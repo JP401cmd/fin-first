@@ -2160,6 +2160,26 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     await refreshEvents()
   }
 
+  /** Drag-and-drop: update event target_age when dragged to a new position on the timeline. */
+  async function handleEventDragEnd(eventId: string, newAge: number) {
+    const ev = events.find(e => e.id === eventId)
+    if (!ev || ev.target_age === newAge) return
+
+    // Optimistic local update for instant feedback
+    setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: newAge } : e))
+
+    const supabase = createClient()
+    const { error } = await supabase.from('life_events').update({ target_age: newAge }).eq('id', eventId)
+    if (error) {
+      console.error('Failed to update life event age:', error)
+      // Revert optimistic update
+      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: ev.target_age } : e))
+      return
+    }
+    // Full reload to recalculate projections with new event position
+    await loadData()
+  }
+
   if (!fire || !range || !healthScore) {
     return (
       <div className="mx-auto max-w-6xl py-5 sm:py-12 px-4 sm:px-6">
@@ -3002,6 +3022,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             setEventPaneMode('edit')
                             setEventPaneOpen(true)
                           }}
+                          onEventDragEnd={handleEventDragEnd}
                         />
                       )}
 

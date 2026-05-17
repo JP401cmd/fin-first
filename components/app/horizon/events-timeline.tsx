@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -10,6 +10,10 @@ import { EVENT_ICONS } from './log-timeline'
 // ── EventsTimeline ──────────────────────────────────────────────────────────
 // Compact timeline below SimChart showing life events on the same linear age axis.
 // Kern = cost/expense events, Wil = income/positive events.
+// Supports drag-and-drop: user can drag a solo event to a new age position.
+
+/** Minimum pointer displacement (px) before we consider it a drag, not a click. */
+const DRAG_THRESHOLD_PX = 5
 
 export function EventsTimeline({
   events,
@@ -22,6 +26,7 @@ export function EventsTimeline({
   onViewEvent,
   onEditEvent,
   onClusterOpen,
+  onEventDragEnd,
 }: {
   events: LifeEvent[]
   currentAge: number
@@ -37,11 +42,31 @@ export function EventsTimeline({
   onEditEvent?: (eventId: string) => void
   /** Klik op een geclusterde +N marker → opent een sheet met de events in dat cluster. */
   onClusterOpen?: (events: LifeEvent[], centerAge: number) => void
+  /** Callback when an event is dragged to a new age. */
+  onEventDragEnd?: (eventId: string, newAge: number) => void
 }) {
   const { masked } = useMaskedAmounts()
   const containerRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
   const [containerW, setContainerW] = useState(600)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+
+  // ── Drag state ──
+  const [dragState, setDragState] = useState<{
+    eventId: string
+    startSvgX: number   // SVG-space X where drag started
+    currentSvgX: number // SVG-space X of current pointer
+    hasMoved: boolean    // true once pointer exceeds DRAG_THRESHOLD_PX
+  } | null>(null)
+
+  /** Convert a client-space pointer coordinate to SVG-space X. */
+  const clientToSvgX = useCallback((clientX: number): number => {
+    const svg = svgRef.current
+    if (!svg) return clientX
+    const rect = svg.getBoundingClientRect()
+    // SVG viewBox maps 0..containerW to rect.width
+    return ((clientX - rect.left) / rect.width) * containerW
+  }, [containerW])
 
   useEffect(() => {
     const el = containerRef.current
@@ -53,6 +78,60 @@ export function EventsTimeline({
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
+
+  // Ref to capture drag end info without calling parent setState during render
+  const pendingDragEndRef = useRef<{ eventId: string; newAge: number } | null>(null)
+
+  // ── Drag handlers (pointer move + up on document level) ──
+  useEffect(() => {
+    if (!dragState) return
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const svgX = clientToSvgX(e.clientX)
+      setDragState(prev => {
+        if (!prev) return prev
+        const moved = prev.hasMoved || Math.abs(svgX - prev.startSvgX) > DRAG_THRESHOLD_PX
+        return { ...prev, currentSvgX: svgX, hasMoved: moved }
+      })
+    }
+
+    const handlePointerUp = () => {
+      // Read current drag state, compute result, and clear state.
+      // We store the pending drag info in a ref and let a separate
+      // effect call the parent callback — avoids "setState during render".
+      setDragState(prev => {
+        if (!prev) return null
+        if (prev.hasMoved && onEventDragEnd) {
+          const PAD = CHART_PAD
+          const innerW = containerW - PAD.left - PAD.right
+          const rangeMinLocal = visibleMinAge ?? currentAge
+          const rangeMaxLocal = visibleMaxAge ?? endAge
+          const fraction = Math.max(0, Math.min(1, (prev.currentSvgX - PAD.left) / innerW))
+          const rawAge = rangeMinLocal + fraction * (rangeMaxLocal - rangeMinLocal)
+          const newAge = Math.round(rawAge * 2) / 2
+          const clampedAge = Math.max(Math.ceil(currentAge), Math.min(endAge, newAge))
+          pendingDragEndRef.current = { eventId: prev.eventId, newAge: clampedAge }
+        }
+        return null
+      })
+    }
+
+    document.addEventListener('pointermove', handlePointerMove)
+    document.addEventListener('pointerup', handlePointerUp)
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove)
+      document.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [dragState, clientToSvgX, containerW, visibleMinAge, visibleMaxAge, currentAge, endAge, onEventDragEnd])
+
+  // Fire the drag-end callback after state has settled (not during render)
+  useEffect(() => {
+    if (dragState === null && pendingDragEndRef.current) {
+      const { eventId, newAge } = pendingDragEndRef.current
+      pendingDragEndRef.current = null
+      onEventDragEnd?.(eventId, newAge)
+    }
+  }, [dragState, onEventDragEnd])
 
   // Use zoomed range if provided, else full range
   const rangeMin = visibleMinAge ?? currentAge
@@ -222,9 +301,10 @@ export function EventsTimeline({
   return (
     <div ref={containerRef} className="relative w-full overflow-x-auto">
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${totalH}`}
         className="w-full"
-        style={{ maxHeight: totalH, minHeight: 40 }}
+        style={{ maxHeight: totalH, minHeight: 40, touchAction: dragState ? 'none' : undefined }}
         aria-label="Levensgebeurtenissen tijdlijn"
         role="img"
       >
@@ -242,64 +322,132 @@ export function EventsTimeline({
           const labelY = Y_LINE + 14
 
           if (!isCluster) {
-            // ── Solo-event rendering (zelfde gedrag als voorheen) ──
+            // ── Solo-event rendering ──
             const ev = slot.events[0]
             const age = ev.target_age!
             const natural = isNaturalEvent(ev)
             const color = natural
               ? naturalColor(ev)
               : (eventDirection(ev) === 'income' ? COLOR_INCOME : COLOR_EXPENSE)
-            const isHovered = hoveredId === ev.id
+            const isDragging = dragState?.eventId === ev.id && dragState.hasMoved
+            const isDragCandidate = dragState?.eventId === ev.id
+            const isHovered = hoveredId === ev.id && !isDragCandidate
+            const canDrag = !natural && !!onEventDragEnd
+
+            // During drag: use current drag position instead of slot position
+            const displayX = isDragging ? dragState!.currentSvgX : cx
+            // Compute drag age for label
+            const dragAge = isDragging
+              ? (() => {
+                  const fraction = Math.max(0, Math.min(1, (displayX - PAD.left) / innerW))
+                  const raw = rangeMin + fraction * (rangeMax - rangeMin)
+                  return Math.max(Math.ceil(currentAge), Math.min(endAge, Math.round(raw * 2) / 2))
+                })()
+              : age
 
             return (
               <g
                 key={ev.id}
-                onMouseEnter={() => setHoveredId(ev.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                onClick={() => onViewEvent?.(ev.id)}
-                style={{ cursor: onViewEvent ? 'pointer' : 'default' }}
+                onMouseEnter={() => { if (!dragState) setHoveredId(ev.id) }}
+                onMouseLeave={() => { if (!dragState) setHoveredId(null) }}
+                onPointerDown={canDrag ? (e) => {
+                  // Only primary button (mouse) or touch
+                  if (e.button !== 0) return
+                  const svgX = clientToSvgX(e.clientX)
+                  setDragState({ eventId: ev.id, startSvgX: svgX, currentSvgX: svgX, hasMoved: false })
+                  setHoveredId(null)
+                  ;(e.target as Element)?.setPointerCapture?.(e.pointerId)
+                  e.preventDefault()
+                } : undefined}
+                onClick={() => {
+                  // Suppress click if we just finished a drag
+                  if (isDragCandidate) return
+                  onViewEvent?.(ev.id)
+                }}
+                style={{ cursor: isDragging ? 'grabbing' : canDrag ? 'grab' : onViewEvent ? 'pointer' : 'default' }}
                 role={onViewEvent ? 'button' : undefined}
                 aria-label={onViewEvent ? `Bekijk ${ev.name}` : undefined}
               >
+                {/* Ghost origin marker when dragging */}
+                {isDragging && (
+                  <>
+                    <line
+                      x1={cx} x2={cx}
+                      y1={Y_LINE - 10} y2={Y_LINE + 2}
+                      stroke={color} strokeWidth={1} opacity={0.2}
+                      strokeDasharray="2 2"
+                    />
+                    <circle
+                      cx={cx} cy={Y_LINE - 14}
+                      r={6}
+                      fill="none"
+                      stroke={color} strokeWidth={1} opacity={0.2}
+                      strokeDasharray="3 2"
+                    />
+                  </>
+                )}
+
+                {/* Main marker (moves during drag) */}
                 <line
-                  x1={cx} x2={cx}
+                  x1={displayX} x2={displayX}
                   y1={Y_LINE - 10} y2={Y_LINE + 2}
-                  stroke={color} strokeWidth={1.5} opacity={natural ? 0.45 : 0.6}
+                  stroke={color} strokeWidth={1.5} opacity={isDragging ? 0.8 : (natural ? 0.45 : 0.6)}
                   strokeDasharray={natural ? '2 2' : undefined}
                 />
                 <circle
-                  cx={cx} cy={Y_LINE - 14}
-                  r={isHovered ? (natural ? 8 : 10) : (natural ? 6 : 8)}
+                  cx={displayX} cy={Y_LINE - 14}
+                  r={isDragging ? 10 : (isHovered ? (natural ? 8 : 10) : (natural ? 6 : 8))}
                   fill={natural ? 'var(--paper)' : color}
-                  opacity={natural ? 1 : (isHovered ? 0.25 : 0.15)}
+                  opacity={isDragging ? 0.35 : (natural ? 1 : (isHovered ? 0.25 : 0.15))}
                   stroke={color}
-                  strokeWidth={natural ? 1.5 : 1}
+                  strokeWidth={isDragging ? 2 : (natural ? 1.5 : 1)}
                   strokeDasharray={natural ? '3 1.5' : undefined}
-                  style={{ transition: 'r 150ms ease, opacity 150ms ease' }}
+                  style={{ transition: isDragging ? 'none' : 'r 150ms ease, opacity 150ms ease' }}
                 />
-                <foreignObject x={cx - 8} y={Y_LINE - 22} width={16} height={16}>
-                  <div className="flex h-4 w-4 items-center justify-center" style={{ color }}>
+                <foreignObject x={displayX - 8} y={Y_LINE - 22} width={16} height={16}>
+                  <div className="flex h-4 w-4 items-center justify-center" style={{ color, pointerEvents: 'none' }}>
                     {EVENT_ICONS[ev.icon] || EVENT_ICONS['Calendar']}
                   </div>
                 </foreignObject>
                 <text
-                  x={cx} y={labelY}
-                  textAnchor="middle" fontSize={8} fontWeight={500}
+                  x={displayX} y={labelY}
+                  textAnchor="middle" fontSize={8} fontWeight={isDragging ? 600 : 500}
                   fill={color}
                   fontFamily="var(--font-inter, sans-serif)"
                 >
                   {ev.name.length > 10 ? ev.name.slice(0, 9) + '…' : ev.name}
                 </text>
                 <text
-                  x={cx} y={labelY + 10}
-                  textAnchor="middle" fontSize={7}
-                  fill="var(--ink-4)"
+                  x={displayX} y={labelY + 10}
+                  textAnchor="middle" fontSize={isDragging ? 8 : 7}
+                  fill={isDragging ? color : 'var(--ink-4)'}
+                  fontWeight={isDragging ? 700 : 400}
                   fontFamily="var(--font-dm-mono, monospace)"
                 >
-                  {age}j
+                  {isDragging ? `${dragAge}j` : `${age}j`}
                 </text>
 
-                {isHovered && (() => {
+                {/* Drag tooltip — show new age prominently */}
+                {isDragging && dragAge !== age && (
+                  <g style={{ pointerEvents: 'none' }}>
+                    <rect
+                      x={displayX - 32} y={0}
+                      width={64} height={16}
+                      rx={4}
+                      fill="var(--ink)" opacity={0.92}
+                    />
+                    <text
+                      x={displayX} y={11}
+                      textAnchor="middle" fontSize={8} fontWeight={600}
+                      fill="var(--paper)"
+                      fontFamily="var(--font-dm-mono, monospace)"
+                    >
+                      {age}j → {dragAge}j
+                    </text>
+                  </g>
+                )}
+
+                {isHovered && !isDragCandidate && (() => {
                   const lines = natural
                     ? [{ label: naturalTooltipLine(ev), color: color }]
                     : eventAmountLines(ev)
