@@ -27,6 +27,7 @@ import {
 } from '@/lib/category-app-nav'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
+import { computeLeverScores } from '@/components/app/shell/lever-scores'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
 import {
@@ -202,6 +203,36 @@ export default async function AppLayout({
     : sidebarCashOnlyAssets
   const sidebarActionCount = actionsCountRes.count ?? 0
 
+  // ── Vier-hefbomen-kompas scores ─────────────────────────
+  // Bereken uit reeds-geladen data — geen extra DB queries.
+  const assetTypeSet = new Set(assetRows.map(a => a.asset_type).filter(Boolean))
+  const txData = txRes.data ?? []
+  const txIncome = txData.filter(t => t.is_income).reduce((s, t) => s + Number(t.amount), 0)
+  const txExpense = txData.filter(t => !t.is_income).reduce((s, t) => s + Number(t.amount), 0)
+  const savingsRate3m = txIncome > 0 ? ((txIncome - txExpense) / txIncome) * 100 : null
+
+  // Box3: ruw totaal van box3-belaste assets (cash, savings, investment, crypto,
+  // real_estate excl. eigen_huis, deelneming, vordering) minus box3-aftrekbare
+  // schulden, minus vrijstelling (€57.684 per persoon, 2025).
+  const BOX3_TYPES = new Set(['cash', 'savings', 'investment', 'crypto', 'real_estate', 'deelneming', 'vordering', 'other'])
+  const box3Assets = assetRows
+    .filter(a => a.asset_type && BOX3_TYPES.has(a.asset_type))
+    .reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+  // Pension, eigen_huis, vehicle, physical, levensverzekering zijn vrijgesteld
+  const box3Debts = debtRows
+    .reduce((s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
+  const box3Net = box3Assets - Math.max(0, box3Debts)
+  const BOX3_VRIJSTELLING = 57_684 // 2025, single
+  const box3TaxableAboveThreshold = Math.max(0, box3Net - BOX3_VRIJSTELLING)
+
+  const sidebarLeverScores = computeLeverScores({
+    totalAssets: sidebarTotalAssetsRaw,
+    totalDebts: sidebarTotalDebtsRaw,
+    assetTypeCount: assetTypeSet.size,
+    savingsRate: savingsRate3m,
+    box3TaxableAboveThreshold,
+  })
+
   // ── Module colors (SSR) ────────────────────────────────
   const mc = profile?.module_colors as Record<string, string> | null
   const moduleColors: ModuleColorConfig = {
@@ -267,6 +298,7 @@ export default async function AppLayout({
                               actionCount: sidebarActionCount,
                               activeAppKeys: sidebarActiveAppKeys,
                               categoryAppLinks: sidebarCategoryAppLinks,
+                              leverScores: sidebarLeverScores,
                             }}
                           >
                             {children}

@@ -20,7 +20,9 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import type { QuickAddIntent } from '@/lib/quick-add/types'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { computeHealthScoreFromInputs, type HealthScore } from '@/lib/financial-health'
 import { CoreHero } from './core-hero'
+import { NetWorthProjectionChart } from './net-worth-projection-chart'
 import { SectionHeader } from './section-header'
 import { CategoryCard, type CategorySegment } from './category-card'
 import { AddCategoryCard } from './add-category-card'
@@ -288,6 +290,64 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
   const [quickAddIntent, setQuickAddIntent] = useState<QuickAddIntent | null>(null)
 
   const fireSnapshot = useMemo(() => computeFireSnapshot(initialData), [initialData])
+
+  // ── Gezondheidsscore: zelfde 6-pilaren berekening als de dashboard-widget ──
+  // Gebruikt `computeHealthScoreFromInputs` (lichtgewicht variant) met inputs
+  // afgeleid uit CorePageData zodat de hero-score overeenkomt met de widget.
+  const healthScore = useMemo((): HealthScore => {
+    const { rawFinancials, fullAssets, savingsRate6m, fireTargetFromHorizon } = initialData
+    const netWorth = rawFinancials.totalAssets - rawFinancials.totalDebts
+
+    // Noodfonds-dekking: liquid assets (cash + savings) / maanduitgaven
+    // Zelfde definitie als dashboard-data-loader: cash- en savings-type assets
+    // plus ontkoppelde bankrekeningen.
+    const liquidAssets = fullAssets
+      .filter(a => a.is_active && (a.asset_type === 'cash' || a.asset_type === 'savings'))
+      .reduce((s, a) => s + Number(a.current_value), 0)
+      + initialData.cashAccounts.filter(c => c.source === 'bank').reduce((s, c) => s + c.balance, 0)
+    const monthlyExp = rawFinancials.monthlyExpenses
+    const emergencyFundMonths = monthlyExp > 0 ? liquidAssets / monthlyExp : 0
+
+    // FIRE-voortgang percentage
+    const fireTarget = fireTargetFromHorizon ?? 0
+    const freedomPct = fireTarget > 0 ? (netWorth / fireTarget) * 100 : 0
+
+    // Unieke asset-types voor diversificatie
+    const assetTypeCount = new Set(
+      fullAssets.filter(a => a.is_active && Number(a.current_value) > 0).map(a => a.asset_type),
+    ).size
+
+    // Budget-categorieën voor discipline
+    // `overviewBudgetGroups` bevat alleen parents (BudgetWithChildren) —
+    // children zitten in `b.children`, niet als losse entries.
+    const budgetCategories = initialData.overviewBudgetGroups
+      .filter(b => b.budget_type === 'expense')
+      .map(b => {
+        const kids = b.children ?? []
+        const limit = kids.length > 0
+          ? kids.reduce((s, c) => s + Number(c.default_limit), 0)
+          : Number(b.default_limit)
+        const spent = kids.length > 0
+          ? kids.reduce((s, c) => s + (initialData.overviewSpending[c.id] ?? 0), 0)
+          : (initialData.overviewSpending[b.id] ?? 0)
+        return { limit, spent }
+      })
+
+    return computeHealthScoreFromInputs(
+      {
+        savingsRate6m,
+        totalAssets: rawFinancials.totalAssets,
+        totalDebts: rawFinancials.totalDebts,
+        emergencyFundMonths: Math.round(emergencyFundMonths * 10) / 10,
+        freedomPct,
+        assetTypeCount,
+        budgetCategories,
+      },
+      initialData.budgetingActive,
+      activeModules,
+    )
+  }, [initialData, activeModules])
+
   const assetGroups = useMemo(() => groupAssetsByType(initialData), [initialData])
   const debtGroups = useMemo(() => groupDebtsByType(initialData), [initialData])
 
@@ -399,7 +459,22 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
         snapshots={initialData.snapshots}
         toekomstActive={toekomstActive}
         fireTarget={fireSnapshot.target}
+        healthScore={healthScore}
         onShowNetWorthReceipt={() => setShowNetWorthReceipt(true)}
+      />
+
+      {/* Netto-vermogen projectiechart — toont vermogenspad tot pensioen */}
+      <NetWorthProjectionChart
+        currentAge={initialData.currentAge}
+        aowAge={initialData.aowAge}
+        netWorth={netWorth}
+        monthlySavings={
+          initialData.rawFinancials.monthlyIncome -
+          initialData.rawFinancials.monthlyExpenses
+        }
+        grossReturn={initialData.fireParams.grossReturn}
+        inflationRate={initialData.fireParams.inflationRate}
+        fireTarget={fireSnapshot.target > 0 ? fireSnapshot.target : undefined}
       />
 
       {/* === Bezittingen — full-bleed sectie, gelijk aan hero ====== */}

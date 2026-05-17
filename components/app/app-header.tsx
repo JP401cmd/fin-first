@@ -10,6 +10,8 @@ import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { PrivacyToggle } from '@/components/app/privacy-toggle'
+import { LeverCompassDots } from '@/components/app/shell/lever-compass'
+import { useLeverScores } from '@/components/app/shell/responsive-shell'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { ShellFlagToggle } from '@/components/app/shell/shell-flag-toggle'
@@ -42,6 +44,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
   const { activeModules } = useModuleAccess()
   const { perspective, isHousehold, partnerName } = usePerspective()
   const { unreadCount, openModal } = useNotifications()
+  const leverScores = useLeverScores()
 
   // Derive which nav tabs to show from active modules. Memoized: getActiveNavModules
   // builds a Set + array each call, and the result only changes when the set of
@@ -109,6 +112,9 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
         </div>
 
         <div className="flex items-center gap-1 md:gap-3">
+          {/* Vier-hefbomen-kompas — compact indicator */}
+          <LeverCompassDots scores={leverScores} />
+
           <PerspectiveSwitcher />
 
           {/* Privacy toggle — mask/unmask monetary amounts across the app */}

@@ -53,7 +53,7 @@
  */
 'use client'
 
-import { Suspense, createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Suspense, createContext, useContext, useEffect, useState, useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AppHeader } from '@/components/app/app-header'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
@@ -67,6 +67,7 @@ import { MobileAppStripProvider } from '@/components/app/shell/mobile-app-strip-
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import type { CategoryAppLink } from '@/lib/category-app-nav'
+import type { LeverScores } from '@/components/app/shell/lever-compass'
 
 export type SidebarMetrics = {
   /** Netto vermogen (assets − debts, gewogen volgens inclusion-pct). */
@@ -86,6 +87,12 @@ export type SidebarMetrics = {
    * Mobile-only consumer: `MobileAppStrip` boven de bottom-nav.
    */
   categoryAppLinks: CategoryAppLink[]
+  /**
+   * Vier-hefbomen-kompas: bezittingen, schulden, cashflow, belasting.
+   * Berekend in layout.tsx uit reeds-geladen data. Optioneel voor
+   * backwards-compatibiliteit.
+   */
+  leverScores?: LeverScores
 }
 
 // ── CategoryAppLinks context ────────────────────────────────────────────────
@@ -99,6 +106,23 @@ const CategoryAppLinksContext = createContext<CategoryAppLink[]>([])
 
 export function useCategoryAppLinks(): CategoryAppLink[] {
   return useContext(CategoryAppLinksContext)
+}
+
+// ── LeverScores context ─────────────────────────────────────────────────────
+//
+// Vier-hefbomen-kompas data, voorberekend in layout.tsx. Via context beschikbaar
+// voor zowel de Sidebar (portal, buiten tree) als AppHeader / TopBar.
+const DEFAULT_LEVER_SCORES: LeverScores = {
+  assets: { score: null, status: 'neutral' },
+  debts: { score: null, status: 'neutral' },
+  cashflow: { score: null, status: 'neutral' },
+  tax: { score: null, status: 'neutral' },
+}
+
+const LeverScoresContext = createContext<LeverScores>(DEFAULT_LEVER_SCORES)
+
+export function useLeverScores(): LeverScores {
+  return useContext(LeverScoresContext)
 }
 
 export type ResponsiveShellProps = {
@@ -249,6 +273,10 @@ function NewShell({
   const actionCount = sidebarMetrics?.actionCount ?? 0
   const activeAppKeys = sidebarMetrics?.activeAppKeys ?? []
   const categoryAppLinks = sidebarMetrics?.categoryAppLinks ?? []
+  const leverScores = useMemo(
+    () => sidebarMetrics?.leverScores ?? DEFAULT_LEVER_SCORES,
+    [sidebarMetrics?.leverScores],
+  )
 
   // Media-query-gated single-mount: pre-hydratie blijven beide shells in de
   // boom (SSR-output matcht, geen flash op eerste paint). Direct na de eerste
@@ -263,6 +291,7 @@ function NewShell({
 
   return (
     <NavStackProvider>
+     <LeverScoresContext.Provider value={leverScores}>
      <CategoryAppLinksContext.Provider value={categoryAppLinks}>
       <MobileAppStripProvider>
       {/* Sidebar via portal naar document.body — omzeilt ChatLayoutWrapper's
@@ -276,6 +305,7 @@ function NewShell({
           userName={userName}
           role={role}
           activeAppKeys={activeAppKeys}
+          leverScores={leverScores}
         />
       </SidebarPortal>
 
@@ -317,6 +347,7 @@ function NewShell({
       </ChatLayoutWrapper>
       </MobileAppStripProvider>
      </CategoryAppLinksContext.Provider>
+     </LeverScoresContext.Provider>
     </NavStackProvider>
   )
 }
@@ -342,6 +373,10 @@ export function ResponsiveShell({
   children,
 }: ResponsiveShellProps) {
   const [enabled] = useFeatureFlag(NEW_NAVIGATION_SHELL_FLAG)
+  const leverScores = useMemo(
+    () => sidebarMetrics?.leverScores ?? DEFAULT_LEVER_SCORES,
+    [sidebarMetrics?.leverScores],
+  )
 
   if (enabled) {
     return (
@@ -351,5 +386,9 @@ export function ResponsiveShell({
     )
   }
 
-  return <LegacyShell email={email} role={role}>{children}</LegacyShell>
+  return (
+    <LeverScoresContext.Provider value={leverScores}>
+      <LegacyShell email={email} role={role}>{children}</LegacyShell>
+    </LeverScoresContext.Provider>
+  )
 }

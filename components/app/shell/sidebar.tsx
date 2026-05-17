@@ -40,6 +40,7 @@ import {
   type NavModule,
 } from '@/lib/module-registry'
 import { useSidebarCollapsed } from '@/lib/hooks/use-sidebar-collapsed'
+import { LeverCompassExpanded, LeverCompassCollapsed, type LeverScores } from '@/components/app/shell/lever-compass'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { ShellFlagToggle } from '@/components/app/shell/shell-flag-toggle'
@@ -70,6 +71,8 @@ export type SidebarProps = {
    * verschijnt alleen wanneer haar `appKey` in deze lijst staat.
    */
   activeAppKeys?: string[]
+  /** Vier-hefbomen-kompas scores. Optioneel; valt terug op neutrale status. */
+  leverScores?: LeverScores
 }
 
 // ── Module-config ────────────────────────────────────────────────────────────
@@ -233,6 +236,13 @@ function detectActiveModule(pathname: string): NavModule | null {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
+const DEFAULT_LEVER_SCORES: LeverScores = {
+  assets: { score: null, status: 'neutral' },
+  debts: { score: null, status: 'neutral' },
+  cashflow: { score: null, status: 'neutral' },
+  tax: { score: null, status: 'neutral' },
+}
+
 export function Sidebar({
   netWorth,
   actionCount,
@@ -241,6 +251,7 @@ export function Sidebar({
   userName,
   role,
   activeAppKeys = [],
+  leverScores = DEFAULT_LEVER_SCORES,
 }: SidebarProps) {
   const pathname = usePathname() ?? '/'
   const [collapsed, setCollapsed] = useSidebarCollapsed()
@@ -287,6 +298,14 @@ export function Sidebar({
         collapsed={collapsed}
         unreadMessageCount={unreadMessageCount}
       />
+
+      <div className="border-t border-[var(--border-ed)]" aria-hidden />
+
+      {/* Vier-hefbomen-kompas — compact overzicht financiële gezondheid */}
+      {collapsed
+        ? <LeverCompassCollapsed scores={leverScores} />
+        : <LeverCompassExpanded scores={leverScores} />
+      }
 
       <div className="flex-1" aria-hidden />
 
