@@ -21,8 +21,10 @@ import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wiza
 import type { QuickAddIntent } from '@/lib/quick-add/types'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthPillar } from '@/lib/financial-health'
-import { GlossaryTerm } from '@/components/editorial'
+import { GlossaryTerm, PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import { CoreHero } from './core-hero'
+import { CashflowHeroTile } from './cashflow-hero-tile'
 import { NetWorthProjectionChart } from './net-worth-projection-chart'
 import { SectionHeader } from './section-header'
 import { CategoryCard, type CategorySegment } from './category-card'
@@ -426,7 +428,11 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
       {/* Editorial opening — blueprint Type 1 (Module-landing) zonder begroeting.
           Welkom-strip leeft op /will (de ingang); /core is een functionele
           registratie-pagina met een neutrale kicker. */}
-      <header className="px-4 pt-5 sm:px-6 sm:pt-8 mb-6 space-y-2">
+      <header className="relative px-4 pt-5 sm:px-6 sm:pt-8 mb-6 space-y-2">
+        <PageInfoButton
+          description={PAGE_INFO['/core']}
+          className="absolute right-4 top-5 sm:right-6 sm:top-8"
+        />
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
           <span
             aria-hidden
@@ -464,6 +470,15 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
         healthScore={healthScore}
         onShowNetWorthReceipt={() => setShowNetWorthReceipt(true)}
         onShowHealthReceipt={() => setShowHealthReceipt(true)}
+      />
+
+      {/* Cashflow hero-tegel — budgetstatus in het status-gebied */}
+      <CashflowHeroTile
+        budgetCount={initialData.budgetCount}
+        overBudgetCount={initialData.overBudgetCount}
+        totalBudgetLimit={initialData.totalBudgetLimit}
+        totalBudgetSpent={initialData.totalBudgetSpent}
+        budgetingActive={initialData.budgetingActive}
       />
 
       {/* Netto-vermogen projectiechart — toont vermogenspad tot pensioen */}
@@ -936,7 +951,7 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
         <GlossaryTerm term="schuldgraad">schuldratio</GlossaryTerm>,{' '}
         noodfonds,{' '}
         <GlossaryTerm term="FIRE">FIRE</GlossaryTerm>-voortgang,{' '}
-        diversificatie{healthScore.budgetingActive ? ' en budgetdiscipline' : ''}.
+        <GlossaryTerm term="diversificatie">diversificatie</GlossaryTerm>{healthScore.budgetingActive ? ' en budgetdiscipline' : ''}.
         Herberekend bij elke paginaweergave.
       </p>
     </div>
