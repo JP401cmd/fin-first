@@ -116,24 +116,42 @@ export function RecommendationList({ initialRecommendations, hideHeader, generat
     return (
       <div className="space-y-4">
         {!hideHeader && header}
-        <div className="flex flex-col items-center py-8 text-center">
-          <div className="mb-3 rounded-2xl bg-[var(--subtle)] p-3">
-            <Sparkles className="h-6 w-6 text-[var(--ink-4)]" />
+        <div className="flex flex-col items-center text-center py-12 px-4 max-w-md mx-auto">
+          <div className="mb-3 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+            <span
+              aria-hidden
+              className="inline-block h-px w-7"
+              style={{ background: 'var(--module-active-500)' }}
+            />
+            Voorstellen
           </div>
-          <h4 className="mb-1 text-sm font-semibold text-[var(--ink-2)]">Nog geen voorstellen</h4>
-          <p className="mb-5 max-w-[240px] text-xs leading-relaxed text-[var(--ink-3)]">
-            Will analyseert je profiel en ontdekt verborgen vrijheidsdagen. Start een analyse om je eerste voorstellen te ontvangen.
+          <h3
+            className="font-bold leading-tight text-[20px] sm:text-[24px]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            Ontdek verborgen{' '}
+            <em
+              className="font-normal italic"
+              style={{ color: 'var(--module-active-700)' }}
+            >
+              vrijheidsdagen
+            </em>
+          </h3>
+          <p
+            className="mt-3 italic text-[14px] text-[var(--ink-2)] max-w-prose"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Will analyseert je financiële profiel en ontdekt kansen om vrijheidsdagen te winnen — slimmere keuzes, besparingen en optimalisaties.
           </p>
           {error && (
-            <p className="mb-3 text-xs text-red-600">{error}</p>
+            <p className="mt-3 text-xs text-red-600">{error}</p>
           )}
           <button
             type="button"
             onClick={openGenerationModal}
-            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)] disabled:opacity-50"
+            className="mt-6 inline-flex items-center gap-1.5 bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-xs font-semibold hover:bg-[var(--ink-2)] min-h-[44px] rounded-[var(--r)]"
           >
-            <Sparkles className="h-3.5 w-3.5" />
-            Analyseren
+            <Sparkles className="h-4 w-4" /> Eerste analyse starten
           </button>
         </div>
 

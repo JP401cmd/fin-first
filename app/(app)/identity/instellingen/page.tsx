@@ -129,7 +129,6 @@ export default function InstellingenPage() {
     transacties: 'totalen',
     inkomen: 'totalen',
   }
-  const [huishoudenOpen, setHuishoudenOpen] = useState(false)
   const [huishoudenPrivacySubOpen, setHuishoudenPrivacySubOpen] = useState(false)
   const [hasHousehold, setHasHousehold] = useState(false)
   const [householdPrivacy, setHouseholdPrivacy] = useState<PrivacySettings>(DEFAULT_HOUSEHOLD_PRIVACY)
@@ -731,6 +730,11 @@ export default function InstellingenPage() {
     await supabase.from('profiles').update({ phase_colors: DEFAULT_PHASE_COLORS }).eq('id', user.id)
   }, [supabase, setPhaseConfig])
 
+  // Conditionally include Huishouden tab when user has a household
+  const visibleTabs = hasHousehold
+    ? [...BASE_TABS, { id: 'huishouden' as SettingsTab, label: 'Huishouden', icon: Users }]
+    : BASE_TABS
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Instellingen" bottomBar={{ kind: 'tabs' }} />
@@ -768,26 +772,32 @@ export default function InstellingenPage() {
         </p>
       </header>
 
-      {/* ── A: Notificaties ─────────────────────────────────────────── */}
-      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setNotifOpen(o => !o)}
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">Notificaties</h2>
-            {!notifOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                {NOTIFICATION_TYPES.filter(n => notifPrefs[n.type] !== false).length} van {NOTIFICATION_TYPES.length} actief
-              </p>
-            )}
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${notifOpen ? 'rotate-180' : ''}`} />
-        </button>
+      {/* ── Tab bar ────────────────────────────────────────────────────────────── */}
+      <nav className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-1">
+        {visibleTabs.map(({ id, label, icon: Icon }) => {
+          const active = activeTab === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                active
+                  ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                  : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          )
+        })}
+      </nav>
 
-        {notifOpen && (
-          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4">
+      {/* ── Tab: Notificaties ──────────────────────────────────────────── */}
+      {activeTab === 'notificaties' && (
+        <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+          <div className="px-4 sm:px-8 py-6">
             {notifLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-zinc-900" />
@@ -991,72 +1001,14 @@ export default function InstellingenPage() {
               </>
             )}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      {/* ── Financiële toelichting ────────────────────────────────────── */}
-      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setToelichtingOpen(o => !o)}
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">Financiële toelichting</h2>
-            {!toelichtingOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                {financialContext ? `${financialContext.length} tekens` : 'Nog niet ingevuld'}
-              </p>
-            )}
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${toelichtingOpen ? 'rotate-180' : ''}`} />
-        </button>
+      {/* ── Tab: Gegevens ──────────────────────────────────────────────── */}
+      {activeTab === 'gegevens' && (
+        <div className="space-y-3">
 
-        {toelichtingOpen && (
-          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-4">
-            <p className="text-xs text-[var(--ink-3)] leading-relaxed">
-              Beschrijf je financiële situatie in eigen woorden. Deze tekst wordt gebruikt als extra context voor het personaliseren van je nieuws.
-            </p>
-
-            <div>
-              <textarea
-                value={financialContext}
-                onChange={e => {
-                  if (e.target.value.length <= 1000) setFinancialContext(e.target.value)
-                }}
-                placeholder="Bijv. ik ben zzp'er in de IT, spaar maandelijks ~€1.500, heb een hypotheek op mijn appartement en beleg via DeGiro..."
-                rows={5}
-                className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:ring-2 focus:ring-zinc-900/10 resize-y"
-              />
-              <div className="mt-1 flex justify-end">
-                <span className={`text-xs tabular-nums ${financialContext.length >= 950 ? 'text-amber-600' : 'text-[var(--ink-4)]'}`}>
-                  {financialContext.length} / 1.000
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={saveFinancialContext}
-                disabled={contextSaving || financialContext === financialContextSaved}
-                className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-              >
-                {contextSaving ? 'Opslaan...' : 'Opslaan'}
-              </button>
-              {contextMessage && (
-                <span className={`text-sm ${contextMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {contextMessage.text}
-                </span>
-              )}
-              {financialContext !== financialContextSaved && !contextMessage && (
-                <span className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</span>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ── C: FIRE Instellingen — verplaatst naar /horizon ────────────── */}
+      {/* ── FIRE Instellingen — verplaatst naar /horizon ────────────── */}
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
         <Link
           href="/horizon"
@@ -1072,421 +1024,16 @@ export default function InstellingenPage() {
         </Link>
       </section>
 
-      {/* Old Section C removed — FIRE settings now on /horizon. See horizon-fire-params-panel.tsx */}
-      {/* @dead-code-start: original accordion with sliders, kassabon, strategy, withdrawal
-          All this functionality moved to HorizonFireParamsPanel on the /horizon page.
-          Variables still declared above (fireOpen, expectedReturn, etc.) kept for TS compat. */}
-      {false && (<button
-          type="button"
-          onClick={() => setFireOpen(o => !o)}
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">FIRE Instellingen</h2>
-            {!fireOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                Rendement {fmt(expectedReturn)} · inflatie {fmt(inflationRate)} · SWR {fmt(Math.max(0.1, expectedReturn - BOX3_DRAG * 100 - inflationRate))} · {STRATEGY_LABELS[fireEndStrategy].name}
-              </p>
-            )}
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${fireOpen ? 'rotate-180' : ''}`} />
-        </button>
+      {/* Old Section C removed — FIRE settings now live inline on /horizon.
+          See components/app/horizon/horizon-fire-params-panel.tsx */}
 
-        {fireOpen && (
-          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 py-6">
-        {/* Marktaannames */}
-        <div className="mb-6">
-          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Marktaannames</p>
-
-          <div className="mb-6">
-            <div className="mb-2 flex items-end justify-between">
-              <label className="text-sm font-semibold text-[var(--ink)]">Verwacht bruto rendement</label>
-              <span className="font-mono text-base font-bold tabular-nums text-horizon-700">{fmt(expectedReturn)}</span>
-            </div>
-            <input
-              type="range" min={1} max={15} step={0.1} value={expectedReturn}
-              onChange={e => setExpectedReturn(Number(e.target.value))}
-              className="w-full cursor-pointer accent-horizon-600"
-            />
-            <div className="mt-1.5 flex justify-between text-[10px] text-[var(--ink-4)]">
-              <span>1% conservatief</span><span>7% historisch gem.</span><span>15% optimistisch</span>
-            </div>
-            <p className="mt-2 font-sans text-[11px] text-[var(--ink-3)]">
-              Verwacht jaarlijks rendement op je beleggingsportefeuille vóór Box 3-heffing en inflatie. Het MSCI World historisch gemiddelde over 30+ jaar is ≈7–9%.
-            </p>
-          </div>
-
-          <div className="mb-4">
-            <div className="mb-2 flex items-end justify-between">
-              <label className="text-sm font-semibold text-[var(--ink)]">Verwachte inflatie</label>
-              <span className="font-mono text-base font-bold tabular-nums text-horizon-700">{fmt(inflationRate)}</span>
-            </div>
-            <input
-              type="range" min={0} max={8} step={0.1} value={inflationRate}
-              onChange={e => setInflationRate(Number(e.target.value))}
-              className="w-full cursor-pointer accent-horizon-600"
-            />
-            <div className="mt-1.5 flex justify-between text-[10px] text-[var(--ink-4)]">
-              <span>0% deflatie</span><span>2% NL-gemiddelde</span><span>8% hoog</span>
-            </div>
-          </div>
-
-          {/* Live kassabon */}
-          <div className="mb-4">
-            <KassabonShell>
-              <div className="mb-3 text-center">
-                <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">NETTO REËEL RENDEMENT</p>
-                <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">Live berekening op basis van jouw aannames</p>
-              </div>
-              <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-                <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">Bruto rendement</span>
-                  <span className="tabular-nums text-[var(--ink)]">+ {fmt(expectedReturn)}</span>
-                </div>
-                <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">Box 3-heffing (wettelijk, vast)</span>
-                  <span className="tabular-nums text-[var(--ink-3)]">− {fmt(box3Pct, 3)}</span>
-                </div>
-                <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">Inflatie</span>
-                  <span className="tabular-nums text-[var(--ink-3)]">− {fmt(inflationRate)}</span>
-                </div>
-              </div>
-              <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-                <span className="text-[var(--ink)]">Netto reëel rendement (SWR)</span>
-                <span className="tabular-nums text-[var(--ink)]">{fmt(effectiveSwrPct, 2)}</span>
-              </div>
-              <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2">
-                <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">FIRE Multiplier (1 ÷ SWR)</span>
-                  <span className="tabular-nums font-bold text-[var(--ink)]">{fireMultiplier.toFixed(1)}×</span>
-                </div>
-                <p className="mt-1.5 font-sans text-[11px] text-[var(--ink-3)]">
-                  Je hebt <strong>{fireMultiplier.toFixed(1)}×</strong> je jaarlijkse must-uitgaven nodig voor volledige vrijheid. Klassiek 4%-regel = 25×.
-                </p>
-              </div>
-              <div className="mt-3 rounded-[var(--r-sm)] border border-dashed border-horizon-300 bg-horizon-50/50 px-3 py-2 font-sans text-[11px] text-horizon-700">
-                De Box 3-heffing ({fmt(box3Pct, 3)}) is wettelijk vastgesteld voor 2025: 5,88% forfaitair rendement × 36% belastingtarief.
-              </div>
-            </KassabonShell>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button" onClick={saveParams} disabled={paramSaving}
-              className="rounded-[var(--r)] bg-horizon-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-horizon-700 disabled:opacity-50"
-            >
-              {paramSaving ? 'Opslaan...' : 'Aannames opslaan'}
-            </button>
-            {paramMessage && (
-              <span className={`text-sm font-medium ${paramMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                {paramMessage.text}
-              </span>
-            )}
-          </div>
         </div>
+      )}
 
-        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
-
-        {/* Box 3 berekeningsmethode */}
-        <div className="mb-6">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Box 3 berekeningsmethode</p>
-          <p className="mb-4 font-sans text-sm text-[var(--ink-3)]">
-            Hoe wordt Box 3 belasting berekend in je vermogensprognose?
-          </p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {([
-              {
-                value: 'forfaitair' as const,
-                label: 'Forfaitair rendement',
-                subtitle: 'Wettelijk fictief rendement per vermogenscategorie (standaard)',
-              },
-              {
-                value: 'werkelijk' as const,
-                label: 'Werkelijk rendement',
-                subtitle: 'Belasting op je daadwerkelijke verwacht rendement per asset',
-              },
-            ]).map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setBox3Method(opt.value)}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors text-left ${
-                  box3Method === opt.value
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-[var(--border-md)] text-[var(--ink-2)] hover:border-zinc-400'
-                }`}
-              >
-                <div className="font-semibold">{opt.label}</div>
-                <div className={`text-xs mt-0.5 ${box3Method === opt.value ? 'text-zinc-300' : 'text-[var(--ink-3)]'}`}>
-                  {opt.subtitle}
-                </div>
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 font-sans text-[11px] text-[var(--ink-3)]">
-            {box3Method === 'forfaitair'
-              ? 'Bij forfaitair rendement gebruikt de Belastingdienst een vast percentage (1,28% spaargeld, 6,00% beleggingen in 2026). Dit kan hoger of lager zijn dan je werkelijke rendement.'
-              : 'Bij werkelijk rendement wordt je daadwerkelijke rendement per asset gebruikt. Dit is nauwkeuriger maar nog niet wettelijk ingevoerd — gebruik dit voor vergelijking.'
-            }
-          </p>
-        </div>
-
-        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
-
-        {/* Marginaal IB-tarief */}
-        <div className="mb-6">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Marginaal belastingtarief</p>
-          <p className="mb-4 font-sans text-sm text-[var(--ink-3)]">
-            Je marginale IB-tarief bepaalt het voordeel van hypotheekrenteaftrek en andere Box 1-aftrekposten.
-          </p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {([
-              {
-                value: 'auto' as const,
-                label: 'Automatisch',
-                subtitle: 'Afgeleid uit je netto maandinkomen',
-              },
-              {
-                value: '0.3697' as const,
-                label: '36,97%',
-                subtitle: 'Schijf 1 — t/m €75.518 bruto',
-              },
-              {
-                value: '0.4950' as const,
-                label: '49,50%',
-                subtitle: 'Schijf 2 — boven €75.518 bruto',
-              },
-            ]).map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setMarginaalTarief(opt.value)}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors text-left ${
-                  marginaalTarief === opt.value
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-[var(--border-md)] text-[var(--ink-2)] hover:border-zinc-400'
-                }`}
-              >
-                <div className="font-semibold">{opt.label}</div>
-                <div className={`text-xs mt-0.5 ${marginaalTarief === opt.value ? 'text-zinc-300' : 'text-[var(--ink-3)]'}`}>
-                  {opt.subtitle}
-                </div>
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 font-sans text-[11px] text-[var(--ink-3)]">
-            {marginaalTarief === 'auto'
-              ? 'Het tarief wordt automatisch bepaald op basis van je netto maandinkomen. Netto > €4.200/mnd = 49,50%, anders 36,97%.'
-              : marginaalTarief === '0.3697'
-                ? 'Schijf 1-tarief (36,97%) geldt voor belastbaar inkomen tot €75.518 per jaar (2025).'
-                : 'Schijf 2-tarief (49,50%) geldt voor belastbaar inkomen boven €75.518 per jaar (2025).'
-            }
-          </p>
-        </div>
-
-        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
-
-        {/* Retirement expense method — herbruikt als FireRetirementExpensePanel
-            in components/horizon/. Synchroniseert lokale state via adapter. */}
-        <FireRetirementExpensePanel
-          value={{ method: retirementMethod, customAmount: retirementCustomAmount }}
-          onChange={next => {
-            setRetirementMethod(next.method)
-            setRetirementCustomAmount(next.customAmount)
-          }}
-        />
-
-        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
-
-        {/* FIRE Eindstrategie — herbruikt als FireEndStrategyPanel in
-            components/horizon/. Synchroniseert lokale state via adapter. */}
-        <FireEndStrategyPanel
-          value={{ strategy: fireEndStrategy, endAge: fireEndAge, legacyAmount: fireLegacyAmount }}
-          onChange={next => {
-            setFireEndStrategy(next.strategy)
-            setFireEndAge(next.endAge)
-            setFireLegacyAmount(next.legacyAmount)
-          }}
-        />
-
-        {/* Save FIRE settings */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button" onClick={saveFireSettings} disabled={fireSaving}
-            className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-          >
-            {fireSaving ? 'Opslaan...' : 'FIRE instellingen opslaan'}
-          </button>
-          {fireMessage && (
-            <span className={`text-sm ${fireMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-              {fireMessage.text}
-            </span>
-          )}
-        </div>
-
-        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
-
-        {/* Eigen woning in FIRE-pot — strategie + parameters */}
-        <HousingStrategySection />
-
-        <div className="my-6 border-t border-dashed border-[var(--border-ed)]" />
-
-        {/* Onttrekkingsstrategie */}
-        <div id="onttrekking" className="mb-6">
-          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Onttrekkingsstrategie</p>
-          <p className="mb-4 font-sans text-sm text-[var(--ink-3)]">
-            Hoe neem je vermogen op na FIRE? Dit bepaalt hoe je jaarlijkse opname reageert op marktschommelingen.
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {([
-              {
-                value: 'static' as WithdrawalStrategyType,
-                label: 'Vast (SWR)',
-                subtitle: 'Vaste jaarlijkse opname op basis van je SWR — de klassieke 4%-regel.',
-              },
-              {
-                value: 'guardrails' as WithdrawalStrategyType,
-                label: 'Guardrails',
-                subtitle: 'Guyton-Klinger: verlaag of verhoog je opname binnen grenzen, afhankelijk van portfolioprestatie.',
-              },
-              {
-                value: 'vpw' as WithdrawalStrategyType,
-                label: 'VPW',
-                subtitle: 'Variable Percentage Withdrawal: elk jaar herberekend op basis van levensverwachting en vermogen.',
-              },
-              {
-                value: 'bucket' as WithdrawalStrategyType,
-                label: 'Bucket',
-                subtitle: 'Drie-emmer strategie: cash (1-2 jaar), obligaties (3-5 jaar), groei (6+ jaar). Hervulling vanuit groei-emmer.',
-              },
-            ]).map(opt => {
-              const isSelected = withdrawalStrategy === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setWithdrawalStrategy(opt.value)}
-                  className={`rounded-xl border-2 p-4 text-left transition-all ${
-                    isSelected ? 'border-zinc-900 bg-zinc-50' : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
-                  }`}
-                >
-                  <span className={`text-sm font-semibold ${isSelected ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
-                    {opt.label}
-                  </span>
-                  <p className="mt-1 text-xs text-[var(--ink-3)]">{opt.subtitle}</p>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Guardrails extra velden */}
-          {withdrawalStrategy === 'guardrails' && (
-            <div className="mt-4 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/50 p-4 space-y-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Guardrail parameters</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Floor (%)</label>
-                  <input
-                    type="number" min={50} max={200} step={1} value={guardrailFloor}
-                    onChange={e => setGuardrailFloor(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[var(--border-md)] bg-white px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-zinc-500"
-                  />
-                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">Minimale opname als % van basis</p>
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Ceiling (%)</label>
-                  <input
-                    type="number" min={50} max={200} step={1} value={guardrailCeiling}
-                    onChange={e => setGuardrailCeiling(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[var(--border-md)] bg-white px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-zinc-500"
-                  />
-                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">Maximale opname als % van basis</p>
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Verlagingsstap (%)</label>
-                  <input
-                    type="number" min={1} max={50} step={1} value={guardrailCutStep}
-                    onChange={e => setGuardrailCutStep(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[var(--border-md)] bg-white px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-zinc-500"
-                  />
-                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">Stap omlaag bij slechte returns</p>
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Verhogingsstap (%)</label>
-                  <input
-                    type="number" min={1} max={50} step={1} value={guardrailRaiseStep}
-                    onChange={e => setGuardrailRaiseStep(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[var(--border-md)] bg-white px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-zinc-500"
-                  />
-                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">Stap omhoog bij goede returns</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* VPW info */}
-          {withdrawalStrategy === 'vpw' && (
-            <div className="mt-4 rounded-xl border border-dashed border-horizon-300 bg-horizon-50/50 p-4">
-              <p className="font-sans text-sm text-horizon-700">
-                <strong>Variable Percentage Withdrawal</strong> herberekent elk jaar je opnamepercentage op basis van je resterende levensverwachting en actuele portfoliowaarde. Je neemt relatief meer op naarmate je ouder wordt, waardoor je vermogen efficiënter wordt benut.
-              </p>
-            </div>
-          )}
-
-          {/* Bucket info */}
-          {withdrawalStrategy === 'bucket' && (
-            <div className="mt-4 rounded-xl border border-dashed border-horizon-300 bg-horizon-50/50 p-4">
-              <p className="font-sans text-sm text-horizon-700">
-                <strong>Bucket-strategie</strong> verdeelt je vermogen over drie emmers: <strong>cash</strong> (1-2 jaar levenskosten), <strong>obligaties</strong> (3-5 jaar), en <strong>groei</strong> (aandelen, 6+ jaar). Je leeft van de cash-emmer en vult die periodiek aan vanuit de groei-emmer bij gunstige markten.
-              </p>
-            </div>
-          )}
-
-          <div className="mt-4 flex items-center gap-3">
-            <button
-              type="button" onClick={saveWithdrawalStrategy} disabled={wsSaving}
-              className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-            >
-              {wsSaving ? 'Opslaan...' : 'Strategie opslaan'}
-            </button>
-            {wsMessage && (
-              <span className={`text-sm ${wsMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                {wsMessage.text}
-              </span>
-            )}
-          </div>
-        </div>
-          </div>
-        )}
-      </section>)}
-
-      {/* ── D: Weergave ─────────────────────────────────────────────── */}
-      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setWeergaveOpen(o => !o)}
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">Weergave</h2>
-            {!weergaveOpen && (
-              <div className="mt-1 flex items-center gap-2">
-                <span className="text-xs text-[var(--ink-3)]">
-                  {FONT_THEMES.find(t => t.id === fontTheme)?.label ?? 'Redactioneel'}
-                </span>
-                <span className="text-[var(--ink-4)]">·</span>
-                {(Object.entries(moduleColors) as [ModuleName, string][]).map(([m, c]) => (
-                  <span key={m} className="inline-block h-3 w-3 rounded-full border border-[var(--border-ed)]" style={{ backgroundColor: c }} title={m} />
-                ))}
-              </div>
-            )}
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${weergaveOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {weergaveOpen && (
-          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 py-6">
+      {/* ── Tab: Weergave ──────────────────────────────────────────────── */}
+      {activeTab === 'weergave' && (
+        <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+          <div className="px-4 sm:px-8 py-6">
 
         {/* Achtergrondkleur — palet-thema */}
         <div className="mb-6">
@@ -1809,43 +1356,58 @@ export default function InstellingenPage() {
           </div>
         </div>
           </div>
-        )}
-      </section>
-
-      {/* ── Rebalancing (verplaatst naar /core/assets) ────────────────── */}
-      {hasTargetAllocations && (
-      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <Link
-          href="/core/assets"
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">Rebalancing</h2>
-            <p className="mt-0.5 text-xs text-[var(--ink-3)]">Verplaatst naar Bezittingen — open de rebalancing-sectie daar</p>
-          </div>
-          <ArrowLeftRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-        </Link>
-      </section>
+        </section>
       )}
 
-      {/* ── F: Privacy & AI ──────────────────────────────────────────── */}
-      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setPrivacyOpen(o => !o)}
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">Privacy & AI</h2>
-            {!privacyOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Transparantie over hoe je gegevens worden gebruikt</p>
-            )}
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${privacyOpen ? 'rotate-180' : ''}`} />
-        </button>
+      {/* ── Tab: Privacy ──────────────────────────────────────────────── */}
+      {activeTab === 'privacy' && (
+        <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+          <div className="px-4 sm:px-8 py-6 space-y-6">
 
-        {privacyOpen && (
-          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-6">
+            {/* ── Financiële toelichting (moved from standalone accordion) ── */}
+            <div className="space-y-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Financiële toelichting</p>
+              <p className="text-xs text-[var(--ink-3)] leading-relaxed">
+                Beschrijf je financiële situatie in eigen woorden. Deze tekst wordt gebruikt als extra context voor het personaliseren van je nieuws.
+              </p>
+
+              <div>
+                <textarea
+                  value={financialContext}
+                  onChange={e => {
+                    if (e.target.value.length <= 1000) setFinancialContext(e.target.value)
+                  }}
+                  placeholder="Bijv. ik ben zzp'er in de IT, spaar maandelijks ~€1.500, heb een hypotheek op mijn appartement en beleg via DeGiro..."
+                  rows={5}
+                  className="w-full rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm text-[var(--ink)] placeholder:text-[var(--ink-4)] focus:outline-none focus:ring-2 focus:ring-zinc-900/10 resize-y"
+                />
+                <div className="mt-1 flex justify-end">
+                  <span className={`text-xs tabular-nums ${financialContext.length >= 950 ? 'text-amber-600' : 'text-[var(--ink-4)]'}`}>
+                    {financialContext.length} / 1.000
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={saveFinancialContext}
+                  disabled={contextSaving || financialContext === financialContextSaved}
+                  className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
+                >
+                  {contextSaving ? 'Opslaan...' : 'Opslaan'}
+                </button>
+                {contextMessage && (
+                  <span className={`text-sm ${contextMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {contextMessage.text}
+                  </span>
+                )}
+                {financialContext !== financialContextSaved && !contextMessage && (
+                  <span className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</span>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-dashed border-[var(--border-ed)]" />
             {/* AI Toggle */}
             <div className="flex items-center justify-between rounded-xl border border-[var(--border-ed)] p-4">
               <div className="flex-1 pr-4">
@@ -1995,8 +1557,8 @@ export default function InstellingenPage() {
               Volledige privacyverklaring
             </button>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ── F: Externe koppelingen ─────────────────────────────────── */}
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">

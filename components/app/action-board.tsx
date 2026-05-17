@@ -187,21 +187,39 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   if (!hasAnyActions && !showForm) {
     return (
       <div className="space-y-4">
-        <div className="flex flex-col items-center py-8 text-center">
-          <div className="mb-3 rounded-2xl bg-[var(--subtle)] p-3">
-            <CheckCircle className="h-6 w-6 text-[var(--ink-4)]" />
+        <div className="flex flex-col items-center text-center py-12 px-4 max-w-md mx-auto">
+          <div className="mb-3 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+            <span
+              aria-hidden
+              className="inline-block h-px w-7"
+              style={{ background: 'var(--module-active-500)' }}
+            />
+            Acties
           </div>
-          <h4 className="mb-1 text-sm font-semibold text-[var(--ink-2)]">Nog geen acties</h4>
-          <p className="mb-5 max-w-[240px] text-xs leading-relaxed text-[var(--ink-3)]">
-            Maak zelf een actie aan, accepteer een voorstel of bespreek je wensen met Will.
+          <h3
+            className="font-bold leading-tight text-[20px] sm:text-[24px]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            Zet je eerste{' '}
+            <em
+              className="font-normal italic"
+              style={{ color: 'var(--module-active-700)' }}
+            >
+              stap
+            </em>
+          </h3>
+          <p
+            className="mt-3 italic text-[14px] text-[var(--ink-2)] max-w-prose"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Acties zijn concrete stappen richting financiële vrijheid — maak er zelf een aan, of accepteer een voorstel van Will.
           </p>
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+            className="mt-6 inline-flex items-center gap-1.5 bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-xs font-semibold hover:bg-[var(--ink-2)] min-h-[44px] rounded-[var(--r)]"
           >
-            <Plus className="h-3.5 w-3.5" />
-            Nieuwe actie
+            <Plus className="h-4 w-4" /> Eerste actie toevoegen
           </button>
         </div>
       </div>
@@ -224,23 +242,41 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center py-8 text-center">
-          <div className="mb-3 rounded-2xl bg-[var(--subtle)] p-3">
-            <CheckCircle className="h-6 w-6 text-[var(--ink-4)]" />
+        <div className="flex flex-col items-center text-center py-12 px-4 max-w-md mx-auto">
+          <div className="mb-3 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+            <span
+              aria-hidden
+              className="inline-block h-px w-7"
+              style={{ background: 'var(--module-active-500)' }}
+            />
+            Acties
           </div>
-          <h4 className="mb-1 text-sm font-semibold text-[var(--ink-2)]">Geen openstaande acties</h4>
-          <p className="mb-5 max-w-[240px] text-xs leading-relaxed text-[var(--ink-3)]">
+          <h3
+            className="font-bold leading-tight text-[20px] sm:text-[24px]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            Alles{' '}
+            <em
+              className="font-normal italic"
+              style={{ color: 'var(--module-active-700)' }}
+            >
+              afgerond
+            </em>
+          </h3>
+          <p
+            className="mt-3 italic text-[14px] text-[var(--ink-2)] max-w-prose"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
             {completedActions.length > 0
-              ? `${completedActions.length} actie${completedActions.length !== 1 ? 's' : ''} afgerond. Maak een nieuwe actie aan, accepteer een voorstel of bespreek je wensen met Will.`
-              : 'Maak zelf een actie aan, accepteer een voorstel of bespreek je wensen met Will.'}
+              ? `${completedActions.length} actie${completedActions.length !== 1 ? 's' : ''} afgerond — goed bezig. Voeg een nieuwe actie toe of accepteer een voorstel van Will.`
+              : 'Geen openstaande acties. Voeg een nieuwe actie toe of accepteer een voorstel van Will.'}
           </p>
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] hover:bg-[var(--subtle)]"
+            className="mt-6 inline-flex items-center gap-1.5 bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-xs font-semibold hover:bg-[var(--ink-2)] min-h-[44px] rounded-[var(--r)]"
           >
-            <Plus className="h-3.5 w-3.5" />
-            Nieuwe actie
+            <Plus className="h-4 w-4" /> Nieuwe actie toevoegen
           </button>
         </div>
       )}
