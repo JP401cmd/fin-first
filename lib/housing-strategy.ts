@@ -214,6 +214,15 @@ export interface HousingContext {
   hasEigenHuis: boolean
   /** Onderliggende hypotheek-schulden gekoppeld aan eigen_huis — voor amortisatie-projectie naar trigger-moment. */
   eigenHuisMortgages: Debt[]
+  /**
+   * Eigen-huis-assets zelf (alleen actieve `eigen_huis`-rijen) — bewaard zodat
+   * downstream-helpers WOZ- en marktwaarde over tijd kunnen projecteren via
+   * het asset-specifieke `expected_return`. Zonder deze referentie zou de
+   * trigger-leeftijd over 10-20 jaar nog steeds de huidige WOZ als
+   * verkoopopbrengst gebruiken (onrealistisch). Niet gefilterd op
+   * `net_worth_inclusion_pct` — projectie-helpers passen dat zelf toe.
+   */
+  eigenHuisAssets: Asset[]
 }
 
 export function deriveHousingContext(assets: Asset[], debts: Debt[]): HousingContext {
@@ -226,6 +235,7 @@ export function deriveHousingContext(assets: Asset[], debts: Debt[]): HousingCon
       mortgageMonthlyPayment: 0,
       hasEigenHuis: false,
       eigenHuisMortgages: [],
+      eigenHuisAssets: [],
     }
   }
 
@@ -264,7 +274,47 @@ export function deriveHousingContext(assets: Asset[], debts: Debt[]): HousingCon
     mortgageMonthlyPayment,
     hasEigenHuis: true,
     eigenHuisMortgages,
+    eigenHuisAssets,
   }
+}
+
+/**
+ * Projecteer de waarde van eigen-huis-assets `monthsForward` maanden vooruit
+ * via compound growth op het asset-specifieke `expected_return`. Wordt
+ * gebruikt door:
+ *   - de downsize-cashflow (verkoopopbrengst is WOZ-bij-trigger × prijsfactor),
+ *   - de reverse_mortgage-equity-projectie,
+ *   - de chart-injectie in vermogensopbouw (vastgoed-bar over tijd).
+ *
+ * Conventies:
+ *   - `wozValue` wordt opgebouwd uit `woz_value` (fallback `current_value`).
+ *   - `currentValue` wordt opgebouwd uit `current_value` (fallback `woz_value`).
+ *   - `net_worth_inclusion_pct` wordt per asset toegepast — consistent met
+ *     `deriveHousingContext`.
+ *   - Negatieve of NaN `expected_return` valt terug op 0 (geen groei).
+ *   - Bij `monthsForward <= 0` retourneert dezelfde basiswaarden zonder
+ *     compounding.
+ *
+ * Retourneert het AGGREGAAT over alle eigen-huis-assets.
+ */
+export function projectEigenHuisValuesAt(
+  eigenHuisAssets: Asset[],
+  monthsForward: number,
+): { wozValue: number; currentValue: number } {
+  const years = Math.max(0, monthsForward) / 12
+  let wozValue = 0
+  let currentValue = 0
+  for (const a of eigenHuisAssets) {
+    if (!a.is_active || a.asset_type !== 'eigen_huis') continue
+    const inclusion = Number(a.net_worth_inclusion_pct ?? 100) / 100
+    const ret = Number.isFinite(Number(a.expected_return)) ? Number(a.expected_return) / 100 : 0
+    const factor = Math.pow(1 + ret, years)
+    const baseWoz = Number(a.woz_value) || Number(a.current_value) || 0
+    const baseCurrent = Number(a.current_value) || baseWoz
+    wozValue += baseWoz * factor * inclusion
+    currentValue += baseCurrent * factor * inclusion
+  }
+  return { wozValue, currentValue }
 }
 
 // ── Mortgage-projectie naar trigger-moment ───────────────────
@@ -493,13 +543,17 @@ export interface OnDepletionTriggerResult {
  *     met `netDecline = expenses − savings` per jaar. Trigger op de
  *     leeftijd waarop het liquide saldo nul bereikt.
  *
- * Naïef projectie-model (MVP):
- *   - `yearsToZero = ceil(currentLiquid / netDecline)`
- *   - `triggerAge = currentAge + yearsToZero`, geclamped op fallback.
- *   - Negeert rendement op liquide vermogen én groei van WOZ
- *     (conservatief; trigger valt iets eerder dan met rendement).
+ * Projectiemodel (yearly compounding):
+ *   - Wanneer `grossReturn` én `inflationRate` zijn gegeven, gebruikt de
+ *     loop het **reële rendement** = `(1+gross) / (1+infl) − 1` per jaar:
+ *     `liquid[t+1] = liquid[t] × (1+realReturn) − declineUsed`.
+ *     Hierdoor valt de trigger ECHT later wanneer het rendement de
+ *     drawdown gedeeltelijk compenseert (realistischer dan lineair).
+ *   - Wanneer beide ontbreken (legacy callers): `realReturn = 0` →
+ *     gedrag identiek aan de oude lineaire `yearsToZero = ceil(...)`.
  *   - Overwaarde wordt op trigger-moment apart geprojecteerd via
- *     `projectMortgageStateAt` (amortisatie van hypotheek).
+ *     `projectMortgageStateAt` (amortisatie van hypotheek). De WOZ-groei
+ *     loopt apart via `projectEigenHuisValuesAt` op de callsite.
  *
  * Returns:
  *   - `immediate`: in afbouw én liquide nu reeds ≤ 0.
@@ -515,6 +569,8 @@ export function resolveDownsizeTriggerOnDepletion(
   context: HousingContext,
   annualSavings: number = 0,
   currentNetCashflowYearly?: number,
+  grossReturn?: number,
+  inflationRate?: number,
 ): OnDepletionTriggerResult {
   const safeFallback = Math.max(currentAge, fallbackAge)
   // Phase-gate. Voorkeur: directe cashflow-meting (`currentNetCashflowYearly`).
@@ -531,10 +587,24 @@ export function resolveDownsizeTriggerOnDepletion(
     ? Math.max(0, -cashflowYearly)
     : Math.max(0, yearlyExpenses - annualSavings)
 
-  // Helper: liquide + equity op gegeven leeftijd onder lineair model.
+  // Reëel rendement (na inflatie) op liquide vermogen. Default 0 wanneer
+  // de caller geen rendement-parameters meegeeft — dan gedraagt deze
+  // functie zich identiek aan de oude lineaire MVP.
+  const realReturn =
+    grossReturn !== undefined && Number.isFinite(grossReturn)
+      ? (1 + grossReturn) / (1 + (inflationRate ?? 0)) - 1
+      : 0
+
+  // Helper: liquide + equity op gegeven leeftijd onder zelfde compounding-model.
   const projectAt = (age: number) => {
     const yearsElapsed = Math.max(0, age - currentAge)
-    const liquid = Math.max(0, currentLiquidPortfolio - yearsElapsed * declineUsed)
+    // Itereer per jaar: rendement bovenop, drawdown eraf. Identiek aan de
+    // hoofd-loop hieronder zodat reason='fallback' consistent is.
+    let liquid = currentLiquidPortfolio
+    for (let y = 1; y <= yearsElapsed; y++) {
+      liquid = liquid * (1 + realReturn) - declineUsed
+      if (liquid < 0) liquid = 0
+    }
     const projection = projectMortgageStateAt(context.eigenHuisMortgages, yearsElapsed * 12)
     const equity = Math.max(0, context.wozValue - projection.balance)
     return { liquid, equity }
@@ -578,12 +648,26 @@ export function resolveDownsizeTriggerOnDepletion(
     }
   }
 
-  // Bereken het jaar waarop liquide naar 0 zakt. `declineUsed > 0` hier
-  // door `!isAccumulating`, dus deling is veilig.
-  const yearsToZero = Math.ceil(currentLiquidPortfolio / declineUsed)
-  const projectedTriggerAge = currentAge + yearsToZero
+  // Yearly compounding loop. Met realReturn=0 vervalt dit naar het oude
+  // lineaire model. Met positief realReturn (bv. 5% gross / 2% infl ≈ 3%
+  // reëel) wordt de drawdown deels gecompenseerd → trigger later.
+  // `declineUsed > 0` hier door `!isAccumulating`, dus de loop termineert
+  // sowieso binnen het fallback-window of valt door naar 'fallback'.
+  let liquid = currentLiquidPortfolio
+  let yearsElapsed = 0
+  let triggered = false
+  const maxYears = Math.max(0, safeFallback - currentAge)
+  for (let y = 1; y <= maxYears; y++) {
+    liquid = liquid * (1 + realReturn) - declineUsed
+    yearsElapsed = y
+    if (liquid <= 0) {
+      triggered = true
+      break
+    }
+  }
 
-  if (projectedTriggerAge <= safeFallback) {
+  if (triggered) {
+    const projectedTriggerAge = currentAge + yearsElapsed
     const { equity } = projectAt(projectedTriggerAge)
     return {
       triggerAge: projectedTriggerAge,
@@ -683,6 +767,21 @@ export interface ApplyHousingStrategyInput {
    * `annualSavings`.
    */
   currentNetCashflowYearly?: number
+  /**
+   * Bruto rendement op het liquide vermogen (decimaal, bv. 0.07). Gebruikt
+   * voor portfolio-groei bij de `on_depletion`-trigger-projectie: zonder
+   * rendement valt de trigger vroeger dan in werkelijkheid. Default
+   * undefined → lineair model (legacy gedrag).
+   */
+  grossReturn?: number
+  /**
+   * Inflatiepercentage (decimaal, bv. 0.02). Gebruikt om reëel rendement
+   * af te leiden bij de `on_depletion`-trigger-projectie. Wanneer
+   * `grossReturn` is gegeven maar `inflationRate` niet, wordt 0 inflatie
+   * aangenomen. Default undefined → samen met `grossReturn` zelf
+   * undefined → lineair model.
+   */
+  inflationRate?: number
 }
 
 /**
@@ -805,6 +904,8 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
     currentLiquidPortfolio,
     annualSavings = 0,
     currentNetCashflowYearly,
+    grossReturn,
+    inflationRate,
   } = input
   if (!context.hasEigenHuis) return []
 
@@ -830,6 +931,8 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
           context,
           annualSavings,
           currentNetCashflowYearly,
+          grossReturn,
+          inflationRate,
         )
         triggerAge = depletion.triggerAge
       } else {
@@ -855,11 +958,23 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
         0,
       )
 
+      // Projecteer woning-waarde naar trigger-moment via asset-specifiek
+      // `expected_return`. Zonder deze stap zou een trigger over 20 jaar nog
+      // steeds met de huidige WOZ rekenen — onrealistisch laag voor
+      // verkoopopbrengsten. Fallback op huidige `wozValue` wanneer er
+      // (theoretisch onmogelijk gegeven `hasEigenHuis`-guard) geen assets in
+      // de context zitten.
+      const projectedHouse =
+        context.eigenHuisAssets.length > 0
+          ? projectEigenHuisValuesAt(context.eigenHuisAssets, monthsToTrigger)
+          : { wozValue: context.wozValue, currentValue: context.eigenHuisValue }
+      const wozValueAtTrigger = projectedHouse.wozValue
+
       const saleProceeds =
-        context.wozValue * config.salePricePct * (1 - config.salesCostsPct) -
+        wozValueAtTrigger * config.salePricePct * (1 - config.salesCostsPct) -
         mortgageBalanceAtTrigger
       const newMonthly =
-        config.newMonthlyHousingCost ?? estimateMonthlyHousingCostAfterSale(context.wozValue)
+        config.newMonthlyHousingCost ?? estimateMonthlyHousingCostAfterSale(wozValueAtTrigger)
 
       // Eén LifeEvent met meerdere sub-cashflows in metadata.cashflows.
       // lifeEventsToCashflows pikt deze array op (zie fire-simulation.ts:817)
@@ -934,6 +1049,10 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
             cashflows,
             saleProceeds,
             wozValue: context.wozValue,
+            // Geprojecteerde WOZ-waarde bij trigger (= huidig × (1+ret)^jaren).
+            // Verschilt van `wozValue` zodra er jaren tussen nu en trigger zitten;
+            // gebruikt door UI om "huidig vs. bij verkoop"-breakdown te tonen.
+            wozValueAtTrigger,
             salePricePct: config.salePricePct,
             salesCostsPct: config.salesCostsPct,
             // Toon zowel huidig saldo als geprojecteerd saldo bij trigger.
@@ -968,11 +1087,18 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
         currentLiquidPortfolio,
       )
       // Projecteer hypotheek-saldo naar trigger — overwaarde groeit terwijl
-      // de hypotheek wordt afgelost. (Woning-waarde blijft statisch in MVP.)
+      // de hypotheek wordt afgelost. Woning-waarde groeit nu ook mee via
+      // het asset-specifieke `expected_return` zodat de equity-projectie
+      // realistisch is voor triggers over 10-20 jaar.
       const monthsToTrigger = Math.max(0, (triggerAge - currentAge) * 12)
       const projected = projectMortgageStateAt(context.eigenHuisMortgages, monthsToTrigger)
       const mortgageBalanceAtTrigger = projected.balance
-      const equityAtTrigger = Math.max(0, context.eigenHuisValue - mortgageBalanceAtTrigger)
+      const projectedHouse =
+        context.eigenHuisAssets.length > 0
+          ? projectEigenHuisValuesAt(context.eigenHuisAssets, monthsToTrigger)
+          : { wozValue: context.wozValue, currentValue: context.eigenHuisValue }
+      const eigenHuisValueAtTrigger = projectedHouse.currentValue
+      const equityAtTrigger = Math.max(0, eigenHuisValueAtTrigger - mortgageBalanceAtTrigger)
       const remainingYears = Math.max(1, endAge - triggerAge)
       const monthlyPayout =
         config.monthlyPayout ??
@@ -1005,6 +1131,9 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
             monthlyPayout,
             isAutoEstimate: config.monthlyPayout == null,
             eigenHuisValue: context.eigenHuisValue,
+            // Geprojecteerde marktwaarde bij trigger — verschilt van
+            // `eigenHuisValue` wanneer er jaren tussen nu en trigger zitten.
+            eigenHuisValueAtTrigger,
             // Display: huidig saldo + geprojecteerd saldo bij trigger.
             mortgageBalance: context.mortgageBalance,
             mortgageBalanceAtTrigger,

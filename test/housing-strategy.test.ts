@@ -202,6 +202,8 @@ describe('deriveHousingContext', () => {
       mortgageMonthlyPayment: 0,
       hasEigenHuis: false,
       eigenHuisMortgages: [],
+      // fix #1: `eigenHuisAssets` exposes assets voor downstream WOZ-groei-projectie.
+      eigenHuisAssets: [],
     })
   })
 
@@ -323,12 +325,28 @@ const aflossingsvrijMortgage: Debt = makeMortgage('asset-eigen-huis-1', {
   end_date: '2055-01-01',
 })
 
+/**
+ * Stabiel test-huis met `expected_return: 0` zodat de WOZ-projectie (fix #1)
+ * dezelfde waarden retourneert als de huidige WOZ. Hierdoor blijven alle
+ * bestaande assertions (saleProceeds, equity, etc.) numeriek geldig. Voor
+ * specifieke tests die WOZ-groei demonstreren wordt expliciet een asset met
+ * `expected_return > 0` opgevoerd.
+ */
+const stableEigenHuis: Asset = makeEigenHuis({
+  id: 'asset-eigen-huis-1',
+  expected_return: 0,
+  current_value: 500_000,
+  woz_value: 480_000,
+})
+
 // ── applyHousingStrategy ─────────────────────────────────────
 
 // standardContext gebruikt een aflossingsvrije hypotheek zodat het saldo
 // bij trigger nog steeds 250K is. Hierdoor blijven verkoop- en mortgage-end-
 // bedragen voorspelbaar (210_800 / 1500) over het project-window. Voor
 // projectie-specifieke scenarios is `annuityMortgage` beschikbaar.
+// `eigenHuisAssets` met expected_return=0 zodat fix #1 (WOZ-groei) deze
+// fixture niet beïnvloedt — gewenst voor regressie-stabiliteit.
 const standardContext: HousingContext = {
   eigenHuisValue: 500_000,
   wozValue: 480_000,
@@ -336,6 +354,7 @@ const standardContext: HousingContext = {
   mortgageMonthlyPayment: 1500,
   hasEigenHuis: true,
   eigenHuisMortgages: [aflossingsvrijMortgage],
+  eigenHuisAssets: [stableEigenHuis],
 }
 
 const baseInput = {
@@ -662,6 +681,7 @@ describe('getFireEligibleNetWorth', () => {
       mortgageMonthlyPayment: 0,
       hasEigenHuis: false,
       eigenHuisMortgages: [],
+      eigenHuisAssets: [],
     }
     expect(getFireEligibleNetWorth(400_000, ctx, { mode: 'exclude_from_fire' })).toBe(400_000)
   })
@@ -690,6 +710,8 @@ describe('Strategy matrix — alle 4 modes × triggers × overrides', () => {
   // €30K/jaar uitgaven. Aflossingsvrij gekozen zodat het saldo na 20 jaar
   // nog steeds 250K is — tests blijven voorspelbaar. Annuïteit-projectie
   // wordt in een aparte describe-block getest.
+  // fix #1: `eigenHuisAssets` met expected_return=0 zodat WOZ-groei deze
+  // matrix-tests niet stiekem verschuift; aparte tests valideren groei.
   const ctxWithHouse: HousingContext = {
     eigenHuisValue: 500_000,
     wozValue: 480_000,
@@ -697,13 +719,19 @@ describe('Strategy matrix — alle 4 modes × triggers × overrides', () => {
     mortgageMonthlyPayment: 1500,
     hasEigenHuis: true,
     eigenHuisMortgages: [aflossingsvrijMortgage],
+    eigenHuisAssets: [stableEigenHuis],
   }
+  // fix #2: lineaire on_depletion-trigger preserveren (geen rendement) zodat
+  // bestaande crossover-assertions (52, 53, 55, 65 etc.) blijven kloppen.
+  // Aparte tests valideren het rendement-pad expliciet.
   const sharedInput = {
     context: ctxWithHouse,
     currentAge: 45,
     endAge: 90,
     yearlyExpenses: 30_000,
     currentLiquidPortfolio: 200_000,
+    grossReturn: 0,
+    inflationRate: 0,
   }
 
   // ── include_full ──────────────────────────────────────────
@@ -1259,6 +1287,7 @@ describe('Strategy matrix — alle 4 modes × triggers × overrides', () => {
         mortgageMonthlyPayment: 0,
         eigenHuisMortgages: [],
         hasEigenHuis: false,
+        eigenHuisAssets: [],
       }
       const modes = [
         { mode: 'include_full' as const },
@@ -1291,7 +1320,11 @@ describe('Strategy matrix — alle 4 modes × triggers × overrides', () => {
     })
 
     it('downsize: zonder WOZ-waarde (WOZ=0) cashflows = [sale (expense), mortgage-end]', () => {
-      const ctxNoWoz: HousingContext = { ...ctxWithHouse, wozValue: 0 }
+      // fix #1: zonder eigen-huis-assets én wozValue=0 valt de lib terug op
+      // `context.wozValue` (= 0). Met assets erin zou `projectEigenHuisValuesAt`
+      // de WOZ uit `stableEigenHuis.woz_value` (480K) overrulen — een ander
+      // scenario. Hier testen we juist de "geen waardering"-fallback.
+      const ctxNoWoz: HousingContext = { ...ctxWithHouse, wozValue: 0, eigenHuisAssets: [] }
       const events = getHousingLifeEvents({
         ...sharedInput,
         context: ctxNoWoz,
@@ -1338,6 +1371,8 @@ describe('Strategy matrix — alle 4 modes × triggers × overrides', () => {
 // ── End-to-end: events → SimCashflows via lifeEventsToCashflows ──
 
 describe('Integratie: virtuele events → SimCashflows', () => {
+  // fix #1: `eigenHuisAssets` met expected_return=0 zodat de geprojecteerde
+  // WOZ-waarde gelijk blijft aan de huidige (bestaande assertions blijven geldig).
   const ctxWithHouse: HousingContext = {
     eigenHuisValue: 500_000,
     wozValue: 480_000,
@@ -1345,13 +1380,17 @@ describe('Integratie: virtuele events → SimCashflows', () => {
     mortgageMonthlyPayment: 1500,
     hasEigenHuis: true,
     eigenHuisMortgages: [aflossingsvrijMortgage],
+    eigenHuisAssets: [stableEigenHuis],
   }
+  // fix #2: lineair model (rendement=0) zodat trigger-leeftijden onveranderd zijn.
   const sharedInput = {
     context: ctxWithHouse,
     currentAge: 45,
     endAge: 90,
     yearlyExpenses: 30_000,
     currentLiquidPortfolio: 200_000,
+    grossReturn: 0,
+    inflationRate: 0,
   }
 
   it('downsize: 1 event met metadata.cashflows → 3 SimCashflows met juiste shape', async () => {
@@ -1555,6 +1594,8 @@ describe('projectMortgageStateAt — amortisatie naar toekomst', () => {
           mortgageMonthlyPayment: 1500,
           hasEigenHuis: true,
           eigenHuisMortgages: [m],
+          // fix #1: leeg array houdt huidige WOZ (geen groei) — saleProceeds-fallback in lib.
+          eigenHuisAssets: [],
         },
         currentAge: 65,
         endAge: 90,
@@ -1662,6 +1703,8 @@ describe('projectMortgageStateAt — amortisatie naar toekomst', () => {
 // ── Downsize met annuïteit-projectie: realistisch scenario ────
 
 describe('downsize × annuiteit-projectie (realistische scenarios)', () => {
+  // fix #1: stableEigenHuis (expected_return=0) → WOZ-projectie blijft 480K
+  // bij elke trigger; bestaande saleProceeds-assertions (460_800 etc.) blijven kloppen.
   const ctxAnnuity: HousingContext = {
     eigenHuisValue: 500_000,
     wozValue: 480_000,
@@ -1676,6 +1719,7 @@ describe('downsize × annuiteit-projectie (realistische scenarios)', () => {
         repayment_type: 'annuiteit',
       }),
     ],
+    eigenHuisAssets: [stableEigenHuis],
   }
   const baseDownsize = {
     mode: 'downsize' as const,
@@ -1754,6 +1798,7 @@ describe('downsize × annuiteit-projectie (realistische scenarios)', () => {
           end_date: '2055-01-01',
         }),
       ],
+      eigenHuisAssets: [stableEigenHuis],
     }
     const events = getHousingLifeEvents({
       context: ctxAflVrijLang,
@@ -1809,5 +1854,205 @@ describe('downsize × annuiteit-projectie (realistische scenarios)', () => {
     const meta = events[0].metadata as { equity: number; mortgageBalanceAtTrigger: number }
     expect(meta.mortgageBalanceAtTrigger).toBe(0)
     expect(meta.equity).toBe(500_000) // volledige woningwaarde want hypotheek weg
+  })
+})
+
+// ── fix #1: WOZ groeit mee met expected_return ────────────────
+//
+// Demonstreert dat de geprojecteerde verkoopopbrengst en de geprojecteerde
+// reverse-mortgage equity meegroeien met de eigen-woning-rendement-aanname.
+// Vóór fix #1 werd `context.wozValue` direct gebruikt — over 20 jaar dezelfde
+// €480K — wat verkoopopbrengsten en opeethypotheek-equity onrealistisch laag
+// liet uitvallen.
+
+describe('fix #1: WOZ-groei via expected_return', () => {
+  // Huis met 2.5% jaarlijkse waardestijging (NL-marktconforme schatting).
+  const groeiendHuis: Asset = makeEigenHuis({
+    id: 'asset-eigen-huis-1',
+    expected_return: 2.5,
+    current_value: 500_000,
+    woz_value: 480_000,
+  })
+
+  const ctxMetGroei: HousingContext = {
+    eigenHuisValue: 500_000,
+    wozValue: 480_000,
+    mortgageBalance: 250_000,
+    mortgageMonthlyPayment: 1500,
+    hasEigenHuis: true,
+    eigenHuisMortgages: [aflossingsvrijMortgage],
+    eigenHuisAssets: [groeiendHuis],
+  }
+
+  it('downsize sale_proceeds groeit mee met expected_return (trigger 65)', () => {
+    // 20 jaar groei: WOZ 480K × 1.025^20 ≈ 786_466
+    // sale = 786_466 × 1.00 × 0.96 − 250_000 ≈ 505_007
+    const events = getHousingLifeEvents({
+      context: ctxMetGroei,
+      currentAge: 45,
+      endAge: 90,
+      yearlyExpenses: 30_000,
+      currentLiquidPortfolio: 200_000,
+      config: {
+        mode: 'downsize',
+        trigger: 'fixed_age',
+        triggerAge: 65,
+        depletionThresholdYears: 2,
+        salePricePct: 1.0,
+        salesCostsPct: 0.04,
+        newMonthlyHousingCost: null,
+      },
+    })
+    const meta = events[0].metadata as {
+      saleProceeds: number
+      wozValue: number
+      wozValueAtTrigger: number
+    }
+    // Huidige WOZ blijft 480K (display-veld); geprojecteerd is hoger.
+    expect(meta.wozValue).toBe(480_000)
+    // 480K × 1.025^20 ≈ 786K (±5K marge voor floating-point afronding).
+    expect(meta.wozValueAtTrigger).toBeGreaterThan(780_000)
+    expect(meta.wozValueAtTrigger).toBeLessThan(792_000)
+    // saleProceeds ≈ 786K × 0.96 − 250_000 ≈ 505K
+    expect(meta.saleProceeds).toBeGreaterThan(500_000)
+    expect(meta.saleProceeds).toBeLessThan(510_000)
+  })
+
+  it('reverse_mortgage equity groeit mee met expected_return (trigger 67, aflossingsvrij)', () => {
+    // 22 jaar groei op current_value 500K: 500K × 1.025^22 ≈ 859_138
+    // equity = 859_138 − 250_000 = 609_138
+    const events = getHousingLifeEvents({
+      context: ctxMetGroei,
+      currentAge: 45,
+      endAge: 90,
+      yearlyExpenses: 30_000,
+      currentLiquidPortfolio: 200_000,
+      config: {
+        mode: 'reverse_mortgage',
+        trigger: 'fixed_age',
+        triggerAge: 67,
+        depletionThresholdYears: 2,
+        maxLoanPct: 0.5,
+        interestRate: 0.055,
+        monthlyPayout: null,
+      },
+    })
+    const meta = events[0].metadata as {
+      equity: number
+      eigenHuisValue: number
+      eigenHuisValueAtTrigger: number
+    }
+    expect(meta.eigenHuisValue).toBe(500_000)
+    // 500K × 1.025^22 ≈ 859K (±5K marge voor floating-point afronding).
+    expect(meta.eigenHuisValueAtTrigger).toBeGreaterThan(852_000)
+    expect(meta.eigenHuisValueAtTrigger).toBeLessThan(866_000)
+    // equity > de oude 250K omdat de woning gegroeid is (~609K).
+    expect(meta.equity).toBeGreaterThan(600_000)
+    expect(meta.equity).toBeLessThan(620_000)
+  })
+
+  it('zonder rendement (expected_return=0) blijft de oude waarde', () => {
+    // Regressie: met stableEigenHuis (return=0) is sale = 480K × 0.96 − 250K = 210_800.
+    const ctxStatic: HousingContext = {
+      ...ctxMetGroei,
+      eigenHuisAssets: [stableEigenHuis],
+    }
+    const events = getHousingLifeEvents({
+      context: ctxStatic,
+      currentAge: 45,
+      endAge: 90,
+      yearlyExpenses: 30_000,
+      currentLiquidPortfolio: 200_000,
+      config: {
+        mode: 'downsize',
+        trigger: 'fixed_age',
+        triggerAge: 65,
+        depletionThresholdYears: 2,
+        salePricePct: 1.0,
+        salesCostsPct: 0.04,
+        newMonthlyHousingCost: null,
+      },
+    })
+    const meta = events[0].metadata as { saleProceeds: number; wozValueAtTrigger: number }
+    expect(meta.wozValueAtTrigger).toBe(480_000) // exact, want return=0
+    expect(meta.saleProceeds).toBeCloseTo(210_800, 0)
+  })
+})
+
+// ── fix #2: on_depletion trigger met portfolio-rendement ──────
+//
+// Demonstreert dat een positief reëel rendement op het liquide vermogen de
+// crossover-leeftijd verlaat ten opzichte van het lineaire model.
+
+describe('fix #2: on_depletion trigger met portfolio-rendement', () => {
+  // Default fixture: 45-jarige, 200K liquide, 30K expenses, geen savings →
+  // lineair valt liquide op nul na ceil(200/30) = 7 jaar → trigger op 52.
+  // Met 5% gross / 2% inflatie ≈ 2.94% reëel rendement schuift de crossover
+  // significant op (rendement compenseert deels de drawdown).
+  const ctxRet: HousingContext = {
+    eigenHuisValue: 500_000,
+    wozValue: 480_000,
+    mortgageBalance: 250_000,
+    mortgageMonthlyPayment: 1500,
+    hasEigenHuis: true,
+    eigenHuisMortgages: [aflossingsvrijMortgage],
+    eigenHuisAssets: [stableEigenHuis],
+  }
+  const baseInput = {
+    context: ctxRet,
+    currentAge: 45,
+    endAge: 90,
+    yearlyExpenses: 30_000,
+    currentLiquidPortfolio: 200_000,
+    config: {
+      mode: 'downsize' as const,
+      trigger: 'on_depletion' as const,
+      triggerAge: 90,
+      depletionThresholdYears: 2,
+      salePricePct: 1.0,
+      salesCostsPct: 0.04,
+      newMonthlyHousingCost: null,
+    },
+  }
+
+  it('crossover met realistische return valt later dan zonder return', () => {
+    const eventsZonderReturn = getHousingLifeEvents({
+      ...baseInput,
+      grossReturn: 0,
+      inflationRate: 0,
+    })
+    const eventsMetReturn = getHousingLifeEvents({
+      ...baseInput,
+      grossReturn: 0.05,
+      inflationRate: 0.02,
+    })
+    const ageZonder = eventsZonderReturn[0].target_age
+    const ageMet = eventsMetReturn[0].target_age
+    // Lineair: 52. Met reëel rendement ~3%: trigger schuift door.
+    expect(ageZonder).toBe(52)
+    expect(ageMet).toBeGreaterThan(52)
+  })
+
+  it('zero return (grossReturn=0, inflationRate=0) levert het oude lineaire pad', () => {
+    const events = getHousingLifeEvents({
+      ...baseInput,
+      grossReturn: 0,
+      inflationRate: 0,
+    })
+    expect(events[0].target_age).toBe(52)
+  })
+
+  it('parameters niet gegeven → realReturn=0 → identiek aan zero return', () => {
+    // Backwards compat: oude callers zonder rendement-parameters krijgen
+    // hetzelfde resultaat als expliciet 0.
+    const events = getHousingLifeEvents({
+      context: ctxRet,
+      currentAge: 45,
+      endAge: 90,
+      yearlyExpenses: 30_000,
+      currentLiquidPortfolio: 200_000,
+      config: baseInput.config,
+    })
+    expect(events[0].target_age).toBe(52)
   })
 })

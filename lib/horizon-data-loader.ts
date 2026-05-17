@@ -571,6 +571,11 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     currentLiquidPortfolio: liquidEstimate,
     annualSavings: annualSavingsForHousing,
     currentNetCashflowYearly,
+    // Rendement-parameters voor de on_depletion-trigger: zonder rendement
+    // valt de trigger te vroeg (liquide raakt sneller op dan in
+    // werkelijkheid omdat de groei niet meetelt).
+    grossReturn: fireParams.grossReturn,
+    inflationRate: fireParams.inflationRate,
   })
   const loadedEvents: LifeEvent[] = [...realEvents, ...housingEvents]
 
