@@ -24315,3 +24315,34 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#805, #806)
+
+## Session 2026-05-18 - Features #819, #820
+
+### Feature #819: Cashflow-sectie gegroepeerd op /will - PASSING
+- Created `components/will/cashflow-section.tsx` with:
+  - Section header with ArrowUpDown icon + "Cashflow" label
+  - Spaarquote (6m) card with savings rate + mini progress bar + sparkline
+  - Maandelijks netto card with income-expenses breakdown
+  - Uitgaventrend card with sparkline + month-over-month delta
+  - VasteKostenAnalyse wrapped inside the section (conditional)
+- Updated `will-landing.tsx`: replaced standalone VasteKostenAnalyse section with CashflowSection
+- Added `id="cashflow"` + `scroll-mt-24` for hash navigation
+- Added "Budgetten beheren →" link to /core/budgets in section header
+
+### Feature #820: Kompas cashflow-icoon linkt naar /will cashflow-sectie - PASSING
+- Added optional `href` field to LeverConfig in lever-compass.tsx
+- Set cashflow lever href to `/will#cashflow`
+- Updated all 3 compass variants (LeverCompassDots, LeverCompassExpanded, LeverCompassCollapsed)
+  to render clickable Link when href is present
+- Verified: clicking compass cashflow → navigates to /will#cashflow (not /core/budgets)
+- Added hover effect on expanded sidebar variant for linked levers
+- Zero new console errors
+- Commit: 90c16cfe
+
+### Files Created/Modified
+- components/will/cashflow-section.tsx — NEW: CashflowSection component
+- components/will/will-landing.tsx — replaced VasteKostenAnalyse section with CashflowSection
+- components/app/shell/lever-compass.tsx — compass cashflow lever now links to /will#cashflow
+
+### Current Status
+- 2 features completed this session (#819, #820)
