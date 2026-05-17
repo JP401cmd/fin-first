@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowRight, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -18,10 +19,154 @@ interface CashflowHeroTileProps {
   budgetingActive: boolean
 }
 
+// ── Health status logic ─────────────────────────────────────────
+// Based on number of over-budget items:
+//   green  = 0 budgetten over (alles op schema)
+//   amber  = 1-2 budgetten over
+//   red    = 3+ budgetten over of negatieve cashflow
+
+type HealthStatus = 'green' | 'amber' | 'red'
+
+function computeBudgetHealthStatus(
+  overBudgetCount: number,
+  available: number,
+): HealthStatus {
+  if (available < 0 || overBudgetCount >= 3) return 'red'
+  if (overBudgetCount >= 1) return 'amber'
+  return 'green'
+}
+
+function getHealthLabel(status: HealthStatus): string {
+  switch (status) {
+    case 'green':
+      return 'Op schema'
+    case 'amber':
+      return 'Aandacht'
+    case 'red':
+      return 'Over limiet'
+  }
+}
+
+function getHealthTooltip(
+  status: HealthStatus,
+  overBudgetCount: number,
+  available: number,
+): string {
+  switch (status) {
+    case 'green':
+      return 'Alle budgetten liggen op schema deze maand.'
+    case 'amber':
+      return `${overBudgetCount} budget${overBudgetCount === 1 ? '' : 'ten'} ${overBudgetCount === 1 ? 'is' : 'zijn'} overschreden. Pas je uitgaven aan om op koers te blijven.`
+    case 'red':
+      if (available < 0) return 'Je totale uitgaven overschrijden je budgetlimiet. Tijd om bij te sturen.'
+      return `${overBudgetCount} budgetten zijn overschreden. Heroverweeg je bestedingspatroon.`
+  }
+}
+
+const HEALTH_COLORS: Record<HealthStatus, { text: string; bg: string; dot: string; border: string }> = {
+  green: {
+    text: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+    dot: 'bg-emerald-500',
+    border: 'border-emerald-200',
+  },
+  amber: {
+    text: 'text-amber-600',
+    bg: 'bg-amber-50',
+    dot: 'bg-amber-500',
+    border: 'border-amber-200',
+  },
+  red: {
+    text: 'text-red-600',
+    bg: 'bg-red-50',
+    dot: 'bg-red-500',
+    border: 'border-red-200',
+  },
+}
+
+// ── Tooltip ─────────────────────────────────────────────────────
+
+function HealthTooltip({
+  status,
+  label,
+  detail,
+  children,
+}: {
+  status: HealthStatus
+  label: string
+  detail: string
+  children: React.ReactNode
+}) {
+  const [show, setShow] = useState(false)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const handleEnter = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    setShow(true)
+  }, [])
+
+  const handleLeave = useCallback(() => {
+    timeoutRef.current = setTimeout(() => setShow(false), 150)
+  }, [])
+
+  // Mobile: close on outside tap
+  useEffect(() => {
+    if (!show) return
+    const handleOutsideTap = (e: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShow(false)
+      }
+    }
+    document.addEventListener('pointerdown', handleOutsideTap)
+    return () => document.removeEventListener('pointerdown', handleOutsideTap)
+  }, [show])
+
+  const colors = HEALTH_COLORS[status]
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative"
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+      onPointerDown={(e) => {
+        e.preventDefault()
+        setShow((prev) => !prev)
+      }}
+    >
+      {children}
+      {show && (
+        <div
+          className={`absolute z-50 right-0 top-full mt-1.5 max-w-[260px] px-2.5 py-1.5 border ${colors.border} ${colors.bg} shadow-sm pointer-events-none`}
+          role="tooltip"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${colors.dot} shrink-0`} aria-hidden />
+            <span className={`text-[11px] font-semibold ${colors.text}`}>
+              {label}
+            </span>
+          </div>
+          <div className="text-[10px] text-[var(--ink-3)] mt-0.5 pl-3 whitespace-normal">
+            {detail}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main component ──────────────────────────────────────────────
+
 /**
  * Cashflow hero-tegel — prominente tegel op de /core landing die
  * de budgetstatus toont: hoeveel budgetten op schema liggen, totaal
  * besteed vs beschikbaar, en een mini-indicator van cashflow-gezondheid.
+ *
+ * Gezondheidsindicator:
+ *   groen  — alle budgetten op schema
+ *   amber  — 1-2 budgetten overschreden
+ *   rood   — 3+ budgetten overschreden of negatieve cashflow
  *
  * Klikt door naar /core/budgets.
  */
@@ -41,21 +186,11 @@ export function CashflowHeroTile({
     ? Math.min(100, Math.max(0, (totalBudgetSpent / totalBudgetLimit) * 100))
     : 0
 
-  // Health indicator: green (<80%), amber (80-100%), red (>100%)
-  const healthStatus: 'green' | 'amber' | 'red' =
-    spentPct > 100 ? 'red' : spentPct > 80 ? 'amber' : 'green'
-
-  const healthColors = {
-    green: 'text-emerald-600',
-    amber: 'text-amber-600',
-    red: 'text-red-600',
-  }
-
-  const healthBgColors = {
-    green: 'bg-emerald-500',
-    amber: 'bg-amber-500',
-    red: 'bg-red-500',
-  }
+  // Health indicator based on over-budget count
+  const healthStatus = computeBudgetHealthStatus(overBudgetCount, available)
+  const healthLabel = getHealthLabel(healthStatus)
+  const healthTooltip = getHealthTooltip(healthStatus, overBudgetCount, available)
+  const colors = HEALTH_COLORS[healthStatus]
 
   const HealthIcon = healthStatus === 'red'
     ? TrendingDown
@@ -99,17 +234,27 @@ export function CashflowHeroTile({
           href="/core/budgets"
           className="group block transition-opacity hover:opacity-90"
         >
-          {/* Header row: kicker + health icon */}
+          {/* Header row: kicker + health indicator with tooltip */}
           <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Cashflow · budgetstatus
             </p>
-            <div className={`flex items-center gap-1.5 ${healthColors[healthStatus]}`}>
-              <HealthIcon className="h-3.5 w-3.5" />
-              <span className="font-mono text-xs tabular-nums">
-                {Math.round(spentPct).toString().replace('.', ',')}%
-              </span>
-            </div>
+            <HealthTooltip
+              status={healthStatus}
+              label={healthLabel}
+              detail={healthTooltip}
+            >
+              <div
+                className={`flex items-center gap-1.5 cursor-default ${colors.text}`}
+                aria-label={`Cashflow-gezondheid: ${healthLabel}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} aria-hidden />
+                <HealthIcon className="h-3.5 w-3.5" />
+                <span className="font-mono text-xs tabular-nums">
+                  {healthLabel}
+                </span>
+              </div>
+            </HealthTooltip>
           </div>
 
           {/* Main metric: X van Y op schema */}
@@ -143,7 +288,7 @@ export function CashflowHeroTile({
               aria-label="Budgetvoortgang"
             >
               <div
-                className={`h-full transition-all duration-600 ease-out ${healthBgColors[healthStatus]}`}
+                className={`h-full transition-all duration-600 ease-out ${colors.dot}`}
                 style={{
                   width: hasEntered ? `${Math.min(spentPct, 100)}%` : '0%',
                   transition: 'width 600ms cubic-bezier(.22,1,.36,1)',
