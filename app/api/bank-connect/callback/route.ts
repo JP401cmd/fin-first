@@ -222,9 +222,38 @@ export async function GET(req: Request) {
       }
     }
 
+    // Check if user has completed onboarding. If not, redirect back to
+    // the onboarding flow instead of the in-app success page — the (app)
+    // layout would redirect them anyway since it gates on onboarding_completed.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('id', user.id)
+      .single()
+
+    if (profile && !profile.onboarding_completed) {
+      return NextResponse.redirect(`${appUrl}/onboarding?bank_connected=1`)
+    }
+
     return NextResponse.redirect(`${appUrl}/core/cash/connect/success`)
   } catch (err) {
     console.error('TrueLayer callback error:', err)
+
+    // If callback fails during onboarding, redirect back to onboarding
+    // with an error param so the user can retry without hitting the (app)
+    // layout gate.
+    const { data: { user: errUser } } = await supabase.auth.getUser()
+    if (errUser) {
+      const { data: errProfile } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', errUser.id)
+        .single()
+      if (errProfile && !errProfile.onboarding_completed) {
+        return NextResponse.redirect(`${appUrl}/onboarding?bank_error=1`)
+      }
+    }
+
     return NextResponse.redirect(`${appUrl}/core/cash/connect?error=callback_failed`)
   }
 }

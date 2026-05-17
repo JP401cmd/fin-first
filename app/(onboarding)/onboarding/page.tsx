@@ -665,6 +665,11 @@ export default function OnboardingPage() {
   const [saveMessageIdx, setSaveMessageIdx] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [restoredNotice, setRestoredNotice] = useState(false)
+
+  // PSD2 bank connect return state — detected via query params from callback redirect.
+  // Uses useState instead of useSearchParams to avoid Suspense boundary requirement.
+  const [bankConnected, setBankConnected] = useState(false)
+  const [bankError, setBankError] = useState(false)
   // Welkomstpopup: alleen tonen bij eerste binnenkomst, niet bij restored-draft
   // (de gebruiker is dan al terug-bezig en de begroeting voelt op dat moment
   // als ruis). De show-beslissing wordt in de check-effect onderaan genomen
@@ -735,6 +740,18 @@ export default function OnboardingPage() {
         setRestoredNotice(true)
         // Auto-dismiss after 4 seconds
         setTimeout(() => setRestoredNotice(false), 4000)
+      }
+
+      // PSD2 bank connect return: force step to bezittingen so the user sees
+      // the success/error message inline. The bank_connected/bank_error params
+      // come from the callback redirect after OAuth completion.
+      const urlParams = new URLSearchParams(window.location.search)
+      const isBankConnected = urlParams.get('bank_connected') === '1'
+      const isBankError = urlParams.get('bank_error') === '1'
+      if (isBankConnected || isBankError) {
+        setBankConnected(isBankConnected)
+        setBankError(isBankError)
+        dispatch({ type: 'SET_STEP', step: 'bezittingen' })
       }
 
       // Welkomstpopup-beslissing: alleen tonen voor een nieuwe gebruiker die
@@ -1204,6 +1221,8 @@ export default function OnboardingPage() {
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
               requireCashAccount={state.activeModules.includes('budgetteren')}
+              bankConnected={bankConnected}
+              bankError={bankError}
             />
           )}
 

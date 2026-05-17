@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { FileText, Minus, Plus, Trash2 } from 'lucide-react'
+import { FileText, Minus, Plus, Trash2, Link2, Shield, Zap, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
@@ -83,6 +83,12 @@ export interface OnboardingBezittingenProps {
    * mag niet stilzwijgend leeg starten.
    */
   requireCashAccount?: boolean
+  /** True wanneer de gebruiker net terug is van een succesvolle PSD2 bank
+   *  koppeling (callback redirect met ?bank_connected=1). Toont een
+   *  succesmelding boven de actie-strip. */
+  bankConnected?: boolean
+  /** True wanneer de PSD2 callback een fout gaf (?bank_error=1). */
+  bankError?: boolean
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -97,11 +103,19 @@ export function OnboardingBezittingen({
   currentStep = 4,
   totalSteps = 5,
   requireCashAccount = false,
+  bankConnected = false,
+  bankError = false,
 }: OnboardingBezittingenProps) {
   // Bij budgetteren-doel moet er minstens één cash-asset zijn. Zonder
   // cash-rekening valt de Budgetteren-app om — daarom dwingen we het hier af.
   const hasCashAccount = quickAssets.some((a) => a.asset_type === 'cash')
   const cashRequirementMet = !requireCashAccount || hasCashAccount
+  // PSD2 bank connect state
+  const [bankConnecting, setBankConnecting] = useState(false)
+  const [bankConnectError, setBankConnectError] = useState<string | null>(
+    bankError ? 'Bankverbinding mislukt. Probeer het opnieuw.' : null
+  )
+
   // Drie modale-states. Ze sluiten elkaar uit (je opent er maar één tegelijk
   // omdat de tiles disabled worden zodra er één open is — onnodig in praktijk,
   // de wizard/pane zelf dimt de achtergrond). We houden ze separaat zodat de
@@ -267,6 +281,55 @@ export function OnboardingBezittingen({
         }
       >
         <div className="space-y-7">
+          {/* ── PSD2 Bank Connect — prominent aanbevolen optie ──────── */}
+          {bankConnected ? (
+            <div className="flex items-center gap-3 border-2 border-green-200 bg-green-50 p-4">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+              <div>
+                <p className="text-sm font-semibold text-green-800">
+                  Bank succesvol gekoppeld
+                </p>
+                <p
+                  className="text-xs italic text-green-700"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  Transacties worden automatisch gesynchroniseerd.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <PSD2ConnectCard
+              connecting={bankConnecting}
+              error={bankConnectError}
+              onConnect={async (provider) => {
+                setBankConnecting(true)
+                setBankConnectError(null)
+                try {
+                  const res = await fetch('/api/bank-connect/auth-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      provider_id: provider.id,
+                      provider_name: provider.name,
+                      provider_logo: provider.logo,
+                    }),
+                  })
+                  const data = await res.json()
+                  if (!res.ok) {
+                    throw new Error(data.error || 'Verbinding maken mislukt')
+                  }
+                  // Redirect to bank authorization — user returns via callback → /onboarding?bank_connected=1
+                  window.location.href = data.auth_url
+                } catch (err) {
+                  setBankConnectError(
+                    err instanceof Error ? err.message : 'Verbinding maken mislukt'
+                  )
+                  setBankConnecting(false)
+                }
+              }}
+            />
+          )}
+
           {/* ── Actie-strip: drie tiles ──────────────────────────────── */}
           <div
             role="group"
@@ -548,6 +611,192 @@ function DebtRow({
       >
         <Trash2 className="h-4 w-4" strokeWidth={1.5} />
       </button>
+    </div>
+  )
+}
+
+// ── PSD2 Connect Card ─────────────────────────────────────────────────
+
+type PSD2Provider = {
+  id: string
+  name: string
+  logo: string
+}
+
+/**
+ * Prominent PSD2/Open Banking verbinding-card bovenaan de bezittingen-stap.
+ * Geframed als "Aanbevolen — snelste weg" om gebruikers te stimuleren hun
+ * bank automatisch te koppelen. Klikken opent een bank-selector en start
+ * de bestaande /api/bank-connect/auth-link flow.
+ */
+function PSD2ConnectCard({
+  connecting,
+  error,
+  onConnect,
+}: {
+  connecting: boolean
+  error: string | null
+  onConnect: (provider: PSD2Provider) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [providers, setProviders] = useState<PSD2Provider[]>([])
+  const [loadingProviders, setLoadingProviders] = useState(false)
+  const [providerError, setProviderError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+
+  async function handleExpand() {
+    setExpanded(true)
+    if (providers.length === 0 && !loadingProviders) {
+      setLoadingProviders(true)
+      setProviderError(null)
+      try {
+        const res = await fetch('/api/bank-connect/providers')
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'Kon banken niet laden')
+        }
+        const data = await res.json()
+        setProviders(data)
+      } catch (err) {
+        setProviderError(err instanceof Error ? err.message : 'Kon banken niet laden')
+      } finally {
+        setLoadingProviders(false)
+      }
+    }
+  }
+
+  const filtered = search.trim()
+    ? providers.filter((p) =>
+        p.name.toLowerCase().includes(search.toLowerCase())
+      )
+    : providers
+
+  return (
+    <div className="border-2 border-[var(--module-active-300)] bg-[var(--module-active-50)]/40 p-5 space-y-4">
+      {/* Header with badge */}
+      <div className="flex items-start gap-4">
+        <span
+          aria-hidden
+          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center bg-[var(--module-active-100)] text-[var(--module-active-700)]"
+        >
+          <Link2 className="h-5 w-5" strokeWidth={1.75} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p
+              className="font-bold text-base text-[var(--ink)] sm:text-[17px]"
+              style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+            >
+              Bank koppelen
+            </p>
+            <span className="inline-flex items-center gap-1 bg-[var(--module-active-600)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <Zap className="h-3 w-3" />
+              Aanbevolen
+            </span>
+          </div>
+          <p
+            className="mt-1 text-sm italic text-[var(--ink-2)] leading-snug"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Snelste weg om te starten — transacties worden automatisch geïmporteerd via Open Banking (PSD2).
+          </p>
+        </div>
+      </div>
+
+      {/* Security info */}
+      <div className="flex items-center gap-2 text-xs text-[var(--ink-3)]">
+        <Shield className="h-3.5 w-3.5 shrink-0" />
+        <span>Veilig via TrueLayer · Alleen lezen · 90 dagen geldig</span>
+      </div>
+
+      {/* Error display */}
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Action: expand to show bank selector */}
+      {!expanded ? (
+        <button
+          type="button"
+          onClick={handleExpand}
+          disabled={connecting}
+          className="w-full min-h-11 bg-[var(--module-active-600)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--module-active-700)] disabled:opacity-50"
+        >
+          {connecting ? 'Verbinden...' : 'Kies je bank'}
+        </button>
+      ) : (
+        <div className="space-y-3">
+          {loadingProviders && (
+            <div className="flex items-center justify-center py-6">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--module-active-500)] border-t-transparent" />
+            </div>
+          )}
+          {providerError && (
+            <p className="text-sm text-red-600 text-center">{providerError}</p>
+          )}
+          {!loadingProviders && !providerError && providers.length > 0 && (
+            <>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Zoek je bank..."
+                className="w-full border border-[var(--border-ed)] bg-[var(--paper)] py-2 pl-3 pr-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--ink-3)] focus:border-[var(--module-active-500)] focus:ring-1 focus:ring-[var(--module-active-500)]"
+                autoFocus
+              />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[200px] overflow-y-auto">
+                {filtered.map((provider) => (
+                  <button
+                    key={provider.id}
+                    type="button"
+                    onClick={() => onConnect(provider)}
+                    disabled={connecting}
+                    className="flex flex-col items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-center text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--module-active-500)] hover:bg-[var(--module-active-50)] disabled:opacity-50"
+                  >
+                    {provider.logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={provider.logo}
+                        alt={provider.name}
+                        className="h-8 w-8 object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center bg-[var(--subtle)] text-[var(--ink-3)]">
+                        <Link2 className="h-4 w-4" />
+                      </div>
+                    )}
+                    <span className="truncate w-full">{provider.name}</span>
+                  </button>
+                ))}
+              </div>
+              {filtered.length === 0 && (
+                <p className="text-sm text-center text-[var(--ink-3)] py-3">
+                  Geen banken gevonden
+                </p>
+              )}
+            </>
+          )}
+
+          {/* Collapse / cancel link */}
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="text-xs text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors"
+          >
+            Annuleren
+          </button>
+        </div>
+      )}
+
+      {/* Skip hint — onboarding framing: expliciet dat overslaan kan */}
+      {!expanded && !connecting && (
+        <p className="text-[11px] text-center text-[var(--ink-4)]">
+          Niet verplicht — je kunt ook handmatig toevoegen
+        </p>
+      )}
     </div>
   )
 }
