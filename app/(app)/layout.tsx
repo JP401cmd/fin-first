@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
 import { ChatPanel } from '@/components/app/chat/chat-panel'
@@ -28,6 +29,7 @@ import {
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { computeLeverScores } from '@/components/app/shell/lever-scores'
+import { CoachBubble } from '@/components/app/coach-bubble'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
 import {
@@ -306,6 +308,9 @@ export default async function AppLayout({
                         </CommandPaletteProvider>
                       </FeatureAccessProvider>
                       <ChatPanel />
+                      <Suspense fallback={null}>
+                        <CoachBubble />
+                      </Suspense>
                     </div>
                   </DashboardTypeProvider>
                 </ModuleColorProvider>
