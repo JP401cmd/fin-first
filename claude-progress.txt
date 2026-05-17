@@ -1,3 +1,24 @@
+## Session 2026-05-18 - Features #861, #862
+
+### Feature #861: Jargon vertaaltabel aangemaakt - PASSING
+- Enhanced GlossaryEntry interface with `alternative` field for jargon-to-plain-Dutch translations
+- Added 14 new financial terms: asset_allocatie, diversificatie, forfaitair_rendement, liquiditeit, compounding, passief_inkomen, expense_ratio, ETF, dividend, hypotheek, annuiteit, LTV, rebalancing, noodreserve
+- Total: 35 glossary entries with name, alternative, and explanation fields
+- Exported JARGON_VERTAALTABEL (flat key→alternative map) and getGlossaryAlternative() helper
+- Re-exported new utilities from components/editorial/index.tsx
+- TypeScript compiles clean, verified with npx tsx validation (35 terms, all fields present)
+
+### Feature #862: Jargon-vervanging toegepast op core module paginas - PASSING
+- /core/belasting: GlossaryTerm wrapping on "Box 3" and "forfaitair rendement" and "heffingsvrij vermogen"
+- /core/assets: GlossaryTerm for "Diversificatie" in Verdeling section
+- /core/debts: GlossaryTerm for "schuldgraad" in EditorialDeck
+- /core (landing): GlossaryTerm for "diversificatie" in health score footer
+- Browser verified: all pages render GlossaryTerm tooltips correctly with proper explanations
+- Commits: 741d8e2b (page-level GlossaryTerms) + 62f1018c (glossary-data vertaaltabel)
+
+### Current Status
+- 2 features completed this session (#861, #862)
+
 ## Session 2026-05-18 - Features #856, #859
 
 ### Feature #856: Fee-erosie dramatic visualisatie - PASSING
