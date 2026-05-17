@@ -7,7 +7,8 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip } from '@/components/editorial'
+import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip, PageInfoButton, GlossaryTerm } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { createClient } from '@/lib/supabase/client'
@@ -481,7 +482,11 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
       {/* 3px module-accent-bar */}
       <div className="h-[3px] w-full mb-5" style={{ background: 'var(--module-active-500)' }} aria-hidden="true" />
 
-      <header className="mb-5 space-y-3">
+      <header className="relative mb-5 space-y-3">
+        <PageInfoButton
+          description={PAGE_INFO['/core/assets']}
+          className="absolute right-0 top-0"
+        />
         <Kicker size="large">Bezittingen · opgeslagen vrijheid</Kicker>
 
         <EditorialHeadline emphasis="vrijheid" size="lg">
@@ -588,6 +593,9 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
             {/* Allocation donut */}
             <section>
               <Kicker>Verdeling</Kicker>
+              <p className="mt-2 text-[11px] text-[var(--ink-3)] italic">
+                <GlossaryTerm term="diversificatie">Diversificatie</GlossaryTerm> over meerdere typen verlaagt risico.
+              </p>
               <div className="mt-4 flex items-center gap-6">
                 <AllocationPie byType={byType} total={totalValue} dailyExpenses={dailyExpenses} />
                 <div className="flex-1 space-y-2">

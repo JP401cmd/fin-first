@@ -14,12 +14,15 @@ import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-anim
 import { ActionCenter } from './action-center'
 import { DoelenStrook } from './doelen-strook'
 import { StappenplannenStrook } from './stappenplannen-strook'
-import { VasteKostenAnalyse, type RecurringItem } from './vaste-kosten-analyse'
+import { type RecurringItem } from './vaste-kosten-analyse'
+import { CashflowSection } from './cashflow-section'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import { MonthlyCheckinCard } from '@/components/dashboard/monthly-checkin-card'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
+import { PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 interface WillLandingProps {
   dashboardData: DashboardData
@@ -112,7 +115,11 @@ export function WillLanding({
       <div className="mx-auto max-w-6xl py-5 sm:py-8">
 
         {/* ── Editorial header — blueprint Type 1 (Module-landing) ── */}
-        <header className="mb-6 space-y-2 px-4 sm:px-6">
+        <header className="relative mb-6 space-y-2 px-4 sm:px-6">
+          <PageInfoButton
+            description={PAGE_INFO['/will']}
+            className="absolute right-4 top-0 sm:right-6"
+          />
           {/* Kicker met 28×1px Wil-streep */}
           <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
             <span
@@ -212,25 +219,19 @@ export function WillLanding({
           />
         </section>
 
-        {/* ── Sectie 4: Vaste Kosten Analyse (2 kolommen) ──── */}
-        <section className="mt-10" aria-label="Vaste Kosten Analyse">
-          {loadingRecurring ? (
-            <div className="animate-pulse rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-              <div className="h-4 w-48 rounded bg-[var(--subtle)]" />
-            </div>
-          ) : (subscriptions.length > 0 || vasteKosten.length > 0) ? (
-            <VasteKostenAnalyse
-              subscriptions={subscriptions}
-              vasteKosten={vasteKosten}
-              totalMonthlySubscriptions={totalMonthlySubs}
-              totalMonthlyVasteKosten={totalMonthlyVK}
-              totalMonthly={totalMonthly}
-              userProfile={userProfile}
-              onCancellationOpen={handleCancellationOpen}
-              onRefresh={loadRecurringData}
-            />
-          ) : null}
-        </section>
+        {/* ── Sectie 4: Cashflow (spaarquote + trends + vaste kosten) ── */}
+        <CashflowSection
+          data={dashboardData}
+          subscriptions={subscriptions}
+          vasteKosten={vasteKosten}
+          totalMonthlySubscriptions={totalMonthlySubs}
+          totalMonthlyVasteKosten={totalMonthlyVK}
+          totalMonthly={totalMonthly}
+          userProfile={userProfile}
+          loadingRecurring={loadingRecurring}
+          onCancellationOpen={handleCancellationOpen}
+          onRefresh={loadRecurringData}
+        />
 
         {/* ── Opzeg Modal ────────────────────────────────────── */}
         <OpzegModal

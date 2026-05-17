@@ -34,7 +34,8 @@ import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wiz
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { VermogenDebtCard } from '@/components/core/vermogen-debt-card'
 import { AddCategoryCard } from '@/components/core/add-category-card'
-import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip } from '@/components/editorial'
+import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip, PageInfoButton, GlossaryTerm } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { buildKpiContext } from '@/lib/kpi-context'
 import { computeDebtKpi } from '@/lib/debt-kpi'
@@ -405,7 +406,11 @@ export default function DebtsPage() {
       {/* 3px module-accent-bar */}
       <div className="h-[3px] w-full mb-5" style={{ background: 'var(--module-active-500)' }} aria-hidden="true" />
 
-      <header className="mb-5 space-y-3">
+      <header className="relative mb-5 space-y-3">
+        <PageInfoButton
+          description={PAGE_INFO['/core/debts']}
+          className="absolute right-0 top-0"
+        />
         <Kicker size="large">Schulden · vrijheid die je terugkoopt</Kicker>
 
         <EditorialHeadline emphasis="terugkoopt" size="lg">
@@ -414,7 +419,7 @@ export default function DebtsPage() {
 
         <EditorialDeck>
           Elke schuld is een claim op je toekomst. Door af te lossen koop je vrijheid terug — euro voor euro,
-          maand na maand.
+          maand na maand. Een lagere <GlossaryTerm term="schuldgraad">schuldgraad</GlossaryTerm> betekent meer financiële speelruimte.
         </EditorialDeck>
 
         {perspective === 'household' && hiddenCategories.includes('debts') && (

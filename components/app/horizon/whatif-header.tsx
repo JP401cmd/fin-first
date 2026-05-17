@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
+import { PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 /**
  * Editorial header voor /horizon/whatif (Type 10: Calculator).
@@ -9,7 +11,11 @@ import { ChevronLeft } from 'lucide-react'
  */
 export function WhatIfHeader() {
   return (
-    <header className="mb-4 space-y-2 px-4 sm:px-6">
+    <header className="relative mb-4 space-y-2 px-4 sm:px-6">
+      <PageInfoButton
+        description={PAGE_INFO['/horizon/whatif']}
+        className="absolute right-4 top-0 sm:right-6"
+      />
       {/* Back link in mono UPPERCASE */}
       <Link
         href="/horizon"

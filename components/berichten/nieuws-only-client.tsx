@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Newspaper, Loader2, RefreshCw, AlertCircle, ArrowRight } from 'lucide-react'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { Masthead } from './masthead'
+import { PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import { NewspaperFooter } from './newspaper-footer'
 import { HeroNewsArticle, NewsArticle, NewsSkeletonLoader } from './news-components'
 import { ArchiveSection } from './archive-section'
@@ -233,7 +235,11 @@ export function NieuwsOnlyClient() {
   }, [generating, newsFetched])
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="relative mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      <PageInfoButton
+        description={PAGE_INFO['/nieuws']}
+        className="absolute right-4 top-5 sm:right-6 sm:top-8"
+      />
       <Masthead editionNr={editionNr} jaargang={jaargang} />
 
       {/* ── FINANCIEEL NIEUWS ──────────────────────────── */}

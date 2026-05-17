@@ -31,6 +31,8 @@ import {
 } from 'lucide-react'
 import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 /**
  * Masked-aware currency formatter hook. Returns a stable callback that
@@ -663,7 +665,11 @@ function CheckinPageContent() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
       {/* ── Header — editorial blueprint met kicker-streep ─────────── */}
-      <div className="mb-6 flex items-center gap-3">
+      <div className="relative mb-6 flex items-center gap-3">
+        <PageInfoButton
+          description={PAGE_INFO['/core/checkin']}
+          className="absolute right-0 top-0"
+        />
         <LegacyBackLink
           href={returnTo}
           className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
@@ -689,7 +695,7 @@ function CheckinPageContent() {
         </div>
         <Link
           href="/core/checkin/historie"
-          className="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
+          className="ml-auto mr-8 flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
           title="Vorige check-ins bekijken"
         >
           <History className="h-3.5 w-3.5" />

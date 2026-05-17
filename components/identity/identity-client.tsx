@@ -14,6 +14,8 @@ import {
   levelCriteriaMap,
 } from '@/lib/identity-constants'
 import type { IdentityPageData } from '@/lib/identity-data-loader'
+import { PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 interface IdentityClientProps {
   initialData: IdentityPageData
@@ -78,7 +80,11 @@ export default function IdentityClient({ initialData }: IdentityClientProps) {
       {/* Editorial page header — blueprint Type 1 / Type 8 hybride.
           Identity is cross-module: --module-active-* valt terug op ink-shades,
           highlight-marker fallback = Horizon-200 (universele uitkomst-marker). */}
-      <header className="mb-6 sm:mb-8 space-y-2">
+      <header className="relative mb-6 sm:mb-8 space-y-2">
+        <PageInfoButton
+          description={PAGE_INFO['/identity']}
+          className="absolute right-0 top-0"
+        />
         {/* Kicker met 28×1px streep */}
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
           <span

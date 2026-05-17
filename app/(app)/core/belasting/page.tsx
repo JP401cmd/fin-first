@@ -14,6 +14,8 @@ import {
   Sparkles, SlidersHorizontal, Shield, Building2, AlertTriangle,
 } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { PageInfoButton, GlossaryTerm } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 const Box3PartnerModal = dynamic(
   () => import('@/components/app/core/box3-partner-modal').then((m) => ({ default: m.Box3PartnerModal })),
@@ -222,14 +224,18 @@ export default function BelastingPage() {
         <div className="h-1.5 bg-kern-500" />
         <div className="p-4 sm:p-6 md:p-8">
           {/* Editorial header — blueprint Type 10 (Calculator) */}
-          <header className="mb-3 sm:mb-4 space-y-1.5">
+          <header className="relative mb-3 sm:mb-4 space-y-1.5">
+            <PageInfoButton
+              description={PAGE_INFO['/core/belasting']}
+              className="absolute right-0 top-0"
+            />
             <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
               <span
                 aria-hidden
                 className="inline-block h-px w-7 shrink-0"
                 style={{ background: 'var(--module-active-500)' }}
               />
-              Box 3 · vermogensheffing {year}
+              <GlossaryTerm term="box_3">Box 3</GlossaryTerm> · vermogensheffing {year}
             </div>
             <div className="flex items-center gap-3">
               <Calculator
@@ -395,6 +401,9 @@ export default function BelastingPage() {
                   />
                   <CalcRow label="Aftrekbare schulden" value={activeResult.aftrekbareSchulden} />
                   <div className="h-px bg-[var(--border-ed)]" />
+                  <p className="text-[11px] text-[var(--ink-3)] italic leading-relaxed">
+                    Het <GlossaryTerm term="forfaitair_rendement">forfaitair rendement</GlossaryTerm> is het fictieve rendement dat de Belastingdienst hanteert — niet je werkelijke opbrengst.
+                  </p>
                   <CalcRow
                     label="Forfaitair rendement spaargeld"
                     value={activeResult.forfaitairSpaargeld}
@@ -525,7 +534,7 @@ export default function BelastingPage() {
                         <div>
                           <p className="text-xs font-semibold text-[var(--ink)] mb-1">Fiscaal partnerschap</p>
                           <p className="text-xs text-[var(--ink-2)] leading-relaxed">
-                            Als fiscaal partners mogen jullie Box 3 vermogen onderling verdelen. Elke partner heeft een eigen heffingsvrij vermogen van{' '}
+                            Als fiscaal partners mogen jullie <GlossaryTerm term="box_3">Box 3</GlossaryTerm> vermogen onderling verdelen. Elke partner heeft een eigen <GlossaryTerm term="heffingsvrij_vermogen">heffingsvrij vermogen</GlossaryTerm> van{' '}
                             <span className="font-mono font-semibold tabular-nums">
                               {fc(activeResult?.params.heffingsvrijSingle ?? 0)}
                             </span>{' '}

@@ -64,6 +64,8 @@ import { Users } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 
 type Goal = BudgetGoal
@@ -117,7 +119,11 @@ function BudgetEditorialHeader({
   const werkelijkBedrag = formatMaskedCurrency(Math.abs(werkelijkRuimte), masked)
 
   return (
-    <header className="mb-6 space-y-3">
+    <header className="relative mb-6 space-y-3">
+      <PageInfoButton
+        description={PAGE_INFO['/core/budgets']}
+        className="absolute right-0 top-0"
+      />
       <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
         <span
           aria-hidden

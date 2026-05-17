@@ -14,7 +14,9 @@ import {
   OrnamentColophon,
   SectionLabel,
   TogglePill,
+  PageInfoButton,
 } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import { SectionDivider } from '@/components/app/section-divider'
 import { formatTimestamp } from '@/lib/format'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
@@ -210,7 +212,11 @@ export default function RapportagesPage() {
     <div className="mx-auto max-w-[720px] px-4 py-6 md:px-8">
       <NavStackMeta title="Rapportages" bottomBar={{ kind: 'tabs' }} />
       {/* Editorial header — Type 1 Module-landing */}
-      <header className="mb-6 space-y-3">
+      <header className="relative mb-6 space-y-3">
+        <PageInfoButton
+          description={PAGE_INFO['/rapportages']}
+          className="absolute right-0 top-0"
+        />
         <Kicker>Rapportages</Kicker>
         <EditorialHeadline level="h1" size="lg" emphasis="archief">
           Jouw financieel archief

@@ -17,8 +17,10 @@ import type { ReactNode } from 'react'
 // Re-export GlossaryTerm (lives in own file due to state/effects)
 export { GlossaryTerm } from './glossary-term'
 export type { GlossaryTermProps } from './glossary-term'
+// Re-export PageInfoButton (page context popover)
+export { PageInfoButton } from './page-info-button'
 // Re-export glossary data for consumers that need the full record
-export { GLOSSARY, GLOSSARY_ENTRIES, getGlossaryExplanation } from '@/lib/glossary-data'
+export { GLOSSARY, GLOSSARY_ENTRIES, JARGON_VERTAALTABEL, getGlossaryExplanation, getGlossaryAlternative } from '@/lib/glossary-data'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
