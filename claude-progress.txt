@@ -1,3 +1,36 @@
+## Session 2026-05-18 - Features #838, #839
+
+### Feature #838: Hefboom-mapping van recommendation type-tags naar 4 hefbomen - PASSING
+- Created `lib/lever-mapping.ts` with 3-layer mapping: exact → prefix → fallback
+- LeverId type: 'assets' | 'debts' | 'cashflow' | 'tax'
+- Exact mappings: budget_optimization→cashflow, asset_reallocation→assets, debt_acceleration→debts, income_increase→cashflow, savings_boost→cashflow
+- Prefix mappings: investment_*→assets, tax_*→tax, debt_*→debts, budget_*→cashflow, income_*→cashflow, savings_*→cashflow
+- Fallback for unknown tags: 'cashflow'
+- Public API: tagToLever(), tagsToLevers(), isLever(), LEVER_LABELS
+- 18 test cases in test/lever-mapping.test.ts — all passing
+- Commit: e2417cc1
+
+### Feature #839: Hefboom-filter op recommendations/acties lijst - PASSING
+- Added lever filter toolbar to ActionCenter component (action-center.tsx)
+- 5 filter chips: "Alle" + Cashflow + Bezittingen + Schulden + Belasting
+- Each chip shows count of active (pending recs + open actions) per lever
+- Toggle behavior: click active filter to reset back to "Alle"
+- Filtering uses useMemo with getRecommendationLever(rec) and getActionLever(action)
+- Actions without linked recommendation type fall back to cashflow
+- DOM snapshot verified: toolbar, all 5 chips, counts, pressed state all correct
+- Note: full click testing blocked by pre-existing parse error in instellingen/page.tsx overlay
+- Commit: 9e9a8b85
+
+### Files Created
+- lib/lever-mapping.ts — lever type, labels, tagToLever mapping with 3 layers
+- test/lever-mapping.test.ts — 18 test cases for all mapping scenarios
+
+### Files Modified
+- components/will/action-center.tsx — lever filter state, chips UI, filtered lists
+
+### Current Status
+- 2 features completed this session (#838, #839)
+
 ## Session 2026-05-18 - Features #861, #862
 
 ### Feature #861: Jargon vertaaltabel aangemaakt - PASSING
