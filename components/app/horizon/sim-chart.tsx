@@ -149,7 +149,7 @@ export const SimChart = memo(function SimChart({
     ? Math.max(...scenarioOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
     : 0
   const mcMax = monteCarloOverlay
-    ? Math.max(...monteCarloOverlay.p75.filter((_, i) => {
+    ? Math.max(...monteCarloOverlay.p90.filter((_, i) => {
         const age = monteCarloOverlay.startAge + i
         return age >= minAge && age <= maxAge
       }))
@@ -277,7 +277,7 @@ export const SimChart = memo(function SimChart({
 
   const yFireDot = fireFractionalPt !== null ? PAD.top + yScale(Math.max(fireFractionalPt[1], 0)) : null
 
-  // Pre-compute Monte Carlo band SVG paths
+  // Pre-compute Monte Carlo band SVG paths (gradient confidence band)
   const mcPaths = monteCarloOverlay ? (() => {
     const mc = monteCarloOverlay
     function bandPath(upper: number[], lower: number[]): string {
@@ -305,9 +305,19 @@ export const SimChart = memo(function SimChart({
         return `${cmd} ${x.toFixed(1)} ${y.toFixed(1)}`
       }).filter(Boolean).join(' ')
     }
+    // Additional bands for smoother gradient effect (interpolated percentiles)
+    function interpolatePercentile(a: number[], b: number[], t: number): number[] {
+      return a.map((v, i) => v + (b[i] - v) * t)
+    }
+    const p15 = interpolatePercentile(mc.p10, mc.p25, 0.5)
+    const p35 = interpolatePercentile(mc.p25, mc.p50, 0.5)
+    const p65 = interpolatePercentile(mc.p50, mc.p75, 0.5)
+    const p85 = interpolatePercentile(mc.p75, mc.p90, 0.5)
     return {
-      outer: bandPath(mc.p90, mc.p10),
-      inner: bandPath(mc.p75, mc.p25),
+      outermost: bandPath(mc.p90, mc.p10),       // p10-p90: lightest
+      outerMid: bandPath(p85, p15),               // p15-p85: slightly denser
+      inner: bandPath(mc.p75, mc.p25),            // p25-p75: medium
+      innerMid: bandPath(p65, p35),               // p35-p65: denser
       median: linePath(mc.p50),
     }
   })() : null
@@ -600,17 +610,52 @@ export const SimChart = memo(function SimChart({
           />
         )}
 
-        {/* Monte Carlo percentile bands (furthest back layer) */}
+        {/* Monte Carlo gradient confidence band */}
         {mcPaths && (
           <g style={{
             opacity: hasEntered ? 1 : 0,
-            transition: hasEntered ? 'opacity 0.6s ease 0.2s' : 'none',
+            transition: hasEntered ? 'opacity 0.8s ease 0.2s' : 'none',
           }}>
-            {mcPaths.outer && <path d={mcPaths.outer} fill="var(--hor-t, #8a6e42)" opacity={0.07} />}
-            {mcPaths.inner && <path d={mcPaths.inner} fill="var(--hor-t, #8a6e42)" opacity={0.1} />}
+            {/* SVG gradient definition for confidence band fade */}
+            <defs>
+              <linearGradient id="mc-band-gradient-v" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0" />
+                <stop offset="35%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.18" />
+                <stop offset="50%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.25" />
+                <stop offset="65%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="mc-band-gradient-h" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="var(--color-horizon-600, #a07840)" stopOpacity="0.4" />
+              </linearGradient>
+            </defs>
+            {/* Outermost band: p10-p90 — lightest layer */}
+            {mcPaths.outermost && (
+              <path d={mcPaths.outermost} fill="url(#mc-band-gradient-v)" opacity={0.5} />
+            )}
+            {/* Outer-mid band: p15-p85 — slightly denser */}
+            {mcPaths.outerMid && (
+              <path d={mcPaths.outerMid} fill="var(--color-horizon-600, #a07840)" opacity={0.06} />
+            )}
+            {/* Inner band: p25-p75 — medium density */}
+            {mcPaths.inner && (
+              <path d={mcPaths.inner} fill="var(--color-horizon-600, #a07840)" opacity={0.09} />
+            )}
+            {/* Inner-mid band: p35-p65 — densest fill near median */}
+            {mcPaths.innerMid && (
+              <path d={mcPaths.innerMid} fill="var(--color-horizon-600, #a07840)" opacity={0.1} />
+            )}
+            {/* Median line: p50 — clear solid line */}
             {mcPaths.median && (
               <path d={mcPaths.median} fill="none"
-                stroke="var(--hor-t, #8a6e42)" strokeWidth={1} strokeDasharray="4 3" opacity={0.4} />
+                stroke="var(--color-horizon-600, #a07840)" strokeWidth={1.8}
+                strokeLinecap="round" strokeLinejoin="round" opacity={0.7}
+                pathLength={1}
+                strokeDasharray="1"
+                strokeDashoffset={hasEntered ? 0 : 1}
+                style={{ transition: hasEntered ? 'stroke-dashoffset 1s cubic-bezier(.22,1,.36,1) 0.3s' : 'none' }}
+              />
             )}
           </g>
         )}

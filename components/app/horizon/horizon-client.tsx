@@ -69,6 +69,8 @@ import { usePerspective } from '@/components/app/perspective-provider'
 import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, ResilienceContextMessage, ResilienceTrendChart, FireAgeContextMessage, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 const ScenariosModal = dynamic(() =>
   import('@/components/app/horizon/scenarios-modal').then(m => ({ default: m.ScenariosModal })),
@@ -2201,7 +2203,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   return (
     <div className="mx-auto max-w-6xl py-5 sm:py-8">
       {/* === Editorial header — blueprint Type 1 (Module-landing) === */}
-      <header className="mb-6 space-y-2 px-4 sm:px-6">
+      <header className="relative mb-6 space-y-2 px-4 sm:px-6">
+        <PageInfoButton
+          description={PAGE_INFO['/horizon']}
+          className="absolute right-4 top-0 sm:right-6"
+        />
         {/* Kicker met 28×1px Horizon-streep */}
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
           <span
@@ -2805,8 +2811,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </ChartOverlayExplainer>
 
               <ChartOverlayExplainer active={mcExpanded && !!mcData}>
-                <em>Monte Carlo</em> simuleert duizend marktverlopen — de bandbreedte
-                toont de range van uitkomsten, de stippellijn de mediane uitkomst.
+                <em>Monte Carlo</em> simuleert duizend marktverlopen — de gradient-band
+                toont de range van uitkomsten, de centrale lijn de mediane uitkomst.
                 Het percentage is de geschatte kans dat je geld het volhoudt.
               </ChartOverlayExplainer>
 
