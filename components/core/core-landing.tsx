@@ -20,7 +20,8 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import type { QuickAddIntent } from '@/lib/quick-add/types'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { computeHealthScoreFromInputs, type HealthScore } from '@/lib/financial-health'
+import { computeHealthScoreFromInputs, type HealthScore, type HealthPillar } from '@/lib/financial-health'
+import { GlossaryTerm } from '@/components/editorial'
 import { CoreHero } from './core-hero'
 import { NetWorthProjectionChart } from './net-worth-projection-chart'
 import { SectionHeader } from './section-header'
@@ -287,6 +288,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
   const toekomstActive = activeModules.includes('toekomstplannen')
 
   const [showNetWorthReceipt, setShowNetWorthReceipt] = useState(false)
+  const [showHealthReceipt, setShowHealthReceipt] = useState(false)
   const [quickAddIntent, setQuickAddIntent] = useState<QuickAddIntent | null>(null)
 
   const fireSnapshot = useMemo(() => computeFireSnapshot(initialData), [initialData])
@@ -461,6 +463,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
         fireTarget={fireSnapshot.target}
         healthScore={healthScore}
         onShowNetWorthReceipt={() => setShowNetWorthReceipt(true)}
+        onShowHealthReceipt={() => setShowHealthReceipt(true)}
       />
 
       {/* Netto-vermogen projectiechart — toont vermogenspad tot pensioen */}
@@ -615,6 +618,16 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
           totalDebts={totalDebts}
           netWorth={netWorth}
         />
+      </BottomSheet>
+
+      {/* Gezondheidsscore drill-down kassabon */}
+      <BottomSheet
+        open={showHealthReceipt}
+        onClose={() => setShowHealthReceipt(false)}
+        title="Financiële Gezondheid"
+        size="md"
+      >
+        <HealthScoreKassabon healthScore={healthScore} />
       </BottomSheet>
     </div>
   )
@@ -816,6 +829,166 @@ function KassabonGroup({
           />
         </span>
       </div>
+    </div>
+  )
+}
+
+// ── Health-score drill-down kassabon ─────────────────────────
+
+/** Kleur-class op basis van pilaar-score. */
+function pillarScoreColorClass(score: number): string {
+  if (score >= 80) return 'text-score-good'
+  if (score >= 60) return 'text-score-ok'
+  if (score >= 40) return 'text-score-warn'
+  return 'text-score-bad'
+}
+
+function pillarBarColorClass(score: number): string {
+  if (score >= 80) return 'bg-score-good'
+  if (score >= 60) return 'bg-score-ok'
+  if (score >= 40) return 'bg-score-warn'
+  return 'bg-score-bad'
+}
+
+/**
+ * Gedetailleerde kassabon voor de financiële gezondheidsscore.
+ *
+ * Toont:
+ * 1. Totaalscore met label en trend
+ * 2. Per pilaar: score-bar, waarde, uitleg, verbetertip
+ * 3. Berekeningsnota
+ *
+ * Volgt het kassabon-patroon (krant-stijl bon) uit de design language.
+ */
+function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
+  // Sorteer pilaren: zwakste bovenaan (meeste aandacht nodig)
+  const sortedPillars = [...healthScore.pillars].sort((a, b) => a.score - b.score)
+  const weakest = sortedPillars.filter(p => p.score < 60)
+
+  return (
+    <div className="space-y-4 p-5">
+      {/* Header: totaalscore + label */}
+      <KassabonShell>
+        <div className="flex items-center justify-between border-b border-dashed border-[var(--border-md)] pb-2 mb-2">
+          <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+            Financiële gezondheid
+          </span>
+          <span className={`font-mono text-lg font-bold tabular-nums ${pillarScoreColorClass(healthScore.total)}`}>
+            {healthScore.total}/100
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-sans text-[var(--ink-3)]">Beoordeling</span>
+          <span className={`font-medium ${pillarScoreColorClass(healthScore.total)}`}>
+            {healthScore.label}
+          </span>
+        </div>
+        {healthScore.previousMonth !== null && (
+          <div className="flex items-center justify-between text-xs mt-1">
+            <span className="font-sans text-[var(--ink-3)]">Vorige maand</span>
+            <span className="font-mono tabular-nums text-[var(--ink-2)]">{healthScore.previousMonth}/100</span>
+          </div>
+        )}
+        {healthScore.trend !== 0 && (
+          <div className="flex items-center justify-between text-xs mt-1">
+            <span className="font-sans text-[var(--ink-3)]">Verandering</span>
+            <span className={`font-mono tabular-nums font-medium ${healthScore.trend > 0 ? 'text-positive' : 'text-negative'}`}>
+              {healthScore.trend > 0 ? '+' : ''}{healthScore.trend}
+            </span>
+          </div>
+        )}
+        <div className="border-t border-dashed border-[var(--border-md)] mt-2 pt-2 text-[10px] text-[var(--ink-3)]">
+          Score = gewogen gemiddelde van {healthScore.activePillarCount} pilaren
+        </div>
+      </KassabonShell>
+
+      {/* Per-pilaar breakdown — zwakste bovenaan */}
+      <div className="space-y-3">
+        <h3 className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+          Pilaren (zwakste eerst)
+        </h3>
+        {sortedPillars.map(pillar => (
+          <HealthPillarCard key={pillar.id} pillar={pillar} />
+        ))}
+      </div>
+
+      {/* Verbeterpunten — alleen als er zwakke pilaren zijn */}
+      {weakest.length > 0 && (
+        <div className="rounded-[var(--r-sm)] border border-amber-200 bg-amber-50/50 p-3">
+          <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700 mb-2">
+            Aandachtspunten
+          </p>
+          <ul className="space-y-1.5">
+            {weakest.slice(0, 3).map(p => (
+              <li key={p.id} className="text-xs text-[var(--ink-2)] leading-snug">
+                <span className="font-semibold text-[var(--ink)]">{p.name}:</span>{' '}
+                {p.improvementTip}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Footer-nota */}
+      <p className="text-center font-sans text-[10px] text-[var(--ink-4)] leading-relaxed">
+        Score gebaseerd op{' '}
+        <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm>,{' '}
+        <GlossaryTerm term="schuldgraad" explanation="Het aandeel van je bezittingen dat met schulden is gefinancierd. Lager is gezonder.">schuldratio</GlossaryTerm>,{' '}
+        noodfonds,{' '}
+        <GlossaryTerm term="FIRE">FIRE</GlossaryTerm>-voortgang,{' '}
+        diversificatie{healthScore.budgetingActive ? ' en budgetdiscipline' : ''}.
+        Herberekend bij elke paginaweergave.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Individuele pilaar-kaart in de drill-down kassabon.
+ * Toont: naam + gewicht, score-bar, huidige waarde, uitleg en verbettertip.
+ */
+function HealthPillarCard({ pillar }: { pillar: HealthPillar }) {
+  const clamp = Math.max(0, Math.min(pillar.score, 100))
+  const weightPct = Math.round(pillar.weight * 100)
+
+  return (
+    <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] p-3">
+      {/* Pilaar naam + score */}
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-sans text-sm font-semibold text-[var(--ink)]">{pillar.name}</span>
+          <span className="font-sans text-[10px] text-[var(--ink-4)]">{weightPct}%</span>
+        </div>
+        <span className={`font-mono text-sm font-bold tabular-nums ${pillarScoreColorClass(pillar.score)}`}>
+          {pillar.score}
+        </span>
+      </div>
+
+      {/* Score bar */}
+      <div className="h-[5px] w-full overflow-hidden bg-[var(--subtle)] mb-2">
+        <div
+          className={`h-full ${pillarBarColorClass(clamp)}`}
+          style={{ width: `${clamp}%` }}
+        />
+      </div>
+
+      {/* Huidige waarde */}
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="font-sans text-[var(--ink-3)]">Huidige waarde</span>
+        <span className="font-mono tabular-nums text-[var(--ink-2)]">{pillar.rawValue}</span>
+      </div>
+
+      {/* Uitleg */}
+      <p className="font-sans text-[11px] text-[var(--ink-2)] leading-snug">
+        {pillar.explanation}
+      </p>
+
+      {/* Verbetettip — alleen tonen bij score < 80 */}
+      {pillar.score < 80 && (
+        <p className="mt-1.5 font-serif text-[11px] italic text-[var(--ink-3)] leading-snug">
+          Tip: {pillar.improvementTip}
+        </p>
+      )}
     </div>
   )
 }

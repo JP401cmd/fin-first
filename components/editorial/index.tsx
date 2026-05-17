@@ -14,6 +14,10 @@
 
 import type { ReactNode } from 'react'
 
+// Re-export GlossaryTerm (lives in own file due to state/effects)
+export { GlossaryTerm, GLOSSARY } from './glossary-term'
+export type { GlossaryTermProps } from './glossary-term'
+
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 

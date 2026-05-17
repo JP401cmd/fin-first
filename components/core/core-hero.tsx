@@ -9,7 +9,7 @@ import {
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { Kicker, HighlightMark, FiguresStrip } from '@/components/editorial'
+import { Kicker, HighlightMark, FiguresStrip, GlossaryTerm } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import type { HealthScore } from '@/lib/financial-health'
@@ -43,6 +43,8 @@ interface CoreHeroProps {
   onShowNetWorthReceipt?: () => void
   /** Klik op de FIRE-bar → open FIRE-kassabon. */
   onShowFireReceipt?: () => void
+  /** Klik op de gezondheidsscore → open drill-down kassabon. */
+  onShowHealthReceipt?: () => void
 }
 
 /**
@@ -68,6 +70,7 @@ export function CoreHero({
   healthScore,
   onShowNetWorthReceipt,
   onShowFireReceipt,
+  onShowHealthReceipt,
 }: CoreHeroProps) {
   // useFlashChange leeft binnen HeroAmount zelf — flashClass-updates triggeren
   // dan alleen een re-render van die span en niet van de omhullende button
@@ -128,7 +131,7 @@ export function CoreHero({
             <HeroAmount netWorth={netWorth} />
           )}
           <span className="font-serif text-base italic text-[var(--ink-3)] sm:text-lg">
-            netto vermogen
+            <GlossaryTerm term="netto_vermogen">netto vermogen</GlossaryTerm>
           </span>
         </div>
 
@@ -140,7 +143,7 @@ export function CoreHero({
         )}
 
         {/* Gezondheidsscore — prominent SVG-gauge met pilaar-bars */}
-        <HealthScoreHero healthScore={healthScore} />
+        <HealthScoreHero healthScore={healthScore} onClick={onShowHealthReceipt} />
 
         {/* FIRE-voortgangsbar — kern-bruin, met % links + doelbedrag rechts */}
         {toekomstActive ? (
@@ -376,11 +379,24 @@ function HeroHealthGauge({ score, size = 88 }: { score: number; size?: number })
  * Toont een semi-circulaire gauge (links) met label + pilaar-bars (rechts).
  * Compact genoeg om niet te concurreren met het netto-vermogen, maar
  * prominent genoeg om de financiële gezondheid als eerste-orde metric te tonen.
+ * Klikbaar wanneer `onClick` is meegegeven — opent de drill-down kassabon.
  */
-function HealthScoreHero({ healthScore }: { healthScore: HealthScore }) {
+function HealthScoreHero({ healthScore, onClick }: { healthScore: HealthScore; onClick?: () => void }) {
+  const Wrapper: React.ElementType = onClick ? 'button' : 'div'
+  const wrapperProps = onClick
+    ? {
+        type: 'button' as const,
+        onClick,
+        className:
+          'mt-5 w-full text-left border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-4 sm:px-5 transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] cursor-pointer',
+      }
+    : {
+        className: 'mt-5 border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-4 sm:px-5',
+      }
+
   return (
-    <div
-      className="mt-5 border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-4 sm:px-5"
+    <Wrapper
+      {...wrapperProps}
       data-testid="health-score-hero"
     >
       <div className="flex items-start gap-4 sm:gap-5">
@@ -420,7 +436,12 @@ function HealthScoreHero({ healthScore }: { healthScore: HealthScore }) {
           </div>
         </div>
       </div>
-    </div>
+      {onClick && (
+        <p className="mt-2 text-right text-[9px] text-[var(--ink-4)] tracking-wide">
+          Tik voor details ›
+        </p>
+      )}
+    </Wrapper>
   )
 }
 
