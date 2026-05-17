@@ -77,6 +77,7 @@ export default async function AppLayout({
     matrixRes,
     lastLevelRes,
     actionsCountRes,
+    budgetCountRes,
   ] = await Promise.all([
     // profile-select bevat alleen velden voor sidebar/feature-access/theming.
     supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules').eq('id', user.id).single(),
@@ -101,6 +102,10 @@ export default async function AppLayout({
     // `openActions` uit will-data-loader.ts (open + postponed). Head-only +
     // count: 'exact' = geen rows-payload, alleen totaal.
     supabase.from('actions').select('id', { count: 'exact', head: true }).in('status', ['open', 'postponed']),
+    // Budget-count: coach-bubble data-gap detectie. Head-only + count: 'exact'
+    // = minimale payload (geen rows). Telt alleen top-level budgets
+    // (parent_id is null) zodat sub-budgets niet meetellen.
+    supabase.from('budgets').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('parent_id', null),
   ])
 
   const profile = profileRes.data
@@ -235,6 +240,16 @@ export default async function AppLayout({
     box3TaxableAboveThreshold,
   })
 
+  // ── Coach-bubble data gaps ──────────────────────────────
+  // Lichtgewicht signalen voor de post-onboarding coach-bubble.
+  // Prioriteit: bank > assets > budget > goals (zie feature #792).
+  const coachDataGaps = {
+    hasBank: assetRows.some(a => a.asset_type === 'cash'),
+    hasAssets: assetRows.length > 0,
+    hasBudgets: (budgetCountRes.count ?? 0) > 0,
+    hasGoals: sidebarActionCount > 0,
+  }
+
   // ── Module colors (SSR) ────────────────────────────────
   const mc = profile?.module_colors as Record<string, string> | null
   const moduleColors: ModuleColorConfig = {
@@ -309,7 +324,7 @@ export default async function AppLayout({
                       </FeatureAccessProvider>
                       <ChatPanel />
                       <Suspense fallback={null}>
-                        <CoachBubble />
+                        <CoachBubble dataGaps={coachDataGaps} />
                       </Suspense>
                     </div>
                   </DashboardTypeProvider>

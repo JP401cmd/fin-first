@@ -9,20 +9,86 @@ import { WillDots } from '@/components/app/will-dots'
 // ── localStorage key ────────────────────────────────────────────────────
 const DISMISSED_KEY = 'trifinity_coach_bubble_dismissed'
 
-// ── Path-based coaching suggestions ─────────────────────────────────────
-//
-// Each suggestion contains:
-//  - message:  The friendly coaching text
-//  - cta:      Button label
-//  - ctaHref:  Optioneel — als de actie een navigatie is i.p.v. een pagina-
-//              element. Wanneer undefined scrollt de pagina naar de eerste
-//              actionable sectie.
+// ── Types ───────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
   message: string
   cta: string
   ctaHref?: string
 }
+
+/**
+ * Data-gap signalen vanuit de server-layout. Bepalen welke contextuele
+ * suggestie de coach-bubble toont. Prioriteit (feature #792):
+ *   bank > assets > budget > goals
+ */
+export type CoachDataGaps = {
+  /** Heeft de gebruiker minstens één bankrekening (asset type=cash)? */
+  hasBank: boolean
+  /** Heeft de gebruiker minstens één actief asset? */
+  hasAssets: boolean
+  /** Heeft de gebruiker minstens één top-level budget? */
+  hasBudgets: boolean
+  /** Heeft de gebruiker openstaande acties/doelen? */
+  hasGoals: boolean
+}
+
+// ── Data-gap-based suggestions (prioriteit: bank > assets > budget > goals) ──
+
+const DATA_GAP_SUGGESTIONS: {
+  check: (gaps: CoachDataGaps) => boolean
+  suggestion: CoachSuggestion
+}[] = [
+  {
+    // Hoogste prioriteit: geen bankrekening
+    check: (g) => !g.hasBank,
+    suggestion: {
+      message: 'Koppel je bankrekening om automatisch je saldo en transacties te importeren.',
+      cta: 'Bank koppelen',
+      ctaHref: '/identity/koppelingen',
+    },
+  },
+  {
+    // Geen assets (maar eventueel wel bank — bank is ook een asset)
+    check: (g) => !g.hasAssets,
+    suggestion: {
+      message: 'Voeg je vermogen toe — spaargeld, beleggingen, je woning — voor een compleet financieel beeld.',
+      cta: 'Vermogen toevoegen',
+      ctaHref: '/core/assets',
+    },
+  },
+  {
+    // Heeft bank + assets, maar geen budget
+    check: (g) => !g.hasBudgets,
+    suggestion: {
+      message: 'Stel je eerste budget in om grip te krijgen op je maandelijkse uitgaven.',
+      cta: 'Budget instellen',
+      ctaHref: '/core/budgets',
+    },
+  },
+  {
+    // Heeft alles behalve doelen
+    check: (g) => !g.hasGoals,
+    suggestion: {
+      message: 'Stel je financiële doelen in — zo weet je precies waar je naartoe werkt.',
+      cta: 'Doelen bekijken',
+      ctaHref: '/will',
+    },
+  },
+]
+
+/**
+ * Bepaal de meest impactvolle suggestie op basis van data-gaps.
+ * Retourneert null als er geen gap is (alles is ingevuld).
+ */
+function getDataGapSuggestion(gaps: CoachDataGaps): CoachSuggestion | null {
+  for (const entry of DATA_GAP_SUGGESTIONS) {
+    if (entry.check(gaps)) return entry.suggestion
+  }
+  return null
+}
+
+// ── Path-based coaching suggestions (fallback) ──────────────────────────
 
 const PATH_SUGGESTIONS: Record<string, CoachSuggestion> = {
   '/core/budgets': {
@@ -61,7 +127,7 @@ const DEFAULT_SUGGESTION: CoachSuggestion = {
  * Zoek de beste suggestie op basis van het huidige pad.
  * Matcht eerst exact, dan prefix (bv. `/core/assets/cash` → `/core`).
  */
-function getSuggestion(pathname: string): CoachSuggestion {
+function getPathSuggestion(pathname: string): CoachSuggestion {
   if (PATH_SUGGESTIONS[pathname]) return PATH_SUGGESTIONS[pathname]
 
   // Prefix-match: langste prefix eerst
@@ -79,19 +145,30 @@ function getSuggestion(pathname: string): CoachSuggestion {
 
 // ── Component ───────────────────────────────────────────────────────────
 
+export type CoachBubbleProps = {
+  /**
+   * Data-gap signalen vanuit de server-layout (feature #792). Wanneer
+   * aanwezig, overruled de data-gap-suggestie de pad-gebaseerde suggestie.
+   * Prioriteit: bank > assets > budget > goals. Wanneer er geen gap
+   * gedetecteerd is, valt de bubble terug op pad-gebaseerde suggesties.
+   */
+  dataGaps?: CoachDataGaps
+}
+
 /**
  * CoachBubble — Verschijnt na onboarding-voltooiing (`?welcome=1`) als
  * een vriendelijke, niet-blokkerende coaching-tip. De WillDots-mascotte
  * begeleidt de gebruiker naar hun eerste meaningvolle actie.
  *
  * Kenmerken:
- *  - Pad-afhankelijke suggestie (per landing-page na onboarding)
+ *  - Data-gap-gebaseerde suggestie (bank > assets > budget > goals)
+ *  - Fallback naar pad-afhankelijke suggestie
  *  - 1.5s vertraging zodat WelcomeBanner eerst verschijnt
  *  - Persistente dismissal via localStorage
  *  - Auto-dismissal na 45 seconden
  *  - Niet-blokkerend: fixed position, pagina blijft bruikbaar
  */
-export function CoachBubble() {
+export function CoachBubble({ dataGaps }: CoachBubbleProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -145,7 +222,9 @@ export function CoachBubble() {
 
   if (!visible) return null
 
-  const suggestion = getSuggestion(pathname)
+  // Data-gap-suggestie heeft voorrang boven pad-gebaseerde suggestie
+  const suggestion = (dataGaps && getDataGapSuggestion(dataGaps))
+    ?? getPathSuggestion(pathname)
 
   return (
     <div
