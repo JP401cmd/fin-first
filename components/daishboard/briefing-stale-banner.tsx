@@ -2,21 +2,24 @@
 
 import { RefreshCw } from 'lucide-react'
 import { formatTimestamp } from '@/lib/format'
+import type { BriefingCadence } from '@/lib/briefing/user-preferences'
+import { getStaleThresholdMs } from '@/lib/briefing/user-preferences'
 
 interface BriefingStaleBannerProps {
   composedAt: string
   dataChanged: boolean
   onRefresh: () => void
   refreshing: boolean
+  cadence: BriefingCadence
 }
 
-function isStale(composedAt: string): boolean {
+function isStale(composedAt: string, cadence: BriefingCadence): boolean {
   const ms = Date.now() - new Date(composedAt).getTime()
-  return ms / (1000 * 60 * 60) >= 24
+  return ms >= getStaleThresholdMs(cadence)
 }
 
-export function BriefingStaleBanner({ composedAt, dataChanged, onRefresh, refreshing }: BriefingStaleBannerProps) {
-  if (!isStale(composedAt)) return null
+export function BriefingStaleBanner({ composedAt, dataChanged, onRefresh, refreshing, cadence }: BriefingStaleBannerProps) {
+  if (!isStale(composedAt, cadence)) return null
 
   const label = formatTimestamp(composedAt)
 

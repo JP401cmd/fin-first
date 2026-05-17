@@ -7,8 +7,40 @@ import { getEngagementSummary, getModuleEngagementSummary } from './engagement'
 const FEEDBACK_KEY = 'briefing_feedback_history'
 const VISITS_KEY = 'briefing_visits'
 const BRIEFING_PREFS_KEY = 'briefing_content_prefs'
+const CADENCE_KEY = 'briefing_cadence'
 const MAX_VISITS = 30
 const MIN_DATA_POINTS = 10
+
+// ── Briefing cadence preference (daily / weekly) ──────────────
+
+export type BriefingCadence = 'daily' | 'weekly'
+
+/** Stale threshold in milliseconds per cadence setting */
+const STALE_MS_BY_CADENCE: Record<BriefingCadence, number> = {
+  daily: 24 * 60 * 60 * 1000,    // 24 hours
+  weekly: 7 * 24 * 60 * 60 * 1000, // 7 days
+}
+
+/** Read the user's chosen briefing cadence from localStorage */
+export function readBriefingCadence(): BriefingCadence {
+  try {
+    const raw = localStorage.getItem(CADENCE_KEY)
+    if (raw === 'daily' || raw === 'weekly') return raw
+  } catch { /* SSR / storage errors */ }
+  return 'daily' // default
+}
+
+/** Save the user's chosen briefing cadence to localStorage */
+export function saveBriefingCadence(cadence: BriefingCadence): void {
+  try {
+    localStorage.setItem(CADENCE_KEY, cadence)
+  } catch { /* quota / SSR */ }
+}
+
+/** Get the stale threshold in ms for the given cadence */
+export function getStaleThresholdMs(cadence: BriefingCadence): number {
+  return STALE_MS_BY_CADENCE[cadence]
+}
 
 export interface BriefingContentPrefs {
   showNextSteps: boolean

@@ -3,10 +3,13 @@
 import { WillDots } from '@/components/app/will-dots'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import type { TemporalContext } from '@/lib/briefing/types'
+import type { BriefingCadence } from '@/lib/briefing/user-preferences'
 
 interface Props {
   temporal: TemporalContext
   userName?: string
+  cadence: BriefingCadence
+  onCadenceChange: (cadence: BriefingCadence) => void
 }
 
 const NL_MONTHS_UPPER: Record<number, string> = {
@@ -19,16 +22,50 @@ const NL_DAYS_UPPER: Record<string, string> = {
   donderdag: 'DONDERDAG', vrijdag: 'VRIJDAG', zaterdag: 'ZATERDAG', zondag: 'ZONDAG',
 }
 
-export function BriefingHeader({ temporal, userName }: Props) {
+export function BriefingHeader({ temporal, userName, cadence, onCadenceChange }: Props) {
   const dateStr = `${NL_DAYS_UPPER[temporal.dayOfWeek] ?? temporal.dayOfWeek.toUpperCase()} ${temporal.dayOfMonth} ${NL_MONTHS_UPPER[temporal.month] ?? ''} ${temporal.year}`
 
   return (
     <header className="mb-6 sm:mb-8">
-      {/* Date line */}
+      {/* Date line with cadence toggle */}
       <div className="flex items-center justify-between border-b border-[var(--border-ed)] pb-2 mb-4">
         <p className="label-editorial text-[var(--ink-3)] tracking-widest text-[10px] sm:text-xs">
           {dateStr}
         </p>
+        {/* Cadence toggle */}
+        <div
+          className="flex rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] p-0.5"
+          role="radiogroup"
+          aria-label="Briefing frequentie"
+          data-testid="briefing-cadence-toggle"
+        >
+          <button
+            type="button"
+            role="radio"
+            aria-checked={cadence === 'daily'}
+            onClick={() => onCadenceChange('daily')}
+            className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-all ${
+              cadence === 'daily'
+                ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
+            }`}
+          >
+            Dagelijks
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={cadence === 'weekly'}
+            onClick={() => onCadenceChange('weekly')}
+            className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-all ${
+              cadence === 'weekly'
+                ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                : 'text-[var(--ink-4)] hover:text-[var(--ink-3)]'
+            }`}
+          >
+            Wekelijks
+          </button>
+        </div>
       </div>
 
       {/* Will's greeting */}

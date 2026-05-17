@@ -6,7 +6,7 @@ import type { BriefingCardSpec, BriefingComposeResponse, TemporalContext, Previo
 import { condenseDashboardData } from '@/lib/briefing/condense'
 import { getVisitedFeaturesLocal } from '@/components/app/discover-carousel'
 import { logCardEngagement } from '@/lib/briefing/engagement'
-import { buildUserPreferenceBlock, persistFeedback, logVisitTimestamp, readVisitTimestamps, detectBriefingFrequency } from '@/lib/briefing/user-preferences'
+import { buildUserPreferenceBlock, persistFeedback, logVisitTimestamp, readVisitTimestamps, detectBriefingFrequency, readBriefingCadence, saveBriefingCadence, getStaleThresholdMs, type BriefingCadence } from '@/lib/briefing/user-preferences'
 import { loadPreviousSnapshot, saveSnapshot, buildSnapshot, detectProgressionEvents } from '@/lib/briefing/progression'
 import { updateSeasonalSnapshot } from '@/lib/briefing/seasonal'
 import { BriefingHeader } from './briefing-header'
@@ -21,9 +21,6 @@ interface Props {
   userName?: string
   aiEnabled?: boolean
 }
-
-/** Stale threshold: 24 hours */
-const STALE_MS = 24 * 60 * 60 * 1000
 
 /** Stable cache key — v3 breaks old sessionStorage cache intentionally */
 const CACHE_KEY = 'briefing_v3'
@@ -165,6 +162,7 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
   const [refreshing, setRefreshing] = useState(false)
   const [polling, setPolling] = useState(false)
   const [cachedHash, setCachedHash] = useState<string | undefined>(undefined)
+  const [cadence, setCadence] = useState<BriefingCadence>('daily')
   const controllerRef = useRef<AbortController | null>(null)
   const hasFetchedRef = useRef(false)
 
@@ -176,9 +174,10 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
     logVisitTimestamp()
   }, [])
 
-  // Read cache after hydration but before paint — avoids hydration mismatch
-  // while preventing a flash of the composing indicator for cached briefings
+  // Read cache and cadence after hydration but before paint — avoids hydration
+  // mismatch while preventing a flash of the composing indicator for cached briefings
   useLayoutEffect(() => {
+    setCadence(readBriefingCadence())
     const cached = readCache()
     if (cached) {
       setCards(cached.cards)
@@ -361,6 +360,11 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
   /** Key for per-session card feedback storage */
   const FEEDBACK_KEY = 'briefing_feedback'
 
+  const handleCadenceChange = useCallback((newCadence: BriefingCadence) => {
+    setCadence(newCadence)
+    saveBriefingCadence(newCadence)
+  }, [])
+
   const handleFeedback = useCallback((cardIndex: number, cardType: string, positive: boolean) => {
     try {
       const raw = sessionStorage.getItem(FEEDBACK_KEY)
@@ -374,7 +378,7 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
-      <BriefingHeader temporal={temporal} userName={userName} />
+      <BriefingHeader temporal={temporal} userName={userName} cadence={cadence} onCadenceChange={handleCadenceChange} />
 
       {!aiEnabled ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -409,17 +413,18 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
               <p className="text-xs text-[var(--ink-4)] animate-pulse">Will stelt je briefing samen...</p>
             </div>
           )}
-          {!composing && composedAt && (Date.now() - new Date(composedAt).getTime()) >= STALE_MS && (
+          {!composing && composedAt && (Date.now() - new Date(composedAt).getTime()) >= getStaleThresholdMs(cadence) && (
             <BriefingStaleBanner
               composedAt={composedAt}
               dataChanged={cachedHash !== undefined && cachedHash !== dataHash}
               onRefresh={handleRefresh}
               refreshing={refreshing}
+              cadence={cadence}
             />
           )}
           <BriefingCardGrid cards={cards} data={data} onCardEngage={handleCardEngage} onFeedback={handleFeedback} />
           {!composing && composedAt && (
-            <BriefingFooter composedAt={composedAt} source="ai" onRefresh={handleRefresh} refreshing={refreshing} />
+            <BriefingFooter composedAt={composedAt} source="ai" onRefresh={handleRefresh} refreshing={refreshing} cadence={cadence} onCadenceChange={handleCadenceChange} />
           )}
         </>
       )}
