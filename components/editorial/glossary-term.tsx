@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { GLOSSARY } from '@/lib/glossary-data'
 
 /**
  * GlossaryTerm — wraps financial jargon with a hover/tap tooltip.
@@ -8,17 +9,18 @@ import { useState, useRef, useEffect, type ReactNode } from 'react'
  * Styling: dotted underline in module-active-700; on hover/tap a popover
  * appears with a short plain-language explanation.
  *
- * Usage:
- *   <GlossaryTerm term="SWR" explanation="Safe Withdrawal Rate — het percentage ...">
- *     SWR
- *   </GlossaryTerm>
+ * Content wordt opgehaald uit `lib/glossary-data.ts` — dezelfde bron als
+ * de ConceptFlipCards in /identity/gids. Eén bron van waarheid.
  *
- * Or with the glossary data helper:
- *   <GlossaryTerm term="netto_vermogen">netto vermogen</GlossaryTerm>
+ * Usage:
+ *   <GlossaryTerm term="SWR">SWR</GlossaryTerm>
+ *
+ * Override explanation (rare, prefer adding to glossary-data.ts):
+ *   <GlossaryTerm term="custom" explanation="Eigen uitleg hier">custom</GlossaryTerm>
  */
 
 export interface GlossaryTermProps {
-  /** The term key (used for lookup in GLOSSARY if no explanation prop). */
+  /** The term key (used for lookup in GLOSSARY from lib/glossary-data.ts). */
   term: string
   /** Override explanation text. If omitted, looks up `term` in GLOSSARY. */
   explanation?: string
@@ -31,7 +33,7 @@ export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps)
   const containerRef = useRef<HTMLSpanElement>(null)
   const tooltipRef = useRef<HTMLSpanElement>(null)
 
-  // Resolve explanation from glossary if not provided
+  // Resolve explanation: prop override → shared glossary → empty
   const text = explanation ?? GLOSSARY[term] ?? ''
 
   // Close on outside click/touch
@@ -107,41 +109,4 @@ export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps)
       </span>
     </span>
   )
-}
-
-// ── Built-in glossary ────────────────────────────────────────────
-// Short, plain-language explanations for common financial terms.
-// Can be extended or overridden via the `explanation` prop.
-
-export const GLOSSARY: Record<string, string> = {
-  netto_vermogen:
-    'Alles wat je bezit (spaargeld, beleggingen, huis) min alles wat je schuldig bent (hypotheek, leningen). Het totaal dat overblijft is jouw netto vermogen.',
-  SWR:
-    'Safe Withdrawal Rate — het percentage van je vermogen dat je jaarlijks kunt opnemen zonder dat het opraakt. Vaak rond de 3-4%.',
-  FIRE:
-    'Financial Independence, Retire Early — het punt waarop je genoeg vermogen hebt om van te leven zonder te hoeven werken.',
-  koopkracht:
-    'De werkelijke waarde van je geld, gecorrigeerd voor inflatie. Door prijsstijgingen koop je over tijd minder met hetzelfde bedrag.',
-  inflatie:
-    'De jaarlijkse stijging van het algemene prijsniveau. Je geld wordt elk jaar iets minder waard als prijzen stijgen.',
-  schuldgraad:
-    'Het percentage van je bezittingen dat met schulden is gefinancierd. Lager is over het algemeen gezonder.',
-  spaarquote:
-    'Het deel van je netto-inkomen dat je maandelijks overhoudt en spaart of belegt. Hoe hoger, hoe sneller je financiele vrijheid bereikt.',
-  box_3:
-    'Het belastingvak voor vermogen in Nederland. Je betaalt belasting over een fictief rendement op je spaargeld en beleggingen boven de vrijstelling.',
-  rendement:
-    'De opbrengst van je beleggingen, uitgedrukt als percentage per jaar. Kan positief (winst) of negatief (verlies) zijn.',
-  vermogensbelasting:
-    'De belasting die je betaalt over je vermogen in Box 3. Gebaseerd op een door de overheid vastgesteld fictief rendement.',
-  AOW:
-    'Algemene Ouderdomswet — het basispensioen van de overheid dat je ontvangt vanaf je AOW-leeftijd (momenteel rond 67 jaar).',
-  pensioen:
-    'Het inkomen dat je ontvangt na je werkzame leven, opgebouwd via je werkgever of zelf aangevuld met beleggingen.',
-  vrijheidstijd:
-    'Het aantal jaren, maanden of dagen dat je kunt leven van je huidige vermogen zonder nieuw inkomen. Gebaseerd op je maandelijkse uitgaven.',
-  Monte_Carlo:
-    'Een simulatiemethode die duizenden mogelijke scenario\'s doorrekent met willekeurige rendementen. Geeft een kans van slagen in plaats van een enkel getal.',
-  SORR:
-    'Sequence of Returns Risk — het risico dat slechte rendementen vroeg in je pensioen je vermogen sneller uitputten dan gemiddelden suggereren.',
 }

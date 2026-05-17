@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { BookOpen, Hourglass, Receipt, Flame, Shield, MessageSquare, BarChart3, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { GLOSSARY_ENTRIES } from '@/lib/glossary-data'
 
 /* ── Types ──────────────────────── */
 
@@ -41,11 +42,10 @@ const CONCEPTS: ConceptCard[] = [
   {
     id: 'vrijheidstijd',
     icon: Hourglass,
-    name: 'Vrijheidstijd',
+    name: GLOSSARY_ENTRIES.vrijheidstijd.name,
     color: 'var(--color-kern-50)',
     colorAccent: 'var(--color-kern-400)',
-    explanation:
-      'Het aantal dagen, maanden of jaren dat je vermogen je levenskosten dekt — zonder te werken. Hoe meer vrijheidstijd, hoe dichter bij financiële onafhankelijkheid.',
+    explanation: GLOSSARY_ENTRIES.vrijheidstijd.explanation,
     personalDataFn: (data) => {
       if (!data) return null
       const { years, months, days } = data.freedomDays
@@ -59,21 +59,19 @@ const CONCEPTS: ConceptCard[] = [
   {
     id: 'kassabon',
     icon: Receipt,
-    name: 'Kassabon',
+    name: GLOSSARY_ENTRIES.kassabon.name,
     color: 'var(--subtle, #f8f8f7)',
     colorAccent: 'var(--ink-2, #555)',
-    explanation:
-      'Tik op een getal in de app en je ziet de kassabon — een stapsgewijze berekening die laat zien hoe het bedrag is opgebouwd. Transparantie in elk cijfer.',
+    explanation: GLOSSARY_ENTRIES.kassabon.explanation,
     personalDataFn: () => null, // no personal data for this concept
   },
   {
     id: 'fire',
     icon: Flame,
-    name: 'FIRE',
+    name: GLOSSARY_ENTRIES.fire.name,
     color: 'var(--color-horizon-50)',
     colorAccent: 'var(--color-horizon-400)',
-    explanation:
-      'Financial Independence, Retire Early — het moment waarop je vermogen genoeg oplevert om je uitgaven te dekken. Werken wordt optioneel.',
+    explanation: GLOSSARY_ENTRIES.fire.explanation,
     personalDataFn: (data) => {
       if (!data?.fireAge) return null
       return `Jouw verwachte FIRE-leeftijd: ${data.fireAge} jaar`
@@ -82,11 +80,10 @@ const CONCEPTS: ConceptCard[] = [
   {
     id: 'soevereiniteit',
     icon: Shield,
-    name: 'Soevereiniteit',
+    name: GLOSSARY_ENTRIES.soevereiniteit.name,
     color: 'var(--color-wil-50)',
     colorAccent: 'var(--color-wil-400)',
-    explanation:
-      'Je financiële zelfredzaamheid, gemeten in niveaus van Herstel tot Meesterschap. Elk niveau ontgrendelt nieuwe functies in de app.',
+    explanation: GLOSSARY_ENTRIES.soevereiniteit.explanation,
     personalDataFn: (data) => {
       if (data === null) return null
       const phase = getSovereigntyPhase(data.sovereigntyLevel)
@@ -97,31 +94,28 @@ const CONCEPTS: ConceptCard[] = [
   {
     id: 'will',
     icon: MessageSquare,
-    name: 'Will',
+    name: GLOSSARY_ENTRIES.will.name,
     color: 'var(--color-horizon-50)',
     colorAccent: 'var(--color-horizon-400)',
-    explanation:
-      'Je persoonlijke financiële assistent. Will kent de context van elke pagina en vertaalt cijfers naar inzichten. Stel hem een vraag via de chatknop rechtsonder.',
+    explanation: GLOSSARY_ENTRIES.will.explanation,
     personalDataFn: () => null, // no personal data for Will
   },
   {
     id: 'per-asset-rendement',
     icon: BarChart3,
-    name: 'Per-asset rendement',
+    name: GLOSSARY_ENTRIES.per_asset_rendement.name,
     color: 'var(--color-horizon-50)',
     colorAccent: 'var(--color-horizon-400)',
-    explanation:
-      'Elke bezitting groeit met een eigen rendement. Spaargeld met de spaarrente, beleggingen met het beursrendement, pensioen met het pensioenrendement. De simulatie berekent groei per type apart — realistischer dan één uniform percentage.',
+    explanation: GLOSSARY_ENTRIES.per_asset_rendement.explanation,
     personalDataFn: () => null,
   },
   {
     id: 'heffingsvrij-vermogen',
     icon: ShieldCheck,
-    name: 'Heffingsvrij vermogen',
+    name: GLOSSARY_ENTRIES.heffingsvrij_vermogen.name,
     color: 'var(--color-kern-50)',
     colorAccent: 'var(--color-kern-400)',
-    explanation:
-      'De eerste € 57.000 (of € 114.000 met partner) van je vermogen is vrijgesteld van Box 3 belasting. Dit bedrag wordt proportioneel verdeeld over je bezittingstypes. Spaargeld profiteert relatief meer omdat het forfaitair rendement lager is.',
+    explanation: GLOSSARY_ENTRIES.heffingsvrij_vermogen.explanation,
     personalDataFn: () => null,
   },
 ]

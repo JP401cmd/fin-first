@@ -933,7 +933,7 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
       <p className="text-center font-sans text-[10px] text-[var(--ink-4)] leading-relaxed">
         Score gebaseerd op{' '}
         <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm>,{' '}
-        <GlossaryTerm term="schuldgraad" explanation="Het aandeel van je bezittingen dat met schulden is gefinancierd. Lager is gezonder.">schuldratio</GlossaryTerm>,{' '}
+        <GlossaryTerm term="schuldgraad">schuldratio</GlossaryTerm>,{' '}
         noodfonds,{' '}
         <GlossaryTerm term="FIRE">FIRE</GlossaryTerm>-voortgang,{' '}
         diversificatie{healthScore.budgetingActive ? ' en budgetdiscipline' : ''}.
