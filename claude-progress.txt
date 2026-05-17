@@ -1,3 +1,72 @@
+## Session 2026-05-18 - Features #789, #792
+
+### Feature #789: Coach-bubble verschijnt na onboarding voltooiing - PASSING
+- Created `components/app/coach-bubble.tsx` — floating post-onboarding coaching tip
+- WillDots mascotte + pad-specifieke suggestie + CTA knop
+- Activatie via `?welcome=1` query param (gezet door onboarding success redirect)
+- localStorage dismissal met key `trifinity_coach_bubble_dismissed`
+- Auto-dismiss na 45 seconden, entrance animatie met 1.5s vertraging
+- Niet-blokkerend: fixed z-50, pagina volledig bruikbaar erachter
+- Alleen voor nieuwe gebruikers (geen bestaande gebruikers)
+- Toegevoegd aan `app/(app)/layout.tsx` in Suspense boundary
+- Zero console errors
+
+### Feature #792: Coach-bubble contextueel op basis van ontbrekende data - PASSING
+- Data-gap prioriteitsketen: bank > assets > budget > goals
+- `coachDataGaps` berekend in server layout uit bestaande queries + budget count
+- Budget count query toegevoegd aan layout's Promise.all (head-only, count exact)
+- 4 data-gap suggesties met specifieke CTA's en hrefs:
+  - Geen bank → "Koppel je bankrekening" → /identity/koppelingen
+  - Geen assets → "Voeg je vermogen toe" → /core/assets
+  - Geen budgets → "Stel je eerste budget in" → /core/budgets
+  - Geen doelen → "Stel je financiële doelen in" → /will
+- Data-gap suggestie overschrijft pad-gebaseerde fallback
+- Geverifieerd: test user zonder assets krijgt "Bank koppelen" ongeacht pagina
+- CoachDataGaps type geëxporteerd voor hergebruik
+
+### Files Modified
+- components/app/coach-bubble.tsx — NEW: coach-bubble component met data-gap awareness
+- app/(app)/layout.tsx — Suspense + CoachBubble, budget count query, coachDataGaps
+
+### Current Status
+- 2 features completed this session (#789, #792)
+- Commits: 2d76aff9, 1f689599
+
+## Session 2026-05-18 - Features #833, #834
+
+### Feature #833: GlossaryTerm component wikkelt jargon met tooltip - PASSING
+- Created `components/editorial/glossary-term.tsx` — reusable component
+- Dotted underline styling + hover/tap tooltip with plain-language explanation
+- Built-in GLOSSARY with 15+ financial terms (SWR, FIRE, inflatie, etc.)
+- Applied on /core: "netto vermogen" label in hero + health score footer (spaarquote, schuldratio, FIRE)
+- Uses `<span>` instead of `<div>` to avoid hydration errors inside `<p>` elements
+- Re-exported from `components/editorial/index.tsx`
+- Zero console errors, tooltip works on click/tap
+- Commit: dade2880
+
+### Feature #834: GlossaryTerm content uit bestaande gids ConceptFlipCards - PASSING
+- Created `lib/glossary-data.ts` as single source of truth for all financial explanations
+- Contains `GLOSSARY_ENTRIES` (Record<string, {name, explanation}>) and derived flat `GLOSSARY` map
+- Updated GlossaryTerm to import from shared source (no hardcoded strings)
+- Updated ConceptFlipCards (7 concepts) to read name + explanation from GLOSSARY_ENTRIES
+- Adding a new entry to glossary-data.ts auto-makes it available for both tooltips and flip cards
+- Verified on /core (tooltip) and /identity/gids (flip cards) — same text displayed
+- Zero console errors on both pages
+- Commit: 0fbfe5af
+
+### Files Created
+- `components/editorial/glossary-term.tsx` — GlossaryTerm component
+- `lib/glossary-data.ts` — shared glossary data (GLOSSARY_ENTRIES + GLOSSARY + helpers)
+
+### Files Modified
+- `components/editorial/index.tsx` — re-exports for GlossaryTerm and glossary data
+- `components/core/core-hero.tsx` — GlossaryTerm on "netto vermogen"
+- `components/core/core-landing.tsx` — GlossaryTerm on health score footer
+- `components/app/concept-flip-cards.tsx` — reads from GLOSSARY_ENTRIES instead of hardcoded strings
+
+### Current Status
+- 2 features completed this session (#833, #834)
+
 ## Session 2026-05-18 - Features #779, #780
 
 ### Feature #779: Briefing als hoofdwidget op /will - PASSING
@@ -24012,3 +24081,95 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#828, #829)
+
+## Session 2026-05-18 - Features #808, #809
+
+### Feature #808: Wft-disclaimer bij eerste chat-interactie - PASSING
+- Created WftDisclaimer component in chat-panel.tsx with ShieldCheck icon
+- Amber-styled disclaimer box with three legally correct bullet points:
+  1. "Alle informatie is uitsluitend educatief en informatief bedoeld."
+  2. "TriFinity beschikt niet over een Wft-vergunning en verleent geen beleggings-, verzekerings- of ander financieel advies."
+  3. "Je bent zelf verantwoordelijk voor je financiële beslissingen."
+- "Ik begrijp het" accept button (wil-600 accent color)
+- One-time acceptance persisted via localStorage (trifinity-chat-wft-accepted)
+- Chat messages and input hidden until disclaimer accepted
+- "Deze melding verschijnt eenmalig." note at bottom
+- Verified: shows on first open, disappears after accept, does not show on subsequent opens
+- Zero new console errors
+- Commit: bb4e152f
+
+### Feature #809: Chat geeft nooit directe koop/verkoop-aanbevelingen - PASSING
+- Enhanced BEPERKINGEN section in lib/ai/dna/base.ts to BEPERKINGEN (Wft-compliance)
+- Added explicit prohibition: "Geef NOOIT directe koop-, verkoop- of beleggingsaanbevelingen"
+- Added specific forbidden examples: "koop aandeel X", "verkoop je obligaties", "stap over naar fonds Y"
+- Added educational approach for advice questions: explain considerations (risico, spreiding, horizon, kosten)
+- Added mandatory advisor referral: "Raadpleeg een erkend financieel adviseur voor persoonlijk advies."
+- Added AFM-geregistreerd reference for financial advisor recommendation
+- Applies universally via BASE_SYSTEM_PROMPT to all domains (kern, wil, horizon)
+- AI response testing limited by tier gate (403 on regression test account)
+- Commit: c5214efb
+
+### Files Modified
+- components/app/chat/chat-panel.tsx — WftDisclaimer component, wftAccepted state, conditional rendering
+- lib/ai/dna/base.ts — Wft-compliance guardrails in system prompt
+
+### Current Status
+- 2 features completed this session (#808, #809)
+
+## Session 2026-05-18 - Features #801, #802
+
+### Feature #801: Alle KPI-widgets geaudit op actie-koppeling - PASSING
+- Created `lib/widget-audit.ts` with WIDGET_CLASSIFICATION map
+- Classified all 50 catalog widgets: 14 observation, 36 insight
+- Observation: netto_vermogen, vrijheidsvoortgang, jouw_pad, pensioen_aow, vrijheidsmijlpalen, maandoverzicht, weekoverzicht, trend_inkomen/uitgaven/sparen/schulden, huishouden_vergelijking/activiteit, beleggingsrendement
+- Insight: all others (cash_flow, budgetten, assets, schulden, etc.) — all have hrefs verified
+- runWidgetAudit() function catches: unclassified widgets, insight widgets missing hrefs
+- assertWidgetAuditPasses() for build-time/test enforcement
+- Created vitest test suite with 8 assertions
+- Commit: 2eee5893
+
+### Feature #802: Observatie-widgets behouden legitimiteit zonder geforceerde actie - PASSING
+- Verified netto-vermogen-widget has `href?: string` (optional) — no forced CTA button
+- Verified jouw-pad-widget-wrapper (fase-bar) has `href?: string` — no forced action
+- Verified net-worth-projection-chart.tsx has ZERO links/buttons/CTAs — pure SVG observation
+- Verified all trend widgets are pure observation (no action requirement)
+- Added documentation block explaining why observation widgets are legitimate
+- Added 5 dedicated test cases confirming observation widget legitimacy
+- All 13 tests passing
+- Commit: 62949f39
+
+### Files Created/Modified
+- lib/widget-audit.ts — NEW: full classification, audit functions, legitimacy documentation
+- components/widgets/__tests__/widget-audit.test.ts — NEW: 13 test cases
+
+### Current Status
+- 2 features completed this session (#801, #802)
+
+## Session 2026-05-18 - Features #805, #806
+
+### Feature #805: Monte Carlo confidence band als gradient SVG - PASSING
+- Replaced flat-opacity MC bands with multi-layer gradient confidence band
+- 5 concentric layers: p10-p90 (outermost, SVG linearGradient), p15-p85, p25-p75, p35-p65 (densest)
+- Interpolated percentiles (p15, p35, p65, p85) for smoother gradient effect
+- SVG linearGradient definition for outermost band (vertical fade from edges to center)
+- Median (p50) changed from dashed to solid animated line (strokeWidth 1.8, opacity 0.7)
+- Updated mcMax to use p90 for correct Y-axis scaling (was p75)
+- Updated explainer text: "gradient-band" and "centrale lijn" wording
+- Zero new console errors
+- Commit: e0045782
+
+### Feature #806: Confidence band toont p10/p25/p50/p75/p90 percentielen - PASSING
+- Added MONTE CARLO section to crosshair tooltip when MC overlay is active
+- Shows all 5 percentile values (p10, p25, p50, p75, p90) at hovered age
+- p50 median highlighted with dot marker and accent color (horizon-300)
+- Outer percentiles (p10/p90) dimmed (opacity 0.5) for visual hierarchy
+- Values correctly ordered and match Monte Carlo calculation
+- Zero new console errors
+- Commit: d19f2fb1
+
+### Files Modified
+- components/app/horizon/sim-chart.tsx — gradient band layers, interpolated percentiles, SVG gradient defs, percentile tooltip
+- components/app/horizon/horizon-client.tsx — updated MC explainer text
+
+### Current Status
+- 2 features completed this session (#805, #806)

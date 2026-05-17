@@ -6,12 +6,17 @@ import { findAlternatives, FUND_ALTERNATIVES_DISCLAIMER, berekenJaarlijkseBespar
 import type { FeeAnalysis, HoldingFee } from '@/lib/fee-analysis'
 import { AlertTriangle, ArrowRight, Info, TrendingDown } from 'lucide-react'
 import { FinTable } from '@/components/app/fin-table'
+import { FeeErosionChart } from '@/components/app/core/fee-erosion-chart'
 
 interface Props {
   open: boolean
   onClose: () => void
   feeAnalysis: FeeAnalysis
   feeImpactMonths: number
+  /** Gross annual return for erosion chart (decimal, e.g. 0.07) */
+  grossReturn?: number
+  /** Daily expense rate for freedom-time display */
+  dailyExpenses?: number
 }
 
 type TerSeverity = 'green' | 'orange' | 'red'
@@ -29,7 +34,7 @@ const SEVERITY_TEXT: Record<TerSeverity, string> = {
   red: 'text-negative',
 }
 
-export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: Props) {
+export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths, grossReturn, dailyExpenses }: Props) {
   const { weightedTER, totalAnnualFee, perHoldingBreakdown, totalPortfolioValue, holdingsWithTER, holdingsWithoutTER } = feeAnalysis
   const terPctStr = (weightedTER * 100).toFixed(2).replace('.', ',')
   const severity = getTerSeverity(weightedTER)
@@ -85,6 +90,18 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths }: 
             </p>
           )}
         </div>
+
+        {/* ── Fee Erosion Chart ── */}
+        {weightedTER > 0 && totalPortfolioValue > 0 && grossReturn && grossReturn > 0 && (
+          <FeeErosionChart
+            portfolioValue={totalPortfolioValue}
+            grossReturn={grossReturn}
+            currentTER={weightedTER}
+            lowTER={0.002}
+            years={30}
+            dailyExpenses={dailyExpenses}
+          />
+        )}
 
         {/* ── Per-holding breakdown table ── */}
         <div>
