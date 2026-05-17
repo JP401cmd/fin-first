@@ -1,3 +1,29 @@
+## Session 2026-05-18 - Features #765, #766
+
+### Feature #765: FIRE parameter UI verborgen als standaard - PASSING
+- Changed HorizonFireParamsPanel toggle label from "FIRE-parameters" to "Geavanceerd"
+- Subtitle shows "Berekening finetunen" when collapsed, "Parameters aanpassen" when open
+- Panel already starts collapsed (useState(false)) — no jargon exposed to new users
+- Fixed pre-existing build error in identity/instellingen/page.tsx (added missing ChevronDown import + 4 collapsible state declarations)
+- Commit: 9efa383c
+
+### Feature #766: Smart defaults fallback zonder gebruikersconfiguratie - PASSING
+- Verified resolveFireParams() gracefully handles null/undefined/empty profile fields
+- DEFAULT_RETURN (7%) and INFLATION (2%) used as fallbacks throughout the codebase
+- useHorizonFireSim hook has grossReturnParam ?? DEFAULT_RETURN fallback
+- computeFireProjection/computeFireRange accept defaults as function parameters
+- Existing regression tests in horizon-parameters.ts cover: fire-params-defaults, fire-params-null-fields, fire-params-swr-floor, params-affect-simulation-consistency
+- No code changes needed (verification only)
+- Commit: 9efa383c (same commit as #765)
+
+### Files Modified
+- components/app/horizon/horizon-fire-params-panel.tsx — NEW file (created by previous session), label changed to "Geavanceerd"
+- components/app/horizon/horizon-client.tsx — import of panel (from previous session's work)
+- app/(app)/identity/instellingen/page.tsx — fixed build error (missing state declarations + ChevronDown import)
+
+### Current Status
+- 2 features completed this session (#765, #766)
+
 ## Session 2026-05-18 - Features #838, #839
 
 ### Feature #838: Hefboom-mapping van recommendation type-tags naar 4 hefbomen - PASSING
