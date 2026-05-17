@@ -1782,79 +1782,19 @@ export default function InstellingenPage() {
         )}
       </section>
 
-      {/* ── Rebalancing ─────────────────────────────────────────────── */}
+      {/* ── Rebalancing (verplaatst naar /core/assets) ────────────────── */}
       {hasTargetAllocations && (
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setRebalancingOpen(o => !o)}
+        <Link
+          href="/core/assets"
           className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
         >
           <div>
             <h2 className="label-editorial text-[var(--ink-2)]">Rebalancing</h2>
-            {!rebalancingOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Drift drempel en herbalanceerinstellingen</p>
-            )}
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">Verplaatst naar Bezittingen — open de rebalancing-sectie daar</p>
           </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${rebalancingOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {rebalancingOpen && (
-          <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-5">
-            <p className="text-sm text-[var(--ink-2)]">
-              Stel in hoe gevoelig de rebalancing-meldingen zijn. Een lagere drempel geeft eerder een signaal, een hogere drempel filtert kleine afwijkingen weg.
-            </p>
-
-            {/* Threshold label + value */}
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">Drift Drempel</p>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min={1}
-                  max={20}
-                  step={1}
-                  value={rebalanceThreshold}
-                  onChange={e => setRebalanceThreshold(Number(e.target.value))}
-                  className="flex-1 h-2 rounded-full appearance-none bg-[var(--border-ed)] accent-horizon-500 cursor-pointer"
-                  style={{ minHeight: '44px' }}
-                />
-                <span className="font-mono tabular-nums text-lg font-semibold text-[var(--ink)] min-w-[3.5rem] text-right">
-                  {rebalanceThreshold}%
-                </span>
-              </div>
-              <div className="flex justify-between text-[10px] text-[var(--ink-4)] mt-1 px-0.5">
-                <span>1% — gevoelig</span>
-                <span>20% — tolerant</span>
-              </div>
-            </div>
-
-            {/* Explanation */}
-            <p className="text-xs text-[var(--ink-3)] leading-relaxed">
-              Je ontvangt een melding wanneer je allocatie meer dan {rebalanceThreshold}% afwijkt van je target.
-              Bij een drempel van {rebalanceThreshold}% en een target van 60% aandelen, krijg je pas een signaal wanneer het aandeel onder {Math.max(0, 60 - rebalanceThreshold)}% of boven {Math.min(100, 60 + rebalanceThreshold)}% komt.
-            </p>
-
-            {/* Save button */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={saveRebalanceThreshold}
-                disabled={rebalanceSaving || rebalanceThreshold === rebalanceThresholdSaved}
-                className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
-              >
-                {rebalanceSaving ? 'Opslaan...' : 'Drempel opslaan'}
-              </button>
-              {rebalanceMessage && (
-                <span className={`text-sm ${rebalanceMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {rebalanceMessage.text}
-                </span>
-              )}
-              {rebalanceThreshold !== rebalanceThresholdSaved && !rebalanceMessage && (
-                <span className="text-xs text-amber-600">Niet opgeslagen</span>
-              )}
-            </div>
-          </div>
-        )}
+          <ArrowLeftRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+        </Link>
       </section>
       )}
 

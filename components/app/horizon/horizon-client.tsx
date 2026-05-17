@@ -142,6 +142,7 @@ import {
 } from '@/lib/chart-tips'
 import { HorizonFireIntroCard } from '@/components/app/horizon/horizon-fire-intro-card'
 import { HorizonSetupPane } from '@/components/app/horizon/horizon-setup-pane'
+import { HorizonFireParamsPanel } from '@/components/app/horizon/horizon-fire-params-panel'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
 
@@ -3697,6 +3698,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
       {/* === 5. Household FIRE Projections === */}
       <HouseholdFireSection />
+
+      {/* === 5.FIRE Parameters Inline Panel === */}
+      <HorizonFireParamsPanel
+        fireParams={fireParams}
+        fireEndStrategy={fireStrategy?.strategy ?? 'deplete'}
+        fireEndAge={fireStrategy?.endAge ?? 90}
+        onParamsChange={(newParams) => setFireParams(newParams)}
+        onStrategyChange={(strategy, endAge) => {
+          setFireStrategy(prev => ({
+            strategy,
+            endAge,
+            legacyAmount: prev?.legacyAmount ?? 0,
+          }))
+        }}
+      />
 
       {/* === 5a. Toekomst instellingen === */}
       <FeatureGate featureId="withdrawal_strategie" fallback="hidden">
