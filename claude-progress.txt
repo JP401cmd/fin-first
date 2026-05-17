@@ -1,3 +1,32 @@
+## Session 2026-05-18 - Features #818, #821
+
+### Feature #818: Cashflow hero-tegel op /core landing - PASSING
+- Created `components/core/cashflow-hero-tile.tsx` — prominent tile on /core landing
+- Shows budget status: X van Y op schema, besteed vs beschikbaar, progress bar
+- Empty state when budgeting not active or no budgets
+- Clicks through to /core/budgets
+- Uses real data from CorePageData (budgetCount, overBudgetCount, totalBudgetLimit, totalBudgetSpent)
+- Placed between CoreHero and NetWorthProjectionChart in core-landing.tsx
+- Commit: 0cf9f193
+
+### Feature #821: /core cashflow-tegel toont budget health status - PASSING
+- Updated health indicator logic to be based on overBudgetCount:
+  - Green (Op schema): 0 budgetten overschreden
+  - Amber (Aandacht): 1-2 budgetten overschreden
+  - Red (Over limiet): 3+ budgetten overschreden of negatieve cashflow
+- Added HealthTooltip component (hover/tap) with status-colored background
+- Tooltip shows label + detail text per health level
+- Visual indicator: colored dot + icon (TrendingUp/Minus/TrendingDown) + status label
+- Progress bar color matches health status
+- Commit: a395165b
+
+### Files Created/Modified
+- components/core/cashflow-hero-tile.tsx — NEW: cashflow hero tile with health indicator + tooltip
+- components/core/core-landing.tsx — added CashflowHeroTile import + placement
+
+### Current Status
+- 2 features completed this session (#818, #821)
+
 ## Session 2026-05-18 - Features #852, #853
 
 ### Feature #852: Wat zie ik hier info-knop op alle hoofdpaginas - PASSING
