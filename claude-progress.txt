@@ -1,3 +1,50 @@
+## Session 2026-05-18 - Features #856, #859
+
+### Feature #856: Fee-erosie dramatic visualisatie - PASSING
+- Created `components/app/core/fee-erosion-chart.tsx` — SVG chart with two growth lines
+- Green line: portfolio with low-cost TER (0.20% default)
+- Amber line: portfolio with current user TER
+- Red shaded area between lines shows the "erosion zone"
+- Mid-chart annotation at 75% horizon shows difference amount
+- End-of-line dots with EUR values
+- Summary box: verloren vermogen (EUR) + verloren vrijheidstijd
+- Integrated into `FeeDetailModal` (accessible from fee analyzer widget on dashboard)
+- Added grossReturn + dailyExpenses props to FeeDetailModal
+- Updated FeeAnalyzerWidget to pass new props
+- Test page at `/test-fee-erosion` with 3 scenarios
+- Zero console errors
+- Commit: already committed by previous session in 73d553c0
+
+### Feature #859: Dramatic visualisaties toegankelijk vanuit insight-cards - PASSING
+- Extended `InsightCardSpec` type with optional `href` and `ctaLabel` fields
+- Updated `InsightCard` component: renders CTA as underlined link with ArrowRight icon
+- Updated `showInsight` AI tool in briefing.ts to accept href + ctaLabel params
+- Added fee-erosion insight to fallback briefing composer (shown when feeAnalysis data exists)
+  - Tip emphasis when FIRE impact > 0: "kost je X vrijheid"
+  - Observation emphasis otherwise: "bekijk hoe kostenverschillen oplopen"
+  - Both include `ctaLabel: 'Bekijk fee-erosie'` and `href: '/core/assets'`
+- Added fee data section to AI condense function (briefing/condense.ts)
+- Added AI prompt guidance for fee-related CTA links
+- Test page at `/test-insight-cta` with 4 insight card variants
+- Verified: CTA link navigates to /core/assets, back-navigation works
+- Zero console errors
+- Commit: 2cd30bde
+
+### Files Modified
+- components/app/core/fee-erosion-chart.tsx — NEW: SVG fee-erosion chart
+- components/widgets/fee-detail-modal.tsx — FeeErosionChart integration + new props
+- components/widgets/fee-analyzer-widget.tsx — pass grossReturn + dailyExpenses
+- components/daishboard/cards/insight-card.tsx — CTA link rendering
+- lib/briefing/types.ts — href + ctaLabel on InsightCardSpec
+- lib/briefing/fallback.ts — fee-erosion insight card
+- lib/briefing/condense.ts — fee data in AI context
+- lib/ai/dna/briefing.ts — showInsight href/ctaLabel + prompt guidance
+- app/test-fee-erosion/page.tsx — NEW: test page for chart
+- app/test-insight-cta/page.tsx — NEW: test page for insight CTA
+
+### Current Status
+- 2 features completed this session (#856, #859)
+
 ## Session 2026-05-18 - Features #818, #821
 
 ### Feature #818: Cashflow hero-tegel op /core landing - PASSING
