@@ -237,10 +237,10 @@ function detectActiveModule(pathname: string): NavModule | null {
 // ── Main component ───────────────────────────────────────────────────────────
 
 const DEFAULT_LEVER_SCORES: LeverScores = {
-  assets: { score: null, status: 'neutral' },
-  debts: { score: null, status: 'neutral' },
-  cashflow: { score: null, status: 'neutral' },
-  tax: { score: null, status: 'neutral' },
+  assets: { score: null, status: 'neutral', detail: 'Geen data' },
+  debts: { score: null, status: 'neutral', detail: 'Geen data' },
+  cashflow: { score: null, status: 'neutral', detail: 'Geen data' },
+  tax: { score: null, status: 'neutral', detail: 'Geen data' },
 }
 
 export function Sidebar({

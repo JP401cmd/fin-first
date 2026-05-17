@@ -113,10 +113,10 @@ export function useCategoryAppLinks(): CategoryAppLink[] {
 // Vier-hefbomen-kompas data, voorberekend in layout.tsx. Via context beschikbaar
 // voor zowel de Sidebar (portal, buiten tree) als AppHeader / TopBar.
 const DEFAULT_LEVER_SCORES: LeverScores = {
-  assets: { score: null, status: 'neutral' },
-  debts: { score: null, status: 'neutral' },
-  cashflow: { score: null, status: 'neutral' },
-  tax: { score: null, status: 'neutral' },
+  assets: { score: null, status: 'neutral', detail: 'Geen data' },
+  debts: { score: null, status: 'neutral', detail: 'Geen data' },
+  cashflow: { score: null, status: 'neutral', detail: 'Geen data' },
+  tax: { score: null, status: 'neutral', detail: 'Geen data' },
 }
 
 const LeverScoresContext = createContext<LeverScores>(DEFAULT_LEVER_SCORES)

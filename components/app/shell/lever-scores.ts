@@ -10,15 +10,22 @@
 
 export type LeverStatus = 'green' | 'amber' | 'red' | 'neutral'
 
+export type LeverEntry = {
+  score: number | null
+  status: LeverStatus
+  /** Korte detailtekst voor tooltip, bv. "4 typen · € 834k". */
+  detail: string
+}
+
 export type LeverScores = {
   /** Bezittingen: diversificatie + omvang. */
-  assets: { score: number | null; status: LeverStatus }
+  assets: LeverEntry
   /** Schulden: schuld-vermogen-ratio. */
-  debts: { score: number | null; status: LeverStatus }
+  debts: LeverEntry
   /** Cashflow: spaarquote (3-maands). */
-  cashflow: { score: number | null; status: LeverStatus }
+  cashflow: LeverEntry
   /** Belasting: box3-exposure. */
-  tax: { score: number | null; status: LeverStatus }
+  tax: LeverEntry
 }
 
 // ── Score computation ────────────────────────────────────────────────────────
@@ -37,6 +44,23 @@ function statusFromScore(score: number | null): LeverStatus {
  * komen uit de reeds-geladen asset/debt/transaction-queries — geen extra DB-
  * round-trips.
  */
+/**
+ * Format a EUR value to a short display string, e.g. "€ 142k" or "€ 1,2M".
+ */
+function fmtShort(value: number): string {
+  const abs = Math.abs(value)
+  const sign = value < 0 ? '-' : ''
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000
+    const rounded = Math.round(m * 10) / 10
+    return `${sign}€ ${rounded.toString().replace('.', ',')}M`
+  }
+  if (abs >= 1_000) {
+    return `${sign}€ ${Math.round(abs / 1_000)}k`
+  }
+  return `${sign}€ ${Math.round(abs)}`
+}
+
 export function computeLeverScores(input: {
   totalAssets: number
   totalDebts: number
@@ -47,8 +71,10 @@ export function computeLeverScores(input: {
   box3TaxableAboveThreshold: number
 }): LeverScores {
   // 1. Bezittingen: diversificatie
-  const assetScore = input.assetTypeCount <= 0
-    ? 0
+  // Bij géén assets → null (neutral/grijs) — er is niets om te beoordelen.
+  // Bij wel assets → score 20–100 op basis van diversificatie.
+  const assetScore: number | null = input.assetTypeCount <= 0
+    ? null
     : input.assetTypeCount >= 5
       ? 100
       : Math.round((input.assetTypeCount / 5) * 100)
@@ -95,10 +121,35 @@ export function computeLeverScores(input: {
     taxScore = 20 // high exposure
   }
 
+  // ── Detail text per lever ─────────────────────────────────────────────────
+  const assetDetail = input.assetTypeCount <= 0
+    ? 'Geen bezittingen geregistreerd'
+    : `${input.assetTypeCount} ${input.assetTypeCount === 1 ? 'type' : 'typen'} · ${fmtShort(input.totalAssets)}`
+
+  let debtDetail: string
+  if (input.totalDebts <= 0 && input.totalAssets <= 0) {
+    debtDetail = 'Geen data'
+  } else if (input.totalDebts <= 0) {
+    debtDetail = 'Schuldenvrij'
+  } else {
+    const ratio = input.totalAssets > 0
+      ? Math.round((input.totalDebts / input.totalAssets) * 100)
+      : 100
+    debtDetail = `${fmtShort(input.totalDebts)} · ${ratio}% van vermogen`
+  }
+
+  const cashflowDetail = input.savingsRate === null
+    ? 'Onvoldoende transactiedata'
+    : `Spaarquote ${Math.round(input.savingsRate)}%`
+
+  const taxDetail = input.box3TaxableAboveThreshold <= 0
+    ? 'Onder vrijstelling'
+    : `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling`
+
   return {
-    assets: { score: assetScore, status: statusFromScore(assetScore) },
-    debts: { score: debtScore, status: statusFromScore(debtScore) },
-    cashflow: { score: cashflowScore, status: statusFromScore(cashflowScore) },
-    tax: { score: taxScore, status: statusFromScore(taxScore) },
+    assets: { score: assetScore, status: statusFromScore(assetScore), detail: assetDetail },
+    debts: { score: debtScore, status: statusFromScore(debtScore), detail: debtDetail },
+    cashflow: { score: cashflowScore, status: statusFromScore(cashflowScore), detail: cashflowDetail },
+    tax: { score: taxScore, status: statusFromScore(taxScore), detail: taxDetail },
   }
 }
