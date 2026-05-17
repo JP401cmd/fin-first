@@ -844,7 +844,7 @@ export default function OnboardingPage() {
           date_of_birth: identity.date_of_birth,
           household_type: identity.household_type,
           number_of_children: identity.number_of_children,
-          net_monthly_income: Number(identity.net_monthly_income),
+          net_monthly_income: identity.net_monthly_income ? Number(identity.net_monthly_income) : 0,
           estimated_monthly_expenses: identity.estimated_monthly_expenses ? Number(identity.estimated_monthly_expenses) : undefined,
         },
         budgetAmounts,

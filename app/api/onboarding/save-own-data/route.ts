@@ -213,7 +213,7 @@ const bodySchema = z.object({
     date_of_birth: z.string().min(1),
     household_type: z.enum(['solo', 'samen', 'gezin']),
     number_of_children: z.number().int().min(0).default(0),
-    net_monthly_income: z.number().positive(),
+    net_monthly_income: z.number().min(0).default(0),
     estimated_monthly_expenses: z.number().positive().optional(),
     // FIRE parameters (optional, with sensible defaults)
     expected_return: z.number().min(0.01).max(0.20).optional(),

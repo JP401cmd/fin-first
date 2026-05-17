@@ -47,17 +47,15 @@ const HOUSEHOLD_OPTIONS: readonly { value: HouseholdType; label: string; sub: st
 function getFieldErrors(data: IncomeData): Partial<Record<FieldKey, string>> {
   const errors: Partial<Record<FieldKey, string>> = {}
 
-  if (!data.net_monthly_income) {
-    errors.net_monthly_income = 'Maandinkomen is verplicht'
-  } else {
-    // Accept zowel "3350" als "3.350" / "3,350" — strip duizend-separators
-    // voordat we parsen. Niet alle browsers honoreren nl-NL locale-input.
+  // Inkomen is optioneel — de gebruiker mag het later invullen via
+  // Instellingen. Wel valideren wanneer er iets is ingevuld.
+  if (data.net_monthly_income) {
     const cleaned = data.net_monthly_income.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.')
     const income = Number(cleaned)
     if (isNaN(income)) {
       errors.net_monthly_income = 'Voer een geldig bedrag in'
-    } else if (income <= 0) {
-      errors.net_monthly_income = 'Inkomen moet hoger dan €0 zijn'
+    } else if (income < 0) {
+      errors.net_monthly_income = 'Inkomen kan niet negatief zijn'
     } else if (income > 1000000) {
       errors.net_monthly_income = 'Voer een realistisch maandinkomen in'
     }
@@ -189,19 +187,20 @@ export function OnboardingInkomen({
         {submitted && !isValid && (
           <div className="border border-red-200 bg-red-50 px-4 py-3" role="alert">
             <p className="text-sm font-medium text-red-700">
-              Vul alle verplichte velden correct in om door te gaan
+              Controleer de gemarkeerde velden
             </p>
           </div>
         )}
 
         {/* Huishouden — segmented control (3 grote tiles).
-            Touch-target ≥44px gegarandeerd via min-h-[64px] per tile. */}
+            Touch-target ≥44px gegarandeerd via min-h-[64px] per tile.
+            Heeft altijd een default ('solo'), dus geen * nodig. */}
         <div>
           <p
             id="ob-household-label"
             className="mb-2 text-sm font-medium text-[var(--ink-2)]"
           >
-            Huishouden <span className="text-red-400">*</span>
+            Huishouden
           </p>
           <div
             role="radiogroup"
@@ -250,7 +249,7 @@ export function OnboardingInkomen({
               htmlFor="ob-kids"
               className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
             >
-              Aantal kinderen <span className="text-red-400">*</span>
+              Aantal kinderen
             </label>
             <input
               id="ob-kids"
@@ -282,13 +281,15 @@ export function OnboardingInkomen({
           </div>
         )}
 
-        {/* Netto maandinkomen — DM Mono input met EUR-prefix. */}
+        {/* Netto maandinkomen — DM Mono input met EUR-prefix. Optioneel
+            sinds feature #828: gebruiker kan later invullen via Instellingen. */}
         <div>
           <label
             htmlFor="ob-income"
             className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
           >
-            Netto maandinkomen <span className="text-red-400">*</span>
+            Netto maandinkomen{' '}
+            <span className="text-xs font-normal italic text-[var(--ink-3)]">(optioneel)</span>
           </label>
           <div className="relative">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-4)]">
@@ -329,7 +330,7 @@ export function OnboardingInkomen({
               className="mt-1 text-xs italic text-[var(--ink-3)]"
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
             >
-              Huishouden-netto (samen als je samenwoont).
+              Huishouden-netto (samen als je samenwoont). Pas je later aan in Instellingen.
             </p>
           )}
         </div>

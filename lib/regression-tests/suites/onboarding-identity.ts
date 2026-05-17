@@ -21,7 +21,10 @@ interface IdentityData {
 
 type FieldKey = 'full_name' | 'date_of_birth' | 'net_monthly_income' | 'number_of_children'
 
-// ── Validation logic mirror (must match getFieldErrors in onboarding-identity.tsx) ──
+// ── Validation logic mirror ──
+// Matches: onboarding-identity.tsx (name + DOB) en onboarding-inkomen.tsx
+// (household + income + children). Inkomen is optioneel geworden sinds
+// feature #828 — alleen niet-lege waarden worden gevalideerd.
 
 function getFieldErrors(data: IdentityData): Partial<Record<FieldKey, string>> {
   const errors: Partial<Record<FieldKey, string>> = {}
@@ -52,15 +55,14 @@ function getFieldErrors(data: IdentityData): Partial<Record<FieldKey, string>> {
     }
   }
 
-  // Income: > 0
-  if (!data.net_monthly_income) {
-    errors.net_monthly_income = 'Maandinkomen is verplicht'
-  } else {
-    const income = Number(data.net_monthly_income)
+  // Income: optioneel (feature #828) \u2014 alleen valideren wanneer ingevuld.
+  if (data.net_monthly_income) {
+    const cleaned = data.net_monthly_income.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.')
+    const income = Number(cleaned)
     if (isNaN(income)) {
       errors.net_monthly_income = 'Voer een geldig bedrag in'
-    } else if (income <= 0) {
-      errors.net_monthly_income = 'Inkomen moet hoger dan \u20AC0 zijn'
+    } else if (income < 0) {
+      errors.net_monthly_income = 'Inkomen kan niet negatief zijn'
     } else if (income > 1000000) {
       errors.net_monthly_income = 'Voer een realistisch maandinkomen in'
     }
@@ -170,30 +172,30 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'ob-id-required-net-monthly-income',
-    name: 'Verplicht veld: net_monthly_income (>0)',
+    id: 'ob-id-optional-net-monthly-income',
+    name: 'Optioneel veld: net_monthly_income (feature #828)',
     category: CAT,
-    description: 'Maandinkomen moet numeriek en >0 zijn, max \u20AC1.000.000',
+    description: 'Maandinkomen is optioneel \u2014 leeg/0 is toegestaan, negatief en >1M geven fout',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // Empty
+      // Empty \u2014 geen fout (optioneel)
       const d1 = { ...validData(), net_monthly_income: '' }
-      assertEqual(getFieldErrors(d1).net_monthly_income, 'Maandinkomen is verplicht', 'Leeg inkomen')
+      assertEqual(getFieldErrors(d1).net_monthly_income, undefined, 'Leeg inkomen is geldig (optioneel)')
 
-      // Zero
+      // Zero \u2014 geen fout (0 is acceptabel)
       const d2 = { ...validData(), net_monthly_income: '0' }
-      assertNotNull(getFieldErrors(d2).net_monthly_income, 'Nul inkomen moet fout geven')
+      assertEqual(getFieldErrors(d2).net_monthly_income, undefined, 'Nul inkomen is geldig')
 
-      // Negative
+      // Negative \u2014 fout
       const d3 = { ...validData(), net_monthly_income: '-500' }
       assertNotNull(getFieldErrors(d3).net_monthly_income, 'Negatief inkomen moet fout geven')
 
-      // Non-numeric
+      // Non-numeric \u2014 fout
       const d4 = { ...validData(), net_monthly_income: 'abc' }
       assertEqual(getFieldErrors(d4).net_monthly_income, 'Voer een geldig bedrag in', 'Niet-numeriek')
 
-      // Over max
+      // Over max \u2014 fout
       const d5 = { ...validData(), net_monthly_income: '1500000' }
       assertEqual(getFieldErrors(d5).net_monthly_income, 'Voer een realistisch maandinkomen in', 'Boven max')
 
@@ -339,7 +341,7 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // Completely invalid data: all required fields empty
+      // Completely invalid data: required fields empty
       const invalid: IdentityData = {
         full_name: '',
         date_of_birth: '',
@@ -351,15 +353,16 @@ const tests: TestCase[] = [
 
       const errors = getFieldErrors(invalid)
 
-      // Should have exactly 3 errors: full_name, date_of_birth, net_monthly_income
+      // Should have exactly 2 errors: full_name, date_of_birth
+      // (net_monthly_income is optioneel sinds feature #828)
       assertNotNull(errors.full_name, 'full_name fout bij lege data')
       assertNotNull(errors.date_of_birth, 'date_of_birth fout bij lege data')
-      assertNotNull(errors.net_monthly_income, 'net_monthly_income fout bij lege data')
+      assertEqual(errors.net_monthly_income, undefined, 'Leeg inkomen geeft geen fout (optioneel)')
 
       // No errors for optional/conditional fields
       assertEqual(errors.number_of_children, undefined, 'Solo: geen children fout')
 
-      // isValid should be false
+      // isValid should be false (naam + DOB zijn verplicht)
       const isValid = Object.keys(errors).length === 0
       assert(!isValid, 'Formulier met lege verplichte velden is niet geldig')
 

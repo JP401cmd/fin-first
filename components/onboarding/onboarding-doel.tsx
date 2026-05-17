@@ -85,7 +85,7 @@ export function OnboardingDoel({
       kicker="Doel"
       romanNum="i."
       title={headline}
-      deck="Dit duurt ongeveer 4 minuten. Je antwoorden bepalen welke onderdelen je dashboard krijgt — je past alles later aan."
+      deck="Dit duurt ongeveer 2 minuten. Je antwoorden bepalen welke onderdelen je dashboard krijgt — je past alles later aan."
       factsPanel={
         <FactsPanel
           stat="68%"
