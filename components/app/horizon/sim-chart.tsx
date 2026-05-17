@@ -999,6 +999,19 @@ export const SimChart = memo(function SimChart({
         if (hoveredRow.oneTimeNet < 0) drukkers.push({ label: 'Eenmalig', value: Math.abs(hoveredRow.oneTimeNet) })
         if (hoveredRow.growth < 0) drukkers.push({ label: 'Rendement', value: Math.abs(hoveredRow.growth) })
 
+        // Monte Carlo percentile values at hovered age
+        const mcPercentiles = monteCarloOverlay ? (() => {
+          const idx = hoveredAge - monteCarloOverlay.startAge
+          if (idx < 0 || idx >= monteCarloOverlay.p50.length) return null
+          return {
+            p10: monteCarloOverlay.p10[idx],
+            p25: monteCarloOverlay.p25[idx],
+            p50: monteCarloOverlay.p50[idx],
+            p75: monteCarloOverlay.p75[idx],
+            p90: monteCarloOverlay.p90[idx],
+          }
+        })() : null
+
         return (
           <div
             className="pointer-events-none absolute z-10"
@@ -1050,6 +1063,38 @@ export const SimChart = memo(function SimChart({
                     <div key={d.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9 }}>
                       <span style={{ color: '#fca5a5' }}>&#9660; {d.label}</span>
                       <span className="font-mono tabular-nums" style={{ color: '#fca5a5' }}>{'\u2212'}{fmtAbs(d.value)}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Monte Carlo percentiles section */}
+              {mcPercentiles && (
+                <>
+                  <div className="mt-1.5" style={{ height: 1, background: 'var(--ink-3)', opacity: 0.25 }} />
+                  <div className="mt-1" style={{ fontSize: 8, color: 'var(--color-horizon-300, #d4b88a)', fontWeight: 600, letterSpacing: '0.04em' }}>
+                    MONTE CARLO
+                  </div>
+                  {([
+                    { label: 'p90', value: mcPercentiles.p90, opacity: 0.5 },
+                    { label: 'p75', value: mcPercentiles.p75, opacity: 0.65 },
+                    { label: 'p50', value: mcPercentiles.p50, opacity: 1 },
+                    { label: 'p25', value: mcPercentiles.p25, opacity: 0.65 },
+                    { label: 'p10', value: mcPercentiles.p10, opacity: 0.5 },
+                  ] as const).map(p => (
+                    <div key={p.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9, opacity: p.opacity }}>
+                      <span style={{ color: p.label === 'p50' ? 'var(--color-horizon-300, #d4b88a)' : 'var(--ink-4, #bbb8b0)' }}>
+                        {p.label}{p.label === 'p50' ? ' \u25cf' : ''}
+                      </span>
+                      <span
+                        className="font-mono tabular-nums"
+                        style={{
+                          color: p.label === 'p50' ? 'var(--color-horizon-300, #d4b88a)' : 'var(--paper)',
+                          fontWeight: p.label === 'p50' ? 600 : 400,
+                        }}
+                      >
+                        {fmtAbs(p.value)}
+                      </span>
                     </div>
                   ))}
                 </>
