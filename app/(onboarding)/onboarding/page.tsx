@@ -1205,6 +1205,16 @@ export default function OnboardingPage() {
               }
               onNext={goToNext}
               onBack={goToBack}
+              onSkipIncome={() => {
+                // "Later invullen" defer-pad (feature #829): wis het
+                // inkomensveld en ga door naar de volgende stap. De
+                // gebruiker vult dit later aan via Instellingen.
+                dispatch({
+                  type: 'SET_IDENTITY',
+                  data: { ...state.identity, net_monthly_income: '' },
+                })
+                goToNext()
+              }}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />

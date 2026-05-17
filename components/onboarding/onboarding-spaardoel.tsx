@@ -290,7 +290,7 @@ export function OnboardingSpaardoel({
             className="w-full min-h-11 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
-            Sla over &rarr;
+            Later invullen &rarr;
           </button>
         </div>
       }

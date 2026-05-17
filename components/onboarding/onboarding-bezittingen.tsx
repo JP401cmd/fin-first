@@ -275,7 +275,7 @@ export function OnboardingBezittingen({
               disabled={!cashRequirementMet}
               className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {hasAnyItem ? 'Verder' : 'Overslaan'}
+              {hasAnyItem ? 'Verder' : 'Later invullen'}
             </button>
           </div>
         }
@@ -400,15 +400,18 @@ export function OnboardingBezittingen({
           )}
 
           {/* ── Skip-link — alleen tonen zolang er nog niks ingevoerd is.
-              Anders is de primary "Verder"-knop in de footer voldoende. */}
+              Anders is de primary "Verder"-knop in de footer voldoende.
+              "Later invullen" ipv "Sla over" (feature #829): expliciet
+              defer-pad dat benadrukt dat overslaan OK is. */}
           {!hasAnyItem && (
             <div className="flex justify-center pt-2">
               <button
                 type="button"
                 onClick={onNext}
-                className="min-h-11 px-3 text-xs uppercase tracking-[0.18em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                className="min-h-11 px-3 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                Sla over &rarr;
+                Later invullen &rarr;
               </button>
             </div>
           )}

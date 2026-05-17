@@ -77,6 +77,13 @@ export interface OnboardingInkomenProps {
   onChange: (data: IncomeData) => void
   onNext: () => void
   onBack: () => void
+  /**
+   * "Later invullen" — wist het inkomensveld en gaat naar de volgende stap.
+   * Explicit defer-pad zodat de gebruiker duidelijk ziet dat overslaan OK is.
+   * Indien niet meegegeven, valt terug op `onNext()` (puur doorgaan zonder
+   * clear — backward-compat).
+   */
+  onSkipIncome?: () => void
   /** 1-indexed stap-nummer voor de voortgangsbalk (default 3). */
   currentStep?: number
   totalSteps?: number
@@ -87,6 +94,7 @@ export function OnboardingInkomen({
   onChange,
   onNext,
   onBack,
+  onSkipIncome,
   currentStep = 3,
   totalSteps = 5,
 }: OnboardingInkomenProps) {
@@ -332,6 +340,21 @@ export function OnboardingInkomen({
             >
               Huishouden-netto (samen als je samenwoont). Pas je later aan in Instellingen.
             </p>
+          )}
+
+          {/* "Later invullen" defer-link — expliciet signaal dat het veld
+              optioneel is en dat overslaan volledig OK is. Alleen tonen als
+              het veld nog leeg is — zodra de gebruiker iets typt, is de
+              primary "Verder"-knop de natuurlijke flow (feature #829). */}
+          {onSkipIncome && !data.net_monthly_income && (
+            <button
+              type="button"
+              onClick={onSkipIncome}
+              className="mt-2 min-h-8 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Later invullen &rarr;
+            </button>
           )}
         </div>
       </div>

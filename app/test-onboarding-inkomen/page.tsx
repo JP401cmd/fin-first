@@ -55,7 +55,7 @@ export default function TestOnboardingInkomen() {
     } as React.CSSProperties}>
       <div className="mx-auto max-w-2xl px-4 pt-4">
         <p className="text-xs font-mono uppercase tracking-widest text-[var(--ink-3)] mb-2">
-          Test: Onboarding Inkomen (feature #828)
+          Test: Onboarding Inkomen (feature #828 + #829)
         </p>
       </div>
       <OnboardingInkomen
@@ -63,6 +63,10 @@ export default function TestOnboardingInkomen() {
         onChange={setData}
         onNext={() => setProceeded(true)}
         onBack={() => alert('Terug geklikt')}
+        onSkipIncome={() => {
+          setData(prev => ({ ...prev, net_monthly_income: '' }))
+          setProceeded(true)
+        }}
       />
     </div>
   )
