@@ -24,6 +24,7 @@ import { ALL_MODULES } from '@/lib/module-registry'
 import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
 import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
+import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -78,6 +79,12 @@ export interface CorePageData {
    * `dateOfBirth`-gegevens hoeven te kennen.
    */
   currentAge: number | null
+  /**
+   * AOW-leeftijd (fractional, bijv. 67.25). Opgehaald uit `aow_leeftijden`
+   * tabel; fallback naar `NL_AOW_AGE` (67) als geboortedatum onbekend of
+   * geen match. Gebruikt voor de netto-vermogen-projectiechart.
+   */
+  aowAge: number
 
   // Assets / debts / cash
   assetsList: { id: string; name: string; current_value: number; net_worth_inclusion_pct: number }[]
@@ -326,6 +333,7 @@ export const loadCoreData = cache(async function loadCoreData(
     txResult, assetsResult, debtsResult, income12Result,
     essentialBudgetsResult, earliestIncomeResult, childBudgetsResult,
     expense12Result, earliestTxResult, profileResult, bankAccountsResult,
+    aowResult,
   ] = await Promise.all([
     supabase
       .from('transactions')
@@ -386,6 +394,9 @@ export const loadCoreData = cache(async function loadCoreData(
       .select('id, name, balance')
       .eq('is_active', true)
       .is('linked_asset_id', null),
+    supabase
+      .from('aow_leeftijden')
+      .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
   ])
 
   if (txResult.error) throw txResult.error
@@ -505,6 +516,12 @@ export const loadCoreData = cache(async function loadCoreData(
   const fireStrategy = parseFireStrategy(profileResult.data ?? {})
   const dobIso = profileResult.data?.date_of_birth ?? null
   const currentAge = dobIso ? ageAtDate(dobIso) : null
+
+  // AOW-leeftijd: lookup uit tabel, fallback naar NL_AOW_AGE (67)
+  const aowAge = lookupAowAge(
+    (aowResult.data ?? []) as AowLeeftijdRow[],
+    dobIso,
+  ).fractional
 
   // ── Total assets (weighted by net_worth_inclusion_pct) ──
   const totalAssetsOnly = assetsResult.data.reduce((s, a) =>
@@ -1010,6 +1027,7 @@ export const loadCoreData = cache(async function loadCoreData(
     fireParams,
     fireStrategy,
     currentAge,
+    aowAge,
 
     assetsList,
     debtsList,
