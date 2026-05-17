@@ -11,7 +11,6 @@ import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 import { SectionDivider } from '@/components/app/section-divider'
 import { DAIshboard } from '@/components/daishboard/daishboard'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
-import { useDashboardType } from '@/components/app/dashboard-type-provider'
 import { ActionCenter } from './action-center'
 import { DoelenStrook } from './doelen-strook'
 import { StappenplannenStrook } from './stappenplannen-strook'
@@ -46,7 +45,8 @@ export function WillLanding({
 }: WillLandingProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { dashboardType, isCollapsed } = useDashboardType()
+  // Briefing is now always the prominent main component at the top of /will
+  // No longer gated behind dashboardType toggle
 
   // Recurring costs state (loaded client-side)
   const [subscriptions, setSubscriptions] = useState<RecurringItem[]>([])
@@ -138,35 +138,38 @@ export function WillLanding({
           </h1>
         </header>
 
-        {/* ── Stappenplannen-strook (boven het dashboard) ── */}
-        <StappenplannenStrook data={dashboardData} />
-
-        {/* ── Sectie 1: Widget grid, DAIshboard of Nieuws ── */}
+        {/* ── Sectie 0: Briefing als prominent hoofdcomponent ── */}
         <section
-          aria-label={dashboardType === 'widgets' ? 'Mijn Widgets' : "Will's Briefing"}
-          data-testid="will-widget-grid"
+          aria-label="Will's Briefing"
+          data-testid="will-briefing-hero"
           className="card-editorial overflow-hidden"
         >
           {/* Module-active accent (Wil-500 op /will/**) */}
           <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
+          <DAIshboard
+            data={dashboardData}
+            temporal={temporal}
+            userName={userName}
+            aiEnabled={aiEnabled}
+          />
+        </section>
+
+        {/* ── Stappenplannen-strook (boven het widget grid) ── */}
+        <StappenplannenStrook data={dashboardData} />
+
+        {/* ── Sectie 1: Widget grid ── */}
+        <section
+          aria-label="Mijn Widgets"
+          data-testid="will-widget-grid"
+          className="card-editorial overflow-hidden"
+        >
           <div className="p-4 sm:p-6 md:p-8">
             <DraggableWidgetGrid
               initialPrefs={activeWidgets}
               allPrefs={allPrefs}
               data={dashboardData}
-              showDashboardTypeToggle
               categoryAppLinks={categoryAppLinks}
             />
-            {dashboardType === 'briefing' && !isCollapsed && (
-              <div className="mt-4">
-                <DAIshboard
-                  data={dashboardData}
-                  temporal={temporal}
-                  userName={userName}
-                  aiEnabled={aiEnabled}
-                />
-              </div>
-            )}
           </div>
         </section>
 
