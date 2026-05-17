@@ -17,6 +17,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import {
   Landmark,
   CreditCard,
@@ -40,12 +41,14 @@ type LeverConfig = {
   key: keyof LeverScores
   label: string
   Icon: LucideIcon
+  /** Optional navigation target when the lever is clicked. */
+  href?: string
 }
 
 const LEVERS: LeverConfig[] = [
   { key: 'assets', label: 'Bezittingen', Icon: Landmark },
   { key: 'debts', label: 'Schulden', Icon: CreditCard },
-  { key: 'cashflow', label: 'Cashflow', Icon: ArrowUpDown },
+  { key: 'cashflow', label: 'Cashflow', Icon: ArrowUpDown, href: '/will#cashflow' },
   { key: 'tax', label: 'Belasting', Icon: Receipt },
 ]
 
@@ -152,9 +155,15 @@ export function LeverCompassDots({ scores }: { scores: LeverScores }) {
       role="group"
       aria-label="Financieel kompas"
     >
-      {LEVERS.map(({ key, label }) => {
+      {LEVERS.map(({ key, label, href }) => {
         const entry = scores[key]
         const colors = STATUS_COLORS[entry.status]
+        const dot = (
+          <span
+            className={`block w-2 h-2 rounded-full ${colors.dot} ${href ? 'cursor-pointer' : 'cursor-default'}`}
+            aria-label={`${label}: ${STATUS_LABELS[entry.status]} — ${entry.detail}`}
+          />
+        )
         return (
           <MiniTooltip
             key={key}
@@ -162,10 +171,7 @@ export function LeverCompassDots({ scores }: { scores: LeverScores }) {
             status={entry.status}
             detail={entry.detail}
           >
-            <span
-              className={`block w-2 h-2 rounded-full ${colors.dot} cursor-default`}
-              aria-label={`${label}: ${STATUS_LABELS[entry.status]} — ${entry.detail}`}
-            />
+            {href ? <Link href={href}>{dot}</Link> : dot}
           </MiniTooltip>
         )
       })}
@@ -189,9 +195,21 @@ export function LeverCompassExpanded({ scores }: { scores: LeverScores }) {
       <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--ink-3)] mb-0.5">
         Kompas
       </span>
-      {LEVERS.map(({ key, label, Icon }) => {
+      {LEVERS.map(({ key, label, Icon, href }) => {
         const entry = scores[key]
         const colors = STATUS_COLORS[entry.status]
+        const row = (
+          <div
+            className={`flex items-center gap-2 py-0.5 ${href ? 'cursor-pointer hover:bg-[var(--subtle)] -mx-2 px-2 rounded transition-colors' : 'cursor-default'}`}
+          >
+            <Icon className="w-3.5 h-3.5 text-[var(--ink-3)]" aria-hidden />
+            <span className="flex-1 text-xs text-[var(--ink-2)] leading-tight">{label}</span>
+            <span
+              className={`w-2 h-2 rounded-full ${colors.dot} shrink-0`}
+              aria-label={`${STATUS_LABELS[entry.status]} — ${entry.detail}`}
+            />
+          </div>
+        )
         return (
           <MiniTooltip
             key={key}
@@ -199,16 +217,7 @@ export function LeverCompassExpanded({ scores }: { scores: LeverScores }) {
             status={entry.status}
             detail={entry.detail}
           >
-            <div
-              className="flex items-center gap-2 py-0.5 cursor-default"
-            >
-              <Icon className="w-3.5 h-3.5 text-[var(--ink-3)]" aria-hidden />
-              <span className="flex-1 text-xs text-[var(--ink-2)] leading-tight">{label}</span>
-              <span
-                className={`w-2 h-2 rounded-full ${colors.dot} shrink-0`}
-                aria-label={`${STATUS_LABELS[entry.status]} — ${entry.detail}`}
-              />
-            </div>
+            {href ? <Link href={href} className="block">{row}</Link> : row}
           </MiniTooltip>
         )
       })}
@@ -226,9 +235,15 @@ export function LeverCompassCollapsed({ scores }: { scores: LeverScores }) {
       role="group"
       aria-label="Financieel kompas"
     >
-      {LEVERS.map(({ key, label }) => {
+      {LEVERS.map(({ key, label, href }) => {
         const entry = scores[key]
         const colors = STATUS_COLORS[entry.status]
+        const dot = (
+          <span
+            className={`block w-2 h-2 rounded-full ${colors.dot} ${href ? 'cursor-pointer' : 'cursor-default'}`}
+            aria-label={`${label}: ${STATUS_LABELS[entry.status]} — ${entry.detail}`}
+          />
+        )
         return (
           <MiniTooltip
             key={key}
@@ -236,10 +251,7 @@ export function LeverCompassCollapsed({ scores }: { scores: LeverScores }) {
             status={entry.status}
             detail={entry.detail}
           >
-            <span
-              className={`block w-2 h-2 rounded-full ${colors.dot} cursor-default`}
-              aria-label={`${label}: ${STATUS_LABELS[entry.status]} — ${entry.detail}`}
-            />
+            {href ? <Link href={href}>{dot}</Link> : dot}
           </MiniTooltip>
         )
       })}
