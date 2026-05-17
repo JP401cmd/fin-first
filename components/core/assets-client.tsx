@@ -77,6 +77,7 @@ import {
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
 import { AangifteImportPane } from '@/components/onboarding/aangifte-import-pane'
+import { RebalancingSettingsSection } from './rebalancing-settings-section'
 import { AssetEditConnectionSection } from './asset-edit-connection-section'
 import { CryptoHoldingCard } from '@/components/holdings/crypto-holding-card'
 import { InvestmentHoldingCard } from '@/components/holdings/investment-holding-card'
@@ -665,6 +666,10 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           </div>
         )}
       </div>
+
+      {/* Rebalancing settings — contextually placed near portfolio allocation.
+          Only visible when user has target allocations. */}
+      <RebalancingSettingsSection />
 
       {/* Grouped asset cards — grid per categorie, conform /core/assets/[type].
           Elke categorie krijgt een klikbare header die doorlinkt naar de

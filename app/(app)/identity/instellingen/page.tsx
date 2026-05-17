@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { ChevronDown, ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Scale, Link2 } from 'lucide-react'
+import { ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Link2 } from 'lucide-react'
 import Link from 'next/link'
 import { BOX3_DRAG } from '@/lib/horizon-data'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -74,22 +74,34 @@ function fmt(pct: number, decimals = 2) {
   return pct.toFixed(decimals).replace('.', ',') + '%'
 }
 
+// ── Tab definitions ──────────────────────────────────────────────────────
+type SettingsTab = 'notificaties' | 'weergave' | 'privacy' | 'gegevens' | 'huishouden'
+
+const BASE_TABS: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
+  { id: 'notificaties', label: 'Notificaties', icon: BellRing },
+  { id: 'weergave', label: 'Weergave', icon: Palette },
+  { id: 'privacy', label: 'Privacy', icon: Shield },
+  { id: 'gegevens', label: 'Gegevens', icon: Server },
+]
+
 // ── Main page ─────────────────────────────────────────────────────────────
 
 export default function InstellingenPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // ─ Accordion open state ─
-  const [notifOpen, setNotifOpen] = useState(false)
-  const [fireOpen, setFireOpen] = useState(false)
-  const [weergaveOpen, setWeergaveOpen] = useState(false)
-  const [gegevensOpen, setGegevensOpen] = useState(false)
-  const [privacyOpen, setPrivacyOpen] = useState(false)
-  const [rebalancingOpen, setRebalancingOpen] = useState(false)
+  const searchParams = useSearchParams()
+
+  // ─ Tab state (URL-driven for deep-linking) ─
+  const activeTab: SettingsTab = (searchParams.get('tab') as SettingsTab) || 'notificaties'
+
+  const setActiveTab = useCallback((tab: SettingsTab) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', tab)
+    router.replace(`/identity/instellingen?${params.toString()}`, { scroll: false })
+  }, [router, searchParams])
 
   // ─ Section: Financiële toelichting ─
-  const [toelichtingOpen, setToelichtingOpen] = useState(false)
   const [financialContext, setFinancialContext] = useState('')
   const [financialContextSaved, setFinancialContextSaved] = useState('')
   const [contextSaving, setContextSaving] = useState(false)
@@ -1044,9 +1056,27 @@ export default function InstellingenPage() {
         )}
       </section>
 
-      {/* ── C: FIRE Instellingen ─────────────────────────────────────── */}
+      {/* ── C: FIRE Instellingen — verplaatst naar /horizon ────────────── */}
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <button
+        <Link
+          href="/horizon"
+          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+        >
+          <div>
+            <h2 className="label-editorial text-[var(--ink-2)]">FIRE Instellingen</h2>
+            <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+              Verplaatst naar Horizon — wijzig rendement, inflatie en strategie direct bij je projectie.
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+        </Link>
+      </section>
+
+      {/* Old Section C removed — FIRE settings now on /horizon. See horizon-fire-params-panel.tsx */}
+      {/* @dead-code-start: original accordion with sliders, kassabon, strategy, withdrawal
+          All this functionality moved to HorizonFireParamsPanel on the /horizon page.
+          Variables still declared above (fireOpen, expectedReturn, etc.) kept for TS compat. */}
+      {false && (<button
           type="button"
           onClick={() => setFireOpen(o => !o)}
           className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
@@ -1429,7 +1459,7 @@ export default function InstellingenPage() {
         </div>
           </div>
         )}
-      </section>
+      </section>)}
 
       {/* ── D: Weergave ─────────────────────────────────────────────── */}
       <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
