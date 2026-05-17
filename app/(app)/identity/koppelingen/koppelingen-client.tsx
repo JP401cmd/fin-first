@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ExternalLink, FileSpreadsheet, Landmark, Building2, PiggyBank, ArrowRight, FileText, Trash2 } from 'lucide-react'
+import { ExternalLink, FileSpreadsheet, Landmark, Building2, PiggyBank, FileText, Trash2, Link2 } from 'lucide-react'
 import Link from 'next/link'
 import { ConnectionSection } from '@/components/connections/connection-section'
 import { ConnectionCard } from '@/components/connections/connection-card'
 import { IsinResolverStatus } from '@/components/connections/isin-resolver-status'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { useToast } from '@/components/app/toast-provider'
+import { WidgetEmpty } from '@/components/widgets/widget-empty'
 import { computeFreshness, type ConnectionsData, type ExchangeConnectionRow, type ExchangeId, type WalletAddressRow, type WalletChain } from '@/lib/connections-data'
 import type { AangifteImportSummary } from '@/lib/aangifte/imports-loader'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -314,11 +315,12 @@ export function KoppelingenClient({ initialData, aangifteImports }: KoppelingenC
         description="Lees-rechten via een API-key. Wij plaatsen nooit orders of bewegen geld."
       >
         {exchanges.length === 0 ? (
-          <EmptyConnectionState
-            message="Nog geen exchange-koppelingen."
-            hint="Voeg een koppeling toe vanuit een crypto-bezitting."
-            ctaHref="/core/assets/crypto"
-            ctaLabel="Naar Crypto"
+          <WidgetEmpty
+            variant="first-use"
+            icon={Link2}
+            title="Nog geen koppelingen"
+            description="Koppel je crypto-exchange om saldi automatisch op te halen."
+            action={{ label: 'Koppeling toevoegen', href: '/core/assets/crypto' }}
           />
         ) : (
           exchanges.map((conn) => {
@@ -348,11 +350,12 @@ export function KoppelingenClient({ initialData, aangifteImports }: KoppelingenC
         description="Publieke adressen. Wij vragen nooit om je private key of seed-phrase."
       >
         {wallets.length === 0 ? (
-          <EmptyConnectionState
-            message="Nog geen wallet-adressen."
-            hint="Voeg een wallet toe vanuit een crypto-bezitting."
-            ctaHref="/core/assets/crypto"
-            ctaLabel="Naar Crypto"
+          <WidgetEmpty
+            variant="first-use"
+            icon={Link2}
+            title="Nog geen wallets"
+            description="Voeg een wallet-adres toe om je crypto-saldo automatisch bij te houden."
+            action={{ label: 'Koppeling toevoegen', href: '/core/assets/crypto' }}
           />
         ) : (
           wallets.map((w) => {
@@ -746,25 +749,3 @@ function AangifteImportPaneLoader({ onClose, onImported }: AangifteImportPaneLoa
   return <Pane open mode="direct-import" onClose={onClose} onImported={onImported} />
 }
 
-interface EmptyConnectionStateProps {
-  message: string
-  hint: string
-  ctaHref: string
-  ctaLabel: string
-}
-
-function EmptyConnectionState({ message, hint, ctaHref, ctaLabel }: EmptyConnectionStateProps) {
-  return (
-    <div className="border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-6 text-center">
-      <p className="text-sm font-semibold text-[var(--ink-2)]">{message}</p>
-      <p className="mt-1 font-serif italic text-[13px] leading-relaxed text-[var(--ink-3)]">{hint}</p>
-      <Link
-        href={ctaHref}
-        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[var(--ink)] underline underline-offset-4 transition-colors hover:text-[var(--ink-2)]"
-      >
-        {ctaLabel}
-        <ArrowRight className="h-3 w-3" aria-hidden="true" />
-      </Link>
-    </div>
-  )
-}

@@ -1,11 +1,15 @@
 'use client'
 
+import { useRef } from 'react'
 import Link from 'next/link'
 import { FreedomCardGenerator } from '@/components/app/freedom-card'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Share2 } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { WidgetEmpty } from '@/components/widgets/widget-empty'
 
 export default function DelenPage() {
+  const generatorRef = useRef<HTMLDivElement>(null)
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Delen" bottomBar={{ kind: 'tabs' }} />
@@ -42,8 +46,27 @@ export default function DelenPage() {
         </p>
       </header>
 
+      {/* ── First-use empty state ──────────────────────────────── */}
+      <section className="mb-5 sm:mb-8 rounded-2xl border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]">
+        <WidgetEmpty
+          variant="first-use"
+          icon={Share2}
+          title="Nog geen content gedeeld"
+          description="Maak een vrijheidskaart aan om je financiële voortgang te delen met vrienden en familie."
+          action={{
+            label: 'Maak je vrijheidskaart',
+            onClick: () => {
+              generatorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            },
+          }}
+        />
+      </section>
+
       {/* ── Vrijheidskaart ──────────────────────────────────────── */}
-      <section className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8">
+      <section
+        ref={generatorRef}
+        className="mb-5 sm:mb-8 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-8 scroll-mt-24"
+      >
         <h2 className="label-editorial text-[var(--ink-2)]">
           Vrijheidskaart Delen
         </h2>
