@@ -744,8 +744,8 @@ export default function WhatIfPage() {
                 variant="first-use"
                 icon={TrendingUp}
                 title="Scenario"
-                description="De Wat-Als simulator heeft basisgegevens nodig — voeg bezittingen toe in De Kern om je toekomst te verkennen."
-                action={{ label: 'Vermogen toevoegen in De Kern', href: '/core' }}
+                description="De Wat-Als simulator heeft basisgegevens nodig — voeg bezittingen toe in Het Overzicht om je toekomst te verkennen."
+                action={{ label: 'Vermogen toevoegen', href: '/overzicht/bezittingen' }}
               />
             )}
           </div>

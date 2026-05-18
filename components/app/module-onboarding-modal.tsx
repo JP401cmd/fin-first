@@ -41,26 +41,26 @@ const STEP_META: Record<OnboardingStep, StepMeta> = {
     detail:
       'Voeg je bezittingen (spaargeld, beleggingen, woning) en eventuele schulden toe zodat je vermogen correct berekend wordt.',
     icon: Wallet,
-    setupRoute: '/core',
-    setupLabel: 'Naar De Kern',
+    setupRoute: '/overzicht/bezittingen',
+    setupLabel: 'Naar Bezittingen',
   },
   budgets: {
     title: 'Budgetten instellen',
     description: 'Voor budgetteren heb je categoriebudgetten nodig.',
     detail:
-      'Op De Kern → Budgetten opent één knop ("Budgetten aanpassen") de hele editor: structuur, maandbedragen en templates (Minimalistisch, Nibud, Uitgebreid) op één plek.',
+      'Op Het Overzicht → Cashflow opent één knop ("Budgetten aanpassen") de hele editor: structuur, maandbedragen en templates (Minimalistisch, Nibud, Uitgebreid) op één plek.',
     icon: PiggyBank,
-    setupRoute: '/core',
-    setupLabel: 'Naar De Kern',
+    setupRoute: '/overzicht/cashflow',
+    setupLabel: 'Naar Cashflow',
   },
   horizon: {
     title: 'Toekomstplanning instellen',
     description: 'Stel je financiële horizon in voor projecties en simulaties.',
     detail:
-      'In De Horizon kun je je pensioenleeftijd, verwachte uitgaven en levensgebeurtenissen instellen. Dit vormt de basis voor je FIRE-berekeningen.',
+      'In De Toekomst kun je je pensioenleeftijd, verwachte uitgaven en levensgebeurtenissen instellen. Dit vormt de basis voor je vrijheidsberekeningen.',
     icon: Telescope,
-    setupRoute: '/horizon',
-    setupLabel: 'Naar De Horizon',
+    setupRoute: '/toekomst',
+    setupLabel: 'Naar De Toekomst',
   },
 }
 

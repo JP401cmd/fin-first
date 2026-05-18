@@ -2730,8 +2730,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   variant="first-use"
                   icon={TrendingUp}
                   title="Projectie"
-                  description="Voeg vermogen toe in De Kern zodat de Horizon een toekomstprojectie kan berekenen."
-                  action={{ label: 'Vermogen toevoegen in De Kern', href: '/core' }}
+                  description="Voeg vermogen toe in Het Overzicht zodat De Toekomst een projectie kan berekenen."
+                  action={{ label: 'Vermogen toevoegen', href: '/overzicht/bezittingen' }}
                 />
               )}
             </div>
