@@ -114,14 +114,14 @@ export const PRESETS: PresetSpec[] = [
   {
     id: 'part-time',
     category: 'werk',
-    label: 'Part-time',
-    description: '4 dagen per week werken, permanent',
-    explainer: 'Vier dagen werken — je inkomen daalt zo\'n 20%, je krijgt een hele dag voor jezelf terug.',
+    label: 'Deeltijd werken',
+    description: 'Van 5 naar 4 dagen (−20% inkomen)',
+    explainer: 'Deeltijd werken — je inkomen daalt 20%, je krijgt een hele dag per week terug. Pas uren en startmoment aan via de sliders en het evenementen-paneel.',
     iconKey: 'Briefcase',
     buildEvents: (b, a) => [
       buildScenarioEvent({
         id: 'whatif-preset-part-time',
-        name: 'Part-time (4 dagen)',
+        name: 'Deeltijd werken (4 dagen)',
         event_type: 'part_time',
         target_age: a,
         monthly_income_change: -round50(b.monthlyIncome * 0.2),
@@ -131,7 +131,7 @@ export const PRESETS: PresetSpec[] = [
         metadata: { huidigUren: 40, nieuwUren: 32, isPermanent: true },
       }),
     ],
-    summary: (b) => `−€${round50(b.monthlyIncome * 0.2)}/mnd, permanent`,
+    summary: (b) => `−€${round50(b.monthlyIncome * 0.2)}/mnd (4 dagen)`,
   },
   {
     id: 'raise',
@@ -196,6 +196,58 @@ export const PRESETS: PresetSpec[] = [
     ],
     summary: (b) => `vanaf ${'+3 jr'}: −€${round50(b.monthlyIncome)}/mnd`,
   },
+  {
+    id: 'zzp-start',
+    category: 'werk',
+    label: 'ZZP starten',
+    description: 'Loondienst → zelfstandig, met aanloopperiode',
+    explainer: 'De stap naar zelfstandig — een aanloopjaar met lager inkomen, geen werkgeverspensioen meer, maar wel zelfstandigenaftrek en vrijheid.',
+    iconKey: 'Rocket',
+    buildEvents: (b, a) => [
+      // Permanent: ZZP income is ~15% lower than salary (no vakantiegeld, no 13e maand, admin overhead)
+      buildScenarioEvent({
+        id: 'whatif-preset-zzp-income',
+        name: 'ZZP netto-inkomen (na aanloop)',
+        event_type: 'income_change',
+        target_age: a,
+        monthly_income_change: -round50(b.monthlyIncome * 0.15),
+        duration_months: 0,
+        scenario_origin: 'preset:zzp-start',
+        icon: 'Rocket',
+        metadata: { type: 'zzp_income_stable' },
+      }),
+      // Temporary: extra income loss during aanloopperiode (first 12 months)
+      // Total first year: -40% income (15% permanent + 25% extra aanloop)
+      buildScenarioEvent({
+        id: 'whatif-preset-zzp-aanloop',
+        name: 'Aanloopperiode (lagere omzet)',
+        event_type: 'income_change',
+        target_age: a,
+        monthly_income_change: -round50(b.monthlyIncome * 0.25),
+        duration_months: 12,
+        scenario_origin: 'preset:zzp-start',
+        icon: 'Hourglass',
+        metadata: { type: 'zzp_aanloop' },
+      }),
+      // Net recurring costs: AOV (€250) + pensioenreservering (€350) − zelfstandigenaftrek (€400) = +€200/mnd
+      buildScenarioEvent({
+        id: 'whatif-preset-zzp-costs',
+        name: 'AOV + pensioen − zelfstandigenaftrek',
+        event_type: 'lifestyle_adjustment',
+        target_age: a,
+        monthly_cost_change: 200,
+        duration_months: 0,
+        scenario_origin: 'preset:zzp-start',
+        icon: 'Activity',
+        metadata: {
+          aov_per_maand: 250,
+          pensioenreservering_per_maand: 350,
+          zelfstandigenaftrek_netto_per_maand: -400,
+        },
+      }),
+    ],
+    summary: (b) => `aanloop 12mnd −€${round50(b.monthlyIncome * 0.40)}/mnd, daarna −€${round50(b.monthlyIncome * 0.15)}/mnd`,
+  },
 
   // ── Familie (3) ───────────────────────────────────────────────────────────
   {
@@ -223,16 +275,17 @@ export const PRESETS: PresetSpec[] = [
   {
     id: 'child-coming',
     category: 'familie',
-    label: 'Kind erbij',
-    description: 'Nieuw kind in 1 jaar',
-    explainer: 'Een kind erbij — kinderopvang, kleding, eten. NIBUD-gebaseerde fasering tot 18.',
+    label: 'Kind krijgen',
+    description: 'Opvang ~€1.320/mnd, kinderbijslag, 4 dagen werken',
+    explainer: 'Een kind krijgen — kinderopvang (3 dagen, ~€1.320/mnd bruto), NIBUD-gefaseerde kosten tot 18, kinderbijslag, en één dag minder werken.',
     iconKey: 'Baby',
-    buildEvents: (_b, a) => [
+    buildEvents: (b, a) => [
       buildScenarioEvent({
         id: 'whatif-preset-child-coming',
-        name: 'Kind (geboorte komend jaar)',
+        name: 'Kind krijgen (komend jaar)',
         event_type: 'children',
         target_age: a + 1,
+        one_time_cost: 5000,
         duration_months: 0,
         scenario_origin: 'preset:child-coming',
         icon: 'Baby',
@@ -240,11 +293,22 @@ export const PRESETS: PresetSpec[] = [
           aantalKinderen: 1,
           kinderopvangDagen: 3,
           kinderbijslag: true,
-          babyuitzet: true,
+          babyuitzet: 5000,
         },
       }),
+      buildScenarioEvent({
+        id: 'whatif-preset-child-coming-parttime',
+        name: 'Minder werken (4 dagen)',
+        event_type: 'part_time',
+        target_age: a + 1,
+        monthly_income_change: -round50(b.monthlyIncome * 0.2),
+        duration_months: 0,
+        scenario_origin: 'preset:child-coming',
+        icon: 'Briefcase',
+        metadata: { huidigUren: 40, nieuwUren: 32, isPermanent: true },
+      }),
     ],
-    summary: () => '+1 kind, NIBUD-fasering',
+    summary: (b) => `opvang 3d, −€${round50(b.monthlyIncome * 0.2)}/mnd werk`,
   },
   {
     id: 'study-cost',
@@ -268,7 +332,47 @@ export const PRESETS: PresetSpec[] = [
     summary: () => '€700/mnd, 4 jaar (vanaf +17j)',
   },
 
-  // ── Wonen (3) ─────────────────────────────────────────────────────────────
+  // ── Wonen (4) ─────────────────────────────────────────────────────────────
+  {
+    id: 'house-purchase',
+    category: 'wonen',
+    label: 'Huis kopen',
+    description: '€350K, overdrachtsbelasting 2%, huur valt weg',
+    explainer: 'Een huis kopen voor €350.000 — kosten koper ~€25K (overdrachtsbelasting 2%, notaris, taxatie), hypotheek ~€1.200/mnd, maar je huur van ~€1.000/mnd valt weg.',
+    iconKey: 'Home',
+    buildEvents: (_b, a) => [
+      buildScenarioEvent({
+        id: 'whatif-preset-house-purchase',
+        name: 'Huis kopen (€350K)',
+        event_type: 'house_purchase',
+        target_age: a + 1,
+        one_time_cost: 25000,
+        monthly_cost_change: 1500, // hypotheek €1.200 + onderhoud €300
+        duration_months: 0,
+        scenario_origin: 'preset:house-purchase',
+        icon: 'Home',
+        metadata: {
+          aankoopprijs: 350000,
+          hypotheekRente: 4.0,
+          eersteWoning: false,
+          hypotheekLasten: 1200,
+          huidigeHuur: 1000,
+          nhg: false,
+        },
+      }),
+      buildScenarioEvent({
+        id: 'whatif-preset-house-purchase-huurvrijval',
+        name: 'Huurvrijval',
+        event_type: 'lifestyle_adjustment',
+        target_age: a + 1,
+        monthly_cost_change: -1000, // besparing op huur
+        duration_months: 0,
+        scenario_origin: 'preset:house-purchase',
+        icon: 'Home',
+      }),
+    ],
+    summary: () => '€25K kk, +€500/mnd netto',
+  },
   {
     id: 'mortgage-payoff',
     category: 'wonen',
