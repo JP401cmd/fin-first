@@ -24985,3 +24985,41 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 6 features completed this session (#788, #810, #815, #816, #791, #795)
+
+## Session 2026-05-18 - Feature #830
+
+### Feature #830: Uitgestelde onboarding-velden bijgehouden voor post-onboarding prompts - PASSING
+- Feature #829 (dependency) already passing — "Later invullen" skip option exists in onboarding
+- Deferred field tracking already partially implemented in onboarding state (DEFER_FIELD action)
+- Key change: migrated storage from `profiles.onboarding_deferred_fields` (column didn't exist) to `feature_preferences.deferred_onboarding_fields` (JSONB sub-key in existing column)
+- Modified save-own-data API: both RPC and upsert paths now store deferred fields in feature_preferences
+- Modified app layout: reads deferred fields from feature_preferences and passes to CoachBubble
+- Modified verify-deferred-fields API: rewritten to use feature_preferences for GET/POST/DELETE
+- Modified identity/profiel page: income deferral cleared from feature_preferences when user saves income
+- Coach-bubble shows deferred suggestions with priority 0 (higher than data-gap and path suggestions)
+- Three deferred field types: income (resolved via API clear), assets (auto-resolved when hasAssets), spaardoel (auto-resolved when hasGoals)
+- Verified with browser automation:
+  - Set all 3 deferred fields via test page → API returns ["income", "assets", "spaardoel"]
+  - Navigated to /core → coach-bubble shows "Je hebt je inkomen overgeslagen bij het instellen"
+  - Navigated to /will → coach-bubble shows "Je hebt je bezittingen overgeslagen" (income already dismissed)
+  - Cleared deferred fields via test page → coach-bubble reverts to generic data-gap suggestions
+  - Data persists across page reloads (stored in Supabase remote PostgreSQL)
+- Zero console errors on all tested pages
+- No mock data patterns found
+- Commit: c6143c6a
+
+### Files Modified
+- app/api/onboarding/save-own-data/route.ts — store deferred fields in feature_preferences
+- app/(app)/layout.tsx — read deferred fields from feature_preferences
+- app/(app)/identity/profiel/page.tsx — clear income deferral from feature_preferences
+- components/app/coach-bubble.tsx — deferred field suggestions + DeferredField type + comment update
+- app/(onboarding)/onboarding/page.tsx — DEFER_FIELD action + state tracking (from #829/#830 chain)
+- components/onboarding/onboarding-*.tsx — "Later invullen" skip handlers (from #829 chain)
+
+### Files Created
+- app/api/verify-deferred-fields/route.ts — verification endpoint
+- app/(app)/beheer/test-deferred/page.tsx — admin test page
+
+### Current Status
+- 1 feature completed this session (#830)
+- Overall progress: 861/861 passing (100.0%) 🎉
