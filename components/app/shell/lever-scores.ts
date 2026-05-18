@@ -79,6 +79,12 @@ export function computeLeverScores(input: {
   hasBox3Assets?: boolean
   /** Huishoudtype: 'solo' | 'samen' | 'gezin'. Partner verdubbelt vrijstelling → optimalisatie-kans. */
   householdType?: string
+  /** Aantal top-level budgets met limiet (expense/savings). */
+  budgetsTotal?: number
+  /** Aantal budgets die op schema liggen (spent ≤ limit). */
+  budgetsOnTrack?: number
+  /** Aantal budgets die over limiet zijn (spent > limit). */
+  budgetsOver?: number
 }): LeverScores {
   // 1. Bezittingen: diversificatie
   // Bij géén assets → null (neutral/grijs) — er is niets om te beoordelen.
@@ -102,20 +108,49 @@ export function computeLeverScores(input: {
     debtScore = ratio >= 1 ? 0 : Math.round((1 - ratio) * 100)
   }
 
-  // 3. Cashflow: savings rate
-  let cashflowScore: number | null
+  // 3. Cashflow: combined savings rate + budget health (#847)
+  //
+  // Savings-rate component (0–100):
+  let savingsComponent: number | null
   if (input.savingsRate === null) {
-    cashflowScore = null // insufficient data
+    savingsComponent = null
   } else if (input.savingsRate <= 0) {
-    cashflowScore = Math.max(0, Math.round(20 + input.savingsRate)) // negative = 0–20
+    savingsComponent = Math.max(0, Math.round(20 + input.savingsRate))
   } else if (input.savingsRate >= 30) {
-    cashflowScore = 100
+    savingsComponent = 100
   } else if (input.savingsRate >= 20) {
-    cashflowScore = Math.round(80 + ((input.savingsRate - 20) / 10) * 20)
+    savingsComponent = Math.round(80 + ((input.savingsRate - 20) / 10) * 20)
   } else if (input.savingsRate >= 10) {
-    cashflowScore = Math.round(50 + ((input.savingsRate - 10) / 10) * 30)
+    savingsComponent = Math.round(50 + ((input.savingsRate - 10) / 10) * 30)
   } else {
-    cashflowScore = Math.round((input.savingsRate / 10) * 30 + 20) // 0→20, 10→50
+    savingsComponent = Math.round((input.savingsRate / 10) * 30 + 20)
+  }
+
+  // Budget-health component (0–100):
+  // Green (≥60): alle budgets op schema
+  // Amber (30–59): 1–2 budgets over limiet
+  // Red (<30): 3+ budgets over limiet
+  const bTotal = input.budgetsTotal ?? 0
+  const bOver = input.budgetsOver ?? 0
+  let budgetComponent: number | null
+  if (bTotal <= 0) {
+    budgetComponent = null // geen budgets → geen data
+  } else if (bOver === 0) {
+    budgetComponent = 100 // alles op schema
+  } else if (bOver <= 2) {
+    budgetComponent = Math.round(50 - (bOver - 1) * 10) // 1→50, 2→40
+  } else {
+    budgetComponent = Math.max(0, Math.round(25 - (bOver - 3) * 5)) // 3→25, 4→20, 5→15...
+  }
+
+  // Combined score: blend beide componenten (50/50 als beide beschikbaar)
+  let cashflowScore: number | null
+  if (savingsComponent !== null && budgetComponent !== null) {
+    cashflowScore = Math.round((savingsComponent + budgetComponent) / 2)
+  } else if (budgetComponent !== null) {
+    cashflowScore = budgetComponent
+  } else {
+    cashflowScore = savingsComponent // null of een waarde
   }
 
   // 4. Belasting: tax optimization status (#848)
@@ -150,12 +185,12 @@ export function computeLeverScores(input: {
 
   // ── Detail text per lever ─────────────────────────────────────────────────
   const assetDetail = input.assetTypeCount <= 0
-    ? 'Geen bezittingen geregistreerd'
+    ? 'Geen bezittingen geregistreerd — Start'
     : `${input.assetTypeCount} ${input.assetTypeCount === 1 ? 'type' : 'typen'} · ${fmtShort(input.totalAssets)}`
 
   let debtDetail: string
   if (input.totalDebts <= 0 && input.totalAssets <= 0) {
-    debtDetail = 'Geen data'
+    debtDetail = 'Geen data — Start'
   } else if (input.totalDebts <= 0) {
     debtDetail = 'Schuldenvrij'
   } else {
@@ -176,13 +211,28 @@ export function computeLeverScores(input: {
     }
   }
 
-  const cashflowDetail = input.savingsRate === null
-    ? 'Onvoldoende transactiedata'
-    : `Spaarquote ${Math.round(input.savingsRate)}%`
+  // Cashflow detail: combine budget health + savings rate
+  let cashflowDetail: string
+  const budgetPart = bTotal > 0
+    ? `${bTotal - bOver}/${bTotal} op schema`
+    : null
+  const savingsPart = input.savingsRate !== null
+    ? `Spaarquote ${Math.round(input.savingsRate)}%`
+    : null
+
+  if (budgetPart && savingsPart) {
+    cashflowDetail = `${budgetPart} · ${savingsPart}`
+  } else if (budgetPart) {
+    cashflowDetail = budgetPart
+  } else if (savingsPart) {
+    cashflowDetail = savingsPart
+  } else {
+    cashflowDetail = 'Onvoldoende transactiedata — Start'
+  }
 
   let taxDetail: string
   if (!hasBox3) {
-    taxDetail = 'Geen belastbare bezittingen'
+    taxDetail = 'Geen belastbare bezittingen — Start'
   } else if (input.box3TaxableAboveThreshold <= 0) {
     taxDetail = 'Onder vrijstelling'
   } else if (hasPartner && input.box3TaxableAboveThreshold <= 100_000) {
