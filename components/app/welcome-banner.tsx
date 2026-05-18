@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback, type ComponentType } from 'react'
 import { Bell, Settings, MessageCircle, X, Wallet, BarChart3, TrendingUp, Zap, Compass, Newspaper } from 'lucide-react'
 import { WillDots } from '@/components/app/will-dots'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
-import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
+import { MODULE_CATALOG, getModuleLabel, type ModuleId } from '@/lib/module-registry'
 
 // ── Module display order (canonical) ────────────────────────
 const MODULE_ORDER: ModuleId[] = [
@@ -76,7 +76,7 @@ function ModuleRow({
 }) {
   const entry = MODULE_SUMMARIES[moduleId]
   const Icon = entry.icon
-  const label = MODULE_CATALOG.find((m) => m.id === moduleId)?.label ?? moduleId
+  const label = getModuleLabel(moduleId)
 
   return (
     <div

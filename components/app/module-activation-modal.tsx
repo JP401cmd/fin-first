@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useId, type ComponentType } from 'rea
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { WillDots } from '@/components/app/will-dots'
 import { SpeechBubble } from '@/components/onboarding/speech-bubble'
-import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
+import { MODULE_CATALOG, getModuleLabel, type ModuleId } from '@/lib/module-registry'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets } from '@/lib/budget-data'
 import { BudgetAmountEditor } from '@/components/onboarding/budget-amount-editor'
@@ -320,7 +320,7 @@ export function ModuleActivationModal({
 
   const info = MODULE_INFO[moduleId]
   const moduleDef = MODULE_CATALOG.find((m) => m.id === moduleId)
-  const moduleLabel = moduleDef?.label ?? moduleId
+  const moduleLabel = getModuleLabel(moduleId)
   const buttonColors = getButtonColors(moduleId)
 
   return (

@@ -29,7 +29,7 @@ import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useModuleGuideState } from '@/lib/hooks/use-module-guide-state'
 import { useGoalGuideState } from '@/lib/hooks/use-goal-guide-state'
 import { MODULE_GUIDE_DISPLAY_ORDER, getModuleGuideSteps } from '@/lib/briefing/module-guide-steps'
-import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
+import { MODULE_CATALOG, getModuleLabel, type ModuleId } from '@/lib/module-registry'
 
 interface BriefingCardGridProps {
   cards: BriefingCardSpec[]
@@ -129,7 +129,7 @@ export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: Brie
           type: 'moduleGuide',
           moduleId,
           module: MODULE_CARD_MODULE[moduleId],
-          title: def?.label ?? moduleId,
+          title: def?.label ?? getModuleLabel(moduleId),
           steps,
         }
       })

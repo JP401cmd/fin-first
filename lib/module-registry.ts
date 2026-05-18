@@ -214,6 +214,18 @@ export function getModuleDef(moduleId: ModuleId): ModuleDef {
 }
 
 /**
+ * Get the human-readable label for a module ID.
+ * Always returns a proper label — never exposes raw module IDs to end users.
+ *
+ * Since ModuleId is a closed union with exactly one catalog entry per member,
+ * the fallback should never trigger, but it exists as defensive programming
+ * to prevent raw IDs like 'inzicht_acties' from leaking into the UI.
+ */
+export function getModuleLabel(moduleId: ModuleId): string {
+  return MODULE_MAP[moduleId]?.label ?? moduleId.replace(/_/g, ' ')
+}
+
+/**
  * Check whether a specific module is in the active set.
  */
 export function isModuleActive(activeModules: ModuleId[], moduleId: ModuleId): boolean {
