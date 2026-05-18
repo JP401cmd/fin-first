@@ -24503,3 +24503,32 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#826, #767)
+
+## Session 2026-05-18 - Features #796, #800
+
+### Feature #796: Tijdas toont doorrekening resultaten inline - PASSING
+- DoorrekeningInlineSection component wired into horizon-client.tsx JSX
+- Inline collapsible section with 3 tabs: Opbouw, Afbouw, Overzicht
+- Dynamic imports for lazy-loading tab content panels
+- DoorrekeningSettingsProvider context wraps tab content
+- Editorial kicker styling + segmented control tab bar
+- All props wired from existing page state (assets, debts, fireParams, etc.)
+- Gate: only renders when simResult + currentAge available
+
+### Feature #800: /horizon/whatif en doorrekening-test redirecten naar uniforme tijdas - PASSING
+- /horizon/whatif: server wrapper with conditional redirect
+  - Direct access (bookmark) → redirect to /horizon?whatif=open → dream gate auto-triggers
+  - Via dream gate (?via=dreamgate) → renders full whatif-page-client
+  - Infinite loop avoided via ?via=dreamgate conditional check
+- /horizon/doorrekening-test/* (5 routes) → redirect to /horizon?doorrekening=<tab>
+  - /doorrekening-test → ?doorrekening=overzicht
+  - /doorrekening-test/opbouw → ?doorrekening=opbouw
+  - /doorrekening-test/afbouw → ?doorrekening=afbouw
+  - /doorrekening-test/overzicht → ?doorrekening=overzicht
+  - /doorrekening-test/gebeurtenissen → /horizon (no param, events already on page)
+- doorrekening-inline-section.tsx: added initialTab + forceOpen props
+- horizon-client.tsx: query param handling in useEffect for both whatif and doorrekening
+- URL cleanup via router.replace('/horizon', { scroll: false })
+
+### Current Status
+- 2 features completed this session (#796, #800)
