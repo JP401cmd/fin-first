@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useId, memo } from 'react'
+import { useState, useMemo, useCallback, useId, useEffect, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -82,6 +82,37 @@ const PAD = { top: 24, right: 24, bottom: 36, left: 64 }
 const HORIZON_OPTIONS = [10, 20, 30] as const
 type HorizonOption = (typeof HORIZON_OPTIONS)[number]
 
+// ── Progressive reveal phases ───────────────────────────────────────────────
+// Phase 0: nothing visible
+// Phase 1: grid + nominal line (the "illusion" — what you think you have)
+// Phase 2: real value line draws downward (the truth unfolds)
+// Phase 3: lost area fills in (the evaporating value — dramatic reveal)
+// Phase 4: milestones + final value (the punchline — how much is gone)
+// Phase 5: summary + urgency insight (the conclusion)
+
+function useProgressiveReveal(hasEntered: boolean) {
+  const [phase, setPhase] = useState(0)
+
+  useEffect(() => {
+    if (!hasEntered) return
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setPhase(5)
+      return
+    }
+
+    const timers: ReturnType<typeof setTimeout>[] = []
+    timers.push(setTimeout(() => setPhase(1), 0))
+    timers.push(setTimeout(() => setPhase(2), 500))
+    timers.push(setTimeout(() => setPhase(3), 1200))
+    timers.push(setTimeout(() => setPhase(4), 1800))
+    timers.push(setTimeout(() => setPhase(5), 2400))
+
+    return () => timers.forEach(clearTimeout)
+  }, [hasEntered])
+
+  return phase
+}
+
 // ── Chart Component ─────────────────────────────────────────────────────────
 
 export const InflationErosionChart = memo(function InflationErosionChart({
@@ -96,7 +127,8 @@ export const InflationErosionChart = memo(function InflationErosionChart({
   height?: number
 }) {
   const uid = useId()
-  const { ref, hasEntered } = useInViewAnimation({ duration: 900 })
+  const { ref, hasEntered } = useInViewAnimation({ duration: 2800 })
+  const phase = useProgressiveReveal(hasEntered)
 
   const [horizon, setHorizon] = useState<HorizonOption>(20)
   const [startAmount, setStartAmount] = useState(1000)
@@ -186,6 +218,8 @@ export const InflationErosionChart = memo(function InflationErosionChart({
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
+      // Only enable hover after animation completes
+      if (phase < 5) return
       const rect = e.currentTarget.getBoundingClientRect()
       const clientX = e.clientX - rect.left
       const svgX = (clientX / rect.width) * W
@@ -196,7 +230,7 @@ export const InflationErosionChart = memo(function InflationErosionChart({
         setHoverYear(null)
       }
     },
-    [chartW, horizon],
+    [chartW, horizon, phase],
   )
 
   const handleMouseLeave = useCallback(() => setHoverYear(null), [])
@@ -373,55 +407,59 @@ export const InflationErosionChart = memo(function InflationErosionChart({
             </pattern>
           </defs>
 
-          {/* Y-axis gridlines */}
-          {yTicks.map((tick) => (
-            <g key={tick}>
-              <line
-                x1={PAD.left}
-                y1={yScale(tick)}
-                x2={W - PAD.right}
-                y2={yScale(tick)}
-                stroke="var(--rule-soft)"
-                strokeWidth={tick === 0 ? 1 : 0.5}
-                strokeDasharray={tick === 0 ? undefined : '3,3'}
-              />
+          {/* Phase 1: Y-axis gridlines + labels + nominal line */}
+          <g
+            style={{
+              opacity: phase >= 1 ? 1 : 0,
+              transition: 'opacity 400ms ease-out',
+            }}
+          >
+            {yTicks.map((tick) => (
+              <g key={tick}>
+                <line
+                  x1={PAD.left}
+                  y1={yScale(tick)}
+                  x2={W - PAD.right}
+                  y2={yScale(tick)}
+                  stroke="var(--rule-soft)"
+                  strokeWidth={tick === 0 ? 1 : 0.5}
+                  strokeDasharray={tick === 0 ? undefined : '3,3'}
+                />
+                <text
+                  x={PAD.left - 8}
+                  y={yScale(tick) + 4}
+                  textAnchor="end"
+                  className="text-[10px] font-mono fill-[var(--ink-3)]"
+                >
+                  {fmtYAxis(tick)}
+                </text>
+              </g>
+            ))}
+
+            {/* X-axis labels */}
+            {xTicks.map((year) => (
               <text
-                x={PAD.left - 8}
-                y={yScale(tick) + 4}
-                textAnchor="end"
+                key={year}
+                x={xScale(year)}
+                y={H - 8}
+                textAnchor="middle"
                 className="text-[10px] font-mono fill-[var(--ink-3)]"
               >
-                {fmtYAxis(tick)}
+                {year === 0 ? 'Nu' : `${year}j`}
               </text>
-            </g>
-          ))}
+            ))}
 
-          {/* X-axis labels */}
-          {xTicks.map((year) => (
-            <text
-              key={year}
-              x={xScale(year)}
-              y={H - 8}
-              textAnchor="middle"
-              className="text-[10px] font-mono fill-[var(--ink-3)]"
-            >
-              {year === 0 ? 'Nu' : `${year}j`}
-            </text>
-          ))}
-
-          {/* Nominal line (constant — the "illusion") */}
-          <line
-            x1={PAD.left}
-            y1={yScale(startAmount)}
-            x2={W - PAD.right}
-            y2={yScale(startAmount)}
-            stroke="var(--ink-3)"
-            strokeWidth={1}
-            strokeDasharray="6,4"
-            opacity={hasEntered ? 0.5 : 0}
-            style={{ transition: 'opacity 0.6s ease-out' }}
-          />
-          {hasEntered && (
+            {/* Nominal line (constant — the "illusion") */}
+            <line
+              x1={PAD.left}
+              y1={yScale(startAmount)}
+              x2={W - PAD.right}
+              y2={yScale(startAmount)}
+              stroke="var(--ink-3)"
+              strokeWidth={1}
+              strokeDasharray="6,4"
+              opacity={0.5}
+            />
             <text
               x={W - PAD.right - 4}
               y={yScale(startAmount) - 8}
@@ -431,37 +469,19 @@ export const InflationErosionChart = memo(function InflationErosionChart({
             >
               nominaal {fmtEur(startAmount)}
             </text>
-          )}
+          </g>
 
-          {/* Lost value area (between nominal and real) — striped */}
-          <path
-            d={lostAreaPath}
-            fill={`url(#${uid}-lost-grad)`}
-            style={{
-              opacity: hasEntered ? 1 : 0,
-              transition: 'opacity 0.8s ease-out 0.2s',
-            }}
-          />
-          <path
-            d={lostAreaPath}
-            fill={`url(#${uid}-stripes)`}
-            style={{
-              opacity: hasEntered ? 1 : 0,
-              transition: 'opacity 0.8s ease-out 0.2s',
-            }}
-          />
-
-          {/* Real value area (what's actually left) */}
+          {/* Phase 2: Real value area (what's actually left) — appears first as context */}
           <path
             d={realAreaPath}
             fill={`url(#${uid}-real-grad)`}
             style={{
-              opacity: hasEntered ? 1 : 0,
-              transition: 'opacity 0.6s ease-out',
+              opacity: phase >= 2 ? 1 : 0,
+              transition: 'opacity 500ms ease-out',
             }}
           />
 
-          {/* Real value line */}
+          {/* Phase 2: Real value line (draws downward — the truth unfolds) */}
           <path
             d={realLine}
             fill="none"
@@ -469,46 +489,70 @@ export const InflationErosionChart = memo(function InflationErosionChart({
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
+            pathLength={1}
             style={{
-              strokeDasharray: hasEntered ? 'none' : '2000',
-              strokeDashoffset: hasEntered ? 0 : 2000,
-              transition: 'stroke-dashoffset 1.2s ease-out',
+              strokeDasharray: 1,
+              strokeDashoffset: phase >= 2 ? 0 : 1,
+              transition: 'stroke-dashoffset 800ms ease-out',
             }}
           />
 
-          {/* Freedom days lost milestone markers */}
-          {hasEntered &&
-            milestones.map((m) => (
-              <g key={m.pct}>
-                <line
-                  x1={xScale(m.year)}
-                  y1={yScale(m.row.realValue)}
-                  x2={xScale(m.year)}
-                  y2={yScale(m.row.nominal)}
-                  stroke="var(--negative)"
-                  strokeWidth={1}
-                  strokeDasharray="3,3"
-                  opacity={0.4}
-                />
-                <text
-                  x={xScale(m.year)}
-                  y={yScale(m.row.nominal) + (yScale(m.row.realValue) - yScale(m.row.nominal)) / 2 + 4}
-                  textAnchor="middle"
-                  className="text-[9px] font-mono font-semibold"
-                  fill="var(--negative)"
-                  opacity={0.7}
-                >
-                  -{Math.round(m.pct * 100)}%
-                </text>
-              </g>
-            ))}
+          {/* Phase 3: Lost value area (between nominal and real) — the dramatic reveal */}
+          <path
+            d={lostAreaPath}
+            fill={`url(#${uid}-lost-grad)`}
+            style={{
+              opacity: phase >= 3 ? 1 : 0,
+              transition: 'opacity 500ms ease-out',
+            }}
+          />
+          <path
+            d={lostAreaPath}
+            fill={`url(#${uid}-stripes)`}
+            style={{
+              opacity: phase >= 3 ? 1 : 0,
+              transition: 'opacity 500ms ease-out',
+            }}
+          />
 
-          {/* Final value annotation */}
-          {hasEntered && finalRow && (
+          {/* Phase 4: Freedom days lost milestone markers (appear sequentially) */}
+          {milestones.map((m, idx) => (
+            <g
+              key={m.pct}
+              style={{
+                opacity: phase >= 4 ? 1 : 0,
+                transition: `opacity 300ms ${idx * 150}ms ease-out`,
+              }}
+            >
+              <line
+                x1={xScale(m.year)}
+                y1={yScale(m.row.realValue)}
+                x2={xScale(m.year)}
+                y2={yScale(m.row.nominal)}
+                stroke="var(--negative)"
+                strokeWidth={1}
+                strokeDasharray="3,3"
+                opacity={0.4}
+              />
+              <text
+                x={xScale(m.year)}
+                y={yScale(m.row.nominal) + (yScale(m.row.realValue) - yScale(m.row.nominal)) / 2 + 4}
+                textAnchor="middle"
+                className="text-[9px] font-mono font-semibold"
+                fill="var(--negative)"
+                opacity={0.7}
+              >
+                -{Math.round(m.pct * 100)}%
+              </text>
+            </g>
+          ))}
+
+          {/* Phase 4: Final value annotation (the punchline) */}
+          {finalRow && (
             <g
               style={{
-                opacity: hasEntered ? 1 : 0,
-                transition: 'opacity 0.5s ease-out 1s',
+                opacity: phase >= 4 ? 1 : 0,
+                transition: 'opacity 500ms ease-out',
               }}
             >
               <circle
@@ -516,20 +560,31 @@ export const InflationErosionChart = memo(function InflationErosionChart({
                 cy={yScale(finalRow.realValue)}
                 r={4}
                 fill="var(--color-horizon-600)"
+                style={{
+                  transform: phase >= 4 ? 'scale(1)' : 'scale(0)',
+                  transformOrigin: `${xScale(horizon)}px ${yScale(finalRow.realValue)}px`,
+                  transformBox: 'fill-box',
+                  transition: 'transform 300ms cubic-bezier(0.34,1.56,0.64,1)',
+                }}
               />
               <text
                 x={xScale(horizon) - 12}
                 y={yScale(finalRow.realValue) + 18}
                 textAnchor="end"
                 className="text-[12px] font-mono font-bold fill-[var(--ink)]"
+                style={{
+                  opacity: phase >= 4 ? 1 : 0,
+                  transform: phase >= 4 ? 'translateY(0)' : 'translateY(-6px)',
+                  transition: 'opacity 400ms 100ms ease-out, transform 400ms 100ms ease-out',
+                }}
               >
                 {fmtEur(Math.round(finalRow.realValue))}
               </text>
             </g>
           )}
 
-          {/* Crosshair + tooltip */}
-          {hoveredRow && hoverYear !== null && (
+          {/* Crosshair + tooltip (only after animation completes) */}
+          {hoveredRow && hoverYear !== null && phase >= 5 && (
             <g>
               <line
                 x1={xScale(hoverYear)}
@@ -553,8 +608,8 @@ export const InflationErosionChart = memo(function InflationErosionChart({
           )}
         </svg>
 
-        {/* Hover tooltip */}
-        {hoveredRow && hoverYear !== null && (
+        {/* Hover tooltip (only after animation) */}
+        {hoveredRow && hoverYear !== null && phase >= 5 && (
           <div
             className="absolute pointer-events-none bg-[var(--paper)] border border-[var(--border-ed)] shadow-sm rounded-md px-3 py-2 text-xs font-mono z-10"
             style={{
@@ -607,8 +662,15 @@ export const InflationErosionChart = memo(function InflationErosionChart({
         )}
       </div>
 
-      {/* ── Legend + Summary ───────────────────────────────────── */}
-      <div className="flex flex-wrap gap-4 sm:gap-6 items-start">
+      {/* ── Phase 5: Legend + Summary ─────────────────────────── */}
+      <div
+        className="flex flex-wrap gap-4 sm:gap-6 items-start"
+        style={{
+          opacity: phase >= 5 ? 1 : 0,
+          transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+          transition: 'opacity 400ms ease-out, transform 400ms ease-out',
+        }}
+      >
         <div className="flex gap-4">
           <div className="flex items-center gap-1.5">
             <span
@@ -634,7 +696,14 @@ export const InflationErosionChart = memo(function InflationErosionChart({
 
         <div className="flex flex-wrap gap-3 ml-auto">
           {/* Freedom days summary */}
-          <div className="bg-[var(--subtle)] px-3 py-2 rounded-md">
+          <div
+            className="bg-[var(--subtle)] px-3 py-2 rounded-md"
+            style={{
+              opacity: phase >= 5 ? 1 : 0,
+              transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+              transition: 'opacity 400ms ease-out, transform 400ms ease-out',
+            }}
+          >
             <div className="text-[10px] uppercase tracking-[0.16em] font-mono text-[var(--ink-3)]">
               Vrijheid vandaag
             </div>
@@ -642,7 +711,14 @@ export const InflationErosionChart = memo(function InflationErosionChart({
               {fmtDays(initialFreedomDays)}
             </div>
           </div>
-          <div className="bg-[var(--subtle)] px-3 py-2 rounded-md">
+          <div
+            className="bg-[var(--subtle)] px-3 py-2 rounded-md"
+            style={{
+              opacity: phase >= 5 ? 1 : 0,
+              transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+              transition: 'opacity 400ms 80ms ease-out, transform 400ms 80ms ease-out',
+            }}
+          >
             <div className="text-[10px] uppercase tracking-[0.16em] font-mono text-[var(--ink-3)]">
               Vrijheid na {horizon}j
             </div>
@@ -653,7 +729,14 @@ export const InflationErosionChart = memo(function InflationErosionChart({
               {fmtDays(finalFreedomDays)}
             </div>
           </div>
-          <div className="bg-[var(--subtle)] px-3 py-2 rounded-md">
+          <div
+            className="bg-[var(--subtle)] px-3 py-2 rounded-md"
+            style={{
+              opacity: phase >= 5 ? 1 : 0,
+              transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+              transition: 'opacity 400ms 160ms ease-out, transform 400ms 160ms ease-out',
+            }}
+          >
             <div className="text-[10px] uppercase tracking-[0.16em] font-mono text-[var(--ink-3)]">
               Vrijheid verdampt
             </div>
@@ -667,16 +750,17 @@ export const InflationErosionChart = memo(function InflationErosionChart({
         </div>
       </div>
 
-      {/* ── Urgency insight ────────────────────────────────────── */}
-      {hasEntered && percentLost > 0 && (
+      {/* ── Phase 5: Urgency insight ──────────────────────────── */}
+      {phase >= 5 && percentLost > 0 && (
         <div
           className="border-l-[3px] pl-4 py-2 text-sm text-[var(--ink-2)]"
           style={{
             borderColor: 'var(--negative)',
             fontFamily: 'var(--font-source-serif, Georgia, serif)',
             fontStyle: 'italic',
-            opacity: hasEntered ? 1 : 0,
-            transition: 'opacity 0.6s ease-out 1.2s',
+            opacity: phase >= 5 ? 1 : 0,
+            transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+            transition: 'opacity 500ms 200ms ease-out, transform 500ms 200ms ease-out',
           }}
         >
           Over {horizon} jaar koopt {fmtEur(startAmount)} nog maar voor{' '}

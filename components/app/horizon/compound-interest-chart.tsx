@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useId, memo } from 'react'
+import { useState, useMemo, useCallback, useId, useEffect, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -70,6 +70,37 @@ const PAD = { top: 24, right: 24, bottom: 36, left: 64 }
 const HORIZON_OPTIONS = [10, 20, 30] as const
 type HorizonOption = (typeof HORIZON_OPTIONS)[number]
 
+// ── Progressive reveal phases ───────────────────────────────────────────────
+// Phase 0: nothing visible
+// Phase 1: grid + axes fade in
+// Phase 2: deposits area grows (your contributions)
+// Phase 3: total line draws + returns area fills (the compound magic)
+// Phase 4: final value annotation + deposits boundary (the comparison)
+// Phase 5: summary stats + snowball insight (the conclusion)
+
+function useProgressiveReveal(hasEntered: boolean) {
+  const [phase, setPhase] = useState(0)
+
+  useEffect(() => {
+    if (!hasEntered) return
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setPhase(5)
+      return
+    }
+
+    const timers: ReturnType<typeof setTimeout>[] = []
+    timers.push(setTimeout(() => setPhase(1), 0))
+    timers.push(setTimeout(() => setPhase(2), 400))
+    timers.push(setTimeout(() => setPhase(3), 1000))
+    timers.push(setTimeout(() => setPhase(4), 1800))
+    timers.push(setTimeout(() => setPhase(5), 2400))
+
+    return () => timers.forEach(clearTimeout)
+  }, [hasEntered])
+
+  return phase
+}
+
 // ── Chart Component ─────────────────────────────────────────────────────────
 
 export const CompoundInterestChart = memo(function CompoundInterestChart({
@@ -84,7 +115,8 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
   height?: number
 }) {
   const uid = useId()
-  const { ref, hasEntered } = useInViewAnimation({ duration: 900 })
+  const { ref, hasEntered } = useInViewAnimation({ duration: 2800 })
+  const phase = useProgressiveReveal(hasEntered)
 
   const [horizon, setHorizon] = useState<HorizonOption>(20)
   const [monthlyDeposit, setMonthlyDeposit] = useState(
@@ -173,6 +205,8 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
+      // Only enable hover after animation completes
+      if (phase < 5) return
       const rect = e.currentTarget.getBoundingClientRect()
       const clientX = e.clientX - rect.left
       const svgX = (clientX / rect.width) * W
@@ -185,7 +219,7 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
         setHoverYear(null)
       }
     },
-    [chartW, horizon],
+    [chartW, horizon, phase],
   )
 
   const handleMouseLeave = useCallback(() => setHoverYear(null), [])
@@ -340,63 +374,70 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
             </linearGradient>
           </defs>
 
-          {/* Y-axis gridlines */}
-          {yTicks.map((tick) => (
-            <g key={tick}>
-              <line
-                x1={PAD.left}
-                y1={yScale(tick)}
-                x2={W - PAD.right}
-                y2={yScale(tick)}
-                stroke="var(--rule-soft)"
-                strokeWidth={tick === 0 ? 1 : 0.5}
-                strokeDasharray={tick === 0 ? undefined : '3,3'}
-              />
+          {/* Phase 1: Y-axis gridlines + labels */}
+          <g
+            style={{
+              opacity: phase >= 1 ? 1 : 0,
+              transition: 'opacity 400ms ease-out',
+            }}
+          >
+            {yTicks.map((tick) => (
+              <g key={tick}>
+                <line
+                  x1={PAD.left}
+                  y1={yScale(tick)}
+                  x2={W - PAD.right}
+                  y2={yScale(tick)}
+                  stroke="var(--rule-soft)"
+                  strokeWidth={tick === 0 ? 1 : 0.5}
+                  strokeDasharray={tick === 0 ? undefined : '3,3'}
+                />
+                <text
+                  x={PAD.left - 8}
+                  y={yScale(tick) + 4}
+                  textAnchor="end"
+                  className="text-[10px] font-mono fill-[var(--ink-3)]"
+                >
+                  {fmtYAxis(tick)}
+                </text>
+              </g>
+            ))}
+
+            {/* X-axis labels */}
+            {xTicks.map((year) => (
               <text
-                x={PAD.left - 8}
-                y={yScale(tick) + 4}
-                textAnchor="end"
+                key={year}
+                x={xScale(year)}
+                y={H - 8}
+                textAnchor="middle"
                 className="text-[10px] font-mono fill-[var(--ink-3)]"
               >
-                {fmtYAxis(tick)}
+                {year === 0 ? 'Nu' : `${year}j`}
               </text>
-            </g>
-          ))}
+            ))}
+          </g>
 
-          {/* X-axis labels */}
-          {xTicks.map((year) => (
-            <text
-              key={year}
-              x={xScale(year)}
-              y={H - 8}
-              textAnchor="middle"
-              className="text-[10px] font-mono fill-[var(--ink-3)]"
-            >
-              {year === 0 ? 'Nu' : `${year}j`}
-            </text>
-          ))}
-
-          {/* Deposits area (bottom layer) */}
+          {/* Phase 2: Deposits area (bottom layer — your contributions) */}
           <path
             d={depositsPath}
             fill={`url(#${uid}-deposits-grad)`}
             style={{
-              opacity: hasEntered ? 1 : 0,
-              transition: 'opacity 0.6s ease-out',
+              opacity: phase >= 2 ? 1 : 0,
+              transition: 'opacity 600ms ease-out',
             }}
           />
 
-          {/* Returns area (top layer — between deposits and total) */}
+          {/* Phase 3: Returns area (top layer — the compound interest magic) */}
           <path
             d={returnsPath}
             fill={`url(#${uid}-returns-grad)`}
             style={{
-              opacity: hasEntered ? 1 : 0,
-              transition: 'opacity 0.8s ease-out 0.2s',
+              opacity: phase >= 3 ? 1 : 0,
+              transition: 'opacity 600ms ease-out',
             }}
           />
 
-          {/* Total value line */}
+          {/* Phase 3: Total value line */}
           <path
             d={totalLine}
             fill="none"
@@ -404,14 +445,15 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
+            pathLength={1}
             style={{
-              strokeDasharray: hasEntered ? 'none' : '2000',
-              strokeDashoffset: hasEntered ? 0 : 2000,
-              transition: 'stroke-dashoffset 1.2s ease-out',
+              strokeDasharray: 1,
+              strokeDashoffset: phase >= 3 ? 0 : 1,
+              transition: 'stroke-dashoffset 800ms ease-out',
             }}
           />
 
-          {/* Deposits boundary line (dashed) */}
+          {/* Phase 4: Deposits boundary line (dashed) */}
           {rows.length > 1 && (
             <path
               d={rows
@@ -424,17 +466,19 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
               stroke="var(--color-horizon-400)"
               strokeWidth={1.5}
               strokeDasharray="6,4"
-              opacity={hasEntered ? 0.7 : 0}
-              style={{ transition: 'opacity 0.8s ease-out 0.4s' }}
+              style={{
+                opacity: phase >= 4 ? 0.7 : 0,
+                transition: 'opacity 500ms ease-out',
+              }}
             />
           )}
 
-          {/* Annotation: final value */}
-          {hasEntered && maxValue > 0 && (
+          {/* Phase 4: Final value annotation (the punchline) */}
+          {maxValue > 0 && (
             <g
               style={{
-                opacity: hasEntered ? 1 : 0,
-                transition: 'opacity 0.5s ease-out 1s',
+                opacity: phase >= 4 ? 1 : 0,
+                transition: 'opacity 500ms ease-out',
               }}
             >
               {/* Arrow from annotation to curve endpoint */}
@@ -443,20 +487,31 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
                 cy={yScale(maxValue)}
                 r={4}
                 fill="var(--color-horizon-600)"
+                style={{
+                  transform: phase >= 4 ? 'scale(1)' : 'scale(0)',
+                  transformOrigin: `${xScale(horizon)}px ${yScale(maxValue)}px`,
+                  transformBox: 'fill-box',
+                  transition: 'transform 300ms cubic-bezier(0.34,1.56,0.64,1)',
+                }}
               />
               <text
                 x={xScale(horizon) - 12}
                 y={yScale(maxValue) - 14}
                 textAnchor="end"
                 className="text-[12px] font-mono font-bold fill-[var(--ink)]"
+                style={{
+                  opacity: phase >= 4 ? 1 : 0,
+                  transform: phase >= 4 ? 'translateY(0)' : 'translateY(6px)',
+                  transition: 'opacity 400ms 100ms ease-out, transform 400ms 100ms ease-out',
+                }}
               >
                 {fmtEur(Math.round(maxValue))}
               </text>
             </g>
           )}
 
-          {/* Crosshair + tooltip */}
-          {hoveredRow && hoverYear !== null && (
+          {/* Crosshair + tooltip (only after animation completes) */}
+          {hoveredRow && hoverYear !== null && phase >= 5 && (
             <g>
               {/* Vertical crosshair line */}
               <line
@@ -491,8 +546,8 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
           )}
         </svg>
 
-        {/* Hover tooltip card */}
-        {hoveredRow && hoverYear !== null && (
+        {/* Hover tooltip card (only after animation) */}
+        {hoveredRow && hoverYear !== null && phase >= 5 && (
           <div
             className="absolute pointer-events-none bg-[var(--paper)] border border-[var(--border-ed)] shadow-sm rounded-md px-3 py-2 text-xs font-mono z-10"
             style={{
@@ -540,8 +595,15 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
         )}
       </div>
 
-      {/* ── Legend + Summary stats ─────────────────────────────── */}
-      <div className="flex flex-wrap gap-4 sm:gap-6 items-start">
+      {/* ── Phase 5: Legend + Summary stats ─────────────────────── */}
+      <div
+        className="flex flex-wrap gap-4 sm:gap-6 items-start"
+        style={{
+          opacity: phase >= 5 ? 1 : 0,
+          transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+          transition: 'opacity 400ms ease-out, transform 400ms ease-out',
+        }}
+      >
         {/* Legend */}
         <div className="flex gap-4">
           <div className="flex items-center gap-1.5">
@@ -562,7 +624,14 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
 
         {/* Summary stat cards */}
         <div className="flex flex-wrap gap-3 ml-auto">
-          <div className="bg-[var(--subtle)] px-3 py-2 rounded-md">
+          <div
+            className="bg-[var(--subtle)] px-3 py-2 rounded-md"
+            style={{
+              opacity: phase >= 5 ? 1 : 0,
+              transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+              transition: 'opacity 400ms ease-out, transform 400ms ease-out',
+            }}
+          >
             <div className="text-[10px] uppercase tracking-[0.16em] font-mono text-[var(--ink-3)]">
               Totale inleg
             </div>
@@ -570,7 +639,14 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
               {fmtEur(finalDeposits)}
             </div>
           </div>
-          <div className="bg-[var(--subtle)] px-3 py-2 rounded-md">
+          <div
+            className="bg-[var(--subtle)] px-3 py-2 rounded-md"
+            style={{
+              opacity: phase >= 5 ? 1 : 0,
+              transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+              transition: 'opacity 400ms 80ms ease-out, transform 400ms 80ms ease-out',
+            }}
+          >
             <div className="text-[10px] uppercase tracking-[0.16em] font-mono text-[var(--ink-3)]">
               Totaal rendement
             </div>
@@ -578,7 +654,14 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
               {fmtEur(finalReturns)}
             </div>
           </div>
-          <div className="bg-[var(--subtle)] px-3 py-2 rounded-md">
+          <div
+            className="bg-[var(--subtle)] px-3 py-2 rounded-md"
+            style={{
+              opacity: phase >= 5 ? 1 : 0,
+              transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+              transition: 'opacity 400ms 160ms ease-out, transform 400ms 160ms ease-out',
+            }}
+          >
             <div className="text-[10px] uppercase tracking-[0.16em] font-mono text-[var(--ink-3)]">
               Rendement / inleg
             </div>
@@ -589,16 +672,17 @@ export const CompoundInterestChart = memo(function CompoundInterestChart({
         </div>
       </div>
 
-      {/* ── Snowball insight ───────────────────────────────────── */}
-      {hasEntered && horizon >= 20 && finalReturns > finalDeposits && (
+      {/* ── Phase 5: Snowball insight ─────────────────────────── */}
+      {phase >= 5 && horizon >= 20 && finalReturns > finalDeposits && (
         <div
           className="border-l-[3px] pl-4 py-2 text-sm text-[var(--ink-2)]"
           style={{
             borderColor: 'var(--module-active-500)',
             fontFamily: 'var(--font-source-serif, Georgia, serif)',
             fontStyle: 'italic',
-            opacity: hasEntered ? 1 : 0,
-            transition: 'opacity 0.6s ease-out 1.2s',
+            opacity: phase >= 5 ? 1 : 0,
+            transform: phase >= 5 ? 'translateY(0)' : 'translateY(8px)',
+            transition: 'opacity 500ms 200ms ease-out, transform 500ms 200ms ease-out',
           }}
         >
           Na {horizon} jaar is{' '}

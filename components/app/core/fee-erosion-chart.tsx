@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState, useEffect } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatCurrency } from '@/lib/format'
 import { TrendingDown } from 'lucide-react'
@@ -74,6 +74,46 @@ function formatFreedomDiff(eurDiff: number, dailyExpenses: number): string {
   return parts.join(' en ')
 }
 
+// ── Progressive reveal phases ─────────────────────────────────
+// Phase 0: nothing visible
+// Phase 1: grid + axes fade in
+// Phase 2: high-cost line draws (your current path)
+// Phase 3: low-cost line draws (the alternative)
+// Phase 4: erosion area fills in (the dramatic reveal)
+// Phase 5: end values + difference annotation (the punchline)
+// Phase 6: summary metrics + legend (the conclusion)
+
+function useProgressiveReveal(hasEntered: boolean) {
+  const [phase, setPhase] = useState(0)
+
+  useEffect(() => {
+    if (!hasEntered) return
+    // Respect prefers-reduced-motion — skip to final phase
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setPhase(6)
+      return
+    }
+
+    const timers: ReturnType<typeof setTimeout>[] = []
+    // Phase 1: grid + axes (immediate)
+    timers.push(setTimeout(() => setPhase(1), 0))
+    // Phase 2: high-cost line (400ms)
+    timers.push(setTimeout(() => setPhase(2), 400))
+    // Phase 3: low-cost line (1000ms)
+    timers.push(setTimeout(() => setPhase(3), 1000))
+    // Phase 4: erosion area (1500ms)
+    timers.push(setTimeout(() => setPhase(4), 1500))
+    // Phase 5: punchline values (2000ms)
+    timers.push(setTimeout(() => setPhase(5), 2000))
+    // Phase 6: summary + legend (2400ms)
+    timers.push(setTimeout(() => setPhase(6), 2400))
+
+    return () => timers.forEach(clearTimeout)
+  }, [hasEntered])
+
+  return phase
+}
+
 // ── Chart Component ────────────────────────────────────────────
 
 export const FeeErosionChart = memo(function FeeErosionChart({
@@ -85,7 +125,8 @@ export const FeeErosionChart = memo(function FeeErosionChart({
   annualContribution = 0,
   dailyExpenses,
 }: FeeErosionChartProps) {
-  const { ref, hasEntered } = useInViewAnimation({ duration: 900 })
+  const { ref, hasEntered } = useInViewAnimation({ duration: 2800 })
+  const phase = useProgressiveReveal(hasEntered)
 
   const { highCostPoints, lowCostPoints, maxValue, difference, differenceFormatted, freedomTimeStr } = useMemo(() => {
     const high = projectGrowth(portfolioValue, grossReturn, currentTER, years, annualContribution)
@@ -201,71 +242,79 @@ export const FeeErosionChart = memo(function FeeErosionChart({
           </linearGradient>
         </defs>
 
-        {/* Grid lines */}
-        {yTicks.map((val) => (
-          <line
-            key={`y-${val}`}
-            x1={pad.left}
-            y1={y(val)}
-            x2={w - pad.right}
-            y2={y(val)}
-            stroke="var(--border-ed)"
-            strokeWidth="0.5"
-            strokeDasharray="3,3"
-          />
-        ))}
-
-        {/* Y-axis labels */}
-        {yTicks.map((val) => (
-          <text
-            key={`yl-${val}`}
-            x={pad.left - 8}
-            y={y(val) + 3}
-            textAnchor="end"
-            className="fill-[var(--ink-4)]"
-            fontSize="10"
-            fontFamily="var(--font-mono)"
-          >
-            {formatEurShort(val)}
-          </text>
-        ))}
-
-        {/* X-axis labels */}
-        {xTicks.map((yr) => (
-          <text
-            key={`xl-${yr}`}
-            x={x(yr)}
-            y={h - pad.bottom + 20}
-            textAnchor="middle"
-            className="fill-[var(--ink-4)]"
-            fontSize="10"
-          >
-            {yr}j
-          </text>
-        ))}
-
-        {/* X-axis label */}
-        <text
-          x={pad.left + chartW / 2}
-          y={h - 4}
-          textAnchor="middle"
-          className="fill-[var(--ink-3)]"
-          fontSize="10"
-        >
-          Jaren
-        </text>
-
-        {/* Difference area (the dramatic erosion zone) */}
-        <path
-          d={buildDiffArea()}
-          fill="url(#fee-erosion-fill)"
+        {/* Phase 1: Grid lines */}
+        <g
           style={{
-            opacity: hasEntered ? 1 : 0,
-            transition: 'opacity 600ms 300ms ease',
+            opacity: phase >= 1 ? 1 : 0,
+            transition: 'opacity 400ms ease-out',
           }}
-        />
+        >
+          {yTicks.map((val) => (
+            <line
+              key={`y-${val}`}
+              x1={pad.left}
+              y1={y(val)}
+              x2={w - pad.right}
+              y2={y(val)}
+              stroke="var(--border-ed)"
+              strokeWidth="0.5"
+              strokeDasharray="3,3"
+            />
+          ))}
 
-        {/* High-cost line (current TER) */}
+          {/* Y-axis labels */}
+          {yTicks.map((val) => (
+            <text
+              key={`yl-${val}`}
+              x={pad.left - 8}
+              y={y(val) + 3}
+              textAnchor="end"
+              className="fill-[var(--ink-4)]"
+              fontSize="10"
+              fontFamily="var(--font-mono)"
+            >
+              {formatEurShort(val)}
+            </text>
+          ))}
+
+          {/* X-axis labels */}
+          {xTicks.map((yr) => (
+            <text
+              key={`xl-${yr}`}
+              x={x(yr)}
+              y={h - pad.bottom + 20}
+              textAnchor="middle"
+              className="fill-[var(--ink-4)]"
+              fontSize="10"
+            >
+              {yr}j
+            </text>
+          ))}
+
+          {/* X-axis label */}
+          <text
+            x={pad.left + chartW / 2}
+            y={h - 4}
+            textAnchor="middle"
+            className="fill-[var(--ink-3)]"
+            fontSize="10"
+          >
+            Jaren
+          </text>
+
+          {/* Start value */}
+          <text
+            x={pad.left - 8}
+            y={y(portfolioValue) - 6}
+            textAnchor="end"
+            className="fill-[var(--ink-3)]"
+            fontSize="9"
+          >
+            Start
+          </text>
+        </g>
+
+        {/* Phase 2: High-cost line (current TER) — your current path */}
         <path
           d={buildPath(highCostPoints)}
           fill="none"
@@ -273,15 +322,15 @@ export const FeeErosionChart = memo(function FeeErosionChart({
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          style={{
-            strokeDasharray: hasEntered ? '0' : '2000',
-            strokeDashoffset: hasEntered ? '0' : '2000',
-            transition: 'stroke-dashoffset 1200ms ease',
-          }}
           pathLength={1}
+          style={{
+            strokeDasharray: 1,
+            strokeDashoffset: phase >= 2 ? 0 : 1,
+            transition: 'stroke-dashoffset 800ms ease-out',
+          }}
         />
 
-        {/* Low-cost line (alternative TER) */}
+        {/* Phase 3: Low-cost line (alternative TER) — the better path */}
         <path
           d={buildPath(lowCostPoints)}
           fill="none"
@@ -289,31 +338,53 @@ export const FeeErosionChart = memo(function FeeErosionChart({
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          style={{
-            strokeDasharray: hasEntered ? '0' : '2000',
-            strokeDashoffset: hasEntered ? '0' : '2000',
-            transition: 'stroke-dashoffset 1200ms 100ms ease',
-          }}
           pathLength={1}
+          style={{
+            strokeDasharray: 1,
+            strokeDashoffset: phase >= 3 ? 0 : 1,
+            transition: 'stroke-dashoffset 800ms ease-out',
+          }}
         />
 
-        {/* End dots */}
+        {/* Phase 4: Difference area (the dramatic erosion zone) */}
+        <path
+          d={buildDiffArea()}
+          fill="url(#fee-erosion-fill)"
+          style={{
+            opacity: phase >= 4 ? 1 : 0,
+            transition: 'opacity 500ms ease-out',
+          }}
+        />
+
+        {/* Phase 5: End dots */}
         <circle
           cx={x(years)}
           cy={y(endHighValue)}
           r="4"
           fill="#d97706"
-          style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 400ms 800ms ease' }}
+          style={{
+            opacity: phase >= 5 ? 1 : 0,
+            transform: phase >= 5 ? 'scale(1)' : 'scale(0)',
+            transformOrigin: `${x(years)}px ${y(endHighValue)}px`,
+            transformBox: 'fill-box',
+            transition: 'opacity 300ms ease-out, transform 300ms cubic-bezier(0.34,1.56,0.64,1)',
+          }}
         />
         <circle
           cx={x(years)}
           cy={y(endLowValue)}
           r="4"
           fill="#059669"
-          style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 400ms 800ms ease' }}
+          style={{
+            opacity: phase >= 5 ? 1 : 0,
+            transform: phase >= 5 ? 'scale(1)' : 'scale(0)',
+            transformOrigin: `${x(years)}px ${y(endLowValue)}px`,
+            transformBox: 'fill-box',
+            transition: 'opacity 300ms 100ms ease-out, transform 300ms 100ms cubic-bezier(0.34,1.56,0.64,1)',
+          }}
         />
 
-        {/* End value labels */}
+        {/* Phase 5: End value labels */}
         <text
           x={x(years) + 10}
           y={y(endLowValue) + 4}
@@ -321,7 +392,11 @@ export const FeeErosionChart = memo(function FeeErosionChart({
           fontSize="11"
           fontFamily="var(--font-mono)"
           fontWeight="600"
-          style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 400ms 900ms ease' }}
+          style={{
+            opacity: phase >= 5 ? 1 : 0,
+            transform: phase >= 5 ? 'translateX(0)' : 'translateX(-8px)',
+            transition: 'opacity 400ms 100ms ease-out, transform 400ms 100ms ease-out',
+          }}
         >
           {formatEurShort(endLowValue)}
         </text>
@@ -332,14 +407,21 @@ export const FeeErosionChart = memo(function FeeErosionChart({
           fontSize="11"
           fontFamily="var(--font-mono)"
           fontWeight="600"
-          style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 400ms 900ms ease' }}
+          style={{
+            opacity: phase >= 5 ? 1 : 0,
+            transform: phase >= 5 ? 'translateX(0)' : 'translateX(-8px)',
+            transition: 'opacity 400ms ease-out, transform 400ms ease-out',
+          }}
         >
           {formatEurShort(endHighValue)}
         </text>
 
-        {/* Difference annotation arrow + label (at midpoint) */}
+        {/* Phase 5: Difference annotation arrow + label (the punchline) */}
         {difference > 0 && (
-          <g style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 500ms 1000ms ease' }}>
+          <g style={{
+            opacity: phase >= 5 ? 1 : 0,
+            transition: 'opacity 500ms 200ms ease-out',
+          }}>
             {/* Vertical dashed line at ~75% of the horizon */}
             <line
               x1={x(Math.round(years * 0.75))}
@@ -367,21 +449,17 @@ export const FeeErosionChart = memo(function FeeErosionChart({
             </text>
           </g>
         )}
-
-        {/* Start value */}
-        <text
-          x={pad.left - 8}
-          y={y(portfolioValue) - 6}
-          textAnchor="end"
-          className="fill-[var(--ink-3)]"
-          fontSize="9"
-        >
-          Start
-        </text>
       </svg>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+      {/* Phase 6: Legend */}
+      <div
+        className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs"
+        style={{
+          opacity: phase >= 6 ? 1 : 0,
+          transform: phase >= 6 ? 'translateY(0)' : 'translateY(8px)',
+          transition: 'opacity 400ms ease-out, transform 400ms ease-out',
+        }}
+      >
         <div className="flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-5 rounded-sm bg-gradient-to-r from-[#10b981] to-[#059669]" />
           <span className="text-[var(--ink-2)]">Lage kosten ({lowTERpct}% TER)</span>
@@ -396,8 +474,15 @@ export const FeeErosionChart = memo(function FeeErosionChart({
         </div>
       </div>
 
-      {/* Summary metrics */}
-      <div className="rounded-lg bg-[var(--subtle)] border border-[var(--border-ed)] p-4 space-y-2">
+      {/* Phase 6: Summary metrics */}
+      <div
+        className="rounded-lg bg-[var(--subtle)] border border-[var(--border-ed)] p-4 space-y-2"
+        style={{
+          opacity: phase >= 6 ? 1 : 0,
+          transform: phase >= 6 ? 'translateY(0)' : 'translateY(12px)',
+          transition: 'opacity 400ms 100ms ease-out, transform 400ms 100ms ease-out',
+        }}
+      >
         <div className="flex items-baseline justify-between">
           <span className="text-sm text-[var(--ink-2)]">Verloren vermogen door kosten</span>
           <span className="font-mono tabular-nums text-sm font-semibold text-negative">
