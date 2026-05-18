@@ -127,6 +127,33 @@ export default function ProfielPage() {
     } else {
       setSaveMessage({ type: 'success', text: 'Opgeslagen!' })
       setTimeout(() => setSaveMessage(null), 3000)
+
+      // Feature #830: clear 'income' from deferred onboarding fields when
+      // the user has now filled in their income. This removes the coach-bubble
+      // suggestion prompting them to complete this field. Stored in
+      // feature_preferences.deferred_onboarding_fields (JSONB sub-key).
+      if (netMonthlyIncome && Number(netMonthlyIncome) > 0) {
+        try {
+          const { data: currentProfile } = await supabase
+            .from('profiles')
+            .select('feature_preferences')
+            .eq('id', user.id)
+            .single()
+          const prefs = (currentProfile?.feature_preferences as Record<string, unknown>) ?? {}
+          const deferred = Array.isArray(prefs.deferred_onboarding_fields)
+            ? prefs.deferred_onboarding_fields as string[]
+            : []
+          if (deferred.includes('income')) {
+            prefs.deferred_onboarding_fields = deferred.filter((f: string) => f !== 'income')
+            await supabase
+              .from('profiles')
+              .update({ feature_preferences: prefs })
+              .eq('id', user.id)
+          }
+        } catch {
+          // Graceful degradation
+        }
+      }
     }
     setSaving(false)
   }, [supabase, fullName, dateOfBirth, country, householdType, numberOfChildren, childrenAges, housingType, energyLabel, hasCar, netMonthlyIncome])

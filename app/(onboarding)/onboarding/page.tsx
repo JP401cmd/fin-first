@@ -241,6 +241,13 @@ interface SpaardoelState {
   skipped: boolean
 }
 
+/**
+ * Keys for fields deferred via "Later invullen" during onboarding.
+ * Tracked so we can surface targeted post-onboarding suggestions
+ * via the coach-bubble (feature #830).
+ */
+type DeferredFieldKey = 'income' | 'assets' | 'spaardoel'
+
 interface State {
   step: Step
   direction: Direction
@@ -262,6 +269,12 @@ interface State {
   spaardoel: SpaardoelState
   /** Parsed UPO pension data — null when nothing uploaded. Optional enrichment. */
   pensionData: PensionParseData | null
+  /**
+   * Velden die de gebruiker expliciet heeft overgeslagen via "Later invullen"
+   * (feature #830). Na onboarding worden ze als suggesties aangeboden via de
+   * coach-bubble of het next-step-mechanisme.
+   */
+  deferredFields: DeferredFieldKey[]
 }
 
 /** Data portion of state that gets persisted to localStorage (excludes step/direction) */
@@ -290,6 +303,8 @@ interface PersistedData {
   pensionData?: PensionParseData | null
   /** Last step the user was on (to restore position) */
   lastStep?: Step
+  /** Fields deferred via "Later invullen" — optioneel, oude drafts kennen dit veld niet. */
+  deferredFields?: DeferredFieldKey[]
 }
 
 type Action =
@@ -316,6 +331,11 @@ type Action =
   | { type: 'SET_SPAARDOEL'; data: SpaardoelState }
   /** UPO pension parse result — set on successful parse, null on remove. */
   | { type: 'SET_PENSION_DATA'; data: PensionParseData | null }
+  /**
+   * Track een overgeslagen veld via "Later invullen" (feature #830).
+   * Idempotent: voegt de key alleen toe als hij er nog niet in zit.
+   */
+  | { type: 'DEFER_FIELD'; key: DeferredFieldKey }
   | { type: 'RESTORE_STATE'; data: PersistedData }
 
 export const _initialState: State = {
@@ -345,6 +365,7 @@ export const _initialState: State = {
     skipped: false,
   },
   pensionData: null,
+  deferredFields: [],
 }
 
 /**
@@ -426,6 +447,11 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, spaardoel: action.data }
     case 'SET_PENSION_DATA':
       return { ...state, pensionData: action.data }
+    case 'DEFER_FIELD': {
+      // Idempotent: voeg alleen toe als de key er nog niet in zit.
+      if (state.deferredFields.includes(action.key)) return state
+      return { ...state, deferredFields: [...state.deferredFields, action.key] }
+    }
     case 'RESTORE_STATE': {
       const restoredModules = action.data.activeModules ?? action.data.selectedModules ?? []
       // Recompute the active step order for the restored module selection so
@@ -474,6 +500,10 @@ export function _reducer(state: State, action: Action): State {
         spaardoel: action.data.spaardoel ?? _initialState.spaardoel,
         // UPO pension data — optioneel, oude drafts kennen dit veld niet.
         pensionData: action.data.pensionData ?? null,
+        // Deferred fields — optioneel, oude drafts kennen dit veld niet.
+        deferredFields: Array.isArray(action.data.deferredFields)
+          ? action.data.deferredFields
+          : [],
       }
     }
     default:
@@ -510,6 +540,7 @@ function saveToLocalStorage(state: State) {
       quickDebts: state.quickDebts,
       spaardoel: state.spaardoel,
       pensionData: state.pensionData,
+      deferredFields: state.deferredFields,
       lastStep: state.step,
     }
     localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(data))
@@ -610,6 +641,7 @@ function loadFromLocalStorage(): PersistedData | null {
       quickDebts: Array.isArray(parsed.quickDebts) ? parsed.quickDebts : [],
       spaardoel,
       pensionData: parsed.pensionData ?? null,
+      deferredFields: Array.isArray(parsed.deferredFields) ? parsed.deferredFields : [],
       lastStep: parsed.lastStep,
     }
 
@@ -913,6 +945,11 @@ export default function OnboardingPage() {
             color: preset.color,
           }
         }
+      }
+
+      // Add deferred fields for post-onboarding suggestions (feature #830)
+      if (state.deferredFields.length > 0) {
+        body.deferredFields = state.deferredFields
       }
 
       // Add news description if present
@@ -1233,6 +1270,8 @@ export default function OnboardingPage() {
                   type: 'SET_IDENTITY',
                   data: { ...state.identity, net_monthly_income: '' },
                 })
+                // Track deferral for post-onboarding suggestions (feature #830)
+                dispatch({ type: 'DEFER_FIELD', key: 'income' })
                 goToNext()
               }}
               pensionData={state.pensionData}
@@ -1249,7 +1288,15 @@ export default function OnboardingPage() {
               quickDebts={state.quickDebts}
               onAssetsChange={handleAssetsChange}
               onDebtsChange={handleDebtsChange}
-              onNext={goToNext}
+              onNext={() => {
+                // Track deferral when user proceeds without adding any
+                // assets or debts (feature #830). The bezittingen step shows
+                // "Later invullen" as button text when the list is empty.
+                if (state.quickAssets.length === 0 && state.quickDebts.length === 0) {
+                  dispatch({ type: 'DEFER_FIELD', key: 'assets' })
+                }
+                goToNext()
+              }}
               onBack={goToBack}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
@@ -1280,6 +1327,8 @@ export default function OnboardingPage() {
                     skipped: true,
                   },
                 })
+                // Track deferral for post-onboarding suggestions (feature #830)
+                dispatch({ type: 'DEFER_FIELD', key: 'spaardoel' })
                 goToNext()
               }}
               monthlyIncome={netMonthlyIncomeForKlaar}

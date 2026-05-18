@@ -86,6 +86,10 @@ export function OnboardingKlaar({
     return `${labels.slice(0, 2).join(' · ')} +${labels.length - 2}`
   }, [selectedGoals])
 
+  // Detect minimal-input scenario: user only filled mandatory fields.
+  // We adapt messaging to feel encouraging rather than incomplete.
+  const hasOptionalData = netMonthlyIncome > 0 || netWorth !== null || spaardoel !== null
+
   const headline = (
     <>
       Bijna{' '}
@@ -104,7 +108,11 @@ export function OnboardingKlaar({
       kicker="Klaar"
       romanNum="v."
       title={headline}
-      deck="Een korte samenvatting van wat je hebt ingevuld. Je past alles later aan vanuit je dashboard."
+      deck={
+        hasOptionalData
+          ? "Een korte samenvatting van wat je hebt ingevuld. Je past alles later aan vanuit je dashboard."
+          : "Je hebt de basis gelegd — de rest vul je aan in je eigen tempo vanuit je dashboard."
+      }
       // Geen apart facts-paneel — recap zelf is de payoff.
       // We renderen een lege div als placeholder zodat de grid-kolom op
       // desktop niet collapseert.
@@ -147,9 +155,11 @@ export function OnboardingKlaar({
                 {goalLabel}
               </span>
             ) : (
-              <span className="block text-[18px] sm:text-[22px] font-black leading-none tabular-nums text-[var(--ink-3)]"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}>
-                &mdash;
+              <span
+                className="block text-[13px] italic leading-snug text-[var(--ink-3)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                Kies op je dashboard
               </span>
             )
           }
@@ -160,12 +170,21 @@ export function OnboardingKlaar({
           kicker="Netto/mnd"
           mobileBottomBorder
           value={
-            <span
-              className="block text-[22px] sm:text-[28px] font-black leading-none tabular-nums tracking-[-0.02em]"
-              style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--ink)' }}
-            >
-              {netMonthlyIncome > 0 ? formatCurrency(netMonthlyIncome) : '—'}
-            </span>
+            netMonthlyIncome > 0 ? (
+              <span
+                className="block text-[22px] sm:text-[28px] font-black leading-none tabular-nums tracking-[-0.02em]"
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--ink)' }}
+              >
+                {formatCurrency(netMonthlyIncome)}
+              </span>
+            ) : (
+              <span
+                className="block text-[13px] italic leading-snug text-[var(--ink-3)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                Vul je later aan
+              </span>
+            )
           }
         />
 
@@ -175,10 +194,10 @@ export function OnboardingKlaar({
           value={
             netWorth === null ? (
               <span
-                className="block text-[22px] sm:text-[28px] font-black leading-none tabular-nums tracking-[-0.02em] text-[var(--ink-3)]"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                className="block text-[13px] italic leading-snug text-[var(--ink-3)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                &mdash;
+                Vul je later aan
               </span>
             ) : (
               <span
@@ -248,8 +267,9 @@ export function OnboardingKlaar({
         className="mt-4 italic text-sm leading-snug text-[var(--ink-3)] max-w-[60ch]"
         style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
       >
-        Klopt het allemaal? Klik door naar je dashboard. Je kunt elk gegeven later wijzigen via
-        Instellingen of door direct op een waarde te klikken.
+        {hasOptionalData
+          ? 'Klopt het? Klik door naar je dashboard. Je kunt elk gegeven later wijzigen via Instellingen of door direct op een waarde te klikken.'
+          : 'Je bent helemaal klaar! Alle overige gegevens vul je aan wanneer het jou uitkomt — vanuit je dashboard of via Instellingen.'}
       </p>
     </OnboardingShell>
   )

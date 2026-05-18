@@ -47,7 +47,7 @@ export function OnboardingDoel({
   onBack,
   onNewsOnly,
   currentStep = 1,
-  totalSteps = 5,
+  totalSteps = 6,
 }: OnboardingDoelProps) {
   const hasSelection = selectedGoals.length > 0
 

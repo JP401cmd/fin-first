@@ -293,6 +293,32 @@ export default async function AppLayout({
     hasGoals: sidebarActionCount > 0,
   }
 
+  // ── Deferred onboarding fields (feature #830) ─────────
+  // Velden die de gebruiker expliciet heeft overgeslagen met "Later invullen"
+  // tijdens onboarding. Doorgestuurd naar de coach-bubble voor gerichte
+  // suggesties. Stored in feature_preferences.deferred_onboarding_fields
+  // (JSONB sub-key) — no DDL migration needed.
+  const validDeferredKeys = ['income', 'assets', 'spaardoel'] as const
+  type DeferredFieldKey = typeof validDeferredKeys[number]
+  let coachDeferredFields: DeferredFieldKey[] = []
+  try {
+    const { data: prefsRow } = await supabase
+      .from('profiles')
+      .select('feature_preferences')
+      .eq('id', user.id)
+      .single()
+    const prefs = prefsRow?.feature_preferences as Record<string, unknown> | null
+    const rawDeferred = prefs?.deferred_onboarding_fields
+    if (Array.isArray(rawDeferred)) {
+      coachDeferredFields = (rawDeferred as string[]).filter(
+        (k): k is DeferredFieldKey =>
+          (validDeferredKeys as readonly string[]).includes(k)
+      )
+    }
+  } catch {
+    // Graceful fallback to empty array
+  }
+
   // ── Module colors (SSR) ────────────────────────────────
   const mc = profile?.module_colors as Record<string, string> | null
   const moduleColors: ModuleColorConfig = {
@@ -367,7 +393,7 @@ export default async function AppLayout({
                       </FeatureAccessProvider>
                       <ChatPanel />
                       <Suspense fallback={null}>
-                        <CoachBubble dataGaps={coachDataGaps} />
+                        <CoachBubble dataGaps={coachDataGaps} deferredFields={coachDeferredFields} />
                       </Suspense>
                     </div>
                   </DashboardTypeProvider>

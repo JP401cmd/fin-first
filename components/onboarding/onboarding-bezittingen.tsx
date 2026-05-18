@@ -101,7 +101,7 @@ export function OnboardingBezittingen({
   onNext,
   onBack,
   currentStep = 4,
-  totalSteps = 5,
+  totalSteps = 6,
   requireCashAccount = false,
   bankConnected = false,
   bankError = false,

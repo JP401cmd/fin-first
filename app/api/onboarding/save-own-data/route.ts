@@ -338,6 +338,12 @@ const bodySchema = z.object({
     nabestaandenpensioen: z.number().nullable(),
     samenvatting: z.string(),
   }).optional(),
+  /**
+   * Fields the user explicitly deferred via "Later invullen" during onboarding
+   * (feature #830). Stored in `profiles.onboarding_deferred_fields` to surface
+   * targeted post-onboarding suggestions via the coach-bubble.
+   */
+  deferredFields: z.array(z.enum(['income', 'assets', 'spaardoel'])).optional(),
   /** Pre-extracted data from client-side review (avoids re-running AI extraction) */
   extractionData: z.object({
     assets: z.array(z.object({
@@ -397,6 +403,7 @@ export async function POST(req: Request) {
     selectedGoalSlug: rawSelectedGoalSlug,
     selectedGoalSlugs: rawSelectedGoalSlugs,
     onboardingGoal,
+    deferredFields,
   } = parsed.data
 
   // Normaliseer de goal-input: de fase-3 client stuurt zowel een array
@@ -637,6 +644,24 @@ export async function POST(req: Request) {
           primary_goal_slug: primaryGoalSlug ?? null,
           selected_goal_slugs: selectedGoalSlugs.length > 0 ? selectedGoalSlugs : null,
         }
+        // Feature #830: persist deferred onboarding fields for post-onboarding suggestions.
+        // Stored in feature_preferences.deferred_onboarding_fields (JSONB sub-key)
+        // so no DDL migration is needed — the column already exists.
+        if (deferredFields && deferredFields.length > 0) {
+          try {
+            const { data: currentPrefs } = await supabase
+              .from('profiles')
+              .select('feature_preferences')
+              .eq('id', user.id)
+              .single()
+            const prefs = (currentPrefs?.feature_preferences as Record<string, unknown>) ?? {}
+            prefs.deferred_onboarding_fields = deferredFields
+            profileUpdates.feature_preferences = prefs
+          } catch {
+            // Graceful: if read fails, write deferred fields into a fresh prefs object
+            profileUpdates.feature_preferences = { deferred_onboarding_fields: deferredFields }
+          }
+        }
         // budgeting_active follows the intent's preset so onboarding-flow gating
         // (e.g. "show budgets step") stays in sync. Tracking on individual
         // assets governs sidebar visibility (see app/(app)/layout.tsx).
@@ -813,6 +838,22 @@ export async function POST(req: Request) {
     if (intent) profileData.onboarding_intent = intent
     if (primaryGoalSlug) profileData.primary_goal_slug = primaryGoalSlug
     if (selectedGoalSlugs.length > 0) profileData.selected_goal_slugs = selectedGoalSlugs
+    // Feature #830: deferred onboarding fields — stored in feature_preferences sub-key
+    // (no DDL migration needed). Read current prefs first to avoid overwriting.
+    if (deferredFields && deferredFields.length > 0) {
+      try {
+        const { data: currentPrefsRow } = await supabase
+          .from('profiles')
+          .select('feature_preferences')
+          .eq('id', user.id)
+          .single()
+        const currentPrefs = (currentPrefsRow?.feature_preferences as Record<string, unknown>) ?? {}
+        currentPrefs.deferred_onboarding_fields = deferredFields
+        profileData.feature_preferences = currentPrefs
+      } catch {
+        profileData.feature_preferences = { deferred_onboarding_fields: deferredFields }
+      }
+    }
     profileData.completed_onboarding_steps = completedSteps
     // Server-controlled: leeg dashboard na onboarding. Zie buildRpcPayload.
     profileData.widget_prefs = { widgets: [] }

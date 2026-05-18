@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ShieldCheck,
   Sun,
@@ -203,14 +203,71 @@ export function OnboardingSpaardoel({
     }
   }, [data, onChange])
 
-  // Validatie: naam-tekst (niet leeg na trim) + bedrag > 0. Geen inline
-  // error-tekst — disabled-state op Verder-knop is genoeg, conform spec.
+  // ── Validation ──────────────────────────────────────────────────────
+  // touched/submitted pattern consistent met OnboardingIdentity en
+  // OnboardingInkomen: inline errors verschijnen na blur of submit,
+  // summary-banner verschijnt na submit, rode borders markeren het veld.
+  type SpaardoelFieldKey = 'name' | 'target_value'
+  const [touched, setTouched] = useState<Partial<Record<SpaardoelFieldKey, boolean>>>({})
+  const [submitted, setSubmitted] = useState(false)
+
+  const fieldErrors = useMemo(() => {
+    const errors: Partial<Record<SpaardoelFieldKey, string>> = {}
+    if (data.presetKey === null) return errors
+    if (data.name.trim().length === 0) {
+      errors.name = 'Vul een naam in voor je spaardoel'
+    }
+    if (parseDecimal(data.target_value) <= 0) {
+      errors.target_value = 'Vul een doelbedrag in'
+    }
+    return errors
+  }, [data.presetKey, data.name, data.target_value])
+
   const isValid = useMemo(() => {
     if (data.presetKey === null) return false
-    if (data.name.trim().length === 0) return false
-    if (parseDecimal(data.target_value) <= 0) return false
-    return true
-  }, [data.presetKey, data.name, data.target_value])
+    return Object.keys(fieldErrors).length === 0
+  }, [data.presetKey, fieldErrors])
+
+  const showError = (field: SpaardoelFieldKey) =>
+    touched[field] || submitted ? fieldErrors[field] : undefined
+  const markTouched = (field: SpaardoelFieldKey) =>
+    setTouched((prev) => ({ ...prev, [field]: true }))
+
+  const inputErrorClass = (field: SpaardoelFieldKey) =>
+    showError(field)
+      ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
+      : 'border-[var(--border-ed)] focus:border-[var(--module-active-500)] focus:ring-[var(--module-active-500)]'
+
+  const scrollToFirstError = useCallback(() => {
+    const fieldOrder: SpaardoelFieldKey[] = ['name', 'target_value']
+    const fieldIds: Record<SpaardoelFieldKey, string> = {
+      name: 'ob-spaardoel-name',
+      target_value: 'ob-spaardoel-amount',
+    }
+    for (const field of fieldOrder) {
+      if (fieldErrors[field]) {
+        const el = document.getElementById(fieldIds[field])
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          el.focus()
+        }
+        break
+      }
+    }
+  }, [fieldErrors])
+
+  function handleNext() {
+    if (data.presetKey === null) {
+      // No preset chosen yet — do nothing (button should be disabled)
+      return
+    }
+    setSubmitted(true)
+    if (isValid) {
+      onNext()
+    } else {
+      requestAnimationFrame(scrollToFirstError)
+    }
+  }
 
   // Headline-em: italic Playfair op "sparen" in --module-active-700,
   // gelijk patroon als de andere stappen.
@@ -278,8 +335,8 @@ export function OnboardingSpaardoel({
         <div className="flex w-full flex-col gap-2">
           <button
             type="button"
-            onClick={onNext}
-            disabled={!isValid}
+            onClick={handleNext}
+            disabled={data.presetKey === null || (submitted && !isValid)}
             className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Verder
@@ -409,23 +466,47 @@ export function OnboardingSpaardoel({
       {/* ── Inline form — alleen wanneer een preset is gekozen ──────── */}
       {data.presetKey !== null && (
         <div className="mt-8 space-y-6">
+          {/* Summary error banner — consistent met OnboardingIdentity */}
+          {submitted && !isValid && (
+            <div
+              className="border border-red-200 bg-red-50 px-4 py-3"
+              role="alert"
+            >
+              <p className="text-sm font-medium text-red-700">
+                Vul alle verplichte velden correct in om door te gaan
+              </p>
+            </div>
+          )}
+
           {/* Naam-input */}
           <div>
             <label
               htmlFor="ob-spaardoel-name"
               className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
             >
-              Naam van je doel
+              Naam van je doel <span className="text-red-400">*</span>
             </label>
             <input
               id="ob-spaardoel-name"
               type="text"
               value={data.name}
               onChange={(e) => onChange({ ...data, name: e.target.value })}
+              onBlur={() => markTouched('name')}
               placeholder={SPAARDOEL_PRESETS[data.presetKey].label}
               maxLength={80}
-              className="w-full bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border border-[var(--border-ed)] focus:border-[var(--module-active-500)] focus:ring-1 focus:ring-[var(--module-active-500)] sm:text-sm"
+              aria-invalid={!!showError('name')}
+              aria-describedby={showError('name') ? 'ob-spaardoel-name-error' : undefined}
+              className={`w-full bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('name')}`}
             />
+            {showError('name') && (
+              <p
+                id="ob-spaardoel-name-error"
+                className="mt-1 text-xs text-red-500"
+                role="alert"
+              >
+                {showError('name')}
+              </p>
+            )}
           </div>
 
           {/* Bedrag-input — DM Mono + tabular-nums voor cijfer-uitlijning. */}
@@ -434,7 +515,7 @@ export function OnboardingSpaardoel({
               htmlFor="ob-spaardoel-amount"
               className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
             >
-              Doelbedrag
+              Doelbedrag <span className="text-red-400">*</span>
             </label>
             <div className="relative">
               <span
@@ -449,30 +530,47 @@ export function OnboardingSpaardoel({
                 inputMode="decimal"
                 value={data.target_value}
                 onChange={(e) => handleAmountChange(e.target.value)}
-                onBlur={handleAmountBlur}
+                onBlur={() => {
+                  handleAmountBlur()
+                  markTouched('target_value')
+                }}
                 placeholder="0"
-                className="w-full bg-[var(--subtle)] pl-7 pr-3 py-2.5 text-base text-[var(--ink)] outline-none border border-[var(--border-ed)] tabular-nums focus:border-[var(--module-active-500)] focus:ring-1 focus:ring-[var(--module-active-500)] sm:text-sm"
+                aria-invalid={!!showError('target_value')}
+                aria-describedby={showError('target_value') ? 'ob-spaardoel-amount-error' : undefined}
+                className={`w-full bg-[var(--subtle)] pl-7 pr-3 py-2.5 text-base text-[var(--ink)] outline-none border tabular-nums focus:ring-1 sm:text-sm ${inputErrorClass('target_value')}`}
                 style={{
                   fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular)',
                 }}
               />
             </div>
+            {showError('target_value') && (
+              <p
+                id="ob-spaardoel-amount-error"
+                className="mt-1 text-xs text-red-500"
+                role="alert"
+              >
+                {showError('target_value')}
+              </p>
+            )}
           </div>
 
-          {/* Datum-disclosure — optioneel, klikbaar geopend. */}
+          {/* Datum-disclosure — optioneel, klikbaar geopend. Geen * markering,
+              geen validatie — leeg laten is OK. */}
           <details className="group">
             <summary
               className="cursor-pointer list-none text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
             >
-              Tijdslijn aanpassen (optioneel)
+              Tijdslijn aanpassen{' '}
+              <span className="text-xs font-normal italic text-[var(--ink-3)]">(optioneel)</span>
             </summary>
             <div className="mt-3">
               <label
                 htmlFor="ob-spaardoel-date"
                 className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
               >
-                Doel-datum
+                Doel-datum{' '}
+                <span className="text-xs font-normal italic text-[var(--ink-3)]">(optioneel)</span>
               </label>
               <input
                 id="ob-spaardoel-date"

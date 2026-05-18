@@ -106,7 +106,7 @@ export function OnboardingInkomen({
   onPensionParsed,
   onPensionRemoved,
   currentStep = 3,
-  totalSteps = 5,
+  totalSteps = 6,
 }: OnboardingInkomenProps) {
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [submitted, setSubmitted] = useState(false)

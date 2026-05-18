@@ -68,6 +68,64 @@ export type CoachDataGaps = {
   hasGoals: boolean
 }
 
+/**
+ * Velden die de gebruiker expliciet heeft overgeslagen met "Later invullen"
+ * tijdens onboarding (feature #830). Stored in profiles.feature_preferences.deferred_onboarding_fields.
+ */
+export type DeferredField = 'income' | 'assets' | 'spaardoel'
+
+// ── Deferred-field suggestions (feature #830) ─────────────────────────────
+// Targeted messages for fields the user explicitly skipped during onboarding.
+// Higher priority than generic data-gap suggestions because they reference
+// the user's specific action ("Je hebt X overgeslagen"). Auto-resolve: the
+// suggestion is suppressed when the underlying data is now present (the
+// `resolved` check uses data gaps to detect fulfilment).
+const DEFERRED_FIELD_SUGGESTIONS: {
+  field: DeferredField
+  key: string
+  /** Returns true when the deferred field has been completed — suggestion auto-resolves */
+  resolved: (gaps: CoachDataGaps) => boolean
+  suggestion: Omit<CoachSuggestion, 'key'>
+}[] = [
+  {
+    field: 'income',
+    key: 'deferred_income',
+    // Income is resolved when the user has bank accounts (income typically
+    // inferred from transactions) or assets — a pragmatic proxy. The real
+    // resolution is checking profiles.net_monthly_income > 0, but we don't
+    // have that in the client. We'll clear the deferred field via an API
+    // endpoint when income is saved.
+    resolved: () => false, // resolved via API clear, not data gap
+    suggestion: {
+      message: 'Je hebt je inkomen overgeslagen bij het instellen. Vul het in voor een nauwkeuriger financieel beeld.',
+      cta: 'Inkomen invullen',
+      ctaHref: '/identity/profiel',
+    },
+  },
+  {
+    field: 'assets',
+    key: 'deferred_assets',
+    // Resolved when the user has at least one asset
+    resolved: (gaps) => gaps.hasAssets,
+    suggestion: {
+      message: 'Je hebt je bezittingen overgeslagen bij het instellen. Voeg ze toe voor een compleet vermogensoverzicht.',
+      cta: 'Bezittingen toevoegen',
+      ctaHref: '/core/assets',
+    },
+  },
+  {
+    field: 'spaardoel',
+    key: 'deferred_spaardoel',
+    // Resolved when the user has at least one goal
+    resolved: (gaps) => gaps.hasGoals,
+    suggestion: {
+      message: 'Je hebt je spaardoel overgeslagen bij het instellen. Een concreet doel helpt je sneller sparen.',
+      cta: 'Spaardoel instellen',
+      ctaHref: '/will',
+    },
+  },
+]
+
 // ── Data-gap-based suggestions (prioriteit: bank > assets > budget > goals) ──
 
 const DATA_GAP_SUGGESTIONS: {
@@ -77,11 +135,11 @@ const DATA_GAP_SUGGESTIONS: {
 }[] = [
   {
     key: 'gap_bank',
-    // Hoogste prioriteit: geen bankrekening
+    // Hoogste prioriteit: geen bankrekening — PSD2-koppeling als eerste stap (#813)
     check: (g) => !g.hasBank,
     suggestion: {
-      message: 'Voeg je eerste bankrekening toe om je saldo te zien en transacties automatisch te importeren.',
-      cta: 'Rekening toevoegen',
+      message: 'Koppel je bank voor automatisch inzicht — je transacties worden vanzelf geïmporteerd en gecategoriseerd.',
+      cta: 'Bank koppelen',
       ctaHref: '/core/cash/connect',
     },
   },
@@ -179,6 +237,7 @@ const DEFAULT_SUGGESTION: CoachSuggestion = {
 
 /**
  * Vind de eerste niet-dismissed suggestie. Prioriteit:
+ *  0. Uitgestelde onboarding-velden (feature #830) — specifieke feedback
  *  1. Data-gap suggesties (bank > assets > budget > goals)
  *  2. Pad-gebaseerde suggestie (exacte + prefix match)
  *  3. Default welkomstbericht
@@ -189,7 +248,21 @@ function getFirstUndismissedSuggestion(
   dataGaps: CoachDataGaps | undefined,
   pathname: string,
   dismissed: Set<string>,
+  deferredFields?: DeferredField[],
 ): CoachSuggestion | null {
+  // 0. Deferred onboarding fields — targeted suggestions for explicitly skipped items
+  if (deferredFields && deferredFields.length > 0 && dataGaps) {
+    for (const entry of DEFERRED_FIELD_SUGGESTIONS) {
+      if (
+        deferredFields.includes(entry.field) &&
+        !entry.resolved(dataGaps) &&
+        !dismissed.has(entry.key)
+      ) {
+        return { key: entry.key, ...entry.suggestion }
+      }
+    }
+  }
+
   // 1. Data-gap suggesties
   if (dataGaps) {
     for (const entry of DATA_GAP_SUGGESTIONS) {
@@ -228,6 +301,13 @@ export type CoachBubbleProps = {
    * gedetecteerd is, valt de bubble terug op pad-gebaseerde suggesties.
    */
   dataGaps?: CoachDataGaps
+  /**
+   * Velden die de gebruiker expliciet heeft overgeslagen met "Later invullen"
+   * tijdens onboarding (feature #830). Wanneer aanwezig, krijgen deferred-
+   * suggesties hogere prioriteit dan data-gap-suggesties. Auto-resolved
+   * wanneer de onderliggende data inmiddels aanwezig is.
+   */
+  deferredFields?: DeferredField[]
 }
 
 /**
@@ -245,7 +325,7 @@ export type CoachBubbleProps = {
  *  - Auto-dismissal na 45 seconden
  *  - Niet-blokkerend: fixed position, pagina blijft bruikbaar
  */
-export function CoachBubble({ dataGaps }: CoachBubbleProps) {
+export function CoachBubble({ dataGaps, deferredFields }: CoachBubbleProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -264,7 +344,7 @@ export function CoachBubble({ dataGaps }: CoachBubbleProps) {
     migrateLegacyDismissal()
 
     const dismissed = getDismissedKeys()
-    const suggestion = getFirstUndismissedSuggestion(dataGaps, pathname, dismissed)
+    const suggestion = getFirstUndismissedSuggestion(dataGaps, pathname, dismissed, deferredFields)
 
     if (!suggestion) return
 
@@ -278,9 +358,9 @@ export function CoachBubble({ dataGaps }: CoachBubbleProps) {
     }, 1500)
 
     return () => clearTimeout(timer)
-  // Re-evaluate when pathname changes (client navigation) or dataGaps change
+  // Re-evaluate when pathname changes (client navigation), dataGaps, or deferredFields change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, dataGaps])
+  }, [pathname, dataGaps, deferredFields])
 
   // Auto-dismiss na 45 seconden
   useEffect(() => {
