@@ -517,7 +517,7 @@ function TextFallback({
       )}
       {allEvents.length > 0 && cumulativeImpact !== 0 && (
         <div className="mt-3 pt-2 border-t border-[var(--border-ed)]">
-          <p className="text-[11px] text-[var(--ink-3)]">Cumulatieve impact op FIRE</p>
+          <p className="text-[11px] text-[var(--ink-3)]">Cumulatieve impact op je vrijheidsmoment</p>
           <p className={cumulativeImpact > 0 ? 'text-positive' : 'text-negative'}>
             <MaskedAmount
               value={Math.abs(cumulativeImpact)}
