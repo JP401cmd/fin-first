@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import Link from 'next/link'
 import { Banknote, CreditCard, Wallet, Receipt, Target, CheckCircle2, AlertCircle, Activity, Compass } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
@@ -523,6 +524,9 @@ function HealthScoreCard({
   const progress = Math.max(0, Math.min(100, health.total)) / 100
   const dashOffset = circumference * (1 - progress)
 
+  // Animeer de stroke-vulling bij eerste view (respecteert prefers-reduced-motion).
+  const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
+
   const trend = health.trend
   const trendLabel =
     trend > 0 ? `+${trend.toFixed(0)} punten t.o.v. vorige maand`
@@ -536,7 +540,7 @@ function HealthScoreCard({
       aria-label="Open detail van financiële gezondheidsscore"
       className={`flex items-center gap-4 sm:gap-6 rounded-2xl border border-[var(--border-ed)] ${style.bgInner} p-4 sm:p-6 text-left hover:border-[var(--ink-3)] hover:shadow-sm transition-all w-full`}
     >
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <div ref={ref} className="relative shrink-0" style={{ width: size, height: size }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
           <circle
             cx={size / 2}
@@ -554,8 +558,13 @@ function HealthScoreCard({
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={circumference}
-            strokeDashoffset={dashOffset}
-            className={`${style.ring} transition-all`}
+            strokeDashoffset={hasEntered ? dashOffset : circumference}
+            className={style.ring}
+            style={{
+              transition: hasEntered
+                ? 'stroke-dashoffset 700ms cubic-bezier(.22,1,.36,1)'
+                : 'none',
+            }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
