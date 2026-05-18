@@ -10,7 +10,7 @@ import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { PrivacyToggle } from '@/components/app/privacy-toggle'
-import { LeverCompassDots } from '@/components/app/shell/lever-compass'
+import { LeverCompassDots, LeverCompassMobile } from '@/components/app/shell/lever-compass'
 import { useLeverScores } from '@/components/app/shell/responsive-shell'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
@@ -112,8 +112,12 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
         </div>
 
         <div className="flex items-center gap-1 md:gap-3">
-          {/* Vier-hefbomen-kompas — compact indicator */}
-          <LeverCompassDots scores={leverScores} />
+          {/* Vier-hefbomen-kompas — mobile: collapsed mini-view met tap-expand;
+              desktop: inline dots met hover-tooltips */}
+          <LeverCompassMobile scores={leverScores} />
+          <div className="hidden md:flex">
+            <LeverCompassDots scores={leverScores} />
+          </div>
 
           <PerspectiveSwitcher />
 

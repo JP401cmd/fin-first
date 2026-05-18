@@ -42,6 +42,8 @@ import { PrivacyToggle } from '@/components/app/privacy-toggle'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
+import { LeverCompassMobile } from '@/components/app/shell/lever-compass'
+import { useLeverScores } from '@/components/app/shell/responsive-shell'
 
 type TopBarProps = {
   /**
@@ -105,6 +107,7 @@ type TopBarProps = {
  */
 function TopBarUtilities({ email, role }: { email: string; role?: string }) {
   const { unreadCount, openModal } = useNotifications()
+  const leverScores = useLeverScores()
   const [menuOpen, setMenuOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -129,6 +132,9 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
 
   return (
     <div className="flex items-center gap-0.5">
+      {/* Vier-hefbomen-kompas — compact dots, expand on tap */}
+      <LeverCompassMobile scores={leverScores} />
+
       <PrivacyToggle />
 
       <Link
