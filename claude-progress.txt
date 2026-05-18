@@ -24439,3 +24439,28 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#819, #820)
+
+## Session 2026-05-18 - Features #826, #767
+
+### Feature #826: Cross-cutting settings als tabs in plaats van accordions - PASSING
+- Settings page already uses tab-based structure (URL-driven via ?tab= param)
+- 4 tabs: Notificaties, Weergave, Privacy, Gegevens (+ conditionally Huishouden)
+- Tab bar with icons, active state styling, and responsive label visibility
+- Each tab renders its own content section without long scrollable accordions
+- URL deep-linking via ?tab=notificaties/?tab=weergave/?tab=privacy/?tab=gegevens
+- Verified all 4 tabs load correctly via browser testing
+- No code changes needed (verification only)
+
+### Feature #767: Lege staten consistent met één CTA — Core module - PASSING
+- All Core module pages follow the empty-state pattern consistently:
+- /core/assets: QuickAddEmptyState (Wallet icon + "Nog geen bezittingen" + "Voeg je eerste bezitting toe" CTA + optional import link)
+- /core/debts: QuickAddEmptyState (CreditCard icon + "Nog geen schulden" + "Voeg je eerste schuld toe" CTA)
+- /core/cash: redirects to /core/assets/cash → EmptyItemsState ("GEEN REKENINGEN GEREGISTREERD" + serif italic text + "+ Voeg rekening toe" CTA)
+- /core/budgets: AppSetupGate (guided first-time setup with "Stel Budgetteren in" + sections + "Voltooien" CTA)
+- /core landing: EmptyAssetsState + EmptyDebtsState (kicker + serif italic heading + description + CTA)
+- All empty states have: editorial typography, clear explanatory text, one primary CTA
+- Verified all pages via browser automation with regression test account (0 assets/debts)
+- No code changes needed (verification only)
+
+### Current Status
+- 2 features completed this session (#826, #767)

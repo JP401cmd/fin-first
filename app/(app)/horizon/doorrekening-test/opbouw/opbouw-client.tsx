@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useCallback, useRef } from 'react'
 import { ChevronDown, ChevronRight, TrendingUp, Landmark, PiggyBank, BarChart3 } from 'lucide-react'
+import { WidgetEmpty } from '@/components/widgets/widget-empty'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
@@ -2228,26 +2229,13 @@ export function OpbouwClient({
 
       {/* Empty state */}
       {!hasAssets && !hasDebts && (
-        <div className="rounded-xl border border-dashed border-[var(--border-md)] p-8 text-center">
-          <p className="text-sm text-[var(--ink-3)]">
-            Nog geen bezittingen of schulden gevonden. Voeg eerst je
-            financi\u00eble gegevens toe via{" "}
-            <a
-              href="/core/assets"
-              className="text-horizon-600 underline underline-offset-2"
-            >
-              Bezittingen
-            </a>{" "}
-            of{" "}
-            <a
-              href="/core/debts"
-              className="text-horizon-600 underline underline-offset-2"
-            >
-              Schulden
-            </a>
-            .
-          </p>
-        </div>
+        <WidgetEmpty
+          variant="first-use"
+          icon={Landmark}
+          title="Opbouwfase"
+          description="Nog geen bezittingen of schulden gevonden. Voeg je financi\u00eble gegevens toe zodat de opbouwprojectie kan starten."
+          action={{ label: 'Bezittingen toevoegen', href: '/core/assets' }}
+        />
       )}
     </div>
   )

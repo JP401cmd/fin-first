@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useCallback } from 'react'
 import { ChevronDown, ChevronRight, Calendar, ArrowUpRight, ArrowDownRight, Clock, Zap, Info, Layers, Banknote, TrendingDown, TrendingUp, Snowflake as SnowflakeIcon } from 'lucide-react'
+import { WidgetEmpty } from '@/components/widgets/widget-empty'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
@@ -1001,15 +1002,13 @@ export function GebeurtenissenClient({
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-8 text-center">
-                <Calendar className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
-                <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
-                  Geen actieve levensgebeurtenissen gevonden
-                </p>
-                <p className="mt-1 text-xs text-[var(--ink-4)]">
-                  Voeg levensgebeurtenissen toe via <span className="font-medium">De Horizon &rarr; Levensgebeurtenissen</span>.
-                </p>
-              </div>
+              <WidgetEmpty
+                variant="first-use"
+                icon={Calendar}
+                title="Levensgebeurtenissen"
+                description="Geen actieve levensgebeurtenissen gevonden. Voeg levensgebeurtenissen toe via De Horizon."
+                action={{ label: 'Levensgebeurtenissen toevoegen', href: '/horizon' }}
+              />
             )}
           </div>
         )}
@@ -1122,15 +1121,13 @@ export function GebeurtenissenClient({
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/30 px-4 py-8 text-center">
-                <Zap className="mx-auto h-8 w-8 text-[var(--ink-4)]" />
-                <p className="mt-2 text-sm font-medium text-[var(--ink-3)]">
-                  Geen cashflows gegenereerd
-                </p>
-                <p className="mt-1 text-xs text-[var(--ink-4)]">
-                  Voeg levensgebeurtenissen toe om cashflows te genereren.
-                </p>
-              </div>
+              <WidgetEmpty
+                variant="first-use"
+                icon={Zap}
+                title="Cashflows"
+                description="Geen cashflows gegenereerd. Voeg levensgebeurtenissen toe om cashflows te genereren."
+                action={{ label: 'Levensgebeurtenissen toevoegen', href: '/horizon' }}
+              />
             )}
           </div>
         )}
