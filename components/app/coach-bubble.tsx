@@ -43,9 +43,9 @@ const DATA_GAP_SUGGESTIONS: {
     // Hoogste prioriteit: geen bankrekening
     check: (g) => !g.hasBank,
     suggestion: {
-      message: 'Koppel je bankrekening om automatisch je saldo en transacties te importeren.',
-      cta: 'Bank koppelen',
-      ctaHref: '/identity/koppelingen',
+      message: 'Voeg je eerste bankrekening toe om je saldo te zien en transacties automatisch te importeren.',
+      cta: 'Rekening toevoegen',
+      ctaHref: '/core/cash/connect',
     },
   },
   {
