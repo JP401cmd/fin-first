@@ -139,6 +139,22 @@ export function OverzichtHero({
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
 
+  // Defensief: log dev-warning bij mismatch tussen goals + progresses-arrays.
+  // Caller (page.tsx) zou ze altijd parallel moeten leveren; mismatch wijst
+  // op een loader-bug die anders silent gewone goals zou laten doorvallen.
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    goals &&
+    goalProgresses &&
+    goalProgresses.length > goals.length
+  ) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[OverzichtHero] goalProgresses.length (${goalProgresses.length}) > ` +
+        `goals.length (${goals.length}). Extra progresses worden genegeerd.`,
+    )
+  }
+
   // Bouw doelen-display: koppel goals met hun progress op index, sorteer
   // achterop-achter doelen eerst (krijgen meer aandacht). Skip voltooide.
   // Type-guard predicate narrowt het type zodat we daarna geen `!` nodig hebben.

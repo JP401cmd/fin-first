@@ -20,7 +20,7 @@ const CHART_VIEW_LABELS: Record<ChartView, string> = {
   nom_reeel: 'Nominaal vs Reëel',
   opbouw: 'Opbouw (assets / schulden)',
   inkomen: 'Inkomen & spaarquote',
-  box3: 'Box 3 belasting',
+  box3: 'Vermogensbelasting (Box 3)',
 }
 
 const CHART_VIEWS = Object.keys(CHART_VIEW_LABELS) as ChartView[]
