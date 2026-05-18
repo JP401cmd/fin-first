@@ -215,27 +215,6 @@ function UitgangspuntRow({
   )
 }
 
-// ── Types ──────────────────────────────────────────────────────
-
-interface Asset {
-  id: string
-  name: string
-  current_value: number
-  expected_return: number
-  monthly_contribution: number
-  asset_type: string
-  [key: string]: unknown
-}
-
-interface Debt {
-  id: string
-  name: string
-  current_balance: number
-  interest_rate: number
-  monthly_payment: number
-  [key: string]: unknown
-}
-
 // ── Main Component ─────────────────────────────────────────────
 
 export function OverzichtClient({
@@ -252,8 +231,8 @@ export function OverzichtClient({
   savingsRate6m,
   estimatedYearlyIncome,
 }: {
-  assets: Asset[]
-  debts: Debt[]
+  assets: LibAsset[]
+  debts: LibDebt[]
   profile: Record<string, unknown> | null
   fireParams: FireParams
   netWorth: number
