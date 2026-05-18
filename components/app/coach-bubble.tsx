@@ -1,17 +1,52 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { X, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { WillDots } from '@/components/app/will-dots'
 
-// ── localStorage key ────────────────────────────────────────────────────
-const DISMISSED_KEY = 'trifinity_coach_bubble_dismissed'
+// ── localStorage keys ───────────────────────────────────────────────────
+/** Legacy key (pre-gezien-tracking) — migrated on first load */
+const LEGACY_DISMISSED_KEY = 'trifinity_coach_bubble_dismissed'
+/** New per-suggestion dismissed tracking (JSON array of keys) */
+const DISMISSED_SUGGESTIONS_KEY = 'trifinity_coach_dismissed_suggestions'
+
+// ── Dismissed-suggestions helpers ───────────────────────────────────────
+
+function getDismissedKeys(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_SUGGESTIONS_KEY)
+    if (raw) return new Set(JSON.parse(raw) as string[])
+  } catch { /* corrupt data — start fresh */ }
+  return new Set()
+}
+
+function addDismissedKey(key: string): void {
+  const dismissed = getDismissedKeys()
+  dismissed.add(key)
+  localStorage.setItem(DISMISSED_SUGGESTIONS_KEY, JSON.stringify([...dismissed]))
+}
+
+/**
+ * Migrate from legacy single-key dismissal to per-suggestion tracking.
+ * If old key exists, we import it as dismissing the "default" suggestion
+ * and remove the old key. Existing users won't see a jarring new bubble.
+ */
+function migrateLegacyDismissal(): void {
+  try {
+    const legacy = localStorage.getItem(LEGACY_DISMISSED_KEY)
+    if (legacy) {
+      addDismissedKey('default')
+      localStorage.removeItem(LEGACY_DISMISSED_KEY)
+    }
+  } catch { /* ignore */ }
+}
 
 // ── Types ───────────────────────────────────────────────────────────────
 
 type CoachSuggestion = {
+  key: string
   message: string
   cta: string
   ctaHref?: string
@@ -36,10 +71,12 @@ export type CoachDataGaps = {
 // ── Data-gap-based suggestions (prioriteit: bank > assets > budget > goals) ──
 
 const DATA_GAP_SUGGESTIONS: {
+  key: string
   check: (gaps: CoachDataGaps) => boolean
-  suggestion: CoachSuggestion
+  suggestion: Omit<CoachSuggestion, 'key'>
 }[] = [
   {
+    key: 'gap_bank',
     // Hoogste prioriteit: geen bankrekening
     check: (g) => !g.hasBank,
     suggestion: {
@@ -49,6 +86,7 @@ const DATA_GAP_SUGGESTIONS: {
     },
   },
   {
+    key: 'gap_assets',
     // Geen assets (maar eventueel wel bank — bank is ook een asset)
     check: (g) => !g.hasAssets,
     suggestion: {
@@ -58,6 +96,7 @@ const DATA_GAP_SUGGESTIONS: {
     },
   },
   {
+    key: 'gap_budgets',
     // Heeft bank + assets, maar geen budget
     check: (g) => !g.hasBudgets,
     suggestion: {
@@ -67,6 +106,7 @@ const DATA_GAP_SUGGESTIONS: {
     },
   },
   {
+    key: 'gap_goals',
     // Heeft alles behalve doelen
     check: (g) => !g.hasGoals,
     suggestion: {
@@ -77,70 +117,105 @@ const DATA_GAP_SUGGESTIONS: {
   },
 ]
 
-/**
- * Bepaal de meest impactvolle suggestie op basis van data-gaps.
- * Retourneert null als er geen gap is (alles is ingevuld).
- */
-function getDataGapSuggestion(gaps: CoachDataGaps): CoachSuggestion | null {
-  for (const entry of DATA_GAP_SUGGESTIONS) {
-    if (entry.check(gaps)) return entry.suggestion
-  }
-  return null
-}
-
 // ── Path-based coaching suggestions (fallback) ──────────────────────────
 
-const PATH_SUGGESTIONS: Record<string, CoachSuggestion> = {
-  '/core/budgets': {
-    message: 'Voeg je eerste budget toe om grip te krijgen op je uitgaven.',
-    cta: 'Budget toevoegen',
+const PATH_SUGGESTIONS: { pathPrefix: string; key: string; suggestion: Omit<CoachSuggestion, 'key'> }[] = [
+  {
+    pathPrefix: '/core/budgets',
+    key: 'path_budgets',
+    suggestion: {
+      message: 'Voeg je eerste budget toe om grip te krijgen op je uitgaven.',
+      cta: 'Budget toevoegen',
+    },
   },
-  '/core/debts': {
-    message: 'Registreer je schulden om je aflosstrategie in kaart te brengen.',
-    cta: 'Schuld toevoegen',
+  {
+    pathPrefix: '/core/debts',
+    key: 'path_debts',
+    suggestion: {
+      message: 'Registreer je schulden om je aflosstrategie in kaart te brengen.',
+      cta: 'Schuld toevoegen',
+    },
   },
-  '/core': {
-    message: 'Dit is je financieel fundament. Voeg bezittingen en schulden toe voor een compleet overzicht.',
-    cta: 'Overzicht bekijken',
+  {
+    pathPrefix: '/core',
+    key: 'path_core',
+    suggestion: {
+      message: 'Dit is je financieel fundament. Voeg bezittingen en schulden toe voor een compleet overzicht.',
+      cta: 'Overzicht bekijken',
+    },
   },
-  '/will': {
-    message: 'Hier vind je gepersonaliseerde tips en acties om je financiële doelen te bereiken.',
-    cta: 'Tips bekijken',
+  {
+    pathPrefix: '/will',
+    key: 'path_will',
+    suggestion: {
+      message: 'Hier vind je gepersonaliseerde tips en acties om je financiële doelen te bereiken.',
+      cta: 'Tips bekijken',
+    },
   },
-  '/horizon': {
-    message: 'Ontdek wanneer je financieel vrij kunt zijn en speel met scenario\'s.',
-    cta: 'Projectie bekijken',
+  {
+    pathPrefix: '/horizon',
+    key: 'path_horizon',
+    suggestion: {
+      message: 'Ontdek wanneer je financieel vrij kunt zijn en speel met scenario\'s.',
+      cta: 'Projectie bekijken',
+    },
   },
-  '/nieuws': {
-    message: 'Je persoonlijke financiële krant staat klaar. Lees het laatste nieuws.',
-    cta: 'Eerste artikel lezen',
+  {
+    pathPrefix: '/nieuws',
+    key: 'path_nieuws',
+    suggestion: {
+      message: 'Je persoonlijke financiële krant staat klaar. Lees het laatste nieuws.',
+      cta: 'Eerste artikel lezen',
+    },
   },
-}
+]
 
 const DEFAULT_SUGGESTION: CoachSuggestion = {
+  key: 'default',
   message: 'Welkom! Verken de app en ontdek wat je financiële vrijheid betekent.',
   cta: 'Aan de slag',
   ctaHref: '/core',
 }
 
 /**
- * Zoek de beste suggestie op basis van het huidige pad.
- * Matcht eerst exact, dan prefix (bv. `/core/assets/cash` → `/core`).
+ * Vind de eerste niet-dismissed suggestie. Prioriteit:
+ *  1. Data-gap suggesties (bank > assets > budget > goals)
+ *  2. Pad-gebaseerde suggestie (exacte + prefix match)
+ *  3. Default welkomstbericht
+ *
+ * Retourneert null als alle toepasselijke suggesties al gezien zijn.
  */
-function getPathSuggestion(pathname: string): CoachSuggestion {
-  if (PATH_SUGGESTIONS[pathname]) return PATH_SUGGESTIONS[pathname]
-
-  // Prefix-match: langste prefix eerst
-  const prefixes = Object.keys(PATH_SUGGESTIONS).sort(
-    (a, b) => b.length - a.length,
-  )
-  for (const prefix of prefixes) {
-    if (pathname.startsWith(prefix + '/') || pathname === prefix) {
-      return PATH_SUGGESTIONS[prefix]
+function getFirstUndismissedSuggestion(
+  dataGaps: CoachDataGaps | undefined,
+  pathname: string,
+  dismissed: Set<string>,
+): CoachSuggestion | null {
+  // 1. Data-gap suggesties
+  if (dataGaps) {
+    for (const entry of DATA_GAP_SUGGESTIONS) {
+      if (entry.check(dataGaps) && !dismissed.has(entry.key)) {
+        return { key: entry.key, ...entry.suggestion }
+      }
     }
   }
 
-  return DEFAULT_SUGGESTION
+  // 2. Pad-gebaseerde suggestie — exact match eerst, dan prefix (langste eerst)
+  //    PATH_SUGGESTIONS is al geordend van specifiek naar breed
+  for (const entry of PATH_SUGGESTIONS) {
+    const matches =
+      pathname === entry.pathPrefix ||
+      pathname.startsWith(entry.pathPrefix + '/')
+    if (matches && !dismissed.has(entry.key)) {
+      return { key: entry.key, ...entry.suggestion }
+    }
+  }
+
+  // 3. Default welkomstbericht
+  if (!dismissed.has(DEFAULT_SUGGESTION.key)) {
+    return DEFAULT_SUGGESTION
+  }
+
+  return null
 }
 
 // ── Component ───────────────────────────────────────────────────────────
@@ -156,15 +231,17 @@ export type CoachBubbleProps = {
 }
 
 /**
- * CoachBubble — Verschijnt na onboarding-voltooiing (`?welcome=1`) als
- * een vriendelijke, niet-blokkerende coaching-tip. De WillDots-mascotte
- * begeleidt de gebruiker naar hun eerste meaningvolle actie.
+ * CoachBubble — Verschijnt als een vriendelijke, niet-blokkerende
+ * coaching-tip. De WillDots-mascotte begeleidt de gebruiker naar hun
+ * eerste meaningvolle actie.
  *
- * Kenmerken:
+ * Kenmerken (feature #791 — gezien-tracking):
+ *  - Per-suggestie gezien-tracking via localStorage
  *  - Data-gap-gebaseerde suggestie (bank > assets > budget > goals)
  *  - Fallback naar pad-afhankelijke suggestie
- *  - 1.5s vertraging zodat WelcomeBanner eerst verschijnt
- *  - Persistente dismissal via localStorage
+ *  - Na sluiten verschijnt dezelfde suggestie niet opnieuw
+ *  - Bij een volgend bezoek kan een andere suggestie verschijnen
+ *  - 1.5s vertraging zodat pagina-content eerst verschijnt
  *  - Auto-dismissal na 45 seconden
  *  - Niet-blokkerend: fixed position, pagina blijft bruikbaar
  */
@@ -174,17 +251,26 @@ export function CoachBubble({ dataGaps }: CoachBubbleProps) {
   const pathname = usePathname()
   const [visible, setVisible] = useState(false)
   const [animating, setAnimating] = useState(false)
+  /** Ref to the current suggestion so dismiss always tracks the correct key */
+  const activeSuggestionRef = useRef<CoachSuggestion | null>(null)
+  /** Prevent showing a second bubble after user already dismissed one this mount */
+  const dismissedThisMount = useRef(false)
 
-  const isWelcome = searchParams.get('welcome') === '1'
-
-  // Toon de bubble alleen bij welcome=1 én niet eerder dismissed
+  // ── Show bubble on mount if there's an applicable undismissed suggestion ──
   useEffect(() => {
-    if (!isWelcome) return
+    if (dismissedThisMount.current) return
 
-    const dismissed = localStorage.getItem(DISMISSED_KEY)
-    if (dismissed) return
+    // Migrate legacy single-key dismissal → per-suggestion tracking
+    migrateLegacyDismissal()
 
-    // Vertraging: laat WelcomeBanner eerst verschijnen
+    const dismissed = getDismissedKeys()
+    const suggestion = getFirstUndismissedSuggestion(dataGaps, pathname, dismissed)
+
+    if (!suggestion) return
+
+    activeSuggestionRef.current = suggestion
+
+    // Vertraging: laat pagina-content eerst verschijnen
     const timer = setTimeout(() => {
       setVisible(true)
       // Entrance animation
@@ -192,7 +278,9 @@ export function CoachBubble({ dataGaps }: CoachBubbleProps) {
     }, 1500)
 
     return () => clearTimeout(timer)
-  }, [isWelcome])
+  // Re-evaluate when pathname changes (client navigation) or dataGaps change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, dataGaps])
 
   // Auto-dismiss na 45 seconden
   useEffect(() => {
@@ -204,10 +292,18 @@ export function CoachBubble({ dataGaps }: CoachBubbleProps) {
 
   const dismiss = useCallback(() => {
     setAnimating(false)
+    dismissedThisMount.current = true
+
+    // Track the specific suggestion that was dismissed
+    const key = activeSuggestionRef.current?.key
+    if (key) {
+      addDismissedKey(key)
+    }
+
     // Wacht op exit-animatie
     setTimeout(() => {
       setVisible(false)
-      localStorage.setItem(DISMISSED_KEY, Date.now().toString())
+      activeSuggestionRef.current = null
     }, 300)
   }, [])
 
@@ -220,11 +316,9 @@ export function CoachBubble({ dataGaps }: CoachBubbleProps) {
     router.replace(pathname + (qs ? `?${qs}` : ''), { scroll: false })
   }, [dismiss, searchParams, router, pathname])
 
-  if (!visible) return null
+  if (!visible || !activeSuggestionRef.current) return null
 
-  // Data-gap-suggestie heeft voorrang boven pad-gebaseerde suggestie
-  const suggestion = (dataGaps && getDataGapSuggestion(dataGaps))
-    ?? getPathSuggestion(pathname)
+  const suggestion = activeSuggestionRef.current
 
   return (
     <div
@@ -240,7 +334,7 @@ export function CoachBubble({ dataGaps }: CoachBubbleProps) {
         }
       `}
       role="complementary"
-      aria-label="Welkomst coaching tip"
+      aria-label="Coaching tip"
     >
       <div className="relative overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s2)]">
         {/* Accent bar */}
