@@ -17,6 +17,8 @@ type OverzichtHeroProps = {
   health: HealthScore | null
   goals?: GoalWithBudget[]
   goalProgresses?: GoalProgress[]
+  /** Percentage op weg naar financiële vrijheid (0-100). Uit healthScoreInput. */
+  freedomPct?: number | null
 }
 
 const BAND_STYLES: Record<string, { ring: string; label: string; text: string; bgInner: string }> = {
@@ -97,7 +99,7 @@ function greetingByHour(): string {
  *  - Status-dots op hefboom-tegels (groen/oranje/rood) op basis van
  *    LeverScores zodra die in scope zijn van /overzicht/page.tsx
  */
-export function OverzichtHero({ userName, health, goals, goalProgresses }: OverzichtHeroProps) {
+export function OverzichtHero({ userName, health, goals, goalProgresses, freedomPct }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
 
   // Bouw doelen-display: koppel goals met hun progress op index, sorteer
@@ -172,6 +174,27 @@ export function OverzichtHero({ userName, health, goals, goalProgresses }: Overz
         )}
         {goalDisplay.length > 0 && <VoortgangDoelenCard items={goalDisplay} />}
       </div>
+
+      {/* Vrijheid-strip: % op weg naar financiële vrijheid → klik naar Toekomst */}
+      {freedomPct != null && (
+        <Link
+          href="/toekomst"
+          className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-ed)] bg-gradient-to-r from-violet-50 to-stone-50 p-3 sm:p-4 hover:border-violet-300 hover:shadow-sm transition-all group"
+        >
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+              Op weg naar vrijheid
+            </div>
+            <div className="mt-0.5 text-sm sm:text-base text-[var(--ink)]">
+              Je bent <strong className="font-serif text-lg sm:text-xl text-violet-700">{Math.round(freedomPct)}%</strong>
+              {' '}op weg naar het moment dat je niet meer hoeft te werken voor geld.
+            </div>
+          </div>
+          <span className="shrink-0 text-xs font-semibold text-violet-700 group-hover:underline">
+            Bekijk projectie →
+          </span>
+        </Link>
+      )}
 
       {/* Drill-down sheet: kassabon met pillars per sub-score */}
       {health && (

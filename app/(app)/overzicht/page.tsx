@@ -51,6 +51,7 @@ export default async function OverzichtPage() {
 
   const temporal = buildTemporalContext()
   const health = horizonData?.healthScore ?? null
+  const freedomPct = horizonData?.healthScoreInput?.freedomPct ?? null
 
   return (
     <>
@@ -59,6 +60,7 @@ export default async function OverzichtPage() {
         health={health}
         goals={willData.goals}
         goalProgresses={willData.goalProgresses}
+        freedomPct={freedomPct}
       />
       <WillLanding
         dashboardData={dashboardData}
