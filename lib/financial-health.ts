@@ -29,6 +29,13 @@ export interface HealthScoreInput {
   assetTypeCount: number
   /** Budget categories with limit/spent; empty array if no budgets */
   budgetCategories: { limit: number; spent: number }[]
+  /** Box 3 tax-context voor tax_optimization-pillar. Optioneel; null → neutral score 50. */
+  taxData?: {
+    box3Bezittingen: number       // spaargeld + beleggingen
+    box3Tax: number               // jaarlijkse Box 3-heffing
+    heffingsvrijVermogen: number  // vrijstelling single/partner
+    rendementsgrondslag: number   // belastbare grondslag na vrijstelling
+  } | null
 }
 
 // ── Types ────────────────────────────────────────────────────
@@ -63,12 +70,13 @@ export interface HealthScore {
 // Each pillar links to the page where the user can take action.
 
 const PILLAR_ACTION: Record<string, { href: string; label: string }> = {
-  savings_rate:      { href: '/will#cashflow',  label: 'Cashflow bekijken' },
-  debt_ratio:        { href: '/core/debts',     label: 'Schulden bekijken' },
-  emergency_fund:    { href: '/core/assets/cash', label: 'Noodfonds opbouwen' },
-  fire_progress:     { href: '/horizon',        label: 'FIRE-plan bekijken' },
-  diversification:   { href: '/core/assets',    label: 'Bezittingen bekijken' },
-  budget_discipline: { href: '/core/budgets',   label: 'Budgetten beheren' },
+  savings_rate:      { href: '/overzicht/cashflow',    label: 'Cashflow bekijken' },
+  debt_ratio:        { href: '/overzicht/schulden',    label: 'Schulden bekijken' },
+  emergency_fund:    { href: '/overzicht/bezittingen', label: 'Noodfonds opbouwen' },
+  fire_progress:     { href: '/toekomst',              label: 'Vrijheidspad bekijken' },
+  diversification:   { href: '/overzicht/bezittingen', label: 'Bezittingen bekijken' },
+  budget_discipline: { href: '/overzicht/cashflow',    label: 'Budgetten beheren' },
+  tax_optimization:  { href: '/overzicht/belasting',   label: 'Belasting bekijken' },
 }
 
 // ── Score curves ─────────────────────────────────────────────
@@ -130,6 +138,43 @@ function scoreBudgetDiscipline(budgetTotals: DashboardData['budgetTotals']): num
   return Math.round((withinBudget / categories.length) * 100)
 }
 
+/**
+ * Tax-optimalisatie-score (Box 3-context).
+ * Hybride benadering (zie deep-dive agent-plan):
+ *  - Geen Box 3-bezit (<€1.000) → neutraal 50 (geen optimalisatie nodig)
+ *  - Anders: blend van vrijstellingsbenutting (40%) + tax-drag (40%) +
+ *    allocatie-hygiene (20%, voor nu = 100 want geen partner-optimalisatie-
+ *    data in de input)
+ *
+ * Vrijstellingsbenutting: hoe goed wordt heffingsvrij vermogen benut?
+ * Tax-drag: belasting als % van bezittingen (lager = beter).
+ */
+function scoreTaxOptimization(
+  taxData?: HealthScoreInput['taxData'],
+): number {
+  if (!taxData || taxData.box3Bezittingen < 1_000) return 50
+
+  // Vrijstellingsbenutting: rendementsgrondslag / heffingsvrijVermogen.
+  // Onder 80% → punten naar rato; boven 80% → 100.
+  const vrijstellingPct = taxData.heffingsvrijVermogen > 0
+    ? Math.min(1, taxData.rendementsgrondslag / taxData.heffingsvrijVermogen)
+    : 0
+  const vrijstellingScore = vrijstellingPct >= 0.8 ? 100 : Math.round(vrijstellingPct * 125)
+
+  // Tax-drag: tax / bezittingen. <0.5% = 100, >2% = 0, lineair tussen.
+  const drag = taxData.box3Bezittingen > 0 ? taxData.box3Tax / taxData.box3Bezittingen : 0
+  const dragScore = drag <= 0.005
+    ? 100
+    : drag >= 0.02
+    ? 0
+    : Math.round((1 - (drag - 0.005) / 0.015) * 100)
+
+  // Allocatie-hygiene: placeholder (geen partner-allocation-data nu beschikbaar).
+  const allocScore = 100
+
+  return Math.round(vrijstellingScore * 0.4 + dragScore * 0.4 + allocScore * 0.2)
+}
+
 // ── Label ────────────────────────────────────────────────────
 
 function getLabel(score: number): string {
@@ -142,7 +187,11 @@ function getLabel(score: number): string {
 
 // ── Weight redistribution ────────────────────────────────────
 
-/** Base weights for all 6 pillars (sum = 1.0) */
+/**
+ * Base weights voor 7 pillars. Sum > 1.0 wordt automatisch herverdeeld
+ * door getRedistributedWeightForSet() — active pillars worden propor-
+ * tioneel geschaald. Voor alle 7 actief: tax krijgt ~9.1%, savings ~22.7%, etc.
+ */
 const BASE_WEIGHTS: Record<string, number> = {
   savings_rate: 0.25,
   debt_ratio: 0.20,
@@ -150,6 +199,7 @@ const BASE_WEIGHTS: Record<string, number> = {
   fire_progress: 0.20,
   diversification: 0.10,
   budget_discipline: 0.10,
+  tax_optimization: 0.10,
 }
 
 /**
@@ -163,6 +213,7 @@ const PILLAR_MODULE_REQUIREMENTS: Record<string, ModuleId | null> = {
   fire_progress: 'toekomstplannen',
   diversification: 'vermogensregistratie',
   budget_discipline: 'budgetteren',
+  tax_optimization: 'vermogensregistratie',
 }
 
 /**
@@ -369,6 +420,19 @@ export function computeHealthScore(
       actionLabel: PILLAR_ACTION.budget_discipline.label,
       rawValue: budgetTotal > 0 ? `${budgetWithin}/${budgetTotal}` : 'Geen budget',
     },
+    {
+      id: 'tax_optimization',
+      name: 'Belasting-optimalisatie',
+      // DashboardData heeft geen taxData; pillar krijgt neutrale 50.
+      // computeHealthScoreFromInputs() levert wel taxData wanneer beschikbaar.
+      score: 50,
+      weight: getRedistributedWeightForSet('tax_optimization', activePillarSet),
+      explanation: 'Hoe slim is je vermogen verdeeld over Box 1, 2 en 3?',
+      improvementTip: 'Bekijk je Box 3-positie — vrijstelling, partner-allocatie en heffingsmethode bepalen je jaarlijkse belasting.',
+      actionHref: PILLAR_ACTION.tax_optimization.href,
+      actionLabel: PILLAR_ACTION.tax_optimization.label,
+      rawValue: 'Geen Box 3-data',
+    },
   ]
 
   // Retain only active pillars (weight === 0 means the pillar was excluded)
@@ -408,6 +472,9 @@ export function computeHealthScore(
       fire_progress: prevFire,
       diversification: prevDiv,
       budget_discipline: prevBudget,
+      // tax_optimization: geen historie beschikbaar in DashboardData → proxy
+      // op huidige score (50 want geen taxData hier). Voorkomt trend-discontinuïteit.
+      tax_optimization: 50,
     }
     previousMonth = Math.round(
       Array.from(activePillarSet).reduce(
@@ -454,6 +521,7 @@ export function computeHealthScoreFromInputs(
   const emergencyScore = scoreEmergencyFund(input.emergencyFundMonths)
   const fireScore = scoreFireProgress(input.freedomPct)
   const diversificationScore = scoreDiversification(input.assetTypeCount)
+  const taxScore = scoreTaxOptimization(input.taxData)
 
   // Budget discipline from raw categories
   const budgetCats = input.budgetCategories.filter(c => c.limit > 0)
@@ -581,6 +649,25 @@ export function computeHealthScoreFromInputs(
       actionHref: PILLAR_ACTION.budget_discipline.href,
       actionLabel: PILLAR_ACTION.budget_discipline.label,
       rawValue: budgetTotal > 0 ? `${budgetWithin}/${budgetTotal}` : 'Geen budget',
+    },
+    {
+      id: 'tax_optimization',
+      name: 'Belasting-optimalisatie',
+      score: taxScore,
+      weight: getRedistributedWeightForSet('tax_optimization', activePillarSet),
+      explanation: 'Hoe slim is je vermogen verdeeld over Box 1, 2 en 3?',
+      improvementTip: !input.taxData || input.taxData.box3Bezittingen < 1_000
+        ? 'Voeg Box 3-data toe om je belasting-optimalisatie te zien.'
+        : taxScore >= 80
+        ? 'Sterk benut — heffingsvrij en allocatie staan goed.'
+        : taxScore >= 50
+        ? 'Bekijk partner-allocatie of switch tussen forfaitair/werkelijk.'
+        : 'Hoge tax-drag — kijk naar groene beleggingen of partner-verdeling.',
+      actionHref: PILLAR_ACTION.tax_optimization.href,
+      actionLabel: PILLAR_ACTION.tax_optimization.label,
+      rawValue: !input.taxData || input.taxData.box3Bezittingen < 1_000
+        ? 'Geen Box 3'
+        : `€${Math.round(input.taxData.box3Tax)}/jaar`,
     },
   ]
 

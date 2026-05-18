@@ -51,7 +51,7 @@ const HEFBOMEN: ReadonlyArray<{
     href: '/overzicht/belasting',
     Icon: Receipt,
     accent: 'text-violet-700 bg-violet-50',
-    pillarKey: null,
+    pillarKey: 'tax_optimization',
     tooltip: 'Box 1, Box 2 en Box 3 — slim verdelen scheelt geld per jaar.',
   },
 ] as const
