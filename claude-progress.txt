@@ -1,3 +1,20 @@
+## Session 2026-05-18 - Feature #849
+
+### Feature #849: Kompas-indicatoren linken naar relevante paginas asymmetrisch - PASSING
+- Added href to all four lever configs in LEVERS array (lever-compass.tsx)
+- bezittingen → /core/assets, schulden → /core/debts, cashflow → /will#cashflow (unchanged), belasting → /core/belasting
+- All three render variants (Dots, Expanded, Collapsed) already had conditional Link rendering for href
+- Verified with browser automation: all four indicators navigate to correct pages
+- Navigation is instant (Next.js client-side routing via Link component)
+- Zero new console errors introduced
+- Commit: cb4e82cf
+
+### Files Modified
+- components/app/shell/lever-compass.tsx — added href to assets, debts, and tax lever configs
+
+### Current Status
+- 1 feature completed this session (#849)
+
 ## Session 2026-05-18 - Features #827, #831
 
 ### Feature #827: /identity/instellingen gereduceerd tot cross-cutting concerns - PASSING
