@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, BarChart3 } from 'lucide-react'
+import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, BarChart3, Sparkles } from 'lucide-react'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
@@ -560,6 +560,15 @@ export function TransactionForm({
                     </optgroup>
                   ))}
                 </select>
+                {isEdit && transaction && (transaction.category_source === 'ai' || transaction.category_source === 'rule') && transaction.budget_id && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-xs text-wil-700" data-testid="suggested-category-notice">
+                    <Sparkles className="h-3 w-3 text-wil-500" />
+                    <span>
+                      {transaction.category_source === 'ai' ? 'Voorgesteld door AI' : 'Voorgesteld op basis van regel'}
+                      {' — opslaan bevestigt deze categorie'}
+                    </span>
+                  </p>
+                )}
               </div>
             )}
 

@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Upload, ArrowUpRight, ArrowDownLeft,
   Wallet, Tag, Settings2, Repeat, Search, Filter, RotateCcw,
   Link2, ArrowLeftRight, HelpCircle, GitFork, Pencil, Sparkles, ArrowLeft,
-  MoreVertical, Unlink, Save,
+  MoreVertical, Unlink, Save, Check,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
@@ -547,6 +547,24 @@ export function CashAccountView({
   function getBudgetForId(budgetId: string | null): Budget | undefined {
     if (!budgetId) return undefined
     return budgets.find((b) => b.id === budgetId)
+  }
+
+  /** A transaction has a "suggested" category when it was auto-categorized (AI or rule) but not yet confirmed by the user. */
+  function isSuggestedCategory(tx: Transaction): boolean {
+    return !!tx.budget_id && (tx.category_source === 'ai' || tx.category_source === 'rule')
+  }
+
+  /** Confirm a suggested category — sets category_source to 'manual' so the badge disappears. */
+  async function confirmSuggestedCategory(e: React.MouseEvent, txId: string) {
+    e.stopPropagation()
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('transactions')
+      .update({ category_source: 'manual', updated_at: new Date().toISOString() })
+      .eq('id', txId)
+    if (!error) {
+      setTransactions(prev => prev.map(t => t.id === txId ? { ...t, category_source: 'manual' } : t))
+    }
   }
 
   // Calculate monthly totals — exclude transfers
@@ -1896,6 +1914,21 @@ export function CashAccountView({
                                 {isTransfer ? 'Eigen overboeking' : tx.description}
                               </p>
                               {isSplitTx && <GitFork className="h-3 w-3 shrink-0 text-kern-400" aria-label="Gesplitste transactie" />}
+                              {!isTransfer && !isPendingTransfer && isSuggestedCategory(tx) && (
+                                <span className="inline-flex shrink-0 items-center gap-1 sm:hidden">
+                                  <span className="rounded border border-wil-300 bg-wil-50 px-1 py-px text-[8px] font-semibold uppercase tracking-[.04em] text-wil-700" data-testid="suggested-badge-mobile">Voorgesteld</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => confirmSuggestedCategory(e, tx.id)}
+                                    className="flex h-4 w-4 items-center justify-center rounded-full border border-emerald-300 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                    title="Categorie bevestigen"
+                                    aria-label="Categorie bevestigen"
+                                    data-testid="confirm-category-btn-mobile"
+                                  >
+                                    <Check className="h-2.5 w-2.5" />
+                                  </button>
+                                </span>
+                              )}
                             </div>
                             <p className="truncate text-xs text-[var(--ink-3)]">
                               {isTransfer && tx.counterparty_name
@@ -1916,6 +1949,21 @@ export function CashAccountView({
                             <span className="hidden shrink-0 rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--ink-3)] sm:inline-block">Overboeking</span>
                           ) : isPendingTransfer ? (
                             <span className="hidden shrink-0 rounded-full bg-[var(--hor-l)] border border-[var(--hor-m)] px-2 py-0.5 text-[9px] font-medium uppercase tracking-[.06em] text-[var(--hor-t)] sm:inline-block">Controleer</span>
+                          ) : budget && isSuggestedCategory(tx) ? (
+                            <span className="hidden shrink-0 items-center gap-1.5 sm:inline-flex">
+                              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-[var(--ink-2)]">{budget.name}</span>
+                              <span className="rounded-full border border-wil-300 bg-wil-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[.06em] text-wil-700" data-testid="suggested-badge">Voorgesteld</span>
+                              <button
+                                type="button"
+                                onClick={(e) => confirmSuggestedCategory(e, tx.id)}
+                                className="flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 bg-emerald-50 text-emerald-600 transition-colors hover:bg-emerald-100 hover:border-emerald-400"
+                                title="Categorie bevestigen"
+                                aria-label="Categorie bevestigen"
+                                data-testid="confirm-category-btn"
+                              >
+                                <Check className="h-3 w-3" />
+                              </button>
+                            </span>
                           ) : budget ? (
                             <span className="hidden shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-[var(--ink-2)] sm:inline-block">{budget.name}</span>
                           ) : isSplitTx ? (
