@@ -24732,3 +24732,32 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#857, #858)
+
+## Session 2026-05-18 - Features #788, #810
+
+### Feature #788: Netto-vermogen-tijdslijn responsive voor mobile - PASSING
+- RangeToggle buttons: changed from h-7 (28px) to min-h-[44px] on mobile, sm:min-h-[28px] on desktop
+- Header layout: flex-col on mobile (kicker above toggle), sm:flex-row on desktop (side-by-side)
+- SVG chart: added min-w-[420px] to ensure labels stay readable on narrow screens
+- Chart wrapper: added overscroll-x-contain and WebkitOverflowScrolling for smooth touch scroll
+- Core-hero timeline slot: changed overflow-hidden to overflow-x-auto for horizontal scroll support
+- Verified: 44px button height measured via DOM, labels readable, no overlap in both views
+- Desktop layout unbroken: kicker+toggle inline on sm+, chart in 2-col grid on lg+
+- Commit: 26b347e3
+
+### Feature #810: Wft-disclaimer persistent in chat UI als subtiele footer - PASSING
+- Added permanent <p> element below chat input area with Wft disclaimer text
+- Text: "Geen financieel advies — uitsluitend educatief en informatief."
+- Styling: text-[10px], text-center, text-[var(--ink-4)] — small, subtle, muted
+- Uses env(safe-area-inset-bottom) for safe area padding on mobile
+- Positioned outside the scrollable message area — permanently visible
+- Verified: text remains visible while typing, readable on mobile (375px)
+- Commit: b5cc79d9
+
+### Files Modified
+- components/core/net-worth-projection-chart.tsx — responsive toggle, SVG min-width, header layout
+- components/core/core-hero.tsx — timeline slot overflow-x-auto
+- components/app/chat/chat-panel.tsx — persistent Wft disclaimer footer
+
+### Current Status
+- 2 features completed this session (#788, #810)
