@@ -1,9 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { Banknote, CreditCard, Wallet, Receipt, Target, CheckCircle2, AlertCircle } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
+import { BottomSheet } from '@/components/app/bottom-sheet'
+import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 
@@ -61,6 +64,8 @@ function greetingByHour(): string {
  *    LeverScores zodra die in scope zijn van /overzicht/page.tsx
  */
 export function OverzichtHero({ userName, health, goals, goalProgresses }: OverzichtHeroProps) {
+  const [receiptOpen, setReceiptOpen] = useState(false)
+
   // Bouw doelen-display: koppel goals met hun progress op index, sorteer
   // achterop-achter doelen eerst (krijgen meer aandacht). Skip voltooide.
   const goalDisplay = (goals ?? [])
@@ -110,9 +115,26 @@ export function OverzichtHero({ userName, health, goals, goalProgresses }: Overz
 
       {/* Health Score + Voortgang doelen — 2-kolom op desktop, stacked op mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-        {health && <HealthScoreCard health={health} />}
+        {health && (
+          <HealthScoreCard
+            health={health}
+            onOpenReceipt={() => setReceiptOpen(true)}
+          />
+        )}
         {goalDisplay.length > 0 && <VoortgangDoelenCard items={goalDisplay} />}
       </div>
+
+      {/* Drill-down sheet: kassabon met pillars per sub-score */}
+      {health && (
+        <BottomSheet
+          open={receiptOpen}
+          onClose={() => setReceiptOpen(false)}
+          title="Financiële gezondheid"
+          size="lg"
+        >
+          <HealthScoreReceipt health={health} />
+        </BottomSheet>
+      )}
     </section>
   )
 }
@@ -178,7 +200,13 @@ function VoortgangDoelenCard({
   )
 }
 
-function HealthScoreCard({ health }: { health: HealthScore }) {
+function HealthScoreCard({
+  health,
+  onOpenReceipt,
+}: {
+  health: HealthScore
+  onOpenReceipt: () => void
+}) {
   const band = health.label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') as keyof typeof BAND_STYLES
   const style = BAND_STYLES[band] ?? BAND_STYLES.redelijk!
 
@@ -197,7 +225,12 @@ function HealthScoreCard({ health }: { health: HealthScore }) {
     : 'gelijk aan vorige maand'
 
   return (
-    <article className={`flex items-center gap-4 sm:gap-6 rounded-2xl border border-[var(--border-ed)] ${style.bgInner} p-4 sm:p-6`}>
+    <button
+      type="button"
+      onClick={onOpenReceipt}
+      aria-label="Open detail van financiële gezondheidsscore"
+      className={`flex items-center gap-4 sm:gap-6 rounded-2xl border border-[var(--border-ed)] ${style.bgInner} p-4 sm:p-6 text-left hover:border-[var(--ink-3)] hover:shadow-sm transition-all w-full`}
+    >
       <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
           <circle
@@ -236,7 +269,10 @@ function HealthScoreCard({ health }: { health: HealthScore }) {
         {health.previousMonth !== null && (
           <div className="text-xs text-[var(--ink-3)] mt-1">{trendLabel}</div>
         )}
+        <div className="text-[11px] text-[var(--ink-3)] mt-2 underline decoration-dotted underline-offset-2">
+          Toon onderverdeling →
+        </div>
       </div>
-    </article>
+    </button>
   )
 }
