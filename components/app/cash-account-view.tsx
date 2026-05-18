@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Upload, ArrowUpRight, ArrowDownLeft,
-  Wallet, Tag, Settings2, Repeat, Search, Filter, RotateCcw,
+  Wallet, Tag, Settings2, Repeat, Search, Filter, RotateCcw, AlertCircle,
   Link2, ArrowLeftRight, HelpCircle, GitFork, Pencil, Sparkles, ArrowLeft,
   MoreVertical, Unlink, Save, Check,
 } from 'lucide-react'
@@ -175,6 +175,9 @@ export function CashAccountView({
   const [filterSearch, setFilterSearch] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'transfer'>('all')
   const [filterBudgetId, setFilterBudgetId] = useState<string>('all')
+
+  // Uncategorized group section state
+  const [showUncatGroup, setShowUncatGroup] = useState(false)
 
   // Transfer detection state
   const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
@@ -1698,7 +1701,7 @@ export function CashAccountView({
             data-testid="filter-budget"
           >
             <option value="all">Alle categorie&#235;n</option>
-            <option value="uncategorized">Niet gecategoriseerd</option>
+            <option value="uncategorized">Niet gecategoriseerd{uncatTx.length > 0 ? ` (${uncatTx.length})` : ''}</option>
             {budgets
               .filter((b) => !b.parent_id || Number(b.default_limit) > 0)
               .map((b) => (
@@ -1725,6 +1728,99 @@ export function CashAccountView({
           </div>
         )}
       </section>
+
+      {/* ── Uncategorized transaction group section ──────────────────────────── */}
+      {/* Collapsed by default; expands to show uncategorized transactions
+          grouped by counterparty name for easy bulk categorization. */}
+      {budgetingActive && uncatTx.length > 0 && filterBudgetId === 'all' && !hasActiveFilters && (
+        <section className="mt-5 sm:mt-8" data-testid="uncategorized-group">
+          <button
+            type="button"
+            onClick={() => setShowUncatGroup(v => !v)}
+            className="flex w-full items-center gap-3 rounded-[var(--r-lg)] border border-dashed border-orange-300 bg-orange-50/60 px-4 py-3 text-left transition-colors hover:bg-orange-50"
+            data-testid="uncategorized-group-toggle"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 text-orange-500" />
+            <div className="min-w-0 flex-1">
+              <span className="text-sm font-semibold text-orange-800">
+                {uncatTx.length} {uncatTx.length === 1 ? 'transactie' : 'transacties'} zonder categorie
+              </span>
+              <span className="ml-2 text-xs text-orange-600">
+                — groepeer en categoriseer in bulk
+              </span>
+            </div>
+            <span
+              className="shrink-0 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700"
+              data-testid="uncategorized-count-badge"
+            >
+              {uncatTx.length}
+            </span>
+            {showUncatGroup ? (
+              <ChevronUp className="h-4 w-4 shrink-0 text-orange-400" />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0 text-orange-400" />
+            )}
+          </button>
+
+          {showUncatGroup && (() => {
+            // Group uncategorized by counterparty_name for bulk view
+            const grouped: Record<string, Transaction[]> = {}
+            for (const tx of uncatTx) {
+              const key = tx.counterparty_name?.trim() || tx.description?.slice(0, 30) || 'Onbekend'
+              if (!grouped[key]) grouped[key] = []
+              grouped[key].push(tx)
+            }
+            const sortedGroups = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length)
+
+            return (
+              <div className="mt-2 space-y-1" data-testid="uncategorized-group-list">
+                {sortedGroups.map(([counterparty, txs]) => {
+                  const total = txs.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+                  return (
+                    <div
+                      key={counterparty}
+                      className="flex items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 cursor-pointer hover:bg-[var(--subtle)] transition-colors"
+                      onClick={() => {
+                        // Open AI categorize sheet filtered for these transactions
+                        setShowAICategorize(true)
+                      }}
+                      data-testid="uncategorized-group-row"
+                    >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--r)] bg-orange-50 border border-orange-200">
+                        <Tag className="h-3.5 w-3.5 text-orange-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-[var(--ink)]">{counterparty}</p>
+                        <p className="text-xs text-[var(--ink-3)]">
+                          {txs.length} {txs.length === 1 ? 'transactie' : 'transacties'}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+                        {new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(total)}
+                      </span>
+                      <span className="hidden shrink-0 items-center gap-1 rounded-full bg-kern-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.04em] text-white sm:inline-flex">
+                        <Sparkles className="h-3 w-3" />
+                        Categoriseer
+                      </span>
+                    </div>
+                  )
+                })}
+                <div className="mt-2 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAICategorize(true)}
+                    className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-kern-700"
+                    data-testid="bulk-categorize-cta"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Alles categoriseren
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
+        </section>
+      )}
 
       {/* Transaction list */}
       {/* Partner privacy notice + category totals for 'totals' mode */}
@@ -1969,7 +2065,24 @@ export function CashAccountView({
                           ) : isSplitTx ? (
                             <span className="hidden shrink-0 rounded-full bg-kern-50 border border-kern-200 px-2.5 py-0.5 text-xs font-medium text-kern-700 sm:inline-flex items-center gap-1"><GitFork className="h-3 w-3" />Verdeeld over budgetten</span>
                           ) : (
-                            <span className="hidden shrink-0 rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-medium text-orange-600 sm:inline-block">Niet gecategoriseerd</span>
+                            <span className="hidden shrink-0 items-center gap-1.5 sm:inline-flex" data-testid="uncategorized-badge">
+                              <span className="rounded-full bg-orange-50 border border-orange-200 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[.04em] text-orange-600">Ongecategoriseerd</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditTransaction(tx)
+                                  setShowForm(true)
+                                }}
+                                className="flex h-5 items-center gap-1 rounded-full border border-kern-300 bg-kern-50 px-2 text-[9px] font-bold uppercase tracking-[.04em] text-kern-700 transition-colors hover:bg-kern-100 hover:border-kern-400"
+                                title="Categorie toewijzen"
+                                aria-label={`Categoriseer ${tx.description}`}
+                                data-testid="quick-categorize-btn"
+                              >
+                                <Tag className="h-2.5 w-2.5" />
+                                Categoriseer
+                              </button>
+                            </span>
                           )}
 
                           <div className="shrink-0 text-right">
