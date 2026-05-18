@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ageAtDate } from '@/lib/horizon-data'
@@ -23,6 +23,9 @@ interface IdentityClientProps {
 
 export default function IdentityClient({ initialData }: IdentityClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  // /mijn krijgt nieuwe profile-tekst; /identity-fallback voor legacy bezoeken
+  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/identity']
   const supabase = createClient()
 
   // Interactive state
@@ -82,7 +85,7 @@ export default function IdentityClient({ initialData }: IdentityClientProps) {
           highlight-marker fallback = Horizon-200 (universele uitkomst-marker). */}
       <header className="relative mb-6 sm:mb-8 space-y-2">
         <PageInfoButton
-          description={PAGE_INFO['/identity']}
+          description={pageInfoText}
           className="absolute right-0 top-0"
         />
         {/* Kicker met 28×1px streep */}

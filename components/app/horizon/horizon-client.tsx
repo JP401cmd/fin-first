@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
@@ -336,6 +336,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
+  // /toekomst krijgt nieuwe overzicht-tekst; /horizon-fallback voor legacy bezoeken
+  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/horizon']
   useEffect(() => {
     const modal = searchParams.get('modal')
     const strategieParam = searchParams.get('strategie')
@@ -2345,7 +2348,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       {/* === Editorial header — blueprint Type 1 (Module-landing) === */}
       <header className="relative mb-6 space-y-2 px-4 sm:px-6">
         <PageInfoButton
-          description={PAGE_INFO['/horizon']}
+          description={pageInfoText}
           className="absolute right-4 top-0 sm:right-6"
         />
         {/* Kicker met 28×1px Horizon-streep */}

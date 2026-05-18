@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip, PageInfoButton, GlossaryTerm } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
@@ -114,6 +114,10 @@ function addAssetCta(type: AssetType): string {
 export default function AssetsPage({ initialAssetId, initialData }: { initialAssetId?: string; initialData?: AssetsPageData } = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  // Show juiste PAGE_INFO afhankelijk van canonieke route: /overzicht/bezittingen
+  // krijgt nieuwe overzicht-tekst; legacy /core/assets blijft fallback.
+  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/core/assets']
   const fc = useFc()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [aangifteImportOpen, setAangifteImportOpen] = useState(false)
@@ -485,7 +489,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
 
       <header className="relative mb-5 space-y-3">
         <PageInfoButton
-          description={PAGE_INFO['/core/assets']}
+          description={pageInfoText}
           className="absolute right-0 top-0"
         />
         <Kicker size="large">Bezittingen · opgeslagen vrijheid</Kicker>
