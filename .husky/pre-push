@@ -17,7 +17,10 @@ echo "→ Running tsc --noEmit on production code…"
 
 # Capture output, filter test-file errors, fail als er productie-errors zijn
 output=$(npx tsc --noEmit 2>&1 || true)
-production_errors=$(echo "$output" | grep "error TS" | grep -v "\.test\.\|/test/\|/__tests__/" || true)
+# Filter test-file errors (pre-existing strict-type issues, Vercel skipt ze)
+# en .next/types errors (gegenereerde route-validators raken stale bij
+# folder-renames; Vercel regenereert ze bij elke build).
+production_errors=$(echo "$output" | grep "error TS" | grep -v "\.test\.\|/test/\|/__tests__/\|\.next/" || true)
 
 if [ -n "$production_errors" ]; then
   echo ""
