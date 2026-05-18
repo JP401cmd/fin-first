@@ -54,7 +54,12 @@ export default async function OverzichtPage() {
 
   return (
     <>
-      <OverzichtHero userName={userName ?? undefined} health={health} />
+      <OverzichtHero
+        userName={userName ?? undefined}
+        health={health}
+        goals={willData.goals}
+        goalProgresses={willData.goalProgresses}
+      />
       <WillLanding
         dashboardData={dashboardData}
         activeWidgets={activeWidgets}
