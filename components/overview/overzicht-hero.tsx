@@ -37,11 +37,13 @@ const HEFBOMEN: ReadonlyArray<{
   accent: string
   /** Pillar-key uit HealthScore voor status-bepaling. null = altijd neutraal. */
   pillarKey: string | null
+  /** Korte uitleg in title-tooltip (hover desktop, long-press mobile). */
+  tooltip: string
 }> = [
-  { key: 'bezittingen', label: 'Bezittingen', href: '/overzicht/bezittingen', Icon: Wallet,     accent: 'text-emerald-700 bg-emerald-50', pillarKey: 'diversification' },
-  { key: 'schulden',    label: 'Schulden',    href: '/overzicht/schulden',    Icon: CreditCard, accent: 'text-amber-700 bg-amber-50',     pillarKey: 'debt_ratio' },
-  { key: 'cashflow',    label: 'Cashflow',    href: '/overzicht/cashflow',    Icon: Banknote,   accent: 'text-sky-700 bg-sky-50',         pillarKey: 'savings_rate' },
-  { key: 'belasting',   label: 'Belasting',   href: '/overzicht/belasting',   Icon: Receipt,    accent: 'text-violet-700 bg-violet-50',   pillarKey: null },
+  { key: 'bezittingen', label: 'Bezittingen', href: '/overzicht/bezittingen', Icon: Wallet,     accent: 'text-emerald-700 bg-emerald-50', pillarKey: 'diversification', tooltip: 'Cash, beleggingen, eigen huis en pensioen — wat groeit voor je.' },
+  { key: 'schulden',    label: 'Schulden',    href: '/overzicht/schulden',    Icon: CreditCard, accent: 'text-amber-700 bg-amber-50',     pillarKey: 'debt_ratio',      tooltip: 'Hypotheek, leningen, studieschuld — wat je terugbetaalt.' },
+  { key: 'cashflow',    label: 'Cashflow',    href: '/overzicht/cashflow',    Icon: Banknote,   accent: 'text-sky-700 bg-sky-50',         pillarKey: 'savings_rate',    tooltip: 'In en uit per maand — het deel dat je opzij zet bepaalt je tempo.' },
+  { key: 'belasting',   label: 'Belasting',   href: '/overzicht/belasting',   Icon: Receipt,    accent: 'text-violet-700 bg-violet-50',   pillarKey: null,              tooltip: 'Box 1, Box 2 en Box 3 — slim verdelen scheelt geld per jaar.' },
 ] as const
 
 /**
@@ -130,7 +132,7 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
 
       {/* Vier-hefbomen-rij — klikbare tegels naar verdiepingen met status-dot */}
       <nav aria-label="Vier hefbomen" className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-6">
-        {HEFBOMEN.map(({ key, label, href, Icon, accent, pillarKey }) => {
+        {HEFBOMEN.map(({ key, label, href, Icon, accent, pillarKey, tooltip }) => {
           // Zoek pillar-score uit health voor deze hefboom. Belasting heeft
           // (nog) geen eigen pillar → gebruik overall health.score als proxy
           // zodat de tegel niet altijd "neutraal" toont voor users met data.
@@ -144,6 +146,7 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
             <Link
               key={key}
               href={href}
+              title={tooltip}
               className="group relative flex flex-col rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
             >
               {/* Status-dot rechtsboven */}
