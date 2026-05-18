@@ -1,3 +1,30 @@
+## Session 2026-05-18 - Features #778, #781
+
+### Feature #778: Gezondheidsscore trend-indicator - PASSING
+- Added HealthTrendIndicator component to core-hero.tsx
+- Shows ↑/↓/→ arrow + delta below the health label in the gauge area
+- Green (text-positive) for improvement, red (text-negative) for decline, neutral (ink-3) for same
+- Only rendered when previousMonth data is available (guarded by null check)
+- Updated core-landing.tsx to compute previous month score from net_worth_snapshots
+- Uses same estimation approach as computeHealthScore in dashboard path
+- Verified: trend shows "↑ +25" with green color on test account
+- Zero console errors
+- Commit: feebb9cb
+
+### Feature #781: Briefing rendert op /will in plaats van alleen dashboard - PASSING
+- Already fully implemented: DAIshboard component renders on /will as main briefing
+- /dashboard redirects to /will via server-side redirect
+- Same engine (DAIshboard), same data (DashboardData + TemporalContext)
+- No duplicate API calls (single page renders)
+- No code changes needed (verification only)
+
+### Files Modified
+- components/core/core-hero.tsx — HealthTrendIndicator component, trend indicator rendering
+- components/core/core-landing.tsx — previous month score computation from snapshots
+
+### Current Status
+- 2 features completed this session (#778, #781)
+
 ## Session 2026-05-18 - Features #840, #841
 
 ### Feature #840: Scenario preset Kind krijgen met realistische defaults - PASSING
