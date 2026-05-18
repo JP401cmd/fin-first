@@ -133,6 +133,7 @@ import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
+import { DoorrekeningInlineSection } from '@/components/app/horizon/doorrekening-inline-section'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import {
@@ -143,6 +144,7 @@ import {
 import { HorizonFireIntroCard } from '@/components/app/horizon/horizon-fire-intro-card'
 import { HorizonSetupPane } from '@/components/app/horizon/horizon-setup-pane'
 import { HorizonFireParamsPanel } from '@/components/app/horizon/horizon-fire-params-panel'
+import { WidgetEmpty } from '@/components/widgets/widget-empty'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
 
@@ -224,6 +226,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [actions, setActions] = useState<Action[]>(initialData.actions)
   const [debts, setDebts] = useState<Debt[]>(initialData.debts)
   const [monthlyDividendIncome, setMonthlyDividendIncome] = useState(0)
+  // Doorrekening-inline needs raw profile data + extrapolated income
+  const [profileRaw, setProfileRaw] = useState<Record<string, unknown> | null>(null)
+  const [estimatedYearlyIncome, setEstimatedYearlyIncome] = useState(0)
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(initialData?.fireStrategy ?? undefined)
   const [userAowAge, setUserAowAge] = useState<AowAge>({ years: 67, months: 0, fractional: 67, isDefinitive: false })
   const [loading, setLoading] = useState(true)
@@ -559,6 +564,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
       setRetirementMethod((profileResult.data?.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod)
 
+      // Store raw profile + extrapolated income for doorrekening-inline
+      setProfileRaw((profileResult.data as Record<string, unknown>) ?? null)
+      setEstimatedYearlyIncome(extrapolatedIncome)
+
       const dob = profileResult.data?.date_of_birth ?? null
 
       // FIRE strategy from profile — use API for pensioen fallback
@@ -851,6 +860,28 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   }, [mcExpanded, simResult, input])
 
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
+
+  // ── Gewogen asset-return voor doorrekening-inline (feature #796) ────────
+  // Weighted gross return from per-asset expected_return, falls back to
+  // fireParams.grossReturn when no assets or zero total value.
+  const weightedGrossReturn = useMemo(() => {
+    const allAssets = initialData.assets ?? []
+    const assetTotal = allAssets.reduce((s, a) => s + Number(a.current_value ?? 0), 0)
+    if (allAssets.length === 0 || assetTotal === 0) return fireParams.grossReturn
+    let weightedSum = 0
+    for (const a of allAssets) {
+      weightedSum += Number(a.current_value ?? 0) * (Number(a.expected_return ?? 0) / 100)
+    }
+    return weightedSum / assetTotal
+  }, [initialData.assets, fireParams.grossReturn])
+
+  // Savings rate 6m derived from transaction averages (same formula as server)
+  const savingsRate6m = useMemo(() => {
+    if (avgIncome6m != null && avgIncome6m > 0 && avgExpenses6m != null) {
+      return Math.round(((avgIncome6m - avgExpenses6m) / avgIncome6m) * 100)
+    }
+    return 0
+  }, [avgIncome6m, avgExpenses6m])
 
   // ── Natuurlijke mijlpalen ───────────────────────────────────────────────
   // Afgeleide events op de tijdlijn — hypotheek afgelost, autolening
@@ -2574,24 +2605,24 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           {!hasCompletedHorizonSetup ? (
             <HorizonFireIntroCard kernEmpty={kernEmpty} />
           ) : !simResult && !loading ? (
-            <div className="flex flex-col items-center justify-center rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] px-6 py-16 text-center" style={{ minHeight: 320 }}>
-              <AlertTriangle className="mb-3 h-8 w-8 text-[var(--ink-4)]" />
-              <p className="font-sans text-sm font-medium text-[var(--ink-2)]">
-                Grafiek kan niet worden geladen
-              </p>
-              <p className="mt-1.5 max-w-xs font-sans text-xs text-[var(--ink-3)]">
-                {simError
-                  ? 'Er is een fout opgetreden bij het berekenen van je FIRE-projectie. Controleer je profielgegevens of probeer opnieuw.'
-                  : 'Profieldata ontbreekt of is onvolledig. Vul je profiel aan om je FIRE-projectie te zien.'}
-              </p>
-              <button
-                type="button"
-                onClick={() => loadData()}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-[var(--r-sm)] border border-horizon-200 bg-horizon-50 px-3 py-1.5 font-sans text-xs font-medium text-horizon-600 transition-colors hover:bg-horizon-100"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Opnieuw laden
-              </button>
+            <div className="py-8" style={{ minHeight: 320 }}>
+              {simError ? (
+                <WidgetEmpty
+                  variant="first-use"
+                  icon={AlertTriangle}
+                  title="Projectie"
+                  description="Er is een fout opgetreden bij het berekenen van je FIRE-projectie. Controleer je gegevens of probeer opnieuw."
+                  action={{ label: 'Opnieuw berekenen', onClick: () => loadData() }}
+                />
+              ) : (
+                <WidgetEmpty
+                  variant="first-use"
+                  icon={TrendingUp}
+                  title="Projectie"
+                  description="Voeg vermogen toe in De Kern zodat de Horizon een toekomstprojectie kan berekenen."
+                  action={{ label: 'Vermogen toevoegen in De Kern', href: '/core' }}
+                />
+              )}
             </div>
           ) : simResult ? (
             <>
@@ -3899,7 +3930,31 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         </section>
       )}
 
-
+      {/* === 10. Doorrekening Inline (feature #796) === */}
+      {simResult && fireStrategy && (
+        <DoorrekeningInlineSection
+          assets={initialData.assets}
+          debts={debts}
+          lifeEvents={events}
+          fireParams={fireParams}
+          fireStrategy={{
+            strategy: fireStrategy.strategy,
+            endAge: fireStrategy.endAge,
+            legacyAmount: fireStrategy.legacyAmount ?? 0,
+          }}
+          netWorth={(effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)}
+          totalAssets={effectiveInput?.totalAssets ?? 0}
+          totalDebts={effectiveInput?.totalDebts ?? 0}
+          yearlyMustExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
+          cashflows={simCashflows ?? []}
+          userAowAge={userAowAge.fractional}
+          weightedGrossReturn={weightedGrossReturn}
+          currentAge={currentAge}
+          savingsRate6m={savingsRate6m}
+          estimatedYearlyIncome={estimatedYearlyIncome}
+          profile={profileRaw}
+        />
+      )}
 
       {/* === Event Form Modal === */}
       {showForm && (() => {
