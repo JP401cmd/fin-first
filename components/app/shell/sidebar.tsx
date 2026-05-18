@@ -146,26 +146,21 @@ const MODULES: ModuleEntry[] = [
       { label: 'Verhuurrendement',  href: '/core/assets/real_estate?tab=verhuurrendement',   appKey: 'verhuurrendement' },
     ],
   },
-  {
-    key: 'wil',
-    prefix: 'De ',
-    italicEm: 'Wil',
-    label: 'De Wil',
-    href: '/will',
-    Icon: Zap,
-    subTags: [],
-  },
+  // 'wil'-entry is verwijderd: Will-coach is een persona overal, geen
+  // route. WillLanding-content (briefing + acties + widget-dashboard)
+  // leeft nu op /overzicht (= 'kern' entry hierboven). Floating
+  // nav-button toont "Vraag Will" als globaal item in NavMenuSheet.
   {
     key: 'horizon',
     prefix: 'De ',
-    italicEm: 'Horizon',
-    label: 'De Horizon',
-    href: '/horizon',
+    italicEm: 'Toekomst',
+    label: 'De Toekomst',
+    href: '/toekomst',
     Icon: Compass,
     subTags: [
-      { label: 'Uitgave na pensioen', href: '/horizon?uitgaven=open' },
-      { label: 'Wat-Als', href: '/horizon/whatif' },
-      { label: 'Strategieën', href: '/horizon?strategie=open' },
+      { label: 'Uitgave na pensioen', href: '/toekomst?uitgaven=open' },
+      { label: 'Wat-Als', href: '/toekomst/whatif' },
+      { label: 'Strategieën', href: '/toekomst?strategie=open' },
     ],
   },
 ]
@@ -188,7 +183,7 @@ type FooterLink = {
 }
 
 const FOOTER_LINKS: FooterLink[] = [
-  { label: 'Identiteit', href: '/identity' },
+  { label: 'Mijn', href: '/mijn' },
   { label: 'Instellingen', href: '/identity/instellingen' },
   { label: 'Uitloggen', href: '/logout' },
 ]
@@ -225,12 +220,18 @@ function moduleVars(module: NavModule): React.CSSProperties {
 
 /**
  * Bepaal welke module actief is op basis van pathname. Match op startsWith
- * — sub-routes zoals `/core/assets/holdings` blijven onder Kern actief.
+ * — sub-routes zoals `/overzicht/bezittingen` blijven onder Overzicht actief.
+ *
+ * Match op zowel nieuwe canonieke routes (/overzicht /toekomst /mijn) als
+ * oude paden (/core /horizon /identity /will) zodat de sidebar de juiste
+ * module markeert ook tijdens redirect-cyclus.
  */
 function detectActiveModule(pathname: string): NavModule | null {
-  if (pathname.startsWith('/core')) return 'kern'
-  if (pathname.startsWith('/will')) return 'wil'
-  if (pathname.startsWith('/horizon')) return 'horizon'
+  if (pathname.startsWith('/overzicht') || pathname.startsWith('/core')) return 'kern'
+  if (pathname.startsWith('/toekomst') || pathname.startsWith('/horizon')) return 'horizon'
+  // /will redirecteert naar /overzicht — als gebruiker pre-redirect /will ziet
+  // markeren we ook 'kern' (= de tab waar WillLanding nu leeft)
+  if (pathname.startsWith('/will')) return 'kern'
   return null
 }
 

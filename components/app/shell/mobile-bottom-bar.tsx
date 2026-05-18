@@ -275,19 +275,12 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
     'border-t-2 border-[var(--ink)] bg-[var(--paper)]/90 backdrop-blur-md'
 
   if (kind === 'tabs') {
-    // Secundaire app-strip (icon-only) verschijnt BOVEN de bottom-nav voor
-    // modules met actieve category-apps (vandaag: alleen Kern). De strip
-    // beslist zelf of hij rendert (pathname-detectie + lege-state filter) —
-    // op /will, /horizon en op brand-new accounts rendert hij `null` zonder
-    // dat we hier hoeven te gaten.
-    return (
-      <>
-        <MobileAppStrip />
-        <nav className={wrapperClasses} data-mobile-bottom-nav="true">
-          <BottomNavTabs />
-        </nav>
-      </>
-    )
+    // Bottom-tab-bar is afgeschaft: mobile-nav loopt nu via de FloatingNavButton
+    // (zie components/app/shell/floating-nav-button.tsx). Wanneer een route
+    // historisch `kind: 'tabs'` aanvraagt op MobileBottomBar/NavStackMeta,
+    // rendert deze tak `null` — geen tab-rij, geen apps-strip-boven. De
+    // floating pill verschijnt onafhankelijk via responsive-shell.
+    return null
   }
 
   if (kind === 'app-tabs' && effectiveConfig?.kind === 'app-tabs') {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, LayoutGrid } from 'lucide-react'
+import { Search, LayoutGrid, X } from 'lucide-react'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
 import { NavMenuSheet } from './nav-menu-sheet'
 
@@ -11,15 +11,17 @@ import { NavMenuSheet } from './nav-menu-sheet'
  * Een floating pill onderaan het scherm met twee acties:
  *  - 🔍 Zoeken (vergrootglas) → opent command-palette voor fuzzy-zoek
  *    door pagina's, doelen, transacties en acties
- *  - ⊞ Waffle/grid → opent NavMenuSheet met de complete nav-structuur
+ *  - ⊞ Waffle/grid (toggle) → opent NavMenuSheet met de complete nav-
+ *    structuur. Wanneer menu open is, verandert het waffle-icoon in een
+ *    kruisje (✕) en sluit een klik het menu — geen dubbele dismiss-area.
  *
- * Vervangt op termijn de drie-tab BottomNav. Eén centrale knop = één
- * mentale instap. Sub-routes en globale items leven in het sheet-menu,
- * net als in Vercel's mobile dashboard.
+ * Vervangt de drie-tab BottomNav. Eén centrale knop = één mentale instap.
+ * Sub-routes en globale items leven in het sheet-menu (Vercel-stijl).
  *
- * Visueel: ~33% schermbreed, midden-gecentreerd, 16px boven safe-area.
- * Altijd zichtbaar — gebruiker kan vanaf elke pagina menu/zoek bereiken
- * zonder eerst naar een ankerpagina te navigeren.
+ * Visueel: ~33% schermbreed, midden-gecentreerd, 12px boven safe-area.
+ * Altijd zichtbaar — óók wanneer het sheet open is, zodat de toggle-knop
+ * blijft staan en het menu eenvoudig dicht kan. z-index boven de sheet's
+ * portal-content om dat te garanderen.
  */
 export function FloatingNavButton() {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -34,7 +36,10 @@ export function FloatingNavButton() {
   return (
     <>
       <div
-        className="fixed left-1/2 -translate-x-1/2 z-40 md:hidden"
+        // z-[60] zit BOVEN de BottomSheet-portal (z-50), zodat de floating
+        // button zichtbaar blijft wanneer het menu open is en de gebruiker
+        // het kruisje kan tappen om weer te sluiten.
+        className="fixed left-1/2 -translate-x-1/2 z-[60] md:hidden"
         style={{
           bottom: `calc(var(--safe-area-bottom, 0px) + 12px)`,
         }}
@@ -52,12 +57,16 @@ export function FloatingNavButton() {
           <div className="w-px self-stretch bg-white/15" aria-hidden="true" />
           <button
             type="button"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Menu openen"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
             aria-expanded={menuOpen}
             className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors"
           >
-            <LayoutGrid size={18} strokeWidth={2.25} />
+            {menuOpen ? (
+              <X size={18} strokeWidth={2.5} />
+            ) : (
+              <LayoutGrid size={18} strokeWidth={2.25} />
+            )}
           </button>
         </div>
       </div>

@@ -58,7 +58,6 @@ import { createPortal } from 'react-dom'
 import { AppHeader } from '@/components/app/app-header'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
 import { ChatLayoutWrapper } from '@/components/app/chat/chat-layout-wrapper'
-import { BottomNav } from '@/components/app/bottom-nav'
 import { FloatingNavButton } from '@/components/app/shell/floating-nav-button'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { Sidebar } from '@/components/app/shell/sidebar'
@@ -228,7 +227,6 @@ function LegacyShell({
           <main id="main-content" tabIndex={-1} className="pb-20 md:pb-0 outline-none">{children}</main>
         </DailyExpenseProvider>
       </ChatLayoutWrapper>
-      <BottomNav />
       <FloatingNavButton />
     </>
   )
