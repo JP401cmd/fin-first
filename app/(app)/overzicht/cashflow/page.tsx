@@ -7,6 +7,10 @@ import { getAppSetupStatus } from '@/lib/app-setup-status'
 import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
 import { CashflowViewSwitcher } from '@/components/overview/cashflow-view-switcher'
 import { TransactiesFeed, type TransactionRow } from '@/components/app/transacties-feed'
+import {
+  VasteLastenList,
+  type VasteLastenRow,
+} from '@/components/overview/vaste-lasten-list'
 
 export const metadata: Metadata = {
   title: 'Cashflow — TriFinity',
@@ -41,23 +45,32 @@ export default async function OverzichtCashflowPage() {
 
   const data = await loadBudgetsData(supabase)
 
-  // Laad ~3 maanden recente transacties voor de Transacties-view.
+  // Laad recente transacties + vaste lasten parallel voor de twee
+  // niet-budget views. Beide queries draaien naast loadBudgetsData.
   const {
     data: { user },
   } = await supabase.auth.getUser()
   let transactions: TransactionRow[] = []
   let monthLabel: string | undefined
+  let vasteLasten: VasteLastenRow[] = []
   if (user) {
     const since = new Date()
     since.setMonth(since.getMonth() - 3)
-    const { data: txs } = await supabase
-      .from('transactions')
-      .select('id, date, description, category, amount, accounts(name)')
-      .eq('user_id', user.id)
-      .gte('date', since.toISOString().split('T')[0])
-      .order('date', { ascending: false })
-      .limit(500)
-    transactions = (txs ?? []).map((t) => {
+    const [txResult, recurringResult] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('id, date, description, category, amount, accounts(name)')
+        .eq('user_id', user.id)
+        .gte('date', since.toISOString().split('T')[0])
+        .order('date', { ascending: false })
+        .limit(500),
+      supabase
+        .from('recurring_transactions')
+        .select('id, name, amount, frequency, category')
+        .eq('user_id', user.id)
+        .eq('is_active', true),
+    ])
+    transactions = (txResult.data ?? []).map((t) => {
       const accountField = (t as { accounts?: { name?: string } | { name?: string }[] | null }).accounts
       const accountName = Array.isArray(accountField)
         ? accountField[0]?.name
@@ -71,6 +84,13 @@ export default async function OverzichtCashflowPage() {
         account_name: accountName ?? null,
       }
     })
+    vasteLasten = (recurringResult.data ?? []).map((r) => ({
+      id: String(r.id),
+      name: String(r.name ?? ''),
+      amount: Math.abs(Number(r.amount)),
+      frequency: (r as { frequency?: string }).frequency as VasteLastenRow['frequency'],
+      category: (r as { category?: string | null }).category ?? null,
+    }))
     monthLabel = new Intl.DateTimeFormat('nl-NL', {
       month: 'long',
       year: 'numeric',
@@ -85,14 +105,7 @@ export default async function OverzichtCashflowPage() {
         transactiesView={
           <TransactiesFeed transactions={transactions} monthLabel={monthLabel} />
         }
-        vasteLastenView={
-          <section className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 text-center">
-            <p className="text-sm text-[var(--ink-2)]">
-              Vaste lasten-analyse komt binnenkort hier — voor nu zie je je
-              vaste kosten in Will.
-            </p>
-          </section>
-        }
+        vasteLastenView={<VasteLastenList items={vasteLasten} />}
       />
     </>
   )
