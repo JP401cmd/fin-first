@@ -130,8 +130,9 @@ function RadarChart({ pillars, sz }: { pillars: HealthPillar[]; sz: number }) {
   })
   const dataPath = dataPoints.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join(' ') + ' Z'
 
-  // Short labels
-  const shortLabels = ['Spaar', 'Schuld', 'Nood', 'FIRE', 'Divers.', 'Budget']
+  // Short labels — 7 pillars (incl. tax_optimization), volgorde matcht
+  // health.pillars uit financial-health.ts.
+  const shortLabels = ['Spaar', 'Schuld', 'Nood', 'Vrij', 'Divers.', 'Budget', 'Bel.']
 
   return (
     <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`}>

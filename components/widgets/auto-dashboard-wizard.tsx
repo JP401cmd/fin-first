@@ -30,7 +30,7 @@ interface AutoDashboardWizardProps {
 const FOCUS_OPTIONS: { value: FocusChoice; label: string; description: string; dotColor: string }[] = [
   { value: 'budget_cashflow',    label: 'Budgetten & cashflow',   description: 'Grip op uitgaven & budgetten',     dotColor: 'bg-kern-400' },
   { value: 'assets_investments', label: 'Vermogen & beleggen',    description: 'Vermogensgroei & beleggingen',     dotColor: 'bg-kern-400' },
-  { value: 'fire_freedom',      label: 'FIRE & vrijheid',        description: 'Financiële onafhankelijkheid',     dotColor: 'bg-horizon-400' },
+  { value: 'fire_freedom',      label: 'Financiële vrijheid',    description: 'Vrijheidsdatum en projectie',      dotColor: 'bg-horizon-400' },
   { value: 'goals_actions',     label: 'Doelen & acties',        description: 'Doelen & acties bijhouden',        dotColor: 'bg-wil-400' },
   { value: 'overview',          label: 'Totaaloverzicht',        description: 'Breed overzicht van alles',        dotColor: 'bg-[var(--ink-4)]' },
 ]
