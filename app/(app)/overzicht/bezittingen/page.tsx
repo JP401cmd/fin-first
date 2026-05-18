@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { loadAssetsData } from '@/lib/assets-data-loader'
 import AssetsPage from '@/components/core/assets-client'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { BezittingenSegmented } from '@/components/overview/bezittingen-segmented'
 
 export const metadata: Metadata = {
   title: 'Bezittingen — TriFinity',
@@ -12,9 +13,9 @@ export const metadata: Metadata = {
 /**
  * /overzicht/bezittingen — eerste hefboom-verdieping in nieuwe architectuur.
  *
- * Vervangt /core/assets. Voor nu rendert AssetsPage met dezelfde data zodat
- * de UI direct werkt onder de nieuwe URL. Toekomstige verbeteringen:
- *  - segmented-control [Alles | Cash | Beleggen | Huis | Pensioen]
+ * Toont "Alles"-view via AssetsPage. Voor specifieke categorieën navigeert
+ * de segmented-control naar /overzicht/bezittingen/[type] (re-exports van
+ * /core/assets/[type]). Toekomstige verbeteringen:
  *  - progressive-disclosure uitbreidingen via "⋯ Meer" (Crypto, NFT, ...)
  *  - Holdings, revalue, etc. worden interne tabs i.p.v. aparte sub-routes
  */
@@ -26,6 +27,9 @@ export default async function OverzichtBezittingenPage() {
     return (
       <>
         <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
+        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+          <BezittingenSegmented />
+        </div>
         <AssetsPage initialData={assetsData} />
       </>
     )
@@ -33,6 +37,9 @@ export default async function OverzichtBezittingenPage() {
     return (
       <>
         <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
+        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+          <BezittingenSegmented />
+        </div>
         <AssetsPage />
       </>
     )
