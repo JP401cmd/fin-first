@@ -1,3 +1,32 @@
+## Session 2026-05-18 - Features #851, #855
+
+### Feature #851: Kompas responsive — collapsed mini-view op mobile - PASSING
+- LeverCompassMobile component already existed (added by another agent)
+- Wired LeverCompassMobile into AppHeader (legacy shell) for mobile (<768px)
+- Desktop shows LeverCompassDots with hover tooltips (md:flex, hidden on mobile)
+- Also integrated into TopBar utilities (new shell) for mobile compass support
+- Verified: compact dots visible in header on mobile, tap opens expanded panel
+- Expanded panel shows all 4 levers with icon, label, status, detail, and progress bars
+- Clicking lever links navigates to correct pages (/core/assets, /core/debts, etc.)
+- Panel closes on re-tap, outside click, and Escape key
+- Desktop shows standard dots (no expandable panel)
+- Zero new console errors
+- Commit: 16f47e43
+
+### Feature #855: Wat zie ik hier knop positie consistent rechtsboven hero - PASSING
+- Verified info button position across /core, /will, /horizon on mobile (375×812)
+- All 3 pages: button at right edge of hero, vertically aligned with kicker text
+- CSS varies by DOM structure (right-4 top-5 vs right-4 top-0) but visual position is identical
+- Button reachable without scrolling on all pages (above fold)
+- No overlap with other interactive elements
+- Popover opens cleanly on all pages with correct page-specific content
+- Also verified on desktop (1280×800) — same consistent position
+- No code changes needed — existing implementation already consistent
+
+### Current Status
+- 2 features completed this session (#851, #855)
+- Overall progress: ~850/861 passing (98.7%)
+
 ## Session 2026-05-18 - Features #854, #863
 
 ### Feature #854: Wat zie ik hier content geschreven voor 15 hoofdpaginas - PASSING
