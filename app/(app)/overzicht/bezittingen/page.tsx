@@ -19,29 +19,25 @@ export const metadata: Metadata = {
  *  - progressive-disclosure uitbreidingen via "⋯ Meer" (Crypto, NFT, ...)
  *  - Holdings, revalue, etc. worden interne tabs i.p.v. aparte sub-routes
  */
+async function tryLoadAssetsData(supabase: Awaited<ReturnType<typeof createClient>>) {
+  try {
+    return await loadAssetsData(supabase)
+  } catch {
+    return undefined
+  }
+}
+
 export default async function OverzichtBezittingenPage() {
   const supabase = await createClient()
+  const assetsData = await tryLoadAssetsData(supabase)
 
-  try {
-    const assetsData = await loadAssetsData(supabase)
-    return (
-      <>
-        <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
-        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-          <BezittingenSegmented />
-        </div>
-        <AssetsPage initialData={assetsData} />
-      </>
-    )
-  } catch {
-    return (
-      <>
-        <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
-        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-          <BezittingenSegmented />
-        </div>
-        <AssetsPage />
-      </>
-    )
-  }
+  return (
+    <>
+      <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
+      <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <BezittingenSegmented />
+      </div>
+      {assetsData ? <AssetsPage initialData={assetsData} /> : <AssetsPage />}
+    </>
+  )
 }

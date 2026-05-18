@@ -84,7 +84,6 @@ export function OverzichtHero({
     goalProgresses &&
     goalProgresses.length > goals.length
   ) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[OverzichtHero] goalProgresses.length (${goalProgresses.length}) > ` +
         `goals.length (${goals.length}). Extra progresses worden genegeerd.`,
