@@ -62,7 +62,10 @@ interface BriefingHistoryItem {
 function briefingToItem(b: StoredBriefing): BriefingHistoryItem {
   let preview = ''
   for (const card of b.cards) {
-    const c = card as Record<string, unknown>
+    // Cast via `unknown` om compiler-warning te vermijden — BriefingCardSpec
+    // is een discriminated union zonder index-signature; runtime-shape
+    // ondersteunt wel string-key access voor de checks hieronder.
+    const c = card as unknown as Record<string, unknown>
     if (c.type === 'insight' && typeof c.text === 'string') {
       preview = (c.text as string).slice(0, 100)
       break
