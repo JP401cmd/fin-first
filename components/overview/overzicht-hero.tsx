@@ -132,12 +132,14 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
       <nav aria-label="Vier hefbomen" className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-6">
         {HEFBOMEN.map(({ key, label, href, Icon, accent, pillarKey }) => {
           // Zoek pillar-score uit health voor deze hefboom. Belasting heeft
-          // (nog) geen pillar → neutraal. Andere hefbomen gebruiken de
-          // mapping in HEFBOMEN-config hierboven.
+          // (nog) geen eigen pillar → gebruik overall health.score als proxy
+          // zodat de tegel niet altijd "neutraal" toont voor users met data.
+          // Andere hefbomen gebruiken hun eigen pillar uit HEFBOMEN-config.
           const pillar = pillarKey && health
             ? health.pillars.find((p) => p.id === pillarKey)
             : undefined
-          const status = pillarStatus(pillar?.score ?? null)
+          const proxyScore = !pillarKey && health ? health.total : null
+          const status = pillarStatus(pillar?.score ?? proxyScore)
           return (
             <Link
               key={key}
