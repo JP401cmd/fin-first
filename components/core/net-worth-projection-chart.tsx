@@ -14,7 +14,7 @@
 // Rekent met real return (rendement − inflatie) zodat de projectie
 // in koopkracht-termen is.
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -72,6 +72,37 @@ const COMPACT_EUR = new Intl.NumberFormat('nl-NL', {
   notation: 'compact',
   maximumFractionDigits: 1,
 })
+
+/** Milestone thresholds in EUR — only show those crossed within the projection. */
+const MILESTONE_THRESHOLDS = [10_000, 50_000, 100_000, 250_000, 500_000, 1_000_000] as const
+
+/** Hover state for interactive tooltip. */
+interface HoverState {
+  /** Fractional index into the points array. */
+  idx: number
+  /** SVG x-coordinate of cursor. */
+  x: number
+  /** Interpolated nominal value at cursor. */
+  nominal: number
+  /** Interpolated real value at cursor. */
+  real: number
+  /** Interpolated age at cursor. */
+  age: number
+}
+
+/** A computed milestone crossing on the nominal line. */
+interface MilestoneMarker {
+  /** EUR threshold value. */
+  threshold: number
+  /** SVG x-coordinate. */
+  x: number
+  /** SVG y-coordinate on the nominal line. */
+  y: number
+  /** Compact label like "€100K". */
+  label: string
+  /** Age or year label like "2029" or "42j". */
+  timeLabel: string
+}
 
 // ── Projection computation ─────────────────────────────────────────
 
@@ -252,6 +283,8 @@ export function NetWorthProjectionChart({
   const { ref, hasEntered } = useInViewAnimation({ duration: 800 })
   const { masked } = useMaskedAmounts()
   const [range, setRange] = useState<TimeRange>('pensioen')
+  const [hover, setHover] = useState<HoverState | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   const longTermPoints = useMemo(
     () =>
@@ -280,6 +313,119 @@ export function NetWorthProjectionChart({
 
   const points = range === '5j' ? shortTermPoints : longTermPoints
   const isShortTerm = range === '5j'
+
+  // ── Milestone raw data ─────────────────────────────────────────────
+  // Find where the nominal line crosses each threshold within the projection range.
+  // Stores fractional index + threshold for SVG position computation after toX/toY.
+  const milestoneData = useMemo(() => {
+    if (points.length < 2) return []
+
+    const startNominal = points[0].nominal
+    const result: Array<{
+      threshold: number
+      fractionalIdx: number
+      label: string
+      timeLabel: string
+    }> = []
+
+    for (const threshold of MILESTONE_THRESHOLDS) {
+      // Skip milestones already passed at start
+      if (threshold <= startNominal) continue
+      // Skip milestones beyond the projection
+      if (threshold > points[points.length - 1].nominal) continue
+
+      // Find crossing point via linear interpolation
+      for (let i = 1; i < points.length; i++) {
+        if (points[i].nominal >= threshold && points[i - 1].nominal < threshold) {
+          const ratio =
+            (threshold - points[i - 1].nominal) /
+            (points[i].nominal - points[i - 1].nominal)
+          const fractionalIdx = i - 1 + ratio
+          const crossAge = points[i - 1].age + ratio * (points[i].age - points[i - 1].age)
+
+          result.push({
+            threshold,
+            fractionalIdx,
+            label: `€${COMPACT_EUR.format(threshold).replace(/\s/g, '')}`,
+            timeLabel: currentAge != null
+              ? `${Math.round(crossAge)}j`
+              : `+${Math.round(crossAge - points[0].age)}j`,
+          })
+          break
+        }
+      }
+    }
+
+    return result
+  }, [points, currentAge])
+
+  // ── Hover event handlers ─────────────────────────────────────────
+  // Compute hover state from a clientX position relative to the SVG.
+  const computeHoverFromClientX = useCallback(
+    (clientX: number) => {
+      const svg = svgRef.current
+      if (!svg || points.length < 2) return null
+
+      const rect = svg.getBoundingClientRect()
+      // Convert client coordinate to SVG coordinate
+      const svgX = ((clientX - rect.left) / rect.width) * SVG_W
+
+      // Clamp to chart area
+      const chartX = Math.max(PAD.left, Math.min(SVG_W - PAD.right, svgX))
+
+      // Convert to fractional index
+      const fractionalIdx = ((chartX - PAD.left) / CHART_W) * (points.length - 1)
+      const clampedIdx = Math.max(0, Math.min(points.length - 1, fractionalIdx))
+
+      // Interpolate values
+      const lowerIdx = Math.floor(clampedIdx)
+      const upperIdx = Math.min(lowerIdx + 1, points.length - 1)
+      const frac = clampedIdx - lowerIdx
+
+      const nominal =
+        points[lowerIdx].nominal + frac * (points[upperIdx].nominal - points[lowerIdx].nominal)
+      const real =
+        points[lowerIdx].real + frac * (points[upperIdx].real - points[lowerIdx].real)
+      const age =
+        points[lowerIdx].age + frac * (points[upperIdx].age - points[lowerIdx].age)
+
+      return {
+        idx: clampedIdx,
+        x: PAD.left + (clampedIdx / (points.length - 1)) * CHART_W,
+        nominal,
+        real,
+        age,
+      } satisfies HoverState
+    },
+    [points],
+  )
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<SVGRectElement>) => {
+      const state = computeHoverFromClientX(e.clientX)
+      if (state) setHover(state)
+    },
+    [computeHoverFromClientX],
+  )
+
+  const handleMouseLeave = useCallback(() => {
+    setHover(null)
+  }, [])
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent<SVGRectElement>) => {
+      if (e.touches.length > 0) {
+        const state = computeHoverFromClientX(e.touches[0].clientX)
+        if (state) setHover(state)
+      }
+    },
+    [computeHoverFromClientX],
+  )
+
+  const handleTouchEnd = useCallback(() => {
+    // Keep tooltip visible briefly on mobile, then dismiss
+    setTimeout(() => setHover(null), 1500)
+  }, [])
 
   // Don't render if we have no meaningful data
   if (points.length < 2 || (netWorth === 0 && monthlySavings <= 0)) {
@@ -328,6 +474,13 @@ export function NetWorthProjectionChart({
 
   // AOW marker position — only in long-term view, always the last point
   const aowX = toX(points.length - 1)
+
+  // ── Milestone markers with SVG coordinates ───────────────────────
+  const milestones: MilestoneMarker[] = milestoneData.map((m) => ({
+    ...m,
+    x: PAD.left + (m.fractionalIdx / (points.length - 1)) * CHART_W,
+    y: toY(m.threshold),
+  }))
 
   // Fire target line
   const fireTargetY =
@@ -431,6 +584,7 @@ export function NetWorthProjectionChart({
             overflow-x-auto + touch-action enable mobile horizontal swipe. */}
         <div ref={ref} className="mt-5 -mx-1 overflow-x-auto overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           <svg
+            ref={svgRef}
             className="w-full min-w-[420px] overflow-visible"
             viewBox={`0 0 ${SVG_W} ${SVG_H}`}
             role="img"
@@ -676,6 +830,156 @@ export function NetWorthProjectionChart({
                 {points[idx].label}
               </text>
             ))}
+
+            {/* ── Milestone markers ─────────────────────────────────── */}
+            {hasEntered && milestones.map((m, i) => {
+              // Alternate label placement above/below to avoid overlap
+              const labelAbove = i % 2 === 0
+              const labelY = labelAbove ? m.y - 10 : m.y + 14
+              return (
+                <g
+                  key={m.threshold}
+                  opacity={hasEntered ? 0.85 : 0}
+                  style={{ transition: 'opacity 400ms ease-out 800ms' }}
+                >
+                  {/* Diamond marker on the nominal line */}
+                  <circle
+                    cx={m.x}
+                    cy={m.y}
+                    r="3"
+                    fill="var(--color-kern-600)"
+                    stroke="var(--paper)"
+                    strokeWidth="1.5"
+                  />
+                  {/* Milestone label */}
+                  <text
+                    x={m.x}
+                    y={labelY}
+                    textAnchor="middle"
+                    fill="var(--ink-2)"
+                    fontSize="9"
+                    fontFamily="var(--font-mono, monospace)"
+                  >
+                    {masked ? '***' : `${m.label} — ${m.timeLabel}`}
+                  </text>
+                </g>
+              )
+            })}
+
+            {/* ── Hover crosshair + dot ─────────────────────────────── */}
+            {hover && (
+              <g>
+                {/* Vertical crosshair line */}
+                <line
+                  x1={hover.x}
+                  x2={hover.x}
+                  y1={PAD.top}
+                  y2={PAD.top + CHART_H}
+                  stroke="var(--ink-3)"
+                  strokeWidth="1"
+                  strokeDasharray="3 2"
+                  opacity={0.6}
+                />
+                {/* Dot on nominal line */}
+                <circle
+                  cx={hover.x}
+                  cy={toY(hover.nominal)}
+                  r="4.5"
+                  fill="var(--color-kern-500)"
+                  stroke="var(--paper)"
+                  strokeWidth="2"
+                />
+                {/* Dot on real line */}
+                <circle
+                  cx={hover.x}
+                  cy={toY(hover.real)}
+                  r="3"
+                  fill="var(--color-horizon-500)"
+                  stroke="var(--paper)"
+                  strokeWidth="1.5"
+                />
+              </g>
+            )}
+
+            {/* ── Hover tooltip ──────────────────────────────────────── */}
+            {hover && (() => {
+              // Position tooltip to the right of cursor, flip if near edge
+              const tooltipW = 130
+              const tooltipH = 52
+              const tooltipPad = 8
+              const flipped = hover.x + tooltipW + 12 > SVG_W - PAD.right
+              const tx = flipped ? hover.x - tooltipW - 12 : hover.x + 12
+              const ty = Math.max(
+                PAD.top,
+                Math.min(PAD.top + CHART_H - tooltipH, toY(hover.nominal) - tooltipH / 2),
+              )
+
+              const ageLabel = currentAge != null
+                ? `${Math.round(hover.age)} jaar`
+                : `+${Math.round(hover.age - points[0].age)}j`
+
+              return (
+                <g>
+                  {/* Tooltip background */}
+                  <rect
+                    x={tx}
+                    y={ty}
+                    width={tooltipW}
+                    height={tooltipH}
+                    rx="4"
+                    fill="var(--paper)"
+                    stroke="var(--border-ed)"
+                    strokeWidth="1"
+                    opacity={0.95}
+                  />
+                  {/* Age / time label */}
+                  <text
+                    x={tx + tooltipPad}
+                    y={ty + 15}
+                    fill="var(--ink-3)"
+                    fontSize="9"
+                    fontFamily="var(--font-mono, monospace)"
+                  >
+                    {ageLabel}
+                  </text>
+                  {/* Nominal value */}
+                  <text
+                    x={tx + tooltipPad}
+                    y={ty + 30}
+                    fill="var(--ink)"
+                    fontSize="11"
+                    fontWeight="600"
+                    fontFamily="var(--font-mono, monospace)"
+                  >
+                    {masked ? '€ ***' : formatMaskedCurrency(Math.round(hover.nominal), false)}
+                  </text>
+                  {/* Real value (smaller) */}
+                  <text
+                    x={tx + tooltipPad}
+                    y={ty + 44}
+                    fill="var(--color-horizon-600)"
+                    fontSize="9"
+                    fontFamily="var(--font-mono, monospace)"
+                  >
+                    {masked ? '(reëel: ***)' : `(reëel: ${formatMaskedCurrency(Math.round(hover.real), false)})`}
+                  </text>
+                </g>
+              )
+            })()}
+
+            {/* ── Interactive overlay — MUST be last (topmost) ────────── */}
+            <rect
+              x={PAD.left}
+              y={PAD.top}
+              width={CHART_W}
+              height={CHART_H}
+              fill="transparent"
+              style={{ cursor: 'crosshair' }}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            />
           </svg>
         </div>
 
