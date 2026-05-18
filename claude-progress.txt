@@ -1,3 +1,28 @@
+## Session 2026-05-18 - Features #827, #831
+
+### Feature #827: /identity/instellingen gereduceerd tot cross-cutting concerns - PASSING
+- Removed 250 lines of dead FIRE, Rebalancing, and Withdrawal strategy code
+- Removed: 26 state variables, 4 handler functions, FIRE/Rebalancing data loading, unused imports
+- Removed FIRE and Rebalancing redirect sections from Gegevens tab
+- Page reduced from 2071 → 1823 lines (originally 2459, now 27% smaller)
+- Remaining tabs: Modules, Notificaties, Weergave, Privacy, Gegevens (cross-cutting only)
+- Zero console errors, all tabs functional
+- Commit: f8a7d645
+
+### Feature #831: Onboarding toont voortgang ook bij minimale input - PASSING
+- Verified through browser automation with fresh test account
+- Progress bar correctly advances 1/6 → 2/6 → 3/6 → 4/6 → 5/6 → 6/6 with minimal input
+- Step 1: select 1 goal, Step 2: name+DOB only, Step 3: household type only (skip income)
+- Step 4: "Later invullen" skip, Step 5: skip spaardoel, Step 6: reached completion
+- Positive messaging: "Je hebt de basis gelegd", "Je bent helemaal klaar!", "100%" voortgang
+- No negative "je hebt velden overgeslagen" messaging
+- No code changes needed — already implemented correctly by dependency #828
+- Test user created, verified, and cleaned up
+
+### Current Status
+- 2 features completed this session (#827, #831)
+- Overall progress: 843/861 passing (97.9%)
+
 ## Session 2026-05-18 - Features #835, #836
 
 ### Feature #835: GlossaryTerm gezien-tracking per gebruiker - PASSING
