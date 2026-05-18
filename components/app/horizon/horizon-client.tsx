@@ -8,6 +8,7 @@ import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
 import { previewEventCashflows, lifeEventsToCashflows, type SimCashflow } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/components/app/toast-provider'
 
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -166,6 +167,7 @@ interface HouseholdHeroData {
 export default function HorizonPage({ initialData }: { initialData: HorizonPageData }) {
   const { triggerDream, phase } = useDreamTransition()
   const { masked } = useMaskedAmounts()
+  const { addToast } = useToast()
   const { perspective, partnerName } = usePerspective()
   const isHouseholdView = perspective === 'household'
   const isPartnerView = perspective === 'partner'
@@ -2272,6 +2274,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     const ev = events.find(e => e.id === eventId)
     if (!ev || ev.target_age === newAge) return
 
+    const originalAge = ev.target_age
+
     // Optimistic local update for instant feedback
     setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: newAge } : e))
 
@@ -2280,9 +2284,40 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     if (error) {
       console.error('Failed to update life event age:', error)
       // Revert optimistic update
-      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: ev.target_age } : e))
+      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: originalAge } : e))
       return
     }
+
+    // Show undo toast after successful drag
+    addToast({
+      type: 'info',
+      title: `${ev.name} verplaatst naar ${newAge}j`,
+      message: `Was ${originalAge}j`,
+      duration: 5000,
+      action: {
+        label: 'Ongedaan maken',
+        onClick: async () => {
+          // Revert to original age optimistically
+          setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: originalAge } : e))
+          const undoSupabase = createClient()
+          const { error: undoErr } = await undoSupabase
+            .from('life_events')
+            .update({ target_age: originalAge })
+            .eq('id', eventId)
+          if (undoErr) {
+            console.error('Failed to undo event drag:', undoErr)
+            // Revert back to the new age if undo failed
+            setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: newAge } : e))
+            addToast({ type: 'error', title: 'Ongedaan maken mislukt', duration: 3000 })
+            return
+          }
+          // Reload data to recalculate projections with restored position
+          await loadData()
+          addToast({ type: 'success', title: `${ev.name} terug op ${originalAge}j`, duration: 3000 })
+        },
+      },
+    })
+
     // Full reload to recalculate projections with new event position
     await loadData()
   }

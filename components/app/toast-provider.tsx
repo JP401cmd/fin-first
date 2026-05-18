@@ -6,6 +6,11 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 
 export type ToastType = 'success' | 'info' | 'warning' | 'error'
 
+export type ToastAction = {
+  label: string
+  onClick: () => void
+}
+
 export type Toast = {
   id: string
   type: ToastType
@@ -13,6 +18,8 @@ export type Toast = {
   message?: string
   icon?: string
   duration?: number
+  /** Optional action button (e.g. "Ongedaan maken") shown inline in the toast. */
+  action?: ToastAction
 }
 
 type ToastContextType = {
@@ -87,6 +94,18 @@ function ToastItem({
           <p className="mt-0.5 text-xs leading-snug opacity-80">{toast.message}</p>
         )}
       </div>
+      {toast.action && (
+        <button
+          onClick={() => {
+            toast.action!.onClick()
+            onRemove()
+          }}
+          className="flex-shrink-0 ml-1 rounded-[var(--r-sm)] px-2.5 py-1 text-xs font-bold underline underline-offset-2 hover:opacity-80 transition-opacity"
+          data-testid="toast-action"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         onClick={onRemove}
         className="flex-shrink-0 ml-2 text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
