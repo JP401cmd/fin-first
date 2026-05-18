@@ -183,7 +183,27 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
         )}
       </div>
 
-      {/* Vrijheid-strip: % op weg naar financiële vrijheid → klik naar Toekomst */}
+      {/* Vrijheid-strip: % op weg naar financiële vrijheid → klik naar Toekomst.
+          Bij ontbrekende freedomPct (geen DOB / geen FIRE-target / geen netto-
+          inkomen): toon dashed CTA naar /mijn/profiel om profile te completeren. */}
+      {freedomPct == null && (
+        <Link
+          href="/mijn/profiel"
+          className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-3 sm:p-4 hover:border-violet-300 hover:shadow-sm transition-all group"
+        >
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+              Op weg naar vrijheid
+            </div>
+            <div className="mt-0.5 text-sm sm:text-base text-[var(--ink-2)]">
+              Vul je geboortedatum, inkomen en gewenste vrijheidsbestedingen in om je vrijheidsmoment te zien.
+            </div>
+          </div>
+          <span className="shrink-0 text-xs font-semibold text-violet-700 group-hover:underline">
+            Vul profiel aan →
+          </span>
+        </Link>
+      )}
       {freedomPct != null && (
         <Link
           href="/toekomst"
