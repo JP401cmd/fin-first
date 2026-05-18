@@ -49,7 +49,7 @@ import {
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw, GitBranch,
-  ChevronDown, ChevronUp, Heart, Compass, FileText,
+  ChevronDown, ChevronUp, Heart, Compass, FileText, SlidersHorizontal,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { HousingStrategyNudgeSheet } from '@/components/app/horizon/housing-strategy-nudge-sheet'
@@ -132,6 +132,8 @@ import { runUnifiedProjection, toSimResult, runSimulationUnified as runSimAowSto
 import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
+import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { DoorrekeningInlineSection } from '@/components/app/horizon/doorrekening-inline-section'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
@@ -292,9 +294,25 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [showSwrReceipt, setShowSwrReceipt] = useState(false)
   // Mobile KPI's tonen nu volledig 2x2 — `horizonHeroExpanded` toggle is verwijderd.
 
-  // Saved scenario overlay state
+  // ── Inline what-if sliders state (feature #795) ──────────────
+  const [whatIfInlineOpen, setWhatIfInlineOpen] = useState(false)
+
+  // Saved scenario overlay state (multi-select)
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([])
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null)
+  const [selectedScenarioIds, setSelectedScenarioIds] = useState<Set<string>>(new Set())
+
+  const toggleScenarioId = useCallback((id: string) => {
+    setSelectedScenarioIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const clearAllScenarioIds = useCallback(() => {
+    setSelectedScenarioIds(new Set())
+  }, [])
 
   // ── Horizon FIRE-prognose setup-pane state ──────────────────────
   // hasCompletedHorizonSetup: true zodra de gebruiker de setup-pane
@@ -366,11 +384,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       shouldReplace = true
     }
 
-    // Feature #800: ?whatif=open — redirect van /horizon/whatif opent dream gate.
+    // Feature #795+#800: ?whatif=open — opens inline what-if sliders (was: dream gate).
     const whatifParam = searchParams.get('whatif')
     if (whatifParam === 'open') {
-      // Vertraag de dream-gate-trigger zodat de pagina eerst rendert
-      setTimeout(() => triggerDream('/horizon/whatif'), 300)
+      setWhatIfInlineOpen(true)
       shouldReplace = true
     }
 
@@ -885,6 +902,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
 
+  // ── Baseline overrides for inline what-if sliders (feature #795) ───────
+  const whatIfBaseline = useMemo<WhatIfOverrides | null>(() => {
+    if (!effectiveInput) return null
+    return buildBaselineOverrides(effectiveInput, fireParams.grossReturn)
+  }, [effectiveInput, fireParams.grossReturn])
+
+  // Typed event setter that accepts WhatIfEvent updaters (structural superset of LifeEvent)
+  const setEventsForSliders = useCallback(
+    (updater: (prev: WhatIfEvent[]) => WhatIfEvent[]) => {
+      setEvents(prev => updater(prev as WhatIfEvent[]) as LifeEvent[])
+    },
+    [setEvents],
+  )
+
   // ── Gewogen asset-return voor doorrekening-inline (feature #796) ────────
   // Weighted gross return from per-asset expected_return, falls back to
   // fireParams.grossReturn when no assets or zero total value.
@@ -1323,77 +1354,89 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     return buildBreakdown(unifiedRows, simResult.rows, debts)
   }, [ieViewMode, unifiedRows, simResult, debts])
 
-  // Saved scenario ghost overlay — re-runs simulation with selected scenario's overrides
-  // applied to the current financial data, then renders as a ghost line over the main chart.
-  const scenarioOverlayData = useMemo(() => {
-    if (!selectedScenarioId) return null
-    const scenario = savedScenarios.find(s => s.id === selectedScenarioId)
-    if (!scenario) return null
+  // Saved scenario ghost overlays — re-runs simulation for each selected scenario's overrides
+  // applied to the current financial data, then renders as ghost lines over the main chart.
+  const scenarioOverlayDataList = useMemo(() => {
+    if (selectedScenarioIds.size === 0) return []
 
     const { effectiveInput: initialEffectiveInput, fireParams: initialFireParams, fireStrategy: initialFireStrategy } = initialData
     const currentAgeVal = initialEffectiveInput.dateOfBirth ? ageAtDate(initialEffectiveInput.dateOfBirth) : null
-    if (currentAgeVal === null) return null
+    if (currentAgeVal === null) return []
 
-    const baselineOvr = buildBaselineOverrides(initialEffectiveInput, initialFireParams.grossReturn)
-    const { adjustedInput, annualSavings } = applyWhatIfOverrides(initialEffectiveInput, scenario.overrides, baselineOvr)
+    const results: Array<{
+      overlay: ScenarioOverlay
+      rows: ReturnType<typeof runSimAowStop>['rows']
+      events: Array<{ id: string; name: string; event_type: string; target_age: number | null; one_time_cost: number; monthly_cost_change: number; monthly_income_change: number; duration_months: number; is_active: boolean; sort_order: number; is_indexed: boolean; icon: string; metadata?: Record<string, unknown> }>
+      color: string
+      scenarioName: string
+    }> = []
 
-    // Build cashflows from scenario events, normalising numeric fields that may be stored as strings.
-    // Only the fields present on LifeEvent are mapped — extra fields from SavedScenario are omitted.
-    const scenarioEvents = (scenario.events ?? [])
-      .filter(e => !e.whatIfDisabled)
-      .map(e => ({
-        id: e.id,
-        name: e.name,
-        event_type: e.event_type,
-        target_age: e.target_age,
-        target_date: null as string | null,
-        one_time_cost: Number(e.one_time_cost ?? 0),
-        monthly_cost_change: Number(e.monthly_cost_change ?? 0),
-        monthly_income_change: Number(e.monthly_income_change ?? 0),
-        duration_months: Number(e.duration_months ?? 0),
-        is_active: true,
-        sort_order: 0,
-        is_indexed: false,
-        icon: '',
-        metadata: e.metadata,
-      }))
+    for (const scenarioId of selectedScenarioIds) {
+      const scenario = savedScenarios.find(s => s.id === scenarioId)
+      if (!scenario) continue
 
-    const cashflows = lifeEventsToCashflows(scenarioEvents)
-    const currentPortfolio = Math.max(0, adjustedInput.totalAssets - adjustedInput.totalDebts)
-    const yearlyExpenses = adjustedInput.yearlyMustExpenses > 0 ? adjustedInput.yearlyMustExpenses : 0
-    if (yearlyExpenses <= 0) return null
+      const baselineOvr = buildBaselineOverrides(initialEffectiveInput, initialFireParams.grossReturn)
+      const { adjustedInput, annualSavings } = applyWhatIfOverrides(initialEffectiveInput, scenario.overrides, baselineOvr)
 
-    const grossReturn = adjustedInput.expectedReturn ?? initialFireParams.grossReturn
-    const endStrategy = initialFireStrategy ?? DEFAULT_FIRE_STRATEGY
+      // Build cashflows from scenario events, normalising numeric fields that may be stored as strings.
+      const scenarioEvents = (scenario.events ?? [])
+        .filter(e => !e.whatIfDisabled)
+        .map(e => ({
+          id: e.id,
+          name: e.name,
+          event_type: e.event_type,
+          target_age: e.target_age,
+          target_date: null as string | null,
+          one_time_cost: Number(e.one_time_cost ?? 0),
+          monthly_cost_change: Number(e.monthly_cost_change ?? 0),
+          monthly_income_change: Number(e.monthly_income_change ?? 0),
+          duration_months: Number(e.duration_months ?? 0),
+          is_active: true,
+          sort_order: 0,
+          is_indexed: false,
+          icon: '',
+          metadata: e.metadata,
+        }))
 
-    // Use runSimulationUnified (aliased as runSimAowStop) for consistency with the rest of the file
-    const result = runSimAowStop(
-      currentAgeVal,
-      endStrategy.endAge ?? 90,
-      currentPortfolio,
-      yearlyExpenses,
-      annualSavings,
-      grossReturn,
-      'nl_box3',
-      initialFireParams.inflationRate,
-      cashflows,
-      endStrategy,
-    )
+      const cashflows = lifeEventsToCashflows(scenarioEvents)
+      const currentPortfolio = Math.max(0, adjustedInput.totalAssets - adjustedInput.totalDebts)
+      const yearlyExpenses = adjustedInput.yearlyMustExpenses > 0 ? adjustedInput.yearlyMustExpenses : 0
+      if (yearlyExpenses <= 0) continue
 
-    const color = WHATIF_SCENARIO_COLORS[scenario.colorIndex ?? 0]
+      const grossReturn = adjustedInput.expectedReturn ?? initialFireParams.grossReturn
+      const endStrategy = initialFireStrategy ?? DEFAULT_FIRE_STRATEGY
 
-    return {
-      overlay: {
-        name: scenario.name as 'pessimist' | 'optimist',
-        label: scenario.name,
+      const result = runSimAowStop(
+        currentAgeVal,
+        endStrategy.endAge ?? 90,
+        currentPortfolio,
+        yearlyExpenses,
+        annualSavings,
+        grossReturn,
+        'nl_box3',
+        initialFireParams.inflationRate,
+        cashflows,
+        endStrategy,
+      )
+
+      const color = WHATIF_SCENARIO_COLORS[scenario.colorIndex ?? 0]
+
+      results.push({
+        overlay: {
+          name: scenario.name,
+          label: scenario.name,
+          color: color.hex,
+          points: result.rows.map(r => [r.age, r.endPortfolio] as [number, number]),
+        },
+        rows: result.rows,
+        events: scenarioEvents,
         color: color.hex,
-        points: result.rows.map(r => [r.age, r.endPortfolio] as [number, number]),
-      },
-      rows: result.rows,
-      events: scenarioEvents,
-      color: color.hex,
+        scenarioName: scenario.name,
+      })
     }
-  }, [selectedScenarioId, savedScenarios, initialData])
+
+    return results
+  }, [selectedScenarioIds, savedScenarios, initialData])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -2798,12 +2841,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   )}
                 </button>
 
-                {/* ── Saved scenario overlay picker — ghost-lijn alleen op line-chart ── */}
+                {/* ── Saved scenario overlay picker — ghost-lijnen alleen op line-chart ── */}
                 {chartMode === 'vermogenspad' && (
                   <ScenarioOverlayPicker
                     scenarios={savedScenarios}
-                    selectedId={selectedScenarioId}
-                    onSelect={setSelectedScenarioId}
+                    selectedIds={selectedScenarioIds}
+                    onToggle={toggleScenarioId}
+                    onClearAll={clearAllScenarioIds}
                   />
                 )}
 
@@ -2845,7 +2889,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           aowAge: Math.round(userAowAge.fractional),
                           currentAge: currentAge ?? 30,
                           hasMonteCarlo: !!monteCarloOverlay,
-                          hasScenario: !!scenarioOverlayData,
+                          hasScenario: scenarioOverlayDataList.length > 0,
                           hasBaseline: false,
                           planningMode,
                         })
@@ -2878,10 +2922,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 Het percentage is de geschatte kans dat je geld het volhoudt.
               </ChartOverlayExplainer>
 
-              <ChartOverlayExplainer active={!!selectedScenarioId && !!scenarioOverlayData}>
-                Het <em>opgeslagen scenario</em> verschijnt als spookrand naast
-                je huidige pad — zo vergelijk je in één oogopslag hoe een eerder
-                doorgerekend wat-als zich verhoudt tot je actuele plan.
+              <ChartOverlayExplainer active={scenarioOverlayDataList.length > 0}>
+                {scenarioOverlayDataList.length === 1
+                  ? <>Het <em>opgeslagen scenario</em> verschijnt als spookrand naast
+                    je huidige pad — zo vergelijk je in één oogopslag hoe een eerder
+                    doorgerekend wat-als zich verhoudt tot je actuele plan.</>
+                  : <><em>{scenarioOverlayDataList.length} opgeslagen scenario&apos;s</em> verschijnen
+                    als gekleurde lijnen naast je huidige pad — zo vergelijk je meerdere
+                    toekomstpaden tegelijk.</>
+                }
               </ChartOverlayExplainer>
 
               <ChartOverlayExplainer active={chartMode === 'vermogensopbouw'}>
@@ -2941,7 +2990,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             targetEndPortfolio={simResult.targetEndPortfolio}
                             scenarioOverlays={isAowStopActive ? undefined : [
                               ...(scenarioOverlays ?? []),
-                              ...(scenarioOverlayData ? [scenarioOverlayData.overlay] : []),
+                              ...scenarioOverlayDataList.map(d => d.overlay),
                             ]}
                             monteCarloOverlay={isAowStopActive ? undefined : monteCarloOverlay}
                             dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
@@ -2951,6 +3000,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             aowAgeFractional={userAowAge.fractional}
                             planningMode={planningMode}
                             showDepletionWarning={isAowStopActive}
+                            eventOverlay={chartEventOverlay}
+                            onEventClick={handleChartEventClick}
                           />
                         </div>
 
@@ -3051,8 +3102,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           aowAgeFractional={userAowAge.fractional}
                           viewMode={ieViewMode}
                           breakdownResult={ieBreakdownResult}
-                          ghostOverlayRows={scenarioOverlayData?.rows}
-                          ghostColor={scenarioOverlayData?.color}
+                          ghostOverlayRows={scenarioOverlayDataList[0]?.rows}
+                          ghostColor={scenarioOverlayDataList[0]?.color}
                         />
                       </div>
 
@@ -3068,8 +3119,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           endAge={simResult.displayEndAge}
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
-                          scenarioEvents={scenarioOverlayData?.events}
-                          scenarioColor={scenarioOverlayData?.color}
+                          scenarioEvents={scenarioOverlayDataList[0]?.events}
+                          scenarioColor={scenarioOverlayDataList[0]?.color}
                           onClusterOpen={(clusterEvents, centerAge) => setClusterSheet({ events: clusterEvents, centerAge })}
                           onViewEvent={id => {
                             // Natuurlijke mijlpalen hebben geen edit-pane; deeplink
@@ -3186,24 +3237,58 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   : <>Berekend als FIRE-pad &middot; <span className="ml-0.5 underline underline-offset-2">Pensioen-modus beschikbaar &rarr;</span></>}
               </button>
 
-              {/* What-If entrypoint — dream gate portal */}
+              {/* ── What-If inline sliders (feature #795) ── */}
               <button
                 type="button"
-                onClick={() => triggerDream('/horizon/whatif')}
-                disabled={phase !== 'idle'}
-                className={`mt-4 flex w-full items-center gap-3 rounded-[var(--r)] border border-dashed border-horizon-300 bg-horizon-50/30 px-4 py-3 text-left transition-all hover:border-horizon-400 hover:bg-horizon-50/60 hover:shadow-[0_0_20px_rgba(196,160,107,0.15)] ${phase !== 'idle' ? 'dream-cta-active' : ''}`}
+                onClick={() => setWhatIfInlineOpen(prev => !prev)}
+                aria-expanded={whatIfInlineOpen}
+                className={`mt-4 flex w-full items-center gap-3 rounded-[var(--r)] border px-4 py-3 text-left transition-all ${
+                  whatIfInlineOpen
+                    ? 'border-horizon-400 bg-horizon-50/60 shadow-[0_0_20px_rgba(196,160,107,0.15)]'
+                    : 'border-dashed border-horizon-300 bg-horizon-50/30 hover:border-horizon-400 hover:bg-horizon-50/60 hover:shadow-[0_0_20px_rgba(196,160,107,0.15)]'
+                }`}
               >
-                <Sparkles className="h-5 w-5 shrink-0 text-horizon-600" />
-                <div className="min-w-0">
-                  <span className="font-serif text-sm italic text-horizon-700">Wat als...? Speel met je toekomst &rarr;</span>
-                  {savedScenarios.length === 0 && (
+                <SlidersHorizontal className="h-5 w-5 shrink-0 text-horizon-600" />
+                <div className="min-w-0 flex-1">
+                  <span className="font-serif text-sm italic text-horizon-700">
+                    Wat als...? Pas je scenario aan
+                  </span>
+                  {!whatIfInlineOpen && (
                     <p className="mt-1 font-sans text-[11px] leading-relaxed text-horizon-700/70">
-                      Stel een alternatief scenario op met andere inkomsten, uitgaven of levensgebeurtenissen.
-                      Sla het op en bekijk het als overlay op deze pagina om te vergelijken met je huidige pad.
+                      Pas inkomen, werkdagen, spaarquote of extra inleg aan — de projectie past zich direct aan.
                     </p>
                   )}
                 </div>
+                {whatIfInlineOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0 text-horizon-600" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 text-horizon-600" />
+                )}
               </button>
+
+              {/* Inline sliders panel — no navigation to /whatif needed */}
+              {whatIfInlineOpen && whatIfBaseline && currentAge !== null && (
+                <div className="mt-2 rounded-[var(--r)] border border-horizon-200 bg-[var(--paper)] px-4 pb-4 pt-3">
+                  <WhatIfSlidersCollapsible
+                    baseline={whatIfBaseline}
+                    events={events as WhatIfEvent[]}
+                    setEvents={setEventsForSliders}
+                    currentAge={currentAge}
+                  />
+                  <div className="mt-3 flex items-center justify-between">
+                    <p className="font-sans text-[10px] text-[var(--ink-4)]">
+                      Elke slider bewerkt je scenario. De projectielijn hierboven past zich direct aan.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => triggerDream('/horizon/whatif')}
+                      className="shrink-0 ml-3 font-sans text-[11px] font-medium text-horizon-600 transition-colors hover:text-horizon-700"
+                    >
+                      Volledig scenario &rarr;
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           ) : null}
         </div>

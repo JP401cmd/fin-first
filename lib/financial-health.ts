@@ -40,6 +40,10 @@ export interface HealthPillar {
   weight: number       // 0–1 (e.g. 0.25)
   explanation: string  // what this pillar measures
   improvementTip: string
+  /** Link to the page where the user can act on this tip */
+  actionHref: string
+  /** Short CTA label for the action link (e.g. "Budget instellen") */
+  actionLabel: string
   rawValue: string     // human-readable current value
 }
 
@@ -53,6 +57,18 @@ export interface HealthScore {
   activePillarCount: number
   /** Whether budget discipline is included in the score */
   budgetingActive: boolean
+}
+
+// ── Pillar action mapping ────────────────────────────────────
+// Each pillar links to the page where the user can take action.
+
+const PILLAR_ACTION: Record<string, { href: string; label: string }> = {
+  savings_rate:      { href: '/will#cashflow',  label: 'Cashflow bekijken' },
+  debt_ratio:        { href: '/core/debts',     label: 'Schulden bekijken' },
+  emergency_fund:    { href: '/core/assets/cash', label: 'Noodfonds opbouwen' },
+  fire_progress:     { href: '/horizon',        label: 'FIRE-plan bekijken' },
+  diversification:   { href: '/core/assets',    label: 'Bezittingen bekijken' },
+  budget_discipline: { href: '/core/budgets',   label: 'Budgetten beheren' },
 }
 
 // ── Score curves ─────────────────────────────────────────────
@@ -262,6 +278,8 @@ export function computeHealthScore(
         : data.savingsRate6m < 30
         ? 'Je bent op de goede weg! Verhoog bij elke loonsverhoging je spaarpercentage.'
         : 'Uitstekende spaarquote — blijf dit volhouden.',
+      actionHref: PILLAR_ACTION.savings_rate.href,
+      actionLabel: PILLAR_ACTION.savings_rate.label,
       rawValue: `${Math.round(data.savingsRate6m)}%`,
     },
     {
@@ -277,6 +295,8 @@ export function computeHealthScore(
         : debtRatio > 0
         ? 'Je schuldenlast is beheersbaar. Overweeg herfinanciering voor betere rente.'
         : 'Schuldenvrij — uitstekend!',
+      actionHref: PILLAR_ACTION.debt_ratio.href,
+      actionLabel: PILLAR_ACTION.debt_ratio.label,
       rawValue: `${debtRatio}%`,
     },
     {
@@ -292,6 +312,8 @@ export function computeHealthScore(
         : data.emergencyFund.monthsCovered < 6
         ? 'Bijna op het ideaal van 6 maanden. Elke extra maand geeft meer rust.'
         : 'Noodfonds compleet — financiële rust als vangnet.',
+      actionHref: PILLAR_ACTION.emergency_fund.href,
+      actionLabel: PILLAR_ACTION.emergency_fund.label,
       rawValue: `${data.emergencyFund.monthsCovered.toFixed(1)} mnd`,
     },
     {
@@ -311,6 +333,8 @@ export function computeHealthScore(
         : data.freedomPct < 100
         ? 'Bijna vrij! Focus op het volhouden van je strategie.'
         : 'FIRE bereikt — geniet van je financiële vrijheid!',
+      actionHref: PILLAR_ACTION.fire_progress.href,
+      actionLabel: PILLAR_ACTION.fire_progress.label,
       rawValue: `${Math.round(data.freedomPct)}%`,
     },
     {
@@ -326,6 +350,8 @@ export function computeHealthScore(
         : data.assetsByType.length <= 3
         ? 'Goede basis — overweeg crypto of fysiek bezit als extra spreiding.'
         : 'Goed gespreid — monitor je allocatie periodiek.',
+      actionHref: PILLAR_ACTION.diversification.href,
+      actionLabel: PILLAR_ACTION.diversification.label,
       rawValue: `${data.assetsByType.length} types`,
     },
     {
@@ -339,6 +365,8 @@ export function computeHealthScore(
         : budgetWithin < budgetTotal
         ? 'Er zijn budgetten overschreden — bekijk de kassabon voor details.'
         : 'Alle budgetten binnen de limiet — goed gedisciplineerd!',
+      actionHref: PILLAR_ACTION.budget_discipline.href,
+      actionLabel: PILLAR_ACTION.budget_discipline.label,
       rawValue: budgetTotal > 0 ? `${budgetWithin}/${budgetTotal}` : 'Geen budget',
     },
   ]
@@ -463,6 +491,8 @@ export function computeHealthScoreFromInputs(
         : input.savingsRate6m < 30
         ? 'Je bent op de goede weg! Verhoog bij elke loonsverhoging je spaarpercentage.'
         : 'Uitstekende spaarquote — blijf dit volhouden.',
+      actionHref: PILLAR_ACTION.savings_rate.href,
+      actionLabel: PILLAR_ACTION.savings_rate.label,
       rawValue: `${Math.round(input.savingsRate6m)}%`,
     },
     {
@@ -478,6 +508,8 @@ export function computeHealthScoreFromInputs(
         : debtRatio > 0
         ? 'Je schuldenlast is beheersbaar. Overweeg herfinanciering voor betere rente.'
         : 'Schuldenvrij — uitstekend!',
+      actionHref: PILLAR_ACTION.debt_ratio.href,
+      actionLabel: PILLAR_ACTION.debt_ratio.label,
       rawValue: `${debtRatio}%`,
     },
     {
@@ -493,6 +525,8 @@ export function computeHealthScoreFromInputs(
         : input.emergencyFundMonths < 6
         ? 'Bijna op het ideaal van 6 maanden. Elke extra maand geeft meer rust.'
         : 'Noodfonds compleet — financiële rust als vangnet.',
+      actionHref: PILLAR_ACTION.emergency_fund.href,
+      actionLabel: PILLAR_ACTION.emergency_fund.label,
       rawValue: `${input.emergencyFundMonths.toFixed(1)} mnd`,
     },
     {
@@ -512,6 +546,8 @@ export function computeHealthScoreFromInputs(
         : input.freedomPct < 100
         ? 'Bijna vrij! Focus op het volhouden van je strategie.'
         : 'FIRE bereikt — geniet van je financiële vrijheid!',
+      actionHref: PILLAR_ACTION.fire_progress.href,
+      actionLabel: PILLAR_ACTION.fire_progress.label,
       rawValue: `${Math.round(input.freedomPct)}%`,
     },
     {
@@ -527,6 +563,8 @@ export function computeHealthScoreFromInputs(
         : input.assetTypeCount <= 3
         ? 'Goede basis — overweeg crypto of fysiek bezit als extra spreiding.'
         : 'Goed gespreid — monitor je allocatie periodiek.',
+      actionHref: PILLAR_ACTION.diversification.href,
+      actionLabel: PILLAR_ACTION.diversification.label,
       rawValue: `${input.assetTypeCount} types`,
     },
     {
@@ -540,6 +578,8 @@ export function computeHealthScoreFromInputs(
         : budgetWithin < budgetTotal
         ? 'Er zijn budgetten overschreden — bekijk de kassabon voor details.'
         : 'Alle budgetten binnen de limiet — goed gedisciplineerd!',
+      actionHref: PILLAR_ACTION.budget_discipline.href,
+      actionLabel: PILLAR_ACTION.budget_discipline.label,
       rawValue: budgetTotal > 0 ? `${budgetWithin}/${budgetTotal}` : 'Geen budget',
     },
   ]

@@ -13,6 +13,7 @@ import {
   DEBT_TYPE_LABELS,
   type DebtType,
 } from '@/lib/debt-data'
+import Link from 'next/link'
 import type { CorePageData } from '@/lib/core-data-loader'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -977,7 +978,10 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
             {weakest.slice(0, 3).map(p => (
               <li key={p.id} className="text-xs text-[var(--ink-2)] leading-snug">
                 <span className="font-semibold text-[var(--ink)]">{p.name}:</span>{' '}
-                {p.improvementTip}
+                {p.improvementTip}{' '}
+                <Link href={p.actionHref} className="font-medium text-[var(--ink)] underline decoration-[var(--border-md)] underline-offset-2 hover:decoration-[var(--ink-2)] transition-colors">
+                  {p.actionLabel} →
+                </Link>
               </li>
             ))}
           </ul>
@@ -1038,11 +1042,22 @@ function HealthPillarCard({ pillar }: { pillar: HealthPillar }) {
         {pillar.explanation}
       </p>
 
-      {/* Verbetettip — alleen tonen bij score < 80 */}
+      {/* Verbetettip + actielink — alleen tonen bij score < 80 */}
       {pillar.score < 80 && (
-        <p className="mt-1.5 font-serif text-[11px] italic text-[var(--ink-3)] leading-snug">
-          Tip: {pillar.improvementTip}
-        </p>
+        <div className="mt-1.5">
+          <p className="font-serif text-[11px] italic text-[var(--ink-3)] leading-snug">
+            Tip: {pillar.improvementTip}
+          </p>
+          <Link
+            href={pillar.actionHref}
+            className="inline-flex items-center gap-1 mt-1 text-[11px] font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors group/tip"
+          >
+            <span className="underline decoration-[var(--border-md)] underline-offset-2 group-hover/tip:decoration-[var(--ink-2)]">
+              {pillar.actionLabel}
+            </span>
+            <svg className="h-3 w-3 transition-transform group-hover/tip:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+          </Link>
+        </div>
       )}
     </div>
   )

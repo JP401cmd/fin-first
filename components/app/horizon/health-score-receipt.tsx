@@ -1,6 +1,7 @@
 'use client'
 
-import { Lightbulb } from 'lucide-react'
+import Link from 'next/link'
+import { Lightbulb, ArrowRight } from 'lucide-react'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import type { HealthScore, HealthPillar } from '@/lib/financial-health'
@@ -137,10 +138,21 @@ export function HealthScoreReceipt({
                 style={{ width: `${pillar.score}%` }}
               />
             </div>
-            {/* Improvement tip */}
+            {/* Improvement tip + action link */}
             <div className="mt-2 flex items-start gap-1.5">
               <Lightbulb className="h-3 w-3 text-horizon-500 mt-0.5 shrink-0" />
-              <p className="text-[10px] text-[var(--ink-2)] leading-snug">{pillar.improvementTip}</p>
+              <div>
+                <p className="text-[10px] text-[var(--ink-2)] leading-snug">{pillar.improvementTip}</p>
+                <Link
+                  href={pillar.actionHref}
+                  className="inline-flex items-center gap-1 mt-1 text-[10px] font-medium text-horizon-600 hover:text-horizon-800 transition-colors group/tip"
+                >
+                  <span className="underline underline-offset-2 group-hover/tip:decoration-horizon-800">
+                    {pillar.actionLabel}
+                  </span>
+                  <ArrowRight className="h-2.5 w-2.5 transition-transform group-hover/tip:translate-x-0.5" />
+                </Link>
+              </div>
             </div>
           </div>
         ))}

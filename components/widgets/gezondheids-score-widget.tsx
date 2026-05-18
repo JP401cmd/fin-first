@@ -432,7 +432,10 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
           <ul className="space-y-0.5">
             {tips.map(p => (
               <li key={p.id} className="text-[10px] text-[var(--ink-2)] leading-snug">
-                <span className="font-medium">{p.name}:</span> {p.improvementTip}
+                <span className="font-medium">{p.name}:</span> {p.improvementTip}{' '}
+                <Link href={p.actionHref} className="font-medium text-horizon-600 hover:text-horizon-800 underline underline-offset-2">
+                  {p.actionLabel} →
+                </Link>
               </li>
             ))}
           </ul>

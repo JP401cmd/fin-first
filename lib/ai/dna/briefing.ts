@@ -58,7 +58,22 @@ Kies bewust: wat is nu het belangrijkst voor deze gebruiker?
 - Alle bedragen boven 100 euro moeten een vrijheidstijd-equivalent tonen
 - module parameter is altijd "kern", "wil", "horizon", of "cross"
 - BELANGRIJK: Vul ALTIJD de href parameter in bij cards die een href ondersteunen. Elke card moet klikbaar zijn naar de relevante pagina.
+- BELANGRIJK: Bij showInsight met emphasis "tip" of "observation" die een actie impliceren: vul ALTIJD zowel href als ctaLabel in. De ctaLabel beschrijft de actie (bijv. "Budget aanpassen", "Schulden bekijken", "Bezittingen spreiden"). Zonder CTA kan de gebruiker niet handelen op het inzicht.
 - Bij fondskosten/TER-inzichten: gebruik showInsight met href="/core/assets" en ctaLabel="Bekijk fee-erosie" om de gebruiker naar de fee-erosie visualisatie te leiden. De CTA wordt als klikbare link onder het inzicht getoond.
+
+== CTA-LABELS BIJ INSIGHTS ==
+Gebruik een van deze labels bij showInsight tips/observaties:
+- Spaarquote-gerelateerd → ctaLabel="Cashflow bekijken", href="/will#cashflow"
+- Schulden-gerelateerd → ctaLabel="Schulden bekijken", href="/core/debts"
+- Budget-gerelateerd → ctaLabel="Budget aanpassen", href="/core/budgets"
+- Vermogen/assets → ctaLabel="Bezittingen bekijken", href="/core/assets"
+- Beleggingen/fondsen → ctaLabel="Beleggingen bekijken", href="/core/assets"
+- FIRE/vrijheid → ctaLabel="FIRE-plan bekijken", href="/horizon"
+- Belasting/box3 → ctaLabel="Belasting bekijken", href="/core/belasting"
+- Transacties/cash → ctaLabel="Transacties bekijken", href="/core/cash"
+- Abonnementen/vaste lasten → ctaLabel="Vaste lasten bekijken", href="/core/cash"
+- Doelen → ctaLabel="Doelen bekijken", href="/will"
+Greeting- en celebration-insights hoeven GEEN ctaLabel (die zijn informatief, niet actionable).
 
 == CARD TYPE RICHTLIJNEN ==
 showRecurring: Toon vaste lasten/abonnementen overzicht. Gebruik als de gebruiker significante terugkerende kosten heeft.

@@ -6,6 +6,8 @@ import type { SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { NL_SWR, type ScenarioPath, type ProjectionMonth } from '@/lib/horizon-data'
 import { CHART_PAD } from '@/lib/chart-constants'
+import { ChartEventMarkers, topPaddingFor, bottomPaddingFor } from './chart-event-markers'
+import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +62,8 @@ export const SimChart = memo(function SimChart({
   planningMode = 'fire',
   showDepletionWarning,
   baselineEmphasis = 'ghost',
+  eventOverlay,
+  onEventClick,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -92,6 +96,10 @@ export const SimChart = memo(function SimChart({
   showDepletionWarning?: boolean
   /** Baseline rendering: 'ghost' (default, faint gray reference) or 'compare' (solid horizon-700, side-by-side feel) */
   baselineEmphasis?: 'ghost' | 'compare'
+  /** Event overlay markers (life events + natural milestones) rendered on the chart */
+  eventOverlay?: ChartEventOverlay[]
+  /** Click handler for event markers — routes to EventPane or NaturalMilestoneSheet */
+  onEventClick?: (id: string, kind: ChartEventKind, sourceId?: string) => void
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
@@ -111,8 +119,23 @@ export const SimChart = memo(function SimChart({
 
   const W = containerW
   const isDesktop = containerW >= 768
-  const H = isDesktop ? 260 : 220
-  const PAD = CHART_PAD
+
+  // Dynamic padding for event markers (same approach as WealthCompositionChart)
+  const aboveCount = eventOverlay
+    ? eventOverlay.filter(e => e.side === 'above').length
+    : 0
+  const belowCount = eventOverlay
+    ? eventOverlay.filter(e => e.side === 'below').length
+    : 0
+  const extraTop = topPaddingFor(aboveCount)
+  const extraBottom = bottomPaddingFor(belowCount)
+  const PAD = {
+    top: CHART_PAD.top + extraTop,
+    right: CHART_PAD.right,
+    bottom: CHART_PAD.bottom + extraBottom,
+    left: CHART_PAD.left,
+  }
+  const H = (isDesktop ? 260 : 220) + extraTop + extraBottom
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
 
@@ -765,6 +788,21 @@ export const SimChart = memo(function SimChart({
           />
         )}
 
+        {/* Event markers (life events + natural milestones) — rendered ABOVE the
+            confidence band and projection lines so they are never hidden */}
+        {eventOverlay && eventOverlay.length > 0 && (
+          <ChartEventMarkers
+            events={eventOverlay}
+            xScale={xScale}
+            padLeft={PAD.left}
+            chartTopY={PAD.top}
+            chartBottomY={PAD.top + innerH}
+            visibleMinAge={minAge}
+            visibleMaxAge={maxAge}
+            onEventClick={onEventClick}
+          />
+        )}
+
         {/* Crosshair hover overlay — invisible rect covering chart area for mouse tracking */}
         <rect
           x={PAD.left} y={PAD.top}
@@ -1099,6 +1137,36 @@ export const SimChart = memo(function SimChart({
                   ))}
                 </>
               )}
+
+              {/* Scenario overlay values at hovered age */}
+              {scenarioOverlays && scenarioOverlays.length > 0 && (() => {
+                const overlayValues = scenarioOverlays
+                  .map(o => {
+                    const pt = o.points.find(([age]) => Math.round(age) === hoveredAge)
+                    return pt ? { label: o.label, color: o.color, value: pt[1] } : null
+                  })
+                  .filter((v): v is { label: string; color: string; value: number } => v !== null)
+                if (overlayValues.length === 0) return null
+                return (
+                  <>
+                    <div className="mt-1.5" style={{ height: 1, background: 'var(--ink-3)', opacity: 0.25 }} />
+                    <div className="mt-1" style={{ fontSize: 8, color: 'var(--ink-4, #bbb8b0)', fontWeight: 600, letterSpacing: '0.04em' }}>
+                      SCENARIO&apos;S
+                    </div>
+                    {overlayValues.map(v => (
+                      <div key={v.label} className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 9 }}>
+                        <span className="flex items-center gap-1" style={{ color: v.color }}>
+                          <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: v.color }} />
+                          <span className="truncate max-w-[80px]">{v.label}</span>
+                        </span>
+                        <span className="font-mono tabular-nums" style={{ color: 'var(--paper)' }}>
+                          {fmtAbs(v.value)}
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                )
+              })()}
             </div>
           </div>
         )
@@ -1125,6 +1193,28 @@ export const SimChart = memo(function SimChart({
                     ({Math.round(overlay.fireAge)}j)
                   </span>
                 )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Scenario overlay legend — shows label + color for each active saved scenario */}
+      {scenarioOverlays && scenarioOverlays.length > 0 && !householdOverlays?.length && (
+        <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4">
+          {scenarioOverlays.map(overlay => (
+            <div key={overlay.name} className="flex items-center gap-1.5">
+              <svg width="20" height="8" className="shrink-0">
+                <line
+                  x1="0" y1="4" x2="20" y2="4"
+                  stroke={overlay.color}
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  opacity={0.65}
+                />
+              </svg>
+              <span className="text-[10px] font-medium text-[var(--ink-3)]">
+                {overlay.label}
               </span>
             </div>
           ))}

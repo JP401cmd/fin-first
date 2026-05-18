@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import {
-  Calendar, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Activity, Sparkles,
+  Calendar, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Activity, Sparkles, ArrowRight,
 } from 'lucide-react'
 import type { SpendingInsight } from '@/lib/spending-patterns'
 
@@ -97,6 +98,19 @@ function SpendingInsightCard({ insight }: { insight: SpendingInsight }) {
               </span>
             )}
           </div>
+
+          {/* CTA link — actionable insights link to budget management */}
+          {(insight.severity === 'warning' || insight.severity === 'info') && (
+            <Link
+              href="/core/budgets"
+              className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors group/cta"
+            >
+              <span className="underline decoration-[var(--border-md)] underline-offset-2 group-hover/cta:decoration-[var(--ink-2)]">
+                Budget aanpassen
+              </span>
+              <ArrowRight className="h-3 w-3 transition-transform group-hover/cta:translate-x-0.5" />
+            </Link>
+          )}
         </div>
       </div>
     </div>

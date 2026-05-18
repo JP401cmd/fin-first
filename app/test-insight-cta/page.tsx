@@ -67,6 +67,33 @@ export default function TestInsightCtaPage() {
         <h2 className="text-lg font-semibold text-[var(--ink)]">4. Celebration zonder CTA (ongewijzigd)</h2>
         <InsightCard spec={celebrationInsight} />
       </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold text-[var(--ink)]">5. Tip zonder expliciete CTA (keyword-fallback)</h2>
+        <InsightCard spec={{
+          type: 'insight',
+          text: 'Je spaarquote is gedaald naar 8%. Met kleine aanpassingen aan je vaste lasten kun je dit verbeteren.',
+          emphasis: 'tip',
+        }} />
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold text-[var(--ink)]">6. Observatie zonder CTA (keyword-fallback schulden)</h2>
+        <InsightCard spec={{
+          type: 'insight',
+          text: 'Je schuldratio is 45% — je aflossing op je duurste lening bespaart de meeste rente.',
+          emphasis: 'observation',
+        }} />
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold text-[var(--ink)]">7. Observatie zonder keywords (geen CTA)</h2>
+        <InsightCard spec={{
+          type: 'insight',
+          text: 'De markt heeft afgelopen week 2,3% gewonnen.',
+          emphasis: 'observation',
+        }} />
+      </section>
     </div>
   )
 }
