@@ -329,7 +329,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         {fireInRange && (
           <>
             <line x1={PAD_LEFT} y1={fireY!} x2={W - PAD_RIGHT} y2={fireY!} stroke="var(--hor-t, #8a6e42)" strokeWidth="1.5" strokeDasharray="6 3" />
-            <text x={W - PAD_RIGHT - 4} y={fireY! + 3} textAnchor="end" style={{ fill: 'var(--hor-t, #8a6e42)', fontSize: 8, fontWeight: 600 }}>FIRE</text>
+            <text x={W - PAD_RIGHT - 4} y={fireY! + 3} textAnchor="end" style={{ fill: 'var(--hor-t, #8a6e42)', fontSize: 8, fontWeight: 600 }}>Vrijheid</text>
           </>
         )}
         {/* Hover dots on nominal line */}
@@ -364,7 +364,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
         {fireInRange && (
           <>
             <line x1={PAD_LEFT} y1={fireY!} x2={W - PAD_RIGHT} y2={fireY!} stroke="var(--hor-t, #8a6e42)" strokeWidth="1.5" strokeDasharray="6 3" />
-            <text x={W - PAD_RIGHT - 4} y={fireY! + 3} textAnchor="end" style={{ fill: 'var(--hor-t, #8a6e42)', fontSize: 8, fontWeight: 600 }}>FIRE</text>
+            <text x={W - PAD_RIGHT - 4} y={fireY! + 3} textAnchor="end" style={{ fill: 'var(--hor-t, #8a6e42)', fontSize: 8, fontWeight: 600 }}>Vrijheid</text>
           </>
         )}
         {/* Individual asset type lines */}
@@ -678,7 +678,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
             {fireInRange && (
               <div className="flex items-center gap-1">
                 <span className="inline-block h-0.5 w-4 rounded border-t border-dashed border-horizon-500" />
-                <span className="text-[10px] text-[var(--ink-3)]">FIRE-doel</span>
+                <span className="text-[10px] text-[var(--ink-3)]">Vrijheidsdoel</span>
               </div>
             )}
           </div>
@@ -712,7 +712,7 @@ export const BucketProjectionChart = memo(function BucketProjectionChart({
             {fireInRange && (
               <div className="flex items-center gap-1">
                 <span className="inline-block h-0.5 w-4 rounded border-t border-dashed border-horizon-500" />
-                <span className="text-[10px] text-[var(--ink-3)]">FIRE-doel</span>
+                <span className="text-[10px] text-[var(--ink-3)]">Vrijheidsdoel</span>
               </div>
             )}
           </div>
