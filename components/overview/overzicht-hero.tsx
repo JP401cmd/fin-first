@@ -200,6 +200,11 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
         </Link>
       )}
 
+      {/* Subtiele filosofie-tagline: bindt alle metingen aan kern-philosophy */}
+      <p className="mt-2 text-center text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)] font-medium">
+        Geld is opgeslagen tijd
+      </p>
+
       {/* Drill-down sheet: kassabon met pillars per sub-score */}
       {health && (
         <BottomSheet
