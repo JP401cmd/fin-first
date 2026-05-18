@@ -47,6 +47,11 @@ interface NetWorthProjectionChartProps {
   inflationRate: number
   /** FIRE-doelbedrag — optionele horizontale doellijn. */
   fireTarget?: number
+  /**
+   * When true, renders without the outer <section> wrapper — for embedding
+   * inside another container (e.g. the CoreHero). Default: false.
+   */
+  inline?: boolean
 }
 
 // ── Constants ──────────────────────────────────────────────────────
@@ -127,6 +132,7 @@ export function NetWorthProjectionChart({
   grossReturn,
   inflationRate,
   fireTarget,
+  inline = false,
 }: NetWorthProjectionChartProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 800 })
   const { masked } = useMaskedAmounts()
@@ -230,12 +236,8 @@ export function NetWorthProjectionChart({
     ? Math.round(aowAge > 0 ? aowAge : NL_AOW_AGE)
     : null
 
-  return (
-    <section
-      data-testid="net-worth-projection"
-      className="border-b border-[var(--border-ed)] bg-[var(--paper)]"
-    >
-      <div className="px-4 py-6 sm:px-6 sm:py-8">
+  const chartContent = (
+    <>
         <div className="mb-1">
           <Kicker>Vermogensprognose</Kicker>
         </div>
@@ -516,6 +518,24 @@ export function NetWorthProjectionChart({
           en {(inflationRate * 100).toFixed(1).replace('.', ',')}% inflatie per jaar.
           Maandelijkse inleg: {formatMaskedCurrency(monthlySavings, masked)}.
         </p>
+    </>
+  )
+
+  if (inline) {
+    return (
+      <div data-testid="net-worth-projection">
+        {chartContent}
+      </div>
+    )
+  }
+
+  return (
+    <section
+      data-testid="net-worth-projection"
+      className="border-b border-[var(--border-ed)] bg-[var(--paper)]"
+    >
+      <div className="px-4 py-6 sm:px-6 sm:py-8">
+        {chartContent}
       </div>
     </section>
   )

@@ -456,7 +456,10 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
         </h1>
       </header>
 
-      {/* Hero — vol-bleed boven, dan inset content. */}
+      {/* Hero — vol-bleed boven, dan inset content.
+          De tijdslijn (NetWorthProjectionChart) is embedded in de hero naast
+          de gezondheidsscore — de twee visuele ankers van Kern:
+          score (hoe gezond) + tijdslijn (waar naartoe). */}
       <CoreHero
         netWorth={netWorth}
         totalAssets={totalAssets}
@@ -470,6 +473,21 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
         healthScore={healthScore}
         onShowNetWorthReceipt={() => setShowNetWorthReceipt(true)}
         onShowHealthReceipt={() => setShowHealthReceipt(true)}
+        timelineSlot={
+          <NetWorthProjectionChart
+            currentAge={initialData.currentAge}
+            aowAge={initialData.aowAge}
+            netWorth={netWorth}
+            monthlySavings={
+              initialData.rawFinancials.monthlyIncome -
+              initialData.rawFinancials.monthlyExpenses
+            }
+            grossReturn={initialData.fireParams.grossReturn}
+            inflationRate={initialData.fireParams.inflationRate}
+            fireTarget={fireSnapshot.target > 0 ? fireSnapshot.target : undefined}
+            inline
+          />
+        }
       />
 
       {/* Cashflow hero-tegel — budgetstatus in het status-gebied */}
@@ -479,20 +497,6 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
         totalBudgetLimit={initialData.totalBudgetLimit}
         totalBudgetSpent={initialData.totalBudgetSpent}
         budgetingActive={initialData.budgetingActive}
-      />
-
-      {/* Netto-vermogen projectiechart — toont vermogenspad tot pensioen */}
-      <NetWorthProjectionChart
-        currentAge={initialData.currentAge}
-        aowAge={initialData.aowAge}
-        netWorth={netWorth}
-        monthlySavings={
-          initialData.rawFinancials.monthlyIncome -
-          initialData.rawFinancials.monthlyExpenses
-        }
-        grossReturn={initialData.fireParams.grossReturn}
-        inflationRate={initialData.fireParams.inflationRate}
-        fireTarget={fireSnapshot.target > 0 ? fireSnapshot.target : undefined}
       />
 
       {/* === Bezittingen — full-bleed sectie, gelijk aan hero ====== */}

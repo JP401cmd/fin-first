@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import {
   formatMaskedCurrency,
   calculateFreedomTime,
@@ -45,6 +45,12 @@ interface CoreHeroProps {
   onShowFireReceipt?: () => void
   /** Klik op de gezondheidsscore → open drill-down kassabon. */
   onShowHealthReceipt?: () => void
+  /**
+   * Netto-vermogen-tijdslijn slot. Rendert naast de gezondheidsscore op
+   * desktop (lg+) en eronder op mobile. De twee visuele ankers van Kern:
+   * score (hoe gezond) + tijdslijn (waar naartoe).
+   */
+  timelineSlot?: ReactNode
 }
 
 /**
@@ -71,6 +77,7 @@ export function CoreHero({
   onShowNetWorthReceipt,
   onShowFireReceipt,
   onShowHealthReceipt,
+  timelineSlot,
 }: CoreHeroProps) {
   // useFlashChange leeft binnen HeroAmount zelf — flashClass-updates triggeren
   // dan alleen een re-render van die span en niet van de omhullende button
@@ -142,8 +149,22 @@ export function CoreHero({
           </p>
         )}
 
-        {/* Gezondheidsscore — prominent SVG-gauge met pilaar-bars */}
-        <HealthScoreHero healthScore={healthScore} onClick={onShowHealthReceipt} />
+        {/* ── Score + Tijdslijn grid ────────────────────────────────
+            Desktop (lg+): twee kolommen naast elkaar — de twee visuele
+            ankers van Kern. Mobile: gestapeld (score boven, tijdslijn
+            onder). max-h-[40vh] op de grid voorkomt dat de hero te hoog
+            wordt op desktop. */}
+        <div className={timelineSlot ? 'mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2 lg:max-h-[40vh]' : ''}>
+          {/* Gezondheidsscore — prominent SVG-gauge met pilaar-bars */}
+          <HealthScoreHero healthScore={healthScore} onClick={onShowHealthReceipt} />
+
+          {/* Tijdslijn — vermogensprognose als inline embed */}
+          {timelineSlot && (
+            <div className="min-w-0 overflow-hidden border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-4 sm:px-5">
+              {timelineSlot}
+            </div>
+          )}
+        </div>
 
         {/* FIRE-voortgangsbar — kern-bruin, met % links + doelbedrag rechts */}
         {toekomstActive ? (
