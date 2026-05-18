@@ -1,11 +1,11 @@
 import { Breadcrumb } from '@/components/app/breadcrumb'
 import { ModuleNav } from '@/components/app/module-nav'
-import { identityNav } from '@/lib/navigation'
+import { mijnNav } from '@/lib/navigation'
 
-export default function IdentityLayout({ children }: { children: React.ReactNode }) {
+export default function MijnLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <ModuleNav config={identityNav} />
+      <ModuleNav config={mijnNav} />
       <div className="mx-auto max-w-6xl px-6">
         <div className="pt-4">
           <Breadcrumb color="teal" />

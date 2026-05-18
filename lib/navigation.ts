@@ -48,6 +48,27 @@ export const identityNav: ModuleNavConfig = {
 }
 
 /**
+ * Canonieke /mijn-navigatie: spiegelt identityNav maar wijst naar de nieuwe
+ * canonieke routes. Items die nog niet onder /mijn bestaan (gids, instellingen,
+ * testscenarios) wijzen tijdelijk naar de /identity-equivalent \u2014 die werken
+ * direct want sub-routes hebben geen redirect (alleen /identity zelf).
+ */
+export const mijnNav: ModuleNavConfig = {
+  module: 'Mijn',
+  basePath: '/mijn',
+  color: 'teal',
+  items: [
+    { label: 'Overzicht', href: '/mijn' },
+    { label: 'Profiel', href: '/mijn/profiel' },
+    { label: 'Gids', href: '/identity/gids' },
+    { label: 'Instellingen', href: '/identity/instellingen' },
+    { label: 'Koppelingen', href: '/mijn/koppelingen' },
+    { label: 'Testscenario\u2019s', href: '/identity/testscenarios' },
+    { label: 'Delen', href: '/mijn/delen' },
+  ],
+}
+
+/**
  * Canonical query-state keys voor overlays/panes en in-page-state.
  * Pane luistert op: budget | debt | asset | strategie.
  * In-page (geen overlay): tab.

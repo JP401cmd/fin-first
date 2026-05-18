@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { FreedomCardGenerator } from '@/components/app/freedom-card'
 import { ChevronRight, Share2 } from 'lucide-react'
@@ -8,6 +9,8 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
 
 export default function DelenPage() {
+  const pathname = usePathname()
+  const moduleContext = pathname?.startsWith('/mijn') ? 'Mijn' : 'Identiteit'
   const generatorRef = useRef<HTMLDivElement>(null)
 
   return (
@@ -21,7 +24,7 @@ export default function DelenPage() {
             className="inline-block h-px w-7 shrink-0"
             style={{ background: 'var(--module-active-500)' }}
           />
-          Identiteit · delen
+          {moduleContext} · delen
         </div>
         <h1
           className="font-bold text-3xl tracking-[-0.02em]"

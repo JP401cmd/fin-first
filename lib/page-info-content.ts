@@ -67,6 +67,21 @@ export const PAGE_INFO: Record<string, string> = {
     'Plus voorkeuren (notificaties, uiterlijk, personalisatie van je Overzicht) en rapportages-export. ' +
     'Eén onderwerp per pagina — geen accordion-monster.',
 
+  '/mijn/profiel':
+    'Je persoonlijke gegevens en huishouden. ' +
+    'Naam, geboortedatum, partner-status en kinderen — de basis waarop alle berekeningen rusten. ' +
+    'Klein draaien hier verschuift je hele projectie.',
+
+  '/mijn/koppelingen':
+    'Automatische koppelingen voor data-invoer. ' +
+    'PSD2-bank, UPO-pensioenoverzicht en crypto-brokerage — telkens een handmatige import minder. ' +
+    'Koppel of ontkoppel per dienst.',
+
+  '/mijn/delen':
+    'Deel mijlpalen, jaaroverzicht of een vrijheidskaart met je partner of vrienden. ' +
+    'Pure delen — niemand ziet je rekening-saldo of transacties zonder dat jij actief deelt. ' +
+    'Privacy-eerst, altijd.',
+
   // ── Dashboard ───────────────────────────────────────────────────
   '/dashboard':
     'Je persoonlijke overzichtspagina met de belangrijkste financiële inzichten. ' +

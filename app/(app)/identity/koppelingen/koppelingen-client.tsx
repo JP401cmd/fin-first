@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { ExternalLink, FileSpreadsheet, Landmark, Building2, PiggyBank, FileText, Trash2, Link2 } from 'lucide-react'
 import Link from 'next/link'
 import { ConnectionSection } from '@/components/connections/connection-section'
@@ -78,6 +78,8 @@ function linkedAssetHref(linkedAssetType: string): string {
 
 export function KoppelingenClient({ initialData, aangifteImports }: KoppelingenClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const moduleContext = pathname?.startsWith('/mijn') ? 'Mijn' : 'Identiteit'
   const { addToast } = useToast()
   const { masked } = useMaskedAmounts()
 
@@ -273,7 +275,7 @@ export function KoppelingenClient({ initialData, aangifteImports }: KoppelingenC
             className="inline-block h-px w-7 shrink-0"
             style={{ background: 'var(--module-active-500)' }}
           />
-          Identiteit · automatische koppelingen
+          {moduleContext} · automatische koppelingen
         </div>
         {/* Headline met italic-em "automatisch" */}
         <h1

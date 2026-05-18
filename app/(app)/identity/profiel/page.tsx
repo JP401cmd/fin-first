@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { HouseholdSection } from '@/components/app/household-section'
 import { useModuleColors, useBudgetColors, usePhaseColors } from '@/components/app/module-color-provider'
@@ -11,6 +12,8 @@ type HouseholdType = 'solo' | 'samen' | 'gezin'
 
 export default function ProfielPage() {
   const supabase = createClient()
+  const pathname = usePathname()
+  const moduleContext = pathname?.startsWith('/mijn') ? 'Mijn' : 'Identiteit'
   const { setConfig } = useModuleColors()
   const { setBudgetConfig } = useBudgetColors()
   const { setPhaseConfig } = usePhaseColors()
@@ -179,7 +182,7 @@ export default function ProfielPage() {
             className="inline-block h-px w-7 shrink-0"
             style={{ background: 'var(--module-active-500)' }}
           />
-          Identiteit · profiel
+          {moduleContext} · profiel
         </div>
         <h1
           className="font-bold text-3xl tracking-[-0.02em]"
