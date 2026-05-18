@@ -23,6 +23,7 @@ import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
+import { BriefingHistory } from '@/components/daishboard/briefing-history'
 
 interface WillLandingProps {
   dashboardData: DashboardData
@@ -160,6 +161,11 @@ export function WillLanding({
             aiEnabled={aiEnabled}
           />
         </section>
+
+        {/* ── Briefing geschiedenis link ── */}
+        <div className="mt-3 px-4 sm:px-6">
+          <BriefingHistory data={dashboardData} />
+        </div>
 
         {/* ── Stappenplannen-strook (boven het widget grid) ── */}
         <StappenplannenStrook data={dashboardData} />

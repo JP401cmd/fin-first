@@ -154,7 +154,7 @@ export function TransactionForm({
       await supabase.from('transaction_splits').delete().eq('transaction_id', transaction.id)
     }
 
-    // 2. Bulk update (als scope niet 'single')
+    // 2. Bulk update existing transactions (als scope niet 'single')
     if (scope !== 'single' && matchName) {
       let query = supabase
         .from('transactions')
@@ -173,8 +173,12 @@ export function TransactionForm({
       }
 
       await query
+    }
 
-      // 3. Upsert category_correction rule
+    // 3. Always save correction rule — system learns from every budget
+    // correction, regardless of scope. Future imports from the same source
+    // will automatically get the corrected category.
+    if (matchName) {
       await supabase
         .from('category_corrections')
         .delete()

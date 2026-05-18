@@ -22,6 +22,20 @@ interface Props {
   aiEnabled?: boolean
 }
 
+import { saveBriefingToLocalHistory } from './briefing-history'
+
+/** Persist a completed briefing to history (localStorage + optional server) */
+function saveBriefingToHistory(cards: BriefingCardSpec[], composedAt: string): void {
+  // Primary: localStorage (immediate, no dependency on migration)
+  saveBriefingToLocalHistory(cards, composedAt)
+  // Secondary: server-side persistence (for cross-device sync, when migration is applied)
+  fetch('/api/briefing/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cards, composedAt }),
+  }).catch(() => { /* non-critical — silent fail */ })
+}
+
 /** Stable cache key — v3 breaks old sessionStorage cache intentionally */
 const CACHE_KEY = 'briefing_v3'
 
@@ -322,6 +336,8 @@ export function DAIshboard({ data, temporal, userName, aiEnabled = true }: Props
           updateLongTermMemory(result.cards, result.composedAt, data)
           // Update seasonal snapshot for year-over-year comparisons
           updateSeasonalSnapshot(temporal.month, temporal.year, data.monthlyExpenses ?? 0, data.monthlyIncome ?? 0)
+          // Persist to server-side history for /will briefing archive
+          saveBriefingToHistory(result.cards, result.composedAt)
         } else if (result.type === 'error') {
           setError(result.message)
           setComposing(false)
