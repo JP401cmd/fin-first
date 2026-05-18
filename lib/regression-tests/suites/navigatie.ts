@@ -21,7 +21,7 @@ const NAV_ITEMS = [
 
 const REDIRECTS = [
   { from: '/identity/voortgang', to: '/identity' },
-  { from: '/identity/widgets', to: '/identity/instellingen' },
+  { from: '/identity/widgets', to: '/will' },
   { from: '/identity/parameters', to: '/identity/instellingen' },
   { from: '/core/cash', to: '/core/assets' },
 ]
@@ -83,8 +83,8 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'nav-redirect-widgets', name: 'Redirect /identity/widgets → /identity/instellingen', category: CAT,
-    description: 'Widgets pagina redirectt naar instellingen',
+    id: 'nav-redirect-widgets', name: 'Redirect /identity/widgets → /will', category: CAT,
+    description: 'Widgets pagina redirectt naar /will (dashboard met widget edit-mode)',
     priority: 'high', estimatedDurationMs: 500,
     async fn() {
       const res = await fetchNoRedirect('/identity/widgets')
@@ -95,8 +95,8 @@ const tests: TestCase[] = [
       if (isRedirect(res.status)) {
         const location = res.headers.get('location') ?? ''
         assert(
-          location.includes('/identity/instellingen') || location.includes('/login'),
-          `Expected redirect to /identity/instellingen or /login, got ${location}`,
+          location.includes('/will') || location.includes('/login'),
+          `Expected redirect to /will or /login, got ${location}`,
         )
       }
     },

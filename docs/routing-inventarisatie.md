@@ -215,7 +215,7 @@ Eigen layout `app/(app)/horizon/doorrekening-test/layout.tsx` + `layout-client.t
 | URL                          | Bestand                                            | Doel                              | Type   |
 |-------------------------------|----------------------------------------------------|------------------------------------|--------|
 | `/identity/voortgang`        | `app/(app)/identity/voortgang/page.tsx`            | → `/identity`                       | Server-redirect |
-| `/identity/widgets`          | `app/(app)/identity/widgets/page.tsx`              | → `/identity/instellingen`          | Server-redirect |
+| `/identity/widgets`          | `app/(app)/identity/widgets/page.tsx`              | → `/will`                           | Server-redirect (widget edit-mode op dashboard) |
 | `/identity/parameters`       | `app/(app)/identity/parameters/page.tsx`           | → `/identity/instellingen` (sectie C — FIRE) | Server-redirect |
 
 ---

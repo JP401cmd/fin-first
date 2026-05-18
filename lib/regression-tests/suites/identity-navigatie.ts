@@ -20,7 +20,7 @@ const IDENTITY_NAV_TABS = [
 const IDENTITY_REDIRECTS = [
   { from: '/identity/voortgang', to: '/identity', description: 'Voortgang → Overzicht' },
   { from: '/identity/parameters', to: '/identity/instellingen', description: 'Parameters → Instellingen' },
-  { from: '/identity/widgets', to: '/identity/instellingen', description: 'Widgets → Instellingen' },
+  { from: '/identity/widgets', to: '/will', description: 'Widgets → Will (dashboard)' },
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -90,9 +90,9 @@ const tests: TestCase[] = [
   // ── Step 3: /identity/widgets redirect ───────────────────────────────────
   {
     id: 'id-nav-widgets-redirect',
-    name: 'Redirect /identity/widgets → /identity/instellingen',
+    name: 'Redirect /identity/widgets → /will',
     category: CAT,
-    description: 'Widgets pagina redirectt correct naar instellingen',
+    description: 'Widgets pagina redirectt naar /will (dashboard met widget edit-mode)',
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
@@ -103,8 +103,8 @@ const tests: TestCase[] = [
       )
       const location = res.headers.get('location') ?? ''
       assert(
-        location.includes('/identity/instellingen') || location.includes('/login'),
-        `Expected redirect to /identity/instellingen or /login, got ${location}`,
+        location.includes('/will') || location.includes('/login'),
+        `Expected redirect to /will or /login, got ${location}`,
       )
     },
   },
