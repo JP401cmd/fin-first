@@ -2,16 +2,19 @@
 
 // ── net-worth-projection-chart.tsx ──────────────────────────────────
 //
-// SVG chart: netto-vermogen-projectie van nu tot pensioenleeftijd (AOW).
-// Toont een lijn met het verwachte vermogenspad op basis van huidig
-// vermogen, maandelijkse besparingen, rendement en inflatie.
+// SVG chart: netto-vermogen-projectie met toggle korte/lange termijn.
+// Korte termijn: 5 jaar met kwartaal-resolutie (gedetailleerd).
+// Lange termijn: tot pensioenleeftijd (AOW) met jaar-resolutie.
+//
+// Beide views gebruiken dezelfde data maar met andere schaal.
+// Toggle: segmented control "5 jaar" / "Tot pensioen".
 //
 // X-as: leeftijd (of jaren vanaf nu als leeftijd onbekend)
 // Y-as: vermogen in EUR
 // Rekent met real return (rendement − inflatie) zodat de projectie
 // in koopkracht-termen is.
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -20,6 +23,8 @@ import { Kicker } from '@/components/editorial'
 import { NL_AOW_AGE } from '@/lib/constants'
 
 // ── Types ──────────────────────────────────────────────────────────
+
+type TimeRange = '5j' | 'pensioen'
 
 interface ProjectionPoint {
   /** Leeftijd (fractional) of jaar-offset als leeftijd onbekend. */
@@ -122,6 +127,116 @@ function computeProjection(
   return points
 }
 
+// ── Short-term projection (5 jaar, kwartaal-resolutie) ─────────────
+
+const SHORT_TERM_YEARS = 5
+const MONTHS_PER_QUARTER = 3
+
+function computeShortTermProjection(
+  currentAge: number | null,
+  netWorth: number,
+  monthlySavings: number,
+  grossReturn: number,
+  inflationRate: number,
+): ProjectionPoint[] {
+  const startAge = currentAge ?? 30
+  const monthlyGross = grossReturn / 12
+  const monthlyInflation = inflationRate / 12
+
+  const totalQuarters = SHORT_TERM_YEARS * 4
+  const points: ProjectionPoint[] = []
+
+  // Start point
+  points.push({
+    age: startAge,
+    label: currentAge != null ? `${startAge}` : 'Nu',
+    nominal: netWorth,
+    real: netWorth,
+  })
+
+  let nominalValue = netWorth
+  let realValue = netWorth
+
+  for (let q = 1; q <= totalQuarters; q++) {
+    // Compute quarter-end values month by month for accuracy
+    for (let m = 0; m < MONTHS_PER_QUARTER; m++) {
+      nominalValue = nominalValue * (1 + monthlyGross) + monthlySavings
+      realValue = realValue * (1 + (monthlyGross - monthlyInflation)) + monthlySavings
+    }
+
+    const ageOffset = q * 0.25
+    const age = startAge + ageOffset
+    const yearNum = Math.floor(q / 4)
+    const quarterInYear = q % 4
+
+    let label: string
+    if (quarterInYear === 0) {
+      // Full year mark
+      label = currentAge != null ? `${startAge + yearNum}` : `+${yearNum}j`
+    } else {
+      // Quarter mark — only show for year boundaries + halfway
+      label = quarterInYear === 2
+        ? (currentAge != null ? `${startAge + yearNum}½` : `+${yearNum}½j`)
+        : ''
+    }
+
+    points.push({
+      age,
+      label,
+      nominal: Math.max(0, nominalValue),
+      real: Math.max(0, realValue),
+    })
+  }
+
+  return points
+}
+
+// ── Range toggle ───────────────────────────────────────────────────
+//
+// Visueel identiek aan PeriodToggle/ViewToggle elders in de app:
+// h-7, font 11px UPPERCASE tracking-[0.06em], active state
+// `bg-kern-100 text-kern-800`. Compact genoeg voor inline embedding.
+
+const RANGE_OPTIONS: { key: TimeRange; label: string }[] = [
+  { key: '5j', label: '5 jaar' },
+  { key: 'pensioen', label: 'Tot pensioen' },
+]
+
+function RangeToggle({
+  value,
+  onChange,
+}: {
+  value: TimeRange
+  onChange: (next: TimeRange) => void
+}) {
+  return (
+    <div
+      className="flex items-center border border-[var(--border-ed)] bg-[var(--paper)]"
+      role="group"
+      aria-label="Tijdshorizon selecteren"
+    >
+      {RANGE_OPTIONS.map((opt) => {
+        const active = opt.key === value
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => onChange(opt.key)}
+            aria-pressed={active}
+            className={`inline-flex h-7 shrink-0 items-center justify-center px-3 text-[11px] font-medium uppercase tracking-[0.06em] transition-colors ${
+              active
+                ? 'bg-kern-100 text-kern-800'
+                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+            }`}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Chart component ────────────────────────────────────────────────
 
 export function NetWorthProjectionChart({
@@ -136,8 +251,9 @@ export function NetWorthProjectionChart({
 }: NetWorthProjectionChartProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 800 })
   const { masked } = useMaskedAmounts()
+  const [range, setRange] = useState<TimeRange>('pensioen')
 
-  const points = useMemo(
+  const longTermPoints = useMemo(
     () =>
       computeProjection(
         currentAge,
@@ -149,6 +265,21 @@ export function NetWorthProjectionChart({
       ),
     [currentAge, aowAge, netWorth, monthlySavings, grossReturn, inflationRate],
   )
+
+  const shortTermPoints = useMemo(
+    () =>
+      computeShortTermProjection(
+        currentAge,
+        netWorth,
+        monthlySavings,
+        grossReturn,
+        inflationRate,
+      ),
+    [currentAge, netWorth, monthlySavings, grossReturn, inflationRate],
+  )
+
+  const points = range === '5j' ? shortTermPoints : longTermPoints
+  const isShortTerm = range === '5j'
 
   // Don't render if we have no meaningful data
   if (points.length < 2 || (netWorth === 0 && monthlySavings <= 0)) {
@@ -184,13 +315,18 @@ export function NetWorthProjectionChart({
     minVal + (valRange / Y_GRID_LINES) * i,
   )
 
-  // X-axis labels — pick ~6 evenly spaced labels
-  const labelCount = Math.min(6, points.length)
-  const labelIndices = Array.from({ length: labelCount }, (_, i) =>
-    Math.round((i / (labelCount - 1)) * (points.length - 1)),
-  )
+  // X-axis labels — short-term uses only labelled points, long-term picks ~6 evenly spaced
+  const labelIndices = isShortTerm
+    ? points.reduce<number[]>((acc, p, i) => {
+        if (p.label !== '') acc.push(i)
+        return acc
+      }, [])
+    : Array.from(
+        { length: Math.min(6, points.length) },
+        (_, i) => Math.round((i / (Math.min(6, points.length) - 1)) * (points.length - 1)),
+      )
 
-  // AOW marker position — always the last point
+  // AOW marker position — only in long-term view, always the last point
   const aowX = toX(points.length - 1)
 
   // Fire target line
@@ -236,17 +372,30 @@ export function NetWorthProjectionChart({
     ? Math.round(aowAge > 0 ? aowAge : NL_AOW_AGE)
     : null
 
+  const endLabel = isShortTerm
+    ? 'Over 5 jaar'
+    : pensionAge != null
+      ? `Bij pensioen (${pensionAge})`
+      : 'Bij pensioen'
+
   const chartContent = (
     <>
-        <div className="mb-1">
+        <div className="mb-1 flex items-center justify-between gap-3">
           <Kicker>Vermogensprognose</Kicker>
+          <RangeToggle value={range} onChange={setRange} />
         </div>
         <p className="text-sm text-[var(--ink-2)] font-serif italic">
-          Geschat vermogensverloop tot{' '}
-          {pensionAge != null ? (
-            <>pensioenleeftijd ({pensionAge})</>
+          {isShortTerm ? (
+            <>Gedetailleerd vermogensverloop komende 5 jaar</>
           ) : (
-            <>pensioen (AOW)</>
+            <>
+              Geschat vermogensverloop tot{' '}
+              {pensionAge != null ? (
+                <>pensioenleeftijd ({pensionAge})</>
+              ) : (
+                <>pensioen (AOW)</>
+              )}
+            </>
           )}
         </p>
 
@@ -262,7 +411,7 @@ export function NetWorthProjectionChart({
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
-              Bij pensioen (nominaal)
+              {endLabel} (nominaal)
             </p>
             <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
               <MaskedAmount value={lastPoint.nominal} tone="kern" className="text-base font-semibold" />
@@ -285,7 +434,10 @@ export function NetWorthProjectionChart({
             viewBox={`0 0 ${SVG_W} ${SVG_H}`}
             className="overflow-visible"
             role="img"
-            aria-label={`Netto vermogen projectie tot ${pensionAge ?? 'pensioen'}${pensionAge ? ` jaar` : ''}`}
+            aria-label={isShortTerm
+            ? 'Netto vermogen projectie komende 5 jaar'
+            : `Netto vermogen projectie tot ${pensionAge ?? 'pensioen'}${pensionAge ? ' jaar' : ''}`
+          }
           >
             {/* Y-axis grid lines + labels */}
             {yGridValues.map((val, i) => (
@@ -424,30 +576,63 @@ export function NetWorthProjectionChart({
               }}
             />
 
-            {/* AOW marker — vertical line at pension age */}
-            <line
-              x1={aowX}
-              x2={aowX}
-              y1={PAD.top}
-              y2={PAD.top + CHART_H}
-              stroke="var(--ink-4)"
-              strokeWidth="1"
-              strokeDasharray="3 2"
-              opacity={hasEntered ? 0.5 : 0}
-              style={{ transition: 'opacity 400ms ease-out 500ms' }}
-            />
-            <text
-              x={aowX}
-              y={PAD.top - 4}
-              textAnchor="middle"
-              fill="var(--ink-3)"
-              fontSize="9"
-              fontFamily="var(--font-mono, monospace)"
-              opacity={hasEntered ? 1 : 0}
-              style={{ transition: 'opacity 400ms ease-out 500ms' }}
-            >
-              {pensionAge != null ? `AOW ${pensionAge}` : 'AOW'}
-            </text>
+            {/* AOW marker — vertical line at pension age (long-term only) */}
+            {!isShortTerm && (
+              <>
+                <line
+                  x1={aowX}
+                  x2={aowX}
+                  y1={PAD.top}
+                  y2={PAD.top + CHART_H}
+                  stroke="var(--ink-4)"
+                  strokeWidth="1"
+                  strokeDasharray="3 2"
+                  opacity={hasEntered ? 0.5 : 0}
+                  style={{ transition: 'opacity 400ms ease-out 500ms' }}
+                />
+                <text
+                  x={aowX}
+                  y={PAD.top - 4}
+                  textAnchor="middle"
+                  fill="var(--ink-3)"
+                  fontSize="9"
+                  fontFamily="var(--font-mono, monospace)"
+                  opacity={hasEntered ? 1 : 0}
+                  style={{ transition: 'opacity 400ms ease-out 500ms' }}
+                >
+                  {pensionAge != null ? `AOW ${pensionAge}` : 'AOW'}
+                </text>
+              </>
+            )}
+
+            {/* 5-year end marker — short-term only */}
+            {isShortTerm && (
+              <>
+                <line
+                  x1={toX(points.length - 1)}
+                  x2={toX(points.length - 1)}
+                  y1={PAD.top}
+                  y2={PAD.top + CHART_H}
+                  stroke="var(--ink-4)"
+                  strokeWidth="1"
+                  strokeDasharray="3 2"
+                  opacity={hasEntered ? 0.4 : 0}
+                  style={{ transition: 'opacity 400ms ease-out 500ms' }}
+                />
+                <text
+                  x={toX(points.length - 1)}
+                  y={PAD.top - 4}
+                  textAnchor="middle"
+                  fill="var(--ink-3)"
+                  fontSize="9"
+                  fontFamily="var(--font-mono, monospace)"
+                  opacity={hasEntered ? 1 : 0}
+                  style={{ transition: 'opacity 400ms ease-out 500ms' }}
+                >
+                  +5 jaar
+                </text>
+              </>
+            )}
 
             {/* End point dots */}
             <circle
