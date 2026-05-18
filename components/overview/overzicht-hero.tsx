@@ -185,20 +185,37 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
       {freedomPct != null && (
         <Link
           href="/toekomst"
-          className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-ed)] bg-gradient-to-r from-violet-50 to-stone-50 p-3 sm:p-4 hover:border-violet-300 hover:shadow-sm transition-all group"
+          className="mt-3 flex flex-col gap-2 rounded-xl border border-[var(--border-ed)] bg-gradient-to-r from-violet-50 to-stone-50 p-3 sm:p-4 hover:border-violet-300 hover:shadow-sm transition-all group"
         >
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
-              Op weg naar vrijheid
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+                Op weg naar vrijheid
+              </div>
+              <div className="mt-0.5 text-sm sm:text-base text-[var(--ink)]">
+                Je bent <strong className="font-serif text-lg sm:text-xl text-violet-700">{Math.round(freedomPct)}%</strong>
+                {' '}op weg naar het moment dat je niet meer hoeft te werken voor geld.
+              </div>
             </div>
-            <div className="mt-0.5 text-sm sm:text-base text-[var(--ink)]">
-              Je bent <strong className="font-serif text-lg sm:text-xl text-violet-700">{Math.round(freedomPct)}%</strong>
-              {' '}op weg naar het moment dat je niet meer hoeft te werken voor geld.
-            </div>
+            <span className="shrink-0 text-xs font-semibold text-violet-700 group-hover:underline">
+              Bekijk projectie →
+            </span>
           </div>
-          <span className="shrink-0 text-xs font-semibold text-violet-700 group-hover:underline">
-            Bekijk projectie →
-          </span>
+          {/* Visuele progress-bar — toont freedomPct als geleidelijke vulling
+              van violet-300. Klein detail dat het percentage tastbaar maakt. */}
+          <div
+            className="h-1.5 rounded-full bg-violet-100 overflow-hidden"
+            role="progressbar"
+            aria-valuenow={Math.round(freedomPct)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Voortgang naar financiële vrijheid"
+          >
+            <div
+              className="h-full bg-gradient-to-r from-violet-500 to-violet-700 transition-all duration-700"
+              style={{ width: `${Math.min(100, Math.max(0, freedomPct))}%` }}
+            />
+          </div>
         </Link>
       )}
 
