@@ -158,9 +158,11 @@ export function CoreHero({
           {/* Gezondheidsscore — prominent SVG-gauge met pilaar-bars */}
           <HealthScoreHero healthScore={healthScore} onClick={onShowHealthReceipt} />
 
-          {/* Tijdslijn — vermogensprognose als inline embed */}
+          {/* Tijdslijn — vermogensprognose als inline embed.
+              overflow-x-auto enables horizontal touch-scroll on mobile when the
+              chart's min-width exceeds the viewport. */}
           {timelineSlot && (
-            <div className="min-w-0 overflow-hidden border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-4 sm:px-5">
+            <div className="min-w-0 overflow-x-auto border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-4 sm:px-5">
               {timelineSlot}
             </div>
           )}

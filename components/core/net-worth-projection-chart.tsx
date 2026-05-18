@@ -223,7 +223,7 @@ function RangeToggle({
             type="button"
             onClick={() => onChange(opt.key)}
             aria-pressed={active}
-            className={`inline-flex h-7 shrink-0 items-center justify-center px-3 text-[11px] font-medium uppercase tracking-[0.06em] transition-colors ${
+            className={`inline-flex min-h-[44px] shrink-0 items-center justify-center px-4 text-[11px] font-medium uppercase tracking-[0.06em] transition-colors sm:min-h-[28px] sm:px-3 ${
               active
                 ? 'bg-kern-100 text-kern-800'
                 : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
@@ -380,7 +380,7 @@ export function NetWorthProjectionChart({
 
   const chartContent = (
     <>
-        <div className="mb-1 flex items-center justify-between gap-3">
+        <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <Kicker>Vermogensprognose</Kicker>
           <RangeToggle value={range} onChange={setRange} />
         </div>
@@ -427,12 +427,12 @@ export function NetWorthProjectionChart({
           </div>
         </div>
 
-        {/* SVG Chart */}
-        <div ref={ref} className="mt-5 -mx-1 overflow-x-auto">
+        {/* SVG Chart — min-w ensures labels stay readable on narrow screens;
+            overflow-x-auto + touch-action enable mobile horizontal swipe. */}
+        <div ref={ref} className="mt-5 -mx-1 overflow-x-auto overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           <svg
-            width="100%"
+            className="w-full min-w-[420px] overflow-visible"
             viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-            className="overflow-visible"
             role="img"
             aria-label={isShortTerm
             ? 'Netto vermogen projectie komende 5 jaar'
