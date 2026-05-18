@@ -58,6 +58,25 @@ const HEFBOMEN: ReadonlyArray<{
  * met de bandbreedtes uit financial-health.ts (Sterk ≥ 70, Redelijk 50-70,
  * Kwetsbaar/Kritiek < 50). Pillar zonder score → neutraal.
  */
+/**
+ * Vertaal score-pillars naar een tijds-anker. Voorkeur: fire_progress (voortgang
+ * naar vrijheid), fallback: emergency_fund (maanden buffer). Filtert "0..."-
+ * waardes uit zodat we geen verwarrende "0% op weg" / "0 maanden buffer" tonen.
+ */
+function getTimeAnchor(
+  health: HealthScore,
+): { kind: 'fire' | 'buffer'; value: string } | null {
+  const firePillar = health.pillars.find((p) => p.id === 'fire_progress')
+  if (firePillar?.rawValue && !firePillar.rawValue.startsWith('0')) {
+    return { kind: 'fire', value: firePillar.rawValue }
+  }
+  const bufferPillar = health.pillars.find((p) => p.id === 'emergency_fund')
+  if (bufferPillar?.rawValue && !bufferPillar.rawValue.startsWith('0')) {
+    return { kind: 'buffer', value: bufferPillar.rawValue }
+  }
+  return null
+}
+
 function pillarStatus(score: number | null | undefined): 'good' | 'warn' | 'bad' | 'neutral' {
   if (score == null) return 'neutral'
   if (score >= 70) return 'good'
@@ -122,10 +141,13 @@ export function OverzichtHero({
 
   // Bouw doelen-display: koppel goals met hun progress op index, sorteer
   // achterop-achter doelen eerst (krijgen meer aandacht). Skip voltooide.
+  // Type-guard predicate narrowt het type zodat we daarna geen `!` nodig hebben.
   const goalDisplay = (goals ?? [])
     .map((g, i) => ({ goal: g, progress: goalProgresses?.[i] ?? null }))
-    .filter((g) => g.progress && g.progress.pct < 100)
-    .sort((a, b) => Number(!a.progress!.onTrack) - Number(!b.progress!.onTrack))
+    .filter((g): g is { goal: GoalWithBudget; progress: GoalProgress } =>
+      g.progress != null && g.progress.pct < 100,
+    )
+    .sort((a, b) => Number(!a.progress.onTrack) - Number(!b.progress.onTrack))
     .slice(0, 3)
 
   return (
@@ -152,10 +174,7 @@ export function OverzichtHero({
             <strong className="font-semibold text-[var(--ink)]">
               {goalDisplay.length}
             </strong>{' '}
-            {goalDisplay.length === 1 ? 'actief doel' : 'actieve doelen'}
-            {goalDisplay.length === 1
-              ? ' — kijk hoever je bent.'
-              : ' — kijk hoever je bent.'}
+            {goalDisplay.length === 1 ? 'actief doel' : 'actieve doelen'} — kijk hoever je bent.
           </p>
         )}
       </header>
@@ -179,10 +198,11 @@ export function OverzichtHero({
               title={tooltip}
               className="group relative flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
             >
-              {/* Status-dot rechtsboven */}
+              {/* Status-dot rechtsboven — sub-overline-label maakt het al
+                  zichtbaar voor screen readers; dot zelf is decoratief. */}
               <span
                 className={`absolute right-2.5 top-2.5 sm:right-3 sm:top-3 w-2 h-2 rounded-full ${STATUS_DOT[status]}`}
-                aria-label={STATUS_LABEL[status]}
+                aria-hidden="true"
                 title={STATUS_LABEL[status]}
               />
               <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${accent}`}>
@@ -383,65 +403,85 @@ function MiniTimelineStrip({
   )
 }
 
-function HealthScoreEmptyState() {
+/**
+ * Gedeelde lege-staat-card voor de hero. Geïdentificeerde
+ * empty-states (Health, Doelen) deelden ~80% markup — dit
+ * extracteer-component houdt copy + styling op één plek.
+ */
+function EmptyStateCard({
+  icon: Icon,
+  iconColor,
+  iconBg,
+  kicker,
+  title,
+  body,
+  ctaHref,
+  ctaLabel,
+}: {
+  icon: typeof Activity
+  iconColor: string
+  iconBg: string
+  kicker: string
+  title: string
+  body: string
+  ctaHref: string
+  ctaLabel: string
+}) {
   return (
     <article className="flex flex-col rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
-          <Activity className="w-5 h-5 text-amber-700" />
+        <div className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center`}>
+          <Icon className={`w-5 h-5 ${iconColor}`} />
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Gezondheid
+            {kicker}
           </div>
           <div className="text-base font-semibold text-[var(--ink)]">
-            Nog geen score
+            {title}
           </div>
         </div>
       </div>
       <p className="text-sm text-[var(--ink-2)] leading-relaxed mb-4">
-        Voeg bezittingen of een schuld toe en je financiële gezondheid
-        verschijnt — vier pijlers (buffer, schuld, sparen, vrijheid) die
-        samen één cijfer vormen.
+        {body}
       </p>
       <Link
-        href="/overzicht/bezittingen"
+        href={ctaHref}
         className="self-start inline-flex items-center gap-2 bg-stone-900 text-white px-4 py-2.5 rounded-lg text-sm font-semibold min-h-[44px] hover:bg-stone-800 transition-colors"
       >
-        Voeg bezitting toe →
+        {ctaLabel}
       </Link>
     </article>
   )
 }
 
+function HealthScoreEmptyState() {
+  return (
+    <EmptyStateCard
+      icon={Activity}
+      iconColor="text-amber-700"
+      iconBg="bg-amber-50"
+      kicker="Gezondheid"
+      title="Nog geen score"
+      body="Voeg bezittingen of een schuld toe en je financiële gezondheid verschijnt — vier pijlers (buffer, schuld, sparen, vrijheid) die samen één cijfer vormen."
+      ctaHref="/overzicht/bezittingen"
+      ctaLabel="Voeg bezitting toe →"
+    />
+  )
+}
+
 function DoelenEmptyState() {
   return (
-    <article className="flex flex-col rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-5 sm:p-6">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center">
-          <Target className="w-5 h-5 text-violet-700" />
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Doelen
-          </div>
-          <div className="text-base font-semibold text-[var(--ink)]">
-            Stel je eerste doel
-          </div>
-        </div>
-      </div>
-      <p className="text-sm text-[var(--ink-2)] leading-relaxed mb-4">
-        Een doel maakt zichtbaar waar je naar toe werkt — vrijheid op je
-        62e, kind in 2027, of een ander mijlpaal. Voortgang zie je dan
-        elke keer dat je inlogt.
-      </p>
-      <Link
-        href="/toekomst"
-        className="self-start inline-flex items-center gap-2 bg-stone-900 text-white px-4 py-2.5 rounded-lg text-sm font-semibold min-h-[44px] hover:bg-stone-800 transition-colors"
-      >
-        Maak een doel →
-      </Link>
-    </article>
+    <EmptyStateCard
+      icon={Target}
+      iconColor="text-violet-700"
+      iconBg="bg-violet-50"
+      kicker="Doelen"
+      title="Stel je eerste doel"
+      body="Een doel maakt zichtbaar waar je naar toe werkt — vrijheid op je 62e, kind in 2027, of een ander mijlpaal. Voortgang zie je dan elke keer dat je inlogt."
+      ctaHref="/toekomst"
+      ctaLabel="Maak een doel →"
+    />
   )
 }
 
@@ -513,7 +553,12 @@ function HealthScoreCard({
   health: HealthScore
   onOpenReceipt: () => void
 }) {
-  const band = health.label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') as keyof typeof BAND_STYLES
+  // Normaliseer label naar BAND_STYLES-key. Combining-marks-range ̀-ͯ
+  // strips diakritische tekens. Whitelist-pattern: alleen geldige keys passen;
+  // onbekende labels (bv. nieuwe band uit financial-health.ts) vallen veilig
+  // terug op 'redelijk' i.p.v. silent te crashen.
+  const normalized = health.label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const band: keyof typeof BAND_STYLES = (normalized in BAND_STYLES ? normalized : 'redelijk') as keyof typeof BAND_STYLES
   const style = BAND_STYLES[band] ?? BAND_STYLES.redelijk!
 
   // SVG ring math
@@ -526,6 +571,10 @@ function HealthScoreCard({
 
   // Animeer de stroke-vulling bij eerste view (respecteert prefers-reduced-motion).
   const { ref, hasEntered } = useInViewAnimation({ duration: 700 })
+
+  // Tijds-anker voor onder de label-regel (uit pillars). Null als geen pillars
+  // beschikbaar OF alle anker-pillars 0 zijn.
+  const timeAnchor = getTimeAnchor(health)
 
   const trend = health.trend
   const trendLabel =
@@ -583,20 +632,14 @@ function HealthScoreCard({
         {health.previousMonth !== null && (
           <div className="text-xs text-[var(--ink-3)] mt-1">{trendLabel}</div>
         )}
-        {/* Filosofie-ankerpunt: vertaal de score-context naar tijd. Pakt de
-            fire_progress-pillar als die er is, anders emergency_fund (maanden
-            buffer). Maakt de score concreet — "Geld is opgeslagen tijd". */}
-        {(() => {
-          const firePillar = health.pillars.find((p) => p.id === 'fire_progress')
-          const bufferPillar = health.pillars.find((p) => p.id === 'emergency_fund')
-          const timeAnchor = firePillar?.rawValue ?? bufferPillar?.rawValue
-          if (!timeAnchor) return null
-          return (
-            <div className="text-[11px] text-[var(--ink-3)] mt-1 italic">
-              {firePillar ? `${timeAnchor} op weg` : `${timeAnchor} buffer`}
-            </div>
-          )
-        })()}
+        {/* Filosofie-ankerpunt: vertaal de score-context naar tijd via
+            getTimeAnchor-helper. Maakt de score concreet conform de project-
+            filosofie "Geld is opgeslagen tijd". */}
+        {timeAnchor && (
+          <div className="text-[11px] text-[var(--ink-3)] mt-1 italic">
+            {timeAnchor.kind === 'fire' ? `${timeAnchor.value} op weg` : `${timeAnchor.value} buffer`}
+          </div>
+        )}
         <div className="text-[11px] text-[var(--ink-3)] mt-2 underline decoration-dotted underline-offset-2">
           Toon onderverdeling →
         </div>

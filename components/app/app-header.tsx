@@ -18,9 +18,9 @@ import { ShellFlagToggle } from '@/components/app/shell/shell-flag-toggle'
 
 // Static config for each nav module — label, path, and color token
 const navConfig: Record<string, { label: string; href: string; color: string }> = {
-  kern:    { label: 'De Kern',     href: '/core',    color: 'amber'  },
-  wil:     { label: 'De Wil',      href: '/will',    color: 'teal'   },
-  horizon: { label: 'De Horizon',  href: '/horizon', color: 'purple' },
+  kern:    { label: 'Het Overzicht', href: '/overzicht', color: 'amber'  },
+  wil:     { label: 'De Wil',        href: '/overzicht', color: 'teal'   },
+  horizon: { label: 'De Toekomst',   href: '/toekomst',  color: 'purple' },
 }
 
 const activeClasses: Record<string, string> = {
