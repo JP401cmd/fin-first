@@ -1,5 +1,15 @@
 'use client'
 
+/**
+ * VasteLastenList — lichtgewicht read-only lijst van recurring_transactions
+ * voor cashflow view-switcher op /overzicht/cashflow?view=vaste-lasten.
+ * Per regel: category-icoon + naam + frequentie-label + bedrag (rechts).
+ * Niet-maandelijkse items tonen extra "€X/mnd"-equivalent. Sorteert op
+ * maandelijks equivalent (groot → klein), met totaal-counter onderaan.
+ *
+ * Geen edit/opzeg-actions — voor bewerking: Will-coach op /overzicht.
+ */
+
 import { CreditCard, Home, Zap, Shield, Car, Building, HelpCircle } from 'lucide-react'
 
 export type VasteLastenRow = {

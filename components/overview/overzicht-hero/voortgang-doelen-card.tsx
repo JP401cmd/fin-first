@@ -1,5 +1,13 @@
 'use client'
 
+/**
+ * VoortgangDoelenCard — list-view van actieve doelen op /overzicht hero.
+ * Per doel: status-icoon (CheckCircle2 onTrack / AlertCircle achter) +
+ * naam + percentage + voortgang-bar. Maximaal 3 doelen getoond (al
+ * gefilterd door caller). Klik op "Bekijk →" navigateert naar
+ * /toekomst voor goal-management.
+ */
+
 import Link from 'next/link'
 import { Target, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { GoalWithBudget } from '@/lib/will-data-loader'

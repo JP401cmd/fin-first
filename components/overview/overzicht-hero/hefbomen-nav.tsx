@@ -1,5 +1,13 @@
 'use client'
 
+/**
+ * HefbomenNav — vier-hefbomen-rij op /overzicht hero. Klikbare tegels
+ * naar /overzicht/{bezittingen,schulden,cashflow,belasting}. Status-dot
+ * rechtsboven elke tegel uit pillar.score van financial-health
+ * (groen/oranje/rood/grijs). Belasting met pillarKey null krijgt
+ * proxy uit health.total. Tooltip per tegel met korte uitleg.
+ */
+
 import Link from 'next/link'
 import { Banknote, CreditCard, Wallet, Receipt } from 'lucide-react'
 import type { HealthScore } from '@/lib/financial-health'
