@@ -1,3 +1,37 @@
+## Session 2026-05-18 - Features #771, #772
+
+### Feature #771: Module-namen verborgen in eindgebruiker-UI - PASSING
+- Added `getModuleLabel()` utility to `lib/module-registry.ts`
+  - Always returns human-readable label, never exposes raw module IDs
+  - Defensive fallback replaces underscores with spaces if catalog lookup fails
+- Fixed 3 user-facing fallbacks that could leak raw module IDs:
+  - `components/app/welcome-banner.tsx` — `?? moduleId` → `getModuleLabel(moduleId)`
+  - `components/app/module-activation-modal.tsx` — `?? moduleId` → `getModuleLabel(moduleId)`
+  - `components/daishboard/briefing-card-grid.tsx` — `?? moduleId` → `getModuleLabel(moduleId)`
+- Verified all widget kickers use human-readable names (not module slugs)
+- Verified navigation items show "De Kern", "De Wil", "De Horizon" (not raw IDs)
+- Verified FeatureGate fallback texts use feature labels, not module IDs
+- Zero console errors, TypeScript compiles clean
+- Commit: ff244897
+
+### Feature #772: Module-namen alleen zichtbaar in configuratiecontexten - PASSING
+- Verified /identity/instellingen shows "De Kern", "De Wil", "De Horizon" for module colors
+- Verified onboarding intent cards use human-readable labels (Coaching, Grip op uitgaven, etc.)
+- Verified /beheer admin panel shows module IDs (acceptable in admin context)
+- Verified no other pages expose raw module IDs as labels
+- Only remaining `?? moduleId` fallbacks are in admin pages and the getModuleLabel utility itself
+- No code changes needed (verification only, #771 fixes already covered this)
+
+### Files Modified
+- lib/module-registry.ts — NEW: getModuleLabel() utility function
+- components/app/welcome-banner.tsx — import + use getModuleLabel
+- components/app/module-activation-modal.tsx — import + use getModuleLabel
+- components/daishboard/briefing-card-grid.tsx — import + use getModuleLabel
+
+### Current Status
+- 2 features completed this session (#771, #772)
+- Overall progress: 805/861 passing (93.5%)
+
 ## Session 2026-05-18 - Features #765, #766
 
 ### Feature #765: FIRE parameter UI verborgen als standaard - PASSING
