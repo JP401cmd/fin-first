@@ -172,7 +172,11 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
             onOpenReceipt={() => setReceiptOpen(true)}
           />
         )}
-        {goalDisplay.length > 0 && <VoortgangDoelenCard items={goalDisplay} />}
+        {goalDisplay.length > 0 ? (
+          <VoortgangDoelenCard items={goalDisplay} />
+        ) : (
+          <DoelenEmptyState />
+        )}
       </div>
 
       {/* Vrijheid-strip: % op weg naar financiële vrijheid → klik naar Toekomst */}
@@ -208,6 +212,37 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
         </BottomSheet>
       )}
     </section>
+  )
+}
+
+function DoelenEmptyState() {
+  return (
+    <article className="flex flex-col rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-5 sm:p-6">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center">
+          <Target className="w-5 h-5 text-violet-700" />
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+            Doelen
+          </div>
+          <div className="text-base font-semibold text-[var(--ink)]">
+            Stel je eerste doel
+          </div>
+        </div>
+      </div>
+      <p className="text-sm text-[var(--ink-2)] leading-relaxed mb-4">
+        Een doel maakt zichtbaar waar je naar toe werkt — vrijheid op je
+        62e, kind in 2027, of een ander mijlpaal. Voortgang zie je dan
+        elke keer dat je inlogt.
+      </p>
+      <Link
+        href="/toekomst"
+        className="self-start inline-flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors"
+      >
+        Maak een doel →
+      </Link>
+    </article>
   )
 }
 
