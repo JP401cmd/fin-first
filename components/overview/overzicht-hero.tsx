@@ -19,6 +19,12 @@ type OverzichtHeroProps = {
   goalProgresses?: GoalProgress[]
   /** Percentage op weg naar financiële vrijheid (0-100). Uit healthScoreInput. */
   freedomPct?: number | null
+  /** Huidige leeftijd (afgerond) — null bij ontbrekende DOB. */
+  currentAge?: number | null
+  /** Vrijheidsleeftijd / pensioenleeftijd uit fireStrategy.endAge. */
+  endAge?: number | null
+  /** Pensioen-modus uit fireStrategy.strategy === 'pensioen'. */
+  isPensioenMode?: boolean
 }
 
 const BAND_STYLES: Record<string, { ring: string; label: string; text: string; bgInner: string }> = {
@@ -101,7 +107,16 @@ function greetingByHour(): string {
  *  - Status-dots op hefboom-tegels (groen/oranje/rood) op basis van
  *    LeverScores zodra die in scope zijn van /overzicht/page.tsx
  */
-export function OverzichtHero({ userName, health, goals, goalProgresses, freedomPct }: OverzichtHeroProps) {
+export function OverzichtHero({
+  userName,
+  health,
+  goals,
+  goalProgresses,
+  freedomPct,
+  currentAge,
+  endAge,
+  isPensioenMode,
+}: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
 
   // Bouw doelen-display: koppel goals met hun progress op index, sorteer
@@ -260,6 +275,18 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
         </Link>
       )}
 
+      {/* Mini-tijdslijn-strip: van vandaag naar vrijheid in leeftijd-jaren.
+          Klikbaar naar /toekomst voor volledige tijdas. Verbergt bij
+          ontbrekende DOB OF endAge zodat hero altijd compleet rendert. */}
+      {currentAge != null && endAge != null && endAge > currentAge && (
+        <MiniTimelineStrip
+          currentAge={currentAge}
+          endAge={endAge}
+          freedomPct={freedomPct ?? 0}
+          isPensioenMode={isPensioenMode ?? false}
+        />
+      )}
+
       {/* Drill-down sheet: kassabon met pillars per sub-score */}
       {health && (
         <BottomSheet
@@ -279,6 +306,74 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
         Geld is opgeslagen tijd
       </p>
     </section>
+  )
+}
+
+/**
+ * Mini-tijdslijn-strip: horizontale balk van vandaag → vrijheidsleeftijd.
+ * Eindlabel toont "Pensioen" of "Vrijheid" afhankelijk van fireStrategy.
+ * Klikbaar naar /toekomst voor volledige tijdas-projectie.
+ *
+ * Visuele compositie:
+ *  - Links: kicker + "Vandaag · X jaar"
+ *  - Midden: progress-bar (h-2 rounded-full) met freedomPct-fill
+ *           + age-marker per 5 jaar als verticale ticks
+ *  - Rechts: "Vrijheid · Y jaar" met aantal jaren-te-gaan in micro-copy
+ */
+function MiniTimelineStrip({
+  currentAge,
+  endAge,
+  freedomPct,
+  isPensioenMode,
+}: {
+  currentAge: number
+  endAge: number
+  freedomPct: number
+  isPensioenMode: boolean
+}) {
+  const yearsToGo = Math.max(0, endAge - currentAge)
+  const pct = Math.max(0, Math.min(100, freedomPct))
+  const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
+  return (
+    <Link
+      href="/toekomst"
+      className="mt-3 flex flex-col gap-2 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 hover:border-violet-300 hover:shadow-sm transition-all group"
+      aria-label={`Tijdslijn van ${currentAge} jaar nu naar ${endAge} jaar ${endLabel.toLowerCase()}`}
+    >
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <div className="flex flex-col">
+          <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+            Vandaag
+          </span>
+          <span className="font-mono text-sm font-semibold text-[var(--ink)]">{currentAge} jaar</span>
+        </div>
+        <div className="text-center">
+          <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+            {yearsToGo === 0 ? 'Bereikt' : `${yearsToGo} jaar te gaan`}
+          </span>
+        </div>
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+            {endLabel}
+          </span>
+          <span className="font-mono text-sm font-semibold text-[var(--ink)]">{endAge} jaar</span>
+        </div>
+      </div>
+      {/* Visuele balk met voortgang-fill (violet) en ticks */}
+      <div
+        className="relative h-2 rounded-full bg-stone-100 overflow-hidden"
+        role="progressbar"
+        aria-valuenow={Math.round(pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Voortgang naar ${endLabel.toLowerCase()}`}
+      >
+        <div
+          className="absolute inset-y-0 left-0 bg-gradient-to-r from-violet-500 to-violet-700 transition-all duration-700"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </Link>
   )
 }
 

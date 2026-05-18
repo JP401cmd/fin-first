@@ -6,6 +6,7 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { WillLanding } from '@/components/will/will-landing'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
+import { ageAtDate } from '@/lib/horizon-data'
 
 export const metadata: Metadata = {
   title: 'Overzicht — TriFinity',
@@ -53,6 +54,14 @@ export default async function OverzichtPage() {
   const health = horizonData?.healthScore ?? null
   const freedomPct = horizonData?.healthScoreInput?.freedomPct ?? null
 
+  // Mini-tijdslijn-strip inputs: huidige leeftijd uit DOB (kan null zijn) +
+  // vrijheidsleeftijd uit fireStrategy.endAge. Beide tonen we als markers
+  // op een lineaire age-bar in de hero.
+  const dob = horizonData?.effectiveInput?.dateOfBirth ?? null
+  const currentAge = dob ? Math.round(ageAtDate(dob)) : null
+  const endAge = horizonData?.fireStrategy?.endAge ?? null
+  const isPensioenMode = horizonData?.fireStrategy?.strategy === 'pensioen'
+
   return (
     <>
       <OverzichtHero
@@ -61,6 +70,9 @@ export default async function OverzichtPage() {
         goals={willData.goals}
         goalProgresses={willData.goalProgresses}
         freedomPct={freedomPct}
+        currentAge={currentAge}
+        endAge={endAge}
+        isPensioenMode={isPensioenMode}
       />
       <WillLanding
         dashboardData={dashboardData}
