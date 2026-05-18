@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -75,6 +75,11 @@ export function OverzichtHero({
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
 
+  // Memoize once per mount — datum + groet wisselen zelden tijdens een
+  // sessie. Voorkomt onnodige Intl-formatter-instances bij elke re-render.
+  const dateLabel = useMemo(() => formatDateNL(), [])
+  const greeting = useMemo(() => greetingByHour(), [])
+
   // Defensief: log dev-warning bij mismatch tussen goals + progresses-arrays.
   // Caller zou ze altijd parallel moeten leveren; mismatch wijst op een
   // loader-bug die anders silent gewone goals zou laten doorvallen.
@@ -111,10 +116,10 @@ export function OverzichtHero({
 
       <header className="mb-6 pr-12 sm:pr-16">
         <div className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-4)]">
-          {formatDateNL()}
+          {dateLabel}
         </div>
         <h1 className="mt-1 font-serif text-2xl md:text-3xl font-semibold text-[var(--ink)] leading-tight">
-          {greetingByHour()}
+          {greeting}
           {userName ? `, ${userName}` : ''}
         </h1>
         {goalDisplay.length > 0 && (
