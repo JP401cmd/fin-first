@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useId } from 'react'
 import {
   ASSET_TYPE_COLORS,
   ASSET_TYPE_ICONS,
@@ -891,19 +891,163 @@ function KassabonGroup({
 
 // ── Health-score drill-down kassabon ─────────────────────────
 
-/** Kleur-class op basis van pilaar-score. */
+/** Kleur-class op basis van pilaar-score (spec: groen >70, amber 40-70, rood <40). */
 function pillarScoreColorClass(score: number): string {
-  if (score >= 80) return 'text-score-good'
-  if (score >= 60) return 'text-score-ok'
-  if (score >= 40) return 'text-score-warn'
-  return 'text-score-bad'
+  if (score > 70) return 'text-emerald-600'
+  if (score >= 40) return 'text-amber-600'
+  return 'text-red-600'
 }
 
 function pillarBarColorClass(score: number): string {
-  if (score >= 80) return 'bg-score-good'
-  if (score >= 60) return 'bg-score-ok'
-  if (score >= 40) return 'bg-score-warn'
-  return 'bg-score-bad'
+  if (score > 70) return 'bg-emerald-500'
+  if (score >= 40) return 'bg-amber-500'
+  return 'bg-red-500'
+}
+
+function pillarScoreBgClass(score: number): string {
+  if (score > 70) return 'bg-emerald-50'
+  if (score >= 40) return 'bg-amber-50'
+  return 'bg-red-50'
+}
+
+function pillarScoreLabel(score: number): string {
+  if (score > 70) return 'Sterk'
+  if (score >= 40) return 'Gemiddeld'
+  return 'Zwak'
+}
+
+function pillarScoreFill(score: number): string {
+  if (score > 70) return 'var(--color-positive, #10b981)'
+  if (score >= 40) return 'var(--color-amber, #f59e0b)'
+  return 'var(--negative, #ef4444)'
+}
+
+/**
+ * Compacte radar/spider chart voor alle pilaar-scores in één oogopslag.
+ * Elke as representeert een pilaar (0-100), met zone-kleuren per drempelwaarde.
+ */
+function PillarRadarChart({ pillars, size = 200 }: { pillars: HealthPillar[]; size?: number }) {
+  const uid = useId()
+  const cx = size / 2
+  const cy = size / 2
+  const maxR = size / 2 - 24
+
+  const n = pillars.length
+  if (n < 3) return null
+
+  function polygonPoints(scores: number[]): string {
+    return scores
+      .map((score, i) => {
+        const angle = (Math.PI * 2 * i) / n - Math.PI / 2
+        const r = (score / 100) * maxR
+        const px = cx + r * Math.cos(angle)
+        const py = cy + r * Math.sin(angle)
+        return `${px.toFixed(1)},${py.toFixed(1)}`
+      })
+      .join(' ')
+  }
+
+  const gridLevels = [40, 70, 100]
+
+  const labelPositions = pillars.map((_, i) => {
+    const angle = (Math.PI * 2 * i) / n - Math.PI / 2
+    const labelR = maxR + 16
+    return {
+      x: cx + labelR * Math.cos(angle),
+      y: cy + labelR * Math.sin(angle),
+      anchor: Math.cos(angle) < -0.3 ? 'end' : Math.cos(angle) > 0.3 ? 'start' : 'middle',
+    }
+  })
+
+  const dataPoints = polygonPoints(pillars.map(p => p.score))
+
+  return (
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      className="w-full max-w-[200px] h-auto mx-auto"
+      role="img"
+      aria-label={`Radar chart van ${n} financiële gezondheids-pilaren. ${pillars.map(p => `${p.name}: ${p.score}`).join(', ')}`}
+    >
+      <defs>
+        <linearGradient id={`${uid}-fill`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--color-kern-500, #f59e0b)" stopOpacity={0.3} />
+          <stop offset="100%" stopColor="var(--color-kern-500, #f59e0b)" stopOpacity={0.08} />
+        </linearGradient>
+      </defs>
+
+      {/* Zone achtergronden: rood (0-40), amber (40-70), groen (70-100) */}
+      <polygon points={polygonPoints(Array(n).fill(100))} fill="rgba(16,185,129,0.06)" stroke="none" />
+      <polygon points={polygonPoints(Array(n).fill(70))} fill="rgba(245,158,11,0.06)" stroke="none" />
+      <polygon points={polygonPoints(Array(n).fill(40))} fill="rgba(239,68,68,0.06)" stroke="none" />
+
+      {/* Grid polygonen */}
+      {gridLevels.map(level => (
+        <polygon
+          key={level}
+          points={polygonPoints(Array(n).fill(level))}
+          fill="none"
+          stroke="var(--border-ed)"
+          strokeWidth={level === 100 ? 1 : 0.5}
+          strokeDasharray={level === 100 ? undefined : '3,3'}
+          opacity={0.6}
+        />
+      ))}
+
+      {/* As-lijnen */}
+      {pillars.map((_, i) => {
+        const angle = (Math.PI * 2 * i) / n - Math.PI / 2
+        const ex = cx + maxR * Math.cos(angle)
+        const ey = cy + maxR * Math.sin(angle)
+        return (
+          <line key={i} x1={cx} y1={cy} x2={ex} y2={ey} stroke="var(--border-ed)" strokeWidth={0.5} opacity={0.4} />
+        )
+      })}
+
+      {/* Data polygoon (gevuld) */}
+      <polygon
+        points={dataPoints}
+        fill={`url(#${uid}-fill)`}
+        stroke="var(--color-kern-600, #d97706)"
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+
+      {/* Datapunten */}
+      {pillars.map((pillar, i) => {
+        const angle = (Math.PI * 2 * i) / n - Math.PI / 2
+        const r = (pillar.score / 100) * maxR
+        const px = cx + r * Math.cos(angle)
+        const py = cy + r * Math.sin(angle)
+        return (
+          <circle
+            key={pillar.id}
+            cx={px}
+            cy={py}
+            r={3.5}
+            fill={pillarScoreFill(pillar.score)}
+            stroke="var(--paper)"
+            strokeWidth={1.5}
+          />
+        )
+      })}
+
+      {/* Labels */}
+      {pillars.map((pillar, i) => (
+        <text
+          key={pillar.id}
+          x={labelPositions[i].x}
+          y={labelPositions[i].y}
+          textAnchor={labelPositions[i].anchor as 'start' | 'middle' | 'end'}
+          dominantBaseline="central"
+          className="fill-[var(--ink-2)]"
+          fontSize="9"
+          fontFamily="var(--font-mono)"
+        >
+          {pillar.name.length > 10 ? pillar.name.slice(0, 9) + '…' : pillar.name}
+        </text>
+      ))}
+    </svg>
+  )
 }
 
 /**
@@ -918,18 +1062,29 @@ function pillarBarColorClass(score: number): string {
  */
 function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
   // Sorteer pilaren: zwakste bovenaan (meeste aandacht nodig)
-  const sortedPillars = [...healthScore.pillars].sort((a, b) => a.score - b.score)
-  const weakest = sortedPillars.filter(p => p.score < 60)
+  const sortedPillars = useMemo(
+    () => [...healthScore.pillars].sort((a, b) => a.score - b.score),
+    [healthScore.pillars],
+  )
+  const weakest = sortedPillars.filter(p => p.score < 40)
+
+  // Pilaaroverzicht tellingen
+  const strongCount = healthScore.pillars.filter(p => p.score > 70).length
+  const mediumCount = healthScore.pillars.filter(p => p.score >= 40 && p.score <= 70).length
+  const weakCount = healthScore.pillars.filter(p => p.score < 40).length
 
   return (
-    <div className="space-y-4 p-5">
+    <div className="space-y-4 p-5" role="region" aria-label="Financiële gezondheidsscore breakdown">
       {/* Header: totaalscore + label */}
       <KassabonShell>
         <div className="flex items-center justify-between border-b border-dashed border-[var(--border-md)] pb-2 mb-2">
           <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
             Financiële gezondheid
           </span>
-          <span className={`font-mono text-lg font-bold tabular-nums ${pillarScoreColorClass(healthScore.total)}`}>
+          <span
+            className={`font-mono text-lg font-bold tabular-nums ${pillarScoreColorClass(healthScore.total)}`}
+            aria-label={`Totaalscore ${healthScore.total} van 100`}
+          >
             {healthScore.total}/100
           </span>
         </div>
@@ -953,10 +1108,41 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
             </span>
           </div>
         )}
-        <div className="border-t border-dashed border-[var(--border-md)] mt-2 pt-2 text-[10px] text-[var(--ink-3)]">
-          Score = gewogen gemiddelde van {healthScore.activePillarCount} pilaren
+
+        {/* Pilaaroverzicht samenvatting */}
+        <div className="border-t border-dashed border-[var(--border-md)] mt-2 pt-2">
+          <div className="flex items-center gap-3 text-[10px]" aria-label="Pilaaroverzicht">
+            {strongCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-emerald-600">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                {strongCount} sterk
+              </span>
+            )}
+            {mediumCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-amber-600">
+                <span className="w-2 h-2 rounded-full bg-amber-500" aria-hidden="true" />
+                {mediumCount} gemiddeld
+              </span>
+            )}
+            {weakCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-red-600">
+                <span className="w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
+                {weakCount} zwak
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-[var(--ink-4)] mt-1">
+            Gewogen gemiddelde van {healthScore.activePillarCount} pilaren
+          </p>
         </div>
       </KassabonShell>
+
+      {/* Radar chart — visueel overzicht van alle pilaren */}
+      {healthScore.pillars.length >= 3 && (
+        <div className="py-2">
+          <PillarRadarChart pillars={healthScore.pillars} />
+        </div>
+      )}
 
       {/* Per-pilaar breakdown — zwakste bovenaan */}
       <div className="space-y-3">
@@ -1004,53 +1190,87 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
 
 /**
  * Individuele pilaar-kaart in de drill-down kassabon.
- * Toont: naam + gewicht, score-bar, huidige waarde, uitleg en verbettertip.
+ * Toont: naam + score-badge, zone-indicator bar, waarde, uitleg en verbettertip.
+ * Verbeterd met kleurdrempels (>70 groen, 40-70 amber, <40 rood),
+ * zone-indicator bars en toegankelijkheidslabels.
  */
 function HealthPillarCard({ pillar }: { pillar: HealthPillar }) {
   const clamp = Math.max(0, Math.min(pillar.score, 100))
-  const weightPct = Math.round(pillar.weight * 100)
+  const label = pillarScoreLabel(pillar.score)
 
   return (
-    <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] p-3">
-      {/* Pilaar naam + score */}
+    <div
+      className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] p-3"
+      role="group"
+      aria-label={`Pilaar: ${pillar.name}, score ${pillar.score} van 100, ${label}`}
+    >
+      {/* Pilaar naam + score badge */}
       <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-sans text-sm font-semibold text-[var(--ink)]">{pillar.name}</span>
-          <span className="font-sans text-[10px] text-[var(--ink-4)]">{weightPct}%</span>
+        <span className="font-sans text-sm font-semibold text-[var(--ink)]">{pillar.name}</span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${pillarScoreBgClass(pillar.score)} ${pillarScoreColorClass(pillar.score)}`}
+          >
+            {label}
+          </span>
+          <span className={`font-mono text-sm font-bold tabular-nums ${pillarScoreColorClass(pillar.score)}`}>
+            {pillar.score}
+          </span>
         </div>
-        <span className={`font-mono text-sm font-bold tabular-nums ${pillarScoreColorClass(pillar.score)}`}>
-          {pillar.score}
-        </span>
-      </div>
-
-      {/* Score bar */}
-      <div className="h-[5px] w-full overflow-hidden bg-[var(--subtle)] mb-2">
-        <div
-          className={`h-full ${pillarBarColorClass(clamp)}`}
-          style={{ width: `${clamp}%` }}
-        />
-      </div>
-
-      {/* Huidige waarde */}
-      <div className="flex items-center justify-between text-xs mb-1">
-        <span className="font-sans text-[var(--ink-3)]">Huidige waarde</span>
-        <span className="font-mono tabular-nums text-[var(--ink-2)]">{pillar.rawValue}</span>
       </div>
 
       {/* Uitleg */}
-      <p className="font-sans text-[11px] text-[var(--ink-2)] leading-snug">
+      <p className="font-sans text-[11px] text-[var(--ink-2)] leading-snug mb-1.5">
         {pillar.explanation}
       </p>
 
-      {/* Verbetettip + actielink — alleen tonen bij score < 80 */}
-      {pillar.score < 80 && (
-        <div className="mt-1.5">
+      {/* Huidige waarde */}
+      <div className="flex items-center justify-between text-[10px] mb-2">
+        <span className="font-sans text-[var(--ink-3)]">Waarde</span>
+        <span className="font-mono tabular-nums text-[var(--ink-2)]">{pillar.rawValue}</span>
+      </div>
+
+      {/* Zone-indicator score bar */}
+      <div
+        className="relative"
+        role="meter"
+        aria-label={`${pillar.name} score`}
+        aria-valuenow={pillar.score}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        {/* Achtergrond met zones */}
+        <div className="h-2.5 w-full rounded-full bg-[var(--subtle)] overflow-hidden flex">
+          <div className="h-full bg-red-100" style={{ width: '40%' }} />
+          <div className="h-full bg-amber-50" style={{ width: '30%' }} />
+          <div className="h-full bg-emerald-50" style={{ width: '30%' }} />
+        </div>
+        {/* Gevulde balk overlay */}
+        <div
+          className={`absolute top-0 left-0 h-2.5 rounded-full transition-all duration-500 ${pillarBarColorClass(clamp)}`}
+          style={{ width: `${clamp}%` }}
+        />
+        {/* Zone-scheidingslijnen */}
+        <div className="absolute top-0 h-2.5 w-px bg-[var(--border-md)]" style={{ left: '40%' }} aria-hidden="true" />
+        <div className="absolute top-0 h-2.5 w-px bg-[var(--border-md)]" style={{ left: '70%' }} aria-hidden="true" />
+        {/* Zone labels */}
+        <div className="flex mt-0.5 text-[8px] text-[var(--ink-4)]" aria-hidden="true">
+          <span className="w-[40%] text-center">zwak</span>
+          <span className="w-[30%] text-center">gemiddeld</span>
+          <span className="w-[30%] text-center">sterk</span>
+        </div>
+      </div>
+
+      {/* Verbetettip + actielink — alleen tonen bij score ≤ 70 */}
+      {pillar.score <= 70 && (
+        <div className="mt-2">
           <p className="font-serif text-[11px] italic text-[var(--ink-3)] leading-snug">
             Tip: {pillar.improvementTip}
           </p>
           <Link
             href={pillar.actionHref}
             className="inline-flex items-center gap-1 mt-1 text-[11px] font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors group/tip"
+            aria-label={`${pillar.actionLabel} voor ${pillar.name}`}
           >
             <span className="underline decoration-[var(--border-md)] underline-offset-2 group-hover/tip:decoration-[var(--ink-2)]">
               {pillar.actionLabel}
