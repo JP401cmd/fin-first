@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Banknote, CreditCard, Wallet, Receipt, Target, CheckCircle2, AlertCircle, Activity } from 'lucide-react'
+import { Banknote, CreditCard, Wallet, Receipt, Target, CheckCircle2, AlertCircle, Activity, Compass } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -225,12 +225,17 @@ export function OverzichtHero({
           href="/mijn/profiel"
           className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-5 sm:p-6 hover:border-violet-300 hover:shadow-sm transition-all group"
         >
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-              Op weg naar vrijheid
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
+              <Compass className="w-5 h-5 text-violet-700" />
             </div>
-            <div className="mt-0.5 text-sm sm:text-base text-[var(--ink-2)]">
-              Vul je geboortedatum, inkomen en gewenste vrijheidsbestedingen in om je vrijheidsmoment te zien.
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+                Op weg naar vrijheid
+              </div>
+              <div className="mt-0.5 text-sm sm:text-base text-[var(--ink-2)]">
+                Vul je geboortedatum, inkomen en gewenste vrijheidsbestedingen in om je vrijheidsmoment te zien.
+              </div>
             </div>
           </div>
           <span className="shrink-0 text-xs font-semibold text-violet-700 group-hover:underline">
@@ -487,7 +492,7 @@ function VoortgangDoelenCard({
                 </div>
                 <div className="mt-1 h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden">
                   <div
-                    className={`h-full rounded-full ${barColor} transition-all`}
+                    className={`h-full rounded-full ${barColor} transition-all duration-700`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
