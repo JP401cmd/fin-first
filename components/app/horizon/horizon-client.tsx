@@ -309,6 +309,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [monthlySavingsOverride, setMonthlySavingsOverride] = useState<number | null>(initialData.monthlySavingsOverride)
   const kernEmpty = (initialData.assets?.length ?? 0) === 0 && (initialData.debts?.length ?? 0) === 0
 
+  // Feature #800: doorrekening-inline query param state
+  const [doorrekeningInitialTab, setDoorrekeningInitialTab] = useState<'opbouw' | 'afbouw' | 'overzicht' | undefined>(undefined)
+  const [doorrekeningForceOpen, setDoorrekeningForceOpen] = useState(false)
+
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -362,8 +366,25 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       shouldReplace = true
     }
 
+    // Feature #800: ?whatif=open — redirect van /horizon/whatif opent dream gate.
+    const whatifParam = searchParams.get('whatif')
+    if (whatifParam === 'open') {
+      // Vertraag de dream-gate-trigger zodat de pagina eerst rendert
+      setTimeout(() => triggerDream('/horizon/whatif'), 300)
+      shouldReplace = true
+    }
+
+    // Feature #800: ?doorrekening=<tab> — redirect van /horizon/doorrekening-test/*
+    const doorrekeningParam = searchParams.get('doorrekening')
+    if (doorrekeningParam === 'opbouw' || doorrekeningParam === 'afbouw' || doorrekeningParam === 'overzicht') {
+      setDoorrekeningInitialTab(doorrekeningParam)
+      setDoorrekeningForceOpen(true)
+      shouldReplace = true
+    }
+
     if (shouldReplace) router.replace('/horizon', { scroll: false })
-  }, [searchParams, router])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, router, triggerDream])
 
   // Event form state
   const [showForm, setShowForm] = useState(false)
@@ -3953,6 +3974,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           savingsRate6m={savingsRate6m}
           estimatedYearlyIncome={estimatedYearlyIncome}
           profile={profileRaw}
+          initialTab={doorrekeningInitialTab}
+          forceOpen={doorrekeningForceOpen}
         />
       )}
 
