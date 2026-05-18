@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Banknote, CreditCard, Wallet, Receipt, Target, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Banknote, CreditCard, Wallet, Receipt, Target, CheckCircle2, AlertCircle, Activity } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -166,11 +166,13 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
 
       {/* Health Score + Voortgang doelen — 2-kolom op desktop, stacked op mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-        {health && (
+        {health ? (
           <HealthScoreCard
             health={health}
             onOpenReceipt={() => setReceiptOpen(true)}
           />
+        ) : (
+          <HealthScoreEmptyState />
         )}
         {goalDisplay.length > 0 ? (
           <VoortgangDoelenCard items={goalDisplay} />
@@ -217,6 +219,37 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
         </BottomSheet>
       )}
     </section>
+  )
+}
+
+function HealthScoreEmptyState() {
+  return (
+    <article className="flex flex-col rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-5 sm:p-6">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+          <Activity className="w-5 h-5 text-amber-700" />
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+            Gezondheid
+          </div>
+          <div className="text-base font-semibold text-[var(--ink)]">
+            Nog geen score
+          </div>
+        </div>
+      </div>
+      <p className="text-sm text-[var(--ink-2)] leading-relaxed mb-4">
+        Voeg bezittingen of een schuld toe en je financiële gezondheid
+        verschijnt — vier pijlers (buffer, schuld, sparen, vrijheid) die
+        samen één cijfer vormen.
+      </p>
+      <Link
+        href="/overzicht/bezittingen"
+        className="self-start inline-flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors"
+      >
+        Voeg bezitting toe →
+      </Link>
+    </article>
   )
 }
 
