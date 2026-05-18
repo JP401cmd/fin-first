@@ -1,3 +1,30 @@
+## Session 2026-05-18 - Features #813, #848
+
+### Feature #813: PSD2 verbinding als aanbevolen eerste stap na onboarding - PASSING
+- Coach-bubble (gap_bank) already implemented as highest-priority data-gap suggestion
+- Next-step-card (connect_bank_psd2) already had priority 0 for PSD2 suggestion
+- Next-steps API already queried bank_connections table for active connections
+- Added bank_connections query + connect_bank_psd2 step to dashboard-data-loader.ts
+- Verified: coach-bubble shows "Koppel je bank voor automatisch inzicht" with "Bank koppelen" CTA
+- Verified: clicking CTA navigates to /core/cash/connect (bank connect flow)
+- Verified: suggestion dismissed after interaction, next priority shown
+- Commit: 0953ff6d
+
+### Feature #848: Kompas belasting-indicator toont tax optimization status - PASSING
+- Enhanced computeLeverScores with hasBox3Assets + householdType inputs
+- Tax indicator now shows neutral/grey when user has no box3-taxable assets
+- Green when under vrijstelling (optimal) or moderate with partner
+- Amber when above vrijstelling with savings opportunities (solo, bekijk tips)
+- Red when very high box3 exposure (>500k above threshold)
+- Detail text explains optimization status with actionable hints
+- Added household_type to layout profile query for partner exemption detection
+- Verified: tooltip shows "Belasting: Geen data — Geen belastbare bezittingen" for no-data state
+- Commit: b17df0f0
+
+### Current Status
+- 2 features completed this session (#813, #848)
+- Overall progress: 843/861 passing (97.9%)
+
 ## Session 2026-05-18 - Features #786, #790
 
 ### Feature #786: Netto-vermogen-tijdslijn toggle korte/lange termijn - PASSING
@@ -24759,5 +24786,50 @@ Current status: 425/431 passing (98.6%)
 - components/core/core-hero.tsx — timeline slot overflow-x-auto
 - components/app/chat/chat-panel.tsx — persistent Wft disclaimer footer
 
+### Feature #815: Categorisatie-suggesties reviewbaar door gebruiker - PASSING
+- Auto-categorized transactions (category_source 'ai' or 'rule') show "Voorgesteld" badge
+- Desktop: badge + confirm button inline after category name (sm:inline-flex)
+- Mobile: badge + confirm button below transaction title (sm:hidden)
+- Confirm button updates category_source to 'manual' and removes badge
+- Edit form shows "Voorgesteld op basis van regel/AI" notice below budget dropdown
+- Verified with browser automation: badge shown, confirm removes it, edit form works
+- Commit: a33cdc74
+
+### Feature #816: Categorisatie leert van gebruikerscorrecties - PASSING
+- Moved correction rule creation out of scope !== 'single' block in handleSaveWithScope
+- System now saves a category_correction rule for every budget change, regardless of scope
+- Delete+insert pattern ensures latest correction always wins for same counterparty
+- Per-user isolation via user_id in WHERE clause + RLS
+- categorizeTransaction() applies corrections at Priority 1 (before keyword rules)
+- Import flow and bank-connect sync both load and apply corrections
+- Verified: correction saved for "Bol.com B.V." after single-scope edit, per-user isolation confirmed
+- Changes included in commit: e256d023
+
+### Files Modified
+- components/app/cash-account-view.tsx — Voorgesteld badge + confirm button (#815)
+- components/app/transaction-form.tsx — suggested notice (#815) + always-save correction rules (#816)
+
+### Feature #791: Coach-bubble wegklikbaar met gezien-tracking - PASSING
+- Rewritten per-suggestion dismiss tracking in coach-bubble.tsx
+- Changed from single DISMISSED_KEY boolean to per-suggestion DISMISSED_SUGGESTIONS_KEY (JSON array)
+- Each CoachSuggestion now has a stable `key` field (gap_bank, gap_assets, path_budgets, etc.)
+- Helpers: getDismissedKeys(), addDismissedKey(), migrateLegacyDismissal()
+- getFirstUndismissedSuggestion() finds first applicable undismissed suggestion
+- Removed ?welcome=1 gate — bubble shows on any visit with applicable undismissed suggestion
+- Committed: 1f819ec6
+
+### Feature #795: Tijdas integreert what-if sliders inline - PASSING
+- Integrated WhatIfSlidersCollapsible into /horizon page inline (no navigation to /whatif needed)
+- Added whatIfInlineOpen toggle state + baseline memo + event setter bridge
+- Toggle button with SlidersHorizontal icon and collapsible panel below chart
+- Sliders (Maandinkomen, Werkdagen, Spaarquote, Extra inleg) modify events → useHorizonFireSim recalculates → SimChart re-renders
+- Updated ?whatif=open handler to open inline panel instead of dream gate navigation
+- "Volledig scenario →" link still available for full /whatif page
+- Changes included in commit: 2f74bb57
+
+### Files Modified
+- components/app/coach-bubble.tsx — per-suggestion dismiss tracking (#791)
+- components/app/horizon/horizon-client.tsx — inline what-if sliders (#795)
+
 ### Current Status
-- 2 features completed this session (#788, #810)
+- 6 features completed this session (#788, #810, #815, #816, #791, #795)
