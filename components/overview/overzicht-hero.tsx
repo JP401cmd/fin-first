@@ -128,28 +128,18 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
         <h1 className="mt-1 font-serif text-2xl md:text-3xl font-semibold text-[var(--ink)] leading-tight">
           {greetingByHour()}{userName ? `, ${userName}` : ''}
         </h1>
-        {/* Data-summary onder begroeting — toont vrijheid+doelen in één regel
-            als concrete eerste-indruk. Verbergt bij geen data om hero-leeg
-            niet "uit te dunnen". */}
-        {(freedomPct != null || goalDisplay.length > 0) && (
+        {/* Data-summary onder begroeting — toont enkel doelen-aantal want
+            de vrijheid-strip onderaan toont al freedomPct. Geen dubbele
+            data-weergave; bij geen doelen verbergt de regel volledig. */}
+        {goalDisplay.length > 0 && (
           <p className="mt-2 text-sm sm:text-base text-[var(--ink-2)]">
-            {freedomPct != null && (
-              <>
-                <strong className="font-semibold text-violet-700">{Math.round(freedomPct)}%</strong>
-                {' '}op weg naar vrijheid
-              </>
-            )}
-            {freedomPct != null && goalDisplay.length > 0 && (
-              <span className="text-[var(--ink-3)]"> · </span>
-            )}
-            {goalDisplay.length > 0 && (
-              <>
-                <strong className="font-semibold text-[var(--ink)]">
-                  {goalDisplay.length}
-                </strong>{' '}
-                {goalDisplay.length === 1 ? 'actief doel' : 'actieve doelen'}
-              </>
-            )}
+            <strong className="font-semibold text-[var(--ink)]">
+              {goalDisplay.length}
+            </strong>{' '}
+            {goalDisplay.length === 1 ? 'actief doel' : 'actieve doelen'}
+            {goalDisplay.length === 1
+              ? ' — kijk hoever je bent.'
+              : ' — kijk hoever je bent.'}
           </p>
         )}
       </header>
@@ -171,7 +161,7 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
               key={key}
               href={href}
               title={tooltip}
-              className="group relative flex flex-col rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
+              className="group relative flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
             >
               {/* Status-dot rechtsboven */}
               <span
@@ -182,8 +172,10 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
               <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${accent}`}>
                 <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
+              {/* Status-tekst als overline — toont per-tegel info (geen herhaling
+                  van section-naam). Bij geen meting: "Onbekend"; anders STATUS_LABEL. */}
               <div className="mt-2 text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)]">
-                Hefboom
+                {status === 'neutral' ? 'Geen meting' : STATUS_LABEL[status]}
               </div>
               <div className="text-sm sm:text-base font-semibold text-[var(--ink)] mt-0.5 group-hover:text-[var(--ink-0)]">
                 {label}
@@ -216,7 +208,7 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
       {freedomPct == null && (
         <Link
           href="/mijn/profiel"
-          className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-3 sm:p-4 hover:border-violet-300 hover:shadow-sm transition-all group"
+          className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-5 sm:p-6 hover:border-violet-300 hover:shadow-sm transition-all group"
         >
           <div className="flex-1 min-w-0">
             <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
@@ -234,7 +226,7 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
       {freedomPct != null && (
         <Link
           href="/toekomst"
-          className="mt-3 flex flex-col gap-2 rounded-xl border border-[var(--border-ed)] bg-gradient-to-r from-violet-50 to-stone-50 p-3 sm:p-4 hover:border-violet-300 hover:shadow-sm transition-all group"
+          className="mt-3 flex flex-col gap-2 rounded-2xl border border-[var(--border-ed)] bg-gradient-to-r from-violet-50 to-stone-50 p-3 sm:p-4 hover:border-violet-300 hover:shadow-sm transition-all group"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -268,11 +260,6 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
         </Link>
       )}
 
-      {/* Subtiele filosofie-tagline: bindt alle metingen aan kern-philosophy */}
-      <p className="mt-2 text-center text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)] font-medium">
-        Geld is opgeslagen tijd
-      </p>
-
       {/* Drill-down sheet: kassabon met pillars per sub-score */}
       {health && (
         <BottomSheet
@@ -284,6 +271,13 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
           <HealthScoreReceipt health={health} />
         </BottomSheet>
       )}
+
+      {/* Filosofie-tagline als hero-footer — visueel afsluitend op alle
+          breakpoints, na alle content en de sheet-mount. pb-4 geeft het
+          ademruimte naar WillLanding die direct hieronder rendert. */}
+      <p className="mt-6 pb-4 text-center text-[11px] uppercase tracking-[0.18em] text-[var(--ink-3)] font-medium">
+        Geld is opgeslagen tijd
+      </p>
     </section>
   )
 }
@@ -311,7 +305,7 @@ function HealthScoreEmptyState() {
       </p>
       <Link
         href="/overzicht/bezittingen"
-        className="self-start inline-flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors"
+        className="self-start inline-flex items-center gap-2 bg-stone-900 text-white px-4 py-2.5 rounded-lg text-sm font-semibold min-h-[44px] hover:bg-stone-800 transition-colors"
       >
         Voeg bezitting toe →
       </Link>
@@ -342,7 +336,7 @@ function DoelenEmptyState() {
       </p>
       <Link
         href="/toekomst"
-        className="self-start inline-flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors"
+        className="self-start inline-flex items-center gap-2 bg-stone-900 text-white px-4 py-2.5 rounded-lg text-sm font-semibold min-h-[44px] hover:bg-stone-800 transition-colors"
       >
         Maak een doel →
       </Link>
@@ -480,6 +474,20 @@ function HealthScoreCard({
         {health.previousMonth !== null && (
           <div className="text-xs text-[var(--ink-3)] mt-1">{trendLabel}</div>
         )}
+        {/* Filosofie-ankerpunt: vertaal de score-context naar tijd. Pakt de
+            fire_progress-pillar als die er is, anders emergency_fund (maanden
+            buffer). Maakt de score concreet — "Geld is opgeslagen tijd". */}
+        {(() => {
+          const firePillar = health.pillars.find((p) => p.id === 'fire_progress')
+          const bufferPillar = health.pillars.find((p) => p.id === 'emergency_fund')
+          const timeAnchor = firePillar?.rawValue ?? bufferPillar?.rawValue
+          if (!timeAnchor) return null
+          return (
+            <div className="text-[11px] text-[var(--ink-3)] mt-1 italic">
+              {firePillar ? `${timeAnchor} op weg` : `${timeAnchor} buffer`}
+            </div>
+          )
+        })()}
         <div className="text-[11px] text-[var(--ink-3)] mt-2 underline decoration-dotted underline-offset-2">
           Toon onderverdeling →
         </div>
