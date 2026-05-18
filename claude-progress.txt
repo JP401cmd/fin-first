@@ -1,3 +1,42 @@
+## Session 2026-05-18 - Features #822, #823
+
+### Feature #822: FIRE-instellingen verplaatst naar /horizon inline - PASSING
+- Verified HorizonFireParamsPanel already exists at components/app/horizon/horizon-fire-params-panel.tsx
+- Panel renders on /horizon page (horizon-client.tsx line 3758) with:
+  - Verwacht bruto rendement slider (1-15%)
+  - Verwachte inflatie slider (0-8%)
+  - Live kassabon with netto reëel rendement calculation
+  - FIRE Eindstrategie picker (4 options: deplete, legacy, perpetual, pensioen)
+  - Eindleeftijd input for deplete/legacy strategies
+  - Opslaan button persisting to /api/parameters + /api/fire-settings
+- onParamsChange/onStrategyChange callbacks trigger immediate projection recalculation via useEffect
+- /identity/instellingen Gegevens tab shows redirect link to /horizon (no form controls)
+- Browser verified: panel opens, shows all controls, link from settings navigates to /horizon
+- No code changes needed (verification only)
+- Commit: 7616bb2d
+
+### Feature #823: Widget-instellingen verplaatst naar /will context - PASSING
+- Dashboard (/will) already has full widget edit-mode via DraggableWidgetGrid:
+  - "Modify"/"Gereed" toggle button in section header
+  - Widget hide (X button), resize (S/M/L), drag-and-drop reorder
+  - "Widget toevoegen" picker, "Automatisch samenstellen" wizard
+  - Changes persist via PUT /api/widgets
+- /identity/instellingen has no widget section B (tabs: Notificaties, Weergave, Privacy, Gegevens)
+- Updated /identity/widgets redirect: now points to /will instead of /identity/instellingen
+- Updated regression tests (identity-navigatie.ts, navigatie.ts) for new redirect target
+- Updated routing-inventarisatie.md documentation
+- Browser verified: Modify button works, edit mode shows controls, redirect works
+- Commit: 7616bb2d
+
+### Files Modified
+- app/(app)/identity/widgets/page.tsx — redirect to /will instead of /identity/instellingen
+- lib/regression-tests/suites/identity-navigatie.ts — updated redirect assertions
+- lib/regression-tests/suites/navigatie.ts — updated redirect assertions
+- docs/routing-inventarisatie.md — updated docs for new redirect target
+
+### Current Status
+- 2 features completed this session (#822, #823)
+
 ## Session 2026-05-18 - Features #771, #772
 
 ### Feature #771: Module-namen verborgen in eindgebruiker-UI - PASSING
