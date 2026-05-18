@@ -1,6 +1,6 @@
 'use client'
 
-import { Clock } from 'lucide-react'
+import { Clock, Landmark, CreditCard, ArrowUpDown, Receipt, type LucideIcon } from 'lucide-react'
 import { BudgetIcon } from '@/components/app/budget-shared'
 import type { Recommendation } from '@/lib/recommendation-data'
 import {
@@ -8,6 +8,23 @@ import {
   RECOMMENDATION_TYPE_ICONS,
   getRecommendationTypeColor,
 } from '@/lib/recommendation-data'
+import { tagToLever, type LeverId } from '@/lib/lever-mapping'
+
+// ── Lever icon config (consistent with kompas) ────────────────────────────────
+
+const LEVER_ICON: Record<LeverId, LucideIcon> = {
+  assets: Landmark,
+  debts: CreditCard,
+  cashflow: ArrowUpDown,
+  tax: Receipt,
+}
+
+const LEVER_TOOLTIP: Record<LeverId, string> = {
+  assets: 'Bezittingen',
+  debts: 'Schulden',
+  cashflow: 'Cashflow',
+  tax: 'Belasting',
+}
 
 type RecommendationCardProps = {
   recommendation: Recommendation
@@ -21,6 +38,11 @@ export function RecommendationCard({ recommendation, onClick, compact }: Recomme
   const iconName = RECOMMENDATION_TYPE_ICONS[recommendation.recommendation_type]
   const typeLabel = RECOMMENDATION_TYPE_LABELS[recommendation.recommendation_type]
   const isPostponed = recommendation.status === 'postponed'
+
+  // Lever icon (consistent with kompas)
+  const leverId = tagToLever(recommendation.recommendation_type)
+  const LeverIcon = LEVER_ICON[leverId]
+  const leverTooltip = LEVER_TOOLTIP[leverId]
 
   // Map bg color class to border-l color class (e.g. "bg-wil-500" → "border-l-wil-500")
   const borderLeftColor = colors.bg.replace('bg-', 'border-l-')
@@ -37,10 +59,13 @@ export function RecommendationCard({ recommendation, onClick, compact }: Recomme
           <BudgetIcon name={iconName} className={`h-4 w-4 ${colors.text}`} />
         </div>
 
-        {/* Title */}
+        {/* Title + lever icon */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {isPostponed && <Clock className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
           <h3 className="truncate text-sm font-semibold text-[var(--ink)]">{recommendation.title}</h3>
+          <span title={leverTooltip} className="shrink-0 text-[var(--ink-4)]">
+            <LeverIcon className="h-3 w-3" />
+          </span>
         </div>
 
         {!compact && (

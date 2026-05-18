@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
-import { ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Link2 } from 'lucide-react'
+import { ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Link2, Blocks, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { BOX3_DRAG } from '@/lib/horizon-data'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -29,6 +29,9 @@ import { type WithdrawalStrategyType, WITHDRAWAL_DEFAULTS } from '@/lib/withdraw
 import { FireEndStrategyPanel } from '@/components/horizon/fire-end-strategy-panel'
 import { FireRetirementExpensePanel } from '@/components/horizon/fire-retirement-expense-panel'
 import { HousingStrategySection } from '@/components/identity/instellingen/housing-strategy-section'
+import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
+import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
+import { useModuleAccess } from '@/components/app/feature-access-provider'
 
 // ── Typography helpers ────────────────────────────────────────────────────
 
@@ -75,9 +78,10 @@ function fmt(pct: number, decimals = 2) {
 }
 
 // ── Tab definitions ──────────────────────────────────────────────────────
-type SettingsTab = 'notificaties' | 'weergave' | 'privacy' | 'gegevens' | 'huishouden'
+type SettingsTab = 'notificaties' | 'weergave' | 'privacy' | 'gegevens' | 'huishouden' | 'modules'
 
 const BASE_TABS: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
+  { id: 'modules', label: 'Modules', icon: Blocks },
   { id: 'notificaties', label: 'Notificaties', icon: BellRing },
   { id: 'weergave', label: 'Weergave', icon: Palette },
   { id: 'privacy', label: 'Privacy', icon: Shield },
@@ -100,6 +104,11 @@ export default function InstellingenPage() {
     params.set('tab', tab)
     router.replace(`/identity/instellingen?${params.toString()}`, { scroll: false })
   }, [router, searchParams])
+
+  // ─ Section H: Modules ─
+  const { activeModules: contextModules, refreshModules } = useModuleAccess()
+  const { modules: localModules, toggle: toggleModule, saving: moduleSaving } = useModuleToggle(contextModules, refreshModules)
+  const [moduleErrors, setModuleErrors] = useState<string[]>([])
 
   // ─ Section: Financiële toelichting ─
   const [financialContext, setFinancialContext] = useState('')
@@ -794,6 +803,96 @@ export default function InstellingenPage() {
         })}
       </nav>
 
+      {/* ── Tab: Modules ──────────────────────────────────────────────── */}
+      {activeTab === 'modules' && (
+        <section id="modules" className="scroll-mt-24 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+          <div className="px-4 sm:px-8 py-6 space-y-5">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--ink)]">Actieve modules</h2>
+              <p className="mt-1 text-sm text-[var(--ink-3)]">
+                Kies welke modules actief zijn. Afhankelijkheden worden automatisch gecontroleerd.
+              </p>
+            </div>
+
+            {/* Module toggles */}
+            <div className="divide-y divide-zinc-100 rounded-xl border border-[var(--border-ed)]">
+              {MODULE_CATALOG.map((mod) => {
+                const enabled = localModules.includes(mod.id)
+                const isDev = mod.inDevelopment
+                return (
+                  <div
+                    key={mod.id}
+                    className={`flex items-center justify-between gap-4 px-4 py-3.5 ${isDev ? 'opacity-60' : ''}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--ink)]">
+                        {mod.label}
+                        {isDev && (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                            In ontwikkeling
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--ink-3)]">{mod.description}</p>
+                      {mod.requires.length > 0 && (
+                        <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+                          Vereist: {mod.requires.map(r => MODULE_CATALOG.find(m => m.id === r)?.label ?? r).join(', ')}
+                        </p>
+                      )}
+                      {mod.requiresOneOf && mod.requiresOneOf.length > 0 && (
+                        <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+                          Vereist een van: {mod.requiresOneOf.map(r => MODULE_CATALOG.find(m => m.id === r)?.label ?? r).join(' of ')}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={enabled}
+                      aria-label={`${mod.label} ${enabled ? 'uitschakelen' : 'inschakelen'}`}
+                      disabled={moduleSaving}
+                      onClick={async () => {
+                        setModuleErrors([])
+                        const result = await toggleModule(mod.id, !enabled)
+                        if (!result.success) {
+                          setModuleErrors(result.errors)
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+                        enabled ? 'bg-emerald-500' : 'bg-zinc-300'
+                      } ${moduleSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                          enabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Validation errors */}
+            {moduleErrors.length > 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <div className="space-y-1">
+                  {moduleErrors.map((err, i) => (
+                    <p key={i} className="text-sm text-amber-800">{err}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Active count */}
+            <p className="text-xs text-[var(--ink-4)]">
+              {localModules.length} van {MODULE_CATALOG.length} modules actief
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* ── Tab: Notificaties ──────────────────────────────────────────── */}
       {activeTab === 'notificaties' && (
         <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
@@ -1002,32 +1101,6 @@ export default function InstellingenPage() {
             )}
           </div>
         </section>
-      )}
-
-      {/* ── Tab: Gegevens ──────────────────────────────────────────────── */}
-      {activeTab === 'gegevens' && (
-        <div className="space-y-3">
-
-      {/* ── FIRE Instellingen — verplaatst naar /horizon ────────────── */}
-      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <Link
-          href="/horizon"
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div>
-            <h2 className="label-editorial text-[var(--ink-2)]">FIRE Instellingen</h2>
-            <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-              Verplaatst naar Horizon — wijzig rendement, inflatie en strategie direct bij je projectie.
-            </p>
-          </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-        </Link>
-      </section>
-
-      {/* Old Section C removed — FIRE settings now live inline on /horizon.
-          See components/app/horizon/horizon-fire-params-panel.tsx */}
-
-        </div>
       )}
 
       {/* ── Tab: Weergave ──────────────────────────────────────────────── */}
@@ -1560,270 +1633,277 @@ export default function InstellingenPage() {
         </section>
       )}
 
-      {/* ── F: Externe koppelingen ─────────────────────────────────── */}
-      <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <Link
-          href="/identity/koppelingen"
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-        >
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] text-[var(--ink-2)]">
-              <Link2 className="h-4 w-4" />
-            </div>
-            <div>
-              <h2 className="label-editorial text-[var(--ink-2)]">Externe koppelingen</h2>
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Crypto-exchanges, wallets, brokers en bankrekeningen — beheer op de Koppelingen-pagina</p>
-            </div>
-          </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-        </Link>
-      </section>
-
-      {/* ── Data Export ─────────────────────────────────────────────── */}
-      <section className="mb-5 sm:mb-8 card-editorial overflow-hidden">
-        <div className="px-4 sm:px-8 py-4">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Data Export</h2>
-          <p className="mt-1 text-xs text-[var(--ink-4)]">Download je financiële gegevens als CSV-bestand</p>
-          <div className="mt-3">
-            <ExportDropdown />
-          </div>
-        </div>
-      </section>
-
-      {/* ── E: Gegevens & Account ────────────────────────────────────── */}
-      <section className="mb-5 sm:mb-8 rounded-2xl border border-red-200 bg-[var(--paper)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setGegevensOpen(o => !o)}
-          className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-red-50/50 transition-colors"
-        >
-          <div>
-            <h2 className="text-xs font-semibold tracking-[0.15em] text-red-400 uppercase">Gegevens Resetten</h2>
-            {!gegevensOpen && (
-              <p className="mt-0.5 text-xs text-[var(--ink-3)]">Alle data permanent verwijderen en opnieuw starten</p>
-            )}
-          </div>
-          <ChevronDown className={`h-4 w-4 shrink-0 text-red-300 transition-transform duration-200 ${gegevensOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {gegevensOpen && (
-          <div className="border-t border-red-100 px-4 sm:px-8 py-6">
-            <p className="mb-4 text-sm text-[var(--ink-3)]">
-              Wis al je financiële gegevens en doorloop de onboarding opnieuw.
-              Dit verwijdert al je bankrekeningen, transacties, budgetten, doelen en overige data.
-            </p>
-            <button
-              onClick={() => setShowResetDialog(true)}
-              disabled={resetting}
-              className="rounded-lg border border-red-300 bg-red-50 px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+      {/* ── Tab: Gegevens ──────────────────────────────────────────────── */}
+      {activeTab === 'gegevens' && (
+        <div className="space-y-3">
+          {/* FIRE Instellingen — verplaatst naar /horizon */}
+          <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+            <Link
+              href="/horizon"
+              className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
             >
-              {resetting ? 'Bezig met wissen...' : 'Alle gegevens wissen'}
-            </button>
-            {resetError && <p className="mt-3 text-sm text-red-600">{resetError}</p>}
-          </div>
-        )}
-      </section>
-
-      {/* ── G: Huishouden ──────────────────────────────────────────── */}
-      {hasHousehold && (
-        <section className="mb-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setHuishoudenOpen(o => !o)}
-            className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-          >
-            <div>
-              <h2 className="label-editorial text-[var(--ink-2)]">Huishouden</h2>
-              {!huishoudenOpen && (
-                <p className="mt-0.5 text-xs text-[var(--ink-3)]">Privacy, verdeling, notificaties en leden</p>
-              )}
-            </div>
-            <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${huishoudenOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {huishoudenOpen && (
-            <div className="border-t border-[var(--border-ed)] px-4 sm:px-8 pb-6 pt-4 space-y-4">
-              {/* Quick-link cards grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Privacy card — expands inline */}
-                <button
-                  type="button"
-                  onClick={() => setHuishoudenPrivacySubOpen(o => !o)}
-                  className={`flex items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
-                    huishoudenPrivacySubOpen
-                      ? 'border-wil-300 bg-wil-50/50'
-                      : 'border-[var(--border-ed)] hover:bg-[var(--subtle)]'
-                  }`}
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-wil-100 text-wil-700">
-                    <Shield className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[var(--ink)]">Privacy</p>
-                    <p className="text-xs text-[var(--ink-3)] truncate">Wat je partner kan zien</p>
-                  </div>
-                  <ChevronRight className={`h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform duration-200 ${huishoudenPrivacySubOpen ? 'rotate-90' : ''}`} />
-                </button>
-
-                {/* Split-modus card — links to profiel */}
-                <Link
-                  href="/identity/profiel#huishouden"
-                  className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] p-4 text-left transition-colors hover:bg-[var(--subtle)]"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                    <SplitSquareVertical className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[var(--ink)]">Split-modus</p>
-                    <p className="text-xs text-[var(--ink-3)] truncate">Kostenverdeling instellen</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
-                </Link>
-
-                {/* Notificaties card — scrolls to partner notifications in Section A */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNotifOpen(true)
-                    setTimeout(() => {
-                      document.getElementById('partner-transacties')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }, 100)
-                  }}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] p-4 text-left transition-colors hover:bg-[var(--subtle)]"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-horizon-100 text-horizon-700">
-                    <Bell className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[var(--ink)]">Notificaties</p>
-                    <p className="text-xs text-[var(--ink-3)] truncate">Partner transactie-meldingen</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
-                </button>
-
-                {/* Leden card — links to profiel */}
-                <Link
-                  href="/identity/profiel#huishouden"
-                  className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] p-4 text-left transition-colors hover:bg-[var(--subtle)]"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
-                    <UserPlus className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[var(--ink)]">Leden</p>
-                    <p className="text-xs text-[var(--ink-3)] truncate">Leden beheren en uitnodigen</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
-                </Link>
+              <div>
+                <h2 className="label-editorial text-[var(--ink-2)]">FIRE Instellingen</h2>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                  Verplaatst naar Horizon — wijzig rendement, inflatie en strategie direct bij je projectie.
+                </p>
               </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+            </Link>
+          </section>
 
-              {/* Privacy sub-section — expands inline when Privacy card is clicked */}
-              {huishoudenPrivacySubOpen && (
-                <div className="rounded-xl border border-wil-200 bg-wil-50/30 p-4 sm:p-5 space-y-4">
-                  <div className="flex items-start gap-3">
-                    <Shield className="mt-0.5 h-5 w-5 text-wil-600 shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-[var(--ink)]">Samen financieel, eigen grenzen</p>
-                      <p className="mt-1 text-sm text-[var(--ink-2)] leading-relaxed">
-                        Ieder huishouden is anders — het is heel normaal om niet alles te delen.
-                        Stel per categorie in wat je partner kan zien. Je kunt dit altijd aanpassen.
-                      </p>
-                    </div>
-                  </div>
+          {/* Rebalancing — verplaatst naar /core/assets */}
+          <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+            <Link
+              href="/core/assets"
+              className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+            >
+              <div>
+                <h2 className="label-editorial text-[var(--ink-2)]">Rebalancing</h2>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                  Beheer je herbalanceringsdrempel bij je bezittingen.
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+            </Link>
+          </section>
 
-                  <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--paper)]">
-                    <div className="flex items-center gap-1.5">
-                      <Eye className="h-3.5 w-3.5 text-wil-600" />
-                      <span className="text-xs text-[var(--ink-2)]"><strong>Volledig</strong> — alle details zichtbaar</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Shield className="h-3.5 w-3.5 text-amber-600" />
-                      <span className="text-xs text-[var(--ink-2)]"><strong>Totalen</strong> — alleen totaalbedragen</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <EyeOff className="h-3.5 w-3.5 text-red-500" />
-                      <span className="text-xs text-[var(--ink-2)]"><strong>Verborgen</strong> — volledig afgeschermd</span>
-                    </div>
-                  </div>
+          {/* Externe koppelingen */}
+          <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+            <Link
+              href="/identity/koppelingen"
+              className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] text-[var(--ink-2)]">
+                  <Link2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <h2 className="label-editorial text-[var(--ink-2)]">Externe koppelingen</h2>
+                  <p className="mt-0.5 text-xs text-[var(--ink-3)]">Crypto-exchanges, wallets, brokers en bankrekeningen — beheer op de Koppelingen-pagina</p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
+            </Link>
+          </section>
 
-                  <div className="space-y-3">
-                    {([
-                      { key: 'vermogen', label: 'Vermogen', description: 'Bezittingen en beleggingen', icon: Wallet },
-                      { key: 'schulden', label: 'Schulden', description: 'Leningen en schulden', icon: CreditCard },
-                      { key: 'budgetten', label: 'Budgetten', description: 'Maandbudgetten en bestedingen', icon: Receipt },
-                      { key: 'transacties', label: 'Transacties', description: 'Individuele transacties', icon: ArrowLeftRight },
-                      { key: 'inkomen', label: 'Inkomen', description: 'Salaris en overig inkomen', icon: Banknote },
-                    ] as const).map(cat => {
-                      const currentLevel = householdPrivacy[cat.key] || 'totalen'
-                      const CatIcon = cat.icon
-                      return (
-                        <div key={cat.key} className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2.5">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-wil-50">
-                                <CatIcon className="h-3.5 w-3.5 text-wil-600" />
-                              </div>
-                              <div>
-                                <h3 className="text-sm font-semibold text-[var(--ink)]">{cat.label}</h3>
-                                <p className="text-xs text-[var(--ink-3)]">{cat.description}</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            {([
-                              { level: 'volledig' as PrivacyLevel, label: 'Volledig', icon: Eye, color: 'wil' },
-                              { level: 'totalen' as PrivacyLevel, label: 'Totalen', icon: Shield, color: 'amber' },
-                              { level: 'verborgen' as PrivacyLevel, label: 'Verborgen', icon: EyeOff, color: 'red' },
-                            ]).map(opt => {
-                              const isActive = currentLevel === opt.level
-                              const Icon = opt.icon
-                              return (
-                                <button
-                                  key={opt.level}
-                                  type="button"
-                                  onClick={() => setHouseholdPrivacy(prev => ({ ...prev, [cat.key]: opt.level }))}
-                                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                                    isActive
-                                      ? opt.color === 'wil'
-                                        ? 'bg-wil-50 text-wil-700 border border-wil-300'
-                                        : opt.color === 'amber'
-                                        ? 'bg-amber-50 text-amber-700 border border-amber-300'
-                                        : 'bg-red-50 text-red-700 border border-red-300'
-                                      : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
-                                  }`}
-                                >
-                                  <Icon className="h-3.5 w-3.5" />
-                                  <span className="hidden sm:inline">{opt.label}</span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+          {/* Data Export */}
+          <section className="card-editorial overflow-hidden">
+            <div className="px-4 sm:px-8 py-4">
+              <h2 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">Data Export</h2>
+              <p className="mt-1 text-xs text-[var(--ink-4)]">Download je financiële gegevens als CSV-bestand</p>
+              <div className="mt-3">
+                <ExportDropdown />
+              </div>
+            </div>
+          </section>
 
-                  <div className="flex items-center gap-4 pt-2">
-                    <button
-                      onClick={saveHouseholdPrivacy}
-                      disabled={householdPrivacySaving || JSON.stringify(householdPrivacy) === JSON.stringify(householdPrivacySaved)}
-                      className="rounded-lg bg-wil-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
-                    >
-                      {householdPrivacySaving ? 'Opslaan...' : 'Opslaan'}
-                    </button>
-                    {householdPrivacyMessage && (
-                      <p className={`text-sm ${householdPrivacyMessage.type === 'success' ? 'text-wil-600' : 'text-red-600'}`}>
-                        {householdPrivacyMessage.text}
-                      </p>
-                    )}
-                    {JSON.stringify(householdPrivacy) !== JSON.stringify(householdPrivacySaved) && !householdPrivacyMessage && (
-                      <p className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</p>
-                    )}
+          {/* Gegevens Resetten */}
+          <section className="rounded-2xl border border-red-200 bg-[var(--paper)] overflow-hidden">
+            <div className="px-4 sm:px-8 py-4">
+              <h2 className="text-xs font-semibold tracking-[0.15em] text-red-400 uppercase">Gegevens Resetten</h2>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">Alle data permanent verwijderen en opnieuw starten</p>
+              <p className="mt-3 text-sm text-[var(--ink-3)]">
+                Wis al je financiële gegevens en doorloop de onboarding opnieuw.
+                Dit verwijdert al je bankrekeningen, transacties, budgetten, doelen en overige data.
+              </p>
+              <button
+                onClick={() => setShowResetDialog(true)}
+                disabled={resetting}
+                className="mt-3 rounded-lg border border-red-300 bg-red-50 px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+              >
+                {resetting ? 'Bezig met wissen...' : 'Alle gegevens wissen'}
+              </button>
+              {resetError && <p className="mt-3 text-sm text-red-600">{resetError}</p>}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* ── Tab: Huishouden ──────────────────────────────────────────── */}
+      {activeTab === 'huishouden' && hasHousehold && (
+        <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
+          <div className="px-4 sm:px-8 py-6 space-y-4">
+            {/* Quick-link cards grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Privacy card — expands inline */}
+              <button
+                type="button"
+                onClick={() => setHuishoudenPrivacySubOpen(o => !o)}
+                className={`flex items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
+                  huishoudenPrivacySubOpen
+                    ? 'border-wil-300 bg-wil-50/50'
+                    : 'border-[var(--border-ed)] hover:bg-[var(--subtle)]'
+                }`}
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-wil-100 text-wil-700">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--ink)]">Privacy</p>
+                  <p className="text-xs text-[var(--ink-3)] truncate">Wat je partner kan zien</p>
+                </div>
+                <ChevronRight className={`h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform duration-200 ${huishoudenPrivacySubOpen ? 'rotate-90' : ''}`} />
+              </button>
+
+              {/* Split-modus card — links to profiel */}
+              <Link
+                href="/identity/profiel#huishouden"
+                className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] p-4 text-left transition-colors hover:bg-[var(--subtle)]"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                  <SplitSquareVertical className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--ink)]">Split-modus</p>
+                  <p className="text-xs text-[var(--ink-3)] truncate">Kostenverdeling instellen</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
+              </Link>
+
+              {/* Notificaties card — switches to notificaties tab */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('notificaties')
+                  setTimeout(() => {
+                    document.getElementById('partner-transacties')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }, 100)
+                }}
+                className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] p-4 text-left transition-colors hover:bg-[var(--subtle)]"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-horizon-100 text-horizon-700">
+                  <Bell className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--ink)]">Notificaties</p>
+                  <p className="text-xs text-[var(--ink-3)] truncate">Partner transactie-meldingen</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
+              </button>
+
+              {/* Leden card — links to profiel */}
+              <Link
+                href="/identity/profiel#huishouden"
+                className="flex items-center gap-3 rounded-xl border border-[var(--border-ed)] p-4 text-left transition-colors hover:bg-[var(--subtle)]"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
+                  <UserPlus className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--ink)]">Leden</p>
+                  <p className="text-xs text-[var(--ink-3)] truncate">Leden beheren en uitnodigen</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
+              </Link>
+            </div>
+
+            {/* Privacy sub-section — expands inline when Privacy card is clicked */}
+            {huishoudenPrivacySubOpen && (
+              <div className="rounded-xl border border-wil-200 bg-wil-50/30 p-4 sm:p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="mt-0.5 h-5 w-5 text-wil-600 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-[var(--ink)]">Samen financieel, eigen grenzen</p>
+                    <p className="mt-1 text-sm text-[var(--ink-2)] leading-relaxed">
+                      Ieder huishouden is anders — het is heel normaal om niet alles te delen.
+                      Stel per categorie in wat je partner kan zien. Je kunt dit altijd aanpassen.
+                    </p>
                   </div>
                 </div>
-              )}
-            </div>
-          )}
+
+                <div className="flex flex-wrap gap-4 rounded-lg border border-[var(--border-ed)] p-3 bg-[var(--paper)]">
+                  <div className="flex items-center gap-1.5">
+                    <Eye className="h-3.5 w-3.5 text-wil-600" />
+                    <span className="text-xs text-[var(--ink-2)]"><strong>Volledig</strong> — alle details zichtbaar</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Shield className="h-3.5 w-3.5 text-amber-600" />
+                    <span className="text-xs text-[var(--ink-2)]"><strong>Totalen</strong> — alleen totaalbedragen</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <EyeOff className="h-3.5 w-3.5 text-red-500" />
+                    <span className="text-xs text-[var(--ink-2)]"><strong>Verborgen</strong> — volledig afgeschermd</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {([
+                    { key: 'vermogen', label: 'Vermogen', description: 'Bezittingen en beleggingen', icon: Wallet },
+                    { key: 'schulden', label: 'Schulden', description: 'Leningen en schulden', icon: CreditCard },
+                    { key: 'budgetten', label: 'Budgetten', description: 'Maandbudgetten en bestedingen', icon: Receipt },
+                    { key: 'transacties', label: 'Transacties', description: 'Individuele transacties', icon: ArrowLeftRight },
+                    { key: 'inkomen', label: 'Inkomen', description: 'Salaris en overig inkomen', icon: Banknote },
+                  ] as const).map(cat => {
+                    const currentLevel = householdPrivacy[cat.key] || 'totalen'
+                    const CatIcon = cat.icon
+                    return (
+                      <div key={cat.key} className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-wil-50">
+                              <CatIcon className="h-3.5 w-3.5 text-wil-600" />
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-semibold text-[var(--ink)]">{cat.label}</h3>
+                              <p className="text-xs text-[var(--ink-3)]">{cat.description}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {([
+                            { level: 'volledig' as PrivacyLevel, label: 'Volledig', icon: Eye, color: 'wil' },
+                            { level: 'totalen' as PrivacyLevel, label: 'Totalen', icon: Shield, color: 'amber' },
+                            { level: 'verborgen' as PrivacyLevel, label: 'Verborgen', icon: EyeOff, color: 'red' },
+                          ]).map(opt => {
+                            const isActive = currentLevel === opt.level
+                            const Icon = opt.icon
+                            return (
+                              <button
+                                key={opt.level}
+                                type="button"
+                                onClick={() => setHouseholdPrivacy(prev => ({ ...prev, [cat.key]: opt.level }))}
+                                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                                  isActive
+                                    ? opt.color === 'wil'
+                                      ? 'bg-wil-50 text-wil-700 border border-wil-300'
+                                      : opt.color === 'amber'
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-300'
+                                      : 'bg-red-50 text-red-700 border border-red-300'
+                                    : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                                }`}
+                              >
+                                <Icon className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">{opt.label}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="flex items-center gap-4 pt-2">
+                  <button
+                    onClick={saveHouseholdPrivacy}
+                    disabled={householdPrivacySaving || JSON.stringify(householdPrivacy) === JSON.stringify(householdPrivacySaved)}
+                    className="rounded-lg bg-wil-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-700 disabled:opacity-50"
+                  >
+                    {householdPrivacySaving ? 'Opslaan...' : 'Opslaan'}
+                  </button>
+                  {householdPrivacyMessage && (
+                    <p className={`text-sm ${householdPrivacyMessage.type === 'success' ? 'text-wil-600' : 'text-red-600'}`}>
+                      {householdPrivacyMessage.text}
+                    </p>
+                  )}
+                  {JSON.stringify(householdPrivacy) !== JSON.stringify(householdPrivacySaved) && !householdPrivacyMessage && (
+                    <p className="text-xs text-amber-600">Niet-opgeslagen wijzigingen</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       )}
 

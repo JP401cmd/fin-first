@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Check, Clock, X, RotateCcw, UserPlus, UserCheck } from 'lucide-react'
+import { Check, Clock, X, RotateCcw, UserPlus, UserCheck, Landmark, CreditCard, ArrowUpDown, Receipt, type LucideIcon } from 'lucide-react'
 import { PostponeForm } from '@/components/app/postpone-form'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
@@ -10,6 +10,23 @@ import {
   ACTION_SOURCE_LABELS,
 } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
+import { tagToLever, type LeverId } from '@/lib/lever-mapping'
+
+// ── Lever icon config (consistent with kompas) ────────────────────────────────
+
+const LEVER_ICON: Record<LeverId, LucideIcon> = {
+  assets: Landmark,
+  debts: CreditCard,
+  cashflow: ArrowUpDown,
+  tax: Receipt,
+}
+
+const LEVER_TOOLTIP: Record<LeverId, string> = {
+  assets: 'Bezittingen',
+  debts: 'Schulden',
+  cashflow: 'Cashflow',
+  tax: 'Belasting',
+}
 
 type ActionCardProps = {
   action: Action
@@ -74,6 +91,13 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
 
   const sourceBadge = getSourceBadgeClasses(action.source)
 
+  // Lever icon — derived from linked recommendation type or fallback to cashflow
+  const leverId = action.recommendation?.recommendation_type
+    ? tagToLever(action.recommendation.recommendation_type)
+    : 'cashflow'
+  const LeverIcon = LEVER_ICON[leverId]
+  const leverTooltip = LEVER_TOOLTIP[leverId]
+
   async function handleStatus(status: ActionStatus, data?: Record<string, unknown>) {
     setIsLoading(true)
     setShowLongPressMenu(false)
@@ -132,9 +156,12 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             <Clock className="h-3.5 w-3.5 shrink-0 text-amber-500" />
           )}
 
-          {/* Title */}
+          {/* Title + lever icon */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <h4 className={`truncate text-sm font-medium ${action.status === 'completed' ? 'text-[var(--ink-4)] line-through' : 'text-[var(--ink)]'}`}>{action.title}</h4>
+            <span title={leverTooltip} className="shrink-0 text-[var(--ink-4)]">
+              <LeverIcon className="h-3 w-3" />
+            </span>
             {!compact && (
               <>
                 {action.status === 'postponed' && action.postponed_until && (
