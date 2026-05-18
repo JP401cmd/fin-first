@@ -6,6 +6,12 @@
  */
 
 export const PAGE_INFO: Record<string, string> = {
+  // ── Dashboard ───────────────────────────────────────────────────
+  '/dashboard':
+    'Je persoonlijke overzichtspagina met de belangrijkste financiële inzichten. ' +
+    'Widgets tonen je vrijheidstijd, vermogensgroei, budgetstatus en aanbevelingen. ' +
+    'Personaliseer de indeling door widgets te verslepen of nieuwe toe te voegen.',
+
   // ── Module-landings ──────────────────────────────────────────────
   '/core':
     'Dit is je financieel fundament: een overzicht van al je bezittingen en schulden. ' +
