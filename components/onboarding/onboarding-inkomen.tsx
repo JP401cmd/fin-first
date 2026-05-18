@@ -348,7 +348,7 @@ export function OnboardingInkomen({
               className="mt-1 text-xs italic text-[var(--ink-3)]"
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
             >
-              Huishouden-netto (samen als je samenwoont). Pas je later aan in Instellingen.
+              Netto per maand voor je hele huishouden. Later aanpasbaar.
             </p>
           )}
 

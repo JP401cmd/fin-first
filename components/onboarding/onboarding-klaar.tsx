@@ -268,8 +268,8 @@ export function OnboardingKlaar({
         style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
       >
         {hasOptionalData
-          ? 'Klopt het? Klik door naar je dashboard. Je kunt elk gegeven later wijzigen via Instellingen of door direct op een waarde te klikken.'
-          : 'Je bent helemaal klaar! Alle overige gegevens vul je aan wanneer het jou uitkomt — vanuit je dashboard of via Instellingen.'}
+          ? 'Klopt het? Tik door naar je overzicht — alles is later aanpasbaar.'
+          : 'Je bent klaar! Aanvullen kan altijd, vanuit je overzicht.'}
       </p>
     </OnboardingShell>
   )
