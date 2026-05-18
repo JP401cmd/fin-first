@@ -24632,3 +24632,44 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#842, #843)
+
+## Session 2026-05-18 - Features #857, #858
+
+### Feature #857: Samengestelde interest dramatic visualisatie - PASSING
+- Created /horizon/samengestelde-interest page with server component + client wrapper
+- SVG stacked area chart showing exponential compound interest growth
+- Two distinct areas: deposits (lighter) and returns (gradient) clearly separated
+- Adjustable time horizon selector (10/20/30 jaar) via segmented control
+- User's monthly savings and expected return as defaults from profile/fire params
+- Interactive crosshair tooltip showing per-year breakdown (deposits + returns + total)
+- Summary cards: Totale inleg, Totaal rendement, Rendement/inleg ratio
+- Snowball insight text for 20+ year horizons ("70% is puur rendement op rendement")
+- Editorial design: Kicker, EditorialHeadline with emphasis, EditorialDeck, PullQuote
+- Return input shows percentage (7.0%) not decimal (0.07) for better UX
+- Zero console errors
+- Commit: 4480189e
+
+### Feature #858: Inflatie koopkrachtverlies dramatic visualisatie - PASSING
+- Created /horizon/inflatie-koopkracht page with server component + client wrapper
+- SVG chart showing real value decline: €1000 → €673 (20j) / €552 (30j) at 2% inflation
+- Freedom days framing: "Vrijheid vandaag: 14 dagen", "Vrijheid na 30j: 8 dagen", "Verdampt: -6 dagen (45%)"
+- Nominal amount dashed line with label vs declining real value curve
+- Striped red area for "evaporated" purchasing power between nominal and real
+- Milestone markers (-25%, -50%, -75% loss) on the chart
+- User's inflation rate from fire params as default (2.0%)
+- Adjustable horizon, start amount, and inflation rate inputs
+- Sparen vs beleggen comparison cards (+5% real vs -1.5% real)
+- PullQuote + explanation about investing vs saving urgency
+- Zero console errors
+- Commit: 32417051
+
+### Files Created
+- app/(app)/horizon/samengestelde-interest/page.tsx — server component with profile data
+- app/(app)/horizon/samengestelde-interest/compound-interest-client.tsx — editorial client wrapper
+- components/app/horizon/compound-interest-chart.tsx — SVG stacked area chart component
+- app/(app)/horizon/inflatie-koopkracht/page.tsx — server component with inflation data
+- app/(app)/horizon/inflatie-koopkracht/inflatie-client.tsx — editorial client wrapper
+- components/app/horizon/inflation-erosion-chart.tsx — SVG erosion chart component
+
+### Current Status
+- 2 features completed this session (#857, #858)
