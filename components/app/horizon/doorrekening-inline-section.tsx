@@ -12,7 +12,7 @@
  * Feature #796 — "Tijdas toont doorrekening resultaten inline"
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
 import {
@@ -103,6 +103,10 @@ export interface DoorrekeningInlineProps {
   savingsRate6m: number
   estimatedYearlyIncome: number
   profile: Record<string, unknown> | null
+  /** Initieel actieve tab, gezet via ?doorrekening= query param (feature #800). */
+  initialTab?: TabKey
+  /** Forceer sectie open (override van localStorage/defaultOpen). */
+  forceOpen?: boolean
 }
 
 // ── Main component ─────────────────────────────────────────────────
@@ -124,8 +128,15 @@ export function DoorrekeningInlineSection({
   savingsRate6m,
   estimatedYearlyIncome,
   profile,
+  initialTab,
+  forceOpen,
 }: DoorrekeningInlineProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('overzicht')
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab ?? 'overzicht')
+
+  // Feature #800: update tab when initialTab changes (via query param redirect)
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab)
+  }, [initialTab])
 
   // Gate: only show when we have sufficient data for projections
   if (currentAge == null) return null
@@ -144,7 +155,7 @@ export function DoorrekeningInlineSection({
         storageKey="doorrekening-inline"
         title="Doorrekening"
         summary="Gedetailleerde projectie per fase: opbouw, afbouw en overzicht"
-        defaultOpen={false}
+        defaultOpen={forceOpen ?? false}
         icon={
           <span
             className="text-xs font-mono font-semibold"

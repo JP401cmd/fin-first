@@ -1,85 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
-import { resolveFireParams } from '@/lib/fire-params'
-import { lifeEventsToCashflows } from '@/lib/fire-simulation'
-import type { LifeEvent } from '@/lib/horizon-data'
-import { loadCoreData } from '@/lib/core-data-loader'
-import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
-import { OpbouwClient } from './opbouw-client'
-import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { redirect } from 'next/navigation'
 
-export default async function OpbouwPage() {
-  const supabase = await createClient()
-
-  const [
-    { data: assets },
-    { data: debts },
-    { data: profile },
-    { data: budgets },
-    { data: lifeEvents },
-    { data: aowRows },
-    coreData,
-  ] = await Promise.all([
-    supabase.from('assets').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
-    supabase.from('debts').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
-    supabase.from('profiles').select('*').single(),
-    supabase.from('budgets').select('*').eq('is_active', true),
-    supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
-    supabase.from('aow_leeftijden').select('*'),
-    loadCoreData(supabase).catch(() => null),
-  ])
-
-  const fireParams = resolveFireParams(profile ?? {})
-  const cashflows = lifeEventsToCashflows((lifeEvents ?? []) as LifeEvent[])
-
-  // Totals + weighted return (zelfde berekening als overzicht, zodat sim-inputs matchen).
-  const totalAssets = (assets ?? []).reduce(
-    (sum: number, a: Record<string, unknown>) => sum + Number(a.current_value ?? 0),
-    0,
-  )
-  const totalDebts = (debts ?? []).reduce(
-    (sum: number, d: Record<string, unknown>) => sum + Number(d.current_balance ?? 0),
-    0,
-  )
-  const netWorth = totalAssets - totalDebts
-
-  let weightedGrossReturn = fireParams.grossReturn
-  if (assets && assets.length > 0 && totalAssets > 0) {
-    let weightedSum = 0
-    for (const a of assets as Record<string, unknown>[]) {
-      const value = Number(a.current_value ?? 0)
-      const expReturn = Number(a.expected_return ?? 0) / 100
-      weightedSum += value * expReturn
-    }
-    weightedGrossReturn = weightedSum / totalAssets
-  }
-
-  const yearlyMustExpenses = (budgets ?? [])
-    .filter((b: Record<string, unknown>) => b.budget_type === 'essentieel' || b.budget_type === 'must')
-    .reduce((sum: number, b: Record<string, unknown>) => sum + Number(b.amount ?? 0) * 12, 0)
-
-  const dob = typeof profile?.date_of_birth === 'string' ? profile.date_of_birth : null
-  const userAowAge = lookupAowAge((aowRows ?? []) as AowLeeftijdRow[], dob).fractional
-
-  const savingsRate6m = coreData?.savingsRate6m ?? 0
-  const estimatedYearlyIncome = coreData?.rawFinancials.extrapolatedIncome ?? 0
-
-  return (
-    <>
-      <NavStackMeta title="Doorrekening — Opbouw" />
-      <OpbouwClient
-        assets={assets ?? []}
-        debts={debts ?? []}
-        profile={profile}
-        fireParams={fireParams}
-        cashflows={cashflows}
-        lifeEvents={(lifeEvents ?? []) as LifeEvent[]}
-        savingsRate6m={savingsRate6m}
-        estimatedYearlyIncome={estimatedYearlyIncome}
-        netWorth={netWorth}
-        yearlyMustExpenses={yearlyMustExpenses}
-        userAowAge={userAowAge}
-        weightedGrossReturn={weightedGrossReturn}
-      />
-    </>
-  )
+/**
+ * /horizon/doorrekening-test/opbouw → redirect naar /horizon met opbouw tab.
+ * Feature #800: uniforme tijdas — bestaande bookmarks blijven werken.
+ */
+export default function OpbouwPage() {
+  redirect('/horizon?doorrekening=opbouw')
 }
