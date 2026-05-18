@@ -1,3 +1,29 @@
+## Session 2026-05-18 - Features #854, #863
+
+### Feature #854: Wat zie ik hier content geschreven voor 15 hoofdpaginas - PASSING
+- Added /dashboard entry to PAGE_INFO in lib/page-info-content.ts
+- Verified all 15+ main pages have unique, non-generic descriptions:
+  /dashboard, /core, /will, /horizon, /core/budgets, /core/cash, /core/assets,
+  /core/debts, /core/belasting, /core/checkin, /horizon/whatif, /horizon/strategie,
+  /identity, /nieuws, /rapportages
+- Visually verified PageInfoButton renders on /core, /will, /horizon, /identity,
+  /core/assets, /core/debts, /core/belasting with unique content in popover
+- Commit: cbfe5fa4
+
+### Feature #863: Jargon-vervanging behoudt oorspronkelijke term in tooltip - PASSING
+- Updated GlossaryTerm tooltip header to use GLOSSARY_ENTRIES name field
+  instead of raw term.replace(/_/g, ' ') for proper capitalization
+- Verified on /core/debts: "schuldgraad" shows tooltip with header "SCHULDGRAAD"
+  and clear explanation
+- Verified on /core/belasting: "Box 3" shows proper display name (not "box 3")
+- Works for both inline labels (deck paragraph text) and section headers (kicker)
+- Zero console errors on all tested pages
+- Commit: 58dbe0af
+
+### Current Status
+- 2 features completed this session (#854, #863)
+- Overall progress: 851/861 passing (98.8%)
+
 ## Session 2026-05-18 - Features #846, #847
 
 ### Feature #846: Kompas schulden-indicator toont payoff voortgang - PASSING
