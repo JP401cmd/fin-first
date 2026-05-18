@@ -37,6 +37,31 @@ export const PAGE_INFO: Record<string, string> = {
     'Tijdas met opbouw (groen) en afbouw (oranje) tot je gekozen eindleeftijd, plus doelen, levensgebeurtenissen en voorkeuren die je projectie sturen. ' +
     'Sleep events om te zien hoe ze je vrijheidsmoment verschuiven.',
 
+  '/toekomst/whatif':
+    'Wat-als-keuzes spelen met je projectie. ' +
+    'Verander je sparen, rendement of pensioenleeftijd en zie direct hoeveel jaar of maanden vrijheid je dat oplevert. ' +
+    'Geen toezegging — alleen verkennen.',
+
+  '/toekomst/strategie':
+    'Drie levensstrategieën die je vrijheidsmoment het sterkst sturen: ' +
+    'AOW (wanneer en hoeveel), pensioen (opbouw en uitkering) en huis (kopen, behouden, afbetalen). ' +
+    'Klein draaien aan deze knoppen verschuift jaren.',
+
+  '/toekomst/uitgaven-na-pensioen':
+    'Wat ga je werkelijk uitgeven als je niet meer hoeft te werken. ' +
+    'Eenzelfde uitgavenpatroon of bewust minder — dit getal bepaalt de hoogte van je vrijheidsdoel. ' +
+    'Geen aanname; je eigen keuze.',
+
+  '/toekomst/inflatie-koopkracht':
+    'Inflatie eet je vermogen op in stille jaren. ' +
+    'Hier zie je hoe €100 vandaag over 10, 20, 30 jaar voelt — en wat dat met je vrijheidsdoel doet. ' +
+    'Reken in koopkracht, niet in euro\'s alleen.',
+
+  '/toekomst/samengestelde-interest':
+    'Rente-op-rente is de stille kracht achter elke vrijheid. ' +
+    'Speel met inleg, rendement en horizon en zie hoe een gewone euro vandaag tot tien euro over 30 jaar groeit. ' +
+    'Tijd is je grootste hefboom.',
+
   '/mijn':
     'Profiel, partner, privacy en koppelingen. ' +
     'Plus voorkeuren (notificaties, uiterlijk, personalisatie van je Overzicht) en rapportages-export. ' +
