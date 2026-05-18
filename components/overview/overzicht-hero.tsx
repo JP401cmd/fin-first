@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { Banknote, CreditCard, Wallet, Receipt, Target, CheckCircle2, AlertCircle } from 'lucide-react'
+import { PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 
@@ -68,9 +70,15 @@ export function OverzichtHero({ userName, health, goals, goalProgresses }: Overz
     .slice(0, 3)
 
   return (
-    <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
+    <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
+      {/* "Wat zie ik hier?"-knop rechtsboven (Tier-1 #5) */}
+      <PageInfoButton
+        description={PAGE_INFO['/overzicht'] ?? ''}
+        className="absolute right-4 top-6 sm:right-6 sm:top-8"
+      />
+
       {/* Header: datum + begroeting */}
-      <header className="mb-6">
+      <header className="mb-6 pr-12 sm:pr-16">
         <div className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-4)]">
           {formatDateNL()}
         </div>

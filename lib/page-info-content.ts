@@ -6,6 +6,42 @@
  */
 
 export const PAGE_INFO: Record<string, string> = {
+  // ── Nieuwe navigatie-architectuur (Overzicht / Toekomst / Mijn) ────
+  '/overzicht':
+    'Hoe sta je er voor in één blik. ' +
+    'Vier hefbomen (bezittingen, schulden, cashflow, belasting), je financiële gezondheidsscore, voortgang op je doelen en de wekelijkse briefing van Will. ' +
+    'Klik op een hefboom voor verdieping.',
+
+  '/overzicht/bezittingen':
+    'Wat groeit voor je: cash, beleggingen, eigen huis en pensioen. ' +
+    'Per categorie zie je waarde en rendement. ' +
+    'Klik op een bezitting voor detail of voeg er een toe.',
+
+  '/overzicht/schulden':
+    'Wat je terugbetaalt: hypotheek, leningen, studieschuld. ' +
+    'Schuld verkort je vrijheid — aflossen verlengt hem. ' +
+    'Bekijk je aflossingsplan en heroverweeg waar nodig.',
+
+  '/overzicht/cashflow':
+    'Wat er in komt en uit gaat. ' +
+    'Het deel van je inkomen dat je opzij zet bepaalt hoe snel je vrijheid bereikt. ' +
+    'Beheer je budgetten, vaste lasten en transacties.',
+
+  '/overzicht/belasting':
+    'Belasting over je inkomen (Box 1), aandeelhouderschap (Box 2) en vermogen (Box 3). ' +
+    'Slim verdelen over fiscale bakjes scheelt geld per jaar. ' +
+    'Bekijk je heffingen en gebruik je jaarruimte.',
+
+  '/toekomst':
+    'Waar ga je heen. ' +
+    'Tijdas met opbouw (groen) en afbouw (oranje) tot je gekozen eindleeftijd, plus doelen, levensgebeurtenissen en voorkeuren die je projectie sturen. ' +
+    'Sleep events om te zien hoe ze je vrijheidsmoment verschuiven.',
+
+  '/mijn':
+    'Profiel, partner, privacy en koppelingen. ' +
+    'Plus voorkeuren (notificaties, uiterlijk, personalisatie van je Overzicht) en rapportages-export. ' +
+    'Eén onderwerp per pagina — geen accordion-monster.',
+
   // ── Dashboard ───────────────────────────────────────────────────
   '/dashboard':
     'Je persoonlijke overzichtspagina met de belangrijkste financiële inzichten. ' +
