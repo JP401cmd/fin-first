@@ -5,6 +5,8 @@ import BudgetsClient from '@/components/app/budgets-client'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { getAppSetupStatus } from '@/lib/app-setup-status'
 import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
+import { CashflowViewSwitcher } from '@/components/overview/cashflow-view-switcher'
+import { TransactiesFeed, type TransactionRow } from '@/components/app/transacties-feed'
 
 export const metadata: Metadata = {
   title: 'Cashflow — TriFinity',
@@ -12,16 +14,13 @@ export const metadata: Metadata = {
 }
 
 /**
- * /overzicht/cashflow — derde hefboom-verdieping in nieuwe architectuur.
+ * /overzicht/cashflow — derde hefboom-verdieping. Drie views via
+ * CashflowViewSwitcher: Budget (default), Transacties, Vaste lasten.
+ * View-state via `?view=`-URL-param. Bookmarkable.
  *
- * Vervangt /core/budgets. Cashflow wordt in de nieuwe architectuur een
- * volwaardig domein (was sub-app onder Cash-asset-type).
- *
- * Voor nu rendert BudgetsClient zodat de bestaande budgetting-UI direct
- * werkt onder de nieuwe URL. Toekomstige verbeteringen:
- *  - segmented-control [Budget | Transacties | Vaste lasten]
- *  - vaste-kosten-analyse versmelt onder Vaste lasten-tab
- *  - transacties uit /core/assets/cash worden Transacties-tab hier
+ * Toekomst:
+ *  - Vaste-lasten view echt vullen (nu placeholder met "binnenkort"-CTA)
+ *  - VasteKostenAnalyse component hergebruiken zodra recurring-data loader
  */
 export default async function OverzichtCashflowPage() {
   const supabase = await createClient()
@@ -42,10 +41,59 @@ export default async function OverzichtCashflowPage() {
 
   const data = await loadBudgetsData(supabase)
 
+  // Laad ~3 maanden recente transacties voor de Transacties-view.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  let transactions: TransactionRow[] = []
+  let monthLabel: string | undefined
+  if (user) {
+    const since = new Date()
+    since.setMonth(since.getMonth() - 3)
+    const { data: txs } = await supabase
+      .from('transactions')
+      .select('id, date, description, category, amount, accounts(name)')
+      .eq('user_id', user.id)
+      .gte('date', since.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+      .limit(500)
+    transactions = (txs ?? []).map((t) => {
+      const accountField = (t as { accounts?: { name?: string } | { name?: string }[] | null }).accounts
+      const accountName = Array.isArray(accountField)
+        ? accountField[0]?.name
+        : accountField?.name
+      return {
+        id: String(t.id),
+        date: String(t.date),
+        description: String(t.description ?? ''),
+        category: (t as { category?: string | null }).category ?? null,
+        amount: Number(t.amount),
+        account_name: accountName ?? null,
+      }
+    })
+    monthLabel = new Intl.DateTimeFormat('nl-NL', {
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date())
+  }
+
   return (
     <>
       <NavStackMeta title="Cashflow" bottomBar={{ kind: 'tabs' }} />
-      <BudgetsClient initialData={data} />
+      <CashflowViewSwitcher
+        budgetView={<BudgetsClient initialData={data} />}
+        transactiesView={
+          <TransactiesFeed transactions={transactions} monthLabel={monthLabel} />
+        }
+        vasteLastenView={
+          <section className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 text-center">
+            <p className="text-sm text-[var(--ink-2)]">
+              Vaste lasten-analyse komt binnenkort hier — voor nu zie je je
+              vaste kosten in Will.
+            </p>
+          </section>
+        }
+      />
     </>
   )
 }
