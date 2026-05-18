@@ -1,0 +1,86 @@
+'use client'
+
+import { ArrowLeft, TrendingUp } from 'lucide-react'
+import Link from 'next/link'
+import { Kicker, EditorialHeadline, EditorialDeck, PullQuote, HL } from '@/components/editorial'
+import { CompoundInterestChart } from '@/components/app/horizon/compound-interest-chart'
+
+export function CompoundInterestPage({
+  defaultMonthlyDeposit,
+  defaultAnnualReturn,
+}: {
+  defaultMonthlyDeposit: number
+  defaultAnnualReturn: number
+}) {
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      {/* Back link */}
+      <Link
+        href="/horizon"
+        className="inline-flex items-center gap-1.5 text-xs font-mono text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors mb-6"
+      >
+        <ArrowLeft size={14} />
+        De Horizon
+      </Link>
+
+      {/* Editorial header */}
+      <div className="space-y-4 mb-8">
+        <Kicker>
+          <TrendingUp size={12} className="inline -mt-0.5 mr-1" />
+          Samengestelde interest
+        </Kicker>
+
+        <EditorialHeadline emphasis="sneeuwbaleffect" size="lg">
+          Het sneeuwbaleffect van tijd
+        </EditorialHeadline>
+
+        <EditorialDeck>
+          Samengestelde interest is de krachtigste kracht in persoonlijke financiering.
+          Een klein maandelijks bedrag groeit exponentieel &mdash; niet lineair.
+          Het rendement dat je verdient, verdient weer rendement.
+        </EditorialDeck>
+      </div>
+
+      {/* Chart */}
+      <CompoundInterestChart
+        defaultMonthlyDeposit={defaultMonthlyDeposit}
+        defaultAnnualReturn={defaultAnnualReturn}
+      />
+
+      {/* Educational pull-quote */}
+      <div className="mt-10">
+        <PullQuote>
+          Albert Einstein noemde samengestelde interest het{' '}
+          <HL>achtste wereldwonder</HL>. Wie het begrijpt, verdient het.
+          Wie het niet begrijpt, betaalt het.
+        </PullQuote>
+      </div>
+
+      {/* Explanation section */}
+      <div className="mt-8 space-y-4 text-sm text-[var(--ink-2)] leading-relaxed" style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}>
+        <h3
+          className="text-base font-bold text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
+          Hoe werkt het?
+        </h3>
+        <p>
+          Samengestelde interest betekent dat je niet alleen rendement verdient op je inleg,
+          maar ook op het rendement dat je al eerder verdiend hebt. In de eerste jaren
+          lijkt de groei bescheiden, maar na verloop van tijd versnelt het dramatisch.
+        </p>
+        <p>
+          Stel je legt maandelijks &euro;500 in tegen 7% rendement. Na 10 jaar heb je
+          &euro;60.000 ingelegd, maar je vermogen is al ruim &euro;86.000. Na 20 jaar
+          heb je &euro;120.000 ingelegd, maar het rendement alleen al is meer dan
+          &euro;140.000 &mdash; meer dan je totale inleg.
+        </p>
+        <p>
+          Dit is het <strong className="text-[var(--ink)] not-italic">sneeuwbaleffect</strong>:
+          hoe langer je belegd blijft, hoe groter het effect. Daarom is de belangrijkste factor
+          niet hoeveel je inlegt, maar <em>hoe lang</em> je belegd blijft.
+        </p>
+      </div>
+    </div>
+  )
+}
