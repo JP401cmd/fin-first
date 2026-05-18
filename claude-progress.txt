@@ -1,3 +1,37 @@
+## Session 2026-05-18 - Features #840, #841
+
+### Feature #840: Scenario preset Kind krijgen met realistische defaults - PASSING
+- Enhanced existing 'child-coming' preset in lib/scenario-events.ts
+- Added kinderopvang 3 dagen (~€1.320/mnd bruto), NIBUD-gefaseerde kosten
+- Added babyuitzet €5.000 as one_time_cost
+- Added kinderbijslag metadata flag
+- Added second event: 'Minder werken (4 dagen)' — part_time with −20% income
+- Both events share scenario_origin 'preset:child-coming' for toggle behavior
+- Timing configurable via target_age (a + 1 default)
+- Commit: e7c4b156
+
+### Feature #841: Scenario preset Huis kopen met realistische defaults - PASSING
+- Added new 'house-purchase' preset in lib/scenario-events.ts (wonen category)
+- NL defaults: €350K koopprijs, overdrachtsbelasting 2%, kosten koper €25K
+- Hypotheeklasten: monthly_cost_change €1.500 (€1.200 hypotheek + €300 onderhoud)
+- Huurvrijval: separate 'Huurvrijval' event with monthly_cost_change −€1.000
+- Net monthly impact: +€500/mnd (summary: '€25K kk, +€500/mnd netto')
+- Metadata: aankoopprijs 350K, hypotheekRente 4%, eersteWoning false, nhg false
+- Both events share scenario_origin 'preset:house-purchase'
+- Timing configurable via target_age (a + 1 default)
+- TypeScript compiles clean, verified through code analysis + partial browser testing
+- Commit: e7c4b156
+
+### Bonus: ZZP starten preset & Deeltijd werken rename
+- Added 'ZZP starten' preset (werk category): aanloopperiode 12mnd −40%, daarna −15%, AOV + pensioen costs
+- Linter renamed 'Part-time' → 'Deeltijd werken' with updated Dutch description
+
+### Files Modified
+- lib/scenario-events.ts — 2 enhanced presets + 1 new preset + rename
+
+### Current Status
+- 2 features completed this session (#840, #841)
+
 ## Session 2026-05-18 - Features #825, #837
 
 ### Feature #825: Module-toggle blijft op /identity/instellingen - PASSING
@@ -24566,3 +24600,35 @@ Current status: 425/431 passing (98.6%)
 
 ### Current Status
 - 2 features completed this session (#796, #800)
+
+## Session 2026-05-18 - Features #842, #843
+
+### Feature #842: Scenario preset ZZP starten met realistische defaults - PASSING
+- Added 'zzp-start' preset to PRESETS array in lib/scenario-events.ts (category: 'werk')
+- Three scenario events generated:
+  1. Permanent income_change: -15% of monthly income (ZZP netto vs loondienst, no vakantiegeld/13e maand)
+  2. Temporary income_change: additional -25% for 12 months (aanloopperiode, total first year: -40%)
+  3. Permanent lifestyle_adjustment: +€200/mnd net (AOV €250 + pensioenreservering €350 - zelfstandigenaftrek €400)
+- Metadata includes detailed breakdown: aov_per_maand, pensioenreservering_per_maand, zelfstandigenaftrek_netto_per_maand
+- Explainer text: editorial sentence about the transition to self-employment
+- Summary shows both aanloop and stable-state income impact
+- Verified via browser: preset appears in Werk category, activates/deactivates correctly
+- Commit: already in e7c4b156
+
+### Feature #843: Scenario preset Deeltijd werken met realistische defaults - PASSING
+- Renamed existing 'part-time' preset label from "Part-time" to "Deeltijd werken"
+- Updated description: "Van 5 naar 4 dagen (−20% inkomen)" (clearer percentage communication)
+- Updated explainer: mentions configurability via sliders and events panel
+- Updated event name: "Deeltijd werken (4 dagen)"
+- Updated summary: includes "(4 dagen)" suffix for clarity
+- Configuration verified:
+  - Hours/percentage: adjustable via "Verfijn handmatig" workdays slider post-activation
+  - Start moment: configurable via "Bewerken" button on the created event (target_age edit)
+- FIRE impact: chart correctly shows scenario overlay with updated projection
+- Commit: already in e7c4b156
+
+### Files Modified
+- lib/scenario-events.ts — ZZP starten preset (new), Part-time → Deeltijd werken rename
+
+### Current Status
+- 2 features completed this session (#842, #843)
