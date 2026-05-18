@@ -80,7 +80,7 @@ export default async function AppLayout({
     budgetCountRes,
   ] = await Promise.all([
     // profile-select bevat alleen velden voor sidebar/feature-access/theming.
-    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules').eq('id', user.id).single(),
+    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type').eq('id', user.id).single(),
     // assets: `asset_type, net_worth_inclusion_pct` voor sidebar netWorth
     // (weighted). De tracking-flags voeden `getActiveAppKeys()` voor de
     // sidebar apps-strip: een app verschijnt alleen als minstens één
@@ -91,7 +91,7 @@ export default async function AppLayout({
     // `has_hypotheekplanner_tracking` voor de Hypotheekplanner-app
     // (mortgage-only). Aflosstrategie is sinds de v2-refactor globaal en
     // kent geen per-debt opt-in meer.
-    supabase.from('debts').select('current_balance, debt_type, net_worth_inclusion_pct, has_hypotheekplanner_tracking').eq('user_id', user.id).eq('is_active', true),
+    supabase.from('debts').select('current_balance, original_amount, debt_type, net_worth_inclusion_pct, has_hypotheekplanner_tracking').eq('user_id', user.id).eq('is_active', true),
     // transactions: 3-maand-window voor `computeFeatureAccess` (income/expense
     // signalen voor phase-detectie).
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
@@ -180,7 +180,7 @@ export default async function AppLayout({
   // dashboard-headers.
   const sidebarHasVermogen = activeModules.includes('vermogensregistratie')
   type AssetRow = { current_value: number | string; asset_type?: string | null; net_worth_inclusion_pct?: number | null; has_budget_tracking?: boolean; has_holdings_tracking?: boolean; has_woonbalans_tracking?: boolean; has_rental_tracking?: boolean }
-  type DebtRow = { current_balance: number | string; debt_type?: string | null; net_worth_inclusion_pct?: number | null; has_hypotheekplanner_tracking?: boolean }
+  type DebtRow = { current_balance: number | string; original_amount?: number | string | null; debt_type?: string | null; net_worth_inclusion_pct?: number | null; has_hypotheekplanner_tracking?: boolean }
   const assetRows = (assetsRes.data ?? []) as AssetRow[]
   const debtRows = (debtsRes.data ?? []) as DebtRow[]
   // App-zichtbaarheid in sidebar: derived van tracking-flags. Een app
@@ -232,12 +232,20 @@ export default async function AppLayout({
   const BOX3_VRIJSTELLING = 57_684 // 2025, single
   const box3TaxableAboveThreshold = Math.max(0, box3Net - BOX3_VRIJSTELLING)
 
+  const sidebarTotalOriginalDebts = debtRows.reduce((s, d) => s + Number(d.original_amount ?? d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
+  // Box3-asset-detectie: of de gebruiker überhaupt box3-belastbare assets bezit
+  const hasBox3Assets = assetRows.some(a => a.asset_type && BOX3_TYPES.has(a.asset_type))
+  const householdType = (profile?.household_type as string | undefined) ?? undefined
   const sidebarLeverScores = computeLeverScores({
     totalAssets: sidebarTotalAssetsRaw,
     totalDebts: sidebarTotalDebtsRaw,
+    totalOriginalDebts: sidebarTotalOriginalDebts,
+    debtCount: debtRows.length,
     assetTypeCount: assetTypeSet.size,
     savingsRate: savingsRate3m,
     box3TaxableAboveThreshold,
+    hasBox3Assets,
+    householdType,
   })
 
   // ── Coach-bubble data gaps ──────────────────────────────

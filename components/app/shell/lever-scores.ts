@@ -15,6 +15,8 @@ export type LeverEntry = {
   status: LeverStatus
   /** Korte detailtekst voor tooltip, bv. "4 typen · € 834k". */
   detail: string
+  /** Optioneel: voortgangspercentage (0–100) voor visuele ring indicator. */
+  progress?: number | null
 }
 
 export type LeverScores = {
@@ -64,11 +66,19 @@ function fmtShort(value: number): string {
 export function computeLeverScores(input: {
   totalAssets: number
   totalDebts: number
+  /** Totale oorspronkelijke schuldbedragen (sum original_amount). Voor payoff-voortgang. */
+  totalOriginalDebts?: number
+  /** Aantal actieve schulden. */
+  debtCount?: number
   assetTypeCount: number
   /** (income − expenses) / income × 100 over 3 maanden. null = geen transacties. */
   savingsRate: number | null
   /** Totaal box3-belast vermogen boven vrijstelling. */
   box3TaxableAboveThreshold: number
+  /** Of de gebruiker box3-belastbare assets heeft (cash, savings, investment, etc.). Geen → neutral. */
+  hasBox3Assets?: boolean
+  /** Huishoudtype: 'solo' | 'samen' | 'gezin'. Partner verdubbelt vrijstelling → optimalisatie-kans. */
+  householdType?: string
 }): LeverScores {
   // 1. Bezittingen: diversificatie
   // Bij géén assets → null (neutral/grijs) — er is niets om te beoordelen.
@@ -108,17 +118,34 @@ export function computeLeverScores(input: {
     cashflowScore = Math.round((input.savingsRate / 10) * 30 + 20) // 0→20, 10→50
   }
 
-  // 4. Belasting: box3 exposure
-  // Green: no meaningful box3 exposure; Amber: moderate; Red: high
-  let taxScore: number
-  if (input.box3TaxableAboveThreshold <= 0) {
-    taxScore = 90 // under vrijstelling = fine
+  // 4. Belasting: tax optimization status (#848)
+  //
+  // Neutral (grijs): geen box3-belastbare assets → niets te optimaliseren
+  // Green (gezond):  onder vrijstelling → optimaal, geen belasting verschuldigd
+  // Green (gezond):  boven vrijstelling maar beperkt + partner → geoptimaliseerd
+  // Amber (aandacht): boven vrijstelling, optimalisatie mogelijk
+  //   - Solo-huishouden met partner-potentieel
+  //   - Significante blootstelling (>100k boven drempel)
+  // Red (zorg): zeer hoge blootstelling (>500k boven drempel)
+  const hasBox3 = input.hasBox3Assets ?? (input.box3TaxableAboveThreshold > 0 || input.totalAssets > 0)
+  const hasPartner = input.householdType === 'samen' || input.householdType === 'gezin'
+  let taxScore: number | null
+
+  if (!hasBox3) {
+    // Geen box3-relevante assets → geen belasting-data
+    taxScore = null
+  } else if (input.box3TaxableAboveThreshold <= 0) {
+    // Onder vrijstelling → optimaal
+    taxScore = 90
   } else if (input.box3TaxableAboveThreshold <= 100_000) {
-    taxScore = 65 // moderate exposure
+    // Lichte blootstelling — amber: er is belasting verschuldigd, tips mogelijk
+    taxScore = hasPartner ? 70 : 45
   } else if (input.box3TaxableAboveThreshold <= 500_000) {
-    taxScore = 40 // significant
+    // Significante blootstelling — amber/red afhankelijk van partner-situatie
+    taxScore = hasPartner ? 40 : 25
   } else {
-    taxScore = 20 // high exposure
+    // Zeer hoge blootstelling
+    taxScore = 20
   }
 
   // ── Detail text per lever ─────────────────────────────────────────────────
@@ -132,23 +159,50 @@ export function computeLeverScores(input: {
   } else if (input.totalDebts <= 0) {
     debtDetail = 'Schuldenvrij'
   } else {
-    const ratio = input.totalAssets > 0
-      ? Math.round((input.totalDebts / input.totalAssets) * 100)
-      : 100
-    debtDetail = `${fmtShort(input.totalDebts)} · ${ratio}% van vermogen`
+    // Payoff voortgang: percentage afbetaald o.b.v. original_amount vs current_balance
+    const origTotal = input.totalOriginalDebts ?? 0
+    const payoffPct = origTotal > 0
+      ? Math.round(((origTotal - input.totalDebts) / origTotal) * 100)
+      : 0
+    // Richting: afnemend is goed (↓ symbool)
+    const directionLabel = payoffPct > 0 ? ' · ↓ afnemend' : ''
+    if (origTotal > 0 && payoffPct > 0) {
+      debtDetail = `${payoffPct}% afbetaald · ${fmtShort(input.totalDebts)} resterend${directionLabel}`
+    } else {
+      const ratio = input.totalAssets > 0
+        ? Math.round((input.totalDebts / input.totalAssets) * 100)
+        : 100
+      debtDetail = `${fmtShort(input.totalDebts)} · ${ratio}% van vermogen`
+    }
   }
 
   const cashflowDetail = input.savingsRate === null
     ? 'Onvoldoende transactiedata'
     : `Spaarquote ${Math.round(input.savingsRate)}%`
 
-  const taxDetail = input.box3TaxableAboveThreshold <= 0
-    ? 'Onder vrijstelling'
-    : `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling`
+  let taxDetail: string
+  if (!hasBox3) {
+    taxDetail = 'Geen belastbare bezittingen'
+  } else if (input.box3TaxableAboveThreshold <= 0) {
+    taxDetail = 'Onder vrijstelling'
+  } else if (hasPartner && input.box3TaxableAboveThreshold <= 100_000) {
+    taxDetail = `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling`
+  } else if (!hasPartner && input.box3TaxableAboveThreshold > 0) {
+    taxDetail = `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling — bekijk tips`
+  } else {
+    taxDetail = `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling — optimalisatie aanbevolen`
+  }
+
+  // Schulden payoff voortgang: 0–100 (null als schuldenvrij of geen data)
+  const origDebt = input.totalOriginalDebts ?? 0
+  const debtProgress: number | null =
+    input.totalDebts <= 0 ? (origDebt > 0 ? 100 : null) :
+    origDebt > 0 ? Math.round(((origDebt - input.totalDebts) / origDebt) * 100) :
+    null
 
   return {
     assets: { score: assetScore, status: statusFromScore(assetScore), detail: assetDetail },
-    debts: { score: debtScore, status: statusFromScore(debtScore), detail: debtDetail },
+    debts: { score: debtScore, status: statusFromScore(debtScore), detail: debtDetail, progress: debtProgress },
     cashflow: { score: cashflowScore, status: statusFromScore(cashflowScore), detail: cashflowDetail },
     tax: { score: taxScore, status: statusFromScore(taxScore), detail: taxDetail },
   }
