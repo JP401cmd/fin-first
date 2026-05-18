@@ -2705,7 +2705,7 @@ function BudgetDetailModal({
                         Spaardoel aanmaken
                       </button>
                       <a
-                        href="/will"
+                        href="/overzicht"
                         className="text-xs italic text-[var(--ink-3)] hover:text-[var(--ink-2)]"
                       >
                         Bekijk doelen →

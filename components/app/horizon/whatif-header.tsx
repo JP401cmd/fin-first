@@ -18,7 +18,7 @@ export function WhatIfHeader() {
       />
       {/* Back link in mono UPPERCASE */}
       <Link
-        href="/horizon"
+        href="/toekomst"
         className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
       >
         <ChevronLeft className="h-3 w-3" />

@@ -68,7 +68,7 @@ export function HorizonFireIntroCard({ kernEmpty }: HorizonFireIntroCardProps) {
 
           {kernEmpty && (
             <Link
-              href="/core"
+              href="/overzicht"
               className="inline-flex items-center gap-1 text-sm text-[var(--ink-2)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]"
               style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
             >

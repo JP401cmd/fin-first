@@ -119,7 +119,7 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           <p className="text-xs text-amber-700">
             Je hebt nog geen huishouden. Nodig eerst je partner uit via{' '}
-            <a href="/identity" className="font-medium underline">Identiteit</a>.
+            <a href="/mijn" className="font-medium underline">Identiteit</a>.
           </p>
         </div>
       )}

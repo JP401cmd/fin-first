@@ -198,7 +198,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                   </Link>
                 )}
                 <Link
-                  href="/identity"
+                  href="/mijn"
                   className="block px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
                   onClick={() => setMenuOpen(false)}
                 >

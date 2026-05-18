@@ -197,7 +197,7 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
               </Link>
             )}
             <Link
-              href="/identity"
+              href="/mijn"
               role="menuitem"
               className="block px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
               onClick={() => setMenuOpen(false)}

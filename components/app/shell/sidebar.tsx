@@ -126,14 +126,16 @@ type SubTag = {
 const MODULES: ModuleEntry[] = [
   {
     key: 'kern',
-    prefix: 'De ',
-    italicEm: 'Kern',
-    label: 'De Kern',
-    href: '/core',
+    prefix: 'Het ',
+    italicEm: 'Overzicht',
+    label: 'Het Overzicht',
+    href: '/overzicht',
     Icon: Wallet,
     subTags: [
-      { label: 'Bezittingen', href: '/core/assets' },
-      { label: 'Schulden', href: '/core/debts' },
+      { label: 'Bezittingen', href: '/overzicht/bezittingen' },
+      { label: 'Schulden', href: '/overzicht/schulden' },
+      { label: 'Cashflow', href: '/overzicht/cashflow' },
+      { label: 'Belasting', href: '/overzicht/belasting' },
     ],
     apps: [
       // Bron: components/core/category-deepening-registry.ts. `appKey` matcht
@@ -848,7 +850,7 @@ function FooterSection({
       <>
         <div className="flex flex-col items-center border-t border-[var(--border-ed)] py-2">
           <Link
-            href="/identity"
+            href="/mijn"
             aria-label={`Account — ${userName}`}
             title={userName}
             className="flex items-center justify-center h-10 w-10 hover:bg-[var(--subtle)]/50 transition-colors duration-150"
@@ -902,7 +904,7 @@ function FooterSection({
     <>
       <div className="border-t border-[var(--border-ed)] px-2 py-3">
         <Link
-          href="/identity"
+          href="/mijn"
           className="flex items-center gap-2.5 w-full px-2 h-10 hover:bg-[var(--subtle)]/50 transition-colors duration-150"
           aria-label="Account-menu"
         >

@@ -118,7 +118,7 @@ export function JouwPadWidget({ level, phase, freedomPct, netWorth = 0, monthsCo
 
   return (
     <Link
-      href="/identity"
+      href="/mijn"
       data-testid="jouw-pad-widget"
       className={`group block rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md`}
     >
