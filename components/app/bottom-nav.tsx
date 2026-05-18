@@ -9,11 +9,14 @@ import { getActiveNavModules } from '@/lib/module-registry'
 import { useMobileAppStripState } from '@/components/app/shell/mobile-app-strip-state'
 import { useCategoryAppLinks } from '@/components/app/shell/responsive-shell'
 
-// Static config per nav module — label, path, icon, and color token
+// Static config per nav module — label, path, icon, and color token.
+// Module-IDs blijven `kern`/`wil`/`horizon` (interne registry) maar de UI
+// gebruikt de nieuwe Overzicht/Toekomst-namen + URLs uit de navigatie-
+// architectuur. Will-tab blijft tijdelijk staan tot Will-domein verhuist.
 const tabConfig: Record<string, { label: string; href: string; icon: ComponentType<{ className?: string }>; color: string }> = {
-  kern:    { label: 'Kern',    href: '/core',    icon: Wallet,  color: 'amber'  },
-  wil:     { label: 'Wil',     href: '/will',    icon: Zap,     color: 'teal'   },
-  horizon: { label: 'Horizon', href: '/horizon', icon: Compass, color: 'purple' },
+  kern:    { label: 'Overzicht', href: '/overzicht', icon: Wallet,  color: 'amber'  },
+  wil:     { label: 'Wil',       href: '/will',      icon: Zap,     color: 'teal'   },
+  horizon: { label: 'Toekomst',  href: '/toekomst',  icon: Compass, color: 'purple' },
 }
 
 const activeColors: Record<string, string> = {
@@ -180,10 +183,10 @@ export function BottomNavTabs() {
         const Icon = tab.icon
         // Non-kern tabs are added dynamically when the user activates a
         // module, so they receive the reveal animation.
-        const isNonKern = tab.href !== '/core'
-        const isKern = tab.href === '/core'
+        const isNonKern = tab.href !== '/overzicht'
+        const isKern = tab.href === '/overzicht'
         // Chevron blijft persistent zichtbaar zodra er apps zijn (ook vanaf
-        // /will of /horizon) zodat gebruikers ook elders weten dat Kern een
+        // /will of /toekomst) zodat gebruikers ook elders weten dat Overzicht een
         // apps-drawer heeft. Rotatie volgt de strip-state direct — de strip
         // is module-agnostisch en kan over elke page openen.
         const showChevron = isKern && hasKernApps
