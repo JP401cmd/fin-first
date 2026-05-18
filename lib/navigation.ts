@@ -48,10 +48,10 @@ export const identityNav: ModuleNavConfig = {
 }
 
 /**
- * Canonieke /mijn-navigatie: spiegelt identityNav maar wijst naar de nieuwe
- * canonieke routes. Items die nog niet onder /mijn bestaan (gids, instellingen,
- * testscenarios) wijzen tijdelijk naar de /identity-equivalent \u2014 die werken
- * direct want sub-routes hebben geen redirect (alleen /identity zelf).
+ * Canonieke /mijn-navigatie. Sub-route-stubs (notificaties, uiterlijk,
+ * privacy, geavanceerd) redirecten naar legacy /identity/instellingen
+ * met de juiste tab geopend \u2014 totdat de monster-pagina is opgesplitst.
+ * Gids/testscenarios blijven onder /identity want geen redirect daar.
  */
 export const mijnNav: ModuleNavConfig = {
   module: 'Mijn',
@@ -60,11 +60,14 @@ export const mijnNav: ModuleNavConfig = {
   items: [
     { label: 'Overzicht', href: '/mijn' },
     { label: 'Profiel', href: '/mijn/profiel' },
-    { label: 'Gids', href: '/identity/gids' },
-    { label: 'Instellingen', href: '/identity/instellingen' },
+    { label: 'Notificaties', href: '/mijn/notificaties' },
+    { label: 'Uiterlijk', href: '/mijn/uiterlijk' },
+    { label: 'Privacy', href: '/mijn/privacy' },
     { label: 'Koppelingen', href: '/mijn/koppelingen' },
-    { label: 'Testscenario\u2019s', href: '/identity/testscenarios' },
     { label: 'Delen', href: '/mijn/delen' },
+    { label: 'Geavanceerd', href: '/mijn/geavanceerd' },
+    { label: 'Gids', href: '/identity/gids' },
+    { label: 'Testscenario\u2019s', href: '/identity/testscenarios' },
   ],
 }
 
