@@ -158,6 +158,35 @@ const PROFILE_DEFAULTS = {
   monthly_savings_override: null as number | null,
 }
 
+/**
+ * Lichtgewicht Box 3-data voor tax_optimization-pillar. Geen volledige
+ * calculateBox3-aanroep (vereist veel context) — een proxy-berekening:
+ *  - Box 3-bezit = sum van cash + investment + savings + checking + crypto-assets
+ *  - Heffingsvrij = €57.000 (single) of €114.000 (partner) per 2026
+ *  - Tax = grondslag × 5,88% × 36% (forfaitair, vereenvoudigd)
+ *
+ * Niet 100% accuraat maar voldoende voor scoreTaxOptimization() in de
+ * health-pillar. Voor exacte aangifte gebruikt /overzicht/belasting
+ * de volledige calculateBox3.
+ */
+function buildTaxData(
+  assets: ReadonlyArray<{ asset_type?: string; current_value?: number | string }>,
+  unlinkedCash: number,
+  profile: Record<string, unknown>,
+): { box3Bezittingen: number; box3Tax: number; heffingsvrijVermogen: number; rendementsgrondslag: number } | null {
+  const box3Types = new Set(['cash', 'savings', 'checking', 'investment', 'crypto'])
+  const box3Bezittingen = assets
+    .filter((a) => a.asset_type && box3Types.has(a.asset_type))
+    .reduce((s, a) => s + Number(a.current_value ?? 0), 0) + unlinkedCash
+  if (box3Bezittingen < 1_000) return null
+  const householdType = String(profile.household_type ?? 'solo')
+  const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
+  const heffingsvrijVermogen = hasPartner ? 114_000 : 57_000
+  const rendementsgrondslag = Math.max(0, box3Bezittingen - heffingsvrijVermogen)
+  const box3Tax = Math.round(rendementsgrondslag * 0.0588 * 0.36)
+  return { box3Bezittingen, box3Tax, heffingsvrijVermogen, rendementsgrondslag }
+}
+
 export async function loadHorizonData(supabase: SupabaseClient): Promise<HorizonPageData> {
   const now = new Date()
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
@@ -516,6 +545,7 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
     freedomPct,
     assetTypeCount,
     budgetCategories,
+    taxData: buildTaxData(fullAssetsResult.data ?? [], unlinkedCash, profile),
   }
   const healthScore = computeHealthScoreFromInputs(healthScoreInput, budgetingActive)
 

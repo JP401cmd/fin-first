@@ -224,7 +224,7 @@ export default function BelastingPage() {
       )}
 
       {/* === Hero === */}
-      <section id="box3" className="card-editorial overflow-hidden mb-6 scroll-mt-20">
+      <section className="card-editorial overflow-hidden mb-6">
         <div className="h-1.5 bg-kern-500" />
         <div className="p-4 sm:p-6 md:p-8">
           {/* Editorial header — blueprint Type 10 (Calculator) */}
@@ -798,7 +798,7 @@ function Box2Section({
   return (
     <>
       {/* Box 2 Hero */}
-      <section id="box2" className="card-editorial overflow-hidden mb-6 mt-8 scroll-mt-20">
+      <section className="card-editorial overflow-hidden mb-6 mt-8">
         <div className="h-1.5 bg-teal-500" />
         <div className="p-4 sm:p-6 md:p-8">
           <div className="mb-3 sm:mb-4 flex items-center gap-3">
