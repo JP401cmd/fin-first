@@ -59,6 +59,7 @@ import { AppHeader } from '@/components/app/app-header'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
 import { ChatLayoutWrapper } from '@/components/app/chat/chat-layout-wrapper'
 import { BottomNav } from '@/components/app/bottom-nav'
+import { FloatingNavButton } from '@/components/app/shell/floating-nav-button'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { Sidebar } from '@/components/app/shell/sidebar'
 import { MobileStackShell } from '@/components/app/shell/mobile-stack-shell'
@@ -228,6 +229,7 @@ function LegacyShell({
         </DailyExpenseProvider>
       </ChatLayoutWrapper>
       <BottomNav />
+      <FloatingNavButton />
     </>
   )
 }
@@ -345,6 +347,7 @@ function NewShell({
           </div>
         </DailyExpenseProvider>
       </ChatLayoutWrapper>
+      <FloatingNavButton />
       </MobileAppStripProvider>
      </CategoryAppLinksContext.Provider>
      </LeverScoresContext.Provider>
