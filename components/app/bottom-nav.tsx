@@ -53,20 +53,13 @@ const LONG_PRESS_MS = 450
 const MOVE_CANCEL_PX = 8
 
 export function BottomNav() {
-  const { activeModules } = useModuleAccess()
-
-  // Derive which tabs to show from active modules.
-  const activeNavModules = getActiveNavModules(activeModules)
-  const visibleTabs = activeNavModules.map(m => tabConfig[m])
-
-  // Hide tab bar when only 1 tab — user is already on that module's page
-  if (visibleTabs.length <= 1) return null
-
-  return (
-    <nav className="fixed bottom-0 left-0 z-40 border-t-2 border-[var(--border-md)] bg-[var(--paper)]/90 backdrop-blur-md transition-[right] duration-300 md:hidden" data-mobile-bottom-nav="true" style={{ right: 'var(--chat-sidebar-width, 0px)' }}>
-      <BottomNavTabs />
-    </nav>
-  )
+  // Mobile-nav wordt nu volledig afgehandeld door FloatingNavButton
+  // (zie components/app/shell/floating-nav-button.tsx). Bottom-nav-tabs
+  // zijn vervangen door één floating pill met zoek- en menu-knop —
+  // Vercel-stijl unified menu. BottomNavTabs blijft als named-export
+  // beschikbaar voor andere shell-componenten (MobileBottomBar) die er
+  // mogelijk nog naar refereren — wordt opgeruimd in volgende cleanup.
+  return null
 }
 
 /**
