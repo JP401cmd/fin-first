@@ -1,3 +1,31 @@
+## Session 2026-05-18 - Features #846, #847
+
+### Feature #846: Kompas schulden-indicator toont payoff voortgang - PASSING
+- Added `progress?: number | null` to LeverEntry type
+- Added `totalOriginalDebts?` and `debtCount?` input params to computeLeverScores
+- Debt detail text shows payoff progress: "X% afbetaald · €Yk resterend · ↓ afnemend"
+- Added MiniProgressRing SVG component (14×14px circular arc) for expanded sidebar
+- Added progress micro-bar in MiniTooltip (16px wide bar + percentage)
+- Expanded sidebar uses MiniProgressRing for debts when progress data available
+- Layout.tsx: expanded debt query with original_amount, computed sidebarTotalOriginalDebts
+- Commit: 51e8ebfc
+
+### Feature #847: Kompas cashflow-indicator toont budget/savings health - PASSING
+- Added budget health queries to layout.tsx: top-level expense/savings budgets + current-month transactions
+- Computes per-budget spending via spendPerBudget Map, derives budgetsTotal/budgetsOver/budgetsOnTrack
+- Rewrote cashflow score: blends savingsComponent + budgetComponent (50/50 when both available)
+- Budget scoring: 100 (all on track), 50-40 (1-2 over), 25- (3+ over), null (no budgets)
+- Updated cashflowDetail text: "X/Y op schema · Spaarquote Z%" (combined), fallbacks for single-source
+- Computation changes committed in ab29c887 (#850 bundled), data wiring in 399f3703
+
+### Files Modified
+- components/app/shell/lever-scores.ts — budget health computation, blended cashflow score, progress field
+- components/app/shell/lever-compass.tsx — MiniProgressRing, MiniTooltip progress bar
+- app/(app)/layout.tsx — budget health queries, debt original_amount, new computeLeverScores params
+
+### Current Status
+- 2 features completed this session (#846, #847)
+
 ## Session 2026-05-18 - Feature #849
 
 ### Feature #849: Kompas-indicatoren linken naar relevante paginas asymmetrisch - PASSING
