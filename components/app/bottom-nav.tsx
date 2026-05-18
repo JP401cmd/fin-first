@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Wallet, Zap, Compass, ChevronUp } from 'lucide-react'
+import { Wallet, Compass, ChevronUp } from 'lucide-react'
 import { useRef, type ComponentType } from 'react'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { getActiveNavModules } from '@/lib/module-registry'
@@ -10,12 +10,19 @@ import { useMobileAppStripState } from '@/components/app/shell/mobile-app-strip-
 import { useCategoryAppLinks } from '@/components/app/shell/responsive-shell'
 
 // Static config per nav module — label, path, icon, and color token.
-// Module-IDs blijven `kern`/`wil`/`horizon` (interne registry) maar de UI
+// Module-IDs blijven `kern`/`horizon` (interne registry), maar de UI
 // gebruikt de nieuwe Overzicht/Toekomst-namen + URLs uit de navigatie-
-// architectuur. Will-tab blijft tijdelijk staan tot Will-domein verhuist.
+// architectuur.
+//
+// `wil` is verwijderd: WillLanding leeft nu op /overzicht (zie
+// app/(app)/overzicht/page.tsx), /will redirect daarheen. Mijn-tab
+// komt niet terug in bottom-nav — wordt bereikbaar via de floating
+// nav-button (waffle-icoon → NavMenuSheet → Mijn).
+//
+// De floating-button is de definitieve mobile-nav; bottom-nav blijft
+// tijdelijk staan voor visuele overgang en wordt later helemaal uit.
 const tabConfig: Record<string, { label: string; href: string; icon: ComponentType<{ className?: string }>; color: string }> = {
   kern:    { label: 'Overzicht', href: '/overzicht', icon: Wallet,  color: 'amber'  },
-  wil:     { label: 'Wil',       href: '/will',      icon: Zap,     color: 'teal'   },
   horizon: { label: 'Toekomst',  href: '/toekomst',  icon: Compass, color: 'purple' },
 }
 
