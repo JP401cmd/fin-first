@@ -12,7 +12,11 @@ export const metadata: Metadata = {
  * /mijn — canonieke profiel/instellingen-pagina (nieuwe navigatie-architectuur).
  *
  * Vervangt /identity. Voor nu rendert IdentityClient zodat preview-functionaliteit
- * meteen werkt onder de nieuwe URL. In komende fases wordt Mijn opgesplitst in:
+ * meteen werkt onder de nieuwe URL. IdentityClient heeft al een
+ * PageInfoButton intern met PAGE_INFO['/identity']-content — geen
+ * wrapper-knop hier om duplicatie te voorkomen.
+ *
+ * In komende fases wordt Mijn opgesplitst in:
  *  - /mijn/profiel  · /mijn/partner  · /mijn/privacy
  *  - /mijn/koppelingen (PSD2, UPO, brokerage)
  *  - /mijn/notificaties  · /mijn/uiterlijk
@@ -20,7 +24,9 @@ export const metadata: Metadata = {
  *  - /mijn/rapportages (4 types index)
  *  - /mijn/geavanceerd (exports, debug)
  *
- * Dit vervangt het 2459-regel /identity/instellingen monster.
+ * Bij die refactor wordt PAGE_INFO['/mijn'] (al toegevoegd in
+ * lib/page-info-content.ts) opgepakt. Dit vervangt het 2459-regel
+ * /identity/instellingen monster.
  */
 export default async function MijnPage() {
   const supabase = await createClient()

@@ -55,13 +55,13 @@ export const PAGE_INFO: Record<string, string> = {
     'Klik op een categorie om items toe te voegen of te beheren.',
 
   '/will':
-    'De Wil is je dagelijkse cockpit: hier zie je je briefing, aanbevelingen en acties. ' +
+    'Je dagelijkse cockpit: hier zie je je briefing, aanbevelingen en acties. ' +
     'Widgets tonen actuele inzichten over je financiën. ' +
     'Sleep widgets om je dashboard te personaliseren.',
 
   '/horizon':
-    'De Horizon projecteert je financiële toekomst. ' +
-    'Je ziet wanneer je financieel vrij bent, hoe scenario\'s je pad beïnvloeden, en wat levensgebeurtenissen kosten. ' +
+    'Je financiële toekomst geprojecteerd. ' +
+    'Zie wanneer je financieel vrij bent, hoe scenario\'s je pad beïnvloeden, en wat levensgebeurtenissen kosten. ' +
     'Voeg events toe of pas parameters aan om je plan te verkennen.',
 
   // ── Kern sub-paginas ─────────────────────────────────────────────
