@@ -9,7 +9,7 @@ import type { TemporalContext } from '@/lib/briefing/types'
 import type { CategoryAppLink } from '@/lib/category-app-nav'
 import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 import { SectionDivider } from '@/components/app/section-divider'
-import { DAIshboard } from '@/components/daishboard/daishboard'
+import { DAIshboard } from '@/components/dashboard/daishboard'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { ActionCenter } from './action-center'
 import { DoelenStrook } from './doelen-strook'
@@ -23,7 +23,7 @@ import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
-import { BriefingHistory } from '@/components/daishboard/briefing-history'
+import { BriefingHistory } from '@/components/dashboard/briefing-history'
 
 interface WillLandingProps {
   dashboardData: DashboardData

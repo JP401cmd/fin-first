@@ -1,6 +1,6 @@
 'use client'
 
-import { InsightCard } from '@/components/daishboard/cards/insight-card'
+import { InsightCard } from '@/components/dashboard/cards/insight-card'
 import type { InsightCardSpec } from '@/lib/briefing/types'
 
 /**

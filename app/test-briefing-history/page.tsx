@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { saveBriefingToLocalHistory } from '@/components/daishboard/briefing-history'
+import { saveBriefingToLocalHistory } from '@/components/dashboard/briefing-history'
 import type { BriefingCardSpec } from '@/lib/briefing/types'
 
 const TEST_BRIEFINGS: { composedAt: string; cards: BriefingCardSpec[] }[] = [

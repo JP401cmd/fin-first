@@ -1,6 +1,6 @@
 'use client'
 
-import { NextStepBriefingCard } from '@/components/daishboard/cards/next-step-card'
+import { NextStepBriefingCard } from '@/components/dashboard/cards/next-step-card'
 import type { NextStepCardSpec } from '@/lib/briefing/types'
 
 const EXAMPLES: NextStepCardSpec[] = [

@@ -13,7 +13,7 @@ import type { Notification } from '@/app/api/notifications/route'
 import type { NewsItem } from '@/app/api/news/route'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { TemporalContext } from '@/lib/briefing/types'
-import { DAIshboard } from '@/components/daishboard/daishboard'
+import { DAIshboard } from '@/components/dashboard/daishboard'
 
 const BERICHTEN_HISTORY_DAYS = 30
 

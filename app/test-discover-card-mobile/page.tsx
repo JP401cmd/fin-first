@@ -1,6 +1,6 @@
 'use client'
 
-import { DiscoverCard } from '@/components/daishboard/cards/discover-card'
+import { DiscoverCard } from '@/components/dashboard/cards/discover-card'
 import type { DiscoverCardSpec } from '@/lib/briefing/types'
 
 const SAMPLE_CARDS: DiscoverCardSpec[] = [

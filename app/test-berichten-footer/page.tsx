@@ -18,7 +18,7 @@ function NewspaperFooter() {
 
         {/* Link to briefing */}
         <Link
-          href="/daishboard"
+          href="/dashboard"
           className="shrink-0 font-source-serif text-sm italic text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
         >
           Naar Will&apos;s Briefing &rarr;
