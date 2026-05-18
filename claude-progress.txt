@@ -1,3 +1,35 @@
+## Session 2026-05-18 - Features #786, #790
+
+### Feature #786: Netto-vermogen-tijdslijn toggle korte/lange termijn - PASSING
+- Added TimeRange type ('5j' | 'pensioen') and useState toggle to NetWorthProjectionChart
+- Created computeShortTermProjection: 20 quarterly data points over 5 years
+- Created RangeToggle segmented control (matching existing ViewToggle/PeriodToggle pattern)
+- Short-term view: quarterly resolution, "+5 jaar" end marker, "Over 5 jaar" summary labels
+- Long-term view: yearly resolution to AOW, "AOW 67" marker, "Bij pensioen" summary labels
+- Toggle placed in header row next to Kicker
+- Subtitle adapts: "Gedetailleerd vermogensverloop komende 5 jaar" vs "Geschat vermogensverloop tot pensioenleeftijd (67)"
+- X-axis labels: short-term shows year + half-year marks, long-term shows ~6 evenly spaced ages
+- AOW marker only in long-term, +5 jaar marker only in short-term
+- Both views use same data computation engine (monthly compounding)
+- Commit: 53312c32
+
+### Feature #790: Coach-bubble suggereert eerste bankrekening toevoegen - PASSING
+- Updated bank suggestion (highest priority in DATA_GAP_SUGGESTIONS) in coach-bubble.tsx
+- Message: "Voeg je eerste bankrekening toe om je saldo te zien en transacties automatisch te importeren."
+- CTA: "Rekening toevoegen" → /core/cash/connect (bank connection wizard)
+- Bank suggestion triggered when !hasBank (no cash-type assets)
+- Disappears automatically when user adds a cash-type asset (hasBank computed in layout.tsx)
+- /core/cash/connect page verified: loads bank selector with 3-step wizard
+- Coach bubble priority chain working: bank > assets > budget > goals
+- Commit: 02f66609
+
+### Files Modified
+- components/core/net-worth-projection-chart.tsx — toggle, short-term projection, RangeToggle component
+- components/app/coach-bubble.tsx — updated bank suggestion message + CTA href
+
+### Current Status
+- 2 features completed this session (#786, #790)
+
 ## Session 2026-05-18 - Features #778, #781
 
 ### Feature #778: Gezondheidsscore trend-indicator - PASSING
