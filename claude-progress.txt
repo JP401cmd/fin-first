@@ -1,3 +1,30 @@
+## Session 2026-05-18 - Features #835, #836
+
+### Feature #835: GlossaryTerm gezien-tracking per gebruiker - PASSING
+- Added localStorage-based seen-tracking to GlossaryTerm component
+- Unseen terms: bold (font-semibold) + thick dotted underline (border-b-2) — draws attention
+- Seen terms: normal weight (font-inherit) + thin dotted underline (border-b) — subtle
+- Tracks opened terms in localStorage under 'glossary_seen_terms' key
+- Graceful fallback for SSR/private mode (silent no-op)
+- Default seen=true to avoid hydration flash, useEffect corrects on mount
+- Zero console errors
+- Commit: 8150a3aa
+
+### Feature #836: GlossaryTerm toegepast op key financiële termen op hoofdpaginas - PASSING
+- Applied GlossaryTerm to key financial jargon across main pages:
+  - /horizon (horizon-client.tsx): spaarquote, Monte_Carlo, FIRE, rendement (×2), netto_vermogen, box_3 (×2), SWR
+  - /horizon/inflatie-koopkracht: inflatie (×2), koopkracht, rendement, noodreserve
+  - /horizon/samengestelde-interest: rendement, compounding
+- Pre-existing: /core (netto_vermogen, spaarquote, schuldgraad, FIRE, diversificatie), /core/assets (diversificatie), /core/debts (schuldgraad), /core/belasting (box_3 ×2, forfaitair_rendement, heffingsvrij_vermogen)
+- Total: 27 GlossaryTerm usages across 9 files
+- Selective wrapping only — no visual overload
+- No new console errors (pre-existing chart key errors on /horizon unrelated)
+- Commit: 6a2a7f4c
+
+### Current Status
+- 2 features completed this session (#835, #836)
+- Overall progress: 843/861 passing (97.9%)
+
 ## Session 2026-05-18 - Features #813, #848
 
 ### Feature #813: PSD2 verbinding als aanbevolen eerste stap na onboarding - PASSING
