@@ -128,6 +128,30 @@ export function OverzichtHero({ userName, health, goals, goalProgresses, freedom
         <h1 className="mt-1 font-serif text-2xl md:text-3xl font-semibold text-[var(--ink)] leading-tight">
           {greetingByHour()}{userName ? `, ${userName}` : ''}
         </h1>
+        {/* Data-summary onder begroeting — toont vrijheid+doelen in één regel
+            als concrete eerste-indruk. Verbergt bij geen data om hero-leeg
+            niet "uit te dunnen". */}
+        {(freedomPct != null || goalDisplay.length > 0) && (
+          <p className="mt-2 text-sm sm:text-base text-[var(--ink-2)]">
+            {freedomPct != null && (
+              <>
+                <strong className="font-semibold text-violet-700">{Math.round(freedomPct)}%</strong>
+                {' '}op weg naar vrijheid
+              </>
+            )}
+            {freedomPct != null && goalDisplay.length > 0 && (
+              <span className="text-[var(--ink-3)]"> · </span>
+            )}
+            {goalDisplay.length > 0 && (
+              <>
+                <strong className="font-semibold text-[var(--ink)]">
+                  {goalDisplay.length}
+                </strong>{' '}
+                {goalDisplay.length === 1 ? 'actief doel' : 'actieve doelen'}
+              </>
+            )}
+          </p>
+        )}
       </header>
 
       {/* Vier-hefbomen-rij — klikbare tegels naar verdiepingen met status-dot */}
