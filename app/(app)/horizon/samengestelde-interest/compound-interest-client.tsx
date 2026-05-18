@@ -2,7 +2,9 @@
 
 import { ArrowLeft, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
-import { Kicker, EditorialHeadline, EditorialDeck, PullQuote, HL, GlossaryTerm } from '@/components/editorial'
+import { usePathname } from 'next/navigation'
+import { Kicker, EditorialHeadline, EditorialDeck, PullQuote, HL, GlossaryTerm, PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import { CompoundInterestChart } from '@/components/app/horizon/compound-interest-chart'
 
 export function CompoundInterestPage({
@@ -12,15 +14,26 @@ export function CompoundInterestPage({
   defaultMonthlyDeposit: number
   defaultAnnualReturn: number
 }) {
+  const pathname = usePathname()
+  // /toekomst/samengestelde-interest krijgt nieuwe info; legacy fallback
+  const pageInfoText =
+    (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/toekomst/samengestelde-interest'] || ''
+  // Back-link wijst naar canonieke route /toekomst (was /horizon)
+  const backHref = pathname?.startsWith('/toekomst') ? '/toekomst' : '/horizon'
+  const backLabel = pathname?.startsWith('/toekomst') ? 'De Toekomst' : 'De Horizon'
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <PageInfoButton
+        description={pageInfoText}
+        className="absolute right-4 top-6 sm:right-6 sm:top-8"
+      />
       {/* Back link */}
       <Link
-        href="/horizon"
+        href={backHref}
         className="inline-flex items-center gap-1.5 text-xs font-mono text-[var(--ink-3)] hover:text-[var(--ink)] transition-colors mb-6"
       >
         <ArrowLeft size={14} />
-        De Horizon
+        {backLabel}
       </Link>
 
       {/* Editorial header */}
