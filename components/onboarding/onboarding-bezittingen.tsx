@@ -398,23 +398,6 @@ export function OnboardingBezittingen({
               )}
             </div>
           )}
-
-          {/* ── Skip-link — alleen tonen zolang er nog niks ingevoerd is.
-              Anders is de primary "Verder"-knop in de footer voldoende.
-              "Later invullen" ipv "Sla over" (feature #829): expliciet
-              defer-pad dat benadrukt dat overslaan OK is. */}
-          {!hasAnyItem && (
-            <div className="flex justify-center pt-2">
-              <button
-                type="button"
-                onClick={onNext}
-                className="min-h-11 px-3 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                Later invullen &rarr;
-              </button>
-            </div>
-          )}
         </div>
       </OnboardingShell>
 
