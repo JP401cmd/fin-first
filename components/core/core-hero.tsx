@@ -339,6 +339,30 @@ function healthBarColorClass(score: number): string {
 }
 
 /**
+ * Trend-indicator: toont ↑ / ↓ / → pijl met delta ten opzichte van vorige maand.
+ * Groen voor verbetering, rood voor verslechtering, neutraal voor gelijk.
+ * Verschijnt alleen wanneer `previousMonth` beschikbaar is (caller-verantwoordelijkheid).
+ */
+function HealthTrendIndicator({ trend }: { trend: number }) {
+  const arrow = trend > 0 ? '↑' : trend < 0 ? '↓' : '→'
+  const colorClass = trend > 0
+    ? 'text-positive'
+    : trend < 0
+      ? 'text-negative'
+      : 'text-[var(--ink-3)]'
+
+  return (
+    <p
+      className={`mt-1 flex items-center gap-0.5 font-mono text-[10px] font-semibold tabular-nums ${colorClass}`}
+      data-testid="health-trend-indicator"
+    >
+      <span>{arrow}</span>
+      <span>{trend > 0 ? '+' : ''}{trend}</span>
+    </p>
+  )
+}
+
+/**
  * Semi-circular gauge SVG voor de gezondheidsscore.
  * Vult van links naar rechts als een halve cirkel (180°).
  */
@@ -430,6 +454,10 @@ function HealthScoreHero({ healthScore, onClick }: { healthScore: HealthScore; o
           >
             {healthScore.label}
           </p>
+          {/* Trend-indicator: pijl + delta vs vorige maand */}
+          {healthScore.previousMonth !== null && (
+            <HealthTrendIndicator trend={healthScore.trend} />
+          )}
         </div>
 
         {/* Pilaar-bars — rechts */}

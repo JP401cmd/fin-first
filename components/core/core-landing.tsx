@@ -337,7 +337,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
         return { limit, spent }
       })
 
-    return computeHealthScoreFromInputs(
+    const score = computeHealthScoreFromInputs(
       {
         savingsRate6m,
         totalAssets: rawFinancials.totalAssets,
@@ -350,6 +350,42 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
       initialData.budgetingActive,
       activeModules,
     )
+
+    // ── Trend berekenen uit snapshots ──────────────────────────
+    // De lightweight `computeHealthScoreFromInputs` retourneert altijd
+    // previousMonth=null. Hier schatten we de vorige-maand-score in op
+    // basis van `net_worth_snapshots`, dezelfde aanpak als
+    // `computeHealthScore` in de dashboard-path.
+    const snaps = initialData.snapshots
+    if (snaps.length >= 2) {
+      const prevSnap = snaps[snaps.length - 2]
+      const prevAssets = Number(prevSnap.total_assets)
+      const prevDebts = Number(prevSnap.total_debts)
+      const prevNetWorth = prevAssets - prevDebts
+      const prevSavingsRate = prevSnap.savings_rate ?? savingsRate6m
+      const prevFreedomPct = fireTarget > 0 ? (prevNetWorth / fireTarget) * 100 : 0
+
+      const prevScore = computeHealthScoreFromInputs(
+        {
+          savingsRate6m: prevSavingsRate,
+          totalAssets: prevAssets,
+          totalDebts: prevDebts,
+          // Noodfonds + diversificatie + budget niet beschikbaar in snapshot;
+          // hergebruik huidige waarden (best estimate — zelfde aanpak als
+          // computeHealthScore in de dashboard-path).
+          emergencyFundMonths: Math.round(emergencyFundMonths * 10) / 10,
+          freedomPct: prevFreedomPct,
+          assetTypeCount,
+          budgetCategories,
+        },
+        initialData.budgetingActive,
+        activeModules,
+      )
+      score.previousMonth = prevScore.total
+      score.trend = score.total - prevScore.total
+    }
+
+    return score
   }, [initialData, activeModules])
 
   const assetGroups = useMemo(() => groupAssetsByType(initialData), [initialData])
