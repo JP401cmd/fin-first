@@ -150,6 +150,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     favHoldingsResult,
     allHoldingsResult,
     aowResult,
+    bankConnectionsResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('*').eq('is_active', true),
@@ -177,6 +178,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('investment_holdings').select('id, name, ticker, units, avg_purchase_price, current_price, previous_close, last_price_update, is_favorite').eq('is_favorite', true),
     supabase.from('investment_holdings').select('name, ticker, units, avg_purchase_price, current_price, ter'),
     supabase.from('aow_leeftijden').select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source'),
+    // PSD2 bank connection check (#813) — active bank connections for next-step suggestion
+    supabase.from('bank_connections').select('id').eq('status', 'active').limit(1),
   ])
 
   // ── Derive budget subsets from single query (was 4 queries) ──
@@ -1117,6 +1120,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const budgetCount = allParentBudgets.length
   const goalCount = (goalsResult.data ?? []).length
   const actionCount = openActions.length
+  // Priority 0: PSD2 bank connection (#813) — highest priority after onboarding
+  const hasBankConnection = (bankConnectionsResult.data?.length ?? 0) > 0
+  if (!hasBankConnection) {
+    potentialSteps.push({ key: 'connect_bank_psd2', title: 'Koppel je bank voor automatisch inzicht', description: 'Verbind je bankrekening via PSD2 — transacties worden automatisch geïmporteerd.', impact: null, href: '/core/cash/connect', dismissed: false })
+  }
   if (txCount === 0) {
     potentialSteps.push({ key: 'import_transactions', title: 'Transacties importeren', description: 'Importeer je bankgegevens voor inzicht in je cashflow.', impact: null, href: '/core/cash/import', dismissed: false })
   }
