@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
-import { GLOSSARY } from '@/lib/glossary-data'
+import { GLOSSARY, GLOSSARY_ENTRIES } from '@/lib/glossary-data'
 
 /**
  * GlossaryTerm — wraps financial jargon with a hover/tap tooltip.
@@ -69,6 +69,9 @@ export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps)
 
   // Resolve explanation: prop override → shared glossary → empty
   const text = explanation ?? GLOSSARY[term] ?? ''
+
+  // Resolve display name: GLOSSARY_ENTRIES name → term with underscores replaced
+  const displayName = GLOSSARY_ENTRIES[term]?.name ?? term.replace(/_/g, ' ')
 
   // On mount, check localStorage for seen status
   useEffect(() => {
@@ -150,7 +153,7 @@ export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps)
         }`}
       >
         <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--module-active-700,var(--ink-3))] mb-1">
-          {term.replace(/_/g, ' ')}
+          {displayName}
         </span>
         <span className="block font-serif text-[13px] leading-snug text-[var(--ink-2)]">
           {text}
