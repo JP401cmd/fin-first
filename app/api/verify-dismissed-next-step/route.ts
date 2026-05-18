@@ -102,7 +102,7 @@ export async function GET() {
       }
     }
 
-    const allStepKeys = ['import_transactions', 'set_budgets', 'add_assets', 'register_debts', 'complete_profile', 'create_snapshot', 'set_goals']
+    const allStepKeys = ['connect_bank_psd2', 'import_transactions', 'set_budgets', 'add_assets', 'register_debts', 'complete_profile', 'create_snapshot', 'set_goals']
     const pendingKeys = allStepKeys.filter(k => !dismissedKeys.has(k))
 
     results.push({

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // Valid step keys as defined in /api/next-steps GET endpoint
 const VALID_STEP_KEYS = [
+  'connect_bank_psd2',
   'import_transactions',
   'set_budgets',
   'add_assets',

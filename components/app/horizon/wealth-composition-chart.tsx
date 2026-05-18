@@ -202,8 +202,21 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   // Early return AFTER all hooks
   if (visibleRows.length === 0) {
     return (
-      <div ref={ref} className="flex items-center justify-center py-8 text-sm text-[var(--ink-4)]">
-        Geen gegevens beschikbaar
+      <div ref={ref} className="flex flex-col items-center text-center py-12 px-4 max-w-sm mx-auto">
+        <div className="mb-2 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          Vermogensopbouw
+        </div>
+        <p
+          className="italic text-[13px] text-[var(--ink-3)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          Voeg bezittingen toe zodat de vermogenssamenstelling zichtbaar wordt.
+        </p>
       </div>
     )
   }

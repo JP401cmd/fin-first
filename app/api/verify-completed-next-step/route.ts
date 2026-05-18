@@ -52,11 +52,11 @@ export async function GET() {
     try {
       // Verify the complete endpoint file exists by checking the route structure
       // The endpoint validates step_key and only accepts valid keys
-      const validKeys = ['import_transactions', 'set_budgets', 'add_assets', 'register_debts', 'complete_profile', 'create_snapshot', 'set_goals']
+      const validKeys = ['connect_bank_psd2', 'import_transactions', 'set_budgets', 'add_assets', 'register_debts', 'complete_profile', 'create_snapshot', 'set_goals']
       return {
         test: 'Complete endpoint validates step_key',
-        passed: validKeys.length === 7,
-        details: `Complete endpoint accepts 7 valid step keys: ${validKeys.join(', ')}. Invalid keys are rejected with 400.`,
+        passed: validKeys.length === 8,
+        details: `Complete endpoint accepts 8 valid step keys: ${validKeys.join(', ')}. Invalid keys are rejected with 400.`,
       }
     } catch (err) {
       return { test: 'Complete endpoint validates step_key', passed: false, details: `Error: ${err}` }

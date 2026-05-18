@@ -47,6 +47,8 @@ export async function GET() {
       // Additional queries for smart prioritization
       budgetSpendingResult,
       monthlyTxResult,
+      // PSD2 bank connection check (#813)
+      bankConnectionsResult,
     ] = await Promise.all([
       supabase
         .from('transactions')
@@ -103,6 +105,13 @@ export async function GET() {
         .eq('user_id', user.id)
         .gte('date', monthStart)
         .lt('date', monthEnd),
+      // PSD2 bank connection check (#813) — active bank connections via TrueLayer/PSD2
+      supabase
+        .from('bank_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .limit(1),
     ])
 
     // Determine what the user has done based on real data
@@ -112,6 +121,7 @@ export async function GET() {
     const hasDebts = (debtsResult.data?.length ?? 0) > 0
     const hasSnapshots = (snapshotsResult.data?.length ?? 0) > 0
     const hasGoals = (goalsResult.data?.length ?? 0) > 0
+    const hasBankConnection = (bankConnectionsResult.data?.length ?? 0) > 0
     const profileComplete = !!(
       profileResult.data?.full_name &&
       profileResult.data?.date_of_birth &&
@@ -196,6 +206,17 @@ export async function GET() {
     // 1. The real data state shows it's done (e.g., hasTransactions for import_transactions)
     // 2. The user explicitly marked it as completed via POST /api/next-steps/complete
     const steps = [
+      {
+        key: 'connect_bank_psd2',
+        title: 'Koppel je bank voor automatisch inzicht',
+        description: 'Verbind je bankrekening via PSD2 en je transacties worden automatisch geïmporteerd en gecategoriseerd.',
+        category: 'onboarding',
+        priority: 0,
+        href: '/core/cash/connect',
+        icon: 'zap',
+        completed: hasBankConnection || completedByDb.has('connect_bank_psd2'),
+        dismissed: dismissedKeys.has('connect_bank_psd2'),
+      },
       {
         key: 'import_transactions',
         title: 'Importeer je bankafschriften',
@@ -319,6 +340,7 @@ export async function GET() {
       dismissed_count: dismissedSteps.length,
       total_steps: steps.length,
       data_state: {
+        has_bank_connection: hasBankConnection,
         has_transactions: hasTransactions,
         has_budgets: hasBudgets,
         has_assets: hasAssets,

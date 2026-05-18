@@ -873,9 +873,33 @@ export function StrategieModal({ open, onClose, housingStrategy }: StrategieModa
   if (error || !input) {
     return (
       <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
-        {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill). */}
-        <div>
-          <p className="font-sans text-sm text-[var(--ink-2)]">{error ?? 'Geen data beschikbaar.'}</p>
+        <div className="flex flex-col items-center text-center py-12 px-4 max-w-md mx-auto">
+          <div className="mb-3 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+            <span
+              aria-hidden
+              className="inline-block h-px w-7"
+              style={{ background: 'var(--module-active-500)' }}
+            />
+            Strategieën
+          </div>
+          <h3
+            className="font-bold leading-tight text-[20px] sm:text-[24px]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            {error ? (
+              <>Laden niet <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>gelukt</em></>
+            ) : (
+              <>Data nodig voor <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>strategieën</em></>
+            )}
+          </h3>
+          <p
+            className="mt-3 italic text-[14px] text-[var(--ink-2)] max-w-prose"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            {error
+              ? 'Er is een fout opgetreden. Controleer je verbinding en probeer het opnieuw.'
+              : 'Voeg vermogen toe in De Kern zodat strategieën vergeleken kunnen worden.'}
+          </p>
         </div>
       </ShellOverlay>
     )

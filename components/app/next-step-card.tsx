@@ -255,7 +255,21 @@ export function computeKernNextStep(data: {
   alertBudgetCount?: number
   hasGoals?: boolean
   fireUnreachable?: boolean
+  /** PSD2 bank connection exists (#813) */
+  hasBankConnection?: boolean
 }): NextStepSuggestion {
+  // Priority 0: No PSD2 bank connection — recommend connecting for automatic insight (#813)
+  if (data.hasBankConnection === false) {
+    return {
+      key: 'connect_bank_psd2',
+      title: 'Koppel je bank voor automatisch inzicht',
+      description: 'Verbind je bankrekening via PSD2 en je transacties worden automatisch geïmporteerd.',
+      href: '/core/cash/connect',
+      icon: 'zap',
+      moduleColor: 'amber',
+    }
+  }
+
   // Priority 1: No transactions (import first)
   if (!data.hasTransactions) {
     return {
@@ -383,8 +397,22 @@ export function computeAllKernSteps(data: {
   alertBudgetCount?: number
   hasGoals?: boolean
   fireUnreachable?: boolean
+  /** PSD2 bank connection exists (#813) */
+  hasBankConnection?: boolean
 }): NextStepSuggestion[] {
   const steps: NextStepSuggestion[] = []
+
+  // Priority 0: No PSD2 bank connection — recommend connecting for automatic insight (#813)
+  if (data.hasBankConnection === false) {
+    steps.push({
+      key: 'connect_bank_psd2',
+      title: 'Koppel je bank voor automatisch inzicht',
+      description: 'Verbind je bankrekening via PSD2 en je transacties worden automatisch geïmporteerd.',
+      href: '/core/cash/connect',
+      icon: 'zap',
+      moduleColor: 'amber',
+    })
+  }
 
   // Priority 1: No transactions (import first)
   if (!data.hasTransactions) {

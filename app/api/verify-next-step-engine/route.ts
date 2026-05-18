@@ -85,9 +85,14 @@ export async function GET() {
       detail: `Real DB state: transactions=${hasTransactions}, budgets=${hasBudgets}, assets=${hasAssets}, debts=${hasDebts}, snapshots=${hasSnapshots}, goals=${hasGoals}`,
     })
 
-    // --- Test 3: No transactions → import is first suggestion ---
+    // --- Test 3: PSD2/import step prioritization ---
+    // Check bank_connections for PSD2 state (#813)
+    const bankConnResult = await supabase.from('bank_connections').select('id').eq('status', 'active').limit(1)
+    const hasBankConnection = (bankConnResult.data?.length ?? 0) > 0
+
     // Build the same step priority list as /api/next-steps
     const steps = [
+      { key: 'connect_bank_psd2', priority: 0, completed: hasBankConnection },
       { key: 'import_transactions', priority: 1, completed: hasTransactions },
       { key: 'set_budgets', priority: 2, completed: hasBudgets },
       { key: 'add_assets', priority: 3, completed: hasAssets },
@@ -98,19 +103,27 @@ export async function GET() {
     const pendingSteps = steps.filter(s => !s.completed)
     const firstPending = pendingSteps.length > 0 ? pendingSteps[0] : null
 
-    if (!hasTransactions) {
+    if (!hasBankConnection) {
       results.push({
-        name: 'No transactions → first suggestion is import_transactions',
+        name: 'No bank connection → first suggestion is connect_bank_psd2',
+        pass: firstPending?.key === 'connect_bank_psd2',
+        detail: firstPending?.key === 'connect_bank_psd2'
+          ? 'Correctly suggests PSD2 bank connection as first step (#813)'
+          : `Expected connect_bank_psd2, got ${firstPending?.key ?? 'none'}`,
+      })
+    } else if (!hasTransactions) {
+      results.push({
+        name: 'Has bank connection, no transactions → first suggestion is import_transactions',
         pass: firstPending?.key === 'import_transactions',
         detail: firstPending?.key === 'import_transactions'
-          ? 'Correctly suggests importing bank statements as first step'
+          ? 'Correctly suggests importing bank statements as first step after PSD2'
           : `Expected import_transactions, got ${firstPending?.key ?? 'none'}`,
       })
     } else {
       results.push({
-        name: 'Has transactions → import_transactions removed from pending',
-        pass: !pendingSteps.some(s => s.key === 'import_transactions'),
-        detail: 'import_transactions correctly excluded since user has real transactions',
+        name: 'Has bank connection + transactions → both removed from pending',
+        pass: !pendingSteps.some(s => s.key === 'connect_bank_psd2') && !pendingSteps.some(s => s.key === 'import_transactions'),
+        detail: 'connect_bank_psd2 and import_transactions correctly excluded',
       })
     }
 
