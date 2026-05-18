@@ -162,7 +162,7 @@ export function ScenarioOverlayPicker({
 
           <div className="border-t border-[var(--border-ed)]">
             <Link
-              href="/horizon/whatif"
+              href="/toekomst/whatif"
               className="flex w-full items-center gap-2 px-3 py-2.5 text-left font-sans text-xs text-wil-600 hover:text-wil-700 hover:bg-wil-50/30 transition-colors"
               style={{ minHeight: 44 }}
               onClick={() => setOpen(false)}
