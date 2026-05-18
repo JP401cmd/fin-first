@@ -115,7 +115,7 @@ export function TransactiesFeed({
                   onClick={() => setFilter(id)}
                   aria-pressed={active}
                   className={[
-                    'flex-1 min-w-[72px] text-center text-xs sm:text-sm font-semibold px-3 py-2 rounded-xl transition-colors',
+                    'flex-1 min-w-[72px] min-h-[44px] text-center text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors',
                     active
                       ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s1)]'
                       : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]',
@@ -137,7 +137,7 @@ export function TransactiesFeed({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Zoek transactie..."
-              className="w-full rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] pl-10 pr-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-2 focus:outline-[var(--ink)] focus:outline-offset-1"
+              className="w-full min-h-[44px] rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] pl-10 pr-3 py-2.5 text-sm text-[var(--ink)] placeholder:text-[var(--ink-3)] focus:outline-2 focus:outline-[var(--ink)] focus:outline-offset-1"
             />
           </div>
         </div>

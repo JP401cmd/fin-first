@@ -38,7 +38,7 @@ export function SchuldenSegmented() {
             href={href}
             aria-current={active ? 'page' : undefined}
             className={[
-              'flex-1 min-w-[64px] text-center text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors',
+              'flex-1 min-w-[64px] min-h-[44px] text-center text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors',
               active
                 ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s1)]'
                 : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]',
