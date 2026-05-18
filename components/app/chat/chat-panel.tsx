@@ -12,6 +12,8 @@ import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
 import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck } from 'lucide-react'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
+import { ChatVisualizationCard } from './chat-visualization-card'
+import type { VisualizationOutput } from '@/lib/ai/tools/show-visualization'
 
 /* ── Wft Disclaimer ───────────────────────────────────────────────── */
 
@@ -386,6 +388,33 @@ export function ChatPanel() {
           )
         }
       }
+
+      // Visualization tool — renders comparison, metric table, or bar chart cards
+      const viz = findToolInvocation(part, 'showVisualization')
+      if (viz) {
+        const isLoading = TOOL_LOADING_STATES.includes(viz.state)
+        const hasOutput = TOOL_OUTPUT_STATES.includes(viz.state) && viz.output
+
+        if (isLoading) {
+          elements.push(
+            <div key={`viz-loading-${viz.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--ink-3)]" />
+                <span className="text-xs text-[var(--ink-3)]">Visualisatie wordt opgebouwd...</span>
+              </div>
+            </div>
+          )
+        }
+
+        if (hasOutput) {
+          elements.push(
+            <ChatVisualizationCard
+              key={`viz-${viz.toolCallId}`}
+              data={viz.output as VisualizationOutput}
+            />
+          )
+        }
+      }
     }
 
     return elements
@@ -521,7 +550,8 @@ export function ChatPanel() {
             // For assistant messages: render text + tool invocations
             const hasContent =
               parts.some((p) => p.type === 'text' && 'text' in p && p.text) ||
-              parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'suggestAction') !== null)
+              parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'suggestAction') !== null) ||
+              parts.some((p) => findToolInvocation(p as Record<string, unknown>, 'showVisualization') !== null)
 
             if (!hasContent) return null
 

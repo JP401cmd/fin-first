@@ -4,6 +4,7 @@ import { freedomCalcTool } from './freedom-calc'
 import { createLookupTool } from './lookup'
 import { suggestActionTool } from './suggest-action'
 import { suggestLifeEventTool } from './suggest-life-event'
+import { showVisualizationTool } from './show-visualization'
 
 /**
  * Get the tool set for a given domain.
@@ -15,6 +16,7 @@ export function getTools(_domain: AIDomain, supabase: SupabaseClient, context?: 
   const base = {
     freedomCalc: freedomCalcTool,
     lookup: createLookupTool(supabase),
+    showVisualization: showVisualizationTool,
   }
 
   if (context === 'whatif') {
