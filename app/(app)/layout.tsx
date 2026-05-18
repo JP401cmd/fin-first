@@ -78,6 +78,8 @@ export default async function AppLayout({
     lastLevelRes,
     actionsCountRes,
     budgetCountRes,
+    budgetHealthRes,
+    budgetTxRes,
   ] = await Promise.all([
     // profile-select bevat alleen velden voor sidebar/feature-access/theming.
     supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type').eq('id', user.id).single(),
@@ -106,6 +108,16 @@ export default async function AppLayout({
     // = minimale payload (geen rows). Telt alleen top-level budgets
     // (parent_id is null) zodat sub-budgets niet meetellen.
     supabase.from('budgets').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('parent_id', null),
+    // Budget health: top-level expense budgets met limit (kompas cashflow-indicator)
+    supabase.from('budgets').select('id, default_limit, budget_type').eq('user_id', user.id).is('parent_id', null).in('budget_type', ['expense', 'savings']).eq('is_archived', false),
+    // Current-month transactions met budget_id (kompas cashflow-indicator)
+    (() => {
+      const now = new Date()
+      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
+      return supabase.from('transactions').select('budget_id, amount').eq('user_id', user.id).not('budget_id', 'is', null).gte('date', monthStart).lt('date', monthEnd)
+    })(),
   ])
 
   const profile = profileRes.data
@@ -236,6 +248,26 @@ export default async function AppLayout({
   // Box3-asset-detectie: of de gebruiker überhaupt box3-belastbare assets bezit
   const hasBox3Assets = assetRows.some(a => a.asset_type && BOX3_TYPES.has(a.asset_type))
   const householdType = (profile?.household_type as string | undefined) ?? undefined
+
+  // ── Budget health (kompas cashflow-indicator #847) ───────
+  // Bereken per top-level expense/savings budget of het binnen de limiet zit.
+  type BudgetHealthRow = { id: string; default_limit: number; budget_type: string }
+  type BudgetTxRow = { budget_id: string; amount: number }
+  const healthBudgets = (budgetHealthRes.data ?? []) as BudgetHealthRow[]
+  const budgetTxRows = (budgetTxRes.data ?? []) as BudgetTxRow[]
+  // Sum spending per budget_id
+  const spendPerBudget = new Map<string, number>()
+  for (const tx of budgetTxRows) {
+    spendPerBudget.set(tx.budget_id, (spendPerBudget.get(tx.budget_id) ?? 0) + Math.abs(Number(tx.amount)))
+  }
+  const budgetsTotal = healthBudgets.filter(b => b.default_limit > 0).length
+  const budgetsOver = healthBudgets.filter(b => {
+    if (b.default_limit <= 0) return false
+    const spent = spendPerBudget.get(b.id) ?? 0
+    return spent > b.default_limit
+  }).length
+  const budgetsOnTrack = budgetsTotal - budgetsOver
+
   const sidebarLeverScores = computeLeverScores({
     totalAssets: sidebarTotalAssetsRaw,
     totalDebts: sidebarTotalDebtsRaw,
@@ -246,6 +278,9 @@ export default async function AppLayout({
     box3TaxableAboveThreshold,
     hasBox3Assets,
     householdType,
+    budgetsTotal,
+    budgetsOnTrack,
+    budgetsOver,
   })
 
   // ── Coach-bubble data gaps ──────────────────────────────
