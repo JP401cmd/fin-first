@@ -15,6 +15,7 @@ import { OnboardingInkomen } from '@/components/onboarding/onboarding-inkomen'
 import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
 import { OnboardingSpaardoel } from '@/components/onboarding/onboarding-spaardoel'
 import { OnboardingKlaar } from '@/components/onboarding/onboarding-klaar'
+import type { PensionParseData } from '@/components/onboarding/onboarding-upo-section'
 import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingNieuwsOnly, type ExtractionResult } from '@/components/onboarding/onboarding-nieuws-only'
@@ -259,6 +260,8 @@ interface State {
   quickDebts: DebtQuickInput[]
   /** Stap v. — spaardoel-keuze. Skipped + presetKey=null = niet weggeschreven. */
   spaardoel: SpaardoelState
+  /** Parsed UPO pension data — null when nothing uploaded. Optional enrichment. */
+  pensionData: PensionParseData | null
 }
 
 /** Data portion of state that gets persisted to localStorage (excludes step/direction) */
@@ -283,6 +286,8 @@ interface PersistedData {
   quickDebts: DebtQuickInput[]
   /** Spaardoel-keuze van stap v. — optioneel zodat oude drafts blijven werken. */
   spaardoel?: SpaardoelState
+  /** Parsed UPO pension data — optioneel, oude drafts kennen dit veld niet. */
+  pensionData?: PensionParseData | null
   /** Last step the user was on (to restore position) */
   lastStep?: Step
 }
@@ -309,6 +314,8 @@ type Action =
    * partial-update-acties want de child levert telkens de volledige shape.
    */
   | { type: 'SET_SPAARDOEL'; data: SpaardoelState }
+  /** UPO pension parse result — set on successful parse, null on remove. */
+  | { type: 'SET_PENSION_DATA'; data: PensionParseData | null }
   | { type: 'RESTORE_STATE'; data: PersistedData }
 
 export const _initialState: State = {
@@ -337,6 +344,7 @@ export const _initialState: State = {
     target_date: '',
     skipped: false,
   },
+  pensionData: null,
 }
 
 /**
@@ -416,6 +424,8 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, quickDebts: action.items }
     case 'SET_SPAARDOEL':
       return { ...state, spaardoel: action.data }
+    case 'SET_PENSION_DATA':
+      return { ...state, pensionData: action.data }
     case 'RESTORE_STATE': {
       const restoredModules = action.data.activeModules ?? action.data.selectedModules ?? []
       // Recompute the active step order for the restored module selection so
@@ -462,6 +472,8 @@ export function _reducer(state: State, action: Action): State {
         // _initialState-shape. Geen migratie nodig — het is een nieuw veld
         // dat oude drafts gewoon niet kennen.
         spaardoel: action.data.spaardoel ?? _initialState.spaardoel,
+        // UPO pension data — optioneel, oude drafts kennen dit veld niet.
+        pensionData: action.data.pensionData ?? null,
       }
     }
     default:
@@ -497,6 +509,7 @@ function saveToLocalStorage(state: State) {
       quickAssets: state.quickAssets,
       quickDebts: state.quickDebts,
       spaardoel: state.spaardoel,
+      pensionData: state.pensionData,
       lastStep: state.step,
     }
     localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(data))
@@ -596,6 +609,7 @@ function loadFromLocalStorage(): PersistedData | null {
       quickAssets: Array.isArray(parsed.quickAssets) ? parsed.quickAssets : [],
       quickDebts: Array.isArray(parsed.quickDebts) ? parsed.quickDebts : [],
       spaardoel,
+      pensionData: parsed.pensionData ?? null,
       lastStep: parsed.lastStep,
     }
 
@@ -911,6 +925,12 @@ export default function OnboardingPage() {
         body.extractionData = state.extraction
       }
 
+      // Add parsed UPO pension data if present — server uses this to
+      // create pension life events and override AOW monthly amount.
+      if (state.pensionData) {
+        body.pensionData = state.pensionData
+      }
+
       // Derive budgettering mode from modules
       const budgetteringMode = state.activeModules.includes('budgetteren') ? 'manual' : 'none'
       body.budgetteringMode = budgetteringMode
@@ -1215,6 +1235,9 @@ export default function OnboardingPage() {
                 })
                 goToNext()
               }}
+              pensionData={state.pensionData}
+              onPensionParsed={(data) => dispatch({ type: 'SET_PENSION_DATA', data })}
+              onPensionRemoved={() => dispatch({ type: 'SET_PENSION_DATA', data: null })}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />

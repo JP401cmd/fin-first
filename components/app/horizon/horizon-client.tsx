@@ -49,7 +49,7 @@ import {
   AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw, GitBranch,
-  ChevronDown, ChevronUp, Heart, Compass,
+  ChevronDown, ChevronUp, Heart, Compass, FileText,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { HousingStrategyNudgeSheet } from '@/components/app/horizon/housing-strategy-nudge-sheet'
@@ -414,6 +414,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set())
   const [selectedRegelingIndex, setSelectedRegelingIndex] = useState(0)
   const pendingPensionFileRef = useRef<File | null>(null)
+
+  // UPO nudge: bottom sheet state for prominent pension upload on /horizon
+  const [upoNudgeSheetOpen, setUpoNudgeSheetOpen] = useState(false)
 
   // Compact life events UI state
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
@@ -1020,6 +1023,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const effectiveFreedomPct = effectiveFireTarget > 0
     ? Math.max(Math.min((effectiveNetWorth / effectiveFireTarget) * 100, 100), 0)
     : (fire?.freedomPercentage ?? 0)
+
+  // ── UPO nudge: check of gebruiker pensioenevent heeft (excl. AOW) ──────
+  const hasPensionEvent = useMemo(
+    () => events.some((ev) => ev.event_type === 'pension'),
+    [events],
+  )
 
   // ── Pensioen-modus afgeleid ──────────────────────────────────────────────
   const isPensioenMode = simResult?.strategy === 'pensioen'
@@ -3212,6 +3221,118 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
         />
       )}
+
+      {/* === UPO Nudge Card === */}
+      {!hasPensionEvent && !loading && (
+        <section className="mt-5 sm:mt-8">
+          <button
+            type="button"
+            onClick={() => setUpoNudgeSheetOpen(true)}
+            className="group w-full rounded-xl border border-dashed border-horizon-300 bg-gradient-to-r from-horizon-50/60 to-[var(--paper)] p-5 text-left transition-all hover:border-horizon-400 hover:shadow-sm"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-horizon-100 text-horizon-600 transition-colors group-hover:bg-horizon-200">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[var(--ink)]">
+                  Pensioenoverzicht uploaden
+                </p>
+                <p
+                  className="mt-1 text-xs italic text-[var(--ink-3)] leading-relaxed"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  Upload je UPO van mijnpensioenoverzicht.nl voor een nauwkeuriger projectie.
+                  We vullen AOW-bedrag en werknemerspensioen automatisch in.
+                </p>
+                <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-horizon-600 group-hover:text-horizon-700">
+                  <Plus className="h-3.5 w-3.5" />
+                  UPO uploaden
+                </span>
+              </div>
+            </div>
+          </button>
+        </section>
+      )}
+
+      {/* UPO Nudge Bottom Sheet */}
+      <BottomSheet
+        open={upoNudgeSheetOpen}
+        onClose={() => setUpoNudgeSheetOpen(false)}
+        title="Pensioenoverzicht uploaden"
+      >
+        <div className="space-y-4 p-6">
+          <PensionInstructionPanel />
+          <PensionPdfUpload
+            onParseResult={async (result) => {
+              const data = result as {
+                aowBedrag: number | null
+                regelingen: Array<{ fondsNaam: string; brutoBedrag: number; ingangLeeftijd: number; isGeindexeerd: boolean; type: string }>
+                nabestaandenpensioen: number | null
+                samenvatting: string
+              }
+
+              // Create pension life events from parsed regelingen
+              const ouderdomsRegelingen = data.regelingen.filter(r => r.type === 'ouderdomspensioen')
+              const supabase = createClient()
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) return
+
+              // Insert pension life events
+              for (const regeling of ouderdomsRegelingen) {
+                await supabase.from('life_events').insert({
+                  user_id: user.id,
+                  name: regeling.fondsNaam || 'Aanvullend pensioen',
+                  event_type: 'pension',
+                  target_age: regeling.ingangLeeftijd,
+                  monthly_income_change: regeling.brutoBedrag,
+                  monthly_cost_change: 0,
+                  one_time_cost: 0,
+                  duration_months: 0,
+                  is_indexed: regeling.isGeindexeerd,
+                  is_active: true,
+                  icon: 'Briefcase',
+                  sort_order: events.length + 1,
+                  metadata: { pensioenType: 'bedrijf', brutoBedrag: regeling.brutoBedrag, source: 'upo_upload' },
+                })
+              }
+
+              // Update AOW amount if parsed
+              if (data.aowBedrag && data.aowBedrag > 0) {
+                const aowEvent = events.find(ev => ev.event_type === 'aow')
+                if (aowEvent) {
+                  await supabase.from('life_events')
+                    .update({ monthly_income_change: data.aowBedrag })
+                    .eq('id', aowEvent.id)
+                }
+              }
+
+              // Refresh events list
+              const { data: refreshedEvents } = await supabase
+                .from('life_events')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('sort_order', { ascending: true })
+              if (refreshedEvents) {
+                setEvents(refreshedEvents as LifeEvent[])
+                if (input) {
+                  setImpacts(computeCumulativeImpacts(input, refreshedEvents as LifeEvent[]))
+                }
+              }
+
+              setUpoNudgeSheetOpen(false)
+            }}
+            onFileRemoved={() => {}}
+          />
+          {/* Summary after parse */}
+          <p
+            className="text-xs italic text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Je pensioendata wordt direct verwerkt in je vrijheidsprojectie.
+          </p>
+        </div>
+      </BottomSheet>
 
       {/* === Levensgebeurtenissen === */}
       <FeatureGate featureId="levensgebeurtenissen" fallback="hidden">

@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
+import { OnboardingUpoSection, type PensionParseData } from './onboarding-upo-section'
 import type { IdentityData } from './onboarding-identity'
 
 /**
@@ -84,6 +85,12 @@ export interface OnboardingInkomenProps {
    * clear — backward-compat).
    */
   onSkipIncome?: () => void
+  /** Parsed UPO pension data — null when nothing uploaded. */
+  pensionData?: PensionParseData | null
+  /** Callback when UPO is successfully parsed. */
+  onPensionParsed?: (data: PensionParseData) => void
+  /** Callback when UPO file is removed. */
+  onPensionRemoved?: () => void
   /** 1-indexed stap-nummer voor de voortgangsbalk (default 3). */
   currentStep?: number
   totalSteps?: number
@@ -95,6 +102,9 @@ export function OnboardingInkomen({
   onNext,
   onBack,
   onSkipIncome,
+  pensionData,
+  onPensionParsed,
+  onPensionRemoved,
   currentStep = 3,
   totalSteps = 5,
 }: OnboardingInkomenProps) {
@@ -357,6 +367,18 @@ export function OnboardingInkomen({
             </button>
           )}
         </div>
+
+        {/* UPO (Uniform Pensioenoverzicht) upload — optioneel. Gebruiker
+            kan een PDF van mijnpensioenoverzicht.nl uploaden om AOW-bedrag
+            en werknemerspensioen automatisch in te vullen. Overslaan is
+            altijd mogelijk — de sectie is standaard ingeklapt. */}
+        {onPensionParsed && (
+          <OnboardingUpoSection
+            pensionData={pensionData ?? null}
+            onParsed={onPensionParsed}
+            onRemoved={onPensionRemoved ?? (() => {})}
+          />
+        )}
       </div>
     </OnboardingShell>
   )

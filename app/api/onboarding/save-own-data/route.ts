@@ -152,6 +152,7 @@ function buildRpcPayload(
   horizonData: z.infer<typeof bodySchema>['horizonData'],
   newsDescription: z.infer<typeof bodySchema>['newsDescription'],
   intent: z.infer<typeof bodySchema>['intent'],
+  pensionData?: z.infer<typeof bodySchema>['pensionData'],
 ) {
   // Budgetten worden niet meer in onboarding geseed — zie comment hierboven.
   const parentBudgets: Record<string, unknown>[] = []
@@ -203,7 +204,9 @@ function buildRpcPayload(
     // configureert dit zelf in Instellingen.
     widget_prefs: { widgets: [] },
     aow_target_age: aowTargetAge,
-    aow_monthly: NL_AOW_MONTHLY,
+    aow_monthly: (pensionData?.aowBedrag && pensionData.aowBedrag > 0)
+      ? pensionData.aowBedrag
+      : NL_AOW_MONTHLY,
   }
 }
 
@@ -322,6 +325,19 @@ const bodySchema = z.object({
     icon: z.string().min(1).max(40),
     color: z.enum(['teal', 'amber', 'purple', 'emerald', 'red', 'blue']),
   }).optional(),
+  /** Parsed UPO pension data — optional, used to create pension life events and override AOW amount. */
+  pensionData: z.object({
+    aowBedrag: z.number().nullable(),
+    regelingen: z.array(z.object({
+      fondsNaam: z.string(),
+      brutoBedrag: z.number(),
+      ingangLeeftijd: z.number(),
+      isGeindexeerd: z.boolean(),
+      type: z.string(),
+    })),
+    nabestaandenpensioen: z.number().nullable(),
+    samenvatting: z.string(),
+  }).optional(),
   /** Pre-extracted data from client-side review (avoids re-running AI extraction) */
   extractionData: z.object({
     assets: z.array(z.object({
@@ -376,6 +392,7 @@ export async function POST(req: Request) {
     activeModules: rawActiveModules,
     newsDescription,
     extractionData,
+    pensionData,
     intent: rawIntent,
     selectedGoalSlug: rawSelectedGoalSlug,
     selectedGoalSlugs: rawSelectedGoalSlugs,
@@ -599,6 +616,7 @@ export async function POST(req: Request) {
       quickAssets, quickDebts,
       aowTargetAge, idempotencyKey,
       horizonData, newsDescription, intent,
+      pensionData,
     )
 
     const { data: rpcResult, error: rpcError } = await supabase
@@ -955,12 +973,17 @@ export async function POST(req: Request) {
     // Delete existing AOW event first to prevent duplicates on retry
     await supabase.from('life_events').delete().eq('user_id', user.id).eq('event_type', 'aow')
 
+    // If UPO pension data was uploaded, use the parsed AOW amount instead of default
+    const aowMonthly = (pensionData?.aowBedrag && pensionData.aowBedrag > 0)
+      ? pensionData.aowBedrag
+      : NL_AOW_MONTHLY
+
     await supabase.from('life_events').insert({
       user_id: user.id,
       name: 'AOW',
       event_type: 'aow',
       target_age: aowTargetAge,
-      monthly_income_change: NL_AOW_MONTHLY,
+      monthly_income_change: aowMonthly,
       monthly_cost_change: 0,
       one_time_cost: 0,
       duration_months: 0,
@@ -971,10 +994,39 @@ export async function POST(req: Request) {
       metadata: { leefsituatie: 'alleenstaand', jarenBuitenNL: 0 },
     })
 
-    // 6b. Insert user-created life events from horizon step (non-AOW)
+    // 6a. Insert pension life events from UPO upload (ouderdomspensioen regelingen)
+    if (pensionData?.regelingen && pensionData.regelingen.length > 0) {
+      const ouderdomsRegelingen = pensionData.regelingen.filter(
+        (r) => r.type === 'ouderdomspensioen'
+      )
+      if (ouderdomsRegelingen.length > 0) {
+        // Delete existing pension events first (prevent duplicates on retry)
+        await supabase.from('life_events').delete().eq('user_id', user.id).eq('event_type', 'pension')
+
+        const pensionEvents = ouderdomsRegelingen.map((r, i) => ({
+          user_id: user.id,
+          name: r.fondsNaam || 'Aanvullend pensioen',
+          event_type: 'pension',
+          target_age: r.ingangLeeftijd,
+          monthly_income_change: r.brutoBedrag,
+          monthly_cost_change: 0,
+          one_time_cost: 0,
+          duration_months: 0,
+          is_indexed: r.isGeindexeerd,
+          is_active: true,
+          icon: 'Briefcase',
+          sort_order: i + 1,
+          metadata: { pensioenType: 'bedrijf', brutoBedrag: r.brutoBedrag, source: 'upo_upload' },
+        }))
+        const { error: pensionErr } = await supabase.from('life_events').insert(pensionEvents)
+        if (pensionErr) console.error('UPO pension life events insert error:', pensionErr)
+      }
+    }
+
+    // 6b. Insert user-created life events from horizon step (non-AOW, non-pension)
     if (horizonData?.life_events && horizonData.life_events.length > 0) {
       const userEvents = horizonData.life_events
-        .filter((e) => e.event_type !== 'aow') // AOW already handled above
+        .filter((e) => e.event_type !== 'aow' && e.event_type !== 'pension') // AOW + pension already handled above
         .map((e, i) => ({
           user_id: user.id,
           name: e.name,
@@ -985,7 +1037,7 @@ export async function POST(req: Request) {
           one_time_cost: e.one_time_cost ?? 0,
           duration_months: e.duration_months ?? 0,
           is_active: e.is_active,
-          sort_order: i + 1,
+          sort_order: i + 1 + (pensionData?.regelingen?.filter(r => r.type === 'ouderdomspensioen').length ?? 0),
           icon: 'Calendar',
         }))
 

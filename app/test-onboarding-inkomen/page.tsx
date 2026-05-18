@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { OnboardingInkomen } from '@/components/onboarding/onboarding-inkomen'
 import type { IdentityData } from '@/components/onboarding/onboarding-identity'
+import type { PensionParseData } from '@/components/onboarding/onboarding-upo-section'
 
 /**
  * Test page for OnboardingInkomen — verifies:
@@ -10,6 +11,7 @@ import type { IdentityData } from '@/components/onboarding/onboarding-identity'
  * 2. Household has no asterisk (has a default)
  * 3. User can proceed without income
  * 4. Only 1-2 real required interactions (household + optionally income)
+ * 5. UPO upload section visible and functional (feature #773)
  */
 export default function TestOnboardingInkomen() {
   const [data, setData] = useState<Pick<IdentityData, 'household_type' | 'number_of_children' | 'net_monthly_income'>>({
@@ -17,6 +19,7 @@ export default function TestOnboardingInkomen() {
     number_of_children: 0,
     net_monthly_income: '',
   })
+  const [pensionData, setPensionData] = useState<PensionParseData | null>(null)
   const [proceeded, setProceeded] = useState(false)
 
   if (proceeded) {
@@ -27,7 +30,7 @@ export default function TestOnboardingInkomen() {
           De gebruiker kon doorgaan met de volgende waarden:
         </p>
         <pre className="text-sm bg-[var(--subtle)] p-4 border border-[var(--border-ed)]">
-          {JSON.stringify(data, null, 2)}
+          {JSON.stringify({ ...data, pensionData }, null, 2)}
         </pre>
         <button
           onClick={() => { setProceeded(false); setData({ household_type: 'solo', number_of_children: 0, net_monthly_income: '' }) }}
@@ -67,6 +70,9 @@ export default function TestOnboardingInkomen() {
           setData(prev => ({ ...prev, net_monthly_income: '' }))
           setProceeded(true)
         }}
+        pensionData={pensionData}
+        onPensionParsed={setPensionData}
+        onPensionRemoved={() => setPensionData(null)}
       />
     </div>
   )
