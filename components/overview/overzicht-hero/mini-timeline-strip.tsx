@@ -65,7 +65,7 @@ export function MiniTimelineStrip({
         </div>
       </div>
       <div
-        className="relative h-2 rounded-full bg-stone-100 overflow-hidden"
+        className="relative h-1.5 rounded-full bg-stone-100 overflow-hidden"
         role="progressbar"
         aria-valuenow={Math.round(pct)}
         aria-valuemin={0}

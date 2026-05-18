@@ -33,7 +33,7 @@ export function EmptyStateCard({
         <div
           className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center`}
         >
-          <Icon className={`w-5 h-5 ${iconColor}`} />
+          <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${iconColor}`} />
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">

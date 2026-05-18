@@ -52,7 +52,7 @@ export function VoortgangDoelenCard({
           const status = progress.onTrack ? 'ontrack' : 'achter'
           const StatusIcon = status === 'ontrack' ? CheckCircle2 : AlertCircle
           const statusColor =
-            status === 'ontrack' ? 'text-emerald-600' : 'text-amber-600'
+            status === 'ontrack' ? 'text-emerald-700' : 'text-amber-700'
           const barColor =
             status === 'ontrack' ? 'bg-emerald-500' : 'bg-amber-500'
 

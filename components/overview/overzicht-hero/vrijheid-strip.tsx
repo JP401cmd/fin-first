@@ -16,7 +16,7 @@ export function VrijheidStrip({ freedomPct }: { freedomPct: number | null }) {
     return (
       <Link
         href="/mijn/profiel"
-        className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-5 sm:p-6 hover:border-violet-300 hover:shadow-sm transition-all group"
+        className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-4 sm:p-6 hover:border-violet-300 hover:shadow-sm transition-all group"
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
