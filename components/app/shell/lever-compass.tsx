@@ -346,3 +346,133 @@ export function LeverCompassCollapsed({ scores }: { scores: LeverScores }) {
     </div>
   )
 }
+
+// ── Mobile collapsed + expand (responsive <768px) ──────────────────────────
+
+/**
+ * Mobile-responsive kompas: toont 4 compacte gekleurde dots als een
+ * tappable trigger. Bij tap opent een expanded panel met volledige lever-
+ * informatie (icoon + label + status + detail + voortgang). Panel sluit
+ * bij buiten-tap, Escape, of tweede tap op de trigger.
+ *
+ * Bedoeld voor AppHeader en TopBar op mobiele schermen (<768px).
+ * Op desktop (≥768px) rendert het niets — gebruik daar LeverCompassDots
+ * of LeverCompassExpanded.
+ */
+export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
+  const [expanded, setExpanded] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Close on outside click
+  useEffect(() => {
+    if (!expanded) return
+    const handleOutside = (e: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setExpanded(false)
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false)
+    }
+    document.addEventListener('pointerdown', handleOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('pointerdown', handleOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [expanded])
+
+  return (
+    <div ref={containerRef} className="relative md:hidden">
+      {/* Compact trigger: 4 dots in a tight cluster */}
+      <button
+        type="button"
+        onClick={() => setExpanded(prev => !prev)}
+        className="flex items-center gap-[3px] rounded-full px-1.5 py-1 transition-colors hover:bg-[var(--subtle)]"
+        aria-label={expanded ? 'Kompas sluiten' : 'Kompas openen'}
+        aria-expanded={expanded}
+        aria-haspopup="dialog"
+      >
+        {LEVERS.map(({ key }) => {
+          const entry = scores[key]
+          const colors = STATUS_COLORS[entry.status]
+          return (
+            <span
+              key={key}
+              className={`block w-[6px] h-[6px] rounded-full ${colors.dot}`}
+              aria-hidden
+            />
+          )
+        })}
+      </button>
+
+      {/* Expanded panel */}
+      {expanded && (
+        <div
+          className="absolute right-0 top-full mt-1.5 z-50 w-64 border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s2)] py-2"
+          role="dialog"
+          aria-label="Financieel kompas"
+        >
+          <div className="px-3 pb-1.5 mb-1 border-b border-[var(--border-ed)]">
+            <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--ink-3)]">
+              Kompas
+            </span>
+          </div>
+          {LEVERS.map(({ key, label, Icon, href }) => {
+            const entry = scores[key]
+            const colors = STATUS_COLORS[entry.status]
+            const hasProgress = key === 'debts' && entry.progress != null
+
+            const content = (
+              <div
+                className={`flex items-start gap-2.5 px-3 py-2 ${href ? 'hover:bg-[var(--subtle)] cursor-pointer' : ''} transition-colors`}
+              >
+                <Icon className="w-4 h-4 text-[var(--ink-3)] mt-0.5 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-[var(--ink)]">{label}</span>
+                    {hasProgress ? (
+                      <MiniProgressRing progress={entry.progress!} status={entry.status} />
+                    ) : (
+                      <span
+                        className={`w-2 h-2 rounded-full ${colors.dot} shrink-0`}
+                        aria-hidden
+                      />
+                    )}
+                    <span className={`text-[10px] font-semibold ${colors.text} ml-auto`}>
+                      {STATUS_LABELS[entry.status]}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-[var(--ink-3)] mt-0.5 leading-snug">
+                    {entry.detail}
+                  </div>
+                  {hasProgress && entry.progress != null && entry.progress > 0 && (
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <div className="w-full h-1 rounded-full bg-[var(--border-ed)] overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${colors.dot}`}
+                          style={{ width: `${Math.min(100, entry.progress)}%`, transition: 'width 0.6s ease' }}
+                        />
+                      </div>
+                      <span className="text-[9px] text-[var(--ink-4)] tabular-nums shrink-0">
+                        {Math.min(100, entry.progress)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+
+            return href ? (
+              <Link key={key} href={href} onClick={() => setExpanded(false)}>
+                {content}
+              </Link>
+            ) : (
+              <div key={key}>{content}</div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
