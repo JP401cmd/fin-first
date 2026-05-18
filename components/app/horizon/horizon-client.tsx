@@ -69,7 +69,7 @@ import { usePerspective } from '@/components/app/perspective-provider'
 import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, ResilienceContextMessage, ResilienceTrendChart, FireAgeContextMessage, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { PageInfoButton } from '@/components/editorial'
+import { PageInfoButton, GlossaryTerm } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 const ScenariosModal = dynamic(() =>
@@ -2705,7 +2705,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                   <p className="font-sans text-[12px] text-orange-700">
-                    FIRE niet bereikbaar voor leeftijd {simResult.displayEndAge} — verhoog je spaarquote of verlaag je uitgaven.
+                    FIRE niet bereikbaar voor leeftijd {simResult.displayEndAge} — verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.
                   </p>
                 </div>
               )}
@@ -2907,17 +2907,17 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               <ChartOverlayExplainer active={isAowStopActive}>
                 <em>Stop op AOW</em> simuleert wat er gebeurt als je tot je
                 AOW-leeftijd doorwerkt en daarna pas onttrekt — zo zie je of
-                je geplande pensioenleeftijd haalbaar is zónder voortijdig FIRE.
+                je geplande pensioenleeftijd haalbaar is zónder voortijdig <GlossaryTerm term="FIRE">FIRE</GlossaryTerm>.
               </ChartOverlayExplainer>
 
               <ChartOverlayExplainer active={scenariosExpanded && !!scenarioData}>
                 De <em>scenario-lijnen</em> tonen je vermogenspad onder een
-                voorzichtiger en optimistischer rendement (±2 procentpunt).
+                voorzichtiger en optimistischer <GlossaryTerm term="rendement">rendement</GlossaryTerm> (±2 procentpunt).
                 Zo zie je hoe gevoelig je pad is voor onzekere markten.
               </ChartOverlayExplainer>
 
               <ChartOverlayExplainer active={mcExpanded && !!mcData}>
-                <em>Monte Carlo</em> simuleert duizend marktverlopen — de gradient-band
+                <GlossaryTerm term="Monte_Carlo"><em>Monte Carlo</em></GlossaryTerm> simuleert duizend marktverlopen — de gradient-band
                 toont de range van uitkomsten, de centrale lijn de mediane uitkomst.
                 Het percentage is de geschatte kans dat je geld het volhoudt.
               </ChartOverlayExplainer>
@@ -2935,8 +2935,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
               <ChartOverlayExplainer active={chartMode === 'vermogensopbouw'}>
                 In <em>opbouw</em>-modus zie je de samenstelling van je vermogen —
-                hoeveel komt uit eigen bijdragen, hoeveel uit rendement, en hoe
-                schulden je netto vermogen drukken. Geeft inzicht in waar je
+                hoeveel komt uit eigen bijdragen, hoeveel uit <GlossaryTerm term="rendement">rendement</GlossaryTerm>, en hoe
+                schulden je <GlossaryTerm term="netto_vermogen">netto vermogen</GlossaryTerm> drukken. Geeft inzicht in waar je
                 groei vandaan komt.
               </ChartOverlayExplainer>
 
@@ -5582,7 +5582,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               <div className="h-px bg-horizon-200 my-1" />
                               <div className="flex justify-between font-semibold"><span>Totale kosten</span><span className="font-mono tabular-nums text-negative">-{<MaskedAmount value={totaal} tone="horizon" />}</span></div>
                             </div>
-                            <p className="text-[10px] text-[var(--ink-4)] mt-1">💍 Na trouwen word je fiscaal partners — Box 3 vermogen en vrijstelling (€57.000 p.p.) worden gezamenlijk berekend.</p>
+                            <p className="text-[10px] text-[var(--ink-4)] mt-1">💍 Na trouwen word je fiscaal partners — <GlossaryTerm term="box_3">Box 3</GlossaryTerm> vermogen en vrijstelling (€57.000 p.p.) worden gezamenlijk berekend.</p>
                           </div>
                         )
                       })()}
@@ -5629,7 +5629,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             )}
                             {isJaarlijks && (
                               <p className="text-[10px] text-[var(--ink-4)]">
-                                Jaarlijkse schenking verlaagt je Box 3 vermogen en daarmee je belasting
+                                Jaarlijkse schenking verlaagt je <GlossaryTerm term="box_3">Box 3</GlossaryTerm> vermogen en daarmee je belasting
                               </p>
                             )}
                           </div>
@@ -6566,7 +6566,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               )}
               {!isPensioenMode && (
                 <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (SWR)</span>
+                  <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (<GlossaryTerm term="SWR">SWR</GlossaryTerm>)</span>
                   <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
                 </div>
               )}

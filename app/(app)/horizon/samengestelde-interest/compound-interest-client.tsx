@@ -2,7 +2,7 @@
 
 import { ArrowLeft, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
-import { Kicker, EditorialHeadline, EditorialDeck, PullQuote, HL } from '@/components/editorial'
+import { Kicker, EditorialHeadline, EditorialDeck, PullQuote, HL, GlossaryTerm } from '@/components/editorial'
 import { CompoundInterestChart } from '@/components/app/horizon/compound-interest-chart'
 
 export function CompoundInterestPage({
@@ -37,7 +37,7 @@ export function CompoundInterestPage({
         <EditorialDeck>
           Samengestelde interest is de krachtigste kracht in persoonlijke financiering.
           Een klein maandelijks bedrag groeit exponentieel &mdash; niet lineair.
-          Het rendement dat je verdient, verdient weer rendement.
+          Het <GlossaryTerm term="rendement">rendement</GlossaryTerm> dat je verdient, verdient weer rendement.
         </EditorialDeck>
       </div>
 
@@ -65,7 +65,7 @@ export function CompoundInterestPage({
           Hoe werkt het?
         </h3>
         <p>
-          Samengestelde interest betekent dat je niet alleen rendement verdient op je inleg,
+          <GlossaryTerm term="compounding">Samengestelde interest</GlossaryTerm> betekent dat je niet alleen rendement verdient op je inleg,
           maar ook op het rendement dat je al eerder verdiend hebt. In de eerste jaren
           lijkt de groei bescheiden, maar na verloop van tijd versnelt het dramatisch.
         </p>

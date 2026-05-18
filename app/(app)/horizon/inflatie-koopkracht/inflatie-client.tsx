@@ -2,7 +2,7 @@
 
 import { ArrowLeft, TrendingDown } from 'lucide-react'
 import Link from 'next/link'
-import { Kicker, EditorialHeadline, EditorialDeck, PullQuote, HL, HLNeg } from '@/components/editorial'
+import { Kicker, EditorialHeadline, EditorialDeck, PullQuote, HL, HLNeg, GlossaryTerm } from '@/components/editorial'
 import { InflationErosionChart } from '@/components/app/horizon/inflation-erosion-chart'
 
 export function InflatieKoopkrachtClient({
@@ -35,7 +35,7 @@ export function InflatieKoopkrachtClient({
         </EditorialHeadline>
 
         <EditorialDeck>
-          Inflatie vreet stilletjes aan je koopkracht. Wat je vandaag kunt
+          <GlossaryTerm term="inflatie">Inflatie</GlossaryTerm> vreet stilletjes aan je <GlossaryTerm term="koopkracht">koopkracht</GlossaryTerm>. Wat je vandaag kunt
           kopen voor &euro;1.000, kost over twintig jaar aanzienlijk meer.
           Elke euro die stil op je rekening staat, verliest elke dag een
           beetje vrijheid.
@@ -80,8 +80,8 @@ export function InflatieKoopkrachtClient({
           &euro;672 waard in koopkracht. Na 30 jaar slechts &euro;552.
         </p>
         <p>
-          Historisch gezien levert de aandelenmarkt circa 7% bruto rendement
-          per jaar op. Na aftrek van inflatie (2%) houd je zo&apos;n 5% re&euml;el
+          Historisch gezien levert de aandelenmarkt circa 7% bruto <GlossaryTerm term="rendement">rendement</GlossaryTerm>{' '}
+          per jaar op. Na aftrek van <GlossaryTerm term="inflatie">inflatie</GlossaryTerm> (2%) houd je zo&apos;n 5% re&euml;el
           rendement over. Dat is het verschil tussen{' '}
           <strong className="text-[var(--ink)] not-italic">
             koopkracht opbouwen
@@ -93,7 +93,7 @@ export function InflatieKoopkrachtClient({
           .
         </p>
         <p>
-          Sparen is essentieel voor je noodfonds &mdash; 3 tot 6 maanden
+          Sparen is essentieel voor je <GlossaryTerm term="noodreserve">noodfonds</GlossaryTerm> &mdash; 3 tot 6 maanden
           uitgaven op een toegankelijke rekening. Maar al het geld daarboven
           verdient het om belegd te worden. Niet om snel rijk te worden, maar
           om je vrijheidstijd te beschermen tegen erosie.
