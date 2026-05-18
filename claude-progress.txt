@@ -1,3 +1,37 @@
+## Session 2026-05-18 - Features #825, #837
+
+### Feature #825: Module-toggle blijft op /identity/instellingen - PASSING
+- Added 'modules' as first tab in settings page (Blocks icon)
+- Added SettingsTab type union member 'modules'
+- Imports: MODULE_CATALOG, ModuleId, useModuleToggle, useModuleAccess
+- Module toggles: all 6 modules from MODULE_CATALOG with toggle switches
+- "In ontwikkeling" badge for modules with inDevelopment flag
+- Dependency info shown per module (requires, requiresOneOf)
+- Validation errors displayed in amber alert box with AlertTriangle icon
+- Active module count shown ("X van 6 modules actief")
+- Uses useModuleToggle hook → calls PUT /api/modules → refreshModules context
+- URL deep-linking: ?tab=modules
+- Tested: toggle on/off, dependency validation (Vermogensregistratie blocked when Aandelenregistratie active)
+- Commit: df9bff09
+
+### Feature #837: Recommendations tonen hefboom-icoon per tip - PASSING
+- Added lever icon (h-3 w-3, text-[var(--ink-4)]) to RecommendationCard after title
+- Added lever icon to ActionCard after title (same styling)
+- Icons consistent with compass: Landmark (assets), CreditCard (debts), ArrowUpDown (cashflow), Receipt (tax)
+- Uses tagToLever() from lib/lever-mapping.ts for type → lever resolution
+- Title tooltip shows Dutch lever name (Bezittingen, Schulden, Cashflow, Belasting)
+- Verified with test page: all 4 lever types map correctly (budget_optimization→cashflow, asset_reallocation→assets, debt_acceleration→debts, savings_boost→cashflow)
+- Both compact and non-compact modes show the icon
+- Commit: df9bff09
+
+### Files Modified
+- app/(app)/identity/instellingen/page.tsx — Modules tab + toggle section + state
+- components/app/recommendation-card.tsx — lever icon imports + render
+- components/app/action-card.tsx — lever icon imports + render
+
+### Current Status
+- 2 features completed this session (#825, #837)
+
 ## Session 2026-05-18 - Features #822, #823
 
 ### Feature #822: FIRE-instellingen verplaatst naar /horizon inline - PASSING
