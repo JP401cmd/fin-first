@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
       setSuccess(true)
       setLoading(false)
       // Redirect to dashboard after short delay so user sees success message
-      setTimeout(() => router.push('/will'), 2000)
+      setTimeout(() => router.push('/overzicht'), 2000)
     }
   }
 
@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
             Je wachtwoord is succesvol bijgewerkt. Je wordt doorgestuurd...
           </p>
           <Link
-            href="/will"
+            href="/overzicht"
             className="mt-6 inline-block text-sm font-medium text-zinc-900 hover:underline"
           >
             Naar De Wil

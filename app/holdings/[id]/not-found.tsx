@@ -13,7 +13,7 @@ export default function HoldingNotFound() {
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
-            href="/will"
+            href="/overzicht"
             className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
           >
             Naar De Wil

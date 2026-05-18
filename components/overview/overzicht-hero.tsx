@@ -341,7 +341,7 @@ function VoortgangDoelenCard({
           </div>
         </div>
         <Link
-          href="/will"
+          href="/toekomst"
           className="text-xs font-semibold text-[var(--ink-2)] hover:text-[var(--ink)] hover:underline shrink-0"
         >
           Bekijk →
