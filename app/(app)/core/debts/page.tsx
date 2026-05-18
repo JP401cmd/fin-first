@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Plus, BarChart3, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BudgetIcon } from '@/components/app/budget-shared'
@@ -78,6 +78,9 @@ function addDebtCta(type: DebtType): string {
 export default function DebtsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  // /overzicht/schulden toont nieuwe overzicht-tekst; legacy /core/debts blijft fallback
+  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/core/debts']
 
   // URL-driven pane-state: `?debt=<id>` opent de slide-in pane voor die
   // schuld. Consistent met `/core/debts/[type]` (debt-category-page.tsx).
@@ -408,7 +411,7 @@ export default function DebtsPage() {
 
       <header className="relative mb-5 space-y-3">
         <PageInfoButton
-          description={PAGE_INFO['/core/debts']}
+          description={pageInfoText}
           className="absolute right-0 top-0"
         />
         <Kicker size="large">Schulden · vrijheid die je terugkoopt</Kicker>

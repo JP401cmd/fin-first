@@ -102,6 +102,10 @@ function BudgetEditorialHeader({
     ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
     : ''
 
+  // /overzicht/cashflow toont nieuwe overzicht-tekst; legacy /core/budgets blijft fallback
+  const pathname = usePathname()
+  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/core/budgets']
+
   // Twee perspectieven op "ruimte":
   //  - Volgens plan: verwacht inkomen − toegewezen budgetten (`teVerdelen`).
   //    Toont of het BUDGET dat je hebt opgesteld klopt met je inkomen.
@@ -121,7 +125,7 @@ function BudgetEditorialHeader({
   return (
     <header className="relative mb-6 space-y-3">
       <PageInfoButton
-        description={PAGE_INFO['/core/budgets']}
+        description={pageInfoText}
         className="absolute right-0 top-0"
       />
       <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
