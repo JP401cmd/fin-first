@@ -39,7 +39,7 @@ export function ModuleStrip({
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {/* De Kern */}
       <Link
-        href="/core"
+        href="/overzicht"
         className="card-editorial flex items-center gap-3 border-l-3 border-kern-400 p-4 no-underline"
       >
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kern-100">
@@ -61,7 +61,7 @@ export function ModuleStrip({
 
       {/* De Horizon */}
       <Link
-        href="/horizon"
+        href="/toekomst"
         className="card-editorial flex items-center gap-3 border-l-3 border-horizon-400 p-4 no-underline"
       >
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-horizon-100">

@@ -251,7 +251,7 @@ export default function UitgavenNaPensioenClient(props: Props) {
       {!props.inPane && (
         <div className="pt-4 pb-2 lg:pt-8">
           <Link
-            href="/horizon"
+            href="/toekomst"
             className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />

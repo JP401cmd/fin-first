@@ -353,7 +353,7 @@ export default function JaaroverzichtPage() {
       <div className="mx-auto max-w-2xl px-4 pt-6 pb-4">
         <div className="flex items-center justify-between">
           <Link
-            href="/identity"
+            href="/mijn"
             className="flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />

@@ -311,7 +311,7 @@ function HealthKassabonSummary({ health }: { health: ReturnType<typeof computeHe
 
       {/* CTA: link to Horizon for full detail view */}
       <Link
-        href="/horizon"
+        href="/toekomst"
         className="flex items-center justify-center gap-2 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 px-4 py-2.5 text-xs font-medium text-horizon-700 transition-colors hover:bg-horizon-100 hover:border-horizon-300"
       >
         <ExternalLink className="h-3.5 w-3.5" />
@@ -444,7 +444,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
 
       {/* CTA: link to Horizon for full detail view */}
       <Link
-        href="/horizon"
+        href="/toekomst"
         className="mt-1.5 font-serif italic text-[11px] text-horizon-600 hover:text-horizon-800 flex items-center gap-1"
       >
         Bekijk details op De Horizon <ChevronRight className="h-3 w-3" />

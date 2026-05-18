@@ -19,7 +19,7 @@ export default function AppNotFound() {
             Naar De Wil
           </Link>
           <Link
-            href="/core"
+            href="/overzicht"
             className="inline-flex items-center justify-center rounded-lg border border-kern-300 bg-white px-6 py-2.5 text-sm font-medium text-kern-700 hover:bg-kern-50 transition-colors"
           >
             Naar De Kern
