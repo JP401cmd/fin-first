@@ -46,10 +46,10 @@ type LeverConfig = {
 }
 
 const LEVERS: LeverConfig[] = [
-  { key: 'assets', label: 'Bezittingen', Icon: Landmark },
-  { key: 'debts', label: 'Schulden', Icon: CreditCard },
+  { key: 'assets', label: 'Bezittingen', Icon: Landmark, href: '/core/assets' },
+  { key: 'debts', label: 'Schulden', Icon: CreditCard, href: '/core/debts' },
   { key: 'cashflow', label: 'Cashflow', Icon: ArrowUpDown, href: '/will#cashflow' },
-  { key: 'tax', label: 'Belasting', Icon: Receipt },
+  { key: 'tax', label: 'Belasting', Icon: Receipt, href: '/core/belasting' },
 ]
 
 // ── Status colors ────────────────────────────────────────────────────────────
@@ -79,11 +79,14 @@ function MiniTooltip({
   label,
   status,
   detail,
+  progress,
   children,
 }: {
   label: string
   status: LeverStatus
   detail: string
+  /** Optional payoff progress (0–100) shown as a micro-bar in the tooltip. */
+  progress?: number | null
   children: React.ReactNode
 }) {
   const [show, setShow] = useState(false)
@@ -136,9 +139,86 @@ function MiniTooltip({
           <div className="text-[10px] text-[var(--ink-3)] mt-0.5 pl-3">
             {detail}
           </div>
+          {progress != null && progress > 0 && (
+            <div className="mt-1 pl-3 flex items-center gap-1.5">
+              <div className="w-16 h-1 rounded-full bg-[var(--border-ed)] overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${colors.dot}`}
+                  style={{ width: `${Math.min(100, progress)}%`, transition: 'width 0.6s ease' }}
+                />
+              </div>
+              <span className="text-[9px] text-[var(--ink-4)] tabular-nums">{Math.min(100, progress)}%</span>
+            </div>
+          )}
         </div>
       )}
     </div>
+  )
+}
+
+// ── Mini progress ring (SVG) ────────────────────────────────────────────────
+
+/**
+ * Tiny SVG ring (14×14 px) that shows payoff progress as a circular arc.
+ * Used in the expanded sidebar for the debt lever when progress data is available.
+ * - Background ring: subtle grey
+ * - Foreground arc: status-colored, proportional to progress (0–100)
+ * - Progress ≥ 100 → fully filled ring (schuldenvrij)
+ */
+function MiniProgressRing({
+  progress,
+  status,
+}: {
+  progress: number
+  status: LeverStatus
+}) {
+  const size = 14
+  const strokeWidth = 2
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const clampedProgress = Math.max(0, Math.min(100, progress))
+  const dashOffset = circumference * (1 - clampedProgress / 100)
+
+  const RING_COLORS: Record<LeverStatus, string> = {
+    green: '#10b981',   // emerald-500
+    amber: '#f59e0b',   // amber-500
+    red: '#ef4444',     // red-500
+    neutral: '#9ca3af', // gray-400
+  }
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="shrink-0"
+      role="img"
+      aria-label={`${clampedProgress}% afbetaald`}
+    >
+      {/* Background ring */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="var(--border-ed)"
+        strokeWidth={strokeWidth}
+      />
+      {/* Foreground arc */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={RING_COLORS[status]}
+        strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={dashOffset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+      />
+    </svg>
   )
 }
 
@@ -170,6 +250,7 @@ export function LeverCompassDots({ scores }: { scores: LeverScores }) {
             label={label}
             status={entry.status}
             detail={entry.detail}
+            progress={entry.progress}
           >
             {href ? <Link href={href}>{dot}</Link> : dot}
           </MiniTooltip>
@@ -198,16 +279,21 @@ export function LeverCompassExpanded({ scores }: { scores: LeverScores }) {
       {LEVERS.map(({ key, label, Icon, href }) => {
         const entry = scores[key]
         const colors = STATUS_COLORS[entry.status]
+        const hasProgress = key === 'debts' && entry.progress != null
         const row = (
           <div
             className={`flex items-center gap-2 py-0.5 ${href ? 'cursor-pointer hover:bg-[var(--subtle)] -mx-2 px-2 rounded transition-colors' : 'cursor-default'}`}
           >
             <Icon className="w-3.5 h-3.5 text-[var(--ink-3)]" aria-hidden />
             <span className="flex-1 text-xs text-[var(--ink-2)] leading-tight">{label}</span>
-            <span
-              className={`w-2 h-2 rounded-full ${colors.dot} shrink-0`}
-              aria-label={`${STATUS_LABELS[entry.status]} — ${entry.detail}`}
-            />
+            {hasProgress ? (
+              <MiniProgressRing progress={entry.progress!} status={entry.status} />
+            ) : (
+              <span
+                className={`w-2 h-2 rounded-full ${colors.dot} shrink-0`}
+                aria-label={`${STATUS_LABELS[entry.status]} — ${entry.detail}`}
+              />
+            )}
           </div>
         )
         return (
@@ -216,6 +302,7 @@ export function LeverCompassExpanded({ scores }: { scores: LeverScores }) {
             label={label}
             status={entry.status}
             detail={entry.detail}
+            progress={entry.progress}
           >
             {href ? <Link href={href} className="block">{row}</Link> : row}
           </MiniTooltip>
@@ -250,6 +337,7 @@ export function LeverCompassCollapsed({ scores }: { scores: LeverScores }) {
             label={label}
             status={entry.status}
             detail={entry.detail}
+            progress={entry.progress}
           >
             {href ? <Link href={href}>{dot}</Link> : dot}
           </MiniTooltip>
