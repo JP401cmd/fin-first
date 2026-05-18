@@ -142,6 +142,11 @@ export const PAGE_INFO: Record<string, string> = {
     'Artikelen worden gescoord op basis van je profiel en doelen. ' +
     'Sla items op of markeer ze als gelezen.',
 
+  '/berichten':
+    'Je dagelijkse briefing van Will, plus notificaties en gefilterd financieel nieuws. ' +
+    'Eén pagina waar alle voor jou relevante updates samenkomen — wat speelt vandaag, wat heb je gemist. ' +
+    'Sla berichten op of markeer ze als gelezen.',
+
   '/rapportages':
     'Overzicht van je financiële rapportages: balans, budget-analyse en vermogensverloop. ' +
     'Genereer rapporten voor een specifieke periode of bekijk trends over tijd. ' +

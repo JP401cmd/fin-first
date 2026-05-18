@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { NotificationItem } from '@/components/app/notifications/notification-item'
 import { Bell, Newspaper, ChevronRight, ChevronDown, CheckCheck, Sparkles, AlertCircle, Loader2, RefreshCw } from 'lucide-react'
@@ -14,6 +15,8 @@ import type { NewsItem } from '@/app/api/news/route'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { TemporalContext } from '@/lib/briefing/types'
 import { DAIshboard } from '@/components/dashboard/daishboard'
+import { PageInfoButton } from '@/components/editorial'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 const BERICHTEN_HISTORY_DAYS = 30
 
@@ -193,6 +196,9 @@ interface BerichtenClientProps {
 }
 
 export function BerichtenClient({ dashboardData, temporal, userName, aiEnabled: initialAiEnabled }: BerichtenClientProps) {
+  const pathname = usePathname()
+  // /berichten = canonieke route; pathname-aware lookup met fallback voor toekomstige sub-routes
+  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/berichten']
   const {
     unreadCount,
     markAsRead,
@@ -422,7 +428,11 @@ export function BerichtenClient({ dashboardData, temporal, userName, aiEnabled: 
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="relative mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      <PageInfoButton
+        description={pageInfoText}
+        className="absolute right-4 top-5 sm:right-6 sm:top-8"
+      />
       <Masthead editionNr={editionNr} jaargang={jaargang} />
       <SectionAnchors />
 
