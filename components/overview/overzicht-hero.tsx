@@ -302,9 +302,9 @@ export function OverzichtHero({
       )}
 
       {/* Mini-tijdslijn-strip: van vandaag naar vrijheid in leeftijd-jaren.
-          Klikbaar naar /toekomst voor volledige tijdas. Verbergt bij
-          ontbrekende DOB OF endAge zodat hero altijd compleet rendert. */}
-      {currentAge != null && endAge != null && endAge > currentAge && (
+          Bij endAge ≤ currentAge tonen we een "Bereikt"-variant; bij
+          ontbrekende DOB OF endAge verbergt de strip volledig. */}
+      {currentAge != null && endAge != null && (
         <MiniTimelineStrip
           currentAge={currentAge}
           endAge={endAge}
@@ -357,9 +357,19 @@ function MiniTimelineStrip({
   freedomPct: number
   isPensioenMode: boolean
 }) {
+  const isReached = currentAge >= endAge
   const yearsToGo = Math.max(0, endAge - currentAge)
-  const pct = Math.max(0, Math.min(100, freedomPct))
+  const pct = isReached ? 100 : Math.max(0, Math.min(100, freedomPct))
   const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
+
+  // Bereikt-variant: emerald accent + "Bereikt"-counter, geen "jaar te gaan".
+  // Gewone variant: violet accent + counter met resterende jaren.
+  const accentClass = isReached ? 'text-emerald-700' : 'text-violet-700'
+  const fillClass = isReached
+    ? 'from-emerald-500 to-emerald-700'
+    : 'from-violet-500 to-violet-700'
+  const counterText = isReached ? 'Bereikt — je bent vrij' : `${yearsToGo} jaar te gaan`
+
   return (
     <Link
       href="/toekomst"
@@ -374,8 +384,8 @@ function MiniTimelineStrip({
           <span className="font-mono text-sm font-semibold text-[var(--ink)]">{currentAge} jaar</span>
         </div>
         <div className="text-center">
-          <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
-            {yearsToGo === 0 ? 'Bereikt' : `${yearsToGo} jaar te gaan`}
+          <span className={`text-[10px] uppercase tracking-[0.12em] font-semibold ${accentClass}`}>
+            {counterText}
           </span>
         </div>
         <div className="flex flex-col items-end">
@@ -385,7 +395,7 @@ function MiniTimelineStrip({
           <span className="font-mono text-sm font-semibold text-[var(--ink)]">{endAge} jaar</span>
         </div>
       </div>
-      {/* Visuele balk met voortgang-fill (violet) en ticks */}
+      {/* Visuele balk met voortgang-fill (violet, of emerald bij bereikt) */}
       <div
         className="relative h-2 rounded-full bg-stone-100 overflow-hidden"
         role="progressbar"
@@ -395,7 +405,7 @@ function MiniTimelineStrip({
         aria-label={`Voortgang naar ${endLabel.toLowerCase()}`}
       >
         <div
-          className="absolute inset-y-0 left-0 bg-gradient-to-r from-violet-500 to-violet-700 transition-all duration-700"
+          className={`absolute inset-y-0 left-0 bg-gradient-to-r ${fillClass} transition-all duration-700`}
           style={{ width: `${pct}%` }}
         />
       </div>
