@@ -36,7 +36,7 @@
 
 import { WIDGET_CATALOG, WIDGET_HREFS } from './widget-catalog'
 
-export type WidgetClassification = 'observation' | 'insight'
+export type WidgetClassification = 'observation' | 'insight' | 'needs_review'
 
 /**
  * Classification map: widget id → observation | insight.
@@ -100,6 +100,83 @@ export const WIDGET_CLASSIFICATION: Record<string, WidgetClassification> = {
   hypotheek_vs_beleggen:    'insight',       // → /core/debts (decide strategy)
 }
 
+// ── Review decision tracking ─────────────────────────────────────────────────
+//
+// When a widget is classified as 'needs_review', it enters the review pipeline.
+// The WIDGET_REVIEW_LOG records decisions made during review:
+//
+//   - 'pending'  — Flagged for review, no decision yet.
+//   - 'keep'     — Reviewed and kept — rationale documents why it stays.
+//   - 'remove'   — Reviewed and approved for removal — will be removed in next cleanup.
+//   - 'modify'   — Reviewed and needs redesign before it earns its place.
+//
+// A needs_review widget with decision 'pending' is an audit violation.
+// A needs_review widget with decision 'keep'/'remove'/'modify' passes the audit.
+
+export type ReviewDecision = 'pending' | 'keep' | 'remove' | 'modify'
+
+export interface WidgetReviewEntry {
+  decision: ReviewDecision
+  rationale: string
+  reviewedAt: string | null  // ISO date string, null if pending
+}
+
+/**
+ * Review log for widgets flagged as 'needs_review'.
+ * Each entry documents the team's decision and reasoning.
+ *
+ * Usage: when classifying a widget as 'needs_review', add an entry here.
+ * The beheer/widget-audit admin page renders this log for transparency.
+ */
+export const WIDGET_REVIEW_LOG: Record<string, WidgetReviewEntry> = {
+  // ── Currently no widgets are flagged for review ──
+  // All 50 widgets have been audited and classified as either
+  // 'observation' (14 — pure metrics/progress) or 'insight' (36 — actionable).
+  //
+  // To flag a widget for review, change its WIDGET_CLASSIFICATION entry
+  // to 'needs_review' and add an entry here with decision: 'pending'.
+  //
+  // Example:
+  // some_widget: {
+  //   decision: 'pending',
+  //   rationale: 'Unclear if this widget drives user action or shows a valuable metric.',
+  //   reviewedAt: null,
+  // },
+}
+
+/**
+ * Returns the review entry for a widget, or null if not in review.
+ */
+export function getWidgetReviewEntry(widgetId: string): WidgetReviewEntry | null {
+  return WIDGET_REVIEW_LOG[widgetId] ?? null
+}
+
+/**
+ * Guard: a widget may only be removed from the catalog if it has been
+ * reviewed and explicitly marked 'remove'. Prevents accidental deletion
+ * of widgets that haven't gone through the review process.
+ */
+export function canRemoveWidget(widgetId: string): boolean {
+  const entry = WIDGET_REVIEW_LOG[widgetId]
+  return entry?.decision === 'remove'
+}
+
+/**
+ * Returns all widgets currently flagged for review, grouped by decision.
+ */
+export function getWidgetsInReview(): {
+  pending: string[]
+  keep: string[]
+  remove: string[]
+  modify: string[]
+} {
+  const result = { pending: [] as string[], keep: [] as string[], remove: [] as string[], modify: [] as string[] }
+  for (const [widgetId, entry] of Object.entries(WIDGET_REVIEW_LOG)) {
+    result[entry.decision].push(widgetId)
+  }
+  return result
+}
+
 /**
  * Returns the classification of a widget.
  * Throws if widget is not classified (should never happen with WIDGET_CATALOG).
@@ -133,7 +210,7 @@ export function isObservationWidget(widgetId: string): boolean {
 
 export interface AuditViolation {
   widgetId: string
-  issue: 'unclassified' | 'insight_missing_href'
+  issue: 'unclassified' | 'insight_missing_href' | 'needs_review_pending'
 }
 
 /**
@@ -143,7 +220,8 @@ export interface AuditViolation {
  * Checks:
  * 1. Every catalog widget has a classification
  * 2. Every insight widget has an href in WIDGET_HREFS
- * 3. No observation widget is forced to have an action (informational - always passes)
+ * 3. Every needs_review widget has a non-pending decision in WIDGET_REVIEW_LOG
+ * 4. No observation widget is forced to have an action (informational - always passes)
  */
 export function runWidgetAudit(): AuditViolation[] {
   const violations: AuditViolation[] = []
@@ -162,9 +240,41 @@ export function runWidgetAudit(): AuditViolation[] {
         violations.push({ widgetId: widget.id, issue: 'insight_missing_href' })
       }
     }
+
+    // Check 3: needs_review must have a resolved decision (not 'pending')
+    if (WIDGET_CLASSIFICATION[widget.id] === 'needs_review') {
+      const review = WIDGET_REVIEW_LOG[widget.id]
+      if (!review || review.decision === 'pending') {
+        violations.push({ widgetId: widget.id, issue: 'needs_review_pending' })
+      }
+    }
   }
 
   return violations
+}
+
+/**
+ * Returns audit summary statistics.
+ */
+export function getAuditSummary() {
+  const observations = Object.values(WIDGET_CLASSIFICATION).filter(c => c === 'observation').length
+  const insights = Object.values(WIDGET_CLASSIFICATION).filter(c => c === 'insight').length
+  const needsReview = Object.values(WIDGET_CLASSIFICATION).filter(c => c === 'needs_review').length
+  const catalogSize = WIDGET_CATALOG.length
+  const classifiedCount = Object.keys(WIDGET_CLASSIFICATION).length
+  const unclassified = WIDGET_CATALOG.filter(w => !WIDGET_CLASSIFICATION[w.id]).length
+  const violations = runWidgetAudit()
+
+  return {
+    catalogSize,
+    classifiedCount,
+    observations,
+    insights,
+    needsReview,
+    unclassified,
+    violations,
+    passing: violations.length === 0,
+  }
 }
 
 /**

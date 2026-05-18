@@ -19,6 +19,7 @@ const tabs = [
   { label: 'Extractie Test', href: '/beheer/extractie-test', activeClass: 'border-sky-500 text-sky-700' },
   { label: 'AI Features', href: '/beheer/ai-features' },
   { label: 'Widgets', href: '/beheer/widgets-test' },
+  { label: 'Widget Audit', href: '/beheer/widget-audit', activeClass: 'border-emerald-500 text-emerald-700' },
   { label: 'Widget Presets', href: '/beheer/widget-presets' },
   { label: 'Propositie', href: '/beheer/propositie' },
   { label: 'AOW-leeftijd', href: '/beheer/aow-leeftijd' },
