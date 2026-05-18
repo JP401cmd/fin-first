@@ -131,16 +131,17 @@ export function ChartEventMarkers({
             aria-label={onEventClick ? `Open ${p.label}` : undefined}
           >
             {/*
-              Grotere transparante hit-target rondom de cirkel zodat klikken
-              makkelijker is op desktop (muis) en mobile (touch). 22×22px =
-              ruim boven het 16px-cirkel-vlak. Bewust onder de cirkel in
-              z-order zodat de visuele cirkel onveranderd blijft.
+              Transparant hit-target rondom de cirkel zodat klikken/tikken
+              makkelijk is op desktop en mobile. 44×44px voldoet aan WCAG
+              2.5.8 (Target Size) en Apple HIG minimale touch-target.
+              Bewust onder de cirkel in z-order zodat de visuele cirkel
+              onveranderd blijft.
             */}
             <rect
-              x={cx - 12}
-              y={cy - 12}
-              width={24}
-              height={24}
+              x={cx - 22}
+              y={cy - 22}
+              width={44}
+              height={44}
               fill="transparent"
               style={{ pointerEvents: 'all' }}
             />

@@ -52,7 +52,7 @@ export function ZoomableChartContainer({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); resetZoom() }}
-            className="rounded-full bg-[var(--ink)]/80 p-1 text-[var(--paper)] transition-opacity hover:opacity-80"
+            className="rounded-full bg-[var(--ink)]/80 p-1 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center text-[var(--paper)] transition-opacity hover:opacity-80"
             aria-label="Reset zoom"
           >
             <RotateCcw className="h-3 w-3" />
@@ -69,18 +69,18 @@ export function ZoomableChartContainer({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); zoomBy(1.4) }}
-            className="flex h-6 w-6 items-center justify-center rounded border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)] transition-colors hover:bg-[var(--paper)]"
+            className="flex h-11 w-11 md:h-6 md:w-6 items-center justify-center rounded border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)] transition-colors hover:bg-[var(--paper)]"
             aria-label="Zoom in"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-3.5 w-3.5 md:h-3 md:w-3" />
           </button>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); zoomBy(0.7) }}
-            className="flex h-6 w-6 items-center justify-center rounded border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)] transition-colors hover:bg-[var(--paper)]"
+            className="flex h-11 w-11 md:h-6 md:w-6 items-center justify-center rounded border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)] transition-colors hover:bg-[var(--paper)]"
             aria-label="Zoom uit"
           >
-            <Minus className="h-3 w-3" />
+            <Minus className="h-3.5 w-3.5 md:h-3 md:w-3" />
           </button>
         </div>
       )}

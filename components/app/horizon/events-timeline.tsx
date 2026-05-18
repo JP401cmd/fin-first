@@ -15,6 +15,21 @@ import { EVENT_ICONS } from './log-timeline'
 /** Minimum pointer displacement (px) before we consider it a drag, not a click. */
 const DRAG_THRESHOLD_PX = 5
 
+/**
+ * Touch-target minimum size in SVG units. WCAG 2.5.8 Target Size requires
+ * 44×44 CSS-px for touch; we use this for the transparent hit-rects around
+ * event markers and cluster badges in the SVG.
+ */
+const TOUCH_TARGET_SIZE = 44
+
+/**
+ * Direction disambiguation threshold (px). When a touch starts on a
+ * draggable event, we track the first N px of movement. If vertical
+ * displacement exceeds horizontal, we release the pointer capture and
+ * let the page scroll. If horizontal, we keep the drag gesture.
+ */
+const DIRECTION_THRESHOLD_PX = 8
+
 export function EventsTimeline({
   events,
   currentAge,
@@ -57,6 +72,9 @@ export function EventsTimeline({
     startSvgX: number   // SVG-space X where drag started
     currentSvgX: number // SVG-space X of current pointer
     hasMoved: boolean    // true once pointer exceeds DRAG_THRESHOLD_PX
+    startClientX: number // client-space X for direction disambiguation
+    startClientY: number // client-space Y for direction disambiguation
+    directionResolved: boolean // true once we've determined scroll vs drag
   } | null>(null)
 
   /** Convert a client-space pointer coordinate to SVG-space X. */
@@ -90,6 +108,28 @@ export function EventsTimeline({
       const svgX = clientToSvgX(e.clientX)
       setDragState(prev => {
         if (!prev) return prev
+
+        // ── Direction disambiguation for touch ──
+        // In the first DIRECTION_THRESHOLD_PX of movement, check whether
+        // the dominant direction is vertical (= user wants to scroll page)
+        // or horizontal (= user wants to drag the event). If vertical,
+        // abort the drag and let the browser handle scroll.
+        if (!prev.directionResolved) {
+          const dx = Math.abs(e.clientX - prev.startClientX)
+          const dy = Math.abs(e.clientY - prev.startClientY)
+          const totalDisplacement = Math.max(dx, dy)
+          if (totalDisplacement >= DIRECTION_THRESHOLD_PX) {
+            if (dy > dx) {
+              // Vertical dominant → abort drag, let browser scroll
+              return null
+            }
+            // Horizontal dominant → commit to drag
+            return { ...prev, currentSvgX: svgX, directionResolved: true }
+          }
+          // Not enough movement yet — update position but don't commit
+          return { ...prev, currentSvgX: svgX }
+        }
+
         const moved = prev.hasMoved || Math.abs(svgX - prev.startSvgX) > DRAG_THRESHOLD_PX
         return { ...prev, currentSvgX: svgX, hasMoved: moved }
       })
@@ -304,7 +344,13 @@ export function EventsTimeline({
         ref={svgRef}
         viewBox={`0 0 ${W} ${totalH}`}
         className="w-full"
-        style={{ maxHeight: totalH, minHeight: 40, touchAction: dragState ? 'none' : undefined }}
+        style={{
+          maxHeight: totalH,
+          minHeight: 40,
+          touchAction: dragState?.directionResolved ? 'none' : 'pan-y',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+        }}
         aria-label="Levensgebeurtenissen tijdlijn"
         role="img"
       >
@@ -353,8 +399,17 @@ export function EventsTimeline({
                 onPointerDown={canDrag ? (e) => {
                   // Only primary button (mouse) or touch
                   if (e.button !== 0) return
+                  e.stopPropagation() // Prevent ZoomableChartContainer capturing
                   const svgX = clientToSvgX(e.clientX)
-                  setDragState({ eventId: ev.id, startSvgX: svgX, currentSvgX: svgX, hasMoved: false })
+                  setDragState({
+                    eventId: ev.id,
+                    startSvgX: svgX,
+                    currentSvgX: svgX,
+                    hasMoved: false,
+                    startClientX: e.clientX,
+                    startClientY: e.clientY,
+                    directionResolved: e.pointerType === 'mouse', // mouse skips disambiguation
+                  })
                   setHoveredId(null)
                   ;(e.target as Element)?.setPointerCapture?.(e.pointerId)
                   e.preventDefault()
@@ -386,6 +441,16 @@ export function EventsTimeline({
                     />
                   </>
                 )}
+
+                {/* Touch hit target — 44×44 transparent rect for WCAG 2.5.8 compliance */}
+                <rect
+                  x={displayX - TOUCH_TARGET_SIZE / 2}
+                  y={Y_LINE - 14 - TOUCH_TARGET_SIZE / 2}
+                  width={TOUCH_TARGET_SIZE}
+                  height={TOUCH_TARGET_SIZE}
+                  fill="transparent"
+                  style={{ pointerEvents: 'all' }}
+                />
 
                 {/* Main marker (moves during drag) */}
                 <line
@@ -550,6 +615,16 @@ export function EventsTimeline({
               role={onClusterOpen ? 'button' : undefined}
               aria-label={onClusterOpen ? `${n} gebeurtenissen rond leeftijd ${Math.round(slot.centerAge)} — open lijst` : undefined}
             >
+              {/* Touch hit target — 44×44 transparent rect for WCAG 2.5.8 compliance */}
+              <rect
+                x={cx - TOUCH_TARGET_SIZE / 2}
+                y={Y_LINE - 14 - TOUCH_TARGET_SIZE / 2}
+                width={TOUCH_TARGET_SIZE}
+                height={TOUCH_TARGET_SIZE}
+                fill="transparent"
+                style={{ pointerEvents: 'all' }}
+              />
+
               <line
                 x1={cx} x2={cx}
                 y1={Y_LINE - 10} y2={Y_LINE + 2}
