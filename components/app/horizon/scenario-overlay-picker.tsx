@@ -5,18 +5,20 @@ import Link from 'next/link'
 import type { SavedScenario } from '@/lib/scenario-types'
 import { WHATIF_SCENARIO_COLORS } from '@/lib/scenario-types'
 import { formatFireAgeShort } from '@/lib/horizon-data'
-import { ChevronDown, Layers } from 'lucide-react'
+import { ChevronDown, Layers, Check } from 'lucide-react'
 
 interface ScenarioOverlayPickerProps {
   scenarios: SavedScenario[]
-  selectedId: string | null
-  onSelect: (id: string | null) => void
+  selectedIds: Set<string>
+  onToggle: (id: string) => void
+  onClearAll: () => void
 }
 
 export function ScenarioOverlayPicker({
   scenarios,
-  selectedId,
-  onSelect,
+  selectedIds,
+  onToggle,
+  onClearAll,
 }: ScenarioOverlayPickerProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,8 +47,14 @@ export function ScenarioOverlayPicker({
 
   if (scenarios.length === 0) return null
 
-  const selected = selectedId ? scenarios.find(s => s.id === selectedId) : null
-  const color = selected ? WHATIF_SCENARIO_COLORS[selected.colorIndex ?? 0] : null
+  const activeCount = selectedIds.size
+  const hasActive = activeCount > 0
+
+  // Collect colors of active scenarios for the trigger button dots
+  const activeColors = scenarios
+    .filter(s => selectedIds.has(s.id))
+    .slice(0, 3)
+    .map(s => WHATIF_SCENARIO_COLORS[s.colorIndex ?? 0])
 
   return (
     <div ref={containerRef} className="relative">
@@ -54,23 +62,31 @@ export function ScenarioOverlayPicker({
         type="button"
         onClick={() => setOpen(prev => !prev)}
         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none cursor-pointer ${
-          selected
+          hasActive
             ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
             : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
         }`}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-label={selected ? `Scenario-overlay: ${selected.name}` : 'Scenario-overlay kiezen'}
+        aria-label={hasActive ? `${activeCount} scenario-overlay${activeCount > 1 ? 's' : ''} actief` : 'Scenario-overlays kiezen'}
       >
-        {color && (
-          <span
-            className="inline-block h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: color.hex }}
-          />
+        {hasActive && (
+          <span className="inline-flex items-center gap-0.5">
+            {activeColors.map((c, i) => (
+              <span
+                key={i}
+                className="inline-block h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: c.hex }}
+              />
+            ))}
+            {activeCount > 3 && (
+              <span className="text-[9px] text-horizon-500">+{activeCount - 3}</span>
+            )}
+          </span>
         )}
-        <Layers size={12} className={selected ? 'text-horizon-600' : 'text-[var(--ink-4)]'} />
+        <Layers size={12} className={hasActive ? 'text-horizon-600' : 'text-[var(--ink-4)]'} />
         <span className="hidden sm:inline max-w-[100px] truncate">
-          {selected ? selected.name : 'Overlay'}
+          {hasActive ? `${activeCount} overlay${activeCount > 1 ? 's' : ''}` : 'Overlays'}
         </span>
         <ChevronDown
           size={12}
@@ -80,40 +96,56 @@ export function ScenarioOverlayPicker({
 
       {open && (
         <div
-          className="absolute right-0 top-full z-50 mt-1 w-64 border border-[var(--border-ed)] bg-[var(--paper)] shadow-md"
-          role="listbox"
+          className="absolute right-0 top-full z-50 mt-1 w-72 border border-[var(--border-ed)] bg-[var(--paper)] shadow-md"
+          role="group"
           aria-label="Scenario overlay selectie"
         >
-          <button
-            type="button"
-            onClick={() => { onSelect(null); setOpen(false) }}
-            className={`flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-[var(--subtle)] ${
-              !selectedId ? 'bg-[var(--subtle)]' : ''
-            }`}
-            style={{ minHeight: 44 }}
-            role="option"
-            aria-selected={!selectedId}
-          >
-            <span className="font-sans text-xs text-[var(--ink-2)]">Geen overlay</span>
-          </button>
+          {/* Header with clear-all */}
+          <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-3 py-2">
+            <span className="font-sans text-[11px] font-medium text-[var(--ink-3)] uppercase tracking-wide">
+              Scenario-overlays
+            </span>
+            {hasActive && (
+              <button
+                type="button"
+                onClick={onClearAll}
+                className="font-sans text-[10px] text-[var(--ink-4)] hover:text-[var(--ink-2)] transition-colors"
+              >
+                Alles uit
+              </button>
+            )}
+          </div>
 
           {scenarios.map(scenario => {
             const c = WHATIF_SCENARIO_COLORS[scenario.colorIndex ?? 0]
-            const isSelected = scenario.id === selectedId
+            const isSelected = selectedIds.has(scenario.id)
             return (
               <button
                 key={scenario.id}
                 type="button"
-                onClick={() => { onSelect(scenario.id); setOpen(false) }}
-                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-[var(--subtle)] ${
+                onClick={() => onToggle(scenario.id)}
+                className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--subtle)] ${
                   isSelected ? 'bg-[var(--subtle)]' : ''
                 }`}
                 style={{ minHeight: 44 }}
-                role="option"
-                aria-selected={isSelected}
+                role="checkbox"
+                aria-checked={isSelected}
               >
+                {/* Color-coded toggle checkbox */}
                 <span
-                  className="inline-block h-2.5 w-2.5 shrink-0"
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded transition-colors ${
+                    isSelected
+                      ? 'text-white'
+                      : 'border border-[var(--border-md)] bg-[var(--paper)]'
+                  }`}
+                  style={isSelected ? { backgroundColor: c.hex } : undefined}
+                >
+                  {isSelected && <Check size={10} strokeWidth={3} />}
+                </span>
+
+                {/* Color dot + label */}
+                <span
+                  className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: c.hex }}
                 />
                 <div className="flex-1 min-w-0">
