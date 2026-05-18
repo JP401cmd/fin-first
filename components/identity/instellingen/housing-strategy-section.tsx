@@ -29,16 +29,16 @@ const MODE_META: Record<
   include_full: {
     label: 'Volledig meetellen',
     description:
-      'Je eigen woning telt 100% mee in de FIRE-berekening. Eenvoudig, maar onrealistisch: het geld is niet liquide.',
+      'Je eigen woning telt 100% mee in de vrijheidsberekening. Eenvoudig, maar onrealistisch: het geld is niet liquide.',
     Icon: Home,
     tag: 'Huidig gedrag',
   },
   exclude_from_fire: {
     label: 'Uitsluiten',
     description:
-      'Eigen woning blijft buiten de FIRE-pot. Conservatief — past bij internationale FIRE-canon. Je blijft wonen, kosten ongewijzigd.',
+      'Eigen woning blijft buiten de vrijheidspot. Conservatief — past bij internationale standaard. Je blijft wonen, kosten ongewijzigd.',
     Icon: Sprout,
-    tag: 'FIRE-canon',
+    tag: 'Internationale standaard',
   },
   downsize: {
     label: 'Verkopen',

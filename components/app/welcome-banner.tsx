@@ -53,7 +53,7 @@ const MODULE_SUMMARIES: Record<ModuleId, {
   },
   toekomstplannen: {
     icon: Compass,
-    summary: 'FIRE-projecties, simulaties en levensgebeurtenissen',
+    summary: 'Vrijheidsdatum, simulaties en levensgebeurtenissen',
     iconColor: 'text-horizon-600',
     circleBg: 'bg-horizon-50',
   },

@@ -74,7 +74,7 @@ const CONCEPTS: ConceptCard[] = [
     explanation: GLOSSARY_ENTRIES.fire.explanation,
     personalDataFn: (data) => {
       if (!data?.fireAge) return null
-      return `Jouw verwachte FIRE-leeftijd: ${data.fireAge} jaar`
+      return `Jouw verwachte vrijheidsleeftijd: ${data.fireAge} jaar`
     },
   },
   {

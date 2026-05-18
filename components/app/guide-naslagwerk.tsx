@@ -198,7 +198,7 @@ const MODULES: NaslagwerkModule[] = [
       {
         icon: LineChart,
         title: 'Hoe de Horizon-grafiek werkt',
-        summary: 'Volledige uitleg: fases, FIRE-leeftijd, belasting, eindstrategie (incl. pensioen-modus) en alle instelbare parameters.',
+        summary: 'Volledige uitleg: fases, vrijheidsleeftijd, belasting, eindstrategie (incl. pensioen-modus) en alle instelbare parameters.',
         anchor: 'guide-horizon-grafiek',
       },
       {

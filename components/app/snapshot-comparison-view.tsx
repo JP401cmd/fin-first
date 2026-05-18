@@ -103,7 +103,7 @@ const metrics: MetricConfig[] = [
   },
   {
     key: 'fire_age',
-    label: 'FIRE-leeftijd',
+    label: 'Vrijheidsleeftijd',
     getValue: (s) => s.fire_age ?? null,
     format: (v) => `${v.toFixed(1)} jaar`,
     formatDelta: (d) => `${d > 0 ? '+' : ''}${d.toFixed(1)} jaar`,
@@ -111,7 +111,7 @@ const metrics: MetricConfig[] = [
   },
   {
     key: 'sovereignty_level',
-    label: 'Soevereiniteitsniveau',
+    label: 'Vrijheidsniveau',
     getValue: (s) => s.sovereignty_level ?? null,
     format: (v) => `${v}`,
     formatDelta: (d) => `${d > 0 ? '+' : ''}${d}`,

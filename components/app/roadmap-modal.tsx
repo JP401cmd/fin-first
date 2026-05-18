@@ -339,7 +339,7 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
               <Rule />
 
               <div className="space-y-4">
-                <ArticleTeaser icon={TrendingUp} title="FIRE Projectie" body="Wanneer bereik je financiele onafhankelijkheid?" />
+                <ArticleTeaser icon={TrendingUp} title="Vrijheidsdatum" body="Wanneer bereik je financiele onafhankelijkheid?" />
                 <ArticleTeaser icon={Calendar} title="Levensgebeurtenissen" body="Plan grote uitgaven en veranderingen in je leven" />
                 <ArticleTeaser icon={GitBranch} title="Scenario's" body="Vergelijk wat-als scenario's naast elkaar" />
                 <ArticleTeaser icon={Dice5} title="Simulaties" body="Monte Carlo simulaties voor robuuste planning" />
