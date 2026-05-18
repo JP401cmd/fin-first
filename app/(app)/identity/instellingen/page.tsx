@@ -6,8 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import { NOTIFICATION_TYPES } from '@/lib/identity-constants'
 import { ChevronRight, Shield, Eye, EyeOff, Server, FileText, Users, CalendarCheck, HandCoins, BellRing, SplitSquareVertical, Bell, UserPlus, Wallet, CreditCard, Receipt, ArrowLeftRight, Banknote, Link2, Blocks, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
-import { BOX3_DRAG } from '@/lib/horizon-data'
-import { KassabonShell } from '@/components/app/kassabon-shell'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { useModuleColors, useBudgetColors, usePhaseColors, useFontTheme, usePaletteTheme, PALETTE_THEMES, type PaletteTheme } from '@/components/app/module-color-provider'
@@ -23,13 +21,7 @@ import {
 } from '@/lib/category-tints'
 import { Palette, RotateCcw, Type } from 'lucide-react'
 import { ExportDropdown } from '@/components/app/export-dropdown'
-import { type RetirementExpenseMethod } from '@/lib/budget-utils'
-import { type FireEndStrategy, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
-import { type WithdrawalStrategyType, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
-import { FireEndStrategyPanel } from '@/components/horizon/fire-end-strategy-panel'
-import { FireRetirementExpensePanel } from '@/components/horizon/fire-retirement-expense-panel'
-import { HousingStrategySection } from '@/components/identity/instellingen/housing-strategy-section'
-import { MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
+import { MODULE_CATALOG } from '@/lib/module-registry'
 import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 
@@ -73,10 +65,6 @@ const FONT_THEMES: {
   },
 ]
 
-function fmt(pct: number, decimals = 2) {
-  return pct.toFixed(decimals).replace('.', ',') + '%'
-}
-
 // ── Tab definitions ──────────────────────────────────────────────────────
 type SettingsTab = 'notificaties' | 'weergave' | 'privacy' | 'gegevens' | 'huishouden' | 'modules'
 
@@ -115,13 +103,6 @@ export default function InstellingenPage() {
   const [financialContextSaved, setFinancialContextSaved] = useState('')
   const [contextSaving, setContextSaving] = useState(false)
   const [contextMessage, setContextMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // ─ Section: Rebalancing ─
-  const [rebalanceThreshold, setRebalanceThreshold] = useState(5)
-  const [rebalanceThresholdSaved, setRebalanceThresholdSaved] = useState(5)
-  const [rebalanceSaving, setRebalanceSaving] = useState(false)
-  const [rebalanceMessage, setRebalanceMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [hasTargetAllocations, setHasTargetAllocations] = useState(false)
 
   // ─ Section F: Privacy & AI ─
   const [aiEnabled, setAiEnabled] = useState(true)
@@ -169,30 +150,6 @@ export default function InstellingenPage() {
   const [checkinEnabled, setCheckinEnabled] = useState(true)
   const [checkinSaving, setCheckinSaving] = useState(false)
 
-  // ─ Section C: FIRE Instellingen ─
-  const [expectedReturn, setExpectedReturn] = useState(7)
-  const [inflationRate, setInflationRate] = useState(2)
-  const [box3Method, setBox3Method] = useState<'forfaitair' | 'werkelijk'>('forfaitair')
-  const [marginaalTarief, setMarginaalTarief] = useState<'auto' | '0.3697' | '0.4950'>('auto')
-  const [paramSaving, setParamSaving] = useState(false)
-  const [paramMessage, setParamMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
-  const [retirementCustomAmount, setRetirementCustomAmount] = useState<string>('')
-  const [fireEndStrategy, setFireEndStrategy] = useState<FireEndStrategy>('perpetual')
-  const [fireEndAge, setFireEndAge] = useState<string>('90')
-  const [fireLegacyAmount, setFireLegacyAmount] = useState<string>('')
-  const [fireSaving, setFireSaving] = useState(false)
-  const [fireMessage, setFireMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // ─ Withdrawal strategy ─
-  const [withdrawalStrategy, setWithdrawalStrategy] = useState<WithdrawalStrategyType>('static')
-  const [guardrailFloor, setGuardrailFloor] = useState<string>('80')
-  const [guardrailCeiling, setGuardrailCeiling] = useState<string>('120')
-  const [guardrailCutStep, setGuardrailCutStep] = useState<string>('10')
-  const [guardrailRaiseStep, setGuardrailRaiseStep] = useState<string>('10')
-  const [wsSaving, setWsSaving] = useState(false)
-  const [wsMessage, setWsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
   // ─ Section D: Weergave ─
   const { fontTheme, setFontTheme } = useFontTheme()
   const { paletteTheme, setPaletteTheme } = usePaletteTheme()
@@ -227,7 +184,7 @@ export default function InstellingenPage() {
       const [notifData, profileData] = await Promise.all([
         supabase.from('app_settings').select('value').eq('key', `notifications_preferences_${user.id}`).maybeSingle(),
         supabase.from('profiles').select(
-          'expected_return, inflation_rate, box3_method, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, rebalance_threshold, financial_context'
+          'module_colors, budget_colors, phase_colors, typography_theme, ai_enabled, financial_context'
         ).eq('id', user.id).single(),
       ])
 
@@ -249,48 +206,8 @@ export default function InstellingenPage() {
         }
       } catch { /* ignore */ }
 
-      // Load marginaal_tarief from parameters API (resilient to missing DB column)
-      try {
-        const paramRes = await fetch('/api/parameters')
-        if (paramRes.ok) {
-          const paramData = await paramRes.json()
-          if (paramData.marginaal_tarief === 0.3697) setMarginaalTarief('0.3697')
-          else if (paramData.marginaal_tarief === 0.4950) setMarginaalTarief('0.4950')
-          else setMarginaalTarief('auto')
-        }
-      } catch { /* ignore */ }
-
-      // FIRE parameters
       const d = profileData.data
       if (d) {
-        if (d.expected_return != null) setExpectedReturn(Math.round(d.expected_return * 1000) / 10)
-        if (d.inflation_rate != null) setInflationRate(Math.round(d.inflation_rate * 1000) / 10)
-        if (d.box3_method === 'werkelijk') setBox3Method('werkelijk')
-        if (d.retirement_expense_method) setRetirementMethod(d.retirement_expense_method as RetirementExpenseMethod)
-        if (d.retirement_expense_custom_amount) setRetirementCustomAmount(String(d.retirement_expense_custom_amount))
-        // Use fire-settings API which handles app_settings fallback for pensioen
-        try {
-          const fsRes = await fetch('/api/fire-settings')
-          if (fsRes.ok) {
-            const fsData = await fsRes.json()
-            setFireEndStrategy(fsData.fire_end_strategy as FireEndStrategy)
-            setFireEndAge(String(fsData.fire_end_age ?? 90))
-            if (fsData.fire_legacy_amount) setFireLegacyAmount(String(fsData.fire_legacy_amount))
-          } else {
-            // Fallback to profile data if API fails
-            const fs = parseFireStrategy(d)
-            setFireEndStrategy(fs.strategy)
-            if (fs.endAge) setFireEndAge(String(fs.endAge))
-            if (fs.legacyAmount) setFireLegacyAmount(String(fs.legacyAmount))
-          }
-        } catch {
-          // Fallback to profile data if fetch fails
-          const fs = parseFireStrategy(d)
-          setFireEndStrategy(fs.strategy)
-          if (fs.endAge) setFireEndAge(String(fs.endAge))
-          if (fs.legacyAmount) setFireLegacyAmount(String(fs.legacyAmount))
-        }
-
         // Weergave: module colors
         if (d.module_colors) {
           const mc = d.module_colors as Record<string, string>
@@ -334,28 +251,12 @@ export default function InstellingenPage() {
           setAiEnabled(d.ai_enabled as boolean)
         }
 
-        // Rebalancing threshold
-        if (d.rebalance_threshold != null) {
-          const th = Number(d.rebalance_threshold)
-          setRebalanceThreshold(th)
-          setRebalanceThresholdSaved(th)
-        }
-
         // Financial context
         if (d.financial_context) {
           setFinancialContext(d.financial_context as string)
           setFinancialContextSaved(d.financial_context as string)
         }
       }
-
-      // Check if user has target allocations (progressive disclosure)
-      try {
-        const { count } = await supabase
-          .from('target_allocations')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-        setHasTargetAllocations((count ?? 0) > 0)
-      } catch { /* table may not exist */ }
 
       // Household privacy settings + partner notification prefs
       try {
@@ -395,19 +296,6 @@ export default function InstellingenPage() {
       } catch {
         // No household or error — leave hidden
       }
-
-      // Withdrawal strategy
-      try {
-        const wsRes = await fetch('/api/withdrawal-strategy')
-        if (wsRes.ok) {
-          const wsData = await wsRes.json()
-          setWithdrawalStrategy(wsData.withdrawal_strategy ?? 'static')
-          setGuardrailFloor(String(Math.round((wsData.guardrail_floor ?? 0.80) * 100)))
-          setGuardrailCeiling(String(Math.round((wsData.guardrail_ceiling ?? 1.20) * 100)))
-          setGuardrailCutStep(String(Math.round((wsData.guardrail_cut_step ?? 0.10) * 100)))
-          setGuardrailRaiseStep(String(Math.round((wsData.guardrail_raise_step ?? 0.10) * 100)))
-        }
-      } catch { /* defaults are fine */ }
 
       setHouseholdPrivacyLoading(false)
     }
@@ -486,110 +374,6 @@ export default function InstellingenPage() {
     }
     setCheckinSaving(false)
   }, [checkinEnabled])
-
-  // ─ Section C handlers ────────────────────────────────────────────────────
-  const box3Pct = BOX3_DRAG * 100
-  const effectiveSwrPct = Math.max(0.1, expectedReturn - box3Pct - inflationRate)
-  const fireMultiplier = effectiveSwrPct > 0 ? (100 / effectiveSwrPct) : 0
-
-  const saveParams = useCallback(async () => {
-    setParamSaving(true)
-    setParamMessage(null)
-    try {
-      const res = await fetch('/api/parameters', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          expected_return: expectedReturn / 100,
-          inflation_rate: inflationRate / 100,
-          box3_method: box3Method,
-          marginaal_tarief: marginaalTarief === 'auto' ? null : Number(marginaalTarief),
-        }),
-      })
-      if (!res.ok) {
-        const d = await res.json()
-        setParamMessage({ type: 'error', text: d.error ?? 'Opslaan mislukt' })
-      } else {
-        setParamMessage({ type: 'success', text: 'Parameters opgeslagen' })
-        setTimeout(() => setParamMessage(null), 3000)
-      }
-    } catch {
-      setParamMessage({ type: 'error', text: 'Netwerkfout — probeer opnieuw' })
-    }
-    setParamSaving(false)
-  }, [expectedReturn, inflationRate, box3Method, marginaalTarief])
-
-  const saveFireSettings = useCallback(async () => {
-    setFireSaving(true)
-    setFireMessage(null)
-    try {
-      const res = await fetch('/api/fire-settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          retirement_expense_method: retirementMethod,
-          retirement_expense_custom_amount: retirementCustomAmount ? Number(retirementCustomAmount) : null,
-          fire_end_strategy: fireEndStrategy,
-          fire_end_age: Number(fireEndAge) || 90,
-          fire_legacy_amount: fireLegacyAmount ? Number(fireLegacyAmount) : null,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Opslaan mislukt')
-      setFireMessage({ type: 'success', text: 'FIRE instellingen opgeslagen!' })
-      setTimeout(() => setFireMessage(null), 3000)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Opslaan mislukt. Probeer opnieuw.'
-      setFireMessage({ type: 'error', text: msg })
-    }
-    setFireSaving(false)
-  }, [retirementMethod, retirementCustomAmount, fireEndStrategy, fireEndAge, fireLegacyAmount])
-
-  const saveWithdrawalStrategy = useCallback(async () => {
-    setWsSaving(true)
-    setWsMessage(null)
-    try {
-      const res = await fetch('/api/withdrawal-strategy', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          withdrawal_strategy: withdrawalStrategy,
-          guardrail_floor: Number(guardrailFloor) / 100,
-          guardrail_ceiling: Number(guardrailCeiling) / 100,
-          guardrail_cut_step: Number(guardrailCutStep) / 100,
-          guardrail_raise_step: Number(guardrailRaiseStep) / 100,
-        }),
-      })
-      if (!res.ok) {
-        const d = await res.json()
-        setWsMessage({ type: 'error', text: d.error ?? 'Opslaan mislukt' })
-      } else {
-        setWsMessage({ type: 'success', text: 'Onttrekkingsstrategie opgeslagen' })
-        setTimeout(() => setWsMessage(null), 3000)
-      }
-    } catch {
-      setWsMessage({ type: 'error', text: 'Netwerkfout — probeer opnieuw' })
-    }
-    setWsSaving(false)
-  }, [withdrawalStrategy, guardrailFloor, guardrailCeiling, guardrailCutStep, guardrailRaiseStep])
-
-  // ─ Section: Rebalancing handler ──────────────────────────────────────────
-  const saveRebalanceThreshold = useCallback(async () => {
-    setRebalanceSaving(true)
-    setRebalanceMessage(null)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
-      const { error } = await supabase.from('profiles').update({ rebalance_threshold: rebalanceThreshold }).eq('id', user.id)
-      if (error) throw error
-      setRebalanceThresholdSaved(rebalanceThreshold)
-      setRebalanceMessage({ type: 'success', text: 'Drempel opgeslagen!' })
-      setTimeout(() => setRebalanceMessage(null), 3000)
-    } catch {
-      setRebalanceMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
-    }
-    setRebalanceSaving(false)
-  }, [supabase, rebalanceThreshold])
 
   // ─ Section F: Privacy & AI handler ────────────────────────────────────────
   const toggleAiEnabled = useCallback(async (enabled: boolean) => {
@@ -1636,38 +1420,6 @@ export default function InstellingenPage() {
       {/* ── Tab: Gegevens ──────────────────────────────────────────────── */}
       {activeTab === 'gegevens' && (
         <div className="space-y-3">
-          {/* FIRE Instellingen — verplaatst naar /horizon */}
-          <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-            <Link
-              href="/horizon"
-              className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-            >
-              <div>
-                <h2 className="label-editorial text-[var(--ink-2)]">FIRE Instellingen</h2>
-                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                  Verplaatst naar Horizon — wijzig rendement, inflatie en strategie direct bij je projectie.
-                </p>
-              </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-            </Link>
-          </section>
-
-          {/* Rebalancing — verplaatst naar /core/assets */}
-          <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-            <Link
-              href="/core/assets"
-              className="flex w-full items-center justify-between px-4 sm:px-8 py-4 text-left hover:bg-[var(--subtle)] transition-colors"
-            >
-              <div>
-                <h2 className="label-editorial text-[var(--ink-2)]">Rebalancing</h2>
-                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                  Beheer je herbalanceringsdrempel bij je bezittingen.
-                </p>
-              </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />
-            </Link>
-          </section>
-
           {/* Externe koppelingen */}
           <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
             <Link
