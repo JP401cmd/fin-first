@@ -585,7 +585,7 @@ export function ChatPanel() {
         </div>
 
         {/* Input */}
-        <div className="border-t border-[var(--border-ed)] px-3 py-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <div className="border-t border-[var(--border-ed)] px-3 py-3 pb-1" style={{ paddingBottom: undefined }}>
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}
@@ -606,6 +606,14 @@ export function ChatPanel() {
             </button>
           </div>
         </div>
+
+        {/* Persistent Wft disclaimer footer */}
+        <p
+          className="px-3 text-center text-[10px] leading-snug text-[var(--ink-4)]"
+          style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}
+        >
+          Geen financieel advies — uitsluitend educatief en informatief.
+        </p>
         </>
         )}
       </div>
