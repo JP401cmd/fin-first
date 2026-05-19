@@ -55,16 +55,27 @@ export function TransactiesFeed({
 }) {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [query, setQuery] = useState('')
+  const [accountFilter, setAccountFilter] = useState<string>('all')
+
+  // Verzamel unieke rekening-namen voor de account-filter dropdown.
+  const accounts = useMemo(() => {
+    const set = new Set<string>()
+    for (const tx of transactions) {
+      if (tx.account_name) set.add(tx.account_name)
+    }
+    return Array.from(set).sort()
+  }, [transactions])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return transactions.filter((tx) => {
       if (filter === 'expense' && tx.amount >= 0) return false
       if (filter === 'income' && tx.amount < 0) return false
+      if (accountFilter !== 'all' && tx.account_name !== accountFilter) return false
       if (q && !tx.description.toLowerCase().includes(q)) return false
       return true
     })
-  }, [transactions, filter, query])
+  }, [transactions, filter, query, accountFilter])
 
   const grouped = useMemo(() => {
     const map = new Map<string, TransactionRow[]>()
@@ -141,6 +152,42 @@ export function TransactiesFeed({
             />
           </div>
         </div>
+
+        {/* Rekening-filter — alleen tonen als er meerdere rekeningen zijn. */}
+        {accounts.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1 text-xs">
+            <span className="text-[var(--ink-3)] font-medium mr-1">Rekening:</span>
+            <button
+              type="button"
+              onClick={() => setAccountFilter('all')}
+              aria-pressed={accountFilter === 'all'}
+              className={[
+                'px-2 py-1 rounded font-semibold transition-colors',
+                accountFilter === 'all'
+                  ? 'bg-[var(--ink)] text-[var(--paper)]'
+                  : 'bg-[var(--subtle)] text-[var(--ink-2)] hover:bg-[var(--border-ed)]',
+              ].join(' ')}
+            >
+              Alle
+            </button>
+            {accounts.map((acc) => (
+              <button
+                key={acc}
+                type="button"
+                onClick={() => setAccountFilter(acc)}
+                aria-pressed={accountFilter === acc}
+                className={[
+                  'px-2 py-1 rounded font-semibold transition-colors',
+                  accountFilter === acc
+                    ? 'bg-[var(--ink)] text-[var(--paper)]'
+                    : 'bg-[var(--subtle)] text-[var(--ink-2)] hover:bg-[var(--border-ed)]',
+                ].join(' ')}
+              >
+                {acc}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {filtered.length === 0 ? (
