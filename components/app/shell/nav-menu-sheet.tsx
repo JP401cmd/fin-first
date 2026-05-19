@@ -4,6 +4,39 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { mainNav, navGroups, globalNav, type NavColor } from '@/lib/nav-config'
+import { useLeverScores } from '@/components/app/shell/responsive-shell'
+import type { LeverStatus } from '@/components/app/shell/lever-compass'
+
+const statusDotClass: Record<LeverStatus, string> = {
+  green: 'bg-emerald-500',
+  amber: 'bg-amber-500',
+  red: 'bg-red-500',
+  neutral: 'bg-stone-300',
+}
+
+const statusTitle: Record<LeverStatus, string> = {
+  green: 'Op koers',
+  amber: 'Aandacht nodig',
+  red: 'Actie vereist',
+  neutral: 'Geen meting',
+}
+
+/**
+ * Map sub-route href → LeverScore-key. Wanneer een sub-route geen
+ * direct-mapping heeft, toont de dot zich niet. Pad-prefix-match zodat
+ * deep-routes (bv. /overzicht/bezittingen/cash) dezelfde indicator
+ * krijgen als de parent.
+ */
+function statusForHref(
+  href: string,
+  scores: ReturnType<typeof useLeverScores>,
+): LeverStatus | null {
+  if (href.startsWith('/overzicht/bezittingen')) return scores.assets.status
+  if (href.startsWith('/overzicht/schulden')) return scores.debts.status
+  if (href.startsWith('/overzicht/cashflow')) return scores.cashflow.status
+  if (href.startsWith('/overzicht/belasting')) return scores.tax.status
+  return null
+}
 
 const colorClasses: Record<NavColor, { active: string; idle: string; icon: string; subActive: string; subIdle: string }> = {
   amber:  { active: 'bg-kern-50 text-kern-900 border-kern-300',     idle: 'hover:bg-kern-50/40',     icon: 'text-kern-700',    subActive: 'bg-kern-100 text-kern-900',    subIdle: 'hover:bg-kern-50/40 text-[var(--ink-2)]' },
@@ -27,6 +60,7 @@ type NavMenuSheetProps = {
  */
 export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   const pathname = usePathname() ?? '/'
+  const leverScores = useLeverScores()
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
@@ -80,16 +114,24 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
                 <div className="mt-1 ml-3 pl-3 border-l border-[var(--border-ed)] grid grid-cols-1 gap-0.5">
                   {subs.map((sub) => {
                     const subActive = isActive(sub.href)
+                    const status = statusForHref(sub.href, leverScores)
                     return (
                       <Link
                         key={sub.href}
                         href={sub.href}
                         onClick={onClose}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                        className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors ${
                           subActive ? c.subActive : c.subIdle
                         }`}
                       >
                         <span className="text-[13px] font-medium">{sub.label}</span>
+                        {status && (
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass[status]}`}
+                            aria-hidden="true"
+                            title={statusTitle[status]}
+                          />
+                        )}
                       </Link>
                     )
                   })}
