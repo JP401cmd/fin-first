@@ -7,6 +7,7 @@ import { ToekomstTabs } from '@/components/future/toekomst-tabs'
 import { DoelenView } from '@/components/future/doelen-view'
 import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
 import { VoorkeurenView } from '@/components/future/voorkeuren-view'
+import { ageAtDate } from '@/lib/horizon-data'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -35,6 +36,10 @@ export default async function ToekomstPage() {
     loadHorizonData(supabase),
     loadWillData(supabase),
   ])
+  // currentAge afgeleid uit DOB voor ScenarioBibliotheek-defaults
+  // (target_age = currentAge + N jaar). Null wanneer DOB ontbreekt.
+  const dob = horizonData.effectiveInput?.dateOfBirth ?? null
+  const currentAge = dob ? Math.round(ageAtDate(dob)) : null
   return (
     <ToekomstTabs
       tijdasView={<HorizonPage initialData={horizonData} />}
@@ -44,7 +49,9 @@ export default async function ToekomstPage() {
           goalProgresses={willData.goalProgresses}
         />
       }
-      gebeurtenissenView={<GebeurtenissenView events={horizonData.events} />}
+      gebeurtenissenView={
+        <GebeurtenissenView events={horizonData.events} currentAge={currentAge} />
+      }
       voorkeurenView={
         <VoorkeurenView
           fireParams={horizonData.fireParams}

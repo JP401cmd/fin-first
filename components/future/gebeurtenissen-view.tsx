@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { LifeEvent } from '@/lib/horizon-data'
+import { ScenarioBibliotheek } from './scenario-bibliotheek'
 
 /**
  * GebeurtenissenView — content voor Gebeurtenissen-tab op /toekomst.
@@ -116,7 +117,16 @@ const LEVENSSTRATEGIEEN: {
   },
 ]
 
-export function GebeurtenissenView({ events }: { events: LifeEvent[] }) {
+export function GebeurtenissenView({
+  events,
+  currentAge,
+}: {
+  events: LifeEvent[]
+  /** Huidige leeftijd uit DOB — nodig om scenario-defaults op te baseren
+   *  (target_age = currentAge + N). Wanneer null: ScenarioBibliotheek
+   *  toont een vriendelijke fout-melding. */
+  currentAge?: number | null
+}) {
   // Sort events op target_date (alfabet als fallback). Events met datum
   // tonen we eerst chronologisch, daarna events met alleen target_age,
   // tenslotte events zonder timing.
@@ -136,15 +146,18 @@ export function GebeurtenissenView({ events }: { events: LifeEvent[] }) {
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8 space-y-8">
       {/* Levensgebeurtenissen */}
       <div>
-        <header className="mb-4">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Toekomst — levensgebeurtenissen
+        <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+              Toekomst — levensgebeurtenissen
+            </div>
+            <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
+              {sorted.length === 0
+                ? 'Geen gebeurtenissen'
+                : `${sorted.length} gebeurtenis${sorted.length === 1 ? '' : 'sen'}`}
+            </h2>
           </div>
-          <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            {sorted.length === 0
-              ? 'Geen gebeurtenissen'
-              : `${sorted.length} gebeurtenis${sorted.length === 1 ? '' : 'sen'}`}
-          </h2>
+          <ScenarioBibliotheek currentAge={currentAge ?? null} />
         </header>
 
         {sorted.length === 0 ? (

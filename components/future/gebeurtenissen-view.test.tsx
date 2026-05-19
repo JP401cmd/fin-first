@@ -1,7 +1,19 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { GebeurtenissenView } from './gebeurtenissen-view'
 import type { LifeEvent } from '@/lib/horizon-data'
+
+// GebeurtenissenView mount ScenarioBibliotheek (plan F-3) die
+// next/navigation + supabase client gebruikt. Mock beide zodat de
+// view zelf in isolatie test-baar blijft.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}))
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    from: () => ({ insert: vi.fn().mockResolvedValue({ error: null }) }),
+  }),
+}))
 
 /**
  * Tests voor GebeurtenissenView — Gebeurtenissen-tab op /toekomst.
