@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import DebtsPage from '../../core/debts/page'
+import { SchuldenFilter } from '@/components/overview/schulden-filter'
 
 export const metadata: Metadata = {
   title: 'Schulden — TriFinity',
@@ -10,16 +11,18 @@ export const metadata: Metadata = {
 /**
  * /overzicht/schulden — tweede hefboom-verdieping.
  *
- * Toont alle schulden in één DebtsPage-view. Geen segmented-control:
- * user-feedback (mei 2026) was dat tab-verdeling niet uitputtend was —
- * filtering/sortering binnen DebtsPage zelf is gepaster. De [type]-sub-
- * routes onder /overzicht/schulden/[type] blijven werken voor directe
- * deep-links.
+ * Toont alle schulden in één DebtsPage-view. Bovenaan een filter-dropdown
+ * met alle 11 debt-types (uit DEBT_TYPE_LABELS). Selectie navigeert naar
+ * /overzicht/schulden/[type] voor categorie-detail; "Alle schulden" terug
+ * naar deze landings-view.
  */
 export default function OverzichtSchuldenPage() {
   return (
     <>
       <NavStackMeta title="Schulden" bottomBar={{ kind: 'tabs' }} />
+      <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <SchuldenFilter />
+      </div>
       <DebtsPage />
     </>
   )
