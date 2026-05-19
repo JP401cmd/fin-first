@@ -5,8 +5,6 @@ import {
   VasteKostenAnalyse,
   type RecurringItem,
 } from '@/components/will/vaste-kosten-analyse'
-import type { CancellationMetadata } from '@/lib/cancellation-types'
-
 type ApiResponse = {
   subscriptions?: RecurringItem[]
   vasteKosten?: RecurringItem[]
@@ -102,8 +100,10 @@ export function VasteLastenLoader({
   }
 
   // No-op cancellation handler — voor opzeg-flows verwijst de view de
-  // gebruiker naar WillLanding op /overzicht.
-  const handleCancellation = (_metadata: CancellationMetadata) => {
+  // gebruiker naar WillLanding op /overzicht (waar de cancellation-modal
+  // gemount is). De prop signature heeft een metadata-arg maar we
+  // negeren deze hier.
+  const handleCancellation = () => {
     // intentional no-op
   }
 
