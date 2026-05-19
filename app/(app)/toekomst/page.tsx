@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadWillData } from '@/lib/will-data-loader'
 import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstTabs } from '@/components/future/toekomst-tabs'
+import { DoelenView } from '@/components/future/doelen-view'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -27,8 +29,19 @@ export const metadata: Metadata = {
  */
 export default async function ToekomstPage() {
   const supabase = await createClient()
-  const horizonData = await loadHorizonData(supabase)
+  const [horizonData, willData] = await Promise.all([
+    loadHorizonData(supabase),
+    loadWillData(supabase),
+  ])
   return (
-    <ToekomstTabs tijdasView={<HorizonPage initialData={horizonData} />} />
+    <ToekomstTabs
+      tijdasView={<HorizonPage initialData={horizonData} />}
+      doelenView={
+        <DoelenView
+          goals={willData.goals}
+          goalProgresses={willData.goalProgresses}
+        />
+      }
+    />
   )
 }
