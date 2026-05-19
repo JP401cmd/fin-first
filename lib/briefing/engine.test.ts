@@ -221,6 +221,86 @@ describe('buildBriefingEntries — upcoming', () => {
   })
 })
 
+describe('buildBriefingEntries — hefboom-tagging (plan T-3)', () => {
+  it('mapt pillar-id naar hefboom op heads_up', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        health: makeHealth({
+          pillars: [
+            { id: 'savings_rate', name: 'Spaarquote', score: 20, weight: 0.25, explanation: '', improvementTip: 't', actionHref: '/x', actionLabel: 'X', rawValue: '' },
+          ],
+        }),
+      }),
+    )
+    const headsUp = result.find((e) => e.category === 'heads_up')
+    expect(headsUp?.hefboom).toBe('cashflow')
+  })
+
+  it('mapt diversification → bezittingen', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        health: makeHealth({
+          pillars: [
+            { id: 'diversification', name: 'Diversificatie', score: 30, weight: 0.1, explanation: '', improvementTip: 't', actionHref: '', actionLabel: '', rawValue: '' },
+          ],
+        }),
+      }),
+    )
+    expect(result.find((e) => e.category === 'heads_up')?.hefboom).toBe('bezittingen')
+  })
+
+  it('mapt debt_ratio → schulden', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        health: makeHealth({
+          pillars: [
+            { id: 'debt_ratio', name: 'Schuld', score: 30, weight: 0.2, explanation: '', improvementTip: 't', actionHref: '', actionLabel: '', rawValue: '' },
+          ],
+        }),
+      }),
+    )
+    expect(result.find((e) => e.category === 'heads_up')?.hefboom).toBe('schulden')
+  })
+
+  it('mapt tax_optimization → belasting', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        health: makeHealth({
+          pillars: [
+            { id: 'tax_optimization', name: 'Belasting', score: 30, weight: 0.1, explanation: '', improvementTip: 't', actionHref: '', actionLabel: '', rawValue: '' },
+          ],
+        }),
+      }),
+    )
+    expect(result.find((e) => e.category === 'heads_up')?.hefboom).toBe('belasting')
+  })
+
+  it('fire_progress blijft ongetagd (cross-hefboom)', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        health: makeHealth({
+          pillars: [
+            { id: 'fire_progress', name: 'FIRE', score: 30, weight: 0.1, explanation: '', improvementTip: 't', actionHref: '', actionLabel: '', rawValue: '' },
+          ],
+        }),
+      }),
+    )
+    expect(result.find((e) => e.category === 'heads_up')?.hefboom).toBeUndefined()
+  })
+
+  it('mapt recommendation_type "debt_acceleration" → schulden', () => {
+    const rec = { ...makeRec('r1', 'Aflossen tip'), recommendation_type: 'debt_acceleration' } as Recommendation
+    const result = buildBriefingEntries(emptyInput({ recommendations: [rec] }))
+    expect(result.find((e) => e.category === 'observation')?.hefboom).toBe('schulden')
+  })
+
+  it('mapt event_type "housing" → schulden op upcoming', () => {
+    const event = { ...makeEvent('e1', 'Huis kopen', 30), event_type: 'housing_purchase' }
+    const result = buildBriefingEntries(emptyInput({ events: [event] }))
+    expect(result.find((e) => e.category === 'upcoming')?.hefboom).toBe('schulden')
+  })
+})
+
 describe('buildBriefingEntries — volgorde', () => {
   it('volgt prioriteit: observation → tip → heads_up → milestone → upcoming', () => {
     const result = buildBriefingEntries(

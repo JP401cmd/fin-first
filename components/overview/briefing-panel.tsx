@@ -8,6 +8,10 @@ import {
   AlertTriangle,
   Sparkles,
   LineChart,
+  Wallet,
+  CreditCard,
+  Banknote,
+  Receipt,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -52,6 +56,14 @@ export type BriefingCategory =
 
 export type BriefingSpan = 'narrow' | 'wide'
 
+/**
+ * Hefboom-tag — plan T-3 (Tier-2 #15): "Tips zijn altijd gekoppeld aan
+ * één van de 4 hefbomen". Wordt visueel als mini-icoon naast de
+ * categorie-kicker getoond zodat de gebruiker leert welke hefboom een
+ * tip/observatie raakt.
+ */
+export type HefboomTag = 'bezittingen' | 'schulden' | 'cashflow' | 'belasting'
+
 export interface BriefingEntry {
   /** Unieke key voor React-list-key. */
   id: string
@@ -62,6 +74,10 @@ export interface BriefingEntry {
   href?: string
   /** Visuele span — 'wide' = 2-kolom-card, 'narrow' = 1-kolom (default). */
   span?: BriefingSpan
+  /** Optionele hefboom-tag. Wanneer aanwezig: mini-icoon naast kicker.
+   *  Bij cross-hefboom inzichten (bv. FIRE-progress, fysiek vermogen
+   *  totaal) blijft het veld undefined. */
+  hefboom?: HefboomTag
 }
 
 const CATEGORY_CONFIG: Record<
@@ -74,6 +90,18 @@ const CATEGORY_CONFIG: Record<
   heads_up:    { label: 'Heads-up',    dotColor: 'bg-amber-500',   Icon: AlertTriangle },
   milestone:   { label: 'Mijlpaal',    dotColor: 'bg-fuchsia-500', Icon: Sparkles },
   market:      { label: 'Markt',       dotColor: 'bg-slate-500',   Icon: LineChart },
+}
+
+/** Hefboom-icoon + tint per HefboomTag — matcht visueel met de
+ *  hefboom-tegels in HefbomenNav (Wallet/CreditCard/Banknote/Receipt). */
+const HEFBOOM_CONFIG: Record<
+  HefboomTag,
+  { label: string; tint: string; Icon: LucideIcon }
+> = {
+  bezittingen: { label: 'Bezittingen', tint: 'text-emerald-700 bg-emerald-50', Icon: Wallet },
+  schulden:    { label: 'Schulden',    tint: 'text-amber-700 bg-amber-50',     Icon: CreditCard },
+  cashflow:    { label: 'Cashflow',    tint: 'text-sky-700 bg-sky-50',         Icon: Banknote },
+  belasting:   { label: 'Belasting',   tint: 'text-violet-700 bg-violet-50',   Icon: Receipt },
 }
 
 /** Maximum aantal kaartjes — plan §6.2 evolutie: 3-koloms × 2 rijen = 6. */
@@ -117,6 +145,8 @@ export function BriefingPanel({ entries }: { entries: BriefingEntry[] }) {
 function BriefingCard({ entry }: { entry: BriefingEntry }) {
   const config = CATEGORY_CONFIG[entry.category]
   const Icon = config.Icon
+  const hefboomCfg = entry.hefboom ? HEFBOOM_CONFIG[entry.hefboom] : null
+  const HefboomIcon = hefboomCfg?.Icon
   // Wide span: 2 kolommen op sm+, full-width op mobile. Narrow: 1 kol.
   const spanClass = entry.span === 'wide' ? 'sm:col-span-2' : ''
 
@@ -127,6 +157,15 @@ function BriefingCard({ entry }: { entry: BriefingEntry }) {
         <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
           {config.label}
         </span>
+        {hefboomCfg && HefboomIcon && (
+          <span
+            className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${hefboomCfg.tint}`}
+            aria-label={`Hefboom: ${hefboomCfg.label}`}
+            title={`Hefboom: ${hefboomCfg.label}`}
+          >
+            <HefboomIcon className="w-3 h-3" aria-hidden="true" />
+          </span>
+        )}
         <Icon className="w-3.5 h-3.5 text-[var(--ink-4)] ml-auto" aria-hidden="true" />
       </div>
       <p className="text-sm text-[var(--ink-2)] leading-snug">{entry.text}</p>

@@ -107,6 +107,43 @@ describe('BriefingPanel — href en span', () => {
   })
 })
 
+describe('BriefingPanel — hefboom-tag (plan T-3)', () => {
+  it('rendert hefboom-icoon badge wanneer hefboom-veld gezet is', () => {
+    const { container } = render(
+      <BriefingPanel
+        entries={[makeEntry('tip', 'Verlaag vaste lasten', { hefboom: 'cashflow' })]}
+      />,
+    )
+    // HEFBOOM_CONFIG.cashflow tint = 'text-sky-700 bg-sky-50'
+    expect(container.querySelector('.bg-sky-50')).toBeTruthy()
+    // aria-label staat op de span
+    expect(container.querySelector('[aria-label*="Cashflow"]')).toBeTruthy()
+  })
+
+  it('rendert GEEN hefboom-icoon zonder hefboom-veld', () => {
+    const { container } = render(
+      <BriefingPanel entries={[makeEntry('tip', 'Geen tag')]} />,
+    )
+    expect(container.querySelector('[aria-label*="Cashflow"]')).toBeNull()
+    expect(container.querySelector('[aria-label*="Bezittingen"]')).toBeNull()
+  })
+
+  it('toont juiste tint per hefboom (bezittingen=emerald, schulden=amber, belasting=violet)', () => {
+    const { container } = render(
+      <BriefingPanel
+        entries={[
+          makeEntry('observation', 'a', { hefboom: 'bezittingen' }),
+          makeEntry('tip', 'b', { hefboom: 'schulden' }),
+          makeEntry('upcoming', 'c', { hefboom: 'belasting' }),
+        ]}
+      />,
+    )
+    expect(container.querySelector('.bg-emerald-50')).toBeTruthy()
+    expect(container.querySelector('.bg-amber-50')).toBeTruthy()
+    expect(container.querySelector('.bg-violet-50')).toBeTruthy()
+  })
+})
+
 describe('BriefingPanel — kleur-codering per categorie', () => {
   it('observation = emerald, tip = violet, upcoming = sky', () => {
     const { container } = render(

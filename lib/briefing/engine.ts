@@ -23,7 +23,60 @@
 import type { HealthScore } from '@/lib/financial-health'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { Recommendation } from '@/lib/recommendation-data'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
+import type { BriefingEntry, HefboomTag } from '@/components/overview/briefing-panel'
+
+/**
+ * Health-pillar id → hefboom-tag. Plan T-3: tips visueel gekoppeld aan
+ * hefbomen. Wanneer geen 1-op-1 mapping (bv. fire_progress is cross-
+ * hefboom) → undefined zodat de briefing-card geen onjuiste tag krijgt.
+ */
+function pillarToHefboom(pillarId: string): HefboomTag | undefined {
+  switch (pillarId) {
+    case 'diversification':
+      return 'bezittingen'
+    case 'debt_ratio':
+      return 'schulden'
+    case 'savings_rate':
+    case 'emergency_fund':
+      return 'cashflow'
+    case 'tax_optimization':
+      return 'belasting'
+    case 'fire_progress':
+    default:
+      return undefined
+  }
+}
+
+/** Recommendation-type → hefboom-tag. Voorlopig conservatief: alleen
+ *  duidelijke 1-op-1 categorieën taggen. */
+function recommendationToHefboom(recType: string | null | undefined): HefboomTag | undefined {
+  if (!recType) return undefined
+  if (recType.includes('savings') || recType.includes('budget') || recType.includes('cashflow')) {
+    return 'cashflow'
+  }
+  if (recType.includes('debt') || recType.includes('mortgage') || recType.includes('loan')) {
+    return 'schulden'
+  }
+  if (recType.includes('asset') || recType.includes('invest') || recType.includes('diversif')) {
+    return 'bezittingen'
+  }
+  if (recType.includes('tax') || recType.includes('box')) {
+    return 'belasting'
+  }
+  return undefined
+}
+
+/** LifeEvent-type → hefboom-tag. De meeste events raken meerdere
+ *  hefbomen; we taggen alleen waar duidelijk één hefboom dominant is. */
+function eventToHefboom(eventType: string): HefboomTag | undefined {
+  const t = eventType.toLowerCase()
+  if (t.includes('housing') || t.includes('huis') || t.includes('hypotheek')) return 'schulden'
+  if (t.includes('inherit') || t.includes('erfenis')) return 'bezittingen'
+  if (t.includes('income') || t.includes('inkomen') || t.includes('zzp') || t.includes('career')) {
+    return 'cashflow'
+  }
+  return undefined
+}
 
 export interface GoalProgressInput {
   current: number
@@ -77,6 +130,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
       category: 'observation',
       text: firstRec.title,
       href: '/overzicht',
+      hefboom: recommendationToHefboom(firstRec.recommendation_type),
     })
   }
 
@@ -88,6 +142,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
       category: 'tip',
       text: secondRec.title,
       href: '/overzicht',
+      hefboom: recommendationToHefboom(secondRec.recommendation_type),
     })
   }
 
@@ -102,6 +157,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
         category: 'heads_up',
         text: `${weakest.name} vraagt aandacht — ${weakest.improvementTip}`,
         href: weakest.actionHref ?? '/overzicht',
+        hefboom: pillarToHefboom(weakest.id),
       })
     }
   }
@@ -148,6 +204,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
         { day: 'numeric', month: 'long' },
       )}`,
       href: '/toekomst',
+      hefboom: eventToHefboom(upcomingEvent.event.event_type),
     })
   }
 
