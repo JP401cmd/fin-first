@@ -175,6 +175,7 @@ export default async function OverzichtPage() {
         fireAge={fireAge}
         simRows={simRows}
         simRequiredPortfolio={simRequiredPortfolio}
+        dashboardData={dashboardData}
       />
       <WillLanding
         dashboardData={dashboardData}

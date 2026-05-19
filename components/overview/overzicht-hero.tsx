@@ -7,6 +7,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
+import type { DashboardData } from '@/components/widgets/widget-renderer'
 import { HefbomenNav } from './overzicht-hero/hefbomen-nav'
 import { BriefingPanel, type BriefingEntry } from './briefing-panel'
 import { MiniNetWorthChart } from './mini-networth-chart'
@@ -21,6 +22,11 @@ import {
 } from './overzicht-hero/voortgang-doelen-card'
 import { VrijheidStrip } from './overzicht-hero/vrijheid-strip'
 import type { HefbomenTotals } from './overzicht-hero/hefbomen-nav'
+import {
+  HeroEditToggle,
+  HeroWidgetRail,
+  useHeroRailState,
+} from './hero-widget-rail'
 
 type OverzichtHeroProps = {
   userName?: string
@@ -52,6 +58,9 @@ type OverzichtHeroProps = {
   /** Doelbedrag bij vrijheid uit de simulatie — toont op de chart als
    *  eindwaarde naast de Vrijheid-marker. */
   simRequiredPortfolio?: number | null
+  /** Volledige DashboardData voor de optionele HeroWidgetRail (power-user
+   *  edit-mode). Wanneer afwezig: edit-toggle wordt niet getoond. */
+  dashboardData?: DashboardData
 }
 
 function formatDateNL(): string {
@@ -99,8 +108,10 @@ export function OverzichtHero({
   fireAge,
   simRows,
   simRequiredPortfolio,
+  dashboardData,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
+  const rail = useHeroRailState()
 
   // Memoize once per mount — datum + groet wisselen zelden tijdens een
   // sessie. Voorkomt onnodige Intl-formatter-instances bij elke re-render.
@@ -136,10 +147,15 @@ export function OverzichtHero({
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
-      <PageInfoButton
-        description={PAGE_INFO['/overzicht'] ?? ''}
-        className="absolute right-4 top-6 sm:right-6 sm:top-8"
-      />
+      <div className="absolute right-4 top-6 sm:right-6 sm:top-8 flex items-center gap-2">
+        {dashboardData && (
+          <HeroEditToggle
+            isEditing={rail.isEditing}
+            onToggle={() => rail.setIsEditing(!rail.isEditing)}
+          />
+        )}
+        <PageInfoButton description={PAGE_INFO['/overzicht'] ?? ''} />
+      </div>
 
       <header className="mb-6 pr-12 sm:pr-16">
         <div className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-4)]">
@@ -188,18 +204,40 @@ export function OverzichtHero({
         </div>
       </div>
 
-      {/* Doelen-rij — los van Health/Chart-rij zodat het volle breedte
-          krijgt op smaller breakpoints en niet onder de chart gedrukt
-          wordt. Empty-state behoudt zijn CTA. */}
+      {/* Optionele power-user widget-rail OP DEZELFDE PLEK als Voortgang-
+          doelen + Vrijheidsstrip. Default (geen edit-mode, geen config):
+          render gewoon de defaults. Edit-mode of met config: 4-slot grid
+          met widgets uit WIDGET_CATALOG. State leeft in localStorage. */}
       <div className="mt-3 sm:mt-4">
-        {goalDisplay.length > 0 ? (
-          <VoortgangDoelenCard items={goalDisplay} />
+        {dashboardData ? (
+          <HeroWidgetRail
+            config={rail.config}
+            isEditing={rail.isEditing}
+            onSlotChange={rail.setSlot}
+            onReset={rail.resetConfig}
+            dashboardData={dashboardData}
+            defaultContent={
+              <>
+                {goalDisplay.length > 0 ? (
+                  <VoortgangDoelenCard items={goalDisplay} />
+                ) : (
+                  <DoelenEmptyState />
+                )}
+                <VrijheidStrip freedomPct={freedomPct ?? null} />
+              </>
+            }
+          />
         ) : (
-          <DoelenEmptyState />
+          <>
+            {goalDisplay.length > 0 ? (
+              <VoortgangDoelenCard items={goalDisplay} />
+            ) : (
+              <DoelenEmptyState />
+            )}
+            <VrijheidStrip freedomPct={freedomPct ?? null} />
+          </>
         )}
       </div>
-
-      <VrijheidStrip freedomPct={freedomPct ?? null} />
 
       <BriefingPanel entries={briefingEntries ?? []} />
 
