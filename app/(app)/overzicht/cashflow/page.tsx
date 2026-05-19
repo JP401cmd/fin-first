@@ -11,6 +11,7 @@ import { TransactiesGeldstroom } from '@/components/overview/transacties-geldstr
 import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
 import { CashflowKalender } from '@/components/overview/cashflow-kalender'
 import { CashflowForecast } from '@/components/overview/cashflow-forecast'
+import { CashflowSankey } from '@/components/overview/cashflow-sankey'
 import type { RecurringTransaction } from '@/lib/recurring-data'
 
 export const metadata: Metadata = {
@@ -150,6 +151,9 @@ export default async function OverzichtCashflowPage() {
             baselineExpenses={baselineExpenses}
             startingBalance={startingBalance}
           />
+        }
+        sankeyView={
+          <CashflowSankey transactions={transactions} monthLabel={monthLabel} />
         }
       />
     </>
