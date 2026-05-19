@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Search, ArrowDown, ArrowUp } from 'lucide-react'
+import { formatCurrency } from '@/lib/format'
 
 export type TransactionRow = {
   id: string
@@ -19,15 +20,6 @@ const FILTERS: { id: FilterMode; label: string }[] = [
   { id: 'expense', label: 'Uitgaven' },
   { id: 'income', label: 'Inkomsten' },
 ]
-
-function formatEUR(amount: number): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
 
 function formatDayHeader(iso: string): string {
   const d = new Date(iso)
@@ -253,7 +245,7 @@ export function TransactiesFeed({
                       ].join(' ')}
                     >
                       {tx.amount < 0 ? '−' : '+'}
-                      {formatEUR(Math.abs(tx.amount))}
+                      {formatCurrency(Math.abs(tx.amount))}
                     </span>
                   </li>
                 ))}
@@ -271,11 +263,11 @@ export function TransactiesFeed({
           </span>
           <span>
             Uit:{' '}
-            <strong className="font-semibold text-amber-700">{formatEUR(totals.expenses)}</strong>
+            <strong className="font-semibold text-amber-700">{formatCurrency(totals.expenses)}</strong>
           </span>
           <span>
             In:{' '}
-            <strong className="font-semibold text-emerald-700">{formatEUR(totals.incomes)}</strong>
+            <strong className="font-semibold text-emerald-700">{formatCurrency(totals.incomes)}</strong>
           </span>
         </footer>
       )}
