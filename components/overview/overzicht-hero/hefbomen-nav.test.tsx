@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { HefbomenNav } from './hefbomen-nav'
+import { HefbomenNav, HefbomenLegenda } from './hefbomen-nav'
 import type { HealthScore } from '@/lib/financial-health'
 
 /**
@@ -135,5 +135,21 @@ describe('HefbomenNav', () => {
     const { container } = render(<HefbomenNav health={mockHealth()} />)
     const nav = container.querySelector('nav')
     expect(nav?.getAttribute('aria-label')).toBe('Vier hefbomen')
+  })
+})
+
+describe('HefbomenLegenda', () => {
+  it('rendert drie status-labels', () => {
+    render(<HefbomenLegenda />)
+    expect(screen.getByText('Op koers')).toBeTruthy()
+    expect(screen.getByText('Aandacht nodig')).toBeTruthy()
+    expect(screen.getByText('Actie vereist')).toBeTruthy()
+  })
+
+  it('elk label heeft een gekleurde dot', () => {
+    const { container } = render(<HefbomenLegenda />)
+    expect(container.querySelector('.bg-emerald-500')).toBeTruthy()
+    expect(container.querySelector('.bg-amber-500')).toBeTruthy()
+    expect(container.querySelector('.bg-red-500')).toBeTruthy()
   })
 })
