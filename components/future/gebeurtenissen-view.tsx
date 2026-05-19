@@ -11,6 +11,7 @@ import {
 import { formatCurrency } from '@/lib/format'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { ScenarioBibliotheek } from './scenario-bibliotheek'
+import { useViewMode } from '@/components/app/view-mode-provider'
 
 /**
  * GebeurtenissenView — content voor Gebeurtenissen-tab op /toekomst.
@@ -127,6 +128,10 @@ export function GebeurtenissenView({
    *  toont een vriendelijke fout-melding. */
   currentAge?: number | null
 }) {
+  // ScenarioBibliotheek = scenario-tool → alleen in 'plannen'-modus
+  // zichtbaar (plan A-5). Niveau-A "Kijken"-gebruikers zien dan een
+  // rustige lijst van bestaande events zonder edit-knoppen.
+  const { isPlannen } = useViewMode()
   // Sort events op target_date (alfabet als fallback). Events met datum
   // tonen we eerst chronologisch, daarna events met alleen target_age,
   // tenslotte events zonder timing.
@@ -157,7 +162,7 @@ export function GebeurtenissenView({
                 : `${sorted.length} gebeurtenis${sorted.length === 1 ? '' : 'sen'}`}
             </h2>
           </div>
-          <ScenarioBibliotheek currentAge={currentAge ?? null} />
+          {isPlannen && <ScenarioBibliotheek currentAge={currentAge ?? null} />}
         </header>
 
         {sorted.length === 0 ? (
