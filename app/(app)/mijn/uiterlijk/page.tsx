@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PalettePicker } from '@/components/mijn/palette-picker'
 import { FontPicker } from '@/components/mijn/font-picker'
 import { ModuleAccentPicker } from '@/components/mijn/module-accent-picker'
 import { BudgetTintPicker } from '@/components/mijn/budget-tint-picker'
+import { PhaseColorPicker } from '@/components/mijn/phase-color-picker'
 
 export const metadata: Metadata = {
   title: 'Uiterlijk — TriFinity',
@@ -55,22 +55,21 @@ export default function MijnUiterlijkPage() {
           <BudgetTintPicker />
         </div>
 
-        <div className="mt-6 rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-4">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)] mb-1">
-            Meer instellingen
-          </div>
-          <p className="text-xs text-[var(--ink-3)] leading-snug mb-3">
-            Phase-kleuren (Recovery / Stability / Momentum / Mastery)
-            wonen voorlopig nog op de legacy weergave-tab.
-          </p>
+        <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+          <PhaseColorPicker />
+        </div>
+
+        <p className="mt-6 text-[11px] italic text-[var(--ink-3)]">
+          Wijzigingen worden direct toegepast en gesynct met je account.
+          Reset naar defaults via{' '}
           <Link
             href="/identity/instellingen?tab=weergave"
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:underline"
+            className="underline hover:text-[var(--ink-2)]"
           >
-            Open geavanceerde weergave-opties
-            <ArrowRight className="w-3 h-3" aria-hidden="true" />
+            geavanceerde weergave-opties
           </Link>
-        </div>
+          .
+        </p>
       </section>
     </>
   )
