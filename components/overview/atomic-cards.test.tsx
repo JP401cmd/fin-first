@@ -8,11 +8,23 @@ import { AtomicCards } from './atomic-cards'
  */
 
 describe('AtomicCards — basis-render', () => {
-  it('rendert niets wanneer alle drie ontbreken', () => {
-    const { container } = render(
-      <AtomicCards observation={null} tip={null} upcoming={null} />,
-    )
-    expect(container.firstChild).toBeNull()
+  it('rendert altijd 3 categorieën, ook bij ontbrekende data', () => {
+    render(<AtomicCards observation={null} tip={null} upcoming={null} />)
+    // Categorieën blijven zichtbaar zodat user leert welke insights komen.
+    expect(screen.getByText('Wat valt op')).toBeTruthy()
+    expect(screen.getByText('Een tip')).toBeTruthy()
+    expect(screen.getByText('Komende maand')).toBeTruthy()
+  })
+
+  it('toont placeholder-tekst bij ontbrekende entry', () => {
+    render(<AtomicCards observation={null} tip={null} upcoming={null} />)
+    // Placeholders zijn italics met dimmed-state; specifieke teksten uit
+    // de implementatie controleren dat de fallback effectief is.
+    expect(
+      screen.getByText(/Nog onvoldoende data/i),
+    ).toBeTruthy()
+    expect(screen.getByText(/Geen tips deze week/i)).toBeTruthy()
+    expect(screen.getByText(/Geen afschrijvingen/i)).toBeTruthy()
   })
 
   it('rendert alle drie cards met labels', () => {
@@ -41,7 +53,7 @@ describe('AtomicCards — basis-render', () => {
     expect(screen.getByText('Autoverz. €87')).toBeTruthy()
   })
 
-  it('verbergt enkele card wanneer entry null is', () => {
+  it('lege card naast gevulde card behoudt categorie', () => {
     render(
       <AtomicCards
         observation={{ text: 'Alleen observatie' }}
@@ -50,8 +62,10 @@ describe('AtomicCards — basis-render', () => {
       />,
     )
     expect(screen.getByText('Wat valt op')).toBeTruthy()
-    expect(screen.queryByText('Een tip')).toBeNull()
-    expect(screen.queryByText('Komende maand')).toBeNull()
+    expect(screen.getByText('Alleen observatie')).toBeTruthy()
+    // Tip en Upcoming labels nog steeds zichtbaar — placeholder vult.
+    expect(screen.getByText('Een tip')).toBeTruthy()
+    expect(screen.getByText('Komende maand')).toBeTruthy()
   })
 })
 
@@ -76,7 +90,8 @@ describe('AtomicCards — href-binding', () => {
         upcoming={null}
       />,
     )
-    expect(container.querySelector('article')).toBeTruthy()
+    // observation = article (geen href), tip + upcoming = articles (placeholder)
+    expect(container.querySelectorAll('article').length).toBeGreaterThan(0)
     expect(container.querySelector('a')).toBeNull()
   })
 

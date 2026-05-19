@@ -7,7 +7,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
-import { HefbomenNav, HefbomenLegenda } from './overzicht-hero/hefbomen-nav'
+import { HefbomenNav } from './overzicht-hero/hefbomen-nav'
 import { AtomicCards, type AtomicCardEntry } from './atomic-cards'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { HealthScoreCard } from './overzicht-hero/health-score-card'
@@ -19,7 +19,6 @@ import {
   VoortgangDoelenCard,
   type GoalProgress,
 } from './overzicht-hero/voortgang-doelen-card'
-import { MiniTimelineStrip } from './overzicht-hero/mini-timeline-strip'
 import { VrijheidStrip } from './overzicht-hero/vrijheid-strip'
 import type { HefbomenTotals } from './overzicht-hero/hefbomen-nav'
 
@@ -157,25 +156,29 @@ export function OverzichtHero({
       </header>
 
       <HefbomenNav health={health} totals={totals} />
-      <HefbomenLegenda />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-        {health ? (
-          <HealthScoreCard health={health} onOpenReceipt={() => setReceiptOpen(true)} />
-        ) : (
-          <HealthScoreEmptyState />
-        )}
-        {/* Naast Health Score: mini netto-vermogen-grafiek. Wanneer geen
-            history of geen DOB → fallback CTA. Doelen-card schuift onder
-            de chart in een nieuwe rij (volgende grid). */}
-        <MiniNetWorthChart
-          netWorthHistory={netWorthHistory ?? []}
-          currentNetWorth={currentNetWorth ?? 0}
-          currentAge={currentAge ?? null}
-          fireAge={fireAge ?? null}
-          endAge={endAge ?? null}
-          isPensioenMode={isPensioenMode ?? false}
-        />
+      {/* Hero-row 1/3 + 2/3: Health Score smaller, MiniNetWorthChart wider.
+          Op smaller breakpoints stack ze full-width onder elkaar. Legenda
+          is verwijderd — status-dots in de tegels zelf zijn zelf-uitleggend
+          (groen/oranje/rood). */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="lg:col-span-1">
+          {health ? (
+            <HealthScoreCard health={health} onOpenReceipt={() => setReceiptOpen(true)} />
+          ) : (
+            <HealthScoreEmptyState />
+          )}
+        </div>
+        <div className="lg:col-span-2">
+          <MiniNetWorthChart
+            netWorthHistory={netWorthHistory ?? []}
+            currentNetWorth={currentNetWorth ?? 0}
+            currentAge={currentAge ?? null}
+            fireAge={fireAge ?? null}
+            endAge={endAge ?? null}
+            isPensioenMode={isPensioenMode ?? false}
+          />
+        </div>
       </div>
 
       {/* Doelen-rij — los van Health/Chart-rij zodat het volle breedte
@@ -190,15 +193,6 @@ export function OverzichtHero({
       </div>
 
       <VrijheidStrip freedomPct={freedomPct ?? null} />
-
-      {currentAge != null && endAge != null && (
-        <MiniTimelineStrip
-          currentAge={currentAge}
-          endAge={endAge}
-          freedomPct={freedomPct ?? 0}
-          isPensioenMode={isPensioenMode ?? false}
-        />
-      )}
 
       {atomicCards && (
         <AtomicCards

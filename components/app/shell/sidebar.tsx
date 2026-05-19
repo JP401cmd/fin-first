@@ -40,7 +40,7 @@ import {
   type NavModule,
 } from '@/lib/module-registry'
 import { useSidebarCollapsed } from '@/lib/hooks/use-sidebar-collapsed'
-import { LeverCompassExpanded, LeverCompassCollapsed, type LeverScores } from '@/components/app/shell/lever-compass'
+import { LeverCompassCollapsed, type LeverScores, type LeverStatus } from '@/components/app/shell/lever-compass'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { ShellFlagToggle } from '@/components/app/shell/shell-flag-toggle'
@@ -116,6 +116,13 @@ type AppTag = {
 type SubTag = {
   label: string
   href: string
+  /**
+   * Optionele kompas-key — wanneer aanwezig, toont SubTagStrip een gekleurde
+   * status-dot naast de tag-label (uit `leverScores[key]`). Dit voegt de
+   * kompas-functionaliteit samen met de sub-route navigatie zodat er geen
+   * dubbele rij ontstaat (gebruiker-feedback mei 2026).
+   */
+  leverKey?: keyof LeverScores
 }
 
 // Conform plan §3.3: tag-strip toont *categorieën* (eerste rij). Daaronder
@@ -132,10 +139,14 @@ const MODULES: ModuleEntry[] = [
     href: '/overzicht',
     Icon: Wallet,
     subTags: [
-      { label: 'Bezittingen', href: '/overzicht/bezittingen' },
-      { label: 'Schulden', href: '/overzicht/schulden' },
-      { label: 'Cashflow', href: '/overzicht/cashflow' },
-      { label: 'Belasting', href: '/overzicht/belasting' },
+      // De vier hefbomen — sub-routes onder "Het Overzicht" mét kompas-
+      // status-indicators. Vervangt de aparte LeverCompassExpanded-mount
+      // (user-feedback mei 2026: "kompas staat los van overzicht, voeg ze
+      // samen zodat er geen duplicatie is").
+      { label: 'Bezittingen', href: '/overzicht/bezittingen', leverKey: 'assets' },
+      { label: 'Schulden', href: '/overzicht/schulden', leverKey: 'debts' },
+      { label: 'Cashflow', href: '/overzicht/cashflow', leverKey: 'cashflow' },
+      { label: 'Belasting', href: '/overzicht/belasting', leverKey: 'tax' },
     ],
     apps: [
       // Bron: components/core/category-deepening-registry.ts. `appKey` matcht
@@ -438,23 +449,16 @@ function ModulesSection({
       {!collapsed && <ModulesSectionLabel />}
       <div className="flex flex-col gap-0.5">
         {MODULES.map((mod) => (
-          <div key={mod.key}>
-            <ModuleRow
-              module={mod}
-              collapsed={collapsed}
-              isActive={mod.key === activeModule}
-              isEnabled={activeNavModules.includes(mod.key)}
-              metric={metrics[mod.key]}
-              activeAppKeys={activeAppKeys}
-            />
-            {/* Vier-hefbomen-kompas onder "Het Overzicht"-module (kern).
-                Toont status-indicators per hefboom inline zodat user
-                er niet voor naar onderaan de sidebar hoeft. Alleen in
-                expanded-mode; collapsed-variant leeft onderaan sidebar. */}
-            {mod.key === 'kern' && !collapsed && (
-              <LeverCompassExpanded scores={leverScores} />
-            )}
-          </div>
+          <ModuleRow
+            key={mod.key}
+            module={mod}
+            collapsed={collapsed}
+            isActive={mod.key === activeModule}
+            isEnabled={activeNavModules.includes(mod.key)}
+            metric={metrics[mod.key]}
+            activeAppKeys={activeAppKeys}
+            leverScores={leverScores}
+          />
         ))}
       </div>
     </div>
@@ -483,6 +487,7 @@ function ModuleRow({
   isEnabled,
   metric,
   activeAppKeys,
+  leverScores,
 }: {
   module: ModuleEntry
   collapsed: boolean
@@ -490,6 +495,7 @@ function ModuleRow({
   isEnabled: boolean
   metric: string
   activeAppKeys: string[]
+  leverScores: LeverScores
 }) {
   const Icon = module.Icon
   const styleVars = moduleVars(module.key)
@@ -619,9 +625,10 @@ function ModuleRow({
 
       {/* Sub-tag-strip — alleen op active+enabled module met sub-tags. Plan
           §3.3: sub-pages verschijnen alleen bij de huidige module om de
-          sidebar visueel rustig te houden. */}
+          sidebar visueel rustig te houden. leverScores wordt doorgegeven
+          zodat tags met `leverKey` een status-dot tonen. */}
       {isActive && isEnabled && module.subTags.length > 0 && (
-        <SubTagStrip subTags={module.subTags} />
+        <SubTagStrip subTags={module.subTags} leverScores={leverScores} />
       )}
 
       {/* Apps-strip — alleen op active+enabled module met apps die door
@@ -670,7 +677,29 @@ function ModuleLabel({
   )
 }
 
-function SubTagStrip({ subTags, dimmed = false }: { subTags: SubTag[]; dimmed?: boolean }) {
+const SUBTAG_STATUS_DOT: Record<LeverStatus, string> = {
+  green: 'bg-emerald-500',
+  amber: 'bg-amber-500',
+  red: 'bg-red-500',
+  neutral: 'bg-[var(--ink-4)]',
+}
+
+const SUBTAG_STATUS_LABEL: Record<LeverStatus, string> = {
+  green: 'Gezond',
+  amber: 'Aandacht',
+  red: 'Zorg',
+  neutral: 'Geen data',
+}
+
+function SubTagStrip({
+  subTags,
+  dimmed = false,
+  leverScores,
+}: {
+  subTags: SubTag[]
+  dimmed?: boolean
+  leverScores?: LeverScores
+}) {
   // Dimmed-state op non-active modules: een toon lichter zodat de actieve
   // module visueel blijft dominen, maar de sub-pages wel scanbaar zijn.
   const baseColorClass = dimmed ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
@@ -683,15 +712,29 @@ function SubTagStrip({ subTags, dimmed = false }: { subTags: SubTag[]; dimmed?: 
       className={`flex flex-col italic text-[12px] leading-snug pl-[42px] pr-3 pb-2 -mt-1 ${baseColorClass}`}
       style={{ fontFamily: SOURCE_SERIF }}
     >
-      {subTags.map((tag) => (
-        <Link
-          key={tag.href}
-          href={tag.href}
-          className={`block py-0.5 ${linkHoverClass} transition-colors duration-150`}
-        >
-          {tag.label}
-        </Link>
-      ))}
+      {subTags.map((tag) => {
+        const entry = tag.leverKey && leverScores ? leverScores[tag.leverKey] : null
+        return (
+          <Link
+            key={tag.href}
+            href={tag.href}
+            className={`flex items-center gap-2 py-0.5 ${linkHoverClass} transition-colors duration-150`}
+            title={
+              entry
+                ? `${tag.label}: ${SUBTAG_STATUS_LABEL[entry.status]} — ${entry.detail}`
+                : tag.label
+            }
+          >
+            <span className="flex-1">{tag.label}</span>
+            {entry && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${SUBTAG_STATUS_DOT[entry.status]}`}
+                aria-label={`${tag.label}: ${SUBTAG_STATUS_LABEL[entry.status]}`}
+              />
+            )}
+          </Link>
+        )
+      })}
     </div>
   )
 }

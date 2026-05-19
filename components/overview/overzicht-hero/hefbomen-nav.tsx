@@ -150,10 +150,14 @@ export function HefbomenNav({
         const formattedTotal = showTotal
           ? key === 'cashflow'
             ? `${Math.round(totalValue)}%`
-            : formatCurrency(totalValue)
+            : key === 'belasting'
+              ? `${formatCurrency(totalValue)}/jr`
+              : formatCurrency(totalValue)
           : ''
         const subText = statusSubText(key, status, pillar)
         const expanded = expandedKey === key
+
+        const hasDrilldown = pillar || status !== 'neutral'
 
         return (
           <div
@@ -188,26 +192,32 @@ export function HefbomenNav({
                   {formattedTotal}
                 </div>
               )}
-              {subText && (
-                <div className={`mt-1 text-[11px] font-medium ${statusTextClass(status)}`}>
-                  {subText}
-                </div>
-              )}
+              {/* Subtext + chevron op één rij — chevron rechts naast de
+                  status-substext zodat de tegel niet hoger wordt en de
+                  primaire link (heel kaartje) intact blijft. */}
+              <div className="mt-1 flex items-end justify-between gap-2 min-h-[16px]">
+                {subText ? (
+                  <span className={`text-[11px] font-medium ${statusTextClass(status)}`}>
+                    {subText}
+                  </span>
+                ) : (
+                  <span />
+                )}
+              </div>
             </Link>
 
-            {/* Chevron-toggle voor drill-down */}
-            {(pillar || status !== 'neutral') && (
+            {/* Chevron-toggle — kleine icon-only knop in rechter-onderhoek,
+                absolute-gepositioneerd binnen de tegel zodat hij naast de
+                status-substext landt. Card-klik gaat naar /overzicht/<hefboom>;
+                alleen chevron-klik toggelt de drill-down hieronder. */}
+            {hasDrilldown && (
               <button
                 type="button"
                 onClick={() => setExpandedKey(expanded ? null : key)}
                 aria-expanded={expanded}
                 aria-label={expanded ? `Verberg detail ${label}` : `Toon detail ${label}`}
-                className="mt-2 -mx-3 sm:-mx-4 -mb-3 sm:-mb-4 px-3 sm:px-4 py-1.5 border-t border-[var(--border-ed)] flex items-center justify-center gap-1.5 text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)] rounded-b-2xl transition-colors"
+                className="absolute right-2 bottom-2 sm:right-2.5 sm:bottom-2.5 inline-flex items-center justify-center w-6 h-6 rounded-md text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
               >
-                {/* "Details/Minder" tekst alleen op sm+ schermen om
-                    mobiel-ruimte te besparen; mobile toont alleen
-                    chevron + aria-label voor screen-readers. */}
-                <span className="hidden sm:inline">{expanded ? 'Minder' : 'Details'}</span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
                   aria-hidden="true"

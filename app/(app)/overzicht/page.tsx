@@ -63,23 +63,40 @@ export default async function OverzichtPage() {
   const isPensioenMode = horizonData?.fireStrategy?.strategy === 'pensioen'
 
   // Totaalbedragen per hefboom-tegel — uit healthScoreInput dat al
-  // beschikbaar is. Cashflow- en belasting-totalen vragen meer plumbing
-  // en komen later. Null/undefined → tegel verbergt de sub-text.
+  // beschikbaar is. Belasting toont Box 3-druk per jaar uit
+  // healthScoreInput.taxData (lichte berekening uit buildTaxData).
+  // Null/undefined → tegel verbergt de sub-text.
   const totals = horizonData?.healthScoreInput
     ? {
         bezittingen: horizonData.healthScoreInput.totalAssets,
         schulden: horizonData.healthScoreInput.totalDebts,
         cashflow: horizonData.healthScoreInput.savingsRate6m,
+        belasting: horizonData.healthScoreInput.taxData?.box3Tax ?? null,
       }
     : undefined
 
-  // Drie atomic cards onderaan hero — mockup-conform. Voor MVP putten we
-  // uit Will-recommendations (titles). Eerste rec = observatie, tweede
-  // = tip. Upcoming komt uit recurring-transactions die deze maand
-  // afgeschreven worden (komt later, voor nu null).
+  // Drie atomic cards onderaan hero — categoriseerde mini-briefing.
+  //
+  // Bron-mapping (zie components/overview/atomic-cards.tsx JSDoc):
+  //  - observation = Will-briefing recommendations[0] (analyse-output)
+  //  - tip         = Will-briefing recommendations[1] (actie-suggestie)
+  //  - upcoming    = eerstvolgende life-event binnen 90 dagen, anders null
+  //
+  // Voor de upcoming-card: we zoeken het volgende life-event waar target_date
+  // binnen 90 dagen van vandaag valt. Recurring transactions tonen we
+  // niet apart op deze laag — die staan elders in cashflow-tab. Null →
+  // AtomicCards toont een dimmed placeholder zodat de categorie zichtbaar
+  // blijft.
   const recommendations = willData.recommendations
   const firstRec = recommendations[0]
   const secondRec = recommendations[1]
+  const today = new Date()
+  const ninetyDaysFromNow = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
+  const upcomingEvent = (horizonData?.events ?? [])
+    .filter((e) => e.target_date)
+    .map((e) => ({ event: e, date: new Date(e.target_date as string) }))
+    .filter(({ date }) => date > today && date < ninetyDaysFromNow)
+    .sort((a, b) => a.date.getTime() - b.date.getTime())[0]
   const atomicCards = {
     observation: firstRec
       ? { text: firstRec.title, href: '/overzicht' }
@@ -87,7 +104,12 @@ export default async function OverzichtPage() {
     tip: secondRec
       ? { text: secondRec.title, href: '/overzicht' }
       : null,
-    upcoming: null,
+    upcoming: upcomingEvent
+      ? {
+          text: `${upcomingEvent.event.name} — ${upcomingEvent.date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}`,
+          href: '/toekomst',
+        }
+      : null,
   }
 
   // Mini-vermogen-grafiek-inputs: net-worth history uit dashboard, huidig
