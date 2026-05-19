@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { Target, ArrowRight } from 'lucide-react'
+import { Target, ArrowRight, Pencil } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
+import { DoelBewerkenSheet } from './doel-bewerken-sheet'
 import { useViewMode } from '@/components/app/view-mode-provider'
 
 /**
@@ -56,6 +58,13 @@ export function DoelenView({
 }) {
   // DoelToevoegenSheet = scenario-tool → alleen in Plannen-modus (plan A-5).
   const { isPlannen } = useViewMode()
+  // Edit-sheet state: which goal is being edited (null = closed).
+  const [editingGoal, setEditingGoal] = useState<{
+    id: string
+    name: string
+    current: number
+    target: number
+  } | null>(null)
 
   // Koppel goals + progresses op index (loader garandeert parallel
   // arrays). Sorteer op status: off-track eerst zodat aandacht-vereisende
@@ -119,14 +128,33 @@ export function DoelenView({
         {display.map(({ goal, progress }) => {
           const status = statusFor(progress)
           const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
+          // Card wordt button in Plannen-modus (opent edit-sheet),
+          // gewone article in Kijken (read-only). Geen genest-Link.
+          const cardClass =
+            'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 text-left w-full'
+          const CardEl: React.ElementType = isPlannen ? 'button' : 'article'
+          const cardProps = isPlannen
+            ? {
+                type: 'button' as const,
+                onClick: () =>
+                  setEditingGoal({
+                    id: goal.id,
+                    name: goal.name,
+                    current: progress.current,
+                    target: progress.target,
+                  }),
+                'aria-label': `Bewerk doel ${goal.name}`,
+                className: `${cardClass} hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
+              }
+            : { className: cardClass }
           return (
-            <article
-              key={goal.id}
-              className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5"
-            >
+            <CardEl key={goal.id} {...cardProps}>
               <header className="flex items-start justify-between gap-2 mb-2">
-                <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0 truncate">
+                <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
                   {goal.name}
+                  {isPlannen && (
+                    <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
+                  )}
                 </h3>
                 <span
                   className={`text-[10px] uppercase tracking-[0.08em] font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.color} shrink-0`}
@@ -169,16 +197,26 @@ export function DoelenView({
                   <span className="text-[var(--ink-3)]">{progress.eta}</span>
                 )}
               </div>
-            </article>
+            </CardEl>
           )
         })}
       </div>
 
       <p className="mt-6 text-[11px] italic text-[var(--ink-3)]">
-        Doelen worden onderhouden via /will (legacy route). Detail-pane
-        per doel + acties-koppeling komen in een volgende iteratie naar
-        deze tab.
+        {isPlannen
+          ? 'Klik op een doel om voortgang bij te werken of het te verwijderen. Volledige edit van naam/bedrag/datum via /will.'
+          : 'Activeer Plannen-modus om doelen bij te werken.'}
       </p>
+
+      {editingGoal && (
+        <DoelBewerkenSheet
+          goalId={editingGoal.id}
+          goalName={editingGoal.name}
+          currentValue={editingGoal.current}
+          targetValue={editingGoal.target}
+          onClose={() => setEditingGoal(null)}
+        />
+      )}
     </section>
   )
 }
