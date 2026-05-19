@@ -62,6 +62,16 @@ export default async function OverzichtPage() {
   const endAge = horizonData?.fireStrategy?.endAge ?? null
   const isPensioenMode = horizonData?.fireStrategy?.strategy === 'pensioen'
 
+  // Totaalbedragen per hefboom-tegel — uit healthScoreInput dat al
+  // beschikbaar is. Cashflow- en belasting-totalen vragen meer plumbing
+  // en komen later. Null/undefined → tegel verbergt de sub-text.
+  const totals = horizonData?.healthScoreInput
+    ? {
+        bezittingen: horizonData.healthScoreInput.totalAssets,
+        schulden: horizonData.healthScoreInput.totalDebts,
+      }
+    : undefined
+
   return (
     <>
       <OverzichtHero
@@ -73,6 +83,7 @@ export default async function OverzichtPage() {
         currentAge={currentAge}
         endAge={endAge}
         isPensioenMode={isPensioenMode}
+        totals={totals}
       />
       <WillLanding
         dashboardData={dashboardData}

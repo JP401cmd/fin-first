@@ -19,6 +19,7 @@ import {
 } from './overzicht-hero/voortgang-doelen-card'
 import { MiniTimelineStrip } from './overzicht-hero/mini-timeline-strip'
 import { VrijheidStrip } from './overzicht-hero/vrijheid-strip'
+import type { HefbomenTotals } from './overzicht-hero/hefbomen-nav'
 
 type OverzichtHeroProps = {
   userName?: string
@@ -33,6 +34,8 @@ type OverzichtHeroProps = {
   endAge?: number | null
   /** Pensioen-modus uit fireStrategy.strategy === 'pensioen'. */
   isPensioenMode?: boolean
+  /** Optionele totaalbedragen per hefboom (bezittingen, schulden, etc.). */
+  totals?: HefbomenTotals
 }
 
 function formatDateNL(): string {
@@ -72,6 +75,7 @@ export function OverzichtHero({
   currentAge,
   endAge,
   isPensioenMode,
+  totals,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
 
@@ -133,7 +137,7 @@ export function OverzichtHero({
         )}
       </header>
 
-      <HefbomenNav health={health} />
+      <HefbomenNav health={health} totals={totals} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         {health ? (
