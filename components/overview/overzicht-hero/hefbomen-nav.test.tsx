@@ -82,22 +82,22 @@ describe('HefbomenNav', () => {
     })
   })
 
-  it('status-overline toont "Goed op koers" bij score >=70', () => {
+  it('status-substext "Diversificatie ok" bij bezittingen good', () => {
     render(<HefbomenNav health={mockHealth()} />)
-    // diversification = 80 → bezittingen heeft "Goed op koers"
-    expect(screen.getAllByText('Goed op koers').length).toBeGreaterThanOrEqual(1)
+    // diversification = 80 → 'good' → "Diversificatie ok"
+    expect(screen.getByText('Diversificatie ok')).toBeTruthy()
   })
 
-  it('status-overline toont "Aandacht" bij score 50-70', () => {
+  it('status-substext "Schuldratio" tekst bij schulden warn', () => {
     render(<HefbomenNav health={mockHealth()} />)
-    // debt_ratio = 60 → schulden heeft "Aandacht"
-    expect(screen.getAllByText('Aandacht').length).toBeGreaterThanOrEqual(1)
+    // debt_ratio = 60 → 'warn' → "Schuldratio 20%"
+    expect(screen.getByText(/Schuldratio/)).toBeTruthy()
   })
 
-  it('status-overline toont "Risico" bij score <50', () => {
+  it('status-substext "Tekort op rekening" bij cashflow bad', () => {
     render(<HefbomenNav health={mockHealth()} />)
-    // savings_rate = 30 → cashflow heeft "Risico"
-    expect(screen.getAllByText('Risico').length).toBeGreaterThanOrEqual(1)
+    // savings_rate = 30 → 'bad' → "Tekort op rekening"
+    expect(screen.getByText('Tekort op rekening')).toBeTruthy()
   })
 
   it('belasting-tegel toont status uit tax_optimization pillar wanneer aanwezig', () => {
@@ -118,14 +118,17 @@ describe('HefbomenNav', () => {
       ],
     })
     render(<HefbomenNav health={healthWithTax} />)
-    // tax pillar score = 85 → 'good' → "Goed op koers" voor belasting
-    expect(screen.getAllByText('Goed op koers').length).toBeGreaterThanOrEqual(2)
+    // tax pillar score = 85 → 'good' → "Geen actie nodig"
+    expect(screen.getByText('Geen actie nodig')).toBeTruthy()
   })
 
-  it('rendert "Geen meting" bij ontbrekende health', () => {
+  it('rendert geen status-substext bij ontbrekende health (neutral)', () => {
     render(<HefbomenNav health={null} />)
-    // Alle 4 tegels → status neutral → "Geen meting"
-    expect(screen.getAllByText('Geen meting').length).toBe(4)
+    // Alle 4 tegels → status neutral → geen substext
+    expect(screen.queryByText('Diversificatie ok')).toBeNull()
+    expect(screen.queryByText('Aflossing op schema')).toBeNull()
+    expect(screen.queryByText('Op koers met sparen')).toBeNull()
+    expect(screen.queryByText('Geen actie nodig')).toBeNull()
   })
 
   it('nav heeft aria-label', () => {

@@ -134,6 +134,26 @@ export function HefbomenNav({
             : formatCurrency(totalValue)
           : ''
 
+        // Contextuele sub-text per hefboom (mockup-stijl). Toont status
+        // in concrete taal i.p.v. de generieke "Goed op koers"-label.
+        const statusSubText = (() => {
+          if (status === 'neutral') return null
+          if (key === 'bezittingen') {
+            return status === 'good' ? 'Diversificatie ok' : status === 'warn' ? 'Beperkt gespreid' : 'Slecht gespreid'
+          }
+          if (key === 'schulden') {
+            const ratio = pillar?.rawValue ?? ''
+            return status === 'good' ? 'Aflossing op schema' : status === 'warn' ? `Schuldratio ${ratio}` : 'Hoge schuldenlast'
+          }
+          if (key === 'cashflow') {
+            return status === 'good' ? 'Op koers met sparen' : status === 'warn' ? 'Lager dan doel' : 'Tekort op rekening'
+          }
+          if (key === 'belasting') {
+            return status === 'good' ? 'Geen actie nodig' : status === 'warn' ? 'Optimaliseer Box 3' : 'Box 3-actie nodig'
+          }
+          return null
+        })()
+
         return (
           <Link
             key={key}
@@ -151,23 +171,52 @@ export function HefbomenNav({
             >
               <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div className="mt-2 text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)]">
-              {status === 'neutral' ? 'Geen meting' : STATUS_LABEL[status]}
-            </div>
-            <div className="text-sm sm:text-base font-semibold text-[var(--ink)] mt-0.5 group-hover:text-[var(--ink-0)]">
+            <div className="mt-2 text-sm sm:text-base font-semibold text-[var(--ink)] group-hover:text-[var(--ink-0)]">
               {label}
             </div>
             {showTotal && (
-              <div className="mt-1 text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
-                <span className="opacity-60">{totalPrefix}</span>{' '}
-                <span className="font-semibold text-[var(--ink-2)]">
-                  {formattedTotal}
-                </span>
+              <div className="mt-0.5 text-base sm:text-lg font-serif font-semibold text-[var(--ink)] tabular-nums">
+                {formattedTotal}
+              </div>
+            )}
+            {statusSubText && (
+              <div
+                className={`mt-1 text-[11px] font-medium ${
+                  status === 'good' ? 'text-emerald-700'
+                  : status === 'warn' ? 'text-amber-700'
+                  : 'text-red-700'
+                }`}
+              >
+                {statusSubText}
               </div>
             )}
           </Link>
         )
       })}
     </nav>
+  )
+}
+
+/**
+ * Compacte legenda onderaan de hefbomen-rij. Toont gebruiker wat de
+ * status-dots betekenen, conform mockup ("Op koers / Aandacht nodig /
+ * Actie vereist").
+ */
+export function HefbomenLegenda() {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-3 mb-6 text-xs text-[var(--ink-3)]">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
+        Op koers
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="w-2 h-2 rounded-full bg-amber-500" aria-hidden="true" />
+        Aandacht nodig
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
+        Actie vereist
+      </span>
+    </div>
   )
 }

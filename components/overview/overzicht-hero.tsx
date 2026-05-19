@@ -7,7 +7,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
-import { HefbomenNav } from './overzicht-hero/hefbomen-nav'
+import { HefbomenNav, HefbomenLegenda } from './overzicht-hero/hefbomen-nav'
 import { HealthScoreCard } from './overzicht-hero/health-score-card'
 import {
   HealthScoreEmptyState,
@@ -138,6 +138,7 @@ export function OverzichtHero({
       </header>
 
       <HefbomenNav health={health} totals={totals} />
+      <HefbomenLegenda />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         {health ? (
