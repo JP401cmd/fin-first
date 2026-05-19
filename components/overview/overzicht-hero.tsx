@@ -8,7 +8,7 @@ import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receip
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 import { HefbomenNav } from './overzicht-hero/hefbomen-nav'
-import { AtomicCards, type AtomicCardEntry } from './atomic-cards'
+import { BriefingPanel, type BriefingEntry } from './briefing-panel'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { HealthScoreCard } from './overzicht-hero/health-score-card'
 import {
@@ -37,13 +37,10 @@ type OverzichtHeroProps = {
   isPensioenMode?: boolean
   /** Optionele totaalbedragen per hefboom (bezittingen, schulden, etc.). */
   totals?: HefbomenTotals
-  /** Drie atomic cards onder de hero (mockup): observation / tip / upcoming.
-   *  Wanneer null/leeg: card wordt weggelaten. */
-  atomicCards?: {
-    observation?: AtomicCardEntry | null
-    tip?: AtomicCardEntry | null
-    upcoming?: AtomicCardEntry | null
-  }
+  /** Briefing-entries onder de hero (max 6, 3-koloms grid). Wanneer leeg
+   *  toont het panel een placeholder-card. Categorieën: observation /
+   *  tip / upcoming / heads_up / milestone / market. */
+  briefingEntries?: BriefingEntry[]
   /** Inputs voor mini-vermogen-grafiek naast Health Score. Wanneer leeg
    *  blijft chart-slot leeg (geen rendering). */
   netWorthHistory?: { month: string; value: number }[]
@@ -96,7 +93,7 @@ export function OverzichtHero({
   endAge,
   isPensioenMode,
   totals,
-  atomicCards,
+  briefingEntries,
   netWorthHistory,
   currentNetWorth,
   fireAge,
@@ -204,13 +201,7 @@ export function OverzichtHero({
 
       <VrijheidStrip freedomPct={freedomPct ?? null} />
 
-      {atomicCards && (
-        <AtomicCards
-          observation={atomicCards.observation}
-          tip={atomicCards.tip}
-          upcoming={atomicCards.upcoming}
-        />
-      )}
+      <BriefingPanel entries={briefingEntries ?? []} />
 
       {health && (
         <BottomSheet
