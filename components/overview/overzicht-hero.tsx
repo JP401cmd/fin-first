@@ -9,6 +9,7 @@ import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 import { HefbomenNav, HefbomenLegenda } from './overzicht-hero/hefbomen-nav'
 import { AtomicCards, type AtomicCardEntry } from './atomic-cards'
+import { MiniNetWorthChart } from './mini-networth-chart'
 import { HealthScoreCard } from './overzicht-hero/health-score-card'
 import {
   HealthScoreEmptyState,
@@ -44,6 +45,11 @@ type OverzichtHeroProps = {
     tip?: AtomicCardEntry | null
     upcoming?: AtomicCardEntry | null
   }
+  /** Inputs voor mini-vermogen-grafiek naast Health Score. Wanneer leeg
+   *  blijft chart-slot leeg (geen rendering). */
+  netWorthHistory?: { month: string; value: number }[]
+  currentNetWorth?: number | null
+  fireAge?: number | null
 }
 
 function formatDateNL(): string {
@@ -86,6 +92,9 @@ export function OverzichtHero({
   isPensioenMode,
   totals,
   atomicCards,
+  netWorthHistory,
+  currentNetWorth,
+  fireAge,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
 
@@ -156,6 +165,23 @@ export function OverzichtHero({
         ) : (
           <HealthScoreEmptyState />
         )}
+        {/* Naast Health Score: mini netto-vermogen-grafiek. Wanneer geen
+            history of geen DOB → fallback CTA. Doelen-card schuift onder
+            de chart in een nieuwe rij (volgende grid). */}
+        <MiniNetWorthChart
+          netWorthHistory={netWorthHistory ?? []}
+          currentNetWorth={currentNetWorth ?? 0}
+          currentAge={currentAge ?? null}
+          fireAge={fireAge ?? null}
+          endAge={endAge ?? null}
+          isPensioenMode={isPensioenMode ?? false}
+        />
+      </div>
+
+      {/* Doelen-rij — los van Health/Chart-rij zodat het volle breedte
+          krijgt op smaller breakpoints en niet onder de chart gedrukt
+          wordt. Empty-state behoudt zijn CTA. */}
+      <div className="mt-3 sm:mt-4">
         {goalDisplay.length > 0 ? (
           <VoortgangDoelenCard items={goalDisplay} />
         ) : (

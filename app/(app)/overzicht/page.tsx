@@ -90,6 +90,20 @@ export default async function OverzichtPage() {
     upcoming: null,
   }
 
+  // Mini-vermogen-grafiek-inputs: net-worth history uit dashboard, huidig
+  // bedrag uit healthScoreInput (totalAssets - totalDebts), fireAge uit
+  // horizonData (komt deels via simResult; voor MVP halen we het uit
+  // dashboardData waar beschikbaar).
+  const netWorthHistory = dashboardData.netWorthHistory ?? []
+  const currentNetWorth =
+    (horizonData?.healthScoreInput?.totalAssets ?? 0) -
+    (horizonData?.healthScoreInput?.totalDebts ?? 0)
+  // fireAge: gebruik fractional (afgerond) als beschikbaar.
+  const fireAge =
+    dashboardData.fireAgeFractional != null
+      ? Math.round(dashboardData.fireAgeFractional)
+      : null
+
   return (
     <>
       <OverzichtHero
@@ -103,6 +117,9 @@ export default async function OverzichtPage() {
         isPensioenMode={isPensioenMode}
         totals={totals}
         atomicCards={atomicCards}
+        netWorthHistory={netWorthHistory}
+        currentNetWorth={currentNetWorth}
+        fireAge={fireAge}
       />
       <WillLanding
         dashboardData={dashboardData}
