@@ -9,6 +9,8 @@ import { CashflowViewSwitcher } from '@/components/overview/cashflow-view-switch
 import { TransactiesFeed, type TransactionRow } from '@/components/app/transacties-feed'
 import { TransactiesGeldstroom } from '@/components/overview/transacties-geldstroom'
 import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
+import { CashflowKalender } from '@/components/overview/cashflow-kalender'
+import type { RecurringTransaction } from '@/lib/recurring-data'
 
 export const metadata: Metadata = {
   title: 'Cashflow — TriFinity',
@@ -51,10 +53,11 @@ export default async function OverzichtCashflowPage() {
   let transactions: TransactionRow[] = []
   let monthLabel: string | undefined
   let fullName: string | null = null
+  let recurrings: RecurringTransaction[] = []
   if (user) {
     const since = new Date()
     since.setMonth(since.getMonth() - 3)
-    const [txResult, profileResult] = await Promise.all([
+    const [txResult, profileResult, recurResult] = await Promise.all([
       supabase
         .from('transactions')
         .select('id, date, description, category, amount, accounts(name)')
@@ -63,7 +66,13 @@ export default async function OverzichtCashflowPage() {
         .order('date', { ascending: false })
         .limit(500),
       supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+      supabase
+        .from('recurring_transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true),
     ])
+    recurrings = (recurResult.data ?? []) as RecurringTransaction[]
     transactions = (txResult.data ?? []).map((t) => {
       const accountField = (t as { accounts?: { name?: string } | { name?: string }[] | null }).accounts
       const accountName = Array.isArray(accountField)
@@ -97,6 +106,7 @@ export default async function OverzichtCashflowPage() {
           </>
         }
         vasteLastenView={<VasteLastenLoader fullName={fullName} />}
+        kalenderView={<CashflowKalender recurrings={recurrings} />}
       />
     </>
   )

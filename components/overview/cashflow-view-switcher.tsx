@@ -3,12 +3,13 @@
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { type ReactNode } from 'react'
 
-type ViewMode = 'budget' | 'transacties' | 'vaste-lasten'
+type ViewMode = 'budget' | 'transacties' | 'vaste-lasten' | 'kalender'
 
 const VIEWS: { id: ViewMode; label: string }[] = [
   { id: 'budget', label: 'Budget' },
   { id: 'transacties', label: 'Transacties' },
   { id: 'vaste-lasten', label: 'Vaste lasten' },
+  { id: 'kalender', label: 'Kalender' },
 ]
 
 /**
@@ -22,10 +23,13 @@ export function CashflowViewSwitcher({
   budgetView,
   transactiesView,
   vasteLastenView,
+  kalenderView,
 }: {
   budgetView: ReactNode
   transactiesView: ReactNode
   vasteLastenView: ReactNode
+  /** Nieuw: Cashflow-kalender met recurring transactions over 5 weken. */
+  kalenderView: ReactNode
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -85,6 +89,9 @@ export function CashflowViewSwitcher({
       )}
       {current === 'vaste-lasten' && (
         <div className="mx-auto max-w-6xl px-4 sm:px-6">{vasteLastenView}</div>
+      )}
+      {current === 'kalender' && (
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">{kalenderView}</div>
       )}
     </>
   )
