@@ -7,10 +7,7 @@ import { getAppSetupStatus } from '@/lib/app-setup-status'
 import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
 import { CashflowViewSwitcher } from '@/components/overview/cashflow-view-switcher'
 import { TransactiesFeed, type TransactionRow } from '@/components/app/transacties-feed'
-import {
-  VasteLastenList,
-  type VasteLastenRow,
-} from '@/components/overview/vaste-lasten-list'
+import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
 
 export const metadata: Metadata = {
   title: 'Cashflow — TriFinity',
@@ -52,11 +49,11 @@ export default async function OverzichtCashflowPage() {
   } = await supabase.auth.getUser()
   let transactions: TransactionRow[] = []
   let monthLabel: string | undefined
-  let vasteLasten: VasteLastenRow[] = []
+  let fullName: string | null = null
   if (user) {
     const since = new Date()
     since.setMonth(since.getMonth() - 3)
-    const [txResult, recurringResult] = await Promise.all([
+    const [txResult, profileResult] = await Promise.all([
       supabase
         .from('transactions')
         .select('id, date, description, category, amount, accounts(name)')
@@ -64,11 +61,7 @@ export default async function OverzichtCashflowPage() {
         .gte('date', since.toISOString().split('T')[0])
         .order('date', { ascending: false })
         .limit(500),
-      supabase
-        .from('recurring_transactions')
-        .select('id, name, amount, frequency, budget_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true),
+      supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
     ])
     transactions = (txResult.data ?? []).map((t) => {
       const accountField = (t as { accounts?: { name?: string } | { name?: string }[] | null }).accounts
@@ -84,13 +77,7 @@ export default async function OverzichtCashflowPage() {
         account_name: accountName ?? null,
       }
     })
-    vasteLasten = (recurringResult.data ?? []).map((r) => ({
-      id: String(r.id),
-      name: String(r.name ?? ''),
-      amount: Math.abs(Number(r.amount)),
-      frequency: (r as { frequency?: string }).frequency as VasteLastenRow['frequency'],
-      category: null, // recurring_transactions heeft geen eigen category-kolom; icoon valt op default
-    }))
+    fullName = (profileResult.data as { full_name?: string | null } | null)?.full_name ?? null
     monthLabel = new Intl.DateTimeFormat('nl-NL', {
       month: 'long',
       year: 'numeric',
@@ -105,7 +92,7 @@ export default async function OverzichtCashflowPage() {
         transactiesView={
           <TransactiesFeed transactions={transactions} monthLabel={monthLabel} />
         }
-        vasteLastenView={<VasteLastenList items={vasteLasten} />}
+        vasteLastenView={<VasteLastenLoader fullName={fullName} />}
       />
     </>
   )

@@ -144,11 +144,21 @@ export function TransactiesFeed({
       </header>
 
       {filtered.length === 0 ? (
-        <div className="py-12 flex flex-col items-center text-center text-[var(--ink-3)]">
+        <div className="py-12 flex flex-col items-center text-center text-[var(--ink-3)] max-w-md mx-auto">
           <Search className="w-8 h-8 mb-2 text-[var(--ink-4)]" />
-          <p className="text-sm">
-            {query.trim() ? 'Geen transactie gevonden voor je zoekopdracht.' : 'Geen transacties deze maand.'}
-          </p>
+          {query.trim() ? (
+            <p className="text-sm">Geen transactie gevonden voor je zoekopdracht.</p>
+          ) : transactions.length === 0 ? (
+            <>
+              <p className="text-sm font-medium text-[var(--ink-2)] mb-1">Nog geen transacties.</p>
+              <p className="text-xs">
+                Koppel een bankrekening of importeer een MT940/CSV-bestand om je
+                transacties hier te zien.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm">Geen transacties met dit filter.</p>
+          )}
         </div>
       ) : (
         <div role="list" className="space-y-4">
@@ -177,13 +187,17 @@ export function TransactiesFeed({
                       <div className="text-sm font-medium text-[var(--ink)] truncate">
                         {tx.description}
                       </div>
-                      {(tx.category || tx.account_name) && (
-                        <div className="text-[11px] text-[var(--ink-3)] truncate">
-                          {tx.category}
-                          {tx.category && tx.account_name ? ' · ' : ''}
-                          {tx.account_name}
-                        </div>
-                      )}
+                      <div className="text-[11px] text-[var(--ink-3)] truncate flex items-center gap-1.5">
+                        {tx.account_name && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--subtle)] text-[var(--ink-2)] font-medium">
+                            {tx.account_name}
+                          </span>
+                        )}
+                        {tx.category && <span>{tx.category}</span>}
+                        {!tx.account_name && !tx.category && (
+                          <span className="italic">Geen rekening</span>
+                        )}
+                      </div>
                     </div>
                     <span
                       className={[

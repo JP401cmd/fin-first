@@ -71,9 +71,10 @@ describe('TransactiesFeed', () => {
     expect(screen.queryByText('Vodafone')).toBeNull()
   })
 
-  it('toont lege staat zonder transacties', () => {
+  it('toont lege staat zonder transacties met import-hint', () => {
     render(<TransactiesFeed transactions={[]} />)
-    expect(screen.getByText('Geen transacties deze maand.')).toBeTruthy()
+    expect(screen.getByText('Nog geen transacties.')).toBeTruthy()
+    expect(screen.getByText(/MT940\/CSV-bestand/)).toBeTruthy()
   })
 
   it('toont specifieke lege staat bij zoek-mismatch', () => {
