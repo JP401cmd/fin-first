@@ -5,6 +5,7 @@ import { loadWillData } from '@/lib/will-data-loader'
 import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstTabs } from '@/components/future/toekomst-tabs'
 import { DoelenView } from '@/components/future/doelen-view'
+import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -42,6 +43,7 @@ export default async function ToekomstPage() {
           goalProgresses={willData.goalProgresses}
         />
       }
+      gebeurtenissenView={<GebeurtenissenView events={horizonData.events} />}
     />
   )
 }

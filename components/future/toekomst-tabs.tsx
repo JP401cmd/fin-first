@@ -34,10 +34,13 @@ const TABS: { id: ToekomstTab; label: string; Icon: typeof Compass }[] = [
 export function ToekomstTabs({
   tijdasView,
   doelenView,
+  gebeurtenissenView,
 }: {
   tijdasView: ReactNode
   /** Optionele content voor Doelen-tab. Wanneer afwezig: placeholder. */
   doelenView?: ReactNode
+  /** Optionele content voor Gebeurtenissen-tab. Wanneer afwezig: placeholder. */
+  gebeurtenissenView?: ReactNode
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -89,7 +92,7 @@ export function ToekomstTabs({
 
       {current === 'tijdas' && tijdasView}
       {current === 'doelen' && (doelenView ?? <DoelenTabPlaceholder />)}
-      {current === 'gebeurtenissen' && <GebeurtenissenTabPlaceholder />}
+      {current === 'gebeurtenissen' && (gebeurtenissenView ?? <GebeurtenissenTabPlaceholder />)}
       {current === 'voorkeuren' && <VoorkeurenTabPlaceholder />}
     </>
   )
