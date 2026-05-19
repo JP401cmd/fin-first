@@ -1,7 +1,11 @@
+'use client'
+
 import Link from 'next/link'
 import { Target, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
+import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
+import { useViewMode } from '@/components/app/view-mode-provider'
 
 /**
  * DoelenView — content voor de Doelen-tab op /toekomst.
@@ -50,6 +54,9 @@ export function DoelenView({
   goals: GoalWithBudget[]
   goalProgresses: GoalDisplay['progress'][]
 }) {
+  // DoelToevoegenSheet = scenario-tool → alleen in Plannen-modus (plan A-5).
+  const { isPlannen } = useViewMode()
+
   // Koppel goals + progresses op index (loader garandeert parallel
   // arrays). Sorteer op status: off-track eerst zodat aandacht-vereisende
   // doelen bovenaan staan.
@@ -78,13 +85,17 @@ export function DoelenView({
             bereiken. Doelen worden hier zichtbaar met status-flags zodat
             je weet hoe je ervoor staat.
           </p>
-          <Link
-            href="/will#goals"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
-          >
-            Eerste doel formuleren
-            <ArrowRight className="w-4 h-4" aria-hidden="true" />
-          </Link>
+          {isPlannen ? (
+            <DoelToevoegenSheet />
+          ) : (
+            <Link
+              href="/will#goals"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
+            >
+              Eerste doel formuleren
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          )}
         </article>
       </section>
     )
@@ -92,13 +103,16 @@ export function DoelenView({
 
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
-      <header className="mb-4">
-        <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-          Toekomst — doelen
+      <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+            Toekomst — doelen
+          </div>
+          <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
+            {display.length} {display.length === 1 ? 'actief doel' : 'actieve doelen'}
+          </h2>
         </div>
-        <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-          {display.length} {display.length === 1 ? 'actief doel' : 'actieve doelen'}
-        </h2>
+        {isPlannen && <DoelToevoegenSheet />}
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">

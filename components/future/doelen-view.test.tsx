@@ -1,7 +1,20 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { DoelenView } from './doelen-view'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
+
+// DoelenView mount DoelToevoegenSheet die next/navigation + supabase
+// client gebruikt. Mock beide zodat de view in isolatie test-baar
+// blijft. Hook useViewMode valt zonder provider terug op default.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}))
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    from: () => ({ insert: vi.fn().mockResolvedValue({ error: null }) }),
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+  }),
+}))
 
 /**
  * Tests voor DoelenView — Doelen-tab op /toekomst met status-flags
