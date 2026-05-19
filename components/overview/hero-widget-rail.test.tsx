@@ -18,12 +18,14 @@ vi.mock('@/components/widgets/draggable-widget-grid', () => ({
     editMode?: boolean
     suppressIntroSheet?: boolean
     hideHeader?: boolean
+    hideRemoveButton?: boolean
   }) => (
     <div
       data-testid="grid"
       data-edit={String(props.editMode)}
       data-suppress={String(props.suppressIntroSheet)}
       data-hideheader={String(props.hideHeader)}
+      data-hideremove={String(props.hideRemoveButton ?? false)}
     >
       DraggableWidgetGrid mock
     </div>
@@ -189,5 +191,22 @@ describe('HeroWidgetRail — render-logica', () => {
       />,
     )
     expect(screen.getByTestId('grid').getAttribute('data-hideheader')).toBe('true')
+  })
+
+  it('hideRemoveButton blijft FALSE — verwijder-knop op widgets moet zichtbaar zijn bij bewerken', () => {
+    // Bug-fix mei 2026: hideHeader koppelde per ongeluk de verwijder-knop
+    // uit, waardoor widgets in edit-mode niet meer te verwijderen waren.
+    render(
+      <HeroWidgetRail
+        isEditing={true}
+        onEditModeChange={() => {}}
+        hasActiveWidgets={false}
+        activeWidgets={[]}
+        allPrefs={[]}
+        dashboardData={mockData}
+        defaultContent={<div>Default</div>}
+      />,
+    )
+    expect(screen.getByTestId('grid').getAttribute('data-hideremove')).toBe('false')
   })
 })

@@ -107,7 +107,16 @@ const HEFBOOM_CONFIG: Record<
 /** Maximum aantal kaartjes — plan §6.2 evolutie: 3-koloms × 2 rijen = 6. */
 const MAX_BRIEFING_ENTRIES = 6
 
-export function BriefingPanel({ entries }: { entries: BriefingEntry[] }) {
+export function BriefingPanel({
+  entries,
+  narrative,
+}: {
+  entries: BriefingEntry[]
+  /** Optionele natuurlijke-taal samenvatting (plan T-1 / Tier-3 #16).
+   *  Gerendered als "Will:"-headline boven de card-grid. Wanneer null
+   *  of leeg blijft de headline weg. */
+  narrative?: string | null
+}) {
   // Slice tot max 6 en behoud volgorde — server-side briefing-engine
   // beslist over prioriteit (most-urgent eerst). Hier alleen capping.
   const capped = entries.slice(0, MAX_BRIEFING_ENTRIES)
@@ -116,29 +125,57 @@ export function BriefingPanel({ entries }: { entries: BriefingEntry[] }) {
     // Volledige lege staat — toon één placeholder zodat user weet dat
     // hier briefing-content komt zodra er data is.
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-6">
-        <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-3 sm:p-4 sm:col-span-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-2 h-2 rounded-full bg-[var(--ink-4)]" aria-hidden="true" />
-            <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-              Briefing
-            </span>
-          </div>
-          <p className="text-sm text-[var(--ink-3)] italic leading-snug">
-            Nog onvoldoende data voor een briefing — vul je hefbomen aan
-            en check terug volgende week voor je eerste samenvatting.
-          </p>
-        </article>
+      <div className="mt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-3 sm:p-4 sm:col-span-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="w-2 h-2 rounded-full bg-[var(--ink-4)]" aria-hidden="true" />
+              <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+                Briefing
+              </span>
+            </div>
+            <p className="text-sm text-[var(--ink-3)] italic leading-snug">
+              Nog onvoldoende data voor een briefing — vul je hefbomen aan
+              en check terug volgende week voor je eerste samenvatting.
+            </p>
+          </article>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-6">
-      {capped.map((entry) => (
-        <BriefingCard key={entry.id} entry={entry} />
-      ))}
+    <div className="mt-6 space-y-3 sm:space-y-4">
+      {narrative && <BriefingNarrative text={narrative} />}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        {capped.map((entry) => (
+          <BriefingCard key={entry.id} entry={entry} />
+        ))}
+      </div>
     </div>
+  )
+}
+
+/**
+ * Headline-card met natuurlijke-taal briefing. Will-persona is de stem
+ * (plan §6.5). Subtiele violet-tint zodat de samenvatting visueel
+ * onderscheidt van de feiten-cards eronder.
+ */
+function BriefingNarrative({ text }: { text: string }) {
+  return (
+    <article className="rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50/60 to-stone-50 p-4 sm:p-5">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold">
+          W
+        </span>
+        <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+          Will — jouw briefing
+        </span>
+      </div>
+      <p className="text-sm sm:text-base text-[var(--ink-2)] leading-relaxed">
+        {text}
+      </p>
+    </article>
   )
 }
 

@@ -210,3 +210,77 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
 
   return entries
 }
+
+// ── Natural-language narrative ─────────────────────────────────────
+//
+// Plan-context: T-1 (Tier-3 #16) "Wekelijkse briefing in natuurlijke taal,
+// gerendered server-side, gecached per gebruiker. 4-zinnen samenvatting
+// + 1 concrete actie."
+//
+// Voorlopig template-based (geen LLM-call). Eén zin per actieve categorie,
+// verbonden met natuurlijke connectoren. Tone: rustig en informatief,
+// niet casual — past bij TriFinity editorial-stijl. Bij weinig data
+// blijft de output beknopt (1-2 zinnen) i.p.v. holle vulling.
+
+interface NarrativeFragment {
+  /** Inleidende connector — undefined voor eerste fragment. */
+  connector?: string
+  /** Body-tekst zonder eindpunt; engine voegt punctuatie toe. */
+  body: string
+}
+
+const CATEGORY_CONNECTORS: Record<string, string[]> = {
+  observation: [], // eerste fragment, geen connector
+  tip:         ['Tegelijkertijd', 'Daarnaast', 'Verder'],
+  heads_up:    ['Let op', 'Aandacht', 'Wel'],
+  milestone:   ['Mooi nieuws', 'Plus', 'En'],
+  upcoming:    ['Op de horizon', 'Komende periode', 'Vooruitkijkend'],
+  market:      ['Markt', 'Buitenwereld'],
+}
+
+function fragmentForEntry(
+  entry: BriefingEntry,
+  index: number,
+): NarrativeFragment {
+  // Eerste entry: geen connector (begin van alinea).
+  // Daarna: roteer door beschikbare connectoren zodat herhaling
+  // beperkt blijft over meerdere weken.
+  const options = CATEGORY_CONNECTORS[entry.category] ?? []
+  const connector =
+    index === 0 || options.length === 0
+      ? undefined
+      : options[index % options.length]
+  // Cap-titel-eerst-woord op één char lowercased zodat de zin
+  // grammaticaal vloeit ná een connector ("Tegelijkertijd verschuif...")
+  let body = entry.text
+  if (connector && body.length > 0) {
+    body = body.charAt(0).toLowerCase() + body.slice(1)
+  }
+  return { connector, body }
+}
+
+/**
+ * Bouw een natuurlijke-taal samenvatting uit BriefingEntry[]. Returnt
+ * `null` wanneer er onvoldoende inhoud is om een zinvolle alinea te
+ * vormen (< 1 entry). Anders: 1-5 zinnen aan elkaar geregen.
+ *
+ * Will-persona: de output is "stem van Will" (plan §6.5). Het is aan
+ * de display-component of er een "Will:" prefix wordt getoond.
+ *
+ * Cap op MAX_NARRATIVE_FRAGMENTS (= 4) zodat de alinea kort en scanbaar
+ * blijft — de visuele cards in BriefingPanel kunnen tot 6 entries
+ * tonen voor wie meer detail wil.
+ */
+export const MAX_NARRATIVE_FRAGMENTS = 4
+
+export function buildBriefingNarrative(entries: BriefingEntry[]): string | null {
+  if (entries.length === 0) return null
+  const capped = entries.slice(0, MAX_NARRATIVE_FRAGMENTS)
+  const fragments = capped.map((entry, i) => fragmentForEntry(entry, i))
+  const sentences = fragments.map((f) => {
+    const text = f.connector ? `${f.connector} ${f.body}` : f.body
+    // Eind-punt veiligstellen.
+    return text.replace(/[.!?]\s*$/, '') + '.'
+  })
+  return sentences.join(' ')
+}

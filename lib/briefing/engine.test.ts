@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { buildBriefingEntries, type BriefingEngineInput } from './engine'
+import {
+  buildBriefingEntries,
+  buildBriefingNarrative,
+  MAX_NARRATIVE_FRAGMENTS,
+  type BriefingEngineInput,
+} from './engine'
 import type { HealthScore } from '@/lib/financial-health'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { Recommendation } from '@/lib/recommendation-data'
+import type { BriefingEntry } from '@/components/overview/briefing-panel'
 
 /**
  * Tests voor briefing-engine — pure functie die ruwe data omzet in
@@ -298,6 +304,89 @@ describe('buildBriefingEntries — hefboom-tagging (plan T-3)', () => {
     const event = { ...makeEvent('e1', 'Huis kopen', 30), event_type: 'housing_purchase' }
     const result = buildBriefingEntries(emptyInput({ events: [event] }))
     expect(result.find((e) => e.category === 'upcoming')?.hefboom).toBe('schulden')
+  })
+})
+
+function makeEntry(
+  category: BriefingEntry['category'],
+  text: string,
+): BriefingEntry {
+  return { id: category + ':' + text.slice(0, 5), category, text }
+}
+
+describe('buildBriefingNarrative — natural-language samenvatting (plan T-1)', () => {
+  it('returnt null bij lege entries', () => {
+    expect(buildBriefingNarrative([])).toBeNull()
+  })
+
+  it('rendert één-zin samenvatting bij één entry', () => {
+    const result = buildBriefingNarrative([
+      makeEntry('observation', 'Je vermogen groeide 1.2% sneller dan gemiddeld'),
+    ])
+    expect(result).toBe('Je vermogen groeide 1.2% sneller dan gemiddeld.')
+  })
+
+  it('voegt connectoren toe na het eerste fragment', () => {
+    const result = buildBriefingNarrative([
+      makeEntry('observation', 'Je vermogen groeit gestaag'),
+      makeEntry('tip', 'Verschuif €3k naar beleggen'),
+    ])
+    // Eerste zonder connector, tweede met "Tegelijkertijd" of vergelijkbaar
+    expect(result?.startsWith('Je vermogen groeit gestaag.')).toBe(true)
+    expect(result?.toLowerCase()).toMatch(
+      /tegelijkertijd|daarnaast|verder/i,
+    )
+  })
+
+  it('lowercase de eerste letter van entry na connector voor grammaticale vlotheid', () => {
+    const result = buildBriefingNarrative([
+      makeEntry('observation', 'Eerste zin'),
+      makeEntry('tip', 'Verschuif vermogen'),
+    ])
+    // Connector + lowercased body: bv. "Daarnaast verschuif vermogen"
+    expect(result).toMatch(/(Tegelijkertijd|Daarnaast|Verder) verschuif/)
+  })
+
+  it('cap op MAX_NARRATIVE_FRAGMENTS (= 4)', () => {
+    const entries: BriefingEntry[] = [
+      makeEntry('observation', 'A'),
+      makeEntry('tip', 'B'),
+      makeEntry('heads_up', 'C'),
+      makeEntry('milestone', 'D'),
+      makeEntry('upcoming', 'E'),
+    ]
+    const result = buildBriefingNarrative(entries)
+    expect(MAX_NARRATIVE_FRAGMENTS).toBe(4)
+    // 5e entry "E" mag niet voorkomen in de samenvatting. A..D zijn aanwezig
+    // (D wordt lowercased na connector → "d.").
+    expect(result).not.toContain(' E.')
+    expect(result).toContain('A.')
+    expect(result).toMatch(/[Dd]\.$/)
+  })
+
+  it('elk fragment eindigt met een eindpunt', () => {
+    const result = buildBriefingNarrative([
+      makeEntry('observation', 'Eerste'),
+      makeEntry('tip', 'Tweede'),
+    ])
+    // Twee zinnen → twee punten
+    expect(result?.match(/\./g)?.length).toBe(2)
+  })
+
+  it('strip bestaand eindpunt voordat punt wordt toegevoegd (geen ".." artifact)', () => {
+    const result = buildBriefingNarrative([
+      makeEntry('observation', 'Zin met eindpunt.'),
+    ])
+    expect(result).toBe('Zin met eindpunt.')
+    expect(result).not.toContain('..')
+  })
+
+  it('heads_up krijgt eigen connector-pool ("Let op" / "Aandacht")', () => {
+    const result = buildBriefingNarrative([
+      makeEntry('observation', 'Iets goeds'),
+      makeEntry('heads_up', 'Spaarquote te laag'),
+    ])
+    expect(result?.toLowerCase()).toMatch(/let op|aandacht|wel/i)
   })
 })
 

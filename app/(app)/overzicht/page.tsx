@@ -6,7 +6,7 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { WillLanding } from '@/components/will/will-landing'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
-import { buildBriefingEntries } from '@/lib/briefing/engine'
+import { buildBriefingEntries, buildBriefingNarrative } from '@/lib/briefing/engine'
 import { ageAtDate } from '@/lib/horizon-data'
 
 export const metadata: Metadata = {
@@ -87,6 +87,7 @@ export default async function OverzichtPage() {
     goalNames: willData.goals.map((g) => g.name),
     goalProgresses: willData.goalProgresses,
   })
+  const briefingNarrative = buildBriefingNarrative(briefingEntries)
 
   // Mini-vermogen-grafiek-inputs: gebruik dezelfde simulatie-data als
   // /toekomst (simRows + simRequiredPortfolio uit runUnifiedProjection)
@@ -117,6 +118,7 @@ export default async function OverzichtPage() {
         isPensioenMode={isPensioenMode}
         totals={totals}
         briefingEntries={briefingEntries}
+        briefingNarrative={briefingNarrative}
         netWorthHistory={netWorthHistory}
         currentNetWorth={currentNetWorth}
         fireAge={fireAge}

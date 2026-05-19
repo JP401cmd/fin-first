@@ -118,6 +118,9 @@ export function HeroWidgetRail({
       //  - categoryAppLinks       (undefined → geen categorie-balk)
       suppressIntroSheet
       hideHeader
+      // hideRemoveButton blijft default false — user wil widgets kunnen
+      // verwijderen in edit-mode (mei 2026 bug-rapport: "widgets op het
+      // overzicht hebben geen verwijder-knop bij bewerken").
       editMode={isEditing}
       onEditModeChange={onEditModeChange}
     />

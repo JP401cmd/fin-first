@@ -218,12 +218,23 @@ interface DraggableWidgetGridProps {
    */
   suppressIntroSheet?: boolean
   /**
-   * Verberg de section-header met "Mijn Dashboard"-titel + Modify-knop
-   * en de individuele verberg-knoppen per widget. Bedoeld voor host-
-   * context waar de host zijn eigen Bewerken-toggle exposeert en de
-   * dashboard-titel visueel overbodig is.
+   * Verberg de section-header met "Mijn Dashboard"-titel + Modify-knop.
+   * Bedoeld voor host-context waar de host zijn eigen Bewerken-toggle
+   * exposeert en de dashboard-titel visueel overbodig is.
+   *
+   * NB: dit raakt NIET de verberg-knoppen per widget — die hebben hun
+   * eigen `hideRemoveButton`-prop. Gebruikers moeten in edit-mode altijd
+   * widgets kunnen verwijderen, ook in host-context (user-feedback mei
+   * 2026: "widgets hebben geen verwijder knop bij bewerken").
    */
   hideHeader?: boolean
+  /**
+   * Verberg de X-verwijder-knop per widget in edit-mode. Default `false` —
+   * widgets blijven altijd verwijderbaar. Alleen op true zetten wanneer
+   * de host een alternatieve verwijder-flow exposeert (geen huidige
+   * gebruik; deze prop bestaat voor toekomstige uitbreidingen).
+   */
+  hideRemoveButton?: boolean
   /**
    * Controlled edit-mode voor host-componenten die hun eigen Bewerken-knop
    * exposen (zoals /overzicht hero-toggle). Bij aanwezigheid van beide
@@ -262,7 +273,7 @@ function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: Das
   return true
 }
 
-export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle, categoryAppLinks, suppressIntroSheet, hideHeader, editMode: controlledEditMode, onEditModeChange }: DraggableWidgetGridProps) {
+export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle, categoryAppLinks, suppressIntroSheet, hideHeader, hideRemoveButton, editMode: controlledEditMode, onEditModeChange }: DraggableWidgetGridProps) {
   const router = useRouter()
   const { features } = useFeatureAccess()
 
@@ -904,7 +915,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
                 isDragging={pref.id === activeId}
                 onResize={handleResize}
                 onHide={handleHide}
-                hideHideButton={hideHeader}
+                hideHideButton={hideRemoveButton}
               />
             ))}
           </div>

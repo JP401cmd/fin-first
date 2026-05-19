@@ -48,6 +48,9 @@ type OverzichtHeroProps = {
    *  toont het panel een placeholder-card. Categorieën: observation /
    *  tip / upcoming / heads_up / milestone / market. */
   briefingEntries?: BriefingEntry[]
+  /** Optionele natuurlijke-taal samenvatting (plan T-1) — gerendered
+   *  als Will-headline boven de briefing-cards. */
+  briefingNarrative?: string | null
   /** Inputs voor mini-vermogen-grafiek naast Health Score. Wanneer leeg
    *  blijft chart-slot leeg (geen rendering). */
   netWorthHistory?: { month: string; value: number }[]
@@ -109,6 +112,7 @@ export function OverzichtHero({
   isPensioenMode,
   totals,
   briefingEntries,
+  briefingNarrative,
   netWorthHistory,
   currentNetWorth,
   fireAge,
@@ -248,7 +252,7 @@ export function OverzichtHero({
         )}
       </div>
 
-      <BriefingPanel entries={briefingEntries ?? []} />
+      <BriefingPanel entries={briefingEntries ?? []} narrative={briefingNarrative ?? null} />
 
       {health && (
         <BottomSheet

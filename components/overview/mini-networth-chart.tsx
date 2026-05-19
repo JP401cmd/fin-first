@@ -132,9 +132,19 @@ export function MiniNetWorthChart({
       : dedupedProjection[dedupedProjection.length - 1]?.value ?? currentNetWorth
   const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
 
-  // Historisch netto vermogen: laatste 12 maanden worden gemapt op de
-  // linker 20% van de x-as (vóór "Vandaag"). Tonen als stippellijn.
+  // Historisch netto vermogen: gebruik de werkelijke tracking (max 12
+  // maanden, bron = net_worth_snapshots). Punten worden TIJDS-PROPORTIONAL
+  // verdeeld over het linker-segment (PAD_LEFT → todayX) i.p.v. evenredig
+  // gespreid — zo komen 6 maanden data uit op halve breedte, niet 100%
+  // uitgerekt zoals 12 maanden. User-feedback mei 2026: "gebruik echte
+  // netto-vermogen tracking tot aan vandaag, vanaf vandaag = toekomst".
   const recentHistory = netWorthHistory.slice(-12)
+  // Vensterbreedte voor visuele schaling: maximaal 12 maanden = volle
+  // linker-segment. Korter venster vult slechts een fractie.
+  const HISTORY_WINDOW_MONTHS = 12
+  // Anchor: oudste history-punt = maand 0 in linker-segment. Wanneer er
+  // minder dan HISTORY_WINDOW_MONTHS punten zijn, schaalt de lijn-lengte
+  // proportioneel mee (geen artificiële uitrekking meer).
 
   // Y-schaal: 0 → max van projectie + history + eindwaarde
   const allValues = [
@@ -161,12 +171,18 @@ export function MiniNetWorthChart({
     return todayX + (yearsFromToday / projYears) * projXSpan
   }
 
-  // Historische lijn — punten over de linker 20%. Stippellijn.
+  // Historische lijn — punten tijdsproportioneel over linker-segment.
+  // Bij minder dan HISTORY_WINDOW_MONTHS punten vult de lijn slechts een
+  // deel van het segment (geen kunstmatige uitrekking). Het laatste
+  // history-punt valt op todayX zodat hij continu overgaat in de
+  // projectie-curve.
   const histPoints = recentHistory.map((h, i) => {
-    const x =
+    const monthsBack = recentHistory.length - 1 - i
+    const fraction =
       recentHistory.length <= 1
-        ? PAD_LEFT
-        : PAD_LEFT + (i / (recentHistory.length - 1)) * (todayX - PAD_LEFT)
+        ? 0
+        : 1 - monthsBack / HISTORY_WINDOW_MONTHS
+    const x = PAD_LEFT + fraction * (todayX - PAD_LEFT)
     const y = valueToY(h.value)
     return { x, y }
   })
