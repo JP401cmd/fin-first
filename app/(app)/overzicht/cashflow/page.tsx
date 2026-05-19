@@ -137,13 +137,18 @@ export default async function OverzichtCashflowPage() {
       <CashflowViewSwitcher
         budgetView={<BudgetsClient initialData={data} />}
         transactiesView={
-          <>
+          <div className="space-y-6">
             <TransactiesGeldstroom transactions={transactions} monthLabel={monthLabel} />
+            <CashflowSankey transactions={transactions} monthLabel={monthLabel} />
             <TransactiesFeed transactions={transactions} monthLabel={monthLabel} />
-          </>
+          </div>
         }
-        vasteLastenView={<VasteLastenLoader fullName={fullName} />}
-        kalenderView={<CashflowKalender recurrings={recurrings} />}
+        vasteLastenView={
+          <div className="space-y-6">
+            <VasteLastenLoader fullName={fullName} />
+            <CashflowKalender recurrings={recurrings} />
+          </div>
+        }
         forecastView={
           <CashflowForecast
             recurrings={recurrings}
@@ -151,9 +156,6 @@ export default async function OverzichtCashflowPage() {
             baselineExpenses={baselineExpenses}
             startingBalance={startingBalance}
           />
-        }
-        sankeyView={
-          <CashflowSankey transactions={transactions} monthLabel={monthLabel} />
         }
       />
     </>

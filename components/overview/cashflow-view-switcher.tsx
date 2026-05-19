@@ -3,15 +3,13 @@
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { type ReactNode } from 'react'
 
-type ViewMode = 'budget' | 'transacties' | 'vaste-lasten' | 'kalender' | 'forecast' | 'sankey'
+type ViewMode = 'budget' | 'transacties' | 'vaste-lasten' | 'forecast'
 
 const VIEWS: { id: ViewMode; label: string }[] = [
   { id: 'budget', label: 'Budget' },
   { id: 'transacties', label: 'Transacties' },
   { id: 'vaste-lasten', label: 'Vaste lasten' },
-  { id: 'kalender', label: 'Kalender' },
   { id: 'forecast', label: 'Forecast' },
-  { id: 'sankey', label: 'Sankey' },
 ]
 
 /**
@@ -25,19 +23,13 @@ export function CashflowViewSwitcher({
   budgetView,
   transactiesView,
   vasteLastenView,
-  kalenderView,
   forecastView,
-  sankeyView,
 }: {
   budgetView: ReactNode
   transactiesView: ReactNode
   vasteLastenView: ReactNode
-  /** Nieuw: Cashflow-kalender met recurring transactions over 5 weken. */
-  kalenderView: ReactNode
-  /** Nieuw: 6-maanden forecast met baseline + recurring aggregaat. */
+  /** 6-maanden forecast met baseline + recurring aggregaat. */
   forecastView: ReactNode
-  /** Nieuw: Sankey-LITE die geldstroom inkomen → uitgaven visualiseert. */
-  sankeyView: ReactNode
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -98,14 +90,8 @@ export function CashflowViewSwitcher({
       {current === 'vaste-lasten' && (
         <div className="mx-auto max-w-6xl px-4 sm:px-6">{vasteLastenView}</div>
       )}
-      {current === 'kalender' && (
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">{kalenderView}</div>
-      )}
       {current === 'forecast' && (
         <div className="mx-auto max-w-6xl px-4 sm:px-6">{forecastView}</div>
-      )}
-      {current === 'sankey' && (
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">{sankeyView}</div>
       )}
     </>
   )
