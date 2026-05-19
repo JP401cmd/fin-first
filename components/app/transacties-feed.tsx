@@ -103,6 +103,18 @@ export function TransactiesFeed({
           )}
         </div>
 
+        {transactions.length > 0 && (
+          <p className="text-xs text-[var(--ink-3)] leading-relaxed">
+            Gecombineerd overzicht van alle gekoppelde rekeningen.{' '}
+            <a
+              href="/overzicht/bezittingen/cash"
+              className="text-violet-700 font-medium hover:underline"
+            >
+              Beheer koppelingen →
+            </a>
+          </p>
+        )}
+
         {/* Filter-segmented + zoek-input */}
         <div className="flex flex-col sm:flex-row gap-2">
           <nav

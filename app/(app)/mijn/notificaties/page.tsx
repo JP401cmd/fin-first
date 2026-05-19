@@ -223,6 +223,21 @@ export default function MijnNotificatiesPage() {
         </p>
       </header>
 
+      {/* Context-banner: maakt duidelijk waar deze meldingen verschijnen.
+          User-feedback (mei 2026): "het is mij niet duidelijk welke
+          notificaties dit zijn, die van de coach of die in het meldingen
+          scherm terecht komen?". */}
+      <div className="mb-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--subtle)] p-3 sm:p-4 text-xs sm:text-sm text-[var(--ink-2)]">
+        <p className="leading-relaxed">
+          <span className="font-semibold text-[var(--ink)]">Push-meldingen</span>{' '}
+          die je op je apparaat ontvangt — ook bekend onder het{' '}
+          <em>belletje</em>-icoon op /berichten. De{' '}
+          <span className="font-semibold text-[var(--ink)]">Will-coach</span> heeft
+          een eigen meldingen-stream onder &quot;Berichten&quot; in het hoofdmenu.
+          Die twee zijn los van elkaar.
+        </p>
+      </div>
+
       <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
         <div className="px-4 sm:px-8 py-6">
           {notifLoading ? (
