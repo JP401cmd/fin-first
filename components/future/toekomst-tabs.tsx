@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { type ReactNode } from 'react'
 import { Compass, Target, CalendarClock, SlidersHorizontal, ArrowRight } from 'lucide-react'
+import { PrintTijdasButton } from './print-tijdas-button'
 
 /**
  * /toekomst segmented-control wrapper. Vier tabs uit navigatie-redesign-plan
@@ -65,12 +66,13 @@ export function ToekomstTabs({
 
   return (
     <>
-      <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        <nav
-          aria-label="Toekomst-tabs"
-          className="mb-4 flex flex-wrap gap-1 rounded-2xl border border-[var(--border-ed)] bg-[var(--subtle)] p-1"
-        >
-          {TABS.map(({ id, label, Icon }) => {
+      <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 print:hidden">
+        <div className="mb-4 flex items-center gap-3 flex-wrap">
+          <nav
+            aria-label="Toekomst-tabs"
+            className="flex flex-wrap gap-1 rounded-2xl border border-[var(--border-ed)] bg-[var(--subtle)] p-1 flex-1 min-w-[280px]"
+          >
+            {TABS.map(({ id, label, Icon }) => {
             const active = current === id
             return (
               <button
@@ -90,7 +92,12 @@ export function ToekomstTabs({
               </button>
             )
           })}
-        </nav>
+          </nav>
+          {/* Tijdas-specifieke actie: Delen/Afdrukken (plan F-6).
+              Alleen zichtbaar op Tijdas-tab — andere tabs hebben hun
+              eigen acties of geen export-relevant content. */}
+          {current === 'tijdas' && <PrintTijdasButton />}
+        </div>
       </div>
 
       {current === 'tijdas' && tijdasView}

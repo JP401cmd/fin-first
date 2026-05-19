@@ -88,6 +88,32 @@ describe('ToekomstTabs — navigatie', () => {
   })
 })
 
+describe('ToekomstTabs — PrintTijdasButton (plan F-6)', () => {
+  it('toont Delen/Afdrukken-knop alleen op Tijdas-tab', () => {
+    mockSearchParams.get.mockReturnValue(null) // default = tijdas
+    render(<ToekomstTabs tijdasView={<div>x</div>} />)
+    expect(screen.getByText(/Delen \/ Afdrukken/i)).toBeTruthy()
+  })
+
+  it('verbergt Delen-knop op Doelen-tab', () => {
+    mockSearchParams.get.mockReturnValue('doelen')
+    render(<ToekomstTabs tijdasView={<div>x</div>} />)
+    expect(screen.queryByText(/Delen \/ Afdrukken/i)).toBeNull()
+  })
+
+  it('verbergt Delen-knop op Gebeurtenissen-tab', () => {
+    mockSearchParams.get.mockReturnValue('gebeurtenissen')
+    render(<ToekomstTabs tijdasView={<div>x</div>} />)
+    expect(screen.queryByText(/Delen \/ Afdrukken/i)).toBeNull()
+  })
+
+  it('verbergt Delen-knop op Voorkeuren-tab', () => {
+    mockSearchParams.get.mockReturnValue('voorkeuren')
+    render(<ToekomstTabs tijdasView={<div>x</div>} />)
+    expect(screen.queryByText(/Delen \/ Afdrukken/i)).toBeNull()
+  })
+})
+
 describe('ToekomstTabs — placeholder deeplinks', () => {
   it('Doelen-placeholder linkt naar /overzicht en /will#goals', () => {
     mockSearchParams.get.mockReturnValue('doelen')
