@@ -6,7 +6,7 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { WillLanding } from '@/components/will/will-landing'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
+import { buildBriefingEntries } from '@/lib/briefing/engine'
 import { ageAtDate } from '@/lib/horizon-data'
 
 export const metadata: Metadata = {
@@ -77,69 +77,16 @@ export default async function OverzichtPage() {
     : undefined
 
   // Briefing-entries onderaan hero — max 6, 3-koloms grid (plan §6.2 +
-  // T-1 Tier-3 #16). Server-side aggregeert uit bestaande data-bronnen
-  // totdat de dedicated briefing-engine (plan A-4) als first-class
-  // server-component leeft. Categorieën worden ingevuld vanuit:
-  //
-  //  observation — recommendations[0] (= analyse-output Will)
-  //  tip         — recommendations[1] (= actie-suggestie Will)
-  //  upcoming    — eerstvolgende life-event binnen 90 dagen
-  //  heads_up    — laagst-scorende health-pillar wanneer < 50 (= zorg)
-  //  milestone   — recent behaald doel (huidige stap = behaald maar nog
-  //                niet completed). Voor MVP overgeslagen tot
-  //                briefing-engine dit kan detecteren.
-  //  market      — voor MVP overgeslagen; toekomstige iteratie pakt
-  //                marktdata uit een externe feed.
-  //
-  // Lege entries vallen weg; BriefingPanel cap't op 6.
-  const recommendations = willData.recommendations
-  const firstRec = recommendations[0]
-  const secondRec = recommendations[1]
-  const today = new Date()
-  const ninetyDaysFromNow = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
-  const upcomingEvent = (horizonData?.events ?? [])
-    .filter((e) => e.target_date)
-    .map((e) => ({ event: e, date: new Date(e.target_date as string) }))
-    .filter(({ date }) => date > today && date < ninetyDaysFromNow)
-    .sort((a, b) => a.date.getTime() - b.date.getTime())[0]
-  const weakestPillar =
-    health?.pillars
-      .filter((p) => p.score != null && p.score < 50)
-      .sort((a, b) => (a.score ?? 100) - (b.score ?? 100))[0] ?? null
-
-  const briefingEntries: BriefingEntry[] = []
-  if (firstRec) {
-    briefingEntries.push({
-      id: 'observation:' + firstRec.id,
-      category: 'observation',
-      text: firstRec.title,
-      href: '/overzicht',
-    })
-  }
-  if (secondRec) {
-    briefingEntries.push({
-      id: 'tip:' + secondRec.id,
-      category: 'tip',
-      text: secondRec.title,
-      href: '/overzicht',
-    })
-  }
-  if (upcomingEvent) {
-    briefingEntries.push({
-      id: 'upcoming:' + upcomingEvent.event.id,
-      category: 'upcoming',
-      text: `${upcomingEvent.event.name} — ${upcomingEvent.date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}`,
-      href: '/toekomst',
-    })
-  }
-  if (weakestPillar) {
-    briefingEntries.push({
-      id: 'heads_up:' + weakestPillar.id,
-      category: 'heads_up',
-      text: `${weakestPillar.name} vraagt aandacht — ${weakestPillar.improvementTip}`,
-      href: weakestPillar.actionHref ?? '/overzicht',
-    })
-  }
+  // T-1 Tier-3 #16). Aggregatie via `lib/briefing/engine.ts` (plan A-4):
+  // pure functie die ruwe inputs omzet in BriefingEntry[] — testbaar en
+  // herbruikbaar buiten deze page.
+  const briefingEntries = buildBriefingEntries({
+    recommendations: willData.recommendations,
+    events: horizonData?.events ?? [],
+    health,
+    goalNames: willData.goals.map((g) => g.name),
+    goalProgresses: willData.goalProgresses,
+  })
 
   // Mini-vermogen-grafiek-inputs: gebruik dezelfde simulatie-data als
   // /toekomst (simRows + simRequiredPortfolio uit runUnifiedProjection)
