@@ -7,6 +7,7 @@ import { getAppSetupStatus } from '@/lib/app-setup-status'
 import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
 import { CashflowViewSwitcher } from '@/components/overview/cashflow-view-switcher'
 import { TransactiesFeed, type TransactionRow } from '@/components/app/transacties-feed'
+import { TransactiesGeldstroom } from '@/components/overview/transacties-geldstroom'
 import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
 
 export const metadata: Metadata = {
@@ -90,7 +91,10 @@ export default async function OverzichtCashflowPage() {
       <CashflowViewSwitcher
         budgetView={<BudgetsClient initialData={data} />}
         transactiesView={
-          <TransactiesFeed transactions={transactions} monthLabel={monthLabel} />
+          <>
+            <TransactiesGeldstroom transactions={transactions} monthLabel={monthLabel} />
+            <TransactiesFeed transactions={transactions} monthLabel={monthLabel} />
+          </>
         }
         vasteLastenView={<VasteLastenLoader fullName={fullName} />}
       />
