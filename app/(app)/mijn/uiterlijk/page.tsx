@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PalettePicker } from '@/components/mijn/palette-picker'
+import { FontPicker } from '@/components/mijn/font-picker'
 
 export const metadata: Metadata = {
   title: 'Uiterlijk — TriFinity',
@@ -40,13 +41,17 @@ export default function MijnUiterlijkPage() {
           <PalettePicker />
         </div>
 
+        <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+          <FontPicker />
+        </div>
+
         <div className="mt-6 rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-4">
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)] mb-1">
             Meer instellingen
           </div>
           <p className="text-xs text-[var(--ink-3)] leading-snug mb-3">
-            Module-accentkleuren, typografie-thema en categorie-tints
-            wonen voorlopig nog op de legacy weergave-tab.
+            Module-accentkleuren en categorie-tints wonen voorlopig nog op
+            de legacy weergave-tab.
           </p>
           <Link
             href="/identity/instellingen?tab=weergave"
