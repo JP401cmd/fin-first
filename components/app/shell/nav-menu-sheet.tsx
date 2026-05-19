@@ -45,7 +45,9 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
       size="md"
       initialMobileHeight="80vh"
     >
-      <div className="space-y-5 pb-4">
+      {/* pb-24 binnen de sheet zelf zodat de floating-pill (die BOVEN de
+          sheet zit) de laatste "Overal beschikbaar"-knoppen niet bedekt. */}
+      <div className="space-y-5 pb-24">
         {/* Hoofdpagina's + hun sub-routes als één gestapelde lijst */}
         {mainNav.map((item) => {
           const Icon = item.icon!

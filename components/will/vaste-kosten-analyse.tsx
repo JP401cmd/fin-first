@@ -55,6 +55,9 @@ interface VasteKostenAnalyseProps {
   userProfile: { full_name: string | null } | null
   onCancellationOpen: (metadata: CancellationMetadata) => void
   onRefresh: () => Promise<void>
+  /** Wanneer false: geen collapse-toggle, content altijd zichtbaar.
+   *  Default true (backwards-compat met WillLanding-gebruik). */
+  collapsible?: boolean
 }
 
 // ── Category icons ───────────────────────────────────────────
@@ -94,6 +97,7 @@ export function VasteKostenAnalyse({
   userProfile,
   onCancellationOpen,
   onRefresh,
+  collapsible = true,
 }: VasteKostenAnalyseProps) {
   const { masked } = useMaskedAmounts()
   const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
@@ -101,19 +105,25 @@ export function VasteKostenAnalyse({
   const [classifyItem, setClassifyItem] = useState<ClassifyItemData | null>(null)
   const [aiSheetOpen, setAiSheetOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'abonnementen' | 'vaste-kosten'>('abonnementen')
-  const [isOpen, setIsOpen] = useState(false)
+  // Wanneer non-collapsible: altijd open, geen localStorage-state.
+  const [isOpen, setIsOpen] = useState(!collapsible)
   const [mounted, setMounted] = useState(false)
   const totalCount = subscriptions.length + vasteKosten.length
 
   useEffect(() => {
+    if (!collapsible) {
+      setMounted(true)
+      return
+    }
     try {
       const stored = localStorage.getItem('collapsible_will-vaste-kosten-analyse')
       if (stored !== null) setIsOpen(stored === 'true')
     } catch { /* localStorage not available */ }
     setMounted(true)
-  }, [])
+  }, [collapsible])
 
   function toggleOpen() {
+    if (!collapsible) return
     const next = !isOpen
     setIsOpen(next)
     try { localStorage.setItem('collapsible_will-vaste-kosten-analyse', String(next)) } catch { /* */ }
@@ -162,14 +172,19 @@ export function VasteKostenAnalyse({
       {/* ── Accent bar ── */}
       <div className="h-[3px] w-full bg-wil-500" />
 
-      {/* ── Header (clickable toggle) ── */}
+      {/* ── Header — collapsible OF static (op aparte tab) ── */}
       <button
         type="button"
         onClick={toggleOpen}
-        aria-expanded={isOpen}
-        className="flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors hover:bg-[var(--subtle)] sm:px-5"
+        aria-expanded={collapsible ? isOpen : undefined}
+        disabled={!collapsible}
+        className={`flex w-full items-center gap-3 border-b border-[var(--border-ed)] px-4 py-4 text-left transition-colors sm:px-5 ${
+          collapsible ? 'hover:bg-[var(--subtle)] cursor-pointer' : 'cursor-default'
+        }`}
       >
-        <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        {collapsible && (
+          <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        )}
         <div className="flex min-w-0 flex-1 items-center justify-between">
           <div className="flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-wil-500" />

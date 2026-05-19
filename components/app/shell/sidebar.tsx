@@ -462,7 +462,7 @@ function ModulesSectionLabel() {
         style={{ background: 'var(--color-horizon-500)' }}
       />
       <span className="text-[10px] font-mono uppercase tracking-[0.20em] text-[var(--ink-2)]">
-        Drie modules
+        Twee modules
       </span>
     </div>
   )

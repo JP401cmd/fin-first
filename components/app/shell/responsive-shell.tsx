@@ -224,10 +224,12 @@ function LegacyShell({
           <WelcomeBanner />
         </Suspense>
         <DailyExpenseProvider>
-          {/* pb-28 mobile (~112px) zodat de floating-nav-pill (~56px hoog,
-              12px safe-area-offset) ruim onder de content blijft tijdens
-              scrollen — geen overlap met laatste interactieve elementen. */}
-          <main id="main-content" tabIndex={-1} className="pb-28 md:pb-0 outline-none">{children}</main>
+          {/* pb-40 mobile (~160px) zodat de floating-nav-pill (~56px hoog,
+              12px safe-area-offset) en het uitgeklapte menu (sheet-content
+              komt over de pill heen) niet over knoppen of links onderaan
+              de pagina vallen. Geldt voor ALLE mobile pages — geen
+              uitzonderingen, anders cherry-pick-bugs. */}
+          <main id="main-content" tabIndex={-1} className="pb-40 md:pb-0 outline-none">{children}</main>
         </DailyExpenseProvider>
       </ChatLayoutWrapper>
       <FloatingNavButton />

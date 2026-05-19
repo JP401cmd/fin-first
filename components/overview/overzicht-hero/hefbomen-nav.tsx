@@ -21,7 +21,7 @@ export type HefbomenTotals = {
   bezittingen?: number | null
   /** Totale openstaande schulden, in EUR. */
   schulden?: number | null
-  /** Maandelijks netto-inkomen (positief saldo), in EUR. */
+  /** Spaarquote 6-maands gemiddelde (0–100 %). */
   cashflow?: number | null
   /** Jaarlijkse Box 3-belasting, in EUR. */
   belasting?: number | null
@@ -68,7 +68,7 @@ const HEFBOMEN: ReadonlyArray<{
     accent: 'text-sky-700 bg-sky-50',
     pillarKey: 'savings_rate',
     tooltip: 'In en uit per maand — het deel dat je opzij zet bepaalt je tempo.',
-    totalPrefix: 'Per maand',
+    totalPrefix: 'Spaarquote',
   },
   {
     key: 'belasting',
@@ -127,6 +127,12 @@ export function HefbomenNav({
 
         const totalValue = totals?.[key]
         const showTotal = typeof totalValue === 'number' && totalValue > 0
+        // Cashflow is een percentage (spaarquote), andere zijn EUR.
+        const formattedTotal = showTotal
+          ? key === 'cashflow'
+            ? `${Math.round(totalValue)}%`
+            : formatCurrency(totalValue)
+          : ''
 
         return (
           <Link
@@ -155,7 +161,7 @@ export function HefbomenNav({
               <div className="mt-1 text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
                 <span className="opacity-60">{totalPrefix}</span>{' '}
                 <span className="font-semibold text-[var(--ink-2)]">
-                  {formatCurrency(totalValue)}
+                  {formattedTotal}
                 </span>
               </div>
             )}

@@ -117,6 +117,7 @@ export function VasteLastenLoader({
       userProfile={fullName ? { full_name: fullName } : null}
       onCancellationOpen={handleCancellation}
       onRefresh={refresh}
+      collapsible={false}
     />
   )
 }

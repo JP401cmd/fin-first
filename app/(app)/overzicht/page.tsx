@@ -69,6 +69,7 @@ export default async function OverzichtPage() {
     ? {
         bezittingen: horizonData.healthScoreInput.totalAssets,
         schulden: horizonData.healthScoreInput.totalDebts,
+        cashflow: horizonData.healthScoreInput.savingsRate6m,
       }
     : undefined
 
