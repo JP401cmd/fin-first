@@ -10,6 +10,7 @@ import { TransactiesFeed, type TransactionRow } from '@/components/app/transacti
 import { TransactiesGeldstroom } from '@/components/overview/transacties-geldstroom'
 import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
 import { CashflowKalender } from '@/components/overview/cashflow-kalender'
+import { CashflowForecast } from '@/components/overview/cashflow-forecast'
 import type { RecurringTransaction } from '@/lib/recurring-data'
 
 export const metadata: Metadata = {
@@ -54,10 +55,19 @@ export default async function OverzichtCashflowPage() {
   let monthLabel: string | undefined
   let fullName: string | null = null
   let recurrings: RecurringTransaction[] = []
+  let baselineIncome = 0
+  let baselineExpenses = 0
+  let startingBalance = 0
   if (user) {
     const since = new Date()
     since.setMonth(since.getMonth() - 3)
-    const [txResult, profileResult, recurResult] = await Promise.all([
+    // Baseline-venster voor forecast: laatste 6 maanden gemiddeld inkomen +
+    // uitgaven. Aparte parallelle query gebruikt zelfde 6m periode als
+    // health-score (consistentie). Bank-accounts voor startingBalance.
+    const sixMonthsAgo = new Date()
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+    const sixMonthsAgoIso = sixMonthsAgo.toISOString().split('T')[0]
+    const [txResult, profileResult, recurResult, baselineResult, accountsResult] = await Promise.all([
       supabase
         .from('transactions')
         .select('id, date, description, category, amount, accounts(name)')
@@ -71,8 +81,34 @@ export default async function OverzichtCashflowPage() {
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true),
+      // 6-maanden transacties voor baseline-aggregaat
+      supabase
+        .from('transactions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .gte('date', sixMonthsAgoIso),
+      // Liquide saldo voor cumulatief-startpunt
+      supabase
+        .from('bank_accounts')
+        .select('balance')
+        .eq('user_id', user.id)
+        .eq('is_active', true),
     ])
     recurrings = (recurResult.data ?? []) as RecurringTransaction[]
+    const baselineRows = (baselineResult.data ?? []) as { amount: number }[]
+    let totalIncome = 0
+    let totalExpenses = 0
+    for (const r of baselineRows) {
+      const a = Number(r.amount)
+      if (a > 0) totalIncome += a
+      else totalExpenses += Math.abs(a)
+    }
+    baselineIncome = Math.round(totalIncome / 6)
+    baselineExpenses = Math.round(totalExpenses / 6)
+    startingBalance = (accountsResult.data ?? []).reduce(
+      (s, a) => s + Number((a as { balance: number }).balance ?? 0),
+      0,
+    )
     transactions = (txResult.data ?? []).map((t) => {
       const accountField = (t as { accounts?: { name?: string } | { name?: string }[] | null }).accounts
       const accountName = Array.isArray(accountField)
@@ -107,6 +143,14 @@ export default async function OverzichtCashflowPage() {
         }
         vasteLastenView={<VasteLastenLoader fullName={fullName} />}
         kalenderView={<CashflowKalender recurrings={recurrings} />}
+        forecastView={
+          <CashflowForecast
+            recurrings={recurrings}
+            baselineIncome={baselineIncome}
+            baselineExpenses={baselineExpenses}
+            startingBalance={startingBalance}
+          />
+        }
       />
     </>
   )

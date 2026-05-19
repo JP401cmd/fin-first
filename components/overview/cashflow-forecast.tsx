@@ -1,0 +1,272 @@
+'use client'
+
+import { useMemo } from 'react'
+import { TrendingDown, TrendingUp, Minus } from 'lucide-react'
+import { formatCurrency } from '@/lib/format'
+import type { RecurringTransaction } from '@/lib/recurring-data'
+
+/**
+ * CashflowForecast — 6-maanden-vooruitblik op kasstroom. Voor elke
+ * toekomstige maand toont een rij: verwacht in / verwacht uit / netto
+ * delta / cumulatief saldo (startend bij huidig saldo of 0).
+ *
+ * Plan-context: backlog "Cashflow Sankey-chart, forecast, kalender uit
+ * cash-overview". Tweede item — kalender doet vooruitblik op dag-niveau,
+ * forecast aggregeert op maand-niveau zodat de tendens zichtbaar wordt
+ * over een langer venster.
+ *
+ * Aannames:
+ *  - Baseline = avgIncome6m + avgExpenses6m (uit BudgetsData), repeat
+ *    iedere maand
+ *  - Recurring transactions worden bovenop de baseline opgeteld in de
+ *    maand waar ze vallen (frequency-aware: monthly elke maand, weekly
+ *    geschat ×4.33, quarterly ÷3, yearly ÷12 — voor MVP simpel)
+ *  - Cumulatief saldo loopt door — start = `startingBalance` (default 0)
+ *
+ * Gebruikt geen Monte Carlo of inflatie; voor scenario-diepere
+ * forecasting verwijst de footer naar /toekomst Tijdas.
+ */
+
+type ForecastRow = {
+  monthIdx: number
+  label: string
+  incoming: number
+  outgoing: number
+  net: number
+  cumulative: number
+}
+
+const FORECAST_MONTHS = 6
+
+function buildForecast(
+  recurrings: RecurringTransaction[],
+  baselineIncome: number,
+  baselineExpenses: number,
+  startingBalance: number,
+  fromDate: Date,
+): ForecastRow[] {
+  const rows: ForecastRow[] = []
+  let cumulative = startingBalance
+
+  for (let i = 1; i <= FORECAST_MONTHS; i++) {
+    const monthDate = new Date(fromDate.getFullYear(), fromDate.getMonth() + i, 1)
+    const label = monthDate.toLocaleDateString('nl-NL', {
+      month: 'short',
+      year: 'numeric',
+    })
+    // Baseline is per-maand. Plus recurring deltas (per-maand omgerekend
+    // — gelijke aanpak per maand voor eenvoudige forecast).
+    let incoming = Math.max(0, baselineIncome)
+    let outgoing = Math.max(0, baselineExpenses)
+    for (const r of recurrings) {
+      if (!r.is_active) continue
+      const amount = Number(r.amount)
+      let perMonth = 0
+      switch (r.frequency) {
+        case 'weekly':
+          perMonth = amount * (52 / 12)
+          break
+        case 'monthly':
+          perMonth = amount
+          break
+        case 'quarterly':
+          perMonth = amount / 3
+          break
+        case 'yearly':
+          perMonth = amount / 12
+          break
+      }
+      if (perMonth > 0) incoming += perMonth
+      else outgoing += Math.abs(perMonth)
+    }
+    const net = incoming - outgoing
+    cumulative += net
+    rows.push({
+      monthIdx: i,
+      label,
+      incoming: Math.round(incoming),
+      outgoing: Math.round(outgoing),
+      net: Math.round(net),
+      cumulative: Math.round(cumulative),
+    })
+  }
+  return rows
+}
+
+export function CashflowForecast({
+  recurrings,
+  baselineIncome,
+  baselineExpenses,
+  startingBalance,
+}: {
+  recurrings: RecurringTransaction[]
+  /** Verwacht maandinkomen uit BudgetsData (avgIncome6m). */
+  baselineIncome: number
+  /** Verwachte maandlasten uit BudgetsData (avgExpenses6m). */
+  baselineExpenses: number
+  /** Huidig liquide saldo waarop cumulatief verder wordt gerekend.
+   *  Default 0 als onbekend. */
+  startingBalance?: number
+}) {
+  const rows = useMemo(
+    () =>
+      buildForecast(
+        recurrings,
+        baselineIncome,
+        baselineExpenses,
+        startingBalance ?? 0,
+        new Date(),
+      ),
+    [recurrings, baselineIncome, baselineExpenses, startingBalance],
+  )
+
+  const totalIn = rows.reduce((s, r) => s + r.incoming, 0)
+  const totalOut = rows.reduce((s, r) => s + r.outgoing, 0)
+  const totalNet = totalIn - totalOut
+  const lastCumulative = rows[rows.length - 1]?.cumulative ?? startingBalance ?? 0
+
+  const hasBaseline = baselineIncome > 0 || baselineExpenses > 0
+  const hasRecurrings = recurrings.length > 0
+
+  if (!hasBaseline && !hasRecurrings) {
+    return (
+      <div className="space-y-4">
+        <header>
+          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+            Cashflow — forecast
+          </div>
+          <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
+            6 maanden vooruit
+          </h2>
+        </header>
+        <div className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 text-center">
+          <p className="text-sm text-[var(--ink-3)] italic leading-relaxed">
+            Forecast vereist baseline-cijfers (inkomen + uitgaven over
+            laatste 6 maanden) of recurring transactions. Voeg ze toe via{' '}
+            <span className="font-medium">Cashflow → Vaste lasten</span>.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <header className="flex items-baseline justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+            Cashflow — forecast
+          </div>
+          <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
+            6 maanden vooruit
+          </h2>
+        </div>
+        <div className="flex items-center gap-4 text-xs">
+          <SummaryStat label="Totaal in" value={totalIn} positive />
+          <SummaryStat label="Totaal uit" value={totalOut} negative />
+          <SummaryStat
+            label={totalNet >= 0 ? 'Overschot' : 'Tekort'}
+            value={totalNet}
+            positive={totalNet >= 0}
+            negative={totalNet < 0}
+          />
+          <SummaryStat label={`Saldo na ${FORECAST_MONTHS}m`} value={lastCumulative} />
+        </div>
+      </header>
+
+      <div className="overflow-x-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)]">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)] border-b border-[var(--border-ed)]">
+              <th className="px-3 sm:px-4 py-2 text-left">Maand</th>
+              <th className="px-3 sm:px-4 py-2 text-right">Verwacht in</th>
+              <th className="px-3 sm:px-4 py-2 text-right">Verwacht uit</th>
+              <th className="px-3 sm:px-4 py-2 text-right">Netto</th>
+              <th className="px-3 sm:px-4 py-2 text-right">Saldo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const NetIcon =
+                row.net > 0 ? TrendingUp : row.net < 0 ? TrendingDown : Minus
+              const netClass =
+                row.net > 0
+                  ? 'text-emerald-700'
+                  : row.net < 0
+                    ? 'text-red-700'
+                    : 'text-[var(--ink-3)]'
+              const cumClass =
+                row.cumulative < 0 ? 'text-red-700' : 'text-[var(--ink)]'
+              return (
+                <tr
+                  key={row.monthIdx}
+                  className="border-b border-[var(--border-ed)] last:border-b-0"
+                >
+                  <td className="px-3 sm:px-4 py-2 text-[var(--ink)] capitalize">
+                    {row.label}
+                  </td>
+                  <td className="px-3 sm:px-4 py-2 text-right tabular-nums text-emerald-700">
+                    {formatCurrency(row.incoming)}
+                  </td>
+                  <td className="px-3 sm:px-4 py-2 text-right tabular-nums text-red-700">
+                    {formatCurrency(row.outgoing)}
+                  </td>
+                  <td
+                    className={`px-3 sm:px-4 py-2 text-right tabular-nums font-semibold ${netClass}`}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <NetIcon className="w-3 h-3" aria-hidden="true" />
+                      {formatCurrency(Math.abs(row.net))}
+                    </span>
+                  </td>
+                  <td
+                    className={`px-3 sm:px-4 py-2 text-right tabular-nums font-serif font-semibold ${cumClass}`}
+                  >
+                    {formatCurrency(row.cumulative)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[11px] italic text-[var(--ink-3)]">
+        Lineaire forecast — geen inflatie of marktvolatiliteit ingerekend.
+        Voor scenario-diepere projectie zie{' '}
+        <a href="/toekomst" className="underline hover:text-[var(--ink-2)]">
+          /toekomst Tijdas
+        </a>
+        .
+      </p>
+    </div>
+  )
+}
+
+function SummaryStat({
+  label,
+  value,
+  positive,
+  negative,
+}: {
+  label: string
+  value: number
+  positive?: boolean
+  negative?: boolean
+}) {
+  const valueClass = positive
+    ? 'text-emerald-700'
+    : negative
+      ? 'text-red-700'
+      : 'text-[var(--ink)]'
+  return (
+    <div className="text-right">
+      <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+        {label}
+      </div>
+      <div className={`font-serif font-semibold tabular-nums ${valueClass}`}>
+        {formatCurrency(Math.abs(value))}
+      </div>
+    </div>
+  )
+}

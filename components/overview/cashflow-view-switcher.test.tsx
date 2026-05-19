@@ -30,6 +30,7 @@ function renderSwitcher() {
       transactiesView={<div data-testid="transacties-view">TRANSACTIES</div>}
       vasteLastenView={<div data-testid="vaste-lasten-view">VASTE LASTEN</div>}
       kalenderView={<div data-testid="kalender-view">KALENDER</div>}
+      forecastView={<div data-testid="forecast-view">FORECAST</div>}
     />,
   )
 }
