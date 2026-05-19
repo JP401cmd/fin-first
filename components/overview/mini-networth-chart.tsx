@@ -62,7 +62,7 @@ export function MiniNetWorthChart({
     return (
       <Link
         href="/toekomst"
-        className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-4 sm:p-6 text-center hover:border-violet-300 transition-colors min-h-[140px]"
+        className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-4 sm:p-6 text-center hover:border-violet-300 transition-colors min-h-[140px] h-full"
       >
         <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
           Vermogen door de tijd
@@ -155,7 +155,7 @@ export function MiniNetWorthChart({
   const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
 
   return (
-    <div className="block rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 transition-all">
+    <div className="flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 transition-all h-full">
       <header className="mb-2 flex items-baseline justify-between gap-3">
         <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
           Netto vermogen door de tijd

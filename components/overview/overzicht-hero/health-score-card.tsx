@@ -76,8 +76,11 @@ export function HealthScoreCard({
       type="button"
       onClick={onOpenReceipt}
       aria-label="Open detail van financiële gezondheidsscore"
-      className={`flex items-center gap-4 sm:gap-6 rounded-2xl border border-[var(--border-ed)] ${style.bgInner} p-4 sm:p-6 text-left hover:border-[var(--ink-3)] hover:shadow-sm transition-all w-full`}
+      className={`flex flex-col items-center justify-center text-center rounded-2xl border border-[var(--border-ed)] ${style.bgInner} p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all w-full h-full`}
     >
+      <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)] mb-3">
+        Financiële gezondheid
+      </div>
       <div ref={ref} className="relative shrink-0" style={{ width: size, height: size }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
           <circle
@@ -115,26 +118,21 @@ export function HealthScoreCard({
         </div>
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-          Financiële gezondheid
+      <div className={`mt-3 text-sm sm:text-base font-semibold ${style.text}`}>
+        {style.label}
+      </div>
+      {health.previousMonth !== null && (
+        <div className="text-[11px] text-[var(--ink-3)] mt-1">{trendLabel}</div>
+      )}
+      {timeAnchor && (
+        <div className="text-[11px] text-[var(--ink-3)] mt-0.5 italic">
+          {timeAnchor.kind === 'fire'
+            ? `${timeAnchor.value} op weg`
+            : `${timeAnchor.value} buffer`}
         </div>
-        <div className={`mt-0.5 text-lg sm:text-xl font-semibold ${style.text}`}>
-          {style.label}
-        </div>
-        {health.previousMonth !== null && (
-          <div className="text-xs text-[var(--ink-3)] mt-1">{trendLabel}</div>
-        )}
-        {timeAnchor && (
-          <div className="text-[11px] text-[var(--ink-3)] mt-1 italic">
-            {timeAnchor.kind === 'fire'
-              ? `${timeAnchor.value} op weg`
-              : `${timeAnchor.value} buffer`}
-          </div>
-        )}
-        <div className="text-[11px] text-[var(--ink-3)] mt-2 underline decoration-dotted underline-offset-2">
-          Toon onderverdeling →
-        </div>
+      )}
+      <div className="text-[11px] text-[var(--ink-3)] mt-3 underline decoration-dotted underline-offset-2">
+        Toon onderverdeling →
       </div>
     </button>
   )

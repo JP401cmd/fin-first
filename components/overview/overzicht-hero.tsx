@@ -157,11 +157,11 @@ export function OverzichtHero({
 
       <HefbomenNav health={health} totals={totals} />
 
-      {/* Hero-row 1/3 + 2/3: Health Score smaller, MiniNetWorthChart wider.
-          Op smaller breakpoints stack ze full-width onder elkaar. Legenda
-          is verwijderd — status-dots in de tegels zelf zijn zelf-uitleggend
-          (groen/oranje/rood). */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+      {/* Hero-row: Health Score smaller (1/4) + chart breder (3/4), beide
+          even hoog via items-stretch + h-full op de cards. Op smaller
+          breakpoints stacken ze full-width. Legenda verwijderd — dots
+          op de tegels zelf zijn zelf-uitleggend. */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 items-stretch">
         <div className="lg:col-span-1">
           {health ? (
             <HealthScoreCard health={health} onOpenReceipt={() => setReceiptOpen(true)} />
@@ -169,7 +169,7 @@ export function OverzichtHero({
             <HealthScoreEmptyState />
           )}
         </div>
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
           <MiniNetWorthChart
             netWorthHistory={netWorthHistory ?? []}
             currentNetWorth={currentNetWorth ?? 0}
