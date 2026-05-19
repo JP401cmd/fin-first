@@ -6,6 +6,7 @@ import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstTabs } from '@/components/future/toekomst-tabs'
 import { DoelenView } from '@/components/future/doelen-view'
 import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
+import { VoorkeurenView } from '@/components/future/voorkeuren-view'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -44,6 +45,13 @@ export default async function ToekomstPage() {
         />
       }
       gebeurtenissenView={<GebeurtenissenView events={horizonData.events} />}
+      voorkeurenView={
+        <VoorkeurenView
+          fireParams={horizonData.fireParams}
+          fireStrategy={horizonData.fireStrategy}
+          withdrawalStrategy={horizonData.withdrawalStrategy}
+        />
+      }
     />
   )
 }

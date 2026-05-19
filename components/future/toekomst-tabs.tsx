@@ -35,12 +35,15 @@ export function ToekomstTabs({
   tijdasView,
   doelenView,
   gebeurtenissenView,
+  voorkeurenView,
 }: {
   tijdasView: ReactNode
   /** Optionele content voor Doelen-tab. Wanneer afwezig: placeholder. */
   doelenView?: ReactNode
   /** Optionele content voor Gebeurtenissen-tab. Wanneer afwezig: placeholder. */
   gebeurtenissenView?: ReactNode
+  /** Optionele content voor Voorkeuren-tab. Wanneer afwezig: placeholder. */
+  voorkeurenView?: ReactNode
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -93,7 +96,7 @@ export function ToekomstTabs({
       {current === 'tijdas' && tijdasView}
       {current === 'doelen' && (doelenView ?? <DoelenTabPlaceholder />)}
       {current === 'gebeurtenissen' && (gebeurtenissenView ?? <GebeurtenissenTabPlaceholder />)}
-      {current === 'voorkeuren' && <VoorkeurenTabPlaceholder />}
+      {current === 'voorkeuren' && (voorkeurenView ?? <VoorkeurenTabPlaceholder />)}
     </>
   )
 }
