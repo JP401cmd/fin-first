@@ -73,6 +73,23 @@ export default async function OverzichtPage() {
       }
     : undefined
 
+  // Drie atomic cards onderaan hero — mockup-conform. Voor MVP putten we
+  // uit Will-recommendations (titles). Eerste rec = observatie, tweede
+  // = tip. Upcoming komt uit recurring-transactions die deze maand
+  // afgeschreven worden (komt later, voor nu null).
+  const recommendations = willData.recommendations
+  const firstRec = recommendations[0]
+  const secondRec = recommendations[1]
+  const atomicCards = {
+    observation: firstRec
+      ? { text: firstRec.title, href: '/overzicht' }
+      : null,
+    tip: secondRec
+      ? { text: secondRec.title, href: '/overzicht' }
+      : null,
+    upcoming: null,
+  }
+
   return (
     <>
       <OverzichtHero
@@ -85,6 +102,7 @@ export default async function OverzichtPage() {
         endAge={endAge}
         isPensioenMode={isPensioenMode}
         totals={totals}
+        atomicCards={atomicCards}
       />
       <WillLanding
         dashboardData={dashboardData}

@@ -8,6 +8,7 @@ import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receip
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 import { HefbomenNav, HefbomenLegenda } from './overzicht-hero/hefbomen-nav'
+import { AtomicCards, type AtomicCardEntry } from './atomic-cards'
 import { HealthScoreCard } from './overzicht-hero/health-score-card'
 import {
   HealthScoreEmptyState,
@@ -36,6 +37,13 @@ type OverzichtHeroProps = {
   isPensioenMode?: boolean
   /** Optionele totaalbedragen per hefboom (bezittingen, schulden, etc.). */
   totals?: HefbomenTotals
+  /** Drie atomic cards onder de hero (mockup): observation / tip / upcoming.
+   *  Wanneer null/leeg: card wordt weggelaten. */
+  atomicCards?: {
+    observation?: AtomicCardEntry | null
+    tip?: AtomicCardEntry | null
+    upcoming?: AtomicCardEntry | null
+  }
 }
 
 function formatDateNL(): string {
@@ -43,6 +51,7 @@ function formatDateNL(): string {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    year: 'numeric',
   })
   const parts = formatter.format(new Date())
   return parts.charAt(0).toUpperCase() + parts.slice(1)
@@ -76,6 +85,7 @@ export function OverzichtHero({
   endAge,
   isPensioenMode,
   totals,
+  atomicCards,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
 
@@ -161,6 +171,14 @@ export function OverzichtHero({
           endAge={endAge}
           freedomPct={freedomPct ?? 0}
           isPensioenMode={isPensioenMode ?? false}
+        />
+      )}
+
+      {atomicCards && (
+        <AtomicCards
+          observation={atomicCards.observation}
+          tip={atomicCards.tip}
+          upcoming={atomicCards.upcoming}
         />
       )}
 

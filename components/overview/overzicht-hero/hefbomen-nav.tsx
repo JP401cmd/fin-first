@@ -4,14 +4,16 @@
  * HefbomenNav — vier-hefbomen-rij op /overzicht hero. Klikbare tegels
  * naar /overzicht/{bezittingen,schulden,cashflow,belasting}.
  *
- * Status-dot rechtsboven elke tegel uit pillar.score van financial-health.
- * Optioneel totaalbedrag per hefboom als sub-text onder de label.
+ * Per tegel: icoon + label + bedrag + contextuele status-substext.
+ * Status-dot rechtsboven uit pillar.score. Chevron rechtsonder toggle
+ * een drill-down met meer detail (zelfde status-kleur, relevante info).
  */
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { Banknote, CreditCard, Wallet, Receipt } from 'lucide-react'
+import { Banknote, CreditCard, Wallet, Receipt, ChevronDown, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-import type { HealthScore } from '@/lib/financial-health'
+import type { HealthScore, HealthPillar } from '@/lib/financial-health'
 
 type HefboomKey = 'bezittingen' | 'schulden' | 'cashflow' | 'belasting'
 type StatusCode = 'good' | 'warn' | 'bad' | 'neutral'
@@ -33,12 +35,8 @@ const HEFBOMEN: ReadonlyArray<{
   href: string
   Icon: typeof Wallet
   accent: string
-  /** Pillar-key uit HealthScore voor status-bepaling. null = proxy uit health.total. */
   pillarKey: string | null
-  /** Korte uitleg in title-tooltip (hover desktop, long-press mobile). */
   tooltip: string
-  /** Sub-tekst-prefix bij totaal-bedrag, bv. "Totaal" of "Per maand". */
-  totalPrefix?: string
 }> = [
   {
     key: 'bezittingen',
@@ -48,7 +46,6 @@ const HEFBOMEN: ReadonlyArray<{
     accent: 'text-emerald-700 bg-emerald-50',
     pillarKey: 'diversification',
     tooltip: 'Cash, beleggingen, eigen huis en pensioen — wat groeit voor je.',
-    totalPrefix: 'Totaal',
   },
   {
     key: 'schulden',
@@ -58,7 +55,6 @@ const HEFBOMEN: ReadonlyArray<{
     accent: 'text-amber-700 bg-amber-50',
     pillarKey: 'debt_ratio',
     tooltip: 'Hypotheek, leningen, studieschuld — wat je terugbetaalt.',
-    totalPrefix: 'Totaal',
   },
   {
     key: 'cashflow',
@@ -68,7 +64,6 @@ const HEFBOMEN: ReadonlyArray<{
     accent: 'text-sky-700 bg-sky-50',
     pillarKey: 'savings_rate',
     tooltip: 'In en uit per maand — het deel dat je opzij zet bepaalt je tempo.',
-    totalPrefix: 'Spaarquote',
   },
   {
     key: 'belasting',
@@ -78,7 +73,6 @@ const HEFBOMEN: ReadonlyArray<{
     accent: 'text-violet-700 bg-violet-50',
     pillarKey: 'tax_optimization',
     tooltip: 'Box 1, Box 2 en Box 3 — slim verdelen scheelt geld per jaar.',
-    totalPrefix: 'Box 3/jaar',
   },
 ] as const
 
@@ -96,15 +90,37 @@ const STATUS_LABEL: Record<StatusCode, string> = {
   neutral: 'Geen score',
 }
 
-/**
- * Map pillar-score (0-100) naar status-codering. Drempels matchen
- * financial-health.ts (Sterk ≥ 70, Redelijk 50-70, anders bad).
- */
 function pillarStatus(score: number | null | undefined): StatusCode {
   if (score == null) return 'neutral'
   if (score >= 70) return 'good'
   if (score >= 50) return 'warn'
   return 'bad'
+}
+
+function statusTextClass(status: StatusCode): string {
+  return status === 'good'
+    ? 'text-emerald-700'
+    : status === 'warn'
+      ? 'text-amber-700'
+      : 'text-red-700'
+}
+
+function statusSubText(key: HefboomKey, status: StatusCode, pillar?: HealthPillar): string | null {
+  if (status === 'neutral') return null
+  if (key === 'bezittingen') {
+    return status === 'good' ? 'Diversificatie ok' : status === 'warn' ? 'Beperkt gespreid' : 'Slecht gespreid'
+  }
+  if (key === 'schulden') {
+    const ratio = pillar?.rawValue ?? ''
+    return status === 'good' ? 'Aflossing op schema' : status === 'warn' ? `Schuldratio ${ratio}` : 'Hoge schuldenlast'
+  }
+  if (key === 'cashflow') {
+    return status === 'good' ? 'Op koers met sparen' : status === 'warn' ? 'Lager dan doel' : 'Tekort op rekening'
+  }
+  if (key === 'belasting') {
+    return status === 'good' ? 'Geen actie nodig' : status === 'warn' ? 'Optimaliseer Box 3' : 'Box 3-actie nodig'
+  }
+  return null
 }
 
 export function HefbomenNav({
@@ -114,12 +130,16 @@ export function HefbomenNav({
   health: HealthScore | null
   totals?: HefbomenTotals
 }) {
+  // Eén tegel-expand per keer — open/dicht via chevron. Mobile: tap, desktop:
+  // tap of hover (we gebruiken alleen state-based toggle voor consistente UX).
+  const [expandedKey, setExpandedKey] = useState<HefboomKey | null>(null)
+
   return (
     <nav
       aria-label="Vier hefbomen"
-      className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-6"
+      className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-3"
     >
-      {HEFBOMEN.map(({ key, label, href, Icon, accent, pillarKey, tooltip, totalPrefix }) => {
+      {HEFBOMEN.map(({ key, label, href, Icon, accent, pillarKey, tooltip }) => {
         const pillar =
           pillarKey && health ? health.pillars.find((p) => p.id === pillarKey) : undefined
         const proxyScore = !pillarKey && health ? health.total : null
@@ -127,70 +147,75 @@ export function HefbomenNav({
 
         const totalValue = totals?.[key]
         const showTotal = typeof totalValue === 'number' && totalValue > 0
-        // Cashflow is een percentage (spaarquote), andere zijn EUR.
         const formattedTotal = showTotal
           ? key === 'cashflow'
             ? `${Math.round(totalValue)}%`
             : formatCurrency(totalValue)
           : ''
-
-        // Contextuele sub-text per hefboom (mockup-stijl). Toont status
-        // in concrete taal i.p.v. de generieke "Goed op koers"-label.
-        const statusSubText = (() => {
-          if (status === 'neutral') return null
-          if (key === 'bezittingen') {
-            return status === 'good' ? 'Diversificatie ok' : status === 'warn' ? 'Beperkt gespreid' : 'Slecht gespreid'
-          }
-          if (key === 'schulden') {
-            const ratio = pillar?.rawValue ?? ''
-            return status === 'good' ? 'Aflossing op schema' : status === 'warn' ? `Schuldratio ${ratio}` : 'Hoge schuldenlast'
-          }
-          if (key === 'cashflow') {
-            return status === 'good' ? 'Op koers met sparen' : status === 'warn' ? 'Lager dan doel' : 'Tekort op rekening'
-          }
-          if (key === 'belasting') {
-            return status === 'good' ? 'Geen actie nodig' : status === 'warn' ? 'Optimaliseer Box 3' : 'Box 3-actie nodig'
-          }
-          return null
-        })()
+        const subText = statusSubText(key, status, pillar)
+        const expanded = expandedKey === key
 
         return (
-          <Link
+          <div
             key={key}
-            href={href}
-            title={tooltip}
-            className="group relative flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
+            className={[
+              'group relative flex flex-col rounded-2xl border bg-[var(--paper)] p-3 sm:p-4 transition-all',
+              expanded
+                ? 'border-[var(--ink-3)] shadow-sm row-span-2 sm:row-span-1'
+                : 'border-[var(--border-ed)] hover:border-[var(--ink-3)] hover:shadow-sm',
+            ].join(' ')}
           >
-            <span
-              className={`absolute right-2.5 top-2.5 sm:right-3 sm:top-3 w-2 h-2 rounded-full ${STATUS_DOT[status]}`}
-              aria-hidden="true"
-              title={STATUS_LABEL[status]}
-            />
-            <div
-              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${accent}`}
+            <Link
+              href={href}
+              title={tooltip}
+              className="flex flex-col"
             >
-              <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-            <div className="mt-2 text-sm sm:text-base font-semibold text-[var(--ink)] group-hover:text-[var(--ink-0)]">
-              {label}
-            </div>
-            {showTotal && (
-              <div className="mt-0.5 text-base sm:text-lg font-serif font-semibold text-[var(--ink)] tabular-nums">
-                {formattedTotal}
-              </div>
-            )}
-            {statusSubText && (
+              <span
+                className={`absolute right-2.5 top-2.5 sm:right-3 sm:top-3 w-2 h-2 rounded-full ${STATUS_DOT[status]}`}
+                aria-hidden="true"
+                title={STATUS_LABEL[status]}
+              />
               <div
-                className={`mt-1 text-[11px] font-medium ${
-                  status === 'good' ? 'text-emerald-700'
-                  : status === 'warn' ? 'text-amber-700'
-                  : 'text-red-700'
-                }`}
+                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${accent}`}
               >
-                {statusSubText}
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
+              <div className="mt-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
+                {label}
+              </div>
+              {showTotal && (
+                <div className="mt-0.5 text-base sm:text-lg font-serif font-semibold text-[var(--ink)] tabular-nums">
+                  {formattedTotal}
+                </div>
+              )}
+              {subText && (
+                <div className={`mt-1 text-[11px] font-medium ${statusTextClass(status)}`}>
+                  {subText}
+                </div>
+              )}
+            </Link>
+
+            {/* Chevron-toggle voor drill-down */}
+            {(pillar || status !== 'neutral') && (
+              <button
+                type="button"
+                onClick={() => setExpandedKey(expanded ? null : key)}
+                aria-expanded={expanded}
+                aria-label={expanded ? `Verberg detail ${label}` : `Toon detail ${label}`}
+                className="mt-2 -mx-3 sm:-mx-4 -mb-3 sm:-mb-4 px-3 sm:px-4 py-1.5 border-t border-[var(--border-ed)] flex items-center justify-center gap-1.5 text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)] rounded-b-2xl transition-colors"
+              >
+                {expanded ? 'Minder' : 'Details'}
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
             )}
-          </Link>
+
+            {expanded && pillar && (
+              <HefboomDetailCard pillar={pillar} status={status} href={href} />
+            )}
+          </div>
         )
       })}
     </nav>
@@ -198,9 +223,56 @@ export function HefbomenNav({
 }
 
 /**
- * Compacte legenda onderaan de hefbomen-rij. Toont gebruiker wat de
- * status-dots betekenen, conform mockup ("Op koers / Aandacht nodig /
- * Actie vereist").
+ * Drill-down detail-content per hefboom. Toont rawValue + improvementTip
+ * uit de pillar, plus deep-link naar de actie-pagina. Tekst-kleur volgt
+ * status zodat groen=informatief, rood=urgent zichtbaar is.
+ */
+function HefboomDetailCard({
+  pillar,
+  status,
+  href,
+}: {
+  pillar: HealthPillar
+  status: StatusCode
+  href: string
+}) {
+  const bgClass =
+    status === 'good'
+      ? 'bg-emerald-50/50'
+      : status === 'warn'
+        ? 'bg-amber-50/50'
+        : status === 'bad'
+          ? 'bg-red-50/50'
+          : 'bg-[var(--subtle)]'
+  return (
+    <div
+      className={`mt-2 -mx-3 sm:-mx-4 px-3 sm:px-4 py-3 border-t border-[var(--border-ed)] ${bgClass}`}
+    >
+      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+        <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)]">
+          {pillar.name}
+        </span>
+        <span className={`text-[11px] font-mono tabular-nums font-semibold ${statusTextClass(status)}`}>
+          {pillar.rawValue}
+        </span>
+      </div>
+      <p className={`text-xs leading-snug ${statusTextClass(status)}`}>
+        {pillar.improvementTip}
+      </p>
+      <Link
+        href={pillar.actionHref || href}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--ink-2)] hover:text-[var(--ink)] hover:underline"
+      >
+        {pillar.actionLabel || 'Bekijk details'}
+        <ArrowRight className="w-3 h-3" aria-hidden="true" />
+      </Link>
+    </div>
+  )
+}
+
+/**
+ * Compacte legenda onder de hefbomen-rij. Mockup-stijl uitleg voor de
+ * status-dots zodat gebruikers meteen weten wat groen/oranje/rood betekent.
  */
 export function HefbomenLegenda() {
   return (
