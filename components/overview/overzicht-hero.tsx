@@ -28,6 +28,7 @@ import {
   HeroWidgetRail,
   useHeroRailState,
 } from './hero-widget-rail'
+import { ViewModeToggle } from '@/components/app/view-mode-provider'
 
 type OverzichtHeroProps = {
   userName?: string
@@ -160,6 +161,7 @@ export function OverzichtHero({
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
       <div className="absolute right-4 top-6 sm:right-6 sm:top-8 flex items-center gap-2">
+        <ViewModeToggle />
         {dashboardData && (
           <HeroEditToggle
             isEditing={rail.isEditing}
