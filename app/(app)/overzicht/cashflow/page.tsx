@@ -66,7 +66,7 @@ export default async function OverzichtCashflowPage() {
         .limit(500),
       supabase
         .from('recurring_transactions')
-        .select('id, name, amount, frequency, category')
+        .select('id, name, amount, frequency, budget_id')
         .eq('user_id', user.id)
         .eq('is_active', true),
     ])
@@ -89,7 +89,7 @@ export default async function OverzichtCashflowPage() {
       name: String(r.name ?? ''),
       amount: Math.abs(Number(r.amount)),
       frequency: (r as { frequency?: string }).frequency as VasteLastenRow['frequency'],
-      category: (r as { category?: string | null }).category ?? null,
+      category: null, // recurring_transactions heeft geen eigen category-kolom; icoon valt op default
     }))
     monthLabel = new Intl.DateTimeFormat('nl-NL', {
       month: 'long',

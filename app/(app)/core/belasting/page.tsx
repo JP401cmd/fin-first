@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { usePathname } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -98,9 +97,6 @@ function InfoTooltip({ text }: { text: string }) {
 export default function BelastingPage() {
   const { perspective, isHousehold } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
-  const pathname = usePathname()
-  // /overzicht/belasting toont nieuwe overzicht-tekst; legacy /core/belasting blijft fallback
-  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/core/belasting']
   const [data, setData] = useState<Box3ApiResponse | null>(null)
   const [box2Data, setBox2Data] = useState<Box2ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -230,7 +226,7 @@ export default function BelastingPage() {
           {/* Editorial header — blueprint Type 10 (Calculator) */}
           <header className="relative mb-3 sm:mb-4 space-y-1.5">
             <PageInfoButton
-              description={pageInfoText}
+              description={PAGE_INFO['/core/belasting']}
               className="absolute right-0 top-0"
             />
             <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
