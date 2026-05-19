@@ -14,11 +14,16 @@ import type { DashboardData } from '@/components/widgets/widget-renderer'
  */
 
 vi.mock('@/components/widgets/draggable-widget-grid', () => ({
-  DraggableWidgetGrid: (props: { editMode?: boolean; suppressIntroSheet?: boolean }) => (
+  DraggableWidgetGrid: (props: {
+    editMode?: boolean
+    suppressIntroSheet?: boolean
+    hideHeader?: boolean
+  }) => (
     <div
       data-testid="grid"
       data-edit={String(props.editMode)}
       data-suppress={String(props.suppressIntroSheet)}
+      data-hideheader={String(props.hideHeader)}
     >
       DraggableWidgetGrid mock
     </div>
@@ -169,5 +174,20 @@ describe('HeroWidgetRail — render-logica', () => {
       />,
     )
     expect(screen.getByTestId('grid').getAttribute('data-edit')).toBe('true')
+  })
+
+  it('geeft hideHeader=true door (geen "Mijn Dashboard"-titel + Modify in hero-context)', () => {
+    render(
+      <HeroWidgetRail
+        isEditing={true}
+        onEditModeChange={() => {}}
+        hasActiveWidgets={false}
+        activeWidgets={[]}
+        allPrefs={[]}
+        dashboardData={mockData}
+        defaultContent={<div>Default</div>}
+      />,
+    )
+    expect(screen.getByTestId('grid').getAttribute('data-hideheader')).toBe('true')
   })
 })

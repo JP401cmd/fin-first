@@ -69,9 +69,13 @@ interface SortableWidgetItemProps {
   isDragging: boolean
   onResize?: (id: string, size: WidgetSize) => void
   onHide?: (id: string) => void
+  /** Verberg de "Verbergen"-X-knop op deze widget in edit-mode. Bedoeld
+   *  voor host-context (hero-rail) waar de user widgets via de
+   *  add-picker beheert i.p.v. per stuk. */
+  hideHideButton?: boolean
 }
 
-function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onResize, onHide }: SortableWidgetItemProps) {
+function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onResize, onHide, hideHideButton }: SortableWidgetItemProps) {
   const {
     attributes,
     listeners,
@@ -112,16 +116,19 @@ function SortableWidgetItem({ pref, data, features, isEditMode, isDragging, onRe
         {/* Edit controls — only visible in edit mode */}
         {isEditMode && (
           <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1">
-            {/* Hide button */}
-            <button
-              type="button"
-              onClick={() => onHide?.(pref.id)}
-              aria-label={`Verberg ${pref.id} widget`}
-              title="Verbergen"
-              className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-all hover:text-negative hover:border-negative/40 hover:bg-negative/10 active:scale-95 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            {/* Hide button — verborgen in host-context (hideHideButton).
+                Host beheert widgets via add-picker zelf. */}
+            {!hideHideButton && (
+              <button
+                type="button"
+                onClick={() => onHide?.(pref.id)}
+                aria-label={`Verberg ${pref.id} widget`}
+                title="Verbergen"
+                className="flex h-7 w-7 sm:h-9 sm:w-9 items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-4)] shadow-[var(--s0)] transition-all hover:text-negative hover:border-negative/40 hover:bg-negative/10 active:scale-95 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
             {/* Size selector buttons — S/M/L only, mini is auto */}
             {(() => {
               const def = getWidgetDef(pref.id)
@@ -211,6 +218,13 @@ interface DraggableWidgetGridProps {
    */
   suppressIntroSheet?: boolean
   /**
+   * Verberg de section-header met "Mijn Dashboard"-titel + Modify-knop
+   * en de individuele verberg-knoppen per widget. Bedoeld voor host-
+   * context waar de host zijn eigen Bewerken-toggle exposeert en de
+   * dashboard-titel visueel overbodig is.
+   */
+  hideHeader?: boolean
+  /**
    * Controlled edit-mode voor host-componenten die hun eigen Bewerken-knop
    * exposen (zoals /overzicht hero-toggle). Bij aanwezigheid van beide
    * props neemt de host de edit-state over; bij undefined valt het grid
@@ -248,7 +262,7 @@ function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: Das
   return true
 }
 
-export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle, categoryAppLinks, suppressIntroSheet, editMode: controlledEditMode, onEditModeChange }: DraggableWidgetGridProps) {
+export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle, categoryAppLinks, suppressIntroSheet, hideHeader, editMode: controlledEditMode, onEditModeChange }: DraggableWidgetGridProps) {
   const router = useRouter()
   const { features } = useFeatureAccess()
 
@@ -613,66 +627,70 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
 
   const gridContent = (
     <div>
-      {/* Section header with edit mode toggle */}
-      <div className={`flex items-center justify-between border-b border-[var(--border-ed)] pb-2 ${isCollapsed ? 'mb-0' : 'mb-4'}`}>
-        <button type="button" onClick={toggleCollapsed} className="flex items-center gap-1.5">
-          <ChevronDown className={`h-3.5 w-3.5 text-[var(--ink-3)] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
-          <h2 className="label-editorial text-[var(--ink-2)]">Mijn Dashboard</h2>
-        </button>
-        {!isCollapsed && <div className="flex items-center gap-2">
-          {/* Dashboard type pill toggle */}
-          {showDashboardTypeToggle && (
-            <div className="flex rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] p-0.5">
-              <button
-                type="button"
-                onClick={() => setDashboardType('widgets')}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  dashboardType === 'widgets'
-                    ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
-                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                }`}
-              >
-                Widgets
-              </button>
-              <button
-                type="button"
-                onClick={() => setDashboardType('briefing')}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  dashboardType === 'briefing'
-                    ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
-                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                }`}
-              >
-                Briefing
-              </button>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={toggleEditMode}
-            aria-pressed={isEditMode}
-            disabled={saveState === 'saving'}
-            className={`flex items-center gap-1 rounded-[var(--r-sm)] border px-2 py-1 text-xs transition-colors disabled:opacity-50 ${
-              isEditMode
-                ? 'border-kern-300 bg-kern-50 text-kern-700'
-                : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-            }`}
-          >
-            <GripVertical className="h-3.5 w-3.5" />
-            <span>
-              {saveState === 'saving' && isEditMode === false
-                ? 'Opslaan…'
-                : saveState === 'saved' && isEditMode === false
-                  ? 'Opgeslagen'
-                  : pendingSave && !isEditMode
-                    ? 'Opslaan…'
-                    : isEditMode
-                      ? 'Gereed'
-                      : 'Modify'}
-            </span>
+      {/* Section header with edit mode toggle — verborgen in host-context
+          (hideHeader). De host levert dan zijn eigen Bewerken-knop en de
+          dashboard-titel is visueel overbodig. */}
+      {!hideHeader && (
+        <div className={`flex items-center justify-between border-b border-[var(--border-ed)] pb-2 ${isCollapsed ? 'mb-0' : 'mb-4'}`}>
+          <button type="button" onClick={toggleCollapsed} className="flex items-center gap-1.5">
+            <ChevronDown className={`h-3.5 w-3.5 text-[var(--ink-3)] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
+            <h2 className="label-editorial text-[var(--ink-2)]">Mijn Dashboard</h2>
           </button>
-        </div>}
-      </div>
+          {!isCollapsed && <div className="flex items-center gap-2">
+            {/* Dashboard type pill toggle */}
+            {showDashboardTypeToggle && (
+              <div className="flex rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setDashboardType('widgets')}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    dashboardType === 'widgets'
+                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                  }`}
+                >
+                  Widgets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDashboardType('briefing')}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    dashboardType === 'briefing'
+                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                  }`}
+                >
+                  Briefing
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={toggleEditMode}
+              aria-pressed={isEditMode}
+              disabled={saveState === 'saving'}
+              className={`flex items-center gap-1 rounded-[var(--r-sm)] border px-2 py-1 text-xs transition-colors disabled:opacity-50 ${
+                isEditMode
+                  ? 'border-kern-300 bg-kern-50 text-kern-700'
+                  : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+              }`}
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+              <span>
+                {saveState === 'saving' && isEditMode === false
+                  ? 'Opslaan…'
+                  : saveState === 'saved' && isEditMode === false
+                    ? 'Opgeslagen'
+                    : pendingSave && !isEditMode
+                      ? 'Opslaan…'
+                      : isEditMode
+                        ? 'Gereed'
+                        : 'Modify'}
+              </span>
+            </button>
+          </div>}
+        </div>
+      )}
 
       {!isCollapsed && (<>
       {/* Categorie-app-balk — direct onder de titel zodat de Kern-apps van
@@ -886,6 +904,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
                 isDragging={pref.id === activeId}
                 onResize={handleResize}
                 onHide={handleHide}
+                hideHideButton={hideHeader}
               />
             ))}
           </div>

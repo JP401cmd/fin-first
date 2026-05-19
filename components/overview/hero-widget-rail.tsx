@@ -117,6 +117,7 @@ export function HeroWidgetRail({
       //  - showDashboardTypeToggle (default false → geen briefing-toggle)
       //  - categoryAppLinks       (undefined → geen categorie-balk)
       suppressIntroSheet
+      hideHeader
       editMode={isEditing}
       onEditModeChange={onEditModeChange}
     />
