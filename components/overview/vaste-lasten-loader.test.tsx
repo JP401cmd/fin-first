@@ -1,54 +1,14 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { VasteLastenLoader } from './vaste-lasten-loader'
 
 /**
  * Tests voor VasteLastenLoader — client-component die /api/subscriptions
- * fetcht en doorgeeft aan VasteKostenAnalyse. We mocken globale fetch
- * voor deterministische tests + matchMedia (gebruikt door useInViewAnimation
- * binnen VasteKostenAnalyse-chart-children).
+ * fetcht en doorgeeft aan VasteKostenAnalyse. matchMedia + IO worden
+ * globaal gemocked in test/setup.ts. Alleen fetch wordt per-test gereset.
  */
 
 const mockFetch = vi.fn()
-
-beforeAll(() => {
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: vi.fn((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  })
-  // IntersectionObserver-mock voor useInViewAnimation
-  class MockIO {
-    private cb: IntersectionObserverCallback
-    constructor(cb: IntersectionObserverCallback) {
-      this.cb = cb
-    }
-    observe(t: Element) {
-      this.cb(
-        [{ isIntersecting: true, target: t } as IntersectionObserverEntry],
-        this as unknown as IntersectionObserver,
-      )
-    }
-    unobserve() {}
-    disconnect() {}
-    takeRecords() {
-      return []
-    }
-    root = null
-    rootMargin = ''
-    thresholds = []
-  }
-  // @ts-expect-error - global override
-  global.IntersectionObserver = MockIO
-})
 
 beforeEach(() => {
   mockFetch.mockReset()

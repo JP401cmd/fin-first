@@ -1,55 +1,12 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { HealthScoreCard } from './health-score-card'
 import type { HealthScore } from '@/lib/financial-health'
 
 /**
- * Tests voor HealthScoreCard. Vereist IntersectionObserver-mock want
- * useInViewAnimation hook gebruikt deze. We mocken het als always-
- * triggered zodat hasEntered immediate true is.
+ * Tests voor HealthScoreCard. matchMedia + IntersectionObserver worden
+ * globaal gemocked in test/setup.ts voor de useInViewAnimation hook.
  */
-
-beforeAll(() => {
-  // jsdom heeft geen IntersectionObserver — mock met triggering-stub.
-  class MockIntersectionObserver {
-    private callback: IntersectionObserverCallback
-    constructor(cb: IntersectionObserverCallback) {
-      this.callback = cb
-    }
-    observe(target: Element) {
-      // Trigger immediate "in view" zodat hasEntered=true wordt
-      this.callback(
-        [{ isIntersecting: true, target } as IntersectionObserverEntry],
-        this as unknown as IntersectionObserver,
-      )
-    }
-    unobserve() {}
-    disconnect() {}
-    takeRecords() {
-      return []
-    }
-    root = null
-    rootMargin = ''
-    thresholds = []
-  }
-  // @ts-expect-error - global is read-only in DOM lib
-  global.IntersectionObserver = MockIntersectionObserver
-
-  // matchMedia voor prefers-reduced-motion
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: vi.fn((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  })
-})
 
 function makeHealth(overrides: Partial<HealthScore> = {}): HealthScore {
   return {
