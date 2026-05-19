@@ -5,11 +5,11 @@ import { usePathname } from 'next/navigation'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { mainNav, navGroups, globalNav, type NavColor } from '@/lib/nav-config'
 
-const colorClasses: Record<NavColor, { active: string; idle: string; icon: string }> = {
-  amber:  { active: 'bg-kern-50 text-kern-900 border-kern-300',     idle: 'hover:bg-kern-50/40',     icon: 'text-kern-700' },
-  purple: { active: 'bg-horizon-50 text-horizon-900 border-horizon-300', idle: 'hover:bg-horizon-50/40', icon: 'text-horizon-700' },
-  teal:   { active: 'bg-wil-50 text-wil-900 border-wil-300',         idle: 'hover:bg-wil-50/40',     icon: 'text-wil-700' },
-  stone:  { active: 'bg-stone-100 text-stone-900 border-stone-300', idle: 'hover:bg-stone-100',     icon: 'text-stone-700' },
+const colorClasses: Record<NavColor, { active: string; idle: string; icon: string; subActive: string; subIdle: string }> = {
+  amber:  { active: 'bg-kern-50 text-kern-900 border-kern-300',     idle: 'hover:bg-kern-50/40',     icon: 'text-kern-700',    subActive: 'bg-kern-100 text-kern-900',    subIdle: 'hover:bg-kern-50/40 text-[var(--ink-2)]' },
+  purple: { active: 'bg-horizon-50 text-horizon-900 border-horizon-300', idle: 'hover:bg-horizon-50/40', icon: 'text-horizon-700', subActive: 'bg-horizon-100 text-horizon-900', subIdle: 'hover:bg-horizon-50/40 text-[var(--ink-2)]' },
+  teal:   { active: 'bg-wil-50 text-wil-900 border-wil-300',         idle: 'hover:bg-wil-50/40',     icon: 'text-wil-700',     subActive: 'bg-wil-100 text-wil-900',      subIdle: 'hover:bg-wil-50/40 text-[var(--ink-2)]' },
+  stone:  { active: 'bg-stone-100 text-stone-900 border-stone-300', idle: 'hover:bg-stone-100',     icon: 'text-stone-700',   subActive: 'bg-stone-200 text-stone-900',  subIdle: 'hover:bg-stone-100 text-[var(--ink-2)]' },
 }
 
 type NavMenuSheetProps = {
@@ -18,11 +18,24 @@ type NavMenuSheetProps = {
   onAction?: (action: 'open-chat' | 'open-account' | 'open-search') => void
 }
 
+/**
+ * NavMenuSheet — mobiele navigatie-sheet. Hoofdpagina's krijgen elk hun
+ * sub-routes DIRECT eronder (zelfde sectie) zodat er geen dubbel menu
+ * ontstaat — gebruiker scrollt één lijst i.p.v. context-switchen tussen
+ * "Hoofd" en "Onder [naam]". Globale items (Krant, Berichten, Account)
+ * blijven in eigen footer-sectie onderaan.
+ */
 export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   const pathname = usePathname() ?? '/'
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
+
+  // Per main-nav-item bijbehorende sub-routes lookuppen
+  const subRoutesFor = (parentHref: string) => {
+    const group = navGroups.find((g) => g.parent.href === parentHref)
+    return group?.items ?? []
+  }
 
   return (
     <BottomSheet
@@ -32,77 +45,59 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
       size="md"
       initialMobileHeight="80vh"
     >
-      <div className="space-y-6 pb-4">
-        {/* Hoofdpagina's — grote tap-targets */}
-        <section>
-          <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)] mb-2 px-1">
-            Hoofdpagina&apos;s
-          </h3>
-          <div className="grid grid-cols-1 gap-1.5">
-            {mainNav.map((item) => {
-              const Icon = item.icon!
-              const active = isActive(item.href)
-              const c = colorClasses[item.color]
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onClose}
-                  className={`flex items-start gap-3 px-3 py-3 rounded-xl border-2 transition-colors ${
-                    active ? c.active : `border-transparent ${c.idle}`
-                  }`}
-                >
-                  <div className={`mt-0.5 ${c.icon}`}>
-                    <Icon size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-[15px] leading-tight">
-                      {item.label}
+      <div className="space-y-5 pb-4">
+        {/* Hoofdpagina's + hun sub-routes als één gestapelde lijst */}
+        {mainNav.map((item) => {
+          const Icon = item.icon!
+          const active = isActive(item.href)
+          const c = colorClasses[item.color]
+          const subs = subRoutesFor(item.href)
+          return (
+            <section key={item.href}>
+              <Link
+                href={item.href}
+                onClick={onClose}
+                className={`flex items-start gap-3 px-3 py-3 rounded-xl border-2 transition-colors ${
+                  active ? c.active : `border-transparent ${c.idle}`
+                }`}
+              >
+                <div className={`mt-0.5 ${c.icon}`}>
+                  <Icon size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-[15px] leading-tight">{item.label}</div>
+                  {item.description && (
+                    <div className="text-[12px] text-[var(--ink-3)] leading-snug mt-0.5">
+                      {item.description}
                     </div>
-                    {item.description && (
-                      <div className="text-[12px] text-[var(--ink-3)] leading-snug mt-0.5">
-                        {item.description}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        </section>
+                  )}
+                </div>
+              </Link>
 
-        {/* Verdiepingen per hoofdpagina */}
-        {navGroups
-          .filter((g) => g.items.length > 0)
-          .map((group) => {
-            const c = colorClasses[group.parent.color]
-            return (
-              <section key={group.parent.href}>
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)] mb-2 px-1">
-                  Onder {group.parent.label}
-                </h3>
-                <div className="grid grid-cols-1 gap-0.5">
-                  {group.items.map((item) => {
-                    const active = isActive(item.href)
+              {subs.length > 0 && (
+                <div className="mt-1 ml-3 pl-3 border-l border-[var(--border-ed)] grid grid-cols-1 gap-0.5">
+                  {subs.map((sub) => {
+                    const subActive = isActive(sub.href)
                     return (
                       <Link
-                        key={item.href}
-                        href={item.href}
+                        key={sub.href}
+                        href={sub.href}
                         onClick={onClose}
-                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors ${
-                          active ? c.active : c.idle
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                          subActive ? c.subActive : c.subIdle
                         }`}
                       >
-                        <span className="font-medium text-[14px]">{item.label}</span>
+                        <span className="text-[13px] font-medium">{sub.label}</span>
                       </Link>
                     )
                   })}
                 </div>
-              </section>
-            )
-          })}
+              )}
+            </section>
+          )
+        })}
 
-        {/* Globale items */}
+        {/* Globale items — overal-beschikbaar (krant/berichten/account) */}
         <section className="border-t border-[var(--border-ed)] pt-4">
           <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)] mb-2 px-1">
             Overal beschikbaar

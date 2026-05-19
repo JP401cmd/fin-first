@@ -122,7 +122,7 @@ export default function BelastingPage() {
         fetch(`/api/household/box2?year=${year}`, { signal }),
       ])
       if (signal?.aborted) return
-      if (!box3Res.ok) throw new Error('Fout bij ophalen gegevens')
+      if (!box3Res.ok) throw new Error(`Fout bij ophalen gegevens (status ${box3Res.status})`)
       const json = await box3Res.json()
       setData(json)
 
@@ -141,8 +141,12 @@ export default function BelastingPage() {
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return
       if (!signal?.aborted) setError(e instanceof Error ? e.message : 'Onbekende fout')
+    } finally {
+      // Loading-state ALTIJD resetten, ook bij abort — anders blijft de
+      // spinner eeuwig draaien als de fetch wordt afgebroken vlak na de
+      // response (bv. bij perspective-switch direct na page-mount).
+      setLoading(false)
     }
-    if (!signal?.aborted) setLoading(false)
   }, [year, perspective])
 
   useEffect(() => {

@@ -224,7 +224,10 @@ function LegacyShell({
           <WelcomeBanner />
         </Suspense>
         <DailyExpenseProvider>
-          <main id="main-content" tabIndex={-1} className="pb-20 md:pb-0 outline-none">{children}</main>
+          {/* pb-28 mobile (~112px) zodat de floating-nav-pill (~56px hoog,
+              12px safe-area-offset) ruim onder de content blijft tijdens
+              scrollen — geen overlap met laatste interactieve elementen. */}
+          <main id="main-content" tabIndex={-1} className="pb-28 md:pb-0 outline-none">{children}</main>
         </DailyExpenseProvider>
       </ChatLayoutWrapper>
       <FloatingNavButton />

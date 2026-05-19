@@ -73,7 +73,13 @@ export function CashflowViewSwitcher({
           })}
         </nav>
       </div>
-      {current === 'budget' && budgetView}
+      {/* Alle drie views in dezelfde max-w-6xl wrapper voor consistent
+          horizontale spacing (matcht bezittingen/schulden-pattern).
+          BudgetsClient heeft zelf geen max-w container — die levert
+          de pagina aan. */}
+      {current === 'budget' && (
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">{budgetView}</div>
+      )}
       {current === 'transacties' && (
         <div className="mx-auto max-w-6xl px-4 sm:px-6">{transactiesView}</div>
       )}

@@ -17,7 +17,7 @@
  *    (expected_return, inflation_rate). Valt terug op NL_SWR bij lege input.
  *    Altijd gebruiken wanneer profiel beschikbaar is.
  */
-import { DEFAULT_RETURN, INFLATION, BOX3_DRAG, ageAtDate } from '@/lib/horizon-data'
+import { DEFAULT_RETURN, INFLATION, BOX3_DRAG } from '@/lib/horizon-data'
 import type { Box3Method } from './bucket-projection'
 
 /** Grens Box 1 IB-tarief 2025 (bruto jaarinkomen) */
@@ -29,25 +29,6 @@ export interface FireParams {
   effectiveSwr: number   // grossReturn - BOX3_DRAG - inflationRate
   box3Method: Box3Method // 'forfaitair' | 'werkelijk'
   marginaalTarief: number // 0.3697 of 0.4950
-}
-
-/**
- * Smart default voor verwacht rendement op basis van leeftijd. Tier-1 #2:
- * users hoeven dit niet in te vullen — we tape-en gemiddeld rendement
- * geleidelijk naar beneden naarmate de horizon korter wordt:
- *  - <30j  → 7,0% (lange horizon, kan volatiliteit absorberen)
- *  - 30-50 → 6,5% (mid-horizon)
- *  - 50-60 → 5,5% (defensiever, minder herstel-tijd)
- *  - 60+   → 5,0% (kapitaal-behoud belangrijker dan groei)
- * Zonder DOB valt het terug op DEFAULT_RETURN (0,07).
- */
-function smartDefaultReturn(dob?: string | null): number {
-  if (!dob) return DEFAULT_RETURN
-  const age = ageAtDate(dob)
-  if (age < 30) return 0.07
-  if (age < 50) return 0.065
-  if (age < 60) return 0.055
-  return 0.05
 }
 
 /**
@@ -63,9 +44,12 @@ function deriveMarginaalTarief(netMonthlyIncome?: number | null): number {
 /**
  * Resolve FIRE parameters from user profile.
  * Returns effectiveSwr (NL Box 3-corrected) based on user settings,
- * falling back to smart defaults (age-tapered) when no profile data
- * is available. Tier-1 #2: smart-defaults beschermen bestaande hand-
- * ingevulde waarden door alleen actief te zijn bij `null`-velden.
+ * falling back to defaults (≈NL_SWR) when no profile data is available.
+ *
+ * NB: leeftijd-getapered smart-default voor expected_return is OPZETTELIJK
+ * NIET geïmplementeerd. TriFinity gebruikt werkelijke insluiting van FIRE-
+ * projectie op de horizon-pagina; rendement is profiel-instelling, geen
+ * leeftijd-formule.
  */
 export function resolveFireParams(profile: {
   expected_return?: number | null
@@ -73,12 +57,8 @@ export function resolveFireParams(profile: {
   box3_method?: string | null
   marginaal_tarief?: number | null
   net_monthly_income?: number | null
-  date_of_birth?: string | null
 }): FireParams {
-  // Smart default voor return: leeftijd-getapered ipv vaste 7%. Alleen
-  // wanneer profile.expected_return null is (hand-ingevulde waardes
-  // blijven onaangetast).
-  const grossReturn = profile.expected_return ?? smartDefaultReturn(profile.date_of_birth)
+  const grossReturn = profile.expected_return ?? DEFAULT_RETURN
   const inflationRate = profile.inflation_rate ?? INFLATION
   const effectiveSwr = Math.max(0.001, grossReturn - BOX3_DRAG - inflationRate)
   const box3Method: Box3Method = (profile.box3_method === 'werkelijk') ? 'werkelijk' : 'forfaitair'
