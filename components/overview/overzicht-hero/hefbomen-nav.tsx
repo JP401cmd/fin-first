@@ -204,7 +204,10 @@ export function HefbomenNav({
                 aria-label={expanded ? `Verberg detail ${label}` : `Toon detail ${label}`}
                 className="mt-2 -mx-3 sm:-mx-4 -mb-3 sm:-mb-4 px-3 sm:px-4 py-1.5 border-t border-[var(--border-ed)] flex items-center justify-center gap-1.5 text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)] rounded-b-2xl transition-colors"
               >
-                {expanded ? 'Minder' : 'Details'}
+                {/* "Details/Minder" tekst alleen op sm+ schermen om
+                    mobiel-ruimte te besparen; mobile toont alleen
+                    chevron + aria-label voor screen-readers. */}
+                <span className="hidden sm:inline">{expanded ? 'Minder' : 'Details'}</span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
                   aria-hidden="true"
