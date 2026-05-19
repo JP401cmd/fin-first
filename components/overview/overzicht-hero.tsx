@@ -8,6 +8,7 @@ import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receip
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { WidgetPref } from '@/lib/widget-catalog'
 import { HefbomenNav } from './overzicht-hero/hefbomen-nav'
 import { BriefingPanel, type BriefingEntry } from './briefing-panel'
 import { MiniNetWorthChart } from './mini-networth-chart'
@@ -61,6 +62,11 @@ type OverzichtHeroProps = {
   /** Volledige DashboardData voor de optionele HeroWidgetRail (power-user
    *  edit-mode). Wanneer afwezig: edit-toggle wordt niet getoond. */
   dashboardData?: DashboardData
+  /** Active + all widget-prefs voor de hero-rail. Aanwezig wanneer
+   *  dashboardData ook aanwezig is — de DraggableWidgetGrid heeft ze
+   *  allebei nodig. */
+  activeWidgets?: WidgetPref[]
+  allWidgetPrefs?: WidgetPref[]
 }
 
 function formatDateNL(): string {
@@ -109,9 +115,11 @@ export function OverzichtHero({
   simRows,
   simRequiredPortfolio,
   dashboardData,
+  activeWidgets,
+  allWidgetPrefs,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
-  const rail = useHeroRailState()
+  const rail = useHeroRailState(activeWidgets ?? [])
 
   // Memoize once per mount — datum + groet wisselen zelden tijdens een
   // sessie. Voorkomt onnodige Intl-formatter-instances bij elke re-render.
@@ -209,12 +217,13 @@ export function OverzichtHero({
           render gewoon de defaults. Edit-mode of met config: 4-slot grid
           met widgets uit WIDGET_CATALOG. State leeft in localStorage. */}
       <div className="mt-3 sm:mt-4">
-        {dashboardData ? (
+        {dashboardData && activeWidgets && allWidgetPrefs ? (
           <HeroWidgetRail
-            config={rail.config}
             isEditing={rail.isEditing}
-            onSlotChange={rail.setSlot}
-            onReset={rail.resetConfig}
+            onEditModeChange={rail.setIsEditing}
+            hasActiveWidgets={rail.hasActiveWidgets}
+            activeWidgets={activeWidgets}
+            allPrefs={allWidgetPrefs}
             dashboardData={dashboardData}
             defaultContent={
               <>

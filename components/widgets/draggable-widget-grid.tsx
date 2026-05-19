@@ -203,6 +203,21 @@ interface DraggableWidgetGridProps {
    * wordt nooit getoond, ook niet als de gebruiker hem aan heeft staan.
    */
   categoryAppLinks?: CategoryAppLink[]
+  /**
+   * Onderdruk de empty-state intro-sheet (handmatig / automatisch / presets)
+   * wanneer er geen actieve widgets zijn. In plaats daarvan toont het grid
+   * een compacte "+ Widget toevoegen"-CTA. Bedoeld voor host-context
+   * (zoals /overzicht hero-rail) waar de intro-sheet visueel te zwaar is.
+   */
+  suppressIntroSheet?: boolean
+  /**
+   * Controlled edit-mode voor host-componenten die hun eigen Bewerken-knop
+   * exposen (zoals /overzicht hero-toggle). Bij aanwezigheid van beide
+   * props neemt de host de edit-state over; bij undefined valt het grid
+   * terug op zijn eigen interne state.
+   */
+  editMode?: boolean
+  onEditModeChange?: (next: boolean) => void
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -233,7 +248,7 @@ function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: Das
   return true
 }
 
-export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle, categoryAppLinks }: DraggableWidgetGridProps) {
+export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle, categoryAppLinks, suppressIntroSheet, editMode: controlledEditMode, onEditModeChange }: DraggableWidgetGridProps) {
   const router = useRouter()
   const { features } = useFeatureAccess()
 
@@ -241,7 +256,21 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const accessibleInitialPrefs = initialPrefs.filter(p => isWidgetVisible(p, features, data))
 
   const [activeWidgets, setActiveWidgets] = useState<WidgetPref[]>(accessibleInitialPrefs)
-  const [isEditMode, setIsEditMode] = useState(false)
+  const [internalEditMode, setInternalEditMode] = useState(false)
+  // Controlled edit-mode: host (zoals /overzicht hero) levert eigen state.
+  // Wanneer beide controlled-props aanwezig → gebruik die. Anders → intern.
+  const isControlledEditMode =
+    controlledEditMode !== undefined && onEditModeChange !== undefined
+  const isEditMode = isControlledEditMode ? controlledEditMode : internalEditMode
+  const setIsEditMode = (next: boolean | ((prev: boolean) => boolean)) => {
+    const resolved =
+      typeof next === 'function' ? (next as (prev: boolean) => boolean)(isEditMode) : next
+    if (isControlledEditMode) {
+      onEditModeChange?.(resolved)
+    } else {
+      setInternalEditMode(resolved)
+    }
+  }
   const [activeId, setActiveId] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -695,7 +724,21 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       {/* Widget content — hidden when briefing mode is active */}
       {!(showDashboardTypeToggle && dashboardType === 'briefing') && (<>
 
-      {activeWidgets.length === 0 && !isEditMode ? (
+      {activeWidgets.length === 0 && !isEditMode && suppressIntroSheet ? (
+        // Host-suppressed intro: compacte CTA i.p.v. "Handmatig / Automatisch /
+        // Presets"-introscherm met wizards. Bedoeld voor /overzicht hero waar
+        // de host zelf een Bewerken-toggle exposeert.
+        <div className="py-6 flex flex-col items-center text-center">
+          <button
+            type="button"
+            onClick={() => { setIsEditMode(true); setShowAddPicker(true) }}
+            className="flex items-center gap-2 rounded-[var(--r-sm)] border border-dashed border-[var(--border-md)] px-4 py-2.5 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Widget toevoegen
+          </button>
+        </div>
+      ) : activeWidgets.length === 0 && !isEditMode ? (
         <div className="py-12 flex flex-col items-center text-center">
           <div className="mb-4 rounded-2xl bg-[var(--subtle)] p-4">
             <LayoutDashboard className="h-7 w-7 text-[var(--ink-4)]" />
