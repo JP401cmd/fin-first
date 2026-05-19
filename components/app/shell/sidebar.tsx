@@ -293,6 +293,7 @@ export function Sidebar({
         activeAppKeys={activeAppKeys}
         netWorth={netWorth}
         actionCount={actionCount}
+        leverScores={leverScores}
       />
 
       <div className="border-t border-[var(--border-ed)]" aria-hidden />
@@ -302,13 +303,13 @@ export function Sidebar({
         unreadMessageCount={unreadMessageCount}
       />
 
-      <div className="border-t border-[var(--border-ed)]" aria-hidden />
-
-      {/* Vier-hefbomen-kompas — compact overzicht financiële gezondheid */}
-      {collapsed
-        ? <LeverCompassCollapsed scores={leverScores} />
-        : <LeverCompassExpanded scores={leverScores} />
-      }
+      {/* Kompas-sectie verplaatst onder Het Overzicht (zie ModulesSection).
+          User-feedback (mei 2026): "kompas staat los van overzicht, neem hem
+          op onder overzicht knop". Kompas-status leeft nu naast de module-
+          row waar hij bij hoort. Voor collapsed-state behouden we onderaan
+          een compacte indicator zodat de kleuren ook in collapse zichtbaar
+          zijn. */}
+      {collapsed && <LeverCompassCollapsed scores={leverScores} />}
 
       <div className="flex-1" aria-hidden />
 
@@ -416,6 +417,7 @@ function ModulesSection({
   activeAppKeys,
   netWorth,
   actionCount,
+  leverScores,
 }: {
   collapsed: boolean
   activeModule: NavModule | null
@@ -423,6 +425,7 @@ function ModulesSection({
   activeAppKeys: string[]
   netWorth: number
   actionCount: number
+  leverScores: LeverScores
 }) {
   const metrics: Record<NavModule, string> = {
     kern: formatNetWorthShort(netWorth),
@@ -434,20 +437,25 @@ function ModulesSection({
     <div className="flex flex-col gap-1 px-2 py-3">
       {!collapsed && <ModulesSectionLabel />}
       <div className="flex flex-col gap-0.5">
-        {MODULES.map((mod) => {
-          const isModuleNavActive = activeNavModules.includes(mod.key)
-          return (
+        {MODULES.map((mod) => (
+          <div key={mod.key}>
             <ModuleRow
-              key={mod.key}
               module={mod}
               collapsed={collapsed}
               isActive={mod.key === activeModule}
-              isEnabled={isModuleNavActive}
+              isEnabled={activeNavModules.includes(mod.key)}
               metric={metrics[mod.key]}
               activeAppKeys={activeAppKeys}
             />
-          )
-        })}
+            {/* Vier-hefbomen-kompas onder "Het Overzicht"-module (kern).
+                Toont status-indicators per hefboom inline zodat user
+                er niet voor naar onderaan de sidebar hoeft. Alleen in
+                expanded-mode; collapsed-variant leeft onderaan sidebar. */}
+            {mod.key === 'kern' && !collapsed && (
+              <LeverCompassExpanded scores={leverScores} />
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )
