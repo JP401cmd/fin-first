@@ -1,6 +1,22 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { VoorkeurenView } from './voorkeuren-view'
+
+// VoorkeurenView mount nu VoorkeurBewerkenSheet (plan §6.3 Tab 4 inline-
+// editor) die next/navigation + supabase client gebruikt. Mock beide.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}))
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    from: () => ({
+      update: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) })),
+    }),
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }),
+    },
+  }),
+}))
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'

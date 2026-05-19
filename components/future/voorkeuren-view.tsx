@@ -1,9 +1,14 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
-import { SlidersHorizontal, ArrowRight, TrendingUp, Wallet } from 'lucide-react'
+import { SlidersHorizontal, ArrowRight, TrendingUp, Wallet, Pencil } from 'lucide-react'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { useViewMode } from '@/components/app/view-mode-provider'
+import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
 
 /**
  * VoorkeurenView — content voor Voorkeuren-tab op /toekomst.
@@ -52,6 +57,17 @@ export function VoorkeurenView({
   fireStrategy: FireStrategyConfig
   withdrawalStrategy: WithdrawalStrategyConfig
 }) {
+  const { isPlannen } = useViewMode()
+  // Inline-editor state — welke voorkeur wordt momenteel bewerkt.
+  const [editing, setEditing] = useState<
+    | null
+    | {
+        title: string
+        column: 'inflation_rate' | 'expected_return'
+        currentValuePct: number
+        helperText: string
+      }
+  >(null)
   const endStrategy = STRATEGY_LABELS[fireStrategy.strategy]
   const wsLabel = WITHDRAWAL_LABELS[withdrawalStrategy.strategy] ?? {
     name: withdrawalStrategy.strategy,
@@ -150,6 +166,17 @@ export function VoorkeurenView({
             href="/identity/parameters?focus=inflatie"
             Icon={TrendingUp}
             badge="Per jaar"
+            onEdit={
+              isPlannen
+                ? () =>
+                    setEditing({
+                      title: 'Inflatie',
+                      column: 'inflation_rate',
+                      currentValuePct: fireParams.inflationRate * 100,
+                      helperText: 'NL-default 2.5% per jaar. Past op alle euro-bedragen in de projectie.',
+                    })
+                : undefined
+            }
           />
           <VoorkeurCard
             label="Bruto rendement"
@@ -158,6 +185,17 @@ export function VoorkeurenView({
             href="/identity/parameters?focus=rendement"
             Icon={TrendingUp}
             badge="Per jaar"
+            onEdit={
+              isPlannen
+                ? () =>
+                    setEditing({
+                      title: 'Bruto rendement',
+                      column: 'expected_return',
+                      currentValuePct: fireParams.grossReturn * 100,
+                      helperText: 'Wereldwijde aandelen-historie: ~6-8%. Conservatief: 4-5%. Voorkeur per asset-groep op /overzicht/bezittingen.',
+                    })
+                : undefined
+            }
           />
           <VoorkeurCard
             label="Effectief SWR"
@@ -171,17 +209,20 @@ export function VoorkeurenView({
       </div>
 
       <p className="text-[11px] italic text-[var(--ink-3)]">
-        Inline-editor voor deze voorkeuren komt in volgende iteratie. Voor
-        nu bewerken via{' '}
-        <Link href="/identity/parameters" className="underline">
-          /identity/parameters
-        </Link>{' '}
-        of{' '}
-        <Link href="/identity/instellingen" className="underline">
-          /identity/instellingen
-        </Link>
-        .
+        {isPlannen
+          ? 'Klik op Inflatie of Bruto rendement om snel bij te werken. Eindstrategie en onttrekking via /identity/parameters.'
+          : 'Activeer Plannen-modus voor inline-editor. Of bewerk via /identity/parameters.'}
       </p>
+
+      {editing && (
+        <VoorkeurBewerkenSheet
+          title={editing.title}
+          column={editing.column}
+          currentValuePct={editing.currentValuePct}
+          helperText={editing.helperText}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </section>
   )
 }
@@ -193,6 +234,7 @@ function VoorkeurCard({
   href,
   Icon,
   badge,
+  onEdit,
 }: {
   label: string
   value: string
@@ -200,17 +242,22 @@ function VoorkeurCard({
   href: string
   Icon: typeof SlidersHorizontal
   badge?: string
+  /** Wanneer aanwezig: card wordt button met inline-edit i.p.v. Link. */
+  onEdit?: () => void
 }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all flex flex-col"
-    >
+  const cardClass =
+    'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all flex flex-col text-left w-full'
+  const cardInner = (
+    <>
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
           {label}
         </div>
-        <Icon className="w-3.5 h-3.5 text-[var(--ink-4)]" aria-hidden="true" />
+        {onEdit ? (
+          <Pencil className="w-3.5 h-3.5 text-[var(--ink-4)]" aria-hidden="true" />
+        ) : (
+          <Icon className="w-3.5 h-3.5 text-[var(--ink-4)]" aria-hidden="true" />
+        )}
       </div>
       <div className="font-serif text-base sm:text-lg font-semibold text-[var(--ink)] tabular-nums">
         {value}
@@ -227,10 +274,22 @@ function VoorkeurCard({
           <span />
         )}
         <span className="text-[11px] font-semibold text-violet-700 inline-flex items-center gap-1">
-          Bewerken
+          {onEdit ? 'Bijwerken' : 'Bewerken'}
           <ArrowRight className="w-3 h-3" aria-hidden="true" />
         </span>
       </div>
+    </>
+  )
+  if (onEdit) {
+    return (
+      <button type="button" onClick={onEdit} className={cardClass}>
+        {cardInner}
+      </button>
+    )
+  }
+  return (
+    <Link href={href} className={cardClass}>
+      {cardInner}
     </Link>
   )
 }
