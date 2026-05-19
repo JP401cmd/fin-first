@@ -9,11 +9,14 @@ import {
   Wallet,
   Compass,
   ArrowRight,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { ScenarioBibliotheek } from './scenario-bibliotheek'
 import { useViewMode } from '@/components/app/view-mode-provider'
+import { computeEventImpact } from '@/lib/event-impact'
 
 /**
  * GebeurtenissenView — content voor Gebeurtenissen-tab op /toekomst.
@@ -123,12 +126,17 @@ const LEVENSSTRATEGIEEN: {
 export function GebeurtenissenView({
   events,
   currentAge,
+  annualSavings,
 }: {
   events: LifeEvent[]
   /** Huidige leeftijd uit DOB — nodig om scenario-defaults op te baseren
    *  (target_age = currentAge + N). Wanneer null: ScenarioBibliotheek
    *  toont een vriendelijke fout-melding. */
   currentAge?: number | null
+  /** Jaarlijks netto overschot (income - expenses × 12). Basis voor
+   *  EventImpactBadge — plan F-5 vergelijk-modus MVP. Wanneer 0 of
+   *  ontbrekend: badge toont "Impact onbekend". */
+  annualSavings?: number
 }) {
   // ScenarioBibliotheek = scenario-tool → alleen in 'plannen'-modus
   // zichtbaar (plan A-5). Niveau-A "Kijken"-gebruikers zien dan een
@@ -186,6 +194,25 @@ export function GebeurtenissenView({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {sorted.map((event) => {
               const Icon = iconForEvent(event.event_type, event.icon)
+              // Plan F-5: per event een impact-badge met geschatte
+              // delta in maanden/jaren vrijheid. Alleen wanneer
+              // annualSavings beschikbaar is en > 0.
+              const impact =
+                annualSavings && annualSavings > 0
+                  ? computeEventImpact(event, annualSavings)
+                  : null
+              const ImpactIcon =
+                impact?.tone === 'cost'
+                  ? TrendingDown
+                  : impact?.tone === 'gain'
+                    ? TrendingUp
+                    : null
+              const impactClass =
+                impact?.tone === 'cost'
+                  ? 'text-amber-700 bg-amber-50'
+                  : impact?.tone === 'gain'
+                    ? 'text-emerald-700 bg-emerald-50'
+                    : 'text-[var(--ink-3)] bg-[var(--subtle)]'
               return (
                 <article
                   key={event.id}
@@ -207,6 +234,15 @@ export function GebeurtenissenView({
                   <p className="text-xs text-[var(--ink-2)] leading-snug">
                     {eventImpact(event)}
                   </p>
+                  {impact && impact.tone !== 'neutral' && (
+                    <div
+                      className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${impactClass}`}
+                      title="Schatting o.b.v. jaarlijks overschot. Voor exacte impact zie Tijdas."
+                    >
+                      {ImpactIcon && <ImpactIcon className="w-3 h-3" aria-hidden="true" />}
+                      {impact.displayLabel}
+                    </div>
+                  )}
                 </article>
               )
             })}

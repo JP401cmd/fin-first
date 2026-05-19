@@ -50,7 +50,14 @@ export default async function ToekomstPage() {
         />
       }
       gebeurtenissenView={
-        <GebeurtenissenView events={horizonData.events} currentAge={currentAge} />
+        <GebeurtenissenView
+          events={horizonData.events}
+          currentAge={currentAge}
+          annualSavings={Math.max(
+            0,
+            (horizonData.avgIncome6m - horizonData.avgExpenses6m) * 12,
+          )}
+        />
       }
       voorkeurenView={
         <VoorkeurenView

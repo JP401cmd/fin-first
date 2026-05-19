@@ -101,6 +101,55 @@ describe('GebeurtenissenView — gebeurtenissen-sectie', () => {
   })
 })
 
+describe('GebeurtenissenView — event-impact-badge (plan F-5)', () => {
+  // Helper voor minimal event zonder maandelijkse delta's (alleen
+  // one_time_cost telt voor de impact-berekening).
+  function flatEvent(overrides: Partial<LifeEvent> = {}): LifeEvent {
+    return mockEvent({
+      monthly_cost_change: 0,
+      monthly_income_change: 0,
+      duration_months: 0,
+      ...overrides,
+    })
+  }
+
+  it('toont impact-badge per event wanneer annualSavings > 0', () => {
+    render(
+      <GebeurtenissenView
+        events={[flatEvent({ one_time_cost: 12000 })]}
+        annualSavings={12000}
+      />,
+    )
+    // 12000 / 12000 = 1.0 jaar → "+1.0 jaar vrijheid"
+    expect(screen.getByText(/\+1\.0 jaar/)).toBeTruthy()
+  })
+
+  it('verbergt impact-badge wanneer annualSavings ontbreekt', () => {
+    render(<GebeurtenissenView events={[flatEvent({ one_time_cost: 12000 })]} />)
+    expect(screen.queryByText(/jaar vrijheid|mnd vrijheid/i)).toBeNull()
+  })
+
+  it('toont gain-tone (emerald) bij erfenis (negatieve one_time_cost)', () => {
+    const { container } = render(
+      <GebeurtenissenView
+        events={[flatEvent({ one_time_cost: -50000 })]}
+        annualSavings={12000}
+      />,
+    )
+    expect(container.querySelector('.bg-emerald-50')).toBeTruthy()
+  })
+
+  it('toont cost-tone (amber) bij positieve cost', () => {
+    const { container } = render(
+      <GebeurtenissenView
+        events={[flatEvent({ one_time_cost: 5000 })]}
+        annualSavings={12000}
+      />,
+    )
+    expect(container.querySelector('.bg-amber-50')).toBeTruthy()
+  })
+})
+
 describe('GebeurtenissenView — strategieën-sectie', () => {
   it('rendert drie levensstrategieën altijd', () => {
     render(<GebeurtenissenView events={[]} />)
