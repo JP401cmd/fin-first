@@ -112,10 +112,10 @@ export default async function OverzichtPage() {
       : null,
   }
 
-  // Mini-vermogen-grafiek-inputs: net-worth history uit dashboard, huidig
-  // bedrag uit healthScoreInput (totalAssets - totalDebts), fireAge uit
-  // horizonData (komt deels via simResult; voor MVP halen we het uit
-  // dashboardData waar beschikbaar).
+  // Mini-vermogen-grafiek-inputs: gebruik dezelfde simulatie-data als
+  // /toekomst (simRows + simRequiredPortfolio uit runUnifiedProjection)
+  // zodat de curve en het doelbedrag bij vrijheid 1:1 matchen tussen
+  // /overzicht en /toekomst. Geen lineaire benadering meer.
   const netWorthHistory = dashboardData.netWorthHistory ?? []
   const currentNetWorth =
     (horizonData?.healthScoreInput?.totalAssets ?? 0) -
@@ -125,6 +125,8 @@ export default async function OverzichtPage() {
     dashboardData.fireAgeFractional != null
       ? Math.round(dashboardData.fireAgeFractional)
       : null
+  const simRows = dashboardData.simRows ?? null
+  const simRequiredPortfolio = dashboardData.simRequiredPortfolio ?? null
 
   return (
     <>
@@ -142,6 +144,8 @@ export default async function OverzichtPage() {
         netWorthHistory={netWorthHistory}
         currentNetWorth={currentNetWorth}
         fireAge={fireAge}
+        simRows={simRows}
+        simRequiredPortfolio={simRequiredPortfolio}
       />
       <WillLanding
         dashboardData={dashboardData}

@@ -49,6 +49,12 @@ type OverzichtHeroProps = {
   netWorthHistory?: { month: string; value: number }[]
   currentNetWorth?: number | null
   fireAge?: number | null
+  /** Per-jaar projectie uit `runUnifiedProjection` — zelfde bron als
+   *  /toekomst zodat curves overeenkomen. */
+  simRows?: { age: number; endPortfolio: number }[] | null
+  /** Doelbedrag bij vrijheid uit de simulatie — toont op de chart als
+   *  eindwaarde naast de Vrijheid-marker. */
+  simRequiredPortfolio?: number | null
 }
 
 function formatDateNL(): string {
@@ -94,6 +100,8 @@ export function OverzichtHero({
   netWorthHistory,
   currentNetWorth,
   fireAge,
+  simRows,
+  simRequiredPortfolio,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
 
@@ -177,6 +185,8 @@ export function OverzichtHero({
             fireAge={fireAge ?? null}
             endAge={endAge ?? null}
             isPensioenMode={isPensioenMode ?? false}
+            simRows={simRows ?? null}
+            simRequiredPortfolio={simRequiredPortfolio ?? null}
           />
         </div>
       </div>

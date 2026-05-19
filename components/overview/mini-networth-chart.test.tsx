@@ -4,7 +4,9 @@ import { MiniNetWorthChart } from './mini-networth-chart'
 
 /**
  * Tests voor MiniNetWorthChart — compacte projectie-chart naast Health
- * Score. Validatie render-states + projectie-clamping + markers.
+ * Score. Gebruikt nu simRows uit `runUnifiedProjection` (dezelfde bron
+ * als /toekomst) zodat de curve 1:1 matcht. Tests valideren render-
+ * states + simRows-injectie + Vrijheid-marker.
  */
 
 function buildHistory(values: number[]): { month: string; value: number }[] {
@@ -12,6 +14,21 @@ function buildHistory(values: number[]): { month: string; value: number }[] {
     const d = new Date(2025, i, 1)
     return { month: d.toISOString().slice(0, 7), value }
   })
+}
+
+function buildSimRows(
+  startAge: number,
+  fireAge: number,
+  startValue: number,
+  growthRate = 0.07,
+): { age: number; endPortfolio: number }[] {
+  const rows: { age: number; endPortfolio: number }[] = []
+  let value = startValue
+  for (let age = startAge; age <= fireAge; age++) {
+    value = value * (1 + growthRate)
+    rows.push({ age, endPortfolio: Math.round(value) })
+  }
+  return rows
 }
 
 describe('MiniNetWorthChart — render-states', () => {
@@ -54,7 +71,24 @@ describe('MiniNetWorthChart — render-states', () => {
     expect(screen.getByText(/Vul je profiel aan/)).toBeTruthy()
   })
 
-  it('toont "pensioen"-label bij isPensioenMode=true', () => {
+  it('toont empty-state placeholder zonder simRows zelfs met fireAge', () => {
+    // simRows-null = simulatie mislukt server-side → empty-state, niet
+    // een eigen lineaire benadering. Garandeert dat /overzicht nooit
+    // afwijkt van /toekomst.
+    render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={null}
+      />,
+    )
+    expect(screen.getByText(/Vul je profiel aan/)).toBeTruthy()
+  })
+
+  it('toont "pensioen"-label in empty-state bij isPensioenMode=true', () => {
     render(
       <MiniNetWorthChart
         netWorthHistory={[]}
@@ -69,7 +103,7 @@ describe('MiniNetWorthChart — render-states', () => {
   })
 })
 
-describe('MiniNetWorthChart — projectie-render', () => {
+describe('MiniNetWorthChart — projectie-render met simRows', () => {
   it('rendert chart-header "Netto vermogen door de tijd"', () => {
     render(
       <MiniNetWorthChart
@@ -78,6 +112,7 @@ describe('MiniNetWorthChart — projectie-render', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
+        simRows={buildSimRows(35, 52, 110_000)}
       />,
     )
     expect(screen.getByText('Netto vermogen door de tijd')).toBeTruthy()
@@ -89,8 +124,9 @@ describe('MiniNetWorthChart — projectie-render', () => {
         netWorthHistory={buildHistory([100_000])}
         currentNetWorth={187_400}
         currentAge={35}
-        fireAge={null}
+        fireAge={52}
         endAge={67}
+        simRows={buildSimRows(35, 52, 187_400)}
       />,
     )
     expect(container.textContent).toContain('€')
@@ -106,6 +142,7 @@ describe('MiniNetWorthChart — projectie-render', () => {
         fireAge={52}
         endAge={67}
         isPensioenMode={false}
+        simRows={buildSimRows(35, 52, 100_000)}
       />,
     )
     expect(screen.getByText(/Vrijheid 52/)).toBeTruthy()
@@ -120,6 +157,7 @@ describe('MiniNetWorthChart — projectie-render', () => {
         fireAge={67}
         endAge={67}
         isPensioenMode={true}
+        simRows={buildSimRows(35, 67, 100_000)}
       />,
     )
     expect(screen.getByText(/Pensioen 67/)).toBeTruthy()
@@ -131,8 +169,9 @@ describe('MiniNetWorthChart — projectie-render', () => {
         netWorthHistory={buildHistory([100_000])}
         currentNetWorth={100_000}
         currentAge={42}
-        fireAge={null}
+        fireAge={52}
         endAge={67}
+        simRows={buildSimRows(42, 52, 100_000)}
       />,
     )
     expect(screen.getByText(/Vandaag.*42/)).toBeTruthy()
@@ -152,16 +191,53 @@ describe('MiniNetWorthChart — projectie-render', () => {
     expect(link).toBeTruthy()
   })
 
-  it('toont "Benadering"-disclaimer met groei-percentage', () => {
+  it('toont GEEN "Benadering"-disclaimer (gebruikt nu echte simRows)', () => {
     const { container } = render(
       <MiniNetWorthChart
-        netWorthHistory={buildHistory([100_000, 102_000, 104_000])}
-        currentNetWorth={104_000}
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={100_000}
         currentAge={35}
         fireAge={52}
         endAge={67}
+        simRows={buildSimRows(35, 52, 100_000)}
       />,
     )
-    expect(container.textContent).toMatch(/Benadering met.*%\/jaar/)
+    // Voorheen: "Benadering met X%/jaar groei". Sinds we de echte
+    // unifiedProjection-rows gebruiken (zelfde data als /toekomst) is
+    // dat geen benadering meer en is de disclaimer weg.
+    expect(container.textContent).not.toMatch(/Benadering/)
+  })
+
+  it('gebruikt simRequiredPortfolio als eindwaarde-bedrag', () => {
+    const { container } = render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 100_000)}
+        simRequiredPortfolio={915_600}
+      />,
+    )
+    // Bedrag bij vrijheid moet uit simRequiredPortfolio komen, niet uit
+    // de simRows-eindwaarde. €915.600 zoals door /toekomst getoond.
+    expect(container.textContent).toContain('915')
+  })
+
+  it('historische curve render als stippellijn (strokeDasharray)', () => {
+    const { container } = render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([90_000, 95_000, 100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 100_000)}
+      />,
+    )
+    // Zoek paths met stroke-dasharray (history is dashed, projectie niet)
+    const paths = container.querySelectorAll('path[stroke-dasharray]')
+    expect(paths.length).toBeGreaterThan(0)
   })
 })

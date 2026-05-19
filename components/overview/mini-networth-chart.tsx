@@ -6,22 +6,25 @@ import { formatCurrency } from '@/lib/format'
 /**
  * MiniNetWorthChart — compacte netto-vermogen-grafiek voor /overzicht hero.
  *
- * Toont historische punten + eenvoudige projectie tot het **vrijheidsmoment**
- * (fireAge). De afbouw-fase (na vrijheid, tot eindleeftijd) leeft op
- * /toekomst — dit overzicht is bewust optimistisch en compact.
+ * Bron-van-waarheid: gebruikt **dezelfde simulatie-data** als de grafiek
+ * op /toekomst (`simRows` uit `runUnifiedProjection`). Geen lineaire
+ * benadering, geen eigen groei-rate — exact dezelfde curve als
+ * /toekomst toont voor het vandaag → vrijheid-segment. Hierdoor komen
+ * vrijheidsleeftijd én doelbedrag bij vrijheid 1:1 overeen tussen de
+ * twee pagina's.
  *
- * Bij user-tap op de tegel of op de "Bekijk afbouw →"-link: navigeert
- * naar /toekomst voor de volledige levenscyclus inclusief afbouw met alle
- * interactie (Risk Lab, events, strategieën).
+ * Visueel:
+ *  - "Vandaag" landt op ~20% van links zodat er ruime ruimte rechts is
+ *    voor de projectie naar vrijheid
+ *  - Linker 20%: historisch netto vermogen als **stippellijn** terug
+ *    in de tijd (uit `netWorthHistory`)
+ *  - Rechter 80%: projectie als **doorlopende lijn** vanaf vandaag naar
+ *    vrijheidsmoment (uit `simRows`, gesplitst op fireAge)
+ *  - Vandaag-marker (groen) + Vrijheid-marker (violet) met label
+ *    "{Vrijheid|Pensioen} {fireAge}"
  *
- * Data: netWorthHistory (van DashboardData) + currentAge + fireAge.
- * Projectie: lineair extrapoleren uit gemiddelde groei van afgelopen 12
- * datapunten naar fireAge. Dit is BENADERING — de echte horizon-grafiek
- * gebruikt full simulation. Voor MVP-overzicht is benadering genoeg.
- *
- * endAge en isPensioenMode worden meegegeven als fallback voor de label-
- * tekst en als reserve-eindpunt wanneer fireAge ontbreekt; primair domein
- * van de chart is vandaag → fireAge.
+ * Bij user-tap: navigeert naar /toekomst voor de volledige grafiek
+ * inclusief afbouw-fase.
  */
 export function MiniNetWorthChart({
   netWorthHistory,
@@ -30,6 +33,8 @@ export function MiniNetWorthChart({
   fireAge,
   endAge,
   isPensioenMode,
+  simRows,
+  simRequiredPortfolio,
 }: {
   netWorthHistory: { month: string; value: number }[]
   currentNetWorth: number
@@ -37,6 +42,19 @@ export function MiniNetWorthChart({
   fireAge: number | null
   endAge: number | null
   isPensioenMode?: boolean
+  /**
+   * Per-jaar projectie-rijen uit `runUnifiedProjection`. Wanneer aanwezig:
+   * de chart gebruikt deze waardes 1:1 (consistent met /toekomst). Wanneer
+   * afwezig (sim mislukt op server): empty-state-CTA.
+   */
+  simRows?: { age: number; endPortfolio: number }[] | null
+  /**
+   * Vereist FIRE-portfolio bij vrijheidsmoment uit de simulatie. Wanneer
+   * gegeven gebruikt de chart deze waarde voor het eind-marker-bedrag
+   * i.p.v. de simRows-waarde op fireAge. Verzekert dat /overzicht en
+   * /toekomst exact hetzelfde "doelbedrag bij vrijheid" tonen.
+   */
+  simRequiredPortfolio?: number | null
 }) {
   // SVG-dimensies
   const W = 420
@@ -48,9 +66,13 @@ export function MiniNetWorthChart({
   const chartW = W - PAD_LEFT - PAD_RIGHT
   const chartH = H - PAD_TOP - PAD_BOTTOM
 
-  // Bepaal eindpunt: primair fireAge (vrijheidsmoment). Bij ontbreken
-  // valt het terug op endAge. Wanneer beide null/ongeldig zijn → render
-  // de empty-state-CTA.
+  // Vandaag staat op 20% van links — rest is projectie naar vrijheid.
+  // Linker 20% is gereserveerd voor historische stippellijn terug in de tijd.
+  const TODAY_X_FRACTION = 0.2
+
+  // Filter de simRows tot het opbouw-segment: vandaag → fireAge (vrijheid).
+  // De afbouw-fase leeft op /toekomst — hier tonen we alleen het verhaal
+  // "hoe kom je bij vrijheid".
   const projectionEndAge =
     fireAge != null && currentAge != null && fireAge > currentAge
       ? fireAge
@@ -58,7 +80,7 @@ export function MiniNetWorthChart({
         ? endAge
         : null
 
-  if (currentAge == null || projectionEndAge == null) {
+  if (currentAge == null || projectionEndAge == null || !simRows || simRows.length === 0) {
     return (
       <Link
         href="/toekomst"
@@ -78,81 +100,93 @@ export function MiniNetWorthChart({
     )
   }
 
-  // Narrowed copies — guard hierboven sluit null uit, maar TS draagt
-  // dat niet altijd over naar nested function-closures hieronder.
+  // Narrowed copies — guard hierboven sluit null uit.
   const startAge: number = currentAge
   const finalAge: number = projectionEndAge
-  const years = finalAge - startAge
-  const projectionPoints = years + 1
 
-  // Bouw history-punten — laatste 12 maanden (of minder) als realized-lijn.
+  // Projectie-segment: simRows van vandaag → fireAge. Voeg vandaag-punt
+  // bovenaan toe (currentNetWorth) zodat het startpunt scherp is en niet
+  // mogelijk verschilt van simRows[0] (dat het einde van jaar 0 is).
+  const projRowsInRange = simRows.filter(
+    (r) => r.age >= startAge && r.age <= finalAge,
+  )
+  const projection: { age: number; value: number }[] = [
+    { age: startAge, value: currentNetWorth },
+    ...projRowsInRange.map((r) => ({ age: r.age, value: r.endPortfolio })),
+  ]
+  // Dedupe identieke leeftijden (currentAge kan al in simRows zitten);
+  // hou de eerste — currentNetWorth is de waarheid voor vandaag.
+  const seen = new Set<number>()
+  const dedupedProjection = projection.filter((p) => {
+    if (seen.has(p.age)) return false
+    seen.add(p.age)
+    return true
+  })
+
+  // Eindwaarde komt primair uit simRequiredPortfolio (= "doelbedrag bij
+  // vrijheid" zoals /toekomst dat ook toont). Fallback: laatste rij in
+  // het opbouw-segment.
+  const endValue =
+    simRequiredPortfolio != null && simRequiredPortfolio > 0
+      ? simRequiredPortfolio
+      : dedupedProjection[dedupedProjection.length - 1]?.value ?? currentNetWorth
+  const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
+
+  // Historisch netto vermogen: laatste 12 maanden worden gemapt op de
+  // linker 20% van de x-as (vóór "Vandaag"). Tonen als stippellijn.
   const recentHistory = netWorthHistory.slice(-12)
 
-  // Bereken groeisnelheid uit recent history (gemiddelde YoY-groei).
-  let yearlyGrowthRate = 0.05 // default 5% groei per jaar
-  if (recentHistory.length >= 2) {
-    const first = recentHistory[0]
-    const last = recentHistory[recentHistory.length - 1]
-    if (first && last && first.value > 0) {
-      const months = recentHistory.length - 1
-      const totalGrowth = last.value / first.value
-      const monthlyGrowth = Math.pow(totalGrowth, 1 / Math.max(1, months))
-      yearlyGrowthRate = Math.pow(monthlyGrowth, 12) - 1
-    }
-  }
-  // Clamp groei zodat onrealistische krachten (bv. 50%/jaar) de chart niet breken.
-  yearlyGrowthRate = Math.max(-0.05, Math.min(0.12, yearlyGrowthRate))
-
-  // Bouw projectie-punten (jaarlijks van currentAge → endAge)
-  const projection: { age: number; value: number }[] = []
-  let current = currentNetWorth
-  for (let i = 0; i < projectionPoints; i++) {
-    projection.push({ age: startAge + i, value: current })
-    current = current * (1 + yearlyGrowthRate)
-  }
-
-  // X-as: age range (currentAge → endAge)
-  // Y-as: 0 → max-waarde uit projectie + history
+  // Y-schaal: 0 → max van projectie + history + eindwaarde
   const allValues = [
     ...recentHistory.map((h) => h.value),
-    ...projection.map((p) => p.value),
+    ...dedupedProjection.map((p) => p.value),
+    endValue,
   ]
   const maxValue = Math.max(...allValues, 1)
   const yScale = chartH / maxValue
-  const xRange = projection.length - 1 || 1
-
-  function ageToX(age: number) {
-    const idx = age - startAge
-    return PAD_LEFT + (idx / xRange) * chartW
-  }
   function valueToY(v: number) {
     return PAD_TOP + chartH - v * yScale
   }
 
-  // Historische lijn-punten (we mappen 12-maand history op de leeftijd-as
-  // van vandaag terug, oftewel currentAge-1 → currentAge).
+  // X-mapping:
+  //  - Vandaag (startAge) zit op PAD_LEFT + chartW * TODAY_X_FRACTION
+  //  - finalAge zit op de rechterrand (PAD_LEFT + chartW)
+  //  - Historische punten (12 maanden terug) over PAD_LEFT → today-x
+  const todayX = PAD_LEFT + chartW * TODAY_X_FRACTION
+  const projXSpan = chartW * (1 - TODAY_X_FRACTION)
+  const projYears = Math.max(1, finalAge - startAge)
+
+  function ageToX(age: number) {
+    const yearsFromToday = age - startAge
+    return todayX + (yearsFromToday / projYears) * projXSpan
+  }
+
+  // Historische lijn — punten over de linker 20%. Stippellijn.
   const histPoints = recentHistory.map((h, i) => {
-    const x = PAD_LEFT + (i / Math.max(1, recentHistory.length - 1)) * (chartW * 0.15)
+    const x =
+      recentHistory.length <= 1
+        ? PAD_LEFT
+        : PAD_LEFT + (i / (recentHistory.length - 1)) * (todayX - PAD_LEFT)
     const y = valueToY(h.value)
     return { x, y }
   })
   const histPath =
     histPoints.length >= 2
-      ? histPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+      ? histPoints
+          .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+          .join(' ')
       : ''
 
-  // Projectie-pad (vanaf currentAge)
-  const projPath = projection
+  // Projectie-pad (vanaf today-x naar finalAge). Doorlopende lijn.
+  const projPath = dedupedProjection
     .map(
       (p, i) =>
         `${i === 0 ? 'M' : 'L'}${ageToX(p.age).toFixed(1)},${valueToY(p.value).toFixed(1)}`,
     )
     .join(' ')
 
-  // Eindpunt is altijd fireAge (vrijheid) of de fallback projectionEndAge.
-  // Toon hem als grote marker rechts in plaats van als sub-jaar-marker.
-  const endValue = projection[projection.length - 1]?.value ?? currentNetWorth
-  const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
+  // Toon de fireAge gerond (in praktijk: integer uit DashboardData).
+  const fireAgeLabel = Math.round(finalAge)
 
   return (
     <div className="flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 transition-all h-full">
@@ -169,31 +203,55 @@ export function MiniNetWorthChart({
       </div>
       <Link
         href="/toekomst"
-        className="block hover:opacity-90 transition-opacity"
+        className="block hover:opacity-90 transition-opacity flex-1"
         aria-label="Bekijk volledige projectie inclusief afbouw op /toekomst"
       >
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto mt-2" aria-label="Vermogensprojectie tot vrijheid">
-          {/* Historische lijn (full opacity) */}
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full h-auto mt-2"
+          aria-label="Vermogensprojectie tot vrijheid (zelfde berekening als /toekomst)"
+          preserveAspectRatio="none"
+          style={{ minHeight: '120px' }}
+        >
+          {/* Historische lijn — stippellijn terug in de tijd (links van Vandaag) */}
           {histPath && (
-            <path d={histPath} fill="none" stroke="var(--module-active-700, #047857)" strokeWidth="2" strokeLinecap="round" />
+            <path
+              d={histPath}
+              fill="none"
+              stroke="var(--module-active-700, #047857)"
+              strokeWidth="2"
+              strokeDasharray="3 3"
+              strokeLinecap="round"
+              opacity="0.7"
+            />
           )}
-          {/* Projectie-lijn (dashed) */}
+          {/* Projectie-lijn — doorlopend van Vandaag naar Vrijheid */}
           <path
             d={projPath}
             fill="none"
-            stroke="var(--module-active-500, #10b981)"
+            stroke="var(--module-active-700, #047857)"
             strokeWidth="2"
-            strokeDasharray="4 3"
             strokeLinecap="round"
           />
           {/* Vandaag-marker */}
           <circle
-            cx={ageToX(startAge)}
+            cx={todayX}
             cy={valueToY(currentNetWorth)}
             r="4"
             fill="var(--module-active-700, #047857)"
           />
-          {/* Vrijheid-eindmarker — altijd rechts in beeld (fireAge of fallback) */}
+          {/* Vandaag verticaal richtlijntje */}
+          <line
+            x1={todayX}
+            y1={PAD_TOP}
+            x2={todayX}
+            y2={H - PAD_BOTTOM}
+            stroke="var(--ink-4)"
+            strokeWidth="0.5"
+            strokeDasharray="2 3"
+            opacity="0.5"
+          />
+          {/* Vrijheid-eindmarker rechts */}
           <line
             x1={ageToX(finalAge)}
             y1={PAD_TOP}
@@ -212,13 +270,13 @@ export function MiniNetWorthChart({
             className="fill-[var(--horizon-700,#6d28d9)] font-mono"
             fontSize="9"
           >
-            {endLabel} {finalAge}
+            {endLabel} {fireAgeLabel}
           </text>
           {/* Vandaag-label */}
           <text
-            x={ageToX(startAge)}
+            x={todayX}
             y={H - 4}
-            textAnchor="start"
+            textAnchor="middle"
             className="fill-[var(--ink-3)] font-mono"
             fontSize="9"
           >
@@ -226,10 +284,7 @@ export function MiniNetWorthChart({
           </text>
         </svg>
       </Link>
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="text-[10px] text-[var(--ink-3)] italic">
-          Benadering met {(yearlyGrowthRate * 100).toFixed(1)}%/jaar groei.
-        </p>
+      <div className="mt-1 flex items-center justify-end gap-2">
         <Link
           href="/toekomst"
           className="text-[11px] font-semibold text-violet-700 hover:underline shrink-0"
