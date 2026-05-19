@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { loadAssetsData } from '@/lib/assets-data-loader'
 import AssetsPage from '@/components/core/assets-client'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { BezittingenSegmented } from '@/components/overview/bezittingen-segmented'
+import { BezittingenFilter } from '@/components/overview/bezittingen-filter'
 
 export const metadata: Metadata = {
   title: 'Bezittingen — TriFinity',
@@ -35,7 +35,7 @@ export default async function OverzichtBezittingenPage() {
     <>
       <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
       <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        <BezittingenSegmented />
+        <BezittingenFilter />
       </div>
       {assetsData ? <AssetsPage initialData={assetsData} /> : <AssetsPage />}
     </>
