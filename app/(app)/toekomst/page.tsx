@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import HorizonPage from '@/components/app/horizon/horizon-client'
+import { ToekomstTabs } from '@/components/future/toekomst-tabs'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -11,23 +12,23 @@ export const metadata: Metadata = {
 /**
  * /toekomst — canonieke toekomst-pagina (nieuwe navigatie-architectuur).
  *
- * Vervangt /horizon. Voor nu rendert HorizonPage (= horizon-client) zodat
- * preview-functionaliteit meteen werkt onder de nieuwe URL. HorizonPage
- * heeft al een PageInfoButton intern met PAGE_INFO['/horizon']-content —
- * geen wrapper-knop hier om duplicatie te voorkomen.
+ * Plan §6.3 vier-tab-structuur:
+ *  - Tab 1: Tijdas (default) — toont bestaande HorizonPage met grafiek
+ *           + Risk Lab + drag&drop events (toekomstige extractie)
+ *  - Tab 2: Doelen — placeholder met deeplink naar Will-doelen
+ *  - Tab 3: Gebeurtenissen — placeholder met deeplinks naar strategie/whatif
+ *  - Tab 4: Voorkeuren — placeholder met deeplinks naar parameters/instellingen
  *
- * In komende fases wordt HorizonPage zelf hervormd naar de vier-tab-structuur:
- *  - Tab 1: Tijdas (fase-bar onder grafiek, drag&drop, Risk Lab inline)
- *  - Tab 2: Doelen (status-flags Wealthfolio-stijl, detail-pane)
- *  - Tab 3: Gebeurtenissen (events + 3 levensstrategieën: AOW · Pensioen · Huis)
- *  - Tab 4: Toekomst voorkeuren (eindstrategie + onttrekking + verdeling)
- *
- * Bij die refactor wordt PAGE_INFO['/toekomst'] (al toegevoegd in
- * lib/page-info-content.ts) opgepakt — voor nu valt /toekomst nog terug
- * op de generieke /horizon-tekst die alsnog passend is.
+ * Niet-destructieve scaffolding: Tijdas-tab rendert het bestaande
+ * HorizonPage 1-op-1, alleen verpakt in de segmented-control. De andere
+ * tabs tonen voor nu placeholder-cards met links naar de huidige routes
+ * — in komende iteraties wordt hun content nativ uit HorizonPage
+ * geëxtraheerd.
  */
 export default async function ToekomstPage() {
   const supabase = await createClient()
   const horizonData = await loadHorizonData(supabase)
-  return <HorizonPage initialData={horizonData} />
+  return (
+    <ToekomstTabs tijdasView={<HorizonPage initialData={horizonData} />} />
+  )
 }
