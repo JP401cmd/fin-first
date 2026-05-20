@@ -22,7 +22,10 @@ function emptyInput(overrides: Partial<BriefingEngineInput> = {}): BriefingEngin
     health: null,
     goalNames: [],
     goalProgresses: [],
-    now: new Date('2026-05-19T12:00:00Z'),
+    // Oktober 15 — bewust gekozen omdat er geen seizoens-rule actief is
+    // in deze maand. Tests die specifiek seasonal-entries valideren
+    // overschrijven 'now' expliciet.
+    now: new Date('2026-10-15T12:00:00Z'),
     ...overrides,
   }
 }
@@ -40,7 +43,8 @@ function makeRec(id: string, title: string): Recommendation {
 }
 
 function makeEvent(id: string, name: string, daysFromNow: number): LifeEvent {
-  const date = new Date('2026-05-19T12:00:00Z')
+  // Match emptyInput.now zodat upcoming-events relatief blijven kloppen.
+  const date = new Date('2026-10-15T12:00:00Z')
   date.setDate(date.getDate() + daysFromNow)
   return {
     id,
@@ -414,5 +418,76 @@ describe('buildBriefingEntries — volgorde', () => {
       'milestone',
       'upcoming',
     ])
+  })
+})
+
+describe('buildBriefingEntries — seasonal entries (T-1)', () => {
+  it('voegt Box 3-peildatum-heads_up toe in januari', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({ now: new Date('2026-01-15T12:00:00Z') }),
+    )
+    const seasonal = entries.find((e) => e.id === 'seasonal:box3-peildatum')
+    expect(seasonal).toBeTruthy()
+    expect(seasonal?.category).toBe('heads_up')
+    expect(seasonal?.hefboom).toBe('belasting')
+  })
+
+  it('voegt aangifte-deadline-heads_up toe in april', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({ now: new Date('2026-04-20T12:00:00Z') }),
+    )
+    const seasonal = entries.find((e) => e.id === 'seasonal:aangifte-deadline')
+    expect(seasonal).toBeTruthy()
+    expect(seasonal?.text).toMatch(/deadline|aangifte/i)
+  })
+
+  it('aangifte-text wordt urgent binnen 7 dagen', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({ now: new Date('2026-04-28T12:00:00Z') }),
+    )
+    const seasonal = entries.find((e) => e.id === 'seasonal:aangifte-deadline')
+    expect(seasonal?.text).toMatch(/over \d dagen|morgen/i)
+  })
+
+  it('voegt vakantiegeld-tip toe rond eind mei', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({ now: new Date('2026-05-20T12:00:00Z') }),
+    )
+    const seasonal = entries.find((e) => e.id === 'seasonal:vakantiegeld')
+    expect(seasonal).toBeTruthy()
+    expect(seasonal?.hefboom).toBe('cashflow')
+  })
+
+  it('voegt zomer-uitgaven-heads_up toe in juli/augustus', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({ now: new Date('2026-07-10T12:00:00Z') }),
+    )
+    const seasonal = entries.find((e) => e.id === 'seasonal:zomer-uitgaven')
+    expect(seasonal).toBeTruthy()
+  })
+
+  it('voegt jaarruimte-upcoming toe in november', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({ now: new Date('2026-11-10T12:00:00Z') }),
+    )
+    const seasonal = entries.find((e) => e.id === 'seasonal:jaarruimte')
+    expect(seasonal?.category).toBe('upcoming')
+  })
+
+  it('voegt jaarruimte-heads_up toe in december (urgenter)', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({ now: new Date('2026-12-15T12:00:00Z') }),
+    )
+    const seasonal = entries.find((e) => e.id === 'seasonal:jaarruimte')
+    expect(seasonal?.category).toBe('heads_up')
+    expect(seasonal?.text).toMatch(/31 december|vervalt/i)
+  })
+
+  it('geen seasonal-entry in oktober (geen rule match)', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({ now: new Date('2026-10-15T12:00:00Z') }),
+    )
+    const seasonal = entries.find((e) => e.id.startsWith('seasonal:'))
+    expect(seasonal).toBeUndefined()
   })
 })

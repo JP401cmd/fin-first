@@ -229,7 +229,135 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
     })
   }
 
+  // 5. Seizoens-entry — fiscale + NL-kalender events. Plan T-1 uitbreiding:
+  //    geef de gebruiker contextuele tijdsbesef (Box 3-peildatum, aangifte-
+  //    deadline, jaareinde-pensioenruimte, etc.) als losse heads-up of
+  //    upcoming-card. Eén entry per briefing-cyclus, max-cap respect.
+  const seasonal = buildSeasonalEntry(now)
+  if (seasonal) entries.push(seasonal)
+
   return entries
+}
+
+// ── Seizoens-entries ────────────────────────────────────────────────
+//
+// Plan T-1 (Tier-3 #16) uitbreiding: contextuele kalender-zinnen die de
+// briefing relevant maken voor het NL-fiscale jaar. Reageert op:
+//   - Box 3-peildatum (1 januari)
+//   - IB-aangifte-deadline (1 mei, met 7-dagen-prewarning)
+//   - Jaareinde pensioen-jaarruimte (november-december)
+//   - Vakantieperiode (juli-augustus)
+//   - Vakantiegeld (mei, eind-week 3)
+//
+// Returnt 1 entry of null. Picks per categorie zijn date-window-gebonden.
+
+interface SeasonalRule {
+  /** Match-functie op de huidige datum (timezone-onafhankelijk). */
+  match: (now: Date) => boolean
+  /** Bouw het entry-object zodra match is gevallen. */
+  build: (now: Date) => BriefingEntry
+}
+
+function daysUntil(now: Date, targetMonth: number, targetDay: number): number {
+  const year = now.getFullYear()
+  let target = new Date(year, targetMonth - 1, targetDay)
+  if (target.getTime() < now.getTime()) {
+    target = new Date(year + 1, targetMonth - 1, targetDay)
+  }
+  const msPerDay = 1000 * 60 * 60 * 24
+  return Math.ceil((target.getTime() - now.getTime()) / msPerDay)
+}
+
+const SEASONAL_RULES: SeasonalRule[] = [
+  // Box 3-peildatum (1 januari) — geldig hele januari + eerste week februari.
+  {
+    match: (now) => {
+      const m = now.getMonth() + 1
+      const d = now.getDate()
+      return m === 1 || (m === 2 && d <= 7)
+    },
+    build: () => ({
+      id: 'seasonal:box3-peildatum',
+      category: 'heads_up',
+      text: 'Box 3-peildatum was 1 januari. Check je vermogen voor de IB-aangifte.',
+      href: '/overzicht/belasting',
+      hefboom: 'belasting',
+    }),
+  },
+  // Aangifte-deadline 1 mei — geldig vanaf 1 april tot en met 30 april.
+  {
+    match: (now) => {
+      const m = now.getMonth() + 1
+      return m === 4
+    },
+    build: (now) => {
+      const days = daysUntil(now, 5, 1)
+      return {
+        id: 'seasonal:aangifte-deadline',
+        category: 'heads_up',
+        text:
+          days <= 7
+            ? `Aangifte-deadline ${days === 1 ? 'morgen' : `over ${days} dagen`}. Heb je je IB-aangifte ingediend?`
+            : 'IB-aangifte-deadline 1 mei nadert. Plan deze week even tijd in.',
+        href: '/overzicht/belasting',
+        hefboom: 'belasting',
+      }
+    },
+  },
+  // Vakantiegeld komt eraan — mei (rond 25e bij de meeste werkgevers).
+  {
+    match: (now) => now.getMonth() + 1 === 5 && now.getDate() >= 15 && now.getDate() <= 31,
+    build: () => ({
+      id: 'seasonal:vakantiegeld',
+      category: 'upcoming',
+      text: 'Vakantiegeld komt eind deze maand. Direct doorstorten naar je doel of beleggen levert het meeste vrijheid.',
+      href: '/overzicht/cashflow',
+      hefboom: 'cashflow',
+    }),
+  },
+  // Vakantieperiode — juli + augustus.
+  {
+    match: (now) => {
+      const m = now.getMonth() + 1
+      return m === 7 || m === 8
+    },
+    build: () => ({
+      id: 'seasonal:zomer-uitgaven',
+      category: 'heads_up',
+      text: 'Zomer-uitgaven liggen typisch 15-25% boven gemiddeld. Vergelijk straks je augustus met vorig jaar.',
+      href: '/overzicht/cashflow',
+      hefboom: 'cashflow',
+    }),
+  },
+  // Jaareinde pensioen-jaarruimte — november (vroege heads-up) +
+  // december (last-call). Veel gebruikers laten de aftrekruimte
+  // ongebruikt liggen.
+  {
+    match: (now) => {
+      const m = now.getMonth() + 1
+      return m === 11 || m === 12
+    },
+    build: (now) => {
+      const m = now.getMonth() + 1
+      return {
+        id: 'seasonal:jaarruimte',
+        category: m === 12 ? 'heads_up' : 'upcoming',
+        text:
+          m === 12
+            ? 'Pensioen-jaarruimte vervalt 31 december. Laatste kans voor extra lijfrente-inleg met IB-aftrek.'
+            : 'Jaareinde nadert: check je pensioen-jaarruimte voor 2026. Een lijfrente-storting bespaart Box 1-belasting.',
+        href: '/overzicht/belasting',
+        hefboom: 'belasting',
+      }
+    },
+  },
+]
+
+export function buildSeasonalEntry(now: Date): BriefingEntry | null {
+  for (const rule of SEASONAL_RULES) {
+    if (rule.match(now)) return rule.build(now)
+  }
+  return null
 }
 
 // ── Natural-language narrative ─────────────────────────────────────
