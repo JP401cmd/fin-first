@@ -194,12 +194,11 @@ export function TipsLijst({
                 )
               },
             )}
-            {rec.freedom_days_per_year != null && rec.freedom_days_per_year > 0 && (
-              <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-[var(--ink-3)]">
-                <Sparkles className="w-3 h-3" aria-hidden="true" />
-                +{Math.round(rec.freedom_days_per_year)} dagen vrijheid/jr
-              </span>
-            )}
+            <ImpactBadges
+              freedomDays={rec.freedom_days_per_year}
+              euroMonthly={rec.euro_impact_monthly}
+              euroYearly={rec.euro_impact_yearly}
+            />
           </div>
         </article>
       ))}
@@ -213,5 +212,42 @@ export function TipsLijst({
         .
       </p>
     </div>
+  )
+}
+
+/**
+ * Impact-badges per tip — toont vrijheidsdagen + EUR-impact per maand of
+ * jaar. Past de TriFinity-filosofie "Geld is opgeslagen tijd" toe door
+ * beide eenheden naast elkaar te tonen.
+ */
+function ImpactBadges({
+  freedomDays,
+  euroMonthly,
+  euroYearly,
+}: {
+  freedomDays: number | null
+  euroMonthly: number | null
+  euroYearly: number | null
+}) {
+  const hasFreedom = freedomDays != null && freedomDays > 0
+  // Geef voorrang aan euroYearly als die er is — meer "concreet
+  // groot bedrag" dan maandelijks. Anders euroMonthly × 12.
+  const yearly = euroYearly ?? (euroMonthly != null ? euroMonthly * 12 : null)
+  const hasYearly = yearly != null && yearly > 0
+  if (!hasFreedom && !hasYearly) return null
+  return (
+    <span className="ml-auto inline-flex items-center gap-2 text-[10px] text-[var(--ink-3)]">
+      {hasYearly && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-1.5 py-0.5 font-semibold">
+          +€{Math.round(yearly).toLocaleString('nl-NL')}/jr
+        </span>
+      )}
+      {hasFreedom && (
+        <span className="inline-flex items-center gap-1">
+          <Sparkles className="w-3 h-3" aria-hidden="true" />
+          +{Math.round(freedomDays)} dagen vrijheid/jr
+        </span>
+      )}
+    </span>
   )
 }

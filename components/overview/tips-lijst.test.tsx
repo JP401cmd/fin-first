@@ -109,6 +109,30 @@ describe('TipsLijst — render', () => {
     )
     expect(screen.getByText(/\+12 dagen vrijheid\/jr/i)).toBeTruthy()
   })
+
+  it('toont EUR-impact-badge bij euro_impact_yearly', () => {
+    render(
+      <TipsLijst
+        recommendations={[
+          makeRec('1', { euro_impact_yearly: 1200 }),
+        ]}
+      />,
+    )
+    // "+€1.200/jr" — Dutch locale duizend-separator
+    expect(screen.getByText(/\+€1\.200\/jr/)).toBeTruthy()
+  })
+
+  it('berekent jaar-impact uit euro_impact_monthly × 12 wanneer yearly ontbreekt', () => {
+    render(
+      <TipsLijst
+        recommendations={[
+          makeRec('1', { euro_impact_monthly: 50, euro_impact_yearly: null }),
+        ]}
+      />,
+    )
+    // 50 × 12 = 600
+    expect(screen.getByText(/\+€600\/jr/)).toBeTruthy()
+  })
 })
 
 describe('TipsLijst — acties', () => {
