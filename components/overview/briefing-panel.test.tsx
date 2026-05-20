@@ -175,3 +175,33 @@ describe('BriefingPanel — kleur-codering per categorie', () => {
     expect(container.querySelector('.bg-slate-500')).toBeTruthy()
   })
 })
+
+describe('BriefingPanel — narrative', () => {
+  it('rendert narrative-card met tekst en Will-W badge', () => {
+    render(
+      <BriefingPanel
+        entries={[makeEntry('observation', 'Vermogen +1.2%')]}
+        narrative="Vorige week: vermogen +1.2%, schuld stabiel."
+      />,
+    )
+    expect(screen.getByText(/Will — jouw briefing/i)).toBeTruthy()
+    expect(screen.getByText(/Vorige week: vermogen/)).toBeTruthy()
+  })
+
+  it('toont "Eerdere briefings →" link naar /will', () => {
+    const { container } = render(
+      <BriefingPanel
+        entries={[makeEntry('observation', 'X')]}
+        narrative="Test narrative."
+      />,
+    )
+    const link = container.querySelector('a[href="/will#briefing"]')
+    expect(link).toBeTruthy()
+    expect(link?.textContent).toMatch(/Eerdere briefings/i)
+  })
+
+  it('rendert geen narrative-card zonder text', () => {
+    render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
+    expect(screen.queryByText(/Will — jouw briefing/i)).toBeNull()
+  })
+})

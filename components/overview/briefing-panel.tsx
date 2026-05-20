@@ -162,6 +162,17 @@ function BriefingNarrative({ text }: { text: string }) {
       <p className="text-sm sm:text-base text-[var(--ink-2)] leading-relaxed">
         {text}
       </p>
+      {/* Plan §6.2: "Toon alle briefings →" — slide-in via /will waar de
+          volledige briefing-historie staat. Kort en niet-opdringerig. */}
+      <div className="mt-3 pt-3 border-t border-violet-100/70">
+        <Link
+          href="/will#briefing"
+          className="text-[11px] font-semibold text-violet-700 hover:underline inline-flex items-center gap-1"
+        >
+          Eerdere briefings
+          <span aria-hidden="true">→</span>
+        </Link>
+      </div>
     </article>
   )
 }
