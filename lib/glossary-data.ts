@@ -251,6 +251,48 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     explanation:
       'Een buffer van 3-6 maanden levenskosten op een spaarrekening, bedoeld voor onvoorziene situaties zoals baanverlies of een grote reparatie.',
   },
+  guardrails: {
+    name: 'Guardrails',
+    alternative: 'Vangrails-strategie',
+    explanation:
+      'Een dynamische onttrekkings-strategie die je opname verlaagt na slechte beurs-jaren en verhoogt na goede. Floor en ceiling bepalen de min/max correctie t.o.v. je startopname.',
+  },
+  swr: {
+    name: 'SWR',
+    alternative: 'Veilig opname-percentage',
+    explanation:
+      'Safe Withdrawal Rate — het percentage van je startvermogen dat je elk jaar kunt opnemen zonder voortijdig door je vermogen heen te zijn. Klassieke vuistregel: 4% bij 30 jaar horizon.',
+  },
+  vpw: {
+    name: 'VPW',
+    alternative: 'Leeftijd-afhankelijke opname',
+    explanation:
+      'Variable Percentage Withdrawal — je onttrekkings-percentage stijgt naarmate je ouder wordt, omdat je horizon korter wordt. Veerkrachtiger dan vast SWR bij lange/onzekere levensduur.',
+  },
+  bucket: {
+    name: 'Bucket-strategie',
+    alternative: 'Cash-buffer + lange termijn',
+    explanation:
+      'Je vermogen wordt verdeeld in pots: een cash-bucket voor 2-3 jaar uitgaven en een belegde bucket voor de rest. Bij beursdips put je uit cash, zodat je niet hoeft te verkopen op een laag punt.',
+  },
+  avalanche: {
+    name: 'Avalanche-methode',
+    alternative: 'Hoogste rente eerst',
+    explanation:
+      'Schuldaflossings-strategie waarbij je extra aflossingen richt op de schuld met het hoogste rente-percentage. Wiskundig de goedkoopste route naar schuldvrij.',
+  },
+  ter: {
+    name: 'TER',
+    alternative: 'Beheerkosten van een fonds',
+    explanation:
+      'Total Expense Ratio — de jaarlijkse kosten van een beleggingsfonds als percentage van het belegd vermogen. Voor een wereldwijde index-ETF is 0.10-0.25% een goede richtwaarde.',
+  },
+  index_etf: {
+    name: 'Index-ETF',
+    alternative: 'Beursverhandelbaar indexfonds',
+    explanation:
+      'Een fonds dat een hele beursindex (bv. MSCI World) volgt en op de beurs wordt verhandeld als een aandeel. Lage kosten en breed gespreid — vandaar de aanbevolen keuze voor lange-termijn beleggers.',
+  },
 }
 
 /**

@@ -31,22 +31,45 @@ import type { FireEndStrategy } from '@/lib/fire-strategy'
  * editor komt in volgende iteratie.
  */
 
-const WITHDRAWAL_LABELS: Record<string, { name: string; subtitle: string }> = {
+const WITHDRAWAL_LABELS: Record<
+  string,
+  { name: string; subtitle: React.ReactNode }
+> = {
   static: {
     name: 'Vast (4%)',
-    subtitle: 'Klassiek SWR — inflatie-geïndexeerd, geen reactie op markt',
+    subtitle: (
+      <>
+        Klassiek <GlossaryTerm term="swr">SWR</GlossaryTerm> — inflatie-
+        geïndexeerd, geen reactie op markt
+      </>
+    ),
   },
   guardrails: {
     name: 'Guardrails',
-    subtitle: 'Dynamisch — verlaagt bij slechte returns, verhoogt bij goede',
+    subtitle: (
+      <>
+        <GlossaryTerm term="guardrails">Dynamisch</GlossaryTerm> — verlaagt bij
+        slechte returns, verhoogt bij goede
+      </>
+    ),
   },
   vpw: {
     name: 'VPW',
-    subtitle: 'Variable Percentage Withdrawal — leeftijd-afhankelijk',
+    subtitle: (
+      <>
+        <GlossaryTerm term="vpw">Variable Percentage Withdrawal</GlossaryTerm>
+        {' '}— leeftijd-afhankelijk
+      </>
+    ),
   },
   bucket: {
     name: 'Bucket',
-    subtitle: 'Cash-buffer + lange-termijn portfolio gescheiden',
+    subtitle: (
+      <>
+        <GlossaryTerm term="bucket">Cash-buffer</GlossaryTerm> + lange-termijn
+        portfolio gescheiden
+      </>
+    ),
   },
 }
 

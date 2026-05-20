@@ -85,7 +85,10 @@ describe('VoorkeurenView — toekomst-regels', () => {
         withdrawalStrategy={mockWithdrawal}
       />,
     )
-    expect(screen.getByText('Guardrails')).toBeTruthy()
+    // 'Guardrails' verschijnt 2× sinds GlossaryTerm-uitbreiding: één keer
+    // als strategie-naam, één keer als gemarkeerde glossary-term in de
+    // subtitle ("Dynamisch"). Beide tellen.
+    expect(screen.getAllByText('Guardrails').length).toBeGreaterThan(0)
   })
 
   it('toont guardrail floor/ceiling-badge bij guardrails-strategie', () => {
