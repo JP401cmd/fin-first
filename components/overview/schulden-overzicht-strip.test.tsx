@@ -5,6 +5,11 @@ import {
   type DebtForStrip,
 } from './schulden-overzicht-strip'
 
+/**
+ * Tests voor SchuldenOverzichtStrip — sinds de refactor naar
+ * `<CategoryCard>` toetsen we hier groepering + totaal + links.
+ */
+
 function debt(debt_type: DebtForStrip['debt_type'], balance: number): DebtForStrip {
   return { debt_type, current_balance: balance }
 }
@@ -22,7 +27,7 @@ describe('SchuldenOverzichtStrip — render', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('rendert vier groepen-tegels', () => {
+  it('rendert vier groep-kaarten', () => {
     render(
       <SchuldenOverzichtStrip
         debts={[
@@ -49,12 +54,13 @@ describe('SchuldenOverzichtStrip — render', () => {
         ]}
       />,
     )
-    // 3 + 5 + 2 = 10k onder Leningen
+    // 3 + 5 + 2 = 10k onder Leningen — verschijnt in totaal-header én in
+    // Leningen-kaart
     expect(container.textContent).toMatch(/€\s*10\.000/)
   })
 
   it('groepeert credit_card + belastingschuld + dga_schuld onder Overig', () => {
-    render(
+    const { container } = render(
       <SchuldenOverzichtStrip
         debts={[
           debt('credit_card', 500),
@@ -63,9 +69,8 @@ describe('SchuldenOverzichtStrip — render', () => {
         ]}
       />,
     )
-    // 500 + 2000 + 1500 = 4000 onder Overig — verschijnt twee keer
-    // (in totaal-stat én in Overig-tegel) — getAllByText voor robuustheid
-    expect(screen.getAllByText(/€\s*4\.000/).length).toBeGreaterThanOrEqual(1)
+    // 500 + 2000 + 1500 = 4000 onder Overig (en in totaal-header)
+    expect(container.textContent).toMatch(/€\s*4\.000/)
   })
 
   it('toont totaal schuld in header', () => {
@@ -78,11 +83,10 @@ describe('SchuldenOverzichtStrip — render', () => {
     expect(screen.getByText('Totaal schuld')).toBeTruthy()
   })
 
-  it('toont percentage per categorie', () => {
+  it('toont percentage per groep in meta-regel', () => {
     render(
       <SchuldenOverzichtStrip debts={[debt('mortgage', 100_000)]} />,
     )
-    // 100% hypotheek
     expect(screen.getByText(/100% van totaal/i)).toBeTruthy()
   })
 
@@ -106,13 +110,13 @@ describe('SchuldenOverzichtStrip — render', () => {
     expect(hrefs).toContain('/overzicht/schulden/other')
   })
 
-  it('toont "—" placeholder bij groep met 0 waarde', () => {
+  it('toont fallback-tekst voor groep met 0 waarde', () => {
     render(
       <SchuldenOverzichtStrip
         debts={[debt('mortgage', 150_000)]}
       />,
     )
-    // Drie andere groepen met 0 → 3 placeholders
-    expect(screen.getAllByText('—').length).toBe(3)
+    // Drie andere groepen met 0 → CategoryCard krijgt meta "Geen schuld"
+    expect(screen.getAllByText(/Geen schuld/i).length).toBe(3)
   })
 })

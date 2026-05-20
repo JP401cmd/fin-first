@@ -2,6 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { BezittingenOverzichtStrip } from './bezittingen-overzicht-strip'
 
+/**
+ * Tests voor BezittingenOverzichtStrip — sinds de refactor naar
+ * `<CategoryCard>` (gedeeld met /core) toetsen we hier vooral de groep-
+ * berekening, totaal-header en sub-route-links. Visuele primitives
+ * (accent-streep, sparkline, hover-lift) horen in CategoryCard-tests thuis.
+ */
+
 describe('BezittingenOverzichtStrip — render', () => {
   it('rendert niets wanneer grandTotal = 0', () => {
     const { container } = render(
@@ -15,7 +22,7 @@ describe('BezittingenOverzichtStrip — render', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('rendert vier categorie-tegels', () => {
+  it('rendert vier categorie-kaarten', () => {
     render(
       <BezittingenOverzichtStrip
         cashTotal={10_000}
@@ -44,7 +51,7 @@ describe('BezittingenOverzichtStrip — render', () => {
     expect(screen.getByText('Totaal vermogen')).toBeTruthy()
   })
 
-  it('toont percentage per categorie', () => {
+  it('toont percentage per categorie in meta-regel', () => {
     const { container } = render(
       <BezittingenOverzichtStrip
         cashTotal={100_000}
@@ -53,11 +60,11 @@ describe('BezittingenOverzichtStrip — render', () => {
         pensioenTotal={0}
       />,
     )
-    // Cash 100% van 100k
+    // Cash 100% van totaal staat in de meta-regel van de CategoryCard
     expect(container.textContent).toMatch(/100% van totaal/i)
   })
 
-  it('toont "—" placeholder bij categorie met 0 waarde', () => {
+  it('toont fallback-tekst voor categorie met 0 waarde', () => {
     render(
       <BezittingenOverzichtStrip
         cashTotal={50_000}
@@ -66,8 +73,9 @@ describe('BezittingenOverzichtStrip — render', () => {
         pensioenTotal={0}
       />,
     )
-    // Drie categorieën met 0 → drie placeholders
-    expect(screen.getAllByText('—').length).toBe(3)
+    // Drie andere categorieën met 0 → CategoryCard krijgt meta "Nog geen
+    // bezittingen". Verschijnt 3× (één per lege categorie).
+    expect(screen.getAllByText(/Nog geen bezittingen/i).length).toBe(3)
   })
 
   it('linkt naar sub-routes per categorie', () => {
@@ -88,18 +96,17 @@ describe('BezittingenOverzichtStrip — render', () => {
     expect(hrefs).toContain('/overzicht/bezittingen/retirement')
   })
 
-  it('toont beschrijving per categorie', () => {
-    render(
+  it('toont item-aantal in meta-regel wanneer counts beschikbaar zijn', () => {
+    const { container } = render(
       <BezittingenOverzichtStrip
-        cashTotal={1000}
-        investmentTotal={1000}
-        housingTotal={1000}
-        pensioenTotal={1000}
+        cashTotal={50_000}
+        investmentTotal={20_000}
+        housingTotal={0}
+        pensioenTotal={0}
+        counts={{ cash: 3, investment: 1 }}
       />,
     )
-    expect(screen.getByText(/Liquide buffer/i)).toBeTruthy()
-    expect(screen.getByText(/Aandelen, ETFs, crypto/i)).toBeTruthy()
-    expect(screen.getByText(/Woning-waarde minus hypotheekschuld/i)).toBeTruthy()
-    expect(screen.getByText(/AOW \+ werkgevers-pensioen/i)).toBeTruthy()
+    expect(container.textContent).toMatch(/3 items/i)
+    expect(container.textContent).toMatch(/1 item(?!s)/i)
   })
 })

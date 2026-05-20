@@ -61,6 +61,19 @@ export default async function OverzichtBezittingenPage() {
     : sumByTypes(['eigen_huis', 'real_estate'])
   const pensioenTotal = sumByTypes(['retirement', 'levensverzekering'])
 
+  // Item-tellingen per categorie voor CategoryCard.meta. unlinkedCash telt
+  // als 1 logisch item zodra het > 0 is (alle ongekoppelde rekeningen
+  // samen). Voor de andere categorieën tellen we per asset-type.
+  function countByTypes(types: string[]): number {
+    return assets.filter((a) => types.includes(a.asset_type ?? '')).length
+  }
+  const counts = {
+    cash: countByTypes(['cash', 'savings', 'checking']) + ((horizonData?.unlinkedCash ?? 0) > 0 ? 1 : 0),
+    investment: countByTypes(['investment', 'crypto']),
+    eigen_huis: countByTypes(['eigen_huis', 'real_estate']),
+    pensioen: countByTypes(['retirement', 'levensverzekering']),
+  }
+
   // Liquide cash voor CompoundInsightCard — zelfde subset als cashTotal,
   // wordt apart geëxposed voor de slider-component.
   const liquidCash = cashTotal
@@ -79,6 +92,7 @@ export default async function OverzichtBezittingenPage() {
         investmentTotal={investmentTotal}
         housingTotal={housingTotal}
         pensioenTotal={pensioenTotal}
+        counts={counts}
       />
       {liquidCash >= 10_000 && (
         <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
