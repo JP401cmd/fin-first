@@ -133,6 +133,33 @@ describe('TipsLijst — render', () => {
     // 50 × 12 = 600
     expect(screen.getByText(/\+€600\/jr/)).toBeTruthy()
   })
+
+  it('toont totaal-impact-banner met som van EUR + vrijheidsdagen', () => {
+    render(
+      <TipsLijst
+        recommendations={[
+          makeRec('1', { euro_impact_yearly: 600, freedom_days_per_year: 5 }),
+          makeRec('2', { euro_impact_yearly: 1200, freedom_days_per_year: 10 }),
+        ]}
+      />,
+    )
+    const banner = screen.getByTestId('tips-impact-totaal')
+    // €600 + €1200 = €1800
+    expect(banner.textContent).toMatch(/\+€1\.800/)
+    // 5 + 10 = 15 dagen
+    expect(banner.textContent).toMatch(/\+15 dagen\/jr/)
+  })
+
+  it('verbergt totaal-impact-banner zonder impact-velden', () => {
+    render(
+      <TipsLijst
+        recommendations={[
+          makeRec('1', { euro_impact_yearly: null, freedom_days_per_year: null }),
+        ]}
+      />,
+    )
+    expect(screen.queryByTestId('tips-impact-totaal')).toBeNull()
+  })
 })
 
 describe('TipsLijst — acties', () => {

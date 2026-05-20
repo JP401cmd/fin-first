@@ -117,8 +117,61 @@ export function TipsLijst({
     )
   }
 
+  // Aggregeer totale potentiële impact als motivatie. Plan-filosofie
+  // "Geld is opgeslagen tijd" — toon beide eenheden bij elkaar.
+  const totalFreedomDays = pending.reduce(
+    (s, r) => s + (r.freedom_days_per_year ?? 0),
+    0,
+  )
+  const totalEuroYearly = pending.reduce((s, r) => {
+    const yearly =
+      r.euro_impact_yearly ??
+      (r.euro_impact_monthly != null ? r.euro_impact_monthly * 12 : 0)
+    return s + yearly
+  }, 0)
+
   return (
     <div className="space-y-3">
+      {(totalFreedomDays > 0 || totalEuroYearly > 0) && (
+        <article
+          data-testid="tips-impact-totaal"
+          className="rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50/60 to-emerald-50/40 p-4 sm:p-5"
+        >
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+                Totale potentiële impact
+              </div>
+              <p className="text-xs text-[var(--ink-2)] mt-0.5 leading-snug">
+                Als je alle {pending.length} tips opvolgt, kan dit jaar er
+                zo uitzien:
+              </p>
+            </div>
+            <div className="flex items-baseline gap-3">
+              {totalEuroYearly > 0 && (
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                    Per jaar
+                  </div>
+                  <div className="font-serif text-base sm:text-lg font-semibold text-emerald-700 tabular-nums">
+                    +€{Math.round(totalEuroYearly).toLocaleString('nl-NL')}
+                  </div>
+                </div>
+              )}
+              {totalFreedomDays > 0 && (
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                    Vrijheid
+                  </div>
+                  <div className="font-serif text-base sm:text-lg font-semibold text-violet-700 tabular-nums">
+                    +{Math.round(totalFreedomDays)} dagen/jr
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </article>
+      )}
       {error && (
         <div
           role="alert"

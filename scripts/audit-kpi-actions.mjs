@@ -50,6 +50,10 @@ const ACTION_PATTERNS = [
   /href=\{/,
   /href="/,
   /onClick=\{/,
+  // Object-property syntax (bv. cardProps = { onClick: () => ... }) telt
+  // ook als actie — gebeurt bij dynamische element-types waar JSX-prop
+  // niet werkt.
+  /onClick:\s*\(/,
   /onEdit=/,
   /onToggle=/,
   // Interactieve form-controls (slider, dropdown, input) tellen ook als
