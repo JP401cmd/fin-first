@@ -63,6 +63,14 @@ export default async function OverzichtPage() {
   const endAge = horizonData?.fireStrategy?.endAge ?? null
   const isPensioenMode = horizonData?.fireStrategy?.strategy === 'pensioen'
 
+  // Onboarding-nudges flags (plan R-1):
+  // - hasDob = DOB ingevuld
+  // - hasAssets = ≥1 totalAssets via healthScoreInput
+  // - hasGoals = ≥1 actief doel
+  const hasDob = dob != null
+  const hasAssets = (horizonData?.healthScoreInput?.totalAssets ?? 0) > 0
+  const hasGoals = (willData.goals?.length ?? 0) > 0
+
   // Totaalbedragen per hefboom-tegel — uit healthScoreInput dat al
   // beschikbaar is. Belasting toont Box 3-druk per jaar uit
   // healthScoreInput.taxData (lichte berekening uit buildTaxData).
@@ -127,6 +135,9 @@ export default async function OverzichtPage() {
         dashboardData={dashboardData}
         activeWidgets={activeWidgets}
         allWidgetPrefs={allWidgetPrefs}
+        hasDob={hasDob}
+        hasAssets={hasAssets}
+        hasGoals={hasGoals}
       />
       <WillLanding
         dashboardData={dashboardData}

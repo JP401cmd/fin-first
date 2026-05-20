@@ -29,6 +29,7 @@ import {
   useHeroRailState,
 } from './hero-widget-rail'
 import { ViewModeToggle, useViewMode } from '@/components/app/view-mode-provider'
+import { OnboardingNudges } from './onboarding-nudges'
 
 type OverzichtHeroProps = {
   userName?: string
@@ -60,6 +61,12 @@ type OverzichtHeroProps = {
   /** Per-jaar projectie uit `runUnifiedProjection` — zelfde bron als
    *  /toekomst zodat curves overeenkomen. */
   simRows?: { age: number; endPortfolio: number }[] | null
+  /** Heeft de user een geboortejaar gezet? Voor onboarding-nudges. */
+  hasDob?: boolean
+  /** Heeft de user minimaal 1 actief asset of bank-account? */
+  hasAssets?: boolean
+  /** Heeft de user minimaal 1 doel? */
+  hasGoals?: boolean
   /** Doelbedrag bij vrijheid uit de simulatie — toont op de chart als
    *  eindwaarde naast de Vrijheid-marker. */
   simRequiredPortfolio?: number | null
@@ -122,6 +129,9 @@ export function OverzichtHero({
   dashboardData,
   activeWidgets,
   allWidgetPrefs,
+  hasDob,
+  hasAssets,
+  hasGoals,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
   const rail = useHeroRailState(activeWidgets ?? [])
@@ -192,6 +202,14 @@ export function OverzichtHero({
           </p>
         )}
       </header>
+
+      {(hasDob !== undefined || hasAssets !== undefined || hasGoals !== undefined) && (
+        <OnboardingNudges
+          hasDob={hasDob ?? false}
+          hasAssets={hasAssets ?? false}
+          hasGoals={hasGoals ?? false}
+        />
+      )}
 
       <HefbomenNav health={health} totals={totals} />
 

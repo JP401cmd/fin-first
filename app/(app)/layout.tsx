@@ -33,7 +33,6 @@ import { CoachBubble } from '@/components/app/coach-bubble'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
 import { ViewModeProvider } from '@/components/app/view-mode-provider'
-import { WillCoachFAB } from '@/components/app/will-coach-fab'
 import {
   generateAllColorVars,
   DEFAULT_MODULE_COLORS,
@@ -392,10 +391,6 @@ export default async function AppLayout({
                           >
                             {children}
                           </ResponsiveShell>
-                          {/* Plan §6.5: Will-coach overal toegankelijk
-                              via FAB rechtsonder. Print-hidden zodat hij
-                              niet op PDF-exports verschijnt. */}
-                          <WillCoachFAB />
                         </CommandPaletteProvider>
                       </FeatureAccessProvider>
                       <ChatPanel />
