@@ -1,4 +1,7 @@
+'use client'
+
 import { formatCurrency } from '@/lib/format'
+import { GlossaryTerm } from '@/components/editorial/glossary-term'
 
 /**
  * BelastingOverzichtStrip — KPI-tegels-rij voor /overzicht/belasting.
@@ -76,7 +79,13 @@ export function BelastingOverzichtStrip({
           number="3"
           label="Sparen + beleggen"
           value={box3Tax}
-          subtitle="Cash, beleggingen, crypto — forfaitair."
+          subtitle={
+            <>
+              Cash, beleggingen, crypto —{' '}
+              <GlossaryTerm term="forfaitair_rendement">forfaitair</GlossaryTerm>
+              .
+            </>
+          }
           disclaimer="Berekening uit healthScoreInput"
         />
       </div>
@@ -95,7 +104,7 @@ function BoxTegel({
   number: string
   label: string
   value: number | null
-  subtitle: string
+  subtitle: React.ReactNode
   disclaimer: string
   forcePlaceholder?: boolean
 }) {

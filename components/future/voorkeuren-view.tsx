@@ -8,6 +8,7 @@ import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { useViewMode } from '@/components/app/view-mode-provider'
+import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
 import { OnttrekkingsBewerkenSheet } from './onttrekkings-bewerken-sheet'
 import { EindstrategieBewerkenSheet } from './eindstrategie-bewerken-sheet'
@@ -207,9 +208,18 @@ export function VoorkeurenView({
             }
           />
           <VoorkeurCard
-            label="Effectief SWR"
+            label={
+              <>
+                Effectief <GlossaryTerm term="SWR">SWR</GlossaryTerm>
+              </>
+            }
             value={formatPct(fireParams.effectiveSwr)}
-            subtitle="Box 3-gecorrigeerd reëel rendement (NL-specifiek)"
+            subtitle={
+              <>
+                <GlossaryTerm term="box_3">Box 3</GlossaryTerm>-gecorrigeerd
+                reëel rendement (NL-specifiek)
+              </>
+            }
             href="/identity/parameters?focus=swr"
             Icon={Wallet}
             badge="Afgeleid"
@@ -259,9 +269,9 @@ function VoorkeurCard({
   badge,
   onEdit,
 }: {
-  label: string
+  label: React.ReactNode
   value: string
-  subtitle: string
+  subtitle: React.ReactNode
   href: string
   Icon: typeof SlidersHorizontal
   badge?: string

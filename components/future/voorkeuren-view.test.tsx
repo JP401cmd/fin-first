@@ -123,7 +123,10 @@ describe('VoorkeurenView — markt-aannames', () => {
     )
     expect(screen.getByText('Inflatie')).toBeTruthy()
     expect(screen.getByText('Bruto rendement')).toBeTruthy()
-    expect(screen.getByText('Effectief SWR')).toBeTruthy()
+    // "Effectief" + GlossaryTerm("SWR") rendert split — controleer via
+    // de body-content of beide aanwezig zijn.
+    expect(document.body.textContent).toMatch(/Effectief/)
+    expect(document.body.textContent).toMatch(/SWR/)
   })
 
   it('formatteert percentages met 1 decimaal', () => {
