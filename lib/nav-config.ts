@@ -85,11 +85,17 @@ export const navGroups: NavGroup[] = [
   },
   {
     parent: mainNav[2]!,
+    // Plan §6.4 + §6.10: nieuwe nav verwijst naar /mijn-sub-routes
+    // i.p.v. legacy /identity/*. De legacy routes blijven werken via
+    // bestaande server-pagina's, maar zijn niet meer in de nav.
     items: [
-      { label: 'Profiel', href: '/identity/profiel' },
-      { label: 'Koppelingen', href: '/identity/koppelingen' },
-      { label: 'Delen', href: '/identity/delen' },
-      { label: 'Instellingen', href: '/identity/instellingen' },
+      { label: 'Profiel', href: '/mijn/profiel' },
+      { label: 'Privacy', href: '/mijn/privacy' },
+      { label: 'Koppelingen', href: '/mijn/koppelingen' },
+      { label: 'Delen', href: '/mijn/delen' },
+      { label: 'Notificaties', href: '/mijn/notificaties' },
+      { label: 'Uiterlijk', href: '/mijn/uiterlijk' },
+      { label: 'Geavanceerd', href: '/mijn/geavanceerd' },
     ],
   },
 ]
