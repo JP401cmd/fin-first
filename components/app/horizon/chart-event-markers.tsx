@@ -245,7 +245,14 @@ export function ChartEventMarkers({
               }
               onEventClick?.(p.id, p.kind, p.sourceId)
             }}
-            style={{ cursor }}
+            style={{
+              cursor,
+              // Voorkom dat de browser scrollt/pinch-zoomt tijdens een
+              // F-1 drag op touch-devices. Alleen actief wanneer het
+              // event dragbaar is, zodat niet-dragbare markers normaal
+              // scroll-gedrag behouden.
+              touchAction: canDrag ? 'none' : undefined,
+            }}
             role={onEventClick ? 'button' : undefined}
             aria-label={onEventClick ? `Open ${p.label}` : undefined}
             data-testid={`chart-event-marker-${p.id}`}
