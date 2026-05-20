@@ -299,22 +299,29 @@ export function ChartEventMarkers({
 
             {/* F-1 drag-tooltip: tijdens slepen verschijnt boven (of onder,
                 mirror van de stack-side) de marker een prominente tooltip
-                met de geprojecteerde nieuwe leeftijd. Vervangt visueel
-                de standaard hover-tooltip zodat het jaar waar je naartoe
-                sleept altijd duidelijk leesbaar is. */}
+                met de geprojecteerde nieuwe leeftijd én delta vs origineel.
+                Vervangt visueel de standaard hover-tooltip zodat het jaar
+                waar je naartoe sleept altijd duidelijk leesbaar is. */}
             {isDragging && (() => {
               const projectedAge = Math.round(invXScale(cx - padLeft))
-              const tooltipW = 120
-              const tooltipH = 30
+              const delta = projectedAge - p.age
+              const hasDelta = delta !== 0
+              const tooltipW = 130
+              const tooltipH = hasDelta ? 42 : 30
               const tx = Math.max(2, cx - tooltipW / 2)
               const ty = isAbove
                 ? Math.max(2, cy - r - tooltipH - 4)
                 : cy + r + 4
               const txCenter = Math.max(2 + tooltipW / 2, cx)
+              const deltaText =
+                delta > 0
+                  ? `+${delta} jaar later`
+                  : delta < 0
+                    ? `${Math.abs(delta)} jaar eerder`
+                    : ''
+              const deltaColor = delta > 0 ? '#fbbf24' : '#34d399' // amber-400 / emerald-400
               return (
                 <g style={{ pointerEvents: 'none' }}>
-                  {/* Achtergrond-rect met paarse rand zodat 'm visueel
-                      onderscheidt van de gewone hover-tooltip. */}
                   <rect
                     x={tx} y={ty}
                     width={tooltipW} height={tooltipH}
@@ -344,6 +351,18 @@ export function ChartEventMarkers({
                   >
                     {projectedAge} jaar
                   </text>
+                  {hasDelta && (
+                    <text
+                      x={txCenter} y={ty + 36}
+                      textAnchor="middle"
+                      fontSize={9}
+                      fontWeight={600}
+                      fill={deltaColor}
+                      fontFamily="var(--font-dm-mono, monospace)"
+                    >
+                      {deltaText}
+                    </text>
+                  )}
                 </g>
               )
             })()}
