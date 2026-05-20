@@ -225,6 +225,37 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
     expect(container.textContent).toContain('915')
   })
 
+  it('rendert confidence-band als zachte gradient polygon (plan F-4)', () => {
+    const { container } = render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 100_000)}
+      />,
+    )
+    // Band is een <path> met fill (geen stroke) en opacity-0.12
+    const fillPaths = Array.from(container.querySelectorAll('path[fill]'))
+      .filter((p) => p.getAttribute('fill') !== 'none')
+    expect(fillPaths.length).toBeGreaterThan(0)
+  })
+
+  it('toont legenda-tekst "Onzekerheid (P10–P90)"', () => {
+    render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 100_000)}
+      />,
+    )
+    expect(screen.getByText(/Onzekerheid \(P10–P90\)/i)).toBeTruthy()
+  })
+
   it('historische curve render als stippellijn (strokeDasharray)', () => {
     const { container } = render(
       <MiniNetWorthChart

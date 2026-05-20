@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/format'
+import { computeConfidenceBand } from '@/lib/confidence-band'
 
 /**
  * MiniNetWorthChart — compacte netto-vermogen-grafiek voor /overzicht hero.
@@ -146,11 +147,17 @@ export function MiniNetWorthChart({
   // minder dan HISTORY_WINDOW_MONTHS punten zijn, schaalt de lijn-lengte
   // proportioneel mee (geen artificiële uitrekking meer).
 
-  // Y-schaal: 0 → max van projectie + history + eindwaarde
+  // Y-schaal: 0 → max van projectie + history + eindwaarde + P90-top
+  // van de confidence-band zodat de gradient binnen het frame valt.
+  // P90 op endpoint = endValue × (1 + 1.28 × σ × √years). Voor MVP
+  // approximaten we via factor 1.5 = simpel-headroom.
+  const maxProjection = Math.max(...dedupedProjection.map((p) => p.value), 1)
+  const bandHeadroom = maxProjection * 1.5
   const allValues = [
     ...recentHistory.map((h) => h.value),
     ...dedupedProjection.map((p) => p.value),
     endValue,
+    bandHeadroom,
   ]
   const maxValue = Math.max(...allValues, 1)
   const yScale = chartH / maxValue
@@ -201,6 +208,30 @@ export function MiniNetWorthChart({
     )
     .join(' ')
 
+  // Plan F-4: confidence-band P10-P90 als zachte gradient rond
+  // projectie. Approximated via σ × √t — geen echte Monte Carlo maar
+  // voldoende voor MVP-visualisatie van onzekerheid.
+  const bandPoints = computeConfidenceBand(
+    dedupedProjection.map((p) => ({ age: p.age, endPortfolio: p.value })),
+  )
+  // Polygon-path: heen langs P90, terug langs P10 (gespiegeld).
+  const bandPath =
+    bandPoints.length >= 2
+      ? [
+          // Forward langs P90
+          ...bandPoints.map(
+            (p, i) =>
+              `${i === 0 ? 'M' : 'L'}${ageToX(p.age).toFixed(1)},${valueToY(p.p90).toFixed(1)}`,
+          ),
+          // Backward langs P10
+          ...[...bandPoints].reverse().map(
+            (p) =>
+              `L${ageToX(p.age).toFixed(1)},${valueToY(p.p10).toFixed(1)}`,
+          ),
+          'Z',
+        ].join(' ')
+      : ''
+
   // Toon de fireAge gerond (in praktijk: integer uit DashboardData).
   const fireAgeLabel = Math.round(finalAge)
 
@@ -239,6 +270,16 @@ export function MiniNetWorthChart({
               strokeDasharray="3 3"
               strokeLinecap="round"
               opacity="0.7"
+            />
+          )}
+          {/* Confidence-band P10-P90 (plan F-4) — zachte gradient onder
+              de projectie-lijn. Approximated via σ×√t. */}
+          {bandPath && (
+            <path
+              d={bandPath}
+              fill="var(--module-active-500, #10b981)"
+              opacity="0.12"
+              stroke="none"
             />
           )}
           {/* Projectie-lijn — doorlopend van Vandaag naar Vrijheid */}
@@ -300,7 +341,18 @@ export function MiniNetWorthChart({
           </text>
         </svg>
       </Link>
-      <div className="mt-1 flex items-center justify-end gap-2">
+      <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">
+        <span
+          className="inline-flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]"
+          title="P10-P90 bandbreedte op basis van marktvolatiliteit σ × √t"
+        >
+          <span
+            className="inline-block w-3 h-2 rounded-sm"
+            style={{ background: 'var(--module-active-500, #10b981)', opacity: 0.25 }}
+            aria-hidden="true"
+          />
+          Onzekerheid (P10–P90)
+        </span>
         <Link
           href="/toekomst"
           className="text-[11px] font-semibold text-violet-700 hover:underline shrink-0"
