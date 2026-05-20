@@ -12,6 +12,7 @@ import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
 import { CashflowKalender } from '@/components/overview/cashflow-kalender'
 import { CashflowForecast } from '@/components/overview/cashflow-forecast'
 import { CashflowSankey } from '@/components/overview/cashflow-sankey'
+import { InflationImpactCard } from '@/components/overview/inflation-impact-card'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import type { RecurringTransaction } from '@/lib/recurring-data'
@@ -142,6 +143,11 @@ export default async function OverzichtCashflowPage() {
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>
+      {baselineExpenses >= 500 && (
+        <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+          <InflationImpactCard monthlyExpenses={baselineExpenses} />
+        </section>
+      )}
       <CashflowViewSwitcher
         budgetView={<BudgetsClient initialData={data} />}
         transactiesView={
