@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, Target } from 'lucide-react'
+import { Plus, X, Target, Calculator } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { formatCurrency } from '@/lib/format'
 
 /**
  * DoelToevoegenSheet — plan §6.3 Tab 2 detail-pane: doelen toevoegen
@@ -26,6 +27,38 @@ const GOAL_TYPE_LABELS: Record<GoalType, string> = {
   savings: 'Sparen',
   wealth: 'Vermogen groeien',
   debt: 'Schuld aflossen',
+}
+
+/** Default jaarrendement per goal-type. NL-context: sparen ~1.5%
+ *  (deposito), beleggen ~6% (wereldwijde ETF lange termijn), schuld
+ *  loopt 0% (we tellen alleen inleg). */
+const RETURN_BY_TYPE: Record<GoalType, number> = {
+  savings: 0.015,
+  wealth: 0.06,
+  debt: 0,
+}
+
+/**
+ * Bereken benodigde maandelijkse inleg om een doelbedrag in N maanden
+ * te bereiken bij gegeven jaarrendement.
+ *
+ * Formule (future-value of annuity):
+ *   FV = PMT × ((1 + r)^n − 1) / r
+ *   PMT = FV × r / ((1 + r)^n − 1)
+ *
+ * Bij r=0 (debt-goal): PMT = FV / n.
+ */
+function monthlyContributionForTarget(
+  target: number,
+  years: number,
+  annualReturn: number,
+): number {
+  if (years <= 0) return target
+  const months = years * 12
+  if (annualReturn <= 0) return target / months
+  const r = annualReturn / 12
+  const growthFactor = Math.pow(1 + r, months)
+  return (target * r) / (growthFactor - 1)
 }
 
 /**
@@ -289,6 +322,16 @@ export function DoelToevoegenSheet() {
               </label>
             </div>
 
+            {/* Live ETA-preview — vult zich zodra targetValue is ingevuld.
+                Toont per goalType de relevante maandelijkse inleg of
+                tijdslijn zodat de gebruiker zijn doel realistisch ijkt
+                voor opslaan. */}
+            <EtaPreview
+              targetValue={targetValue}
+              targetDate={targetDate}
+              goalType={goalType}
+            />
+
             <div className="mt-5 flex items-center justify-end gap-2">
               <button
                 type="button"
@@ -312,5 +355,101 @@ export function DoelToevoegenSheet() {
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * EtaPreview — toont live berekening op basis van targetValue +
+ * targetDate + goalType. Drie scenario's:
+ *
+ *  1. targetValue + targetDate ingevuld → toont 'X €/maand nodig' bij
+ *     het gekozen goalType-rendement.
+ *  2. Alleen targetValue → toont 'bij €100/mnd haal je dit in N jaar'
+ *     als referentiepunt.
+ *  3. Niet genoeg input → blok rendert niet.
+ *
+ * NL-defaults zijn voorzichtig (1.5% sparen, 6% beleggen). De waarden
+ * zijn richtcijfers — gebruiker kan na opslaan in DoelBewerkenSheet
+ * z'n voortgang bijwerken.
+ */
+function EtaPreview({
+  targetValue,
+  targetDate,
+  goalType,
+}: {
+  targetValue: string
+  targetDate: string
+  goalType: GoalType
+}) {
+  const target = Number(targetValue)
+  if (!Number.isFinite(target) || target <= 0) return null
+
+  const annualReturn = RETURN_BY_TYPE[goalType]
+
+  // Case 1: doel + datum → maandelijkse inleg
+  if (targetDate) {
+    const targetMs = new Date(targetDate).getTime()
+    if (Number.isNaN(targetMs)) return null
+    const years = (targetMs - Date.now()) / (1000 * 60 * 60 * 24 * 365)
+    if (years <= 0.1) return null
+    const monthly = monthlyContributionForTarget(target, years, annualReturn)
+    const yearsLabel =
+      years >= 2 ? `${Math.round(years)} jaar` : `${Math.round(years * 12)} maanden`
+    return (
+      <section
+        data-testid="eta-preview"
+        className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3"
+      >
+        <header className="flex items-center gap-1.5 mb-1">
+          <Calculator className="w-3.5 h-3.5 text-emerald-700" aria-hidden="true" />
+          <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-emerald-700">
+            Wat je nodig hebt
+          </span>
+        </header>
+        <p className="text-xs text-[var(--ink-2)] leading-snug">
+          <strong className="font-semibold text-[var(--ink)] tabular-nums">
+            {formatCurrency(Math.round(monthly))}
+          </strong>{' '}
+          per maand inleggen over{' '}
+          <strong className="font-semibold text-[var(--ink)]">{yearsLabel}</strong>
+          {goalType === 'wealth' && ` bij ${Math.round(annualReturn * 100)}% rendement`}
+          {goalType === 'savings' && ` op deposito (~${(annualReturn * 100).toFixed(1)}%)`}
+          {goalType === 'debt' && ' extra-aflossing'}.
+        </p>
+      </section>
+    )
+  }
+
+  // Case 2: alleen target → toon hoe lang bij standaard €100/mnd
+  const REFERENCE_MONTHLY = 100
+  // Solve voor years: target = 100 × ((1+r)^n − 1) / r where n = years × 12
+  let yearsAt100: number
+  if (annualReturn <= 0) {
+    yearsAt100 = target / (REFERENCE_MONTHLY * 12)
+  } else {
+    const r = annualReturn / 12
+    const n = Math.log(1 + (target * r) / REFERENCE_MONTHLY) / Math.log(1 + r)
+    yearsAt100 = n / 12
+  }
+  if (!Number.isFinite(yearsAt100) || yearsAt100 > 80) return null
+  return (
+    <section
+      data-testid="eta-preview"
+      className="mt-4 rounded-xl border border-violet-100 bg-violet-50/40 p-3"
+    >
+      <header className="flex items-center gap-1.5 mb-1">
+        <Calculator className="w-3.5 h-3.5 text-violet-700" aria-hidden="true" />
+        <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-violet-700">
+          Indicatie
+        </span>
+      </header>
+      <p className="text-xs text-[var(--ink-2)] leading-snug">
+        Bij €100/maand inleg haal je dit doel in{' '}
+        <strong className="font-semibold text-[var(--ink)]">
+          ~{Math.round(yearsAt100)} jaar
+        </strong>
+        . Voeg een datum toe voor de exacte maandbedrag-berekening.
+      </p>
+    </section>
   )
 }

@@ -123,6 +123,44 @@ describe('DoelToevoegenSheet — insert-flow', () => {
   })
 })
 
+describe('DoelToevoegenSheet — ETA-preview', () => {
+  it('toont indicatie bij alleen target-bedrag (geen datum)', () => {
+    render(<DoelToevoegenSheet />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(dialog.querySelector('input[type="number"]')!, {
+      target: { value: '50000' },
+    })
+    const preview = screen.getByTestId('eta-preview')
+    expect(preview.textContent).toMatch(/Bij €100\/maand/i)
+    expect(preview.textContent).toMatch(/jaar/i)
+  })
+
+  it('toont maandelijkse inleg wanneer target én datum gevuld zijn', () => {
+    render(<DoelToevoegenSheet />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(dialog.querySelector('input[type="number"]')!, {
+      target: { value: '60000' },
+    })
+    // Datum 10 jaar vooruit
+    const futureDate = new Date()
+    futureDate.setFullYear(futureDate.getFullYear() + 10)
+    fireEvent.change(dialog.querySelector('input[type="date"]')!, {
+      target: { value: futureDate.toISOString().slice(0, 10) },
+    })
+    const preview = screen.getByTestId('eta-preview')
+    expect(preview.textContent).toMatch(/per maand inleggen/i)
+    expect(preview.textContent).toMatch(/€/)
+  })
+
+  it('verbergt preview bij leeg of negatief bedrag', () => {
+    render(<DoelToevoegenSheet />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    expect(screen.queryByTestId('eta-preview')).toBeNull()
+  })
+})
+
 describe('DoelToevoegenSheet — presets', () => {
   it('toont 3 preset-buttons (Noodfonds / Schuldvrij / Vrijheidsgetal)', () => {
     render(<DoelToevoegenSheet />)
