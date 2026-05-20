@@ -694,7 +694,7 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           const groupIcon = ASSET_TYPE_ICONS[type]
 
           return (
-            <div key={type}>
+            <div key={type} id={`asset-group-${type}`} className="scroll-mt-24">
               {/* Group header — altijd klikbaar door naar /core/assets/[type] */}
               <div className="flex items-center gap-2 pt-2 pb-2.5">
                 <span style={{ color: groupColor }}><BudgetIcon name={groupIcon} className="h-4 w-4" /></span>

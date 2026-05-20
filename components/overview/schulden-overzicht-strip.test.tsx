@@ -104,10 +104,10 @@ describe('SchuldenOverzichtStrip — render', () => {
     const hrefs = Array.from(container.querySelectorAll('a')).map((a) =>
       a.getAttribute('href'),
     )
-    expect(hrefs).toContain('/overzicht/schulden/mortgage')
-    expect(hrefs).toContain('/overzicht/schulden/personal_loan')
-    expect(hrefs).toContain('/overzicht/schulden/student_loan')
-    expect(hrefs).toContain('/overzicht/schulden/other')
+    expect(hrefs).toContain('/overzicht/schulden#debt-group-mortgage')
+    expect(hrefs).toContain('/overzicht/schulden#debt-group-personal_loan')
+    expect(hrefs).toContain('/overzicht/schulden#debt-group-student_loan')
+    expect(hrefs).toContain('/overzicht/schulden#debt-group-credit_card')
   })
 
   it('toont fallback-tekst voor groep met 0 waarde', () => {

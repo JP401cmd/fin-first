@@ -93,10 +93,10 @@ describe('BezittingenOverzichtStrip — render', () => {
     const hrefs = Array.from(container.querySelectorAll('a')).map((a) =>
       a.getAttribute('href'),
     )
-    expect(hrefs).toContain('/overzicht/bezittingen/cash')
-    expect(hrefs).toContain('/overzicht/bezittingen/investment')
-    expect(hrefs).toContain('/overzicht/bezittingen/eigen_huis')
-    expect(hrefs).toContain('/overzicht/bezittingen/retirement')
+    expect(hrefs).toContain('/overzicht/bezittingen#asset-group-cash')
+    expect(hrefs).toContain('/overzicht/bezittingen#asset-group-investment')
+    expect(hrefs).toContain('/overzicht/bezittingen#asset-group-eigen_huis')
+    expect(hrefs).toContain('/overzicht/bezittingen#asset-group-retirement')
   })
 
   it('toont item-aantal in meta-regel wanneer counts beschikbaar zijn', () => {

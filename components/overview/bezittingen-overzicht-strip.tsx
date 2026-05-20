@@ -12,30 +12,37 @@ import { CategoryCard } from '@/components/core/category-card'
  * achtergrond, hover-lift, scherpe hoeken) komt 1-op-1 uit /core.
  */
 
+// Tegel-href = anchor naar de eerste asset-group in dezelfde bundle op
+// /overzicht/bezittingen. Klik → smooth-scroll naar die sectie, en alles
+// daaronder (inclusief de andere bundle-types) blijft zichtbaar.
+//
+// Voor "Pensioen + overig" linken we naar retirement; de 6 andere
+// bundle-types (levensverzekering, vehicle, physical, deelneming,
+// vordering, other) staan eronder in AssetsPage's groep-volgorde.
 const CATEGORIES = [
   {
     key: 'cash' as const,
     label: 'Cash + spaargeld',
     iconName: 'Wallet',
-    href: '/overzicht/bezittingen/cash',
+    href: '/overzicht/bezittingen#asset-group-cash',
   },
   {
     key: 'investment' as const,
     label: 'Beleggen',
     iconName: 'LineChart',
-    href: '/overzicht/bezittingen/investment',
+    href: '/overzicht/bezittingen#asset-group-investment',
   },
   {
     key: 'eigen_huis' as const,
     label: 'Eigen huis',
     iconName: 'Home',
-    href: '/overzicht/bezittingen/eigen_huis',
+    href: '/overzicht/bezittingen#asset-group-eigen_huis',
   },
   {
     key: 'pensioen' as const,
     label: 'Pensioen + overig',
     iconName: 'Hourglass',
-    href: '/overzicht/bezittingen/retirement',
+    href: '/overzicht/bezittingen#asset-group-retirement',
   },
 ]
 

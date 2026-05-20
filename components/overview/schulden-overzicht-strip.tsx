@@ -28,6 +28,9 @@ const GROUP_MAP: Record<DebtType, DebtGroup> = {
   other: 'other',
 }
 
+// Tegel-href = anchor naar de eerste debt-group in dezelfde bundle op
+// /overzicht/schulden. Klik scrollt naar die sectie, alles daaronder
+// (inclusief overige groep-types in dezelfde bundle) blijft zichtbaar.
 const GROUPS: {
   key: DebtGroup
   label: string
@@ -38,25 +41,25 @@ const GROUPS: {
     key: 'mortgage',
     label: 'Hypotheek',
     iconName: 'Building2',
-    href: '/overzicht/schulden/mortgage',
+    href: '/overzicht/schulden#debt-group-mortgage',
   },
   {
     key: 'loans',
     label: 'Leningen',
     iconName: 'Banknote',
-    href: '/overzicht/schulden/personal_loan',
+    href: '/overzicht/schulden#debt-group-personal_loan',
   },
   {
     key: 'student',
     label: 'Studieschuld',
     iconName: 'GraduationCap',
-    href: '/overzicht/schulden/student_loan',
+    href: '/overzicht/schulden#debt-group-student_loan',
   },
   {
     key: 'other',
     label: 'Overig',
     iconName: 'CreditCard',
-    href: '/overzicht/schulden/other',
+    href: '/overzicht/schulden#debt-group-credit_card',
   },
 ]
 

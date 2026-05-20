@@ -535,7 +535,7 @@ export default function DebtsPage() {
           const groupIcon = DEBT_TYPE_ICONS[type] ?? 'CircleDot'
 
           return (
-            <div key={type}>
+            <div key={type} id={`debt-group-${type}`} className="scroll-mt-24">
               {/* Group header — altijd klikbaar door naar /core/debts/[type] */}
               <div className="flex items-center gap-2 pt-2 pb-2.5">
                 <span style={{ color: groupColor }}>
