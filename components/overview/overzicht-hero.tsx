@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
+import { ArrowRight } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -302,6 +304,16 @@ export function OverzichtHero({
       )}
 
       <BriefingPanel entries={briefingEntries ?? []} narrative={briefingNarrative ?? null} />
+
+      <div className="mt-4 text-center print:hidden">
+        <Link
+          href="/overzicht/tips"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline"
+        >
+          Alle tips bekijken
+          <ArrowRight className="w-3 h-3" aria-hidden="true" />
+        </Link>
+      </div>
 
       {health && (
         <BottomSheet

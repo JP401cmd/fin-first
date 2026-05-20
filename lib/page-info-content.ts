@@ -32,6 +32,11 @@ export const PAGE_INFO: Record<string, string> = {
     'Slim verdelen over fiscale bakjes scheelt geld per jaar. ' +
     'Bekijk je heffingen en gebruik je jaarruimte.',
 
+  '/overzicht/tips':
+    'Wills wekelijkse aanbevelingen als prioriteerbare lijst. ' +
+    'Markeer per tip "Doe nu", "Later" of "Negeren" zodat alleen wat aandacht vraagt zichtbaar blijft. ' +
+    'Gearchiveerde tips vind je terug op /will.',
+
   '/toekomst':
     'Waar ga je heen. ' +
     'Tijdas met opbouw (groen) en afbouw (oranje) tot je gekozen eindleeftijd, plus doelen, levensgebeurtenissen en voorkeuren die je projectie sturen. ' +
