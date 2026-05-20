@@ -3,24 +3,24 @@ import { createClient } from '@/lib/supabase/server'
 import { loadWillData } from '@/lib/will-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { TipsLijst } from '@/components/overview/tips-lijst'
+import { OffTrackDoelenLijst } from '@/components/overview/off-track-doelen-lijst'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
-  title: 'Tips — TriFinity',
+  title: 'Tips & acties — TriFinity',
   description:
-    'Prioriteerbare lijst van Will-aanbevelingen — doe nu, later of negeren.',
+    'Prioriteerbare lijst van Will-aanbevelingen plus doelen die aandacht vragen.',
 }
 
 /**
- * /overzicht/tips — prioriteerbare lijst van Will-recommendations.
+ * /overzicht/tips — acties-pool MVP. Plan T-5 + §6.6 MVP:
+ * recommendations (TipsLijst) + off-track goals (OffTrackDoelenLijst)
+ * in één view. Voorkomt dat de gebruiker tussen /overzicht/tips en
+ * /toekomst moet schakelen om alles te zien wat aandacht vraagt.
  *
- * Plan T-5 (Tier-2 #11): "Tips-overzicht als prioriteerbare lijst,
- * niet als losse cards. Eén top-tip per week met 'doe dit nu / negeer
- * / later' als actie."
- *
- * Eerste item krijgt visueel accent ("Top tip deze week"). Acties
- * persistent via supabase.from('recommendations').update({ status }).
+ * Volledige acties-pool met DB-tabel + Will-chat-bron volgt later
+ * (§6.6 - DB schema werk).
  */
 export default async function OverzichtTipsPage() {
   const supabase = await createClient()
@@ -29,7 +29,7 @@ export default async function OverzichtTipsPage() {
 
   return (
     <>
-      <NavStackMeta title="Tips" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Tips & acties" bottomBar={{ kind: 'tabs' }} />
       <section className="relative mx-auto max-w-3xl px-4 sm:px-6 py-6">
         {description && (
           <PageInfoButton
@@ -39,19 +39,23 @@ export default async function OverzichtTipsPage() {
         )}
         <header className="mb-6 pr-12 sm:pr-16">
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Will — tips
+            Will — acties
           </div>
           <h1 className="mt-1 font-serif text-2xl md:text-3xl font-semibold text-[var(--ink)] leading-tight">
             Wat zou je nu kunnen doen?
           </h1>
           <p className="mt-2 text-sm sm:text-base text-[var(--ink-2)]">
-            Een prioriteerbare lijst van Will&apos;s aanbevelingen. Markeer
-            wat je vandaag oppakt, wat je voor later parkeert, en wat je
-            wegfiltert.
+            Tips van Will plus doelen die aandacht vragen — op één plek
+            zodat je niet hoeft te schakelen.
           </p>
         </header>
 
         <TipsLijst recommendations={willData.recommendations} />
+
+        <OffTrackDoelenLijst
+          goals={willData.goals}
+          goalProgresses={willData.goalProgresses}
+        />
       </section>
     </>
   )
