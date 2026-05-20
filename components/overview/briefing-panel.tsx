@@ -8,12 +8,9 @@ import {
   AlertTriangle,
   Sparkles,
   LineChart,
-  Wallet,
-  CreditCard,
-  Banknote,
-  Receipt,
   type LucideIcon,
 } from 'lucide-react'
+import { HEFBOOM_CONFIG, type Hefboom } from '@/lib/hefboom-config'
 
 /**
  * BriefingPanel — vervangt AtomicCards op /overzicht hero. Toont een
@@ -62,7 +59,9 @@ export type BriefingSpan = 'narrow' | 'wide'
  * categorie-kicker getoond zodat de gebruiker leert welke hefboom een
  * tip/observatie raakt.
  */
-export type HefboomTag = 'bezittingen' | 'schulden' | 'cashflow' | 'belasting'
+/** Backwards-compatible alias — gedeelde definitie staat in
+ *  `lib/hefboom-config.ts`. */
+export type HefboomTag = Hefboom
 
 export interface BriefingEntry {
   /** Unieke key voor React-list-key. */
@@ -90,18 +89,6 @@ const CATEGORY_CONFIG: Record<
   heads_up:    { label: 'Heads-up',    dotColor: 'bg-amber-500',   Icon: AlertTriangle },
   milestone:   { label: 'Mijlpaal',    dotColor: 'bg-fuchsia-500', Icon: Sparkles },
   market:      { label: 'Markt',       dotColor: 'bg-slate-500',   Icon: LineChart },
-}
-
-/** Hefboom-icoon + tint per HefboomTag — matcht visueel met de
- *  hefboom-tegels in HefbomenNav (Wallet/CreditCard/Banknote/Receipt). */
-const HEFBOOM_CONFIG: Record<
-  HefboomTag,
-  { label: string; tint: string; Icon: LucideIcon }
-> = {
-  bezittingen: { label: 'Bezittingen', tint: 'text-emerald-700 bg-emerald-50', Icon: Wallet },
-  schulden:    { label: 'Schulden',    tint: 'text-amber-700 bg-amber-50',     Icon: CreditCard },
-  cashflow:    { label: 'Cashflow',    tint: 'text-sky-700 bg-sky-50',         Icon: Banknote },
-  belasting:   { label: 'Belasting',   tint: 'text-violet-700 bg-violet-50',   Icon: Receipt },
 }
 
 /** Maximum aantal kaartjes — plan §6.2 evolutie: 3-koloms × 2 rijen = 6. */
