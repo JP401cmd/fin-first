@@ -71,6 +71,8 @@ type OverzichtHeroProps = {
   hasAssets?: boolean
   /** Heeft de user minimaal 1 doel? */
   hasGoals?: boolean
+  /** Dagen sinds account-aanmaak — voor de briefing-nudge (≥ 7d trigger). */
+  accountAgeDays?: number
   /** Liquide cash op spaarrekeningen — voor compound-insight reveal. */
   liquidCash?: number
   /** Doelbedrag bij vrijheid uit de simulatie — toont op de chart als
@@ -138,6 +140,7 @@ export function OverzichtHero({
   hasDob,
   hasAssets,
   hasGoals,
+  accountAgeDays,
   liquidCash,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
@@ -216,6 +219,7 @@ export function OverzichtHero({
           hasDob={hasDob ?? false}
           hasAssets={hasAssets ?? false}
           hasGoals={hasGoals ?? false}
+          accountAgeDays={accountAgeDays ?? 0}
         />
       )}
 

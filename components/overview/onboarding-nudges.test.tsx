@@ -2,92 +2,113 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { OnboardingNudges } from './onboarding-nudges'
 
+/**
+ * Tests voor OnboardingNudges — sinds de R-7 refactor wordt de rendering
+ * gedreven door `lib/onboarding-orchestrator`. Hier toetsen we:
+ *   1. UI-aansluiting (stappen, completed-state, dismissibility)
+ *   2. localStorage-persistentie van per-stap-dismissal
+ *   3. Conditioneel verbergen wanneer alles afgerond is
+ *
+ * Pure state-machine-tests staan in `lib/onboarding-orchestrator.test.ts`.
+ */
+
 beforeEach(() => {
   window.localStorage.clear()
 })
 
+async function hydrate() {
+  // useEffect-hydration uit localStorage
+  await new Promise((r) => setTimeout(r, 10))
+}
+
 describe('OnboardingNudges — render', () => {
-  it('rendert niets wanneer alle 3 stappen done', async () => {
+  it('rendert niets wanneer alle 3 stappen done en briefing-stap niet unlocked', async () => {
     const { container } = render(
-      <OnboardingNudges hasDob hasAssets hasGoals />,
+      <OnboardingNudges hasDob hasAssets hasGoals accountAgeDays={0} />,
     )
-    // Wacht op useEffect hydration
-    await new Promise((r) => setTimeout(r, 10))
+    await hydrate()
     expect(container.querySelector('section')).toBeNull()
   })
 
-  it('toont section wanneer 0/3 done', async () => {
+  it('toont section wanneer 0 stappen done', async () => {
     render(
       <OnboardingNudges hasDob={false} hasAssets={false} hasGoals={false} />,
     )
-    await new Promise((r) => setTimeout(r, 10))
-    expect(screen.getByText(/0\/3 voltooid/)).toBeTruthy()
+    await hydrate()
+    expect(screen.getByText(/0\/1 voltooid/)).toBeTruthy()
   })
 
-  it('toont 3 stappen-rijen', async () => {
+  it('toont alleen unlocked stappen', async () => {
     render(
       <OnboardingNudges hasDob={false} hasAssets={false} hasGoals={false} />,
     )
-    await new Promise((r) => setTimeout(r, 10))
+    await hydrate()
+    // DOB is unlocked, asset/goal locked tot DOB gezet is
     expect(screen.getByText('Geboortejaar invullen')).toBeTruthy()
-    expect(screen.getByText('Eerste rekening toevoegen')).toBeTruthy()
-    expect(screen.getByText('Eerste doel formuleren')).toBeTruthy()
+    expect(screen.queryByText('Eerste rekening toevoegen')).toBeNull()
+    expect(screen.queryByText('Eerste doel formuleren')).toBeNull()
   })
 
-  it('voltooide stap toont check-icon en line-through', async () => {
+  it('na DOB toont eerste-rekening + voltooide DOB-stap', async () => {
+    render(<OnboardingNudges hasDob hasAssets={false} hasGoals={false} />)
+    await hydrate()
+    // DOB als doorgestreepte completed-rij
+    expect(screen.getByTestId('nudge-step-dob-done')).toBeTruthy()
+    // Eerste rekening als open stap
+    expect(screen.getByTestId('nudge-step-first-asset')).toBeTruthy()
+  })
+
+  it('toont briefing-stap pas na ≥ 7 dagen', async () => {
+    const { rerender } = render(
+      <OnboardingNudges hasDob hasAssets hasGoals accountAgeDays={3} />,
+    )
+    await hydrate()
+    expect(screen.queryByText(/weekly briefing/i)).toBeNull()
+
+    rerender(
+      <OnboardingNudges hasDob hasAssets hasGoals accountAgeDays={7} />,
+    )
+    expect(screen.getByText(/weekly briefing/i)).toBeTruthy()
+  })
+
+  it('CTA-href volgt orchestrator (geen DOB-link bij hasDob=true)', async () => {
     const { container } = render(
       <OnboardingNudges hasDob hasAssets={false} hasGoals={false} />,
     )
-    await new Promise((r) => setTimeout(r, 10))
-    // bg-emerald-500 op de voltooide stap-bolletje
-    expect(container.querySelector('.bg-emerald-500')).toBeTruthy()
-    // line-through op de voltooide label
-    expect(container.querySelector('.line-through')).toBeTruthy()
-  })
-
-  it('toont "1/3 voltooid" bij één done', async () => {
-    render(
-      <OnboardingNudges hasDob hasAssets={false} hasGoals={false} />,
-    )
-    await new Promise((r) => setTimeout(r, 10))
-    expect(screen.getByText(/1\/3 voltooid/)).toBeTruthy()
-  })
-
-  it('CTA-link verschijnt alleen op onvoltooide stappen', async () => {
-    const { container } = render(
-      <OnboardingNudges hasDob hasAssets={false} hasGoals={false} />,
-    )
-    await new Promise((r) => setTimeout(r, 10))
+    await hydrate()
     const links = Array.from(container.querySelectorAll('a')).map((a) =>
       a.getAttribute('href'),
     )
-    // hasDob=true → /mijn/profiel link NIET aanwezig
     expect(links.some((h) => h === '/mijn/profiel')).toBe(false)
-    // hasAssets=false → /overzicht/bezittingen wel
     expect(links.some((h) => h === '/overzicht/bezittingen')).toBe(true)
-    // hasGoals=false → /toekomst?tab=doelen wel
-    expect(links.some((h) => h?.includes('tab=doelen'))).toBe(true)
   })
 })
 
-describe('OnboardingNudges — dismiss', () => {
-  it('verbergt zichzelf na X-klik en persisteert in localStorage', async () => {
-    const { container } = render(
+describe('OnboardingNudges — per-stap dismiss', () => {
+  it('skip-knop op een stap persisteert in localStorage', async () => {
+    render(
       <OnboardingNudges hasDob={false} hasAssets={false} hasGoals={false} />,
     )
-    await new Promise((r) => setTimeout(r, 10))
-    expect(container.querySelector('section')).toBeTruthy()
-    fireEvent.click(screen.getByLabelText('Onboarding-nudges verbergen'))
-    expect(container.querySelector('section')).toBeNull()
-    expect(window.localStorage.getItem('tf-onboarding-dismissed')).toBe('1')
+    await hydrate()
+    const skipBtn = screen.getByLabelText(/Stap '.*' overslaan/i)
+    fireEvent.click(skipBtn)
+    // localStorage bevat nu de dismissed key
+    const raw = window.localStorage.getItem('tf-onboarding-dismissed-keys')
+    expect(raw).toBeTruthy()
+    const parsed = JSON.parse(raw ?? '[]')
+    expect(parsed).toContain('dob')
   })
 
-  it('rendert niets bij localStorage="1" (eerder dismissed)', async () => {
-    window.localStorage.setItem('tf-onboarding-dismissed', '1')
-    const { container } = render(
+  it('eerder gedismissed stap blijft verborgen na re-mount', async () => {
+    window.localStorage.setItem(
+      'tf-onboarding-dismissed-keys',
+      JSON.stringify(['dob']),
+    )
+    render(
       <OnboardingNudges hasDob={false} hasAssets={false} hasGoals={false} />,
     )
-    await new Promise((r) => setTimeout(r, 10))
-    expect(container.querySelector('section')).toBeNull()
+    await hydrate()
+    // DOB is gedismissed → niet meer als open stap zichtbaar
+    expect(screen.queryByTestId('nudge-step-dob')).toBeNull()
   })
 })
