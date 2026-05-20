@@ -33,9 +33,8 @@ export const PAGE_INFO: Record<string, string> = {
     'Bekijk je heffingen en gebruik je jaarruimte.',
 
   '/overzicht/tips':
-    'Wills wekelijkse aanbevelingen als prioriteerbare lijst. ' +
-    'Markeer per tip "Doe nu", "Later" of "Negeren" zodat alleen wat aandacht vraagt zichtbaar blijft. ' +
-    'Gearchiveerde tips vind je terug op /will.',
+    'Acties-pool: Will-tips plus doelen die aandacht vragen, gebundeld. ' +
+    'Markeer per tip "Doe nu", "Later" of "Negeren". Off-track-doelen krijgen een eigen blok met directe link naar bewerken.',
 
   '/toekomst':
     'Waar ga je heen. ' +
