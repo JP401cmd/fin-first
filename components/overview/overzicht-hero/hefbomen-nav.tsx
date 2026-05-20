@@ -11,11 +11,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Banknote, CreditCard, Wallet, Receipt, ChevronDown, ArrowRight } from 'lucide-react'
+import { ChevronDown, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { HealthScore, HealthPillar } from '@/lib/financial-health'
+import { HEFBOOM_CONFIG, type Hefboom } from '@/lib/hefboom-config'
 
-type HefboomKey = 'bezittingen' | 'schulden' | 'cashflow' | 'belasting'
+type HefboomKey = Hefboom
 type StatusCode = 'good' | 'warn' | 'bad' | 'neutral'
 
 export type HefbomenTotals = {
@@ -29,48 +30,38 @@ export type HefbomenTotals = {
   belasting?: number | null
 }
 
+/**
+ * Nav-specifieke metadata per hefboom — `href`, `pillarKey`, `tooltip`.
+ * Visuele velden (label/Icon/accent) komen uit `HEFBOOM_CONFIG` zodat de
+ * navigatie 1-op-1 matcht met BriefingPanel- en TipsLijst-tags.
+ */
 const HEFBOMEN: ReadonlyArray<{
-  key: HefboomKey
-  label: string
+  key: Hefboom
   href: string
-  Icon: typeof Wallet
-  accent: string
   pillarKey: string | null
   tooltip: string
 }> = [
   {
     key: 'bezittingen',
-    label: 'Bezittingen',
     href: '/overzicht/bezittingen',
-    Icon: Wallet,
-    accent: 'text-emerald-700 bg-emerald-50',
     pillarKey: 'diversification',
     tooltip: 'Cash, beleggingen, eigen huis en pensioen — wat groeit voor je.',
   },
   {
     key: 'schulden',
-    label: 'Schulden',
     href: '/overzicht/schulden',
-    Icon: CreditCard,
-    accent: 'text-amber-700 bg-amber-50',
     pillarKey: 'debt_ratio',
     tooltip: 'Hypotheek, leningen, studieschuld — wat je terugbetaalt.',
   },
   {
     key: 'cashflow',
-    label: 'Cashflow',
     href: '/overzicht/cashflow',
-    Icon: Banknote,
-    accent: 'text-sky-700 bg-sky-50',
     pillarKey: 'savings_rate',
     tooltip: 'In en uit per maand — het deel dat je opzij zet bepaalt je tempo.',
   },
   {
     key: 'belasting',
-    label: 'Belasting',
     href: '/overzicht/belasting',
-    Icon: Receipt,
-    accent: 'text-violet-700 bg-violet-50',
     pillarKey: 'tax_optimization',
     tooltip: 'Box 1, Box 2 en Box 3 — slim verdelen scheelt geld per jaar.',
   },
@@ -139,7 +130,10 @@ export function HefbomenNav({
       aria-label="Vier hefbomen"
       className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-3"
     >
-      {HEFBOMEN.map(({ key, label, href, Icon, accent, pillarKey, tooltip }) => {
+      {HEFBOMEN.map(({ key, href, pillarKey, tooltip }) => {
+        const cfg = HEFBOOM_CONFIG[key]
+        const { label, Icon } = cfg
+        const accent = cfg.tint
         const pillar =
           pillarKey && health ? health.pillars.find((p) => p.id === pillarKey) : undefined
         const proxyScore = !pillarKey && health ? health.total : null
