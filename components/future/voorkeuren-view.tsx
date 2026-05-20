@@ -10,7 +10,9 @@ import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { useViewMode } from '@/components/app/view-mode-provider'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
 import { OnttrekkingsBewerkenSheet } from './onttrekkings-bewerken-sheet'
+import { EindstrategieBewerkenSheet } from './eindstrategie-bewerken-sheet'
 import type { WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
+import type { FireEndStrategy } from '@/lib/fire-strategy'
 
 /**
  * VoorkeurenView — content voor Voorkeuren-tab op /toekomst.
@@ -72,6 +74,7 @@ export function VoorkeurenView({
   >(null)
   // Aparte state voor onttrekkings-sheet (geen overlap met getal-editor).
   const [editingOnttrekking, setEditingOnttrekking] = useState(false)
+  const [editingEindstrategie, setEditingEindstrategie] = useState(false)
   const endStrategy = STRATEGY_LABELS[fireStrategy.strategy]
   const wsLabel = WITHDRAWAL_LABELS[withdrawalStrategy.strategy] ?? {
     name: withdrawalStrategy.strategy,
@@ -108,6 +111,7 @@ export function VoorkeurenView({
             href="/identity/parameters?focus=eindstrategie"
             Icon={SlidersHorizontal}
             badge={`Tot ${fireStrategy.endAge} jaar`}
+            onEdit={isPlannen ? () => setEditingEindstrategie(true) : undefined}
           />
           <VoorkeurCard
             label="Onttrekkingsstrategie"
@@ -215,7 +219,7 @@ export function VoorkeurenView({
 
       <p className="text-[11px] italic text-[var(--ink-3)]">
         {isPlannen
-          ? 'Klik op Inflatie of Bruto rendement om snel bij te werken. Eindstrategie en onttrekking via /identity/parameters.'
+          ? 'Klik op Eindstrategie, Onttrekking, Inflatie of Rendement om snel bij te werken. Andere voorkeuren via /identity/parameters.'
           : 'Activeer Plannen-modus voor inline-editor. Of bewerk via /identity/parameters.'}
       </p>
 
@@ -233,6 +237,13 @@ export function VoorkeurenView({
         <OnttrekkingsBewerkenSheet
           currentStrategy={withdrawalStrategy.strategy as WithdrawalStrategyType}
           onClose={() => setEditingOnttrekking(false)}
+        />
+      )}
+
+      {editingEindstrategie && (
+        <EindstrategieBewerkenSheet
+          currentStrategy={fireStrategy.strategy as FireEndStrategy}
+          onClose={() => setEditingEindstrategie(false)}
         />
       )}
     </section>
