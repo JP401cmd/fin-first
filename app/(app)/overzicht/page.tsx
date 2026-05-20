@@ -71,6 +71,15 @@ export default async function OverzichtPage() {
   const hasAssets = (horizonData?.healthScoreInput?.totalAssets ?? 0) > 0
   const hasGoals = (willData.goals?.length ?? 0) > 0
 
+  // Liquide cash = niet-gekoppelde bank-accounts + cash/savings-typed
+  // assets. Basis voor de CompoundInsightCard (plan T-4) zodat we
+  // dramatic compound-impact alleen voor cash-zware users tonen.
+  const liquidCash =
+    (horizonData?.unlinkedCash ?? 0) +
+    (horizonData?.assets ?? [])
+      .filter((a) => ['cash', 'savings', 'checking'].includes(a.asset_type ?? ''))
+      .reduce((s, a) => s + Number(a.current_value ?? 0), 0)
+
   // Totaalbedragen per hefboom-tegel — uit healthScoreInput dat al
   // beschikbaar is. Belasting toont Box 3-druk per jaar uit
   // healthScoreInput.taxData (lichte berekening uit buildTaxData).
@@ -138,6 +147,7 @@ export default async function OverzichtPage() {
         hasDob={hasDob}
         hasAssets={hasAssets}
         hasGoals={hasGoals}
+        liquidCash={liquidCash}
       />
       <WillLanding
         dashboardData={dashboardData}

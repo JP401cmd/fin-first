@@ -30,6 +30,7 @@ import {
 } from './hero-widget-rail'
 import { ViewModeToggle, useViewMode } from '@/components/app/view-mode-provider'
 import { OnboardingNudges } from './onboarding-nudges'
+import { CompoundInsightCard } from './compound-insight-card'
 
 type OverzichtHeroProps = {
   userName?: string
@@ -67,6 +68,8 @@ type OverzichtHeroProps = {
   hasAssets?: boolean
   /** Heeft de user minimaal 1 doel? */
   hasGoals?: boolean
+  /** Liquide cash op spaarrekeningen — voor compound-insight reveal. */
+  liquidCash?: number
   /** Doelbedrag bij vrijheid uit de simulatie — toont op de chart als
    *  eindwaarde naast de Vrijheid-marker. */
   simRequiredPortfolio?: number | null
@@ -132,6 +135,7 @@ export function OverzichtHero({
   hasDob,
   hasAssets,
   hasGoals,
+  liquidCash,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
   const rail = useHeroRailState(activeWidgets ?? [])
@@ -276,6 +280,16 @@ export function OverzichtHero({
           </>
         )}
       </div>
+
+      {/* T-4 Dramatic Compound — alleen voor cash-zware users zodat
+          we niet alle gebruikers met irrelevante content lastig vallen.
+          Drempel €10k; component zelf rendert nog een 2e check op
+          hasDramaticDelta. */}
+      {liquidCash != null && liquidCash >= 10_000 && (
+        <div className="mt-6">
+          <CompoundInsightCard liquidCash={liquidCash} />
+        </div>
+      )}
 
       <BriefingPanel entries={briefingEntries ?? []} narrative={briefingNarrative ?? null} />
 
