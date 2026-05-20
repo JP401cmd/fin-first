@@ -93,4 +93,15 @@ describe('VrijheidStrip — data-staat', () => {
     const inner = bar?.querySelector('div')
     expect(inner?.getAttribute('style')).toContain('width: 0%')
   })
+
+  it('rendert mijlpaal-markers op 25/50/75%', () => {
+    const { container } = render(<VrijheidStrip freedomPct={40} />)
+    const bar = container.querySelector('[role="progressbar"]')
+    const markers = bar?.querySelectorAll('span[aria-hidden="true"]')
+    expect(markers?.length).toBe(3)
+    const positions = Array.from(markers ?? []).map(
+      (s) => (s as HTMLElement).style.left,
+    )
+    expect(positions).toEqual(['25%', '50%', '75%'])
+  })
 })
