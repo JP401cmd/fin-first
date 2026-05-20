@@ -132,6 +132,39 @@ describe('DoelBewerkenSheet — bijdrage-monitor', () => {
   })
 })
 
+describe('DoelBewerkenSheet — doel-behaald-celebratie', () => {
+  it('toont geen banner bij waarde < target', () => {
+    renderSheet()
+    expect(screen.queryByTestId('doel-behaald')).toBeNull()
+  })
+
+  it('toont banner zodra waarde = target', () => {
+    const { container } = renderSheet()
+    const input = container.querySelector('input[type="number"]')!
+    fireEvent.change(input, { target: { value: '50000' } })
+    expect(screen.getByTestId('doel-behaald').textContent).toMatch(
+      /Doel behaald/i,
+    )
+  })
+
+  it('toont banner ook bij waarde > target', () => {
+    const { container } = renderSheet()
+    const input = container.querySelector('input[type="number"]')!
+    fireEvent.change(input, { target: { value: '60000' } })
+    expect(screen.getByTestId('doel-behaald')).toBeTruthy()
+  })
+
+  it('submit markeert is_completed=true bij target bereikt', async () => {
+    const onClose = vi.fn()
+    const { container } = renderSheet(onClose)
+    const input = container.querySelector('input[type="number"]')!
+    fireEvent.change(input, { target: { value: '50000' } })
+    fireEvent.submit(container.querySelector('form')!)
+    await new Promise((r) => setTimeout(r, 10))
+    expect(mockUpdate).toHaveBeenCalled()
+  })
+})
+
 describe('DoelBewerkenSheet — submit', () => {
   it('roept supabase.update met current_value', async () => {
     const onClose = vi.fn()

@@ -54,10 +54,18 @@ export function DoelBewerkenSheet({
     }
     setSaving(true)
     setError(null)
+    // Auto-completion: zodra current_value ≥ target_value markeren we
+    // het doel als voltooid. Voor schuld-doelen ligt 'voltooid' bij
+    // current_value = 0 (afgelost) — dat patroon volgt later wanneer
+    // de schema goal_type-specifieke completion-logica heeft.
+    const willBeCompleted = targetValue > 0 && numeric >= targetValue
     const supabase = createClient()
     const { error: updateError } = await supabase
       .from('goals')
-      .update({ current_value: numeric })
+      .update({
+        current_value: numeric,
+        is_completed: willBeCompleted,
+      })
       .eq('id', goalId)
     if (updateError) {
       setError(`Opslaan mislukt: ${updateError.message}`)
@@ -213,6 +221,22 @@ export function DoelBewerkenSheet({
           >
             <Minus className="w-3 h-3" aria-hidden="true" />
             <span>Nog geen wijziging</span>
+          </div>
+        )}
+
+        {/* Doel-behaald-celebratie: zichtbaar zodra de gebruiker een
+            waarde invoert die ≥ target is. Vóór submit zodat 't voelt
+            als bevestiging tijdens typen. */}
+        {targetValue > 0 && validNew >= targetValue && (
+          <div
+            data-testid="doel-behaald"
+            className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 flex items-center gap-2"
+          >
+            <span className="text-base" aria-hidden="true">🎉</span>
+            <span>
+              <strong>Doel behaald!</strong> Opslaan markeert dit doel als
+              voltooid.
+            </span>
           </div>
         )}
 
