@@ -79,6 +79,7 @@ export function ChartEventMarkers({
   onEventClick,
   onEventHover,
   onEventDragEnd,
+  onEventDragMove,
 }: {
   events: ChartEventOverlay[]
   xScale: (age: number) => number
@@ -109,6 +110,20 @@ export function ChartEventMarkers({
     newAge: number,
     kind: ChartEventKind,
   ) => void
+  /**
+   * Live drag-feedback (F-5 MVP): vuurt af telkens wanneer tijdens een
+   * drag een nieuwe kwartaal-positie wordt gepasseerd. De host kan
+   * hierop optimistic-events bijwerken zodat de NW-curve live mee
+   * beweegt. Drag-volgorde:
+   *   onEventDragMove (meerdere keren tijdens drag, gesnapt op kwartaal)
+   *   → onEventDragEnd (één keer bij release, met definitieve waarde).
+   */
+  onEventDragMove?: (
+    id: string,
+    sourceId: string | undefined,
+    newAge: number,
+    kind: ChartEventKind,
+  ) => void
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const showInlineTooltip = !onEventHover
@@ -126,6 +141,9 @@ export function ChartEventMarkers({
     currentX: number
     /** Of we de drag-drempel zijn gepasseerd. */
     moved: boolean
+    /** Laatste leeftijd waarop onEventDragMove is gevuurd (snap-gebonden
+     *  zodat we niet bij elke pixel een nieuwe move-callback firen). */
+    lastEmittedAge: number | null
   }
   const [drag, setDrag] = useState<DragState | null>(null)
   const dragRef = useRef<DragState | null>(null)
@@ -229,6 +247,7 @@ export function ChartEventMarkers({
                 startX: e.clientX,
                 currentX: cxBase,
                 moved: false,
+                lastEmittedAge: p.age,
               })
             }}
             onPointerMove={(e) => {
@@ -236,7 +255,27 @@ export function ChartEventMarkers({
               if (!d || d.id !== p.id) return
               const dx = e.clientX - d.startX
               const moved = d.moved || Math.abs(dx) >= DRAG_PROMOTE_THRESHOLD_PX
-              setDrag({ ...d, currentX: cxBase + dx, moved })
+              const newCurrentX = cxBase + dx
+              // Fire live-callback alleen wanneer we een nieuwe quarter-
+              // boundary passeren (= snapped-age verandert). Voorkomt
+              // dat onEventDragMove 60× per seconde wordt aangeroepen.
+              let nextLastEmittedAge = d.lastEmittedAge
+              if (moved && onEventDragMove) {
+                const minX = padLeft + xScale(visibleMinAge)
+                const maxX = padLeft + xScale(visibleMaxAge)
+                const clampedX = Math.max(minX, Math.min(maxX, newCurrentX))
+                const snappedAge = snapAge(invXScale(clampedX - padLeft))
+                if (snappedAge !== d.lastEmittedAge) {
+                  nextLastEmittedAge = snappedAge
+                  onEventDragMove(d.id, d.sourceId, snappedAge, d.kind)
+                }
+              }
+              setDrag({
+                ...d,
+                currentX: newCurrentX,
+                moved,
+                lastEmittedAge: nextLastEmittedAge,
+              })
             }}
             onPointerUp={(e) => {
               const d = dragRef.current

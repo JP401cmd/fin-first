@@ -65,6 +65,7 @@ export const SimChart = memo(function SimChart({
   eventOverlay,
   onEventClick,
   onEventDragEnd,
+  onEventDragMove,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -104,6 +105,13 @@ export const SimChart = memo(function SimChart({
   /** F-1 directe manipulatie: drag-end handler. Caller persisteert de
    *  nieuwe target_age (typisch via supabase.update op life_events). */
   onEventDragEnd?: (
+    id: string,
+    sourceId: string | undefined,
+    newAge: number,
+    kind: ChartEventKind,
+  ) => void
+  /** F-5 live curve-update: vuurt per kwartaal-crossing tijdens drag. */
+  onEventDragMove?: (
     id: string,
     sourceId: string | undefined,
     newAge: number,
@@ -810,6 +818,7 @@ export const SimChart = memo(function SimChart({
             visibleMaxAge={maxAge}
             onEventClick={onEventClick}
             onEventDragEnd={onEventDragEnd}
+            onEventDragMove={onEventDragMove}
           />
         )}
 

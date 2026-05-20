@@ -154,6 +154,39 @@ describe('ChartEventMarkers — click vs drag (F-1)', () => {
     expect(onEventDragEnd).not.toHaveBeenCalled()
   })
 
+  it('vuurt onEventDragMove per kwartaal-crossing tijdens drag (F-5 live)', () => {
+    const onEventDragMove = vi.fn()
+    const events = [makeEvent({ id: 'e1', age: 40, sourceId: 'src-1' })]
+    const { getByTestId } = renderInSvg(
+      <ChartEventMarkers
+        events={events}
+        xScale={xScale}
+        padLeft={50}
+        chartTopY={20}
+        chartBottomY={300}
+        visibleMinAge={20}
+        visibleMaxAge={100}
+        onEventDragEnd={() => {}}
+        onEventDragMove={onEventDragMove}
+      />,
+    )
+    const marker = getByTestId('chart-event-marker-e1')
+    fireEvent.pointerDown(marker, { pointerId: 1, clientX: 100 })
+    // 800px / 80 jaar = 10px per jaar; 2.5px = kwartaal (0.25 jaar)
+    // Beweeg 30px naar rechts (3 jaar / 12 kwartalen) — verwacht 12 calls
+    // maar mogelijk minder door bouncing tussen integer-snaps. We checken
+    // alleen dat een meaningful aantal callbacks is gevuurd.
+    fireEvent.pointerMove(marker, { pointerId: 1, clientX: 110 }) // +1 jr
+    fireEvent.pointerMove(marker, { pointerId: 1, clientX: 130 }) // +3 jr
+    fireEvent.pointerUp(marker, { pointerId: 1, clientX: 130 })
+    expect(onEventDragMove.mock.calls.length).toBeGreaterThanOrEqual(2)
+    // Eerste move-call moet een nieuwe leeftijd ≠ 40 leveren
+    const [, sourceId, newAge, kind] = onEventDragMove.mock.calls[0]!
+    expect(sourceId).toBe('src-1')
+    expect(kind).toBe('life_event')
+    expect(newAge).not.toBe(40)
+  })
+
   it('zonder onEventDragEnd-prop is drag een no-op', () => {
     const onEventClick = vi.fn()
     const events = [makeEvent({ id: 'e1', age: 40 })]

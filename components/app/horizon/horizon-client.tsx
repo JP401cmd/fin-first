@@ -1059,6 +1059,37 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
    * van de events-state. Alleen life_events zijn dragbaar; natural
    * milestones zijn auto-afgeleid en niet bewerkbaar.
    */
+  /**
+   * F-5 live curve-update: tijdens een drag krijgen we per kwartaal-
+   * crossing een nieuwe target_age aangeleverd. We werken events lokaal
+   * bij zonder supabase-call zodat de SimChart-NW-curve live mee
+   * beweegt. Bij release commit handleChartEventDragEnd de definitieve
+   * waarde naar de DB.
+   */
+  const handleChartEventDragMove = useCallback(
+    (
+      id: string,
+      sourceId: string | undefined,
+      newAge: number,
+      kind: 'life_event' | 'natural',
+    ) => {
+      if (kind !== 'life_event') return
+      const eventId = sourceId ?? id
+      if (!eventId) return
+      // Persist als geheel jaar (DB-schema beperking) maar respecteer
+      // wel het clamp-bereik van de drag.
+      const rounded = Math.max(currentAge ?? 18, Math.min(120, Math.round(newAge)))
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId && e.target_age !== rounded
+            ? { ...e, target_age: rounded, target_date: null }
+            : e,
+        ),
+      )
+    },
+    [currentAge],
+  )
+
   const handleChartEventDragEnd = useCallback(
     async (
       id: string,
@@ -3101,6 +3132,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             eventOverlay={chartEventOverlay}
                             onEventClick={handleChartEventClick}
                             onEventDragEnd={handleChartEventDragEnd}
+                            onEventDragMove={handleChartEventDragMove}
                           />
                         </div>
 
