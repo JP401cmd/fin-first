@@ -62,6 +62,7 @@ describe('VoorkeurenView — toekomst-regels', () => {
     expect(screen.getByText('Onttrekkingsstrategie')).toBeTruthy()
     expect(screen.getByText('Onttrekkingsvolgorde')).toBeTruthy()
     expect(screen.getByText('Verdeling bij toename')).toBeTruthy()
+    expect(screen.getByText('Onttrekking bij afname')).toBeTruthy()
   })
 
   it('toont eindstrategie-naam uit STRATEGY_LABELS', () => {

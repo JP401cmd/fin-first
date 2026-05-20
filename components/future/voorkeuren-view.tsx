@@ -150,6 +150,14 @@ export function VoorkeurenView({
             Icon={SlidersHorizontal}
             badge="Standaard"
           />
+          <VoorkeurCard
+            label="Onttrekking bij afname"
+            value="Uit liquide pot eerst"
+            subtitle="Waar wordt geld vandaan gehaald bij een negatief event"
+            href="/identity/parameters?focus=afname"
+            Icon={SlidersHorizontal}
+            badge="Standaard"
+          />
         </div>
       </div>
 
