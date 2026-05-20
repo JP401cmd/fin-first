@@ -9,10 +9,17 @@ import {
   Clock,
   X,
   ArrowRight,
+  Wallet,
+  CreditCard,
+  Banknote,
+  Receipt,
   type LucideIcon,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { Recommendation } from '@/lib/recommendation-data'
+import type {
+  Recommendation,
+  RecommendationType,
+} from '@/lib/recommendation-data'
 
 /**
  * TipsLijst — prioriteerbare lijst van Will-recommendations met 3
@@ -41,6 +48,29 @@ const ACTION_LABELS: Record<'accepted' | 'postponed' | 'rejected', {
   accepted: { label: 'Doe nu', Icon: Check, tone: 'text-emerald-700 border-emerald-200 hover:bg-emerald-50' },
   postponed: { label: 'Later', Icon: Clock, tone: 'text-amber-700 border-amber-200 hover:bg-amber-50' },
   rejected: { label: 'Negeren', Icon: X, tone: 'text-stone-700 border-stone-200 hover:bg-stone-50' },
+}
+
+/**
+ * Plan T-3: tips zijn altijd gekoppeld aan één van de vier hefbomen.
+ * Mapping van recommendation_type → hefboom + visuele tag (icoon + tint).
+ * Belasting heeft geen directe recommendation_type — komt later via een
+ * eigen 'tax_optimization'-type.
+ */
+type Hefboom = 'bezittingen' | 'schulden' | 'cashflow' | 'belasting'
+
+const HEFBOOM_FOR_TYPE: Record<RecommendationType, Hefboom> = {
+  budget_optimization: 'cashflow',
+  asset_reallocation: 'bezittingen',
+  debt_acceleration: 'schulden',
+  income_increase: 'cashflow',
+  savings_boost: 'cashflow',
+}
+
+const HEFBOOM_CONFIG: Record<Hefboom, { label: string; Icon: LucideIcon; tone: string }> = {
+  bezittingen: { label: 'Bezittingen', Icon: Wallet, tone: 'text-emerald-700 bg-emerald-50' },
+  schulden: { label: 'Schulden', Icon: CreditCard, tone: 'text-amber-700 bg-amber-50' },
+  cashflow: { label: 'Cashflow', Icon: Banknote, tone: 'text-sky-700 bg-sky-50' },
+  belasting: { label: 'Belasting', Icon: Receipt, tone: 'text-violet-700 bg-violet-50' },
 }
 
 export function TipsLijst({
@@ -147,6 +177,21 @@ export function TipsLijst({
                   {rec.description}
                 </p>
               )}
+              {(() => {
+                const hefboom = HEFBOOM_FOR_TYPE[rec.recommendation_type]
+                if (!hefboom) return null
+                const cfg = HEFBOOM_CONFIG[hefboom]
+                const HefIcon = cfg.Icon
+                return (
+                  <div
+                    data-testid="hefboom-tag"
+                    className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${cfg.tone}`}
+                  >
+                    <HefIcon className="w-3 h-3" aria-hidden="true" />
+                    {cfg.label}
+                  </div>
+                )
+              })()}
             </div>
           </header>
 

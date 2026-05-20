@@ -83,6 +83,22 @@ describe('TipsLijst — render', () => {
     expect(screen.getByText('Negeren')).toBeTruthy()
   })
 
+  it('toont hefboom-tag bij elke tip (plan T-3)', () => {
+    render(
+      <TipsLijst
+        recommendations={[
+          makeRec('1', { recommendation_type: 'debt_acceleration' }),
+          makeRec('2', { recommendation_type: 'asset_reallocation' }),
+          makeRec('3', { recommendation_type: 'savings_boost' }),
+        ]}
+      />,
+    )
+    expect(screen.getAllByTestId('hefboom-tag').length).toBe(3)
+    expect(screen.getByText('Schulden')).toBeTruthy()
+    expect(screen.getByText('Bezittingen')).toBeTruthy()
+    expect(screen.getByText('Cashflow')).toBeTruthy()
+  })
+
   it('toont vrijheidsdagen-badge bij positieve impact', () => {
     render(
       <TipsLijst
