@@ -31,6 +31,7 @@ import {
 import { ViewModeToggle, useViewMode } from '@/components/app/view-mode-provider'
 import { OnboardingNudges } from './onboarding-nudges'
 import { CompoundInsightCard } from './compound-insight-card'
+import { PrintOverzichtButton } from './print-overzicht-button'
 
 type OverzichtHeroProps = {
   userName?: string
@@ -185,6 +186,7 @@ export function OverzichtHero({
             onToggle={() => rail.setIsEditing(!rail.isEditing)}
           />
         )}
+        <PrintOverzichtButton />
         <PageInfoButton description={PAGE_INFO['/overzicht'] ?? ''} />
       </div>
 
