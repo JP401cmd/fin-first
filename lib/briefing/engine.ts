@@ -183,6 +183,26 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
     }
   }
 
+  // 3b. Goal heads-up — meest off-track-doel (pct < 50 én niet onTrack).
+  //     Vult de health-pillar-heads_up aan: een gebruiker met groene
+  //     pillars maar achterblijvende doelen ziet hier toch een nudge.
+  const worstGoalIdx = input.goalProgresses
+    .map((p, i) => ({ p, i }))
+    .filter(({ p }) => !p.onTrack && p.pct < 50 && p.pct > 0)
+    .sort((a, b) => a.p.pct - b.p.pct)[0]?.i
+  if (worstGoalIdx != null) {
+    const goalName = input.goalNames[worstGoalIdx]
+    const progress = input.goalProgresses[worstGoalIdx]
+    if (goalName && progress) {
+      entries.push({
+        id: `heads_up:goal:${worstGoalIdx}`,
+        category: 'heads_up',
+        text: `${goalName} ligt achter op planning (${Math.round(progress.pct)}%) — extra inleg deze maand?`,
+        href: '/toekomst?tab=doelen',
+      })
+    }
+  }
+
   // 4. Milestone — twee triggers, één entry per briefing:
   //    (a) doel dat 100% raakt (= behaald)
   //    (b) health-score-trend >= +5 punten t.o.v. vorige maand

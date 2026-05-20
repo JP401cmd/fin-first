@@ -421,6 +421,61 @@ describe('buildBriefingEntries — volgorde', () => {
   })
 })
 
+describe('buildBriefingEntries — goal heads_up (3b)', () => {
+  it('voegt heads_up toe voor meest off-track-doel', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({
+        goalNames: ['Noodfonds'],
+        goalProgresses: [
+          { current: 1000, target: 10000, pct: 10, onTrack: false, eta: null },
+        ],
+      }),
+    )
+    const headsUp = entries.find((e) => e.id.startsWith('heads_up:goal'))
+    expect(headsUp).toBeTruthy()
+    expect(headsUp?.text).toMatch(/Noodfonds/)
+    expect(headsUp?.text).toMatch(/10%/)
+  })
+
+  it('voegt geen heads_up toe als doel ≥ 50% bij is', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({
+        goalNames: ['Noodfonds'],
+        goalProgresses: [
+          { current: 6000, target: 10000, pct: 60, onTrack: false, eta: null },
+        ],
+      }),
+    )
+    expect(entries.find((e) => e.id.startsWith('heads_up:goal'))).toBeUndefined()
+  })
+
+  it('voegt geen heads_up toe als doel op koers is', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({
+        goalNames: ['Noodfonds'],
+        goalProgresses: [
+          { current: 1000, target: 10000, pct: 10, onTrack: true, eta: null },
+        ],
+      }),
+    )
+    expect(entries.find((e) => e.id.startsWith('heads_up:goal'))).toBeUndefined()
+  })
+
+  it('kiest het slechtst-presterende doel bij meerdere off-track', () => {
+    const entries = buildBriefingEntries(
+      emptyInput({
+        goalNames: ['Doel A', 'Doel B'],
+        goalProgresses: [
+          { current: 4000, target: 10000, pct: 40, onTrack: false, eta: null },
+          { current: 1000, target: 10000, pct: 10, onTrack: false, eta: null },
+        ],
+      }),
+    )
+    const headsUp = entries.find((e) => e.id.startsWith('heads_up:goal'))
+    expect(headsUp?.text).toMatch(/Doel B/)
+  })
+})
+
 describe('buildBriefingEntries — seasonal entries (T-1)', () => {
   it('voegt Box 3-peildatum-heads_up toe in januari', () => {
     const entries = buildBriefingEntries(
