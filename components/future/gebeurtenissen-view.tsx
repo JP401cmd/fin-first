@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import {
   Baby,
@@ -11,12 +12,14 @@ import {
   ArrowRight,
   TrendingDown,
   TrendingUp,
+  Pencil,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { LifeEvent } from '@/lib/horizon-data'
 import { ScenarioBibliotheek } from './scenario-bibliotheek'
 import { useViewMode } from '@/components/app/view-mode-provider'
 import { computeEventImpact } from '@/lib/event-impact'
+import { EventBewerkenSheet } from './event-bewerken-sheet'
 
 /**
  * GebeurtenissenView — content voor Gebeurtenissen-tab op /toekomst.
@@ -142,6 +145,8 @@ export function GebeurtenissenView({
   // zichtbaar (plan A-5). Niveau-A "Kijken"-gebruikers zien dan een
   // rustige lijst van bestaande events zonder edit-knoppen.
   const { isPlannen } = useViewMode()
+  // Edit-state: welk event wordt bewerkt (null = sheet dicht).
+  const [editingEvent, setEditingEvent] = useState<LifeEvent | null>(null)
   // Sort events op target_date (alfabet als fallback). Events met datum
   // tonen we eerst chronologisch, daarna events met alleen target_age,
   // tenslotte events zonder timing.
@@ -213,18 +218,31 @@ export function GebeurtenissenView({
                   : impact?.tone === 'gain'
                     ? 'text-emerald-700 bg-emerald-50'
                     : 'text-[var(--ink-3)] bg-[var(--subtle)]'
+              // Plannen-modus: card wordt button die EventBewerkenSheet
+              // opent. Kijken-modus: gewone article (read-only).
+              const cardClass =
+                'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 text-left w-full'
+              const CardEl: React.ElementType = isPlannen ? 'button' : 'article'
+              const cardProps = isPlannen
+                ? {
+                    type: 'button' as const,
+                    onClick: () => setEditingEvent(event),
+                    'aria-label': `Bewerk ${event.name}`,
+                    className: `${cardClass} hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
+                  }
+                : { className: cardClass }
               return (
-                <article
-                  key={event.id}
-                  className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5"
-                >
+                <CardEl key={event.id} {...cardProps}>
                   <header className="flex items-start gap-3 mb-2">
                     <span className="w-9 h-9 rounded-lg bg-[var(--subtle)] flex items-center justify-center shrink-0">
                       <Icon className="w-4 h-4 text-[var(--ink-2)]" aria-hidden="true" />
                     </span>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-[var(--ink)] truncate">
+                      <h3 className="text-sm font-semibold text-[var(--ink)] truncate inline-flex items-center gap-1.5">
                         {event.name}
+                        {isPlannen && (
+                          <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
+                        )}
                       </h3>
                       <div className="text-[11px] text-[var(--ink-3)] mt-0.5">
                         {formatEventDate(event)}
@@ -243,7 +261,7 @@ export function GebeurtenissenView({
                       {impact.displayLabel}
                     </div>
                   )}
-                </article>
+                </CardEl>
               )
             })}
           </div>
@@ -307,6 +325,13 @@ export function GebeurtenissenView({
         </Link>
         ).
       </p>
+
+      {editingEvent && (
+        <EventBewerkenSheet
+          event={editingEvent}
+          onClose={() => setEditingEvent(null)}
+        />
+      )}
     </section>
   )
 }
