@@ -993,6 +993,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           color: side === 'above' ? COLOR_LIFE_INCOME : COLOR_LIFE_EXPENSE,
           icon: ev.icon || 'Calendar',
           kind: 'life_event',
+          // F-1 drag-handler heeft sourceId nodig om de supabase-update
+          // te kunnen routeren. Voor life_events is dat de event-id zelf.
+          sourceId: ev.id,
         })
       }
     }
@@ -1058,33 +1061,50 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
    */
   const handleChartEventDragEnd = useCallback(
     async (
-      _id: string,
+      id: string,
       sourceId: string | undefined,
       newAge: number,
       kind: 'life_event' | 'natural',
     ) => {
-      if (kind !== 'life_event' || !sourceId) return
+      if (kind !== 'life_event') return
+      // Voor life_events is sourceId === id (zie chartEventOverlay-build).
+      // Val terug op id wanneer sourceId om welke reden ook ontbreekt.
+      const eventId = sourceId ?? id
+      if (!eventId) return
       const clamped = Math.max(currentAge ?? 18, Math.min(120, newAge))
-      const target = events.find((e) => e.id === sourceId)
-      // Geen update als de leeftijd niet wezenlijk veranderd is (drag-
-      // resolution is per heel jaar).
+      const target = events.find((e) => e.id === eventId)
       if (target && target.target_age === clamped) return
+
+      // Optimistic update vóór de async supabase-call. Voorkomt dat de
+      // marker terugschiet naar zijn oude positie tussen pointer-release
+      // en server-response. Oude waarden bewaren voor rollback.
+      const oldTargetAge = target?.target_age ?? null
+      const oldTargetDate =
+        (target as { target_date?: string | null } | undefined)?.target_date ?? null
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId
+            ? { ...e, target_age: clamped, target_date: null }
+            : e,
+        ),
+      )
+
       const supabase = createClient()
       const { error } = await supabase
         .from('life_events')
         .update({ target_age: clamped, target_date: null })
-        .eq('id', sourceId)
+        .eq('id', eventId)
       if (error) {
-        // Stil-falen voor de demo; de chart re-loadt vanzelf bij volgende refresh.
         console.error('[F-1 drag] life_events update faalde:', error)
-        return
+        // Rollback optimistic update naar oorspronkelijke waarden.
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === eventId
+              ? { ...e, target_age: oldTargetAge, target_date: oldTargetDate }
+              : e,
+          ),
+        )
       }
-      // Optimistic update lokaal — events-array bijwerken zonder volledige reload.
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === sourceId ? { ...e, target_age: clamped, target_date: null } : e,
-        ),
-      )
     },
     [currentAge, events],
   )

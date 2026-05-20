@@ -297,31 +297,52 @@ export function ChartEventMarkers({
               </div>
             </foreignObject>
 
-            {/* F-1 drag-feedback: tijdens slepen toon een klein label met
-                de geprojecteerde nieuwe leeftijd boven (of onder, mirror
-                van de stack-side) de marker zodat de gebruiker direct
-                ziet waar hij naartoe schuift. */}
+            {/* F-1 drag-tooltip: tijdens slepen verschijnt boven (of onder,
+                mirror van de stack-side) de marker een prominente tooltip
+                met de geprojecteerde nieuwe leeftijd. Vervangt visueel
+                de standaard hover-tooltip zodat het jaar waar je naartoe
+                sleept altijd duidelijk leesbaar is. */}
             {isDragging && (() => {
               const projectedAge = Math.round(invXScale(cx - padLeft))
-              const labelY = isAbove ? cy - r - 10 : cy + r + 14
-              const text = `→ ${projectedAge} jaar`
+              const tooltipW = 120
+              const tooltipH = 30
+              const tx = Math.max(2, cx - tooltipW / 2)
+              const ty = isAbove
+                ? Math.max(2, cy - r - tooltipH - 4)
+                : cy + r + 4
+              const txCenter = Math.max(2 + tooltipW / 2, cx)
               return (
                 <g style={{ pointerEvents: 'none' }}>
+                  {/* Achtergrond-rect met paarse rand zodat 'm visueel
+                      onderscheidt van de gewone hover-tooltip. */}
                   <rect
-                    x={cx - 32} y={labelY - 9}
-                    width={64} height={14}
-                    rx={2}
-                    fill="var(--ink)" opacity={0.92}
+                    x={tx} y={ty}
+                    width={tooltipW} height={tooltipH}
+                    rx={3}
+                    fill="var(--ink)" opacity={0.95}
+                    stroke="var(--module-active-500, #8b5cf6)"
+                    strokeWidth={1.5}
                   />
                   <text
-                    x={cx} y={labelY + 1}
+                    x={txCenter} y={ty + 12}
                     textAnchor="middle"
                     fontSize={9}
-                    fontWeight={600}
+                    fontWeight={500}
+                    fill="var(--paper)"
+                    opacity={0.75}
+                    fontFamily="var(--font-inter, sans-serif)"
+                  >
+                    Verschuif naar
+                  </text>
+                  <text
+                    x={txCenter} y={ty + 24}
+                    textAnchor="middle"
+                    fontSize={12}
+                    fontWeight={700}
                     fill="var(--paper)"
                     fontFamily="var(--font-dm-mono, monospace)"
                   >
-                    {text}
+                    {projectedAge} jaar
                   </text>
                 </g>
               )
