@@ -342,17 +342,61 @@ export function MiniNetWorthChart({
         </svg>
       </Link>
       <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">
-        <span
-          className="inline-flex items-center gap-1.5 text-[10px] text-[var(--ink-3)]"
-          title="P10-P90 bandbreedte op basis van marktvolatiliteit σ × √t"
-        >
+        <div className="flex items-center gap-3 flex-wrap text-[10px] text-[var(--ink-3)]">
+          {/* Historisch — stippellijn-indicator zodat de gebruiker weet
+              dat het verleden uit netto-vermogen-tracking komt. */}
+          {recentHistory.length > 0 && (
+            <span
+              className="inline-flex items-center gap-1.5"
+              title="Gerealiseerde netto-vermogen-tracking uit het verleden"
+            >
+              <svg width="16" height="2" aria-hidden="true">
+                <line
+                  x1="0"
+                  y1="1"
+                  x2="16"
+                  y2="1"
+                  stroke="var(--module-active-700, #10b981)"
+                  strokeWidth="1.5"
+                  strokeDasharray="3 2"
+                />
+              </svg>
+              Historisch
+            </span>
+          )}
+          {/* Projectie — doorlopende lijn-indicator. */}
           <span
-            className="inline-block w-3 h-2 rounded-sm"
-            style={{ background: 'var(--module-active-500, #10b981)', opacity: 0.25 }}
-            aria-hidden="true"
-          />
-          Onzekerheid (P10–P90)
-        </span>
+            className="inline-flex items-center gap-1.5"
+            title="Toekomst-projectie tot vrijheidsmoment"
+          >
+            <svg width="16" height="2" aria-hidden="true">
+              <line
+                x1="0"
+                y1="1"
+                x2="16"
+                y2="1"
+                stroke="var(--module-active-500, #10b981)"
+                strokeWidth="2"
+              />
+            </svg>
+            Projectie
+          </span>
+          {/* Confidence-band — gevuld rechthoekje. */}
+          <span
+            className="inline-flex items-center gap-1.5"
+            title="P10-P90 bandbreedte op basis van marktvolatiliteit σ × √t"
+          >
+            <span
+              className="inline-block w-3 h-2 rounded-sm"
+              style={{
+                background: 'var(--module-active-500, #10b981)',
+                opacity: 0.25,
+              }}
+              aria-hidden="true"
+            />
+            Onzekerheid (P10–P90)
+          </span>
+        </div>
         <Link
           href="/toekomst"
           className="text-[11px] font-semibold text-violet-700 hover:underline shrink-0"
