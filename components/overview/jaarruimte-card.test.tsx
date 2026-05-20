@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { JaarruimteCard } from './jaarruimte-card'
 
 describe('JaarruimteCard — render', () => {
@@ -47,5 +47,63 @@ describe('JaarruimteCard — render', () => {
     expect(screen.getByText(/13.3%/)).toBeTruthy()
     expect(screen.getByText(/17\.545/)).toBeTruthy()
     expect(screen.getByText(/34\.310/)).toBeTruthy()
+  })
+})
+
+describe('JaarruimteCard — interactieve pensioen-aangroei', () => {
+  it('toont input-veld voor pensioenaangroei', () => {
+    render(<JaarruimteCard grossYearlyIncome={50_000} />)
+    expect(screen.getByLabelText(/Pensioenaangroei werkgever/i)).toBeTruthy()
+  })
+
+  it('default aangroei = 0 wanneer geen prop', () => {
+    render(<JaarruimteCard grossYearlyIncome={50_000} />)
+    const input = screen.getByLabelText(
+      /Pensioenaangroei werkgever/i,
+    ) as HTMLInputElement
+    expect(input.value).toBe('0')
+  })
+
+  it('default aangroei = prop-waarde wanneer aanwezig', () => {
+    render(
+      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={3000} />,
+    )
+    const input = screen.getByLabelText(
+      /Pensioenaangroei werkgever/i,
+    ) as HTMLInputElement
+    expect(input.value).toBe('3000')
+  })
+
+  it('wijziging update de jaarruimte-berekening live', () => {
+    const { container } = render(<JaarruimteCard grossYearlyIncome={50_000} />)
+    // €50k bruto, aangroei 0 → ruimte ≈ €4.317
+    expect(container.textContent).toMatch(/€\s*4\.317/)
+    const input = screen.getByLabelText(/Pensioenaangroei werkgever/i)
+    fireEvent.change(input, { target: { value: '2000' } })
+    // Met €2000 aangroei → ruimte ≈ €2.317
+    expect(container.textContent).toMatch(/€\s*2\.317/)
+  })
+
+  it('reset-knop verschijnt wanneer aangroei > 0', () => {
+    render(
+      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={3000} />,
+    )
+    expect(screen.getByLabelText('Reset naar 0')).toBeTruthy()
+  })
+
+  it('reset-knop zet aangroei terug naar 0', () => {
+    render(
+      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={3000} />,
+    )
+    fireEvent.click(screen.getByLabelText('Reset naar 0'))
+    const input = screen.getByLabelText(
+      /Pensioenaangroei werkgever/i,
+    ) as HTMLInputElement
+    expect(input.value).toBe('0')
+  })
+
+  it('toont UPO-hint', () => {
+    render(<JaarruimteCard grossYearlyIncome={50_000} />)
+    expect(screen.getByText(/Mijnpensioenoverzicht/i)).toBeTruthy()
   })
 })

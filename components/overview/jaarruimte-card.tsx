@@ -1,5 +1,8 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowRight, Sparkles, RotateCcw } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import {
   computeJaarruimte,
@@ -41,7 +44,11 @@ export function JaarruimteCard({
   /** Marginaal Box 1-tarief (0.3697 of 0.495). Voor besparings-schatting. */
   marginaalTarief?: number
 }) {
-  const result = computeJaarruimte(grossYearlyIncome, pensioenAangroei)
+  // Interactieve pensioen-aangroei: user kan zijn UPO-bedrag invullen
+  // zodat de berekening accuraat wordt. Default = prop-waarde (0 als
+  // niets bekend).
+  const [aangroei, setAangroei] = useState(pensioenAangroei)
+  const result = computeJaarruimte(grossYearlyIncome, aangroei)
   const besparing =
     marginaalTarief && marginaalTarief > 0
       ? Math.round(result.jaarruimte * marginaalTarief)
@@ -114,6 +121,46 @@ export function JaarruimteCard({
           </p>
         </>
       )}
+
+      {/* Interactieve pensioen-aangroei input — user vult zijn werkgevers-
+          aangroei (uit UPO) in voor accurate jaarruimte. Default 0. */}
+      <div className="mb-3 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]/60 p-3">
+        <label
+          htmlFor="jaarruimte-aangroei"
+          className="block text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)] mb-1"
+        >
+          Pensioenaangroei werkgever (per jaar)
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-[var(--ink-3)]">€</span>
+          <input
+            id="jaarruimte-aangroei"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={100}
+            value={aangroei}
+            onChange={(e) => setAangroei(Number(e.target.value) || 0)}
+            className="flex-1 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1 text-sm tabular-nums focus:outline-none focus:border-[var(--ink-3)]"
+            aria-label="Pensioenaangroei werkgever per jaar"
+          />
+          {aangroei > 0 && (
+            <button
+              type="button"
+              onClick={() => setAangroei(0)}
+              aria-label="Reset naar 0"
+              title="Reset"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        <p className="mt-1 text-[10px] italic text-[var(--ink-4)] leading-snug">
+          Uit je UPO (Mijnpensioenoverzicht.nl) — typisch 5–10% van je
+          bruto-inkomen.
+        </p>
+      </div>
 
       <Link
         href="/core/belasting"
