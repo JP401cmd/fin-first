@@ -64,6 +64,7 @@ export const SimChart = memo(function SimChart({
   baselineEmphasis = 'ghost',
   eventOverlay,
   onEventClick,
+  onEventDragEnd,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -100,6 +101,14 @@ export const SimChart = memo(function SimChart({
   eventOverlay?: ChartEventOverlay[]
   /** Click handler for event markers — routes to EventPane or NaturalMilestoneSheet */
   onEventClick?: (id: string, kind: ChartEventKind, sourceId?: string) => void
+  /** F-1 directe manipulatie: drag-end handler. Caller persisteert de
+   *  nieuwe target_age (typisch via supabase.update op life_events). */
+  onEventDragEnd?: (
+    id: string,
+    sourceId: string | undefined,
+    newAge: number,
+    kind: ChartEventKind,
+  ) => void
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
@@ -800,6 +809,7 @@ export const SimChart = memo(function SimChart({
             visibleMinAge={minAge}
             visibleMaxAge={maxAge}
             onEventClick={onEventClick}
+            onEventDragEnd={onEventDragEnd}
           />
         )}
 

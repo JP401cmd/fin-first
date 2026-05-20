@@ -1048,6 +1048,46 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     },
     [naturalMilestones],
   )
+
+  /**
+   * F-1 directe manipulatie: drag-and-drop op chart-events. Wanneer de
+   * gebruiker een marker horizontaal sleept en loslaat, persisteren we
+   * de nieuwe target_age direct in supabase en triggeren een re-load
+   * van de events-state. Alleen life_events zijn dragbaar; natural
+   * milestones zijn auto-afgeleid en niet bewerkbaar.
+   */
+  const handleChartEventDragEnd = useCallback(
+    async (
+      _id: string,
+      sourceId: string | undefined,
+      newAge: number,
+      kind: 'life_event' | 'natural',
+    ) => {
+      if (kind !== 'life_event' || !sourceId) return
+      const clamped = Math.max(currentAge ?? 18, Math.min(120, newAge))
+      const target = events.find((e) => e.id === sourceId)
+      // Geen update als de leeftijd niet wezenlijk veranderd is (drag-
+      // resolution is per heel jaar).
+      if (target && target.target_age === clamped) return
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('life_events')
+        .update({ target_age: clamped, target_date: null })
+        .eq('id', sourceId)
+      if (error) {
+        // Stil-falen voor de demo; de chart re-loadt vanzelf bij volgende refresh.
+        console.error('[F-1 drag] life_events update faalde:', error)
+        return
+      }
+      // Optimistic update lokaal — events-array bijwerken zonder volledige reload.
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === sourceId ? { ...e, target_age: clamped, target_date: null } : e,
+        ),
+      )
+    },
+    [currentAge, events],
+  )
   const baseFireStratOpts = fireStrategy ? { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge } : undefined
   const baseFire = effectiveInput ? computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr, undefined, baseFireStratOpts) : null
   const totalDelayMonths = impacts.reduce((s, i) => s + i.fireDelayMonths, 0)
@@ -3040,6 +3080,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             showDepletionWarning={isAowStopActive}
                             eventOverlay={chartEventOverlay}
                             onEventClick={handleChartEventClick}
+                            onEventDragEnd={handleChartEventDragEnd}
                           />
                         </div>
 
