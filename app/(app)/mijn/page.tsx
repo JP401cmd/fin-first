@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
-import { loadIdentityData } from '@/lib/identity-data-loader'
-import IdentityClient from '@/components/identity/identity-client'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { MijnOverview } from '@/components/mijn/mijn-overview'
 
 export const metadata: Metadata = {
   title: 'Mijn — TriFinity',
@@ -9,27 +8,27 @@ export const metadata: Metadata = {
 }
 
 /**
- * /mijn — canonieke profiel/instellingen-pagina (nieuwe navigatie-architectuur).
+ * /mijn — kaart-grid van alle 8 sub-routes (plan §6.4).
  *
- * Vervangt /identity. Voor nu rendert IdentityClient zodat preview-functionaliteit
- * meteen werkt onder de nieuwe URL. IdentityClient heeft al een
- * PageInfoButton intern met PAGE_INFO['/identity']-content — geen
- * wrapper-knop hier om duplicatie te voorkomen.
+ * Vervangt eerdere IdentityClient-mount (= 2459-regel monolith). De
+ * IdentityClient blijft beschikbaar op /identity voor legacy-content
+ * die nog niet uitgekamerd is naar de 8 sub-pages.
  *
- * In komende fases wordt Mijn opgesplitst in:
- *  - /mijn/profiel  · /mijn/partner  · /mijn/privacy
- *  - /mijn/koppelingen (PSD2, UPO, brokerage)
- *  - /mijn/notificaties  · /mijn/uiterlijk
- *  - /mijn/personalisatie (widgets-configurator voor Overzicht-hero)
- *  - /mijn/rapportages (4 types index)
- *  - /mijn/geavanceerd (exports, debug)
- *
- * Bij die refactor wordt PAGE_INFO['/mijn'] (al toegevoegd in
- * lib/page-info-content.ts) opgepakt. Dit vervangt het 2459-regel
- * /identity/instellingen monster.
+ * Acht sub-routes:
+ *  - /mijn/profiel       basis-gegevens
+ *  - /mijn/delen         partner & delen
+ *  - /mijn/privacy       data-overzicht
+ *  - /mijn/koppelingen   PSD2/UPO/brokerage
+ *  - /mijn/uiterlijk     palet, font, kleuren
+ *  - /mijn/notificaties  e-mail/push instellingen
+ *  - /rapportages        balans/vermogen/budget/plan
+ *  - /mijn/geavanceerd   exports, debug
  */
-export default async function MijnPage() {
-  const supabase = await createClient()
-  const data = await loadIdentityData(supabase)
-  return <IdentityClient initialData={data} />
+export default function MijnPage() {
+  return (
+    <>
+      <NavStackMeta title="Mijn" bottomBar={{ kind: 'tabs' }} />
+      <MijnOverview />
+    </>
+  )
 }
