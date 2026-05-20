@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { BelastingOverzichtStrip } from '@/components/overview/belasting-overzicht-strip'
+import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
 import BelastingPage from '../../core/belasting/page'
 
 export const metadata: Metadata = {
@@ -38,10 +39,11 @@ export default async function OverzichtBelastingPage() {
   // Versimpelde benadering — voldoende voor KPI-tegel context, niet voor
   // aangifte. effectiveInput.monthlyIncome is netto.
   let box1Tax: number | null = null
+  let grossYearly = 0
   const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
   const marg = horizonData.fireParams?.marginaalTarief ?? 0.3697
   if (netMonthly > 0 && marg > 0 && marg < 1) {
-    const grossYearly = (netMonthly * 12) / (1 - marg)
+    grossYearly = (netMonthly * 12) / (1 - marg)
     box1Tax = Math.round(grossYearly * marg)
   }
 
@@ -53,6 +55,13 @@ export default async function OverzichtBelastingPage() {
         box2Tax={null}
         box3Tax={box3Tax}
       />
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-2">
+        <JaarruimteCard
+          grossYearlyIncome={grossYearly}
+          pensioenAangroei={0}
+          marginaalTarief={marg}
+        />
+      </section>
       <BelastingPage />
     </>
   )
