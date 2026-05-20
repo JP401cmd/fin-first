@@ -135,10 +135,15 @@ export function ChartEventMarkers({
     id: string
     sourceId: string | undefined
     kind: ChartEventKind
-    /** Pixel-x bij pointer-down. */
+    /** Pixel-x bij pointer-down (CSS-coordinaten van de muis). */
     startX: number
-    /** Huidige pixel-x van de pointer (relatief aan dezelfde origin). */
+    /** Huidige pixel-x van de marker in SVG-user-units. */
     currentX: number
+    /** Schaal-factor van CSS-pixel → SVG-unit op het moment van drag-
+     *  start. Nodig omdat de host-SVG met `className="w-full"` rekt op
+     *  een viewBox; zonder deze conversie beweegt de marker te snel of
+     *  te langzaam mee t.o.v. de muis. */
+    pxToSvg: number
     /** Of we de drag-drempel zijn gepasseerd. */
     moved: boolean
     /** Laatste leeftijd waarop onEventDragMove is gevuurd (snap-gebonden
@@ -240,12 +245,25 @@ export function ChartEventMarkers({
               e.stopPropagation()
               if (!canDrag) return
               ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
+              // Bereken CSS-pixel → SVG-unit schaal-factor op basis van
+              // de SVG-viewBox vs zijn rendered breedte. De host gebruikt
+              // `<svg viewBox="0 0 W H" className="w-full">` dus 1 CSS-px
+              // muisbeweging is meestal NIET 1 SVG-unit marker-beweging.
+              const svg = (e.currentTarget as SVGElement).ownerSVGElement
+              let pxToSvg = 1
+              if (svg) {
+                const rect = svg.getBoundingClientRect()
+                if (rect.width > 0 && svg.viewBox?.baseVal?.width > 0) {
+                  pxToSvg = svg.viewBox.baseVal.width / rect.width
+                }
+              }
               setDrag({
                 id: p.id,
                 sourceId: p.sourceId,
                 kind: p.kind,
                 startX: e.clientX,
                 currentX: cxBase,
+                pxToSvg,
                 moved: false,
                 lastEmittedAge: p.age,
               })
@@ -253,9 +271,14 @@ export function ChartEventMarkers({
             onPointerMove={(e) => {
               const d = dragRef.current
               if (!d || d.id !== p.id) return
-              const dx = e.clientX - d.startX
-              const moved = d.moved || Math.abs(dx) >= DRAG_PROMOTE_THRESHOLD_PX
-              const newCurrentX = cxBase + dx
+              // CSS-pixel delta → SVG-unit delta via vooraf-berekende
+              // schaal-factor (zie pointer-down). Zorgt dat de marker
+              // exact met de muis meebeweegt ongeacht hoe het SVG
+              // wordt geschaald in z'n container.
+              const dxCss = e.clientX - d.startX
+              const dxSvg = dxCss * d.pxToSvg
+              const moved = d.moved || Math.abs(dxCss) >= DRAG_PROMOTE_THRESHOLD_PX
+              const newCurrentX = cxBase + dxSvg
               // Fire live-callback alleen wanneer we een nieuwe quarter-
               // boundary passeren (= snapped-age verandert). Voorkomt
               // dat onEventDragMove 60× per seconde wordt aangeroepen.
