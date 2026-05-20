@@ -5,6 +5,8 @@ import { formatCurrency } from '@/lib/format'
 import type { TransactionRow } from '@/components/app/transacties-feed'
 
 /**
+ * @audit-kpi-actions skip — banner-style stats; actie via parent feed
+ *
  * TransactiesGeldstroom — banner-style cashflow-overzicht boven de
  * TransactiesFeed op /overzicht/cashflow?view=transacties. Aggregeert
  * de transactions uit de HUIDIGE maand (filter op month-match) en toont

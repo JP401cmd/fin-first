@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { formatCurrency } from '@/lib/format'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
 
@@ -109,8 +110,14 @@ function BoxTegel({
   forcePlaceholder?: boolean
 }) {
   const hasValue = value != null && value > 0 && !forcePlaceholder
+  // Plan T-2: KPI-tegels gekoppeld aan een actie. Klik op de tegel
+  // scrolt door naar de Box-sectie in /core/belasting (anchor).
+  const href = `/core/belasting?box=${number}`
   return (
-    <article className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5">
+    <Link
+      href={href}
+      className="block rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
+    >
       <header className="flex items-center gap-2 mb-2">
         <span
           className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-violet-50 text-violet-700 text-xs font-mono font-bold"
@@ -134,6 +141,6 @@ function BoxTegel({
       <p className="mt-2 text-[10px] italic text-[var(--ink-4)] leading-snug">
         {disclaimer}
       </p>
-    </article>
+    </Link>
   )
 }

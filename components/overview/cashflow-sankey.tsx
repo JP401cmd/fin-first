@@ -5,6 +5,8 @@ import { formatCurrency } from '@/lib/format'
 import type { TransactionRow } from '@/components/app/transacties-feed'
 
 /**
+ * @audit-kpi-actions skip — visualisatie; actie via parent tab
+ *
  * CashflowSankey — visualiseert geldstroom van inkomen naar uitgaven en
  * overschot. MVP-versie: horizontale Sankey-LITE met staked-bars i.p.v.
  * crossing-paths (vereist polygon-rendering of dedicated library).

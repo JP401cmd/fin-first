@@ -12,6 +12,7 @@
     "build:sw": "serwist build serwist.config.mjs",
     "start": "next start",
     "lint": "eslint",
+    "audit:kpi-actions": "node scripts/audit-kpi-actions.mjs",
     "db:pull": "npx supabase db pull",
     "db:push": "npx supabase db push",
     "db:diff": "npx supabase db diff",

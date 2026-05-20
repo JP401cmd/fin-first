@@ -8,6 +8,8 @@ import {
 } from '@/lib/recurring-data'
 
 /**
+ * @audit-kpi-actions skip — visualisatie-banner; actie via parent tab
+ *
  * CashflowKalender — visualiseert recurring transactions over de
  * komende 30 dagen als kalender-grid. Per dag een mini-stack van
  * afschrijvings-markers (rood = uitgave) en inkomens-markers (groen).
