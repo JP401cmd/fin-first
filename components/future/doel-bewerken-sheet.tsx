@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { X, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { X, Trash2, TrendingUp, TrendingDown, Minus, Sparkles, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
+import { getGoalSuggestions } from '@/lib/goal-suggestions'
 
 /**
  * DoelBewerkenSheet — quick-update flow per doel op /toekomst Doelen-tab.
@@ -25,14 +27,18 @@ export function DoelBewerkenSheet({
   goalName,
   currentValue,
   targetValue,
+  goalType,
   onClose,
 }: {
   goalId: string
   goalName: string
   currentValue: number
   targetValue: number
+  /** Goal-type (savings/wealth/debt) — voedt contextuele Will-suggesties. */
+  goalType?: string | null
   onClose: () => void
 }) {
+  const suggestions = getGoalSuggestions(goalType)
   const [newValue, setNewValue] = useState(String(currentValue))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -208,6 +214,48 @@ export function DoelBewerkenSheet({
             <Minus className="w-3 h-3" aria-hidden="true" />
             <span>Nog geen wijziging</span>
           </div>
+        )}
+
+        {/* Will-suggesties — plan §6.3 "acties van Will" op doel-detail.
+            Statische tips per goal_type uit lib/goal-suggestions; geen
+            DB-fetch nodig. Verschijnt alleen wanneer er suggesties zijn
+            voor het type (savings/wealth/debt). */}
+        {suggestions.length > 0 && (
+          <section
+            data-testid="will-suggesties"
+            aria-label="Will-suggesties"
+            className="mb-4 rounded-xl border border-violet-100 bg-violet-50/40 p-3"
+          >
+            <header className="flex items-center gap-1.5 mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-violet-700" aria-hidden="true" />
+              <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-violet-700">
+                Will-suggesties
+              </span>
+            </header>
+            <ul className="space-y-2">
+              {suggestions.map((s) => (
+                <li key={s.key} className="text-xs text-[var(--ink-2)] leading-snug">
+                  <p>{s.text}</p>
+                  <div className="mt-1 flex items-center gap-2 flex-wrap">
+                    {s.impact && (
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-1.5 py-0.5 text-[10px] font-semibold">
+                        {s.impact}
+                      </span>
+                    )}
+                    {s.href && s.ctaLabel && (
+                      <Link
+                        href={s.href}
+                        className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-700 hover:underline"
+                      >
+                        {s.ctaLabel}
+                        <ArrowRight className="w-3 h-3" aria-hidden="true" />
+                      </Link>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {confirmDelete ? (

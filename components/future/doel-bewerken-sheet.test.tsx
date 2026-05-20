@@ -37,13 +37,20 @@ beforeEach(() => {
   mockRefresh.mockReset()
 })
 
-function renderSheet(onClose = () => {}) {
+function renderSheet(
+  onClose = () => {},
+  opts: { goalType?: string | null } = {},
+) {
+  // Belangrijk: 'goalType' in opts → respecteer expliciete null,
+  // anders default naar 'savings'.
+  const goalType = 'goalType' in opts ? opts.goalType : 'savings'
   return render(
     <DoelBewerkenSheet
       goalId="g1"
       goalName="Spaargeld voor woning"
       currentValue={20000}
       targetValue={50000}
+      goalType={goalType}
       onClose={onClose}
     />,
   )
@@ -82,6 +89,25 @@ describe('DoelBewerkenSheet — bijdrage-monitor', () => {
     renderSheet()
     const monitor = screen.getByTestId('bijdrage-monitor')
     expect(monitor.textContent).toMatch(/Nog geen wijziging/)
+  })
+
+  it('toont Will-suggesties-blok voor savings-doel', () => {
+    renderSheet(() => {}, { goalType: 'savings' })
+    const block = screen.getByTestId('will-suggesties')
+    expect(block).toBeTruthy()
+    expect(block.textContent).toMatch(/Will-suggesties/i)
+  })
+
+  it('toont 2 suggestie-items per default', () => {
+    renderSheet(() => {}, { goalType: 'wealth' })
+    const block = screen.getByTestId('will-suggesties')
+    const items = block.querySelectorAll('li')
+    expect(items.length).toBe(2)
+  })
+
+  it('verbergt Will-suggesties-blok bij onbekend goal_type', () => {
+    renderSheet(() => {}, { goalType: null })
+    expect(screen.queryByTestId('will-suggesties')).toBeNull()
   })
 
   it('toont +bedrag en +pp delta bij verhoging', () => {

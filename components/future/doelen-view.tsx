@@ -65,6 +65,7 @@ export function DoelenView({
     name: string
     current: number
     target: number
+    goalType: string | null
   } | null>(null)
 
   // Koppel goals + progresses op index (loader garandeert parallel
@@ -143,6 +144,7 @@ export function DoelenView({
                     name: goal.name,
                     current: progress.current,
                     target: progress.target,
+                    goalType: (goal as { goal_type?: string | null }).goal_type ?? null,
                   }),
                 'aria-label': `Bewerk doel ${goal.name}`,
                 className: `${cardClass} hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
@@ -216,6 +218,7 @@ export function DoelenView({
           goalName={editingGoal.name}
           currentValue={editingGoal.current}
           targetValue={editingGoal.target}
+          goalType={editingGoal.goalType}
           onClose={() => setEditingGoal(null)}
         />
       )}
