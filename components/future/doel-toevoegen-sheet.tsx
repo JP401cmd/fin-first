@@ -28,6 +28,48 @@ const GOAL_TYPE_LABELS: Record<GoalType, string> = {
   debt: 'Schuld aflossen',
 }
 
+/**
+ * Doel-presets — drie veel-gebruikte startsjablonen (CBS-/Nibud-typische
+ * bedragen). Klik vult naam + bedrag + type in zodat de gebruiker niet
+ * vanaf nul hoeft te beginnen. Datum blijft leeg; gebruiker stelt zelf in
+ * wanneer hij dat doel wil bereiken.
+ */
+type GoalPreset = {
+  key: string
+  emoji: string
+  name: string
+  target: number
+  goalType: GoalType
+  hint: string
+}
+
+const PRESETS: GoalPreset[] = [
+  {
+    key: 'noodfonds',
+    emoji: '🛟',
+    name: 'Noodfonds',
+    target: 5000,
+    goalType: 'savings',
+    hint: '3 maanden vaste lasten',
+  },
+  {
+    key: 'schuldvrij',
+    emoji: '✂️',
+    name: 'Schuldvrij',
+    target: 10000,
+    goalType: 'debt',
+    hint: 'Aflossen tot 0',
+  },
+  {
+    key: 'vrijheidsgetal',
+    emoji: '🏁',
+    name: 'Vrijheidsgetal',
+    target: 500000,
+    goalType: 'wealth',
+    hint: 'FIRE = 25× jaaruitgaven',
+  },
+]
+
 export function DoelToevoegenSheet() {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -152,6 +194,37 @@ export function DoelToevoegenSheet() {
                 {error}
               </div>
             )}
+
+            {/* Snel-start presets — één klik vult naam/bedrag/type in. */}
+            <div className="mb-4">
+              <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)] mb-2">
+                Snel starten met
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {PRESETS.map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => {
+                      setName(preset.name)
+                      setTargetValue(String(preset.target))
+                      setGoalType(preset.goalType)
+                    }}
+                    className="flex flex-col items-start gap-0.5 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-2.5 text-left hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
+                  >
+                    <span className="text-base leading-none" aria-hidden="true">
+                      {preset.emoji}
+                    </span>
+                    <span className="text-xs font-semibold text-[var(--ink)] mt-1">
+                      {preset.name}
+                    </span>
+                    <span className="text-[10px] text-[var(--ink-3)] leading-snug">
+                      {preset.hint}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="space-y-3">
               <label className="block">

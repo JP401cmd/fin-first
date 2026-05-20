@@ -122,3 +122,33 @@ describe('DoelToevoegenSheet — insert-flow', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/RLS denied/)
   })
 })
+
+describe('DoelToevoegenSheet — presets', () => {
+  it('toont 3 preset-buttons (Noodfonds / Schuldvrij / Vrijheidsgetal)', () => {
+    render(<DoelToevoegenSheet />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    expect(screen.getByText('Noodfonds')).toBeTruthy()
+    expect(screen.getByText('Schuldvrij')).toBeTruthy()
+    expect(screen.getByText('Vrijheidsgetal')).toBeTruthy()
+  })
+
+  it('klik op Noodfonds-preset vult naam + bedrag in', () => {
+    render(<DoelToevoegenSheet />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    fireEvent.click(screen.getByText('Noodfonds'))
+    const dialog = screen.getByRole('dialog')
+    const nameInput = dialog.querySelector('input[type="text"]') as HTMLInputElement
+    const targetInput = dialog.querySelector('input[type="number"]') as HTMLInputElement
+    expect(nameInput.value).toBe('Noodfonds')
+    expect(targetInput.value).toBe('5000')
+  })
+
+  it('klik op Schuldvrij-preset zet goalType naar debt', () => {
+    render(<DoelToevoegenSheet />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    fireEvent.click(screen.getByText('Schuldvrij'))
+    const dialog = screen.getByRole('dialog')
+    const select = dialog.querySelector('select') as HTMLSelectElement
+    expect(select.value).toBe('debt')
+  })
+})
