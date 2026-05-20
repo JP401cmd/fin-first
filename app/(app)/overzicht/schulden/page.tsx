@@ -1,7 +1,12 @@
 import type { Metadata } from 'next'
+import { createClient } from '@/lib/supabase/server'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import DebtsPage from '../../core/debts/page'
 import { SchuldenFilter } from '@/components/overview/schulden-filter'
+import {
+  SchuldenOverzichtStrip,
+  type DebtForStrip,
+} from '@/components/overview/schulden-overzicht-strip'
 
 export const metadata: Metadata = {
   title: 'Schulden — TriFinity',
@@ -11,15 +16,27 @@ export const metadata: Metadata = {
 /**
  * /overzicht/schulden — tweede hefboom-verdieping.
  *
- * Toont alle schulden in één DebtsPage-view. Bovenaan een filter-dropdown
- * met alle 11 debt-types (uit DEBT_TYPE_LABELS). Selectie navigeert naar
- * /overzicht/schulden/[type] voor categorie-detail; "Alle schulden" terug
- * naar deze landings-view.
+ * Layout:
+ *  1. SchuldenOverzichtStrip — 4 groep-tegels (hypotheek/leningen/
+ *     studie/overig) met bedrag + percentage
+ *  2. SchuldenFilter — dropdown naar debt-type sub-routes
+ *  3. DebtsPage — bestaande detail-rendering uit /core/debts
  */
-export default function OverzichtSchuldenPage() {
+export default async function OverzichtSchuldenPage() {
+  const supabase = await createClient()
+  const { data: debtsRaw } = await supabase
+    .from('debts')
+    .select('debt_type, current_balance')
+    .eq('is_active', true)
+  const debts: DebtForStrip[] = (debtsRaw ?? []).map((d) => ({
+    debt_type: d.debt_type,
+    current_balance: Number(d.current_balance ?? 0),
+  }))
+
   return (
     <>
       <NavStackMeta title="Schulden" bottomBar={{ kind: 'tabs' }} />
+      <SchuldenOverzichtStrip debts={debts} />
       <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <SchuldenFilter />
       </div>
