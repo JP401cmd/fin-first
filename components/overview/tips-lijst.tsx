@@ -17,6 +17,7 @@ import {
   HEFBOOM_CONFIG,
   HEFBOOM_FOR_RECOMMENDATION,
 } from '@/lib/hefboom-config'
+import { deepLinkForRecommendation } from '@/lib/recommendation-deep-link'
 
 /**
  * TipsLijst — prioriteerbare lijst van Will-recommendations met 3
@@ -229,6 +230,22 @@ export function TipsLijst({
           </header>
 
           <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+            {(() => {
+              const deepLink = deepLinkForRecommendation(rec)
+              if (!deepLink) return null
+              return (
+                <Link
+                  href={deepLink.href}
+                  target={deepLink.isExternal ? '_blank' : undefined}
+                  rel={deepLink.isExternal ? 'noopener noreferrer' : undefined}
+                  data-testid={`tip-deeplink-${rec.id}`}
+                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-800 px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                >
+                  <ArrowRight className="w-3 h-3" aria-hidden="true" />
+                  {deepLink.label}
+                </Link>
+              )
+            })()}
             {(Object.keys(ACTION_LABELS) as Array<keyof typeof ACTION_LABELS>).map(
               (status) => {
                 const meta = ACTION_LABELS[status]

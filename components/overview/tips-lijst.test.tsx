@@ -150,6 +150,34 @@ describe('TipsLijst — render', () => {
     expect(banner.textContent).toMatch(/\+15 dagen\/jr/)
   })
 
+  it('toont contextuele deep-link op tip (plan T-6)', () => {
+    render(
+      <TipsLijst
+        recommendations={[
+          makeRec('1', {
+            recommendation_type: 'debt_acceleration',
+            related_debt_id: 'd-42',
+          }),
+        ]}
+      />,
+    )
+    const link = screen.getByTestId('tip-deeplink-1')
+    expect(link.getAttribute('href')).toBe('/overzicht/schulden#debt-d-42')
+    expect(link.textContent).toMatch(/Open schuld/i)
+  })
+
+  it('valt terug op type-route wanneer related_* leeg', () => {
+    render(
+      <TipsLijst
+        recommendations={[
+          makeRec('1', { recommendation_type: 'asset_reallocation' }),
+        ]}
+      />,
+    )
+    const link = screen.getByTestId('tip-deeplink-1')
+    expect(link.getAttribute('href')).toBe('/overzicht/bezittingen')
+  })
+
   it('verbergt totaal-impact-banner zonder impact-velden', () => {
     render(
       <TipsLijst
