@@ -77,6 +77,11 @@ export const PAGE_INFO: Record<string, string> = {
     'Naam, geboortedatum, partner-status en kinderen — de basis waarop alle berekeningen rusten. ' +
     'Klein draaien hier verschuift je hele projectie.',
 
+  '/mijn/privacy':
+    'Wat we opslaan, waar en waarom — per data-categorie helder uitgelegd. ' +
+    'Plus directe acties voor data-export (JSON) en account-verwijdering. ' +
+    'Niet als juridische verplichting — als merkpijler.',
+
   '/mijn/koppelingen':
     'Automatische koppelingen voor data-invoer. ' +
     'PSD2-bank, UPO-pensioenoverzicht en crypto-brokerage — telkens een handmatige import minder. ' +
