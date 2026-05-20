@@ -209,9 +209,21 @@ export function ChatPanel() {
   const { activeModules } = useModuleAccess()
 
   const domain = useMemo(() => {
-    // Route-based domain selection, gated by active modules
-    if (pathname.startsWith('/horizon') && activeModules.includes('toekomstplannen')) return 'horizon'
-    if (pathname.startsWith('/will') && activeModules.includes('inzicht_acties')) return 'wil'
+    // Route-based domain selection, gated by active modules.
+    // Nieuwe nav-routes (Overzicht/Toekomst/Mijn) routen naar dezelfde
+    // AI-domeinen als de legacy-routes:
+    //   /toekomst  → horizon  (planning + scenario's)
+    //   /overzicht → wil      (briefing + acties + tips)
+    //   /mijn      → kern     (profiel + config)
+    if (
+      (pathname.startsWith('/horizon') || pathname.startsWith('/toekomst')) &&
+      activeModules.includes('toekomstplannen')
+    ) return 'horizon'
+    if (
+      (pathname.startsWith('/will') || pathname.startsWith('/overzicht')) &&
+      activeModules.includes('inzicht_acties')
+    ) return 'wil'
+    if (pathname.startsWith('/mijn')) return 'kern'
     // Default: wil if available, otherwise kern
     if (activeModules.includes('inzicht_acties')) return 'wil'
     return 'kern'
