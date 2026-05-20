@@ -77,6 +77,35 @@ describe('DoelBewerkenSheet — render', () => {
   })
 })
 
+describe('DoelBewerkenSheet — bijdrage-monitor', () => {
+  it('toont "Nog geen wijziging" bij ongewijzigde waarde', () => {
+    renderSheet()
+    const monitor = screen.getByTestId('bijdrage-monitor')
+    expect(monitor.textContent).toMatch(/Nog geen wijziging/)
+  })
+
+  it('toont +bedrag en +pp delta bij verhoging', () => {
+    const { container } = renderSheet()
+    const input = container.querySelector('input[type="number"]')!
+    fireEvent.change(input, { target: { value: '25000' } })
+    const monitor = screen.getByTestId('bijdrage-monitor')
+    // +5000, +10 pp (van 40% naar 50%)
+    expect(monitor.textContent).toMatch(/\+/)
+    expect(monitor.textContent).toMatch(/5\.000/)
+    expect(monitor.textContent).toMatch(/10 pp/)
+  })
+
+  it('toont −bedrag en −pp delta bij verlaging', () => {
+    const { container } = renderSheet()
+    const input = container.querySelector('input[type="number"]')!
+    fireEvent.change(input, { target: { value: '15000' } })
+    const monitor = screen.getByTestId('bijdrage-monitor')
+    expect(monitor.textContent).toMatch(/−/)
+    expect(monitor.textContent).toMatch(/5\.000/)
+    expect(monitor.textContent).toMatch(/10 pp/)
+  })
+})
+
 describe('DoelBewerkenSheet — submit', () => {
   it('roept supabase.update met current_value', async () => {
     const onClose = vi.fn()

@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Trash2 } from 'lucide-react'
+import { X, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { formatCurrency } from '@/lib/format'
 
 /**
  * DoelBewerkenSheet — quick-update flow per doel op /toekomst Doelen-tab.
@@ -80,7 +81,16 @@ export function DoelBewerkenSheet({
     router.refresh()
   }
 
-  const pct = targetValue > 0 ? Math.min(100, (Number(newValue) / targetValue) * 100) : 0
+  const parsedNew = Number(newValue)
+  const validNew = Number.isFinite(parsedNew) ? parsedNew : currentValue
+  const pct = targetValue > 0 ? Math.min(100, (validNew / targetValue) * 100) : 0
+  const oldPct = targetValue > 0 ? Math.min(100, (currentValue / targetValue) * 100) : 0
+  // Bijdrage-delta vs. originele waarde — voedt de monitor onder de input
+  // zodat de user de wijziging ziet vóór "Opslaan". Plan §6.3 "bijdrage-
+  // monitor". MVP-versie: alleen verschil-bedrag + delta in percentage-
+  // punten. Volledige bijdrage-historie blijft toekomstig werk.
+  const delta = validNew - currentValue
+  const deltaPct = pct - oldPct
 
   return (
     <div
@@ -145,17 +155,60 @@ export function DoelBewerkenSheet({
           <span className="tabular-nums">{Math.round(pct)}%</span>
         </div>
         <div
-          className="h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden mb-4"
+          className="relative h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden mb-2"
           role="progressbar"
           aria-valuenow={Math.round(pct)}
           aria-valuemin={0}
           aria-valuemax={100}
         >
+          {/* Originele waarde als spook-balk onder de nieuwe — geeft visueel
+              de delta weer (Wealthfolio-stijl bijdrage-monitor). */}
           <div
-            className="h-full bg-emerald-500 transition-all duration-300"
+            aria-hidden="true"
+            className="absolute inset-y-0 left-0 bg-emerald-200/70"
+            style={{ width: `${oldPct}%` }}
+          />
+          <div
+            className="relative h-full bg-emerald-500 transition-all duration-300"
             style={{ width: `${pct}%` }}
           />
         </div>
+
+        {/* Bijdrage-monitor — toont de wijziging vóór opslaan. Alleen
+            zichtbaar als er een delta is, zodat de standaard-state rustig
+            blijft. */}
+        {Math.round(delta) !== 0 && (
+          <div
+            data-testid="bijdrage-monitor"
+            className={`mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+              delta > 0
+                ? 'bg-emerald-50 text-emerald-800'
+                : 'bg-amber-50 text-amber-800'
+            }`}
+          >
+            {delta > 0 ? (
+              <TrendingUp className="w-3 h-3" aria-hidden="true" />
+            ) : (
+              <TrendingDown className="w-3 h-3" aria-hidden="true" />
+            )}
+            <span className="tabular-nums">
+              {delta > 0 ? '+' : '−'}{formatCurrency(Math.abs(Math.round(delta)))}
+            </span>
+            <span className="text-[var(--ink-3)]">·</span>
+            <span className="tabular-nums">
+              {deltaPct >= 0 ? '+' : '−'}{Math.abs(Math.round(deltaPct * 10) / 10)} pp
+            </span>
+          </div>
+        )}
+        {Math.round(delta) === 0 && (
+          <div
+            data-testid="bijdrage-monitor"
+            className="mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-[var(--subtle)] text-[var(--ink-3)]"
+          >
+            <Minus className="w-3 h-3" aria-hidden="true" />
+            <span>Nog geen wijziging</span>
+          </div>
+        )}
 
         {confirmDelete ? (
           <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3">
