@@ -48,9 +48,28 @@ describe('VrijheidStrip — data-staat', () => {
     expect(link).toBeTruthy()
   })
 
-  it('toont "Bekijk projectie →" CTA', () => {
+  it('toont "Bekijk →" CTA', () => {
     render(<VrijheidStrip freedomPct={50} />)
-    expect(screen.getByText('Bekijk projectie →')).toBeTruthy()
+    expect(screen.getByText('Bekijk →')).toBeTruthy()
+  })
+
+  it('toont aftelling wanneer currentAge + fireAge gegeven', () => {
+    render(
+      <VrijheidStrip freedomPct={50} currentAge={35} fireAge={52} />,
+    )
+    // 52 - 35 = 17 jaar
+    expect(screen.getByText(/17 jaar/i)).toBeTruthy()
+    expect(screen.getByText('Nog')).toBeTruthy()
+  })
+
+  it('verbergt aftelling wanneer currentAge missing', () => {
+    render(<VrijheidStrip freedomPct={50} fireAge={52} />)
+    expect(screen.queryByText('Nog')).toBeNull()
+  })
+
+  it('verbergt aftelling wanneer fireAge ≤ currentAge', () => {
+    render(<VrijheidStrip freedomPct={100} currentAge={55} fireAge={52} />)
+    expect(screen.queryByText('Nog')).toBeNull()
   })
 
   it('progressbar heeft aria-valuenow uit freedomPct', () => {

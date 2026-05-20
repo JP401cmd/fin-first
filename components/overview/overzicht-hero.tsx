@@ -267,7 +267,11 @@ export function OverzichtHero({
                 ) : (
                   <DoelenEmptyState />
                 )}
-                <VrijheidStrip freedomPct={freedomPct ?? null} />
+                <VrijheidStrip
+                  freedomPct={freedomPct ?? null}
+                  currentAge={currentAge ?? null}
+                  fireAge={fireAge ?? null}
+                />
               </>
             }
           />
@@ -278,7 +282,11 @@ export function OverzichtHero({
             ) : (
               <DoelenEmptyState />
             )}
-            <VrijheidStrip freedomPct={freedomPct ?? null} />
+            <VrijheidStrip
+                  freedomPct={freedomPct ?? null}
+                  currentAge={currentAge ?? null}
+                  fireAge={fireAge ?? null}
+                />
           </>
         )}
       </div>
