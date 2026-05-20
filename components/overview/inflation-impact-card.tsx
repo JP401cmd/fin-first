@@ -73,9 +73,9 @@ export function InflationImpactCard({
       </header>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
-        <HorizonTile years={10} value={in10} accent="amber-700" />
-        <HorizonTile years={20} value={in20} accent="amber-700" />
-        <HorizonTile years={30} value={in30} accent="amber-700" />
+        <HorizonTile years={10} value={in10} />
+        <HorizonTile years={20} value={in20} />
+        <HorizonTile years={30} value={in30} />
       </div>
 
       <label className="block">
@@ -126,20 +126,16 @@ export function InflationImpactCard({
 function HorizonTile({
   years,
   value,
-  accent,
 }: {
   years: number
   value: number
-  accent: string
 }) {
   return (
     <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-center">
       <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)]">
         Over {years} jaar
       </div>
-      <div
-        className={`font-serif text-base sm:text-lg font-semibold tabular-nums mt-0.5 text-${accent}`}
-      >
+      <div className="font-serif text-base sm:text-lg font-semibold tabular-nums mt-0.5 text-amber-700">
         {formatCurrency(Math.round(value))}
       </div>
     </div>
