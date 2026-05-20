@@ -148,9 +148,10 @@ export function WillLanding({
 
         {/* ── Sectie 0: Briefing als prominent hoofdcomponent ── */}
         <section
+          id="briefing"
           aria-label="Will's Briefing"
           data-testid="will-briefing-hero"
-          className="card-editorial overflow-hidden"
+          className="card-editorial overflow-hidden scroll-mt-20"
         >
           {/* Module-active accent (Wil-500 op /will/**) */}
           <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
