@@ -9,6 +9,8 @@ import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { useViewMode } from '@/components/app/view-mode-provider'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
+import { OnttrekkingsBewerkenSheet } from './onttrekkings-bewerken-sheet'
+import type { WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
 
 /**
  * VoorkeurenView — content voor Voorkeuren-tab op /toekomst.
@@ -68,6 +70,8 @@ export function VoorkeurenView({
         helperText: string
       }
   >(null)
+  // Aparte state voor onttrekkings-sheet (geen overlap met getal-editor).
+  const [editingOnttrekking, setEditingOnttrekking] = useState(false)
   const endStrategy = STRATEGY_LABELS[fireStrategy.strategy]
   const wsLabel = WITHDRAWAL_LABELS[withdrawalStrategy.strategy] ?? {
     name: withdrawalStrategy.strategy,
@@ -116,6 +120,7 @@ export function VoorkeurenView({
                 ? `Floor ${formatPct(withdrawalStrategy.guardrailFloor)} · Ceiling ${formatPct(withdrawalStrategy.guardrailCeiling)}`
                 : undefined
             }
+            onEdit={isPlannen ? () => setEditingOnttrekking(true) : undefined}
           />
           <VoorkeurCard
             label="Onttrekkingsvolgorde"
@@ -221,6 +226,13 @@ export function VoorkeurenView({
           currentValuePct={editing.currentValuePct}
           helperText={editing.helperText}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {editingOnttrekking && (
+        <OnttrekkingsBewerkenSheet
+          currentStrategy={withdrawalStrategy.strategy as WithdrawalStrategyType}
+          onClose={() => setEditingOnttrekking(false)}
         />
       )}
     </section>
