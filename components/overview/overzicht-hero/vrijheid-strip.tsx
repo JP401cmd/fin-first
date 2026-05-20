@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Compass } from 'lucide-react'
+import { ProgressMilestones } from '@/components/editorial/progress-milestones'
 
 /**
  * Vrijheid-strip: % op weg naar financiële vrijheid → klik naar /toekomst.
@@ -119,16 +120,7 @@ export function VrijheidStrip({
           className="h-full bg-gradient-to-r from-violet-500 to-violet-700 transition-all duration-700"
           style={{ width: `${Math.min(100, Math.max(0, freedomPct))}%` }}
         />
-        {/* Mijlpaal-markers 25/50/75% — visuele afstand-feedback,
-            consistent met DoelenView progress-bars. */}
-        {[25, 50, 75].map((mark) => (
-          <span
-            key={mark}
-            aria-hidden="true"
-            className="absolute inset-y-0 w-px bg-[var(--paper)]/80"
-            style={{ left: `${mark}%` }}
-          />
-        ))}
+        <ProgressMilestones />
       </div>
     </Link>
   )

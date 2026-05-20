@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { ProgressMilestones } from '@/components/editorial/progress-milestones'
 
 /**
  * Mini-tijdslijn-strip: horizontale balk van vandaag → vrijheidsleeftijd.
@@ -76,15 +77,7 @@ export function MiniTimelineStrip({
           className={`absolute inset-y-0 left-0 bg-gradient-to-r ${fillClass} transition-all duration-700`}
           style={{ width: `${pct}%` }}
         />
-        {/* Mijlpaal-markers — consistent met VrijheidStrip en DoelenView. */}
-        {[25, 50, 75].map((mark) => (
-          <span
-            key={mark}
-            aria-hidden="true"
-            className="absolute inset-y-0 w-px bg-[var(--paper)]/80"
-            style={{ left: `${mark}%` }}
-          />
-        ))}
+        <ProgressMilestones />
       </div>
     </Link>
   )

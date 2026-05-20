@@ -8,6 +8,7 @@ import type { GoalWithBudget } from '@/lib/will-data-loader'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
 import { DoelBewerkenSheet } from './doel-bewerken-sheet'
 import { useViewMode } from '@/components/app/view-mode-provider'
+import { ProgressMilestones } from '@/components/editorial/progress-milestones'
 
 /**
  * DoelenView — content voor de Doelen-tab op /toekomst.
@@ -190,17 +191,7 @@ export function DoelenView({
                   } transition-all duration-700`}
                   style={{ width: `${pct}%` }}
                 />
-                {/* Mijlpaal-markers 25/50/75% — geven gevoel van afstand
-                    zonder dat de gebruiker percentages hoeft te interpreteren.
-                    Wealthfolio-stijl: subtiele witte verticale lijntjes. */}
-                {[25, 50, 75].map((mark) => (
-                  <span
-                    key={mark}
-                    aria-hidden="true"
-                    className="absolute inset-y-0 w-px bg-[var(--paper)]/70"
-                    style={{ left: `${mark}%` }}
-                  />
-                ))}
+                <ProgressMilestones className="bg-[var(--paper)]/70" />
               </div>
               <div className="flex items-center justify-between gap-2 text-[11px]">
                 <span className="text-[var(--ink-3)] tabular-nums">{pct}%</span>
