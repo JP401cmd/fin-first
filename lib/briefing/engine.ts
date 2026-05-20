@@ -49,6 +49,23 @@ function pillarToHefboom(pillarId: string): HefboomTag | undefined {
 
 /** Recommendation-type → hefboom-tag. Voorlopig conservatief: alleen
  *  duidelijke 1-op-1 categorieën taggen. */
+/** Impact-extractor — leest de freedom_days en EUR-effect uit een
+ *  recommendation zodat de BriefingCard dezelfde dual-unit-badge toont
+ *  als TipsLijst ("Geld is opgeslagen tijd"). Wanneer yearly ontbreekt
+ *  rekenen we maandelijks × 12 om. */
+function impactFromRecommendation(
+  rec: BriefingEngineInput['recommendations'][number],
+): { freedomDaysPerYear?: number | null; euroPerYear?: number | null } | undefined {
+  const days = rec.freedom_days_per_year
+  const yearly =
+    rec.euro_impact_yearly ??
+    (rec.euro_impact_monthly != null ? rec.euro_impact_monthly * 12 : null)
+  const hasDays = days != null && days > 0
+  const hasEuro = yearly != null && yearly > 0
+  if (!hasDays && !hasEuro) return undefined
+  return { freedomDaysPerYear: days, euroPerYear: yearly }
+}
+
 function recommendationToHefboom(recType: string | null | undefined): HefboomTag | undefined {
   if (!recType) return undefined
   if (recType.includes('savings') || recType.includes('budget') || recType.includes('cashflow')) {
@@ -131,6 +148,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
       text: firstRec.title,
       href: '/overzicht',
       hefboom: recommendationToHefboom(firstRec.recommendation_type),
+      impact: impactFromRecommendation(firstRec),
     })
   }
 
@@ -142,6 +160,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
       category: 'tip',
       text: secondRec.title,
       href: '/overzicht',
+      impact: impactFromRecommendation(secondRec),
       hefboom: recommendationToHefboom(secondRec.recommendation_type),
     })
   }

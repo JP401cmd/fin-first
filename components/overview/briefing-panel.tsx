@@ -77,6 +77,14 @@ export interface BriefingEntry {
    *  Bij cross-hefboom inzichten (bv. FIRE-progress, fysiek vermogen
    *  totaal) blijft het veld undefined. */
   hefboom?: HefboomTag
+  /** Optionele impact-metadata. Tip/observation-entries die uit een
+   *  recommendation komen krijgen hier de freedom-days + EUR-effect
+   *  meegestuurd zodat de card dezelfde dual-unit-badges toont als
+   *  TipsLijst ("Geld is opgeslagen tijd"). */
+  impact?: {
+    freedomDaysPerYear?: number | null
+    euroPerYear?: number | null
+  }
 }
 
 const CATEGORY_CONFIG: Record<
@@ -177,6 +185,31 @@ function BriefingNarrative({ text }: { text: string }) {
   )
 }
 
+function BriefingImpactBadge({
+  impact,
+}: {
+  impact?: BriefingEntry['impact']
+}) {
+  if (!impact) return null
+  const eur = impact.euroPerYear
+  const days = impact.freedomDaysPerYear
+  const hasEur = eur != null && eur > 0
+  const hasDays = days != null && days > 0
+  if (!hasEur && !hasDays) return null
+  return (
+    <div className="mt-2 inline-flex items-center gap-2 text-[10px] text-[var(--ink-3)]">
+      {hasEur && (
+        <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-1.5 py-0.5 font-semibold tabular-nums">
+          +€{Math.round(eur).toLocaleString('nl-NL')}/jr
+        </span>
+      )}
+      {hasDays && (
+        <span className="tabular-nums">+{Math.round(days)} dagen vrijheid/jr</span>
+      )}
+    </div>
+  )
+}
+
 function BriefingCard({ entry }: { entry: BriefingEntry }) {
   const config = CATEGORY_CONFIG[entry.category]
   const Icon = config.Icon
@@ -204,6 +237,7 @@ function BriefingCard({ entry }: { entry: BriefingEntry }) {
         <Icon className="w-3.5 h-3.5 text-[var(--ink-4)] ml-auto" aria-hidden="true" />
       </div>
       <p className="text-sm text-[var(--ink-2)] leading-snug">{entry.text}</p>
+      <BriefingImpactBadge impact={entry.impact} />
     </>
   )
 
