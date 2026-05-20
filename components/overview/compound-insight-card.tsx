@@ -1,5 +1,8 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
-import { TrendingUp, ArrowRight } from 'lucide-react'
+import { TrendingUp, ArrowRight, Plus } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { compareCompound } from '@/lib/compound-projection'
 
@@ -29,12 +32,16 @@ export function CompoundInsightCard({
 }: {
   /** Huidig liquide cash dat NU op spaarrekening staat. */
   liquidCash: number
-  /** Maandelijkse extra inleg (optioneel). Default 0. */
+  /** Initiële maandelijkse inleg (slider-startwaarde). Default 0. */
   monthlyContribution?: number
 }) {
+  // Interactieve slider-state: user kan inleg variëren tussen €0 en €1000/mnd
+  // om het compound-effect dynamisch te ervaren.
+  const [monthly, setMonthly] = useState(monthlyContribution)
+
   const result = compareCompound({
     principal: liquidCash,
-    monthlyContribution,
+    monthlyContribution: monthly,
     years: HORIZON_YEARS,
     conservativeRate: CONSERVATIVE_RATE,
     ambitiousRate: AMBITIOUS_RATE,
@@ -64,6 +71,40 @@ export function CompoundInsightCard({
           </h3>
         </div>
       </header>
+
+      {/* Interactieve slider — user past maandelijkse inleg aan en ziet
+          de twee balken live updaten. Hands-on betrokkenheid maakt
+          compound interest tastbaarder dan een statisch getal. */}
+      <div className="mt-4 mb-1">
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <label
+            htmlFor="compound-monthly"
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--ink-2)]"
+          >
+            <Plus className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+            Extra €/maand inleggen
+          </label>
+          <span className="font-serif font-semibold text-emerald-700 tabular-nums text-sm">
+            {formatCurrency(monthly)}/mnd
+          </span>
+        </div>
+        <input
+          id="compound-monthly"
+          type="range"
+          min={0}
+          max={1000}
+          step={25}
+          value={monthly}
+          onChange={(e) => setMonthly(Number(e.target.value))}
+          className="w-full accent-emerald-600 cursor-pointer"
+          aria-label="Maandelijkse extra inleg"
+        />
+        <div className="flex justify-between text-[9px] text-[var(--ink-4)] mt-0.5">
+          <span>€ 0</span>
+          <span>€ 500</span>
+          <span>€ 1.000</span>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:gap-6 items-end mb-3 mt-4 min-h-[120px]">
         <div className="flex flex-col items-center">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { CompoundInsightCard } from './compound-insight-card'
 
 describe('CompoundInsightCard — render', () => {
@@ -44,5 +44,41 @@ describe('CompoundInsightCard — render', () => {
     // 0.5% en 7% — card toont hem dus.
     render(<CompoundInsightCard liquidCash={0} monthlyContribution={500} />)
     expect(screen.getByText(/samengestelde rente/i)).toBeTruthy()
+  })
+})
+
+describe('CompoundInsightCard — interactieve slider', () => {
+  it('toont slider met label "Extra €/maand inleggen"', () => {
+    render(<CompoundInsightCard liquidCash={20_000} />)
+    expect(screen.getByText(/Extra €\/maand inleggen/i)).toBeTruthy()
+    expect(screen.getByRole('slider')).toBeTruthy()
+  })
+
+  it('slider default = 0 wanneer monthlyContribution niet meegegeven', () => {
+    render(<CompoundInsightCard liquidCash={20_000} />)
+    const slider = screen.getByRole('slider') as HTMLInputElement
+    expect(slider.value).toBe('0')
+  })
+
+  it('slider default = monthlyContribution prop wanneer aanwezig', () => {
+    render(<CompoundInsightCard liquidCash={20_000} monthlyContribution={250} />)
+    const slider = screen.getByRole('slider') as HTMLInputElement
+    expect(slider.value).toBe('250')
+  })
+
+  it('wijziging via slider update bedrag-display', () => {
+    const { container } = render(<CompoundInsightCard liquidCash={20_000} />)
+    const slider = screen.getByRole('slider')
+    fireEvent.change(slider, { target: { value: '500' } })
+    // Display "€500/mnd" verschijnt direct
+    expect(container.textContent).toMatch(/€\s*500.*\/mnd/)
+  })
+
+  it('slider heeft range 0-1000 met step=25', () => {
+    render(<CompoundInsightCard liquidCash={20_000} />)
+    const slider = screen.getByRole('slider')
+    expect(slider.getAttribute('min')).toBe('0')
+    expect(slider.getAttribute('max')).toBe('1000')
+    expect(slider.getAttribute('step')).toBe('25')
   })
 })
