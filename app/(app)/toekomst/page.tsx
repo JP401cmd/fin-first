@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { loadWillData } from '@/lib/will-data-loader'
+import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstTabs } from '@/components/future/toekomst-tabs'
 import { DoelenView } from '@/components/future/doelen-view'
@@ -32,14 +33,22 @@ export const metadata: Metadata = {
  */
 export default async function ToekomstPage() {
   const supabase = await createClient()
-  const [horizonData, willData] = await Promise.all([
+  const [horizonData, willData, dashboardResult] = await Promise.all([
     loadHorizonData(supabase),
     loadWillData(supabase),
+    loadDashboardData(supabase),
   ])
   // currentAge afgeleid uit DOB voor ScenarioBibliotheek-defaults
   // (target_age = currentAge + N jaar). Null wanneer DOB ontbreekt.
   const dob = horizonData.effectiveInput?.dateOfBirth ?? null
   const currentAge = dob ? Math.round(ageAtDate(dob)) : null
+
+  // simRows + fireAge voor AfbouwOverzichtCard in VoorkeurenView (plan F-2).
+  const simRows = dashboardResult.dashboardData.simRows ?? null
+  const fireAge =
+    dashboardResult.dashboardData.fireAgeFractional != null
+      ? Math.round(dashboardResult.dashboardData.fireAgeFractional)
+      : null
   return (
     <ToekomstTabs
       tijdasView={<HorizonPage initialData={horizonData} />}
@@ -64,6 +73,8 @@ export default async function ToekomstPage() {
           fireParams={horizonData.fireParams}
           fireStrategy={horizonData.fireStrategy}
           withdrawalStrategy={horizonData.withdrawalStrategy}
+          fireAge={fireAge}
+          simRows={simRows}
         />
       }
     />

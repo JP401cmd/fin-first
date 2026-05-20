@@ -12,6 +12,7 @@ import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
 import { OnttrekkingsBewerkenSheet } from './onttrekkings-bewerken-sheet'
 import { EindstrategieBewerkenSheet } from './eindstrategie-bewerken-sheet'
+import { AfbouwOverzichtCard } from './afbouw-overzicht-card'
 import type { WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 
@@ -57,10 +58,16 @@ export function VoorkeurenView({
   fireParams,
   fireStrategy,
   withdrawalStrategy,
+  fireAge,
+  simRows,
 }: {
   fireParams: FireParams
   fireStrategy: FireStrategyConfig
   withdrawalStrategy: WithdrawalStrategyConfig
+  /** Vrijheidsleeftijd (gerond) voor AfbouwOverzichtCard. */
+  fireAge?: number | null
+  /** Per-jaar projectie uit runUnifiedProjection — voor eindsaldo-berekening. */
+  simRows?: { age: number; endPortfolio: number }[] | null
 }) {
   const { isPlannen } = useViewMode()
   // Inline-editor state — welke voorkeur wordt momenteel bewerkt.
@@ -232,6 +239,23 @@ export function VoorkeurenView({
           ? 'Klik op Eindstrategie, Onttrekking, Inflatie of Rendement om snel bij te werken. Andere voorkeuren via /identity/parameters.'
           : 'Activeer Plannen-modus voor inline-editor. Of bewerk via /identity/parameters.'}
       </p>
+
+      {/* Plan F-2: Afbouw-overzicht — eindsaldo bij fireAge vs endAge.
+          Toont gebruiker de cijfer-impact van zijn strategie zonder
+          volle tijdas-chart te vereisen. */}
+      {fireAge != null && simRows && simRows.length > 0 && (() => {
+        const fireRow = simRows.find((r) => r.age === fireAge) ?? simRows[0]
+        const endRow = simRows.find((r) => r.age === fireStrategy.endAge) ?? simRows[simRows.length - 1]
+        return (
+          <AfbouwOverzichtCard
+            fireAge={fireAge}
+            endAge={fireStrategy.endAge}
+            fireAgeBalance={fireRow?.endPortfolio ?? null}
+            endBalance={endRow?.endPortfolio ?? null}
+            strategy={fireStrategy.strategy}
+          />
+        )
+      })()}
 
       {editing && (
         <VoorkeurBewerkenSheet
