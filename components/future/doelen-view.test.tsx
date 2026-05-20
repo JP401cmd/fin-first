@@ -43,10 +43,11 @@ function mockGoal(overrides: Partial<GoalWithBudget> = {}): GoalWithBudget {
 }
 
 describe('DoelenView — basis-render', () => {
-  it('rendert empty-state CTA wanneer geen doelen', () => {
+  it('rendert empty-state met hint in Kijken-modus', () => {
+    // Default useViewMode → isPlannen=false → italic Plannen-modus-hint.
     render(<DoelenView goals={[]} goalProgresses={[]} />)
     expect(screen.getByText('Nog geen doelen')).toBeTruthy()
-    expect(screen.getByText('Eerste doel formuleren')).toBeTruthy()
+    expect(screen.getByText(/Activeer Plannen-modus/)).toBeTruthy()
   })
 
   it('rendert doel-cards met naam en bedragen', () => {

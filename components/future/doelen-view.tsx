@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { Target, ArrowRight, Pencil } from 'lucide-react'
+import { Target, Pencil } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
@@ -99,13 +98,10 @@ export function DoelenView({
           {isPlannen ? (
             <DoelToevoegenSheet />
           ) : (
-            <Link
-              href="/will#goals"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
-            >
-              Eerste doel formuleren
-              <ArrowRight className="w-4 h-4" aria-hidden="true" />
-            </Link>
+            <p className="text-xs italic text-[var(--ink-3)]">
+              Activeer Plannen-modus rechtsboven om je eerste doel toe te
+              voegen.
+            </p>
           )}
         </article>
       </section>
