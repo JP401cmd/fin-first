@@ -4,6 +4,8 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { BelastingOverzichtStrip } from '@/components/overview/belasting-overzicht-strip'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
+import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { PAGE_INFO } from '@/lib/page-info-content'
 import BelastingPage from '../../core/belasting/page'
 
 export const metadata: Metadata = {
@@ -50,6 +52,12 @@ export default async function OverzichtBelastingPage() {
   return (
     <>
       <NavStackMeta title="Belasting" bottomBar={{ kind: 'tabs' }} />
+      <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <PageInfoButton
+          description={PAGE_INFO['/overzicht/belasting'] ?? ''}
+          className="absolute right-4 top-4 sm:right-6"
+        />
+      </div>
       <BelastingOverzichtStrip
         box1Tax={box1Tax}
         box2Tax={null}

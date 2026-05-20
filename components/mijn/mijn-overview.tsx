@@ -11,6 +11,8 @@ import {
   ArrowRight,
   type LucideIcon,
 } from 'lucide-react'
+import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 /**
  * MijnOverview — kaart-grid op /mijn root die de 8 sub-routes
@@ -101,8 +103,12 @@ const ROUTES: SubRoute[] = [
 
 export function MijnOverview() {
   return (
-    <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
-      <header className="mb-6">
+    <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
+      <PageInfoButton
+        description={PAGE_INFO['/mijn'] ?? ''}
+        className="absolute right-4 top-6 sm:right-6 sm:top-8"
+      />
+      <header className="mb-6 pr-12 sm:pr-16">
         <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
           Mijn TriFinity
         </div>

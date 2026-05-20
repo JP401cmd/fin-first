@@ -7,6 +7,8 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { BezittingenFilter } from '@/components/overview/bezittingen-filter'
 import { CompoundInsightCard } from '@/components/overview/compound-insight-card'
 import { BezittingenOverzichtStrip } from '@/components/overview/bezittingen-overzicht-strip'
+import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
   title: 'Bezittingen — TriFinity',
@@ -66,6 +68,12 @@ export default async function OverzichtBezittingenPage() {
   return (
     <>
       <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
+      <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <PageInfoButton
+          description={PAGE_INFO['/overzicht/bezittingen'] ?? ''}
+          className="absolute right-4 top-4 sm:right-6"
+        />
+      </div>
       <BezittingenOverzichtStrip
         cashTotal={cashTotal}
         investmentTotal={investmentTotal}
