@@ -171,7 +171,7 @@ export function DoelenView({
                 </span>
               </div>
               <div
-                className="h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden mb-1"
+                className="relative h-1.5 rounded-full bg-[var(--subtle)] overflow-hidden mb-1"
                 role="progressbar"
                 aria-valuenow={pct}
                 aria-valuemin={0}
@@ -190,6 +190,17 @@ export function DoelenView({
                   } transition-all duration-700`}
                   style={{ width: `${pct}%` }}
                 />
+                {/* Mijlpaal-markers 25/50/75% — geven gevoel van afstand
+                    zonder dat de gebruiker percentages hoeft te interpreteren.
+                    Wealthfolio-stijl: subtiele witte verticale lijntjes. */}
+                {[25, 50, 75].map((mark) => (
+                  <span
+                    key={mark}
+                    aria-hidden="true"
+                    className="absolute inset-y-0 w-px bg-[var(--paper)]/70"
+                    style={{ left: `${mark}%` }}
+                  />
+                ))}
               </div>
               <div className="flex items-center justify-between gap-2 text-[11px]">
                 <span className="text-[var(--ink-3)] tabular-nums">{pct}%</span>

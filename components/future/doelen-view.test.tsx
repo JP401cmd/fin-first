@@ -140,6 +140,27 @@ describe('DoelenView — basis-render', () => {
     expect(bar?.getAttribute('aria-valuenow')).toBe('40')
   })
 
+  it('rendert mijlpaal-markers op 25/50/75% van progressbar', () => {
+    const { container } = render(
+      <DoelenView
+        goals={[mockGoal()]}
+        goalProgresses={[
+          { current: 20000, target: 50000, pct: 40, onTrack: false, eta: null },
+        ]}
+      />,
+    )
+    const bar = container.querySelector('[role="progressbar"]')
+    expect(bar).toBeTruthy()
+    // Drie aria-hidden mijlpaal-spans als directe children
+    const markers = bar?.querySelectorAll('span[aria-hidden="true"]')
+    expect(markers?.length).toBe(3)
+    // Posities 25%, 50%, 75%
+    const positions = Array.from(markers ?? []).map((s) =>
+      (s as HTMLElement).style.left,
+    )
+    expect(positions).toEqual(['25%', '50%', '75%'])
+  })
+
   it('toont aantal doelen in header', () => {
     render(
       <DoelenView
