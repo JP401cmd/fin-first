@@ -14,6 +14,23 @@ import { EVENT_ICONS } from './log-timeline'
  *  tijdas zonder de bestaande klik-flow te breken. */
 const DRAG_PROMOTE_THRESHOLD_PX = 6
 
+/** Snap-precisie tijdens drag — 0.25 jaar = kwartaal. Geeft een
+ *  smoother visueel gedrag dan integer-snapping zonder dat we het
+ *  schema hoeven aan te passen (persisten gebeurt nog altijd
+ *  als integer-jaar via Math.round in de host). */
+const DRAG_SNAP_INCREMENT = 0.25
+
+function snapAge(age: number): number {
+  return Math.round(age / DRAG_SNAP_INCREMENT) * DRAG_SNAP_INCREMENT
+}
+
+function formatAgeYearsMonths(age: number): { years: number; months: number } {
+  const snapped = snapAge(age)
+  const years = Math.floor(snapped)
+  const months = Math.round((snapped - years) * 12)
+  return { years, months }
+}
+
 // ── Layout-constanten ────────────────────────────────────────
 //
 // Marker-cirkel-radius en stack-spacing. We renderen markers in de PAD.top
@@ -141,13 +158,18 @@ export function ChartEventMarkers({
         if (p.stackIndex >= MAX_STACK_VISIBLE) return null // gemarkeerd als cluster hieronder
         // F-1: tijdens actieve drag overschrijft de pointer-positie de
         // pre-computed cx zodat de marker met de cursor meebeweegt.
+        // Snap visueel naar kwartaal-precisie zodat de marker niet
+        // jittert op sub-3-maand-niveau.
         const isDragging = drag?.id === p.id && drag?.moved
         const cxBase = padLeft + xScale(p.age)
         const cx = isDragging
-          ? Math.max(
-              padLeft + xScale(visibleMinAge),
-              Math.min(padLeft + xScale(visibleMaxAge), drag!.currentX),
-            )
+          ? (() => {
+              const minX = padLeft + xScale(visibleMinAge)
+              const maxX = padLeft + xScale(visibleMaxAge)
+              const clampedX = Math.max(minX, Math.min(maxX, drag!.currentX))
+              const snappedAge = snapAge(invXScale(clampedX - padLeft))
+              return padLeft + xScale(snappedAge)
+            })()
           : cxBase
         const isAbove = p.side === 'above'
 
@@ -310,23 +332,37 @@ export function ChartEventMarkers({
                 Vervangt visueel de standaard hover-tooltip zodat het jaar
                 waar je naartoe sleept altijd duidelijk leesbaar is. */}
             {isDragging && (() => {
-              const projectedAge = Math.round(invXScale(cx - padLeft))
-              const delta = projectedAge - p.age
-              const hasDelta = delta !== 0
-              const tooltipW = 130
+              const rawAge = invXScale(cx - padLeft)
+              const snappedAge = snapAge(rawAge)
+              const ym = formatAgeYearsMonths(snappedAge)
+              const ageLabel =
+                ym.months === 0 ? `${ym.years} jaar` : `${ym.years} jr ${ym.months} mnd`
+              // Delta in maanden voor precieze feedback.
+              const deltaMonths = Math.round((snappedAge - p.age) * 12)
+              const hasDelta = deltaMonths !== 0
+              const tooltipW = 140
               const tooltipH = hasDelta ? 42 : 30
               const tx = Math.max(2, cx - tooltipW / 2)
               const ty = isAbove
                 ? Math.max(2, cy - r - tooltipH - 4)
                 : cy + r + 4
               const txCenter = Math.max(2 + tooltipW / 2, cx)
+              const deltaAbs = Math.abs(deltaMonths)
+              const deltaYearsPart = Math.floor(deltaAbs / 12)
+              const deltaMonthsPart = deltaAbs % 12
+              const deltaUnit =
+                deltaYearsPart === 0
+                  ? `${deltaMonthsPart} mnd`
+                  : deltaMonthsPart === 0
+                    ? `${deltaYearsPart} jr`
+                    : `${deltaYearsPart}j ${deltaMonthsPart}m`
               const deltaText =
-                delta > 0
-                  ? `+${delta} jaar later`
-                  : delta < 0
-                    ? `${Math.abs(delta)} jaar eerder`
+                deltaMonths > 0
+                  ? `+${deltaUnit} later`
+                  : deltaMonths < 0
+                    ? `${deltaUnit} eerder`
                     : ''
-              const deltaColor = delta > 0 ? '#fbbf24' : '#34d399' // amber-400 / emerald-400
+              const deltaColor = deltaMonths > 0 ? '#fbbf24' : '#34d399' // amber-400 / emerald-400
               return (
                 <g style={{ pointerEvents: 'none' }}>
                   <rect
@@ -356,7 +392,7 @@ export function ChartEventMarkers({
                     fill="var(--paper)"
                     fontFamily="var(--font-dm-mono, monospace)"
                   >
-                    {projectedAge} jaar
+                    {ageLabel}
                   </text>
                   {hasDelta && (
                     <text
