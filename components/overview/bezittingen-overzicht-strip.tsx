@@ -33,7 +33,7 @@ const CATEGORIES = [
   },
   {
     key: 'pensioen' as const,
-    label: 'Pensioen',
+    label: 'Pensioen + overig',
     iconName: 'Hourglass',
     href: '/overzicht/bezittingen/retirement',
   },
@@ -94,12 +94,17 @@ export function BezittingenOverzichtStrip({
           const value = totals[key]
           const pct = grandTotal > 0 ? Math.round((value / grandTotal) * 100) : 0
           const count = counts?.[key] ?? 0
+          // Speciale meta-tekst voor de Pensioen + overig-tegel zodat de
+          // gebruiker weet dat hier meer dan alleen pensioen-instrumenten
+          // in zitten (auto, inboedel, deelneming, vordering, overig).
+          const baseEmpty =
+            key === 'pensioen' ? 'Pensioen en overige bezittingen' : 'Nog geen bezittingen'
           const meta =
             value > 0
               ? count > 0
                 ? `${count} item${count === 1 ? '' : 's'} · ${pct}% van totaal`
                 : `${pct}% van totaal`
-              : 'Nog geen bezittingen'
+              : baseEmpty
           return (
             <CategoryCard
               key={key}

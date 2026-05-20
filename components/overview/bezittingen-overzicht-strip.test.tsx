@@ -34,7 +34,7 @@ describe('BezittingenOverzichtStrip — render', () => {
     expect(screen.getByText('Cash + spaargeld')).toBeTruthy()
     expect(screen.getByText('Beleggen')).toBeTruthy()
     expect(screen.getByText('Eigen huis')).toBeTruthy()
-    expect(screen.getByText('Pensioen')).toBeTruthy()
+    expect(screen.getByText('Pensioen + overig')).toBeTruthy()
   })
 
   it('toont totaal vermogen in header', () => {
@@ -64,7 +64,7 @@ describe('BezittingenOverzichtStrip — render', () => {
     expect(container.textContent).toMatch(/100% van totaal/i)
   })
 
-  it('toont fallback-tekst voor categorie met 0 waarde', () => {
+  it('toont fallback-tekst voor lege bezittingen-categorieën', () => {
     render(
       <BezittingenOverzichtStrip
         cashTotal={50_000}
@@ -73,9 +73,12 @@ describe('BezittingenOverzichtStrip — render', () => {
         pensioenTotal={0}
       />,
     )
-    // Drie andere categorieën met 0 → CategoryCard krijgt meta "Nog geen
-    // bezittingen". Verschijnt 3× (één per lege categorie).
-    expect(screen.getAllByText(/Nog geen bezittingen/i).length).toBe(3)
+    // Beleggen + Eigen huis: meta "Nog geen bezittingen" (2× verwacht).
+    // Pensioen + overig: meta "Pensioen en overige bezittingen" (eigen
+    // tekst zodat de gebruiker weet dat de tegel meer dan pensioen
+    // omvat).
+    expect(screen.getAllByText(/Nog geen bezittingen/i).length).toBe(2)
+    expect(screen.getByText(/Pensioen en overige bezittingen/i)).toBeTruthy()
   })
 
   it('linkt naar sub-routes per categorie', () => {

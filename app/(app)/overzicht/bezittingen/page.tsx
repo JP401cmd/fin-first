@@ -49,23 +49,24 @@ export default async function OverzichtBezittingenPage() {
   // Hergebruikt asset_type-mapping uit horizon-data-loader.
   //
   // Mapping van 13 asset_types naar 4 categorie-tegels:
-  //   Cash       : cash, savings (+ unlinkedCash uit bank-koppelingen)
-  //   Beleggen   : investment, crypto, vehicle, physical, deelneming,
-  //                vordering, other — alle "groei/restant" valt hier
-  //   Eigen huis : eigen_huis, real_estate (netto: waarde − hypotheek)
-  //   Pensioen   : retirement, levensverzekering
+  //   Cash + spaargeld   : cash, savings (+ unlinkedCash uit bank-koppelingen)
+  //   Beleggen           : investment, crypto
+  //   Eigen huis         : eigen_huis, real_estate (netto: waarde − hypotheek)
+  //   Pensioen + overig  : retirement, levensverzekering, vehicle, physical,
+  //                        deelneming, vordering, other — pensioen-instrumenten
+  //                        plus alle restcategorieën
   //
-  // Beleggen vangt bewust de 5 restcategorieën zodat de 4-tegel-grammar
-  // intact blijft en het totaal-vermogen in de header 1-op-1 klopt.
+  // De 4e tegel bundelt pensioen + de 5 rest-asset-types zodat het totaal-
+  // vermogen in de header 1-op-1 klopt met de som van alle assets.
   const assets = horizonData?.assets ?? []
   function sumByTypes(types: string[]): number {
     return assets
       .filter((a) => types.includes(a.asset_type ?? ''))
       .reduce((s, a) => s + Number(a.current_value ?? 0), 0)
   }
-  const INVESTMENT_TYPES = [
-    'investment',
-    'crypto',
+  const PENSIOEN_OVERIG_TYPES = [
+    'retirement',
+    'levensverzekering',
     'vehicle',
     'physical',
     'deelneming',
@@ -73,19 +74,17 @@ export default async function OverzichtBezittingenPage() {
     'other',
   ]
   const cashTotal = (horizonData?.unlinkedCash ?? 0) + sumByTypes(['cash', 'savings', 'checking'])
-  const investmentTotal = sumByTypes(INVESTMENT_TYPES)
-  // FeeImpactCard is specifiek over beheerkosten op belegd vermogen
-  // (ETF/aandelen/crypto). Voertuig, inboedel, deelnemingen en
-  // vorderingen vallen daar conceptueel buiten — die hebben geen
-  // beheerkosten in de Empower-zin. Gebruik daarom een striktere subset
-  // voor de fee-drempel.
-  const beleggenForFee = sumByTypes(['investment', 'crypto'])
+  const investmentTotal = sumByTypes(['investment', 'crypto'])
   // Eigen huis netto: woning-waarde minus hypotheek-balans uit
   // housingContext (al voorberekend in horizon-data-loader).
   const housingTotal = horizonData?.housingContext
     ? Math.max(0, horizonData.housingContext.eigenHuisValue - horizonData.housingContext.mortgageBalance)
     : sumByTypes(['eigen_huis', 'real_estate'])
-  const pensioenTotal = sumByTypes(['retirement', 'levensverzekering'])
+  const pensioenTotal = sumByTypes(PENSIOEN_OVERIG_TYPES)
+  // FeeImpactCard is specifiek over beheerkosten op belegd vermogen
+  // (ETF/aandelen/crypto) — gebruikt daarom dezelfde investmentTotal,
+  // los van de Beleggen-tegel.
+  const beleggenForFee = investmentTotal
 
   // Item-tellingen per categorie voor CategoryCard.meta. unlinkedCash telt
   // als 1 logisch item zodra het > 0 is (alle ongekoppelde rekeningen
@@ -95,9 +94,9 @@ export default async function OverzichtBezittingenPage() {
   }
   const counts = {
     cash: countByTypes(['cash', 'savings', 'checking']) + ((horizonData?.unlinkedCash ?? 0) > 0 ? 1 : 0),
-    investment: countByTypes(INVESTMENT_TYPES),
+    investment: countByTypes(['investment', 'crypto']),
     eigen_huis: countByTypes(['eigen_huis', 'real_estate']),
-    pensioen: countByTypes(['retirement', 'levensverzekering']),
+    pensioen: countByTypes(PENSIOEN_OVERIG_TYPES),
   }
 
   // Liquide cash voor CompoundInsightCard — zelfde subset als cashTotal,
