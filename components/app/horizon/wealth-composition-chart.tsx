@@ -143,6 +143,16 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   const minAge = visibleMinAge ?? currentAge
   const maxAge = visibleMaxAge ?? endAge
 
+  // Early-return wanneer er geen data is. Voorkomt dat we een lege
+  // SVG renderen + voorziet de gebruiker van een rustige status-tekst.
+  if (stackedRows.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px] text-sm text-[var(--ink-3)] italic">
+        Geen gegevens beschikbaar
+      </div>
+    )
+  }
+
   // Filter rows to visible range
   const visibleRows = stackedRows.filter(r => r.age >= minAge && r.age <= maxAge)
 
