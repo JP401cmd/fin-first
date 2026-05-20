@@ -146,7 +146,9 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
       id: 'observation:' + firstRec.id,
       category: 'observation',
       text: firstRec.title,
-      href: '/overzicht',
+      // Direct naar /overzicht/tips zodat de gebruiker meteen actie kan
+      // ondernemen (i.p.v. eerst weer op /overzicht te landen).
+      href: '/overzicht/tips',
       hefboom: recommendationToHefboom(firstRec.recommendation_type),
       impact: impactFromRecommendation(firstRec),
     })
@@ -159,7 +161,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
       id: 'tip:' + secondRec.id,
       category: 'tip',
       text: secondRec.title,
-      href: '/overzicht',
+      href: '/overzicht/tips',
       impact: impactFromRecommendation(secondRec),
       hefboom: recommendationToHefboom(secondRec.recommendation_type),
     })
