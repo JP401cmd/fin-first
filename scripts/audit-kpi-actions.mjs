@@ -52,6 +52,9 @@ const ACTION_PATTERNS = [
   /onClick=\{/,
   /onEdit=/,
   /onToggle=/,
+  // Interactieve form-controls (slider, dropdown, input) tellen ook als
+  // actie — de gebruiker stuurt de visualisatie ermee bij.
+  /onChange=\{/,
 ]
 
 /**

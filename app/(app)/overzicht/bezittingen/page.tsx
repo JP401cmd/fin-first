@@ -6,6 +6,7 @@ import AssetsPage from '@/components/core/assets-client'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { BezittingenFilter } from '@/components/overview/bezittingen-filter'
 import { CompoundInsightCard } from '@/components/overview/compound-insight-card'
+import { FeeImpactCard } from '@/components/overview/fee-impact-card'
 import { BezittingenOverzichtStrip } from '@/components/overview/bezittingen-overzicht-strip'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -97,6 +98,11 @@ export default async function OverzichtBezittingenPage() {
       {liquidCash >= 10_000 && (
         <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
           <CompoundInsightCard liquidCash={liquidCash} />
+        </section>
+      )}
+      {investmentTotal >= 25_000 && (
+        <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+          <FeeImpactCard investmentTotal={investmentTotal} />
         </section>
       )}
       <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
