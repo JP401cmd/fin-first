@@ -13,6 +13,7 @@ import { CashflowKalender } from '@/components/overview/cashflow-kalender'
 import { CashflowForecast } from '@/components/overview/cashflow-forecast'
 import { CashflowSankey } from '@/components/overview/cashflow-sankey'
 import { InflationImpactCard } from '@/components/overview/inflation-impact-card'
+import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-banner'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import type { RecurringTransaction } from '@/lib/recurring-data'
@@ -62,6 +63,7 @@ export default async function OverzichtCashflowPage() {
   let baselineIncome = 0
   let baselineExpenses = 0
   let startingBalance = 0
+  let accountCount = 0
   if (user) {
     const since = new Date()
     since.setMonth(since.getMonth() - 3)
@@ -74,7 +76,10 @@ export default async function OverzichtCashflowPage() {
     const [txResult, profileResult, recurResult, baselineResult, accountsResult] = await Promise.all([
       supabase
         .from('transactions')
-        .select('id, date, description, category, amount, accounts(name)')
+        // De transactions-tabel heeft geen `category`-kolom; categorie
+        // komt uit budget_id-join. account-naam komt uit
+        // bank_accounts-join (de FK heet account_id → bank_accounts.id).
+        .select('id, date, description, amount, bank_accounts(name), budgets(name)')
         .eq('user_id', user.id)
         .gte('date', since.toISOString().split('T')[0])
         .order('date', { ascending: false })
@@ -94,7 +99,7 @@ export default async function OverzichtCashflowPage() {
       // Liquide saldo voor cumulatief-startpunt
       supabase
         .from('bank_accounts')
-        .select('balance')
+        .select('id, balance, name')
         .eq('user_id', user.id)
         .eq('is_active', true),
     ])
@@ -109,20 +114,26 @@ export default async function OverzichtCashflowPage() {
     }
     baselineIncome = Math.round(totalIncome / 6)
     baselineExpenses = Math.round(totalExpenses / 6)
-    startingBalance = (accountsResult.data ?? []).reduce(
-      (s, a) => s + Number((a as { balance: number }).balance ?? 0),
+    const accountsRows = (accountsResult.data ?? []) as { id: string; balance: number; name: string }[]
+    startingBalance = accountsRows.reduce(
+      (s, a) => s + Number(a.balance ?? 0),
       0,
     )
+    accountCount = accountsRows.length
     transactions = (txResult.data ?? []).map((t) => {
-      const accountField = (t as { accounts?: { name?: string } | { name?: string }[] | null }).accounts
-      const accountName = Array.isArray(accountField)
-        ? accountField[0]?.name
-        : accountField?.name
+      const bankField = (t as { bank_accounts?: { name?: string } | { name?: string }[] | null }).bank_accounts
+      const accountName = Array.isArray(bankField)
+        ? bankField[0]?.name
+        : bankField?.name
+      const budgetField = (t as { budgets?: { name?: string } | { name?: string }[] | null }).budgets
+      const categoryName = Array.isArray(budgetField)
+        ? budgetField[0]?.name
+        : budgetField?.name
       return {
         id: String(t.id),
         date: String(t.date),
         description: String(t.description ?? ''),
-        category: (t as { category?: string | null }).category ?? null,
+        category: categoryName ?? null,
         amount: Number(t.amount),
         account_name: accountName ?? null,
       }
@@ -152,6 +163,7 @@ export default async function OverzichtCashflowPage() {
         budgetView={<BudgetsClient initialData={data} />}
         transactiesView={
           <div className="space-y-6">
+            <KoppelRekeningBanner accountCount={accountCount} />
             <TransactiesGeldstroom transactions={transactions} monthLabel={monthLabel} />
             <CashflowSankey transactions={transactions} monthLabel={monthLabel} />
             <TransactiesFeed transactions={transactions} monthLabel={monthLabel} />
