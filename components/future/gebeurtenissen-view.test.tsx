@@ -51,6 +51,21 @@ describe('GebeurtenissenView — gebeurtenissen-sectie', () => {
     expect(screen.getByText('Tweede kind')).toBeTruthy()
   })
 
+  it('rendert verticale tijdlijn als <ol> met Nu-startnode', () => {
+    const { container } = render(<GebeurtenissenView events={[mockEvent()]} />)
+    // Timeline = <ol> met list-items; eerste item is de "Nu"-startnode.
+    const ol = container.querySelector('ol')
+    expect(ol).toBeTruthy()
+    expect(screen.getByText(/^Nu/)).toBeTruthy()
+    // 1 startnode + 1 event = 2 <li>
+    expect(ol!.querySelectorAll(':scope > li').length).toBe(2)
+  })
+
+  it('toont leeftijd in Nu-startnode wanneer currentAge bekend', () => {
+    render(<GebeurtenissenView events={[mockEvent()]} currentAge={42} />)
+    expect(screen.getByText(/Nu · 42 jaar/)).toBeTruthy()
+  })
+
   it('toont aantal gebeurtenissen in header', () => {
     render(
       <GebeurtenissenView

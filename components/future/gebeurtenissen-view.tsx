@@ -196,7 +196,34 @@ export function GebeurtenissenView({
             </Link>
           </article>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          // Verticale tijdlijn: doorlopende streep links met een bolletje
+          // (event-icoon in een cirkel) per gebeurtenis, chronologisch
+          // gesorteerd. Een "Nu"-startnode verankert de lijn.
+          <ol className="relative">
+            {/* De doorlopende streep — loopt door het midden van de
+                bolletjes (cirkel-radius 20px → center op left-5). Stopt
+                onder het laatste bolletje via de gradient-fade niet nodig;
+                we laten 'm gewoon tot de laatste node lopen. */}
+            <span
+              aria-hidden="true"
+              className="absolute left-5 top-2 bottom-8 w-px bg-[var(--border-ed)]"
+            />
+
+            {/* Start-node: "Nu" */}
+            <li className="relative flex gap-4 pb-6">
+              <span
+                aria-hidden="true"
+                className="relative z-10 shrink-0 w-10 h-10 rounded-full border-2 border-[var(--ink-3)] bg-[var(--paper)] flex items-center justify-center"
+              >
+                <span className="w-2 h-2 rounded-full bg-[var(--ink-3)]" />
+              </span>
+              <div className="flex-1 min-w-0 pt-2">
+                <div className="text-[11px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)]">
+                  Nu{currentAge != null ? ` · ${currentAge} jaar` : ''}
+                </div>
+              </div>
+            </li>
+
             {sorted.map((event) => {
               const Icon = iconForEvent(event.event_type, event.icon)
               // Plan F-5: per event een impact-badge met geschatte
@@ -218,53 +245,64 @@ export function GebeurtenissenView({
                   : impact?.tone === 'gain'
                     ? 'text-emerald-700 bg-emerald-50'
                     : 'text-[var(--ink-3)] bg-[var(--subtle)]'
-              // Plannen-modus: card wordt button die EventBewerkenSheet
-              // opent. Kijken-modus: gewone article (read-only).
+              // Bolletje-kleur volgt de impact-tone zodat de tijdlijn in
+              // één oogopslag kosten (amber) vs. opbrengsten (emerald)
+              // toont.
+              const nodeColor =
+                impact?.tone === 'cost'
+                  ? 'border-amber-400 text-amber-700'
+                  : impact?.tone === 'gain'
+                    ? 'border-emerald-400 text-emerald-700'
+                    : 'border-[var(--ink-3)] text-[var(--ink-2)]'
+              // Plannen-modus: content-kaart wordt button die
+              // EventBewerkenSheet opent. Kijken-modus: gewone div.
               const cardClass =
-                'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 text-left w-full'
-              const CardEl: React.ElementType = isPlannen ? 'button' : 'article'
+                'flex-1 min-w-0 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left'
+              const CardEl: React.ElementType = isPlannen ? 'button' : 'div'
               const cardProps = isPlannen
                 ? {
                     type: 'button' as const,
                     onClick: () => setEditingEvent(event),
                     'aria-label': `Bewerk ${event.name}`,
-                    className: `${cardClass} hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
+                    className: `${cardClass} w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
                   }
                 : { className: cardClass }
               return (
-                <CardEl key={event.id} {...cardProps}>
-                  <header className="flex items-start gap-3 mb-2">
-                    <span className="w-9 h-9 rounded-lg bg-[var(--subtle)] flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-[var(--ink-2)]" aria-hidden="true" />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-[var(--ink)] truncate inline-flex items-center gap-1.5">
-                        {event.name}
-                        {isPlannen && (
-                          <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
-                        )}
-                      </h3>
-                      <div className="text-[11px] text-[var(--ink-3)] mt-0.5">
-                        {formatEventDate(event)}
+                <li key={event.id} className="relative flex gap-4 pb-6 last:pb-0">
+                  {/* Bolletje met event-icoon, zit op de streep */}
+                  <span
+                    className={`relative z-10 shrink-0 w-10 h-10 rounded-full border-2 bg-[var(--paper)] flex items-center justify-center ${nodeColor}`}
+                  >
+                    <Icon className="w-4 h-4" aria-hidden="true" />
+                  </span>
+
+                  <CardEl {...cardProps}>
+                    <div className="text-[11px] text-[var(--ink-3)] mb-0.5">
+                      {formatEventDate(event)}
+                    </div>
+                    <h3 className="text-sm font-semibold text-[var(--ink)] truncate inline-flex items-center gap-1.5">
+                      {event.name}
+                      {isPlannen && (
+                        <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
+                      )}
+                    </h3>
+                    <p className="text-xs text-[var(--ink-2)] leading-snug mt-1">
+                      {eventImpact(event)}
+                    </p>
+                    {impact && impact.tone !== 'neutral' && (
+                      <div
+                        className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${impactClass}`}
+                        title="Schatting o.b.v. jaarlijks overschot. Voor exacte impact zie Tijdas."
+                      >
+                        {ImpactIcon && <ImpactIcon className="w-3 h-3" aria-hidden="true" />}
+                        {impact.displayLabel}
                       </div>
-                    </div>
-                  </header>
-                  <p className="text-xs text-[var(--ink-2)] leading-snug">
-                    {eventImpact(event)}
-                  </p>
-                  {impact && impact.tone !== 'neutral' && (
-                    <div
-                      className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${impactClass}`}
-                      title="Schatting o.b.v. jaarlijks overschot. Voor exacte impact zie Tijdas."
-                    >
-                      {ImpactIcon && <ImpactIcon className="w-3 h-3" aria-hidden="true" />}
-                      {impact.displayLabel}
-                    </div>
-                  )}
-                </CardEl>
+                    )}
+                  </CardEl>
+                </li>
               )
             })}
-          </div>
+          </ol>
         )}
       </div>
 
