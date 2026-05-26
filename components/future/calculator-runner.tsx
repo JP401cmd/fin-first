@@ -108,11 +108,13 @@ export function CalculatorRunner({
 }: {
   definition: CalculatorDefinition
   prefill: PrefillValues
-  /** Optionele render-prop voor acties; krijgt huidige input-state +
-   *  winnaar door zodat de host bv. een levensgebeurtenis kan maken. */
+  /** Optionele render-prop voor acties; krijgt huidige input-state,
+   *  winnaar én de geëvalueerde waarden door zodat de host bv. een
+   *  levensgebeurtenis kan destilleren. */
   footer?: (state: {
     inputs: Record<string, number>
     winner: string | null
+    values: Record<string, Record<string, number | null>>
   }) => React.ReactNode
 }) {
   const [inputs, setInputs] = useState<Record<string, number>>(() =>
@@ -255,7 +257,7 @@ export function CalculatorRunner({
         </div>
       )}
 
-      {footer?.({ inputs, winner: result.winner })}
+      {footer?.({ inputs, winner: result.winner, values: result.values })}
 
       {/* Wft-disclaimer */}
       <p className="text-[11px] italic text-[var(--ink-3)] leading-snug">

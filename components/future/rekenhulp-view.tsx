@@ -13,8 +13,10 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CalculatorRunner } from './calculator-runner'
+import { CalculatorToLifeEventSheet } from './calculator-to-life-event-sheet'
 import type { CalculatorDefinition, CustomCalculatorRow } from '@/lib/calculator/types'
 import type { PrefillValues } from '@/lib/calculator/user-data-keys'
+import { CalendarPlus } from 'lucide-react'
 
 /**
  * RekenhulpView — eigen plek (/toekomst?tab=rekenhulp) waar Will helpt
@@ -50,6 +52,10 @@ export function RekenhulpView({
   const [draft, setDraft] = useState<CalculatorDefinition | null>(null)
   const [running, setRunning] = useState<CustomCalculatorRow | null>(null)
   const [saving, setSaving] = useState(false)
+  const [lifeEventSeed, setLifeEventSeed] = useState<{
+    name: string
+    amount: number
+  } | null>(null)
 
   async function generate(refine = false) {
     if (!prompt.trim()) return
@@ -233,7 +239,40 @@ export function RekenhulpView({
           </div>
           <h2 className="font-serif text-xl text-[var(--ink)] mt-1">{running.name}</h2>
         </header>
-        <CalculatorRunner definition={running.definition} prefill={prefill} />
+        <CalculatorRunner
+          definition={running.definition}
+          prefill={prefill}
+          footer={({ winner, values }) => {
+            // Voorgevuld bedrag: de compare-output van het winnende
+            // scenario (indien aanwezig), anders 0.
+            const compareKey = running.definition.compare?.outputKey
+            const seedAmount =
+              winner && compareKey ? values[winner]?.[compareKey] ?? 0 : 0
+            return (
+              <button
+                type="button"
+                onClick={() =>
+                  setLifeEventSeed({
+                    name: running.definition.name,
+                    amount: Math.abs(seedAmount ?? 0),
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 text-sm font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
+              >
+                <CalendarPlus className="w-4 h-4" aria-hidden="true" />
+                Maak hier een levensgebeurtenis van
+              </button>
+            )
+          }}
+        />
+        {lifeEventSeed && (
+          <CalculatorToLifeEventSheet
+            defaultName={lifeEventSeed.name}
+            defaultAmount={lifeEventSeed.amount}
+            defaultAge={prefill.current_age ? Math.round(prefill.current_age) : null}
+            onClose={() => setLifeEventSeed(null)}
+          />
+        )}
       </section>
     )
   }
