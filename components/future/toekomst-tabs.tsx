@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { type ReactNode } from 'react'
-import { Compass, Target, CalendarClock, SlidersHorizontal, ArrowRight } from 'lucide-react'
+import { Compass, Target, CalendarClock, SlidersHorizontal, Calculator, ArrowRight } from 'lucide-react'
 import { PrintTijdasButton } from './print-tijdas-button'
 
 /**
@@ -23,13 +23,14 @@ import { PrintTijdasButton } from './print-tijdas-button'
  * (geen query). Bookmarkable; switching gebeurt via `router.replace`
  * met `scroll: false`.
  */
-type ToekomstTab = 'tijdas' | 'doelen' | 'gebeurtenissen' | 'voorkeuren'
+type ToekomstTab = 'tijdas' | 'doelen' | 'gebeurtenissen' | 'voorkeuren' | 'rekenhulp'
 
 const TABS: { id: ToekomstTab; label: string; Icon: typeof Compass }[] = [
   { id: 'tijdas', label: 'Tijdas', Icon: Compass },
   { id: 'doelen', label: 'Doelen', Icon: Target },
   { id: 'gebeurtenissen', label: 'Gebeurtenissen', Icon: CalendarClock },
   { id: 'voorkeuren', label: 'Voorkeuren', Icon: SlidersHorizontal },
+  { id: 'rekenhulp', label: 'Rekenhulp', Icon: Calculator },
 ]
 
 export function ToekomstTabs({
@@ -37,6 +38,7 @@ export function ToekomstTabs({
   doelenView,
   gebeurtenissenView,
   voorkeurenView,
+  rekenhulpView,
 }: {
   tijdasView: ReactNode
   /** Optionele content voor Doelen-tab. Wanneer afwezig: placeholder. */
@@ -45,6 +47,8 @@ export function ToekomstTabs({
   gebeurtenissenView?: ReactNode
   /** Optionele content voor Voorkeuren-tab. Wanneer afwezig: placeholder. */
   voorkeurenView?: ReactNode
+  /** Optionele content voor Rekenhulp-tab. Wanneer afwezig: placeholder. */
+  rekenhulpView?: ReactNode
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -104,6 +108,7 @@ export function ToekomstTabs({
       {current === 'doelen' && (doelenView ?? <DoelenTabPlaceholder />)}
       {current === 'gebeurtenissen' && (gebeurtenissenView ?? <GebeurtenissenTabPlaceholder />)}
       {current === 'voorkeuren' && (voorkeurenView ?? <VoorkeurenTabPlaceholder />)}
+      {current === 'rekenhulp' && rekenhulpView}
     </>
   )
 }

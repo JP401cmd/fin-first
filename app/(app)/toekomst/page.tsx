@@ -8,6 +8,9 @@ import { ToekomstTabs } from '@/components/future/toekomst-tabs'
 import { DoelenView } from '@/components/future/doelen-view'
 import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
 import { VoorkeurenView } from '@/components/future/voorkeuren-view'
+import { RekenhulpView } from '@/components/future/rekenhulp-view'
+import { buildPrefillValues } from '@/lib/calculator/user-data-keys'
+import type { CustomCalculatorRow } from '@/lib/calculator/types'
 import { ageAtDate } from '@/lib/horizon-data'
 
 export const metadata: Metadata = {
@@ -49,6 +52,28 @@ export default async function ToekomstPage() {
     dashboardResult.dashboardData.fireAgeFractional != null
       ? Math.round(dashboardResult.dashboardData.fireAgeFractional)
       : null
+
+  // Rekenhulp (Will-assisted calculators): prefill-waarden uit de
+  // horizon-data + opgeslagen calculators van de gebruiker.
+  const prefill = buildPrefillValues({
+    effectiveInput: horizonData.effectiveInput,
+    unlinkedCash: horizonData.unlinkedCash,
+    assets: horizonData.assets,
+    housingContext: horizonData.housingContext,
+    fireParams: horizonData.fireParams,
+  })
+  const { data: { user } } = await supabase.auth.getUser()
+  let savedCalculators: CustomCalculatorRow[] = []
+  if (user) {
+    const { data: calcRows } = await supabase
+      .from('custom_calculators')
+      .select('id, name, description, definition, created_by_ai, sort_order, created_at')
+      .eq('user_id', user.id)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false })
+    savedCalculators = (calcRows ?? []) as CustomCalculatorRow[]
+  }
+
   return (
     <ToekomstTabs
       tijdasView={<HorizonPage initialData={horizonData} />}
@@ -76,6 +101,9 @@ export default async function ToekomstPage() {
           fireAge={fireAge}
           simRows={simRows}
         />
+      }
+      rekenhulpView={
+        <RekenhulpView saved={savedCalculators} prefill={prefill} />
       }
     />
   )
