@@ -1,5 +1,9 @@
 import { redirect } from 'next/navigation'
 
-export default function VoortgangPage() {
-  redirect('/identity')
+/**
+ * Voortgang/sovereignty-overzicht is opgegaan in /mijn. Single-hop
+ * redirect — geen /identity-omweg meer.
+ */
+export default function VoortgangRedirect() {
+  redirect('/mijn')
 }

@@ -1,10 +1,9 @@
 import { redirect } from 'next/navigation'
 
 /**
- * /horizon/uitgaven-na-pensioen redirects naar /horizon met de pane open.
- * De content leeft in components/app/horizon/uitgaven-pane.tsx en wordt
- * via ShellOverlay kind="pane" gerenderd op /horizon.
+ * Legacy-route. Uitgaven-na-pensioen-pane leeft nu op /toekomst
+ * (?uitgaven=open). Single-hop naar de canonieke URL.
  */
 export default function UitgavenNaPensioenRedirectPage() {
-  redirect('/horizon?uitgaven=open')
+  redirect('/toekomst?uitgaven=open')
 }

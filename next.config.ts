@@ -41,6 +41,17 @@ const nextConfig: NextConfig = {
       { source: '/identity', destination: '/mijn', permanent: false },
       { source: '/will', destination: '/overzicht', permanent: false },
       { source: '/dashboard', destination: '/overzicht', permanent: false },
+
+      // ── Alias-opschoning (route-audit categorie 2) ──────────────
+      // Legacy-pagina's worden door de nieuwe routes ge-re-export
+      // (build-time module-import → geen redirect-loop). We sturen de
+      // legacy-URL's naar hun canonieke /mijn- resp. /toekomst-tegenhanger
+      // zodat er per functie één URL overblijft.
+      { source: '/identity/profiel', destination: '/mijn/profiel', permanent: false },
+      { source: '/identity/koppelingen', destination: '/mijn/koppelingen', permanent: false },
+      { source: '/identity/delen', destination: '/mijn/delen', permanent: false },
+      { source: '/horizon/samengestelde-interest', destination: '/toekomst/samengestelde-interest', permanent: false },
+      { source: '/horizon/inflatie-koopkracht', destination: '/toekomst/inflatie-koopkracht', permanent: false },
     ]
   },
 };

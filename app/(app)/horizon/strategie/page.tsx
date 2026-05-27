@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation'
 
 /**
- * /horizon/strategie now redirects to /horizon with the strategie modal open.
- * The actual content lives in components/app/horizon/strategie-modal.tsx.
+ * Legacy-route. De levensstrategieën leven nu op /toekomst (Tijdas-tab,
+ * strategie-modal via ?strategie=open). Single-hop naar de canonieke URL.
  */
 export default function StrategieRedirectPage() {
-  redirect('/horizon?strategie=open')
+  redirect('/toekomst?strategie=open')
 }

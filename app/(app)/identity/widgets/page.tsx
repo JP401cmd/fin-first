@@ -1,5 +1,9 @@
 import { redirect } from 'next/navigation'
 
-export default function WidgetsPage() {
-  redirect('/will')
+/**
+ * Widget-configuratie verhuist naar /mijn (personalisatie). Single-hop
+ * redirect — geen /will-omweg meer.
+ */
+export default function WidgetsRedirect() {
+  redirect('/mijn')
 }
