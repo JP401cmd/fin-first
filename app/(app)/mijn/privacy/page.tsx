@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PrivacyOverview } from '@/components/mijn/privacy-overview'
+import { AiPrivacySettings } from '@/components/mijn/ai-privacy-settings'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
@@ -26,6 +27,7 @@ export default function MijnPrivacyPage() {
         />
       </div>
       <PrivacyOverview />
+      <AiPrivacySettings />
     </>
   )
 }
