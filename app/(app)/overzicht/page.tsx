@@ -6,6 +6,7 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { WillLanding } from '@/components/will/will-landing'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
+import { CheckinBanner } from '@/components/overview/checkin-banner'
 import { buildBriefingEntries, buildBriefingNarrative } from '@/lib/briefing/engine'
 import { ageAtDate } from '@/lib/horizon-data'
 
@@ -136,6 +137,7 @@ export default async function OverzichtPage() {
 
   return (
     <>
+      <CheckinBanner />
       <OverzichtHero
         userName={userName ?? undefined}
         health={health}
