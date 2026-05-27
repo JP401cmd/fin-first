@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calculator, ChevronDown, ChevronUp, Clock, Info } from 'lucide-react'
+import { Calculator, ChevronDown, ChevronUp, Clock, Info, Layers, Users } from 'lucide-react'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { BOX3_TOOLTIPS, type Box3Result } from '@/lib/box3-data'
@@ -20,8 +20,35 @@ import { GlossaryTerm } from '@/components/editorial/glossary-term'
  * asset-classificatie volgen in een latere "diepe belasting"-iteratie.
  */
 
+interface PartnerEntry {
+  isCurrentUser: boolean
+  result: Box3Result
+}
+
+interface OptimalAllocation {
+  totalTax: number
+  savingsVsEqual: number
+}
+
 interface Box3ApiResponse {
-  personal: Box3Result
+  /** Aanwezig in single-modus. */
+  personal?: Box3Result
+  /** Household-modus: geen `personal`, wel partners + combined. */
+  hasHousehold?: boolean
+  partners?: PartnerEntry[]
+  combined?: Box3Result
+  optimalAllocation?: OptimalAllocation
+  dailyExpenses?: number
+}
+
+/** Kies het privé-resultaat in beide modi: single → personal; household
+ *  → de partner-entry van de huidige gebruiker. */
+function selectPersonal(data: Box3ApiResponse): Box3Result | null {
+  return (
+    data.personal ??
+    data.partners?.find((p) => p.isCurrentUser)?.result ??
+    null
+  )
 }
 
 function formatPct(value: number): string {
@@ -95,8 +122,10 @@ function CalcRow({
 
 export function Box3Detail({ year = 2026 }: { year?: number }) {
   const [result, setResult] = useState<Box3Result | null>(null)
+  const [api, setApi] = useState<Box3ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
+  const [showClassificatie, setShowClassificatie] = useState(false)
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
 
@@ -105,7 +134,9 @@ export function Box3Detail({ year = 2026 }: { year?: number }) {
     fetch(`/api/household/box3?year=${year}`)
       .then((r) => r.json())
       .then((data: Box3ApiResponse) => {
-        if (!cancelled) setResult(data.personal ?? null)
+        if (cancelled) return
+        setApi(data)
+        setResult(selectPersonal(data))
       })
       .catch(() => {
         /* stil falen — sectie blijft leeg */
@@ -117,6 +148,12 @@ export function Box3Detail({ year = 2026 }: { year?: number }) {
       cancelled = true
     }
   }, [year])
+
+  // 3a partner-optimalisatie: alleen household + daadwerkelijke besparing.
+  const optimal = api?.optimalAllocation
+  const dailyExpenses = api?.dailyExpenses ?? 0
+  const showPartnerOptim =
+    !!api?.hasHousehold && !!optimal && optimal.savingsVsEqual > 0
 
   if (loading) {
     return (
@@ -227,7 +264,127 @@ export function Box3Detail({ year = 2026 }: { year?: number }) {
             </div>
           </div>
         )}
+
+        {/* 3b — Hoe is je vermogen ingedeeld? (asset/schuld-classificatie) */}
+        <button
+          type="button"
+          onClick={() => setShowClassificatie((s) => !s)}
+          aria-expanded={showClassificatie}
+          className="flex w-full items-center justify-between border-t border-[var(--border-ed)] p-4 sm:px-5 hover:bg-[var(--subtle)] transition-colors"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+            <Layers className="h-4 w-4 text-violet-600" aria-hidden="true" />
+            Hoe is je vermogen ingedeeld?
+          </span>
+          {showClassificatie ? (
+            <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" aria-hidden="true" />
+          )}
+        </button>
+        {showClassificatie && (
+          <div className="border-t border-[var(--border-ed)] px-4 py-4 sm:px-5 space-y-2">
+            {result.assetClassifications.map((ac, i) => (
+              <ClassRow
+                key={`a-${i}`}
+                name={ac.asset.name}
+                amount={Number(ac.asset.current_value)}
+                categoryLabel={
+                  ac.category === 'spaargeld'
+                    ? 'Spaargeld'
+                    : ac.category === 'beleggingen'
+                      ? 'Beleggingen'
+                      : 'Uitgesloten (Box 1/2)'
+                }
+                dotClass={
+                  ac.category === 'spaargeld'
+                    ? 'bg-sky-500'
+                    : ac.category === 'beleggingen'
+                      ? 'bg-amber-500'
+                      : 'bg-[var(--ink-4)]'
+                }
+                muted={ac.category === null}
+                fc={fc}
+              />
+            ))}
+            {result.debtClassifications.length > 0 && (
+              <>
+                <div className="pt-2 text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)]">
+                  Schulden
+                </div>
+                {result.debtClassifications.map((dc, i) => (
+                  <ClassRow
+                    key={`d-${i}`}
+                    name={dc.debt.name}
+                    amount={Number(dc.debt.current_balance)}
+                    categoryLabel={dc.inBox3 ? 'Box 3' : 'Uitgesloten'}
+                    dotClass={dc.inBox3 ? 'bg-rose-500' : 'bg-[var(--ink-4)]'}
+                    muted={!dc.inBox3}
+                    fc={fc}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* 3a — Partner-optimalisatie (alleen household + besparing > 0) */}
+        {showPartnerOptim && optimal && (
+          <div className="border-t border-emerald-200 bg-emerald-50/50 px-4 py-4 sm:px-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Users className="h-4 w-4 text-emerald-700" aria-hidden="true" />
+              <span className="text-sm font-semibold text-emerald-800">
+                Partner-optimalisatie
+              </span>
+            </div>
+            <p className="text-xs text-[var(--ink-2)] leading-snug">
+              Door je Box 3-vermogen fiscaal optimaal over jou en je partner te
+              verdelen bespaar je{' '}
+              <strong className="text-emerald-700">{fc(optimal.savingsVsEqual)}</strong>{' '}
+              per jaar
+              {dailyExpenses > 0 && (
+                <> — zo&apos;n {Math.round(optimal.savingsVsEqual / dailyExpenses)} vrijheidsdagen</>
+              )}
+              {' '}t.o.v. een 50/50-verdeling.
+            </p>
+          </div>
+        )}
       </div>
     </section>
+  )
+}
+
+function ClassRow({
+  name,
+  amount,
+  categoryLabel,
+  dotClass,
+  muted,
+  fc,
+}: {
+  name: string
+  amount: number
+  categoryLabel: string
+  dotClass: string
+  muted?: boolean
+  fc: (v: number) => string
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="flex items-center gap-2 min-w-0">
+        <span className={`h-2 w-2 rounded-full shrink-0 ${dotClass}`} aria-hidden="true" />
+        <span className={`text-xs truncate ${muted ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'}`}>
+          {name}
+        </span>
+      </span>
+      <span className="flex items-center gap-2 shrink-0">
+        <span className="text-[10px] uppercase tracking-[0.06em] text-[var(--ink-3)]">
+          {categoryLabel}
+        </span>
+        <span className="text-xs font-mono tabular-nums text-[var(--ink-2)]">
+          {fc(amount)}
+        </span>
+      </span>
+    </div>
   )
 }

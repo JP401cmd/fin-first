@@ -76,6 +76,49 @@ describe('Box3Detail', () => {
     expect(screen.getByText(/Voordeel uit sparen en beleggen/)).toBeTruthy()
   })
 
+  it('pakt eigen partner-resultaat in household-modus (geen personal-key)', async () => {
+    mockFetch({
+      hasHousehold: true,
+      dailyExpenses: 100,
+      partners: [
+        { isCurrentUser: true, result: mockResult({ tax: 321 }) },
+        { isCurrentUser: false, result: mockResult({ tax: 8888 }) },
+      ],
+    })
+    render(<Box3Detail year={2026} />)
+    await waitFor(() => expect(screen.getByText(/321/)).toBeTruthy())
+    expect(screen.queryByText(/8\.888/)).toBeNull()
+  })
+
+  it('toont partner-optimalisatie bij besparing > 0', async () => {
+    mockFetch({
+      hasHousehold: true,
+      dailyExpenses: 100,
+      partners: [{ isCurrentUser: true, result: mockResult() }],
+      optimalAllocation: { totalTax: 500, savingsVsEqual: 250 },
+    })
+    render(<Box3Detail year={2026} />)
+    await waitFor(() => expect(screen.getByText(/Partner-optimalisatie/i)).toBeTruthy())
+    expect(screen.getByText(/250/)).toBeTruthy()
+  })
+
+  it('toont classificatie-sectie uitklapbaar', async () => {
+    mockFetch({
+      personal: mockResult({
+        assetClassifications: [
+          { asset: { name: 'Spaarrekening', current_value: 30000 }, category: 'spaargeld', exclusionReason: null, note: null },
+          { asset: { name: 'Eigen huis', current_value: 400000 }, category: null, exclusionReason: 'Box 1', note: null },
+        ] as never,
+      }),
+    })
+    render(<Box3Detail year={2026} />)
+    await waitFor(() => screen.getByText('Hoe is je vermogen ingedeeld?'))
+    expect(screen.queryByText('Spaarrekening')).toBeNull()
+    fireEvent.click(screen.getByText('Hoe is je vermogen ingedeeld?'))
+    expect(screen.getByText('Spaarrekening')).toBeTruthy()
+    expect(screen.getByText('Eigen huis')).toBeTruthy()
+  })
+
   it('rendert niets wanneer de API geen personal-resultaat geeft', async () => {
     mockFetch({ personal: null })
     const { container } = render(<Box3Detail year={2026} />)

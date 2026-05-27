@@ -5,6 +5,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { BelastingOverzichtStrip } from '@/components/overview/belasting-overzicht-strip'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
 import { Box3Detail } from '@/components/overview/box3-detail'
+import { Box2Detail } from '@/components/overview/box2-detail'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
@@ -37,6 +38,22 @@ export default async function OverzichtBelastingPage() {
   const horizonData = await loadHorizonData(supabase)
 
   const box3Tax = horizonData.healthScoreInput.taxData?.box3Tax ?? null
+
+  // Aanmerkelijk belang (Box 2): alleen tonen als de gebruiker een
+  // deelneming-asset heeft. We detecteren dat server-side zodat de
+  // Box 2-sectie niet flitst voor de ~99% niet-DGA's.
+  const { data: { user } } = await supabase.auth.getUser()
+  let hasAanmerkelijkBelang = false
+  if (user) {
+    const { data: deelnemingen } = await supabase
+      .from('assets')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .eq('asset_type', 'deelneming')
+      .limit(1)
+    hasAanmerkelijkBelang = (deelnemingen?.length ?? 0) > 0
+  }
 
   // Box 1-schatting: netto-maandinkomen ≈ bruto × (1 − marginaal_tarief),
   // dus bruto-inkomen ≈ netto / (1 − marginaal). Box 1-druk ≈ bruto × marg.
@@ -73,6 +90,7 @@ export default async function OverzichtBelastingPage() {
         />
       </section>
       <Box3Detail year={2026} />
+      {hasAanmerkelijkBelang && <Box2Detail year={2026} />}
     </>
   )
 }
