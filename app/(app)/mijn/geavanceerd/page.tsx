@@ -1,10 +1,22 @@
-import { redirect } from 'next/navigation'
+import type { Metadata } from 'next'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { GeavanceerdSettings } from '@/components/mijn/geavanceerd-settings'
+
+export const metadata: Metadata = {
+  title: 'Geavanceerd — TriFinity',
+  description: 'Modules aan/uit, data-export en je gegevens resetten.',
+}
 
 /**
- * /mijn/geavanceerd — redirect-stub naar legacy /identity/instellingen
- * (modules + export + RESET). Per agent-plan worden deze restant-
- * onderdelen in een latere refactor naar een eigen page geëxtraheerd.
+ * /mijn/geavanceerd — modules + data-export + reset. Vervangt de
+ * redirect-stub naar /identity/instellingen?tab=gegevens (plan A-2,
+ * ontmanteling settings-monolith). Content in GeavanceerdSettings (client).
  */
 export default function MijnGeavanceerdPage() {
-  redirect('/identity/instellingen?tab=gegevens')
+  return (
+    <>
+      <NavStackMeta title="Geavanceerd" bottomBar={{ kind: 'tabs' }} />
+      <GeavanceerdSettings />
+    </>
+  )
 }

@@ -191,14 +191,14 @@ export function PrivacyOverview() {
         </p>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <Link
-            href="/mijn/geavanceerd?focus=export"
+            href="/mijn/geavanceerd#export"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
           >
             <Download className="w-4 h-4" aria-hidden="true" />
             Data exporteren (JSON)
           </Link>
           <Link
-            href="/identity/instellingen?tab=privacy&focus=delete"
+            href="/mijn/geavanceerd"
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 text-red-800 px-4 py-2.5 text-sm font-semibold hover:bg-red-100 transition-colors"
           >
             <Trash2 className="w-4 h-4" aria-hidden="true" />

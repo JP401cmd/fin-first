@@ -44,8 +44,9 @@ describe('PrivacyOverview', () => {
     }))
     expect(links.some((l) => l.text.includes('Data exporteren'))).toBe(true)
     expect(links.some((l) => l.text.includes('Account verwijderen'))).toBe(true)
-    expect(links.some((l) => l.href.includes('focus=export'))).toBe(true)
-    expect(links.some((l) => l.href.includes('focus=delete'))).toBe(true)
+    // Beide CTA's wijzen nu naar /mijn/geavanceerd (export-anchor + reset).
+    expect(links.some((l) => l.href === '/mijn/geavanceerd#export')).toBe(true)
+    expect(links.some((l) => l.href === '/mijn/geavanceerd')).toBe(true)
   })
 
   it('noemt expliciet "Supabase" en "EU-regio"', () => {
