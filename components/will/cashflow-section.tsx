@@ -1,11 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowUpDown, ArrowRight, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { ArrowUpDown, ArrowRight, TrendingUp, TrendingDown, Minus, Receipt } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { RecurringItem } from './vaste-kosten-analyse'
-import { VasteKostenAnalyse } from './vaste-kosten-analyse'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 
 // ── Sparkline for expense/savings trends ──────────────────────
@@ -77,15 +76,7 @@ interface CashflowSectionProps {
 
 export function CashflowSection({
   data,
-  subscriptions,
-  vasteKosten,
-  totalMonthlySubscriptions,
-  totalMonthlyVasteKosten,
   totalMonthly,
-  userProfile,
-  loadingRecurring,
-  onCancellationOpen,
-  onRefresh,
 }: CashflowSectionProps) {
   const { monthlyIncome, monthlyExpenses, savingsRate6m, savingsHistory, expenseHistory } = data
   const monthlyCashflow = monthlyIncome - monthlyExpenses
@@ -111,7 +102,7 @@ export function CashflowSection({
           </h2>
         </div>
         <Link
-          href="/core/budgets"
+          href="/overzicht/cashflow"
           className="group flex items-center gap-1 text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink)]"
         >
           Budgetten beheren
@@ -206,23 +197,27 @@ export function CashflowSection({
         )}
       </div>
 
-      {/* ── Vaste Kosten Analyse ── */}
-      {loadingRecurring ? (
-        <div className="animate-pulse rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-          <div className="h-4 w-48 rounded bg-[var(--subtle)]" />
-        </div>
-      ) : (subscriptions.length > 0 || vasteKosten.length > 0) ? (
-        <VasteKostenAnalyse
-          subscriptions={subscriptions}
-          vasteKosten={vasteKosten}
-          totalMonthlySubscriptions={totalMonthlySubscriptions}
-          totalMonthlyVasteKosten={totalMonthlyVasteKosten}
-          totalMonthly={totalMonthly}
-          userProfile={userProfile}
-          onCancellationOpen={onCancellationOpen}
-          onRefresh={onRefresh}
-        />
-      ) : null}
+      {/* ── Vaste lasten — link naar de canonieke plek (/overzicht/cashflow) ──
+          De volledige vaste-kosten-analyse leeft op de Cashflow-hefboom-
+          pagina (Vaste-lasten-tab); hier alleen een compacte teaser zodat
+          de dashboard-sectie niet dubbelt met die pagina. */}
+      {totalMonthly > 0 && (
+        <Link
+          href="/overzicht/cashflow?view=vaste-lasten"
+          className="group flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-colors hover:border-[var(--ink-3)]"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-violet-50 text-violet-700 shrink-0">
+            <Receipt className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[var(--ink)]">Vaste lasten &amp; abonnementen</p>
+            <p className="text-[11px] text-[var(--ink-3)]">
+              <MaskedAmount value={totalMonthly} className="font-mono tabular-nums" />/mnd — bekijk de analyse
+            </p>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      )}
     </section>
   )
 }

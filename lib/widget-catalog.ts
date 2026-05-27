@@ -578,7 +578,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   levensgebeurtenissen:     '/horizon?modal=life_events',
   spaarquote:               '/core',
   vrijheidsvoortgang:       '/horizon',
-  vaste_lasten:             '/core/cash',
+  vaste_lasten:             '/overzicht/cashflow?view=vaste-lasten',
   jouw_pad:                 '/identity',
   gezondheids_score:        '/horizon',
   belasting_box3:           '/core/debts',
