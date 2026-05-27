@@ -82,15 +82,21 @@ export default async function OverzichtBelastingPage() {
         box2Tax={null}
         box3Tax={box3Tax}
       />
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-2">
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-2" id="jaarruimte" style={{ scrollMarginTop: '5rem' }}>
         <JaarruimteCard
           grossYearlyIncome={grossYearly}
           pensioenAangroei={0}
           marginaalTarief={marg}
         />
       </section>
-      <Box3Detail year={2026} />
-      {hasAanmerkelijkBelang && <Box2Detail year={2026} />}
+      <div id="box3" style={{ scrollMarginTop: '5rem' }}>
+        <Box3Detail year={2026} />
+      </div>
+      {hasAanmerkelijkBelang && (
+        <div id="box2" style={{ scrollMarginTop: '5rem' }}>
+          <Box2Detail year={2026} />
+        </div>
+      )}
     </>
   )
 }

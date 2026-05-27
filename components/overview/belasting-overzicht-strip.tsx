@@ -110,9 +110,11 @@ function BoxTegel({
   forcePlaceholder?: boolean
 }) {
   const hasValue = value != null && value > 0 && !forcePlaceholder
-  // Plan T-2: KPI-tegels gekoppeld aan een actie. Klik op de tegel
-  // scrolt door naar de Box-sectie in /core/belasting (anchor).
-  const href = `/core/belasting?box=${number}`
+  // Plan T-2: KPI-tegel gekoppeld aan een actie — scrollt naar de
+  // bijbehorende sectie op /overzicht/belasting (Box3Detail / Box2Detail
+  // / JaarruimteCard). Box 1 heeft geen eigen rekensectie → jaarruimte.
+  const anchor = number === '3' ? 'box3' : number === '2' ? 'box2' : 'jaarruimte'
+  const href = `/overzicht/belasting#${anchor}`
   return (
     <Link
       href={href}
