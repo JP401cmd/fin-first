@@ -62,10 +62,6 @@ const WIL_PAGES: StaticPage[] = [
 const HORIZON_PAGES: StaticPage[] = [
   { label: 'De Horizon',                sublabel: 'FIRE-projectie en scenario\'s',      href: '/horizon',                               icon: Telescope,   module: 'horizon', requiredModule: 'toekomstplannen' },
   { label: 'Wat-als',                   sublabel: 'Scenario builder met sliders',       href: '/horizon/whatif',                        icon: Compass,     module: 'horizon', requiredModule: 'toekomstplannen' },
-  { label: 'Doorrekening: opbouw',      sublabel: 'Vermogenspad + fase-analyses',       href: '/horizon/doorrekening-test/opbouw',      icon: TrendingUp,  module: 'horizon', requiredModule: 'toekomstplannen' },
-  { label: 'Doorrekening: afbouw',      sublabel: 'Onttrekkingsstrategieën',            href: '/horizon/doorrekening-test/afbouw',      icon: Activity,    module: 'horizon', requiredModule: 'toekomstplannen' },
-  { label: 'Doorrekening: overzicht',   sublabel: 'Levensloop-tabel',                   href: '/horizon/doorrekening-test/overzicht',   icon: ListChecks,  module: 'horizon', requiredModule: 'toekomstplannen' },
-  { label: 'Doorrekening: gebeurtenissen', sublabel: 'Levensgebeurtenissen-beheer',     href: '/horizon/doorrekening-test/gebeurtenissen', icon: Calendar,  module: 'horizon', requiredModule: 'toekomstplannen' },
 ]
 
 // ── Identity ─────────────────────────────────────────────────────────────────
@@ -73,12 +69,9 @@ const HORIZON_PAGES: StaticPage[] = [
 const IDENTITY_PAGES: StaticPage[] = [
   { label: 'Identiteit',                sublabel: 'Profiel en voortgang',               href: '/identity',                              icon: User,        module: 'globaal' },
   { label: 'Profiel',                   sublabel: 'Persoonlijke gegevens en huishouden', href: '/identity/profiel',                     icon: User,        module: 'globaal' },
-  { label: 'Gids',                      sublabel: 'Concepten en modules uitgelegd',     href: '/identity/gids',                         icon: BookOpen,    module: 'globaal' },
   { label: 'Instellingen',              sublabel: 'Notificaties, FIRE, weergave, modules', href: '/identity/instellingen',              icon: Settings,    module: 'globaal' },
   { label: 'Koppelingen',               sublabel: 'Banken, brokers, exchanges',         href: '/identity/koppelingen',                  icon: Plug,        module: 'globaal' },
-  { label: 'Testscenario\'s',           sublabel: '26 use-cases × 4 personas',          href: '/identity/testscenarios',                icon: ListChecks,  module: 'globaal' },
   { label: 'Delen',                     sublabel: 'Vrijheidskaart-generator',           href: '/identity/delen',                        icon: Send,        module: 'globaal' },
-  { label: 'Jaaroverzicht',             sublabel: 'Year-in-Review + permalink',         href: '/identity/jaaroverzicht',                icon: Sparkles,    module: 'globaal' },
 ]
 
 // ── Globaal ──────────────────────────────────────────────────────────────────

@@ -2,9 +2,8 @@
 
 import { useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import Link from 'next/link'
 import { FreedomCardGenerator } from '@/components/app/freedom-card'
-import { ChevronRight, Share2 } from 'lucide-react'
+import { Share2 } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
 
@@ -45,7 +44,7 @@ export default function DelenPage() {
             borderLeft: '2px solid var(--module-active-500)',
           }}
         >
-          Deel je voortgang en bekijk je jaaroverzicht.
+          Deel je voortgang met je partner of een adviseur.
         </p>
       </header>
 
@@ -80,22 +79,6 @@ export default function DelenPage() {
 
         <FreedomCardGenerator />
       </section>
-
-      {/* ── Jaaroverzicht link ──────────────────────────────────── */}
-      <Link
-        href="/identity/jaaroverzicht"
-        className="group mb-5 sm:mb-8 flex items-center justify-between rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-all hover:border-wil-300 hover:shadow-sm sm:p-8"
-      >
-        <div>
-          <h2 className="label-editorial text-[var(--ink-2)]">
-            Jaaroverzicht
-          </h2>
-          <p className="mt-1 text-sm text-[var(--ink-3)]">
-            Bekijk je volledige financiele jaaroverzicht met statistieken en hoogtepunten.
-          </p>
-        </div>
-        <ChevronRight className="h-5 w-5 shrink-0 text-[var(--ink-4)] transition-colors group-hover:text-wil-500" />
-      </Link>
     </div>
   )
 }

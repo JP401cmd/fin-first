@@ -39,10 +39,8 @@ export const identityNav: ModuleNavConfig = {
   items: [
     { label: 'Overzicht', href: '/identity' },
     { label: 'Profiel', href: '/identity/profiel' },
-    { label: 'Gids', href: '/identity/gids' },
     { label: 'Instellingen', href: '/identity/instellingen' },
     { label: 'Koppelingen', href: '/identity/koppelingen' },
-    { label: 'Testscenario\u2019s', href: '/identity/testscenarios' },
     { label: 'Delen', href: '/identity/delen' },
   ],
 }
@@ -51,7 +49,6 @@ export const identityNav: ModuleNavConfig = {
  * Canonieke /mijn-navigatie. Sub-route-stubs (notificaties, uiterlijk,
  * privacy, geavanceerd) redirecten naar legacy /identity/instellingen
  * met de juiste tab geopend \u2014 totdat de monster-pagina is opgesplitst.
- * Gids/testscenarios blijven onder /identity want geen redirect daar.
  */
 export const mijnNav: ModuleNavConfig = {
   module: 'Mijn',
@@ -66,8 +63,6 @@ export const mijnNav: ModuleNavConfig = {
     { label: 'Koppelingen', href: '/mijn/koppelingen' },
     { label: 'Delen', href: '/mijn/delen' },
     { label: 'Geavanceerd', href: '/mijn/geavanceerd' },
-    { label: 'Gids', href: '/identity/gids' },
-    { label: 'Testscenario\u2019s', href: '/identity/testscenarios' },
   ],
 }
 

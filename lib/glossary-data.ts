@@ -3,7 +3,7 @@
  *
  * Gebruikt door:
  * - `<GlossaryTerm>` component (tooltip-popover)
- * - `ConceptFlipCards` in /identity/gids (flip-kaart achterkant)
+ * - glossary-popovers (GlossaryTerm)
  *
  * Elke entry heeft:
  * - `name`: korte weergavenaam (voor kaart-voorkant, tooltip-header)

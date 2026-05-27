@@ -16,7 +16,7 @@ import { GLOSSARY, GLOSSARY_ENTRIES } from '@/lib/glossary-data'
  *   → subtle, non-distracting for terms already learned.
  *
  * Content wordt opgehaald uit `lib/glossary-data.ts` — dezelfde bron als
- * de ConceptFlipCards in /identity/gids. Eén bron van waarheid.
+ * de glossary-popovers. Eén bron van waarheid.
  *
  * Usage:
  *   <GlossaryTerm term="SWR">SWR</GlossaryTerm>
