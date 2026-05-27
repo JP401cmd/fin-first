@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PalettePicker } from '@/components/mijn/palette-picker'
 import { FontPicker } from '@/components/mijn/font-picker'
 import { ModuleAccentPicker } from '@/components/mijn/module-accent-picker'
 import { BudgetTintPicker } from '@/components/mijn/budget-tint-picker'
 import { PhaseColorPicker } from '@/components/mijn/phase-color-picker'
+import { CategoryTintPicker } from '@/components/mijn/category-tint-picker'
 
 export const metadata: Metadata = {
   title: 'Uiterlijk — TriFinity',
@@ -59,16 +59,13 @@ export default function MijnUiterlijkPage() {
           <PhaseColorPicker />
         </div>
 
+        <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+          <CategoryTintPicker />
+        </div>
+
         <p className="mt-6 text-[11px] italic text-[var(--ink-3)]">
-          Wijzigingen worden direct toegepast en gesynct met je account.
-          Reset naar defaults via{' '}
-          <Link
-            href="/identity/instellingen?tab=weergave"
-            className="underline hover:text-[var(--ink-2)]"
-          >
-            geavanceerde weergave-opties
-          </Link>
-          .
+          Wijzigingen worden direct toegepast en gesynct met je account. Elke sectie heeft een eigen
+          standaard-knop om naar de fabrieksinstelling terug te zetten.
         </p>
       </section>
     </>
