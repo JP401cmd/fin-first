@@ -52,6 +52,13 @@ const nextConfig: NextConfig = {
       { source: '/identity/delen', destination: '/mijn/delen', permanent: false },
       { source: '/horizon/samengestelde-interest', destination: '/toekomst/samengestelde-interest', permanent: false },
       { source: '/horizon/inflatie-koopkracht', destination: '/toekomst/inflatie-koopkracht', permanent: false },
+
+      // Budgetten-dedup (beslissing 1): de budget-OVERZICHT-pagina is
+      // identiek aan de Budget-view op /overzicht/cashflow (zelfde
+      // BudgetsClient). Index redirect; de detail-/nieuw-subroutes
+      // (/core/budgets/[id], /core/budgets/new) blijven los bestaan
+      // (exact-match redirect raakt die niet).
+      { source: '/core/budgets', destination: '/overzicht/cashflow', permanent: false },
     ]
   },
 };
