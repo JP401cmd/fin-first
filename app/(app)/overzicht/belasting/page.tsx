@@ -4,9 +4,9 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { BelastingOverzichtStrip } from '@/components/overview/belasting-overzicht-strip'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
+import { Box3Detail } from '@/components/overview/box3-detail'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
-import BelastingPage from '../../core/belasting/page'
 
 export const metadata: Metadata = {
   title: 'Belasting — TriFinity',
@@ -19,8 +19,10 @@ export const metadata: Metadata = {
  * Layout:
  *  1. BelastingOverzichtStrip — 3-tegel KPI-strip met Box 1/2/3
  *     (server-side data uit horizonData)
- *  2. BelastingPage — bestaande detail-sectie met alle berekeningen,
- *     filters en breakdowns per box
+ *  2. JaarruimteCard — pensioen-aftrekruimte (Box 1)
+ *  3. Box3Detail — compacte, inklapbare Box 3-berekening (vervangt het
+ *     volledige /core/belasting-embed; zelfde pure engine via
+ *     /api/household/box3). /core/belasting redirect hierheen.
  *
  * Box-data bronnen:
  *  - Box 3: horizonData.healthScoreInput.taxData.box3Tax (echte forfaitair
@@ -70,7 +72,7 @@ export default async function OverzichtBelastingPage() {
           marginaalTarief={marg}
         />
       </section>
-      <BelastingPage />
+      <Box3Detail year={2026} />
     </>
   )
 }

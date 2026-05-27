@@ -59,6 +59,11 @@ const nextConfig: NextConfig = {
       // (/core/budgets/[id], /core/budgets/new) blijven los bestaan
       // (exact-match redirect raakt die niet).
       { source: '/core/budgets', destination: '/overzicht/cashflow', permanent: false },
+
+      // Belasting-dedup (beslissing 3): de volledige Box 3-pagina is nu
+      // compact als Box3Detail op /overzicht/belasting (zelfde pure
+      // box3-data-engine via /api/household/box3). Index redirect.
+      { source: '/core/belasting', destination: '/overzicht/belasting', permanent: false },
     ]
   },
 };
