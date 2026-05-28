@@ -5,10 +5,11 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import AssetsPage from '@/components/core/assets-client'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { BezittingenFilter } from '@/components/overview/bezittingen-filter'
-import { CompoundInsightCard } from '@/components/overview/compound-insight-card'
-import { FeeImpactCard } from '@/components/overview/fee-impact-card'
+import { CompoundInsightCard, COMPOUND_INSIGHT_ID } from '@/components/overview/compound-insight-card'
+import { FeeImpactCard, FEE_IMPACT_ID } from '@/components/overview/fee-impact-card'
 import { BezittingenOverzichtStrip } from '@/components/overview/bezittingen-overzicht-strip'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
@@ -107,6 +108,10 @@ export default async function OverzichtBezittingenPage() {
     <>
       <NavStackMeta title="Bezittingen" bottomBar={{ kind: 'tabs' }} />
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <InsightToggleButton
+          ids={[COMPOUND_INSIGHT_ID, FEE_IMPACT_ID]}
+          className="absolute right-[52px] top-4 sm:right-[60px]"
+        />
         <PageInfoButton
           description={PAGE_INFO['/overzicht/bezittingen'] ?? ''}
           className="absolute right-4 top-4 sm:right-6"

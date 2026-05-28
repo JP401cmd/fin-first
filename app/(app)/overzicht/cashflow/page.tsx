@@ -12,9 +12,10 @@ import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
 import { CashflowKalender } from '@/components/overview/cashflow-kalender'
 import { CashflowForecast } from '@/components/overview/cashflow-forecast'
 import { CashflowSankey } from '@/components/overview/cashflow-sankey'
-import { InflationImpactCard } from '@/components/overview/inflation-impact-card'
+import { InflationImpactCard, INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
 import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-banner'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import type { RecurringTransaction } from '@/lib/recurring-data'
 
@@ -149,6 +150,10 @@ export default async function OverzichtCashflowPage() {
     <>
       <NavStackMeta title="Cashflow" bottomBar={{ kind: 'tabs' }} />
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <InsightToggleButton
+          ids={[INFLATION_IMPACT_ID]}
+          className="absolute right-[52px] top-4 sm:right-[60px]"
+        />
         <PageInfoButton
           description={PAGE_INFO['/overzicht/cashflow'] ?? ''}
           className="absolute right-4 top-4 sm:right-6"

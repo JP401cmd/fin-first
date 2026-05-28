@@ -1,9 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Percent, TrendingDown } from 'lucide-react'
+import { Percent, TrendingDown, X } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { projectCompound } from '@/lib/compound-projection'
+import { useInsightVisibility } from '@/lib/hooks/use-insight-visibility'
+
+/** Canonieke id voor InsightToggleButton — match met page-mounting. */
+export const FEE_IMPACT_ID = 'fee-impact'
 
 /**
  * FeeImpactCard — tweede "moment of realization"-card (plan T-4 /
@@ -33,6 +37,7 @@ export function FeeImpactCard({
   // Interactieve slider voor extra beheerkosten — laat user zien hoe
   // gevoelig de eindwaarde is.
   const [extraFeePct, setExtraFeePct] = useState(0.5)
+  const { visible, hide } = useInsightVisibility(FEE_IMPACT_ID)
 
   if (investmentTotal < MIN_PORTFOLIO_FOR_CARD) return null
 
@@ -52,9 +57,20 @@ export function FeeImpactCard({
   const noFeeBar = (noFeeValue / maxValue) * 100
   const withFeeBar = (withFeeValue / maxValue) * 100
 
+  if (!visible) return null
+
   return (
-    <article className="rounded-2xl border border-[var(--border-ed)] bg-gradient-to-br from-rose-50/60 to-stone-50 p-4 sm:p-6">
-      <header className="flex items-start gap-3 mb-4">
+    <article className="relative rounded-2xl border border-[var(--border-ed)] bg-gradient-to-br from-rose-50/60 to-stone-50 p-4 sm:p-6">
+      <button
+        type="button"
+        onClick={hide}
+        aria-label="Inzicht minimaliseren"
+        title="Minimaliseren"
+        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full text-rose-700/70 transition-colors hover:bg-rose-100 hover:text-rose-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      <header className="flex items-start gap-3 mb-4 pr-7">
         <span className="inline-flex w-9 h-9 rounded-lg bg-rose-100 text-rose-700 items-center justify-center shrink-0">
           <Percent className="w-4 h-4" aria-hidden="true" />
         </span>

@@ -83,4 +83,13 @@ describe('FeeImpactCard — slider', () => {
     rerender(<FeeImpactCard investmentTotal={100_000} />)
     expect(container.textContent).toMatch(/1\.5%/)
   })
+
+  it('minimaliseer-knop verbergt de card en schrijft id naar localStorage', () => {
+    window.localStorage.clear()
+    const { container } = render(<FeeImpactCard investmentTotal={100_000} />)
+    fireEvent.click(screen.getByRole('button', { name: /minimaliseren/i }))
+    expect(container.querySelector('article')).toBeNull()
+    const stored = JSON.parse(window.localStorage.getItem('tf-insight-hidden') ?? '[]')
+    expect(stored).toContain('fee-impact')
+  })
 })

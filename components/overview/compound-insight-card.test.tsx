@@ -81,4 +81,13 @@ describe('CompoundInsightCard — interactieve slider', () => {
     expect(slider.getAttribute('max')).toBe('1000')
     expect(slider.getAttribute('step')).toBe('25')
   })
+
+  it('minimaliseer-knop verbergt de card en schrijft id naar localStorage', () => {
+    window.localStorage.clear()
+    const { container } = render(<CompoundInsightCard liquidCash={20_000} />)
+    fireEvent.click(screen.getByRole('button', { name: /minimaliseren/i }))
+    expect(container.querySelector('article')).toBeNull()
+    const stored = JSON.parse(window.localStorage.getItem('tf-insight-hidden') ?? '[]')
+    expect(stored).toContain('compound-insight')
+  })
 })

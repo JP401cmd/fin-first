@@ -2,9 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { TrendingDown, ArrowRight } from 'lucide-react'
+import { TrendingDown, ArrowRight, X } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { projectCompound } from '@/lib/compound-projection'
+import { useInsightVisibility } from '@/lib/hooks/use-insight-visibility'
+
+/** Canonieke id voor InsightToggleButton — match met page-mounting. */
+export const INFLATION_IMPACT_ID = 'inflation-impact'
 
 /**
  * InflationImpactCard — derde dramatic visualization (plan T-4 /
@@ -30,8 +34,10 @@ export function InflationImpactCard({
   monthlyExpenses: number
 }) {
   const [inflationPct, setInflationPct] = useState(DEFAULT_INFLATION)
+  const { visible, hide } = useInsightVisibility(INFLATION_IMPACT_ID)
 
   if (monthlyExpenses < MIN_MONTHLY_FOR_CARD) return null
+  if (!visible) return null
 
   const rate = inflationPct / 100
   // Voor inflatie-projectie gebruik FV = monthly × (1+r)^years (van het
@@ -48,8 +54,17 @@ export function InflationImpactCard({
     : 0
 
   return (
-    <article className="rounded-2xl border border-[var(--border-ed)] bg-gradient-to-br from-amber-50/60 to-stone-50 p-4 sm:p-6">
-      <header className="flex items-start gap-3 mb-4">
+    <article className="relative rounded-2xl border border-[var(--border-ed)] bg-gradient-to-br from-amber-50/60 to-stone-50 p-4 sm:p-6">
+      <button
+        type="button"
+        onClick={hide}
+        aria-label="Inzicht minimaliseren"
+        title="Minimaliseren"
+        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full text-amber-700/70 transition-colors hover:bg-amber-100 hover:text-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      <header className="flex items-start gap-3 mb-4 pr-7">
         <span className="inline-flex w-9 h-9 rounded-lg bg-amber-100 text-amber-700 items-center justify-center shrink-0">
           <TrendingDown className="w-4 h-4" aria-hidden="true" />
         </span>

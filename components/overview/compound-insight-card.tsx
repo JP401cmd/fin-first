@@ -2,9 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { TrendingUp, ArrowRight, Plus } from 'lucide-react'
+import { TrendingUp, ArrowRight, Plus, X } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { compareCompound } from '@/lib/compound-projection'
+import { useInsightVisibility } from '@/lib/hooks/use-insight-visibility'
+
+/** Canonieke id voor InsightToggleButton — match met page-mounting. */
+export const COMPOUND_INSIGHT_ID = 'compound-insight'
 
 /**
  * CompoundInsightCard — "moment of realization"-card die laat zien wat
@@ -38,6 +42,7 @@ export function CompoundInsightCard({
   // Interactieve slider-state: user kan inleg variëren tussen €0 en €1000/mnd
   // om het compound-effect dynamisch te ervaren.
   const [monthly, setMonthly] = useState(monthlyContribution)
+  const { visible, hide } = useInsightVisibility(COMPOUND_INSIGHT_ID)
 
   const result = compareCompound({
     principal: liquidCash,
@@ -56,9 +61,20 @@ export function CompoundInsightCard({
   const consPct = Math.max(30, (result.conservative / maxValue) * 100)
   const ambPct = (result.ambitious / maxValue) * 100
 
+  if (!visible) return null
+
   return (
-    <article className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/50 to-stone-50 p-4 sm:p-6">
-      <header className="flex items-center gap-2 mb-3">
+    <article className="relative rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/50 to-stone-50 p-4 sm:p-6">
+      <button
+        type="button"
+        onClick={hide}
+        aria-label="Inzicht minimaliseren"
+        title="Minimaliseren"
+        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full text-emerald-700/70 transition-colors hover:bg-emerald-100 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      <header className="flex items-center gap-2 mb-3 pr-7">
         <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700">
           <TrendingUp className="w-4 h-4" aria-hidden="true" />
         </span>

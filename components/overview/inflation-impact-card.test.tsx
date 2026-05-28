@@ -59,4 +59,13 @@ describe('InflationImpactCard — slider', () => {
     // €2000 × (1.01)^30 ≈ €2695 → 35% delta
     expect(container.textContent).toMatch(/\+3[0-9]% nominaal/)
   })
+
+  it('minimaliseer-knop verbergt de card en schrijft id naar localStorage', () => {
+    window.localStorage.clear()
+    const { container } = render(<InflationImpactCard monthlyExpenses={2000} />)
+    fireEvent.click(screen.getByRole('button', { name: /minimaliseren/i }))
+    expect(container.querySelector('article')).toBeNull()
+    const stored = JSON.parse(window.localStorage.getItem('tf-insight-hidden') ?? '[]')
+    expect(stored).toContain('inflation-impact')
+  })
 })
