@@ -11,15 +11,13 @@ import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 import { SectionDivider } from '@/components/app/section-divider'
 import { DAIshboard } from '@/components/dashboard/daishboard'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
-import { ActionCenter } from './action-center'
+import { ActiesTeaser } from '@/components/overview/acties-teaser'
 import { DoelenStrook } from './doelen-strook'
 import { StappenplannenStrook } from './stappenplannen-strook'
 import { type RecurringItem } from './vaste-kosten-analyse'
 import { CashflowSection } from './cashflow-section'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import { MonthlyCheckinCard } from '@/components/dashboard/monthly-checkin-card'
-import { useFeatureAccess } from '@/components/app/feature-access-provider'
-import { isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -99,17 +97,7 @@ export function WillLanding({
     router.refresh()
   }, [router])
 
-  const { kpiData, recommendations, actions, goals, goalProgresses, goalAssets, goalDebts, partnerInfo, currentUserId, userProfile } = willData
-
-  // Compute average goal progress for KPI card
-  const avgGoalProgress = kpiData.goalProgresses.length > 0
-    ? Math.round(kpiData.goalProgresses.reduce((s, g) => s + g.pct, 0) / kpiData.goalProgresses.length)
-    : 0
-
-  // Doelen-feature-flag — bepaalt of de Doelvoortgang-cel in de header zichtbaar is
-  // en of de DoelenStrook überhaupt rendert (FeatureGate binnen DoelenStrook handelt fallback af).
-  const { features } = useFeatureAccess()
-  const doelenEnabled = isFeatureAccessible(features, 'doelen_systeem')
+  const { actions, goals, goalProgresses, goalAssets, goalDebts, partnerInfo, currentUserId, userProfile } = willData
 
   return (
     <FreedomDaysAnimationProvider>
@@ -194,21 +182,11 @@ export function WillLanding({
 
         <SectionDivider variant="asterisk" />
 
-        {/* ── Sectie 3a: Actiecentrum (2-koloms werk-board) ──── */}
-        <section className="mt-4" aria-label="Actiecentrum">
-          <ActionCenter
-            recommendations={recommendations}
-            actions={actions}
-            partnerInfo={partnerInfo}
-            currentUserId={currentUserId}
-            onCancellationOpen={handleCancellationOpen}
-            onDataChanged={handleDataChanged}
-            openRecommendationCount={kpiData.allPendingRecs.length}
-            openActionCount={kpiData.openActions.length}
-            avgGoalProgress={avgGoalProgress}
-            doelenEnabled={doelenEnabled}
-          />
-        </section>
+        {/* ── Sectie 3a: Acties-teaser → /overzicht/acties + Will-chat ─── */}
+        <ActiesTeaser
+          openActionCount={actions.filter((a) => a.status === 'open').length}
+          postponedActionCount={actions.filter((a) => a.status === 'postponed').length}
+        />
 
         {/* ── Sectie 3b: Doelen (Kompas) — gescheiden door double-rule ── */}
         <SectionDivider variant="double-rule" />

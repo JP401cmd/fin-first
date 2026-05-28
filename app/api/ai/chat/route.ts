@@ -161,7 +161,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const tools = getTools(safeDomain, supabase, chatContext)
+  const tools = getTools(safeDomain, supabase, chatContext, user.id)
   const modelMessages = await convertToModelMessages(messages)
 
   /* Create an AbortController that fires on timeout */

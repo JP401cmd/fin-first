@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
 import { ChatPanel } from '@/components/app/chat/chat-panel'
+import { ChatPromptDeeplink } from '@/components/app/chat/chat-prompt-deeplink'
 import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
 import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame'
@@ -394,6 +395,9 @@ export default async function AppLayout({
                         </CommandPaletteProvider>
                       </FeatureAccessProvider>
                       <ChatPanel />
+                      <Suspense fallback={null}>
+                        <ChatPromptDeeplink />
+                      </Suspense>
                       <Suspense fallback={null}>
                         <CoachBubble dataGaps={coachDataGaps} deferredFields={coachDeferredFields} />
                       </Suspense>

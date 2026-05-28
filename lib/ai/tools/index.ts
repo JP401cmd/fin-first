@@ -1,19 +1,28 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ToolSet } from 'ai'
 import type { AIDomain, ChatContext } from '@/lib/ai/dna'
 import { freedomCalcTool } from './freedom-calc'
 import { createLookupTool } from './lookup'
 import { suggestActionTool } from './suggest-action'
 import { suggestLifeEventTool } from './suggest-life-event'
 import { showVisualizationTool } from './show-visualization'
+import { createSuggestRecommendationTool } from './suggest-recommendation'
 
 /**
  * Get the tool set for a given domain.
- * All domains get all tools including suggestAction (Will is the sole assistant).
- * When context is 'whatif', replace suggestAction with suggestLifeEvent
- * (actions are handled elsewhere on the what-if page).
+ * Standaard tools krijgen alle domeinen — Will is de enige assistent.
+ *
+ * Voor de whatif-context wisselen we suggestAction in voor suggestLifeEvent
+ * en LATEN we suggestRecommendation weg: voorstellen horen in de hoofdchat,
+ * niet in de what-if-sandbox waar de gebruiker scenario's bouwt.
  */
-export function getTools(_domain: AIDomain, supabase: SupabaseClient, context?: ChatContext) {
-  const base = {
+export function getTools(
+  _domain: AIDomain,
+  supabase: SupabaseClient,
+  context?: ChatContext,
+  userId?: string | null,
+): ToolSet {
+  const base: ToolSet = {
     freedomCalc: freedomCalcTool,
     lookup: createLookupTool(supabase),
     showVisualization: showVisualizationTool,
@@ -23,5 +32,13 @@ export function getTools(_domain: AIDomain, supabase: SupabaseClient, context?: 
     return { ...base, suggestLifeEvent: suggestLifeEventTool, suggestAction: suggestActionTool }
   }
 
-  return { ...base, suggestAction: suggestActionTool }
+  const tools: ToolSet = { ...base, suggestAction: suggestActionTool }
+
+  // suggestRecommendation alleen aanmelden als we een user-id hebben — de tool
+  // schrijft naar de recommendations-tabel namens deze gebruiker (RLS).
+  if (userId) {
+    tools.suggestRecommendation = createSuggestRecommendationTool(supabase, userId)
+  }
+
+  return tools
 }

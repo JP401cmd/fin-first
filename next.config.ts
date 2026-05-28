@@ -85,6 +85,11 @@ const nextConfig: NextConfig = {
       // configuratie zijn opgegaan in de Mijn-hub.
       { source: '/identity/voortgang', destination: '/mijn', permanent: false },
       { source: '/identity/widgets', destination: '/mijn', permanent: false },
+
+      // Acties-pool integratie: /overzicht/tips wordt /overzicht/acties.
+      // Voorstellen leven nu in Will-chat (één-voor-één, niks doen = weg);
+      // de pool toont alleen geaccepteerde acties + off-track doelen.
+      { source: '/overzicht/tips', destination: '/overzicht/acties', permanent: false },
     ]
   },
 };

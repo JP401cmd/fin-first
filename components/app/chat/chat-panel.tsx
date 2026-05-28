@@ -10,7 +10,8 @@ import { WillDots } from '@/components/app/will-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
-import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck } from 'lucide-react'
+import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown } from 'lucide-react'
+import type { SuggestRecommendationResult } from '@/lib/ai/tools/suggest-recommendation'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { ChatVisualizationCard } from './chat-visualization-card'
 import type { VisualizationOutput } from '@/lib/ai/tools/show-visualization'
@@ -167,6 +168,137 @@ function ActionSuggestionCard({
   )
 }
 
+/* ── Recommendation suggestion card ────────────────────────────────── */
+
+type RecommendationDecision = 'accepted' | 'postponed' | 'rejected'
+
+function RecommendationSuggestionCard({
+  data,
+  decision,
+  loading,
+  onDecision,
+}: {
+  data: SuggestRecommendationResult
+  decision: RecommendationDecision | null
+  loading: 'accept' | 'postpone' | 'reject' | null
+  onDecision: (action: 'accept' | 'postpone' | 'reject') => void
+}) {
+  const resolved = decision !== null
+  return (
+    <div
+      className={`mt-2 w-full rounded-[var(--r-lg)] border transition-colors ${
+        resolved
+          ? decision === 'accepted'
+            ? 'border-emerald-200 bg-emerald-50/60'
+            : decision === 'postponed'
+              ? 'border-amber-200 bg-amber-50/60'
+              : 'border-zinc-200 bg-zinc-50/60'
+          : 'border-wil-200 bg-[var(--paper)]'
+      }`}
+    >
+      <div className="px-3 py-2.5">
+        <div className="flex items-start gap-2">
+          <Sparkles
+            className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${resolved ? 'text-[var(--ink-3)]' : 'text-wil-500'}`}
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-wil-700">
+              Voorstel van Will
+            </div>
+            <h4 className="mt-0.5 text-sm font-semibold text-[var(--ink)] leading-snug">
+              {data.title}
+            </h4>
+            <p className="mt-1 text-xs text-[var(--ink-2)] leading-snug">{data.description}</p>
+            <div className="mt-1.5 flex items-center gap-3 text-xs text-[var(--ink-3)]">
+              <span className="font-medium text-wil-600">
+                +{data.freedom_days_per_year}{' '}
+                {data.freedom_days_per_year === 1 ? 'dag' : 'dagen'} vrijheid/jaar
+              </span>
+              {data.euro_impact_monthly != null && data.euro_impact_monthly !== 0 && (
+                <span>&euro;{Math.abs(data.euro_impact_monthly)}/mnd</span>
+              )}
+            </div>
+            {data.suggested_actions.length > 0 && (
+              <ul className="mt-2 space-y-0.5 text-[11px] text-[var(--ink-3)]">
+                {data.suggested_actions.map((a, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-wil-400" aria-hidden="true" />
+                    <span>{a.title}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {resolved ? (
+          <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-medium text-[var(--ink-2)]">
+            {decision === 'accepted' && (
+              <>
+                <Check className="h-3 w-3 text-emerald-600" aria-hidden="true" /> Geaccepteerd —
+                staat op je acties
+              </>
+            )}
+            {decision === 'postponed' && (
+              <>
+                <Clock className="h-3 w-3 text-amber-600" aria-hidden="true" /> Uitgesteld
+              </>
+            )}
+            {decision === 'rejected' && (
+              <>
+                <ThumbsDown className="h-3 w-3 text-zinc-600" aria-hidden="true" /> Afgewezen
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => onDecision('accept')}
+              disabled={loading !== null}
+              className="inline-flex items-center gap-1 rounded-full bg-wil-500 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
+            >
+              {loading === 'accept' ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              ) : (
+                <Check className="h-3 w-3" aria-hidden="true" />
+              )}
+              Accepteer
+            </button>
+            <button
+              type="button"
+              onClick={() => onDecision('postpone')}
+              disabled={loading !== null}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-50"
+            >
+              {loading === 'postpone' ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              ) : (
+                <Clock className="h-3 w-3" aria-hidden="true" />
+              )}
+              Uitstel
+            </button>
+            <button
+              type="button"
+              onClick={() => onDecision('reject')}
+              disabled={loading !== null}
+              className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-[var(--paper)] px-2.5 py-1 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+            >
+              {loading === 'reject' ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              ) : (
+                <ThumbsDown className="h-3 w-3" aria-hidden="true" />
+              )}
+              Wijs af
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
@@ -200,6 +332,13 @@ export function ChatPanel() {
   // Track which suggestions have been added (by toolInvocationId)
   const [addedActions, setAddedActions] = useState<Set<string>>(new Set())
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
+
+  // Voorstel-beslissingen: per toolCallId welk antwoord de gebruiker gaf
+  // (accepted/postponed/rejected). Niet-besliste voorstellen worden bij
+  // chat-sluit ge-expired via /api/ai/recommendations/[id] action:'expire'.
+  const [recDecisions, setRecDecisions] = useState<Map<string, RecommendationDecision>>(new Map())
+  const [loadingRec, setLoadingRec] = useState<{ id: string; kind: 'accept' | 'postpone' | 'reject' } | null>(null)
+  const pendingRecsRef = useRef<Map<string, string>>(new Map()) // toolCallId → recommendationId
 
   // Modal state
   const [editAction, setEditAction] = useState<Action | null>(null)
@@ -327,6 +466,66 @@ export function ChatPanel() {
     }
   }, [addedActions])
 
+  /* ── Recommendation decision ──────────────────────────────────── */
+
+  const handleRecDecision = useCallback(
+    async (
+      toolCallId: string,
+      recommendationId: string,
+      kind: 'accept' | 'postpone' | 'reject',
+    ) => {
+      if (recDecisions.has(toolCallId)) return
+      setLoadingRec({ id: toolCallId, kind })
+
+      try {
+        const res = await fetch(`/api/ai/recommendations/${recommendationId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: kind }),
+        })
+
+        if (!res.ok) throw new Error('decision failed')
+
+        const decision: RecommendationDecision =
+          kind === 'accept' ? 'accepted' : kind === 'postpone' ? 'postponed' : 'rejected'
+
+        setRecDecisions((prev) => {
+          const next = new Map(prev)
+          next.set(toolCallId, decision)
+          return next
+        })
+        // Eenmaal beslist: weghalen uit pending-set zodat chat-sluit geen
+        // expire-call triggert.
+        pendingRecsRef.current.delete(toolCallId)
+      } catch {
+        // silently fail — user can retry
+      } finally {
+        setLoadingRec(null)
+      }
+    },
+    [recDecisions],
+  )
+
+  // Expire-on-close: bij chat-sluit met onbeantwoorde voorstellen → expire ze
+  // server-side zodat Will ze niet opnieuw aanraadt.
+  useEffect(() => {
+    if (isOpen) return
+    if (pendingRecsRef.current.size === 0) return
+
+    const ids = Array.from(pendingRecsRef.current.values())
+    pendingRecsRef.current.clear()
+    // Fire-and-forget; geen UI-feedback nodig (chat is dicht).
+    void Promise.allSettled(
+      ids.map((id) =>
+        fetch(`/api/ai/recommendations/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'expire' }),
+        }),
+      ),
+    )
+  }, [isOpen])
+
   /* ── Modal handlers ───────────────────────────────────────────── */
 
   const handleModalSave = useCallback(async (data: Record<string, unknown>) => {
@@ -398,6 +597,53 @@ export function ChatPanel() {
               onClick={() => handleAddAction(action.toolCallId, data)}
             />
           )
+        }
+      }
+
+      // Recommendation suggestion — één-voor-één voorstel met 3 knoppen.
+      // DB-rij is al aangemaakt door de tool (server-side); kaart toont
+      // alleen UI-state. Pending recommendations worden bij chat-sluit
+      // ge-expired.
+      const rec = findToolInvocation(part, 'suggestRecommendation')
+      if (rec) {
+        const isLoading = TOOL_LOADING_STATES.includes(rec.state)
+        const hasOutput = TOOL_OUTPUT_STATES.includes(rec.state) && rec.output
+
+        if (isLoading) {
+          elements.push(
+            <div key={`rec-loading-${rec.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-wil-100 bg-[var(--paper)] px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-400" />
+                <span className="text-xs text-[var(--ink-3)]">Voorstel wordt voorbereid...</span>
+              </div>
+            </div>
+          )
+        }
+
+        if (hasOutput) {
+          const out = rec.output as SuggestRecommendationResult | { error: true; message: string }
+          if ('error' in out && out.error) {
+            elements.push(
+              <div key={`rec-err-${rec.toolCallId}`} className="mt-2 rounded-[var(--r-lg)] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {out.message}
+              </div>
+            )
+          } else {
+            const data = out as SuggestRecommendationResult
+            // Registreer pending voor expire-on-close (alleen vóór beslissing).
+            if (!recDecisions.has(rec.toolCallId)) {
+              pendingRecsRef.current.set(rec.toolCallId, data.id)
+            }
+            elements.push(
+              <RecommendationSuggestionCard
+                key={`rec-${rec.toolCallId}`}
+                data={data}
+                decision={recDecisions.get(rec.toolCallId) ?? null}
+                loading={loadingRec?.id === rec.toolCallId ? loadingRec.kind : null}
+                onDecision={(kind) => handleRecDecision(rec.toolCallId, data.id, kind)}
+              />
+            )
+          }
         }
       }
 

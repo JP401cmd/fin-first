@@ -32,9 +32,10 @@ export const PAGE_INFO: Record<string, string> = {
     'Slim verdelen over fiscale bakjes scheelt geld per jaar. ' +
     'Bekijk je heffingen en gebruik je jaarruimte.',
 
-  '/overzicht/tips':
-    'Acties-pool: Will-tips plus doelen die aandacht vragen, gebundeld. ' +
-    'Markeer per tip "Doe nu", "Later" of "Negeren". Off-track-doelen krijgen een eigen blok met directe link naar bewerken.',
+  '/overzicht/acties':
+    'Je open acties plus doelen die aandacht vragen. ' +
+    'Nieuwe acties komen via twee kanalen: Will-chat (voorstellen accepteren) of de "Nieuwe actie"-knop. ' +
+    'Sleep tussen lanes om uit te stellen, af te ronden of te wijzigen.',
 
   '/toekomst':
     'Waar ga je heen. ' +
