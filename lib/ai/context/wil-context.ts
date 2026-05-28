@@ -69,7 +69,11 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
       ? supabase
           .from('recommendations')
           .select('title, status')
-          .in('status', ['dismissed', 'completed'])
+          // Negatief signaal: alles wat al een keer voorgesteld is en
+          // niet geaccepteerd — inclusief het nieuwe `expired` (chat-sluit
+          // zonder beslissing). Legacy-statussen blijven aanwezig voor
+          // data die nog van vroegere flows komt.
+          .in('status', ['dismissed', 'completed', 'rejected', 'expired'])
           .gte('updated_at', oneYearAgo)
           .order('updated_at', { ascending: false })
           .limit(30)

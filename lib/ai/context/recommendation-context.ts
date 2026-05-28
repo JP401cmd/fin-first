@@ -298,16 +298,24 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
     .limit(30)
 
   if (feedback && feedback.length > 0) {
-    const rejected = feedback.filter(f => f.feedback_type === 'rejected' || f.feedback_type === 'action_rejected')
+    // Negatief signaal: afgewezen door knop OF genegeerd door chat-sluit
+    // (status='expired'). Beide tellen als "doe dit type niet opnieuw".
+    const rejected = feedback.filter(
+      f =>
+        f.feedback_type === 'rejected' ||
+        f.feedback_type === 'action_rejected' ||
+        f.feedback_type === 'expired',
+    )
     const accepted = feedback.filter(f => f.feedback_type === 'accepted' || f.feedback_type === 'action_completed')
 
     if (rejected.length > 0) {
       const rejectedLines = rejected.map(f => {
         const slug = f.related_budget_slug ? ` (${f.related_budget_slug})` : ''
         const reason = f.reason ? ` — reden: "${f.reason}"` : ''
-        return `${f.recommendation_type}${slug}: ${f.feedback_type}${reason}`
+        const kind = f.feedback_type === 'expired' ? 'genegeerd' : 'afgewezen'
+        return `${f.recommendation_type}${slug}: ${kind}${reason}`
       })
-      parts.push(section('EERDER AFGEWEZEN (vermijd vergelijkbaar)', bulletList(rejectedLines)))
+      parts.push(section('EERDER AFGEWEZEN OF GENEGEERD (vermijd vergelijkbaar)', bulletList(rejectedLines)))
     }
 
     if (accepted.length > 0) {
@@ -319,18 +327,49 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
     }
   }
 
-  // Existing pending/accepted recommendations — avoid duplicates
-  const { data: existing } = await supabase
-    .from('recommendations')
-    .select('title, recommendation_type, related_budget_slug, status')
-    .in('status', ['pending', 'accepted'])
+  // Recommendation-historie: actuele voorstellen + recent afgewezen/genegeerd.
+  // Plan §6.6: voorstellen leven niet meer in een UI-lijst, dus Will moet
+  // de titels van eerdere voorstellen meekrijgen om tekstueel-vergelijkbare
+  // herhalingen te vermijden ("Wissel energieleverancier" → "Vergelijk
+  // energiecontracten" is verboden, ook al is het type identiek).
+  const NEGATIVE_HORIZON_DAYS = 60
+  const horizonIso = new Date(
+    Date.now() - NEGATIVE_HORIZON_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString()
 
-  if (existing && existing.length > 0) {
-    const existingLines = existing.map(r => {
+  const { data: activeRecs } = await supabase
+    .from('recommendations')
+    .select('title, related_budget_slug, status')
+    .in('status', ['pending', 'accepted', 'postponed'])
+
+  if (activeRecs && activeRecs.length > 0) {
+    const lines = activeRecs.map(r => {
       const slug = r.related_budget_slug ? ` (${r.related_budget_slug})` : ''
-      return `${r.title}${slug} — status: ${r.status}`
+      return `${r.title}${slug} — ${r.status}`
     })
-    parts.push(section('BESTAANDE VOORSTELLEN (geen duplicaten)', bulletList(existingLines)))
+    parts.push(section('ACTIEVE AANBEVELINGEN (geen duplicaten)', bulletList(lines)))
+  }
+
+  const { data: closedRecs } = await supabase
+    .from('recommendations')
+    .select('title, related_budget_slug, status, decided_at')
+    .in('status', ['rejected', 'expired'])
+    .gte('decided_at', horizonIso)
+    .order('decided_at', { ascending: false })
+    .limit(20)
+
+  if (closedRecs && closedRecs.length > 0) {
+    const lines = closedRecs.map(r => {
+      const slug = r.related_budget_slug ? ` (${r.related_budget_slug})` : ''
+      const kind = r.status === 'expired' ? 'genegeerd' : 'afgewezen'
+      return `${r.title}${slug} — ${kind}`
+    })
+    parts.push(
+      section(
+        `RECENT NIET BESLOTEN (laatste ${NEGATIVE_HORIZON_DAYS} dagen — herhaal niet, ook geen varianten)`,
+        bulletList(lines),
+      ),
+    )
   }
 
   return parts.join('\n')
