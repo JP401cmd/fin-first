@@ -10,9 +10,8 @@ export const metadata: Metadata = {
 /**
  * /mijn — kaart-grid van alle 8 sub-routes (plan §6.4).
  *
- * Vervangt eerdere IdentityClient-mount (= 2459-regel monolith). De
- * IdentityClient blijft beschikbaar op /identity voor legacy-content
- * die nog niet uitgekamerd is naar de 8 sub-pages.
+ * Vervangt de eerdere /identity-monolith (1823+ regels) volledig: alle
+ * tabs zijn uitgekamerd naar dedicated sub-pages onder /mijn.
  *
  * Acht sub-routes:
  *  - /mijn/profiel       basis-gegevens

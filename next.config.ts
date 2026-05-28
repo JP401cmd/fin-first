@@ -80,6 +80,11 @@ const nextConfig: NextConfig = {
       // editors hebben geen directe URL, ze leven in de strategie-modal
       // op /toekomst.
       { source: '/identity/instellingen', destination: '/mijn', permanent: false },
+
+      // Restanten van het /identity-tijdperk — voortgang en widgets-
+      // configuratie zijn opgegaan in de Mijn-hub.
+      { source: '/identity/voortgang', destination: '/mijn', permanent: false },
+      { source: '/identity/widgets', destination: '/mijn', permanent: false },
     ]
   },
 };
