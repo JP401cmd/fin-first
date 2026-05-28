@@ -147,8 +147,8 @@ describe('VoorkeurenView — markt-aannames', () => {
   })
 })
 
-describe('VoorkeurenView — deeplinks', () => {
-  it('alle cards linken naar /identity/parameters met focus-param', () => {
+describe('VoorkeurenView — geen dode /identity/parameters-deeplinks meer', () => {
+  it('cards bevatten geen /identity/parameters-href (inline-editor of static)', () => {
     const { container } = render(
       <VoorkeurenView
         fireParams={mockFireParams}
@@ -157,12 +157,9 @@ describe('VoorkeurenView — deeplinks', () => {
       />,
     )
     const hrefs = Array.from(container.querySelectorAll('a')).map((a) =>
-      a.getAttribute('href'),
+      a.getAttribute('href') ?? '',
     )
-    expect(hrefs.some((h) => h?.includes('focus=eindstrategie'))).toBe(true)
-    expect(hrefs.some((h) => h?.includes('focus=onttrekking'))).toBe(true)
-    expect(hrefs.some((h) => h?.includes('focus=inflatie'))).toBe(true)
-    expect(hrefs.some((h) => h?.includes('focus=rendement'))).toBe(true)
+    expect(hrefs.some((h) => h.includes('/identity/parameters'))).toBe(false)
   })
 
   it('linkt expliciet naar /overzicht/bezittingen voor per-groep rendement', () => {
@@ -175,5 +172,18 @@ describe('VoorkeurenView — deeplinks', () => {
     )
     const link = container.querySelector('a[href="/overzicht/bezittingen"]')
     expect(link).toBeTruthy()
+  })
+
+  it('toont "Binnenkort instelbaar"-hint op de drie placeholder-cards', () => {
+    render(
+      <VoorkeurenView
+        fireParams={mockFireParams}
+        fireStrategy={mockFireStrategy}
+        withdrawalStrategy={mockWithdrawal}
+      />,
+    )
+    // Volgorde + Verdeling + Afname → 3× "Binnenkort instelbaar"
+    const hints = screen.getAllByText('Binnenkort instelbaar')
+    expect(hints.length).toBe(3)
   })
 })

@@ -139,16 +139,15 @@ export function VoorkeurenView({
                 fireStrategy.legacyAmount > 0 ? `€${fireStrategy.legacyAmount}` : '€0'
               }`
             }
-            href="/identity/parameters?focus=eindstrategie"
             Icon={SlidersHorizontal}
             badge={`Tot ${fireStrategy.endAge} jaar`}
             onEdit={isPlannen ? () => setEditingEindstrategie(true) : undefined}
+            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Onttrekkingsstrategie"
             value={wsLabel.name}
             subtitle={wsLabel.subtitle}
-            href="/identity/parameters?focus=onttrekking"
             Icon={SlidersHorizontal}
             badge={
               withdrawalStrategy.strategy === 'guardrails'
@@ -156,30 +155,31 @@ export function VoorkeurenView({
                 : undefined
             }
             onEdit={isPlannen ? () => setEditingOnttrekking(true) : undefined}
+            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Onttrekkingsvolgorde"
             value="Cash → Beleggen → Pensioen"
             subtitle="Welke pot eerst leegtrekken bij afbouw"
-            href="/identity/parameters?focus=volgorde"
             Icon={SlidersHorizontal}
             badge="Standaard"
+            hint="Binnenkort instelbaar"
           />
           <VoorkeurCard
             label="Verdeling bij toename"
             value="Naar lange-termijn portfolio"
             subtitle="Waar gaat extra geld heen bij een positief event"
-            href="/identity/parameters?focus=verdeling"
             Icon={SlidersHorizontal}
             badge="Standaard"
+            hint="Binnenkort instelbaar"
           />
           <VoorkeurCard
             label="Onttrekking bij afname"
             value="Uit liquide pot eerst"
             subtitle="Waar wordt geld vandaan gehaald bij een negatief event"
-            href="/identity/parameters?focus=afname"
             Icon={SlidersHorizontal}
             badge="Standaard"
+            hint="Binnenkort instelbaar"
           />
         </div>
       </div>
@@ -211,7 +211,6 @@ export function VoorkeurenView({
             label="Inflatie"
             value={formatPct(fireParams.inflationRate)}
             subtitle="Jaarlijkse prijsstijging — index alle bedragen"
-            href="/identity/parameters?focus=inflatie"
             Icon={TrendingUp}
             badge="Per jaar"
             onEdit={
@@ -225,12 +224,12 @@ export function VoorkeurenView({
                     })
                 : undefined
             }
+            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Bruto rendement"
             value={formatPct(fireParams.grossReturn)}
             subtitle="Verwacht jaarrendement op het belegbaar vermogen"
-            href="/identity/parameters?focus=rendement"
             Icon={TrendingUp}
             badge="Per jaar"
             onEdit={
@@ -244,6 +243,7 @@ export function VoorkeurenView({
                     })
                 : undefined
             }
+            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label={
@@ -258,17 +258,17 @@ export function VoorkeurenView({
                 reëel rendement (NL-specifiek)
               </>
             }
-            href="/identity/parameters?focus=swr"
             Icon={Wallet}
             badge="Afgeleid"
+            hint="Niet handmatig"
           />
         </div>
       </div>
 
       <p className="text-[11px] italic text-[var(--ink-3)]">
         {isPlannen
-          ? 'Klik op Eindstrategie, Onttrekking, Inflatie of Rendement om snel bij te werken. Andere voorkeuren via /identity/parameters.'
-          : 'Activeer Plannen-modus voor inline-editor. Of bewerk via /identity/parameters.'}
+          ? 'Klik op Eindstrategie, Onttrekking, Inflatie of Rendement om snel bij te werken. Volgorde, verdeling en afname worden binnenkort instelbaar.'
+          : 'Activeer Plannen-modus om Eindstrategie, Onttrekking, Inflatie en Rendement inline bij te werken.'}
       </p>
 
       {/* Plan F-2: Afbouw-overzicht — eindsaldo bij fireAge vs endAge.
@@ -319,22 +319,26 @@ function VoorkeurCard({
   label,
   value,
   subtitle,
-  href,
   Icon,
   badge,
   onEdit,
+  hint,
 }: {
   label: React.ReactNode
   value: string
   subtitle: React.ReactNode
-  href: string
   Icon: typeof SlidersHorizontal
   badge?: string
-  /** Wanneer aanwezig: card wordt button met inline-edit i.p.v. Link. */
+  /** Wanneer aanwezig: card wordt button met inline-edit. Anders static. */
   onEdit?: () => void
+  /** Footer-hint voor static cards (bv. 'Alleen in Plannen-modus' of
+   *  'Binnenkort instelbaar'). Niet getoond als onEdit aanwezig is. */
+  hint?: string
 }) {
+  const interactive = Boolean(onEdit)
   const cardClass =
-    'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all flex flex-col text-left w-full'
+    'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 flex flex-col text-left w-full' +
+    (interactive ? ' hover:border-[var(--ink-3)] hover:shadow-sm transition-all' : '')
   const cardInner = (
     <>
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -361,10 +365,16 @@ function VoorkeurCard({
         ) : (
           <span />
         )}
-        <span className="text-[11px] font-semibold text-violet-700 inline-flex items-center gap-1">
-          {onEdit ? 'Bijwerken' : 'Bewerken'}
-          <ArrowRight className="w-3 h-3" aria-hidden="true" />
-        </span>
+        {onEdit ? (
+          <span className="text-[11px] font-semibold text-violet-700 inline-flex items-center gap-1">
+            Bijwerken
+            <ArrowRight className="w-3 h-3" aria-hidden="true" />
+          </span>
+        ) : hint ? (
+          <span className="text-[11px] italic text-[var(--ink-3)]">{hint}</span>
+        ) : (
+          <span />
+        )}
       </div>
     </>
   )
@@ -375,9 +385,5 @@ function VoorkeurCard({
       </button>
     )
   }
-  return (
-    <Link href={href} className={cardClass}>
-      {cardInner}
-    </Link>
-  )
+  return <div className={cardClass}>{cardInner}</div>
 }

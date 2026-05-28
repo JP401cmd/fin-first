@@ -64,6 +64,13 @@ const nextConfig: NextConfig = {
       // compact als Box3Detail op /overzicht/belasting (zelfde pure
       // box3-data-engine via /api/household/box3). Index redirect.
       { source: '/core/belasting', destination: '/overzicht/belasting', permanent: false },
+
+      // Parameters-migratie (beslissing 5): eindstrategie/onttrekking/
+      // inflatie/rendement leven inline onder de Voorkeuren-tab op
+      // /toekomst. Volgorde/verdeling/afname zijn nog placeholders zonder
+      // engine-koppeling; tot die tijd landt iedere /identity/parameters-
+      // link op de Voorkeuren-tab waar de 4 werkende editors zitten.
+      { source: '/identity/parameters', destination: '/toekomst?tab=voorkeuren', permanent: false },
     ]
   },
 };
