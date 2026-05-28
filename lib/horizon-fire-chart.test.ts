@@ -237,10 +237,12 @@ describe('FIRE-vermogen consistentie', () => {
     // It should be >= requiredFirePortfolio (you may overshoot the target)
     expect(result.firePortfolioAtFire).toBeGreaterThanOrEqual(result.requiredFirePortfolio)
 
-    // The decumulation path starts from requiredFirePortfolio (not firePortfolioAtFire)
-    // This is by design: the chart shows the sustainable path
-    const diff = Math.abs(firstRetRow!.startPortfolio - result.requiredFirePortfolio)
-    const tolerance = Math.max(result.requiredFirePortfolio * 0.01, 1_000)
+    // Sinds feature #511 begint de decumulation met het werkelijke portfolio
+    // op fireAge (firePortfolioAtFire), niet meer met requiredFirePortfolio.
+    // De chart toont nu het echte pad — typische overshoot van één jaar
+    // savings boven het minimum-target.
+    const diff = Math.abs(firstRetRow!.startPortfolio - result.firePortfolioAtFire)
+    const tolerance = Math.max(result.firePortfolioAtFire * 0.01, 1_000)
     expect(diff).toBeLessThan(tolerance)
   })
 })

@@ -76,10 +76,14 @@ describe('buildDashboardLayout', () => {
   })
 
   it('excludes feature-gated widgets when locked', () => {
+    // Sinds de geconsolideerde feature-registry mappen widgets via de nieuwe
+    // feature-IDs (fire_projecties / simulaties / vermogensbeheer). Legacy
+    // IDs zoals widget_monte_carlo doen niets meer — lookup gaat altijd via
+    // de nieuwe ID die WIDGET_FEATURE_MAP teruggeeft.
     const lockedFeatures: FeatureAccessMap = {
       fire_projecties: accessible(false),
-      widget_monte_carlo: accessible(false),
-      widget_assets: accessible(false),
+      simulaties: accessible(false),
+      vermogensbeheer: accessible(false),
     }
     const answers: AutoDashboardAnswers = {
       focuses: ['fire_freedom'],

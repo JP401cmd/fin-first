@@ -512,9 +512,11 @@ describe('bucket strategy', () => {
       endStrategy: 'legacy',
       legacyAmount: 300_000,
     }), state)
-    // Annuity on surplus (€1M - €300k = €700k) at 5% over 23 years ≈ €51_896
+    // PV(L) = 300_000 / 1.05^23 ≈ 98_752 wordt apart gezet (groeit naar
+    // 300k op endAge). Available = 1_000_000 − 98_752 = 901_248 onttrokken
+    // via groeiende annuïteit (g=0) over 23 jaar bij 5% ≈ €66_896.
     expect(result).toBeGreaterThan(40_000)
-    expect(result).toBeCloseTo(51_896, -2)
+    expect(result).toBeCloseTo(66_896, -2)
   })
 
   it('bucket + legacy falls back to netBaseExpenses when surplus annuity is small', () => {
@@ -1067,11 +1069,13 @@ describe('guardrails + legacy — annuity as base (#522)', () => {
       endStrategy: 'legacy',
       legacyAmount: indexedLegacy,
     }))
-    // Available = 1_000_000 - 300_000 = 700_000
-    // Annuity: 700_000 * 0.05 / (1 - 1.05^(-23)) ≈ 51_896
-    // effectiveBase = max(51_896, 40_000) = 51_896
+    // PV(300_000) op endAge−currentAge=23 jaar bij r=5%: 300k / 1.05^23
+    // ≈ 98_752. Available = 1_000_000 − 98_752 = 901_248. Growing annuity
+    // (g=0): 901_248 × 0.05 / (1 − 1.05^-23) ≈ €66_896 — die geeft op
+    // endAge exact 300k (de PV-portion compoundt naar 300k).
+    // effectiveBase = max(66_896, 40_000) = 66_896
     expect(result).toBeGreaterThan(40_000)
-    expect(result).toBeCloseTo(51_896, -2)
+    expect(result).toBeCloseTo(66_896, -2)
   })
 
   it('legacy: annuity is lower than deplete (some portfolio reserved)', () => {

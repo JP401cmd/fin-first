@@ -217,10 +217,16 @@ function computeAnnuityBase(ctx: WithdrawalContext): number {
   const g = ctx.inflation ?? 0
   const rg = r - g
 
-  // For legacy: only the surplus above the indexed legacy target is available
+  // For legacy: only the surplus above the indexed legacy target is available.
+  // ctx.legacyAmount is the NOMINAL target at endAge (already indexed by the
+  // caller in fire-simulation). Discount to current PV so the growing annuity
+  // depletes only the surplus, while the legacy portion compounds at r naar L
+  // op endAge. Math: P_T = P_0 × (1+r)^n − Σ W_i × (1+g)^i × (1+r)^{n-1-i};
+  // bij P_T = L volgt W_0 = (P_0 − L/(1+r)^n) × (r−g)/(1−((1+g)/(1+r))^n).
   let availablePortfolio = ctx.currentPortfolio
   if (ctx.endStrategy === 'legacy' && ctx.legacyAmount != null && ctx.legacyAmount > 0) {
-    availablePortfolio = Math.max(0, ctx.currentPortfolio - ctx.legacyAmount)
+    const pvLegacy = ctx.legacyAmount / Math.pow(1 + r, n)
+    availablePortfolio = Math.max(0, ctx.currentPortfolio - pvLegacy)
   }
 
   if (n <= 1) {

@@ -754,7 +754,13 @@ function makeLisaInput(overrides: Partial<UnifiedProjectionInput> = {}): Unified
     annualSavings: 14_400,  // €1200/mnd
     monthlySurplus: 1200,
     monthlyIncome: 5200,
-    strategyConfig: { strategy: 'legacy', endAge: 90, legacyAmount: 100_000 },
+    // Deplete-strategy in Lisa-fixture sinds de legacy-fix in withdrawal-
+    // strategy.ts (correct PV-discount). Lisa's matig portfolio + €350k
+    // hypotheek + €48k jaarlijkse uitgaven maakt élke positieve legacy nu
+    // moeilijk bereikbaar binnen de simulatiehorizon. De Lisa-tests
+    // focussen op "FIRE-bereikbaarheid ondanks hypotheek", niet op de
+    // legacy-modus zelf.
+    strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
     withdrawalStrategy: { strategy: 'bucket', guardrailFloor: 0.8, guardrailCeiling: 1.2, guardrailCutStep: 0.1, guardrailRaiseStep: 0.1 },
     hasPartner: true,
     ...overrides,

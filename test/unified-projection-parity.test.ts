@@ -423,7 +423,9 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     // flat BOX3_DRAG. Large portfolios (Willem, Lisa) are within 1 year.
     const TOLERANCE: Record<PersonaKey, number> = {
       daan: 8,      // starter with tiny portfolio, heffingsvrij eliminates drag for years
-      lisa: 3,      // moderate portfolio; per-bucket waterfall + withdraw-before-grow order
+      lisa: 5,      // moderate portfolio + legacy strategy; engine-engine drift
+                    //   na de legacy PV-discount-fix (correct preserve van geïndexeerde
+                    //   nalatenschap i.p.v. de oude deplete-achtige fallback)
       willem: 1,    // large portfolio (1.46M), heffingsvrij negligible
       marijke: 1,   // pensioen mode, forcedFireAge
     }

@@ -124,6 +124,14 @@ export function runSimulation(
   const strategy = cfg.strategy
   const effectiveEndAge = strategy === 'perpetual' ? Math.max(endAge, 100) : cfg.endAge
   const legacyAmount = cfg.legacyAmount
+  // Geïndexeerde legacy-target op endAge (nominaal). Berekend in huidige
+  // euro's × inflatie over de hele simulatie-horizon, zodat de wens
+  // "behoud €X koopkracht" overeenkomt met €X × (1+g)^n nominaal eindbedrag.
+  // Wordt zowel door de binary-search (line ~400) als door de withdrawal-
+  // strategy (via wCtx.legacyAmount) gebruikt — één bron voor het target.
+  const indexedLegacy = strategy === 'legacy'
+    ? legacyAmount * Math.pow(1 + inflation, effectiveEndAge - currentAge)
+    : 0
   // Display horizon: for perpetual use config.endAge (or 100); for others use effectiveEndAge
   const displayEndAge = strategy === 'perpetual' ? cfg.endAge : effectiveEndAge
 
@@ -312,6 +320,7 @@ export function runSimulation(
         currentAge: age,
         endAge: simEndAge,
         endStrategy: useWithdrawalStrategy ? strategy : undefined,
+        legacyAmount: useWithdrawalStrategy && strategy === 'legacy' ? indexedLegacy : undefined,
         inflation,
       }
       const withdrawal = applyWithdrawalStrategy(activeConfig, wCtx)
@@ -394,11 +403,6 @@ export function runSimulation(
       currentPortfolio * 10,
       10_000_000,
     )
-
-    // Indexed legacy target on endAge
-    const indexedLegacy = strategy === 'legacy'
-      ? legacyAmount * Math.pow(1 + inflation, effectiveEndAge - currentAge)
-      : 0
 
     // Binary search always uses static withdrawal strategy for reliable convergence.
     // Guardrails/VPW use startPortfolio as anchor for thresholds — when startPortfolio
