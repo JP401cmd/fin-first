@@ -44,7 +44,7 @@ function useFc() {
 /**
  * Render een definition-list-paartje. Lege waardes (null/undefined/'') krijgen
  * de "—" placeholder in `var(--ink-4)` zodat duidelijk is dat het veld nog
- * ingevuld kan worden in `/identity/instellingen`. Spec sectie 5.
+ * ingevuld kan worden in `/mijn/profiel`. Spec sectie 5.
  */
 function DefinitionRow({
   label,

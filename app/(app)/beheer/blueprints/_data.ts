@@ -125,7 +125,7 @@ export const BLUEPRINTS: BlueprintMeta[] = [
     description:
       'Voorkeuren-pagina met tabs, autosave en card-editorial per groep.',
     module: 'cross',
-    routeExample: '/identity/instellingen, /identity/profiel',
+    routeExample: '/mijn, /mijn/profiel',
     group: 'page-type',
   },
   {

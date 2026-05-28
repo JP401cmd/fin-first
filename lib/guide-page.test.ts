@@ -499,10 +499,10 @@ describe('GuideFaq — FAQ content and accordion logic', () => {
     const FAQ_LINKS = [
       { label: 'Ga naar import', href: '/core/cash/import' },
       { label: 'Bekijk je prognose', href: '/horizon' },
-      { label: 'Widget-instellingen', href: '/identity/instellingen' },
-      { label: 'Privacy-instellingen', href: '/identity/instellingen' },
-      { label: 'Beheer widgets', href: '/identity/instellingen' },
-      { label: 'Profiel bewerken', href: '/identity/profiel' },
+      { label: 'Widget-instellingen', href: '/mijn/geavanceerd' },
+      { label: 'Privacy-instellingen', href: '/mijn/privacy' },
+      { label: 'Beheer widgets', href: '/mijn/geavanceerd' },
+      { label: 'Profiel bewerken', href: '/mijn/profiel' },
     ]
 
     FAQ_LINKS.forEach(link => {

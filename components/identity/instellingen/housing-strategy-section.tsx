@@ -64,7 +64,11 @@ const MODES: HousingStrategyMode[] = [
 ]
 
 /**
- * Eigen-woning-sectie binnen Sectie C (FIRE Instellingen) op /identity/instellingen.
+ * Eigen-woning-sectie. Wordt nu gerenderd binnen de strategie-modal op
+ * /toekomst (geïmporteerd door components/app/horizon/strategie-modal.tsx).
+ * De oude /identity/instellingen-monolith is opgeheven; het component-pad
+ * blijft historisch onder components/identity/instellingen/ totdat een
+ * herschikking van deze map opportuun is.
  *
  * Beheert zijn eigen GET/PUT naar /api/housing-strategy zodat de bestaande
  * instellingen-pagina niet hoeft te weten van housing-strategy-state. De

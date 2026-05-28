@@ -182,7 +182,7 @@ export default function ShellPrototypePage() {
         </li>
         <li>
           <strong className="text-[var(--ink)]">Module-fallback.</strong>{' '}
-          Schakel een module uit via <code className="font-mono text-xs">/identity/instellingen</code>{' '}
+          Schakel een module uit via <code className="font-mono text-xs">/mijn/geavanceerd</code>{' '}
           en kom terug — de sidebar-rij voor die module dient gedimd te zijn met
           een &ldquo;Activeer in Instellingen&rdquo;-CTA (plan §2.6).
         </li>

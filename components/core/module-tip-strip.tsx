@@ -7,7 +7,7 @@ interface ModuleTipStripProps {
   /** Tip text — actieve stem, sentence case, geen uitroepteken */
   copy: string
   /**
-   * Doel-href voor de inline action. Default `/identity/instellingen` —
+   * Doel-href voor de inline action. Default `/mijn/geavanceerd` —
    * waar de moduleschakelaars staan. Override voor module-specifieke deeplinks.
    */
   href?: string

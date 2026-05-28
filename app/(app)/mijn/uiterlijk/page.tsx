@@ -14,12 +14,11 @@ export const metadata: Metadata = {
 
 /**
  * /mijn/uiterlijk — uiterlijk-instellingen (plan A-2 ontmantelen van
- * legacy settings-monster).
+ * legacy settings-monster, voltooid).
  *
- * Voor MVP: alleen het cream-palet picker (3 voorkeuzes). Per-module
- * accent-kleuren + font-theme + budget-categorie-tints blijven nog
- * op /identity/instellingen?tab=weergave totdat ze stuk-voor-stuk
- * worden uitgekamerd.
+ * Alle weergave-blokken van de oude monolith leven nu hier: palet,
+ * typografie, module-accent, budget-categorie-tints, fase-kleuren en
+ * categoriekaart-tinten. Iedere sectie heeft een eigen standaard-knop.
  */
 export default function MijnUiterlijkPage() {
   return (

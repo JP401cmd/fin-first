@@ -178,7 +178,7 @@ export default async function AppLayout({
   }, { onConflict: 'key' }).then(() => {})
 
   // ── Active modules ────────────────────────────────────
-  // Module-toggle is verwijderd uit Trifinity (zie /identity/instellingen).
+  // Module-toggle is verwijderd uit Trifinity (zie /mijn/geavanceerd).
   // App-zichtbaarheid wordt voortaan per individuele app afgeleid van
   // tracking-flags op assets/debts (zie `sidebarActiveAppKeys` hieronder).
   // Op module-niveau zijn voortaan alle modules altijd beschikbaar; de DB-
