@@ -203,8 +203,8 @@ function VoorkeurenTabPlaceholder() {
       label="Voorkeuren"
       description="Eindstrategie, onttrekkingsstrategie, onttrekkingsvolgorde, verdeling bij toename, onttrekking bij afname en markt-aannames. Regels die op de hele tijdas + alle events werken."
       links={[
-        { href: '/identity/parameters', label: 'FIRE-parameters & withdrawal' },
-        { href: '/identity/instellingen', label: 'Profiel & inkomensgegevens' },
+        { href: '/toekomst?tab=voorkeuren', label: 'FIRE-parameters & withdrawal' },
+        { href: '/mijn/profiel', label: 'Profiel & inkomensgegevens' },
       ]}
     />
   )

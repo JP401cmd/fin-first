@@ -152,15 +152,7 @@ export function MijnOverview() {
       </div>
 
       <p className="mt-6 text-[11px] italic text-[var(--ink-3)] text-center">
-        Plan §6.4: het 2459-regel /identity/instellingen-scherm wordt
-        geleidelijk ontmanteld. Klassieke weergave blijft beschikbaar via{' '}
-        <Link
-          href="/identity/instellingen"
-          className="underline hover:text-[var(--ink-2)]"
-        >
-          /identity/instellingen
-        </Link>
-        .
+        Ieder onderwerp een eigen pagina — geen monolith meer.
       </p>
     </section>
   )

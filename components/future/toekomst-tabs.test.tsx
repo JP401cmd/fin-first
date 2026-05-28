@@ -135,12 +135,16 @@ describe('ToekomstTabs — placeholder deeplinks', () => {
     expect(hrefs.some((h) => h === '/toekomst/whatif')).toBe(true)
   })
 
-  it('Voorkeuren-placeholder linkt naar /identity/parameters', () => {
+  it('Voorkeuren-placeholder bevat geen dode /identity/parameters-link', () => {
     mockSearchParams.get.mockReturnValue('voorkeuren')
     const { container } = render(<ToekomstTabs tijdasView={<div>x</div>} />)
-    const hrefs = Array.from(container.querySelectorAll('a')).map((a) =>
-      a.getAttribute('href'),
+    const hrefs = Array.from(container.querySelectorAll('a')).map(
+      (a) => a.getAttribute('href') ?? '',
     )
-    expect(hrefs.some((h) => h === '/identity/parameters')).toBe(true)
+    expect(hrefs.some((h) => h.includes('/identity/parameters'))).toBe(false)
+    // De FIRE-parameters-link wijst nu naar de Voorkeuren-tab zelf.
+    expect(hrefs.some((h) => h === '/toekomst?tab=voorkeuren')).toBe(true)
+    // En profiel/inkomensgegevens leeft op /mijn/profiel.
+    expect(hrefs.some((h) => h === '/mijn/profiel')).toBe(true)
   })
 })

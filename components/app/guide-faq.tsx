@@ -29,13 +29,13 @@ const FAQ_ITEMS: FaqItem[] = [
     question: 'Hoe pas ik mijn dashboard aan?',
     answer:
       'Ga naar Identiteit \u2192 Instellingen \u2192 Widgets. Daar kun je widgets aan- of uitzetten, en op het dashboard kun je ze verslepen om de volgorde te wijzigen. Er zijn meer dan 25 widgets beschikbaar.',
-    link: { label: 'Widget-instellingen', href: '/identity/instellingen' },
+    link: { label: 'Widget-instellingen', href: '/mijn/geavanceerd' },
   },
   {
     question: 'Is mijn financiële data veilig?',
     answer:
       'Je data wordt versleuteld opgeslagen in Supabase (PostgreSQL) en is alleen toegankelijk met jouw inloggegevens. Er worden geen gegevens gedeeld met derden. Je kunt in de privacy-instellingen precies instellen wat zichtbaar is.',
-    link: { label: 'Privacy-instellingen', href: '/identity/instellingen' },
+    link: { label: 'Privacy-instellingen', href: '/mijn/privacy' },
   },
   {
     question: 'Wat is de maandelijkse check-in?',
@@ -46,7 +46,7 @@ const FAQ_ITEMS: FaqItem[] = [
     question: 'Wat zijn widgets en hoe werken ze?',
     answer:
       'Widgets zijn compacte inzichtkaarten op je dashboard. Elke widget toont een specifieke metric \u2014 van vermogensgroei tot FIRE-countdown. Je kunt ze aan- of uitzetten en naar wens herschikken.',
-    link: { label: 'Beheer widgets', href: '/identity/instellingen' },
+    link: { label: 'Beheer widgets', href: '/mijn/geavanceerd' },
   },
   {
     question: 'Wat is een kassabon?',

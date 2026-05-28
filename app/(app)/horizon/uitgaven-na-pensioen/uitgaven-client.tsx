@@ -348,7 +348,7 @@ export default function UitgavenNaPensioenClient(props: Props) {
         {!props.budgetingActive && (
           <p className="mt-3 text-xs text-[var(--ink-3)]">
             Budgetteren staat uit.{' '}
-            <Link href="/identity/instellingen#modules" className="underline">
+            <Link href="/mijn/geavanceerd" className="underline">
               Activeer in Instellingen
             </Link>{' '}
             voor preciezere essentiële-budgetten-berekening.

@@ -346,7 +346,7 @@ export function NotificationModal() {
               Bekijk alles &rarr;
             </a>
             <a
-              href="/identity/instellingen"
+              href="/mijn/notificaties"
               onClick={closeModal}
               className="font-[family-name:var(--font-source-serif)] text-[11px] italic text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
             >

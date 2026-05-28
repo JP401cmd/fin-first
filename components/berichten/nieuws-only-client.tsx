@@ -404,7 +404,7 @@ export function NieuwsOnlyClient() {
           Wil je meer uit TriFinity halen?
         </p>
         <Link
-          href="/identity/instellingen"
+          href="/mijn/geavanceerd"
           className="flex items-center gap-1 font-inter text-[12px] font-semibold text-wil-600 hover:text-wil-700 transition-colors"
         >
           Ontdek de volledige app

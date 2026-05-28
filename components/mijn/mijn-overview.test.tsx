@@ -43,10 +43,10 @@ describe('MijnOverview — render', () => {
     expect(screen.getByText(/Kleurpalet, typografie/i)).toBeTruthy()
   })
 
-  it('footer linkt naar /identity/instellingen voor legacy-fallback', () => {
+  it('bevat geen legacy /identity/instellingen-link meer in de footer', () => {
     const { container } = render(<MijnOverview />)
     const legacyLink = container.querySelector('a[href="/identity/instellingen"]')
-    expect(legacyLink).toBeTruthy()
+    expect(legacyLink).toBeNull()
   })
 
   it('toont uitleg-tekst over 8 onderwerpen', () => {

@@ -266,7 +266,7 @@ export function AppHeader({ email, role }: { email: string; role?: string }) {
                   <>
                     <div className="my-1 border-t border-[var(--border-ed)]" />
                     <Link
-                      href="/identity/instellingen"
+                      href="/mijn"
                       className="block px-4 py-2 text-sm text-wil-600 font-medium hover:bg-wil-50"
                       onClick={() => setMenuOpen(false)}
                     >

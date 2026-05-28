@@ -197,7 +197,6 @@ type FooterLink = {
 
 const FOOTER_LINKS: FooterLink[] = [
   { label: 'Mijn', href: '/mijn' },
-  { label: 'Instellingen', href: '/identity/instellingen' },
   { label: 'Uitloggen', href: '/logout' },
 ]
 

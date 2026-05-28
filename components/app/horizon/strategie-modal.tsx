@@ -1525,7 +1525,7 @@ export function StrategieModal({ open, onClose, housingStrategy }: StrategieModa
 
         {/* ── Secondary link to full settings (guardrail parameters etc.) ── */}
         <Link
-          href="/identity/instellingen#onttrekking"
+          href="/toekomst?tab=voorkeuren"
           className="flex items-center justify-between rounded-[var(--r)] border-2 border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 transition-all hover:border-horizon-300 hover:shadow-sm"
         >
           <div className="flex items-center gap-2.5">

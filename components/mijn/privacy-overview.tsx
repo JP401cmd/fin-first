@@ -92,7 +92,7 @@ const CATEGORIES: DataCategory[] = [
     what: 'Berichten die je naar Will stuurt plus de samenvatting van je financiële context die als prompt wordt meegegeven.',
     where: 'Verwerking via Anthropic / OpenAI (afhankelijk van model-config). Géén model-training op je data.',
     why: 'Zonder context kan Will geen relevante antwoorden geven. Chat-historie blijft van jou.',
-    action: { label: 'AI-instellingen', href: '/identity/instellingen?tab=ai' },
+    action: { label: 'AI-instellingen', href: '/mijn/privacy' },
   },
   {
     Icon: Sparkles,
