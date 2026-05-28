@@ -296,7 +296,7 @@ export default function GuideHorizonUitleg() {
             Je kiest je methode in{' '}
             <InLink href="/identity/profiel">Profiel</InLink>. Het gekozen bedrag wordt
             elk jaar <strong>verhoogd met inflatie</strong> (instelbaar via{' '}
-            <InLink href="/identity/instellingen">Instellingen</InLink>) — €2.000/maand nu
+            <InLink href="/toekomst?tab=voorkeuren">Instellingen</InLink>) — €2.000/maand nu
             is meer dan €2.000/maand over 20 jaar.
           </p>
           <p>
@@ -346,7 +346,7 @@ export default function GuideHorizonUitleg() {
           </p>
           <p>
             Stel je eindstrategie in via{' '}
-            <InLink href="/identity/instellingen">Instellingen → FIRE Instellingen</InLink> of
+            <InLink href="/toekomst?tab=voorkeuren">Instellingen → FIRE Instellingen</InLink> of
             via de strategie-modal op{' '}
             <InLink href="/horizon">De Horizon</InLink>.
           </p>
@@ -430,7 +430,7 @@ export default function GuideHorizonUitleg() {
           </p>
           <p>
             Je kunt je bruto rendement aanpassen via{' '}
-            <InLink href="/identity/instellingen">Instellingen → FIRE Instellingen</InLink>.
+            <InLink href="/toekomst?tab=voorkeuren">Instellingen → FIRE Instellingen</InLink>.
             De Box 3 constanten (forfaitair rendement en tarief) zijn wettelijk vastgesteld en
             worden niet door de gebruiker aangepast.
           </p>
@@ -499,14 +499,14 @@ export default function GuideHorizonUitleg() {
               beleggingen.
               <br />
               <span className="text-[var(--ink-3)]">
-                → <InLink href="/identity/instellingen">Identiteit → Instellingen → FIRE Instellingen</InLink>
+                → <InLink href="/toekomst?tab=voorkeuren">Identiteit → Instellingen → FIRE Instellingen</InLink>
               </span>
             </p>
             <p>
               <strong>Inflatie</strong> — verwachte jaarlijkse prijsstijging.
               <br />
               <span className="text-[var(--ink-3)]">
-                → <InLink href="/identity/instellingen">Identiteit → Instellingen → FIRE Instellingen</InLink>
+                → <InLink href="/toekomst?tab=voorkeuren">Identiteit → Instellingen → FIRE Instellingen</InLink>
               </span>
             </p>
             <p>
@@ -521,7 +521,7 @@ export default function GuideHorizonUitleg() {
               <strong>Eindstrategie</strong> — deplete, legacy, perpetual of pensioenleeftijd.
               <br />
               <span className="text-[var(--ink-3)]">
-                → <InLink href="/identity/instellingen">Identiteit → Instellingen</InLink> of strategie-modal op{' '}
+                → <InLink href="/toekomst?tab=voorkeuren">Identiteit → Instellingen</InLink> of strategie-modal op{' '}
                 <InLink href="/horizon">De Horizon</InLink>
               </span>
             </p>

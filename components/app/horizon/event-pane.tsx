@@ -269,7 +269,7 @@ export function EventPane({
               label: 'Beheer in instellingen',
               onClick: () => {
                 onClose()
-                router.push('/identity/instellingen#housing-strategy')
+                router.push('/toekomst')
               },
             }
           : {

@@ -112,7 +112,7 @@ export function EventPaneView({
                 {' · '}
                 <span className="not-italic">Beheerd via</span>{' '}
                 <Link
-                  href="/identity/instellingen#housing-strategy"
+                  href="/toekomst"
                   className="not-italic underline underline-offset-2 hover:text-[var(--ink-2)]"
                 >
                   Eigen-woning-strategie
@@ -288,7 +288,7 @@ function HousingCalculationBreakdown({ event }: { event: LifeEvent }) {
         <p className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] italic text-[var(--ink-3)]">
           Pas aan via{' '}
           <Link
-            href="/identity/instellingen#housing-strategy"
+            href="/toekomst"
             className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-[var(--ink-2)]"
           >
             Eigen-woning-strategie

@@ -71,6 +71,15 @@ const nextConfig: NextConfig = {
       // engine-koppeling; tot die tijd landt iedere /identity/parameters-
       // link op de Voorkeuren-tab waar de 4 werkende editors zitten.
       { source: '/identity/parameters', destination: '/toekomst?tab=voorkeuren', permanent: false },
+
+      // Instellingen-monolith retirement (beslissing 4 voltooid): alle zes
+      // tabs leven op /mijn/* (geavanceerd, privacy, profiel, uiterlijk,
+      // notificaties, plus huishouden-privacy op profiel). De legacy URL
+      // landt op de Mijn-hub. Eventuele stale anchors (#fire-parameters,
+      // #housing-strategy, #onttrekking) worden door Next gestript — die
+      // editors hebben geen directe URL, ze leven in de strategie-modal
+      // op /toekomst.
+      { source: '/identity/instellingen', destination: '/mijn', permanent: false },
     ]
   },
 };

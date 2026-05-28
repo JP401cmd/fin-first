@@ -650,13 +650,13 @@ export function OverzichtClient({
           <UitgangspuntRow
             label="Gewogen rendement"
             value={`${grossReturnPct.toFixed(1)}%`}
-            href="/identity/instellingen#fire-parameters"
+            href="/toekomst?tab=voorkeuren"
             sourceLabel="instellingen"
           />
           <UitgangspuntRow
             label="Inflatie"
             value={`${inflationPct.toFixed(1)}%`}
-            href="/identity/instellingen#fire-parameters"
+            href="/toekomst?tab=voorkeuren"
             sourceLabel="instellingen"
           />
           <UitgangspuntRow
@@ -676,7 +676,7 @@ export function OverzichtClient({
             label="Retirement-uitgaven"
             value={`${fc(monthlyRetirement)} /mnd`}
             suffix={retirementSource}
-            href="/identity/instellingen"
+            href="/toekomst?tab=voorkeuren"
             sourceLabel="instellingen"
           />
           <UitgangspuntRow

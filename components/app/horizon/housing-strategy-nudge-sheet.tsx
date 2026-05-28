@@ -83,7 +83,7 @@ export function HousingStrategyNudgeSheet({ open, onDismiss }: HousingStrategyNu
             Later beslissen
           </button>
           <Link
-            href="/identity/instellingen#housing-strategy"
+            href="/toekomst"
             onClick={onDismiss}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] transition-colors hover:opacity-90"
           >

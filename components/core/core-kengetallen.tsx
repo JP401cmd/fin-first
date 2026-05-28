@@ -412,10 +412,10 @@ function MustExpenseKassabon({
         <p>
           Pas je jaarlijkse uitgaven aan via{' '}
           <a
-            href="/identity/instellingen"
+            href="/toekomst"
             className="text-kern-700 underline underline-offset-2"
           >
-            Instellingen → FIRE Instellingen
+            de strategie-modal op /toekomst
           </a>
           .
         </p>

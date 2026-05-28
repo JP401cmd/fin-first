@@ -31,7 +31,7 @@ interface ModuleTipStripProps {
  */
 export function ModuleTipStrip({
   copy,
-  href = '/identity/instellingen',
+  href = '/mijn/geavanceerd',
   linkLabel = 'Instellingen',
   className = '',
 }: ModuleTipStripProps) {
