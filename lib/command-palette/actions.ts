@@ -102,17 +102,16 @@ const ACTIONS: ActionDef[] = [
   },
 ]
 
-// ── Perspectief-acties ───────────────────────────────────────────────────────
+// ── Perspectief-actie ────────────────────────────────────────────────────────
 //
-// Per beschikbaar perspectief één actie (dynamisch, omdat solo-gebruikers
-// alleen `personal` hebben). Vervangt de oude PerspectiveSwitcher-dropdown
-// die in AppHeader leefde — nu bereikbaar via ⌘K, consistent met de andere
-// quick-toggles als "Bedragen verbergen".
+// Eén compacte cycle-actie i.p.v. losse rows per perspectief — past beter bij
+// het dropdown-pattern dat de gebruiker zoekt:
+//   "Perspectief: [huidige]"
+//   ↳ sublabel: "Wisselen naar [volgende] · [beschrijving]"
 //
-// Het huidige perspectief wordt gemarkeerd via een sublabel-suffix; klikken
-// op het actieve perspectief is no-op (`setPerspective` rejecteert dezelfde
-// waarde verderop in de provider). We tonen 'm wel zodat de huidige status
-// zichtbaar is.
+// Klik cyclet naar de volgende beschikbare optie en persisteert via
+// `setPerspective` (server-PATCH naar /api/perspective is ingebouwd in
+// PerspectiveProvider). Solo-gebruikers (1 perspectief) krijgen niets te zien.
 
 const PERSPECTIVE_ICONS: Record<Perspective, LucideIcon> = {
   personal: User,
@@ -123,21 +122,25 @@ const PERSPECTIVE_ICONS: Record<Perspective, LucideIcon> = {
 function buildPerspectiveActions(ctx: ActionRunContext): CommandItem[] {
   if (ctx.availablePerspectives.length <= 1) return []
 
-  return ctx.availablePerspectives.map<CommandItem>((opt) => {
-    const isCurrent = ctx.currentPerspective === opt.id
-    return {
-      id: `action:perspective-${opt.id}`,
+  const currentIdx = ctx.availablePerspectives.findIndex((p) => p.id === ctx.currentPerspective)
+  const safeIdx = currentIdx >= 0 ? currentIdx : 0
+  const current = ctx.availablePerspectives[safeIdx]
+  const next = ctx.availablePerspectives[(safeIdx + 1) % ctx.availablePerspectives.length]
+
+  return [
+    {
+      id: 'action:perspective-cycle',
       kind: 'action',
-      label: `Wissel naar ${opt.label}`,
-      sublabel: isCurrent ? `${opt.description} · nu actief` : opt.description,
-      icon: PERSPECTIVE_ICONS[opt.id],
+      label: `Perspectief: ${current.label}`,
+      sublabel: `Wisselen naar ${next.label} · ${next.description}`,
+      icon: PERSPECTIVE_ICONS[current.id] ?? User,
       module: 'globaal',
       run: () => {
-        ctx.setPerspective(opt.id)
+        ctx.setPerspective(next.id)
         ctx.closePalette()
       },
-    }
-  })
+    },
+  ]
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
