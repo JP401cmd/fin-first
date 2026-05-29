@@ -37,29 +37,41 @@ export const showVisualizationTool = tool({
     'Toon een visuele kaart in de chat voor vergelijkingen, statistieken of grafieken. ' +
     'Gebruik dit wanneer een visueel overzicht de gebruiker helpt om data sneller te begrijpen ' +
     'dan een tekst-uitleg. Voorbeelden: vergelijk twee scenario\'s, toon kerngetallen, ' +
-    'of visualiseer budgetverhoudingen. Gebruik altijd Nederlandse labels.',
-  inputSchema: z.discriminatedUnion('kind', [
-    z.object({
-      kind: z.literal('comparison'),
-      title: z.string().describe('Titel van de vergelijking'),
-      items: z.array(ComparisonItemSchema).min(2).max(4).describe('De opties om te vergelijken'),
-      conclusion: z.string().optional().describe('Korte conclusie of aanbeveling'),
-    }),
-    z.object({
-      kind: z.literal('metric_table'),
-      title: z.string().describe('Titel van de tabel'),
-      rows: z.array(MetricRowSchema).min(1).max(8).describe('De metrieken'),
-      footer: z.string().optional().describe('Optionele voetnoot'),
-    }),
-    z.object({
-      kind: z.literal('bar_chart'),
-      title: z.string().describe('Titel van de grafiek'),
-      items: z.array(BarItemSchema).min(2).max(6).describe('De balken'),
-      unit: z.string().optional().describe('Eenheid (bijv. "€/mnd", "dagen")'),
-    }),
-  ]),
+    'of visualiseer budgetverhoudingen. Gebruik altijd Nederlandse labels. ' +
+    'Kies één `kind` en vul ALLEEN de bijbehorende velden in: ' +
+    'comparison → items (2-4); metric_table → rows (1-8); bar_chart → items (2-6).',
+  // Vlakke object-schema i.p.v. discriminated union: Anthropic's tool-API
+  // verwacht een input_schema met top-level `type: "object"`. Een
+  // z.discriminatedUnion serialiseert naar `anyOf` zonder dat top-level
+  // type, wat resulteert in "tools.N.custom.input_schema.type: Field
+  // required". We accepteren hier looser type-safety op de tool-payload
+  // (alle varianten-velden optional) en valideren de invariant in de
+  // execute() handler en in de runtime VisualizationOutput type-guard.
+  inputSchema: z.object({
+    kind: z.enum(['comparison', 'metric_table', 'bar_chart']).describe(
+      'Type visualisatie. Bepaalt welk veld je vult: comparison/bar_chart → items; metric_table → rows.',
+    ),
+    title: z.string().describe('Titel van de kaart'),
+    items: z
+      .array(z.union([ComparisonItemSchema, BarItemSchema]))
+      .min(2)
+      .max(6)
+      .optional()
+      .describe('Comparison-items (2-4) of bar-chart-items (2-6). NIET gebruiken voor metric_table.'),
+    rows: z
+      .array(MetricRowSchema)
+      .min(1)
+      .max(8)
+      .optional()
+      .describe('Metric-rijen (1-8). ALLEEN voor metric_table.'),
+    conclusion: z.string().optional().describe('Korte conclusie/aanbeveling. Alleen voor comparison.'),
+    footer: z.string().optional().describe('Voetnoot. Alleen voor metric_table.'),
+    unit: z.string().optional().describe('Eenheid (bijv. "€/mnd", "dagen"). Alleen voor bar_chart.'),
+  }),
   execute: async (args) => {
-    // Pass through — the structured data is rendered client-side
+    // Pass through — de structured data wordt client-side gerenderd.
+    // Validatie van per-kind invarianten gebeurt in de render-component
+    // (ChatVisualizationCard); foute combinaties tonen een fallback.
     return args
   },
 })
