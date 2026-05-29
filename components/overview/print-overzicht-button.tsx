@@ -8,7 +8,7 @@ import { Printer } from 'lucide-react'
  *
  * Plan F-6 + Tier-3 #16: "Persoonlijk plan PDF-export". Bestaande
  * globale `@media print` CSS in app/globals.css verbergt automatisch
- * de TopBar, Sidebar, BottomNav, chat-FAB en alle [data-print-hide]
+ * de TopBar, Sidebar, MobileBottomBar, chat-FAB en alle [data-print-hide]
  * elementen. Resultaat: clean A4-portret met:
  *  - Begroeting + datum
  *  - 4 hefboom-tegels

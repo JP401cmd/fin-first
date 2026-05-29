@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
-import { LegacyBackLink } from '@/components/app/shell/legacy-back-link'
+import { ExternalLink } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/format'
@@ -146,13 +145,6 @@ export default async function InvestmentHoldingDetailPage({
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:py-10">
       <NavStackMeta title={displayName} />
-      <LegacyBackLink
-        href="/core/assets/investment"
-        className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-      >
-        <ArrowLeft className="h-3 w-3" aria-hidden="true" />
-        <span>Beleggingen</span>
-      </LegacyBackLink>
 
       <header className="mt-4 border-b border-[var(--border-ed)] pb-6">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">

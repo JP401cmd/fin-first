@@ -93,9 +93,8 @@ type TopBarProps = {
 
 /**
  * Utility-cluster rechts in de TopBar — PrivacyToggle + News + Bell + Avatar.
- * Vervangt de oorspronkelijke hamburger-placeholder uit plan §4.7. Functies
- * die voorheen in `AppHeader` zaten en die op mobile bij flag-aan zouden
- * verdwijnen, leven hier voort.
+ * Alle utility-affordances op mobile leven hier; de Sidebar levert hetzelfde
+ * op desktop.
  *
  * - PrivacyToggle: maskeer bedragen across de app (eye-icoon, context-driven).
  * - Newspaper: shortcut naar `/nieuws` (TriFinity Post).
@@ -213,8 +212,7 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
               Rapportages
             </Link>
 
-            {/* Sync nu + Sync-rapport, side-by-side. Zelfde patroon als
-                AppHeader-mobile-dropdown: GlobalSyncButton triggert globale
+            {/* Sync nu + Sync-rapport, side-by-side. GlobalSyncButton triggert globale
                 sync; "Rapport" opent SyncReportModal voor het laatste verslag. */}
             <div className="grid grid-cols-2 border-y border-[var(--border-ed)]">
               <div className="flex flex-col items-center justify-center gap-1 py-2 hover:bg-[var(--subtle)]">

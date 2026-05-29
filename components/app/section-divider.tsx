@@ -13,7 +13,7 @@ interface SectionDividerProps {
 /**
  * Editorial section divider met drie varianten.
  * Gebruik 'double-rule' voor hero-koppen op editorial pagina's
- * (gids, briefing, rapportage, jaaroverzicht). Niet voor chrome (`AppHeader`).
+ * (gids, briefing, rapportage, jaaroverzicht). Niet voor chrome (TopBar/Sidebar).
  */
 export function SectionDivider({ variant = 'line', className = '' }: SectionDividerProps) {
   if (variant === 'asterisk') {

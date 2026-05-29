@@ -49,7 +49,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import type { ComponentType, CSSProperties } from 'react'
-import { BottomNavTabs } from '@/components/app/bottom-nav'
+import { BottomNavTabs } from './bottom-nav-tabs'
 import type { BottomBarConfig, BottomBarAction, BottomBarAppTab } from './nav-stack-provider'
 import { useLiveBottomBar } from './nav-stack-provider'
 import { MobileAppStrip } from './mobile-app-strip'

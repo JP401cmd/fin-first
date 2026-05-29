@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { LegacyBackLink } from '@/components/app/shell/legacy-back-link'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import {
   ArrowLeft,
@@ -425,13 +424,8 @@ function CheckinPageContent() {
       <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
         {/* Header — editorial blueprint met kicker-streep */}
         <div className="mb-6 flex items-center gap-3">
-          <LegacyBackLink
-            href={returnTo}
-            className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
-            aria-label="Terug"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </LegacyBackLink>
+          {/* Back-affordance wordt geleverd door de TopBar (mobile) /
+              Sidebar (desktop). Geen ingebakken back-knop meer. */}
           <div className="flex-1">
             <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
               <span
@@ -670,13 +664,8 @@ function CheckinPageContent() {
           description={PAGE_INFO['/core/checkin']}
           className="absolute right-0 top-0"
         />
-        <LegacyBackLink
-          href={returnTo}
-          className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
-          aria-label="Terug"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </LegacyBackLink>
+        {/* Back-affordance wordt geleverd door de TopBar (mobile) /
+            Sidebar (desktop). Geen ingebakken back-knop meer. */}
         <div>
           <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
             <span

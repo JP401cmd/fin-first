@@ -3,7 +3,7 @@
 /**
  * Eye-icon toggle that masks/unmasks monetary amounts across TriFinity.
  *
- * Lives in the app-header next to the profile dropdown so it is always
+ * Lives in the TopBar (mobile) and Sidebar (desktop) so it is always
  * reachable on every authenticated screen — the design-bible positions
  * privacy as a persistent affordance, not a buried setting.
  *

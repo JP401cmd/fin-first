@@ -43,7 +43,6 @@ import { useSidebarCollapsed } from '@/lib/hooks/use-sidebar-collapsed'
 import { LeverCompassCollapsed, type LeverScores, type LeverStatus } from '@/components/app/shell/lever-compass'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
-import { ShellFlagToggle } from '@/components/app/shell/shell-flag-toggle'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
@@ -274,7 +273,7 @@ export function Sidebar({
 
   // Module-fallback: welke nav-modules ten minste één actief module hebben.
   // We gebruiken de echte bron-of-truth (`getActiveNavModules`) i.p.v. zelf
-  // moduleId's matchen — zo blijft de fallback synchroon met BottomNav en
+  // moduleId's matchen — zo blijft de fallback synchroon met de mobile tabs en
   // widget-gating. App-zichtbaarheid in de strip wordt afzonderlijk
   // gefilterd op `activeAppKeys` (zie ModuleRow).
   const activeNavModules = getActiveNavModules(activeModules)
@@ -344,7 +343,7 @@ function BrandingRow({
   collapsed: boolean
   onToggle: () => void
 }) {
-  // `tf.` mark in Playfair, kern-accent op de punt — match met app-header.tsx:76-78.
+  // `tf.` mark in Playfair, kern-accent op de punt — canonieke brand-glyph.
   // Collapsed: alleen "t." getoond.
   const mark = (
     <span
@@ -1007,11 +1006,6 @@ function FooterSection({
                 Rapport
               </span>
             </button>
-          </div>
-          {/* Beta-toggle voor de nieuwe shell. Klik = wisselen + reload zodat
-              ResponsiveShell de andere tak rendert. */}
-          <div className="border-t border-[var(--border-ed)]">
-            <ShellFlagToggle variant="sidebar-footer" />
           </div>
         </div>
       </div>

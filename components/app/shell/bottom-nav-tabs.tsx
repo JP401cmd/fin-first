@@ -52,18 +52,8 @@ const activeBorder: Record<string, string> = {
 const LONG_PRESS_MS = 450
 const MOVE_CANCEL_PX = 8
 
-export function BottomNav() {
-  // Mobile-nav wordt nu volledig afgehandeld door FloatingNavButton
-  // (zie components/app/shell/floating-nav-button.tsx). Bottom-nav-tabs
-  // zijn vervangen door één floating pill met zoek- en menu-knop —
-  // Vercel-stijl unified menu. BottomNavTabs blijft als named-export
-  // beschikbaar voor andere shell-componenten (MobileBottomBar) die er
-  // mogelijk nog naar refereren — wordt opgeruimd in volgende cleanup.
-  return null
-}
-
 /**
- * Content-only versie van de BottomNav. Rendert ALLEEN de tab-rij zonder
+ * Content-only mobile bottom-tab-rij. Rendert ALLEEN de tab-rij zonder
  * `fixed bottom-0`-positionering of safe-area-padding — bedoeld om
  * geëmbed te worden in een ander shell-element (bv. de tray-of-three van
  * MobileStackShell, plan §4.4). De wrapping `<nav>` met fixed-styling blijft

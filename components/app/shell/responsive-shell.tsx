@@ -1,61 +1,30 @@
 /**
- * Fase 0.2 — onderdeel van new-navigation-shell migratie.
- * Plan: docs/navigatie-redesign-plan.md §2.2, §3.1, §4.1
- * Achter feature-flag `new_navigation_shell`. Bij flag uit = oude shell.
+ * ResponsiveShell — wrapper rond de pagina-content die de nieuwe shell
+ * rendert: Sidebar (desktop, via portal) + MobileStackShell (mobile,
+ * tray-of-three) + ChatLayoutWrapper voor de Will-chat-sidebar.
  *
- * Kern-wrapper die op basis van de feature-flag `new_navigation_shell` de
- * oude (AppHeader + ChatLayoutWrapper + BottomNav) of de nieuwe shell
- * (Sidebar + MobileStackShell + tray-of-three) rendert.
+ * Layout-strategie:
+ *  - Sidebar via portal naar `document.body` — omzeilt ChatLayoutWrapper's
+ *    `contain: layout` zodat de fixed-positioned sidebar t.o.v. de viewport
+ *    blijft (niet de wrapper).
+ *  - Content blijft binnen ChatLayoutWrapper voor de right-side chat-panel
+ *    (`--chat-sidebar-width` resize).
+ *  - Op desktop (≥lg) krijgt content `lg:pl-[264px]` ruimte naast de sidebar.
+ *  - Op mobile (<lg) wrapt MobileStackShell de content in TopBar + Content +
+ *    BottomBar — schuift als één blok bij push/pop.
+ *  - Pre-hydratie staan beide breakpoint-takken in de DOM (Tailwind hide/show)
+ *    voor identieke SSR-HTML; post-hydratie kiest `useIsLgUp` welke tak in
+ *    de React-tree blijft zodat zware pagina-content niet dubbel draait.
  *
- * ── Veiligheidsgaranties bij flag UIT ────────────────────────────────
- * Wanneer de flag uit staat (default voor alle gebruikers in Fase 0.2)
- * rendert deze component EXACT dezelfde DOM-structuur als de oude layout:
- *
- *   <ChatLayoutWrapper>
- *     <AppHeader />
- *     <Suspense><WelcomeBanner /></Suspense>
- *     <DailyExpenseProvider>
- *       <main className="pb-20 md:pb-0">{children}</main>
- *     </DailyExpenseProvider>
- *   </ChatLayoutWrapper>
- *   <BottomNav />
- *
- * Geen gedragsverandering, geen visuele afwijking. Bestaande rendering-
- * volgorde, classes, providers — alles behouden.
- *
- * ── Bij flag AAN ─────────────────────────────────────────────────────
- * 1. NavStackProvider wikkelt alles voor per-tab-stack-state.
- * 2. Sidebar (≥lg) wordt via portal naar `document.body` gerenderd —
- *    omzeilt ChatLayoutWrapper's `contain: layout` dat fixed-positioned
- *    descendants normaal aan de wrapper bindt i.p.v. de viewport. Zie
- *    `app/(app)/beheer/shell-prototype/sidebar-demo.tsx:117-141` voor
- *    het canonical portal-patroon dat we hier hergebruiken.
- * 3. ChatLayoutWrapper blijft staan zodat de chat-functionaliteit
- *    (right-panel resize via `--chat-sidebar-width`) onaangeroerd werkt.
- * 4. Op desktop rendert content met `lg:pl-[264px]` (sidebar-breedte).
- * 5. Op mobile (<lg) wordt content geëmbed in MobileStackShell — de
- *    tray-of-three (TopBar + Content + BottomBar) regelt rendering.
- * 6. AppHeader + BottomNav blijven achterwege bij flag aan; Sidebar +
- *    TopBar + MobileBottomBar nemen het over.
- *
- * ── Sidebar-mock-data (Fase 0.2) ─────────────────────────────────────
- * In deze fase krijgt Sidebar mock-props (netWorth=0, actionCount=0)
- * omdat productie-data integratie een aparte taak is (Fase 1.x).
- * userInitials + userName worden afgeleid uit `email`.
- *
- * ── Bekende edge-cases tijdens transitiefase ─────────────────────────
- * - Pagina's met ingebakken back-knoppen (zie docs/shell-agnostische-
- *   content-audit.md) tonen tijdelijk dubbele back-knoppen bij flag aan.
- *   Cleanup in Fase 1.x.
- * - Sidebar krijgt mock-data, geen echte gebruikersmetrieken — Fase 1.x.
- * - ChatPanel + NotificationModal blijven in `(app)/layout.tsx` zelf;
- *   deze wrapper raakt ze niet aan.
+ * Auth/onboarding/phase-transition/sovereignty/color-vars/font-vars blijven
+ * verantwoordelijkheid van `app/(app)/layout.tsx`. Alle providers daar
+ * blijven nesting-gelijk; alleen het binnenste rendering-blok wordt door
+ * deze component geleverd.
  */
 'use client'
 
 import { Suspense, createContext, useContext, useEffect, useState, useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AppHeader } from '@/components/app/app-header'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
 import { ChatLayoutWrapper } from '@/components/app/chat/chat-layout-wrapper'
 import { FloatingNavButton } from '@/components/app/shell/floating-nav-button'
@@ -64,7 +33,6 @@ import { Sidebar } from '@/components/app/shell/sidebar'
 import { MobileStackShell } from '@/components/app/shell/mobile-stack-shell'
 import { NavStackProvider } from '@/components/app/shell/nav-stack-provider'
 import { MobileAppStripProvider } from '@/components/app/shell/mobile-app-strip-state'
-import { useFeatureFlag } from '@/lib/hooks/use-feature-flag'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import type { CategoryAppLink } from '@/lib/category-app-nav'
 import type { LeverScores } from '@/components/app/shell/lever-compass'
@@ -140,9 +108,6 @@ export type ResponsiveShellProps = {
   children: ReactNode
 }
 
-/** De feature-flag die de nieuwe shell activeert. */
-const NEW_NAVIGATION_SHELL_FLAG = 'new_navigation_shell'
-
 /**
  * Leid 1-2 letter initialen af uit een email-adres voor de Sidebar profiel-pill.
  * Pakt de eerste twee tekens van het deel vóór de `@` en zet ze in uppercase.
@@ -204,63 +169,9 @@ function SidebarPortal({ children }: { children: ReactNode }) {
   return createPortal(children, document.body)
 }
 
-// ── Sub-shell renderers ─────────────────────────────────────────────────────
+// ── Shell renderer ──────────────────────────────────────────────────────────
 
-/**
- * Oude shell (flag UIT). EXACT zoals in `app/(app)/layout.tsx` vóór de
- * migratie — geen wijziging. Veiligheidsgarantie: als deze rendering identiek
- * blijft aan de pre-migratie versie, kan de flag risicoloos uit blijven staan.
- */
-function LegacyShell({
-  email,
-  role,
-  children,
-}: ResponsiveShellProps) {
-  return (
-    <>
-      <ChatLayoutWrapper>
-        <AppHeader email={email} role={role} />
-        <Suspense fallback={null}>
-          <WelcomeBanner />
-        </Suspense>
-        <DailyExpenseProvider>
-          {/* pb-40 mobile (~160px) zodat de floating-nav-pill (~56px hoog,
-              12px safe-area-offset) en het uitgeklapte menu (sheet-content
-              komt over de pill heen) niet over knoppen of links onderaan
-              de pagina vallen. Geldt voor ALLE mobile pages — geen
-              uitzonderingen, anders cherry-pick-bugs. */}
-          <main id="main-content" tabIndex={-1} className="pb-40 md:pb-0 outline-none">{children}</main>
-        </DailyExpenseProvider>
-      </ChatLayoutWrapper>
-      <FloatingNavButton />
-    </>
-  )
-}
-
-/**
- * Nieuwe shell (flag AAN). Sidebar (desktop, via portal) + MobileStackShell
- * (mobile, geëmbed binnen ChatLayoutWrapper). NavStackProvider wikkelt alles
- * voor per-tab-stack-state.
- *
- * Layout-strategie:
- *  - Sidebar wordt via SidebarPortal naar `document.body` gerenderd. Dit is
- *    nodig omdat ChatLayoutWrapper `contain: layout` gebruikt om een
- *    containing-block te creëren voor fixed-positioned descendants — zonder
- *    portal zou de Sidebar relatief aan ChatLayoutWrapper komen te staan en
- *    meescrollen met de wrapper-content. Door naar document.body te porteren
- *    ontwijken we de containment en blijft `position: fixed` t.o.v. viewport.
- *  - Content blijft binnen ChatLayoutWrapper zodat de chat-functionaliteit
- *    (right-side panel via `--chat-sidebar-width`) onaangeroerd werkt.
- *  - Op desktop (≥lg) krijgt content `lg:pl-[264px]` om ruimte naast de
- *    fixed sidebar te reserveren. Onder lg verbergt Sidebar zichzelf
- *    (`hidden lg:flex`) en valt de padding weg.
- *  - Op mobile (<lg) wikkelt MobileStackShell de content in een tray-of-
- *    three (TopBar + Content + BottomBar), die als één blok schuift bij
- *    push/pop. Tegelijkertijd toont Desktop een directe `<main>` met
- *    sidebar-padding — beide zijn altijd in de DOM, breakpoint-classes
- *    bepalen welke zichtbaar is (geen useMediaQuery, geen flicker).
- */
-function NewShell({
+function ShellContent({
   email,
   role,
   sidebarMetrics,
@@ -360,41 +271,6 @@ function NewShell({
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
-/**
- * ResponsiveShell — rendert oude of nieuwe shell op basis van feature-flag
- * `new_navigation_shell`. Default uit; toggle via
- * `/beheer/shell-prototype` of direct via localStorage:
- *   localStorage.setItem('fintwo:flag:new_navigation_shell', 'true')
- *
- * Vervangt het `<ChatLayoutWrapper>...<BottomNav />`-blok in
- * `app/(app)/layout.tsx`. Alle providers in (app)/layout blijven nesting-
- * gelijk; alleen het binnenste deel verandert. Auth-redirect, onboarding-
- * redirect, phase-transition-detection, sovereignty-level-detection, color
- * vars en font-vars blijven verantwoordelijkheid van (app)/layout.tsx.
- */
-export function ResponsiveShell({
-  email,
-  role,
-  sidebarMetrics,
-  children,
-}: ResponsiveShellProps) {
-  const [enabled] = useFeatureFlag(NEW_NAVIGATION_SHELL_FLAG)
-  const leverScores = useMemo(
-    () => sidebarMetrics?.leverScores ?? DEFAULT_LEVER_SCORES,
-    [sidebarMetrics?.leverScores],
-  )
-
-  if (enabled) {
-    return (
-      <NewShell email={email} role={role} sidebarMetrics={sidebarMetrics}>
-        {children}
-      </NewShell>
-    )
-  }
-
-  return (
-    <LeverScoresContext.Provider value={leverScores}>
-      <LegacyShell email={email} role={role}>{children}</LegacyShell>
-    </LeverScoresContext.Provider>
-  )
+export function ResponsiveShell(props: ResponsiveShellProps) {
+  return <ShellContent {...props} />
 }
