@@ -29,15 +29,19 @@ function makeCtx(overrides: Partial<ActionRunContext> = {}): ActionRunContext {
   }
 }
 
-describe('buildActionItems — perspectief-cycle', () => {
-  it('voegt precies één perspectief-actie toe wanneer er meerdere opties zijn', () => {
+describe('buildActionItems — perspectief-acties', () => {
+  it('voegt één actie per beschikbaar perspectief toe', () => {
     const items = buildActionItems(makeCtx(), [])
     const perspectiveItems = items.filter((i) => i.id.startsWith('action:perspective-'))
-    expect(perspectiveItems).toHaveLength(1)
-    expect(perspectiveItems[0].id).toBe('action:perspective-cycle')
+    expect(perspectiveItems).toHaveLength(3)
+    expect(perspectiveItems.map((i) => i.id)).toEqual([
+      'action:perspective-personal',
+      'action:perspective-household',
+      'action:perspective-partner',
+    ])
   })
 
-  it('toont geen perspectief-actie voor solo-gebruikers (1 optie)', () => {
+  it('toont geen perspectief-acties voor solo-gebruikers (1 optie)', () => {
     const items = buildActionItems(
       makeCtx({ availablePerspectives: [PERSPECTIVES[0]] }),
       [],
@@ -45,42 +49,48 @@ describe('buildActionItems — perspectief-cycle', () => {
     expect(items.filter((i) => i.id.startsWith('action:perspective-'))).toHaveLength(0)
   })
 
-  it('toont huidige perspectief in label en volgende in sublabel', () => {
-    const items = buildActionItems(makeCtx({ currentPerspective: 'personal' }), [])
-    const cycle = items.find((i) => i.id === 'action:perspective-cycle')!
-    expect(cycle.label).toBe('Perspectief: Persoonlijk')
-    expect(cycle.sublabel).toContain('Huishouden')
-    expect(cycle.sublabel).toContain('Beide partners samen')
+  it('gebruikt korte labels (perspectief-naam) zonder "Wissel naar"-prefix', () => {
+    const items = buildActionItems(makeCtx(), [])
+    const personal = items.find((i) => i.id === 'action:perspective-personal')!
+    const household = items.find((i) => i.id === 'action:perspective-household')!
+    expect(personal.label).toBe('Persoonlijk')
+    expect(household.label).toBe('Huishouden')
   })
 
-  it('cyclet naar het volgende perspectief in de array', () => {
+  it('markeert het huidige perspectief met "· actief" in sublabel', () => {
+    const items = buildActionItems(makeCtx({ currentPerspective: 'household' }), [])
+    const current = items.find((i) => i.id === 'action:perspective-household')!
+    const other = items.find((i) => i.id === 'action:perspective-personal')!
+    expect(current.sublabel).toContain('· actief')
+    expect(other.sublabel).not.toContain('actief')
+  })
+
+  it('klik op niet-actieve optie roept setPerspective met dat id', () => {
+    const setPerspective = vi.fn()
+    const items = buildActionItems(
+      makeCtx({ currentPerspective: 'personal', setPerspective }),
+      [],
+    )
+    items.find((i) => i.id === 'action:perspective-partner')!.run()
+    expect(setPerspective).toHaveBeenCalledWith('partner')
+  })
+
+  it('klik op het actieve perspectief is no-op voor setPerspective', () => {
     const setPerspective = vi.fn()
     const items = buildActionItems(
       makeCtx({ currentPerspective: 'household', setPerspective }),
       [],
     )
-    const cycle = items.find((i) => i.id === 'action:perspective-cycle')!
-    cycle.run()
-    expect(setPerspective).toHaveBeenCalledWith('partner')
+    items.find((i) => i.id === 'action:perspective-household')!.run()
+    expect(setPerspective).not.toHaveBeenCalled()
   })
 
-  it('wraps van laatste terug naar eerste perspectief', () => {
-    const setPerspective = vi.fn()
-    const items = buildActionItems(
-      makeCtx({ currentPerspective: 'partner', setPerspective }),
-      [],
-    )
-    const cycle = items.find((i) => i.id === 'action:perspective-cycle')!
-    cycle.run()
-    expect(setPerspective).toHaveBeenCalledWith('personal')
-  })
-
-  it('roept closePalette na cycle', () => {
+  it('elke optie sluit het palette na klik', () => {
     const closePalette = vi.fn()
     const items = buildActionItems(makeCtx({ closePalette }), [])
-    const cycle = items.find((i) => i.id === 'action:perspective-cycle')!
-    cycle.run()
-    expect(closePalette).toHaveBeenCalled()
+    items.find((i) => i.id === 'action:perspective-personal')!.run()
+    items.find((i) => i.id === 'action:perspective-household')!.run()
+    expect(closePalette).toHaveBeenCalledTimes(2)
   })
 
   it('behoudt de bestaande statische acties (toggle-privacy, sync, logout, chat)', () => {
