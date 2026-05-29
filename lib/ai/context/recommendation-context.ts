@@ -298,24 +298,20 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
     .limit(30)
 
   if (feedback && feedback.length > 0) {
-    // Negatief signaal: afgewezen door knop OF genegeerd door chat-sluit
-    // (status='expired'). Beide tellen als "doe dit type niet opnieuw".
-    const rejected = feedback.filter(
-      f =>
-        f.feedback_type === 'rejected' ||
-        f.feedback_type === 'action_rejected' ||
-        f.feedback_type === 'expired',
-    )
+    // Negatief signaal: expliciet afgewezen door knop. Stilzwijgend
+    // genegeerd ("expired") komt niet via feedback maar via de
+    // status='expired' op de recommendation zelf (zie sectie "RECENT
+    // NIET BESLOTEN" verderop).
+    const rejected = feedback.filter(f => f.feedback_type === 'rejected' || f.feedback_type === 'action_rejected')
     const accepted = feedback.filter(f => f.feedback_type === 'accepted' || f.feedback_type === 'action_completed')
 
     if (rejected.length > 0) {
       const rejectedLines = rejected.map(f => {
         const slug = f.related_budget_slug ? ` (${f.related_budget_slug})` : ''
         const reason = f.reason ? ` — reden: "${f.reason}"` : ''
-        const kind = f.feedback_type === 'expired' ? 'genegeerd' : 'afgewezen'
-        return `${f.recommendation_type}${slug}: ${kind}${reason}`
+        return `${f.recommendation_type}${slug}: afgewezen${reason}`
       })
-      parts.push(section('EERDER AFGEWEZEN OF GENEGEERD (vermijd vergelijkbaar)', bulletList(rejectedLines)))
+      parts.push(section('EERDER AFGEWEZEN (vermijd vergelijkbaar)', bulletList(rejectedLines)))
     }
 
     if (accepted.length > 0) {
@@ -337,17 +333,46 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
     Date.now() - NEGATIVE_HORIZON_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString()
 
+  const nowIso = new Date().toISOString()
+
   const { data: activeRecs } = await supabase
     .from('recommendations')
-    .select('title, related_budget_slug, status')
+    .select('id, title, description, recommendation_type, related_budget_slug, status, postponed_until, freedom_days_per_year, euro_impact_monthly')
     .in('status', ['pending', 'accepted', 'postponed'])
 
   if (activeRecs && activeRecs.length > 0) {
-    const lines = activeRecs.map(r => {
-      const slug = r.related_budget_slug ? ` (${r.related_budget_slug})` : ''
-      return `${r.title}${slug} — ${r.status}`
-    })
-    parts.push(section('ACTIEVE AANBEVELINGEN (geen duplicaten)', bulletList(lines)))
+    // Splits postponed-recs op terugkomdatum: die voorbij hun
+    // postponed_until zijn mag (en moet) Will opnieuw aandragen.
+    const readyForReview = activeRecs.filter(
+      r => r.status === 'postponed' && r.postponed_until && r.postponed_until <= nowIso,
+    )
+    const stillActive = activeRecs.filter(r => !readyForReview.includes(r))
+
+    if (stillActive.length > 0) {
+      const lines = stillActive.map(r => {
+        const slug = r.related_budget_slug ? ` (${r.related_budget_slug})` : ''
+        return `${r.title}${slug} — ${r.status}`
+      })
+      parts.push(section('ACTIEVE AANBEVELINGEN (geen duplicaten)', bulletList(lines)))
+    }
+
+    if (readyForReview.length > 0) {
+      const lines = readyForReview.map(r => {
+        const impact = r.euro_impact_monthly != null
+          ? ` — €${Math.abs(Number(r.euro_impact_monthly))}/mnd, +${r.freedom_days_per_year} dagen/jaar`
+          : ''
+        return `[${r.id}] ${r.title}${impact} — ${r.description ?? ''}`
+      })
+      parts.push(
+        section(
+          'UITGESTELD — KLAAR VOOR HERBEOORDELING (prioriteit)',
+          'De gebruiker heeft deze voorstellen eerder uitgesteld; de wachttijd is voorbij. ' +
+            'Begin je antwoord met DEZE voorstellen voordat je nieuwe optimalisaties aandraagt. ' +
+            'Roep voor elk een suggestRecommendation aan met dezelfde inhoud en voeg in description ' +
+            'kort toe dat het een herinnering is. Maximaal één per gespreksbeurt.\n' + bulletList(lines),
+        ),
+      )
+    }
   }
 
   const { data: closedRecs } = await supabase

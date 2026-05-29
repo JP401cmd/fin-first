@@ -51,6 +51,15 @@ B) **suggestAction** — een LOSSE actie zonder voorstel-context:
    - Goed voor follow-ups in een gesprek ("OK, voeg dit toe aan mijn lijst")
    - Maximaal 3 per bericht
 
+UITGESTELDE VOORSTELLEN — HERBEOORDELING:
+Wanneer de context een sectie "UITGESTELD — KLAAR VOOR HERBEOORDELING" bevat,
+behandel die voorstellen als prioriteit voordat je nieuwe optimalisaties verkent:
+- De gebruiker heeft ze eerder uitgesteld en de wachttijd (14 dagen) is voorbij
+- Roep voor het belangrijkste een suggestRecommendation aan met DEZELFDE inhoud
+  als de uitgestelde rij (gebruik de meegegeven titel en bedragen)
+- Voeg in de description toe: "Eerder uitgesteld — leek dit toen niet het juiste moment?"
+- Maximaal één herbeoordeling per gespreksbeurt, net als gewone voorstellen
+
 Wanneer GEEN voorstel/actie:
 - Pure feitelijke vragen zonder optimalisatie-kans ("hoeveel vermogen heb ik?")
 - Als je onvoldoende data hebt om een betrouwbare impact te berekenen

@@ -123,9 +123,12 @@ export async function PATCH(
 
   if (body.action === 'expire') {
     // "Niks doen" in chat: gebruiker sloot of negeerde het voorstel.
-    // Status='expired' zodat Will het niet opnieuw aanraadt (anti-duplicaat
-    // via recommendation_feedback + de pending→expired transitie), maar
-    // het verschijnt niet meer in een lijst voor de gebruiker zelf.
+    // Status='expired' + decided_at op de recommendation-rij is genoeg
+    // signaal voor anti-duplicaat (zie buildRecommendationContext sectie
+    // "RECENT NIET BESLOTEN"). We schrijven GEEN recommendation_feedback-
+    // rij omdat 'expired' geen geldige feedback_type-enum is (alleen
+    // accepted/rejected/postponed/action_*) en omdat er geen
+    // user-intentie aan vasthangt — louter inactiviteit.
     const { error: updateError } = await supabase
       .from('recommendations')
       .update({ status: 'expired', decided_at: now, updated_at: now })
@@ -138,15 +141,6 @@ export async function PATCH(
     if (updateError) {
       return Response.json({ error: updateError.message }, { status: 500 })
     }
-
-    await supabase.from('recommendation_feedback').insert({
-      user_id: user.id,
-      recommendation_id: id,
-      feedback_type: 'expired',
-      recommendation_type: recommendation.recommendation_type,
-      related_budget_slug: recommendation.related_budget_slug,
-      freedom_days_impact: recommendation.freedom_days_per_year,
-    })
 
     return Response.json({ status: 'expired' })
   }

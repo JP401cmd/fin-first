@@ -25,6 +25,8 @@ const PROMPTS: Record<string, (params: URLSearchParams) => string> = {
     if (!rec) return 'Stel je beste voorstel voor op basis van mijn huidige situatie.'
     return `Toon mij het voorstel met id ${rec} uit mijn pending recommendations en leg uit waarom het relevant is.`
   },
+  'herbekijk-uitgesteld': () =>
+    'Ik wil opnieuw kijken naar voorstellen die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met het belangrijkste.',
 }
 
 export function ChatPromptDeeplink() {

@@ -302,7 +302,7 @@ function RecommendationSuggestionCard({
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, toggle, pendingMessage, clearPendingMessage, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage } = useChatContext()
+  const { isOpen, close, toggle, openWithMessage, pendingMessage, clearPendingMessage, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage } = useChatContext()
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -339,6 +339,10 @@ export function ChatPanel() {
   const [recDecisions, setRecDecisions] = useState<Map<string, RecommendationDecision>>(new Map())
   const [loadingRec, setLoadingRec] = useState<{ id: string; kind: 'accept' | 'postpone' | 'reject' } | null>(null)
   const pendingRecsRef = useRef<Map<string, string>>(new Map()) // toolCallId → recommendationId
+
+  // Badge-count op de FAB: postponed voorstellen die over hun
+  // terugkomdatum zijn. Discoverability voor de herbekijk-flow.
+  const [postponedReady, setPostponedReady] = useState(0)
 
   // Modal state
   const [editAction, setEditAction] = useState<Action | null>(null)
@@ -477,11 +481,20 @@ export function ChatPanel() {
       if (recDecisions.has(toolCallId)) return
       setLoadingRec({ id: toolCallId, kind })
 
+      // Postponed-voorstellen krijgen een terugkomdatum mee — na 14 dagen
+      // mag Will ze opnieuw aandragen (zie recommendation-context sectie
+      // "UITGESTELD — KLAAR VOOR HERBEOORDELING"). Zonder timer zou
+      // "uitstellen" effectief een soft-delete zijn.
+      const POSTPONE_DAYS = 14
+      const postponedUntil = kind === 'postpone'
+        ? new Date(Date.now() + POSTPONE_DAYS * 24 * 60 * 60 * 1000).toISOString()
+        : undefined
+
       try {
         const res = await fetch(`/api/ai/recommendations/${recommendationId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: kind }),
+          body: JSON.stringify({ action: kind, postponed_until: postponedUntil }),
         })
 
         if (!res.ok) throw new Error('decision failed')
@@ -505,6 +518,32 @@ export function ChatPanel() {
     },
     [recDecisions],
   )
+
+  // Postponed-ready badge: laad bij mount en wanneer de chat sluit (na
+  // mogelijke nieuwe postpones). Polling is bewust gemist — een minuutje
+  // achterloop maakt voor deze nudge niet uit.
+  const fetchPostponedReady = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/recommendations/postponed-ready', {
+        cache: 'no-store',
+      })
+      if (!res.ok) return
+      const { count } = await res.json() as { count: number }
+      setPostponedReady(count)
+    } catch {
+      // silently fail — badge is informational
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchPostponedReady()
+  }, [fetchPostponedReady])
+
+  useEffect(() => {
+    // Refresh wanneer de chat sluit — gebruiker kan voorstellen uitgesteld
+    // hebben in deze sessie of er nieuwe inzichten zijn.
+    if (!isOpen) void fetchPostponedReady()
+  }, [isOpen, fetchPostponedReady])
 
   // Expire-on-close: bij chat-sluit met onbeantwoorde voorstellen → expire ze
   // server-side zodat Will ze niet opnieuw aanraadt.
@@ -710,14 +749,38 @@ export function ChatPanel() {
   /* ── FAB ──────────────────────────────────────────────────────── */
 
   if (!isOpen) {
+    const hasPostponedReady = postponedReady > 0
+    const fabAria = hasPostponedReady
+      ? `Open chat met ${config.name} — ${postponedReady} uitgestelde voorstel${postponedReady === 1 ? '' : 'len'} klaar`
+      : `Open chat met ${config.name}`
+    const onFabClick = () => {
+      if (hasPostponedReady) {
+        // Auto-kick-off: open chat met herbekijk-prompt zodat Will
+        // direct begint met de openstaande herbeoordelingen.
+        openWithMessage(
+          'Ik wil opnieuw kijken naar voorstellen die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met het belangrijkste.',
+        )
+      } else {
+        toggle()
+      }
+    }
+
     return (
       <div className="fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] z-50 md:bottom-6" style={{ right: 'calc(1.5rem + var(--chat-sidebar-width, 0px))' }}>
         <button
-          onClick={toggle}
-          className={`flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-wil-600 shadow-[var(--s1)] transition-all hover:scale-105 active:scale-95`}
-          aria-label={`Open chat met ${config.name}`}
+          onClick={onFabClick}
+          className={`relative flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-wil-600 shadow-[var(--s1)] transition-all hover:scale-105 active:scale-95`}
+          aria-label={fabAria}
         >
           {config.fabAvatar(36)}
+          {hasPostponedReady && (
+            <span
+              aria-hidden="true"
+              className="absolute -top-1.5 -left-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-wil-600 px-1.5 text-[11px] font-semibold text-white shadow-md ring-2 ring-[var(--paper)]"
+            >
+              {postponedReady > 9 ? '9+' : postponedReady}
+            </span>
+          )}
         </button>
         <AiPrivacyIndicator size={12} className="absolute -top-1 -right-1 rounded-full bg-[var(--paper)] p-0.5 shadow-sm" />
       </div>
