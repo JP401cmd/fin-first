@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -189,8 +189,17 @@ export function RekenhulpView({
         </button>
 
         <header className="mb-4">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
-            Rekenhulp bouwen met Will
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+              Rekenhulp bouwen met Will
+            </div>
+            {/* Verbruik-badge — geeft de gebruiker zicht op zijn weekquotum
+                vóór hij submit. `usageRefreshKey` bumpt na een succesvolle
+                generate zodat de teller meteen zakt. */}
+            <RateLimitBadge
+              refreshKey={usageRefreshKey}
+              mode={draft ? 'refinements' : 'generations'}
+            />
           </div>
           <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
             Beschrijf je vraagstuk
@@ -337,18 +346,31 @@ export function RekenhulpView({
             Jouw rekenhulpen
           </h2>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setMode('build')
-            setDraft(null)
-            setError(null)
-          }}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
-        >
-          <Sparkles className="w-4 h-4" aria-hidden="true" />
-          Nieuwe met Will
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Brug naar de publieke marktplaats — anderen hun gepubliceerde
+              rekenhulpen ontdekken en kopiëren. Bewust een tekstlink (geen
+              primary CTA) zodat de "Nieuwe met Will"-actie de hoofdfocus
+              blijft. */}
+          <Link
+            href="/toekomst/bibliotheek"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-700 hover:text-violet-800 transition-colors"
+          >
+            <Library className="w-4 h-4" aria-hidden="true" />
+            Open bibliotheek →
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('build')
+              setDraft(null)
+              setError(null)
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
+          >
+            <Sparkles className="w-4 h-4" aria-hidden="true" />
+            Nieuwe met Will
+          </button>
+        </div>
       </header>
 
       {saved.length === 0 ? (
@@ -376,47 +398,190 @@ export function RekenhulpView({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {saved.map((calc) => (
-            <article
+            <SavedCalculatorCard
               key={calc.id}
-              className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 flex flex-col"
-            >
-              <div className="flex items-start gap-2 mb-2">
-                <span className="inline-flex w-8 h-8 rounded-lg bg-violet-50 text-violet-700 items-center justify-center shrink-0">
-                  <Calculator className="w-4 h-4" aria-hidden="true" />
-                </span>
-                <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0">
-                  {calc.name}
-                </h3>
-              </div>
-              {calc.description && (
-                <p className="text-xs text-[var(--ink-2)] leading-snug mb-3 line-clamp-2">
-                  {calc.description}
-                </p>
-              )}
-              <div className="mt-auto flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRunning(calc)
-                    setMode('run')
-                  }}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-xs font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
-                >
-                  Openen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteSaved(calc.id)}
-                  aria-label={`Verwijder ${calc.name}`}
-                  className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-[var(--ink-3)] hover:bg-red-50 hover:text-red-600 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" aria-hidden="true" />
-                </button>
-              </div>
-            </article>
+              calc={calc}
+              menuOpen={openMenuId === calc.id}
+              onOpenMenu={() => setOpenMenuId(calc.id)}
+              onCloseMenu={() => setOpenMenuId(null)}
+              onRun={() => {
+                setRunning(calc)
+                setMode('run')
+              }}
+              onPublish={() => {
+                setOpenMenuId(null)
+                setPublishing(calc)
+              }}
+              onUnpublish={() => {
+                setOpenMenuId(null)
+                void unpublishCalculator(calc.id)
+              }}
+              onDelete={() => {
+                setOpenMenuId(null)
+                void deleteSaved(calc.id)
+              }}
+            />
           ))}
         </div>
       )}
+
+      {/* Publish-flow modal — alleen gerenderd als er een geselecteerde
+          calculator is. De sheet beheert zijn eigen submit-state; bij
+          succes doet hij router.refresh zodat de lijst de nieuwe
+          is_public-status oppikt. */}
+      {publishing && (
+        <PublishCurationSheet
+          open={publishing !== null}
+          onClose={() => setPublishing(null)}
+          calculator={publishing}
+        />
+      )}
     </section>
+  )
+}
+
+/**
+ * SavedCalculatorCard — één rij in de "Jouw rekenhulpen"-lijst. Bevat:
+ *  - Naam + (indien publiek) `<OwnerStatsBadge>` met like/copy-tellers
+ *  - "Openen"-knop (primary)
+ *  - "..."-menu met Publiceren / Unpublishen / Verwijderen
+ *
+ * Het menu sluit automatisch bij klik buiten de kaart, escape, en bij
+ * elke gekozen actie (de parent reset `openMenuId` na de mutatie).
+ */
+function SavedCalculatorCard({
+  calc,
+  menuOpen,
+  onOpenMenu,
+  onCloseMenu,
+  onRun,
+  onPublish,
+  onUnpublish,
+  onDelete,
+}: {
+  calc: CustomCalculatorRow
+  menuOpen: boolean
+  onOpenMenu: () => void
+  onCloseMenu: () => void
+  onRun: () => void
+  onPublish: () => void
+  onUnpublish: () => void
+  onDelete: () => void
+}) {
+  const isPublic = Boolean(calc.is_public)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Click-outside + Escape sluiten het menu. We binden alleen wanneer
+  // het menu daadwerkelijk open is om onnodige globale listeners te
+  // voorkomen.
+  useEffect(() => {
+    if (!menuOpen) return
+    function onClick(e: MouseEvent) {
+      if (!menuRef.current) return
+      if (e.target instanceof Node && !menuRef.current.contains(e.target)) {
+        onCloseMenu()
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCloseMenu()
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen, onCloseMenu])
+
+  return (
+    <article className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 flex flex-col">
+      <div className="flex items-start gap-2 mb-2">
+        <span className="inline-flex w-8 h-8 rounded-lg bg-violet-50 text-violet-700 items-center justify-center shrink-0">
+          <Calculator className="w-4 h-4" aria-hidden="true" />
+        </span>
+        <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0">
+          {calc.name}
+        </h3>
+      </div>
+
+      {/* OwnerStatsBadge: zelf-rendert niets als is_public=false, dus
+          we mogen 'm altijd plaatsen — geen conditional rendering nodig. */}
+      <div className="mb-2">
+        <OwnerStatsBadge
+          likeCount={calc.like_count ?? 0}
+          duplicateCount={calc.duplicate_count ?? 0}
+          isPublic={isPublic}
+          publishedAt={calc.published_at ?? null}
+        />
+      </div>
+
+      {calc.description && (
+        <p className="text-xs text-[var(--ink-2)] leading-snug mb-3 line-clamp-2">
+          {calc.description}
+        </p>
+      )}
+
+      <div className="mt-auto flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onRun}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-2 text-xs font-semibold text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
+        >
+          Openen
+        </button>
+
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => (menuOpen ? onCloseMenu() : onOpenMenu())}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={`Meer acties voor ${calc.name}`}
+            className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] transition-colors"
+          >
+            <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+          </button>
+
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 bottom-full mb-1 z-10 min-w-[180px] rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-lg overflow-hidden"
+            >
+              {isPublic ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={onUnpublish}
+                  className="w-full inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] text-left"
+                >
+                  <EyeOff className="w-3.5 h-3.5" aria-hidden="true" />
+                  Uit bibliotheek halen
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={onPublish}
+                  className="w-full inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] text-left"
+                >
+                  <Globe2 className="w-3.5 h-3.5 text-violet-700" aria-hidden="true" />
+                  Publiceren in bibliotheek
+                </button>
+              )}
+              <div className="border-t border-[var(--border-ed)]" />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={onDelete}
+                className="w-full inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 text-left"
+              >
+                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                Verwijderen
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
   )
 }
