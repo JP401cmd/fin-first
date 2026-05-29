@@ -65,8 +65,6 @@ export interface WillPageData {
   kpiData: WillKpiData
   goals: GoalWithBudget[]
   goalProgresses: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }[]
-  goalAssets: { id: string; name: string; current_value: number }[]
-  goalDebts: { id: string; name: string; current_balance: number }[]
   partnerInfo: { partnerId: string; partnerName: string } | null
   currentUserId: string | null
   userProfile: { full_name: string | null }
@@ -314,8 +312,6 @@ export async function loadWillData(
     kpiData,
     goals,
     goalProgresses,
-    goalAssets: loadedAssets,
-    goalDebts: loadedDebts,
     partnerInfo,
     currentUserId,
     userProfile,

@@ -104,11 +104,6 @@ export const PAGE_INFO: Record<string, string> = {
     'Je ziet je netto vermogen, schuldgraad en FIRE-voortgang. ' +
     'Klik op een categorie om items toe te voegen of te beheren.',
 
-  '/will':
-    'Je dagelijkse cockpit: hier zie je je briefing, aanbevelingen en acties. ' +
-    'Widgets tonen actuele inzichten over je financiën. ' +
-    'Sleep widgets om je dashboard te personaliseren.',
-
   '/horizon':
     'Je financiële toekomst geprojecteerd. ' +
     'Zie wanneer je financieel vrij bent, hoe scenario\'s je pad beïnvloeden, en wat levensgebeurtenissen kosten. ' +
