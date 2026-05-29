@@ -8,9 +8,10 @@
 // foutobject teruggegeven i.p.v. te throwen, zodat de UI een nette
 // melding kan tonen.
 
-import { generateObject } from 'ai'
+import { generateObject, NoObjectGeneratedError } from 'ai'
+import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getModel } from '@/lib/ai/config'
+import { AIConfigError, getModel } from '@/lib/ai/config'
 import {
   CalculatorDefinitionSchema,
   type CalculatorDefinition,
@@ -109,13 +110,46 @@ export async function buildCalculator(
 
     return { ok: true, definition: object }
   } catch (err) {
-    console.error(
-      '[build-calculator] generatie mislukt:',
-      err instanceof Error ? err.message : err,
-    )
+    // Volledige error loggen voor server-diagnostiek.
+    console.error('[build-calculator] generatie mislukt:', err)
+
+    // AI-config (geen API key, verkeerde provider, etc.) → laat de
+    // specifieke message door zodat de admin weet wat te configureren.
+    if (err instanceof AIConfigError) {
+      return { ok: false, error: err.message }
+    }
+
+    // Zod-schema-mismatch → het AI-model produceerde een output die niet
+    // aan de strikte CalculatorDefinitionSchema voldoet. Vaak: snake_case
+    // regex faalde, of een verplicht veld ontbrak.
+    if (err instanceof z.ZodError) {
+      const fields = err.issues.slice(0, 3).map((i) => i.path.join('.')).join(', ')
+      return {
+        ok: false,
+        error: `De AI genereerde een ongeldig formaat (${fields}). Probeer je vraag concreter te formuleren.`,
+      }
+    }
+
+    // Vercel AI SDK kon geen object genereren — meestal omdat het model
+    // (zoals een lokaal Ollama-model) tool-calling niet ondersteunt of de
+    // output afkapte.
+    if (NoObjectGeneratedError.isInstance(err)) {
+      return {
+        ok: false,
+        error: 'De AI kon geen geldige rekenhulp produceren. Probeer een kortere of concretere vraag.',
+      }
+    }
+
+    // Fallback: toon error-class naam + bericht in dev voor diagnostiek,
+    // generic in productie.
+    const isDev = process.env.NODE_ENV !== 'production'
+    const detail =
+      isDev && err instanceof Error
+        ? ` (${err.name}: ${err.message})`
+        : ''
     return {
       ok: false,
-      error: 'Kon geen rekenhulp genereren. Probeer het opnieuw of herformuleer je vraag.',
+      error: `Kon geen rekenhulp genereren. Probeer het opnieuw of herformuleer je vraag.${detail}`,
     }
   }
 }

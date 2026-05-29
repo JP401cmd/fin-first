@@ -241,7 +241,7 @@ export function CalculatorRunner({
       )}
 
       {/* Aannames */}
-      {definition.assumptions.length > 0 && (
+      {(definition.assumptions?.length ?? 0) > 0 && (
         <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-3 py-2.5">
           <div className="flex items-center gap-1.5 mb-1">
             <Info className="w-3.5 h-3.5 text-[var(--ink-3)]" aria-hidden="true" />
@@ -250,7 +250,7 @@ export function CalculatorRunner({
             </span>
           </div>
           <ul className="list-disc list-inside space-y-0.5 text-[11px] text-[var(--ink-2)] leading-snug">
-            {definition.assumptions.map((a, i) => (
+            {definition.assumptions?.map((a, i) => (
               <li key={i}>{a}</li>
             ))}
           </ul>
