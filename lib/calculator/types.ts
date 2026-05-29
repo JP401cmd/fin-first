@@ -115,4 +115,14 @@ export interface CustomCalculatorRow {
   created_by_ai: boolean
   sort_order: number
   created_at: string
+  // ── Bibliotheek-velden (migratie 20260529100000) ───────────────
+  // Velden zijn `nullable`/optional zodat bestaande selects zonder
+  // de nieuwe kolommen blijven werken (oudere code in rekenhulp-view
+  // selecteert maar een subset). Counter-velden zijn synchroon
+  // gehouden door DB-triggers (zie sync_calculator_like_count).
+  is_public?: boolean
+  published_at?: string | null
+  forked_from?: string | null
+  like_count?: number
+  duplicate_count?: number
 }
