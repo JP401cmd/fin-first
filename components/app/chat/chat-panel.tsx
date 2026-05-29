@@ -299,6 +299,83 @@ function RecommendationSuggestionCard({
   )
 }
 
+/* ── Quick-action chips (empty state) ──────────────────────────────── */
+
+/**
+ * Mappen van pathname-prefix naar een context-bewuste chip. Eerste match
+ * wint. Pad-matching is bewust permissief (`startsWith`) zodat sub-routes
+ * binnen een hefboom (bv. /overzicht/schulden/detail) ook de juiste chip
+ * krijgen.
+ */
+const CONTEXT_CHIPS: Array<{
+  prefixes: string[]
+  label: string
+  prompt: string
+}> = [
+  {
+    prefixes: ['/overzicht/schulden', '/core/debts'],
+    label: 'Voorstel voor mijn schulden',
+    prompt: 'Geef me één concreet voorstel om mijn schulden sneller of slimmer af te lossen.',
+  },
+  {
+    prefixes: ['/overzicht/bezittingen', '/core/assets'],
+    label: 'Voorstel voor mijn bezittingen',
+    prompt: 'Geef me één concreet voorstel om mijn bezittingen beter te laten renderen of risico te verlagen.',
+  },
+  {
+    prefixes: ['/overzicht/cashflow', '/core/budgets', '/core/cash'],
+    label: 'Voorstel voor mijn cashflow',
+    prompt: 'Geef me één concreet voorstel om mijn maandelijkse cashflow te verbeteren.',
+  },
+  {
+    prefixes: ['/overzicht/belasting', '/core/belasting'],
+    label: 'Voorstel om belasting te besparen',
+    prompt: 'Geef me één concreet voorstel om dit jaar belasting te besparen (Box 1, 2 of 3).',
+  },
+  {
+    prefixes: ['/toekomst', '/horizon'],
+    label: 'Versnel mijn vrijheidsdatum',
+    prompt: 'Geef me één concreet voorstel om mijn FIRE-datum naar voren te halen.',
+  },
+]
+
+const GENERIC_PROMPT =
+  'Geef me één concreet voorstel op basis van mijn huidige situatie. Begin met de grootste kans.'
+
+function QuickActionChips({
+  pathname,
+  disabled,
+  onPick,
+}: {
+  pathname: string
+  disabled: boolean
+  onPick: (prompt: string) => void
+}) {
+  const contextChip = CONTEXT_CHIPS.find((c) => c.prefixes.some((p) => pathname.startsWith(p)))
+  const chips: Array<{ label: string; prompt: string }> = [
+    { label: 'Geef me een voorstel', prompt: GENERIC_PROMPT },
+  ]
+  if (contextChip) {
+    chips.push({ label: contextChip.label, prompt: contextChip.prompt })
+  }
+
+  return (
+    <div className="mt-4 flex max-w-[300px] flex-wrap justify-center gap-1.5">
+      {chips.map((c) => (
+        <button
+          key={c.label}
+          type="button"
+          onClick={() => onPick(c.prompt)}
+          disabled={disabled}
+          className="inline-flex items-center gap-1 rounded-full border border-wil-200 bg-wil-50 px-3 py-1 text-xs font-medium text-wil-700 transition-colors hover:bg-wil-100 disabled:opacity-50"
+        >
+          {c.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
@@ -334,11 +411,11 @@ export function ChatPanel() {
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
 
   // Voorstel-beslissingen: per toolCallId welk antwoord de gebruiker gaf
-  // (accepted/postponed/rejected). Niet-besliste voorstellen worden bij
-  // chat-sluit ge-expired via /api/ai/recommendations/[id] action:'expire'.
+  // (accepted/postponed/rejected). Onbesliste voorstellen blijven na
+  // chat-sluit pending op /overzicht/tips — daar kan de gebruiker alsnog
+  // beslissen. Geen expire-on-close meer.
   const [recDecisions, setRecDecisions] = useState<Map<string, RecommendationDecision>>(new Map())
   const [loadingRec, setLoadingRec] = useState<{ id: string; kind: 'accept' | 'postpone' | 'reject' } | null>(null)
-  const pendingRecsRef = useRef<Map<string, string>>(new Map()) // toolCallId → recommendationId
 
   // Badge-count op de FAB: postponed voorstellen die over hun
   // terugkomdatum zijn. Discoverability voor de herbekijk-flow.
@@ -507,9 +584,6 @@ export function ChatPanel() {
           next.set(toolCallId, decision)
           return next
         })
-        // Eenmaal beslist: weghalen uit pending-set zodat chat-sluit geen
-        // expire-call triggert.
-        pendingRecsRef.current.delete(toolCallId)
       } catch {
         // silently fail — user can retry
       } finally {
@@ -544,26 +618,6 @@ export function ChatPanel() {
     // hebben in deze sessie of er nieuwe inzichten zijn.
     if (!isOpen) void fetchPostponedReady()
   }, [isOpen, fetchPostponedReady])
-
-  // Expire-on-close: bij chat-sluit met onbeantwoorde voorstellen → expire ze
-  // server-side zodat Will ze niet opnieuw aanraadt.
-  useEffect(() => {
-    if (isOpen) return
-    if (pendingRecsRef.current.size === 0) return
-
-    const ids = Array.from(pendingRecsRef.current.values())
-    pendingRecsRef.current.clear()
-    // Fire-and-forget; geen UI-feedback nodig (chat is dicht).
-    void Promise.allSettled(
-      ids.map((id) =>
-        fetch(`/api/ai/recommendations/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'expire' }),
-        }),
-      ),
-    )
-  }, [isOpen])
 
   /* ── Modal handlers ───────────────────────────────────────────── */
 
@@ -669,10 +723,6 @@ export function ChatPanel() {
             )
           } else {
             const data = out as SuggestRecommendationResult
-            // Registreer pending voor expire-on-close (alleen vóór beslissing).
-            if (!recDecisions.has(rec.toolCallId)) {
-              pendingRecsRef.current.set(rec.toolCallId, data.id)
-            }
             elements.push(
               <RecommendationSuggestionCard
                 key={`rec-${rec.toolCallId}`}
@@ -837,7 +887,7 @@ export function ChatPanel() {
         <>
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center py-10 text-center">
               {config.fabAvatar(64)}
               <p className={`mt-3 text-sm font-medium ${config.accentColor}`}>
                 {config.greeting}
@@ -845,6 +895,11 @@ export function ChatPanel() {
               <p className="mt-1 max-w-[260px] text-xs text-[var(--ink-3)]">
                 {config.greetingDescription}
               </p>
+              <QuickActionChips
+                pathname={pathname}
+                disabled={isStreaming}
+                onPick={(prompt) => sendMessage({ text: prompt })}
+              />
             </div>
           )}
 

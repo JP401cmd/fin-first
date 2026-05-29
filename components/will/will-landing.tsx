@@ -11,7 +11,7 @@ import { DraggableWidgetGrid } from '@/components/widgets/draggable-widget-grid'
 import { SectionDivider } from '@/components/app/section-divider'
 import { DAIshboard } from '@/components/dashboard/daishboard'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
-import { ActiesTeaser } from '@/components/overview/acties-teaser'
+import { TipsTeaser } from '@/components/overview/tips-teaser'
 import { DoelenStrook } from './doelen-strook'
 import { StappenplannenStrook } from './stappenplannen-strook'
 import { type RecurringItem } from './vaste-kosten-analyse'
@@ -97,7 +97,13 @@ export function WillLanding({
     router.refresh()
   }, [router])
 
-  const { actions, goals, goalProgresses, goalAssets, goalDebts, partnerInfo, currentUserId, userProfile } = willData
+  const { recommendations, actions, goals, goalProgresses, goalAssets, goalDebts, partnerInfo, currentUserId, userProfile } = willData
+  const now = Date.now()
+  const pendingTipCount = recommendations.filter(
+    (r) =>
+      r.status === 'pending' ||
+      (r.status === 'postponed' && r.postponed_until && new Date(r.postponed_until).getTime() <= now),
+  ).length
 
   return (
     <FreedomDaysAnimationProvider>
@@ -182,10 +188,10 @@ export function WillLanding({
 
         <SectionDivider variant="asterisk" />
 
-        {/* ── Sectie 3a: Acties-teaser → /overzicht/acties + Will-chat ─── */}
-        <ActiesTeaser
+        {/* ── Sectie 3a: Tips-teaser → /overzicht/tips + Will-chat ─── */}
+        <TipsTeaser
+          pendingTipCount={pendingTipCount}
           openActionCount={actions.filter((a) => a.status === 'open').length}
-          postponedActionCount={actions.filter((a) => a.status === 'postponed').length}
         />
 
         {/* ── Sectie 3b: Doelen (Kompas) — gescheiden door double-rule ── */}

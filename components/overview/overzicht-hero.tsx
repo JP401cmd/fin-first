@@ -311,10 +311,10 @@ export function OverzichtHero({
 
       <div className="mt-4 text-center print:hidden">
         <Link
-          href="/overzicht/acties"
+          href="/overzicht/tips"
           className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline"
         >
-          Naar je acties
+          Alle tips & acties
           <ArrowRight className="w-3 h-3" aria-hidden="true" />
         </Link>
       </div>

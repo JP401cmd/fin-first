@@ -146,10 +146,9 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
       id: 'observation:' + firstRec.id,
       category: 'observation',
       text: firstRec.title,
-      // Voorstellen leven in de Will-chat (één-voor-één met
-      // accept/postpone/reject); de briefing linkt naar de chat met
-      // deze specifieke recommendation als kick-off-prompt.
-      href: `/berichten?prompt=toon-voorstel&rec=${firstRec.id}`,
+      // Toptips zijn zichtbaar op /overzicht/tips — daar beslist de
+      // gebruiker met Doe nu / Later / Negeren.
+      href: '/overzicht/tips',
       hefboom: recommendationToHefboom(firstRec.recommendation_type),
       impact: impactFromRecommendation(firstRec),
     })
@@ -162,7 +161,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
       id: 'tip:' + secondRec.id,
       category: 'tip',
       text: secondRec.title,
-      href: `/berichten?prompt=toon-voorstel&rec=${secondRec.id}`,
+      href: '/overzicht/tips',
       impact: impactFromRecommendation(secondRec),
       hefboom: recommendationToHefboom(secondRec.recommendation_type),
     })

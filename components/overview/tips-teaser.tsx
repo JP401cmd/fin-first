@@ -1,69 +1,63 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Inbox, MessageCircle, Clock } from 'lucide-react'
+import { ArrowRight, Sparkles, ListChecks, MessageCircle } from 'lucide-react'
 
 /**
- * ActiesTeaser — compacte strip op /overzicht die naar de Acties-pool
- * verwijst. Vervangt de inline 2-koloms ActionCenter sinds de
- * acties-pool een eigen pagina kreeg (/overzicht/acties) en voorstellen
- * naar Will-chat verhuisden.
+ * TipsTeaser — compacte strip op /overzicht die naar de Tips & acties
+ * pagina verwijst plus een snelle Will-chat-ingang biedt.
  *
- * Toont drie tegels:
- *   - Open acties      → /overzicht/acties
- *   - Uitgesteld werk  → /overzicht/acties (lane: postponed)
- *   - Voorstellen      → Will-chat met kick-off-prompt
- *
- * Counts komen van de server (loadWillData kpiData). De Voorstellen-tegel
- * heeft geen count omdat voorstellen niet meer persisteren voor de
- * gebruiker — ze komen voorbij in de chat en zijn na beslissing weg.
+ * Drie tegels:
+ *   - Toptips        → /overzicht/tips (lijst met pending recommendations)
+ *   - Open acties    → /overzicht/tips (#acties anker voor scroll)
+ *   - Vraag Will     → /berichten?prompt=analyseer-mijn-financien
  */
-interface ActiesTeaserProps {
+interface TipsTeaserProps {
+  pendingTipCount: number
   openActionCount: number
-  postponedActionCount: number
 }
 
-export function ActiesTeaser({ openActionCount, postponedActionCount }: ActiesTeaserProps) {
+export function TipsTeaser({ pendingTipCount, openActionCount }: TipsTeaserProps) {
   const items = [
     {
-      href: '/overzicht/acties',
-      Icon: Inbox,
-      label: 'Open acties',
-      count: openActionCount,
-      sublabel: openActionCount === 1 ? 'wacht op jou' : 'wachten op jou',
+      href: '/overzicht/tips',
+      Icon: Sparkles,
+      label: 'Toptips',
+      count: pendingTipCount,
+      sublabel: pendingTipCount === 1 ? 'voorstel wacht' : 'voorstellen wachten',
     },
     {
-      href: '/overzicht/acties#postponed',
-      Icon: Clock,
-      label: 'Uitgesteld',
-      count: postponedActionCount,
-      sublabel: postponedActionCount === 1 ? 'staat klaar' : 'staan klaar',
+      href: '/overzicht/tips#acties',
+      Icon: ListChecks,
+      label: 'Open acties',
+      count: openActionCount,
+      sublabel: openActionCount === 1 ? 'op je lijst' : 'op je lijst',
     },
     {
       href: '/berichten?prompt=analyseer-mijn-financien',
       Icon: MessageCircle,
-      label: 'Will-voorstellen',
+      label: 'Vraag Will',
       count: null,
-      sublabel: 'vraag analyse aan',
+      sublabel: 'nieuwe analyse',
     },
   ] as const
 
   return (
-    <section aria-label="Acties" className="mt-4 px-4 sm:px-6">
+    <section aria-label="Tips & acties" className="mt-4 px-4 sm:px-6">
       <header className="mb-3 flex items-baseline justify-between">
         <div>
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
             Wat zou je nu kunnen doen
           </div>
           <h2 className="mt-0.5 font-serif text-lg sm:text-xl text-[var(--ink)]">
-            Acties en voorstellen
+            Tips en acties
           </h2>
         </div>
         <Link
-          href="/overzicht/acties"
+          href="/overzicht/tips"
           className="inline-flex items-center gap-1 text-xs font-semibold text-wil-700 hover:text-wil-800"
         >
-          Alle acties
+          Bekijk alles
           <ArrowRight className="h-3 w-3" aria-hidden="true" />
         </Link>
       </header>

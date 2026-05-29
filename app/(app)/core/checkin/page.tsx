@@ -1515,7 +1515,7 @@ function StepDoelen({
         <div className="card-editorial p-5">
           <p className="text-sm text-[var(--ink-3)] font-serif italic">
             Nog geen doelen ingesteld.{' '}
-            <Link href="/will#doelen" className="text-wil-600 hover:underline">Stel je eerste doel in</Link>
+            <Link href="/toekomst#doelen" className="text-wil-600 hover:underline">Stel je eerste doel in</Link>
           </p>
         </div>
       ) : (

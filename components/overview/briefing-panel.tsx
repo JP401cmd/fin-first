@@ -174,7 +174,7 @@ function BriefingNarrative({ text }: { text: string }) {
           volledige briefing-historie staat. Kort en niet-opdringerig. */}
       <div className="mt-3 pt-3 border-t border-violet-100/70">
         <Link
-          href="/will#briefing"
+          href="/overzicht#briefing"
           className="text-[11px] font-semibold text-violet-700 hover:underline inline-flex items-center gap-1"
         >
           Eerdere briefings

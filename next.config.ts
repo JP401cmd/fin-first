@@ -86,10 +86,11 @@ const nextConfig: NextConfig = {
       { source: '/identity/voortgang', destination: '/mijn', permanent: false },
       { source: '/identity/widgets', destination: '/mijn', permanent: false },
 
-      // Acties-pool integratie: /overzicht/tips wordt /overzicht/acties.
-      // Voorstellen leven nu in Will-chat (één-voor-één, niks doen = weg);
-      // de pool toont alleen geaccepteerde acties + off-track doelen.
-      { source: '/overzicht/tips', destination: '/overzicht/acties', permanent: false },
+      // Tips & acties op één scherm: /overzicht/tips is canoniek.
+      // Tips (pending recommendations) bovenaan, open acties eronder.
+      // Voorstellen ontstaan in Will-chat maar blijven pending tot
+      // beslissing — zichtbaar op deze pagina én in de chat.
+      { source: '/overzicht/acties', destination: '/overzicht/tips', permanent: false },
     ]
   },
 };

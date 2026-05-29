@@ -188,14 +188,14 @@ describe('BriefingPanel — narrative', () => {
     expect(screen.getByText(/Vorige week: vermogen/)).toBeTruthy()
   })
 
-  it('toont "Eerdere briefings →" link naar /will', () => {
+  it('toont "Eerdere briefings →" link naar /overzicht#briefing', () => {
     const { container } = render(
       <BriefingPanel
         entries={[makeEntry('observation', 'X')]}
         narrative="Test narrative."
       />,
     )
-    const link = container.querySelector('a[href="/will#briefing"]')
+    const link = container.querySelector('a[href="/overzicht#briefing"]')
     expect(link).toBeTruthy()
     expect(link?.textContent).toMatch(/Eerdere briefings/i)
   })

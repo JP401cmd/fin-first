@@ -63,16 +63,17 @@ Kies bewust: wat is nu het belangrijkst voor deze gebruiker?
 
 == CTA-LABELS BIJ INSIGHTS ==
 Gebruik een van deze labels bij showInsight tips/observaties:
-- Spaarquote-gerelateerd → ctaLabel="Cashflow bekijken", href="/will#cashflow"
-- Schulden-gerelateerd → ctaLabel="Schulden bekijken", href="/core/debts"
-- Budget-gerelateerd → ctaLabel="Budget aanpassen", href="/core/budgets"
-- Vermogen/assets → ctaLabel="Bezittingen bekijken", href="/core/assets"
-- Beleggingen/fondsen → ctaLabel="Beleggingen bekijken", href="/core/assets"
-- FIRE/vrijheid → ctaLabel="FIRE-plan bekijken", href="/horizon"
-- Belasting/box3 → ctaLabel="Belasting bekijken", href="/core/belasting"
-- Transacties/cash → ctaLabel="Transacties bekijken", href="/core/cash"
-- Abonnementen/vaste lasten → ctaLabel="Vaste lasten bekijken", href="/core/cash"
-- Doelen → ctaLabel="Doelen bekijken", href="/will"
+- Spaarquote-gerelateerd → ctaLabel="Cashflow bekijken", href="/overzicht/cashflow"
+- Schulden-gerelateerd → ctaLabel="Schulden bekijken", href="/overzicht/schulden"
+- Budget-gerelateerd → ctaLabel="Budget aanpassen", href="/overzicht/cashflow"
+- Vermogen/assets → ctaLabel="Bezittingen bekijken", href="/overzicht/bezittingen"
+- Beleggingen/fondsen → ctaLabel="Beleggingen bekijken", href="/overzicht/bezittingen"
+- FIRE/vrijheid → ctaLabel="FIRE-plan bekijken", href="/toekomst"
+- Belasting/box3 → ctaLabel="Belasting bekijken", href="/overzicht/belasting"
+- Transacties/cash → ctaLabel="Transacties bekijken", href="/overzicht/cashflow"
+- Abonnementen/vaste lasten → ctaLabel="Vaste lasten bekijken", href="/overzicht/cashflow"
+- Doelen → ctaLabel="Doelen bekijken", href="/toekomst"
+- Tips/voorstellen → ctaLabel="Naar tips & acties", href="/overzicht/tips"
 Greeting- en celebration-insights hoeven GEEN ctaLabel (die zijn informatief, niet actionable).
 
 == CARD TYPE RICHTLIJNEN ==

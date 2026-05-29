@@ -46,23 +46,28 @@ describe('ChatPromptDeeplink', () => {
     expect(mockOpenWithMessage.mock.calls[0][0]).toContain('Doorlicht mijn financiën')
   })
 
-  it('opens the chat with a rec-id-specific kick-off when prompt=toon-voorstel', () => {
-    mockSearchParams = new URLSearchParams('prompt=toon-voorstel&rec=abc-123')
+  it('opens the chat with herbekijk-uitgesteld kick-off', () => {
+    mockSearchParams = new URLSearchParams('prompt=herbekijk-uitgesteld')
     render(<ChatPromptDeeplink />)
     expect(mockOpenWithMessage).toHaveBeenCalledTimes(1)
-    expect(mockOpenWithMessage.mock.calls[0][0]).toContain('abc-123')
+    expect(mockOpenWithMessage.mock.calls[0][0]).toContain('uitgesteld')
   })
 
-  it('strips prompt + rec from the URL after firing', () => {
-    mockSearchParams = new URLSearchParams('prompt=toon-voorstel&rec=abc&other=keep')
+  it('strips prompt from the URL after firing while preserving other params', () => {
+    mockSearchParams = new URLSearchParams('prompt=analyseer-mijn-financien&other=keep')
     mockPathname = '/overzicht'
     render(<ChatPromptDeeplink />)
     expect(mockReplace).toHaveBeenCalledTimes(1)
     const target = mockReplace.mock.calls[0][0] as string
     expect(target).not.toContain('prompt=')
-    expect(target).not.toContain('rec=')
     expect(target).toContain('other=keep')
     expect(target.startsWith('/overzicht')).toBe(true)
+  })
+
+  it('does not open the chat for the removed toon-voorstel prompt key', () => {
+    mockSearchParams = new URLSearchParams('prompt=toon-voorstel&rec=abc-123')
+    render(<ChatPromptDeeplink />)
+    expect(mockOpenWithMessage).not.toHaveBeenCalled()
   })
 
   it('ignores unknown prompt keys (no chat-open, no URL-rewrite)', () => {
