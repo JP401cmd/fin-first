@@ -204,7 +204,7 @@ function RecommendationSuggestionCard({
           />
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-wil-700">
-              Voorstel van Will
+              Tip van Will
             </div>
             <h4 className="mt-0.5 text-sm font-semibold text-[var(--ink)] leading-snug">
               {data.title}
@@ -314,33 +314,33 @@ const CONTEXT_CHIPS: Array<{
 }> = [
   {
     prefixes: ['/overzicht/schulden', '/core/debts'],
-    label: 'Voorstel voor mijn schulden',
-    prompt: 'Geef me één concreet voorstel om mijn schulden sneller of slimmer af te lossen.',
+    label: 'Tip voor mijn schulden',
+    prompt: 'Geef me één concrete tip om mijn schulden sneller of slimmer af te lossen.',
   },
   {
     prefixes: ['/overzicht/bezittingen', '/core/assets'],
-    label: 'Voorstel voor mijn bezittingen',
-    prompt: 'Geef me één concreet voorstel om mijn bezittingen beter te laten renderen of risico te verlagen.',
+    label: 'Tip voor mijn bezittingen',
+    prompt: 'Geef me één concrete tip om mijn bezittingen beter te laten renderen of risico te verlagen.',
   },
   {
     prefixes: ['/overzicht/cashflow', '/core/budgets', '/core/cash'],
-    label: 'Voorstel voor mijn cashflow',
-    prompt: 'Geef me één concreet voorstel om mijn maandelijkse cashflow te verbeteren.',
+    label: 'Tip voor mijn cashflow',
+    prompt: 'Geef me één concrete tip om mijn maandelijkse cashflow te verbeteren.',
   },
   {
     prefixes: ['/overzicht/belasting', '/core/belasting'],
-    label: 'Voorstel om belasting te besparen',
-    prompt: 'Geef me één concreet voorstel om dit jaar belasting te besparen (Box 1, 2 of 3).',
+    label: 'Tip om belasting te besparen',
+    prompt: 'Geef me één concrete tip om dit jaar belasting te besparen (Box 1, 2 of 3).',
   },
   {
     prefixes: ['/toekomst', '/horizon'],
     label: 'Versnel mijn vrijheidsdatum',
-    prompt: 'Geef me één concreet voorstel om mijn FIRE-datum naar voren te halen.',
+    prompt: 'Geef me één concrete tip om mijn FIRE-datum naar voren te halen.',
   },
 ]
 
 const GENERIC_PROMPT =
-  'Geef me één concreet voorstel op basis van mijn huidige situatie. Begin met de grootste kans.'
+  'Geef me één concrete tip op basis van mijn huidige situatie. Begin met de grootste kans.'
 
 function QuickActionChips({
   pathname,
@@ -353,7 +353,7 @@ function QuickActionChips({
 }) {
   const contextChip = CONTEXT_CHIPS.find((c) => c.prefixes.some((p) => pathname.startsWith(p)))
   const chips: Array<{ label: string; prompt: string }> = [
-    { label: 'Geef me een voorstel', prompt: GENERIC_PROMPT },
+    { label: 'Geef me een tip', prompt: GENERIC_PROMPT },
   ]
   if (contextChip) {
     chips.push({ label: contextChip.label, prompt: contextChip.prompt })
@@ -707,7 +707,7 @@ export function ChatPanel() {
             <div key={`rec-loading-${rec.toolCallId}`} className="mt-2 w-full rounded-[var(--r-lg)] border border-wil-100 bg-[var(--paper)] px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-wil-400" />
-                <span className="text-xs text-[var(--ink-3)]">Voorstel wordt voorbereid...</span>
+                <span className="text-xs text-[var(--ink-3)]">Tip wordt voorbereid...</span>
               </div>
             </div>
           )
@@ -787,6 +787,26 @@ export function ChatPanel() {
     return 'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.'
   }
 
+  /**
+   * Extract server-side error detail uit de raw err.message. De chat-route
+   * returnt {error, detail} JSON; useChat()'s error.message bevat de raw body.
+   * Toon dat detail als debug-helper zodat productie-bugs zonder log-toegang
+   * diagnoseerbaar zijn.
+   */
+  function getErrorDetail(err: Error | undefined): string | null {
+    if (!err?.message) return null
+    try {
+      const parsed = JSON.parse(err.message) as { error?: string; detail?: string }
+      if (parsed.detail && parsed.detail !== parsed.error) return parsed.detail
+    } catch {
+      // Niet-JSON message; toon de raw text als deze afwijkt van de standaard
+      if (err.message.length > 0 && err.message.length < 280 && !err.message.startsWith('Er ging')) {
+        return err.message
+      }
+    }
+    return null
+  }
+
   const handleRetry = useCallback(() => {
     clearError()
     regenerate()
@@ -801,14 +821,14 @@ export function ChatPanel() {
   if (!isOpen) {
     const hasPostponedReady = postponedReady > 0
     const fabAria = hasPostponedReady
-      ? `Open chat met ${config.name} — ${postponedReady} uitgestelde voorstel${postponedReady === 1 ? '' : 'len'} klaar`
+      ? `Open chat met ${config.name} — ${postponedReady} uitgestelde tip${postponedReady === 1 ? '' : 's'} klaar`
       : `Open chat met ${config.name}`
     const onFabClick = () => {
       if (hasPostponedReady) {
         // Auto-kick-off: open chat met herbekijk-prompt zodat Will
         // direct begint met de openstaande herbeoordelingen.
         openWithMessage(
-          'Ik wil opnieuw kijken naar voorstellen die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met het belangrijkste.',
+          'Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met de belangrijkste.',
         )
       } else {
         toggle()
@@ -963,6 +983,19 @@ export function ChatPanel() {
                   <p className="text-sm font-medium text-red-800">
                     {getErrorMessage(error)}
                   </p>
+                  {(() => {
+                    const detail = getErrorDetail(error)
+                    return detail ? (
+                      <details className="mt-1.5">
+                        <summary className="cursor-pointer text-[11px] text-red-700 hover:text-red-900">
+                          Technische details
+                        </summary>
+                        <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-red-100/60 px-2 py-1 text-[11px] font-mono text-red-900">
+                          {detail}
+                        </pre>
+                      </details>
+                    ) : null
+                  })()}
                   <div className="mt-2 flex items-center gap-2">
                     <button
                       type="button"

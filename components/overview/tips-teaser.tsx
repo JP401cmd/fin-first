@@ -24,7 +24,7 @@ export function TipsTeaser({ pendingTipCount, openActionCount }: TipsTeaserProps
       Icon: Sparkles,
       label: 'Toptips',
       count: pendingTipCount,
-      sublabel: pendingTipCount === 1 ? 'voorstel wacht' : 'voorstellen wachten',
+      sublabel: pendingTipCount === 1 ? 'tip wacht' : 'tips wachten',
     },
     {
       href: '/overzicht/tips#acties',

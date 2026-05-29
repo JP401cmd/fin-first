@@ -136,8 +136,8 @@ const MODULES: NaslagwerkModule[] = [
     topics: [
       {
         icon: Sparkles,
-        title: 'Voorstellen',
-        summary: 'AI-gegenereerde aanbevelingen op basis van je financiële situatie.',
+        title: 'Tips',
+        summary: 'AI-gegenereerde tips op basis van je financiële situatie.',
         anchor: 'guide-reis-3',
       },
       {

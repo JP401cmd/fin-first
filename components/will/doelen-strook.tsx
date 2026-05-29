@@ -371,7 +371,7 @@ function EmptyDoelenState({ onClick }: { onClick: () => void }) {
         className="mt-3 italic text-[14px] text-[var(--ink-2)] max-w-prose"
         style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
       >
-        Doelen geven je voorstellen en acties richting — een noodfonds, een aflossing, een
+        Doelen geven je tips en acties richting — een noodfonds, een aflossing, een
         spaardoel. Zonder kompas blijft het bij optimalisatie zonder bestemming.
       </p>
       <button

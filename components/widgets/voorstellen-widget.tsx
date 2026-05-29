@@ -71,7 +71,7 @@ export const VoorstellenWidget = memo(function VoorstellenWidget({ size, data, h
   // ── Mini-size: active count ────
   if (size === 'mini') {
     return (
-      <WidgetShell module="wil" size="mini" kicker="Voorstellen" href={href}>
+      <WidgetShell module="wil" size="mini" kicker="Tips" href={href}>
         <p className="font-mono text-[15px] font-semibold tabular-nums text-[var(--ink)] leading-none truncate">
           {recommendations} actief
         </p>
@@ -82,7 +82,7 @@ export const VoorstellenWidget = memo(function VoorstellenWidget({ size, data, h
   // ── Quarter-size: count + icon + priority dot ────
   if (size === 'quarter') {
     return (
-      <WidgetShell module="wil" size={size} kicker="Voorstellen" href={href}>
+      <WidgetShell module="wil" size={size} kicker="Tips" href={href}>
         <div className="flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-wil-500 shrink-0" />
           <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
@@ -96,7 +96,7 @@ export const VoorstellenWidget = memo(function VoorstellenWidget({ size, data, h
           )}
         </div>
         <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
-          {recommendations === 1 ? 'aanbeveling' : 'aanbevelingen'}
+          {recommendations === 1 ? 'tip' : 'tips'}
         </p>
       </WidgetShell>
     )
@@ -107,16 +107,16 @@ export const VoorstellenWidget = memo(function VoorstellenWidget({ size, data, h
     const top2 = (topRecommendations ?? []).slice(0, 2)
 
     return (
-      <WidgetShell module="wil" size={size} kicker="Voorstellen" href={href}>
+      <WidgetShell module="wil" size={size} kicker="Tips" href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <Lightbulb className="h-5 w-5 text-wil-500 mb-1" />
             <span className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">{recommendations}</span>
-            <span className="text-[11px] text-[var(--ink-3)]">{recommendations === 1 ? 'aanbeveling' : 'aanbevelingen'}</span>
+            <span className="text-[11px] text-[var(--ink-3)]">{recommendations === 1 ? 'tip' : 'tips'}</span>
           </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             {top2.length === 0 ? (
-              <p className="text-[11px] text-[var(--ink-3)]">Geen aanbevelingen</p>
+              <p className="text-[11px] text-[var(--ink-3)]">Geen tips</p>
             ) : (
               <div className="space-y-0">
                 {top2.map((rec, i) => (
@@ -137,7 +137,7 @@ export const VoorstellenWidget = memo(function VoorstellenWidget({ size, data, h
   )
 
   return (
-    <WidgetShell module="wil" size={size} kicker="Voorstellen" href={href}>
+    <WidgetShell module="wil" size={size} kicker="Tips" href={href}>
       <div>
         {/* Samenvattingsrij */}
         <div className="grid grid-cols-2 divide-x divide-dashed divide-[var(--border-ed)] border border-dashed border-[var(--border-ed)] rounded-[var(--r)] p-3">

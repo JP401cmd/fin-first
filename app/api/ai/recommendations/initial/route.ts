@@ -88,7 +88,7 @@ export async function POST() {
       model,
       schema: recommendationSchema,
       system: RECOMMENDATIONS_SYSTEM_PROMPT,
-      prompt: `Analyseer het volgende financiële profiel en genereer 3 optimalisatievoorstellen:\n\n${context}`,
+      prompt: `Analyseer het volgende financiële profiel en genereer 3 optimalisatietips:\n\n${context}`,
     })
 
     const recommendations: Record<string, unknown>[] = []

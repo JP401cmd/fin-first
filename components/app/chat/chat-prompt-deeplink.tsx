@@ -21,9 +21,9 @@ import { useChatContext } from './chat-provider'
 
 const PROMPTS: Record<string, (params: URLSearchParams) => string> = {
   'analyseer-mijn-financien': () =>
-    'Doorlicht mijn financiën voor optimalisaties. Begin met het belangrijkste voorstel dat je nu ziet en stel het voor.',
+    'Doorlicht mijn financiën voor optimalisaties. Begin met de belangrijkste tip die je nu ziet en stel die voor.',
   'herbekijk-uitgesteld': () =>
-    'Ik wil opnieuw kijken naar voorstellen die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met het belangrijkste.',
+    'Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met de belangrijkste.',
 }
 
 export function ChatPromptDeeplink() {

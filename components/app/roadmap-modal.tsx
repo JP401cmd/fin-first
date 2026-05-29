@@ -316,7 +316,7 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
               <Rule />
 
               <div className="space-y-4">
-                <ArticleTeaser icon={Zap} title="Voorstellen" body="Gepersonaliseerde aanbevelingen op basis van jouw situatie" />
+                <ArticleTeaser icon={Zap} title="Tips" body="Persoonlijke tips van Will op basis van jouw situatie" />
                 <ArticleTeaser icon={Target} title="Doelen" body="Stel financiele doelen en volg je voortgang over tijd" />
                 <ArticleTeaser icon={ListChecks} title="Acties" body="Concrete stappen die je vandaag al kunt nemen" />
                 <ArticleTeaser icon={CreditCard} title="Abonnementen" body="Beheer en optimaliseer je vaste lasten" />

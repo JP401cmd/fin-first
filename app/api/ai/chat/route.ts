@@ -204,11 +204,23 @@ export async function POST(req: Request) {
   } catch (err) {
     clearTimeout(timeoutId)
     const isTimeout = err instanceof DOMException && err.name === 'AbortError'
-    const message = isTimeout
+    const baseMessage = isTimeout
       ? 'Het AI-antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.'
       : 'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.'
+
+    // Geef de gebruiker de daadwerkelijke error-detail mee zodat productie-
+    // bugs zichtbaar worden zonder Vercel-log-toegang. PII-gevoelige delen
+    // (stacktraces, paden) blijven achterwege; alleen de error-message zelf.
+    const rawDetail = err instanceof Error ? err.message : String(err)
+    const detail = isTimeout
+      ? null
+      : rawDetail.slice(0, 240).replace(/\s+/g, ' ').trim() || null
+
     console.error('[AI Chat] Stream error:', isTimeout ? 'TIMEOUT' : err)
-    return Response.json({ error: message }, { status: isTimeout ? 504 : 500 })
+    return Response.json(
+      { error: baseMessage, detail },
+      { status: isTimeout ? 504 : 500 },
+    )
   } finally {
     clearTimeout(timeoutId)
   }

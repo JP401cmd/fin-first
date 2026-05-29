@@ -119,8 +119,8 @@ export function BriefingCardGrid({ cards, data, onCardEngage, onFeedback }: Brie
         if (moduleId === 'inzicht_acties' && !hasRecommendations) {
           const fallbackStep = {
             key: 'inzicht_genereer',
-            label: 'Genereer je eerste voorstellen',
-            href: '/will',
+            label: 'Genereer je eerste tips',
+            href: '/overzicht/tips',
           }
           steps = [fallbackStep, ...steps]
         }

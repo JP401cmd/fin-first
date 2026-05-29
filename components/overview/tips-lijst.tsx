@@ -105,14 +105,14 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
         <Sparkles className="mx-auto h-6 w-6 text-wil-400" aria-hidden="true" />
         <h2 className="mt-2 font-serif text-lg text-[var(--ink)]">Geen tips wachten op je</h2>
         <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Vraag Will om een doorlichting voor een vers voorstel.
+          Vraag Will om een doorlichting voor een verse tip.
         </p>
         <Link
           href="/berichten?prompt=analyseer-mijn-financien"
           className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-wil-500 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600"
         >
           <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
-          Vraag Will om voorstellen
+          Vraag Will om tips
         </Link>
       </section>
     )

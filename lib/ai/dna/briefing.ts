@@ -73,7 +73,7 @@ Gebruik een van deze labels bij showInsight tips/observaties:
 - Transacties/cash → ctaLabel="Transacties bekijken", href="/overzicht/cashflow"
 - Abonnementen/vaste lasten → ctaLabel="Vaste lasten bekijken", href="/overzicht/cashflow"
 - Doelen → ctaLabel="Doelen bekijken", href="/toekomst"
-- Tips/voorstellen → ctaLabel="Naar tips & acties", href="/overzicht/tips"
+- Tips → ctaLabel="Naar tips & acties", href="/overzicht/tips"
 Greeting- en celebration-insights hoeven GEEN ctaLabel (die zijn informatief, niet actionable).
 
 == CARD TYPE RICHTLIJNEN ==

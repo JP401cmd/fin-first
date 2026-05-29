@@ -145,8 +145,8 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   },
   {
     id: 'voorstellen',
-    name: 'Voorstellen',
-    description: 'Persoonlijke aanbevelingen',
+    name: 'Tips',
+    description: 'Persoonlijke tips van Will',
     module: 'wil',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
