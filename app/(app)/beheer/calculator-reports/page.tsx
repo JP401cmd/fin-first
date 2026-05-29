@@ -121,7 +121,7 @@ export default async function CalculatorReportsPage() {
                 <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
                   {calculator && (
                     <Link
-                      href={`/toekomst/bibliotheek?calculator=${calculator.id}`}
+                      href={`/toekomst/bibliotheek/${calculator.id}`}
                       className="text-[11px] font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] underline underline-offset-2"
                     >
                       Bekijk in bibliotheek →
