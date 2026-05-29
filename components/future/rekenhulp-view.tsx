@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Calculator,
@@ -10,10 +11,17 @@ import {
   Trash2,
   Wand2,
   Loader2,
+  MoreHorizontal,
+  Globe2,
+  EyeOff,
+  Library,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { CalculatorRunner } from './calculator-runner'
 import { CalculatorToLifeEventSheet } from './calculator-to-life-event-sheet'
+import { PublishCurationSheet } from './publish-curation-sheet'
+import { OwnerStatsBadge } from './owner-stats-badge'
+import { RateLimitBadge } from './rate-limit-badge'
 import type { CalculatorDefinition, CustomCalculatorRow } from '@/lib/calculator/types'
 import type { PrefillValues } from '@/lib/calculator/user-data-keys'
 import { CalendarPlus } from 'lucide-react'
@@ -56,6 +64,18 @@ export function RekenhulpView({
     name: string
     amount: number
   } | null>(null)
+  // Bibliotheek-flow: welke calculator zit op dit moment in de
+  // publish-sheet (open ↔ null). We bewaren de volledige row zodat de
+  // sheet meteen toegang heeft tot `definition.inputs` zonder een
+  // extra query.
+  const [publishing, setPublishing] = useState<CustomCalculatorRow | null>(null)
+  // Welke "..."-menu is open in de lijst-modus (id of null). We
+  // sluiten 'm automatisch zodra de gebruiker een actie kiest.
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  // Verandert na elke succesvolle generate-call zodat `<RateLimitBadge>`
+  // zijn verbruik opnieuw ophaalt — anders ziet de gebruiker pas bij
+  // een page-reload dat zijn quotum is verlaagd.
+  const [usageRefreshKey, setUsageRefreshKey] = useState(0)
 
   async function generate(refine = false) {
     if (!prompt.trim()) return
@@ -77,10 +97,38 @@ export function RekenhulpView({
       }
       setDraft(data.definition)
       if (refine) setPrompt('')
+      // Bump de refresh-key zodat de RateLimitBadge zijn quotum opnieuw
+      // ophaalt — net na een succesvolle generate-call is dat het meest
+      // relevante moment om de teller te zien zakken.
+      setUsageRefreshKey((k) => k + 1)
     } catch {
       setError('Netwerkfout — probeer het opnieuw.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  /**
+   * Unpublish-flow: trekt de calculator uit de bibliotheek zonder hem
+   * te verwijderen. `is_public` gaat naar false, `published_at` naar
+   * NULL. Bestaande forks (door anderen) blijven leven omdat dat
+   * deep-clones zijn — zie `/api/calculators/duplicate`.
+   */
+  async function unpublishCalculator(id: string) {
+    try {
+      const res = await fetch('/api/calculators/unpublish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calculatorId: id }),
+      })
+      if (res.ok) {
+        router.refresh()
+      }
+    } catch {
+      // Stille no-op: een netwerkfout hier laten we voor wat het is;
+      // de gebruiker ziet dat zijn status niet veranderde en kan
+      // opnieuw klikken. Geen alert-melding voor zo'n laagfrequente
+      // actie.
     }
   }
 

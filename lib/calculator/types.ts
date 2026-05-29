@@ -1,6 +1,15 @@
 import { z } from 'zod'
 
 /**
+ * OPMAAK-LOCK: dit schema bevat UITSLUITEND logica-velden. Geen icon,
+ * color, layout, sectionOrder, theme of vergelijkbare velden — die zijn
+ * een framework-verantwoordelijkheid (de TriFinity-UI bepaalt opmaak
+ * deterministisch op basis van module en type). AI-generatie moet
+ * opmaak-verzoeken negeren; eventuele extra velden vanuit een LLM
+ * worden door Zod stilzwijgend afgekapt.
+ */
+
+/**
  * Normaliseer LLM-output naar strikte snake_case. Modellen genereren soms
  * `kebab-case`, `camelCase` of beginnen met een hoofdletter / cijfer; we
  * converteren stil i.p.v. te falen, zodat een prima definitie niet door
@@ -73,7 +82,7 @@ export const CalculatorOutputSchema = z.object({
   formula: z
     .string()
     .min(1)
-    .max(500)
+    .max(300)
     .describe(
       'Wiskundige expressie zonder code. Mag verwijzen naar input-keys, prefill-keys, "scenario" en whitelisted functies (compound, annuity, fvAnnuity, box3, pow, sqrt, min, max, abs, round, floor, ceil, if).',
     ),
@@ -87,9 +96,9 @@ export type CalculatorOutput = z.infer<typeof CalculatorOutputSchema>
 export const CalculatorDefinitionSchema = z.object({
   name: z.string().min(1).max(120).describe('Korte Nederlandse titel van de rekenhulp'),
   description: z.string().max(400).optional().describe('Eén à twee zinnen die uitleggen wat de hulp berekent'),
-  inputs: z.array(CalculatorInputSchema).min(1).max(12).describe('Tussen 1 en 12 invoervelden'),
+  inputs: z.array(CalculatorInputSchema).min(1).max(8).describe('Tussen 1 en 8 invoervelden'),
   scenarios: z.array(CalculatorScenarioSchema).min(1).max(4).describe('1 tot 4 scenario-tabs, bv. "Aflossen" en "Beleggen"'),
-  outputs: z.array(CalculatorOutputSchema).min(1).max(8).describe('1 tot 8 berekende uitkomsten'),
+  outputs: z.array(CalculatorOutputSchema).min(1).max(6).describe('1 tot 6 berekende uitkomsten'),
   compare: z
     .object({
       outputKey: z.string().describe('De output-key die wordt vergeleken tussen scenarios'),

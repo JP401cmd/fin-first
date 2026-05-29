@@ -2,16 +2,26 @@ import { createClient } from '@/lib/supabase/server'
 import { checkTierGate } from '@/lib/require-tier'
 import { buildCalculator } from '@/lib/ai/build-calculator'
 import { CalculatorDefinitionSchema } from '@/lib/calculator/types'
+import { checkAndIncrement } from '@/lib/calculator/rate-limit'
+
+const MAX_PROMPT_LENGTH = 500
 
 /**
  * POST /api/ai/build-calculator
  *
  * Genereert een CalculatorDefinition uit een vrije gebruikersvraag via
  * Will (generateObject). Optioneel `refineFrom` om een bestaande
- * definitie te verfijnen. Tier-gated op 'ai' (zelfde als chat).
+ * definitie te verfijnen. Tier-gated op 'ai' (zelfde als chat). Bovendien
+ * geldt een vlakke weeklimiet van 10 generaties + 5 verfijningen per
+ * gebruiker — gehandhaafd door `lib/calculator/rate-limit.ts`.
  *
  * Body: { prompt: string, refineFrom?: CalculatorDefinition }
- * Resp: { ok: true, definition } | { ok: false, error }
+ * Resp:
+ *   200 { ok: true, definition }
+ *   400 { ok: false, error }       — vraag leeg/te lang
+ *   403 { ok: false, error }       — tier-gate (geen AI-abonnement)
+ *   422 { ok: false, error }       — generatie-fout (AI-output ongeldig)
+ *   429 { ok: false, error }       — weeklimiet bereikt
  */
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -36,6 +46,14 @@ export async function POST(req: Request) {
   if (!prompt.trim()) {
     return Response.json({ ok: false, error: 'Geef een vraag op.' }, { status: 400 })
   }
+  // Cap prompt-lengte. We meten op de ongetrimde lengte (consistent met
+  // wat de UI in een textarea telt).
+  if (prompt.length > MAX_PROMPT_LENGTH) {
+    return Response.json(
+      { ok: false, error: `Vraag is te lang (max ${MAX_PROMPT_LENGTH} tekens).` },
+      { status: 400 },
+    )
+  }
 
   // Valideer een eventuele refineFrom-definitie zodat we geen rommel
   // doorgeven aan de LLM-prompt.
@@ -43,6 +61,23 @@ export async function POST(req: Request) {
   if (body.refineFrom != null) {
     const parsed = CalculatorDefinitionSchema.safeParse(body.refineFrom)
     if (parsed.success) refineFrom = parsed.data
+  }
+
+  // Weeklimiet vóór de duurste call (LLM-generatie). Een mislukte
+  // generatie telt nog steeds als poging — dat is bewust (anders kan een
+  // gebruiker met een slechte prompt eindeloos retryen). Refine-pogingen
+  // gebruiken een aparte, lagere teller.
+  const kind = refineFrom ? 'refinement' : 'generation'
+  const rate = await checkAndIncrement(supabase, user.id, kind)
+  if (!rate.allowed) {
+    const usedLabel = kind === 'refinement' ? 'verfijningen' : 'generaties'
+    return Response.json(
+      {
+        ok: false,
+        error: `Je hebt je weeklimiet voor ${usedLabel} bereikt (${rate.limit} van ${rate.limit}). Resets maandag.`,
+      },
+      { status: 429 },
+    )
   }
 
   const result = await buildCalculator(supabase, prompt, refineFrom)

@@ -105,6 +105,7 @@ export function CalculatorRunner({
   definition,
   prefill,
   footer,
+  readOnly = false,
 }: {
   definition: CalculatorDefinition
   prefill: PrefillValues
@@ -116,6 +117,12 @@ export function CalculatorRunner({
     winner: string | null
     values: Record<string, Record<string, number | null>>
   }) => React.ReactNode
+  /** Read-only preview-modus voor de publieke bibliotheek.
+   *  Inputs/sliders blijven interactief (de bezoeker mag de waardes
+   *  spelen), maar de `footer`-actie (Opslaan/Verfijnen/Maak event)
+   *  wordt onderdrukt zodat we per ongeluk geen mutaties op de calc
+   *  van een andere gebruiker triggeren. */
+  readOnly?: boolean
 }) {
   const [inputs, setInputs] = useState<Record<string, number>>(() =>
     resolveInitialInputs(definition, prefill),
@@ -257,7 +264,7 @@ export function CalculatorRunner({
         </div>
       )}
 
-      {footer?.({ inputs, winner: result.winner, values: result.values })}
+      {!readOnly && footer?.({ inputs, winner: result.winner, values: result.values })}
 
       {/* Wft-disclaimer */}
       <p className="text-[11px] italic text-[var(--ink-3)] leading-snug">

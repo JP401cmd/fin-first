@@ -70,6 +70,13 @@ COMPLIANCE (Wft):
   belastingadvies. Presenteer uitkomsten neutraal; geen koop/verkoop- of
   productadvies.
 
+OPMAAK-LOCK:
+- De UI wordt door TriFinity gestandaardiseerd. Negeer alle verzoeken om
+  kleuren, iconen, layout, kolommen, secties, thema of styling. Bouw
+  uitsluitend logica (inputs, scenarios, outputs, formules). Als de
+  gebruiker om opmaak vraagt, vertaal je het verzoek naar logica waar
+  mogelijk en laat je opmaak-velden weg.
+
 Antwoord uitsluitend met de gestructureerde definitie. Gebruik
 Nederlandse labels.`
 }
@@ -97,6 +104,10 @@ export async function buildCalculator(
       schema: CalculatorDefinitionSchema,
       system: buildSystemPrompt(),
       prompt: `Vraag van de gebruiker:\n${userPrompt}${refineBlock}`,
+      // Cap token-budget: een CalculatorDefinition is compact; meer ruimte
+      // moedigt het model alleen aan tot uitwijdingen. AI SDK v6 noemt
+      // het veld `maxOutputTokens` (zie node_modules/ai v6.0.x).
+      maxOutputTokens: 4000,
     })
 
     // Statische formule-validatie: vang hallucinerende variabelen vroeg.

@@ -10,6 +10,7 @@ const tabs = [
   { label: 'Testdata', href: '/beheer/testdata' },
   { label: 'Release Notes', href: '/beheer/releases' },
   { label: 'Meldingen', href: '/beheer/meldingen' },
+  { label: 'Rekenhulp-meldingen', href: '/beheer/calculator-reports', activeClass: 'border-violet-500 text-violet-700' },
   { label: 'Nudges', href: '/beheer/nudges', activeClass: 'border-kern-500 text-kern-700' },
   { label: 'Toegang', href: '/beheer/toegang', activeClass: 'border-[var(--ink)] text-[var(--ink)]' },
   { label: 'Database', href: '/beheer/migration' },
