@@ -21,8 +21,7 @@ import { PAGE_INFO } from '@/lib/page-info-content'
  *
  * MVP-versie: 8 cards in een 2-koloms grid op desktop, single-col op
  * mobile. Per card icoon-badge + label + 1-zin uitleg + chevron-link.
- * Visuele consistentie met BezittingenOverzichtStrip /
- * SchuldenOverzichtStrip / BelastingOverzichtStrip patroon.
+ * Visuele consistentie met het BelastingOverzichtStrip-patroon.
  */
 
 type SubRoute = {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Plus, BarChart3, ChevronDown } from 'lucide-react'
@@ -75,7 +75,15 @@ function addDebtCta(type: DebtType): string {
  * dit overzicht — die noise is verhuisd naar dedicated pagina's. Overzicht
  * is een registratie-fundament, niet een berekenings-tool.
  */
-export default function DebtsPage() {
+type DebtsPageProps = {
+  /** Filter-control die naast de "Schuld toevoegen"-knop rendert. Doorgegeven
+   *  vanaf `/overzicht/schulden` zodat de filter in de toolbar zit i.p.v.
+   *  een aparte rij erboven. Optioneel zodat `/core/debts` zonder filter
+   *  blijft werken. */
+  toolbarFilter?: ReactNode
+}
+
+export default function DebtsPage({ toolbarFilter }: DebtsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -505,8 +513,13 @@ export default function DebtsPage() {
         </div>
       )}
 
-      {/* Toolbar — primaire CTA rechts, voor de cards */}
-      <div className="flex items-center justify-end mb-5 mt-5 sm:mt-6">
+      {/* Toolbar — filter links (indien meegegeven), primaire CTA rechts.
+          flex-wrap zorgt dat op smalle schermen de filter onder de actie-knop
+          vouwt zonder overlap. */}
+      <div className="flex flex-wrap items-center justify-end gap-2 mb-5 mt-5 sm:mt-6">
+        {toolbarFilter && (
+          <div className="mr-auto">{toolbarFilter}</div>
+        )}
         <button
           type="button"
           onClick={() => { setQuickAddInitialType(null); setQuickAddOpen(true) }}

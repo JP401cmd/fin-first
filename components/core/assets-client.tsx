@@ -111,7 +111,21 @@ function addAssetCta(type: AssetType): string {
   return `Voeg ${ASSET_ITEM_NOUN[type][0]} toe`
 }
 
-export default function AssetsPage({ initialAssetId, initialData }: { initialAssetId?: string; initialData?: AssetsPageData } = {}) {
+type AssetsPageProps = {
+  initialAssetId?: string
+  initialData?: AssetsPageData
+  /** Filter-control die naast de Herwaarderen/Bezitting-toevoegen-knoppen
+   *  rendert. Doorgegeven vanaf `/overzicht/bezittingen` zodat de filter
+   *  visueel bij de toolbar zit (i.p.v. los daarboven). Optioneel zodat
+   *  `/core/assets` zonder filter blijft werken. */
+  toolbarFilter?: ReactNode
+  /** Inspiratie-blokken (CompoundInsightCard, FeeImpactCard) die direct
+   *  onder de toolbar rendert. Drempel-logica leeft op de page-server zodat
+   *  deze component pure render-laag blijft. */
+  inspirationCards?: ReactNode
+}
+
+export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards }: AssetsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -548,8 +562,13 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
         ]}
       />
 
-      {/* Toolbar — primaire CTA + Herwaarderen rechts */}
-      <div className="mb-5 flex items-center justify-end gap-2">
+      {/* Toolbar — filter links (indien meegegeven), Herwaarderen + primaire
+          CTA rechts. flex-wrap zorgt dat op smalle schermen de filter onder
+          de actie-knoppen vouwt zonder overlap. */}
+      <div className="mb-5 flex flex-wrap items-center justify-end gap-2">
+        {toolbarFilter && (
+          <div className="mr-auto">{toolbarFilter}</div>
+        )}
         <Link
           href="/core/assets/revalue"
           className="inline-flex min-h-[40px] items-center gap-2 border border-[var(--border-md)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
@@ -567,6 +586,12 @@ export default function AssetsPage({ initialAssetId, initialData }: { initialAss
           Bezitting toevoegen
         </button>
       </div>
+
+      {/* Inspiratie-blokken direct onder de toolbar — leeg/null als de
+          page-server geen drempels haalt. */}
+      {inspirationCards && (
+        <div className="mb-5 space-y-4">{inspirationCards}</div>
+      )}
 
       {/* Allocation + projection — collapsible card */}
       <div className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
