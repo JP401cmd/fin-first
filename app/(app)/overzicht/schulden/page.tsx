@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import DebtsPage from '../../core/debts/page'
-import { SchuldenFilter } from '@/components/overview/schulden-filter'
+import { SchuldenView } from '@/components/overview/schulden-view'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
@@ -13,10 +12,10 @@ export const metadata: Metadata = {
 /**
  * /overzicht/schulden — tweede hefboom-verdieping.
  *
- * Layout: PageInfo rechtsboven, DebtsPage met SchuldenFilter naast de
- * "Schuld toevoegen"-knop in de toolbar. De losse vierdeling-strook is
- * op verzoek verwijderd — de categorieën onder de filter tonen schulden
- * weer in hun oorspronkelijke groepering.
+ * Layout: PageInfo rechtsboven, SchuldenView (client-wrapper) toont
+ * DebtsPage met de SchuldenFilter naast de "Schuld toevoegen"-knop in
+ * de toolbar. Filter werkt client-side: selecteren beperkt de
+ * categorie-lijst eronder zonder route-navigatie.
  */
 export default function OverzichtSchuldenPage() {
   return (
@@ -28,7 +27,7 @@ export default function OverzichtSchuldenPage() {
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>
-      <DebtsPage toolbarFilter={<SchuldenFilter />} />
+      <SchuldenView />
     </>
   )
 }

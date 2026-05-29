@@ -1,78 +1,58 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { SchuldenFilter } from './schulden-filter'
 
 /**
- * Tests voor SchuldenFilter — dropdown-filter op /overzicht/schulden.
- * Mocked next/navigation voor router.push assertions.
+ * Tests voor SchuldenFilter — controlled dropdown-filter op
+ * /overzicht/schulden. State leeft in de parent; deze tests verifiëren
+ * dat de component value rendert en onChange aanroept zonder router-call.
  */
 
-const mockPush = vi.fn()
-let mockPathname = '/overzicht/schulden'
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
-  usePathname: () => mockPathname,
-}))
-
-beforeEach(() => {
-  mockPush.mockReset()
-  mockPathname = '/overzicht/schulden'
-})
-
 describe('SchuldenFilter', () => {
-  it('toont default-label "Alle schulden"', () => {
-    render(<SchuldenFilter />)
+  it('toont default-label "Alle schulden" wanneer value=null', () => {
+    render(<SchuldenFilter value={null} onChange={() => {}} />)
     expect(screen.getByText('Alle schulden')).toBeTruthy()
   })
 
   it('opent dropdown bij klik op trigger', () => {
-    render(<SchuldenFilter />)
+    render(<SchuldenFilter value={null} onChange={() => {}} />)
     expect(screen.queryByRole('listbox')).toBeNull()
     fireEvent.click(screen.getByText('Alle schulden'))
     expect(screen.getByRole('listbox')).toBeTruthy()
   })
 
-  it('toont alle 11 debt-types + "Alle schulden" in dropdown', () => {
-    render(<SchuldenFilter />)
+  it('toont alle debt-types + "Alle schulden" in dropdown', () => {
+    render(<SchuldenFilter value={null} onChange={() => {}} />)
     fireEvent.click(screen.getByText('Alle schulden'))
-    // 1 (Alle) + alle DEBT_TYPE_LABELS waarden
     const options = screen.getAllByRole('option')
-    expect(options.length).toBeGreaterThan(10) // 11 + 1
+    expect(options.length).toBeGreaterThan(10)
   })
 
-  it('navigeert naar /overzicht/schulden/[type] bij selectie', () => {
-    render(<SchuldenFilter />)
+  it('roept onChange met het juiste type bij selectie', () => {
+    const onChange = vi.fn()
+    render(<SchuldenFilter value={null} onChange={onChange} />)
     fireEvent.click(screen.getByText('Alle schulden'))
     fireEvent.click(screen.getByText('Hypotheek'))
-    expect(mockPush).toHaveBeenCalledWith('/overzicht/schulden/mortgage')
+    expect(onChange).toHaveBeenCalledWith('mortgage')
   })
 
-  it('navigeert naar /overzicht/schulden bij "Alle"-keuze vanuit detail', () => {
-    mockPathname = '/overzicht/schulden/mortgage'
-    render(<SchuldenFilter />)
-    // Trigger toont nu "Hypotheek"
+  it('roept onChange met null bij selectie "Alle schulden"', () => {
+    const onChange = vi.fn()
+    render(<SchuldenFilter value="mortgage" onChange={onChange} />)
     expect(screen.getByText('Hypotheek')).toBeTruthy()
     fireEvent.click(screen.getByText('Hypotheek'))
-    const allOptions = screen.getAllByRole('option')
-    fireEvent.click(allOptions[0]!) // "Alle schulden"
-    expect(mockPush).toHaveBeenCalledWith('/overzicht/schulden')
+    const options = screen.getAllByRole('option')
+    fireEvent.click(options[0]!)
+    expect(onChange).toHaveBeenCalledWith(null)
   })
 
-  it('toont actieve type-label in trigger', () => {
-    mockPathname = '/overzicht/schulden/student_loan'
-    render(<SchuldenFilter />)
+  it('toont actieve type-label in trigger wanneer value gezet is', () => {
+    render(<SchuldenFilter value="student_loan" onChange={() => {}} />)
     expect(screen.getByText('Studielening')).toBeTruthy()
   })
 
-  it('valt terug op "Alle schulden" bij onbekend type', () => {
-    mockPathname = '/overzicht/schulden/onbekend_type_xyz'
-    render(<SchuldenFilter />)
-    expect(screen.getByText('Alle schulden')).toBeTruthy()
-  })
-
   it('aria-expanded reflecteert dropdown-state', () => {
-    const { container } = render(<SchuldenFilter />)
+    const { container } = render(<SchuldenFilter value={null} onChange={() => {}} />)
     const trigger = container.querySelector('button[aria-haspopup="listbox"]')
     expect(trigger?.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(trigger!)
@@ -80,7 +60,7 @@ describe('SchuldenFilter', () => {
   })
 
   it('elke optie heeft min-h-[44px] (WCAG tap-target)', () => {
-    const { container } = render(<SchuldenFilter />)
+    const { container } = render(<SchuldenFilter value={null} onChange={() => {}} />)
     fireEvent.click(screen.getByText('Alle schulden'))
     const options = container.querySelectorAll('[role="option"]')
     options.forEach((opt) => {

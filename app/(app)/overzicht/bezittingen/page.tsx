@@ -2,9 +2,8 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadAssetsData } from '@/lib/assets-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
-import AssetsPage from '@/components/core/assets-client'
+import { BezittingenView } from '@/components/overview/bezittingen-view'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { BezittingenFilter } from '@/components/overview/bezittingen-filter'
 import { CompoundInsightCard, COMPOUND_INSIGHT_ID } from '@/components/overview/compound-insight-card'
 import { FeeImpactCard, FEE_IMPACT_ID } from '@/components/overview/fee-impact-card'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
@@ -80,9 +79,8 @@ export default async function OverzichtBezittingenPage() {
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>
-      <AssetsPage
+      <BezittingenView
         initialData={assetsData}
-        toolbarFilter={<BezittingenFilter />}
         inspirationCards={inspirationCards}
       />
     </>

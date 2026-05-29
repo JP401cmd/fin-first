@@ -81,9 +81,14 @@ type DebtsPageProps = {
    *  een aparte rij erboven. Optioneel zodat `/core/debts` zonder filter
    *  blijft werken. */
   toolbarFilter?: ReactNode
+  /** Wanneer gezet: client-side filter op debt-type. Verbergt alle
+   *  categorie-groepen behalve die met het gefilterde type. Wordt
+   *  gecontroleerd door de page-wrapper die ook `toolbarFilter` rendert
+   *  zodat dropdown en lijst in sync blijven. */
+  debtTypeFilter?: DebtType | null
 }
 
-export default function DebtsPage({ toolbarFilter }: DebtsPageProps = {}) {
+export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -541,6 +546,8 @@ export default function DebtsPage({ toolbarFilter }: DebtsPageProps = {}) {
         )}
 
         {(Object.keys(DEBT_TYPE_LABELS) as DebtType[]).map((type) => {
+          // Client-side filter: verberg alle types behalve het geselecteerde.
+          if (debtTypeFilter && type !== debtTypeFilter) return null
           const group = byType[type]
           if (!group || group.debts.length === 0) return null
 

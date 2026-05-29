@@ -123,9 +123,14 @@ type AssetsPageProps = {
    *  onder de toolbar rendert. Drempel-logica leeft op de page-server zodat
    *  deze component pure render-laag blijft. */
   inspirationCards?: ReactNode
+  /** Wanneer gezet: client-side filter op asset-type. Verbergt alle
+   *  categorie-groepen behalve die met het gefilterde type. Wordt
+   *  gecontroleerd door de page-wrapper die ook `toolbarFilter` rendert
+   *  zodat dropdown en lijst in sync blijven. */
+  assetTypeFilter?: AssetType | null
 }
 
-export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards }: AssetsPageProps = {}) {
+export default function AssetsPage({ initialAssetId, initialData, toolbarFilter, inspirationCards, assetTypeFilter }: AssetsPageProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -713,6 +718,8 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           />
         )}
         {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
+          // Client-side filter: verberg alle types behalve het geselecteerde.
+          if (assetTypeFilter && type !== assetTypeFilter) return null
           const group = byType[type]
           if (!group || group.assets.length === 0) return null
           const groupColor = ASSET_TYPE_COLORS[type]

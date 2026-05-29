@@ -1,40 +1,32 @@
 'use client'
 
-import { useRouter, usePathname } from 'next/navigation'
 import { DEBT_TYPE_LABELS, type DebtType } from '@/lib/debt-data'
 import { FilterDropdown, type FilterItem } from './filter-dropdown'
 
 /**
- * SchuldenFilter — dropdown-filter op /overzicht/schulden. Levert
- * filter-items uit DEBT_TYPE_LABELS aan generic FilterDropdown, met
- * router-binding naar /overzicht/schulden/[type].
+ * SchuldenFilter — controlled dropdown-filter op /overzicht/schulden.
+ *
+ * State leeft in de parent (SchuldenView): `value` is het actieve
+ * debt-type of `null` voor "alle schulden"; `onChange` ontvangt de nieuwe
+ * selectie. Voor synchronisatie met de categorie-lijst eronder geeft de
+ * parent dezelfde `value` ook door aan `DebtsPage.debtTypeFilter`.
  */
-
 const ITEMS: FilterItem<DebtType>[] = (
   Object.entries(DEBT_TYPE_LABELS) as [DebtType, string][]
 ).map(([key, label]) => ({ key, label }))
 
-export function SchuldenFilter() {
-  const router = useRouter()
-  const pathname = usePathname() ?? '/overzicht/schulden'
+type SchuldenFilterProps = {
+  value: DebtType | null
+  onChange: (value: DebtType | null) => void
+}
 
-  const activeType: DebtType | null = (() => {
-    const match = pathname.match(/^\/overzicht\/schulden\/([^/]+)/)
-    if (!match) return null
-    const type = match[1] as DebtType
-    return type in DEBT_TYPE_LABELS ? type : null
-  })()
-
-  function handleSelect(key: DebtType | null) {
-    router.push(key ? `/overzicht/schulden/${key}` : '/overzicht/schulden')
-  }
-
+export function SchuldenFilter({ value, onChange }: SchuldenFilterProps) {
   return (
     <FilterDropdown<DebtType>
       items={ITEMS}
-      activeKey={activeType}
+      activeKey={value}
       allLabel="Alle schulden"
-      onSelect={handleSelect}
+      onSelect={onChange}
     />
   )
 }
