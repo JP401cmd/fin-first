@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { CalculatorDefinitionSchema } from '@/lib/calculator/types'
+import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
 import { screenPublishMetadata } from '@/lib/ai/screen-publish-metadata'
 
 /**
@@ -98,7 +98,9 @@ export async function POST(req: Request) {
   }
 
   // Definitie valideren zodat we niet op corrupte JSONB werken.
-  const parsed = CalculatorDefinitionSchema.safeParse(source.definition)
+  // Soepelere caps voor stored data — oude calculators kunnen ruimer zijn
+  // dan de huidige strikte AI-output-caps.
+  const parsed = StoredCalculatorDefinitionSchema.safeParse(source.definition)
   if (!parsed.success) {
     return Response.json(
       { ok: false, error: 'De rekenhulp-definitie is ongeldig en kan niet gepubliceerd worden.' },

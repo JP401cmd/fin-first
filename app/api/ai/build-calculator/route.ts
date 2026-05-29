@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { checkTierGate } from '@/lib/require-tier'
 import { buildCalculator } from '@/lib/ai/build-calculator'
-import { CalculatorDefinitionSchema } from '@/lib/calculator/types'
+import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
 import { checkAndIncrement } from '@/lib/calculator/rate-limit'
 
 const MAX_PROMPT_LENGTH = 500
@@ -56,10 +56,12 @@ export async function POST(req: Request) {
   }
 
   // Valideer een eventuele refineFrom-definitie zodat we geen rommel
-  // doorgeven aan de LLM-prompt.
+  // doorgeven aan de LLM-prompt. Soepelere caps zodat verfijning van
+  // oude calculators (pre-MVP-limieten) niet stilzwijgend wordt geweigerd
+  // — de AI-output wordt alsnog gecapd op de strikte limieten.
   let refineFrom = undefined
   if (body.refineFrom != null) {
-    const parsed = CalculatorDefinitionSchema.safeParse(body.refineFrom)
+    const parsed = StoredCalculatorDefinitionSchema.safeParse(body.refineFrom)
     if (parsed.success) refineFrom = parsed.data
   }
 

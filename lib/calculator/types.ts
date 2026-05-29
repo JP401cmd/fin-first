@@ -114,6 +114,29 @@ export const CalculatorDefinitionSchema = z.object({
 })
 export type CalculatorDefinition = z.infer<typeof CalculatorDefinitionSchema>
 
+// ── Stored / legacy variant ──────────────────────────────────────
+//
+// Calculators uit de DB kunnen ruimer zijn dan de huidige strikte caps:
+// pre-MVP-rijen werden gegenereerd onder `inputs.max(12)`, `outputs.max(8)`,
+// `formula.max(500)`. We willen die oude rijen niet hardhandig blokkeren
+// bij read-only paden (publish-source, duplicate-source, refineFrom-input).
+//
+// `StoredCalculatorDefinitionSchema` gebruikt daarom ruimere caps die de
+// historische limieten plus marge omvatten. Nieuwe AI-output blijft door
+// de strikte `CalculatorDefinitionSchema` gevalideerd worden.
+
+const StoredCalculatorOutputSchema = CalculatorOutputSchema.extend({
+  formula: z.string().min(1).max(1000),
+})
+
+export const StoredCalculatorDefinitionSchema = CalculatorDefinitionSchema.extend({
+  inputs: z.array(CalculatorInputSchema).min(1).max(20),
+  outputs: z.array(StoredCalculatorOutputSchema).min(1).max(12),
+})
+export type StoredCalculatorDefinition = z.infer<
+  typeof StoredCalculatorDefinitionSchema
+>
+
 // ── Persisted row ────────────────────────────────────────────────
 
 export interface CustomCalculatorRow {

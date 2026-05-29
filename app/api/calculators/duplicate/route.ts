@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { CalculatorDefinitionSchema } from '@/lib/calculator/types'
+import { StoredCalculatorDefinitionSchema } from '@/lib/calculator/types'
 
 /**
  * POST /api/calculators/duplicate
@@ -54,8 +54,9 @@ export async function POST(req: Request) {
   }
 
   // Definitie valideren — een corrupte JSONB-rij willen we niet in een
-  // andere user-account dumpen.
-  const parsed = CalculatorDefinitionSchema.safeParse(source.definition)
+  // andere user-account dumpen. Soepelere caps voor stored data: oudere
+  // rijen kunnen ruimer zijn dan de huidige strikte AI-output-caps.
+  const parsed = StoredCalculatorDefinitionSchema.safeParse(source.definition)
   if (!parsed.success) {
     return Response.json(
       { ok: false, error: 'De bron-definitie is ongeldig en kan niet worden gekopieerd.' },

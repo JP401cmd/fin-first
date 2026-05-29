@@ -24,6 +24,7 @@ export default function ProfielPage() {
   const [dateOfBirth, setDateOfBirth] = useState('')
   const [country, setCountry] = useState('NL')
   const [householdType, setHouseholdType] = useState<HouseholdType>('solo')
+  const [marketplaceDisplayName, setMarketplaceDisplayName] = useState('')
 
   // Household profile state (NIBUD matching)
   const [numberOfChildren, setNumberOfChildren] = useState(0)
@@ -55,6 +56,7 @@ export default function ProfielPage() {
         setDateOfBirth(data.date_of_birth ?? '')
         setCountry(data.country ?? 'NL')
         setHouseholdType(data.household_type ?? 'solo')
+        setMarketplaceDisplayName(data.marketplace_display_name ?? '')
         setNumberOfChildren(data.number_of_children ?? 0)
         setChildrenAges(data.children_ages ?? [])
         setHousingType(data.housing_type ?? null)
@@ -117,6 +119,7 @@ export default function ProfielPage() {
         date_of_birth: dateOfBirth || null,
         country: country || 'NL',
         household_type: householdType,
+        marketplace_display_name: marketplaceDisplayName.trim() || null,
         number_of_children: numberOfChildren,
         children_ages: childrenAges,
         housing_type: housingType,
@@ -231,6 +234,24 @@ export default function ProfielPage() {
               placeholder="Je naam"
               className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
             />
+          </div>
+
+          <div>
+            <label htmlFor="marketplaceDisplayName" className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+              Naam in bibliotheek
+            </label>
+            <input
+              id="marketplaceDisplayName"
+              type="text"
+              maxLength={40}
+              value={marketplaceDisplayName}
+              onChange={(e) => setMarketplaceDisplayName(e.target.value)}
+              placeholder="Anoniem"
+              className="w-full rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
+            />
+            <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+              Wordt getoond bij door jou gedeelde rekenhulpen. Leeg = &quot;Anoniem&quot;.
+            </p>
           </div>
 
           <div>
