@@ -64,7 +64,7 @@ const MODULE_ACCENT: Record<string, string> = {
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Section = {
-  key: 'recent' | 'pages' | 'items' | 'actions'
+  key: 'recent' | 'pages' | 'items' | 'actions' | 'perspective'
   label: string
   items: CommandItem[]
 }
@@ -197,13 +197,23 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
 
   // ── Secties berekenen ──────────────────────────────────────────────────────
   const sections = useMemo<Section[]>(() => {
+    // Splits perspective-acties van algemene acties: ze leven in een eigen
+    // sectie "Perspectief" zodat ze niet wegvallen achter de
+    // ACTIONS_LIMIT_VISIBLE-cap én visueel gegroepeerd zijn met andere
+    // perspective-opties wanneer er meerdere zijn (household-users).
+    const perspectiveActions = allActions.filter((a) => a.id.startsWith('action:perspective-'))
+    const generalActions = allActions.filter((a) => !a.id.startsWith('action:perspective-'))
+
     const trimmed = query.trim()
     if (!trimmed) {
       const out: Section[] = []
       if (recents.length > 0) {
         out.push({ key: 'recent', label: 'Recent', items: recents.slice(0, 6) })
       }
-      out.push({ key: 'actions', label: 'Acties', items: allActions.slice(0, ACTIONS_LIMIT_VISIBLE) })
+      out.push({ key: 'actions', label: 'Acties', items: generalActions.slice(0, ACTIONS_LIMIT_VISIBLE) })
+      if (perspectiveActions.length > 0) {
+        out.push({ key: 'perspective', label: 'Perspectief', items: perspectiveActions })
+      }
       return out
     }
 
@@ -228,17 +238,26 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
       .map((r) => r.item)
 
     // Actions: ook fuzzy-rank zodat "verberg" → "Bedragen verbergen" werkt
-    const rankedActions = allActions
+    const rankedActions = generalActions
       .map((a) => ({ item: a, score: fuzzyScore(a.label, trimmed)?.score ?? 0 }))
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, ACTIONS_LIMIT_VISIBLE)
       .map((r) => r.item)
 
+    // Perspective-acties: óók fuzzy-rank (zodat zoeken op "huishouden"
+    // ze meteen toont) maar in eigen sectie en zonder cap.
+    const rankedPerspective = perspectiveActions
+      .map((a) => ({ item: a, score: fuzzyScore(a.label, trimmed)?.score ?? 0 }))
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((r) => r.item)
+
     const out: Section[] = []
     if (rankedPages.length > 0) out.push({ key: 'pages', label: 'Pagina\'s', items: rankedPages })
     if (rankedItems.length > 0) out.push({ key: 'items', label: 'Mijn data', items: rankedItems })
     if (rankedActions.length > 0) out.push({ key: 'actions', label: 'Acties', items: rankedActions })
+    if (rankedPerspective.length > 0) out.push({ key: 'perspective', label: 'Perspectief', items: rankedPerspective })
     return out
   }, [query, recents, allPages, allActions, entityResults])
 
