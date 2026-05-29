@@ -60,8 +60,8 @@ export async function POST() {
     // Reset stappenplan- en onboarding-metadata. Deze leven in optionele
     // kolommen die mogelijk ontbreken op pre-migration databases, dus we
     // proberen ze één voor één en strippen op schema-cache-miss. Reden:
-    // zonder deze reset blijft de StappenplannenStrook op /will de oude
-    // afgevinkte/weggeklikte staat tonen na een data-wipe.
+    // zonder deze reset blijven de module-/goal-guide-cards in de briefing
+    // de oude afgevinkte/weggeklikte staat tonen na een data-wipe.
     const STAPPENPLAN_RESET_FIELDS: Record<string, unknown> = {
       module_guide_state: {},
       primary_goal_slug: null,

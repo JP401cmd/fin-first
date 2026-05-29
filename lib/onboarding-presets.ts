@@ -10,9 +10,9 @@
  *
  * Bewuste keuze: ALLE presets gebruiken `goal_type: 'savings'`, óók het
  * noodfonds. De `emergency_fund`-enum gebruikt `unit: 'maanden'` (zie
- * `lib/goal-data.ts:88`), wat een ander UI-pad afdwingt op /will. Voor de
+ * `lib/goal-data.ts:88`), wat een ander UI-pad afdwingt. Voor de
  * onboarding-context willen we een gewoon €-spaardoel zodat de figures op
- * `<DoelenStrook>` direct kloppen. De semantiek "Noodfonds" wordt
+ * de doelenkaarten direct kloppen. De semantiek "Noodfonds" wordt
  * gecommuniceerd via het Shield-icoon + de naam, niet via de enum.
  */
 
