@@ -34,6 +34,7 @@ import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useGlobalSync } from '@/components/sync/global-sync-provider'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
+import { usePerspective } from '@/components/app/perspective-provider'
 import {
   getAllPageItems,
   getAdminPageItems,
@@ -91,6 +92,11 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
   const { open: openChat } = useChatContext()
   const { masked, toggle: togglePrivacy } = useMaskedAmounts()
   const { triggerGlobalSync } = useGlobalSync()
+  const {
+    perspective: currentPerspective,
+    availablePerspectives,
+    setPerspective,
+  } = usePerspective()
 
   // ── Action-context bouwen ──────────────────────────────────────────────────
   const actionCtx = useMemo<ActionRunContext>(
@@ -103,8 +109,21 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
       triggerPricesSync: async () => {
         await triggerGlobalSync({ exchanges: [], wallets: [], pricesOnly: true })
       },
+      currentPerspective,
+      availablePerspectives,
+      setPerspective,
     }),
-    [router, onClose, openChat, togglePrivacy, masked, triggerGlobalSync],
+    [
+      router,
+      onClose,
+      openChat,
+      togglePrivacy,
+      masked,
+      triggerGlobalSync,
+      currentPerspective,
+      availablePerspectives,
+      setPerspective,
+    ],
   )
 
   // ── Statische items (memoized) ─────────────────────────────────────────────

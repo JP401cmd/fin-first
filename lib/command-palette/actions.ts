@@ -4,15 +4,16 @@
 // route-gebaseerde "acties" leven in `navigation-index.ts` — geen duplicatie.
 
 import {
-  MessageSquare, Eye, EyeOff, RefreshCw, LogOut, type LucideIcon,
+  MessageSquare, Eye, EyeOff, RefreshCw, LogOut, User, Users, UserCheck, type LucideIcon,
 } from 'lucide-react'
 import type { ModuleId } from '@/lib/module-registry'
+import type { Perspective, PerspectiveOption } from '@/components/app/perspective-provider'
 import type { CommandItem, CommandModuleContext } from './types'
 
 /**
  * Capabilities die een action kan gebruiken. Wordt door de provider gebouwd
  * uit React contexts (`useChatContext`, `useMaskedAmounts`, `useGlobalSync`,
- * `useRouter`) en doorgegeven aan de `build`-factory.
+ * `useRouter`, `usePerspective`) en doorgegeven aan de `build`-factory.
  */
 export type ActionRunContext = {
   router: { push: (href: string) => void }
@@ -25,6 +26,13 @@ export type ActionRunContext = {
   privacyMasked: boolean
   /** Trigger een prices-only sync (geen bank-/exchange-koppelingen vereist). */
   triggerPricesSync: () => Promise<void> | void
+  /** Huidig actief perspectief (personal/household/partner). */
+  currentPerspective: Perspective
+  /** Beschikbare perspectief-opties voor deze gebruiker. Solo-users zien
+   *  alleen `personal`; household-users zien de drie opties. */
+  availablePerspectives: ReadonlyArray<PerspectiveOption>
+  /** Wijzig actief perspectief. */
+  setPerspective: (p: Perspective) => void
 }
 
 /**
@@ -94,6 +102,44 @@ const ACTIONS: ActionDef[] = [
   },
 ]
 
+// ── Perspectief-acties ───────────────────────────────────────────────────────
+//
+// Per beschikbaar perspectief één actie (dynamisch, omdat solo-gebruikers
+// alleen `personal` hebben). Vervangt de oude PerspectiveSwitcher-dropdown
+// die in AppHeader leefde — nu bereikbaar via ⌘K, consistent met de andere
+// quick-toggles als "Bedragen verbergen".
+//
+// Het huidige perspectief wordt gemarkeerd via een sublabel-suffix; klikken
+// op het actieve perspectief is no-op (`setPerspective` rejecteert dezelfde
+// waarde verderop in de provider). We tonen 'm wel zodat de huidige status
+// zichtbaar is.
+
+const PERSPECTIVE_ICONS: Record<Perspective, LucideIcon> = {
+  personal: User,
+  household: Users,
+  partner: UserCheck,
+}
+
+function buildPerspectiveActions(ctx: ActionRunContext): CommandItem[] {
+  if (ctx.availablePerspectives.length <= 1) return []
+
+  return ctx.availablePerspectives.map<CommandItem>((opt) => {
+    const isCurrent = ctx.currentPerspective === opt.id
+    return {
+      id: `action:perspective-${opt.id}`,
+      kind: 'action',
+      label: `Wissel naar ${opt.label}`,
+      sublabel: isCurrent ? `${opt.description} · nu actief` : opt.description,
+      icon: PERSPECTIVE_ICONS[opt.id],
+      module: 'globaal',
+      run: () => {
+        ctx.setPerspective(opt.id)
+        ctx.closePalette()
+      },
+    }
+  })
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /** Bouwt de runtime-CommandItem[] uit het action-register voor de huidige context. */
@@ -101,7 +147,7 @@ export function buildActionItems(
   ctx: ActionRunContext,
   activeModules: ReadonlyArray<ModuleId>,
 ): CommandItem[] {
-  return ACTIONS
+  const staticItems = ACTIONS
     .filter((a) => !a.requiredModule || activeModules.includes(a.requiredModule))
     .map<CommandItem>((a) => ({
       id: a.id,
@@ -113,4 +159,6 @@ export function buildActionItems(
       requiredModule: a.requiredModule,
       run: a.build(ctx),
     }))
+
+  return [...staticItems, ...buildPerspectiveActions(ctx)]
 }
