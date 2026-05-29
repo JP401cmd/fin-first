@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadWillData } from '@/lib/will-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
-import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { WillLanding } from '@/components/will/will-landing'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
@@ -19,20 +18,14 @@ export const metadata: Metadata = {
  * /overzicht — canonieke landing in nieuwe navigatie-architectuur.
  *
  * Render-volgorde:
- *  1. OverzichtHero — Tier-2 visuele hero met begroeting, Health Score
- *     (uit financial-health) en vier hefbomen-tegels naar verdiepingen
- *  2. WillLanding — bestaande briefing + acties + widget-dashboard
- *     (DAIshboard) + doelen-strook + vaste-kosten
+ *  1. OverzichtHero — Tier-2 visuele hero met begroeting, Health Score,
+ *     vier hefbomen-tegels, mini-vermogen-grafiek en 6 briefing-kaartjes
+ *  2. WillLanding — minimale Will-sectie: header, MonthlyCheckin,
+ *     TipsTeaser, CashflowSection
  *
  * Drie parallelle data-loaders: dashboard (21 queries), will (3-6
  * queries), horizon (incl. health score). Wall-clock blijft max van
  * de drie — Postgres handelt dit prima af.
- *
- * Toekomstige uitbreidingen:
- *  - Netto-vermogen-tijdslijn-strip (Tier-2 #9, scope tot vrijheidsmoment)
- *  - 3 atomic cards (wat valt op / een tip / komende maand) uit briefing
- *  - LeverScores-status op de vier hefboom-tegels (Tier-1 #4 verfijning)
- *  - "Wat zie ik hier?"-knop met inline glossarium (Tier-1 #5)
  */
 export default async function OverzichtPage() {
   const supabase = await createClient()
@@ -48,11 +41,8 @@ export default async function OverzichtPage() {
     activeWidgets,
     allWidgetPrefs,
     userName,
-    aiEnabled,
-    categoryAppLinks,
   } = dashboardResult
 
-  const temporal = buildTemporalContext()
   const health = horizonData?.healthScore ?? null
   const freedomPct = horizonData?.healthScoreInput?.freedomPct ?? null
 
@@ -166,13 +156,8 @@ export default async function OverzichtPage() {
       />
       <WillLanding
         dashboardData={dashboardData}
-        activeWidgets={activeWidgets}
-        allPrefs={allWidgetPrefs}
         willData={willData}
-        temporal={temporal}
         userName={userName ?? undefined}
-        aiEnabled={aiEnabled}
-        categoryAppLinks={categoryAppLinks}
       />
     </>
   )
