@@ -13,7 +13,7 @@ import { usePathname } from 'next/navigation'
  * instead of the browser viewport — no per-overlay right adjustments needed.
  *
  * contain:layout (unlike transform) does NOT break position:sticky,
- * so the AppHeader sticky behavior is preserved.
+ * so sticky chrome (TopBar, ModuleNav) keeps working inside the wrapper.
  */
 export function ChatLayoutWrapper({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)

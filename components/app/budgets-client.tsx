@@ -10,9 +10,7 @@
  *  - Edit-mode binnen pane: `?budget=<id>&edit=true` (compositie, plan §6.4)
  *  - Sluiten: query-params verwijderen → `/core/budgets`
  *
- * ShellOverlay zelf kijkt niet naar de feature-flag `new_navigation_shell`;
- * dat is verantwoordelijkheid van ResponsiveShell. Op deze pagina is de
- * pane dus altijd actief: een visuele upgrade die geen functionaliteit-
+ * ShellOverlay is altijd actief: een visuele upgrade die geen functionaliteit-
  * verlies veroorzaakt en de migratie geleidelijk maakt. Mobile (<lg)
  * krijgt voorlopig nog een full-height BottomSheet als pane-fallback;
  * Fase 0.5 vervangt dat door echte stack-push via NavStackProvider.

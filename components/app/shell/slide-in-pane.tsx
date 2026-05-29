@@ -201,11 +201,10 @@ export function SlideInPane({
       // ruim links van de bubble.
       className="hidden lg:flex fixed right-0 z-40 flex-col bg-[var(--paper)] border-l border-[var(--border-ed)] shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.12)] lg:w-[560px] xl:w-[680px]"
       style={{
-        // Pane reikt tot de bovenkant van de viewport: in de new-navigation-shell
-        // (file-header r3-8) wordt geen AppHeader gerenderd, dus er is geen
-        // header-strook om onder te schuiven. Tot 0 doorlopen geeft visueel
-        // ruimte voor een prominente close-affordance bovenin én voorkomt een
-        // lege strook bij flag-aan. `bottom: 0` blijft ongemoeid.
+        // Pane reikt tot de bovenkant van de viewport — geen header-strook
+        // om onder te schuiven (Sidebar+TopBar leven via een portal naast de
+        // pane). Tot 0 doorlopen geeft visueel ruimte voor een prominente
+        // close-affordance bovenin. `bottom: 0` blijft ongemoeid.
         top: 0,
         bottom: 0,
         // Closed state: volledig rechts uit beeld. Open state: 0.
@@ -220,8 +219,7 @@ export function SlideInPane({
       }}
     >
       {/* Pane-header — back-knop links (standaard), titel midden, actions + ✕ rechts.
-          Krant-stijl: scherpe hoeken, geen rounded. Hoogte 56px = 1px ruimer
-          dan AppHeader (57px) zodat content-area visueel niet wegschuift.
+          Krant-stijl: scherpe hoeken, geen rounded. Hoogte 56px.
           De ←-knop is **altijd** zichtbaar: wanneer geen `onBack` is doorgegeven
           valt deze terug op `onClose`, zodat de affordance bestaat ongeacht
           de flow. ✕ rechtsboven blijft daarnaast als snelle-exit-knop staan. */}

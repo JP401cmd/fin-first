@@ -11,8 +11,8 @@
  * Hover/tap op een indicator toont een mini-tooltip met detailinformatie
  * (bv. "4 typen · € 834k" voor bezittingen).
  *
- * Bedoeld voor de sidebar (desktop, naast branding of onder modules) en
- * de AppHeader / TopBar (mobile, in utility-cluster).
+ * Bedoeld voor de Sidebar (desktop, naast branding of onder modules) en
+ * de TopBar (mobile, in utility-cluster).
  */
 'use client'
 
@@ -222,11 +222,11 @@ function MiniProgressRing({
   )
 }
 
-// ── Compact render (inline dots — for TopBar / AppHeader) ────────────────────
+// ── Compact render (inline dots — for TopBar) ────────────────────
 
 /**
  * Ultra-compact variant: 4 gekleurde stippen naast elkaar met hover-tooltips.
- * Bedoeld voor TopBar utility-cluster of AppHeader waar ruimte beperkt is.
+ * Bedoeld voor TopBar utility-cluster waar ruimte beperkt is.
  */
 export function LeverCompassDots({ scores }: { scores: LeverScores }) {
   return (
@@ -355,7 +355,7 @@ export function LeverCompassCollapsed({ scores }: { scores: LeverScores }) {
  * informatie (icoon + label + status + detail + voortgang). Panel sluit
  * bij buiten-tap, Escape, of tweede tap op de trigger.
  *
- * Bedoeld voor AppHeader en TopBar op mobiele schermen (<768px).
+ * Bedoeld voor de TopBar op mobiele schermen (<768px).
  * Op desktop (≥768px) rendert het niets — gebruik daar LeverCompassDots
  * of LeverCompassExpanded.
  */

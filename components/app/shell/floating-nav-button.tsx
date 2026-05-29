@@ -15,8 +15,8 @@ import { NavMenuSheet } from './nav-menu-sheet'
  *    structuur. Wanneer menu open is, verandert het waffle-icoon in een
  *    kruisje (✕) en sluit een klik het menu — geen dubbele dismiss-area.
  *
- * Vervangt de drie-tab BottomNav. Eén centrale knop = één mentale instap.
- * Sub-routes en globale items leven in het sheet-menu (Vercel-stijl).
+ * Eén centrale knop = één mentale instap. Sub-routes en globale items
+ * leven in het sheet-menu (Vercel-stijl).
  *
  * Visueel: ~33% schermbreed, midden-gecentreerd, 12px boven safe-area.
  * Altijd zichtbaar — óók wanneer het sheet open is, zodat de toggle-knop

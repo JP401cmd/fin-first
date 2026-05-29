@@ -13,11 +13,11 @@
  *  - `context-actions`: 2-3 actie-knoppen op detail-pagina's.
  *  - `hidden`: rendert niets — full-screen content.
  *
- * Hoogte komt overeen met de bestaande BottomNav (var --bottom-nav-height,
- * standaard 64px) + safe-area-padding voor iOS home-indicator.
+ * Hoogte = `var(--bottom-nav-height)` (default 64px) + safe-area-padding
+ * voor iOS home-indicator.
  *
- * Achtergrond + border-top: consistent met de bestaande BottomNav
- * (`bg-[var(--paper)]/90 backdrop-blur-md`, `border-t-2 border-[var(--ink)]`).
+ * Achtergrond + border-top: `bg-[var(--paper)]/90 backdrop-blur-md`,
+ * `border-t-2 border-[var(--ink)]`.
  *
  * Belangrijke ontwerpkeuze: dit component zit BINNEN de tray-of-three van
  * MobileStackShell. Geen `fixed bottom-0` — de positionering komt van de
@@ -267,10 +267,8 @@ export function MobileBottomBar({ config }: MobileBottomBarProps) {
 
   if (kind === 'hidden') return null
 
-  // Wrapper-styling: consistent met de bestaande BottomNav. Geen `fixed`
-  // hier — de tray-layout in MobileStackShell positioneert ons als laatste
-  // flex-row, zodat we MEEschuiven bij push/pop (plan §4.1 cruciaal verschil
-  // met v2 waar BottomNav buiten de animation-layer zat).
+  // Geen `fixed` hier — de tray-layout in MobileStackShell positioneert ons
+  // als laatste flex-row, zodat we MEEschuiven bij push/pop.
   const wrapperClasses =
     'border-t-2 border-[var(--ink)] bg-[var(--paper)]/90 backdrop-blur-md'
 

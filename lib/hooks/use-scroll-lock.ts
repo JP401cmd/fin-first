@@ -24,8 +24,8 @@ function lock() {
     }
     // NOTE: body/html overflow is NOT locked — ChatLayoutWrapper (position:fixed,
     // inset:0) is the sole scroll container. Touching body/html overflow triggers
-    // iOS Safari to re-evaluate position:fixed descendants (BottomNav), causing
-    // them to visually jump.
+    // iOS Safari to re-evaluate position:fixed descendants (e.g. MobileBottomBar,
+    // FloatingNavButton), causing them to visually jump.
   }
 }
 

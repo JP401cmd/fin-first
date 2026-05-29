@@ -30,7 +30,6 @@ const tabs = [
   { label: 'Doelen', href: '/beheer/doelen' },
   { label: 'Module Guide', href: '/beheer/module-guide' },
   { label: 'Blueprints', href: '/beheer/blueprints', activeClass: 'border-[var(--color-horizon-500)] text-[var(--color-horizon-700)]' },
-  { label: 'Shell-prototype', href: '/beheer/shell-prototype', activeClass: 'border-[var(--color-kern-500)] text-[var(--color-kern-700)]' },
 ] as const
 
 export function BeheerNav() {

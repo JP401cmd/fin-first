@@ -79,7 +79,7 @@ export function useCategoryAppLinks(): CategoryAppLink[] {
 // ── LeverScores context ─────────────────────────────────────────────────────
 //
 // Vier-hefbomen-kompas data, voorberekend in layout.tsx. Via context beschikbaar
-// voor zowel de Sidebar (portal, buiten tree) als AppHeader / TopBar.
+// voor zowel de Sidebar (portal, buiten tree) als de mobile TopBar.
 const DEFAULT_LEVER_SCORES: LeverScores = {
   assets: { score: null, status: 'neutral', detail: 'Geen data — Start' },
   debts: { score: null, status: 'neutral', detail: 'Geen data — Start' },
@@ -94,9 +94,9 @@ export function useLeverScores(): LeverScores {
 }
 
 export type ResponsiveShellProps = {
-  /** Email van de ingelogde user — gebruikt voor AppHeader (oude shell) en initials/name afleiding (nieuwe shell sidebar). */
+  /** Email van de ingelogde user — initials/name worden hieruit afgeleid voor de Sidebar profile-pill. */
   email: string
-  /** Role van de user (default 'user'). Doorgegeven aan AppHeader voor superadmin-link. */
+  /** Role van de user (default 'user'). Bepaalt zichtbaarheid van de superadmin-link in de Sidebar en TopBar avatar-dropdown. */
   role?: string
   /**
    * Sidebar-kerncijfers, voorberekend in de server-layout zodat ze synchroon
@@ -144,9 +144,8 @@ function getUserName(email: string): string {
 
 // ── Portal subscribe-helpers (canonical client-only-detect pattern) ─────────
 //
-// Zie `app/(app)/beheer/shell-prototype/sidebar-demo.tsx:133-135` — we
-// hergebruiken hetzelfde useSyncExternalStore-pattern (i.p.v.
-// useState+useEffect) zodat we voldoen aan de React 19 lint-regel
+// useSyncExternalStore-pattern (i.p.v. useState+useEffect) zodat we voldoen
+// aan de React 19 lint-regel
 // `react-hooks/set-state-in-effect`. Server-snapshot = false (geen mount);
 // client-snapshot = true → portal mount.
 const subscribePortal = (): (() => void) => () => {}

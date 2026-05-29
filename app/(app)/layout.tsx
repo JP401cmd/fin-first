@@ -369,8 +369,7 @@ export default async function AppLayout({
                           screen-reader-gebruikers (WCAG 2.1 Bypass Blocks).
                           sr-only verbergt visueel; focus:not-sr-only maakt
                           zichtbaar wanneer geactiveerd. Target = #main-content,
-                          gezet door beide shell-takken (LegacyShell main +
-                          NewShell wrapper-div). */}
+                          gezet door de ResponsiveShell wrapper-div. */}
                       <a
                         href="#main-content"
                         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-[var(--paper)] focus:px-4 focus:py-2 focus:border-2 focus:border-[var(--ink)] focus:text-sm focus:font-medium focus:text-[var(--ink)] focus:no-underline"
