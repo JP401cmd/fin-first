@@ -128,7 +128,7 @@ export default function GuideHorizonUitleg() {
       content: (
         <>
           <p>
-            De Horizon-grafiek toont je vermogen over de tijd in <strong>drie fases</strong>:
+            Toekomst-grafiek toont je vermogen over de tijd in <strong>drie fases</strong>:
           </p>
           <p>
             <strong>1. Opbouwfase</strong> — van nu tot je FIRE-leeftijd. In deze periode groeit je
@@ -216,7 +216,7 @@ export default function GuideHorizonUitleg() {
             een <strong>eigen verwacht rendement</strong>. Spaargeld groeit met de spaarrente,
             beleggingen met het beursrendement, pensioen met het pensioenrendement, vastgoed
             met de verwachte waardestijging. Dit rendement stel je per bezitting in via{' '}
-            <InLink href="/core/assets">De Kern → Bezittingen</InLink>. De simulatie berekent
+            <InLink href="/core/assets">Overzicht → Bezittingen</InLink>. De simulatie berekent
             de groei per type apart en telt de resultaten op. Zo krijg je een realistischer
             beeld dan bij één uniform rendement.
           </p>
@@ -261,7 +261,7 @@ export default function GuideHorizonUitleg() {
           </p>
           <p>
             Je beheert levensgebeurtenissen op{' '}
-            <InLink href="/horizon">De Horizon</InLink> pagina. Elk event verschuift je
+            <InLink href="/horizon">Toekomst</InLink> pagina. Elk event verschuift je
             FIRE-datum — je ziet de impact direct.
           </p>
         </>
@@ -348,7 +348,7 @@ export default function GuideHorizonUitleg() {
             Stel je eindstrategie in via{' '}
             <InLink href="/toekomst?tab=voorkeuren">Instellingen → FIRE Instellingen</InLink> of
             via de strategie-modal op{' '}
-            <InLink href="/horizon">De Horizon</InLink>.
+            <InLink href="/horizon">Toekomst</InLink>.
           </p>
         </>
       ),
@@ -389,7 +389,7 @@ export default function GuideHorizonUitleg() {
           </p>
           <p>
             Kies je opnamestrategie via de strategie-modal op{' '}
-            <InLink href="/horizon">De Horizon</InLink>.
+            <InLink href="/horizon">Toekomst</InLink>.
           </p>
         </>
       ),
@@ -477,7 +477,7 @@ export default function GuideHorizonUitleg() {
           </p>
           <p>
             Beheer je schulden via{' '}
-            <InLink href="/core/debts">De Kern → Schulden</InLink>.
+            <InLink href="/core/debts">Overzicht → Schulden</InLink>.
           </p>
         </>
       ),
@@ -522,21 +522,21 @@ export default function GuideHorizonUitleg() {
               <br />
               <span className="text-[var(--ink-3)]">
                 → <InLink href="/toekomst?tab=voorkeuren">Identiteit → Instellingen</InLink> of strategie-modal op{' '}
-                <InLink href="/horizon">De Horizon</InLink>
+                <InLink href="/horizon">Toekomst</InLink>
               </span>
             </p>
             <p>
               <strong>Opnamestrategie</strong> — Vast, Guardrails, VPW of Bucket.
               <br />
               <span className="text-[var(--ink-3)]">
-                → Strategie-modal op <InLink href="/horizon">De Horizon</InLink>
+                → Strategie-modal op <InLink href="/horizon">Toekomst</InLink>
               </span>
             </p>
             <p>
               <strong>Levensgebeurtenissen</strong> — eenmalige en terugkerende events.
               <br />
               <span className="text-[var(--ink-3)]">
-                → <InLink href="/horizon">De Horizon</InLink> pagina
+                → <InLink href="/horizon">Toekomst</InLink> pagina
               </span>
             </p>
           </div>
@@ -670,7 +670,7 @@ export default function GuideHorizonUitleg() {
             <strong>Hoe wordt elke categorie geprojecteerd?</strong> Per bezitting berekent TriFinity
             het toekomstige saldo op basis van het <strong>verwachte rendement</strong> dat je per
             bezitting hebt ingesteld (in{' '}
-            <InLink href="/core/assets">De Kern → Bezittingen</InLink>), plus eventuele{' '}
+            <InLink href="/core/assets">Overzicht → Bezittingen</InLink>), plus eventuele{' '}
             <strong>maandelijkse bijdragen</strong>. Schulden worden afgelost volgens hun
             aflossingsschema (annuïteit, lineair of aflossingsvrij).
           </p>
@@ -970,7 +970,7 @@ export default function GuideHorizonUitleg() {
               Hoe de Horizon-grafiek werkt
             </p>
             <p className="mt-1 text-base font-medium leading-relaxed text-[var(--ink)]">
-              De grafiek op De Horizon is het hart van TriFinity. Hij toont je volledige
+              De grafiek op Toekomst is het hart van TriFinity. Hij toont je volledige
               vermogenspad — van nu tot voorbij je pensioen. Hieronder leggen we stap voor stap
               uit wat je ziet en welke knoppen je kunt draaien.
             </p>

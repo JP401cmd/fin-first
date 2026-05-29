@@ -35,7 +35,7 @@ const FASE_A_FEATURES: readonly Feature[] = [
     nr: 1,
     name: 'Gestapelde Inkomsten vs. Uitgaven Grafiek',
     description:
-      'De bestaande SimChart op De Horizon toont het vermogenspad als lijn met markers voor AOW-leeftijd, pensioen, FIRE-leeftijd en levensgebeurtenissen (cashflow bands). Wat ontbreekt is een gestapelde kolomweergave die per jaar laat zien WAAR het inkomen vandaan komt in de afbouwfase. Boldin\u2019s \u201cLifetime Income Projection Chart\u201d is hun vlaggenschip \u2014 dit is de ontbrekende visualisatie in TriFinity. Daarnaast moet de bestaande vermogenslijn expliciet gemarkeerd worden met verticale annotaties voor sleutelmomenten: AOW-startmoment, pensioen-startmoment, FIRE-moment, onttrekkingsfase-start, en alle andere actieve levensgebeurtenissen. Deze markers laten zien WANNEER elke bron inschakelt.',
+      'De bestaande SimChart op Toekomst toont het vermogenspad als lijn met markers voor AOW-leeftijd, pensioen, FIRE-leeftijd en levensgebeurtenissen (cashflow bands). Wat ontbreekt is een gestapelde kolomweergave die per jaar laat zien WAAR het inkomen vandaan komt in de afbouwfase. Boldin\u2019s \u201cLifetime Income Projection Chart\u201d is hun vlaggenschip \u2014 dit is de ontbrekende visualisatie in TriFinity. Daarnaast moet de bestaande vermogenslijn expliciet gemarkeerd worden met verticale annotaties voor sleutelmomenten: AOW-startmoment, pensioen-startmoment, FIRE-moment, onttrekkingsfase-start, en alle andere actieve levensgebeurtenissen. Deze markers laten zien WANNEER elke bron inschakelt.',
     werking:
       'Een gestapelde kolom-grafiek (stacked bar chart) die per jaar toont: Kolommen (gestapeld): eigen vermogen/onttrekking, AOW-uitkering, werkgeverspensioen, passief inkomen, deeltijds werk, overige inkomstenbronnen. Lijn: totale uitgaven (ge\u00efndexeerd voor inflatie). Visueel: als de kolommen hoger zijn dan de lijn = surplus; lager = deficit (rode zone). Integratie met de bestaande SimChart: kan als alternatieve weergavemodus (\u201cVermogenspad\u201d vs \u201cInkomstenbronnen\u201d) of als aanvullende grafiek eronder. De bestaande AOW/pensioen/life event markers uit SimChart worden hier vertaald naar gestapelde bronnen. Aanvullend: de bestaande vermogenslijn/SimChart krijgt verticale marker-lijnen en annotaties op de tijdas voor elk sleutelmoment \u2014 AOW-start (verticale lijn + label), pensioen-start (verticale lijn + label), FIRE-moment (prominente marker), onttrekkingsfase-start, en alle actieve levensgebeurtenissen (bijv. kind, huis, sabbatical). Elke marker toont het moment waarop een inkomstenbron of uitgavenpost activeert, zodat de gebruiker in \u00e9\u00e9n oogopslag ziet WANNEER en WAAROM het vermogenspad verandert.',
     afhankelijkheden: [
@@ -49,7 +49,7 @@ const FASE_A_FEATURES: readonly Feature[] = [
       'profiles.inflation_rate',
     ],
     technisch:
-      'Data grotendeels beschikbaar via SimRow (withdrawal, cashflowNet, savings, growth). Wat nodig is: cashflows opsplitsen per bron (nu opgeteld in cashflowNet), stacked bar chart component (Recharts of custom SVG zoals SimChart), weergave als toggle of tab op De Horizon. De bestaande levensgebeurtenissen (AOW, pensioen, erfenis, etc.) worden automatisch als inkomstenbronnen getoond.',
+      'Data grotendeels beschikbaar via SimRow (withdrawal, cashflowNet, savings, growth). Wat nodig is: cashflows opsplitsen per bron (nu opgeteld in cashflowNet), stacked bar chart component (Recharts of custom SVG zoals SimChart), weergave als toggle of tab op Toekomst. De bestaande levensgebeurtenissen (AOW, pensioen, erfenis, etc.) worden automatisch als inkomstenbronnen getoond.',
     waardeGebruiker:
       'Beantwoordt de #1 vraag: \u201cWaar komt mijn geld vandaan als ik stop met werken?\u201d De huidige SimChart toont WANNEER, deze grafiek toont HOEVEEL per bron.',
     aandachtspunten: [
@@ -222,7 +222,7 @@ const FASE_A_FEATURES: readonly Feature[] = [
       'debts tabel (schulden als negatieve laag)',
     ],
     technisch:
-      'Data deels beschikbaar via SimRow (savings, growth), maar vermogenscategorie\u00ebn moeten uitgesplitst worden. Nieuwe helper: splitVermogenPerBron(simRows, assets, holdings) \u2192 StackedRow[]. Stacked bar chart component (Recharts StackedBarChart of custom SVG). Integratie als toggle-modus op De Horizon naast bestaande SimChart. Categorie\u00ebn afleiden uit asset.type en holding.asset_class. Pensioen apart berekenen op basis van UPO-data of handmatige invoer. AOW gekapitaliseerd als contante waarde van toekomstige uitkeringen.',
+      'Data deels beschikbaar via SimRow (savings, growth), maar vermogenscategorie\u00ebn moeten uitgesplitst worden. Nieuwe helper: splitVermogenPerBron(simRows, assets, holdings) \u2192 StackedRow[]. Stacked bar chart component (Recharts StackedBarChart of custom SVG). Integratie als toggle-modus op Toekomst naast bestaande SimChart. Categorie\u00ebn afleiden uit asset.type en holding.asset_class. Pensioen apart berekenen op basis van UPO-data of handmatige invoer. AOW gekapitaliseerd als contante waarde van toekomstige uitkeringen.',
     waardeGebruiker:
       'Beantwoordt de vraag: "Waaruit bestaat mijn vermogen straks?" De huidige lijngrafiek toont alleen het totaal \u2014 deze visualisatie laat zien dat bijv. 40% uit beleggingen komt, 30% uit pensioen, 20% uit vastgoed. Helpt bij diversificatie-beslissingen en geeft vertrouwen dat het vermogen over meerdere bronnen verspreid is.',
     aandachtspunten: [
@@ -316,7 +316,7 @@ const FASE_B_FEATURES: readonly Feature[] = [
       'holdings module voor beleggingsscenario',
     ],
     technisch:
-      'Nieuwe lib/mortgage-optimizer.ts: compareMortgageVsInvest(params) \u2192 { aflossing: Scenario, beleggen: Scenario, breakeven: number }. Aflossingsscenario: bereken restschuld, totale rente bespaard, verlies hypotheekrenteaftrek (marginaal tarief \u00d7 rente). Beleggingsscenario: bereken verwacht eindvermogen (Monte Carlo), Box 3 belasting over groei. Breakeven: bij welk rendement is beleggen voordeliger dan aflossen? Nieuwe pagina /horizon/hypotheek of modal in De Horizon. Integratie met What-If planner.',
+      'Nieuwe lib/mortgage-optimizer.ts: compareMortgageVsInvest(params) \u2192 { aflossing: Scenario, beleggen: Scenario, breakeven: number }. Aflossingsscenario: bereken restschuld, totale rente bespaard, verlies hypotheekrenteaftrek (marginaal tarief \u00d7 rente). Beleggingsscenario: bereken verwacht eindvermogen (Monte Carlo), Box 3 belasting over groei. Breakeven: bij welk rendement is beleggen voordeliger dan aflossen? Nieuwe pagina /horizon/hypotheek of modal in Toekomst. Integratie met What-If planner.',
     waardeGebruiker:
       'De #1 financi\u00eble vraag in Nederland \u2014 iedereen met een hypotheek worstelt hiermee. Adviseurs rekenen \u20ac200+ voor dit advies. TriFinity kan dit gratis bieden met de data die er al is. Direct actionable: \u201cBij jouw hypotheekrente van 3.2% en verwacht rendement van 7% is beleggen \u20acX voordeliger over 20 jaar.\u201d',
     aandachtspunten: [
@@ -432,7 +432,7 @@ const FASE_B_FEATURES: readonly Feature[] = [
       'profiles (leeftijd, pensioenleeftijd)',
     ],
     technisch:
-      'Nieuwe helper: computeVermogensgroeiPerBron(simRows, assets, profile) \u2192 AreaRow[]. Per jaar cumulatieve bijdrage per bron berekenen: arbeidsinleg = sum(netto savings), rendement = sum(portfolio growth), pensioen = sum(pension accrual), vastgoed = sum(property appreciation). Area chart component (Recharts AreaChart met stackId of custom SVG). Crossover-punt berekenen: het jaar waar passieve bronnen > arbeidsinleg. Hover-tooltip met absolute bedragen en percentages per bron. Integratie op De Horizon als extra tab/visualisatie.',
+      'Nieuwe helper: computeVermogensgroeiPerBron(simRows, assets, profile) \u2192 AreaRow[]. Per jaar cumulatieve bijdrage per bron berekenen: arbeidsinleg = sum(netto savings), rendement = sum(portfolio growth), pensioen = sum(pension accrual), vastgoed = sum(property appreciation). Area chart component (Recharts AreaChart met stackId of custom SVG). Crossover-punt berekenen: het jaar waar passieve bronnen > arbeidsinleg. Hover-tooltip met absolute bedragen en percentages per bron. Integratie op Toekomst als extra tab/visualisatie.',
     waardeGebruiker:
       'Maakt het "sneeuwbaleffect" van compound interest visueel: je ziet hoe beleggingsrendement over tijd de dominante bron van vermogensgroei wordt. Motiveert langetermijnbeleggers \u2014 "elke euro die ik nu beleg, groeit over 20 jaar tot vier euro." Toont waarom vroeg beginnen zo belangrijk is.',
     aandachtspunten: [
@@ -462,7 +462,7 @@ const FASE_B_FEATURES: readonly Feature[] = [
       'lib/fire-simulation.ts (lifeEventsToCashflows)',
     ],
     technisch:
-      'Nieuwe helper: computeWithdrawalStrategy(simRows, profile, pensionIncome, aowIncome) \u2192 WithdrawalPhase[]. Per fase: bronnen met bedragen, start/eindjaar, restant per pot. Visualisatie als horizontale tijdlijn met gestapelde bronnen per fase (Gantt-chart stijl). Alternatief: waterval-diagram dat toont hoe elke bron de druk op beleggingen verlaagt. Integratie op De Horizon, eventueel als onderdeel van het Onttrekkingsmodal (bestaand). SimRow bevat al withdrawal en cashflowNet \u2014 deze opsplitsen per bron voor de visualisatie.',
+      'Nieuwe helper: computeWithdrawalStrategy(simRows, profile, pensionIncome, aowIncome) \u2192 WithdrawalPhase[]. Per fase: bronnen met bedragen, start/eindjaar, restant per pot. Visualisatie als horizontale tijdlijn met gestapelde bronnen per fase (Gantt-chart stijl). Alternatief: waterval-diagram dat toont hoe elke bron de druk op beleggingen verlaagt. Integratie op Toekomst, eventueel als onderdeel van het Onttrekkingsmodal (bestaand). SimRow bevat al withdrawal en cashflowNet \u2014 deze opsplitsen per bron voor de visualisatie.',
     waardeGebruiker:
       'Beantwoordt de cruciale vraag: "Hoe overleef ik de bridge-periode tussen FIRE en pensioen?" Laat zien dat FIRE niet betekent dat al het geld uit \u00e9\u00e9n pot komt \u2014 pensioen en AOW nemen het over. Vermindert angst: "Ik hoef niet alles zelf te hebben, want op mijn 67e komt AOW erbij." Helpt bij het bepalen van het optimale FIRE-moment.',
     aandachtspunten: [
@@ -643,7 +643,7 @@ const FASE_C_FEATURES: readonly Feature[] = [
       'budgets (huidige uitgaven als basis)',
     ],
     technisch:
-      'Nieuwe helper: computeLevensfaseBreakdown(simRows, profile, pensionIncome, aowIncome) \u2192 LevensfaseRow[]. Per fase: faseLidwoord, startJaar, eindJaar, bronnen: { label, bedrag, percentage, kleur }[]. Levensfasen afleiden uit profile: werkfase (nu \u2192 FIRE), bridge (FIRE \u2192 pensioen), pensioen (pensioen \u2192 AOW), AOW (AOW \u2192 eindleeftijd), laat (80+). Visualisatie als horizontale gestapelde balken per fase, compact onder elkaar. Kan als sectie op De Horizon of als onderdeel van het rapportage-systeem. Relatief simpel te bouwen op basis van bestaande SimRow data \u2014 voornamelijk een presentatie-laag.',
+      'Nieuwe helper: computeLevensfaseBreakdown(simRows, profile, pensionIncome, aowIncome) \u2192 LevensfaseRow[]. Per fase: faseLidwoord, startJaar, eindJaar, bronnen: { label, bedrag, percentage, kleur }[]. Levensfasen afleiden uit profile: werkfase (nu \u2192 FIRE), bridge (FIRE \u2192 pensioen), pensioen (pensioen \u2192 AOW), AOW (AOW \u2192 eindleeftijd), laat (80+). Visualisatie als horizontale gestapelde balken per fase, compact onder elkaar. Kan als sectie op Toekomst of als onderdeel van het rapportage-systeem. Relatief simpel te bouwen op basis van bestaande SimRow data \u2014 voornamelijk een presentatie-laag.',
     waardeGebruiker:
       'Geeft in \u00e9\u00e9n oogopslag het "grote plaatje" van je financi\u00eble levenslijn. Maakt abstract plannen concreet: "Na mijn 67e komt 35% van mijn inkomen uit AOW." Helpt bij het identificeren van kwetsbare fasen: als de bridge-periode bijna volledig afhankelijk is van onttrekking, is dat een risico. Ideaal voor rapportages en delen met partner.',
     aandachtspunten: [

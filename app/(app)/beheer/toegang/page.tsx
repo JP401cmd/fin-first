@@ -19,9 +19,9 @@ const TIER_COLORS: Record<CommercialTier, { bg: string; text: string; border: st
 }
 
 const MODULE_LABELS: Record<string, string> = {
-  kern: 'Kern',
-  wil: 'Wil',
-  horizon: 'Horizon',
+  kern: 'Overzicht',
+  wil: 'Tips & acties',
+  horizon: 'Toekomst',
   bank: 'Bank',
   ai: 'AI',
 }

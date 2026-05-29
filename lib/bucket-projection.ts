@@ -8,7 +8,7 @@
  * models debt repayment schedules, and applies Box 3 tax drag
  * using either forfaitair or werkelijk rendement method.
  *
- * Behouden als referentie en fallback. De Kern pagina gebruikt nu de unified engine.
+ * Behouden als referentie en fallback. Overzicht pagina gebruikt nu de unified engine.
  */
 
 import { projectAsset, resolveDepreciation, type Asset, type AssetType, ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, ASSET_TYPE_ICONS } from './asset-data'

@@ -78,12 +78,12 @@ export function FireRetirementExpensePanel({ value, onChange, showDeepLink = tru
         </p>
       )}
       <p className="mt-3 font-sans text-[11px] text-[var(--ink-3)]">
-        De gekozen methode bepaalt het FIRE-doel, alle vrijheidsdagen-berekeningen en de dagprijs in De Kern, De Horizon en de belastingpagina.
+        De gekozen methode bepaalt het FIRE-doel, alle vrijheidsdagen-berekeningen en de dagprijs in Overzicht, Toekomst en de belastingpagina.
       </p>
       {showDeepLink && (
         <p className="mt-2 font-sans text-[11px]">
           <Link href="/horizon?uitgaven=open" className="text-[var(--ink-2)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
-            &rarr; Stel je uitgaven gedetailleerd samen in De Horizon
+            &rarr; Stel je uitgaven gedetailleerd samen in Toekomst
           </Link>
         </p>
       )}

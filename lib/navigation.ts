@@ -14,7 +14,7 @@ export type ModuleNavConfig = {
 }
 
 export const willNav: ModuleNavConfig = {
-  module: 'De Wil',
+  module: 'Tips & acties',
   basePath: '/will',
   color: 'teal',
   items: [
@@ -23,7 +23,7 @@ export const willNav: ModuleNavConfig = {
 }
 
 export const horizonNav: ModuleNavConfig = {
-  module: 'De Horizon',
+  module: 'Toekomst',
   basePath: '/horizon',
   color: 'purple',
   items: [

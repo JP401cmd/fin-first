@@ -33,9 +33,9 @@ const MODULE_DOT: Record<WidgetModule, string> = {
 }
 
 const MODULE_LABEL: Record<WidgetModule, string> = {
-  kern: 'Kern',
-  wil: 'Wil',
-  horizon: 'Horizon',
+  kern: 'Overzicht',
+  wil: 'Tips & acties',
+  horizon: 'Toekomst',
   cross: 'Cross',
 }
 

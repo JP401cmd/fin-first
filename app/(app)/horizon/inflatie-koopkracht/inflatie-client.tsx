@@ -20,7 +20,7 @@ export function InflatieKoopkrachtClient({
     (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/toekomst/inflatie-koopkracht'] || ''
   // Back-link wijst naar canonieke route /toekomst (was /horizon)
   const backHref = pathname?.startsWith('/toekomst') ? '/toekomst' : '/horizon'
-  const backLabel = pathname?.startsWith('/toekomst') ? 'De Toekomst' : 'De Horizon'
+  const backLabel = pathname?.startsWith('/toekomst') ? 'De Toekomst' : 'Toekomst'
   return (
     <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <PageInfoButton

@@ -36,9 +36,9 @@ const FOCUS_OPTIONS: { value: FocusChoice; label: string; description: string; d
 ]
 
 const MODULE_OPTIONS: { value: ModulePreference; label: string; description: string; dotColor: string }[] = [
-  { value: 'kern',     label: 'De Kern',       description: 'Focus op financiële basis',     dotColor: 'bg-kern-400' },
-  { value: 'wil',      label: 'De Wil',        description: 'Focus op acties & impact',      dotColor: 'bg-wil-400' },
-  { value: 'horizon',  label: 'De Horizon',    description: 'Focus op toekomst & projecties', dotColor: 'bg-horizon-400' },
+  { value: 'kern',     label: 'Overzicht',       description: 'Focus op financiële basis',     dotColor: 'bg-kern-400' },
+  { value: 'wil',      label: 'Tips & acties',   description: 'Focus op acties & impact',      dotColor: 'bg-wil-400' },
+  { value: 'horizon',  label: 'Toekomst',    description: 'Focus op toekomst & projecties', dotColor: 'bg-horizon-400' },
   { value: 'balanced', label: 'Evenwichtig',   description: 'Gelijke verdeling',             dotColor: 'bg-[var(--ink-4)]' },
 ]
 

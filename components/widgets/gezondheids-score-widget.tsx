@@ -316,7 +316,7 @@ function HealthKassabonSummary({ health }: { health: ReturnType<typeof computeHe
         className="flex items-center justify-center gap-2 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 px-4 py-2.5 text-xs font-medium text-horizon-700 transition-colors hover:bg-horizon-100 hover:border-horizon-300"
       >
         <ExternalLink className="h-3.5 w-3.5" />
-        Bekijk volledige analyse op De Horizon
+        Bekijk volledige analyse op Toekomst
       </Link>
     </div>
   )
@@ -448,7 +448,7 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
         href="/toekomst"
         className="mt-1.5 font-serif italic text-[11px] text-horizon-600 hover:text-horizon-800 flex items-center gap-1"
       >
-        Bekijk details op De Horizon <ChevronRight className="h-3 w-3" />
+        Bekijk details op Toekomst <ChevronRight className="h-3 w-3" />
       </Link>
 
       <BottomSheet open={showKassabon} onClose={() => setShowKassabon(false)} title="Financiële Gezondheid">

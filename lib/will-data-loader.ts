@@ -1,5 +1,5 @@
 /**
- * Server-side data loader for the Will (De Wil) landing page.
+ * Server-side data loader for the Will (Overzicht) landing page.
  *
  * Optimized to accept shared data from loadDashboardData to avoid
  * duplicate Supabase queries (assets, debts, auth, profile).

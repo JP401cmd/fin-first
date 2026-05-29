@@ -2619,7 +2619,7 @@ function BudgetDetailModal({
           )}
         </div>
 
-        {/* Doeltype — 4c: Spaardoel (budget-native) — hidden when a De Wil goal is linked */}
+        {/* Doeltype — 4c: Spaardoel (budget-native) — hidden when a Overzicht goal is linked */}
         {budget.goal_type === 'spaardoel' && budget.goal_amount && goals.length === 0 && (() => {
           const maandenResterend = budget.goal_date
             ? Math.max(1, (new Date(budget.goal_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30))
@@ -3526,7 +3526,7 @@ function BudgetEditModal({
   const [goalAmount, setGoalAmount] = useState(budget.goal_amount ? String(budget.goal_amount) : '')
   const [goalDate, setGoalDate] = useState(budget.goal_date ?? '')
   const [goalFrequency, setGoalFrequency] = useState(budget.goal_frequency ?? '')
-  // De Wil goal linking
+  // Overzicht goal linking
   const [linkedGoalId, setLinkedGoalId] = useState<string>('')
   const [availableSavingsGoals, setAvailableSavingsGoals] = useState<
     { id: string; name: string; target_value: number; target_date: string | null }[]
@@ -3576,7 +3576,7 @@ function BudgetEditModal({
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty])
 
-  // Load De Wil savings goals + existing linked goal
+  // Load Overzicht savings goals + existing linked goal
   useEffect(() => {
     const supabase = createClient()
     supabase
@@ -4219,7 +4219,7 @@ function BudgetEditModal({
                           ))}
                         </div>
                         <p id="goal-type-help" className="mt-1 text-xs text-[var(--ink-3)] leading-relaxed">
-                          Geen = gewoon budget. Vaste maandlast = terugkerende vaste post (hypotheek). Bestedingslimiet = plafond op variabele uitgaven. Spaardoel = koppelen aan een doel in De Wil. Reservering = maandelijks saldo opbouwen. Periodieke last = kost die elk kwartaal/jaar terugkomt, verspreid over maanden.
+                          Geen = gewoon budget. Vaste maandlast = terugkerende vaste post (hypotheek). Bestedingslimiet = plafond op variabele uitgaven. Spaardoel = koppelen aan een doel in Overzicht. Reservering = maandelijks saldo opbouwen. Periodieke last = kost die elk kwartaal/jaar terugkomt, verspreid over maanden.
                         </p>
 
                         {goalType === 'spaardoel' && (
@@ -4254,7 +4254,7 @@ function BudgetEditModal({
                               className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-wil-600 hover:text-wil-700"
                             >
                               <Plus className="h-3.5 w-3.5" />
-                              Maak nieuw doel aan in De Wil
+                              Maak nieuw doel aan in Overzicht
                             </button>
                           </div>
                         )}

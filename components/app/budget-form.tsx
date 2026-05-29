@@ -876,7 +876,7 @@ export function BudgetForm({
                 className="mt-2 inline-flex items-center gap-1.5 text-xs text-wil-600 hover:text-wil-700"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Maak nieuw doel aan in De Wil
+                Maak nieuw doel aan in Overzicht
               </button>
             </div>
           )}

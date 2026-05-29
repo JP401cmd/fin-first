@@ -5192,7 +5192,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               </div>
                             </div>
                             <p className="text-[10px] leading-relaxed text-amber-600">
-                              Tip: vergeet niet je woning als asset toe te voegen in De Kern → Bezittingen, zodat je vermogensoverzicht klopt.
+                              Tip: vergeet niet je woning als asset toe te voegen in Overzicht → Bezittingen, zodat je vermogensoverzicht klopt.
                             </p>
                           </div>
                         )

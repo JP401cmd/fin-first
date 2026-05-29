@@ -9,7 +9,7 @@ import type { QuickAddIntent } from '@/lib/quick-add/types'
  * binnenkomen zien deze stap nooit (de wizard wordt met `initialIntent`
  * geopend en skipt direct naar stap 2).
  *
- * Elke kaart heeft drie regels: kicker ("De Kern"), label, subtitel met
+ * Elke kaart heeft drie regels: kicker ("Overzicht"), label, subtitel met
  * concrete voorbeelden. Min-h 120px om de touch-target-eis ruim te halen
  * én visueel gewicht te geven aan de keuze.
  */

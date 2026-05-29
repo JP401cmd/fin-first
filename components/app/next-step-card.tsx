@@ -234,7 +234,7 @@ export function NextStepSection({ steps, moduleColor }: { steps: NextStepSuggest
 }
 
 /**
- * Compute the next step suggestion for De Kern module based on financial data.
+ * Compute the next step suggestion for Overzicht module based on financial data.
  *
  * Smart prioritization (Feature #255):
  * 1. No transactions (import first)
@@ -622,7 +622,7 @@ export function computeAllHorizonSteps(data: {
 }
 
 /**
- * Compute the next step suggestion for De Wil module based on action/recommendation data.
+ * Compute the next step suggestion for Overzicht module based on action/recommendation data.
  */
 export function computeWilNextStep(data: {
   pendingRecommendations: number
@@ -674,7 +674,7 @@ export function computeWilNextStep(data: {
 }
 
 /**
- * Compute the next step suggestion for De Horizon module.
+ * Compute the next step suggestion for Toekomst module.
  */
 export function computeHorizonNextStep(data: {
   hasFireProjection: boolean

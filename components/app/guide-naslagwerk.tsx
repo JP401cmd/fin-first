@@ -55,7 +55,7 @@ interface NaslagwerkModule {
 const MODULES: NaslagwerkModule[] = [
   {
     id: 'kern',
-    label: 'De Kern',
+    label: 'Overzicht',
     color: 'var(--color-kern-400)',
     topics: [
       {
@@ -131,7 +131,7 @@ const MODULES: NaslagwerkModule[] = [
   },
   {
     id: 'wil',
-    label: 'De Wil',
+    label: 'Tips & acties',
     color: 'var(--color-wil-400)',
     topics: [
       {
@@ -186,7 +186,7 @@ const MODULES: NaslagwerkModule[] = [
   },
   {
     id: 'horizon',
-    label: 'De Horizon',
+    label: 'Toekomst',
     color: 'var(--color-horizon-400)',
     topics: [
       {

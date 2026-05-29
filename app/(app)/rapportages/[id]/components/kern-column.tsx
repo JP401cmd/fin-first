@@ -24,7 +24,7 @@ export function KernColumn({
 
   return (
     <div className="space-y-6">
-      <SectionLabel num="i.">De Kern</SectionLabel>
+      <SectionLabel num="i.">Overzicht</SectionLabel>
 
       {/* Netto kasstroom sparkline */}
       {cashflowValues.length >= 2 && (

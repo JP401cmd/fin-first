@@ -32,40 +32,40 @@ export default function PropositiePage() {
         </p>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          {/* De Kern */}
+          {/* Overzicht */}
           <div className="rounded-lg border-l-3 border-kern-500 bg-kern-50/50 p-4">
             <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-kern-600">
               1. Ken je werkelijkheid
             </p>
-            <p className="mb-2 font-display text-sm font-semibold text-[var(--ink)]">De Kern</p>
+            <p className="mb-2 font-display text-sm font-semibold text-[var(--ink)]">Overzicht</p>
             <p className="font-serif text-xs leading-relaxed text-[var(--ink-3)]">
-              Wat bezit je, wat ben je schuldig, wat geef je uit? De Kern brengt alles samen: je
+              Wat bezit je, wat ben je schuldig, wat geef je uit? Overzicht brengt alles samen: je
               nettovermogen in euro&apos;s, je vrijheidstijd in maanden en jaren, je budget als je
               dat wilt. Begin simpel of ga zo diep als je wilt.
             </p>
           </div>
 
-          {/* De Wil */}
+          {/* Overzicht */}
           <div className="rounded-lg border-l-3 border-wil-500 bg-wil-50/50 p-4">
             <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-wil-600">
               2. Neem de regie
             </p>
-            <p className="mb-2 font-display text-sm font-semibold text-[var(--ink)]">De Wil</p>
+            <p className="mb-2 font-display text-sm font-semibold text-[var(--ink)]">Overzicht</p>
             <p className="font-serif text-xs leading-relaxed text-[var(--ink-3)]">
-              De Wil combineert jouw financiële data met AI om je te laten zien wat je nu kunt
+              Overzicht combineert jouw financiële data met AI om je te laten zien wat je nu kunt
               doen. Persoonlijke inzichten over je uitgaven, maar ook signalen van buiten:
               belastingwijzigingen, rentestand en marktontwikkelingen &mdash; vertaald naar impact
               op jou.
             </p>
           </div>
 
-          {/* De Horizon */}
+          {/* Toekomst */}
           <div className="rounded-lg border-l-3 border-horizon-500 bg-horizon-50/50 p-4">
             <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-horizon-600">
               3. Zie je vrijheid groeien
             </p>
             <p className="mb-2 font-display text-sm font-semibold text-[var(--ink)]">
-              De Horizon
+              Toekomst
             </p>
             <p className="font-serif text-xs leading-relaxed text-[var(--ink-3)]">
               Of je doel nu &apos;grip krijgen&apos; of &apos;met 50 stoppen&apos; is &mdash; De
@@ -265,7 +265,7 @@ export default function PropositiePage() {
           {/* Kern features */}
           <div>
             <p className="mb-2 font-sans text-xs font-bold text-kern-600">
-              De Kern &mdash; &ldquo;Ken je werkelijkheid&rdquo;
+              Overzicht &mdash; &ldquo;Ken je werkelijkheid&rdquo;
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
@@ -288,7 +288,7 @@ export default function PropositiePage() {
           {/* Wil features */}
           <div>
             <p className="mb-2 font-sans text-xs font-bold text-wil-600">
-              De Wil &mdash; &ldquo;Neem de regie&rdquo;
+              Overzicht &mdash; &ldquo;Neem de regie&rdquo;
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
@@ -311,7 +311,7 @@ export default function PropositiePage() {
           {/* Horizon features */}
           <div>
             <p className="mb-2 font-sans text-xs font-bold text-horizon-600">
-              De Horizon &mdash; &ldquo;Zie je vrijheid groeien&rdquo;
+              Toekomst &mdash; &ldquo;Zie je vrijheid groeien&rdquo;
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
               {[

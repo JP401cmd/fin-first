@@ -51,9 +51,9 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export type SidebarProps = {
-  /** Netto vermogen in EUR — getoond rechts van "De Kern". */
+  /** Netto vermogen in EUR — getoond rechts van "Overzicht". */
   netWorth: number
-  /** Aantal openstaande acties — getoond als "· {n} acties" rechts van "De Wil". */
+  /** Aantal openstaande acties — getoond als "· {n} acties" rechts van "Overzicht". */
   actionCount: number
   /** Aantal ongelezen berichten in Inbox-rij. */
   unreadMessageCount?: number

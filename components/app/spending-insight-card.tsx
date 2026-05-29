@@ -118,7 +118,7 @@ function SpendingInsightCard({ insight }: { insight: SpendingInsight }) {
 }
 
 /**
- * Section component for spending pattern insights on De Kern page.
+ * Section component for spending pattern insights on Overzicht page.
  */
 export function SpendingInsightsSection({
   insights,

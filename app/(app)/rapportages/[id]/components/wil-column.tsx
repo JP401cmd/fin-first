@@ -18,7 +18,7 @@ export function WilColumn({
 
   return (
     <div className="space-y-6">
-      <SectionLabel num="ii.">De Wil</SectionLabel>
+      <SectionLabel num="ii.">Tips & acties</SectionLabel>
 
       {/* Actions completed */}
       <div className="report-section">

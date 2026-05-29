@@ -24,7 +24,7 @@ export function HorizonColumn({
 
   return (
     <div className="space-y-6">
-      <SectionLabel num="iii.">De Horizon</SectionLabel>
+      <SectionLabel num="iii.">Toekomst</SectionLabel>
 
       {/* FIRE progress */}
       {(horizon.fireStart || horizon.fireEnd) && (

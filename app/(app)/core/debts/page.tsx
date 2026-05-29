@@ -72,7 +72,7 @@ function addDebtCta(type: DebtType): string {
  * bestaande detail-modal-patroon.
  *
  * Bewust géén aflossingsstrategie, freedom-time of Box 3-content meer in
- * dit overzicht — die noise is verhuisd naar dedicated pagina's. De Kern
+ * dit overzicht — die noise is verhuisd naar dedicated pagina's. Overzicht
  * is een registratie-fundament, niet een berekenings-tool.
  */
 export default function DebtsPage() {

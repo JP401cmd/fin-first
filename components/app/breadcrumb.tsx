@@ -19,12 +19,12 @@ type BreadcrumbSegment = {
  */
 const segmentLabels: Record<string, string> = {
   dashboard: 'Dashboard',
-  core: 'De Kern',
-  overzicht: 'Het Overzicht',
-  toekomst: 'De Toekomst',
+  core: 'Overzicht',
+  overzicht: 'Overzicht',
+  toekomst: 'Toekomst',
   mijn: 'Mijn',
-  will: 'De Wil',
-  horizon: 'De Horizon',
+  will: 'Overzicht',
+  horizon: 'Toekomst',
   budgets: 'Budgetten',
   cash: 'Cash',
   cashflow: 'Cashflow',
@@ -34,7 +34,7 @@ const segmentLabels: Record<string, string> = {
   assets: 'Vermogen',
   bezittingen: 'Bezittingen',
   belasting: 'Belasting',
-  identity: 'Identiteit',
+  identity: 'Mijn',
   profiel: 'Profiel',
   koppelingen: 'Koppelingen',
   delen: 'Delen',
@@ -58,7 +58,7 @@ const colorAccent: Record<DomainColor, { text: string; hover: string }> = {
  * Breadcrumb component — shows the navigation hierarchy.
  *
  * Automatically derives breadcrumbs from the current URL path.
- * Example: /core/cash/import → De Kern / Cash / Importeren
+ * Example: /core/cash/import → Overzicht / Cash / Importeren
  *
  * Props:
  * - color: Module color theme (amber, teal, purple)
@@ -119,7 +119,7 @@ export function Breadcrumb({
 
 /**
  * Builds breadcrumb segments from a URL pathname.
- * /core/cash/import → [{ label: 'De Kern', href: '/core' }, { label: 'Cash', href: '/core/cash' }, { label: 'Importeren', href: '/core/cash/import' }]
+ * /core/cash/import → [{ label: 'Overzicht', href: '/core' }, { label: 'Cash', href: '/core/cash' }, { label: 'Importeren', href: '/core/cash/import' }]
  */
 function buildBreadcrumbs(pathname: string): BreadcrumbSegment[] {
   const parts = pathname.split('/').filter(Boolean)

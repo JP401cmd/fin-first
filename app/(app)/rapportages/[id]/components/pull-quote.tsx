@@ -2,9 +2,9 @@ import type { ReportAiInsight } from '@/lib/report-data'
 import { PullQuote as EditorialPullQuote } from '@/components/editorial'
 
 const MODULE_NAMES: Record<ReportAiInsight['module'], string> = {
-  kern: 'De Kern',
-  wil: 'De Wil',
-  horizon: 'De Horizon',
+  kern: 'Overzicht',
+  wil: 'Tips & acties',
+  horizon: 'Toekomst',
 }
 
 const AVATAR_NAMES: Record<string, string> = {

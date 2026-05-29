@@ -898,7 +898,7 @@ export function StrategieModal({ open, onClose, housingStrategy }: StrategieModa
           >
             {error
               ? 'Er is een fout opgetreden. Controleer je verbinding en probeer het opnieuw.'
-              : 'Voeg vermogen toe in De Kern zodat strategieën vergeleken kunnen worden.'}
+              : 'Voeg vermogen toe in Overzicht zodat strategieën vergeleken kunnen worden.'}
           </p>
         </div>
       </ShellOverlay>

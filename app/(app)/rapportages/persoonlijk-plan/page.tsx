@@ -154,7 +154,7 @@ function CashflowBlock({ cashflows }: { cashflows: PersoonlijkPlanCashflow[] }) 
         <p
           className="font-source-serif italic text-[13px] text-[var(--ink-3)]"
         >
-          Geen AOW- of pensioen-cashflows geregistreerd. Voeg ze toe in De Horizon onder levensgebeurtenissen.
+          Geen AOW- of pensioen-cashflows geregistreerd. Voeg ze toe in Toekomst onder levensgebeurtenissen.
         </p>
       ) : (
         <div className="space-y-2">

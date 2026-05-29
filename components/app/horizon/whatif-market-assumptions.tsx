@@ -108,7 +108,7 @@ export function WhatIfMarketAssumptions({ value, onChange, assetGroups = [] }: P
         <div className="border-t border-[var(--border-ed)] px-4 pb-4 pt-3">
           {assetGroups.length === 0 ? (
             <p className="py-3 font-sans text-[11px] text-[var(--ink-4)]">
-              Geen assets geregistreerd — voeg eerst bezittingen toe in De Kern.
+              Geen assets geregistreerd — voeg eerst bezittingen toe in Overzicht.
             </p>
           ) : (
             <>

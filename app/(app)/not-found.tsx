@@ -16,13 +16,13 @@ export default function AppNotFound() {
             href="/overzicht"
             className="inline-flex items-center justify-center rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
           >
-            Naar De Wil
+            Naar Overzicht
           </Link>
           <Link
             href="/overzicht"
             className="inline-flex items-center justify-center rounded-lg border border-kern-300 bg-white px-6 py-2.5 text-sm font-medium text-kern-700 hover:bg-kern-50 transition-colors"
           >
-            Naar De Kern
+            Naar Overzicht
           </Link>
         </div>
       </div>

@@ -16,7 +16,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'Hoe importeer ik mijn transacties?',
     answer:
-      'Ga naar De Kern \u2192 Kas en klik op \u201cImporteren\u201d. Je kunt MT940-, CSV- en OFX-bestanden uploaden die je bij je bank kunt downloaden. Na het uploaden worden transacties automatisch gecategoriseerd.',
+      'Ga naar Overzicht \u2192 Kas en klik op \u201cImporteren\u201d. Je kunt MT940-, CSV- en OFX-bestanden uploaden die je bij je bank kunt downloaden. Na het uploaden worden transacties automatisch gecategoriseerd.',
     link: { label: 'Ga naar import', href: '/core/cash/import' },
   },
   {
@@ -62,7 +62,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'Wat als ik niet voor FIRE ga?',
     answer:
-      'Niet iedereen streeft naar vroeg stoppen met werken \u2014 en dat hoeft ook niet. Schakel de pensioen-modus in via de strategie-instellingen op De Horizon. In deze modus berekent TriFinity je verwachte vermogen op je AOW-leeftijd en hoeveel je daaruit maandelijks kunt onttrekken. Je kunt altijd wisselen tussen FIRE en Pensioen \u2014 je data blijft bewaard.',
+      'Niet iedereen streeft naar vroeg stoppen met werken \u2014 en dat hoeft ook niet. Schakel de pensioen-modus in via de strategie-instellingen op Toekomst. In deze modus berekent TriFinity je verwachte vermogen op je AOW-leeftijd en hoeveel je daaruit maandelijks kunt onttrekken. Je kunt altijd wisselen tussen FIRE en Pensioen \u2014 je data blijft bewaard.',
     link: { label: 'Strategie-instellingen', href: '/horizon?strategie=open' },
   },
   {

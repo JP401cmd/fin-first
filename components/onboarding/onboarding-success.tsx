@@ -26,16 +26,16 @@ export function OnboardingSuccess({
   const ctaLabel = isNewsOnly
     ? 'Naar de Trifinity Post'
     : firstWinPath === '/horizon'
-      ? 'Bekijk De Horizon'
+      ? 'Bekijk Toekomst'
       : firstWinPath === '/core/budgets'
         ? 'Bekijk je budgetten'
         : firstWinPath === '/core/debts'
           ? 'Bekijk je schulden'
           : firstWinPath === '/core'
-            ? 'Bekijk De Kern'
+            ? 'Bekijk Overzicht'
             : navModules.includes('wil')
-              ? 'Bekijk De Wil'
-              : 'Bekijk De Kern'
+              ? 'Bekijk Tips & acties'
+              : 'Bekijk Toekomst'
 
   return (
     <div className="flex flex-col items-center py-8 text-center sm:py-12">
@@ -193,7 +193,7 @@ interface ModuleCardDef {
 
 const MODULE_CARDS: ModuleCardDef[] = [
   {
-    name: 'De Kern',
+    name: 'Overzicht',
     description: 'Ken je werkelijkheid: nettovermogen, bezittingen, schulden en budget.',
     icon: Shield,
     borderClass: 'border-kern-400',
@@ -203,8 +203,8 @@ const MODULE_CARDS: ModuleCardDef[] = [
     navModule: 'kern',
   },
   {
-    name: 'De Wil',
-    description: 'Neem de regie: gepersonaliseerde inzichten en acties op basis van jouw data en de wereld om je heen.',
+    name: 'Tips & acties',
+    description: 'Neem de regie: gepersonaliseerde tips en acties op basis van jouw data en de wereld om je heen.',
     icon: Zap,
     borderClass: 'border-wil-400',
     iconBgClass: 'bg-wil-100',
@@ -213,7 +213,7 @@ const MODULE_CARDS: ModuleCardDef[] = [
     navModule: 'wil',
   },
   {
-    name: 'De Horizon',
+    name: 'Toekomst',
     description: "Zie je vrijheid groeien: prognoses, scenario's en het effect van elke keuze.",
     icon: Telescope,
     borderClass: 'border-horizon-400',

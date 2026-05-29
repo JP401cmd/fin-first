@@ -18,7 +18,7 @@ interface FreedomDaysMonthlyTrendProps {
 
 /**
  * Bar chart showing 12-month freedom days trend with summary stats.
- * Used on De Wil overview page.
+ * Used on Overzicht overview page.
  */
 export function FreedomDaysMonthlyTrend({ completedActions }: FreedomDaysMonthlyTrendProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 400 + 35 * 12 })

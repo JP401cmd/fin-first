@@ -271,7 +271,7 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
               ════════════════════════════════════════════════════ */}
           {step === 'kern' && (
             <article>
-              <Masthead section="De Kern — Financieel Overzicht" pageNum={2} />
+              <Masthead section="Overzicht — Financieel Overzicht" pageNum={2} />
 
               <Headline>Je fundament staat</Headline>
               <Byline>
@@ -296,7 +296,7 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
               <Rule />
 
               <PullQuote>
-                De Kern is je anker — hier keer je altijd terug om de feiten te zien.
+                Overzicht is je anker — hier keer je altijd terug om de feiten te zien.
               </PullQuote>
             </article>
           )}
@@ -306,11 +306,11 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
               ════════════════════════════════════════════════════ */}
           {step === 'wil' && (
             <article>
-              <Masthead section="De Wil — Actie & Inzicht" pageNum={3} />
+              <Masthead section="Tips & acties — Actie & Inzicht" pageNum={3} />
 
               <Headline>Van data naar daadkracht</Headline>
               <Byline>
-                De Wil vertaalt je financiele werkelijkheid naar concrete stappen.
+                Tips & acties vertalen je financiele werkelijkheid naar concrete stappen.
               </Byline>
 
               <Rule />
@@ -329,11 +329,11 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
               ════════════════════════════════════════════════════ */}
           {step === 'horizon' && (
             <article>
-              <Masthead section="De Horizon — Toekomst & Vrijheid" pageNum={4} />
+              <Masthead section="Toekomst — Toekomst & Vrijheid" pageNum={4} />
 
               <Headline>Wanneer ben je vrij?</Headline>
               <Byline>
-                De Horizon berekent je pad naar financiele onafhankelijkheid.
+                Toekomst berekent je pad naar financiele onafhankelijkheid.
               </Byline>
 
               <Rule />
@@ -351,7 +351,7 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
               <div className="rounded-[var(--r)] border-2 border-[var(--ink)] p-4 text-center">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">Klaar om te beginnen?</p>
                 <p className="mt-1 font-serif text-sm italic text-[var(--ink-2)]">
-                  Activeer je routekaart en ontgrendel De Wil en De Horizon.
+                  Activeer je routekaart en ontgrendel Overzicht en Toekomst.
                 </p>
               </div>
             </article>

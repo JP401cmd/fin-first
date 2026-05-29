@@ -1099,9 +1099,9 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
 
 const MODULE_ORDER: WidgetModule[] = ['kern', 'wil', 'horizon', 'cross']
 const MODULE_LABELS: Record<WidgetModule, string> = {
-  kern: 'De Kern',
-  wil: 'De Wil',
-  horizon: 'De Horizon',
+  kern: 'Overzicht',
+  wil: 'Tips & acties',
+  horizon: 'Toekomst',
   cross: 'Cross-Module',
 }
 const MODULE_DOT_COLORS: Record<WidgetModule, string> = {

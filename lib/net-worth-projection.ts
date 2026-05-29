@@ -1,5 +1,5 @@
 /**
- * Net worth growth projection utility for De Kern.
+ * Net worth growth projection utility for Overzicht.
  *
  * Short-term (1-5 year) projection based on:
  * - Current net worth

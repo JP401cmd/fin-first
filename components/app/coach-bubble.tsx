@@ -312,7 +312,7 @@ export type CoachBubbleProps = {
 
 /**
  * CoachBubble — Verschijnt als een vriendelijke, niet-blokkerende
- * coaching-tip. De WillDots-mascotte begeleidt de gebruiker naar hun
+ * coaching-tip. OverzichtlDots-mascotte begeleidt de gebruiker naar hun
  * eerste meaningvolle actie.
  *
  * Kenmerken (feature #791 — gezien-tracking):

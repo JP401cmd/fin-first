@@ -86,8 +86,8 @@ export async function GET() {
     },
     {
       id: 'kern',
-      label: 'Kern',
-      description: 'Domeinprompt voor De Kern: feitelijk, spiegelend, focus op huidige financiële situatie.',
+      label: 'Overzicht',
+      description: 'Domeinprompt voor Overzicht: feitelijk, spiegelend, focus op huidige financiële situatie.',
       content: KERN_PROMPT,
       source: 'lib/ai/dna/kern.ts',
       domain: 'kern',
@@ -96,8 +96,8 @@ export async function GET() {
     },
     {
       id: 'horizon',
-      label: 'Horizon',
-      description: 'Domeinprompt voor De Horizon: toekomstgericht, scenario\'s en projecties.',
+      label: 'Toekomst',
+      description: 'Domeinprompt voor Toekomst: toekomstgericht, scenario\'s en projecties.',
       content: HORIZON_PROMPT,
       source: 'lib/ai/dna/horizon.ts',
       domain: 'horizon',

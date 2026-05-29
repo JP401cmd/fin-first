@@ -24,7 +24,7 @@ type AnimationItem = {
 }
 
 /**
- * Provider that wraps the De Wil page and provides animation capabilities.
+ * Provider that wraps the Overzicht page and provides animation capabilities.
  * When triggerAnimation is called, a floating "+X.X dagen" text appears
  * and floats upward while fading out.
  */

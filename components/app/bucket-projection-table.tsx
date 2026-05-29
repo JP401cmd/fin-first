@@ -112,7 +112,7 @@ export function BucketProjectionTable({
                     highlight={cf.monthlySurplus < 0}
                   />
                   {kernSpaarquote != null && (
-                    <AssumptionRow label="Spaarquote" value={`${kernSpaarquote.toFixed(1)}%`} source="Kern (6 mnd)" />
+                    <AssumptionRow label="Spaarquote" value={`${kernSpaarquote.toFixed(1)}%`} source="Overzicht (6 mnd)" />
                   )}
                 </div>
               </div>

@@ -231,7 +231,7 @@ export function DiscoverCarousel({ module }: DiscoverCarouselProps) {
               <div className="mb-2 flex items-center gap-2">
                 <div className={`h-2 w-2 rounded-full ${isVisited ? 'bg-zinc-300' : colors.dot}`} />
                 <span className={`text-[10px] font-semibold uppercase tracking-wider ${isVisited ? 'text-[var(--ink-3)]' : colors.text}`}>
-                  {item.module === 'kern' ? 'De Kern' : item.module === 'wil' ? 'De Wil' : 'De Horizon'}
+                  {item.module === 'kern' ? 'Overzicht' : item.module === 'wil' ? 'Tips & acties' : 'Toekomst'}
                 </span>
               </div>
               <p className={`text-sm font-semibold ${isVisited ? 'text-[var(--ink-3)]' : 'text-[var(--ink)]'}`}>

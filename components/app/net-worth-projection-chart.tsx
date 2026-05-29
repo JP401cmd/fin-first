@@ -7,7 +7,7 @@ import { TrendingUp, TrendingDown, Target, Info } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
 /**
- * Net worth growth projection chart for De Kern.
+ * Net worth growth projection chart for Overzicht.
  * Shows 1-5 year projection with FIRE target comparison line.
  *
  * Short-term tactical view (differs from Horizon's 30-year strategic projection).

@@ -82,7 +82,7 @@ export function Header() {
                   className="block px-4 py-2 font-sans text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
                   onClick={() => setMenuOpen(false)}
                 >
-                  De Wil
+                  Overzicht
                 </Link>
                 <Link
                   href="/logout"

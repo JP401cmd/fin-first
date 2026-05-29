@@ -57,7 +57,7 @@ export default function ResetPasswordPage() {
             href="/overzicht"
             className="mt-6 inline-block text-sm font-medium text-zinc-900 hover:underline"
           >
-            Naar De Wil
+            Naar Overzicht
           </Link>
         </div>
       </div>

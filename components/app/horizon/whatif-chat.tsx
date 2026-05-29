@@ -164,7 +164,7 @@ function ActionSuggestionCard({
             </span>
           ) : (
             <span className="flex items-center gap-0.5 rounded-full bg-horizon-100 px-1.5 py-0.5 text-xs font-medium text-horizon-700">
-              <Plus className="h-3 w-3" /> Voeg toe aan De Wil
+              <Plus className="h-3 w-3" /> Voeg toe aan Overzicht
             </span>
           )}
         </div>
@@ -294,7 +294,7 @@ export function WhatIfChat({ onAddEvent, scenarioContext }: WhatIfChatProps) {
     setAddedEvents(prev => new Set(prev).add(toolCallId))
   }, [addedEvents, onAddEvent])
 
-  // Handle adding an action to De Wil from AI suggestion
+  // Handle adding an action to Overzicht from AI suggestion
   const handleAddAction = useCallback(async (toolCallId: string, data: SuggestActionResult) => {
     if (addedActions.has(toolCallId) || loadingActions.has(toolCallId)) return
 

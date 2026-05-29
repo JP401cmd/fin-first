@@ -20,13 +20,13 @@ export function Footer() {
         {/* Module-indicators — verborgen op mobiel */}
         <div className="hidden items-center gap-5 md:flex">
           <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-kern-600">
-            De Kern
+            Overzicht
           </span>
           <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-wil-600">
-            De Wil
+            Tips & acties
           </span>
           <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">
-            De Horizon
+            Toekomst
           </span>
         </div>
 

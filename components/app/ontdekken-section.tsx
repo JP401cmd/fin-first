@@ -17,9 +17,9 @@ const DISCOVER_MODULE_COLORS: Record<string, { bg: string; border: string; text:
 }
 
 const MODULE_LABELS: Record<string, string> = {
-  kern: 'De Kern',
-  wil: 'De Wil',
-  horizon: 'De Horizon',
+  kern: 'Overzicht',
+  wil: 'Tips & acties',
+  horizon: 'Toekomst',
 }
 
 /* ── Helpers ─────────────────────── */

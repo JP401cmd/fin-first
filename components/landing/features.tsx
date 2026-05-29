@@ -239,14 +239,14 @@ export function Features() {
             <div className="mb-8 grid items-start gap-10 md:grid-cols-2 md:gap-16">
               <div>
                 <p className="mb-2 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-kern-600">
-                  De Kern — Ken je werkelijkheid
+                  Overzicht — Ken je werkelijkheid
                 </p>
                 <h3 className="mb-4 font-display text-[1.7rem] font-bold tracking-[-0.02em] text-[var(--ink)] md:text-[2rem]">
                   Je nettovermogen, bezittingen en{' '}
                   <span className="text-kern-600">uitgaven</span> — <em>helder en eerlijk</em>
                 </h3>
                 <p className="font-serif text-base leading-relaxed text-[var(--ink-2)]">
-                  Wat bezit je, wat ben je schuldig, wat geef je uit? De Kern brengt
+                  Wat bezit je, wat ben je schuldig, wat geef je uit? Overzicht brengt
                   alles samen: je nettovermogen in euro&apos;s, je vrijheidstijd in
                   maanden en jaren, je budget als je dat wilt. Begin simpel of ga zo
                   diep als je wilt.
@@ -371,16 +371,16 @@ export function Features() {
               </div>
               <div className="order-1 md:order-2">
                 <p className="mb-2 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-wil-600">
-                  De Wil — Neem de regie
+                  Tips & acties — Neem de regie
                 </p>
                 <h3 className="mb-4 font-display text-[1.7rem] font-bold tracking-[-0.02em] text-[var(--ink)] md:text-[2rem]">
-                  Gepersonaliseerde{' '}
-                  <span className="text-wil-600"><em>inzichten en acties</em></span>{' '}
+                  Persoonlijke{' '}
+                  <span className="text-wil-600"><em>tips en acties</em></span>{' '}
                   voor jouw situatie
                 </h3>
                 <p className="font-serif text-base leading-relaxed text-[var(--ink-2)]">
-                  De Wil combineert jouw financiële data met AI om je te laten zien
-                  wat je nu kunt doen. Persoonlijke inzichten over je uitgaven, maar
+                  Will combineert jouw financiële data met AI en laat je zien
+                  wat je nu kunt doen. Persoonlijke tips over je uitgaven, maar
                   ook signalen van buiten: belastingwijzigingen, rentestand en
                   marktontwikkelingen — vertaald naar impact op jou.
                 </p>
@@ -489,7 +489,7 @@ export function Features() {
             <div className="mb-8 grid items-start gap-10 md:grid-cols-2 md:gap-16">
               <div>
                 <p className="mb-2 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-horizon-600">
-                  De Horizon — Zie je vrijheid groeien
+                  Toekomst — Zie je vrijheid groeien
                 </p>
                 <h3 className="mb-4 font-display text-[1.7rem] font-bold tracking-[-0.02em] text-[var(--ink)] md:text-[2rem]">
                   Je <span className="text-horizon-600"><em>toekomst</em></span>{' '}
@@ -497,7 +497,7 @@ export function Features() {
                 </h3>
                 <p className="font-serif text-base leading-relaxed text-[var(--ink-2)]">
                   Of je doel nu &apos;grip krijgen&apos; of &apos;met 50 stoppen&apos;
-                  is — De Horizon laat je zien waar je naartoe gaat. What-if
+                  is — Toekomst laat je zien waar je naartoe gaat. What-if
                   scenario&apos;s, levensgebeurtenissen, en je vrijheidsgetal dat maand
                   na maand groeit.
                 </p>
@@ -627,7 +627,7 @@ export function Features() {
           <div className="grid gap-4 sm:grid-cols-3">
             {[
               {
-                label: 'De Kern',
+                label: 'Overzicht',
                 colorClass: 'text-kern-600',
                 borderClass: 'border-kern-200',
                 bgClass: 'bg-kern-50/70',
@@ -636,7 +636,7 @@ export function Features() {
                   '"Je boodschappenbudget staat op €412 van €480. Maar je abonnementen zijn al €7 boven budget gegaan — wil je zien welke dat zijn?"',
               },
               {
-                label: 'De Wil',
+                label: 'Tips & acties',
                 colorClass: 'text-wil-600',
                 borderClass: 'border-wil-200',
                 bgClass: 'bg-wil-50/70',
@@ -645,7 +645,7 @@ export function Features() {
                   '"Schrap twee streaming-abonnementen en beleg het verschil — dat levert je 12 vrijheidsdagen per jaar op."',
               },
               {
-                label: 'De Horizon',
+                label: 'Toekomst',
                 colorClass: 'text-horizon-600',
                 borderClass: 'border-horizon-200',
                 bgClass: 'bg-horizon-50/70',

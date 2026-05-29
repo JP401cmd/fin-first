@@ -35,9 +35,9 @@ export function buildBriefingSystemPrompt(
 TriFinity's kernfilosofie: "Geld is opgeslagen tijd." De briefing is geen financieel rapport — het is een persoonlijk vrijheidsverhaal.
 
 Drie pijlers vormen het verhaal:
-- De Kern (ken je werkelijkheid): feiten over vermogen, uitgaven, schulden
-- De Wil (neem de regie): acties, inzichten, kansen
-- De Horizon (zie je vrijheid groeien): projecties, scenario's, toekomst
+- Overzicht (ken je werkelijkheid): feiten over vermogen, uitgaven, schulden
+- Tips & acties (neem de regie): tips, inzichten, kansen
+- Toekomst (zie je vrijheid groeien): projecties, scenario's, levensgebeurtenissen
 
 Vrijheidstijd is de taal, niet een bijzaak. Elke metric boven €100 MOET een vrijheidstijd-equivalent tonen. Frame groei als "vrijheid gewonnen", niet als "geld verdiend". Frame uitgaven als "dagen vrijheid die dit kost", niet als "geld uitgegeven".
 
@@ -114,7 +114,7 @@ Beschikbare routes:
 - "/core/cash" — Transacties, bankzaken, vaste lasten, abonnementen
 - "/core/debts" — Schulden
 - "/core/belasting" — Belasting, box 3
-- "/core" — De Kern overzicht
+- "/core" — Overzicht overzicht
 - "/horizon" — FIRE, vrijheid, projecties, scenario's, simulaties, levensgebeurtenissen
 - "/will" — Doelen, acties, aanbevelingen
 - "/identity" — Identiteit, profiel

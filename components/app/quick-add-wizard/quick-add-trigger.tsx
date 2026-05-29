@@ -39,7 +39,7 @@ export function QuickAddTrigger({
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="label-editorial text-[var(--color-kern-700)]">
-            De Kern
+            Overzicht
           </span>
           <span className="text-sm font-medium text-[var(--ink)] leading-tight">
             Bezitting toevoegen
@@ -60,7 +60,7 @@ export function QuickAddTrigger({
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="label-editorial text-[var(--color-debt-700)]">
-            De Kern
+            Overzicht
           </span>
           <span className="text-sm font-medium text-[var(--ink)] leading-tight">
             Schuld toevoegen

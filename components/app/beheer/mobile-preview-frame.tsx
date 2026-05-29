@@ -4,9 +4,9 @@ import { type ReactNode, useState, useEffect, useRef, useCallback } from 'react'
 import { useMobilePreview, DEVICE_PRESETS } from './mobile-preview-provider'
 
 const NAV_ROUTES = [
-  { label: 'Kern', path: '/core' },
-  { label: 'Wil', path: '/will' },
-  { label: 'Horizon', path: '/horizon' },
+  { label: 'Overzicht', path: '/overzicht' },
+  { label: 'Tips & acties', path: '/overzicht/tips' },
+  { label: 'Toekomst', path: '/toekomst' },
 ]
 
 export function MobilePreviewFrame({ children }: { children: ReactNode }) {

@@ -21,7 +21,7 @@ type StaticPage = Omit<CommandItem, 'kind' | 'id'> & {
 // ── Kern ─────────────────────────────────────────────────────────────────────
 
 const KERN_PAGES: StaticPage[] = [
-  { label: 'De Kern',                   sublabel: 'Bezittingen en schulden',           href: '/core',                                  icon: Home,        module: 'kern' },
+  { label: 'Overzicht',                   sublabel: 'Bezittingen en schulden',           href: '/core',                                  icon: Home,        module: 'kern' },
   { label: 'Bezittingen',               sublabel: 'Alle activa per categorie',          href: '/core/assets',                           icon: Wallet,      module: 'kern' },
   { label: 'Schulden',                  sublabel: 'Hypotheken en leningen',             href: '/core/debts',                            icon: CreditCard,  module: 'kern' },
 
@@ -54,13 +54,13 @@ const KERN_PAGES: StaticPage[] = [
 // ── Wil ──────────────────────────────────────────────────────────────────────
 
 const WIL_PAGES: StaticPage[] = [
-  { label: 'De Wil',                    sublabel: 'Doelen, voorstellen en acties',      href: '/will',                                  icon: Goal,        module: 'wil' },
+  { label: 'Overzicht',                    sublabel: 'Doelen, voorstellen en acties',      href: '/will',                                  icon: Goal,        module: 'wil' },
 ]
 
 // ── Horizon ──────────────────────────────────────────────────────────────────
 
 const HORIZON_PAGES: StaticPage[] = [
-  { label: 'De Horizon',                sublabel: 'FIRE-projectie en scenario\'s',      href: '/horizon',                               icon: Telescope,   module: 'horizon', requiredModule: 'toekomstplannen' },
+  { label: 'Toekomst',                sublabel: 'FIRE-projectie en scenario\'s',      href: '/horizon',                               icon: Telescope,   module: 'horizon', requiredModule: 'toekomstplannen' },
   { label: 'Wat-als',                   sublabel: 'Scenario builder met sliders',       href: '/horizon/whatif',                        icon: Compass,     module: 'horizon', requiredModule: 'toekomstplannen' },
 ]
 

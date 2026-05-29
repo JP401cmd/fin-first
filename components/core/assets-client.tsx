@@ -1105,7 +1105,7 @@ export function AssetDetailModal({
                   </div>
                 </>
               ) : (
-                <p className="text-xs text-[var(--ink-3)]">Geen hypotheek gekoppeld. Koppel een hypotheek via De Kern &gt; Schulden.</p>
+                <p className="text-xs text-[var(--ink-3)]">Geen hypotheek gekoppeld. Koppel een hypotheek via Overzicht &gt; Schulden.</p>
               )}
             </div>
           )}
@@ -1163,7 +1163,7 @@ export function AssetDetailModal({
                 </div>
               ) : (
                 <p className="text-xs text-[var(--ink-3)]">
-                  Geen DGA-lening gekoppeld. Koppel een schuld uit De Kern &gt; Schulden.
+                  Geen DGA-lening gekoppeld. Koppel een schuld uit Overzicht &gt; Schulden.
                 </p>
               )}
 

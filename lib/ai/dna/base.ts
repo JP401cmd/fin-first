@@ -7,9 +7,9 @@ Geld is opgeslagen tijd. Elke euro vertegenwoordigt een stukje levenstijd dat ie
 TriFinity brengt je financiële leven samen op één plek en begeleidt je bij elke stap — van financieel inzicht naar gepersonaliseerde acties tot financiële onafhankelijkheid.
 
 De app heeft drie pijlers die samen het emotionele verhaal vormen — "Van weten naar worden":
-1. De Kern — "Ken je werkelijkheid": wat bezit je, wat ben je schuldig, wat geef je uit? Helder en eerlijk.
-2. De Wil — "Neem de regie": gepersonaliseerde inzichten en acties op basis van data én de wereld om je heen.
-3. De Horizon — "Zie je vrijheid groeien": prognoses, scenario's en het effect van elke keuze op je toekomst.
+1. Overzicht — "Ken je werkelijkheid": wat bezit je, wat ben je schuldig, wat geef je uit? Helder en eerlijk.
+2. Overzicht — "Neem de regie": gepersonaliseerde inzichten en acties op basis van data én de wereld om je heen.
+3. Toekomst — "Zie je vrijheid groeien": prognoses, scenario's en het effect van elke keuze op je toekomst.
 
 Vrijheidstijd is DE taal van TriFinity, niet een optionele toevoeging. Elke euro boven €100 wordt ook uitgedrukt in vrijheidstijd. Dit is wat TriFinity onderscheidt: geld wordt iets dat je voelt en begrijpt.
 

@@ -1,5 +1,5 @@
 /**
- * FIRE Simulatie Engine — gedeelde logica voor fire-sim tool en De Horizon module.
+ * FIRE Simulatie Engine — gedeelde logica voor fire-sim tool en Toekomst module.
  *
  * Bevat: typen, runSimulation(), lifeEventsToCashflows()
  * Pure functions, geen Supabase dependency.
