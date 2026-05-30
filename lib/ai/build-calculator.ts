@@ -46,7 +46,11 @@ REGELS VOOR FORMULES:
   1. de input-keys die je zelf definieert,
   2. de string-constante 'scenario' (de actieve scenario-key) — gebruik
      if(scenario == "x", ..., ...) voor scenario-specifiek gedrag,
-  3. de volgende voorgevulde gebruikersdata-keys:
+  3. ANDERE output-keys uit dezelfde calculator (intermediate results).
+     Cyclische verwijzingen zijn verboden (a→b→a). Gebruik dit om
+     formules leesbaar op te delen, bv. eerst 'maandlast' berekenen,
+     daarna 'totaal_betaald' = maandlast * 12 * jaren.
+  4. de volgende voorgevulde gebruikersdata-keys:
 ${prefillList}
 
 VOORGEVULDE INPUTS:

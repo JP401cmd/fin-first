@@ -187,4 +187,80 @@ describe('validateFormulas', () => {
     })
     expect(validateFormulas(d, PREFILL_KEY_SET)).toEqual([])
   })
+
+  it('output mag verwijzen naar eerder gedefinieerde output', () => {
+    const d = def({
+      outputs: [
+        { key: 'maandlast', label: 'Maandlast', formula: 'inleg / 12', format: 'euro' },
+        { key: 'totaal', label: 'Totaal', formula: 'maandlast * 36', format: 'euro' },
+      ],
+    })
+    expect(validateFormulas(d, PREFILL_KEY_SET)).toEqual([])
+  })
+
+  it('output mag ook naar LATERE output verwijzen — wordt topo-gesorteerd', () => {
+    const d = def({
+      outputs: [
+        { key: 'totaal', label: 'Totaal', formula: 'maandlast * 36', format: 'euro' },
+        { key: 'maandlast', label: 'Maandlast', formula: 'inleg / 12', format: 'euro' },
+      ],
+    })
+    expect(validateFormulas(d, PREFILL_KEY_SET)).toEqual([])
+  })
+
+  it('detecteert directe cyclus (zelf-referentie)', () => {
+    const d = def({
+      outputs: [
+        { key: 'a', label: 'A', formula: 'a + 1', format: 'number' },
+      ],
+    })
+    const errs = validateFormulas(d, PREFILL_KEY_SET)
+    expect(errs.some((e) => e.startsWith('cyclus'))).toBe(true)
+  })
+
+  it('detecteert indirecte cyclus a→b→a', () => {
+    const d = def({
+      outputs: [
+        { key: 'a', label: 'A', formula: 'b + 1', format: 'number' },
+        { key: 'b', label: 'B', formula: 'a + 1', format: 'number' },
+      ],
+    })
+    const errs = validateFormulas(d, PREFILL_KEY_SET)
+    expect(errs.some((e) => e.startsWith('cyclus'))).toBe(true)
+  })
+})
+
+describe('evaluateCalculator — output→output referenties', () => {
+  it('berekent dependent outputs in juiste volgorde', () => {
+    const d = def({
+      inputs: [{ key: 'bedrag', label: 'B', kind: 'euro', default: 1200 }],
+      outputs: [
+        // bewust in "verkeerde" volgorde — topo-sort moet maandlast eerst doen
+        { key: 'jaarlast', label: 'Jaar', formula: 'maandlast * 12', format: 'euro' },
+        { key: 'maandlast', label: 'Maand', formula: 'bedrag / 12', format: 'euro' },
+      ],
+    })
+    const r = evaluateCalculator(d, { bedrag: 1200 }, {})
+    expect(r.values.a.maandlast).toBe(100)
+    expect(r.values.a.jaarlast).toBe(1200)
+    // cells worden in definition-volgorde geleverd voor UI-stabiliteit
+    expect(r.cells.map((c) => c.outputKey)).toEqual(['jaarlast', 'maandlast'])
+  })
+
+  it('mengt output-refs met scenario-conditionals', () => {
+    const d = def({
+      inputs: [{ key: 'p', label: 'P', kind: 'euro', default: 1000 }],
+      scenarios: [
+        { key: 'lo', label: 'Laag' },
+        { key: 'hi', label: 'Hoog' },
+      ],
+      outputs: [
+        { key: 'tarief', label: 'Tarief', formula: 'if(scenario == "lo", 0.1, 0.2)', format: 'percent' },
+        { key: 'bedrag', label: 'Bedrag', formula: 'p * tarief', format: 'euro' },
+      ],
+    })
+    const r = evaluateCalculator(d, { p: 1000 }, {})
+    expect(r.values.lo.bedrag).toBe(100)
+    expect(r.values.hi.bedrag).toBe(200)
+  })
 })
