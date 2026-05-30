@@ -8,7 +8,7 @@
 // foutobject teruggegeven i.p.v. te throwen, zodat de UI een nette
 // melding kan tonen.
 
-import { generateObject, NoObjectGeneratedError } from 'ai'
+import { generateObject, NoObjectGeneratedError, APICallError } from 'ai'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { AIConfigError, getModel } from '@/lib/ai/config'
@@ -151,16 +151,26 @@ export async function buildCalculator(
       }
     }
 
-    // Fallback: toon error-class naam + bericht in dev voor diagnostiek,
-    // generic in productie.
-    const isDev = process.env.NODE_ENV !== 'production'
+    // HTTP-fout bij het LLM-provider-endpoint (rate-limit, invalid key,
+    // overload, etc.). De API-message bevat meestal genoeg context om te
+    // begrijpen wat te doen — geef die door.
+    if (APICallError.isInstance(err)) {
+      const status = err.statusCode ?? '?'
+      const reason = err.responseBody?.slice(0, 200) || err.message || 'onbekend'
+      return {
+        ok: false,
+        error: `AI-provider gaf een fout (HTTP ${status}): ${reason}`,
+      }
+    }
+
+    // Fallback: altijd de error-class naam + bericht meegeven. Voor een
+    // educatieve rekenhulp-flow is dat geen security-risico en zonder die
+    // info kan de gebruiker niets melden.
     const detail =
-      isDev && err instanceof Error
-        ? ` (${err.name}: ${err.message})`
-        : ''
+      err instanceof Error ? ` (${err.name}: ${err.message})` : ` (${String(err)})`
     return {
       ok: false,
-      error: `Kon geen rekenhulp genereren. Probeer het opnieuw of herformuleer je vraag.${detail}`,
+      error: `Kon geen rekenhulp genereren.${detail}`,
     }
   }
 }
