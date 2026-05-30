@@ -9,6 +9,12 @@ import {
   inferRequirements,
 } from '@/lib/calculator/requirements'
 import type { CustomCalculatorRow } from '@/lib/calculator/types'
+import {
+  prefabTierForName,
+  PREFAB_TIER_ORDER,
+  PREFAB_TIER_LABELS,
+  type PrefabTier,
+} from '@/lib/calculator/prefab-definitions'
 import { LibraryCard } from '@/components/future/library-card'
 import { LibraryFilter } from '@/components/future/library-filter'
 import { DisclaimerStrip } from '@/components/future/disclaimer-strip'
@@ -145,6 +151,23 @@ export default async function BibliotheekPage({
     ? enriched.filter((e) => e.userMeetsAll)
     : enriched
 
+  // Groepeer in tier-secties. Curated prefabs (herkend op naam) vallen in
+  // Starters/Verdieping/Specialist; user-gepubliceerde calcs in "community".
+  type EnrichedItem = (typeof enriched)[number]
+  const groups: { key: PrefabTier | 'community'; label: string; items: EnrichedItem[] }[] = [
+    ...PREFAB_TIER_ORDER.map((tier) => ({
+      key: tier,
+      label: PREFAB_TIER_LABELS[tier],
+      items: visible.filter((e) => prefabTierForName(e.calc.name) === tier),
+    })),
+    {
+      key: 'community' as const,
+      label: 'Van de community',
+      items: visible.filter((e) => prefabTierForName(e.calc.name) === null),
+    },
+  ]
+  const nonEmptyGroups = groups.filter((g) => g.items.length > 0)
+
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-12 pt-4">
       {/* Breadcrumb terug — geen tab-balk; bibliotheek is een aparte route. */}
@@ -168,27 +191,39 @@ export default async function BibliotheekPage({
           <p className="text-sm text-[var(--ink-2)] mt-2 leading-relaxed max-w-2xl">
             Bekijk rekenhulpen die andere TriFinity-gebruikers met Will hebben
             gemaakt en gedeeld. Dupliceer wat je raakt — je eigen cijfers
-            worden meteen ingevuld zodat je 'm op jouw situatie kunt
+            worden meteen ingevuld zodat je &apos;m op jouw situatie kunt
             beoordelen.
           </p>
         </div>
         <LibraryFilter defaultEnabled={showOnlyUsable} />
       </header>
 
-      {/* Lijst of empty state */}
+      {/* Lijst (per tier-sectie) of empty state */}
       {visible.length === 0 ? (
         <EmptyState showOnlyUsable={showOnlyUsable && enriched.length > 0} />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visible.map(({ calc, checks, userMeetsAll, isLiked, authorDisplayName }) => (
-            <LibraryCard
-              key={calc.id}
-              calculator={calc}
-              authorDisplayName={authorDisplayName}
-              isLiked={isLiked}
-              requirements={checks}
-              userMeetsAll={userMeetsAll}
-            />
+        <div className="space-y-8">
+          {nonEmptyGroups.map((group) => (
+            <section key={group.key}>
+              <h2 className="mb-3 text-[11px] uppercase tracking-[0.14em] font-semibold text-[var(--ink-3)] border-b border-[var(--border-ed)] pb-1.5">
+                {group.label}
+                <span className="ml-2 text-[var(--ink-3)]/60 normal-case tracking-normal">
+                  {group.items.length}
+                </span>
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {group.items.map(({ calc, checks, userMeetsAll, isLiked, authorDisplayName }) => (
+                  <LibraryCard
+                    key={calc.id}
+                    calculator={calc}
+                    authorDisplayName={authorDisplayName}
+                    isLiked={isLiked}
+                    requirements={checks}
+                    userMeetsAll={userMeetsAll}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
@@ -243,7 +278,7 @@ function EmptyState({ showOnlyUsable }: { showOnlyUsable: boolean }) {
       </h2>
       <p className="text-sm text-[var(--ink-2)] leading-relaxed mb-4 max-w-md mx-auto">
         Word de eerste die een rekenhulp deelt. Maak er een met Will, en
-        publiceer 'm zodat anderen op jouw inzicht kunnen voortbouwen.
+        publiceer &apos;m zodat anderen op jouw inzicht kunnen voortbouwen.
       </p>
       <Link
         href="/toekomst?tab=rekenhulp"
