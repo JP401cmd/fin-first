@@ -102,6 +102,10 @@ export function suggestPublicDefault(value: number, kind: InputKind): number {
       return roundYears(value)
     case 'number':
       return roundGenericNumber(value)
+    case 'boolean':
+    case 'enum':
+      // Categorische inputs zijn al "ronde" waarden — laat ongemoeid.
+      return value
   }
 }
 

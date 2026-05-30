@@ -264,3 +264,138 @@ describe('evaluateCalculator — output→output referenties', () => {
     expect(r.values.hi.bedrag).toBe(200)
   })
 })
+
+describe('evaluateCalculator — derived rows', () => {
+  it('berekent derived rij op eerste scenario', () => {
+    const d = def({
+      inputs: [
+        { key: 'kamers', label: 'K', kind: 'number', default: 2 },
+        { key: 'huur', label: 'H', kind: 'euro', default: 750 },
+      ],
+      derived: [
+        { key: 'maand_huur', label: 'Maand', formula: 'kamers * huur', format: 'euro' },
+        { key: 'jaar_huur', label: 'Jaar', formula: 'maand_huur * 12', format: 'euro' },
+      ],
+    })
+    const r = evaluateCalculator(d, { kamers: 2, huur: 750 }, {})
+    expect(r.derived).toHaveLength(2)
+    expect(r.derived[0].value).toBe(1500)
+    expect(r.derived[1].value).toBe(18000)
+  })
+
+  it('derived mag output van eerste scenario gebruiken', () => {
+    const d = def({
+      inputs: [{ key: 'p', label: 'P', kind: 'euro', default: 1000 }],
+      outputs: [
+        { key: 'belasting', label: 'B', formula: 'p * 0.36', format: 'euro' },
+      ],
+      derived: [
+        { key: 'netto', label: 'N', formula: 'p - belasting', format: 'euro' },
+      ],
+    })
+    const r = evaluateCalculator(d, { p: 1000 }, {})
+    expect(r.derived[0].value).toBe(640)
+  })
+})
+
+describe('evaluateCalculator — applicability', () => {
+  it('classificeert appliesWhen-resultaat naar yes/maybe/no', () => {
+    const d = def({
+      inputs: [{ key: 'huur', label: 'H', kind: 'euro', default: 5000 }],
+      scenarios: [
+        {
+          key: 'vrij',
+          label: 'Vrijstelling',
+          appliesWhen: 'if(huur <= 6633, 1, 0)',
+          notApplicableReason: 'huur overschrijdt vrijstellingsgrens',
+        },
+        {
+          key: 'box3',
+          label: 'Box 3',
+          appliesWhen: 'if(huur > 6633, 1, 0)',
+        },
+      ],
+    })
+    const rUnder = evaluateCalculator(d, { huur: 5000 }, {})
+    expect(rUnder.applicability.vrij.status).toBe('yes')
+    expect(rUnder.applicability.box3.status).toBe('no')
+    expect(rUnder.applicability.box3.reason).toBeUndefined()
+
+    const rOver = evaluateCalculator(d, { huur: 18000 }, {})
+    expect(rOver.applicability.vrij.status).toBe('no')
+    expect(rOver.applicability.vrij.reason).toBe('huur overschrijdt vrijstellingsgrens')
+    expect(rOver.applicability.box3.status).toBe('yes')
+  })
+
+  it('appliesWhen met fout valt failsafe terug op yes', () => {
+    const d = def({
+      scenarios: [
+        { key: 'a', label: 'A', appliesWhen: 'verzonnen_var' },
+      ],
+    })
+    const r = evaluateCalculator(d, { inleg: 1000 }, {})
+    expect(r.applicability.a.status).toBe('yes')
+  })
+})
+
+describe('evaluateCalculator — narrative', () => {
+  it('vervangt placeholders met winnaar-context', () => {
+    const d = def({
+      inputs: [{ key: 'p', label: 'P', kind: 'euro', default: 1000 }],
+      scenarios: [
+        { key: 'a', label: 'Aflossen' },
+        { key: 'b', label: 'Beleggen' },
+      ],
+      outputs: [
+        {
+          key: 'netto',
+          label: 'Netto',
+          formula: 'if(scenario == "a", 5000, 4500)',
+          format: 'euro',
+        },
+      ],
+      compare: { outputKey: 'netto', betterDirection: 'higher' },
+      narrative: '{winner_label} levert {compare_output} op.',
+    })
+    const r = evaluateCalculator(d, { p: 1000 }, {})
+    expect(r.winner).toBe('a')
+    expect(r.narrative).toBe('Aflossen levert €5.000 op.')
+  })
+
+  it('output:key en derived:key placeholders werken', () => {
+    const d = def({
+      inputs: [{ key: 'p', label: 'P', kind: 'euro', default: 1000 }],
+      derived: [{ key: 'extra', label: 'X', formula: 'p * 2', format: 'euro' }],
+      outputs: [{ key: 'totaal', label: 'T', formula: 'p + 100', format: 'euro' }],
+      narrative: 'T = {output:totaal}, X = {derived:extra}',
+    })
+    const r = evaluateCalculator(d, { p: 1000 }, {})
+    expect(r.narrative).toBe('T = €1.100, X = €2.000')
+  })
+
+  it('onbekende placeholder blijft intact zodat fout zichtbaar is', () => {
+    const d = def({
+      narrative: '{output:nonexistent}',
+    })
+    const r = evaluateCalculator(d, { inleg: 1000 }, {})
+    expect(r.narrative).toBe('{output:nonexistent}')
+  })
+})
+
+describe('validateFormulas — DNA-velden', () => {
+  it('derived-keys mogen in outputs gebruikt worden', () => {
+    const d = def({
+      inputs: [{ key: 'p', label: 'P', kind: 'euro', default: 1000 }],
+      derived: [{ key: 'context', label: 'C', formula: 'p * 2', format: 'euro' }],
+      outputs: [{ key: 'totaal', label: 'T', formula: 'context + 100', format: 'euro' }],
+    })
+    expect(validateFormulas(d, PREFILL_KEY_SET)).toEqual([])
+  })
+
+  it('appliesWhen-formule wordt gevalideerd op onbekende namen', () => {
+    const d = def({
+      scenarios: [{ key: 'a', label: 'A', appliesWhen: 'verzonnen_key > 0' }],
+    })
+    expect(validateFormulas(d, PREFILL_KEY_SET)).toContain('verzonnen_key')
+  })
+})

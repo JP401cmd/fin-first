@@ -76,6 +76,22 @@ export interface EvaluatedCell {
   error?: string
 }
 
+export type ApplicabilityStatus = 'yes' | 'maybe' | 'no'
+
+export interface ScenarioApplicability {
+  status: ApplicabilityStatus
+  /** Ruwe formule-uitkomst voor debug; 1=yes, 0.5=maybe, 0=no. */
+  raw: number | null
+  reason?: string
+}
+
+export interface EvaluatedDerived {
+  key: string
+  label: string
+  value: number | null
+  error?: string
+}
+
 export interface CalculatorResult {
   /** value[scenarioKey][outputKey] = number | null. */
   values: Record<string, Record<string, number | null>>
@@ -83,6 +99,13 @@ export interface CalculatorResult {
   /** Winnende scenario-key volgens compare, of null. */
   winner: string | null
   errors: string[]
+  /** Afgeleide context-rijen, berekend op het eerste scenario. */
+  derived: EvaluatedDerived[]
+  /** Per scenario: van-toepassing-status. Leeg als geen appliesWhen
+   *  is gedefinieerd op een scenario. */
+  applicability: Record<string, ScenarioApplicability>
+  /** Geïnterpoleerde narrative (placeholders ingevuld) of null. */
+  narrative: string | null
 }
 
 /**
@@ -176,7 +199,153 @@ export function evaluateCalculator(
     winner = best?.key ?? null
   }
 
-  return { values, cells, winner, errors }
+  // Derived rows — context-strook, berekend op het EERSTE scenario.
+  // Mogen verwijzen naar inputs, prefill, eerdere derived én outputs van
+  // het eerste scenario (zodat samenvattende posten als "totaal − belasting"
+  // werken zonder dat we per scenario context maken).
+  const derived: EvaluatedDerived[] = []
+  if (definition.derived && definition.derived.length > 0) {
+    const firstScenario = definition.scenarios[0]
+    const derivedScope: Record<string, unknown> = {
+      ...prefill,
+      ...inputValues,
+      scenario: firstScenario?.key ?? '',
+      ...WHITELIST_FNS,
+      ...(firstScenario ? values[firstScenario.key] : {}),
+    }
+    for (const row of definition.derived) {
+      let value: number | null = null
+      let error: string | undefined
+      try {
+        const expr = parser.parse(row.formula)
+        const raw = expr.evaluate(derivedScope as Record<string, number>)
+        if (typeof raw === 'number' && Number.isFinite(raw)) {
+          value = raw
+          derivedScope[row.key] = raw
+        } else {
+          error = 'Formule gaf geen geldig getal'
+        }
+      } catch (e) {
+        error = e instanceof Error ? e.message : 'Onbekende formule-fout'
+      }
+      derived.push({ key: row.key, label: row.label, value, error })
+      if (error) errors.push(`Afgeleid · ${row.label}: ${error}`)
+    }
+  }
+
+  // Applicability — per scenario evalueer optionele appliesWhen-formule.
+  // Resultaat ≥1 = yes, >0 = maybe, ≤0 = no. Scope is identiek aan de
+  // output-scope van dat scenario, plus alle outputs en derived.
+  const applicability: Record<string, ScenarioApplicability> = {}
+  for (const scenario of definition.scenarios) {
+    if (!scenario.appliesWhen) continue
+    const scope: Record<string, unknown> = {
+      ...prefill,
+      ...inputValues,
+      scenario: scenario.key,
+      ...WHITELIST_FNS,
+      ...values[scenario.key],
+      ...Object.fromEntries(derived.map((d) => [d.key, d.value])),
+    }
+    let raw: number | null = null
+    let status: ApplicabilityStatus = 'yes'
+    try {
+      const r = parser.parse(scenario.appliesWhen).evaluate(scope as Record<string, number>)
+      if (typeof r === 'number' && Number.isFinite(r)) {
+        raw = r
+        if (r >= 1) status = 'yes'
+        else if (r > 0) status = 'maybe'
+        else status = 'no'
+      }
+    } catch {
+      // Formule-fout — laat status op 'yes' staan (failsafe: niet
+      // onterecht een scenario verbergen door een fouttje in de
+      // appliesWhen-expressie).
+    }
+    applicability[scenario.key] = {
+      status,
+      raw,
+      reason: status === 'no' ? scenario.notApplicableReason : undefined,
+    }
+  }
+
+  // Narrative — placeholders invullen op winnaar-context.
+  let narrative: string | null = null
+  if (definition.narrative) {
+    narrative = interpolateNarrative(definition, values, derived, winner)
+  }
+
+  return { values, cells, winner, errors, derived, applicability, narrative }
+}
+
+/**
+ * Vervang placeholders in de narrative-string door geëvalueerde
+ * waarden. Ondersteunt:
+ *   {winner_label}        — label van het winnende scenario
+ *   {compare_output}      — geformatteerde compare-waarde van winnaar
+ *   {output:key}          — geformatteerde output van winnaar (of eerste
+ *                            scenario als er geen winnaar is)
+ *   {derived:key}         — geformatteerde derived-rij
+ * Onbekende placeholders blijven staan zodat de gebruiker ze opmerkt.
+ */
+function interpolateNarrative(
+  definition: CalculatorDefinition,
+  values: Record<string, Record<string, number | null>>,
+  derived: EvaluatedDerived[],
+  winner: string | null,
+): string {
+  const fallbackScenarioKey = winner ?? definition.scenarios[0]?.key ?? ''
+  const winnerLabel =
+    definition.scenarios.find((s) => s.key === fallbackScenarioKey)?.label ?? ''
+  const outputByKey = new Map(definition.outputs.map((o) => [o.key, o]))
+  const derivedByKey = new Map(derived.map((d) => [d.key, d]))
+
+  const fmt = (
+    value: number | null,
+    format: 'euro' | 'percent' | 'years' | 'number',
+  ): string => {
+    if (value == null) return '—'
+    if (format === 'euro') {
+      const sign = value < 0 ? '−' : ''
+      return `${sign}€${Math.round(Math.abs(value)).toLocaleString('nl-NL')}`
+    }
+    if (format === 'percent') return `${(value * 100).toFixed(1)}%`
+    if (format === 'years') {
+      const y = Math.floor(value)
+      const m = Math.round((value - y) * 12)
+      return m === 0 ? `${y} jr` : `${y} jr ${m} mnd`
+    }
+    return Math.round(value).toLocaleString('nl-NL')
+  }
+
+  return definition.narrative!.replace(
+    /\{(winner_label|compare_output|output:[a-z][a-z0-9_]*|derived:[a-z][a-z0-9_]*)\}/g,
+    (_match, token: string) => {
+      if (token === 'winner_label') return winnerLabel
+      if (token === 'compare_output') {
+        if (!definition.compare) return ''
+        const out = outputByKey.get(definition.compare.outputKey)
+        if (!out) return ''
+        const v = values[fallbackScenarioKey]?.[out.key] ?? null
+        return fmt(v, out.format)
+      }
+      if (token.startsWith('output:')) {
+        const key = token.slice('output:'.length)
+        const out = outputByKey.get(key)
+        if (!out) return `{${token}}`
+        const v = values[fallbackScenarioKey]?.[key] ?? null
+        return fmt(v, out.format)
+      }
+      if (token.startsWith('derived:')) {
+        const key = token.slice('derived:'.length)
+        const d = derivedByKey.get(key)
+        if (!d) return `{${token}}`
+        const row = definition.derived?.find((r) => r.key === key)
+        return fmt(d.value, row?.format ?? 'number')
+      }
+      return `{${token}}`
+    },
+  )
 }
 
 /**
@@ -250,6 +419,7 @@ export function validateFormulas(
   prefillKeySet: Set<string>,
 ): string[] {
   const outputKeys = new Set(definition.outputs.map((o) => o.key))
+  const derivedKeys = new Set((definition.derived ?? []).map((d) => d.key))
   const knownNames = new Set<string>([
     'scenario',
     ...Object.keys(WHITELIST_FNS),
@@ -258,6 +428,10 @@ export function validateFormulas(
     // Outputs mogen naar elkaar verwijzen (intermediate results). Cyclisch
     // is alsnog verboden — zie cycle-check hieronder.
     ...outputKeys,
+    // Derived rows zijn ook beschikbaar in andere derived/output/appliesWhen-
+    // formules. Geen cycle-check op derived: de evaluator gebruikt
+    // definition-volgorde voor derived.
+    ...derivedKeys,
   ])
 
   const unknown = new Set<string>()
@@ -284,6 +458,39 @@ export function validateFormulas(
       unknown.add(`cyclus: ${output.key} → ${output.key}`)
     }
     deps.set(output.key, outDeps)
+  }
+
+  // Derived-formules: parse + check op onbekende namen. Geen cycle-check —
+  // ze worden in definition-volgorde geëvalueerd, dus een latere derived
+  // mag wel een eerdere noemen, maar niet andersom (zou stilletjes 0/NaN
+  // produceren in plaats van te crashen).
+  for (const row of definition.derived ?? []) {
+    let vars: string[] = []
+    try {
+      vars = parser.parse(row.formula).variables({ withMembers: false })
+    } catch {
+      unknown.add(`${row.key}: parse-fout`)
+      continue
+    }
+    for (const v of vars) {
+      if (!knownNames.has(v)) unknown.add(v)
+    }
+  }
+
+  // appliesWhen per scenario: check op onbekende namen. Mag verwijzen
+  // naar alles: inputs, outputs, derived, prefill, scenario-constante.
+  for (const scenario of definition.scenarios) {
+    if (!scenario.appliesWhen) continue
+    let vars: string[] = []
+    try {
+      vars = parser.parse(scenario.appliesWhen).variables({ withMembers: false })
+    } catch {
+      unknown.add(`${scenario.key}.appliesWhen: parse-fout`)
+      continue
+    }
+    for (const v of vars) {
+      if (!knownNames.has(v)) unknown.add(v)
+    }
   }
 
   // Cycle-detectie via DFS met 3-state coloring.

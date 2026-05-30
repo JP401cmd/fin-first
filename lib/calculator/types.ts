@@ -48,18 +48,47 @@ const KeyString = z
 
 // ── Input-velden ─────────────────────────────────────────────────
 
-export const INPUT_KINDS = ['euro', 'percent', 'years', 'number'] as const
+export const INPUT_KINDS = [
+  'euro',
+  'percent',
+  'years',
+  'number',
+  'boolean',
+  'enum',
+] as const
 export type InputKind = (typeof INPUT_KINDS)[number]
+
+/** Optie binnen een enum-input. Waarde is numeriek zodat formules
+ *  natuurlijk vergelijken: `if(rental_type == 1, ..., ...)`. */
+const CalculatorInputOptionSchema = z.object({
+  value: z.number().describe('Numerieke waarde (gebruik in formules, bv. 0/1 of 1/2/3)'),
+  label: z.string().min(1).describe('Nederlands label voor de keuze-knop'),
+  hint: z.string().optional().describe('Korte verduidelijking onder het label'),
+})
+export type CalculatorInputOption = z.infer<typeof CalculatorInputOptionSchema>
 
 export const CalculatorInputSchema = z.object({
   key: KeyString.describe('Sleutel in snake_case die in formules wordt gebruikt, bv. "mortgage_rate"'),
   label: z.string().min(1).describe('Leesbaar Nederlands label voor de slider/input'),
-  kind: z.enum(INPUT_KINDS).describe('Type waarde: euro, percent (fractie 0-1), years of number'),
+  kind: z.enum(INPUT_KINDS).describe(
+    'Type waarde: euro, percent (fractie 0-1), years, number, boolean (0/1) of enum (numerieke keuze)',
+  ),
   default: z.number().describe('Startwaarde als terugval wanneer prefill niet beschikbaar is'),
   prefill: z.string().optional().describe('Optionele key uit de gebruikersdata-whitelist; onbekende keys worden genegeerd'),
   min: z.number().optional(),
   max: z.number().optional(),
   step: z.number().optional(),
+  hint: z.string().optional().describe('Korte uitleg/disclaimer onder de slider (max 1 zin)'),
+  options: z
+    .array(CalculatorInputOptionSchema)
+    .optional()
+    .describe('Verplicht bij kind="enum": lijst van keuze-opties (2-5)'),
+  relevantFor: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Optionele lijst van scenario-keys waarvoor dit veld relevant is. Bij scenarios buiten deze lijst markeert de UI het veld als minder relevant.',
+    ),
 })
 export type CalculatorInput = z.infer<typeof CalculatorInputSchema>
 
@@ -68,6 +97,23 @@ export type CalculatorInput = z.infer<typeof CalculatorInputSchema>
 export const CalculatorScenarioSchema = z.object({
   key: KeyString.describe('Sleutel in snake_case, vergelijkbaar in formules via if(scenario == "x", ...)'),
   label: z.string().min(1).describe('Nederlands label voor de scenario-tab'),
+  description: z
+    .string()
+    .max(280)
+    .optional()
+    .describe('1-2 zinnen die het scenario uitleggen (verschijnt onder de tab-keuze)'),
+  appliesWhen: z
+    .string()
+    .max(300)
+    .optional()
+    .describe(
+      'Optionele formule die de toepasbaarheid van dit scenario uitdrukt: 1 = van toepassing, 0.5 = wellicht, 0 = niet van toepassing. Mag dezelfde namen gebruiken als output-formules.',
+    ),
+  notApplicableReason: z
+    .string()
+    .max(240)
+    .optional()
+    .describe('Toon deze reden wanneer appliesWhen ≤ 0 evalueert.'),
 })
 export type CalculatorScenario = z.infer<typeof CalculatorScenarioSchema>
 
@@ -75,6 +121,9 @@ export type CalculatorScenario = z.infer<typeof CalculatorScenarioSchema>
 
 export const OUTPUT_FORMATS = ['euro', 'percent', 'years', 'number'] as const
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number]
+
+export const OUTPUT_STYLES = ['normal', 'subtotal', 'total', 'warn', 'good'] as const
+export type OutputStyle = (typeof OUTPUT_STYLES)[number]
 
 export const CalculatorOutputSchema = z.object({
   key: KeyString,
@@ -88,8 +137,45 @@ export const CalculatorOutputSchema = z.object({
     ),
   format: z.enum(OUTPUT_FORMATS).describe('Hoe de uitkomst gepresenteerd wordt'),
   unit: z.string().optional(),
+  section: z
+    .string()
+    .max(60)
+    .optional()
+    .describe('Optionele groepskop voor de breakdown (bv. "Kosten", "Belasting", "Voordelen")'),
+  style: z
+    .enum(OUTPUT_STYLES)
+    .optional()
+    .describe(
+      'Visuele weging: normal | subtotal | total | warn (rood, negatief) | good (groen, positief)',
+    ),
+  hint: z
+    .string()
+    .max(160)
+    .optional()
+    .describe('Korte inline uitleg onder de waarde'),
 })
 export type CalculatorOutput = z.infer<typeof CalculatorOutputSchema>
+
+// ── Afgeleide context-rijen ──────────────────────────────────────
+//
+// Een "derived" is geen output maar een tussenresultaat dat de UI
+// toont als context-strook tussen inputs en outputs — bv. "Totale
+// huur per jaar = €18.000" of "+€11.367 boven vrijstellingsgrens".
+// Niet vergelijkbaar tussen scenarios; berekend op het eerste
+// scenario (of het scenario dat de actieve tab toont).
+
+export const CalculatorDerivedSchema = z.object({
+  key: KeyString.describe('Sleutel — mag in latere derived/output-formules gebruikt worden'),
+  label: z.string().min(1).describe('Nederlands label, bv. "Totale huur per jaar"'),
+  formula: z.string().min(1).max(300),
+  format: z.enum(OUTPUT_FORMATS).describe('euro / percent / years / number'),
+  hint: z
+    .string()
+    .max(160)
+    .optional()
+    .describe('Inline duiding, bv. "boven vrijstellingsgrens"'),
+})
+export type CalculatorDerived = z.infer<typeof CalculatorDerivedSchema>
 
 // ── Definitie ────────────────────────────────────────────────────
 //
@@ -112,16 +198,21 @@ function arrayMax<T extends z.ZodArray<z.ZodTypeAny>>(
 export const CalculatorDefinitionSchema = z.object({
   name: z.string().min(1).max(120).describe('Korte Nederlandse titel van de rekenhulp'),
   description: z.string().max(400).optional().describe('Eén à twee zinnen die uitleggen wat de hulp berekent'),
-  inputs: arrayMax(z.array(CalculatorInputSchema).min(1), 8, 'inputs').describe(
-    'Tussen 1 en 8 invoervelden',
+  inputs: arrayMax(z.array(CalculatorInputSchema).min(1), 10, 'inputs').describe(
+    'Tussen 1 en 10 invoervelden',
   ),
+  derived: arrayMax(z.array(CalculatorDerivedSchema), 6, 'derived')
+    .optional()
+    .describe(
+      'Optionele context-strook tussen inputs en outputs: tussenresultaten zoals "Totale huur per jaar" of "Boven vrijstellingsgrens". Niet vergelijkbaar tussen scenarios.',
+    ),
   scenarios: arrayMax(
     z.array(CalculatorScenarioSchema).min(1),
-    4,
+    8,
     'scenarios',
-  ).describe('1 tot 4 scenario-tabs, bv. "Aflossen" en "Beleggen"'),
-  outputs: arrayMax(z.array(CalculatorOutputSchema).min(1), 6, 'outputs').describe(
-    '1 tot 6 berekende uitkomsten',
+  ).describe('1 tot 8 scenario-tabs, bv. "Aflossen" en "Beleggen"'),
+  outputs: arrayMax(z.array(CalculatorOutputSchema).min(1), 8, 'outputs').describe(
+    '1 tot 8 berekende uitkomsten',
   ),
   compare: z
     .object({
@@ -130,6 +221,13 @@ export const CalculatorDefinitionSchema = z.object({
     })
     .optional()
     .describe('Optioneel: welke output bepaalt de "keuze" tussen scenarios'),
+  narrative: z
+    .string()
+    .max(280)
+    .optional()
+    .describe(
+      'Eén zin als samenvatting/pull-quote bovenaan het resultaat. Mag placeholders gebruiken: {winner_label}, {compare_output} en {output:key} voor outputs van het winnende scenario.',
+    ),
   assumptions: arrayMax(z.array(z.string()), 10, 'aannames')
     .optional()
     .describe('Documenteer gebruikte aannames (tarieven, vereenvoudigingen)'),
@@ -154,6 +252,8 @@ const StoredCalculatorOutputSchema = CalculatorOutputSchema.extend({
 export const StoredCalculatorDefinitionSchema = CalculatorDefinitionSchema.extend({
   inputs: z.array(CalculatorInputSchema).min(1).max(20),
   outputs: z.array(StoredCalculatorOutputSchema).min(1).max(12),
+  scenarios: z.array(CalculatorScenarioSchema).min(1).max(10),
+  derived: z.array(CalculatorDerivedSchema).max(10).optional(),
 })
 export type StoredCalculatorDefinition = z.infer<
   typeof StoredCalculatorDefinitionSchema
