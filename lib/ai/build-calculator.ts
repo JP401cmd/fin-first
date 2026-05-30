@@ -104,9 +104,17 @@ alleen toe wanneer ze de calc duidelijker maken — niet als invuloefening.
     voor één scenario.
 
 **Voor context (\`derived\`)**:
-  Voeg toe als een tussenresultaat de gebruiker helpt het antwoord te
-  snappen ("Totale rentekosten over looptijd", "Boven vrijstellingsgrens").
-  Niet vergelijkbaar tussen scenario's. Max 4 rijen.
+  Derived zijn benoemde TUSSENWAARDEN (zoals \`let\`-bindings): ze
+  worden VÓÓR de outputs berekend en zijn daarna in elke output-formule
+  beschikbaar. Gebruik ze dubbel:
+    1. om een veelgebruikte berekening één keer te definiëren en in
+       meerdere outputs te hergebruiken (bv. \`bijtelling_per_jaar\`
+       berekenen in derived, dan in meerdere output-formules gebruiken);
+    2. als context-strook die de gebruiker helpt het antwoord te snappen
+       ("Totale rentekosten over looptijd", "Boven vrijstellingsgrens").
+  Een derive-formule mag verwijzen naar inputs, prefill, \`scenario\` en
+  EERDERE derived — NIET naar outputs (die bestaan op dat moment nog
+  niet). Outputs mogen wél naar derived verwijzen. Max 4 rijen.
 
 **Voor scenario's (\`scenarios\`)**:
   - \`description\`: 1-2 zinnen wanneer het scenario van toepassing is.

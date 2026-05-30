@@ -283,18 +283,52 @@ describe('evaluateCalculator — derived rows', () => {
     expect(r.derived[1].value).toBe(18000)
   })
 
-  it('derived mag output van eerste scenario gebruiken', () => {
+  it('output mag derived-tussenwaarde gebruiken (regressie: bijtelling-bug)', () => {
+    // De gebruiker kreeg "undefined variable: belasting_bijtelling_jaar"
+    // omdat een output naar een derived-key verwees terwijl derived
+    // vroeger ná de outputs werd berekend. Derived is nu een pre-output
+    // tussenwaarde-laag.
     const d = def({
-      inputs: [{ key: 'p', label: 'P', kind: 'euro', default: 1000 }],
-      outputs: [
-        { key: 'belasting', label: 'B', formula: 'p * 0.36', format: 'euro' },
+      inputs: [
+        { key: 'catalogus', label: 'Cat', kind: 'euro', default: 35000 },
+        { key: 'jaren', label: 'Jaren', kind: 'years', default: 4 },
       ],
       derived: [
-        { key: 'netto', label: 'N', formula: 'p - belasting', format: 'euro' },
+        { key: 'bijtelling_jaar', label: 'Bijtelling/jr', formula: 'catalogus * 0.04', format: 'euro' },
+        { key: 'belasting_jaar', label: 'Belasting/jr', formula: 'bijtelling_jaar * 0.37', format: 'euro' },
+      ],
+      outputs: [
+        { key: 'totale_belasting', label: 'Totaal', formula: 'belasting_jaar * jaren', format: 'euro' },
+        { key: 'netto', label: 'Netto', formula: 'totale_belasting + 100', format: 'euro' },
       ],
     })
-    const r = evaluateCalculator(d, { p: 1000 }, {})
-    expect(r.derived[0].value).toBe(640)
+    const r = evaluateCalculator(d, { catalogus: 35000, jaren: 4 }, {})
+    // bijtelling 1400/jr, belasting 518/jr, ×4 = 2072
+    expect(r.derived[0].value).toBeCloseTo(1400)
+    expect(r.derived[1].value).toBeCloseTo(518)
+    expect(r.values.a.totale_belasting).toBeCloseTo(2072)
+    expect(r.values.a.netto).toBeCloseTo(2172)
+    expect(r.errors).toEqual([])
+  })
+
+  it('scenario-afhankelijke derived werkt door in outputs per scenario', () => {
+    const d = def({
+      inputs: [{ key: 'bedrag', label: 'B', kind: 'euro', default: 1000 }],
+      scenarios: [
+        { key: 'lease', label: 'Lease' },
+        { key: 'koop', label: 'Koop' },
+      ],
+      derived: [
+        { key: 'factor', label: 'F', formula: 'if(scenario == "lease", 2, 3)', format: 'number' },
+      ],
+      outputs: [
+        { key: 'kosten', label: 'Kosten', formula: 'bedrag * factor', format: 'euro' },
+      ],
+    })
+    const r = evaluateCalculator(d, { bedrag: 1000 }, {})
+    expect(r.values.lease.kosten).toBe(2000)
+    expect(r.values.koop.kosten).toBe(3000)
+    expect(r.errors).toEqual([])
   })
 })
 
@@ -390,6 +424,16 @@ describe('validateFormulas — DNA-velden', () => {
       outputs: [{ key: 'totaal', label: 'T', formula: 'context + 100', format: 'euro' }],
     })
     expect(validateFormulas(d, PREFILL_KEY_SET)).toEqual([])
+  })
+
+  it('derived mag NIET naar een output verwijzen (volgorde-restrictie)', () => {
+    const d = def({
+      inputs: [{ key: 'p', label: 'P', kind: 'euro', default: 1000 }],
+      outputs: [{ key: 'belasting', label: 'B', formula: 'p * 0.36', format: 'euro' }],
+      derived: [{ key: 'netto', label: 'N', formula: 'p - belasting', format: 'euro' }],
+    })
+    const errs = validateFormulas(d, PREFILL_KEY_SET)
+    expect(errs.some((e) => e.includes("output 'belasting'"))).toBe(true)
   })
 
   it('appliesWhen-formule wordt gevalideerd op onbekende namen', () => {

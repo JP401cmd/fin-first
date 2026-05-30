@@ -132,10 +132,20 @@ export function evaluateCalculator(
   const outputByKey = new Map(definition.outputs.map((o) => [o.key, o]))
   const sortedKeys = topoSortOutputs(definition, outputKeys)
 
+  // Derived = benoemde tussenwaarden (vergelijkbaar met `let`-bindings):
+  // berekend uit inputs/prefill/scenario + eerdere derived, en daarna
+  // beschikbaar in de output-scope. Ze worden dus PER SCENARIO en VÓÓR
+  // de outputs geëvalueerd. De context-strook in de UI toont de waarden
+  // van het eerste scenario (zie `derived` hieronder).
+  const derivedDefs = definition.derived ?? []
+  // Per-scenario derived-waarden, zodat scenario-afhankelijke derived
+  // (bv. via if(scenario==..)) correct doorwerken in de outputs.
+  const derivedByScenario: Record<string, Record<string, number | null>> = {}
+
   for (const scenario of definition.scenarios) {
     values[scenario.key] = {}
-    // Scope leeft per scenario; eerder berekende outputs worden hierin
-    // toegevoegd zodat latere outputs ernaar kunnen verwijzen.
+    // Scope leeft per scenario; eerst derived, dan outputs worden hierin
+    // toegevoegd zodat latere formules ernaar kunnen verwijzen.
     const scope: Record<string, unknown> = {
       ...prefill,
       ...inputValues,
@@ -143,7 +153,33 @@ export function evaluateCalculator(
       ...WHITELIST_FNS,
     }
 
-    // PASS 1: evalueer in dependency-volgorde, vul scope.
+    // PASS 0: derived in definition-volgorde. Elke derived mag verwijzen
+    // naar inputs, prefill, scenario en EERDERE derived — niet naar
+    // outputs (die bestaan nog niet). Resultaat gaat in scope.
+    const scenarioDerived: Record<string, number | null> = {}
+    for (const row of derivedDefs) {
+      let value: number | null = null
+      let error: string | undefined
+      try {
+        const raw = parser.parse(row.formula).evaluate(scope as Record<string, number>)
+        if (typeof raw === 'number' && Number.isFinite(raw)) {
+          value = raw
+          scope[row.key] = raw
+        } else {
+          error = 'Formule gaf geen geldig getal'
+        }
+      } catch (e) {
+        error = e instanceof Error ? e.message : 'Onbekende formule-fout'
+      }
+      scenarioDerived[row.key] = value
+      // Fouten op derived rapporteren we alleen voor het eerste scenario
+      // (zie display-derived hieronder), om duplicate-meldingen te
+      // voorkomen wanneer een derived-formule structureel faalt.
+    }
+    derivedByScenario[scenario.key] = scenarioDerived
+
+    // PASS 1: outputs in dependency-volgorde, vul scope. Outputs zien nu
+    // óók de derived-waarden van dit scenario.
     const scenarioValues = new Map<string, number | null>()
     const scenarioErrors = new Map<string, string | undefined>()
     for (const outputKey of sortedKeys) {
@@ -199,37 +235,19 @@ export function evaluateCalculator(
     winner = best?.key ?? null
   }
 
-  // Derived rows — context-strook, berekend op het EERSTE scenario.
-  // Mogen verwijzen naar inputs, prefill, eerdere derived én outputs van
-  // het eerste scenario (zodat samenvattende posten als "totaal − belasting"
-  // werken zonder dat we per scenario context maken).
+  // Derived-display — context-strook toont de waarden van het EERSTE
+  // scenario (de strook is niet per-scenario in de UI). De berekening
+  // zelf is al per scenario gedaan in de loop hierboven.
   const derived: EvaluatedDerived[] = []
-  if (definition.derived && definition.derived.length > 0) {
+  if (derivedDefs.length > 0) {
     const firstScenario = definition.scenarios[0]
-    const derivedScope: Record<string, unknown> = {
-      ...prefill,
-      ...inputValues,
-      scenario: firstScenario?.key ?? '',
-      ...WHITELIST_FNS,
-      ...(firstScenario ? values[firstScenario.key] : {}),
-    }
-    for (const row of definition.derived) {
-      let value: number | null = null
-      let error: string | undefined
-      try {
-        const expr = parser.parse(row.formula)
-        const raw = expr.evaluate(derivedScope as Record<string, number>)
-        if (typeof raw === 'number' && Number.isFinite(raw)) {
-          value = raw
-          derivedScope[row.key] = raw
-        } else {
-          error = 'Formule gaf geen geldig getal'
-        }
-      } catch (e) {
-        error = e instanceof Error ? e.message : 'Onbekende formule-fout'
+    const firstDerived = firstScenario ? derivedByScenario[firstScenario.key] : undefined
+    for (const row of derivedDefs) {
+      const value = firstDerived?.[row.key] ?? null
+      derived.push({ key: row.key, label: row.label, value })
+      if (value === null) {
+        errors.push(`Afgeleid · ${row.label}: kon niet berekend worden`)
       }
-      derived.push({ key: row.key, label: row.label, value, error })
-      if (error) errors.push(`Afgeleid · ${row.label}: ${error}`)
     }
   }
 
@@ -244,8 +262,8 @@ export function evaluateCalculator(
       ...inputValues,
       scenario: scenario.key,
       ...WHITELIST_FNS,
+      ...(derivedByScenario[scenario.key] ?? {}),
       ...values[scenario.key],
-      ...Object.fromEntries(derived.map((d) => [d.key, d.value])),
     }
     let raw: number | null = null
     let status: ApplicabilityStatus = 'yes'
@@ -460,10 +478,18 @@ export function validateFormulas(
     deps.set(output.key, outDeps)
   }
 
-  // Derived-formules: parse + check op onbekende namen. Geen cycle-check —
-  // ze worden in definition-volgorde geëvalueerd, dus een latere derived
-  // mag wel een eerdere noemen, maar niet andersom (zou stilletjes 0/NaN
-  // produceren in plaats van te crashen).
+  // Derived-formules worden VÓÓR de outputs geëvalueerd (ze zijn
+  // benoemde tussenwaarden die outputs mogen gebruiken). Daarom mogen
+  // derived-formules NIET naar output-keys verwijzen — die bestaan op
+  // dat moment nog niet in scope. Toegestaan: inputs, prefill, scenario,
+  // en andere derived-keys (definition-volgorde; geen cycle-check).
+  const derivedKnownNames = new Set<string>([
+    'scenario',
+    ...Object.keys(WHITELIST_FNS),
+    ...prefillKeySet,
+    ...definition.inputs.map((i) => i.key),
+    ...derivedKeys,
+  ])
   for (const row of definition.derived ?? []) {
     let vars: string[] = []
     try {
@@ -473,7 +499,17 @@ export function validateFormulas(
       continue
     }
     for (const v of vars) {
-      if (!knownNames.has(v)) unknown.add(v)
+      if (derivedKnownNames.has(v)) continue
+      // Een output-key in een derived-formule is een specifieke,
+      // begrijpelijke fout — geef een gerichte melding i.p.v. de
+      // variabele als "onbekend" te bestempelen.
+      if (outputKeys.has(v)) {
+        unknown.add(
+          `${row.key}: derived mag niet naar output '${v}' verwijzen (outputs worden ná derived berekend)`,
+        )
+      } else {
+        unknown.add(v)
+      }
     }
   }
 
