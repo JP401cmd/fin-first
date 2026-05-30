@@ -92,13 +92,37 @@ export const CalculatorOutputSchema = z.object({
 export type CalculatorOutput = z.infer<typeof CalculatorOutputSchema>
 
 // ── Definitie ────────────────────────────────────────────────────
+//
+// Belangrijk: Anthropic's Claude-API ondersteunt geen `maxItems` op
+// JSON-schema arrays (rejected met HTTP 400). Zod's `.max(n)` op een
+// array serialiseert wel naar `maxItems`, dus we vermijden die en
+// gebruiken `.refine()` voor de runtime-cap — die wordt niet in het
+// JSON-schema gezet maar wel na de parse afgedwongen.
+
+function arrayMax<T extends z.ZodArray<z.ZodTypeAny>>(
+  schema: T,
+  limit: number,
+  label: string,
+) {
+  return schema.refine((arr) => arr.length <= limit, {
+    message: `Maximaal ${limit} ${label}`,
+  })
+}
 
 export const CalculatorDefinitionSchema = z.object({
   name: z.string().min(1).max(120).describe('Korte Nederlandse titel van de rekenhulp'),
   description: z.string().max(400).optional().describe('Eén à twee zinnen die uitleggen wat de hulp berekent'),
-  inputs: z.array(CalculatorInputSchema).min(1).max(8).describe('Tussen 1 en 8 invoervelden'),
-  scenarios: z.array(CalculatorScenarioSchema).min(1).max(4).describe('1 tot 4 scenario-tabs, bv. "Aflossen" en "Beleggen"'),
-  outputs: z.array(CalculatorOutputSchema).min(1).max(6).describe('1 tot 6 berekende uitkomsten'),
+  inputs: arrayMax(z.array(CalculatorInputSchema).min(1), 8, 'inputs').describe(
+    'Tussen 1 en 8 invoervelden',
+  ),
+  scenarios: arrayMax(
+    z.array(CalculatorScenarioSchema).min(1),
+    4,
+    'scenarios',
+  ).describe('1 tot 4 scenario-tabs, bv. "Aflossen" en "Beleggen"'),
+  outputs: arrayMax(z.array(CalculatorOutputSchema).min(1), 6, 'outputs').describe(
+    '1 tot 6 berekende uitkomsten',
+  ),
   compare: z
     .object({
       outputKey: z.string().describe('De output-key die wordt vergeleken tussen scenarios'),
@@ -106,9 +130,7 @@ export const CalculatorDefinitionSchema = z.object({
     })
     .optional()
     .describe('Optioneel: welke output bepaalt de "keuze" tussen scenarios'),
-  assumptions: z
-    .array(z.string())
-    .max(10)
+  assumptions: arrayMax(z.array(z.string()), 10, 'aannames')
     .optional()
     .describe('Documenteer gebruikte aannames (tarieven, vereenvoudigingen)'),
 })
