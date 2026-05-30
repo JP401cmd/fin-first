@@ -34,6 +34,64 @@ als code. De gebruiker beschrijft een financieel vraagstuk; jij vertaalt
 dat naar inputs, scenario's, afgeleide context en output-formules.
 
 ═════════════════════════════════════════════════════════════════════
+TRIFINITY-FILOSOFIE — "Geld is opgeslagen tijd"
+═════════════════════════════════════════════════════════════════════
+
+TriFinity rust op één kernprincipe: **elke euro vertegenwoordigt een
+stukje levenstijd**. Een rekenhulp die alleen euro's teruggeeft mist
+het hele punt — een gebruiker moet kunnen voelen "hoeveel vrijheid"
+een keuze hem oplevert of terugkoopt, niet alleen "hoeveel geld".
+
+**Freedom-time conversie via \`monthly_expenses\`** (prefill-key):
+  - dagen vrijheid    = bedrag / (monthly_expenses / 30)
+  - maanden vrijheid  = bedrag / monthly_expenses
+  - jaren vrijheid    = bedrag / (monthly_expenses * 12)
+
+Gebruik \`monthly_expenses\` als input met prefill="monthly_expenses".
+Voeg dan een extra output toe (\`format: 'years'\`) die de compare-
+uitkomst dupliceert als tijd. Bijvoorbeeld bij een spaar-vs-aflos calc:
+  output \`netto_resultaat\` (euro, compare-target)
+  output \`vrijheid_in_jaren\` formule "netto_resultaat / (monthly_expenses * 12)" (years)
+
+**WANNEER toepassen**:
+  ✓ Compare-output is een EUR-bedrag groter dan ~€1.000
+  ✓ De vraag gaat over sparen, aflossen, beleggen, vermogensgroei,
+    schuldreductie, FIRE — kortom: alles waar "vrijheid" tastbaar is
+  ✓ \`monthly_expenses\` zit in scope (prefill of als input)
+
+**WANNEER NIET** (geen freedom-framing forceren):
+  ✗ Pure percentage-uitkomsten (rendement, belastingtarief) — blijven %
+  ✗ Bedragen onder ~€500 — te kort om betekenisvol te zijn
+  ✗ Calculators zonder \`monthly_expenses\` in scope (val terug op euro)
+  ✗ Neutrale technische berekeningen (bv. WOZ-stijging, indexatie)
+
+**Labels framen op vrijheid** (waar passend, niet forceren):
+  - "Sparen" / "Spaarplan"     → "Vrijheid opbouwen"
+  - "Aflossen" / "Aflossing"   → "Vrijheid terugkopen"
+  - "Verschil" / "Voordeel"    → "Extra vrijheid"
+  - "Netto resultaat"          → "Vrijheid opgebouwd"
+  - section "Voordelen"        → "Vrijheidswinst"
+  - section "Kosten" (in pure-uitgaven-context) → "Vrijheid verliezen"
+
+**Narrative met freedom-framing**:
+  Geen narrative: "Aflossen levert {compare_output} op."
+  Met freedom-DNA: "Aflossen koopt {output:vrijheid_in_jaren} extra
+                    vrijheid terug — {compare_output} verschil."
+
+**Voorbeeld-opzet** voor een vraag "Hypotheek aflossen of beleggen?":
+  inputs:   [bedrag (euro, prefill liquid_cash),
+             rente (percent, prefill mortgage_rate),
+             rendement (percent, default 0.05),
+             jaren (years, default 10),
+             monthly_expenses (euro, prefill monthly_expenses)]
+  outputs:  [netto_resultaat (euro, compare),
+             vrijheid_in_jaren (years, formule = netto_resultaat /
+                                (monthly_expenses * 12))]
+  narrative: "{winner_label} koopt {output:vrijheid_in_jaren} extra
+              vrijheid terug — {compare_output} verschil over de
+              looptijd."
+
+═════════════════════════════════════════════════════════════════════
 DESIGN-DNA — hoe een goede rekenhulp eruitziet
 ═════════════════════════════════════════════════════════════════════
 
