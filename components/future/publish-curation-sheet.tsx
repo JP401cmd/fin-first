@@ -330,6 +330,10 @@ function kindLabel(kind: InputKind): string {
       return 'Jaren'
     case 'number':
       return 'Getal'
+    case 'boolean':
+      return 'Ja/nee'
+    case 'enum':
+      return 'Keuze'
   }
 }
 
@@ -346,6 +350,11 @@ function defaultStepForKind(kind: InputKind): number {
     case 'years':
       return 1
     case 'number':
+      return 1
+    case 'boolean':
+    case 'enum':
+      // Categorische inputs hebben geen "step" — value komt uit
+      // toggle/segmented control, niet uit een slider.
       return 1
   }
 }
