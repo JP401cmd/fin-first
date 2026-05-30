@@ -47,14 +47,52 @@ function formatOutput(value: number | null, format: OutputFormat, unit?: string)
   }
 }
 
+/**
+ * Toon "uit jouw data"-indicator als de input een prefill-key heeft en
+ * die key een resolved waarde uit de gebruikersdata levert. Verandert
+ * naar "aangepast" zodra de gebruiker de slider beweegt — zo blijft
+ * zichtbaar dat dit veld OORSPRONKELIJK uit eigen data kwam, maar dat
+ * de gebruiker het bewust heeft bijgesteld.
+ */
+function PrefillIndicator({
+  prefillValue,
+  currentValue,
+}: {
+  prefillValue: number | undefined
+  currentValue: number
+}) {
+  if (prefillValue == null) return null
+  const isModified = Math.abs(prefillValue - currentValue) > 1e-9
+  if (isModified) {
+    return (
+      <span
+        title={`Voorgevuld uit jouw data; aangepast door jou.`}
+        className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)] border border-dashed border-[var(--border-ed)] px-1 py-0.5 rounded"
+      >
+        aangepast
+      </span>
+    )
+  }
+  return (
+    <span
+      title="Voorgevuld uit jouw eigen gegevens. Pas met de slider aan om een aanname te wijzigen."
+      className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.5 rounded"
+    >
+      uit jouw data
+    </span>
+  )
+}
+
 function InputField({
   input,
   value,
+  prefillValue,
   onChange,
   scenarioKey,
 }: {
   input: CalculatorInput
   value: number
+  prefillValue: number | undefined
   onChange: (v: number) => void
   scenarioKey: string
 }) {
@@ -64,7 +102,10 @@ function InputField({
     return (
       <div className="block">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-xs font-semibold text-[var(--ink-2)]">{input.label}</span>
+          <span className="text-xs font-semibold text-[var(--ink-2)] inline-flex items-center gap-1.5">
+            {input.label}
+            <PrefillIndicator prefillValue={prefillValue} currentValue={value} />
+          </span>
           <button
             type="button"
             onClick={() => onChange(on ? 0 : 1)}
@@ -91,7 +132,10 @@ function InputField({
     return (
       <div className="block">
         <div className="flex items-baseline justify-between gap-2 mb-1.5">
-          <span className="text-xs font-semibold text-[var(--ink-2)]">{input.label}</span>
+          <span className="text-xs font-semibold text-[var(--ink-2)] inline-flex items-center gap-1.5">
+            {input.label}
+            <PrefillIndicator prefillValue={prefillValue} currentValue={value} />
+          </span>
         </div>
         <div className="inline-flex rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
           {input.options.map((opt) => {
@@ -128,7 +172,10 @@ function InputField({
   return (
     <label className="block">
       <div className="flex items-baseline justify-between gap-2 mb-1">
-        <span className="text-xs font-semibold text-[var(--ink-2)]">{input.label}</span>
+        <span className="text-xs font-semibold text-[var(--ink-2)] inline-flex items-center gap-1.5">
+          {input.label}
+          <PrefillIndicator prefillValue={prefillValue} currentValue={value} />
+        </span>
         <span className="text-xs font-mono text-[var(--ink)] tabular-nums">{display}</span>
       </div>
       {hasRange ? (
@@ -204,6 +251,23 @@ const STYLE_ROW_CLASS: Record<string, string> = {
   good: 'bg-emerald-50/40 text-emerald-900',
 }
 
+/**
+ * Vaste sectie-kop boven Uitgangspunten / Context / Uitkomsten. Geeft
+ * de gebruiker een herkenbaar ritme: dezelfde drie blokken in dezelfde
+ * volgorde bij elke calculator, los van wat de AI er inhoudelijk in
+ * stopt.
+ */
+function SectionHeader({ id, label }: { id: string; label: string }) {
+  return (
+    <h3
+      id={id}
+      className="mb-2 text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--ink-3)]"
+    >
+      {label}
+    </h3>
+  )
+}
+
 export function CalculatorRunner({
   definition,
   prefill,
@@ -269,27 +333,34 @@ export function CalculatorRunner({
         </blockquote>
       )}
 
-      {/* Inputs */}
+      {/* Uitgangspunten — sliders / toggles / enum-keuzes */}
       {definition.inputs.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
-          {definition.inputs.map((input) => (
-            <InputField
-              key={input.key}
-              input={input}
-              value={inputs[input.key] ?? input.default}
-              onChange={(v) => setInputs((prev) => ({ ...prev, [input.key]: v }))}
-              scenarioKey={activeScenario}
-            />
-          ))}
-        </div>
+        <section aria-labelledby="calc-sec-uitgangspunten">
+          <SectionHeader id="calc-sec-uitgangspunten" label="Uitgangspunten" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+            {definition.inputs.map((input) => (
+              <InputField
+                key={input.key}
+                input={input}
+                value={inputs[input.key] ?? input.default}
+                prefillValue={
+                  input.prefill && prefill[input.prefill] != null
+                    ? prefill[input.prefill]
+                    : undefined
+                }
+                onChange={(v) => setInputs((prev) => ({ ...prev, [input.key]: v }))}
+                scenarioKey={activeScenario}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
-      {/* Derived context-strook */}
+      {/* Context — afgeleide tussenresultaten */}
       {result.derived.length > 0 && (
-        <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-4 py-3">
-          <div className="text-[9px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)] mb-2">
-            Context
-          </div>
+        <section aria-labelledby="calc-sec-context">
+          <SectionHeader id="calc-sec-context" label="Context" />
+          <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-4 py-3">
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
             {result.derived.map((d) => {
               const row = definition.derived?.find((r) => r.key === d.key)
@@ -308,7 +379,8 @@ export function CalculatorRunner({
               )
             })}
           </dl>
-        </div>
+          </div>
+        </section>
       )}
 
       {/* Scenario-tabs met applicability-dot + description */}
@@ -359,8 +431,13 @@ export function CalculatorRunner({
         </div>
       )}
 
-      {/* Scenario × output vergelijking */}
-      <div className="overflow-x-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)]">
+      {/* Uitkomsten — scenario × output tabel */}
+      <section aria-labelledby="calc-sec-uitkomsten">
+        <SectionHeader
+          id="calc-sec-uitkomsten"
+          label={definition.scenarios.length > 1 ? "Scenario's & uitkomsten" : 'Uitkomsten'}
+        />
+        <div className="overflow-x-auto rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)]">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border-ed)]">
@@ -405,7 +482,8 @@ export function CalculatorRunner({
             ))}
           </tbody>
         </table>
-      </div>
+        </div>
+      </section>
 
       {/* Keuze-conclusie (alleen tonen als er geen narrative is) */}
       {!result.narrative && result.winner && definition.compare && (
