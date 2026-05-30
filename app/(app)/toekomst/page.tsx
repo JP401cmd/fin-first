@@ -67,7 +67,9 @@ export default async function ToekomstPage() {
   if (user) {
     const { data: calcRows } = await supabase
       .from('custom_calculators')
-      .select('id, name, description, definition, created_by_ai, sort_order, created_at')
+      .select(
+        'id, name, description, definition, created_by_ai, sort_order, created_at, is_public, published_at, forked_from, like_count, duplicate_count',
+      )
       .eq('user_id', user.id)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false })

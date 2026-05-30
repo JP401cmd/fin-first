@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -396,33 +396,18 @@ export function RekenhulpView({
           </button>
         </article>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {saved.map((calc) => (
-            <SavedCalculatorCard
-              key={calc.id}
-              calc={calc}
-              menuOpen={openMenuId === calc.id}
-              onOpenMenu={() => setOpenMenuId(calc.id)}
-              onCloseMenu={() => setOpenMenuId(null)}
-              onRun={() => {
-                setRunning(calc)
-                setMode('run')
-              }}
-              onPublish={() => {
-                setOpenMenuId(null)
-                setPublishing(calc)
-              }}
-              onUnpublish={() => {
-                setOpenMenuId(null)
-                void unpublishCalculator(calc.id)
-              }}
-              onDelete={() => {
-                setOpenMenuId(null)
-                void deleteSaved(calc.id)
-              }}
-            />
-          ))}
-        </div>
+        <CategorizedCalcGrid
+          saved={saved}
+          openMenuId={openMenuId}
+          setOpenMenuId={setOpenMenuId}
+          onRun={(calc) => {
+            setRunning(calc)
+            setMode('run')
+          }}
+          onPublish={setPublishing}
+          onUnpublish={(id) => void unpublishCalculator(id)}
+          onDelete={(id) => void deleteSaved(id)}
+        />
       )}
 
       {/* Publish-flow modal — alleen gerenderd als er een geselecteerde
@@ -441,6 +426,149 @@ export function RekenhulpView({
 }
 
 /**
+ * Categoriseer "Jouw rekenhulpen" in drie groepen zodat het verschil
+ * tussen privé-werkbladen, eigen publicaties en aanpassingen-vanuit-de-
+ * bibliotheek visueel helder is — én zodat een gepubliceerde calc niet
+ * tegelijk als duplicate in de "privé"-sectie verschijnt (publish-flow
+ * creëert bewust een snapshot-rij; die hoort onder "Mijn publicaties",
+ * niet ernaast in "Werkbladen").
+ *
+ * Categorieën:
+ *   - Werkbladen       : !is_public && !forked_from
+ *   - Vanuit bibliotheek : forked_from != null (eventueel ook publiek)
+ *   - Mijn publicaties : is_public && !forked_from
+ */
+type CalcCategory = 'private' | 'forked' | 'published'
+
+function categorize(calc: CustomCalculatorRow): CalcCategory {
+  if (calc.forked_from) return 'forked'
+  if (calc.is_public) return 'published'
+  return 'private'
+}
+
+function CategorizedCalcGrid({
+  saved,
+  openMenuId,
+  setOpenMenuId,
+  onRun,
+  onPublish,
+  onUnpublish,
+  onDelete,
+}: {
+  saved: CustomCalculatorRow[]
+  openMenuId: string | null
+  setOpenMenuId: (id: string | null) => void
+  onRun: (calc: CustomCalculatorRow) => void
+  onPublish: (calc: CustomCalculatorRow) => void
+  onUnpublish: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const groups = useMemo(() => {
+    const map: Record<CalcCategory, CustomCalculatorRow[]> = {
+      private: [],
+      forked: [],
+      published: [],
+    }
+    for (const calc of saved) {
+      map[categorize(calc)].push(calc)
+    }
+    return map
+  }, [saved])
+
+  const sections: Array<{
+    key: CalcCategory
+    label: string
+    hint: string
+    items: CustomCalculatorRow[]
+  }> = [
+    {
+      key: 'private',
+      label: 'Werkbladen',
+      hint: 'Je eigen rekenhulpen — alleen voor jou zichtbaar.',
+      items: groups.private,
+    },
+    {
+      key: 'forked',
+      label: 'Vanuit bibliotheek',
+      hint: 'Gekopieerd uit de bibliotheek en aanpasbaar op jouw situatie.',
+      items: groups.forked,
+    },
+    {
+      key: 'published',
+      label: 'Mijn publicaties',
+      hint: 'Versies die je hebt gedeeld in de bibliotheek.',
+      items: groups.published,
+    },
+  ]
+
+  return (
+    <div className="space-y-6">
+      {sections.map((section) =>
+        section.items.length === 0 ? null : (
+          <section key={section.key} aria-labelledby={`calc-sec-${section.key}`}>
+            <header className="flex items-baseline justify-between gap-3 mb-2 border-b border-[var(--border-ed)] pb-1">
+              <h3
+                id={`calc-sec-${section.key}`}
+                className="text-[10px] uppercase tracking-[0.14em] font-bold text-[var(--ink-3)]"
+              >
+                {section.label}
+                <span className="ml-1.5 text-[var(--ink-3)] font-mono font-normal normal-case tracking-normal">
+                  ({section.items.length})
+                </span>
+              </h3>
+              <p className="text-[11px] italic text-[var(--ink-3)] leading-snug hidden sm:block">
+                {section.hint}
+              </p>
+            </header>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {section.items.map((calc) => (
+                <SavedCalculatorCard
+                  key={calc.id}
+                  calc={calc}
+                  category={section.key}
+                  menuOpen={openMenuId === calc.id}
+                  onOpenMenu={() => setOpenMenuId(calc.id)}
+                  onCloseMenu={() => setOpenMenuId(null)}
+                  onRun={() => onRun(calc)}
+                  onPublish={() => {
+                    setOpenMenuId(null)
+                    onPublish(calc)
+                  }}
+                  onUnpublish={() => {
+                    setOpenMenuId(null)
+                    onUnpublish(calc.id)
+                  }}
+                  onDelete={() => {
+                    setOpenMenuId(null)
+                    onDelete(calc.id)
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+        ),
+      )}
+    </div>
+  )
+}
+
+const CATEGORY_BADGE: Record<
+  CalcCategory,
+  { label: string; className: string } | null
+> = {
+  // Geen badge nodig voor "private" — dat is de default state.
+  private: null,
+  forked: {
+    label: 'Uit bibliotheek',
+    className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  },
+  published: {
+    label: 'Gepubliceerd',
+    className: 'bg-violet-50 text-violet-800 border-violet-200',
+  },
+}
+
+/**
  * SavedCalculatorCard — één rij in de "Jouw rekenhulpen"-lijst. Bevat:
  *  - Naam + (indien publiek) `<OwnerStatsBadge>` met like/copy-tellers
  *  - "Openen"-knop (primary)
@@ -451,6 +579,7 @@ export function RekenhulpView({
  */
 function SavedCalculatorCard({
   calc,
+  category,
   menuOpen,
   onOpenMenu,
   onCloseMenu,
@@ -460,6 +589,7 @@ function SavedCalculatorCard({
   onDelete,
 }: {
   calc: CustomCalculatorRow
+  category: CalcCategory
   menuOpen: boolean
   onOpenMenu: () => void
   onCloseMenu: () => void
@@ -469,6 +599,7 @@ function SavedCalculatorCard({
   onDelete: () => void
 }) {
   const isPublic = Boolean(calc.is_public)
+  const badge = CATEGORY_BADGE[category]
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Click-outside + Escape sluiten het menu. We binden alleen wanneer
@@ -495,6 +626,13 @@ function SavedCalculatorCard({
 
   return (
     <article className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 flex flex-col">
+      {badge && (
+        <span
+          className={`self-start inline-block text-[9px] uppercase tracking-[0.12em] font-bold border px-1.5 py-0.5 rounded mb-2 ${badge.className}`}
+        >
+          {badge.label}
+        </span>
+      )}
       <div className="flex items-start gap-2 mb-2">
         <span className="inline-flex w-8 h-8 rounded-lg bg-violet-50 text-violet-700 items-center justify-center shrink-0">
           <Calculator className="w-4 h-4" aria-hidden="true" />
