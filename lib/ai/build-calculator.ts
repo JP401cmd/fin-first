@@ -237,10 +237,14 @@ export async function buildCalculator(
       schema: CalculatorDefinitionSchema,
       system: buildSystemPrompt(),
       prompt: `Vraag van de gebruiker:\n${userPrompt}${refineBlock}`,
-      // Cap token-budget: een CalculatorDefinition is compact; meer ruimte
-      // moedigt het model alleen aan tot uitwijdingen. AI SDK v6 noemt
-      // het veld `maxOutputTokens` (zie node_modules/ai v6.0.x).
-      maxOutputTokens: 4000,
+      // Token-budget: een eenvoudige calc past in ~2k tokens, maar met
+      // de toolbox-velden (narrative, derived, hints, descriptions,
+      // sections) en meerdere scenarios + assumptions kan een rijke
+      // definitie 4-7k tokens groot worden. We zetten op 8000 zodat
+      // complexere vragen (BV-route vs privé, regime-vergelijkingen)
+      // niet stilletjes worden afgekapt — dat veroorzaakt JSON-parse-
+      // fouten die als "NoObjectGenerated" terugkomen.
+      maxOutputTokens: 8000,
     })
 
     // Statische formule-validatie: vang hallucinerende variabelen vroeg.
@@ -274,13 +278,40 @@ export async function buildCalculator(
       }
     }
 
-    // Vercel AI SDK kon geen object genereren — meestal omdat het model
-    // (zoals een lokaal Ollama-model) tool-calling niet ondersteunt of de
-    // output afkapte.
+    // Vercel AI SDK kon geen object genereren. Drie typische oorzaken:
+    //  1. finishReason='length' → output afgekapt door maxOutputTokens.
+    //     Bij complexe vragen (meerdere fiscale routes, BV-structuren)
+    //     komt dit het vaakst voor.
+    //  2. Model ondersteunt geen tool-calling / structured output.
+    //  3. Model genereerde wel tekst, maar geen geldig schema-object.
     if (NoObjectGeneratedError.isInstance(err)) {
+      const reason = err.finishReason
+      const tokenInfo =
+        err.usage?.outputTokens != null
+          ? ` (gebruikte ${err.usage.outputTokens} tokens van max)`
+          : ''
+      const textLen = err.text?.length ?? 0
+      console.error('[build-calculator] NoObjectGenerated detail:', {
+        finishReason: reason,
+        usage: err.usage,
+        textLen,
+        textTail: err.text?.slice(-300),
+      })
+      if (reason === 'length') {
+        return {
+          ok: false,
+          error: `De AI-output werd afgekapt voordat de rekenhulp compleet was${tokenInfo}. Probeer je vraag iets korter of specifieker te stellen, of vraag een eenvoudigere variant (bijv. 'maandlast vergelijken' i.p.v. 'volledige fiscale doorrekening').`,
+        }
+      }
+      if (reason === 'content-filter') {
+        return {
+          ok: false,
+          error: 'De AI-provider heeft de output geweigerd vanwege contentfilter. Herformuleer de vraag iets neutraler.',
+        }
+      }
       return {
         ok: false,
-        error: 'De AI kon geen geldige rekenhulp produceren. Probeer een kortere of concretere vraag.',
+        error: `De AI kon geen geldige rekenhulp produceren (reden: ${reason ?? 'onbekend'}${tokenInfo}). Probeer een kortere of concretere vraag.`,
       }
     }
 
