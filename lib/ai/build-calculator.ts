@@ -157,25 +157,38 @@ terug". Geen labels herframen tenzij de vraag dat uitnodigt.
 REGELS VOOR FORMULES
 ═════════════════════════════════════════════════════════════════════
 
-- Formules zijn pure wiskundige expressies (geen code, geen functies
-  buiten de whitelist).
+**HARDE REGEL — geen verzonnen variabelen.** ELKE naam die je in een
+formule gebruikt MOET vooraf zijn gedeclareerd. De evaluator weigert
+de hele calc als één naam onbekend is. Vóór je een formule schrijft,
+controleer: komt elke variabele uit deze 5 bronnen?
+
+  1. een input-key die JIJ in \`inputs\` hebt gedefinieerd
+     (bv. \`bedrag\`, \`rente\`, \`jaren\`),
+  2. de string-constante \`scenario\` (alleen voor scenario-vergelijking),
+  3. een output-key uit DEZELFDE calc (zie cycle-regel hieronder),
+  4. een derived-key uit DEZELFDE calc,
+  5. een EXACT spelende key uit deze prefill-lijst (case-sensitive):
+${prefillList}
+
+**Veel-voorkomende fout om te vermijden**: een formule die naar
+\`co2_uitstoot\`, \`brandstofkosten\`, \`bijtelling\`, \`btw_tarief\`,
+\`afschrijving\` etc. verwijst zonder dat je die ZELF eerst als input
+hebt toegevoegd. Dat soort domein-specifieke parameters bestaan NIET
+automatisch. Als je ze nodig hebt: voeg ze toe als input met een
+sensible default. Heb je ze niet als input gedeclareerd? Dan mogen
+ze NIET in een formule staan.
+
+**Overige formule-regels**:
+- Pure wiskundige expressies (geen code, geen functies buiten de whitelist).
 - Beschikbare functies: compound(principal, rate, years),
   fvAnnuity(monthlyDeposit, rate, years), annuity(principal, rate, years),
   box3(grondslag, forfait, tarief), pow, sqrt, min, max, abs, round,
   floor, ceil, if(cond, a, b).
 - Operatoren: + - * / ^ en vergelijkingen (==, <, >, <=, >=) binnen if().
 - Rentes/percentages als FRACTIE (6% = 0.06).
-- Een formule mag verwijzen naar:
-  1. de input-keys die je zelf definieert (ook boolean/enum als getal),
-  2. de string-constante 'scenario' (de actieve scenario-key) — gebruik
-     if(scenario == "x", ..., ...) voor scenario-specifiek gedrag,
-  3. ANDERE output-keys uit dezelfde calculator (intermediate results).
-     Cyclische verwijzingen zijn verboden (a→b→a). Gebruik dit om
-     formules leesbaar op te delen, bv. eerst 'maandlast' berekenen,
-     daarna 'totaal_betaald' = maandlast * 12 * jaren.
-  4. derived-keys (afgeleide context-rijen, in volgorde gedefinieerd).
-  5. de volgende voorgevulde gebruikersdata-keys:
-${prefillList}
+- Output mag naar ANDERE output verwijzen (intermediate results), maar
+  GEEN cycles (a→b→a verboden). Gebruik dit om formules leesbaar op te
+  delen: eerst \`maandlast\` berekenen, dan \`totaal_betaald = maandlast * 12 * jaren\`.
 
 VOORGEVULDE INPUTS:
 - Geef een input een 'prefill' uit bovenstaande lijst wanneer de waarde
@@ -232,31 +245,65 @@ export async function buildCalculator(
       ? `\n\nBestaande definitie om aan te passen (pas alleen aan wat de gebruiker vraagt):\n${JSON.stringify(refineFrom)}`
       : ''
 
-    const { object } = await generateObject({
-      model,
-      schema: CalculatorDefinitionSchema,
-      system: buildSystemPrompt(),
-      prompt: `Vraag van de gebruiker:\n${userPrompt}${refineBlock}`,
-      // Token-budget: een eenvoudige calc past in ~2k tokens, maar met
-      // de toolbox-velden (narrative, derived, hints, descriptions,
-      // sections) en meerdere scenarios + assumptions kan een rijke
-      // definitie 4-7k tokens groot worden. We zetten op 8000 zodat
-      // complexere vragen (BV-route vs privé, regime-vergelijkingen)
-      // niet stilletjes worden afgekapt — dat veroorzaakt JSON-parse-
-      // fouten die als "NoObjectGenerated" terugkomen.
-      maxOutputTokens: 8000,
-    })
+    const basePrompt = `Vraag van de gebruiker:\n${userPrompt}${refineBlock}`
+    const system = buildSystemPrompt()
 
-    // Statische formule-validatie: vang hallucinerende variabelen vroeg.
-    const unknown = validateFormulas(object, PREFILL_KEY_SET)
-    if (unknown.length > 0) {
-      return {
-        ok: false,
-        error: `De gegenereerde formules verwijzen naar onbekende namen: ${unknown.join(', ')}. Probeer je vraag te herformuleren.`,
-      }
+    const generate = (prompt: string) =>
+      generateObject({
+        model,
+        schema: CalculatorDefinitionSchema,
+        system,
+        prompt,
+        // Token-budget: een eenvoudige calc past in ~2k tokens, maar
+        // met toolbox-velden (narrative, derived, hints, descriptions,
+        // sections) en meerdere scenarios + assumptions kan een rijke
+        // definitie 4-7k tokens groot worden. 8000 zodat complexere
+        // vragen niet stilletjes worden afgekapt (NoObjectGenerated).
+        maxOutputTokens: 8000,
+      })
+
+    const { object: first } = await generate(basePrompt)
+
+    // Statische formule-validatie: vang hallucinerende variabelen.
+    // Bij fail één retry met de fout in de prompt — de AI verzint
+    // soms een domein-specifieke variabele (bv. 'co2_uitstoot' bij
+    // een auto-calc) zonder die als input te declareren; meestal kan
+    // hij dat zelf repareren als hij de fout-context krijgt.
+    let unknown = validateFormulas(first, PREFILL_KEY_SET)
+    if (unknown.length === 0) {
+      return { ok: true, definition: first }
     }
 
-    return { ok: true, definition: object }
+    console.warn(
+      '[build-calculator] eerste poging gaf onbekende namen — auto-retry:',
+      unknown,
+    )
+    const retryPrompt = `${basePrompt}
+
+LET OP — je vorige poging gebruikte deze namen die NIET bestaan:
+  ${unknown.join(', ')}
+
+Mogelijke oorzaken:
+  - Je hebt ze in een formule gebruikt zonder ze als input te declareren.
+    Oplossing: voeg ze toe als input met sensible default + label, OF
+    haal ze uit de formule.
+  - Je gebruikte een naam die LIJKT op een prefill-key maar niet exact
+    matcht. Prefill-keys zijn case-sensitive en snake_case.
+
+Genereer de calc opnieuw zonder deze fout. Elke variabele in een
+formule MOET ofwel in je eigen inputs/outputs/derived staan, ofwel
+EXACT overeenkomen met een prefill-key.`
+
+    const { object: second } = await generate(retryPrompt)
+    unknown = validateFormulas(second, PREFILL_KEY_SET)
+    if (unknown.length === 0) {
+      return { ok: true, definition: second }
+    }
+
+    return {
+      ok: false,
+      error: `De rekenhulp kon niet worden gegenereerd: formules verwijzen na een retry nog steeds naar onbekende namen (${unknown.join(', ')}). Probeer je vraag iets concreter te formuleren.`,
+    }
   } catch (err) {
     // Volledige error loggen voor server-diagnostiek.
     console.error('[build-calculator] generatie mislukt:', err)
