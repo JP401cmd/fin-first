@@ -69,18 +69,33 @@ export const navGroups: NavGroup[] = [
   {
     parent: mainNav[0]!,
     items: [
+      // De vier hefbomen — kompas-categorieën onder Overzicht.
       { label: 'Bezittingen', href: '/overzicht/bezittingen' },
       { label: 'Schulden', href: '/overzicht/schulden' },
       { label: 'Cashflow', href: '/overzicht/cashflow' },
       { label: 'Belasting', href: '/overzicht/belasting' },
+      // Actieve apps — deep-tools per categorie. Statisch opgenomen
+      // zodat ze direct in zowel de desktop-sidebar als het mobile-
+      // menu klikbaar zijn (sidebar.tsx filtert ze nog op tracking-
+      // flag, mobiel toont alle).
+      { label: 'Budgetteren', href: '/core/assets/cash?tab=budgetteren' },
+      { label: 'Aandelen holdings', href: '/core/assets/investment?tab=aandelen-holdings' },
+      { label: 'Crypto holdings', href: '/core/assets/crypto?tab=crypto-holdings' },
+      { label: 'Hypotheekplanner', href: '/core/debts/mortgage?tab=hypotheekplanner' },
+      { label: 'Verhuurrendement', href: '/core/assets/real_estate?tab=verhuurrendement' },
     ],
   },
   {
     parent: mainNav[1]!,
     items: [
-      // Toekomst-tabs (Tijdas/Doelen/Gebeurtenissen/Voorkeuren) leven als
-      // segmented-control binnen /toekomst, geen aparte routes. Lege groep
-      // wordt skip-gerendered in de UI.
+      // Toekomst-tabs als deeplink ?tab=… — segmented-control binnen
+      // /toekomst leest dezelfde query-key (zie components/future/
+      // toekomst-tabs.tsx). Tijdas is de default zonder query-param.
+      { label: 'Tijdas', href: '/toekomst' },
+      { label: 'Doelen', href: '/toekomst?tab=doelen' },
+      { label: 'Gebeurtenissen', href: '/toekomst?tab=gebeurtenissen' },
+      { label: 'Voorkeuren', href: '/toekomst?tab=voorkeuren' },
+      { label: 'Rekenhulp', href: '/toekomst?tab=rekenhulp' },
     ],
   },
   {

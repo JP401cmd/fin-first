@@ -170,9 +170,13 @@ const MODULES: ModuleEntry[] = [
     href: '/toekomst',
     Icon: Compass,
     subTags: [
-      { label: 'Uitgave na pensioen', href: '/toekomst?uitgaven=open' },
-      { label: 'Wat-Als', href: '/toekomst/whatif' },
-      { label: 'Strategieën', href: '/toekomst?strategie=open' },
+      // De vijf tabs van /toekomst (zie components/future/toekomst-tabs.tsx).
+      // ?tab=tijdas is de default zonder query-param.
+      { label: 'Tijdas', href: '/toekomst' },
+      { label: 'Doelen', href: '/toekomst?tab=doelen' },
+      { label: 'Gebeurtenissen', href: '/toekomst?tab=gebeurtenissen' },
+      { label: 'Voorkeuren', href: '/toekomst?tab=voorkeuren' },
+      { label: 'Rekenhulp', href: '/toekomst?tab=rekenhulp' },
     ],
   },
 ]
