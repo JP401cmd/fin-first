@@ -131,7 +131,12 @@ export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps)
     <span ref={containerRef} className="relative inline">
       <button
         type="button"
-        onClick={() => (open ? setOpen(false) : handleOpen())}
+        onClick={(e) => {
+          // Voorkom dat een klik op de term een klikbare ouder (bv. een
+          // role="button"-card) activeert — toon enkel de tooltip.
+          e.stopPropagation()
+          open ? setOpen(false) : handleOpen()
+        }}
         onMouseEnter={handleOpen}
         onMouseLeave={() => setOpen(false)}
         className={buttonClass}

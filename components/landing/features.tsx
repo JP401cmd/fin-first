@@ -1,6 +1,4 @@
-'use client'
-
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   ShieldCheck,
@@ -18,40 +16,13 @@ import {
   Calculator,
   Calendar,
   Target,
+  LineChart,
+  Shuffle,
+  ShieldAlert,
+  Landmark,
   type LucideIcon,
 } from 'lucide-react'
-
-// ── Reveal on scroll ─────────────────────────────────────────────────
-
-function Reveal({ children, className = '' }: { children: ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [visible, setVisible] = useState(false)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setVisible(true) },
-      { threshold: 0.08, rootMargin: '0px 0px -20px 0px' },
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  return (
-    <div
-      ref={ref}
-      style={{
-        transition: visible ? 'opacity 0.7s ease-out, transform 0.7s ease-out' : 'none',
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(28px)',
-      }}
-      className={className}
-    >
-      {children}
-    </div>
-  )
-}
+import { Reveal } from './reveal'
 
 // ── Sectie-scheidingslijn ────────────────────────────────────────────
 
@@ -59,7 +30,7 @@ function SectionRule({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-4 px-6 py-8 md:px-12">
       <div className="h-px flex-1 bg-[var(--border-ed)]" />
-      <span className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+      <span className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
         {label}
       </span>
       <div className="h-px flex-1 bg-[var(--border-ed)]" />
@@ -82,7 +53,7 @@ function SectionTitle({
 }) {
   return (
     <div className="mb-10 text-center">
-      <p className="mb-4 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+      <p className="mb-4 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
         {kicker}
       </p>
       <h2 className="font-display text-[2rem] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)] md:text-[2.6rem]">
@@ -219,7 +190,7 @@ function DemoMock({
 
         {/* Mock content */}
         <div className="bg-[var(--bg)] px-5 py-5">
-          <p className="mb-3 font-sans text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+          <p className="mb-3 font-sans text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
             {rubriek}
           </p>
           {children}
@@ -378,13 +349,49 @@ export function Features() {
               features={[
                 'Tijdas met levensgebeurtenissen (kinderen, verhuizing, pensioen)',
                 'FIRE-prognose met scenario-vergelijking',
-                'Rekenhulp-bibliotheek met 12 prefab-calcs',
+                'Rekenhulp-bibliotheek met 12 kant-en-klare rekenhulpen',
                 'Vraag Will een eigen rekenhulp op maat',
               ]}
               bgClass="bg-horizon-50"
               borderClass="border-horizon-200"
               iconColor="text-horizon-600"
               Icon={Compass}
+            />
+          </div>
+        </Reveal>
+      </section>
+
+      {/* ── EERLIJKE PROJECTIES ──────────────────────────────────── */}
+      <SectionRule label="Eerlijke projecties" />
+      <section id="projecties" className="px-6 py-20 md:px-12 md:py-24">
+        <Reveal className="mx-auto max-w-5xl">
+          <SectionTitle
+            kicker="Geen hype, wel cijfers"
+            title="Projecties die"
+            italics="eerlijk durven zijn"
+            intro="Een prognose is zo goed als de aannames eronder. Daarom rekenen we tegen echte marktdata, tonen we een bandbreedte in plaats van één gladde lijn, en zit de Nederlandse fiscaliteit gewoon ingebakken."
+          />
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            <PrivacyBullet
+              Icon={LineChart}
+              titel="55 jaar echte marktdata"
+              beschrijving="Backtesting tegen werkelijke MSCI World-rendementen (1970–2024), niet tegen een gladde aanname."
+            />
+            <PrivacyBullet
+              Icon={Shuffle}
+              titel="Een waaier, geen losse voorspelling"
+              beschrijving="Monte-Carlo-simulaties tonen een bandbreedte met kansen — optimistisch, verwacht én pessimistisch."
+            />
+            <PrivacyBullet
+              Icon={ShieldAlert}
+              titel="Getest tegen echte crashes"
+              beschrijving="Hoe houdt je plan stand door 1987, 2000, 2008 en 2020? Dat reken je gewoon na."
+            />
+            <PrivacyBullet
+              Icon={Landmark}
+              titel="Box 3-bewust"
+              beschrijving="De Nederlandse vermogensbelasting zit ingebakken in de prognose — in euro's én in vrijheidsdagen."
             />
           </div>
         </Reveal>
@@ -412,7 +419,7 @@ export function Features() {
                     Vandaag
                   </p>
                   <p className="mt-1 font-serif text-xs leading-relaxed text-[var(--ink-2)]">
-                    Je netto vermogen groeide met €1.240 deze maand — vooral door je beleggingen (+€890).
+                    Je netto vermogen groeide met €1.240 deze maand — vooral door je beleggingen (+€890). Dat is ≈ +9 dagen vrijheid.
                   </p>
                 </div>
                 <div className="rounded border border-wil-200 bg-wil-50 p-3">
@@ -476,6 +483,9 @@ export function Features() {
                 <p className="font-serif text-[11px] italic leading-snug text-[var(--ink-2)] border-l-2 border-amber-400 pl-2">
                   Beleggen (8%) geeft 2 jr 4 mnd extra vrijheid.
                 </p>
+                <p className="mt-1 font-serif text-[10px] italic text-[var(--ink-3)]">
+                  Rendement is een aanname die je zelf instelt.
+                </p>
               </div>
             </DemoMock>
           </div>
@@ -487,7 +497,7 @@ export function Features() {
       <section id="rekenhulp" className="px-6 py-16 md:px-12 md:py-20">
         <Reveal className="mx-auto max-w-4xl">
           <div className="mb-8 text-center">
-            <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+            <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
               Voor de momenten dat je twijfelt
             </p>
             <h2 className="font-display text-[1.7rem] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)] md:text-[2.1rem]">
@@ -505,14 +515,14 @@ export function Features() {
               <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
                 Uit de bibliotheek
               </p>
-              <span className="font-mono text-[10px] text-[var(--ink-4)]">12 stuks</span>
+              <span className="font-mono text-[10px] text-[var(--ink-4)]">12 rekenhulpen</span>
             </div>
 
             <div className="space-y-0">
               <CalcRow
                 titel="Aflossen vs. beleggen"
                 sterren={1}
-                beschrijving="Hypotheek extra aflossen of die maandelijkse €X beleggen?"
+                beschrijving="Hypotheek extra aflossen of die maandelijkse €250 beleggen?"
               />
               <CalcRow
                 titel="Huren vs. kopen"
@@ -532,10 +542,10 @@ export function Features() {
                 Of vraag Will een eigen rekenhulp
               </p>
               <Link
-                href="/toekomst/bibliotheek"
+                href="/signup"
                 className="inline-flex items-center gap-1.5 font-sans text-xs font-semibold text-kern-700 hover:text-kern-800 hover:underline"
               >
-                Bekijk de bibliotheek
+                Bekijk de bibliotheek in de app
                 <ArrowRight className="h-3 w-3" aria-hidden="true" />
               </Link>
             </div>
@@ -556,10 +566,10 @@ export function Features() {
 
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { Icon: Calculator, titel: 'Bouwt rekenhulpen', text: 'Beschrijf je dilemma, Will levert een werkende calc met scenario\'s en uitleg.' },
+              { Icon: Calculator, titel: 'Bouwt rekenhulpen', text: 'Beschrijf je dilemma, Will levert een werkende rekenhulp met scenario\'s en uitleg.' },
               { Icon: Calendar, titel: 'Stelt gebeurtenissen voor', text: 'Verbouwing, kind, verhuizing — Will vertaalt naar tijd en geld op je tijdas.' },
               { Icon: Target, titel: 'Suggereert acties', text: 'Bij elk doel een paar concrete stappen die er sneller bij brengen.' },
-              { Icon: HelpCircle, titel: 'Beantwoordt vragen', text: 'In jouw context, met jouw cijfers — geen generieke financiële advies-tekst.' },
+              { Icon: HelpCircle, titel: 'Beantwoordt vragen', text: 'In jouw context, met jouw cijfers — geen generiek financieel adviespraatje.' },
             ].map((it) => (
               <div key={it.titel} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5">
                 <span className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-[var(--r)] border border-wil-200 bg-wil-50">
@@ -588,7 +598,7 @@ export function Features() {
       <section id="voor-wie" className="px-6 py-20 md:px-12 md:py-24">
         <Reveal className="mx-auto max-w-5xl">
           <SectionTitle
-            kicker="Self-selection"
+            kicker="Voor wie"
             title="Voor wie wel,"
             italics="en voor wie niet"
           />
@@ -638,7 +648,7 @@ export function Features() {
                   Mensen die enkel een betaalrekening willen &mdash; daar is je bank-app voor.
                 </li>
                 <li>
-                  Wie een zakelijke boekhouding zoekt voor zijn BV of onderneming
+                  Wie een zakelijke boekhouding zoekt voor een BV of onderneming
                   &mdash; TriFinity is voor privé-gebruik; je BV verschijnt als bezitting.
                 </li>
                 <li>
@@ -672,7 +682,7 @@ export function Features() {
             <PrivacyBullet
               Icon={ShieldCheck}
               titel="EU-hosted"
-              beschrijving="Data leeft op Supabase-servers in Frankfurt. Geen overdracht buiten de EU, geen exotische subprocessors."
+              beschrijving="Je financiële gegevens leven op Supabase-servers in Frankfurt (EU), versleuteld in rust en transport. Alleen voor de AI-functies sturen we strikt-noodzakelijke context naar onze AI-subprocessor — nooit je volledige dataset, nooit voor advertenties of verkoop aan derden."
             />
             <PrivacyBullet
               Icon={Lock}

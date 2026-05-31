@@ -252,6 +252,82 @@ export interface PensionMetadata {
   partnerUitkeringPct?: number
 }
 
+// ── AOW & Pensioen helpers ───────────────────────────────────────────
+// Gedeeld door de strategie-bewerk-modals én lifeEventsToCashflows, zodat
+// readout, lijst en grafiek altijd hetzelfde getal tonen (single source).
+
+/**
+ * Aangepast maandelijks AOW-bedrag o.b.v. leefsituatie + opbouwkorting
+ * (2% per jaar buiten Nederland → opbouwFactor = (50 − jaren) / 50).
+ */
+export function computeAowMonthly(
+  leefsituatie: 'alleenstaand' | 'samenwonend' | undefined,
+  jarenBuitenNL: number | undefined,
+): number {
+  const jaren = Math.min(50, Math.max(0, Number(jarenBuitenNL ?? 0)))
+  const opbouwFactor = (50 - jaren) / 50
+  const base = leefsituatie === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
+  return Math.round(base * opbouwFactor)
+}
+
+export type CanonicalPensionType =
+  | 'bedrijf'
+  | 'lijfrente_levenslang'
+  | 'lijfrente_bancair'
+  | 'tijdelijke_oudedagslijfrente'
+
+/** Map (legacy) pensioenType-waarden naar de canonieke vier. */
+export function normalizePensionType(raw: string | undefined): CanonicalPensionType {
+  switch (raw) {
+    case 'lijfrente':
+      return 'lijfrente_levenslang' // legacy
+    case 'banksparen':
+      return 'lijfrente_bancair' // legacy
+    case 'bedrijf':
+    case 'lijfrente_levenslang':
+    case 'lijfrente_bancair':
+    case 'tijdelijke_oudedagslijfrente':
+      return raw
+    default:
+      return 'bedrijf'
+  }
+}
+
+/**
+ * Zet een opgebouwde pensioenpot (eenmalige inleg) om naar een bruto maandbedrag
+ * via de standaard annuïteitenformule A = P·r / (1 − (1+r)^−n).
+ * - levenslang: annuïteit over (endAge − ingangLeeftijd) jaar.
+ * - vaste duur (5/10/20): annuïteit over dat aantal jaren.
+ * Conservatief reëel rendement (default 1,5%) want de pot blijft tijdens
+ * uitkering doorbelegd. partnerUitkeringPct (alleen levenslang) verlaagt de
+ * eigen uitkering omdat de pot langer moet doorlopen.
+ */
+export function annuitizePension(input: {
+  inlegBedrag: number
+  ingangLeeftijd: number
+  uitkeringsduur: 'levenslang' | '20' | '10' | '5'
+  partnerUitkeringPct?: number
+  realReturn?: number
+  endAge?: number
+}): number {
+  const { inlegBedrag, ingangLeeftijd } = input
+  if (!(inlegBedrag > 0)) return 0
+  const r = input.realReturn ?? 0.015
+  const years =
+    input.uitkeringsduur === 'levenslang'
+      ? Math.max(1, (input.endAge ?? 95) - ingangLeeftijd)
+      : Number(input.uitkeringsduur)
+  const yearly =
+    r === 0 ? inlegBedrag / years : (inlegBedrag * r) / (1 - Math.pow(1 + r, -years))
+  let monthly = yearly / 12
+  if (input.uitkeringsduur === 'levenslang' && input.partnerUitkeringPct) {
+    const p = input.partnerUitkeringPct / 100
+    // Benadering: ~5 jaar partner-overleving tegen p% → lagere eigen uitkering.
+    monthly = monthly / (1 + p * (5 / years))
+  }
+  return Math.round(monthly)
+}
+
 export interface CarPurchaseMetadata {
   brandstof?: 'benzine' | 'diesel' | 'elektrisch' | 'hybride'
   nieuwOfTweedehands?: 'nieuw' | 'tweedehands'

@@ -1,32 +1,26 @@
-import { Parser } from 'expr-eval'
+import { Parser } from './safe-eval'
 import type { CalculatorDefinition } from './types'
 import type { PrefillValues } from './user-data-keys'
 
 /**
  * Rekenhulp — veilige formule-evaluator.
  *
- * Gebruikt `expr-eval` (pure math-parser, GEEN JS-eval / code-exec). Een
- * formule heeft alleen toegang tot:
+ * Gebruikt de in-house `safe-eval` parser (pure math-parser, GEEN JS-eval /
+ * code-exec, GEEN member-access). Een formule heeft alleen toegang tot:
  *   - input-waarden (de actuele slider-stand)
  *   - voorgevulde gebruikersdata (PrefillValues)
  *   - de actieve scenario-key als string-constante `scenario`
  *   - een whitelisted set financiële functies (zie WHITELIST_FNS)
  *
- * expr-eval blokkeert toegang tot globals (process/global/constructor) —
- * onbekende namen gooien "undefined variable". We vangen dat af en
- * leveren een nette foutmelding per output i.p.v. de hele evaluatie te
+ * De evaluator blokkeert toegang tot globals (process/global/constructor) by
+ * construction: er is geen `.`-operator en opzoekingen gaan uitsluitend via
+ * hasOwnProperty. Onbekende namen gooien "undefined variable". We vangen dat
+ * af en leveren een nette foutmelding per output i.p.v. de hele evaluatie te
  * laten crashen.
  */
 
 // Eén Parser-instance volstaat; parse() is stateless.
-const parser = new Parser({
-  operators: {
-    // Sta alleen rekenkundige operators toe. Logische/vergelijkings-
-    // operators blijven aan voor `if(cond, a, b)`-achtige formules.
-    concatenate: false,
-    assignment: false,
-  },
-})
+const parser = new Parser()
 
 /** Whitelisted financiële + wiskundige helperfuncties. */
 const WHITELIST_FNS: Record<string, (...args: number[]) => number> = {

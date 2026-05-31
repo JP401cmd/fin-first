@@ -9,7 +9,12 @@ import {
 import { type FireStrategyConfig, type FireEndStrategy, parseFireStrategy } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { BOX3_DRAG, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
-import { NIBUD_CHILDREN_MONTHLY_COST } from '@/lib/horizon-data'
+import {
+  NIBUD_CHILDREN_MONTHLY_COST,
+  annuitizePension,
+  normalizePensionType,
+  computeAowMonthly,
+} from '@/lib/horizon-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 
 // ── Standard fixture ────────────────────────────────────────────────────────
@@ -944,5 +949,123 @@ describe('H — Pensioen-modus', () => {
     const result = runStandard({}, [], pensioenStrategy, vpwConfig)
     expect(result.rows.length).toBe(0)
     expect(result.fireReachable).toBe(false)
+  })
+})
+
+// ── I — AOW & Pensioen strategie-helpers + cashflow-tak ─────────────────────
+
+describe('I — AOW & Pensioen helpers', () => {
+  it('I1: normalizePensionType maps legacy + canonical + default', () => {
+    expect(normalizePensionType('lijfrente')).toBe('lijfrente_levenslang')
+    expect(normalizePensionType('banksparen')).toBe('lijfrente_bancair')
+    expect(normalizePensionType('bedrijf')).toBe('bedrijf')
+    expect(normalizePensionType('tijdelijke_oudedagslijfrente')).toBe('tijdelijke_oudedagslijfrente')
+    expect(normalizePensionType(undefined)).toBe('bedrijf')
+    expect(normalizePensionType('onzin')).toBe('bedrijf')
+  })
+
+  it('I2: computeAowMonthly respects leefsituatie + opbouwkorting', () => {
+    expect(computeAowMonthly('alleenstaand', 0)).toBe(NL_AOW_MONTHLY)
+    expect(computeAowMonthly('samenwonend', 0)).toBe(NL_AOW_MONTHLY_SAMENWONEND)
+    expect(computeAowMonthly(undefined, undefined)).toBe(NL_AOW_MONTHLY)
+    // 10 jaar buiten NL → 20% korting → 80% van basis
+    expect(computeAowMonthly('alleenstaand', 10)).toBe(Math.round(NL_AOW_MONTHLY * 0.8))
+    // >50 jaar clamp → 0 opbouw
+    expect(computeAowMonthly('alleenstaand', 60)).toBe(0)
+  })
+
+  it('I3: annuitizePension — 0 inleg → 0; r=0 → lineair; pot > principal', () => {
+    expect(annuitizePension({ inlegBedrag: 0, ingangLeeftijd: 67, uitkeringsduur: '10' })).toBe(0)
+    // realReturn 0 → puur lineaire verdeling: 120k / 10 jr / 12 = 1000
+    expect(
+      annuitizePension({ inlegBedrag: 120_000, ingangLeeftijd: 67, uitkeringsduur: '10', realReturn: 0 }),
+    ).toBe(1000)
+    // met rendement keert de pot in totaal méér uit dan de inleg
+    const m = annuitizePension({ inlegBedrag: 100_000, ingangLeeftijd: 67, uitkeringsduur: '10' })
+    expect(m * 12 * 10).toBeGreaterThan(100_000)
+  })
+
+  it('I4: annuitizePension — kortere duur geeft hoger maandbedrag; partner verlaagt', () => {
+    const d5 = annuitizePension({ inlegBedrag: 100_000, ingangLeeftijd: 67, uitkeringsduur: '5' })
+    const d10 = annuitizePension({ inlegBedrag: 100_000, ingangLeeftijd: 67, uitkeringsduur: '10' })
+    const d20 = annuitizePension({ inlegBedrag: 100_000, ingangLeeftijd: 67, uitkeringsduur: '20' })
+    const levenslang = annuitizePension({ inlegBedrag: 100_000, ingangLeeftijd: 67, uitkeringsduur: 'levenslang' })
+    expect(d5).toBeGreaterThan(d10)
+    expect(d10).toBeGreaterThan(d20)
+    expect(d20).toBeGreaterThan(levenslang)
+    const zonderPartner = annuitizePension({ inlegBedrag: 100_000, ingangLeeftijd: 67, uitkeringsduur: 'levenslang' })
+    const metPartner = annuitizePension({ inlegBedrag: 100_000, ingangLeeftijd: 67, uitkeringsduur: 'levenslang', partnerUitkeringPct: 70 })
+    expect(metPartner).toBeLessThan(zonderPartner)
+  })
+})
+
+describe('I — Pension cashflow branch (lifeEventsToCashflows)', () => {
+  it('I5: maand-modus levenslang → één recurring income, fromAge=ingang, toAge=null', () => {
+    const ev = makeEvent({
+      id: 'pension-1',
+      name: 'Bedrijfspensioen',
+      event_type: 'pension',
+      target_age: 67,
+      monthly_income_change: 1500,
+      is_indexed: false,
+      metadata: {
+        pensioenType: 'bedrijf',
+        ingangLeeftijd: 67,
+        brutoBedrag: 1500,
+        uitkeringsduur: 'levenslang',
+        isGeindexeerd: false,
+      },
+    })
+    const flows = lifeEventsToCashflows([ev])
+    const pension = flows.filter((cf) => cf.id.startsWith('le-pension-'))
+    expect(pension).toHaveLength(1)
+    // geen dubbeltelling: geen generieke maandinkomen-flow
+    expect(flows.filter((cf) => cf.id.startsWith('le-costchange-'))).toHaveLength(0)
+    const f = pension[0]!
+    expect(f.direction).toBe('income')
+    expect(f.amount).toBe(1500)
+    expect(f.fromAge).toBe(67)
+    expect(f.toAge).toBeNull()
+    expect(f.indexed).toBe(false)
+  })
+
+  it('I6: eindige uitkeringsduur → toAge = ingang + duur', () => {
+    const ev = makeEvent({
+      id: 'pension-2',
+      event_type: 'pension',
+      target_age: 67,
+      monthly_income_change: 320,
+      metadata: {
+        pensioenType: 'lijfrente_bancair',
+        ingangLeeftijd: 67,
+        brutoBedrag: 320,
+        uitkeringsduur: '20',
+        isGeindexeerd: true,
+      },
+    })
+    const f = lifeEventsToCashflows([ev]).find((cf) => cf.id.startsWith('le-pension-'))!
+    expect(f.fromAge).toBe(67)
+    expect(f.toAge).toBe(87) // 67 + 20
+    expect(f.indexed).toBe(true)
+  })
+
+  it('I7: inleg-modus annuïtiseert (amount == annuitizePension)', () => {
+    const ev = makeEvent({
+      id: 'pension-3',
+      event_type: 'pension',
+      target_age: 67,
+      monthly_income_change: 0,
+      metadata: {
+        pensioenType: 'lijfrente_bancair',
+        ingangLeeftijd: 67,
+        inlegBedrag: 100_000,
+        uitkeringsduur: '20',
+        isGeindexeerd: false,
+      },
+    })
+    const f = lifeEventsToCashflows([ev]).find((cf) => cf.id.startsWith('le-pension-'))!
+    const expected = annuitizePension({ inlegBedrag: 100_000, ingangLeeftijd: 67, uitkeringsduur: '20' })
+    expect(f.amount).toBe(expected)
+    expect(expected).toBeGreaterThan(0)
   })
 })

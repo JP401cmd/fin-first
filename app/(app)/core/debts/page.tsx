@@ -1,11 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Plus, BarChart3, ChevronDown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { BudgetIcon } from '@/components/app/budget-shared'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import {
   type Debt,
@@ -34,6 +32,7 @@ import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wiz
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { VermogenDebtCard } from '@/components/core/vermogen-debt-card'
 import { AddCategoryCard } from '@/components/core/add-category-card'
+import { CategoryGroupHeader } from '@/components/core/category-group-header'
 import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip, PageInfoButton, GlossaryTerm } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
@@ -307,7 +306,12 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
   }, [selectedDebt, valuationsByDebtId, loadValuations])
 
   function openDebtModal(debt: Debt) {
-    setSelectedDebtId(debt.id)
+    // Klik op de kaart-body opent de view-modal op de categoriepagina van de
+    // schuld: `/core/debts/[type]?debt=<id>`. De categoriepagina leest `?debt=`
+    // zelf uit de URL. `router.push` zodat browser-Back terugkeert naar dit
+    // overzicht. Snelle acties (Saldo bijwerken / Bewerken) openen wél ter
+    // plekke — zie handleDebtRevalue / handleDebtEdit.
+    router.push(`/core/debts/${debt.debt_type}?debt=${debt.id}`)
   }
 
   // Direct revaluation-target — gezet door de "Saldo bijwerken"-knop op een
@@ -556,21 +560,15 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
 
           return (
             <div key={type} id={`debt-group-${type}`} className="scroll-mt-24">
-              {/* Group header — altijd klikbaar door naar /core/debts/[type] */}
-              <div className="flex items-center gap-2 pt-2 pb-2.5">
-                <span style={{ color: groupColor }}>
-                  <BudgetIcon name={groupIcon} className="h-4 w-4" />
-                </span>
-                <Link
-                  href={`/core/debts/${type}`}
-                  className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)] hover:text-kern-600 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kern-500"
-                >
-                  {DEBT_TYPE_LABELS[type]}
-                </Link>
-                <span className="text-[var(--ink-3)]">
-                  <MaskedAmount value={group.total} tone="kern" className="text-xs" />
-                </span>
-              </div>
+              {/* Group header — gedeelde component (zie assets-client.tsx):
+                  icoon + label + chevron = link naar /core/debts/[type]. */}
+              <CategoryGroupHeader
+                href={`/core/debts/${type}`}
+                label={DEBT_TYPE_LABELS[type]}
+                iconName={groupIcon}
+                iconColor={groupColor}
+                total={group.total}
+              />
 
               {/* Debt cards — zelfde grid + cards als /core/debts/[type].
                   KPI-strip + sparkline-overlay worden door VermogenDebtCard

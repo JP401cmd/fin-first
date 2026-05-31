@@ -1324,3 +1324,14 @@ body {
     animation: none;
   }
 }
+
+/* ── Globale focus-indicator (WCAG 2.1 Focus Visible) ───────────
+   Conservatief: alleen :focus-visible (keyboard/programmatic), niet
+   bij muisklik. Bestaande component-specifieke focus-regels blijven
+   intact — dit is een vangnet voor links/knoppen zonder eigen stijl. */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}

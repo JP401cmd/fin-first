@@ -57,8 +57,22 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://trifinity.app'),
   title: "TriFinity — Ken je waarheid. Kies je vrijheid. Leef je tijd.",
   description: "Geld is opgeslagen tijd. TriFinity vertaalt je financien naar vrijheid — jouw persoonlijke finance freedom navigator.",
+  openGraph: {
+    title: "TriFinity — Ken je waarheid. Kies je vrijheid. Leef je tijd.",
+    description: "Geld is opgeslagen tijd. TriFinity vertaalt je financien naar vrijheid — jouw persoonlijke finance freedom navigator.",
+    type: 'website',
+    locale: 'nl_NL',
+    siteName: 'TriFinity',
+    url: 'https://trifinity.app',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "TriFinity — Ken je waarheid. Kies je vrijheid. Leef je tijd.",
+    description: "Geld is opgeslagen tijd. TriFinity vertaalt je financien naar vrijheid — jouw persoonlijke finance freedom navigator.",
+  },
   manifest: '/manifest.json',
   // Icons block: gives Next.js explicit references for favicon, Apple touch
   // icon, and the PWA icons that Bubblewrap reads from the manifest later.

@@ -18,7 +18,7 @@ import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { Kicker, FiguresStrip } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { isHousingStrategyEvent } from '@/lib/housing-strategy'
+import { isStrategyManagedEvent, STRATEGY_BADGE_LABEL } from '@/lib/strategy-events'
 import { formatCurrency } from '@/lib/format'
 import { EventImpactPreview } from './event-impact-preview'
 import { EVENT_ICONS } from './log-timeline'
@@ -74,7 +74,14 @@ export function EventPaneView({
 
   const catalogEntry = LIFE_EVENT_CATALOG[event.event_type]
   const eventIcon = catalogEntry?.icon ?? event.icon ?? 'Calendar'
-  const isHousing = isHousingStrategyEvent(event)
+  const managed = isStrategyManagedEvent(event)
+  const isHousing = managed === 'huis'
+  const managedStrategyLabel =
+    managed === 'aow'
+      ? 'AOW-strategie'
+      : managed === 'pensioen'
+        ? 'Pensioen-strategie'
+        : 'Eigen-woning-strategie'
 
   return (
     // Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
@@ -84,11 +91,11 @@ export function EventPaneView({
       <div className="mb-6 flex items-start gap-3">
         <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--module-active-50)] text-[var(--module-active-700)]">
           {EVENT_ICONS[eventIcon] ?? EVENT_ICONS['Calendar']}
-          {isHousing && (
+          {managed && (
             <span
               aria-hidden
               className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-[var(--paper)] bg-[var(--module-active-700)] text-[var(--paper)]"
-              title="Beheerd via Eigen-woning-strategie"
+              title={STRATEGY_BADGE_LABEL[managed]}
             >
               <Sparkles className="h-3 w-3" />
             </span>
@@ -107,15 +114,15 @@ export function EventPaneView({
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
             Op {event.target_age}-jarige leeftijd
-            {isHousing && (
+            {managed && (
               <>
                 {' · '}
                 <span className="not-italic">Beheerd via</span>{' '}
                 <Link
-                  href="/toekomst"
+                  href={`/toekomst?tab=gebeurtenissen&strategie=${managed}`}
                   className="not-italic underline underline-offset-2 hover:text-[var(--ink-2)]"
                 >
-                  Eigen-woning-strategie
+                  {managedStrategyLabel}
                 </Link>
               </>
             )}

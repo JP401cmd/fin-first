@@ -33,7 +33,7 @@ describe('PrivacyOverview', () => {
     expect(screen.getByText('Cashflow & transacties')).toBeTruthy()
     expect(screen.getByText('Doelen')).toBeTruthy()
     expect(screen.getByText('Will-chat & AI-context')).toBeTruthy()
-    expect(screen.getByText('Briefing-historie')).toBeTruthy()
+    expect(screen.getByText('Wekelijkse briefing')).toBeTruthy()
   })
 
   it('export- en delete-CTAs zijn aanwezig met deep-links', () => {
@@ -60,8 +60,8 @@ describe('PrivacyOverview', () => {
     expect(screen.getByText(/Géén model-training/i)).toBeTruthy()
   })
 
-  it('vermeldt "localStorage" bij Briefing-historie', () => {
+  it('vermeldt server-side opslag bij de wekelijkse briefing', () => {
     render(<PrivacyOverview />)
-    expect(screen.getByText(/localStorage/i)).toBeTruthy()
+    expect(screen.getByText(/briefing_snapshot/i)).toBeTruthy()
   })
 })

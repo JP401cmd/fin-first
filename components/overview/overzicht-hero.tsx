@@ -13,6 +13,7 @@ import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import { HefbomenNav } from './overzicht-hero/hefbomen-nav'
 import { BriefingPanel, type BriefingEntry } from './briefing-panel'
+import type { FreedomHeroProps } from '@/lib/briefing/overview-briefing'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { HealthScoreCard } from './overzicht-hero/health-score-card'
 import {
@@ -54,9 +55,14 @@ type OverzichtHeroProps = {
    *  toont het panel een placeholder-card. Categorieën: observation /
    *  tip / upcoming / heads_up / milestone / market. */
   briefingEntries?: BriefingEntry[]
-  /** Optionele natuurlijke-taal samenvatting (plan T-1) — gerendered
-   *  als Will-headline boven de briefing-cards. */
-  briefingNarrative?: string | null
+  /** ISO-tijdstip waarop de briefing voor vandaag is vastgezet ("Bijgewerkt …"). */
+  briefingRefreshedAt?: string | null
+  /** Of de handmatige ververs vandaag nog beschikbaar is (max 1×/dag). */
+  briefingCanRefresh?: boolean
+  /** Vrijheidstijd-hero bovenaan de briefing (week-over-week delta). */
+  freedomHero?: FreedomHeroProps | null
+  /** Eén-zin kop boven de briefjes. */
+  briefingHeadline?: string | null
   /** Inputs voor mini-vermogen-grafiek naast Health Score. Wanneer leeg
    *  blijft chart-slot leeg (geen rendering). */
   netWorthHistory?: { month: string; value: number }[]
@@ -128,7 +134,10 @@ export function OverzichtHero({
   isPensioenMode,
   totals,
   briefingEntries,
-  briefingNarrative,
+  briefingRefreshedAt,
+  briefingCanRefresh,
+  freedomHero,
+  briefingHeadline,
   netWorthHistory,
   currentNetWorth,
   fireAge,
@@ -307,7 +316,13 @@ export function OverzichtHero({
         </div>
       )}
 
-      <BriefingPanel entries={briefingEntries ?? []} narrative={briefingNarrative ?? null} />
+      <BriefingPanel
+        entries={briefingEntries ?? []}
+        refreshedAt={briefingRefreshedAt ?? null}
+        canRefresh={briefingCanRefresh ?? false}
+        freedomHero={freedomHero ?? null}
+        headline={briefingHeadline ?? null}
+      />
 
       <div className="mt-4 text-center print:hidden">
         <Link

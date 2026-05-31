@@ -6,10 +6,10 @@ import { Check, Sparkles } from 'lucide-react'
  *
  * Twee tiers naast elkaar in krantenstijl:
  *  - Gratis: complete Overzicht-module, beperkt rekenhulpen, single-user
- *  - Pro:    onbeperkt rekenhulpen, huishouden-modus, specialist-calcs
+ *  - Pro:    onbeperkt rekenhulpen, huishouden-modus, specialist-rekenhulpen
  *
  * Geen creditcard bij signup. Geen trial-countdowns of dark patterns.
- * Exact tarief Pro = aparte beslissing — placeholder €X,XX zolang.
+ * Pro-tarief = €9 per maand.
  */
 
 interface Tier {
@@ -26,7 +26,7 @@ interface Tier {
 const tiers: Tier[] = [
   {
     name: 'Gratis',
-    kicker: 'Voor wie wil beginnen',
+    kicker: 'Om mee te beginnen',
     price: '€0',
     priceSuffix: 'voor altijd',
     description:
@@ -43,8 +43,8 @@ const tiers: Tier[] = [
   },
   {
     name: 'Pro',
-    kicker: 'Voor wie verder wil',
-    price: '€X,XX',
+    kicker: 'Om verder te gaan',
+    price: '€9',
     priceSuffix: 'per maand',
     description:
       'Voor wie de fiscale specialist-rekenhulpen, huishouden-modus en onbeperkte Will-toegang nodig heeft.',
@@ -52,11 +52,11 @@ const tiers: Tier[] = [
       'Alles uit Gratis',
       'Onbeperkt AI-gegenereerde rekenhulpen',
       'Huishouden-modus (privé / samen / partner-perspectief)',
-      'Specialist-calcs (BV, box 3 werkelijk, kamerverhuur-regimes)',
+      'Specialist-rekenhulpen (BV, box 3 werkelijk, kamerverhuur-regimes)',
       'Publiceren naar de bibliotheek',
       'Priority-support',
     ],
-    cta: 'Begin met Pro',
+    cta: 'Start gratis — Pro in de app',
     highlighted: true,
   },
 ]
@@ -67,7 +67,7 @@ export function Pricing() {
       {/* Sectie-scheidingsregel — consistent met Features.tsx */}
       <div className="flex items-center gap-4 px-6 py-8 md:px-12">
         <div className="h-px flex-1 bg-[var(--border-ed)]" />
-        <span className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+        <span className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
           Prijzen
         </span>
         <div className="h-px flex-1 bg-[var(--border-ed)]" />
@@ -77,7 +77,7 @@ export function Pricing() {
         <div className="mx-auto max-w-5xl">
           {/* Sectie-titel */}
           <div className="mb-12 text-center">
-            <p className="mb-4 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+            <p className="mb-4 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
               Prijzen
             </p>
             <h2 className="font-display text-[2rem] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)] md:text-[2.6rem]">
@@ -165,7 +165,7 @@ export function Pricing() {
                 {/* CTA */}
                 <div className="px-6 pb-6">
                   <Link
-                    href="/signup"
+                    href={tier.highlighted ? '/signup?plan=pro' : '/signup'}
                     className={`block w-full rounded-[var(--r)] px-4 py-3 text-center font-sans text-sm font-medium transition-all ${
                       tier.highlighted
                         ? 'bg-[var(--ink)] text-[var(--bg)] hover:bg-[var(--ink-2)] hover:shadow-[var(--s1)]'
@@ -180,9 +180,9 @@ export function Pricing() {
           </div>
 
           {/* Kleine voetnoot */}
-          <p className="mx-auto mt-10 max-w-2xl text-center font-serif text-xs italic leading-relaxed text-[var(--ink-4)]">
-            Exact Pro-tarief volgt bij de officiële launch. Wie nu begint
-            met Gratis houdt &apos;m gratis &mdash; ook na introductie van Pro.
+          <p className="mx-auto mt-10 max-w-2xl text-center font-serif text-xs italic leading-relaxed text-[var(--ink-2)]">
+            Wie nu met Gratis begint, houdt het gratis-account &mdash; ook ná de
+            introductie van Pro, zolang je wilt.
           </p>
         </div>
       </section>

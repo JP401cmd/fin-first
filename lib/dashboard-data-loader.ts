@@ -41,6 +41,8 @@ import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy } from '@/lib/withdrawal-strategy'
 import { runUnifiedProjection, toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
+import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
 import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
@@ -117,6 +119,15 @@ export interface DashboardDataResult {
    * of bijbehorende module uit) — UI verbergt de balk dan.
    */
   categoryAppLinks: CategoryAppLink[]
+  /** Pot-regels (onttrekkingsvolgorde/verdeling/afname) voor de Voorkeuren-tab. */
+  regelVoorkeuren: PotRulesConfig
+  /**
+   * Serialiseerbare snapshot van de unified-projection input + AOW-data, zodat
+   * de /toekomst Voorkeuren-bewerkschermen een baseline kunnen rekenen die
+   * identiek is aan de Tijdas-grafiek. Null wanneer er geen simulatie liep
+   * (geen DOB of geen positief vermogen).
+   */
+  regelSimSnapshot: RegelSimSnapshot | null
 }
 
 // ── Main loader ────────────────────────────────────────────────
@@ -579,6 +590,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   let simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number }[] | null = null
   let simRequiredPortfolio: number | null = null
   let simFireAgeFractional: number | null = null
+  // Snapshot voor de /toekomst Voorkeuren-bewerkschermen (regel-sim baseline = Tijdas-curve).
+  let regelSimSnapshot: RegelSimSnapshot | null = null
   if (dob && netWorth > 0) {
     try {
       const currentAge = ageAtDate(dob)
@@ -642,6 +655,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         forcedFireAge: dashboardForcedFireAge,
         hasPartner,
         bankAccountCash: unlinkedCash,
+      }
+      // Bewaar de snapshot zodat de Voorkeuren-editors dezelfde baseline rekenen.
+      // `fireStrategy` is de rauwe strategie (vóór de pensioen-endAge-bump); de
+      // editor-helper recomputet forcedFireAge/endAge consistent per kandidaat.
+      regelSimSnapshot = {
+        unifiedInput,
+        fireStrategy,
+        withdrawalStrategy,
+        aowAgeInt,
+        aowFractional: userAowAge.fractional,
       }
       const unifiedResult = runUnifiedProjection(unifiedInput)
       const simResult = toSimResult(unifiedResult)
@@ -1764,6 +1787,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     heatmapBeschikbaarMap,
   }
 
+  // Pot-regels — defensieve aparte fetch zodat een ontbrekende kolom (DB zonder
+  // migratie 20260601000000_add_pot_rules) de hele dashboard-load niet laat falen.
+  // resolvePotRules valt terug op defaults bij missing/lege waarde.
+  let regelVoorkeuren: PotRulesConfig = POT_RULES_DEFAULTS
+  if (currentUserId) {
+    const { data: potData, error: potErr } = await supabase
+      .from('profiles')
+      .select('pot_rules')
+      .eq('id', currentUserId)
+      .maybeSingle()
+    if (!potErr && potData) regelVoorkeuren = resolvePotRules(potData)
+  }
+
   return {
     dashboardData,
     activeWidgets,
@@ -1792,6 +1828,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // Categorie-balk-input voor het Will-dashboard. We projecteren naar de
     // lichte CategoryNavAssetInput/DebtInput shapes — de builder filtert
     // verder op actieve module + tracked-items.
+    regelSimSnapshot,
+    regelVoorkeuren,
     categoryAppLinks: buildCategoryAppLinks(
       (assetsResult.data ?? []).map((a) => ({
         asset_type: (a as { asset_type: Asset['asset_type'] }).asset_type,

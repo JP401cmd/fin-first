@@ -40,7 +40,7 @@ const KeyString = z
  * uitvoerbare code. De definitie beschrijft invoervelden (optioneel
  * voorgevuld met gebruikersdata), één of meer scenario's, en outputs als
  * wiskundige formules. De formules worden veilig geëvalueerd door
- * `lib/calculator/evaluate.ts` (expr-eval sandbox, geen JS-eval).
+ * `lib/calculator/evaluate.ts` (in-house safe-eval, geen JS-eval / member-access).
  *
  * Deze definitie is de durable artifact: hij wordt opgeslagen in de
  * `custom_calculators`-tabel (JSONB) en blijft herbruikbaar/aanpasbaar.

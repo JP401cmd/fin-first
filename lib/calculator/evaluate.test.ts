@@ -124,6 +124,59 @@ describe('evaluateCalculator — veiligheid', () => {
     expect(r.values.a.x).toBeNull()
   })
 
+  it('member-access (.) is een parse-fout — sluit de constructor-escape', () => {
+    // Dit was de exploiteerbare expr-eval-kwetsbaarheid:
+    //   scenario.constructor.constructor("…kwaadaardige JS…")()
+    const d = def({
+      outputs: [
+        {
+          key: 'x',
+          label: 'X',
+          formula: 'scenario.constructor.constructor("return 1")()',
+          format: 'number',
+        },
+      ],
+    })
+    const r = evaluateCalculator(d, {}, {})
+    expect(r.values.a.x).toBeNull()
+    expect(r.errors.length).toBeGreaterThan(0)
+  })
+
+  it('bracket-index, __proto__ en property-toegang leveren null op', () => {
+    const d = def({
+      outputs: [
+        { key: 'a', label: 'A', formula: 'scenario["constructor"]', format: 'number' },
+        { key: 'b', label: 'B', formula: '__proto__', format: 'number' },
+        { key: 'c', label: 'C', formula: 'inleg.toString', format: 'number' },
+      ],
+    })
+    const r = evaluateCalculator(d, { inleg: 1 }, {})
+    expect(r.values.a.a).toBeNull()
+    expect(r.values.a.b).toBeNull()
+    expect(r.values.a.c).toBeNull()
+  })
+
+  it('assignment (=) wordt niet ondersteund', () => {
+    const d = def({
+      outputs: [{ key: 'x', label: 'X', formula: 'inleg = 5', format: 'number' }],
+    })
+    const r = evaluateCalculator(d, { inleg: 1 }, {})
+    expect(r.values.a.x).toBeNull()
+  })
+
+  it('formule kan het globale prototype niet vervuilen', () => {
+    const probe = {} as Record<string, unknown>
+    const before = probe.polluted
+    const d = def({
+      outputs: [
+        { key: 'x', label: 'X', formula: 'constructor("x")', format: 'number' },
+        { key: 'y', label: 'Y', formula: 'toString()', format: 'number' },
+      ],
+    })
+    evaluateCalculator(d, {}, {})
+    expect(({} as Record<string, unknown>).polluted).toBe(before)
+  })
+
   it('vangt onzin-formule netjes af', () => {
     const d = def({
       outputs: [{ key: 'x', label: 'X', formula: 'inleg +* 2', format: 'number' }],

@@ -36,7 +36,7 @@ describe('BriefingPanel — basis-render', () => {
     )
     expect(screen.getByText('Wat valt op')).toBeTruthy()
     expect(screen.getByText('Een tip')).toBeTruthy()
-    expect(screen.getByText('Komende maand')).toBeTruthy()
+    expect(screen.getByText('Binnenkort')).toBeTruthy()
     expect(screen.getByText('Heads-up')).toBeTruthy()
     expect(screen.getByText('Mijlpaal')).toBeTruthy()
     expect(screen.getByText('Markt')).toBeTruthy()
@@ -176,32 +176,71 @@ describe('BriefingPanel — kleur-codering per categorie', () => {
   })
 })
 
-describe('BriefingPanel — narrative', () => {
-  it('rendert narrative-card met tekst en Will-W badge', () => {
+describe('BriefingPanel — vrijheidstijd-hero + kop', () => {
+  const hero = {
+    totalFreedomDays: 1000,
+    totalLabel: '2 jaar en 9 maanden',
+    deltaDays: 12,
+    isFirstWeek: false,
+    sparkline: [],
+    isInfinite: false,
+    isDeficit: false,
+  }
+
+  it('rendert de hero wanneer freedomHero gegeven is', () => {
+    render(<BriefingPanel entries={[makeEntry('observation', 'X')]} freedomHero={hero} />)
+    expect(screen.getByText(/Jouw vrijheid deze week/i)).toBeTruthy()
+    expect(screen.getByText(/2 jaar en 9 maanden/)).toBeTruthy()
+  })
+
+  it('rendert geen hero zonder freedomHero', () => {
+    render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
+    expect(screen.queryByText(/Jouw vrijheid deze week/i)).toBeNull()
+  })
+
+  it('toont de kop-zin wanneer headline gegeven is', () => {
     render(
       <BriefingPanel
-        entries={[makeEntry('observation', 'Vermogen +1.2%')]}
-        narrative="Vorige week: vermogen +1.2%, schuld stabiel."
+        entries={[makeEntry('observation', 'X')]}
+        headline="Deze week 5 dagen vrijheid erbij."
       />,
     )
-    expect(screen.getByText(/Will — jouw briefing/i)).toBeTruthy()
-    expect(screen.getByText(/Vorige week: vermogen/)).toBeTruthy()
+    expect(screen.getByText(/Deze week 5 dagen vrijheid erbij/)).toBeTruthy()
+  })
+})
+
+describe('BriefingPanel — wekelijkse-briefing header + ververs', () => {
+  it('rendert de sectiekop "Jouw wekelijkse briefing"', () => {
+    render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
+    expect(screen.getByText(/Jouw wekelijkse briefing/i)).toBeTruthy()
   })
 
-  it('toont "Eerdere briefings →" link naar /overzicht#briefing', () => {
-    const { container } = render(
+  it('toont een "Bijgewerkt …"-stempel wanneer refreshedAt gegeven is', () => {
+    render(
       <BriefingPanel
         entries={[makeEntry('observation', 'X')]}
-        narrative="Test narrative."
+        refreshedAt={new Date().toISOString()}
       />,
     )
-    const link = container.querySelector('a[href="/overzicht#briefing"]')
-    expect(link).toBeTruthy()
-    expect(link?.textContent).toMatch(/Eerdere briefings/i)
+    expect(screen.getByText(/Bijgewerkt/i)).toBeTruthy()
   })
 
-  it('rendert geen narrative-card zonder text', () => {
+  it('toont altijd een Deel-knop in de header', () => {
     render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
-    expect(screen.queryByText(/Will — jouw briefing/i)).toBeNull()
+    expect(screen.getByRole('button', { name: /deel je vrijheidsweek/i })).toBeTruthy()
+  })
+
+  it('toont een actieve Ververs-knop wanneer canRefresh true is', () => {
+    render(
+      <BriefingPanel entries={[makeEntry('observation', 'X')]} canRefresh />,
+    )
+    const btn = screen.getByRole('button', { name: /ververs/i })
+    expect(btn).toBeTruthy()
+    expect((btn as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('toont geen Ververs-knop wanneer canRefresh false en nog niet gebruikt', () => {
+    render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
+    expect(screen.queryByRole('button', { name: /ververs/i })).toBeNull()
   })
 })

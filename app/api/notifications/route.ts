@@ -5,6 +5,7 @@ import { getActiveNudges, type NudgeDataState, type NudgeOverrides } from '@/lib
 import type { ModuleId } from '@/lib/module-registry'
 import { shouldSendWozReminder, WOZ_REMINDER_TEMPLATE } from '@/lib/notifications/woz-reminder'
 import { shouldSendPensionReminder, PENSION_REMINDER_TEMPLATE } from '@/lib/notifications/pension-reminder'
+import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ export type NotificationType =
   | 'horizon'
   | 'holding_alert'
   | 'module_nudge'
+  | 'briefing'
 
 export type Notification = {
   id: string
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest) {
       budget: true, streak: true, sync: true,
       recommendation: true, insight: true, badge: true, levelup: true,
       partner_transaction: true, horizon: true,
-      holding_alert: true, module_nudge: true,
+      holding_alert: true, module_nudge: true, briefing: true,
     }
     const prefs: Record<string, boolean> = prefsRes.data?.value
       ? { ...defaultPrefs, ...JSON.parse(prefsRes.data.value) }
@@ -379,6 +381,43 @@ export async function GET(request: NextRequest) {
       }
     } catch (err) {
       console.error('Yearly reminder notification error:', err)
+    }
+
+    // ── 4c. Wekelijkse briefing-melding ─────────────────────────────
+    // Eén melding per ISO-week (Amsterdam): nudge naar /overzicht waar de
+    // verse weekbriefing + vrijheidswinst klaarstaat. Gegate via een
+    // app_settings-key, exact zoals de woz/pension-reminders hierboven.
+    // De voorkeur-check zit hier (niet pas in het eind-filter) zodat een
+    // uitgezette melding de week-key niet "opbrandt".
+    if (prefs.briefing !== false) try {
+      const briefingWeekKey = `briefing_notified_week_${user.id}`
+      const { data: lastBriefingWeekRow } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', briefingWeekKey)
+        .maybeSingle()
+      const currentWeek = amsterdamWeekKey(new Date())
+      if (lastBriefingWeekRow?.value !== currentWeek) {
+        await supabase
+          .from('app_settings')
+          .upsert({ key: briefingWeekKey, value: currentWeek }, { onConflict: 'key' })
+        const id = `briefing_${currentWeek}`
+        notifications.push({
+          id,
+          type: 'briefing',
+          priority: 4,
+          title: 'Je weekbriefing staat klaar',
+          description:
+            'Bekijk je vrijheidswinst van deze week — wat je geld je aan tijd opleverde.',
+          icon: 'Sparkles',
+          color: 'violet',
+          createdAt: now,
+          read: readIds.includes(id),
+          actionUrl: '/overzicht#briefing',
+        })
+      }
+    } catch (err) {
+      console.error('Weekly briefing notification error:', err)
     }
 
     // ── 5. Level-up notifications ───────────────────────────────────
@@ -1025,7 +1064,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const validTypes = ['budget', 'streak', 'sync', 'recommendation', 'insight', 'badge', 'levelup', 'partner_transaction', 'horizon', 'holding_alert', 'module_nudge']
+    const validTypes = ['budget', 'streak', 'sync', 'recommendation', 'insight', 'badge', 'levelup', 'partner_transaction', 'horizon', 'holding_alert', 'module_nudge', 'briefing']
     const sanitized: Record<string, boolean> = {}
     for (const key of validTypes) {
       sanitized[key] = preferences[key] !== false

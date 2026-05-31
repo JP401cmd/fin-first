@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SlidersHorizontal, ArrowRight, TrendingUp, Wallet, Pencil } from 'lucide-react'
 import type { FireParams } from '@/lib/fire-params'
@@ -10,25 +11,22 @@ import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { useViewMode } from '@/components/app/view-mode-provider'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
-import { OnttrekkingsBewerkenSheet } from './onttrekkings-bewerken-sheet'
-import { EindstrategieBewerkenSheet } from './eindstrategie-bewerken-sheet'
 import { AfbouwOverzichtCard } from './afbouw-overzicht-card'
-import type { WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
-import type { FireEndStrategy } from '@/lib/fire-strategy'
+import { RegelBewerkenPane } from './regel-bewerken-pane'
+import type { RegelId } from '@/lib/future/regel-registry'
+import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
+import type { PotRulesConfig, SurplusGroup } from '@/lib/pot-rules'
+import { WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
 
 /**
  * VoorkeurenView — content voor Voorkeuren-tab op /toekomst.
  *
- * Plan §6.3 Tab 4: regels die op de hele tijdas + alle events werken.
- * Twee secties:
- *  1. Toekomst-regels — eindstrategie · onttrekkingsstrategie · volgorde ·
- *     verdeling-bij-toename · onttrekking-bij-afname
- *  2. Markt-aannames — inflatie + bruto rendement (effectief SWR)
+ * Sectie "Regels op de hele tijdas": vijf regels die elk een rijk bewerkscherm
+ * (RegelBewerkenPane) openen met uitleg, instellingen en impact. Regel 1 & 2
+ * (eindstrategie/onttrekking) tonen een échte live impact-grafiek; regel 3/4/5
+ * (pot-volgorde/verdeling/afname) tonen een illustratieve pot-flow-weergave.
  *
- * Voor MVP-extractie: read-only samenvatting van huidige waarden uit
- * horizonData (fireParams + fireStrategy + withdrawalStrategy), met
- * deeplinks naar /identity/parameters voor het bewerken zelf. Inline-
- * editor komt in volgende iteratie.
+ * Daaronder: "Markt-aannames" (inflatie + bruto rendement) via VoorkeurBewerkenSheet.
  */
 
 const WITHDRAWAL_LABELS: Record<
@@ -77,12 +75,27 @@ function formatPct(value: number, digits = 1): string {
   return `${(value * 100).toFixed(digits)}%`
 }
 
+/** "Spaargeld → Beleggingen → Overig → …" — compacte weergave van een groep-volgorde. */
+function formatGroupOrder(groups: WealthGroup[], max = 3): string {
+  const labels = groups.map((g) => WEALTH_GROUP_LABELS[g])
+  if (labels.length <= max) return labels.join(' → ')
+  return `${labels.slice(0, max).join(' → ')} → …`
+}
+
+function surplusLabel(s: SurplusGroup): string {
+  if (s === 'schuld_aflossen') return 'Schulden aflossen'
+  return `Naar ${WEALTH_GROUP_LABELS[s].toLowerCase()}`
+}
+
 export function VoorkeurenView({
   fireParams,
   fireStrategy,
   withdrawalStrategy,
   fireAge,
   simRows,
+  simSnapshot,
+  regelVoorkeuren,
+  potBalances,
 }: {
   fireParams: FireParams
   fireStrategy: FireStrategyConfig
@@ -91,9 +104,16 @@ export function VoorkeurenView({
   fireAge?: number | null
   /** Per-jaar projectie uit runUnifiedProjection — voor eindsaldo-berekening. */
   simRows?: { age: number; endPortfolio: number }[] | null
+  /** Simulatie-snapshot voor de live-sim bewerkschermen (regel 1 & 2). */
+  simSnapshot: RegelSimSnapshot | null
+  /** Pot-regels (regel 3/4/5). */
+  regelVoorkeuren: PotRulesConfig
+  /** Huidige saldo per WealthGroup voor de illustratieve pot-flow-weergave. */
+  potBalances: Record<WealthGroup, number>
 }) {
+  const router = useRouter()
   const { isPlannen } = useViewMode()
-  // Inline-editor state — welke voorkeur wordt momenteel bewerkt.
+  // Inline-editor state voor de markt-aannames (inflatie/rendement).
   const [editing, setEditing] = useState<
     | null
     | {
@@ -103,14 +123,17 @@ export function VoorkeurenView({
         helperText: string
       }
   >(null)
-  // Aparte state voor onttrekkings-sheet (geen overlap met getal-editor).
-  const [editingOnttrekking, setEditingOnttrekking] = useState(false)
-  const [editingEindstrategie, setEditingEindstrategie] = useState(false)
+  // Welke "Regel op de hele tijdas" wordt bewerkt (null = gesloten).
+  const [editingRegel, setEditingRegel] = useState<RegelId | null>(null)
+
   const endStrategy = STRATEGY_LABELS[fireStrategy.strategy]
   const wsLabel = WITHDRAWAL_LABELS[withdrawalStrategy.strategy] ?? {
     name: withdrawalStrategy.strategy,
     subtitle: 'Onbekende strategie',
   }
+
+  const openRegel = (id: RegelId) =>
+    isPlannen ? () => setEditingRegel(id) : undefined
 
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8 space-y-8">
@@ -125,7 +148,7 @@ export function VoorkeurenView({
           </h2>
           <p className="mt-1 text-xs text-[var(--ink-3)]">
             Bepalen hoe je projectie zich gedraagt bij events en in de
-            afbouw-fase.
+            afbouw-fase. Klik een regel om uitleg, instellingen en impact te zien.
           </p>
         </header>
 
@@ -141,7 +164,7 @@ export function VoorkeurenView({
             }
             Icon={SlidersHorizontal}
             badge={`Tot ${fireStrategy.endAge} jaar`}
-            onEdit={isPlannen ? () => setEditingEindstrategie(true) : undefined}
+            onEdit={openRegel('eindstrategie')}
             hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
@@ -154,32 +177,35 @@ export function VoorkeurenView({
                 ? `Floor ${formatPct(withdrawalStrategy.guardrailFloor)} · Ceiling ${formatPct(withdrawalStrategy.guardrailCeiling)}`
                 : undefined
             }
-            onEdit={isPlannen ? () => setEditingOnttrekking(true) : undefined}
+            onEdit={openRegel('onttrekkingsstrategie')}
             hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Onttrekkingsvolgorde"
-            value="Cash → Beleggen → Pensioen"
+            value={formatGroupOrder(regelVoorkeuren.withdrawalOrderGroups)}
             subtitle="Welke pot eerst leegtrekken bij afbouw"
             Icon={SlidersHorizontal}
-            badge="Standaard"
-            hint="Binnenkort instelbaar"
+            badge="Potten"
+            onEdit={openRegel('onttrekkingsvolgorde')}
+            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Verdeling bij toename"
-            value="Naar lange-termijn portfolio"
+            value={surplusLabel(regelVoorkeuren.surplusGroup)}
             subtitle="Waar gaat extra geld heen bij een positief event"
             Icon={SlidersHorizontal}
-            badge="Standaard"
-            hint="Binnenkort instelbaar"
+            badge="Potten"
+            onEdit={openRegel('verdeling-toename')}
+            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Onttrekking bij afname"
-            value="Uit liquide pot eerst"
+            value={formatGroupOrder(regelVoorkeuren.deficitOrderGroups)}
             subtitle="Waar wordt geld vandaan gehaald bij een negatief event"
             Icon={SlidersHorizontal}
-            badge="Standaard"
-            hint="Binnenkort instelbaar"
+            badge="Potten"
+            onEdit={openRegel('onttrekking-afname')}
+            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
         </div>
       </div>
@@ -267,13 +293,11 @@ export function VoorkeurenView({
 
       <p className="text-[11px] italic text-[var(--ink-3)]">
         {isPlannen
-          ? 'Klik op Eindstrategie, Onttrekking, Inflatie of Rendement om snel bij te werken. Volgorde, verdeling en afname worden binnenkort instelbaar.'
-          : 'Activeer Plannen-modus om Eindstrategie, Onttrekking, Inflatie en Rendement inline bij te werken.'}
+          ? 'Klik op een regel of markt-aanname om uitleg, instellingen en impact te zien en bij te werken.'
+          : 'Activeer Plannen-modus om de regels en markt-aannames bij te werken.'}
       </p>
 
-      {/* Plan F-2: Afbouw-overzicht — eindsaldo bij fireAge vs endAge.
-          Toont gebruiker de cijfer-impact van zijn strategie zonder
-          volle tijdas-chart te vereisen. */}
+      {/* Afbouw-overzicht — eindsaldo bij fireAge vs endAge. */}
       {fireAge != null && simRows && simRows.length > 0 && (() => {
         const fireRow = simRows.find((r) => r.age === fireAge) ?? simRows[0]
         const endRow = simRows.find((r) => r.age === fireStrategy.endAge) ?? simRows[simRows.length - 1]
@@ -288,6 +312,7 @@ export function VoorkeurenView({
         )
       })()}
 
+      {/* Markt-aanname-editor (inflatie/rendement). */}
       {editing && (
         <VoorkeurBewerkenSheet
           title={editing.title}
@@ -298,19 +323,18 @@ export function VoorkeurenView({
         />
       )}
 
-      {editingOnttrekking && (
-        <OnttrekkingsBewerkenSheet
-          currentStrategy={withdrawalStrategy.strategy as WithdrawalStrategyType}
-          onClose={() => setEditingOnttrekking(false)}
-        />
-      )}
-
-      {editingEindstrategie && (
-        <EindstrategieBewerkenSheet
-          currentStrategy={fireStrategy.strategy as FireEndStrategy}
-          onClose={() => setEditingEindstrategie(false)}
-        />
-      )}
+      {/* Gedeeld bewerkscherm voor de 5 regels op de hele tijdas. */}
+      <RegelBewerkenPane
+        open={editingRegel !== null}
+        regelId={editingRegel}
+        onClose={() => setEditingRegel(null)}
+        onSaved={() => router.refresh()}
+        simSnapshot={simSnapshot}
+        fireStrategy={fireStrategy}
+        withdrawalStrategy={withdrawalStrategy}
+        potRules={regelVoorkeuren}
+        potBalances={potBalances}
+      />
     </section>
   )
 }
@@ -331,14 +355,13 @@ function VoorkeurCard({
   badge?: string
   /** Wanneer aanwezig: card wordt button met inline-edit. Anders static. */
   onEdit?: () => void
-  /** Footer-hint voor static cards (bv. 'Alleen in Plannen-modus' of
-   *  'Binnenkort instelbaar'). Niet getoond als onEdit aanwezig is. */
+  /** Footer-hint voor static cards (bv. 'Alleen in Plannen-modus'). */
   hint?: string
 }) {
   const interactive = Boolean(onEdit)
   const cardClass =
     'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 flex flex-col text-left w-full' +
-    (interactive ? ' hover:border-[var(--ink-3)] hover:shadow-sm transition-all' : '')
+    (interactive ? ' cursor-pointer hover:border-[var(--ink-3)] hover:shadow-sm transition-all' : '')
   const cardInner = (
     <>
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -379,10 +402,24 @@ function VoorkeurCard({
     </>
   )
   if (onEdit) {
+    // role="button" i.p.v. <button>: de subtitle/label kan een interactieve
+    // GlossaryTerm (<button>) bevatten — een button-in-button is ongeldige
+    // HTML en veroorzaakt een hydration-mismatch.
     return (
-      <button type="button" onClick={onEdit} className={cardClass}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onEdit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onEdit()
+          }
+        }}
+        className={cardClass}
+      >
         {cardInner}
-      </button>
+      </div>
     )
   }
   return <div className={cardClass}>{cardInner}</div>

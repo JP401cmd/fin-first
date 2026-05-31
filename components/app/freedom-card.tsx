@@ -36,8 +36,12 @@ export interface FreedomCardData {
 /**
  * Render the Freedom Card to a Canvas element for reliable PNG download.
  * This draws the card programmatically instead of using unreliable SVG foreignObject.
+ *
+ * Exported so andere surfaces (zoals de wekelijkse briefing-header) dezelfde
+ * deel-kaart kunnen genereren via ShareDialog's `renderCanvas`-prop. Importeer
+ * dynamisch om de canvas-tekencode buiten hun initiële bundle te houden.
  */
-function renderFreedomCardToCanvas(data: FreedomCardData): HTMLCanvasElement {
+export function renderFreedomCardToCanvas(data: FreedomCardData): HTMLCanvasElement {
   const W = 840   // 420px * 2x retina
   const H = 580   // card height
   const S = 2     // scale factor

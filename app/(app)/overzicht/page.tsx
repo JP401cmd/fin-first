@@ -6,7 +6,15 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { WillLanding } from '@/components/will/will-landing'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
-import { buildBriefingEntries, buildBriefingNarrative } from '@/lib/briefing/engine'
+import {
+  composeOverviewBriefing,
+  computeFreedomTotal,
+  buildFreedomHeroProps,
+  buildBriefingHeadline,
+  type FreedomHeroProps,
+} from '@/lib/briefing/overview-briefing'
+import { getOrCreateWeeklySnapshot, canRefreshToday } from '@/lib/briefing/snapshot'
+import { loadTopMarketBriefing } from '@/lib/briefing/news-market'
 import { ageAtDate } from '@/lib/horizon-data'
 
 export const metadata: Metadata = {
@@ -96,27 +104,84 @@ export default async function OverzichtPage() {
       }
     : undefined
 
-  // Briefing-entries onderaan hero — max 6, 3-koloms grid (plan §6.2 +
-  // T-1 Tier-3 #16). Aggregatie via `lib/briefing/engine.ts` (plan A-4):
-  // pure functie die ruwe inputs omzet in BriefingEntry[] — testbaar en
-  // herbruikbaar buiten deze page.
-  const briefingEntries = buildBriefingEntries({
-    recommendations: willData.recommendations,
-    events: horizonData?.events ?? [],
-    health,
-    goalNames: willData.goals.map((g) => g.name),
-    goalProgresses: willData.goalProgresses,
-  })
-  const briefingNarrative = buildBriefingNarrative(briefingEntries)
-
-  // Mini-vermogen-grafiek-inputs: gebruik dezelfde simulatie-data als
-  // /toekomst (simRows + simRequiredPortfolio uit runUnifiedProjection)
-  // zodat de curve en het doelbedrag bij vrijheid 1:1 matchen tussen
-  // /overzicht en /toekomst. Geen lineaire benadering meer.
+  // Netto vermogen (live) + vermogensverloop — basis voor zowel de
+  // vrijheidstijd-hero als de mini-vermogen-grafiek verderop.
   const netWorthHistory = dashboardData.netWorthHistory ?? []
   const currentNetWorth =
     (horizonData?.healthScoreInput?.totalAssets ?? 0) -
     (horizonData?.healthScoreInput?.totalDebts ?? 0)
+
+  // Wekelijkse briefing — verrijkte engine (finance-bronnen) + snapshot.
+  // De snapshot bevriest de briefing per ISO-week (Amsterdam) zodat het een
+  // echte wekelijkse briefing is; de gebruiker mag hem daarnaast 1× per dag
+  // handmatig verversen (Ververs-knop). Compose put uit de al-geladen
+  // loaders; de snapshot zet hem vast en bepaalt de "Bijgewerkt …"-stempel.
+  // Valt terug op vers-gecomposeerde briefjes wanneer de gebruiker (nog) niet
+  // bekend is of de snapshot-kolom ontbreekt (graceful degradation).
+  // Markt-briefje (read-only uit de nieuws-cache; triggert geen generatie).
+  const marketEntry = authUser.user?.id
+    ? await loadTopMarketBriefing(supabase, authUser.user.id)
+    : null
+  const composedBriefing = composeOverviewBriefing(
+    dashboardData,
+    willData,
+    horizonData,
+    new Date(),
+    marketEntry ?? undefined,
+  )
+  const freedomTotal = computeFreedomTotal(currentNetWorth, dashboardData.monthlyExpenses ?? 0)
+  let briefingEntries = composedBriefing
+  let briefingRefreshedAt: string | null = null
+  let briefingCanRefresh = false
+  // Hero uit live data; in de eerste week (geen basis) toont hij het totaal.
+  let freedomHero: FreedomHeroProps = buildFreedomHeroProps(
+    freedomTotal,
+    null,
+    netWorthHistory,
+  )
+  let briefingHeadline: string | null = null
+  if (authUser.user?.id) {
+    // NB: bij het eerste bezoek van een nieuwe ISO-week schrijft dit de
+    // snapshot weg tíjdens de RSC-render. Dat is bewust en veilig: het is een
+    // pure data-`.update()` (zet geen cookies, dus geen "cookies can only be
+    // modified in a Server Action"-fout) en de write is idempotent per week —
+    // een dubbele write bij prefetch/parallelle requests levert dezelfde
+    // week-snapshot op. Deze `.update()` moet de ENIGE write in dit request
+    // blijven en nooit met een sessie-refresh gecombineerd worden.
+    const { snapshot } = await getOrCreateWeeklySnapshot(
+      supabase,
+      authUser.user.id,
+      composedBriefing,
+      {
+        freedom: {
+          totalFreedomDays: freedomTotal.totalFreedomDays,
+          netWorth: freedomTotal.netWorth,
+          monthlyExpenses: freedomTotal.monthlyExpenses,
+          capturedAt: new Date().toISOString(),
+        },
+      },
+    )
+    briefingEntries = snapshot.entries
+    briefingRefreshedAt = snapshot.refreshedAt
+    briefingCanRefresh = canRefreshToday(snapshot)
+    // Hero uit de bevroren snapshot → stabiel de hele week.
+    if (snapshot.freedomSnapshot) {
+      freedomHero = buildFreedomHeroProps(
+        snapshot.freedomSnapshot,
+        snapshot.previousFreedomSnapshot ?? null,
+        netWorthHistory,
+      )
+    }
+    briefingHeadline = snapshot.headline ?? buildBriefingHeadline(freedomHero)
+  } else {
+    briefingHeadline = buildBriefingHeadline(freedomHero)
+  }
+
+  // Mini-vermogen-grafiek-inputs: gebruik dezelfde simulatie-data als
+  // /toekomst (simRows + simRequiredPortfolio uit runUnifiedProjection)
+  // zodat de curve en het doelbedrag bij vrijheid 1:1 matchen tussen
+  // /overzicht en /toekomst. netWorthHistory + currentNetWorth zijn hierboven
+  // al berekend (voor de vrijheidstijd-hero).
   // fireAge: gebruik fractional (afgerond) als beschikbaar.
   const fireAge =
     dashboardData.fireAgeFractional != null
@@ -139,7 +204,10 @@ export default async function OverzichtPage() {
         isPensioenMode={isPensioenMode}
         totals={totals}
         briefingEntries={briefingEntries}
-        briefingNarrative={briefingNarrative}
+        briefingRefreshedAt={briefingRefreshedAt}
+        briefingCanRefresh={briefingCanRefresh}
+        freedomHero={freedomHero}
+        briefingHeadline={briefingHeadline}
         netWorthHistory={netWorthHistory}
         currentNetWorth={currentNetWorth}
         fireAge={fireAge}

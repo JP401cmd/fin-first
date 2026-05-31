@@ -83,6 +83,7 @@ import { CryptoHoldingCard } from '@/components/holdings/crypto-holding-card'
 import { InvestmentHoldingCard } from '@/components/holdings/investment-holding-card'
 import { VermogenAssetCard } from './vermogen-asset-card'
 import { AddCategoryCard } from './add-category-card'
+import { CategoryGroupHeader } from './category-group-header'
 import { buildKpiContext } from '@/lib/kpi-context'
 import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
@@ -451,17 +452,13 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   }, [initialAssetId, loading, assets, requestedAssetId, setSelectedAssetId])
 
   function handleAssetClick(asset: Asset) {
-    // Cash assets met actieve budget-tracking deep-linken naar de cash-
-    // categorie-pagina. Reden: `/core/assets/cash` toont de Budgetteren-app
-    // (transactie-tabel + categorie-strip) als verdiepende tab; daar wil
-    // de gebruiker direct in zitten zodra hij op een tracker-rekening klikt.
-    // De `?asset=<id>`-pane werkt op die pagina ook, dus de detail-overlay
-    // blijft bereikbaar.
-    if (asset.asset_type === 'cash' && budgetingActive && asset.has_budget_tracking) {
-      router.push(`/core/assets/cash?asset=${asset.id}`)
-      return
-    }
-    setSelectedAssetId(asset.id)
+    // Klik op de kaart-body opent de view-modal op de categoriepagina van het
+    // item: `/core/assets/[type]?asset=<id>`. De categoriepagina leest `?asset=`
+    // zelf uit de URL en opent daar de detail-pane (view-mode). `router.push`
+    // (geen replace) zodat browser-Back terugkeert naar dit overzicht.
+    // Snelle acties (Herwaarderen / Bewerken) openen bewust WÉL ter plekke —
+    // zie handleAssetRevalue / handleAssetEdit.
+    router.push(`/core/assets/${asset.asset_type}?asset=${asset.id}`)
   }
 
   // Snelle acties vanuit de kaart-actie-rij. Bewerken opent de detail-pane
@@ -727,19 +724,15 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
 
           return (
             <div key={type} id={`asset-group-${type}`} className="scroll-mt-24">
-              {/* Group header — altijd klikbaar door naar /core/assets/[type] */}
-              <div className="flex items-center gap-2 pt-2 pb-2.5">
-                <span style={{ color: groupColor }}><BudgetIcon name={groupIcon} className="h-4 w-4" /></span>
-                <Link
-                  href={`/core/assets/${type}`}
-                  className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)] hover:text-kern-600 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kern-500"
-                >
-                  {ASSET_TYPE_LABELS[type]}
-                </Link>
-                <span className="text-xs tabular-nums text-[var(--ink-3)]">
-                  {fc(group.total)}
-                </span>
-              </div>
+              {/* Group header — gedeelde component (zie debts/page.tsx):
+                  icoon + label + chevron = link naar /core/assets/[type]. */}
+              <CategoryGroupHeader
+                href={`/core/assets/${type}`}
+                label={ASSET_TYPE_LABELS[type]}
+                iconName={groupIcon}
+                iconColor={groupColor}
+                total={group.total}
+              />
 
               {/* Asset cards — zelfde grid + cards als /core/assets/[type].
                   KPI-strip, sparkline-overlay, connection-badge en app-chip

@@ -143,11 +143,41 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   const minAge = visibleMinAge ?? currentAge
   const maxAge = visibleMaxAge ?? endAge
 
+  // Hover-handlers — MOETEN onvoorwaardelijk vóór elke early-return worden
+  // aangeroepen (Rules of Hooks). Ze hangen enkel af van W/innerW/minAge/
+  // maxAge, die hierboven al berekend zijn. Stonden voorheen ná de
+  // stackedRows-empty early-return: dat liet het aantal hooks verspringen
+  // tussen lege en gevulde render (chartMode-toggle Pad↔Opbouw) en gaf
+  // "Rendered more hooks than during the previous render."
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = e.currentTarget
+    const rect = svg.getBoundingClientRect()
+    const mouseX = ((e.clientX - rect.left) / rect.width) * W - PAD.left
+    if (mouseX < 0 || mouseX > innerW) { setHoveredAge(null); return }
+    const age = Math.round((mouseX / innerW) * (maxAge - minAge) + minAge)
+    const clamped = Math.max(minAge, Math.min(maxAge, age))
+    setHoveredAge(clamped)
+  }, [W, innerW, minAge, maxAge])
+
+  const handleMouseLeave = useCallback(() => setHoveredAge(null), [])
+
   // Early-return wanneer er geen data is. Voorkomt dat we een lege
   // SVG renderen + voorziet de gebruiker van een rustige status-tekst.
+  //
+  // `ref` MOET ook hier hangen. De chart wordt in horizon-client altijd
+  // gemount (ook in Pad-modus, verborgen via opacity:0) en start dán met
+  // lege stackedRows. Zonder ref koppelen de IntersectionObserver
+  // (hasEntered → bar-animatie) en de ResizeObserver (containerW →
+  // isDesktop/hoogte) niet aan; beide effects draaien alleen on-mount en
+  // re-runnen niet bij de toggle, dus de bars bleven op hoogte 0 en de
+  // chart op de mobiele 600px-zoom hangen. React hergebruikt dezelfde
+  // <div> bij de empty→data-overgang, zodat de ref stabiel blijft.
   if (stackedRows.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[200px] text-sm text-[var(--ink-3)] italic">
+      <div
+        ref={ref}
+        className="flex items-center justify-center min-h-[200px] text-sm text-[var(--ink-3)] italic"
+      >
         Geen gegevens beschikbaar
       </div>
     )
@@ -195,19 +225,6 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   for (let a = Math.ceil(minAge / xStep) * xStep; a <= maxAge; a += xStep) {
     xTickAges.push(a)
   }
-
-  // Hover handler (hooks must be called unconditionally)
-  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget
-    const rect = svg.getBoundingClientRect()
-    const mouseX = ((e.clientX - rect.left) / rect.width) * W - PAD.left
-    if (mouseX < 0 || mouseX > innerW) { setHoveredAge(null); return }
-    const age = Math.round((mouseX / innerW) * (maxAge - minAge) + minAge)
-    const clamped = Math.max(minAge, Math.min(maxAge, age))
-    setHoveredAge(clamped)
-  }, [W, innerW, minAge, maxAge])
-
-  const handleMouseLeave = useCallback(() => setHoveredAge(null), [])
 
   // Early return AFTER all hooks
   if (visibleRows.length === 0) {

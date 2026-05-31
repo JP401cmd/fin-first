@@ -546,3 +546,262 @@ describe('buildBriefingEntries — seasonal entries (T-1)', () => {
     expect(seasonal).toBeUndefined()
   })
 })
+
+describe('buildBriefingEntries — finance-verrijking', () => {
+  // 1 oktober: geen seizoens-rule én ruim buiten de salaris-countdown (24 dagen
+  // tot de 25e), zodat finance-generators geïsoleerd getest kunnen worden.
+  const financeNow = new Date('2026-10-01T12:00:00Z')
+
+  it('zonder finance blijft de output ongewijzigd (geen finance-entries)', () => {
+    const result = buildBriefingEntries(
+      emptyInput({ recommendations: [makeRec('r1', 'A'), makeRec('r2', 'B')] }),
+    )
+    expect(result.every((e) => !e.id.startsWith('finance:'))).toBe(true)
+    expect(result.map((e) => e.category)).toEqual(['observation', 'tip'])
+  })
+
+  it('vermogensgroei → observation met bezittingen-hefboom en vrijheidsdagen', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          netWorthHistory: [
+            { month: '2026-08', value: 100000 },
+            { month: '2026-09', value: 103000 },
+          ],
+          monthlyExpenses: 3000, // dagbasis €100 → €3000 = 30 dagen vrijheid
+        },
+      }),
+    )
+    const nw = result.find((e) => e.id === 'finance:networth')
+    expect(nw?.category).toBe('observation')
+    expect(nw?.hefboom).toBe('bezittingen')
+    expect(nw?.text).toMatch(/groeide/)
+    expect(nw?.text).toMatch(/30 dagen vrijheid/)
+  })
+
+  it('vermogensdaling → heads_up', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          netWorthHistory: [
+            { month: '2026-08', value: 103000 },
+            { month: '2026-09', value: 100000 },
+          ],
+        },
+      }),
+    )
+    const nw = result.find((e) => e.id === 'finance:networth')
+    expect(nw?.category).toBe('heads_up')
+    expect(nw?.text).toMatch(/daalde/)
+  })
+
+  it('vermogensdelta onder de drempel levert geen briefje', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          netWorthHistory: [
+            { month: '2026-08', value: 100000 },
+            { month: '2026-09', value: 100100 }, // €100 < €250-drempel
+          ],
+        },
+      }),
+    )
+    expect(result.find((e) => e.id === 'finance:networth')).toBeUndefined()
+  })
+
+  it('budgetdruk >90% → heads_up cashflow en onderdrukt spaarquote', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          budgetExpense: { spent: 950, limit: 1000 },
+          monthlyIncome: 4000,
+          monthlyExpenses: 3000,
+        },
+      }),
+    )
+    const budget = result.find((e) => e.id === 'finance:budget')
+    expect(budget?.category).toBe('heads_up')
+    expect(budget?.hefboom).toBe('cashflow')
+    expect(result.find((e) => e.id === 'finance:savings')).toBeUndefined()
+  })
+
+  it('spaarquote → observation cashflow wanneer geen budgetdruk', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { monthlyIncome: 4000, monthlyExpenses: 3000 }, // 25%
+      }),
+    )
+    const sav = result.find((e) => e.id === 'finance:savings')
+    expect(sav?.category).toBe('observation')
+    expect(sav?.hefboom).toBe('cashflow')
+    expect(sav?.text).toMatch(/25%/)
+  })
+
+  it('negatieve spaarquote → heads_up', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { monthlyIncome: 3000, monthlyExpenses: 3500 },
+      }),
+    )
+    const sav = result.find((e) => e.id === 'finance:savings')
+    expect(sav?.category).toBe('heads_up')
+    expect(sav?.text).toMatch(/meer uit/)
+  })
+
+  it('FIRE-voortgang → observation met percentage en leeftijd', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { freedomPct: 42, fireAge: 58 },
+      }),
+    )
+    const fire = result.find((e) => e.id === 'finance:fire')
+    expect(fire?.category).toBe('observation')
+    expect(fire?.text).toMatch(/42%/)
+    expect(fire?.text).toMatch(/58e/)
+  })
+
+  it('cash-drag boven drempel → tip bezittingen', () => {
+    const result = buildBriefingEntries(
+      emptyInput({ now: financeNow, finance: { liquidCash: 25000 } }),
+    )
+    const cd = result.find((e) => e.id === 'finance:cashdrag')
+    expect(cd?.category).toBe('tip')
+    expect(cd?.hefboom).toBe('bezittingen')
+  })
+
+  it('cash-drag onder drempel → geen briefje', () => {
+    const result = buildBriefingEntries(
+      emptyInput({ now: financeNow, finance: { liquidCash: 5000 } }),
+    )
+    expect(result.find((e) => e.id === 'finance:cashdrag')).toBeUndefined()
+  })
+
+  it('salaris-countdown binnen 10 dagen → upcoming', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: new Date('2026-10-20T12:00:00Z'), // 5 dagen tot de 25e
+        finance: { monthlyIncome: 4000 },
+      }),
+    )
+    const sal = result.find((e) => e.id === 'finance:salary')
+    expect(sal?.category).toBe('upcoming')
+    expect(sal?.text).toMatch(/5 dagen/)
+  })
+
+  it('geen salaris-countdown zonder bekend inkomen', () => {
+    const result = buildBriefingEntries(
+      emptyInput({ now: new Date('2026-10-20T12:00:00Z'), finance: {} }),
+    )
+    expect(result.find((e) => e.id === 'finance:salary')).toBeUndefined()
+  })
+
+  it('open acties → tip met vrijheidsdagen', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { openActions: 3, totalFreedomDaysOpen: 21 },
+      }),
+    )
+    const act = result.find((e) => e.id === 'finance:actions')
+    expect(act?.category).toBe('tip')
+    expect(act?.text).toMatch(/3 openstaande acties/)
+    expect(act?.text).toMatch(/21 vrijheidsdagen/)
+  })
+
+  it('Time Machine: alle crashes doorstaan → milestone met crash + percentage', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          backtestSuccessRate: 92,
+          backtestNamedPaths: [
+            { label: 'de Oliecrisis (1973)', success: true },
+            { label: 'de Dotcom-top (2000)', success: true },
+          ],
+        },
+      }),
+    )
+    const res = result.find((e) => e.id === 'finance:resilience')
+    expect(res?.category).toBe('milestone')
+    expect(res?.hefboom).toBe('bezittingen')
+    expect(res?.text).toMatch(/Oliecrisis \(1973\)/)
+    expect(res?.text).toMatch(/92%/)
+  })
+
+  it('Time Machine: een gefaalde crash → heads_up die de crash eerlijk benoemt', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          backtestSuccessRate: 64,
+          backtestNamedPaths: [
+            { label: 'de Oliecrisis (1973)', success: true },
+            { label: 'de Dotcom-top (2000)', success: false },
+          ],
+        },
+      }),
+    )
+    const res = result.find((e) => e.id === 'finance:resilience')
+    expect(res?.category).toBe('heads_up')
+    expect(res?.text).toMatch(/Dotcom-top \(2000\)/)
+    expect(res?.text).toMatch(/64%/)
+  })
+
+  it('Time Machine: geen briefje zonder backtest-data', () => {
+    const result = buildBriefingEntries(
+      emptyInput({ now: financeNow, finance: { backtestSuccessRate: null, backtestNamedPaths: null } }),
+    )
+    expect(result.find((e) => e.id === 'finance:resilience')).toBeUndefined()
+  })
+
+  it('marketEntry wordt getoond, ook zonder finance-context', () => {
+    const market = { id: 'market:n1', category: 'market' as const, text: 'Markt-nieuws' }
+    const result = buildBriefingEntries(emptyInput({ now: financeNow, marketEntry: market }))
+    expect(result.find((e) => e.id === 'market:n1')).toBeTruthy()
+  })
+
+  it('marketEntry wordt op rang (65) tussen de andere entries geweven', () => {
+    const market = { id: 'market:n1', category: 'market' as const, text: 'Markt-nieuws' }
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        recommendations: [makeRec('r1', 'Obs')],
+        marketEntry: market,
+        finance: { freedomPct: 40, fireAge: 58 }, // finance:fire rank 78 > market 65
+      }),
+    )
+    const ids = result.map((e) => e.id)
+    expect(ids).toContain('market:n1')
+    expect(ids.indexOf('observation:r1')).toBeLessThan(ids.indexOf('market:n1'))
+    expect(ids.indexOf('finance:fire')).toBeLessThan(ids.indexOf('market:n1'))
+  })
+
+  it('weeft finance-entries op prioriteit tussen kern-entries', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        recommendations: [makeRec('r1', 'Observatie'), makeRec('r2', 'Tip')],
+        finance: {
+          netWorthHistory: [
+            { month: '2026-08', value: 100000 },
+            { month: '2026-09', value: 105000 },
+          ],
+          monthlyIncome: 4000,
+          monthlyExpenses: 3000,
+        },
+      }),
+    )
+    const ids = result.map((e) => e.id)
+    // observation(rec)=100 > finance:networth=95 > tip(rec)=90 > finance:savings=80
+    expect(ids.indexOf('observation:r1')).toBeLessThan(ids.indexOf('finance:networth'))
+    expect(ids.indexOf('finance:networth')).toBeLessThan(ids.indexOf('tip:r2'))
+    expect(ids.indexOf('tip:r2')).toBeLessThan(ids.indexOf('finance:savings'))
+  })
+})

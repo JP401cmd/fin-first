@@ -10,9 +10,18 @@ import type { StackedRow } from '@/lib/wealth-composition'
 
 // ── Mocks ──────────────────────────────────────────────────────
 
+// Gedeelde ref zodat tests kunnen verifiëren dat de chart `ref` op ELK
+// render-pad koppelt (ook de empty-state). Mist een pad de ref, dan koppelen
+// de Intersection-/ResizeObserver niet aan — hun effects draaien enkel
+// on-mount — en blijven bars na de Pad→Opbouw-toggle op hoogte 0 staan met de
+// verkeerde (mobiele) zoom.
+const { inViewRef } = vi.hoisted(() => ({
+  inViewRef: { current: null as HTMLElement | null },
+}))
+
 vi.mock('@/lib/hooks/use-in-view-animation', () => ({
   useInViewAnimation: () => ({
-    ref: { current: document.createElement('div') },
+    ref: inViewRef,
     hasEntered: true,
     animationComplete: true,
   }),
@@ -26,6 +35,7 @@ class MockResizeObserver {
 
 beforeEach(() => {
   global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
+  inViewRef.current = null
 })
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -170,6 +180,41 @@ describe('WealthCompositionChart — rendering', () => {
     )
 
     expect(screen.getByText('Geen gegevens beschikbaar')).toBeTruthy()
+  })
+
+  it('survives an empty→data rerender without a hooks-count mismatch (Pad↔Opbouw toggle)', () => {
+    // Reproduceert de chartMode-toggle op /toekomst: de chart wordt altijd
+    // gemount, eerst met lege stackedRows (Pad-modus → wealthCompositionRows
+    // = []) en daarna met data (Opbouw-modus). Vóór de hook-fix verschoof het
+    // aantal aangeroepen hooks tussen die twee renders (de useCallback-hover-
+    // handlers stonden ná de empty early-return), wat React de fout
+    // "Rendered more hooks than during the previous render" liet gooien —
+    // waardoor de toggle in de praktijk niets meer deed.
+    const { rerender, container } = render(
+      <WealthCompositionChart stackedRows={[]} currentAge={35} endAge={44} />
+    )
+    expect(screen.getByText('Geen gegevens beschikbaar')).toBeTruthy()
+
+    // Toggle naar Opbouw: zelfde component-instance, nu mét data.
+    expect(() =>
+      rerender(
+        <WealthCompositionChart stackedRows={makeRows(10, 35)} currentAge={35} endAge={44} />
+      ),
+    ).not.toThrow()
+
+    expect(screen.queryByText('Geen gegevens beschikbaar')).toBeNull()
+    expect(container.querySelector('svg')).toBeTruthy()
+  })
+
+  it('wires the in-view ref on the empty-state path (observers attach before data arrives)', () => {
+    // De empty-state-return moet dezelfde `ref` dragen als de data-render.
+    // Mist die ref, dan koppelen de Intersection-/ResizeObserver nooit aan
+    // (hun effects draaien enkel on-mount) en blijven bars na de Pad→Opbouw-
+    // toggle op hoogte 0 staan met de mobiele 600px-zoom.
+    render(
+      <WealthCompositionChart stackedRows={[]} currentAge={35} endAge={44} />
+    )
+    expect(inViewRef.current).toBe(screen.getByText('Geen gegevens beschikbaar'))
   })
 })
 

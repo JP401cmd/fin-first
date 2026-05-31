@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   Baby,
   Briefcase,
@@ -13,6 +14,7 @@ import {
   TrendingDown,
   TrendingUp,
   Pencil,
+  Sparkles,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { LifeEvent } from '@/lib/horizon-data'
@@ -20,6 +22,12 @@ import { ScenarioBibliotheek } from './scenario-bibliotheek'
 import { useViewMode } from '@/components/app/view-mode-provider'
 import { computeEventImpact } from '@/lib/event-impact'
 import { EventBewerkenSheet } from './event-bewerken-sheet'
+import {
+  isStrategyManagedEvent,
+  STRATEGY_BADGE_LABEL,
+  type ManagedStrategy,
+} from '@/lib/strategy-events'
+import { StrategieEditors, type StrategieEditorsData } from './strategie/strategie-editors'
 
 /**
  * GebeurtenissenView — content voor Gebeurtenissen-tab op /toekomst.
@@ -86,10 +94,9 @@ function eventImpact(event: LifeEvent): string {
 }
 
 const LEVENSSTRATEGIEEN: {
-  key: string
+  key: ManagedStrategy
   label: string
   description: string
-  href: string
   Icon: typeof Compass
   bg: string
   text: string
@@ -98,8 +105,7 @@ const LEVENSSTRATEGIEEN: {
     key: 'aow',
     label: 'AOW-strategie',
     description:
-      'Ingangsleeftijd, partneraftrek en AOW-gat-overbrugging. Default = wettelijk; pas aan voor eerder of later opnemen.',
-    href: '/toekomst/strategie?focus=aow',
+      'Ingangsleeftijd, leefsituatie en opbouwkorting (jaren buiten NL). Default = wettelijk.',
     Icon: Compass,
     bg: 'bg-violet-50',
     text: 'text-violet-700',
@@ -108,8 +114,7 @@ const LEVENSSTRATEGIEEN: {
     key: 'pensioen',
     label: 'Pensioen-strategie',
     description:
-      'Werknemerspensioen, lijfrente en jaarruimte/reserveringsruimte. UPO-data invoer komt in volgende iteratie.',
-    href: '/toekomst/strategie?focus=pensioen',
+      'Werknemerspensioen, lijfrente en banksparen — beheer al je pensioenpotten op één plek.',
     Icon: Wallet,
     bg: 'bg-emerald-50',
     text: 'text-emerald-700',
@@ -118,8 +123,7 @@ const LEVENSSTRATEGIEEN: {
     key: 'huis',
     label: 'Huis-strategie',
     description:
-      'Kopen / verkopen / herfinancieren / verbouwen + aflossingsplan (annuïteit, lineair of extra aflossen).',
-    href: '/toekomst/strategie?focus=huis',
+      'Volledig meetellen, uitsluiten, verkopen of opeethypotheek — hoe je woning meetelt in je vrijheid.',
     Icon: Home,
     bg: 'bg-amber-50',
     text: 'text-amber-700',
@@ -130,6 +134,7 @@ export function GebeurtenissenView({
   events,
   currentAge,
   annualSavings,
+  strategieData,
 }: {
   events: LifeEvent[]
   /** Huidige leeftijd uit DOB — nodig om scenario-defaults op te baseren
@@ -140,6 +145,8 @@ export function GebeurtenissenView({
    *  EventImpactBadge — plan F-5 vergelijk-modus MVP. Wanneer 0 of
    *  ontbrekend: badge toont "Impact onbekend". */
   annualSavings?: number
+  /** Baseline + lookup-data voor de levensstrategie-editors (AOW/Pensioen/Huis). */
+  strategieData: StrategieEditorsData
 }) {
   // ScenarioBibliotheek = scenario-tool → alleen in 'plannen'-modus
   // zichtbaar (plan A-5). Niveau-A "Kijken"-gebruikers zien dan een
@@ -147,6 +154,35 @@ export function GebeurtenissenView({
   const { isPlannen } = useViewMode()
   // Edit-state: welk event wordt bewerkt (null = sheet dicht).
   const [editingEvent, setEditingEvent] = useState<LifeEvent | null>(null)
+  // Welke levensstrategie-modal is open (null = dicht).
+  const [openStrategy, setOpenStrategy] = useState<ManagedStrategy | null>(null)
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Deep-link: ?strategie=aow|pensioen|huis opent de bijbehorende modal.
+  // (Disjunct van het bestaande ?strategie=open van de horizon-strategiekiezer.)
+  useEffect(() => {
+    const s = searchParams.get('strategie')
+    if (s === 'aow' || s === 'pensioen' || s === 'huis') setOpenStrategy(s)
+  }, [searchParams])
+
+  function closeStrategy() {
+    setOpenStrategy(null)
+    if (searchParams.get('strategie')) {
+      const p = new URLSearchParams(searchParams)
+      p.delete('strategie')
+      router.replace(`${pathname}${p.toString() ? `?${p}` : ''}`, { scroll: false })
+    }
+  }
+
+  // Routeert een klik op een event-kaart: strategie-beheerde events openen hun
+  // strategie-modal; vrije events de generieke quick-edit sheet.
+  function openEventOrStrategy(event: LifeEvent) {
+    const managed = isStrategyManagedEvent(event)
+    if (managed) setOpenStrategy(managed)
+    else setEditingEvent(event)
+  }
   // Sort events op target_date (alfabet als fallback). Events met datum
   // tonen we eerst chronologisch, daarna events met alleen target_age,
   // tenslotte events zonder timing.
@@ -259,11 +295,14 @@ export function GebeurtenissenView({
               const cardClass =
                 'flex-1 min-w-0 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left'
               const CardEl: React.ElementType = isPlannen ? 'button' : 'div'
+              const managed = isStrategyManagedEvent(event)
               const cardProps = isPlannen
                 ? {
                     type: 'button' as const,
-                    onClick: () => setEditingEvent(event),
-                    'aria-label': `Bewerk ${event.name}`,
+                    onClick: () => openEventOrStrategy(event),
+                    'aria-label': managed
+                      ? `Open ${STRATEGY_BADGE_LABEL[managed]}`
+                      : `Bewerk ${event.name}`,
                     className: `${cardClass} w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
                   }
                 : { className: cardClass }
@@ -282,10 +321,18 @@ export function GebeurtenissenView({
                     </div>
                     <h3 className="text-sm font-semibold text-[var(--ink)] truncate inline-flex items-center gap-1.5">
                       {event.name}
-                      {isPlannen && (
+                      {isPlannen && !managed && (
                         <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
                       )}
+                      {managed && (
+                        <Sparkles className="w-3 h-3 text-[var(--module-active-700)] shrink-0" aria-hidden="true" />
+                      )}
                     </h3>
+                    {managed && (
+                      <div className="mt-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+                        {STRATEGY_BADGE_LABEL[managed]}
+                      </div>
+                    )}
                     <p className="text-xs text-[var(--ink-2)] leading-snug mt-1">
                       {eventImpact(event)}
                     </p>
@@ -324,12 +371,10 @@ export function GebeurtenissenView({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {LEVENSSTRATEGIEEN.map((strat) => {
             const Icon = strat.Icon
-            return (
-              <Link
-                key={strat.key}
-                href={strat.href}
-                className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all flex flex-col"
-              >
+            const cls =
+              'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 flex flex-col text-left'
+            const inner = (
+              <>
                 <div
                   className={`w-9 h-9 rounded-lg ${strat.bg} ${strat.text} flex items-center justify-center mb-3`}
                 >
@@ -341,11 +386,27 @@ export function GebeurtenissenView({
                 <p className="text-xs text-[var(--ink-2)] leading-snug flex-1">
                   {strat.description}
                 </p>
-                <span className="mt-3 text-[11px] font-semibold text-violet-700 inline-flex items-center gap-1">
-                  Configureren
-                  <ArrowRight className="w-3 h-3" aria-hidden="true" />
-                </span>
-              </Link>
+                {isPlannen && (
+                  <span className="mt-3 text-[11px] font-semibold text-violet-700 inline-flex items-center gap-1">
+                    Configureren
+                    <ArrowRight className="w-3 h-3" aria-hidden="true" />
+                  </span>
+                )}
+              </>
+            )
+            return isPlannen ? (
+              <button
+                key={strat.key}
+                type="button"
+                onClick={() => setOpenStrategy(strat.key)}
+                className={`${cls} w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all`}
+              >
+                {inner}
+              </button>
+            ) : (
+              <div key={strat.key} className={cls}>
+                {inner}
+              </div>
             )
           })}
         </div>
@@ -370,6 +431,14 @@ export function GebeurtenissenView({
           onClose={() => setEditingEvent(null)}
         />
       )}
+
+      <StrategieEditors
+        open={openStrategy}
+        onClose={closeStrategy}
+        events={events}
+        data={strategieData}
+        readOnly={!isPlannen}
+      />
     </section>
   )
 }

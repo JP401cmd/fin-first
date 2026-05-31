@@ -24,9 +24,9 @@ export function Hero() {
           </p>
 
           <h1 className="mb-6 font-display text-[2.6rem] font-bold leading-[1.05] tracking-[-0.03em] text-[var(--ink)] sm:text-[3.2rem] md:text-[3.8rem] lg:text-[4.2rem]">
-            Grip op uitgaven,
+            Grip op vandaag,
             <br />
-            <span className="text-kern-600">grip op vermogen.</span>
+            <span className="text-kern-600">vrijheid voor morgen.</span>
           </h1>
 
           <p className="mb-8 max-w-[520px] font-serif text-lg leading-relaxed text-[var(--ink-2)]">
@@ -40,7 +40,7 @@ export function Hero() {
             <strong className="font-semibold text-[var(--ink)]">de toekomst</strong>.
           </p>
 
-          <div className="mb-12 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
               href="/signup"
               className="inline-flex items-center justify-center rounded-[var(--r)] bg-[var(--ink)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--bg)] transition-all hover:bg-[var(--ink-2)] hover:shadow-[var(--s1)]"
@@ -55,6 +55,8 @@ export function Hero() {
               <span className="text-[var(--ink-4)]">↓</span>
             </a>
           </div>
+
+          <p className="mb-12 font-sans text-xs text-[var(--ink-3)]">Klaar in ±5 minuten · geen creditcard nodig</p>
 
           {/* Rol-tags — wie heeft hier wat aan? */}
           <div className="flex flex-wrap gap-2">
@@ -71,7 +73,7 @@ export function Hero() {
               FIRE-traject
             </span>
             <span className="rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)]">
-              100% Nederlands
+              Nederlandse fiscaliteit
             </span>
           </div>
         </div>
@@ -107,7 +109,7 @@ export function Hero() {
             {/* Sub-metrics grid */}
             <div className="grid grid-cols-2 divide-x divide-[var(--border-ed)]">
               <div className="border-b border-dashed border-[var(--border-ed)] px-4 py-4">
-                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-4)]">
+                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
                   Maandelijkse vrijheid
                 </p>
                 <p className="font-mono text-lg font-bold text-kern-600 tabular-nums">
@@ -116,7 +118,7 @@ export function Hero() {
                 </p>
               </div>
               <div className="border-b border-dashed border-[var(--border-ed)] px-4 py-4">
-                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-4)]">
+                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
                   FIRE-datum
                 </p>
                 <p className="font-mono text-lg font-bold tabular-nums text-horizon-600">
@@ -125,7 +127,7 @@ export function Hero() {
                 </p>
               </div>
               <div className="px-4 py-4">
-                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-4)]">
+                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
                   Spaarquote
                 </p>
                 <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
@@ -133,7 +135,7 @@ export function Hero() {
                 </p>
               </div>
               <div className="px-4 py-4">
-                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-4)]">
+                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
                   Vrijheidsgroei
                 </p>
                 <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
@@ -146,7 +148,7 @@ export function Hero() {
             {/* Card footer */}
             <div className="bg-[var(--subtle)] px-5 py-3">
               <p className="text-center font-sans text-[10px] italic text-[var(--ink-4)]">
-                Zo ziet jouw profiel eruit na de eerste setup
+                Voorbeeldprofiel — klaar in ±5 minuten na je eerste setup
               </p>
             </div>
           </div>

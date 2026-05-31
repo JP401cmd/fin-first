@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { X, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { LifeEvent } from '@/lib/horizon-data'
+import { isStrategyManagedEvent } from '@/lib/strategy-events'
 
 /**
  * EventBewerkenSheet — quick-edit flow per event op /toekomst
@@ -36,6 +37,10 @@ export function EventBewerkenSheet({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (isStrategyManagedEvent(event)) {
+      setError('Deze gebeurtenis wordt via een strategie beheerd — bewerk haar daar.')
+      return
+    }
     if (!name.trim()) {
       setError('Naam is verplicht.')
       return
@@ -73,6 +78,10 @@ export function EventBewerkenSheet({
   }
 
   async function handleDelete() {
+    if (isStrategyManagedEvent(event)) {
+      setError('Deze gebeurtenis wordt via een strategie beheerd — verwijder haar daar.')
+      return
+    }
     setSaving(true)
     setError(null)
     const supabase = createClient()

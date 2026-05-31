@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { type ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { Compass, Target, CalendarClock, SlidersHorizontal, Calculator, ArrowRight } from 'lucide-react'
 import { PrintTijdasButton } from './print-tijdas-button'
 
@@ -104,11 +104,25 @@ export function ToekomstTabs({
         </div>
       </div>
 
-      {current === 'tijdas' && tijdasView}
-      {current === 'doelen' && (doelenView ?? <DoelenTabPlaceholder />)}
-      {current === 'gebeurtenissen' && (gebeurtenissenView ?? <GebeurtenissenTabPlaceholder />)}
-      {current === 'voorkeuren' && (voorkeurenView ?? <VoorkeurenTabPlaceholder />)}
-      {current === 'rekenhulp' && rekenhulpView}
+      {/* Elk tab-paneel in een keyed Fragment. De view-props zijn elementen
+          die in de server-component (ToekomstPage) zijn aangemaakt en als prop
+          worden doorgegeven; React markeert ze niet als "key-gevalideerd", dus
+          de reconciler waarschuwt ("unique key") zodra het actieve paneel als
+          array-kind van dit fragment wordt afgespeeld. Een keyed Fragment levert
+          de key én valideert de ingepakte view. */}
+      {current === 'tijdas' && <Fragment key="tijdas">{tijdasView}</Fragment>}
+      {current === 'doelen' && (
+        <Fragment key="doelen">{doelenView ?? <DoelenTabPlaceholder />}</Fragment>
+      )}
+      {current === 'gebeurtenissen' && (
+        <Fragment key="gebeurtenissen">
+          {gebeurtenissenView ?? <GebeurtenissenTabPlaceholder />}
+        </Fragment>
+      )}
+      {current === 'voorkeuren' && (
+        <Fragment key="voorkeuren">{voorkeurenView ?? <VoorkeurenTabPlaceholder />}</Fragment>
+      )}
+      {current === 'rekenhulp' && <Fragment key="rekenhulp">{rekenhulpView}</Fragment>}
     </>
   )
 }

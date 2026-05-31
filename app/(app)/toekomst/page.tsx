@@ -12,6 +12,9 @@ import { RekenhulpView } from '@/components/future/rekenhulp-view'
 import { buildPrefillValues } from '@/lib/calculator/user-data-keys'
 import type { CustomCalculatorRow } from '@/lib/calculator/types'
 import { ageAtDate } from '@/lib/horizon-data'
+import type { PreviewBaseline } from '@/lib/strategy-preview'
+import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { WEALTH_GROUPS, type WealthGroup } from '@/lib/wealth-composition'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -36,11 +39,16 @@ export const metadata: Metadata = {
  */
 export default async function ToekomstPage() {
   const supabase = await createClient()
-  const [horizonData, willData, dashboardResult] = await Promise.all([
+  const [horizonData, willData, dashboardResult, aowRes] = await Promise.all([
     loadHorizonData(supabase),
     loadWillData(supabase),
     loadDashboardData(supabase),
+    supabase
+      .from('aow_leeftijd')
+      .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')
+      .order('birth_date_from', { ascending: true }),
   ])
+  const aowRows = (aowRes.data ?? []) as AowLeeftijdRow[]
   // currentAge afgeleid uit DOB voor ScenarioBibliotheek-defaults
   // (target_age = currentAge + N jaar). Null wanneer DOB ontbreekt.
   const dob = horizonData.effectiveInput?.dateOfBirth ?? null
@@ -52,6 +60,17 @@ export default async function ToekomstPage() {
     dashboardResult.dashboardData.fireAgeFractional != null
       ? Math.round(dashboardResult.dashboardData.fireAgeFractional)
       : null
+
+  // Huidig saldo per WealthGroup voor de illustratieve pot-flow-weergave (regel 3/4/5).
+  const potBalances: Record<WealthGroup, number> = {
+    spaargeld: 0, beleggingen: 0, pensioen: 0, vastgoed: 0, overig: 0,
+  }
+  for (const a of horizonData.assets ?? []) {
+    if (a.is_active === false) continue
+    const g = WEALTH_GROUPS[a.asset_type]
+    if (g) potBalances[g] += Number(a.current_value) || 0
+  }
+  potBalances.spaargeld += Math.max(0, horizonData.unlinkedCash ?? 0)
 
   // Rekenhulp (Will-assisted calculators): prefill-waarden uit de
   // horizon-data + opgeslagen calculators van de gebruiker.
@@ -76,6 +95,30 @@ export default async function ToekomstPage() {
     savedCalculators = (calcRows ?? []) as CustomCalculatorRow[]
   }
 
+  // Baseline + lookup-data voor de levensstrategie-editors (AOW/Pensioen/Huis).
+  const ei = horizonData.effectiveInput
+  const strategieBaseline: PreviewBaseline | null =
+    currentAge != null && ei.yearlyMustExpenses > 0
+      ? {
+          currentAge,
+          endAge: horizonData.fireStrategy.endAge,
+          portfolio: ei.totalAssets - ei.totalDebts,
+          yearlyExpenses: ei.yearlyMustExpenses,
+          annualSavings: (ei.monthlyContributions ?? 0) * 12,
+          grossReturn: horizonData.fireParams.grossReturn,
+          inflation: horizonData.fireParams.inflationRate,
+          fireStrategy: horizonData.fireStrategy,
+          withdrawalStrategy: horizonData.withdrawalStrategy,
+        }
+      : null
+  const strategieData = {
+    baseline: strategieBaseline,
+    dailyExpenses: ei.yearlyMustExpenses > 0 ? ei.yearlyMustExpenses / 365 : 0,
+    aowRows,
+    dateOfBirth: dob,
+    grossYearlyIncome: (ei.monthlyIncome ?? 0) * 12,
+  }
+
   return (
     <ToekomstTabs
       tijdasView={<HorizonPage initialData={horizonData} />}
@@ -93,6 +136,7 @@ export default async function ToekomstPage() {
             0,
             (horizonData.avgIncome6m - horizonData.avgExpenses6m) * 12,
           )}
+          strategieData={strategieData}
         />
       }
       voorkeurenView={
@@ -102,6 +146,9 @@ export default async function ToekomstPage() {
           withdrawalStrategy={horizonData.withdrawalStrategy}
           fireAge={fireAge}
           simRows={simRows}
+          simSnapshot={dashboardResult.regelSimSnapshot}
+          regelVoorkeuren={dashboardResult.regelVoorkeuren}
+          potBalances={potBalances}
         />
       }
       rekenhulpView={

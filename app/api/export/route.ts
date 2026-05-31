@@ -29,13 +29,15 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url)
   const type = url.searchParams.get('type') as ExportType | null
+  const format = (url.searchParams.get('format') ?? 'csv') as 'csv' | 'json'
 
   if (!type || !['transactions', 'budgets', 'net_worth', 'assets', 'debts', 'goals'].includes(type)) {
     return Response.json({ error: 'Ongeldig type. Gebruik: transactions, budgets, net_worth, assets, debts, goals' }, { status: 400 })
   }
 
-  let csv: string
-  let filename: string
+  let headers: string[] = []
+  let rows: (string | number | null | undefined)[][] = []
+  let filenameBase: string
 
   switch (type) {
     case 'transactions': {
@@ -46,7 +48,7 @@ export async function GET(req: Request) {
         .order('date', { ascending: false })
         .limit(10000)
 
-      const rows = (data ?? []).map(t => [
+      rows = (data ?? []).map(t => [
         t.date,
         t.amount,
         t.description,
@@ -57,11 +59,8 @@ export async function GET(req: Request) {
         (t.budget as { name?: string } | null)?.name ?? '',
       ])
 
-      csv = toCSV(
-        ['Datum', 'Bedrag', 'Beschrijving', 'Tegenpartij', 'IBAN', 'Inkomen', 'Referentie', 'Budget'],
-        rows,
-      )
-      filename = `transacties-${new Date().toISOString().split('T')[0]}.csv`
+      headers = ['Datum', 'Bedrag', 'Beschrijving', 'Tegenpartij', 'IBAN', 'Inkomen', 'Referentie', 'Budget']
+      filenameBase = `transacties-${new Date().toISOString().split('T')[0]}`
       break
     }
 
@@ -92,7 +91,7 @@ export async function GET(req: Request) {
         }
       }
 
-      const rows = (budgetsRes.data ?? []).map(b => [
+      rows = (budgetsRes.data ?? []).map(b => [
         b.name,
         b.slug,
         b.budget_type,
@@ -101,11 +100,8 @@ export async function GET(req: Request) {
         b.is_essential ? 'Ja' : 'Nee',
       ])
 
-      csv = toCSV(
-        ['Naam', 'Slug', 'Type', 'Limiet', 'Besteed deze maand', 'Essentieel'],
-        rows,
-      )
-      filename = `budgetten-${new Date().toISOString().split('T')[0]}.csv`
+      headers = ['Naam', 'Slug', 'Type', 'Limiet', 'Besteed deze maand', 'Essentieel']
+      filenameBase = `budgetten-${new Date().toISOString().split('T')[0]}`
       break
     }
 
@@ -116,18 +112,15 @@ export async function GET(req: Request) {
         .eq('user_id', user.id)
         .order('snapshot_date', { ascending: true })
 
-      const rows = (data ?? []).map(s => [
+      rows = (data ?? []).map(s => [
         s.snapshot_date,
         s.total_assets,
         s.total_debts,
         s.net_worth,
       ])
 
-      csv = toCSV(
-        ['Datum', 'Vermogen', 'Schulden', 'Netto Vermogen'],
-        rows,
-      )
-      filename = `netto-vermogen-${new Date().toISOString().split('T')[0]}.csv`
+      headers = ['Datum', 'Vermogen', 'Schulden', 'Netto Vermogen']
+      filenameBase = `netto-vermogen-${new Date().toISOString().split('T')[0]}`
       break
     }
 
@@ -138,7 +131,7 @@ export async function GET(req: Request) {
         .eq('user_id', user.id)
         .order('sort_order')
 
-      const rows = (data ?? []).map(a => [
+      rows = (data ?? []).map(a => [
         a.name,
         a.asset_type,
         a.current_value,
@@ -150,11 +143,8 @@ export async function GET(req: Request) {
         a.notes,
       ])
 
-      csv = toCSV(
-        ['Naam', 'Type', 'Huidige waarde', 'Aankoopwaarde', 'Verwacht rendement %', 'Maandelijkse inleg', 'Instelling', 'Actief', 'Notities'],
-        rows,
-      )
-      filename = `assets-${new Date().toISOString().split('T')[0]}.csv`
+      headers = ['Naam', 'Type', 'Huidige waarde', 'Aankoopwaarde', 'Verwacht rendement %', 'Maandelijkse inleg', 'Instelling', 'Actief', 'Notities']
+      filenameBase = `assets-${new Date().toISOString().split('T')[0]}`
       break
     }
 
@@ -165,7 +155,7 @@ export async function GET(req: Request) {
         .eq('user_id', user.id)
         .order('sort_order')
 
-      const rows = (data ?? []).map(d => [
+      rows = (data ?? []).map(d => [
         d.name,
         d.debt_type,
         d.original_amount,
@@ -179,11 +169,8 @@ export async function GET(req: Request) {
         d.notes,
       ])
 
-      csv = toCSV(
-        ['Naam', 'Type', 'Oorspronkelijk bedrag', 'Huidig saldo', 'Rente %', 'Maandelijkse betaling', 'Kredietverstrekker', 'Startdatum', 'Einddatum', 'Actief', 'Notities'],
-        rows,
-      )
-      filename = `schulden-${new Date().toISOString().split('T')[0]}.csv`
+      headers = ['Naam', 'Type', 'Oorspronkelijk bedrag', 'Huidig saldo', 'Rente %', 'Maandelijkse betaling', 'Kredietverstrekker', 'Startdatum', 'Einddatum', 'Actief', 'Notities']
+      filenameBase = `schulden-${new Date().toISOString().split('T')[0]}`
       break
     }
 
@@ -194,7 +181,7 @@ export async function GET(req: Request) {
         .eq('user_id', user.id)
         .order('sort_order')
 
-      const rows = (data ?? []).map(g => [
+      rows = (data ?? []).map(g => [
         g.name,
         g.goal_type,
         g.target_value,
@@ -203,19 +190,35 @@ export async function GET(req: Request) {
         g.is_completed ? 'Ja' : 'Nee',
       ])
 
-      csv = toCSV(
-        ['Naam', 'Type', 'Doelbedrag', 'Huidig bedrag', 'Doeldatum', 'Voltooid'],
-        rows,
-      )
-      filename = `doelen-${new Date().toISOString().split('T')[0]}.csv`
+      headers = ['Naam', 'Type', 'Doelbedrag', 'Huidig bedrag', 'Doeldatum', 'Voltooid']
+      filenameBase = `doelen-${new Date().toISOString().split('T')[0]}`
       break
     }
   }
 
+  if (format === 'json') {
+    const objects = rows.map(row => {
+      const obj: Record<string, string | number | null | undefined> = {}
+      headers.forEach((header, i) => {
+        obj[header] = row[i]
+      })
+      return obj
+    })
+
+    return Response.json(objects, {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filenameBase}.json"`,
+      },
+    })
+  }
+
+  const csv = toCSV(headers, rows)
+
   return new Response(csv, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': `attachment; filename="${filenameBase}.csv"`,
     },
   })
 }

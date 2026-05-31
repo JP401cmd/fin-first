@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function Header() {
       <Link href="/" className="flex items-center">
         <span className="font-display text-[26px] font-bold leading-none text-[var(--ink)]">t</span>
         <span className="font-display text-[26px] font-bold leading-none text-kern-600">f.</span>
-        <span className="ml-2.5 hidden font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-4)] sm:inline">
+        <span className="ml-2.5 hidden font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)] sm:inline">
           TriFinity
         </span>
       </Link>
@@ -61,6 +63,18 @@ export function Header() {
         >
           Prijzen
         </a>
+
+        {/* Hamburger — alleen mobiel */}
+        <button
+          type="button"
+          onClick={() => setMobileOpen((open) => !open)}
+          aria-label="Menu"
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-nav"
+          className="flex h-9 w-9 items-center justify-center rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] text-[var(--ink-2)] transition-all hover:border-[var(--ink-3)] hover:text-[var(--ink)] hover:shadow-[var(--s0)] md:hidden"
+        >
+          {mobileOpen ? <X size={18} strokeWidth={2} /> : <Menu size={18} strokeWidth={2} />}
+        </button>
 
         {user ? (
           <div className="relative">
@@ -103,6 +117,55 @@ export function Header() {
           </Link>
         )}
       </div>
+
+      {/* Mobiele navigatie — volle breedte strook onder de header-balk */}
+      {mobileOpen && (
+        <div
+          id="mobile-nav"
+          className="absolute left-0 right-0 top-full border-b-2 border-t border-[var(--ink)] border-t-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s2)] md:hidden"
+        >
+          <div className="flex flex-col px-6 py-3">
+            <a
+              href="#modules"
+              onClick={() => setMobileOpen(false)}
+              className="border-b border-[var(--border-ed)] py-3 font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
+            >
+              Modules
+            </a>
+            <a
+              href="#rekenhulp"
+              onClick={() => setMobileOpen(false)}
+              className="border-b border-[var(--border-ed)] py-3 font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
+            >
+              Rekenhulp
+            </a>
+            <a
+              href="#pricing"
+              onClick={() => setMobileOpen(false)}
+              className="border-b border-[var(--border-ed)] py-3 font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
+            >
+              Prijzen
+            </a>
+            {user ? (
+              <Link
+                href="/overzicht"
+                onClick={() => setMobileOpen(false)}
+                className="mt-3 rounded-[var(--r)] border-2 border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-center font-sans text-sm font-medium text-[var(--bg)] transition-all hover:border-[var(--ink-2)] hover:bg-[var(--ink-2)]"
+              >
+                Overzicht
+              </Link>
+            ) : (
+              <Link
+                href="/signup"
+                onClick={() => setMobileOpen(false)}
+                className="mt-3 rounded-[var(--r)] border-2 border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-center font-sans text-sm font-medium text-[var(--bg)] transition-all hover:border-[var(--ink-2)] hover:bg-[var(--ink-2)]"
+              >
+                Begin gratis
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

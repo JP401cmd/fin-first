@@ -11,11 +11,13 @@ import {
   type UserDefinedCashflow,
   type ChildrenMetadata,
   type AOWMetadata,
+  type PensionMetadata,
   type InheritanceMetadata,
   type BegrafenisMetadata,
   NIBUD_CHILDREN_MONTHLY_COST,
-  NL_AOW_MONTHLY,
-  NL_AOW_MONTHLY_SAMENWONEND,
+  computeAowMonthly,
+  normalizePensionType,
+  annuitizePension,
   berekenErfbelasting,
   berekenKinderopvangNetto,
   kinderbijslagPerMaand,
@@ -721,11 +723,7 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
     // AOW: adjust amount based on leefsituatie and opbouwpercentage
     if (ev.event_type === 'aow' && (meta.leefsituatie || meta.jarenBuitenNL)) {
       const m = meta as AOWMetadata
-      const leefsituatie = m.leefsituatie ?? 'alleenstaand'
-      const jarenBuiten = Math.min(50, Math.max(0, Number(m.jarenBuitenNL ?? m.jarenInNL ?? 0)))
-      const opbouwFactor = (50 - jarenBuiten) / 50
-      const baseAmount = leefsituatie === 'samenwonend' ? NL_AOW_MONTHLY_SAMENWONEND : NL_AOW_MONTHLY
-      const adjustedAmount = Math.round(baseAmount * opbouwFactor)
+      const adjustedAmount = computeAowMonthly(m.leefsituatie, m.jarenBuitenNL ?? m.jarenInNL)
       if (adjustedAmount > 0) {
         flows.push({
           id: `le-aow-adjusted-${ev.id}`,
@@ -738,6 +736,44 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
           indexed: true,
         })
       }
+      skipGenericMonthlyIncome = true
+    }
+
+    // PENSION: type-bewuste uitkering (vervangt de generieke maandinkomen-fallback).
+    // inleg → annuïteit; uitkeringsduur → toAge; partner-% verwerkt in de annuïteit
+    // (geen aparte flow → geen dubbeltelling op de eigen tijdas).
+    if (ev.event_type === 'pension') {
+      const m = meta as PensionMetadata
+      const pType = normalizePensionType(m.pensioenType)
+      const ingang = m.ingangLeeftijd ?? age
+      const duur = m.uitkeringsduur ?? 'levenslang'
+      const inleg = Number(m.inlegBedrag ?? 0)
+      const brutoMaand =
+        inleg > 0
+          ? annuitizePension({
+              inlegBedrag: inleg,
+              ingangLeeftijd: ingang,
+              uitkeringsduur: duur,
+              partnerUitkeringPct:
+                pType === 'lijfrente_levenslang' ? m.partnerUitkeringPct : undefined,
+            })
+          : Number(m.brutoBedrag ?? ev.monthly_income_change ?? 0)
+      if (brutoMaand > 0) {
+        flows.push({
+          id: `le-pension-${ev.id}`,
+          name: ev.name,
+          type: 'recurring',
+          direction: 'income',
+          amount: brutoMaand,
+          fromAge: ingang,
+          toAge: duur === 'levenslang' ? null : ingang + Number(duur),
+          // Nieuwe potten zetten isGeindexeerd expliciet; legacy UPO-rijen vallen
+          // terug op de rij-vlag zodat hun bestaande projectie niet stil verandert.
+          indexed: m.isGeindexeerd ?? ev.is_indexed ?? false,
+        })
+      }
+      skipGenericCost = true
+      skipGenericMonthlyCost = true
       skipGenericMonthlyIncome = true
     }
 

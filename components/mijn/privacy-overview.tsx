@@ -97,11 +97,11 @@ const CATEGORIES: DataCategory[] = [
   {
     Icon: Sparkles,
     iconTint: 'text-fuchsia-700 bg-fuchsia-50',
-    label: 'Briefing-historie',
-    what: 'Wekelijkse Will-briefings (tekst + kaartjes) en welke je hebt geopend of gedismissed.',
-    where: 'localStorage in je browser (lokaal) — server-mirror is opt-in.',
-    why: 'Voor de "Eerdere briefings"-historie en het overslaan-gedrag van de onboarding-nudge.',
-    action: { label: 'Briefing openen', href: '/will#briefing' },
+    label: 'Wekelijkse briefing',
+    what: 'Je wekelijkse briefing-kaartjes (vermogen, budget, doelen, vrijheid) — per week vastgezet.',
+    where: 'Server-side opgeslagen in je profiel (briefing_snapshot).',
+    why: 'Zo blijft je briefing de hele week stabiel en kun je hem 1× per dag handmatig verversen.',
+    action: { label: 'Briefing openen', href: '/overzicht' },
   },
 ]
 

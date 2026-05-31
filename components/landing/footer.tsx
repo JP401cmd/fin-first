@@ -39,13 +39,12 @@ function SlotCta() {
 const PRODUCTEN = [
   { label: 'Het Overzicht', href: '/#modules' },
   { label: 'De Toekomst', href: '/#modules' },
-  { label: 'Rekenhulp-bibliotheek', href: '/toekomst/bibliotheek' },
+  { label: 'Rekenhulp-bibliotheek', href: '/#rekenhulp' },
   { label: 'Will — AI-coach', href: '/#coach' },
 ]
 
 const HULP = [
   { label: 'Veelgestelde vragen', href: '/#faq' },
-  { label: 'Status', href: '/status' },
   { label: 'Contact', href: '/contact' },
 ]
 
@@ -65,7 +64,7 @@ function FooterColumn({
 }) {
   return (
     <div>
-      <h3 className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+      <h3 className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
         {titel}
       </h3>
       <ul className="space-y-2">
@@ -114,10 +113,10 @@ export function Footer() {
 
           {/* Slot-strook */}
           <div className="mt-12 flex flex-col gap-3 border-t border-[var(--border-ed)] pt-6 sm:flex-row sm:items-center sm:justify-between">
-            <span className="font-sans text-xs text-[var(--ink-4)]">
+            <span className="font-sans text-xs text-[var(--ink-3)]">
               &copy; {new Date().getFullYear()} TriFinity &mdash; gemaakt in Nederland
             </span>
-            <span className="font-sans text-[10px] uppercase tracking-[0.1em] text-[var(--ink-4)]">
+            <span className="font-sans text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
               Editie 2026
             </span>
           </div>

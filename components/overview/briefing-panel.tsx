@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import {
   TrendingUp,
@@ -8,39 +9,42 @@ import {
   AlertTriangle,
   Sparkles,
   LineChart,
+  RefreshCw,
+  ArrowUpRight,
+  Share2,
   type LucideIcon,
 } from 'lucide-react'
 import { HEFBOOM_CONFIG, type Hefboom } from '@/lib/hefboom-config'
+import { formatTimestamp } from '@/lib/format'
+import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
+import { VrijheidsbriefingHero } from './vrijheidsbriefing-hero'
+import type { FreedomHeroProps } from '@/lib/briefing/overview-briefing'
+import type { FreedomCardData } from '@/components/app/freedom-card'
 
 /**
- * BriefingPanel — vervangt AtomicCards op /overzicht hero. Toont een
- * 3-koloms grid (max 6 entries = 3×2) met door AI gegenereerde
- * briefing-kaarten. Elke kaart heeft een categorie-kicker, eigen
- * kleur-codering en optioneel een href voor doorklikken.
+ * BriefingPanel — de "wekelijkse briefing" op /overzicht. Toont een 3-koloms
+ * grid (max 6) met door de briefing-engine gegenereerde kaartjes. Elke kaart
+ * heeft een categorie-kicker, kleur-accent (linkerrail) en optioneel een href
+ * voor doorklikken.
  *
- * Achtergrond — plan §6.2 + Tier-3 #16 (Wekelijkse briefing):
- *   Het plan beschrijft "drie atomic cards onder hero" voor de wekelijkse
- *   briefing. User-feedback (mei 19) verzoekt evolutie naar max 6 cards
- *   in 3-koloms-grid met meer categorieën. Cards mogen verschillende
- *   afmetingen hebben (1-col vs 2-col).
+ * Wekelijks karakter (mei 2026):
+ *   De briefing wordt server-side per ISO-week (Amsterdam) vastgezet en krijgt
+ *   een "Bijgewerkt …"-stempel. De gebruiker mag de briefing daarnaast 1× per
+ *   dag handmatig verversen via de Ververs-knop; daarna staat die tot de
+ *   volgende dag uit. Het oude "Will — jouw briefing" samenvattende blok is
+ *   verwijderd ten gunste van beter vormgegeven losse kaartjes.
  *
  * Categorieën (6 stuks):
- *   - observation  WAT VALT OP        emerald  TrendingUp
- *   - tip          EEN TIP            violet   Lightbulb
- *   - upcoming     KOMENDE MAAND      sky      Calendar
- *   - heads_up     HEADS-UP           amber    AlertTriangle
- *   - milestone    MIJLPAAL           fuchsia  Sparkles
- *   - market       MARKT              slate    LineChart
+ *   - observation  WAT VALT OP    emerald  TrendingUp
+ *   - tip          EEN TIP        violet   Lightbulb
+ *   - upcoming     KOMENDE MAAND  sky      Calendar
+ *   - heads_up     HEADS-UP       amber    AlertTriangle
+ *   - milestone    MIJLPAAL       fuchsia  Sparkles
+ *   - market       MARKT          slate    LineChart
  *
  * Span (visueel onderscheid voor verschillende prioriteit):
  *   - 'narrow'  → 1 kolom (default)
  *   - 'wide'    → 2 kolommen (breekt visueel uit, voor headline-items)
- *
- * Data-bron: server-side briefing-engine genereert per dag/week deze
- * entries op basis van temporal-context, recommendations, life-events,
- * net-worth-delta. Voor MVP putten we uit recommendations + life-events
- * + financial-health pillars; de briefing-engine als first-class
- * server-component (plan A-4) komt in volgende iteratie.
  */
 
 export type BriefingCategory =
@@ -53,12 +57,6 @@ export type BriefingCategory =
 
 export type BriefingSpan = 'narrow' | 'wide'
 
-/**
- * Hefboom-tag — plan T-3 (Tier-2 #15): "Tips zijn altijd gekoppeld aan
- * één van de 4 hefbomen". Wordt visueel als mini-icoon naast de
- * categorie-kicker getoond zodat de gebruiker leert welke hefboom een
- * tip/observatie raakt.
- */
 /** Backwards-compatible alias — gedeelde definitie staat in
  *  `lib/hefboom-config.ts`. */
 export type HefboomTag = Hefboom
@@ -73,14 +71,9 @@ export interface BriefingEntry {
   href?: string
   /** Visuele span — 'wide' = 2-kolom-card, 'narrow' = 1-kolom (default). */
   span?: BriefingSpan
-  /** Optionele hefboom-tag. Wanneer aanwezig: mini-icoon naast kicker.
-   *  Bij cross-hefboom inzichten (bv. FIRE-progress, fysiek vermogen
-   *  totaal) blijft het veld undefined. */
+  /** Optionele hefboom-tag. Wanneer aanwezig: mini-icoon naast kicker. */
   hefboom?: HefboomTag
-  /** Optionele impact-metadata. Tip/observation-entries die uit een
-   *  recommendation komen krijgen hier de freedom-days + EUR-effect
-   *  meegestuurd zodat de card dezelfde dual-unit-badges toont als
-   *  TipsLijst ("Geld is opgeslagen tijd"). */
+  /** Optionele impact-metadata (freedom-days + EUR-effect uit recommendation). */
   impact?: {
     freedomDaysPerYear?: number | null
     euroPerYear?: number | null
@@ -89,38 +82,152 @@ export interface BriefingEntry {
 
 const CATEGORY_CONFIG: Record<
   BriefingCategory,
-  { label: string; dotColor: string; Icon: LucideIcon }
+  { label: string; dotColor: string; bar: string; Icon: LucideIcon }
 > = {
-  observation: { label: 'Wat valt op', dotColor: 'bg-emerald-500', Icon: TrendingUp },
-  tip:         { label: 'Een tip',     dotColor: 'bg-violet-500',  Icon: Lightbulb },
-  upcoming:    { label: 'Komende maand', dotColor: 'bg-sky-500',   Icon: Calendar },
-  heads_up:    { label: 'Heads-up',    dotColor: 'bg-amber-500',   Icon: AlertTriangle },
-  milestone:   { label: 'Mijlpaal',    dotColor: 'bg-fuchsia-500', Icon: Sparkles },
-  market:      { label: 'Markt',       dotColor: 'bg-slate-500',   Icon: LineChart },
+  observation: { label: 'Wat valt op', dotColor: 'bg-emerald-500', bar: 'bg-emerald-400', Icon: TrendingUp },
+  tip:         { label: 'Een tip',      dotColor: 'bg-violet-500',  bar: 'bg-violet-400',  Icon: Lightbulb },
+  upcoming:    { label: 'Binnenkort',   dotColor: 'bg-sky-500',     bar: 'bg-sky-400',     Icon: Calendar },
+  heads_up:    { label: 'Heads-up',     dotColor: 'bg-amber-500',   bar: 'bg-amber-400',   Icon: AlertTriangle },
+  milestone:   { label: 'Mijlpaal',     dotColor: 'bg-fuchsia-500', bar: 'bg-fuchsia-400', Icon: Sparkles },
+  market:      { label: 'Markt',        dotColor: 'bg-slate-500',   bar: 'bg-slate-400',   Icon: LineChart },
 }
 
-/** Maximum aantal kaartjes — plan §6.2 evolutie: 3-koloms × 2 rijen = 6. */
+/** Maximum aantal kaartjes — 3-koloms × 2 rijen = 6. */
 const MAX_BRIEFING_ENTRIES = 6
+
+/** Lees het gedeelde privacy-niveau (zelfde key als /identity/delen). */
+function readPrivacyLevel(): 'anonymous' | 'named' | 'full' {
+  try {
+    const s = typeof window !== 'undefined' ? localStorage.getItem('trifinity_privacy_level') : null
+    if (s === 'anonymous' || s === 'named' || s === 'full') return s
+  } catch {
+    /* localStorage niet beschikbaar */
+  }
+  return 'anonymous'
+}
+
+/** Bouw de ShareContent-tekst uit de vrijheidskaart-data. */
+function buildShareContent(data: FreedomCardData): ShareContent {
+  const pct = data.freedomPercentage != null ? `${data.freedomPercentage}%` : 'N/B'
+  const daysWon = data.freedomDaysWonThisMonth ?? data.freedomDaysWon
+  return {
+    title: 'Mijn TriFinity vrijheidsweek',
+    text: `Mijn financiële vrijheid: ${pct} · ${daysWon} vrijheidsdagen · FIRE: ${data.fireCountdown?.label ?? 'N/B'} #TriFinity`,
+    url: typeof window !== 'undefined' ? window.location.origin : '',
+    contentType: 'freedom_card',
+    privacyLevel: data.privacyLevel,
+  }
+}
 
 export function BriefingPanel({
   entries,
-  narrative,
+  refreshedAt,
+  canRefresh = false,
+  freedomHero,
+  headline,
 }: {
   entries: BriefingEntry[]
-  /** Optionele natuurlijke-taal samenvatting (plan T-1 / Tier-3 #16).
-   *  Gerendered als "Will:"-headline boven de card-grid. Wanneer null
-   *  of leeg blijft de headline weg. */
-  narrative?: string | null
+  /** ISO-tijdstip waarop de briefing voor vandaag is vastgezet ("Bijgewerkt …"). */
+  refreshedAt?: string | null
+  /** Of de handmatige ververs vandaag nog beschikbaar is (max 1×/dag). */
+  canRefresh?: boolean
+  /** Vrijheidstijd-hero bovenaan (week-over-week delta). Optioneel. */
+  freedomHero?: FreedomHeroProps | null
+  /** Eén-zin kop onder de titel (deterministisch of AI bij ververs). */
+  headline?: string | null
 }) {
-  // Slice tot max 6 en behoud volgorde — server-side briefing-engine
-  // beslist over prioriteit (most-urgent eerst). Hier alleen capping.
-  const capped = entries.slice(0, MAX_BRIEFING_ENTRIES)
+  // Override-state: alleen gezet ná een succesvolle handmatige ververs. Zonder
+  // override blijven de server-props de bron van waarheid — remount-veilig.
+  const [override, setOverride] = useState<{
+    entries: BriefingEntry[]
+    refreshedAt: string
+    headline: string | null
+  } | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [usedToday, setUsedToday] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  if (capped.length === 0) {
-    // Volledige lege staat — toon één placeholder zodat user weet dat
-    // hier briefing-content komt zodra er data is.
-    return (
-      <div className="mt-6">
+  // Deel-state: de canvas-renderer wordt dynamisch geïmporteerd bij de eerste
+  // klik zodat de tekencode buiten de initiële /overzicht-bundle blijft.
+  const [sharing, setSharing] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareData, setShareData] = useState<FreedomCardData | null>(null)
+  const [shareRenderer, setShareRenderer] = useState<
+    ((d: FreedomCardData) => HTMLCanvasElement) | null
+  >(null)
+
+  const shownEntries = (override?.entries ?? entries).slice(0, MAX_BRIEFING_ENTRIES)
+  const shownRefreshedAt = override?.refreshedAt ?? refreshedAt ?? null
+  const shownHeadline = override?.headline ?? headline ?? null
+  const refreshable = canRefresh && !usedToday && !refreshing
+
+  async function handleShare() {
+    if (sharing) return
+    setSharing(true)
+    setError(null)
+    try {
+      const [res, mod] = await Promise.all([
+        fetch(`/api/share/freedom-card?privacy=${readPrivacyLevel()}`),
+        import('@/components/app/freedom-card'),
+      ])
+      if (!res.ok) throw new Error('Kon je vrijheidskaart niet genereren')
+      const data: FreedomCardData = await res.json()
+      setShareData(data)
+      setShareRenderer(() => mod.renderFreedomCardToCanvas)
+      setShareOpen(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delen mislukt')
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  async function handleRefresh() {
+    if (!refreshable) return
+    setRefreshing(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/briefing/refresh', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error ?? 'Verversen mislukt')
+      if (data.allowed && Array.isArray(data.entries)) {
+        setOverride({
+          entries: data.entries,
+          refreshedAt: data.refreshedAt,
+          headline: data.headline ?? null,
+        })
+      }
+      // Of de ververs nu nieuwe content opleverde of al gebruikt was: vandaag
+      // is de knop hierna uitgeput.
+      setUsedToday(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Verversen mislukt')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  return (
+    <div id="briefing" className="mt-6 scroll-mt-20">
+      {freedomHero && <VrijheidsbriefingHero {...freedomHero} />}
+      <BriefingHeader
+        refreshedAt={shownRefreshedAt}
+        headline={shownHeadline}
+        refreshable={refreshable}
+        refreshing={refreshing}
+        showRefresh={canRefresh || usedToday}
+        onRefresh={handleRefresh}
+        onShare={handleShare}
+        sharing={sharing}
+      />
+
+      {error && (
+        <p className="mb-3 text-[11px] text-rose-600" role="status">
+          {error}
+        </p>
+      )}
+
+      {shownEntries.length === 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-3 sm:p-4 sm:col-span-3">
             <div className="flex items-center gap-2 mb-1.5">
@@ -130,96 +237,163 @@ export function BriefingPanel({
               </span>
             </div>
             <p className="text-sm text-[var(--ink-3)] italic leading-snug">
-              Nog onvoldoende data voor een briefing — vul je hefbomen aan
-              en check terug volgende week voor je eerste samenvatting.
+              Nog onvoldoende data voor een briefing — vul je hefbomen aan en
+              check binnenkort terug voor je eerste samenvatting.
             </p>
           </article>
         </div>
-      </div>
-    )
-  }
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          {shownEntries.map((entry, i) => (
+            <BriefingCard key={entry.id} entry={entry} index={i} />
+          ))}
+        </div>
+      )}
 
-  return (
-    <div className="mt-6 space-y-3 sm:space-y-4">
-      {narrative && <BriefingNarrative text={narrative} />}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        {capped.map((entry) => (
-          <BriefingCard key={entry.id} entry={entry} />
-        ))}
-      </div>
+      {shareOpen && shareData && shareRenderer && (
+        <ShareDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          content={buildShareContent(shareData)}
+          renderCanvas={() => shareRenderer(shareData)}
+        />
+      )}
     </div>
   )
 }
 
 /**
- * Headline-card met natuurlijke-taal briefing. Will-persona is de stem
- * (plan §6.5). Subtiele violet-tint zodat de samenvatting visueel
- * onderscheidt van de feiten-cards eronder.
+ * Sectiekop boven het briefing-grid: titel + "Bijgewerkt …"-stempel links,
+ * Ververs-knop rechts. Vervangt het oude Will-narratief-blok als visuele
+ * identiteit van de briefing.
  */
-function BriefingNarrative({ text }: { text: string }) {
+function BriefingHeader({
+  refreshedAt,
+  headline,
+  refreshable,
+  refreshing,
+  showRefresh,
+  onRefresh,
+  onShare,
+  sharing,
+}: {
+  refreshedAt: string | null
+  headline: string | null
+  refreshable: boolean
+  refreshing: boolean
+  showRefresh: boolean
+  onRefresh: () => void
+  onShare: () => void
+  sharing: boolean
+}) {
   return (
-    <article className="rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50/60 to-stone-50 p-4 sm:p-5">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold">
-          W
-        </span>
-        <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
-          Will — jouw briefing
-        </span>
+    <div className="mb-3 flex items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="font-serif text-lg sm:text-xl font-semibold leading-tight text-[var(--ink)]">
+          Jouw wekelijkse briefing
+        </h2>
+        {headline && (
+          <p className="mt-1 text-[13px] sm:text-sm text-[var(--ink-2)] leading-snug">
+            {headline}
+          </p>
+        )}
+        {refreshedAt && (
+          <p className="mt-0.5 text-[11px] text-[var(--ink-3)] tabular-nums">
+            Bijgewerkt {formatTimestamp(refreshedAt)}
+          </p>
+        )}
       </div>
-      <p className="text-sm sm:text-base text-[var(--ink-2)] leading-relaxed">
-        {text}
-      </p>
-      {/* Plan §6.2: "Toon alle briefings →" — slide-in via /will waar de
-          volledige briefing-historie staat. Kort en niet-opdringerig. */}
-      <div className="mt-3 pt-3 border-t border-violet-100/70">
-        <Link
-          href="/overzicht#briefing"
-          className="text-[11px] font-semibold text-violet-700 hover:underline inline-flex items-center gap-1"
+
+      <div className="flex shrink-0 items-center gap-2 print:hidden">
+        <button
+          type="button"
+          onClick={onShare}
+          disabled={sharing}
+          title="Deel je vrijheidsweek"
+          aria-label="Deel je vrijheidsweek"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
         >
-          Eerdere briefings
-          <span aria-hidden="true">→</span>
-        </Link>
+          <Share2
+            className={`h-3.5 w-3.5 ${sharing ? 'animate-pulse' : ''}`}
+            aria-hidden="true"
+          />
+          {sharing ? 'Even…' : 'Deel'}
+        </button>
+
+        {showRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={!refreshable}
+            title={
+              refreshable
+                ? 'Ververs je briefing (1× per dag)'
+                : 'Je hebt vandaag al ververst — morgen weer'
+            }
+            aria-label={
+              refreshable
+                ? 'Ververs je briefing'
+                : 'Briefing verversen — vandaag al gebruikt, morgen weer'
+            }
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            {refreshing ? 'Verversen…' : 'Ververs'}
+          </button>
+        )}
       </div>
-    </article>
+    </div>
   )
 }
 
-function BriefingImpactBadge({
-  impact,
-}: {
-  impact?: BriefingEntry['impact']
-}) {
+function BriefingImpactBadge({ impact }: { impact?: BriefingEntry['impact'] }) {
   if (!impact) return null
   const eur = impact.euroPerYear
   const days = impact.freedomDaysPerYear
   const hasEur = eur != null && eur > 0
   const hasDays = days != null && days > 0
   if (!hasEur && !hasDays) return null
+  // "Geld is opgeslagen tijd": de vrijheidsdagen krijgen de visuele lead
+  // (geaccentueerde chip), het euro-bedrag is de secundaire context.
   return (
     <div className="mt-2 inline-flex items-center gap-2 text-[10px] text-[var(--ink-3)]">
-      {hasEur && (
+      {hasDays && (
         <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-1.5 py-0.5 font-semibold tabular-nums">
-          +€{Math.round(eur).toLocaleString('nl-NL')}/jr
+          +{Math.round(days)} dagen vrijheid/jr
         </span>
       )}
-      {hasDays && (
-        <span className="tabular-nums">+{Math.round(days)} dagen vrijheid/jr</span>
+      {hasEur && (
+        <span className="tabular-nums">+€{Math.round(eur).toLocaleString('nl-NL')}/jr</span>
       )}
     </div>
   )
 }
 
-function BriefingCard({ entry }: { entry: BriefingEntry }) {
+function BriefingCard({ entry, index = 0 }: { entry: BriefingEntry; index?: number }) {
   const config = CATEGORY_CONFIG[entry.category]
+  // Defensief: een bevroren snapshot kan na schema-evolutie een onbekende
+  // categorie bevatten. Liever het kaartje overslaan dan /overzicht laten
+  // crashen op een undefined config.
+  if (!config) return null
   const Icon = config.Icon
   const hefboomCfg = entry.hefboom ? HEFBOOM_CONFIG[entry.hefboom] : null
   const HefboomIcon = hefboomCfg?.Icon
   // Wide span: 2 kolommen op sm+, full-width op mobile. Narrow: 1 kol.
   const spanClass = entry.span === 'wide' ? 'sm:col-span-2' : ''
+  // Staggered reveal — altijd-actieve CSS-keyframe (reduced-motion-safe via
+  // globals.css). Per-kaart vertraging zodat ze één voor één binnenvallen.
+  const revealStyle = { animationDelay: `${index * 70}ms` } as const
 
   const inner = (
     <>
+      {/* Kleur-accent: linkerrail per categorie. */}
+      <span
+        className={`absolute left-0 top-0 bottom-0 w-1 ${config.bar}`}
+        aria-hidden="true"
+      />
       <div className="flex items-center gap-2 mb-1.5">
         <span className={`w-2 h-2 rounded-full ${config.dotColor}`} aria-hidden="true" />
         <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
@@ -236,25 +410,33 @@ function BriefingCard({ entry }: { entry: BriefingEntry }) {
         )}
         <Icon className="w-3.5 h-3.5 text-[var(--ink-4)] ml-auto" aria-hidden="true" />
       </div>
-      <p className="text-sm text-[var(--ink-2)] leading-snug">{entry.text}</p>
+      <p className="text-sm text-[var(--ink)] leading-snug">{entry.text}</p>
       <BriefingImpactBadge impact={entry.impact} />
+      {entry.href && (
+        <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--ink-3)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          Bekijk
+          <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
+        </span>
+      )}
     </>
   )
+
+  const base =
+    'group relative flex flex-col overflow-hidden rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3.5 sm:p-4'
 
   if (entry.href) {
     return (
       <Link
         href={entry.href}
-        className={`rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 hover:border-[var(--ink-3)] hover:shadow-sm transition-all block ${spanClass}`}
+        style={revealStyle}
+        className={`${base} ${spanClass} animate-fade-up transition-all hover:-translate-y-0.5 hover:border-[var(--ink-3)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ink-3)] focus-visible:ring-offset-1`}
       >
         {inner}
       </Link>
     )
   }
   return (
-    <article
-      className={`rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 ${spanClass}`}
-    >
+    <article style={revealStyle} className={`${base} ${spanClass} animate-fade-up`}>
       {inner}
     </article>
   )

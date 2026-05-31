@@ -12,6 +12,7 @@ import {
   type HousingStrategyMode,
   type HousingStrategyTrigger,
 } from '@/lib/housing-strategy'
+import { LabeledNumber, TriggerButton } from '@/components/future/strategie/fields'
 
 interface HousingStrategyContext {
   has_eigen_huis: boolean
@@ -74,7 +75,10 @@ const MODES: HousingStrategyMode[] = [
  * instellingen-pagina niet hoeft te weten van housing-strategy-state. De
  * Opslaan-knop is lokaal; bij succes verschijnt een korte bevestiging.
  */
-export function HousingStrategySection() {
+export function HousingStrategySection({
+  showHeader = true,
+  onSaved,
+}: { showHeader?: boolean; onSaved?: () => void } = {}) {
   const [config, setConfig] = useState<HousingStrategyConfig>({ mode: 'include_full' })
   const [context, setContext] = useState<HousingStrategyContext | null>(null)
   const [loading, setLoading] = useState(true)
@@ -136,6 +140,7 @@ export function HousingStrategySection() {
         return
       }
       setMessage({ type: 'success', text: 'Eigen-woning-strategie opgeslagen.' })
+      onSaved?.()
     } catch {
       setMessage({ type: 'error', text: 'Netwerkfout — probeer opnieuw' })
     } finally {
@@ -145,28 +150,32 @@ export function HousingStrategySection() {
 
   return (
     <div id="housing-strategy" className="mb-6">
-      <p className="mb-1 flex items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
-        <span
-          aria-hidden
-          className="inline-block h-px w-7 shrink-0"
-          style={{ background: 'var(--module-active-500)' }}
-        />
-        Eigen woning in pensioenplanning
-      </p>
-      <p
-        className="mb-4 font-serif text-base leading-relaxed text-[var(--ink-2)]"
-        style={{ fontFamily: 'var(--font-playfair, serif)' }}
-      >
-        Bepaal hoe je eigen{' '}
-        <em
-          className="font-normal italic"
-          style={{ color: 'var(--module-active-700)' }}
-        >
-          woning
-        </em>{' '}
-        meedoet in de FIRE-berekening. Een huis is geen liquide vermogen — je kunt er pas uit
-        putten door te verkopen of een opeethypotheek af te sluiten.
-      </p>
+      {showHeader && (
+        <>
+          <p className="mb-1 flex items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
+            <span
+              aria-hidden
+              className="inline-block h-px w-7 shrink-0"
+              style={{ background: 'var(--module-active-500)' }}
+            />
+            Eigen woning in pensioenplanning
+          </p>
+          <p
+            className="mb-4 font-serif text-base leading-relaxed text-[var(--ink-2)]"
+            style={{ fontFamily: 'var(--font-playfair, serif)' }}
+          >
+            Bepaal hoe je eigen{' '}
+            <em
+              className="font-normal italic"
+              style={{ color: 'var(--module-active-700)' }}
+            >
+              woning
+            </em>{' '}
+            meedoet in de FIRE-berekening. Een huis is geen liquide vermogen — je kunt er pas uit
+            putten door te verkopen of een opeethypotheek af te sluiten.
+          </p>
+        </>
+      )}
 
       {!hasEigenHuis && (
         <div className="mb-4 rounded-lg border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-3 text-xs text-[var(--ink-3)]">
@@ -443,76 +452,5 @@ function StrategyDetailsPanel({
   )
 }
 
-// ── kleine UI-helpers ──
-
-function TriggerButton({
-  selected,
-  onClick,
-  title,
-  subtitle,
-}: {
-  selected: boolean
-  onClick: () => void
-  title: string
-  subtitle: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-lg border-2 p-3 text-left transition-all ${
-        selected
-          ? 'border-[var(--ink)] bg-[var(--paper)]'
-          : 'border-[var(--border-ed)] hover:border-[var(--border-md)]'
-      }`}
-    >
-      <span
-        className={`text-sm font-semibold ${selected ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}
-      >
-        {title}
-      </span>
-      <p className="mt-1 text-[11px] text-[var(--ink-3)]">{subtitle}</p>
-    </button>
-  )
-}
-
-function LabeledNumber({
-  label,
-  unit,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-  hint,
-}: {
-  label: string
-  unit: string
-  value: number
-  min: number
-  max: number
-  step: number
-  onChange: (v: number) => void
-  hint?: string
-}) {
-  return (
-    <div>
-      <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
-        {label}
-      </label>
-      <div className="mt-1.5 flex items-center gap-2">
-        <input
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-28 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm font-mono text-[var(--ink)] outline-none focus:border-[var(--ink)]"
-        />
-        <span className="text-sm text-[var(--ink-3)]">{unit}</span>
-      </div>
-      {hint && <p className="mt-1 text-[10px] text-[var(--ink-3)]">{hint}</p>}
-    </div>
-  )
-}
+// TriggerButton + LabeledNumber zijn verplaatst naar
+// components/future/strategie/fields.tsx (gedeeld met de AOW/Pensioen-editors).

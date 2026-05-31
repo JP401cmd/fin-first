@@ -17,12 +17,15 @@ export function EventImpactPreview({
   baselineFireAge,
   draftFireAge,
   height = 140,
+  legendLabels = { draft: 'met deze gebeurtenis', baseline: 'zonder' },
 }: {
   baselineRows: SimRow[]
   draftRows: SimRow[]
   baselineFireAge: number | null
   draftFireAge: number | null
   height?: number
+  /** Legenda-teksten — pas aan voor niet-event-context (bv. "deze keuze" / "huidige instelling"). */
+  legendLabels?: { draft: string; baseline: string }
 }) {
   const { masked } = useMaskedAmounts()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -253,14 +256,14 @@ export function EventImpactPreview({
               style={{ background: 'var(--module-active-700, #c4a06b)' }}
               aria-hidden
             />
-            met deze gebeurtenis
+            {legendLabels.draft}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span
               className="inline-block h-[2px] w-3 border-t border-dashed border-[var(--ink-4)]"
               aria-hidden
             />
-            zonder
+            {legendLabels.baseline}
           </span>
         </div>
         {fireDeltaMonths != null && fireDeltaMonths !== 0 && (
