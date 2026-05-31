@@ -484,93 +484,61 @@ export function Features() {
       </section>
 
       {/* ── REKENHULP + BIBLIOTHEEK ──────────────────────────────── */}
-      <SectionRule label="Rekenhulp van Will" />
-      <section id="rekenhulp" className="px-6 py-20 md:px-12 md:py-24">
-        <Reveal className="mx-auto max-w-6xl">
-          <SectionTitle
-            kicker="De krachtigste laag"
-            title="Een rekenhulp"
-            italics="voor elke beslissing"
-            intro="Wij geven je 12 kant-en-klare rekenhulpen — van aflossen vs. beleggen tot BV agio storten vs. privé beleggen. Maar het echte verhaal: je vraagt Will een eigen rekenhulp voor jouw dilemma, en hij bouwt 'm."
-          />
+      <SectionRule label="Rekenhulp" />
+      <section id="rekenhulp" className="px-6 py-16 md:px-12 md:py-20">
+        <Reveal className="mx-auto max-w-4xl">
+          <div className="mb-8 text-center">
+            <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
+              Voor de momenten dat je twijfelt
+            </p>
+            <h2 className="font-display text-[1.7rem] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)] md:text-[2.1rem]">
+              Een rekenhulp{' '}
+              <em className="italic text-kern-600">als je &apos;m nodig hebt</em>
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl font-serif text-base leading-relaxed text-[var(--ink-2)]">
+              Twaalf kant-en-klare rekenhulpen voor veelvoorkomende keuzes.
+              Heb je een ander dilemma? Vraag Will er een op maat.
+            </p>
+          </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Bibliotheek-preview */}
-            <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
-              <div className="mb-4 flex items-center justify-between border-b border-dashed border-[var(--border-ed)] pb-3">
-                <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
-                  Uit de bibliotheek
-                </p>
-                <span className="font-mono text-[10px] text-[var(--ink-4)]">12 stuks</span>
-              </div>
-
-              <div className="space-y-0">
-                <CalcRow
-                  titel="Aflossen vs. beleggen"
-                  sterren={1}
-                  beschrijving="Hypotheek extra aflossen of die maandelijkse €X beleggen?"
-                />
-                <CalcRow
-                  titel="Eerder met pensioen"
-                  sterren={2}
-                  beschrijving="Wanneer kan ik stoppen bij jouw inleg en uitgaven?"
-                />
-                <CalcRow
-                  titel="Huren vs. kopen"
-                  sterren={3}
-                  beschrijving="Huren + beleggen of kopen + aflossen — netto na 10 jaar."
-                />
-                <CalcRow
-                  titel="Schenken vs. erven"
-                  sterren={4}
-                  beschrijving="Jaarlijkse vrijstelling benutten of erfenis laten."
-                />
-                <CalcRow
-                  titel="BV agio vs. privé box 3"
-                  sterren={5}
-                  beschrijving="Bruto opbouwen in de BV of eerst uitkeren naar privé?"
-                />
-              </div>
-
-              <Link
-                href="/toekomst/bibliotheek"
-                className="mt-5 inline-flex items-center gap-1.5 font-sans text-sm font-semibold text-kern-700 hover:text-kern-800 hover:underline"
-              >
-                Bekijk de bibliotheek
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </Link>
+          <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5 md:p-6">
+            <div className="mb-3 flex items-center justify-between border-b border-dashed border-[var(--border-ed)] pb-3">
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                Uit de bibliotheek
+              </p>
+              <span className="font-mono text-[10px] text-[var(--ink-4)]">12 stuks</span>
             </div>
 
-            {/* Will-prompt mock */}
-            <div className="rounded-[var(--r-lg)] border-2 border-wil-200 bg-wil-50/40 p-6">
-              <div className="mb-3 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-wil-700" aria-hidden="true" />
-                <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-wil-700">
-                  Vraag het Will
-                </p>
-              </div>
+            <div className="space-y-0">
+              <CalcRow
+                titel="Aflossen vs. beleggen"
+                sterren={1}
+                beschrijving="Hypotheek extra aflossen of die maandelijkse €X beleggen?"
+              />
+              <CalcRow
+                titel="Huren vs. kopen"
+                sterren={3}
+                beschrijving="Huren + beleggen of kopen + aflossen — netto na 10 jaar."
+              />
+              <CalcRow
+                titel="BV agio vs. privé box 3"
+                sterren={5}
+                beschrijving="Bruto opbouwen in de BV of eerst uitkeren naar privé?"
+              />
+            </div>
 
-              <div className="mb-4 rounded-[var(--r)] border border-wil-200 bg-[var(--paper)] p-3">
-                <p className="font-mono text-[11px] text-[var(--ink-2)]">
-                  &ldquo;auto private leasen vs auto kopen in de bv?&rdquo;
-                </p>
-              </div>
-
-              <div className="space-y-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3">
-                <p className="font-sans text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--ink-4)]">
-                  Will bouwt een rekenhulp met:
-                </p>
-                <ul className="space-y-1.5 font-serif text-xs leading-snug text-[var(--ink-2)]">
-                  <li>· 7 sliders (catalogus, lease p/m, bijtelling, looptijd, ...)</li>
-                  <li>· 2 scenario&apos;s (private lease / kopen in BV)</li>
-                  <li>· 6 outputs gegroepeerd in kosten + belasting + netto</li>
-                  <li>· 1-zinnige conclusie bovenaan met winnaar</li>
-                </ul>
-              </div>
-
-              <p className="mt-4 font-serif text-xs italic leading-relaxed text-[var(--ink-3)]">
-                Je kunt &apos;m aanpassen, opslaan, en optioneel publiceren naar de bibliotheek.
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-[var(--border-ed)] pt-4">
+              <p className="inline-flex items-center gap-1.5 font-serif text-xs italic text-[var(--ink-3)]">
+                <Sparkles className="h-3.5 w-3.5 text-wil-700" aria-hidden="true" />
+                Of vraag Will een eigen rekenhulp
               </p>
+              <Link
+                href="/toekomst/bibliotheek"
+                className="inline-flex items-center gap-1.5 font-sans text-xs font-semibold text-kern-700 hover:text-kern-800 hover:underline"
+              >
+                Bekijk de bibliotheek
+                <ArrowRight className="h-3 w-3" aria-hidden="true" />
+              </Link>
             </div>
           </div>
         </Reveal>

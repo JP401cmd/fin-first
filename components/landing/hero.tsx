@@ -24,21 +24,20 @@ export function Hero() {
           </p>
 
           <h1 className="mb-6 font-display text-[2.6rem] font-bold leading-[1.05] tracking-[-0.03em] text-[var(--ink)] sm:text-[3.2rem] md:text-[3.8rem] lg:text-[4.2rem]">
-            Financiële vrijheid
+            Grip op uitgaven,
             <br />
-            is geen droom.
-            <br />
-            <span className="text-kern-600">Het is een berekening.</span>
+            <span className="text-kern-600">grip op vermogen.</span>
           </h1>
 
-          <p className="mb-8 max-w-[500px] font-serif text-lg leading-relaxed text-[var(--ink-2)]">
-            TriFinity geeft je inzicht, grip en vooruitzicht op je financiële
-            leven &mdash; alles op één plek, in één taal:{' '}
-            <strong className="font-semibold text-[var(--ink)]">
-              tijd
-            </strong>
-            . Van nettovermogen tot vrijheidsprognose, van dagelijkse
-            inzichten tot toekomstscenario&apos;s.
+          <p className="mb-8 max-w-[520px] font-serif text-lg leading-relaxed text-[var(--ink-2)]">
+            De vrijheid om met{' '}
+            <strong className="font-semibold text-[var(--ink)]">inzicht</strong>{' '}
+            en{' '}
+            <strong className="font-semibold text-[var(--ink)]">grip</strong>{' '}
+            keuzes te maken voor{' '}
+            <strong className="font-semibold text-[var(--ink)]">nu</strong>{' '}
+            en{' '}
+            <strong className="font-semibold text-[var(--ink)]">de toekomst</strong>.
           </p>
 
           <div className="mb-12 flex flex-col gap-3 sm:flex-row sm:items-center">
