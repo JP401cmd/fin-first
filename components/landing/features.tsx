@@ -13,7 +13,6 @@ import {
   Wallet,
   Compass,
   Users,
-  Briefcase,
   Heart,
   TrendingUp,
   Calculator,
@@ -609,11 +608,7 @@ export function Features() {
               <ul className="space-y-3 font-serif text-sm leading-relaxed text-[var(--ink-2)]">
                 <li className="flex items-start gap-2">
                   <Users className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" aria-hidden="true" />
-                  <span>Salarismannen/-vrouwen met de vraag &ldquo;kan ik dit betalen?&rdquo;</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" aria-hidden="true" />
-                  <span>Ondernemers / ZZP met BV-vraagstukken (dividend, agio, lijfrente)</span>
+                  <span>Wie de vraag &ldquo;kan ik dit betalen?&rdquo; rustig wil beantwoorden</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Heart className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" aria-hidden="true" />
@@ -625,7 +620,7 @@ export function Features() {
                 </li>
                 <li className="flex items-start gap-2">
                   <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" aria-hidden="true" />
-                  <span>Vermogenden met box 3, vastgoed of familievermogen</span>
+                  <span>Privé-gebruikers met vermogen in box 3, vastgoed, een BV of familievermogen</span>
                 </li>
               </ul>
             </div>
@@ -641,6 +636,10 @@ export function Features() {
               <ul className="space-y-3 font-serif text-sm leading-relaxed text-[var(--ink-3)]">
                 <li>
                   Mensen die enkel een betaalrekening willen &mdash; daar is je bank-app voor.
+                </li>
+                <li>
+                  Wie een zakelijke boekhouding zoekt voor zijn BV of onderneming
+                  &mdash; TriFinity is voor privé-gebruik; je BV verschijnt als bezitting.
                 </li>
                 <li>
                   Active day-traders &mdash; wij rekenen over jaren, niet over minuten.

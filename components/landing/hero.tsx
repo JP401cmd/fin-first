@@ -59,10 +59,10 @@ export function Hero() {
           {/* Rol-tags — wie heeft hier wat aan? */}
           <div className="flex flex-wrap gap-2">
             <span className="rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)]">
-              Salarisman/vrouw
+              Privé-gebruik
             </span>
             <span className="rounded-full border border-kern-200 bg-kern-50 px-3 py-1 font-sans text-[11px] font-medium text-kern-700">
-              Ondernemer/ZZP
+              Eigen vermogen
             </span>
             <span className="rounded-full border border-wil-200 bg-wil-50 px-3 py-1 font-sans text-[11px] font-medium text-wil-700">
               Met huishouden

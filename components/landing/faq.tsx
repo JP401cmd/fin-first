@@ -24,9 +24,9 @@ const VRAGEN: Vraag[] = [
       'Bankkoppeling (PSD2) is in ontwikkeling. Voorlopig kun je transacties handmatig invoeren of als CSV-bestand importeren — alle gangbare NL-banken (ING, Rabobank, ABN AMRO, bunq, ASN, SNS, RegioBank, Knab, Triodos) worden ondersteund.',
   },
   {
-    q: 'Werkt het voor ondernemers / BV-houders?',
+    q: 'Werkt het als ik ook een BV heb?',
     a:
-      'Ja. Specialist-rekenhulpen voor BV-vraagstukken (agio storten vs. privé beleggen, dividend-uitkeer-strategie, lijfrente vs. ETF) zitten in de Pro-tier. Box 2 / box 3 / VPB-tarieven zijn modulair instelbaar.',
+      'TriFinity is een app voor privé-gebruik; je BV staat erin als bezitting, niet als zakelijke boekhouding. Voor privé-keuzes met BV-impact (agio storten vs. privé beleggen, dividend-uitkeerstrategie, lijfrente vs. ETF) zijn er specialist-rekenhulpen in de Pro-tier — box 2 / box 3 / VPB-tarieven instelbaar.',
   },
   {
     q: 'Wat als ik geen partner heb?',
