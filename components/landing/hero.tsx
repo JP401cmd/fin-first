@@ -46,10 +46,10 @@ export function Hero() {
               href="/signup"
               className="inline-flex items-center justify-center rounded-[var(--r)] bg-[var(--ink)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--bg)] transition-all hover:bg-[var(--ink-2)] hover:shadow-[var(--s1)]"
             >
-              Bereken je vrijheid
+              Begin gratis
             </Link>
             <a
-              href="#domeinen"
+              href="#modules"
               className="inline-flex items-center justify-center gap-2 rounded-[var(--r)] border border-[var(--border-md)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--ink-2)] transition-all hover:border-[var(--ink-3)] hover:shadow-[var(--s0)]"
             >
               Ontdek hoe het werkt
@@ -57,19 +57,19 @@ export function Hero() {
             </a>
           </div>
 
-          {/* Feature tags */}
+          {/* Rol-tags — wie heeft hier wat aan? */}
           <div className="flex flex-wrap gap-2">
             <span className="rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)]">
-              Voor iedereen
+              Salarisman/vrouw
             </span>
             <span className="rounded-full border border-kern-200 bg-kern-50 px-3 py-1 font-sans text-[11px] font-medium text-kern-700">
-              Vermogen &amp; schulden
+              Ondernemer/ZZP
             </span>
             <span className="rounded-full border border-wil-200 bg-wil-50 px-3 py-1 font-sans text-[11px] font-medium text-wil-700">
-              Budget &amp; patronen
+              Met huishouden
             </span>
             <span className="rounded-full border border-horizon-200 bg-horizon-50 px-3 py-1 font-sans text-[11px] font-medium text-horizon-700">
-              Pensioen &amp; FIRE
+              FIRE-traject
             </span>
             <span className="rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-1 font-sans text-[11px] font-medium text-[var(--ink-3)]">
               100% Nederlands

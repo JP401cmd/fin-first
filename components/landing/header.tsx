@@ -44,22 +44,22 @@ export function Header() {
 
       <div className="flex items-center gap-6 md:gap-8">
         <a
-          href="#domeinen"
+          href="#modules"
           className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
         >
-          Domeinen
+          Modules
         </a>
         <a
-          href="#coach"
+          href="#rekenhulp"
           className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
         >
-          AI Coach
+          Rekenhulp
         </a>
         <a
-          href="#voor-wie"
+          href="#pricing"
           className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
         >
-          Voor wie
+          Prijzen
         </a>
 
         {user ? (
@@ -96,10 +96,10 @@ export function Header() {
           </div>
         ) : (
           <Link
-            href="/login"
+            href="/signup"
             className="rounded-[var(--r)] border-2 border-[var(--ink)] bg-[var(--ink)] px-4 py-2 font-sans text-sm font-medium text-[var(--bg)] transition-all hover:bg-[var(--ink-2)] hover:border-[var(--ink-2)]"
           >
-            Start je reis
+            Begin gratis
           </Link>
         )}
       </div>
