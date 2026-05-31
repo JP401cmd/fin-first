@@ -29,8 +29,11 @@ beforeEach(() => {
 })
 
 describe('ScenarioBibliotheek — template-catalogus', () => {
-  it('bevat 8 templates met realistische defaults', () => {
-    expect(_SCENARIO_TEMPLATES.length).toBe(8)
+  it('bevat een breed scala aan levensgebeurtenis-templates', () => {
+    // Lijst kan groeien; minimaal de 8 originele + de uitgebreide set
+    // (wereldreis, verbouwing, studie, auto, huis-verkopen, vroeg-pensioen,
+    // aow-start, werkloosheid).
+    expect(_SCENARIO_TEMPLATES.length).toBeGreaterThanOrEqual(16)
   })
 
   it('elke template heeft een unieke key + label', () => {
@@ -73,13 +76,13 @@ describe('ScenarioBibliotheek — UI-flow', () => {
   it('opent dialog bij klik op "Snel toevoegen"', () => {
     render(<ScenarioBibliotheek currentAge={35} />)
     expect(screen.queryByRole('dialog')).toBeNull()
-    fireEvent.click(screen.getByText('Snel toevoegen'))
+    fireEvent.click(screen.getByText('Levensgebeurtenis toevoegen'))
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
   it('rendert alle 8 template-namen in dialog', () => {
     render(<ScenarioBibliotheek currentAge={35} />)
-    fireEvent.click(screen.getByText('Snel toevoegen'))
+    fireEvent.click(screen.getByText('Levensgebeurtenis toevoegen'))
     _SCENARIO_TEMPLATES.forEach((t) => {
       expect(screen.getByText(t.label)).toBeTruthy()
     })
@@ -87,7 +90,7 @@ describe('ScenarioBibliotheek — UI-flow', () => {
 
   it('sluit dialog bij klik op X', () => {
     render(<ScenarioBibliotheek currentAge={35} />)
-    fireEvent.click(screen.getByText('Snel toevoegen'))
+    fireEvent.click(screen.getByText('Levensgebeurtenis toevoegen'))
     expect(screen.getByRole('dialog')).toBeTruthy()
     fireEvent.click(screen.getByLabelText('Sluiten'))
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -97,7 +100,7 @@ describe('ScenarioBibliotheek — UI-flow', () => {
 describe('ScenarioBibliotheek — insert-flow', () => {
   it('roept supabase.insert met juiste payload + target_age', async () => {
     render(<ScenarioBibliotheek currentAge={35} />)
-    fireEvent.click(screen.getByText('Snel toevoegen'))
+    fireEvent.click(screen.getByText('Levensgebeurtenis toevoegen'))
     // Klik op "Tweede kind" — default_years = 2
     fireEvent.click(screen.getByText('Tweede kind'))
     // Async insert
@@ -113,7 +116,7 @@ describe('ScenarioBibliotheek — insert-flow', () => {
 
   it('toont fout-melding wanneer currentAge null is', () => {
     render(<ScenarioBibliotheek currentAge={null} />)
-    fireEvent.click(screen.getByText('Snel toevoegen'))
+    fireEvent.click(screen.getByText('Levensgebeurtenis toevoegen'))
     fireEvent.click(screen.getByText('Tweede kind'))
     expect(screen.getByText(/Geboortejaar ontbreekt/i)).toBeTruthy()
     expect(mockInsert).not.toHaveBeenCalled()
@@ -122,7 +125,7 @@ describe('ScenarioBibliotheek — insert-flow', () => {
   it('toont fout-melding bij Supabase-fout', async () => {
     mockInsert.mockResolvedValueOnce({ error: { message: 'RLS denied' } })
     render(<ScenarioBibliotheek currentAge={35} />)
-    fireEvent.click(screen.getByText('Snel toevoegen'))
+    fireEvent.click(screen.getByText('Levensgebeurtenis toevoegen'))
     fireEvent.click(screen.getByText('Erfenis'))
     await new Promise((r) => setTimeout(r, 10))
     expect(screen.getByText(/RLS denied/)).toBeTruthy()

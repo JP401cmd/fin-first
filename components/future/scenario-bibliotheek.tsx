@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   Baby,
   Home,
@@ -13,6 +14,13 @@ import {
   Plane,
   Plus,
   X,
+  Hammer,
+  Car,
+  GraduationCap,
+  Landmark,
+  TrendingDown,
+  Heart,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -175,6 +183,134 @@ const TEMPLATES: ScenarioTemplate[] = [
     },
   },
   {
+    key: 'wereldreis',
+    label: 'Wereldreis',
+    description: 'Eenmalige reiskosten + 6 mnd geen inkomen.',
+    Icon: Plane,
+    defaultYearsFromNow: 3,
+    defaults: {
+      event_type: 'world_trip',
+      icon: 'plane',
+      one_time_cost: 15000,
+      monthly_cost_change: 0,
+      monthly_income_change: -3000,
+      duration_months: 6,
+      is_indexed: true,
+    },
+  },
+  {
+    key: 'verbouwing',
+    label: 'Verbouwing',
+    description: 'Keuken, badkamer, dakkapel of uitbouw — eenmalig.',
+    Icon: Hammer,
+    defaultYearsFromNow: 3,
+    defaults: {
+      event_type: 'renovation',
+      icon: 'hammer',
+      one_time_cost: 40000,
+      monthly_cost_change: 0,
+      monthly_income_change: 0,
+      duration_months: 0,
+      is_indexed: true,
+    },
+  },
+  {
+    key: 'studie',
+    label: 'Studie of opleiding',
+    description: 'Eenmalige collegegeld + tijdelijk minder werken.',
+    Icon: GraduationCap,
+    defaultYearsFromNow: 2,
+    defaults: {
+      event_type: 'study',
+      icon: 'graduation',
+      one_time_cost: 8000,
+      monthly_cost_change: 0,
+      monthly_income_change: -500,
+      duration_months: 24,
+      is_indexed: false,
+    },
+  },
+  {
+    key: 'auto-kopen',
+    label: 'Auto kopen',
+    description: 'Eenmalige aanschaf + maandelijkse onderhoudslasten.',
+    Icon: Car,
+    defaultYearsFromNow: 2,
+    defaults: {
+      event_type: 'car_purchase',
+      icon: 'car',
+      one_time_cost: 25000,
+      monthly_cost_change: 200,
+      monthly_income_change: 0,
+      duration_months: 0,
+      is_indexed: true,
+    },
+  },
+  {
+    key: 'huis-verkopen',
+    label: 'Huis verkopen',
+    description: 'Eenmalige opbrengst (na hypotheek-aflossing).',
+    Icon: Home,
+    defaultYearsFromNow: 10,
+    defaults: {
+      event_type: 'house_sale',
+      icon: 'home',
+      one_time_cost: -100000,
+      monthly_cost_change: 0,
+      monthly_income_change: 0,
+      duration_months: 0,
+      is_indexed: true,
+    },
+  },
+  {
+    key: 'vroeg-pensioen',
+    label: 'Eerder met pensioen',
+    description: 'Stoppen met werken vóór AOW-leeftijd.',
+    Icon: Heart,
+    defaultYearsFromNow: 15,
+    defaults: {
+      event_type: 'early_retirement',
+      icon: 'heart',
+      one_time_cost: 0,
+      monthly_cost_change: 0,
+      monthly_income_change: -3000,
+      duration_months: 0,
+      is_indexed: true,
+    },
+  },
+  {
+    key: 'aow-start',
+    label: 'AOW start',
+    description: 'Maandelijkse AOW-uitkering vanaf AOW-leeftijd.',
+    Icon: Landmark,
+    defaultYearsFromNow: 25,
+    defaults: {
+      event_type: 'aow',
+      icon: 'landmark',
+      one_time_cost: 0,
+      monthly_cost_change: 0,
+      monthly_income_change: 1500,
+      duration_months: 0,
+      is_indexed: true,
+    },
+  },
+  {
+    key: 'werkloosheid',
+    label: 'Werkloosheid',
+    description: 'Tijdelijk minder inkomen — voorbereiden op buffer-test.',
+    Icon: TrendingDown,
+    defaultYearsFromNow: 1,
+    defaults: {
+      event_type: 'werkloosheid',
+      icon: 'trending-down',
+      one_time_cost: 0,
+      monthly_cost_change: 0,
+      monthly_income_change: -1500,
+      duration_months: 6,
+      is_indexed: false,
+    },
+  },
+  {
     key: 'sabbatical',
     label: 'Sabbatical',
     description: '12 maanden geen inkomen — voor reizen of studeren.',
@@ -241,10 +377,10 @@ export function ScenarioBibliotheek({ currentAge }: { currentAge: number | null 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:border-[var(--ink-3)] hover:bg-[var(--subtle)] transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
       >
         <Plus className="w-4 h-4" aria-hidden="true" />
-        Snel toevoegen
+        Levensgebeurtenis toevoegen
       </button>
 
       {open && (
@@ -262,14 +398,14 @@ export function ScenarioBibliotheek({ currentAge }: { currentAge: number | null 
             <header className="flex items-start justify-between gap-3 mb-4">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-                  Scenario-bibliotheek
+                  Toevoegen aan tijdas
                 </div>
                 <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-                  Snel toevoegen aan tijdas
+                  Levensgebeurtenis toevoegen
                 </h2>
                 <p className="text-xs text-[var(--ink-3)] mt-1">
-                  Klik op een scenario — defaults zijn realistisch voor NL.
-                  Je kunt het event daarna verfijnen via /toekomst.
+                  Kies een gebeurtenis hieronder — of laat Will een
+                  passend scenario voor je opstellen.
                 </p>
               </div>
               <button
@@ -281,6 +417,25 @@ export function ScenarioBibliotheek({ currentAge }: { currentAge: number | null 
                 <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </header>
+
+            {/* Will-route: gepersonaliseerde levensgebeurtenis via AI-chat */}
+            <Link
+              href="/toekomst/whatif"
+              onClick={() => setOpen(false)}
+              className="mb-4 flex items-center gap-3 rounded-xl border border-violet-300 bg-violet-50/60 px-4 py-3 hover:border-violet-500 hover:bg-violet-50 transition-colors"
+            >
+              <span className="inline-flex w-9 h-9 shrink-0 rounded-lg bg-violet-100 items-center justify-center">
+                <Sparkles className="w-4 h-4 text-violet-700" aria-hidden="true" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[var(--ink)]">
+                  Vraag het Will
+                </p>
+                <p className="text-[11px] text-[var(--ink-3)] leading-snug">
+                  Beschrijf je situatie — Will stelt een passende gebeurtenis voor met realistische bedragen.
+                </p>
+              </div>
+            </Link>
 
             {error && (
               <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
