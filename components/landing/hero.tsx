@@ -20,7 +20,7 @@ export function Hero() {
         {/* Linkerkolom — redactionele tekst */}
         <div className="md:col-span-3">
           <p className="mb-5 font-serif italic text-base text-kern-600 leading-relaxed">
-            "Geld is opgeslagen tijd"
+            &ldquo;Geld is opgeslagen tijd&rdquo;
           </p>
 
           <h1 className="mb-6 font-display text-[2.6rem] font-bold leading-[1.05] tracking-[-0.03em] text-[var(--ink)] sm:text-[3.2rem] md:text-[3.8rem] lg:text-[4.2rem]">
