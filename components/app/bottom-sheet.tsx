@@ -494,9 +494,12 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
         {/* Optionele sticky footer-slot — staat buiten de scroll-content zodat
             primary/secondary acties altijd zichtbaar blijven. Border-top en
             paper-bg zijn consistent met de desktop SlideInPane-footer, zodat
-            beide rendermodi visueel uitwisselbaar zijn. */}
+            beide rendermodi visueel uitwisselbaar zijn.
+            Mobile pb is opgehoogd zodat de sticky knoppen NIET achter de
+            floating-nav-pill (z-[60], ~52px hoog, 12px boven safe-area)
+            verdwijnen. Op md+ valt die pill weg → normale py-3 padding. */}
         {footerSlot && (
-          <div className="shrink-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-5 py-3">
+          <div className="shrink-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-5 pt-3 pb-[76px] md:pb-3">
             {footerSlot}
           </div>
         )}
