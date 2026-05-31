@@ -80,11 +80,14 @@ Op basis van veelgebruikte patronen in succesvolle fintech/PFM apps
 | 5 | **Rekenhulp + bibliotheek** | Differentiator | nieuw |
 | 6 | **Will — AI-coach** | Differentiator | refactor |
 | 7 | **Voor wie (en voor wie niet)** | Self-selection | refactor |
-| 8 | **Sociale proof** | Vertrouwen | nieuw (placeholder eerst) |
-| 9 | **Privacy & vertrouwen** | Risico-reductie | behoud |
-| 10 | **Pricing** | Transparantie | nieuw / refactor |
-| 11 | **FAQ** | Objection-handling | nieuw |
-| 12 | **Slot-CTA + footer** | Conversie | behoud |
+| 8 | **Privacy & vertrouwen** | Risico-reductie | behoud |
+| 9 | **Pricing** (freemium) | Transparantie | nieuw |
+| 10 | **FAQ** | Objection-handling | nieuw |
+| 11 | **Slot-CTA + footer** | Conversie | behoud |
+
+> *Sociale proof (testimonials) is bewust weggelaten — gebruiker-beslissing
+> 31 mei 2026. Vervangen door één neutrale telbalk in de rekenhulp-sectie
+> (§4.5) zodra die data beschikbaar is.*
 
 ### 4.1 Hero — refactor
 
@@ -97,9 +100,10 @@ Op basis van veelgebruikte patronen in succesvolle fintech/PFM apps
 - Tagline blijft: *"Financiële vrijheid is geen droom. Het is een berekening."*
 - Sub: *"Inzicht in je geld vandaag, grip op je keuzes morgen,
   vooruitzicht op je vrijheid voor altijd."*
-- Primary CTA: "Begin gratis" → `/signup`
-- Secondary CTA: "Bekijk een demo" → demo-flow met seeded
-  test-account (Ronald/Bas/Leo/Jochen — bestaan al in seed-migratie)
+- Primary CTA: "Begin gratis" → `/signup` (freemium-tier, geen creditcard)
+- Secondary CTA: "Ontdek hoe het werkt" → scroll-anchor naar §4.3
+  (Twee modules). Geen seeded test-account — productowner-beslissing
+  31 mei 2026.
 
 ### 4.2 Probleem → belofte — refactor
 
@@ -157,6 +161,12 @@ rekenhulp-runner).
 CTA: "Bekijk de bibliotheek" → `/toekomst/bibliotheek` (publieke
 preview na inloggen).
 
+**Neutrale telbalk** (eenvoudige sociale-proof zonder testimonials):
+*"Inmiddels door TriFinity-gebruikers gepubliceerd: **X** publieke
+rekenhulpen · samen voor **Y** vrijheidsjaren in beeld."* Render
+alleen wanneer de telstand boven een minimum (bv. ≥20) staat —
+anders weglaten zodat we geen lage tellingen tonen.
+
 ### 4.6 Will — AI-coach — refactor
 
 Update wat Will doet:
@@ -184,18 +194,7 @@ beleggingsadvies, geen verkooppraat. Bouwt vertrouwen.
 
 Self-selection bespaart frustratie aan beide kanten.
 
-### 4.8 Sociale proof — nieuw
-
-Drie elementen:
-1. **Quote-strip** (3 testimonials, anoniem of met initialen + leeftijd)
-2. **Telbalk**: "X publieke rekenhulpen gedeeld · Y miljoen euro
-   tijd-equivalent in beeld" (zodra data beschikbaar)
-3. **Press/awards** (optioneel — als ze er komen)
-
-Voor v1: 3 placeholder-quotes die we later vervangen door echte
-testimonials uit beta-gebruikers.
-
-### 4.9 Privacy & vertrouwen — behoud
+### 4.8 Privacy & vertrouwen — behoud
 
 Wel verscherpen:
 - Concrete beweringen: "Data leeft op EU-servers (Supabase Frankfurt)"
@@ -204,33 +203,71 @@ Wel verscherpen:
 - "Eigen export: download al je data wanneer je wilt"
 - Wft-disclaimer expliciet maar rustig gepresenteerd
 
-### 4.10 Pricing — nieuw of refactor
+### 4.9 Pricing — nieuw (freemium)
 
-Twee opties:
-- **Gratis met optionele Pro** (freemium): basis-overzicht + 5
-  rekenhulpen per week gratis. Pro €5-10/mnd: onbeperkt rekenhulpen,
-  geavanceerde fiscale modules, partner-modus.
-- **Eén tarief** (single tier): €X/mnd voor alles.
+**Gekozen model**: freemium (productowner-beslissing 31 mei 2026).
 
-Welke = product-keuze, niet landing-keuze. Voor de landing:
-toon wat de gekozen variant ook is, transparant.
+Twee kaarten naast elkaar:
 
-### 4.11 FAQ — nieuw
+**Gratis**
+- Overzicht-module compleet (bezittingen, schulden, cashflow, briefing)
+- Doelen + tijdas met levensgebeurtenissen
+- 5 AI-gegenereerde rekenhulpen per week
+- Toegang tot de publieke bibliotheek (lezen + dupliceren)
+- Single-user (geen huishouden-modus)
 
-Top 6 vragen (op basis van wat beta-gebruikers waarschijnlijk vragen):
-1. *"Kan ik mijn bankrekeningen koppelen?"* (PSD2/Tink-status)
-2. *"Werkt het voor ondernemers / BV-houders?"*
-3. *"Wat als ik geen partner heb?"* (single-user UX)
-4. *"Hoe veilig is mijn data?"* (verwijst naar privacy-sectie)
-5. *"Is dit financieel advies?"* (nee, educatief — Wft-compliance)
-6. *"Kan ik opzeggen?"* (ja, met data-export)
+**Pro** (richtprijs €5-10/mnd, exact tarief = aparte beslissing)
+- Onbeperkt AI-gegenereerde rekenhulpen
+- Huishouden-modus (privé/samen/partner)
+- Geavanceerde fiscale modules (BV, box 3 werkelijk, kamerverhuur-regimes)
+- Publiceren naar bibliotheek
+- Priority-support
 
-Accordion-stijl, compact.
+Tone: *"Probeer gratis, betaal pas als je 'm wilt uitbreiden."* Géén
+creditcard bij signup. Géén dark-patterns ("trial expires in 7
+days") — gewoon eerlijk: free werkt altijd, Pro is voor wie meer wil.
 
-### 4.12 Footer — behoud + uitbreid
+### 4.10 FAQ — nieuw
 
-Voeg toe: blog-link (als er een blog komt), changelog, status-pagina,
-GitHub-link (als open-source), contact.
+Top 6 vragen + concrete antwoorden (accordion-stijl, compact):
+
+1. **"Kan ik mijn bankrekeningen koppelen?"**
+   *Bankkoppeling (PSD2) is in ontwikkeling. Voorlopig kun je
+   transacties handmatig invoeren of als CSV-bestand importeren —
+   alle gangbare NL-banken worden ondersteund.*
+
+2. **"Werkt het voor ondernemers / BV-houders?"**
+   *Ja. Specialist-rekenhulpen voor BV-vraagstukken (agio storten vs.
+   privé beleggen, dividend-uitkeer-strategie) zitten in de Pro-tier.*
+
+3. **"Wat als ik geen partner heb?"**
+   *De app werkt volledig single-user. Huishouden-modus is een Pro-
+   feature voor wie de financiën met een partner deelt.*
+
+4. **"Hoe veilig is mijn data?"**
+   *EU-hosted (Supabase Frankfurt), versleuteld in rust en transport,
+   geen verkoop aan derden. Zie ook §Privacy hierboven.*
+
+5. **"Is dit financieel advies?"**
+   *Nee, educatief reken-instrument. Geen koop/verkoop-advies, geen
+   productadvies. Wft-compliant.*
+
+6. **"Kan ik opzeggen?"**
+   *Ja, op elk moment. Bij opzegging download je al je data als JSON
+   of CSV — geen vendor-lock-in.*
+
+### 4.11 Slot-CTA + footer — behoud + uitbreid
+
+Slot-CTA: dezelfde primary "Begin gratis" op donkere achtergrond als
+laatste mid-page conversiepunt.
+
+**Footer** (uitbreiden t.o.v. huidige):
+- Producten: Overzicht, Toekomst, Rekenhulp-bibliotheek
+- Hulp: FAQ, Contact, Status-pagina
+- Bedrijf: Over ons, Privacy, Voorwaarden, Wft-disclaimer
+- Geen GitHub-link (productowner-beslissing 31 mei 2026 — geen
+  open-source-positionering)
+- Blog/changelog optioneel later
 
 ## 5. Tone-of-voice
 
@@ -257,15 +294,16 @@ Geen onderdeel van dit voorstel-bestand zelf. Bij groen licht:
 
 Iedere stap zelfstandig committeerbaar en deploybaar — geen big bang.
 
-## 7. Wat hierna nog beslist moet
+## 7. Productowner-beslissingen (31 mei 2026)
 
-| Beslissing | Wie |
+Alle openstaande punten zijn beslist:
+
+| Onderwerp | Keuze |
 |---|---|
-| Freemium-vs-single-tier pricing | productowner |
-| Echte testimonials (beta-recruitment) | productowner |
-| Demo-flow: seeded account of guided tour? | productowner |
-| Bankkoppeling-status (PSD2/Tink) in FAQ | techlead |
-| Open-source-positionering (GitHub-link?) | productowner |
+| Pricing-model | **Freemium** — gratis tier compleet, Pro voor onbeperkt + huishouden + specialist-calcs (zie §4.9) |
+| Testimonials | **Geen** — vervangen door één neutrale telbalk in §4.5 zodra ≥20 publieke calcs |
+| Demo-flow | **Geen seeded test-account** — secondary CTA wordt scroll-anchor naar §4.3 |
+| Bankkoppeling | **In ontwikkeling** — FAQ vermeldt CSV-import als tussenoplossing |
+| GitHub-footer | **Geen** — geen open-source-positionering |
 
-Met deze beslissingen kan de implementatie in ~8-10 commits over een
-paar dagen worden uitgerold.
+Implementatie kan starten — zie §6 voor de 9-commits-volgorde.
