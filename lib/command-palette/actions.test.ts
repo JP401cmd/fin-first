@@ -41,12 +41,20 @@ describe('buildActionItems — perspectief-acties', () => {
     ])
   })
 
-  it('toont geen perspectief-acties voor solo-gebruikers (1 optie)', () => {
+  it('toont een "Huishouden instellen"-fallback voor solo-gebruikers (1 optie)', () => {
+    const router = { push: vi.fn() }
+    const closePalette = vi.fn()
     const items = buildActionItems(
-      makeCtx({ availablePerspectives: [PERSPECTIVES[0]] }),
+      makeCtx({ availablePerspectives: [PERSPECTIVES[0]], router, closePalette }),
       [],
     )
-    expect(items.filter((i) => i.id.startsWith('action:perspective-'))).toHaveLength(0)
+    const perspectiveItems = items.filter((i) => i.id.startsWith('action:perspective-'))
+    expect(perspectiveItems).toHaveLength(1)
+    expect(perspectiveItems[0]?.id).toBe('action:perspective-setup')
+    expect(perspectiveItems[0]?.label).toBe('Huishouden instellen…')
+    perspectiveItems[0]?.run()
+    expect(router.push).toHaveBeenCalledWith('/identity/profiel')
+    expect(closePalette).toHaveBeenCalled()
   })
 
   it('gebruikt korte labels (perspectief-naam) zonder "Wissel naar"-prefix', () => {

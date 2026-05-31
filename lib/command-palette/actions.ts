@@ -121,7 +121,26 @@ const PERSPECTIVE_ICONS: Record<Perspective, LucideIcon> = {
 }
 
 function buildPerspectiveActions(ctx: ActionRunContext): CommandItem[] {
-  if (ctx.availablePerspectives.length <= 1) return []
+  // Solo-gebruiker (geen partner gekoppeld): toon één enkele
+  // "Huishouden instellen…"-actie zodat het zoekmenu altijd een
+  // ingangspunt naar huishouden-instellingen biedt. Wie wel een
+  // partner heeft, krijgt direct de 3 snelle-keuze-opties.
+  if (ctx.availablePerspectives.length <= 1) {
+    return [
+      {
+        id: 'action:perspective-setup',
+        kind: 'action',
+        label: 'Huishouden instellen…',
+        sublabel: 'Voeg een partner toe om tussen privé/samen/partner te wisselen',
+        icon: Users,
+        module: 'globaal',
+        run: () => {
+          ctx.router.push('/identity/profiel')
+          ctx.closePalette()
+        },
+      },
+    ]
+  }
 
   return ctx.availablePerspectives.map<CommandItem>((opt) => {
     const isCurrent = ctx.currentPerspective === opt.id
