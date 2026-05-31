@@ -69,20 +69,14 @@ export const navGroups: NavGroup[] = [
   {
     parent: mainNav[0]!,
     items: [
-      // De vier hefbomen — kompas-categorieën onder Overzicht.
+      // De vier hefbomen — kompas-categorieën onder Overzicht. Statisch
+      // omdat ze altijd beschikbaar zijn (lege state heeft eigen empty-
+      // state-UI). Actieve deep-app-tools komen daar BOVENOP, dynamisch
+      // gefilterd op tracking-flag — zie OVERVIEW_APP_SUBROUTES.
       { label: 'Bezittingen', href: '/overzicht/bezittingen' },
       { label: 'Schulden', href: '/overzicht/schulden' },
       { label: 'Cashflow', href: '/overzicht/cashflow' },
       { label: 'Belasting', href: '/overzicht/belasting' },
-      // Actieve apps — deep-tools per categorie. Statisch opgenomen
-      // zodat ze direct in zowel de desktop-sidebar als het mobile-
-      // menu klikbaar zijn (sidebar.tsx filtert ze nog op tracking-
-      // flag, mobiel toont alle).
-      { label: 'Budgetteren', href: '/core/assets/cash?tab=budgetteren' },
-      { label: 'Aandelen holdings', href: '/core/assets/investment?tab=aandelen-holdings' },
-      { label: 'Crypto holdings', href: '/core/assets/crypto?tab=crypto-holdings' },
-      { label: 'Hypotheekplanner', href: '/core/debts/mortgage?tab=hypotheekplanner' },
-      { label: 'Verhuurrendement', href: '/core/assets/real_estate?tab=verhuurrendement' },
     ],
   },
   {
@@ -96,6 +90,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Gebeurtenissen', href: '/toekomst?tab=gebeurtenissen' },
       { label: 'Voorkeuren', href: '/toekomst?tab=voorkeuren' },
       { label: 'Rekenhulp', href: '/toekomst?tab=rekenhulp' },
+      { label: 'Wat-Als', href: '/toekomst/whatif' },
     ],
   },
   {
@@ -113,6 +108,27 @@ export const navGroups: NavGroup[] = [
       { label: 'Geavanceerd', href: '/mijn/geavanceerd' },
     ],
   },
+]
+
+/**
+ * Overzicht-sub-tools (deep-app-tools) per appKey — dynamisch gefilterd op
+ * de active-tracking-flag op assets/debts. Sidebar én NavMenuSheet lezen
+ * deze lijst en tonen alleen items waarvan `appKey` voorkomt in de
+ * runtime `activeAppKeys` (via useActiveAppKeys-context op mobiel, of
+ * `activeAppKeys`-prop op de sidebar).
+ *
+ * Bron-of-truth voor appKey-slugs is `getActiveAppKeys()` uit
+ * components/core/category-deepening-registry.ts. Toevoegen van een
+ * nieuwe deep-tool: hier registreren én registry bijwerken.
+ */
+export type OverviewAppItem = NavItem & { appKey: string }
+
+export const OVERVIEW_APP_SUBROUTES: OverviewAppItem[] = [
+  { label: 'Budgetteren', href: '/core/assets/cash?tab=budgetteren', appKey: 'budgetteren' },
+  { label: 'Aandelen holdings', href: '/core/assets/investment?tab=aandelen-holdings', appKey: 'aandelen-holdings' },
+  { label: 'Crypto holdings', href: '/core/assets/crypto?tab=crypto-holdings', appKey: 'crypto-holdings' },
+  { label: 'Hypotheekplanner', href: '/core/debts/mortgage?tab=hypotheekplanner', appKey: 'hypotheekplanner' },
+  { label: 'Verhuurrendement', href: '/core/assets/real_estate?tab=verhuurrendement', appKey: 'verhuurrendement' },
 ]
 
 /**

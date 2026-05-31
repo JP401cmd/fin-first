@@ -3,8 +3,18 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { mainNav, navGroups, globalNav, type NavColor } from '@/lib/nav-config'
-import { useLeverScores } from '@/components/app/shell/responsive-shell'
+import {
+  mainNav,
+  navGroups,
+  globalNav,
+  OVERVIEW_APP_SUBROUTES,
+  type NavColor,
+  type NavItem,
+} from '@/lib/nav-config'
+import {
+  useLeverScores,
+  useActiveAppKeys,
+} from '@/components/app/shell/responsive-shell'
 import type { LeverStatus } from '@/components/app/shell/lever-compass'
 
 const statusDotClass: Record<LeverStatus, string> = {
@@ -61,14 +71,25 @@ type NavMenuSheetProps = {
 export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   const pathname = usePathname() ?? '/'
   const leverScores = useLeverScores()
+  const activeAppKeys = useActiveAppKeys()
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
 
-  // Per main-nav-item bijbehorende sub-routes lookuppen
-  const subRoutesFor = (parentHref: string) => {
+  // Per main-nav-item bijbehorende sub-routes lookuppen. Voor Overzicht
+  // voegen we dynamisch de actieve deep-app-tools toe (gefilterd op
+  // activeAppKeys — alleen apps waarvan ten minste één asset/debt de
+  // tracking-flag heeft staan).
+  const subRoutesFor = (parentHref: string): NavItem[] => {
     const group = navGroups.find((g) => g.parent.href === parentHref)
-    return group?.items ?? []
+    const base = group?.items ?? []
+    if (parentHref === '/overzicht') {
+      const activeApps = OVERVIEW_APP_SUBROUTES.filter((a) =>
+        activeAppKeys.includes(a.appKey),
+      )
+      return [...base, ...activeApps]
+    }
+    return base
   }
 
   return (

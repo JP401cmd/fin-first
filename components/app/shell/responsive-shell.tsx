@@ -93,6 +93,18 @@ export function useLeverScores(): LeverScores {
   return useContext(LeverScoresContext)
 }
 
+// ── ActiveAppKeys context ────────────────────────────────────────────────────
+//
+// Welke deep-app-tools daadwerkelijk geactiveerd zijn door tracking-flags op
+// assets/debts. Sidebar (desktop, portal-tree) consumeert dit al via prop;
+// NavMenuSheet (mobile, render-tree) leest via context zodat hij dezelfde
+// filtering kan toepassen voor de Overzicht-sub-items.
+const ActiveAppKeysContext = createContext<string[]>([])
+
+export function useActiveAppKeys(): string[] {
+  return useContext(ActiveAppKeysContext)
+}
+
 export type ResponsiveShellProps = {
   /** Email van de ingelogde user — initials/name worden hieruit afgeleid voor de Sidebar profile-pill. */
   email: string
@@ -207,6 +219,7 @@ function ShellContent({
   return (
     <NavStackProvider>
      <LeverScoresContext.Provider value={leverScores}>
+     <ActiveAppKeysContext.Provider value={activeAppKeys}>
      <CategoryAppLinksContext.Provider value={categoryAppLinks}>
       <MobileAppStripProvider>
       {/* Sidebar via portal naar document.body — omzeilt ChatLayoutWrapper's
@@ -263,6 +276,7 @@ function ShellContent({
       <FloatingNavButton />
       </MobileAppStripProvider>
      </CategoryAppLinksContext.Provider>
+     </ActiveAppKeysContext.Provider>
      </LeverScoresContext.Provider>
     </NavStackProvider>
   )
