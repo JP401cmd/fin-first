@@ -58,14 +58,10 @@ export function DoelenView({
 }) {
   // DoelToevoegenSheet = scenario-tool → alleen in Plannen-modus (plan A-5).
   const { isPlannen } = useViewMode()
-  // Edit-sheet state: which goal is being edited (null = closed).
-  const [editingGoal, setEditingGoal] = useState<{
-    id: string
-    name: string
-    current: number
-    target: number
-    goalType: string | null
-  } | null>(null)
+  // Edit-sheet state: het volledige Goal-object wordt doorgegeven zodat
+  // de bewerken-sheet een GoalForm (volledig edit met asset/debt-link)
+  // kan openen zonder extra DB-fetch.
+  const [editingGoal, setEditingGoal] = useState<GoalWithBudget | null>(null)
 
   // Koppel goals + progresses op index (loader garandeert parallel
   // arrays). Sorteer op status: off-track eerst zodat aandacht-vereisende
@@ -134,14 +130,7 @@ export function DoelenView({
           const cardProps = isPlannen
             ? {
                 type: 'button' as const,
-                onClick: () =>
-                  setEditingGoal({
-                    id: goal.id,
-                    name: goal.name,
-                    current: progress.current,
-                    target: progress.target,
-                    goalType: (goal as { goal_type?: string | null }).goal_type ?? null,
-                  }),
+                onClick: () => setEditingGoal(goal),
                 'aria-label': `Bewerk doel ${goal.name}`,
                 className: `${cardClass} hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
               }
@@ -210,11 +199,7 @@ export function DoelenView({
 
       {editingGoal && (
         <DoelBewerkenSheet
-          goalId={editingGoal.id}
-          goalName={editingGoal.name}
-          currentValue={editingGoal.current}
-          targetValue={editingGoal.target}
-          goalType={editingGoal.goalType}
+          goal={editingGoal}
           onClose={() => setEditingGoal(null)}
         />
       )}

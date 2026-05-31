@@ -1,6 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DoelBewerkenSheet } from './doel-bewerken-sheet'
+import type { Goal, GoalType } from '@/lib/goal-data'
+
+function makeGoal(overrides: Partial<Goal> = {}): Goal {
+  return {
+    id: 'g1',
+    user_id: 'u1',
+    name: 'Spaargeld voor woning',
+    description: null,
+    goal_type: 'savings' as GoalType,
+    target_value: 50000,
+    current_value: 20000,
+    target_date: null,
+    linked_asset_id: null,
+    linked_debt_id: null,
+    icon: 'Target',
+    color: 'teal',
+    is_completed: false,
+    completed_at: null,
+    sort_order: 0,
+    ownership: 'personal',
+    household_id: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...overrides,
+  }
+}
 
 /**
  * Tests voor DoelBewerkenSheet — voortgang updaten + verwijderen.
@@ -39,21 +65,10 @@ beforeEach(() => {
 
 function renderSheet(
   onClose = () => {},
-  opts: { goalType?: string | null } = {},
+  opts: { goalType?: GoalType } = {},
 ) {
-  // Belangrijk: 'goalType' in opts → respecteer expliciete null,
-  // anders default naar 'savings'.
-  const goalType = 'goalType' in opts ? opts.goalType : 'savings'
-  return render(
-    <DoelBewerkenSheet
-      goalId="g1"
-      goalName="Spaargeld voor woning"
-      currentValue={20000}
-      targetValue={50000}
-      goalType={goalType}
-      onClose={onClose}
-    />,
-  )
+  const goal = makeGoal({ goal_type: opts.goalType ?? ('savings' as GoalType) })
+  return render(<DoelBewerkenSheet goal={goal} onClose={onClose} />)
 }
 
 describe('DoelBewerkenSheet — render', () => {
@@ -99,14 +114,18 @@ describe('DoelBewerkenSheet — bijdrage-monitor', () => {
   })
 
   it('toont 2 suggestie-items per default', () => {
-    renderSheet(() => {}, { goalType: 'wealth' })
+    // 'wealth' was de legacy-key; in GoalType heet hij 'net_worth' →
+    // suggesties komen via getGoalSuggestions die ook GoalKind-mapping
+    // verzorgt. We forceren een GoalKind via cast.
+    renderSheet(() => {}, { goalType: 'wealth' as unknown as GoalType })
     const block = screen.getByTestId('will-suggesties')
     const items = block.querySelectorAll('li')
     expect(items.length).toBe(2)
   })
 
-  it('verbergt Will-suggesties-blok bij onbekend goal_type', () => {
-    renderSheet(() => {}, { goalType: null })
+  it('verbergt Will-suggesties-blok bij goal_type zonder suggesties', () => {
+    // 'custom' heeft geen suggestion-set in lib/goal-suggestions.ts.
+    renderSheet(() => {}, { goalType: 'custom' as GoalType })
     expect(screen.queryByTestId('will-suggesties')).toBeNull()
   })
 

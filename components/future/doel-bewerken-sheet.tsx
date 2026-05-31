@@ -1,12 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { X, Trash2, TrendingUp, TrendingDown, Minus, Sparkles, ArrowRight } from 'lucide-react'
+import { X, Trash2, TrendingUp, TrendingDown, Minus, Sparkles, ArrowRight, Settings2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import { getGoalSuggestions } from '@/lib/goal-suggestions'
+import { GoalForm } from '@/components/app/goal-form'
+import type { Goal } from '@/lib/goal-data'
+
+type AssetLite = { id: string; name: string; current_value: number }
+type DebtLite = { id: string; name: string; current_balance: number }
 
 /**
  * DoelBewerkenSheet — quick-update flow per doel op /toekomst Doelen-tab.
@@ -23,27 +28,51 @@ import { getGoalSuggestions } from '@/lib/goal-suggestions'
  *  4. Optioneel: Verwijderen-knop met confirm voor doel-delete
  */
 export function DoelBewerkenSheet({
-  goalId,
-  goalName,
-  currentValue,
-  targetValue,
-  goalType,
+  goal,
   onClose,
 }: {
-  goalId: string
-  goalName: string
-  currentValue: number
-  targetValue: number
-  /** Goal-type (savings/wealth/debt) — voedt contextuele Will-suggesties. */
-  goalType?: string | null
+  /** Volledig Goal-object — nodig voor GoalForm (volledig-bewerken-flow). */
+  goal: Goal
   onClose: () => void
 }) {
+  const goalId = goal.id
+  const goalName = goal.name
+  const currentValue = Number(goal.current_value)
+  const targetValue = Number(goal.target_value)
+  const goalType = goal.goal_type
   const suggestions = getGoalSuggestions(goalType)
   const [newValue, setNewValue] = useState(String(currentValue))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // Volledig-bewerken-modus (GoalForm overlay). Bij open laden we lazy
+  // assets+debts uit de DB zodat de koppeling-selects compleet zijn.
+  const [fullEditOpen, setFullEditOpen] = useState(false)
+  const [assets, setAssets] = useState<AssetLite[]>([])
+  const [debts, setDebts] = useState<DebtLite[]>([])
   const router = useRouter()
+
+  // Laad assets+debts on-demand wanneer de gebruiker voor 'Volledig
+  // bewerken' kiest. Niet bij eerste mount — anders maken we een
+  // overbodige DB-query voor de gebruikers die alleen quick-update doen.
+  useEffect(() => {
+    if (!fullEditOpen) return
+    let cancelled = false
+    async function load() {
+      const supabase = createClient()
+      const [aRes, dRes] = await Promise.all([
+        supabase.from('assets').select('id, name, current_value').order('name'),
+        supabase.from('debts').select('id, name, current_balance').order('name'),
+      ])
+      if (cancelled) return
+      setAssets(((aRes.data ?? []) as AssetLite[]))
+      setDebts(((dRes.data ?? []) as DebtLite[]))
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [fullEditOpen])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -308,6 +337,18 @@ export function DoelBewerkenSheet({
           </div>
         ) : null}
 
+        {/* Volledig-bewerken-link — opent GoalForm met alle velden +
+            asset/debt-koppeling + alle goal_types (netto vermogen,
+            schuldratio via debt_payoff, spaarquote, etc.). */}
+        <button
+          type="button"
+          onClick={() => setFullEditOpen(true)}
+          className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-700 hover:text-violet-800 hover:underline"
+        >
+          <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
+          Volledig bewerken (naam, bedrag, datum, koppeling…)
+        </button>
+
         <div className="flex items-center justify-between gap-2">
           {!confirmDelete && (
             <button
@@ -337,6 +378,23 @@ export function DoelBewerkenSheet({
           </div>
         </div>
       </form>
+
+      {/* GoalForm sheet — verschijnt boven de quick-update dialog. Bij
+          opslaan/verwijderen sluiten we eerst GoalForm, daarna de hele
+          sheet (verse data via router.refresh). */}
+      {fullEditOpen && (
+        <GoalForm
+          goal={goal}
+          assets={assets}
+          debts={debts}
+          onClose={() => setFullEditOpen(false)}
+          onSaved={() => {
+            setFullEditOpen(false)
+            onClose()
+            router.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

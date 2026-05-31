@@ -1,10 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, Target, Calculator } from 'lucide-react'
+import { Plus, X, Target, Calculator, Settings2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
+import { GoalForm } from '@/components/app/goal-form'
+
+type AssetLite = { id: string; name: string; current_value: number }
+type DebtLite = { id: string; name: string; current_balance: number }
 
 /**
  * DoelToevoegenSheet — plan §6.3 Tab 2 detail-pane: doelen toevoegen
@@ -111,7 +115,31 @@ export function DoelToevoegenSheet() {
   const [goalType, setGoalType] = useState<GoalType>('savings')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Geavanceerd-modus: opent GoalForm met alle goal_types + asset/debt-
+  // koppeling. Assets+debts laden we lazy bij open van die overlay.
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [assets, setAssets] = useState<AssetLite[]>([])
+  const [debts, setDebts] = useState<DebtLite[]>([])
   const router = useRouter()
+
+  useEffect(() => {
+    if (!advancedOpen) return
+    let cancelled = false
+    async function load() {
+      const supabase = createClient()
+      const [aRes, dRes] = await Promise.all([
+        supabase.from('assets').select('id, name, current_value').order('name'),
+        supabase.from('debts').select('id, name, current_balance').order('name'),
+      ])
+      if (cancelled) return
+      setAssets(((aRes.data ?? []) as AssetLite[]))
+      setDebts(((dRes.data ?? []) as DebtLite[]))
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [advancedOpen])
 
   function reset() {
     setName('')
@@ -351,8 +379,45 @@ export function DoelToevoegenSheet() {
                 {saving ? 'Opslaan…' : 'Doel toevoegen'}
               </button>
             </div>
+
+            {/* Geavanceerd: alle goal_types (netto vermogen, spaarquote,
+                noodfonds, vrijheidsdagen, passief inkomen, vrij doel),
+                asset/debt-koppeling, en optionele velden. */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setAdvancedOpen(true)
+              }}
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-700 hover:text-violet-800 hover:underline"
+            >
+              <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
+              Geavanceerd (meer doel-types + koppelingen)
+            </button>
           </form>
         </div>
+      )}
+
+      {/* GoalForm overlay (geavanceerde modus). Gebruikt initialValues
+          om de al-ingevulde naam/bedrag/datum mee te nemen — zo verliest
+          de gebruiker geen input bij de switch. */}
+      {advancedOpen && (
+        <GoalForm
+          assets={assets}
+          debts={debts}
+          initialValues={{
+            name: name || undefined,
+            target_value: targetValue || undefined,
+            target_date: targetDate || undefined,
+          }}
+          onClose={() => setAdvancedOpen(false)}
+          onSaved={() => {
+            setAdvancedOpen(false)
+            setOpen(false)
+            reset()
+            router.refresh()
+          }}
+        />
       )}
     </>
   )
