@@ -541,13 +541,41 @@ body {
   }
 }
 
-/* ── Newspaper column separators ──────────────────────── */
+/* ── Newspaper columns ──────────────────────────────────
+   Secondary articles render as flat newspaper columns (no card
+   chrome) separated by hairline rules instead of borders + shadow. */
 
-/* Vertical rule between columns in a 2-col grid (desktop only) */
+/* Mobile (single column): hairline above each article after the first */
+.news-grid-columns > :not(:first-child) {
+  border-top: 1px solid var(--border-ed);
+  padding-top: 1.25rem;
+}
+
+/* Desktop (two columns): centred vertical gutter rule + per-row hairline */
 @media (min-width: 640px) {
+  .news-grid-columns {
+    column-gap: 0;
+  }
+  .news-grid-columns > :not(:first-child) {
+    border-top: none;
+    padding-top: 0;
+  }
   .news-grid-columns > :nth-child(odd) {
     border-right: 1px solid var(--border-ed);
-    padding-right: 4px;
+    padding-right: 1.5rem;
+  }
+  .news-grid-columns > :nth-child(even) {
+    padding-left: 1.5rem;
+  }
+  /* Horizontal hairline above the second row onward (both columns) */
+  .news-grid-columns > :nth-child(n + 3) {
+    border-top: 1px solid var(--border-ed);
+    padding-top: 1.5rem;
+  }
+  /* A lone last article in the left column has no neighbour — drop its rule */
+  .news-grid-columns > :last-child:nth-child(odd) {
+    border-right: none;
+    padding-right: 0;
   }
 }
 

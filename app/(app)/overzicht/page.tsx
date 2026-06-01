@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadWillData } from '@/lib/will-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
-import { WillLanding } from '@/components/will/will-landing'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
 import {
@@ -26,10 +25,16 @@ export const metadata: Metadata = {
  * /overzicht — canonieke landing in nieuwe navigatie-architectuur.
  *
  * Render-volgorde:
- *  1. OverzichtHero — Tier-2 visuele hero met begroeting, Health Score,
+ *  1. CheckinBanner — paarse maand-check-in-nudge (alleen eerste week,
+ *     wanneer relevant); de volledige historie leeft op /mijn/checkins
+ *  2. OverzichtHero — Tier-2 visuele hero met begroeting, Health Score,
  *     vier hefbomen-tegels, mini-vermogen-grafiek en 6 briefing-kaartjes
- *  2. WillLanding — minimale Will-sectie: header, MonthlyCheckin,
- *     TipsTeaser, CashflowSection
+ *     (inclusief de tips & acties-ingang)
+ *
+ * Het oude WillLanding-blok (tweede check-in, "Wat zou je nu kunnen doen"
+ * en cashflow-samenvatting) is verwijderd: de check-in-historie verhuist
+ * naar /mijn, tips staan al in de briefing en de cashflow-samenvatting
+ * leeft nu op de hefboom-pagina /overzicht/cashflow.
  *
  * Drie parallelle data-loaders: dashboard (21 queries), will (3-6
  * queries), horizon (incl. health score). Wall-clock blijft max van
@@ -221,11 +226,6 @@ export default async function OverzichtPage() {
         hasGoals={hasGoals}
         accountAgeDays={accountAgeDays}
         liquidCash={liquidCash}
-      />
-      <WillLanding
-        dashboardData={dashboardData}
-        willData={willData}
-        userName={userName ?? undefined}
       />
     </>
   )

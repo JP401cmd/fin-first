@@ -2,10 +2,14 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { BelastingOverzichtStrip } from '@/components/overview/belasting-overzicht-strip'
-import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
-import { Box3Detail } from '@/components/overview/box3-detail'
-import { Box2Detail } from '@/components/overview/box2-detail'
+import {
+  BelastingBoxCards,
+  type BelastingBoxCard,
+  type BelastingBoxStatus,
+} from '@/components/overview/belasting-box-cards'
+import { computeJaarruimte } from '@/lib/jaarruimte'
+import { hasBox2Relevance } from '@/lib/box2-relevance'
+import { pillarStatus } from '@/lib/leverage-status'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
@@ -15,23 +19,24 @@ export const metadata: Metadata = {
 }
 
 /**
- * /overzicht/belasting — vierde hefboom-verdieping.
+ * /overzicht/belasting — vierde hefboom-verdieping, nu als **landing/hub**.
  *
- * Layout:
- *  1. BelastingOverzichtStrip — 3-tegel KPI-strip met Box 1/2/3
- *     (server-side data uit horizonData)
- *  2. JaarruimteCard — pensioen-aftrekruimte (Box 1)
- *  3. Box3Detail — compacte, inklapbare Box 3-berekening (vervangt het
- *     volledige /core/belasting-embed; zelfde pure engine via
- *     /api/household/box3). /core/belasting redirect hierheen.
+ * De pagina toont drie klikbare box-kaarten in hefbomen-stijl (icoon +
+ * status + KPI), elk doorlinkend naar de eigen box-subpagina:
+ *  - /overzicht/belasting/box1 — Werk + woning (jaarruimte-actie)
+ *  - /overzicht/belasting/box2 — Aanmerkelijk belang (DGA)
+ *  - /overzicht/belasting/box3 — Sparen + beleggen (forfaitair rendement)
  *
- * Box-data bronnen:
- *  - Box 3: horizonData.healthScoreInput.taxData.box3Tax (echte forfaitair
- *    berekening)
- *  - Box 1: schatting via netto-inkomen × marginaal-tarief (afgeleid
- *    uit fireParams.marginaalTarief). Niet een aangifte-berekening
- *    maar wel een snelle indicatie van orde-grootte
- *  - Box 2: 0 voor MVP — geen deelnemingen-tracking in TriFinity
+ * Status per kaart wordt server-side bepaald:
+ *  - Box 1: onbenutte jaarruimte = kans (amber) / benut (groen) / onbekend
+ *  - Box 2: aanwezigheid van een deelneming-asset
+ *  - Box 3: de tax_optimization-pillar uit de gezondheidsscore
+ *
+ * Box-data bronnen (KPI's):
+ *  - Box 3: horizonData.healthScoreInput.taxData.box3Tax (forfaitaire berekening)
+ *  - Box 1: schatting via netto-inkomen × marginaal-tarief
+ *  - Box 2: KPI leeg (geen deelnemingen-berekening op de landing) — de
+ *    box2-subpagina rekent het echte bedrag uit via /api/household/box2
  */
 export default async function OverzichtBelastingPage() {
   const supabase = await createClient()
@@ -39,26 +44,19 @@ export default async function OverzichtBelastingPage() {
 
   const box3Tax = horizonData.healthScoreInput.taxData?.box3Tax ?? null
 
-  // Aanmerkelijk belang (Box 2): alleen tonen als de gebruiker een
-  // deelneming-asset heeft. We detecteren dat server-side zodat de
-  // Box 2-sectie niet flitst voor de ~99% niet-DGA's.
-  const { data: { user } } = await supabase.auth.getUser()
-  let hasAanmerkelijkBelang = false
-  if (user) {
-    const { data: deelnemingen } = await supabase
-      .from('assets')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .eq('asset_type', 'deelneming')
-      .limit(1)
-    hasAanmerkelijkBelang = (deelnemingen?.length ?? 0) > 0
-  }
+  // Aanmerkelijk belang (Box 2): relevant zodra de gebruiker een deelneming,
+  // DGA-vordering óf DGA-schuld heeft — dezelfde detectie-breedte als de Box 2-
+  // engine (lib/box2-relevance.ts), zodat de status klopt voor de ~99%
+  // niet-DGA's én een DGA met excessief-lenen-positie niet ten onrechte als
+  // "geen aanmerkelijk belang" verschijnt.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const hasAanmerkelijkBelang = user ? await hasBox2Relevance(supabase, user.id) : false
 
   // Box 1-schatting: netto-maandinkomen ≈ bruto × (1 − marginaal_tarief),
-  // dus bruto-inkomen ≈ netto / (1 − marginaal). Box 1-druk ≈ bruto × marg.
-  // Versimpelde benadering — voldoende voor KPI-tegel context, niet voor
-  // aangifte. effectiveInput.monthlyIncome is netto.
+  // dus bruto ≈ netto / (1 − marginaal). Box 1-druk ≈ bruto × marginaal.
+  // Versimpelde benadering — voldoende voor de KPI-tegel, niet voor aangifte.
   let box1Tax: number | null = null
   let grossYearly = 0
   const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
@@ -67,6 +65,62 @@ export default async function OverzichtBelastingPage() {
     grossYearly = (netMonthly * 12) / (1 - marg)
     box1Tax = Math.round(grossYearly * marg)
   }
+
+  // Box 1-status uit onbenutte jaarruimte: een onbenutte ruimte is een
+  // belastingbesparingskans → amber ("aandacht"); volledig benut → groen.
+  const jaarruimte = computeJaarruimte(grossYearly, 0)
+  const box1Status: BelastingBoxStatus = !jaarruimte.hasData
+    ? 'neutral'
+    : jaarruimte.jaarruimte > 0
+      ? 'warn'
+      : 'good'
+  const box1StatusText = !jaarruimte.hasData
+    ? 'Inkomen onbekend'
+    : jaarruimte.jaarruimte > 0
+      ? 'Onbenutte jaarruimte'
+      : 'Ruimte benut'
+
+  // Box 3-status uit de tax_optimization-pillar (gedeeld met de hefbomen-rij).
+  const taxPillar = horizonData.healthScore?.pillars.find((p) => p.id === 'tax_optimization')
+  const box3Status = pillarStatus(taxPillar?.score)
+  const box3StatusText =
+    box3Status === 'good'
+      ? 'Geen actie nodig'
+      : box3Status === 'warn'
+        ? 'Optimaliseer Box 3'
+        : box3Status === 'bad'
+          ? 'Box 3-actie nodig'
+          : null
+
+  const cards: BelastingBoxCard[] = [
+    {
+      number: '1',
+      label: 'Werk + woning',
+      href: '/overzicht/belasting/box1',
+      tax: box1Tax,
+      status: box1Status,
+      statusText: box1StatusText,
+      subtitle: 'Loon, ondernemerswinst en eigen huis.',
+    },
+    {
+      number: '2',
+      label: 'Aanmerkelijk belang',
+      href: '/overzicht/belasting/box2',
+      tax: null,
+      status: 'neutral',
+      statusText: hasAanmerkelijkBelang ? 'Aanmerkelijk belang' : 'Geen aanmerkelijk belang',
+      subtitle: 'DGA / aandeelhouder ≥ 5%.',
+    },
+    {
+      number: '3',
+      label: 'Sparen + beleggen',
+      href: '/overzicht/belasting/box3',
+      tax: box3Tax,
+      status: box3Status,
+      statusText: box3StatusText,
+      subtitle: 'Cash, beleggingen en crypto — forfaitair.',
+    },
+  ]
 
   return (
     <>
@@ -77,26 +131,10 @@ export default async function OverzichtBelastingPage() {
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>
-      <BelastingOverzichtStrip
-        box1Tax={box1Tax}
-        box2Tax={null}
-        box3Tax={box3Tax}
+      <BelastingBoxCards
+        cards={cards}
+        totalNote={hasAanmerkelijkBelang ? 'excl. Box 2' : undefined}
       />
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-2" id="jaarruimte" style={{ scrollMarginTop: '5rem' }}>
-        <JaarruimteCard
-          grossYearlyIncome={grossYearly}
-          pensioenAangroei={0}
-          marginaalTarief={marg}
-        />
-      </section>
-      <div id="box3" style={{ scrollMarginTop: '5rem' }}>
-        <Box3Detail year={2026} />
-      </div>
-      {hasAanmerkelijkBelang && (
-        <div id="box2" style={{ scrollMarginTop: '5rem' }}>
-          <Box2Detail year={2026} />
-        </div>
-      )}
     </>
   )
 }

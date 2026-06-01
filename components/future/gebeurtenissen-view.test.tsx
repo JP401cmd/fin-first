@@ -11,7 +11,7 @@ import type { StrategieEditorsData } from './strategie/strategie-editors'
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => '/toekomst',
+  usePathname: () => '/toekomst/gebeurtenissen',
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({

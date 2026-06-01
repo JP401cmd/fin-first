@@ -26,9 +26,10 @@ export default function MijnNotificatiesPage() {
     budget: true,
     sync: true,
     recommendation: true,
-    insight: true,
     levelup: true,
+    horizon: true,
     holding_alert: true,
+    briefing: true,
   })
   const [notifLoading, setNotifLoading] = useState(true)
   const [notifSaving, setNotifSaving] = useState(false)

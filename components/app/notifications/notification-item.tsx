@@ -17,19 +17,20 @@ type ModuleInfo = {
   mediumVar: string   // CSS variable for medium border
 }
 
+// De oude module-indeling (Kern/Wil/Horizon) bestaat niet meer als gebruikers-
+// term. We tonen daarom een concept-label per bericht-type (uitgelijnd op de
+// huidige navigatie: Overzicht / Acties / Toekomst) en houden de kleur-accenten
+// puur visueel aan via de bestaande --kern/--will/--hor tokens.
 const MODULE_MAP: Record<NotificationType, ModuleInfo> = {
-  budget:         { label: 'DE KERN',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
-  streak:         { label: 'DE KERN',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
-  sync:           { label: 'DE KERN',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
-  recommendation: { label: 'DE WIL',     colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
-  insight:        { label: 'DE WIL',     colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
-  badge:               { label: 'DE HORIZON', colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
-  levelup:             { label: 'DE HORIZON', colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
-  partner_transaction: { label: 'DE KERN',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
-  horizon:             { label: 'DE HORIZON', colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
-  holding_alert:       { label: 'DE KERN',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
-  module_nudge:        { label: 'INVULLEN',   colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
-  briefing:            { label: 'DE WIL',     colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
+  budget:         { label: 'Budget',       colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+  sync:           { label: 'Bank',         colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+  recommendation: { label: 'Partner-actie',colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
+  levelup:             { label: 'Niveau',      colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
+  partner_transaction: { label: 'Partner',     colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+  horizon:             { label: 'Toekomst',    colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
+  holding_alert:       { label: 'Belegging',   colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+  module_nudge:        { label: 'Invullen',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+  briefing:            { label: 'Briefing',    colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
 }
 
 function formatTime(dateStr: string): string {
@@ -55,11 +56,11 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
   if (notification.type === 'module_nudge' && notification.metadata?.moduleId) {
     const nudgeModuleId = notification.metadata.moduleId as string
     const navColors: Record<string, Pick<ModuleInfo, 'label' | 'colorVar' | 'textVar' | 'lightVar' | 'mediumVar'>> = {
-      budgetteren:          { label: 'DE KERN',    colorVar: 'var(--kern)', textVar: 'var(--kern-t)', lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
-      vermogensregistratie: { label: 'DE KERN',    colorVar: 'var(--kern)', textVar: 'var(--kern-t)', lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
-      aandelenregistratie:  { label: 'DE KERN',    colorVar: 'var(--kern)', textVar: 'var(--kern-t)', lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
-      inzicht_acties:       { label: 'DE WIL',     colorVar: 'var(--will)', textVar: 'var(--will-t)', lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
-      toekomstplannen:      { label: 'DE HORIZON', colorVar: 'var(--hor)',  textVar: 'var(--hor-t)',  lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
+      budgetteren:          { label: 'Overzicht', colorVar: 'var(--kern)', textVar: 'var(--kern-t)', lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+      vermogensregistratie: { label: 'Overzicht', colorVar: 'var(--kern)', textVar: 'var(--kern-t)', lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+      aandelenregistratie:  { label: 'Overzicht', colorVar: 'var(--kern)', textVar: 'var(--kern-t)', lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+      inzicht_acties:       { label: 'Acties',    colorVar: 'var(--will)', textVar: 'var(--will-t)', lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
+      toekomstplannen:      { label: 'Toekomst',  colorVar: 'var(--hor)',  textVar: 'var(--hor-t)',  lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
     }
     const nudgeColors = navColors[nudgeModuleId]
     if (nudgeColors) {

@@ -47,7 +47,7 @@ describe('loadTopMarketBriefing', () => {
     expect(entry?.text).toMatch(/ECB verhoogt rente/)
     expect(entry?.text).toMatch(/€47/)
     expect(entry?.hefboom).toBe('schulden') // rente → schulden
-    expect(entry?.href).toBe('/berichten')
+    expect(entry?.href).toBe('/nieuws') // markt-briefje leidt naar de krant
   })
 
   it('valt terug op het eerste item als er geen direct-impact is', async () => {

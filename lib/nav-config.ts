@@ -19,6 +19,12 @@ export type NavItem = {
   href: string
   icon?: NavIcon
   description?: string
+  /**
+   * Optionele geneste subroutes — verschijnen ingesprongen ónder dit item,
+   * maar alléén wanneer de gebruiker op dit item (of een van zijn kinderen)
+   * staat (contextueel derde niveau). Gebruikt voor Box 1/2/3 onder Belasting.
+   */
+  children?: NavItem[]
 }
 
 export type NavGroup = {
@@ -76,20 +82,29 @@ export const navGroups: NavGroup[] = [
       { label: 'Bezittingen', href: '/overzicht/bezittingen' },
       { label: 'Schulden', href: '/overzicht/schulden' },
       { label: 'Cashflow', href: '/overzicht/cashflow' },
-      { label: 'Belasting', href: '/overzicht/belasting' },
+      {
+        label: 'Belasting',
+        href: '/overzicht/belasting',
+        // Box-subpagina's — geneste, contextuele subroutes (zie NavMenuSheet).
+        children: [
+          { label: 'Box 1 · Werk + woning', href: '/overzicht/belasting/box1' },
+          { label: 'Box 2 · Aanmerkelijk belang', href: '/overzicht/belasting/box2' },
+          { label: 'Box 3 · Sparen + beleggen', href: '/overzicht/belasting/box3' },
+        ],
+      },
     ],
   },
   {
     parent: mainNav[1]!,
     items: [
-      // Toekomst-tabs als deeplink ?tab=… — segmented-control binnen
-      // /toekomst leest dezelfde query-key (zie components/future/
-      // toekomst-tabs.tsx). Tijdas is de default zonder query-param.
+      // Toekomst-subnavigatie: Tijdas (/toekomst) is de landing met
+      // navigatiekaarten; Doelen/Gebeurtenissen/Voorkeuren/Rekenhulp en
+      // Wat-Als hebben elk een eigen subroute.
       { label: 'Tijdas', href: '/toekomst' },
-      { label: 'Doelen', href: '/toekomst?tab=doelen' },
-      { label: 'Gebeurtenissen', href: '/toekomst?tab=gebeurtenissen' },
-      { label: 'Voorkeuren', href: '/toekomst?tab=voorkeuren' },
-      { label: 'Rekenhulp', href: '/toekomst?tab=rekenhulp' },
+      { label: 'Doelen', href: '/toekomst/doelen' },
+      { label: 'Gebeurtenissen', href: '/toekomst/gebeurtenissen' },
+      { label: 'Voorkeuren', href: '/toekomst/voorkeuren' },
+      { label: 'Rekenhulp', href: '/toekomst/rekenhulp' },
       { label: 'Wat-Als', href: '/toekomst/whatif' },
     ],
   },
@@ -102,7 +117,6 @@ export const navGroups: NavGroup[] = [
       { label: 'Profiel', href: '/mijn/profiel' },
       { label: 'Privacy', href: '/mijn/privacy' },
       { label: 'Koppelingen', href: '/mijn/koppelingen' },
-      { label: 'Delen', href: '/mijn/delen' },
       { label: 'Notificaties', href: '/mijn/notificaties' },
       { label: 'Uiterlijk', href: '/mijn/uiterlijk' },
       { label: 'Geavanceerd', href: '/mijn/geavanceerd' },

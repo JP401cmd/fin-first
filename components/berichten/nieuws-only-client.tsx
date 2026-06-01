@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Newspaper, Loader2, RefreshCw, AlertCircle, ArrowRight } from 'lucide-react'
+import { Newspaper, Loader2, RefreshCw, AlertCircle } from 'lucide-react'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { Masthead } from './masthead'
 import { PageInfoButton } from '@/components/editorial'
@@ -10,7 +10,6 @@ import { NewspaperFooter } from './newspaper-footer'
 import { HeroNewsArticle, NewsArticle, NewsSkeletonLoader } from './news-components'
 import { ArchiveSection } from './archive-section'
 import type { NewsItem } from '@/app/api/news/route'
-import Link from 'next/link'
 
 // ── News cache (client-side) ────────────────────────────────────────
 // Duplicated from berichten-client.tsx intentionally — the two pages
@@ -23,23 +22,24 @@ const NEWS_CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
 interface LocalNewsCache {
   items: NewsItem[]
   fetchedAt: number
+  generatedAt?: string
 }
 
-function getLocalNewsCache(): NewsItem[] | null {
+function getLocalNewsCache(): { items: NewsItem[]; generatedAt?: string } | null {
   try {
     const raw = localStorage.getItem(NEWS_LOCAL_CACHE_KEY)
     if (!raw) return null
     const cache: LocalNewsCache = JSON.parse(raw)
     if (Date.now() - cache.fetchedAt > NEWS_CACHE_TTL_MS) return null
-    return cache.items
+    return { items: cache.items, generatedAt: cache.generatedAt }
   } catch {
     return null
   }
 }
 
-function setLocalNewsCache(items: NewsItem[]): void {
+function setLocalNewsCache(items: NewsItem[], generatedAt?: string): void {
   try {
-    const cache: LocalNewsCache = { items, fetchedAt: Date.now() }
+    const cache: LocalNewsCache = { items, fetchedAt: Date.now(), generatedAt }
     localStorage.setItem(NEWS_LOCAL_CACHE_KEY, JSON.stringify(cache))
   } catch {
     // Silent fail — localStorage might be full
@@ -78,6 +78,7 @@ export function NieuwsOnlyClient() {
   const [jaargang, setJaargang] = useState<number | undefined>()
   const [refreshesRemaining, setRefreshesRemaining] = useState<number | undefined>()
   const [generating, setGenerating] = useState(false)
+  const [generatedAt, setGeneratedAt] = useState<string | undefined>()
 
   // ── Read article tracking ──
   useEffect(() => {
@@ -108,7 +109,8 @@ export function NieuwsOnlyClient() {
     if (newsFetched) return
     const cached = getLocalNewsCache()
     if (cached) {
-      setNewsItems(cached)
+      setNewsItems(cached.items)
+      if (cached.generatedAt) setGeneratedAt(cached.generatedAt)
       setNewsFetched(true)
       return
     }
@@ -132,10 +134,11 @@ export function NieuwsOnlyClient() {
 
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
-      setLocalNewsCache(items)
+      setLocalNewsCache(items, data.generatedAt)
       setNewsFetched(true)
       if (data.editionNr) setEditionNr(data.editionNr)
       if (data.jaargang) setJaargang(data.jaargang)
+      if (data.generatedAt) setGeneratedAt(data.generatedAt)
       if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
     } catch (err) {
       setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
@@ -174,11 +177,12 @@ export function NieuwsOnlyClient() {
 
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
-      setLocalNewsCache(items)
+      setLocalNewsCache(items, data.generatedAt)
       setNewsFetched(true)
       setRefreshing(false)
       if (data.editionNr) setEditionNr(data.editionNr)
       if (data.jaargang) setJaargang(data.jaargang)
+      if (data.generatedAt) setGeneratedAt(data.generatedAt)
       if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
     } catch (err) {
       setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
@@ -217,7 +221,7 @@ export function NieuwsOnlyClient() {
         // Generation complete — final items arrived
         const items: NewsItem[] = data.items ?? data
         setNewsItems(items)
-        setLocalNewsCache(items)
+        setLocalNewsCache(items, data.generatedAt)
         setNewsFetched(true)
         setGenerating(false)
         setRefreshing(false)
@@ -240,7 +244,12 @@ export function NieuwsOnlyClient() {
         description={PAGE_INFO['/nieuws']}
         className="absolute right-4 top-5 sm:right-6 sm:top-8"
       />
-      <Masthead editionNr={editionNr} jaargang={jaargang} />
+      <Masthead
+        editionNr={editionNr}
+        jaargang={jaargang}
+        articleCount={newsTab === 'current' ? newsItems.length : undefined}
+        updatedAt={newsTab === 'current' ? generatedAt : undefined}
+      />
 
       {/* ── FINANCIEEL NIEUWS ──────────────────────────── */}
       <section className="mt-4">
@@ -307,6 +316,10 @@ export function NieuwsOnlyClient() {
                     from { opacity: 0; transform: translateY(12px); }
                     to { opacity: 1; transform: translateY(0); }
                   }
+                  .news-reveal-item { animation: news-reveal 0.4s ease-out both; }
+                  @media (prefers-reduced-motion: reduce) {
+                    .news-reveal-item { animation: none; }
+                  }
                 `}</style>
 
                 {newsLoading ? (
@@ -360,7 +373,7 @@ export function NieuwsOnlyClient() {
                         </span>
                       </div>
                     )}
-                    <div style={{ animation: 'news-reveal 0.4s ease-out both' }}>
+                    <div className="news-reveal-item">
                       <HeroNewsArticle item={newsItems[0]} isRead={readArticleIds.has(newsItems[0].id)} onMarkRead={markArticleRead} />
                     </div>
                     {newsItems.length > 1 && (
@@ -368,7 +381,8 @@ export function NieuwsOnlyClient() {
                         {newsItems.slice(1).map((item, index) => (
                           <div
                             key={item.id}
-                            style={{ animation: `news-reveal 0.4s ease-out ${(index + 1) * 120}ms both` }}
+                            className="news-reveal-item"
+                            style={{ animationDelay: `${(index + 1) * 120}ms` }}
                           >
                             <NewsArticle item={item} isRead={readArticleIds.has(item.id)} onMarkRead={markArticleRead} />
                           </div>
@@ -397,20 +411,6 @@ export function NieuwsOnlyClient() {
           </div>
         </div>
       </section>
-
-      {/* ── Subtiele upgrade banner ──────────────────── */}
-      <div className="mt-10 flex items-center justify-center gap-3 rounded-xl border border-dashed border-[var(--border-ed)] px-6 py-4">
-        <p className="font-source-serif text-[13px] italic text-[var(--ink-3)]">
-          Wil je meer uit TriFinity halen?
-        </p>
-        <Link
-          href="/mijn/geavanceerd"
-          className="flex items-center gap-1 font-inter text-[12px] font-semibold text-wil-600 hover:text-wil-700 transition-colors"
-        >
-          Ontdek de volledige app
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      </div>
 
       <NewspaperFooter />
     </div>

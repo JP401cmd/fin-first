@@ -11,13 +11,20 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { HealthScore, HealthPillar } from '@/lib/financial-health'
 import { HEFBOOM_CONFIG, type Hefboom } from '@/lib/hefboom-config'
+import { LeverageCard } from '@/components/overview/leverage-card'
+import {
+  pillarStatus,
+  leverageStatusBgClass,
+  leverageStatusTextClass,
+  type LeverageStatus,
+} from '@/lib/leverage-status'
 
 type HefboomKey = Hefboom
-type StatusCode = 'good' | 'warn' | 'bad' | 'neutral'
+type StatusCode = LeverageStatus
 
 export type HefbomenTotals = {
   /** Totale waarde bezittingen, in EUR. */
@@ -66,35 +73,6 @@ const HEFBOMEN: ReadonlyArray<{
     tooltip: 'Box 1, Box 2 en Box 3 — slim verdelen scheelt geld per jaar.',
   },
 ] as const
-
-const STATUS_DOT: Record<StatusCode, string> = {
-  good: 'bg-emerald-500',
-  warn: 'bg-amber-500',
-  bad: 'bg-red-500',
-  neutral: 'bg-stone-300',
-}
-
-const STATUS_LABEL: Record<StatusCode, string> = {
-  good: 'Goed op koers',
-  warn: 'Aandacht',
-  bad: 'Risico',
-  neutral: 'Geen score',
-}
-
-function pillarStatus(score: number | null | undefined): StatusCode {
-  if (score == null) return 'neutral'
-  if (score >= 70) return 'good'
-  if (score >= 50) return 'warn'
-  return 'bad'
-}
-
-function statusTextClass(status: StatusCode): string {
-  return status === 'good'
-    ? 'text-emerald-700'
-    : status === 'warn'
-      ? 'text-amber-700'
-      : 'text-red-700'
-}
 
 function statusSubText(key: HefboomKey, status: StatusCode, pillar?: HealthPillar): string | null {
   if (status === 'neutral') return null
@@ -151,78 +129,27 @@ export function HefbomenNav({
         const subText = statusSubText(key, status, pillar)
         const expanded = expandedKey === key
 
-        const hasDrilldown = pillar || status !== 'neutral'
+        const hasDrilldown = Boolean(pillar) || status !== 'neutral'
 
         return (
-          <div
+          <LeverageCard
             key={key}
-            className={[
-              'group relative flex flex-col rounded-2xl border bg-[var(--paper)] p-3 sm:p-4 transition-all',
-              expanded
-                ? 'border-[var(--ink-3)] shadow-sm row-span-2 sm:row-span-1'
-                : 'border-[var(--border-ed)] hover:border-[var(--ink-3)] hover:shadow-sm',
-            ].join(' ')}
+            Icon={Icon}
+            tint={accent}
+            label={label}
+            kpi={showTotal ? formattedTotal : null}
+            status={status}
+            subText={subText}
+            href={href}
+            tooltip={tooltip}
+            expandable={hasDrilldown}
+            expanded={expanded}
+            onToggleExpand={() => setExpandedKey(expanded ? null : key)}
           >
-            <Link
-              href={href}
-              title={tooltip}
-              className="flex flex-col"
-            >
-              <span
-                className={`absolute right-2.5 top-2.5 sm:right-3 sm:top-3 w-2 h-2 rounded-full ${STATUS_DOT[status]}`}
-                aria-hidden="true"
-                title={STATUS_LABEL[status]}
-              />
-              <div
-                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${accent}`}
-              >
-                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-              </div>
-              <div className="mt-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
-                {label}
-              </div>
-              {showTotal && (
-                <div className="mt-0.5 text-base sm:text-lg font-serif font-semibold text-[var(--ink)] tabular-nums">
-                  {formattedTotal}
-                </div>
-              )}
-              {/* Subtext + chevron op één rij — chevron rechts naast de
-                  status-substext zodat de tegel niet hoger wordt en de
-                  primaire link (heel kaartje) intact blijft. */}
-              <div className="mt-1 flex items-end justify-between gap-2 min-h-[16px]">
-                {subText ? (
-                  <span className={`text-[11px] font-medium ${statusTextClass(status)}`}>
-                    {subText}
-                  </span>
-                ) : (
-                  <span />
-                )}
-              </div>
-            </Link>
-
-            {/* Chevron-toggle — kleine icon-only knop in rechter-onderhoek,
-                absolute-gepositioneerd binnen de tegel zodat hij naast de
-                status-substext landt. Card-klik gaat naar /overzicht/<hefboom>;
-                alleen chevron-klik toggelt de drill-down hieronder. */}
-            {hasDrilldown && (
-              <button
-                type="button"
-                onClick={() => setExpandedKey(expanded ? null : key)}
-                aria-expanded={expanded}
-                aria-label={expanded ? `Verberg detail ${label}` : `Toon detail ${label}`}
-                className="absolute right-2 bottom-2 sm:right-2.5 sm:bottom-2.5 inline-flex items-center justify-center w-6 h-6 rounded-md text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)] transition-colors"
-              >
-                <ChevronDown
-                  className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-                  aria-hidden="true"
-                />
-              </button>
-            )}
-
-            {expanded && pillar && (
+            {pillar && (
               <HefboomDetailCard pillar={pillar} status={status} href={href} />
             )}
-          </div>
+          </LeverageCard>
         )
       })}
     </nav>
@@ -243,27 +170,19 @@ function HefboomDetailCard({
   status: StatusCode
   href: string
 }) {
-  const bgClass =
-    status === 'good'
-      ? 'bg-emerald-50/50'
-      : status === 'warn'
-        ? 'bg-amber-50/50'
-        : status === 'bad'
-          ? 'bg-red-50/50'
-          : 'bg-[var(--subtle)]'
   return (
     <div
-      className={`mt-2 -mx-3 sm:-mx-4 px-3 sm:px-4 py-3 border-t border-[var(--border-ed)] ${bgClass}`}
+      className={`mt-2 -mx-3 sm:-mx-4 px-3 sm:px-4 py-3 border-t border-[var(--border-ed)] ${leverageStatusBgClass(status)}`}
     >
       <div className="flex items-baseline justify-between gap-2 mb-1.5">
         <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)]">
           {pillar.name}
         </span>
-        <span className={`text-[11px] font-mono tabular-nums font-semibold ${statusTextClass(status)}`}>
+        <span className={`text-[11px] font-mono tabular-nums font-semibold ${leverageStatusTextClass(status)}`}>
           {pillar.rawValue}
         </span>
       </div>
-      <p className={`text-xs leading-snug ${statusTextClass(status)}`}>
+      <p className={`text-xs leading-snug ${leverageStatusTextClass(status)}`}>
         {pillar.improvementTip}
       </p>
       <Link

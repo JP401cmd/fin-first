@@ -4,13 +4,16 @@ import { GeavanceerdSettings } from '@/components/mijn/geavanceerd-settings'
 
 export const metadata: Metadata = {
   title: 'Geavanceerd — TriFinity',
-  description: 'Modules aan/uit, data-export en je gegevens resetten.',
+  description: 'Externe koppelingen, data-export en je gegevens resetten.',
 }
 
 /**
- * /mijn/geavanceerd — modules + data-export + reset. Vervangt de
+ * /mijn/geavanceerd — koppelingen + data-export + reset. Vervangt de
  * redirect-stub naar /identity/instellingen?tab=gegevens (plan A-2,
  * ontmanteling settings-monolith). Content in GeavanceerdSettings (client).
+ *
+ * De handmatige module-aan/uit-toggle is hier verwijderd — modules worden
+ * tijdens onboarding ingesteld en daarna niet meer handmatig geschakeld.
  */
 export default function MijnGeavanceerdPage() {
   return (

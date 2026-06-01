@@ -27,10 +27,44 @@ export const PAGE_INFO: Record<string, string> = {
     'Het deel van je inkomen dat je opzij zet bepaalt hoe snel je vrijheid bereikt. ' +
     'Beheer je budgetten, vaste lasten en transacties.',
 
+  '/overzicht/cashflow/budget':
+    'Plan en volg je maandbudgetten. ' +
+    'Verdeel je inkomen over categorieën en zie per categorie hoeveel ruimte je nog hebt. ' +
+    'Het deel dat je opzij zet is vrijheid die je opbouwt.',
+
+  '/overzicht/cashflow/transacties':
+    'Alles wat er deze maand in komt en uit gaat. ' +
+    'Filter en doorzoek je boekingen, zie je geldstroom per categorie en je spaarquote van de maand. ' +
+    'Koppel een rekening om automatisch te importeren.',
+
+  '/overzicht/cashflow/vaste-lasten':
+    'Je abonnementen en terugkerende kosten op één plek. ' +
+    'Zie wat je per maand en per jaar kwijt bent, en welke posten je kunt opzeggen. ' +
+    'Elke euro minder vaste last is vrijheid die je terugkoopt.',
+
+  '/overzicht/cashflow/forecast':
+    'Je spaarquote, maandelijks netto en uitgaventrend in één blik, plus een vooruitblik van 6 maanden. ' +
+    'Zie hoe je saldo zich ontwikkelt op basis van je baseline en vaste lasten. ' +
+    'Lineair — voor scenario-diepere projectie zie Toekomst.',
+
   '/overzicht/belasting':
     'Belasting over je inkomen (Box 1), aandeelhouderschap (Box 2) en vermogen (Box 3). ' +
     'Slim verdelen over fiscale bakjes scheelt geld per jaar. ' +
-    'Bekijk je heffingen en gebruik je jaarruimte.',
+    'Klik een box aan voor de berekening en je besparingskansen.',
+
+  '/overzicht/belasting/box1':
+    'Box 1 belast inkomen uit werk en woning. ' +
+    'TriFinity toont een orde-grootte-schatting van je Box 1-druk plus je onbenutte jaarruimte: ' +
+    'de pensioen-aftrekruimte waarmee je via een lijfrente-inleg belasting kunt besparen.',
+
+  '/overzicht/belasting/box2':
+    'Box 2 belast inkomen uit aanmerkelijk belang — voor wie ≥ 5% van de aandelen in een vennootschap bezit (bijvoorbeeld een eigen BV). ' +
+    'Dividend en vervreemdingswinst worden hier belast. ' +
+    'Heb je een deelneming? Voeg die toe als bezitting, dan rekent TriFinity Box 2 automatisch uit.',
+
+  '/overzicht/belasting/box3':
+    'Box 3 belast je vermogen — sparen en beleggen — via een forfaitair (fictief) rendement boven je heffingsvrije vermogen. ' +
+    'Vrijstelling, partner-verdeling en de mix spaargeld/beleggingen bepalen je jaarlijkse heffing.',
 
   '/overzicht/tips':
     'Toptips bovenaan, open acties eronder. ' +
@@ -86,11 +120,6 @@ export const PAGE_INFO: Record<string, string> = {
     'Automatische koppelingen voor data-invoer. ' +
     'PSD2-bank, UPO-pensioenoverzicht en crypto-brokerage — telkens een handmatige import minder. ' +
     'Koppel of ontkoppel per dienst.',
-
-  '/mijn/delen':
-    'Deel mijlpalen, jaaroverzicht of een vrijheidskaart met je partner of vrienden. ' +
-    'Pure delen — niemand ziet je rekening-saldo of transacties zonder dat jij actief deelt. ' +
-    'Privacy-eerst, altijd.',
 
   // ── Dashboard ───────────────────────────────────────────────────
   '/dashboard':
@@ -163,9 +192,10 @@ export const PAGE_INFO: Record<string, string> = {
     'Sla items op of markeer ze als gelezen.',
 
   '/berichten':
-    'Je dagelijkse briefing van Will, plus notificaties en gefilterd financieel nieuws. ' +
-    'Eén pagina waar alle voor jou relevante updates samenkomen — wat speelt vandaag, wat heb je gemist. ' +
-    'Sla berichten op of markeer ze als gelezen.',
+    'Je berichtencentrum: alle meldingen die je ontvangt komen hier samen — ' +
+    'budgetwaarschuwingen, partner-transacties, mijlpalen, herinneringen en nog-in-te-vullen-tips. ' +
+    'Filter op ongelezen en markeer berichten als gelezen. ' +
+    'Het financiële nieuws vind je in De Krant, je wekelijkse briefing op het Overzicht.',
 
   '/rapportages':
     'Overzicht van je financiële rapportages: balans, budget-analyse en vermogensverloop. ' +

@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { ArrowRight, Sparkles, RotateCcw } from 'lucide-react'
+import { Sparkles, RotateCcw } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import {
   computeJaarruimte,
@@ -161,14 +160,6 @@ export function JaarruimteCard({
           bruto-inkomen.
         </p>
       </div>
-
-      <Link
-        href="/core/belasting"
-        className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:underline"
-      >
-        Volledige Box 1-berekening
-        <ArrowRight className="w-3 h-3" aria-hidden="true" />
-      </Link>
 
       <p className="mt-3 text-[10px] italic text-[var(--ink-4)] leading-snug">
         Berekening 2025: {(JAARRUIMTE_FACTOR_A * 100).toFixed(1)}% × (inkomen − {formatCurrency(JAARRUIMTE_FRANCHISE_2025)})

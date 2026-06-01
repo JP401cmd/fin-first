@@ -11,11 +11,8 @@ import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 
 export type NotificationType =
   | 'budget'
-  | 'streak'
   | 'sync'
   | 'recommendation'
-  | 'insight'
-  | 'badge'
   | 'levelup'
   | 'partner_transaction'
   | 'horizon'
@@ -71,8 +68,8 @@ export async function GET(request: NextRequest) {
     ])
 
     const defaultPrefs: Record<string, boolean> = {
-      budget: true, streak: true, sync: true,
-      recommendation: true, insight: true, badge: true, levelup: true,
+      budget: true, sync: true,
+      recommendation: true, levelup: true,
       partner_transaction: true, horizon: true,
       holding_alert: true, module_nudge: true, briefing: true,
     }
@@ -958,8 +955,15 @@ export async function GET(request: NextRequest) {
         { onConflict: 'key' }
       )
 
-    // Return only entries within requested `days` window
-    const returnHistory = history.filter((h) => h.createdAt >= returnCutoff)
+    // Return only entries within the requested `days` window AND respect the
+    // user's per-type voorkeuren. We persist the FULL history above (so
+    // toggling a type back on re-reveals it), but we never SHOW a type the
+    // user switched off. This is what makes de toggles op /mijn/notificaties
+    // het berichtencentrum daadwerkelijk filteren — óók voor reeds ontvangen
+    // berichten zoals partner-acties, die alleen via de history binnenkomen.
+    const returnHistory = history.filter(
+      (h) => h.createdAt >= returnCutoff && prefs[h.type] !== false
+    )
 
     return NextResponse.json({
       notifications: filtered,
@@ -1064,7 +1068,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const validTypes = ['budget', 'streak', 'sync', 'recommendation', 'insight', 'badge', 'levelup', 'partner_transaction', 'horizon', 'holding_alert', 'module_nudge', 'briefing']
+    const validTypes = ['budget', 'sync', 'recommendation', 'levelup', 'partner_transaction', 'horizon', 'holding_alert', 'module_nudge', 'briefing']
     const sanitized: Record<string, boolean> = {}
     for (const key of validTypes) {
       sanitized[key] = preferences[key] !== false

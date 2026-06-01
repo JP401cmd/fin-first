@@ -1,0 +1,185 @@
+// lib/cashflow-cards.ts
+// Bouwt de vier hefboom-stijl kaarten voor de cashflow-landingspagina
+// (/overzicht/cashflow): Budget, Transacties, Vaste lasten, Forecast. Elke
+// kaart krijgt een status, een KPI en uitklap-detail — afgeleid uit data die
+// de pagina toch al laadt (DashboardData + CashflowData). Pure module zodat de
+// server-page hem kan aanroepen; de client rendert de serialiseerbare output.
+
+import type { DashboardData } from '@/components/widgets/widget-renderer'
+import type { CashflowData } from '@/lib/cashflow-data-loader'
+import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
+import { buildForecast } from '@/lib/cashflow-forecast-math'
+import { pillarStatus, type LeverageStatus } from '@/lib/leverage-status'
+import { formatCurrency } from '@/lib/format'
+
+export type CashflowCardKey = 'budget' | 'transacties' | 'vaste-lasten' | 'forecast'
+
+export interface CashflowCard {
+  key: CashflowCardKey
+  label: string
+  href: string
+  tooltip: string
+  /** Hoofdcijfer (al geformatteerd), of null wanneer er geen data is. */
+  kpi: string | null
+  status: LeverageStatus
+  subText: string | null
+  /** Uitklap-detail: secundaire waarde + 1-regel inzicht + deeplink-label. */
+  detail: { label: string; value: string; tip: string; actionLabel: string }
+}
+
+const BASE = '/overzicht/cashflow'
+
+function signed(value: number): string {
+  return `${value >= 0 ? '+' : ''}${formatCurrency(value)}`
+}
+
+export function buildCashflowCards(
+  dashboardData: DashboardData,
+  cashflow: CashflowData,
+  vasteLastenSummary: VasteLastenSummary,
+): CashflowCard[] {
+  // ── Budget ──────────────────────────────────────────────────
+  const budgetLimit = dashboardData.budgetTotals.expense.limit
+  const budgetSpent = dashboardData.budgetTotals.expense.spent
+  const budgetScore = dashboardData.monthSummary.budgetScore
+  const budgetActive = dashboardData.budgetingActive && budgetLimit > 0
+  const budgetStatus: LeverageStatus = budgetActive ? pillarStatus(budgetScore) : 'neutral'
+  const budget: CashflowCard = {
+    key: 'budget',
+    label: 'Budget',
+    href: `${BASE}/budget`,
+    tooltip: 'Plan en volg je maandbudgetten.',
+    kpi: budgetActive ? `${formatCurrency(budgetLimit)}/mnd` : null,
+    status: budgetStatus,
+    subText: budgetActive
+      ? budgetStatus === 'good'
+        ? 'Op schema'
+        : budgetStatus === 'warn'
+          ? 'Let op je budget'
+          : 'Boven budget'
+      : 'Nog geen budget',
+    detail: {
+      label: 'Budgetdekking',
+      value: budgetActive ? `${Math.round(budgetScore)}/100` : '—',
+      tip: budgetActive
+        ? `${formatCurrency(budgetSpent)} van ${formatCurrency(budgetLimit)} besteed deze maand.`
+        : 'Stel budgetten in om grip te krijgen op je uitgaven.',
+      actionLabel: 'Bekijk budget',
+    },
+  }
+
+  // ── Transacties ─────────────────────────────────────────────
+  const monthlyIncome = dashboardData.monthlyIncome
+  const monthlyExpenses = dashboardData.monthlyExpenses
+  const monthlyNet = monthlyIncome - monthlyExpenses
+  const hasTx = monthlyIncome > 0 || monthlyExpenses > 0
+  const rate = monthlyIncome > 0 ? (monthlyNet / monthlyIncome) * 100 : null
+  const txStatus: LeverageStatus = !hasTx || rate == null
+    ? 'neutral'
+    : rate >= 20
+      ? 'good'
+      : rate >= 0
+        ? 'warn'
+        : 'bad'
+  const transacties: CashflowCard = {
+    key: 'transacties',
+    label: 'Transacties',
+    href: `${BASE}/transacties`,
+    tooltip: 'Inkomsten en uitgaven van deze maand.',
+    kpi: hasTx ? signed(monthlyNet) : null,
+    subText: !hasTx
+      ? 'Nog geen transacties'
+      : txStatus === 'good'
+        ? 'Goed gespaard deze maand'
+        : txStatus === 'warn'
+          ? 'Krap deze maand'
+          : 'Tekort deze maand',
+    status: txStatus,
+    detail: {
+      label: 'Deze maand',
+      value: rate != null ? `${rate.toFixed(0)}% spaarquote` : '—',
+      tip: `Inkomen ${formatCurrency(monthlyIncome)} · uitgaven ${formatCurrency(monthlyExpenses)}.`,
+      actionLabel: 'Bekijk transacties',
+    },
+  }
+
+  // ── Vaste lasten ────────────────────────────────────────────
+  // Bron: gedeelde vaste-lasten-samenvatting (confirmed recurrings +
+  // auto-detectie over 12 mnd) — exact hetzelfde totaal als de
+  // Vaste-lasten-pagina, die /api/subscriptions → loadVasteLastenSummary leest.
+  const vastePerMonth = vasteLastenSummary.totalMonthly
+  const vasteCount = vasteLastenSummary.count
+  const hasVaste = vasteCount > 0
+  const vasteRatio = monthlyIncome > 0 ? vastePerMonth / monthlyIncome : null
+  const vasteStatus: LeverageStatus = !hasVaste || vasteRatio == null
+    ? 'neutral'
+    : vasteRatio < 0.5
+      ? 'good'
+      : vasteRatio <= 0.7
+        ? 'warn'
+        : 'bad'
+  const vasteLasten: CashflowCard = {
+    key: 'vaste-lasten',
+    label: 'Vaste lasten',
+    href: `${BASE}/vaste-lasten`,
+    tooltip: 'Abonnementen en terugkerende kosten.',
+    kpi: hasVaste ? `${formatCurrency(Math.round(vastePerMonth))}/mnd` : null,
+    subText: !hasVaste
+      ? 'Nog geen vaste lasten'
+      : vasteRatio != null
+        ? `${Math.round(vasteRatio * 100)}% van inkomen`
+        : `${vasteCount} ${vasteCount === 1 ? 'post' : 'posten'}`,
+    status: vasteStatus,
+    detail: {
+      label: 'Vaste lasten',
+      value: hasVaste ? `${formatCurrency(Math.round(vastePerMonth * 12))}/jr` : '—',
+      tip: hasVaste
+        ? `${vasteCount} terugkerende ${vasteCount === 1 ? 'post' : 'posten'}.`
+        : 'Voeg je abonnementen en vaste kosten toe.',
+      actionLabel: 'Bekijk vaste lasten',
+    },
+  }
+
+  // ── Forecast ────────────────────────────────────────────────
+  const rows = buildForecast(
+    cashflow.recurrings,
+    cashflow.baselineIncome,
+    cashflow.baselineExpenses,
+    cashflow.startingBalance,
+    new Date(),
+  )
+  const netPerMonth = rows[0]?.net ?? 0
+  const endBalance = rows[rows.length - 1]?.cumulative ?? cashflow.startingBalance
+  const hasForecast =
+    cashflow.baselineIncome > 0 || cashflow.baselineExpenses > 0 || cashflow.recurrings.length > 0
+  const fcStatus: LeverageStatus = !hasForecast
+    ? 'neutral'
+    : netPerMonth > 0
+      ? 'good'
+      : netPerMonth < 0
+        ? 'bad'
+        : 'warn'
+  const forecast: CashflowCard = {
+    key: 'forecast',
+    label: 'Forecast',
+    href: `${BASE}/forecast`,
+    tooltip: 'Verwachte kasstroom 6 maanden vooruit.',
+    kpi: hasForecast ? formatCurrency(endBalance) : null,
+    subText: !hasForecast
+      ? 'Nog geen forecast'
+      : netPerMonth > 0
+        ? 'Saldo groeit'
+        : netPerMonth < 0
+          ? 'Saldo daalt'
+          : 'Stabiel',
+    status: fcStatus,
+    detail: {
+      label: 'Netto per maand',
+      value: signed(netPerMonth),
+      tip: `Verwacht saldo na ${rows.length} maanden: ${formatCurrency(endBalance)}.`,
+      actionLabel: 'Bekijk forecast',
+    },
+  }
+
+  return [budget, transacties, vasteLasten, forecast]
+}

@@ -605,7 +605,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   beslissingspatronen:     '/will',
   vrijheidsdagen_maand:    '/will',
   wilskracht:              '/will',
-  berichten:               '/berichten',
+  berichten:               '/nieuws',
   trend_inkomen:           '/core/budgets',
   trend_uitgaven:          '/core/budgets',
   trend_sparen:            '/core/budgets',

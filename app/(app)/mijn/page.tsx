@@ -13,9 +13,8 @@ export const metadata: Metadata = {
  * Vervangt de eerdere /identity-monolith (1823+ regels) volledig: alle
  * tabs zijn uitgekamerd naar dedicated sub-pages onder /mijn.
  *
- * Acht sub-routes:
+ * Zeven sub-routes:
  *  - /mijn/profiel       basis-gegevens
- *  - /mijn/delen         partner & delen
  *  - /mijn/privacy       data-overzicht
  *  - /mijn/koppelingen   PSD2/UPO/brokerage
  *  - /mijn/uiterlijk     palet, font, kleuren

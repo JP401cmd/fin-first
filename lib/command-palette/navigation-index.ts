@@ -6,8 +6,8 @@
 import {
   Home, Wallet, Coins, Banknote, Building2, Car, GraduationCap,
   CreditCard, RefreshCw, PiggyBank, Receipt, Calendar, History, Link as LinkIcon,
-  TrendingUp, Calculator, Sparkles, FileText, Newspaper, Settings, User,
-  BookOpen, Send, Compass, Telescope, Activity, ListChecks, Cog, Plug,
+  TrendingUp, Calculator, Sparkles, FileText, Newspaper, Settings, User, Bell,
+  BookOpen, Compass, Telescope, Activity, ListChecks, Cog, Plug,
   Goal, LineChart, type LucideIcon,
 } from 'lucide-react'
 import type { ModuleId } from '@/lib/module-registry'
@@ -49,6 +49,11 @@ const KERN_PAGES: StaticPage[] = [
   { label: 'Maandelijkse check-in',     sublabel: '7-stap reflectie en snapshot',       href: '/core/checkin',                          icon: Calendar,    module: 'kern' },
   { label: 'Check-in historie',         sublabel: 'Eerdere check-ins met trendline',    href: '/core/checkin/historie',                 icon: History,     module: 'kern' },
   { label: 'Bank koppelen',             sublabel: 'Open Banking (Tink/Yodlee/Nordigen)', href: '/core/cash/connect',                    icon: LinkIcon,    module: 'kern' },
+  { label: 'Cashflow',                  sublabel: 'Budget, transacties, vaste lasten, forecast', href: '/overzicht/cashflow',              icon: Banknote,    module: 'kern' },
+  { label: 'Budget',                    sublabel: 'Maandbudgetten plannen en volgen',   href: '/overzicht/cashflow/budget',             icon: PiggyBank,   module: 'kern',  requiredModule: 'budgetteren' },
+  { label: 'Transacties',               sublabel: 'Inkomsten en uitgaven deze maand',   href: '/overzicht/cashflow/transacties',        icon: Receipt,     module: 'kern' },
+  { label: 'Vaste lasten',              sublabel: 'Abonnementen en terugkerende kosten', href: '/overzicht/cashflow/vaste-lasten',      icon: RefreshCw,   module: 'kern' },
+  { label: 'Forecast',                  sublabel: 'Spaarquote, netto, trend + 6-maands-vooruitblik', href: '/overzicht/cashflow/forecast', icon: LineChart,   module: 'kern' },
 ]
 
 // ── Wil ──────────────────────────────────────────────────────────────────────
@@ -71,13 +76,12 @@ const IDENTITY_PAGES: StaticPage[] = [
   { label: 'Profiel',                   sublabel: 'Persoonlijke gegevens en huishouden', href: '/identity/profiel',                     icon: User,        module: 'globaal' },
   { label: 'Instellingen',              sublabel: 'Notificaties, FIRE, weergave, modules', href: '/identity/instellingen',              icon: Settings,    module: 'globaal' },
   { label: 'Koppelingen',               sublabel: 'Banken, brokers, exchanges',         href: '/identity/koppelingen',                  icon: Plug,        module: 'globaal' },
-  { label: 'Delen',                     sublabel: 'Vrijheidskaart-generator',           href: '/identity/delen',                        icon: Send,        module: 'globaal' },
 ]
 
 // ── Globaal ──────────────────────────────────────────────────────────────────
 
 const GLOBAL_PAGES: StaticPage[] = [
-  { label: 'Berichten',                 sublabel: 'AI-briefings en nieuws',             href: '/berichten',                             icon: FileText,    module: 'globaal' },
+  { label: 'Berichten',                 sublabel: 'Al je meldingen op één plek',        href: '/berichten',                             icon: Bell,        module: 'globaal' },
   { label: 'Nieuws',                    sublabel: 'Financieel marktnieuws',             href: '/nieuws',                                icon: Newspaper,   module: 'globaal',  requiredModule: 'nieuws' },
   { label: 'Rapportages',               sublabel: 'Maand- / kwartaal- / jaarrapport',   href: '/rapportages',                           icon: FileText,    module: 'globaal' },
   { label: 'FIRE-simulatie',            sublabel: 'Standalone tool met sliders',        href: '/tools/fire-sim',                        icon: Calculator,  module: 'globaal' },

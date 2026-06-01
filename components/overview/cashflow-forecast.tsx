@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { RecurringTransaction } from '@/lib/recurring-data'
+import { buildForecast, FORECAST_MONTHS } from '@/lib/cashflow-forecast-math'
 
 /**
  * CashflowForecast — 6-maanden-vooruitblik op kasstroom. Voor elke
@@ -26,72 +27,6 @@ import type { RecurringTransaction } from '@/lib/recurring-data'
  * Gebruikt geen Monte Carlo of inflatie; voor scenario-diepere
  * forecasting verwijst de footer naar /toekomst Tijdas.
  */
-
-type ForecastRow = {
-  monthIdx: number
-  label: string
-  incoming: number
-  outgoing: number
-  net: number
-  cumulative: number
-}
-
-const FORECAST_MONTHS = 6
-
-function buildForecast(
-  recurrings: RecurringTransaction[],
-  baselineIncome: number,
-  baselineExpenses: number,
-  startingBalance: number,
-  fromDate: Date,
-): ForecastRow[] {
-  const rows: ForecastRow[] = []
-  let cumulative = startingBalance
-
-  for (let i = 1; i <= FORECAST_MONTHS; i++) {
-    const monthDate = new Date(fromDate.getFullYear(), fromDate.getMonth() + i, 1)
-    const label = monthDate.toLocaleDateString('nl-NL', {
-      month: 'short',
-      year: 'numeric',
-    })
-    // Baseline is per-maand. Plus recurring deltas (per-maand omgerekend
-    // — gelijke aanpak per maand voor eenvoudige forecast).
-    let incoming = Math.max(0, baselineIncome)
-    let outgoing = Math.max(0, baselineExpenses)
-    for (const r of recurrings) {
-      if (!r.is_active) continue
-      const amount = Number(r.amount)
-      let perMonth = 0
-      switch (r.frequency) {
-        case 'weekly':
-          perMonth = amount * (52 / 12)
-          break
-        case 'monthly':
-          perMonth = amount
-          break
-        case 'quarterly':
-          perMonth = amount / 3
-          break
-        case 'yearly':
-          perMonth = amount / 12
-          break
-      }
-      if (perMonth > 0) incoming += perMonth
-      else outgoing += Math.abs(perMonth)
-    }
-    const net = incoming - outgoing
-    cumulative += net
-    rows.push({
-      monthIdx: i,
-      label,
-      incoming: Math.round(incoming),
-      outgoing: Math.round(outgoing),
-      net: Math.round(net),
-      cumulative: Math.round(cumulative),
-    })
-  }
-  return rows
-}
 
 export function CashflowForecast({
   recurrings,

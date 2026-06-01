@@ -49,7 +49,7 @@ const LEVERS: LeverConfig[] = [
   { key: 'assets', label: 'Bezittingen', Icon: Landmark, href: '/core/assets' },
   { key: 'debts', label: 'Schulden', Icon: CreditCard, href: '/core/debts' },
   { key: 'cashflow', label: 'Cashflow', Icon: ArrowUpDown, href: '/will#cashflow' },
-  { key: 'tax', label: 'Belasting', Icon: Receipt, href: '/core/belasting' },
+  { key: 'tax', label: 'Belasting', Icon: Receipt, href: '/overzicht/belasting' },
 ]
 
 // ── Status colors ────────────────────────────────────────────────────────────

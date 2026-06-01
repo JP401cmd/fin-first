@@ -324,12 +324,29 @@ export function OverzichtHero({
         headline={briefingHeadline ?? null}
       />
 
-      <div className="mt-4 text-center print:hidden">
+      {/* Drie "alles bekijken"-ingangen onder de briefing: de tips & acties-
+          stroom, het berichtencentrum (alle meldingen) en de financiële krant.
+          Wrapt op smalle schermen zodat alle drie leesbaar blijven. */}
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 print:hidden">
         <Link
           href="/overzicht/tips"
           className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline"
         >
           Alle tips & acties
+          <ArrowRight className="w-3 h-3" aria-hidden="true" />
+        </Link>
+        <Link
+          href="/berichten"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline"
+        >
+          Alle meldingen & berichten
+          <ArrowRight className="w-3 h-3" aria-hidden="true" />
+        </Link>
+        <Link
+          href="/nieuws"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline"
+        >
+          Bekijk het nieuws
           <ArrowRight className="w-3 h-3" aria-hidden="true" />
         </Link>
       </div>

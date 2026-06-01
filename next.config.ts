@@ -49,7 +49,6 @@ const nextConfig: NextConfig = {
       // zodat er per functie één URL overblijft.
       { source: '/identity/profiel', destination: '/mijn/profiel', permanent: false },
       { source: '/identity/koppelingen', destination: '/mijn/koppelingen', permanent: false },
-      { source: '/identity/delen', destination: '/mijn/delen', permanent: false },
       { source: '/horizon/samengestelde-interest', destination: '/toekomst/samengestelde-interest', permanent: false },
       { source: '/horizon/inflatie-koopkracht', destination: '/toekomst/inflatie-koopkracht', permanent: false },
 
@@ -70,7 +69,7 @@ const nextConfig: NextConfig = {
       // /toekomst. Volgorde/verdeling/afname zijn nog placeholders zonder
       // engine-koppeling; tot die tijd landt iedere /identity/parameters-
       // link op de Voorkeuren-tab waar de 4 werkende editors zitten.
-      { source: '/identity/parameters', destination: '/toekomst?tab=voorkeuren', permanent: false },
+      { source: '/identity/parameters', destination: '/toekomst/voorkeuren', permanent: false },
 
       // Instellingen-monolith retirement (beslissing 4 voltooid): alle zes
       // tabs leven op /mijn/* (geavanceerd, privacy, profiel, uiterlijk,

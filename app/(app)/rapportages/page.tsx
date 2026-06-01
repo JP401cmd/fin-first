@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, Fragment } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { ReportConfig } from '@/lib/report-data'
@@ -209,7 +209,7 @@ export default function RapportagesPage() {
       : getYearOptions()
 
   return (
-    <div className="mx-auto max-w-[720px] px-4 py-6 md:px-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
       <NavStackMeta title="Rapportages" bottomBar={{ kind: 'tabs' }} />
       {/* Editorial header — Type 1 Module-landing */}
       <header className="relative mb-6 space-y-3">
@@ -228,109 +228,118 @@ export default function RapportagesPage() {
 
       <SectionDivider variant="double-rule" />
 
-      {/* === I. Periodiek rapport === */}
+      {/* === I. Periodiek rapport — lead/hoofdartikel (volle breedte) === */}
       <CardEditorial accent className="mt-6">
-        <div className="p-6 sm:p-8">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <Kicker size="small">
-              <FileText className="h-3 w-3" aria-hidden />
-              <span>Periodiek rapport</span>
-            </Kicker>
-            <span
-              className="italic text-sm text-[var(--module-active-700)]"
-              style={{ fontFamily: 'var(--font-playfair, serif)' }}
-              aria-hidden
-            >
-              i.
-            </span>
-          </div>
-
-          <EditorialHeadline level="h2" size="sm" emphasis="samenvatting" className="mb-2">
-            Een redactionele samenvatting
-          </EditorialHeadline>
-
-          <EditorialDeck className="mb-5">
-            Hoe groei je vermogen, waar gaat je geld heen, en hoeveel dichter bij je horizon ben je gekomen?
-          </EditorialDeck>
-
-          {/* Periode-segmented + dropdown */}
-          <div className="mb-4">
-            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Periode</label>
-            <div className="flex gap-1 border border-[var(--border-ed)] bg-[var(--subtle)] p-1">
-              {PERIOD_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setPeriodType(opt.value)}
-                  className={`flex-1 px-3 py-1.5 font-inter text-xs font-medium transition-all ${
-                    periodType === opt.value
-                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s0)]'
-                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+        <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-2 lg:gap-10">
+          {/* Links — redactionele intro */}
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <Kicker size="small">
+                <FileText className="h-3 w-3" aria-hidden />
+                <span>Periodiek rapport</span>
+              </Kicker>
+              <span
+                className="italic text-sm text-[var(--module-active-700)]"
+                style={{ fontFamily: 'var(--font-playfair, serif)' }}
+                aria-hidden
+              >
+                i.
+              </span>
             </div>
+
+            <EditorialHeadline level="h2" size="sm" emphasis="samenvatting" className="mb-2">
+              Een redactionele samenvatting
+            </EditorialHeadline>
+
+            <EditorialDeck className="mb-0">
+              Hoe groei je vermogen, waar gaat je geld heen, en hoeveel dichter bij je horizon ben je gekomen?
+            </EditorialDeck>
           </div>
 
-          <div className="mb-5">
-            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
-              {periodType === 'month' ? 'Maand' : periodType === 'quarter' ? 'Kwartaal' : 'Jaar'}
-            </label>
-            <select
-              value={selection}
-              onChange={(e) => setSelection(e.target.value)}
-              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-[var(--module-active-500)]"
-            >
-              {options.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* AI-toggle als TogglePill-row */}
-          <div className="mb-5">
-            <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Inleiding</label>
-            <div className="flex flex-wrap items-center gap-2">
-              <TogglePill on={!useAi} label="standaard" onClick={() => setUseAi(false)} />
-              <TogglePill on={useAi} label="met ai-inleiding" onClick={() => setUseAi(true)} />
-              {useAi && <Sparkles className="h-3.5 w-3.5 text-[var(--module-active-700)]" aria-hidden />}
+          {/* Rechts — generator-formulier */}
+          <div>
+            {/* Periode-segmented + dropdown */}
+            <div className="mb-4">
+              <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Periode</label>
+              <div className="flex gap-1 border border-[var(--border-ed)] bg-[var(--subtle)] p-1">
+                {PERIOD_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setPeriodType(opt.value)}
+                    className={`flex-1 px-3 py-1.5 font-inter text-xs font-medium transition-all ${
+                      periodType === opt.value
+                        ? 'bg-[var(--paper)] text-[var(--ink)] shadow-[var(--s0)]'
+                        : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            <div className="mb-5">
+              <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                {periodType === 'month' ? 'Maand' : periodType === 'quarter' ? 'Kwartaal' : 'Jaar'}
+              </label>
+              <select
+                value={selection}
+                onChange={(e) => setSelection(e.target.value)}
+                className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-inter text-sm text-[var(--ink)] outline-none transition-colors focus:border-[var(--module-active-500)]"
+              >
+                {options.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* AI-toggle als TogglePill-row */}
+            <div className="mb-5">
+              <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">Inleiding</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <TogglePill on={!useAi} label="standaard" onClick={() => setUseAi(false)} />
+                <TogglePill on={useAi} label="met ai-inleiding" onClick={() => setUseAi(true)} />
+                {useAi && <Sparkles className="h-3.5 w-3.5 text-[var(--module-active-700)]" aria-hidden />}
+              </div>
+            </div>
+
+            {/* Primary CTA — bestaande button-stijl */}
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={generating}
+              className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)] disabled:opacity-50"
+            >
+              {generating ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--paper)] border-t-transparent" />
+                  Pagina&apos;s worden opgesteld...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4" />
+                  Genereer rapport
+                </>
+              )}
+            </button>
+
+            <p
+              className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              {useAi ? 'Will leest je cijfers en schrijft een korte editie. +5–10 seconden.' : 'Direct beschikbaar — een redactionele samenvatting in jouw context.'}
+            </p>
           </div>
-
-          {/* Primary CTA — bestaande button-stijl */}
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={generating}
-            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)] disabled:opacity-50"
-          >
-            {generating ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--paper)] border-t-transparent" />
-                Pagina&apos;s worden opgesteld...
-              </>
-            ) : (
-              <>
-                <FileText className="h-4 w-4" />
-                Genereer rapport
-              </>
-            )}
-          </button>
-
-          <p
-            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
-            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-          >
-            {useAi ? 'Will leest je cijfers en schrijft een korte editie. +5–10 seconden.' : 'Direct beschikbaar — een redactionele samenvatting in jouw context.'}
-          </p>
         </div>
       </CardEditorial>
 
+      {/* === Raster ii–v — secundaire rapporten (2 kolommen op sm+) === */}
+      <div className="mt-6 grid gap-6 sm:grid-cols-2">
+
       {/* === II. Persoonlijke balans === */}
-      <CardEditorial accent className="mt-6">
-        <div className="p-6 sm:p-8">
+      <CardEditorial accent className="flex flex-col">
+        <div className="flex flex-1 flex-col p-6 sm:p-8">
           <div className="mb-3 flex items-center justify-between gap-3">
             <Kicker size="small">
               <Scale className="h-3 w-3" aria-hidden />
@@ -364,27 +373,29 @@ export default function RapportagesPage() {
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push(`/rapportages/balans?date=${balansDate}`)}
-            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
-          >
-            <Scale className="h-4 w-4" />
-            Genereer balans
-          </button>
+          <div className="mt-auto">
+            <button
+              type="button"
+              onClick={() => router.push(`/rapportages/balans?date=${balansDate}`)}
+              className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+            >
+              <Scale className="h-4 w-4" />
+              Genereer balans
+            </button>
 
-          <p
-            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
-            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-          >
-            Activa, passiva en netto vermogen op een moment vastgelegd.
-          </p>
+            <p
+              className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Activa, passiva en netto vermogen op een moment vastgelegd.
+            </p>
+          </div>
         </div>
       </CardEditorial>
 
       {/* === III. Budgetrapport === */}
-      <CardEditorial accent className="mt-6">
-        <div className="p-6 sm:p-8">
+      <CardEditorial accent className="flex flex-col">
+        <div className="flex flex-1 flex-col p-6 sm:p-8">
           <div className="mb-3 flex items-center justify-between gap-3">
             <Kicker size="small">
               <BarChart3 className="h-3 w-3" aria-hidden />
@@ -420,27 +431,29 @@ export default function RapportagesPage() {
             </select>
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push(`/rapportages/budget?month=${budgetMonth}`)}
-            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
-          >
-            <BarChart3 className="h-4 w-4" />
-            Genereer budgetrapport
-          </button>
+          <div className="mt-auto">
+            <button
+              type="button"
+              onClick={() => router.push(`/rapportages/budget?month=${budgetMonth}`)}
+              className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Genereer budgetrapport
+            </button>
 
-          <p
-            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
-            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-          >
-            Per categorie en per maand, inclusief trendanalyse over zes maanden.
-          </p>
+            <p
+              className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Per categorie en per maand, inclusief trendanalyse over zes maanden.
+            </p>
+          </div>
         </div>
       </CardEditorial>
 
       {/* === IV. Vermogensoverzicht (Kern-rapport) === */}
-      <CardEditorial accent className="mt-6">
-        <div className="p-6 sm:p-8">
+      <CardEditorial accent className="flex flex-col">
+        <div className="flex flex-1 flex-col p-6 sm:p-8">
           <div className="mb-3 flex items-center justify-between gap-3">
             <Kicker size="small">
               <Layers className="h-3 w-3" aria-hidden />
@@ -474,27 +487,29 @@ export default function RapportagesPage() {
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push(`/rapportages/vermogen?date=${vermogenDate}`)}
-            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
-          >
-            <Layers className="h-4 w-4" />
-            Genereer vermogensoverzicht
-          </button>
+          <div className="mt-auto">
+            <button
+              type="button"
+              onClick={() => router.push(`/rapportages/vermogen?date=${vermogenDate}`)}
+              className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+            >
+              <Layers className="h-4 w-4" />
+              Genereer vermogensoverzicht
+            </button>
 
-          <p
-            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
-            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-          >
-            Per asset-type gegroepeerd, met alle type-specifieke kenmerken. Verschijnt naast app-secties zodra er activatie is.
-          </p>
+            <p
+              className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Per asset-type gegroepeerd, met alle type-specifieke kenmerken. Verschijnt naast app-secties zodra er activatie is.
+            </p>
+          </div>
         </div>
       </CardEditorial>
 
       {/* === V. Persoonlijk plan === */}
-      <CardEditorial accent className="mt-6">
-        <div className="p-6 sm:p-8">
+      <CardEditorial accent className="flex flex-col">
+        <div className="flex flex-1 flex-col p-6 sm:p-8">
           <div className="mb-3 flex items-center justify-between gap-3">
             <Kicker size="small">
               <Compass className="h-3 w-3" aria-hidden />
@@ -517,23 +532,27 @@ export default function RapportagesPage() {
             De aannames waarmee TriFinity je toekomst doorrekent — demografie, inkomen, AOW, uitgaven, rendement, eindstrategie. Om te delen met partner of adviseur.
           </EditorialDeck>
 
-          <button
-            type="button"
-            onClick={() => router.push('/rapportages/persoonlijk-plan')}
-            className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
-          >
-            <Compass className="h-4 w-4" />
-            Genereer persoonlijk plan
-          </button>
+          <div className="mt-auto">
+            <button
+              type="button"
+              onClick={() => router.push('/rapportages/persoonlijk-plan')}
+              className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+            >
+              <Compass className="h-4 w-4" />
+              Genereer persoonlijk plan
+            </button>
 
-          <p
-            className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
-            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-          >
-            Geen prognoses — alleen de input-zijde, zodat je kunt controleren of de parameters nog kloppen.
-          </p>
+            <p
+              className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Geen prognoses — alleen de input-zijde, zodat je kunt controleren of de parameters nog kloppen.
+            </p>
+          </div>
         </div>
       </CardEditorial>
+
+      </div>
 
       <SectionDivider variant="line" className="mt-10" />
 
@@ -564,68 +583,63 @@ export default function RapportagesPage() {
               </p>
             </div>
           ) : (
-            <ul className="-mx-2">
+            // 2-koloms editorial index — vult de breedte als krant-"back-issues"-lijst
+            <ul className="grid gap-x-10 sm:grid-cols-2">
               {savedConfigs.map((config, idx) => (
-                <Fragment key={config.id}>
-                  <li className="group flex items-center gap-3 px-2 py-3 transition-colors hover:bg-[var(--subtle)]">
-                    <span
-                      className="mr-1 min-w-[2.5ch] shrink-0 italic text-sm text-[var(--module-active-700)]"
-                      style={{ fontFamily: 'var(--font-playfair, serif)' }}
-                      aria-hidden
-                    >
-                      {ROMAN[idx] ?? `${idx + 1}`}.
+                <li
+                  key={config.id}
+                  className="group flex items-center gap-3 border-b border-dotted border-[var(--rule-soft)] px-2 py-3 transition-colors hover:bg-[var(--subtle)]"
+                >
+                  <span
+                    className="mr-1 min-w-[2.5ch] shrink-0 italic text-sm text-[var(--module-active-700)]"
+                    style={{ fontFamily: 'var(--font-playfair, serif)' }}
+                    aria-hidden
+                  >
+                    {ROMAN[idx] ?? `${idx + 1}`}.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleView(config)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="truncate text-sm text-[var(--ink)]"
+                        style={{ fontFamily: 'var(--font-playfair, serif)' }}
+                      >
+                        {config.name}
+                      </span>
+                      {config.use_ai && (
+                        <span className="shrink-0 border border-[var(--module-active-300)] bg-[var(--module-active-50)]/40 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.06em] text-[var(--module-active-700)]">
+                          AI
+                        </span>
+                      )}
+                    </div>
+                    <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-[0.10em] text-[var(--ink-3)]">
+                      {formatTimestamp(config.date_from)} – {formatTimestamp(config.date_to)}
                     </span>
+                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
                       onClick={() => handleView(config)}
-                      className="min-w-0 flex-1 text-left"
+                      className="p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)]"
+                      title="Bekijken"
+                      aria-label={`Bekijk ${config.name}`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="truncate text-sm text-[var(--ink)]"
-                          style={{ fontFamily: 'var(--font-playfair, serif)' }}
-                        >
-                          {config.name}
-                        </span>
-                        {config.use_ai && (
-                          <span className="shrink-0 border border-[var(--module-active-300)] bg-[var(--module-active-50)]/40 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.06em] text-[var(--module-active-700)]">
-                            AI
-                          </span>
-                        )}
-                      </div>
-                      <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-[0.10em] text-[var(--ink-3)]">
-                        {formatTimestamp(config.date_from)} – {formatTimestamp(config.date_to)}
-                      </span>
+                      <Eye className="h-4 w-4" />
                     </button>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleView(config)}
-                        className="p-2 text-[var(--ink-3)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)]"
-                        title="Bekijken"
-                        aria-label={`Bekijk ${config.name}`}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(config.id)}
-                        className="p-2 text-[var(--ink-4)] transition-colors hover:bg-[var(--negative)]/10 hover:text-[var(--negative)]"
-                        title="Verwijderen"
-                        aria-label={`Verwijder ${config.name}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </li>
-                  {/* Dotted ritme tussen rijen — niet onder laatste */}
-                  {idx < savedConfigs.length - 1 && (
-                    <li
-                      aria-hidden
-                      className="border-b border-dotted border-[var(--rule-soft)]"
-                    />
-                  )}
-                </Fragment>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(config.id)}
+                      className="p-2 text-[var(--ink-4)] transition-colors hover:bg-[var(--negative)]/10 hover:text-[var(--negative)]"
+                      title="Verwijderen"
+                      aria-label={`Verwijder ${config.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </li>
               ))}
             </ul>
           )}

@@ -14,7 +14,6 @@ const NAV_ITEMS = [
   { label: 'Profiel', href: '/identity/profiel' },
   { label: 'Gids', href: '/identity/gids' },
   { label: 'Instellingen', href: '/identity/instellingen' },
-  { label: 'Delen', href: '/identity/delen' },
 ]
 
 // ── Redirect mappings (source → expected target) ─────────────────────────────
@@ -34,6 +33,11 @@ const KNOWN_ROUTES = [
   '/core/budgets',
   '/core/assets',
   '/core/debts',
+  '/overzicht/cashflow',
+  '/overzicht/cashflow/budget',
+  '/overzicht/cashflow/transacties',
+  '/overzicht/cashflow/vaste-lasten',
+  '/overzicht/cashflow/forecast',
   '/will',
   '/horizon',
   '/identity',

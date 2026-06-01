@@ -122,6 +122,13 @@ type SubTag = {
    * dubbele rij ontstaat (gebruiker-feedback mei 2026).
    */
   leverKey?: keyof LeverScores
+  /**
+   * Optionele geneste subroutes — verschijnen ingesprongen ónder deze tag,
+   * maar alléén wanneer de gebruiker op deze tag (of een van zijn kinderen)
+   * staat. Houdt de sidebar rustig: het derde niveau is contextueel. Gebruikt
+   * voor de Box 1/2/3-pagina's onder Belasting.
+   */
+  children?: SubTag[]
 }
 
 // Conform plan §3.3: tag-strip toont *categorieën* (eerste rij). Daaronder
@@ -144,8 +151,33 @@ const MODULES: ModuleEntry[] = [
       // samen zodat er geen duplicatie is").
       { label: 'Bezittingen', href: '/overzicht/bezittingen', leverKey: 'assets' },
       { label: 'Schulden', href: '/overzicht/schulden', leverKey: 'debts' },
-      { label: 'Cashflow', href: '/overzicht/cashflow', leverKey: 'cashflow' },
-      { label: 'Belasting', href: '/overzicht/belasting', leverKey: 'tax' },
+      {
+        label: 'Cashflow',
+        href: '/overzicht/cashflow',
+        leverKey: 'cashflow',
+        // Cashflow-onderdelen — derde niveau, alleen zichtbaar op een
+        // cashflow-route (zie SubTagStrip). Bron: app/(app)/overzicht/
+        // cashflow/{budget,transacties,vaste-lasten,forecast}/page.tsx.
+        children: [
+          { label: 'Budget', href: '/overzicht/cashflow/budget' },
+          { label: 'Transacties', href: '/overzicht/cashflow/transacties' },
+          { label: 'Vaste lasten', href: '/overzicht/cashflow/vaste-lasten' },
+          { label: 'Forecast', href: '/overzicht/cashflow/forecast' },
+        ],
+      },
+      {
+        label: 'Belasting',
+        href: '/overzicht/belasting',
+        leverKey: 'tax',
+        // Box-subpagina's — derde niveau, alleen zichtbaar op een
+        // belasting-route (zie SubTagStrip). Bron: app/(app)/overzicht/
+        // belasting/box{1,2,3}/page.tsx.
+        children: [
+          { label: 'Box 1 · Werk + woning', href: '/overzicht/belasting/box1' },
+          { label: 'Box 2 · Aanmerkelijk belang', href: '/overzicht/belasting/box2' },
+          { label: 'Box 3 · Sparen + beleggen', href: '/overzicht/belasting/box3' },
+        ],
+      },
     ],
     apps: [
       // Bron: components/core/category-deepening-registry.ts. `appKey` matcht
@@ -170,14 +202,13 @@ const MODULES: ModuleEntry[] = [
     href: '/toekomst',
     Icon: Compass,
     subTags: [
-      // De vijf tabs van /toekomst (zie components/future/toekomst-tabs.tsx).
-      // ?tab=tijdas is de default zonder query-param. Wat-Als is een eigen
-      // route naast de tabs, geen tab-state.
+      // Toekomst-subnavigatie: Tijdas (/toekomst) is de landing met
+      // navigatiekaarten; de overige items hebben elk een eigen subroute.
       { label: 'Tijdas', href: '/toekomst' },
-      { label: 'Doelen', href: '/toekomst?tab=doelen' },
-      { label: 'Gebeurtenissen', href: '/toekomst?tab=gebeurtenissen' },
-      { label: 'Voorkeuren', href: '/toekomst?tab=voorkeuren' },
-      { label: 'Rekenhulp', href: '/toekomst?tab=rekenhulp' },
+      { label: 'Doelen', href: '/toekomst/doelen' },
+      { label: 'Gebeurtenissen', href: '/toekomst/gebeurtenissen' },
+      { label: 'Voorkeuren', href: '/toekomst/voorkeuren' },
+      { label: 'Rekenhulp', href: '/toekomst/rekenhulp' },
       { label: 'Wat-Als', href: '/toekomst/whatif' },
     ],
   },
@@ -190,6 +221,9 @@ type OverigeEntry = {
 }
 
 const OVERIGE_BASE: OverigeEntry[] = [
+  // Tips & acties — de Will-stroom (briefing-vervolg) als vaste ingang.
+  // Zap = de actie-helft van "tips & acties" (zie guide-naslagwerk).
+  { label: 'Tips & acties', Icon: Zap, href: '/overzicht/tips' },
   { label: 'Berichten', Icon: Inbox, href: '/berichten' },
   { label: 'Nieuws', Icon: Newspaper, href: '/nieuws' },
   { label: 'Rapportages', Icon: BarChart3, href: '/rapportages' },
@@ -704,10 +738,14 @@ function SubTagStrip({
   dimmed?: boolean
   leverScores?: LeverScores
 }) {
+  const pathname = usePathname() ?? '/'
   // Dimmed-state op non-active modules: een toon lichter zodat de actieve
   // module visueel blijft dominen, maar de sub-pages wel scanbaar zijn.
   const baseColorClass = dimmed ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
   const linkHoverClass = dimmed ? 'hover:text-[var(--ink-2)]' : 'hover:text-[var(--ink)]'
+  // Match op de tag zelf of een dieper kind zodat het derde niveau
+  // (Box 1/2/3) alleen op een belasting-route uitklapt.
+  const isOnTag = (href: string) => pathname === href || pathname.startsWith(href + '/')
   // Vertical stack: elke sub-tag op eigen rij. pl-[42px] = px-3 (12) + icon (18)
   // + gap-3 (12) zodat de tags onder de module-label uitlijnen i.p.v. onder de
   // icon-kolom. Communiceert duidelijker de parent/child-relatie.
@@ -718,25 +756,48 @@ function SubTagStrip({
     >
       {subTags.map((tag) => {
         const entry = tag.leverKey && leverScores ? leverScores[tag.leverKey] : null
+        const showChildren = tag.children && tag.children.length > 0 && isOnTag(tag.href)
         return (
-          <Link
-            key={tag.href}
-            href={tag.href}
-            className={`flex items-center gap-2 py-0.5 ${linkHoverClass} transition-colors duration-150`}
-            title={
-              entry
-                ? `${tag.label}: ${SUBTAG_STATUS_LABEL[entry.status]} — ${entry.detail}`
-                : tag.label
-            }
-          >
-            <span className="flex-1">{tag.label}</span>
-            {entry && (
-              <span
-                className={`w-1.5 h-1.5 rounded-full shrink-0 ${SUBTAG_STATUS_DOT[entry.status]}`}
-                aria-label={`${tag.label}: ${SUBTAG_STATUS_LABEL[entry.status]}`}
-              />
+          <div key={tag.href} className="flex flex-col">
+            <Link
+              href={tag.href}
+              className={`flex items-center gap-2 py-0.5 ${linkHoverClass} transition-colors duration-150`}
+              title={
+                entry
+                  ? `${tag.label}: ${SUBTAG_STATUS_LABEL[entry.status]} — ${entry.detail}`
+                  : tag.label
+              }
+            >
+              <span className="flex-1">{tag.label}</span>
+              {entry && (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${SUBTAG_STATUS_DOT[entry.status]}`}
+                  aria-label={`${tag.label}: ${SUBTAG_STATUS_LABEL[entry.status]}`}
+                />
+              )}
+            </Link>
+            {showChildren && (
+              <div className="flex flex-col border-l border-[var(--border-ed)] ml-1 pl-3 mt-0.5 mb-1">
+                {tag.children!.map((child) => {
+                  const childActive = isOnTag(child.href)
+                  return (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      aria-current={childActive ? 'page' : undefined}
+                      className={`py-0.5 transition-colors duration-150 ${
+                        childActive
+                          ? 'text-[var(--ink)] font-medium'
+                          : `text-[var(--ink-3)] ${linkHoverClass}`
+                      }`}
+                    >
+                      {child.label}
+                    </Link>
+                  )
+                })}
+              </div>
             )}
-          </Link>
+          </div>
         )
       })}
     </div>

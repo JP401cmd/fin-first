@@ -3,30 +3,21 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, Link2, ChevronRight } from 'lucide-react'
-import { MODULE_CATALOG } from '@/lib/module-registry'
-import { useModuleToggle } from '@/lib/hooks/use-module-toggle'
-import { useModuleAccess } from '@/components/app/feature-access-provider'
+import { Link2, ChevronRight } from 'lucide-react'
 import { ExportDropdown } from '@/components/app/export-dropdown'
 
 /**
- * GeavanceerdSettings — modules, data-export en data-reset. Geëxtraheerd
- * uit de legacy /identity/instellingen-monolith (tabs 'modules' +
+ * GeavanceerdSettings — externe koppelingen, data-export en data-reset.
+ * Geëxtraheerd uit de legacy /identity/instellingen-monolith (tab
  * 'gegevens') naar de canonieke /mijn/geavanceerd-pagina (plan A-2).
  *
- * Hergebruikt dezelfde hooks/endpoints als de monolith — geen nieuwe
- * data-logica: useModuleToggle (module aan/uit + dependency-validatie),
- * ExportDropdown (CSV-export) en /api/onboarding/reset.
+ * De handmatige module-aan/uit-toggle is bewust verwijderd: modules
+ * worden tijdens onboarding ingesteld en daarna niet meer handmatig
+ * geschakeld. Hergebruikt ExportDropdown (CSV-export) en
+ * /api/onboarding/reset.
  */
 export function GeavanceerdSettings() {
   const router = useRouter()
-  const { activeModules, refreshModules } = useModuleAccess()
-  const {
-    modules: localModules,
-    toggle: toggleModule,
-    saving: moduleSaving,
-  } = useModuleToggle(activeModules, refreshModules)
-  const [moduleErrors, setModuleErrors] = useState<string[]>([])
   const [showResetDialog, setShowResetDialog] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [resetError, setResetError] = useState<string | null>(null)
@@ -38,92 +29,9 @@ export function GeavanceerdSettings() {
           Mijn — geavanceerd
         </div>
         <h1 className="font-serif text-2xl text-[var(--ink)] mt-1">
-          Modules &amp; gegevens
+          Gegevens &amp; export
         </h1>
       </header>
-
-      {/* ── Modules ─────────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        <div className="px-4 sm:px-6 py-5 space-y-5">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--ink)]">Actieve modules</h2>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
-              Kies welke modules actief zijn. Afhankelijkheden worden automatisch gecontroleerd.
-            </p>
-          </div>
-
-          <div className="divide-y divide-[var(--border-ed)] rounded-xl border border-[var(--border-ed)]">
-            {MODULE_CATALOG.map((mod) => {
-              const enabled = localModules.includes(mod.id)
-              const isDev = mod.inDevelopment
-              return (
-                <div
-                  key={mod.id}
-                  className={`flex items-center justify-between gap-4 px-4 py-3.5 ${isDev ? 'opacity-60' : ''}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-[var(--ink)]">
-                      {mod.label}
-                      {isDev && (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
-                          In ontwikkeling
-                        </span>
-                      )}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--ink-3)]">{mod.description}</p>
-                    {mod.requires.length > 0 && (
-                      <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-                        Vereist: {mod.requires.map((r) => MODULE_CATALOG.find((m) => m.id === r)?.label ?? r).join(', ')}
-                      </p>
-                    )}
-                    {mod.requiresOneOf && mod.requiresOneOf.length > 0 && (
-                      <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-                        Vereist een van: {mod.requiresOneOf.map((r) => MODULE_CATALOG.find((m) => m.id === r)?.label ?? r).join(' of ')}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={enabled}
-                    aria-label={`${mod.label} ${enabled ? 'uitschakelen' : 'inschakelen'}`}
-                    disabled={moduleSaving}
-                    onClick={async () => {
-                      setModuleErrors([])
-                      const result = await toggleModule(mod.id, !enabled)
-                      if (!result.success) setModuleErrors(result.errors)
-                    }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
-                      enabled ? 'bg-emerald-500' : 'bg-zinc-300'
-                    } ${moduleSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                        enabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-
-          {moduleErrors.length > 0 && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
-              <div className="space-y-1">
-                {moduleErrors.map((err, i) => (
-                  <p key={i} className="text-sm text-amber-800">{err}</p>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <p className="text-xs text-[var(--ink-4)]">
-            {localModules.length} van {MODULE_CATALOG.length} modules actief
-          </p>
-        </div>
-      </section>
 
       {/* ── Externe koppelingen ─────────────────────────────────── */}
       <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">

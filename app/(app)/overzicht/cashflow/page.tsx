@@ -1,150 +1,42 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { loadBudgetsData } from '@/lib/budgets-data-loader'
-import BudgetsClient from '@/components/app/budgets-client'
+import { loadDashboardData } from '@/lib/dashboard-data-loader'
+import { loadCashflowData } from '@/lib/cashflow-data-loader'
+import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
+import { buildCashflowCards } from '@/lib/cashflow-cards'
+import { CashflowLandingCards } from '@/components/overview/cashflow-landing-cards'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { getAppSetupStatus } from '@/lib/app-setup-status'
-import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
-import { CashflowViewSwitcher } from '@/components/overview/cashflow-view-switcher'
-import { TransactiesFeed, type TransactionRow } from '@/components/app/transacties-feed'
-import { TransactiesGeldstroom } from '@/components/overview/transacties-geldstroom'
-import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
-import { CashflowKalender } from '@/components/overview/cashflow-kalender'
-import { CashflowForecast } from '@/components/overview/cashflow-forecast'
-import { CashflowSankey } from '@/components/overview/cashflow-sankey'
 import { InflationImpactCard, INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
-import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-banner'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
-import type { RecurringTransaction } from '@/lib/recurring-data'
 
 export const metadata: Metadata = {
   title: 'Cashflow — TriFinity',
-  description: 'Budget, transacties en vaste lasten — de hefboom cashflow.',
+  description: 'Budget, transacties, vaste lasten en forecast — de hefboom cashflow.',
 }
 
 /**
- * /overzicht/cashflow — derde hefboom-verdieping. Drie views via
- * CashflowViewSwitcher: Budget (default), Transacties, Vaste lasten.
- * View-state via `?view=`-URL-param. Bookmarkable.
+ * /overzicht/cashflow — cashflow-landingspagina.
  *
- * Toekomst:
- *  - Vaste-lasten view echt vullen (nu placeholder met "binnenkort"-CTA)
- *  - VasteKostenAnalyse component hergebruiken zodra recurring-data loader
+ * Vier hefboom-stijl kaarten (Budget, Transacties, Vaste lasten, Forecast),
+ * elk met een status-dot, een KPI en een uitklapbare chevron — identiek aan de
+ * vier-hefbomen-rij op /overzicht. Elke kaart deeplinkt naar zijn eigen
+ * sub-pagina onder /overzicht/cashflow/*, waar de volledige inhoud leeft.
+ * Daaronder het inspiratieblok (Inflatie & koopkracht).
+ *
+ * De spaarquote / maandelijks netto / uitgaventrend-samenvatting is verhuisd
+ * naar de Forecast-sub-pagina (CashflowSection).
  */
 export default async function OverzichtCashflowPage() {
   const supabase = await createClient()
-
-  // Setup-gate: nieuwe gebruikers zonder budgetten zien een eenvoudige
-  // intro-pagina. Bestaande gebruikers met budgetten worden direct doorgelaten.
-  const setupStatus = await getAppSetupStatus(supabase, ['budgetteren'])
-  if (!setupStatus.budgetteren) {
-    return (
-      <>
-        <NavStackMeta title="Cashflow" bottomBar={{ kind: 'tabs' }} />
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <AppSetupGate appKey="budgetteren" />
-        </div>
-      </>
-    )
-  }
-
-  const data = await loadBudgetsData(supabase)
-
-  // Laad recente transacties + vaste lasten parallel voor de twee
-  // niet-budget views. Beide queries draaien naast loadBudgetsData.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  let transactions: TransactionRow[] = []
-  let monthLabel: string | undefined
-  let fullName: string | null = null
-  let recurrings: RecurringTransaction[] = []
-  let baselineIncome = 0
-  let baselineExpenses = 0
-  let startingBalance = 0
-  let accountCount = 0
-  if (user) {
-    const since = new Date()
-    since.setMonth(since.getMonth() - 3)
-    // Baseline-venster voor forecast: laatste 6 maanden gemiddeld inkomen +
-    // uitgaven. Aparte parallelle query gebruikt zelfde 6m periode als
-    // health-score (consistentie). Bank-accounts voor startingBalance.
-    const sixMonthsAgo = new Date()
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-    const sixMonthsAgoIso = sixMonthsAgo.toISOString().split('T')[0]
-    const [txResult, profileResult, recurResult, baselineResult, accountsResult] = await Promise.all([
-      supabase
-        .from('transactions')
-        // De transactions-tabel heeft geen `category`-kolom; categorie
-        // komt uit budget_id-join. account-naam komt uit
-        // bank_accounts-join (de FK heet account_id → bank_accounts.id).
-        .select('id, date, description, amount, bank_accounts(name), budgets(name)')
-        .eq('user_id', user.id)
-        .gte('date', since.toISOString().split('T')[0])
-        .order('date', { ascending: false })
-        .limit(500),
-      supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
-      supabase
-        .from('recurring_transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true),
-      // 6-maanden transacties voor baseline-aggregaat
-      supabase
-        .from('transactions')
-        .select('amount')
-        .eq('user_id', user.id)
-        .gte('date', sixMonthsAgoIso),
-      // Liquide saldo voor cumulatief-startpunt
-      supabase
-        .from('bank_accounts')
-        .select('id, balance, name')
-        .eq('user_id', user.id)
-        .eq('is_active', true),
-    ])
-    recurrings = (recurResult.data ?? []) as RecurringTransaction[]
-    const baselineRows = (baselineResult.data ?? []) as { amount: number }[]
-    let totalIncome = 0
-    let totalExpenses = 0
-    for (const r of baselineRows) {
-      const a = Number(r.amount)
-      if (a > 0) totalIncome += a
-      else totalExpenses += Math.abs(a)
-    }
-    baselineIncome = Math.round(totalIncome / 6)
-    baselineExpenses = Math.round(totalExpenses / 6)
-    const accountsRows = (accountsResult.data ?? []) as { id: string; balance: number; name: string }[]
-    startingBalance = accountsRows.reduce(
-      (s, a) => s + Number(a.balance ?? 0),
-      0,
-    )
-    accountCount = accountsRows.length
-    transactions = (txResult.data ?? []).map((t) => {
-      const bankField = (t as { bank_accounts?: { name?: string } | { name?: string }[] | null }).bank_accounts
-      const accountName = Array.isArray(bankField)
-        ? bankField[0]?.name
-        : bankField?.name
-      const budgetField = (t as { budgets?: { name?: string } | { name?: string }[] | null }).budgets
-      const categoryName = Array.isArray(budgetField)
-        ? budgetField[0]?.name
-        : budgetField?.name
-      return {
-        id: String(t.id),
-        date: String(t.date),
-        description: String(t.description ?? ''),
-        category: categoryName ?? null,
-        amount: Number(t.amount),
-        account_name: accountName ?? null,
-      }
-    })
-    fullName = (profileResult.data as { full_name?: string | null } | null)?.full_name ?? null
-    monthLabel = new Intl.DateTimeFormat('nl-NL', {
-      month: 'long',
-      year: 'numeric',
-    }).format(new Date())
-  }
+  const [dashboardResult, cashflow, vasteLasten] = await Promise.all([
+    loadDashboardData(supabase),
+    loadCashflowData(supabase),
+    loadVasteLastenSummary(supabase),
+  ])
+  const { dashboardData } = dashboardResult
+  const cards = buildCashflowCards(dashboardData, cashflow, vasteLasten)
 
   return (
     <>
@@ -159,36 +51,33 @@ export default async function OverzichtCashflowPage() {
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>
-      {baselineExpenses >= 500 && (
+
+      <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <div className="mb-2 flex items-center gap-2.5">
+          <span
+            aria-hidden
+            className="inline-block h-px w-7"
+            style={{ background: 'var(--module-active-500)' }}
+          />
+          <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-[var(--ink-2)]">
+            Je geldstroom
+          </span>
+        </div>
+        <p
+          className="mb-4 max-w-[60ch] border-l-2 pl-3 font-serif text-sm italic text-[var(--ink-2)]"
+          style={{ borderColor: 'var(--module-active-500)' }}
+        >
+          Het deel van je inkomen dat je opzij zet bepaalt hoe snel je vrijheid
+          bereikt. Kies een onderdeel om dieper te kijken.
+        </p>
+        <CashflowLandingCards cards={cards} />
+      </section>
+
+      {cashflow.baselineExpenses >= 500 && (
         <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-          <InflationImpactCard monthlyExpenses={baselineExpenses} />
+          <InflationImpactCard monthlyExpenses={cashflow.baselineExpenses} />
         </section>
       )}
-      <CashflowViewSwitcher
-        budgetView={<BudgetsClient initialData={data} />}
-        transactiesView={
-          <div className="space-y-6">
-            <KoppelRekeningBanner accountCount={accountCount} />
-            <TransactiesGeldstroom transactions={transactions} monthLabel={monthLabel} />
-            <CashflowSankey transactions={transactions} monthLabel={monthLabel} />
-            <TransactiesFeed transactions={transactions} monthLabel={monthLabel} />
-          </div>
-        }
-        vasteLastenView={
-          <div className="space-y-6">
-            <VasteLastenLoader fullName={fullName} />
-            <CashflowKalender recurrings={recurrings} />
-          </div>
-        }
-        forecastView={
-          <CashflowForecast
-            recurrings={recurrings}
-            baselineIncome={baselineIncome}
-            baselineExpenses={baselineExpenses}
-            startingBalance={startingBalance}
-          />
-        }
-      />
     </>
   )
 }

@@ -12,5 +12,5 @@ export default async function ToekomstStrategieRedirectPage({
 }) {
   const { focus } = await searchParams
   const key = focus === 'aow' || focus === 'pensioen' || focus === 'huis' ? focus : 'aow'
-  redirect(`/toekomst?tab=gebeurtenissen&strategie=${key}`)
+  redirect(`/toekomst/gebeurtenissen?strategie=${key}`)
 }

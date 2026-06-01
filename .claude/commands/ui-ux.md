@@ -527,7 +527,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
   6. Bij laatste stap success: redirect naar bestemming + toast met undo-link.
 
 ### Type 8: Settings / preferences-pagina
-- **Routes**: `/identity/instellingen`, `/identity/profiel`, `/identity/delen`, `/beheer/*`.
+- **Routes**: `/identity/instellingen`, `/identity/profiel`, `/beheer/*`.
 - **Doel**: configuratie en voorkeuren — meestal autosave.
 - **Top-down structuur**:
   1. Editorial header: kicker-met-streepje "INSTELLINGEN" → titel (Playfair) → `<EditorialDeck>`.

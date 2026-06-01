@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Source_Serif_4, DM_Mono, Inter, Andada_Pro } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { HeadScripts } from "@/components/app/head-scripts";
 import "./globals.css";
 
 // LCP-font: hero h1 op /core, /will, /horizon en alle category-pages.
@@ -91,27 +92,6 @@ export const metadata: Metadata = {
   },
 };
 
-/**
- * Pre-hydration script — leest opgeslagen palette-keuze uit localStorage en zet
- * de CSS-vars (`--bg`, `--paper`, `--subtle`, `--border-ed`, `--border-md`,
- * `--background`) op `<html>` voordat de React-app rendert. Voorkomt een korte
- * flash van het default-palet (cream) wanneer de gebruiker een ander palet had
- * gekozen. De waardes hier zijn een 1:1 spiegel van `PALETTE_THEMES` in
- * `module-color-provider.tsx`; bij een nieuwe palette-optie beide updaten.
- */
-const PALETTE_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('tf-palette-theme');if(!t)return;var p={cream:{bg:'#f5efe2',paper:'#fbf7ec',subtle:'#f3ead9',ed:'#e3dac8',md:'#ccc1aa'},licht:{bg:'#fbf2e7',paper:'#fef9ef',subtle:'#f5ecd6',ed:'#e6dcc4',md:'#d4c8a8'},'fd-bruin':{bg:'#e9dcb8',paper:'#f0e6cf',subtle:'#e0d2a8',ed:'#c9b88e',md:'#a89968'}}[t];if(!p)return;var r=document.documentElement.style;r.setProperty('--bg',p.bg);r.setProperty('--paper',p.paper);r.setProperty('--subtle',p.subtle);r.setProperty('--border-ed',p.ed);r.setProperty('--border-md',p.md);r.setProperty('--background',p.bg);}catch(e){}})();`
-
-// Inline service-worker registratie. Reden voor inline (i.p.v. een client-component
-// in <body>): static-analyzers (PWABuilder, Play Store crawl) parsen alleen HTML —
-// een useEffect-call zien zij niet. Crawlers bezoeken alleen productie-URLs, dus we
-// gaten registratie op productie en saneren in dev (een eerder gebouwde `public/sw.js`
-// is in git getrackt en wordt door `next dev` gewoon geserveerd; zonder de unregister
-// blijft een stale SW alle `/api/*`-requests onderscheppen en breekt HMR de fetches
-// met "Failed to fetch").
-const SW_REGISTER_SCRIPT = process.env.NODE_ENV === 'production'
-  ? `(function(){if(!('serviceWorker' in navigator))return;window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(e){console.warn('[trifinity] sw register failed:',e);});});})();`
-  : `(function(){if(!('serviceWorker' in navigator))return;navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister();});}).catch(function(){});if(window.caches&&caches.keys){caches.keys().then(function(keys){keys.forEach(function(k){caches.delete(k);});}).catch(function(){});}})();`
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -119,14 +99,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="nl" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: PALETTE_INIT_SCRIPT }} />
-        <script dangerouslySetInnerHTML={{ __html: SW_REGISTER_SCRIPT }} />
-      </head>
       <body
         className={`${playfair.variable} ${sourceSerif.variable} ${dmMono.variable} ${inter.variable} ${andadaPro.variable} antialiased`}
         suppressHydrationWarning
       >
+        <HeadScripts />
         {children}
         <SpeedInsights />
       </body>

@@ -8,7 +8,8 @@ import { BOX3_TOOLTIPS, type Box3Result } from '@/lib/box3-data'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
 
 /**
- * Box3Detail — compacte, inklapbare Box 3-berekening op /overzicht/belasting.
+ * Box3Detail — compacte, inklapbare Box 3-berekening op de Box 3-subpagina
+ * /overzicht/belasting/box3.
  *
  * Vervangt het volledige (1393-regel) BelastingPage-embed door alleen het
  * Box 3-rekenwerk: een samenvatting (belasting + vrijheidsdagen) plus een

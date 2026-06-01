@@ -95,7 +95,7 @@ const CATEGORY_CONFIG: Record<
 /** Maximum aantal kaartjes — 3-koloms × 2 rijen = 6. */
 const MAX_BRIEFING_ENTRIES = 6
 
-/** Lees het gedeelde privacy-niveau (zelfde key als /identity/delen). */
+/** Lees het gedeelde privacy-niveau (zelfde key als de vrijheidskaart-generator). */
 function readPrivacyLevel(): 'anonymous' | 'named' | 'full' {
   try {
     const s = typeof window !== 'undefined' ? localStorage.getItem('trifinity_privacy_level') : null

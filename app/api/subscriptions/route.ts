@@ -1,181 +1,29 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { detectRecurringTransactions, detectCategory, CATEGORY_LABELS, type RecurringCategory } from '@/lib/recurring-detection'
-
-const SUBSCRIPTION_CATEGORIES: RecurringCategory[] = ['subscription']
-const VASTE_KOSTEN_CATEGORIES: RecurringCategory[] = ['rent', 'mortgage', 'utility', 'insurance', 'transport', 'taxes', 'childcare', 'housing_other', 'healthcare', 'donation', 'loan']
+import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 
 /**
  * GET /api/subscriptions
  *
- * Detects recurring expense patterns from the last 12 months of transaction history.
- * Returns subscriptions and fixed costs (vaste kosten) with monthly cost totals.
+ * Detects recurring expense patterns from the last 12 months of transaction
+ * history (plus confirmed recurring_transactions). Returns subscriptions and
+ * fixed costs (vaste kosten) with monthly cost totals.
+ *
+ * De detectie-/classificatie-logica leeft in `lib/vaste-lasten-summary.ts`
+ * zodat de cashflow-landingskaart exact hetzelfde totaal kan tonen.
  */
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
     }
 
-    const now = new Date()
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-    const startDateStr = startDate.toISOString().split('T')[0]
-
-    const [txResult, recurringResult, budgetResult] = await Promise.all([
-      supabase
-        .from('transactions')
-        .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
-        .gte('date', startDateStr)
-        .order('date', { ascending: true }),
-      supabase
-        .from('recurring_transactions')
-        .select('id, counterparty_name, amount, name, frequency, category_override')
-        .eq('is_active', true),
-      supabase
-        .from('budgets')
-        .select('id, name, parent_id, budget_type')
-        .order('sort_order', { ascending: true }),
-    ])
-
-    const transactions = txResult.data ?? []
-    const existingRecurrings = recurringResult.data ?? []
-    const budgets = budgetResult.data ?? []
-
-    // Convert to monthly amount equivalent
-    function toMonthly(amount: number, frequency: string): number {
-      const abs = Math.abs(amount)
-      switch (frequency) {
-        case 'weekly': return (abs * 52) / 12
-        case 'quarterly': return abs / 3
-        case 'yearly': return abs / 12
-        default: return abs // monthly
-      }
-    }
-
-    // Build confirmed recurring items from DB (expenses only: amount < 0)
-    // Exclude items explicitly marked as 'excluded' by the user
-    const confirmedItems = existingRecurrings
-      .filter(r => Number(r.amount) < 0 && r.category_override !== 'excluded')
-      .map(r => {
-        const name = r.name || r.counterparty_name || 'Onbekend'
-        const autoCategory = detectCategory(r.counterparty_name ?? '', name, false)
-        // If user has overridden the classification, use that instead
-        const category: RecurringCategory = r.category_override === 'subscription'
-          ? 'subscription'
-          : r.category_override === 'vaste_kosten'
-            ? 'other_expense' // Map vaste_kosten override to a non-subscription category
-            : autoCategory
-        return {
-          id: r.id,
-          name,
-          averageAmount: Math.abs(Number(r.amount)),
-          monthlyAmount: toMonthly(Number(r.amount), r.frequency ?? 'monthly'),
-          frequency: (r.frequency ?? 'monthly') as 'monthly' | 'weekly' | 'quarterly' | 'yearly',
-          nextDate: null as string | null,
-          confidence: 'high' as const,
-          isVariableAmount: false,
-          occurrences: null as number | null,
-          alreadyConfirmed: true,
-          category,
-          categoryLabel: CATEGORY_LABELS[category],
-          categoryOverride: r.category_override ?? null,
-        }
-      })
-
-    if (transactions.length < 3) {
-      const subs = confirmedItems.filter(i => SUBSCRIPTION_CATEGORIES.includes(i.category))
-      const vk = confirmedItems.filter(i => VASTE_KOSTEN_CATEGORIES.includes(i.category) || i.category === 'other_expense')
-      const totalSubs = subs.reduce((s, i) => s + i.monthlyAmount, 0)
-      const totalVK = vk.reduce((s, i) => s + i.monthlyAmount, 0)
-      return NextResponse.json({
-        subscriptions: subs,
-        vasteKosten: vk,
-        totalMonthlySubscriptions: Math.round(totalSubs * 100) / 100,
-        totalMonthlyVasteKosten: Math.round(totalVK * 100) / 100,
-        totalMonthly: Math.round((totalSubs + totalVK) * 100) / 100,
-        count: subs.length + vk.length,
-      })
-    }
-
-    // Run detection algorithm
-    const allDetected = detectRecurringTransactions(
-      transactions.map(t => ({
-        id: t.id,
-        date: t.date,
-        amount: Number(t.amount),
-        description: t.description ?? '',
-        counterparty_name: t.counterparty_name ?? null,
-        is_income: t.is_income ?? false,
-        budget_id: t.budget_id ?? null,
-        transaction_type: t.transaction_type ?? null,
-      })),
-      existingRecurrings,
-      budgets,
-    )
-
-    // Filter: expenses with medium/high confidence in subscription or vaste kosten categories
-    const relevantCategories = [...SUBSCRIPTION_CATEGORIES, ...VASTE_KOSTEN_CATEGORIES]
-    const detected = allDetected.filter(
-      d =>
-        relevantCategories.includes(d.suggestedCategory) &&
-        !d.isIncome &&
-        d.confidence !== 'low',
-    )
-
-    // Also include other_expense with medium+ confidence — these are likely fixed costs
-    // that don't match any keyword pattern but have clear recurring patterns
-    const detectedOther = allDetected.filter(
-      d =>
-        d.suggestedCategory === 'other_expense' &&
-        !d.isIncome &&
-        d.confidence !== 'low',
-    )
-
-    const detectedItems = [...detected, ...detectedOther].map(d => ({
-      id: d.key,
-      name: d.counterpartyName || d.commonDescription,
-      averageAmount: Math.abs(d.averageAmount),
-      monthlyAmount: toMonthly(d.averageAmount, d.frequency),
-      frequency: d.frequency,
-      nextDate: null as string | null,
-      confidence: d.confidence,
-      isVariableAmount: d.isVariableAmount,
-      occurrences: d.occurrences,
-      alreadyConfirmed: d.alreadyExists,
-      category: d.suggestedCategory,
-      categoryLabel: CATEGORY_LABELS[d.suggestedCategory],
-      categoryOverride: null as string | null,
-    }))
-
-    // Merge: confirmed first, then new auto-detections that aren't already confirmed
-    const newDetections = detectedItems.filter(s => !s.alreadyConfirmed)
-    const allItems = [
-      ...confirmedItems.filter(i => relevantCategories.includes(i.category) || i.category === 'other_expense'),
-      ...newDetections,
-    ]
-
-    // User overrides take precedence over auto-detected categories
-    const subscriptions = allItems.filter(i =>
-      i.categoryOverride === 'subscription' ||
-      (!i.categoryOverride && SUBSCRIPTION_CATEGORIES.includes(i.category))
-    )
-    const vasteKosten = allItems.filter(i =>
-      i.categoryOverride === 'vaste_kosten' ||
-      (!i.categoryOverride && (VASTE_KOSTEN_CATEGORIES.includes(i.category) || i.category === 'other_expense'))
-    )
-    const totalSubs = subscriptions.reduce((s, i) => s + i.monthlyAmount, 0)
-    const totalVK = vasteKosten.reduce((s, i) => s + i.monthlyAmount, 0)
-
-    return NextResponse.json({
-      subscriptions,
-      vasteKosten,
-      totalMonthlySubscriptions: Math.round(totalSubs * 100) / 100,
-      totalMonthlyVasteKosten: Math.round(totalVK * 100) / 100,
-      totalMonthly: Math.round((totalSubs + totalVK) * 100) / 100,
-      count: subscriptions.length + vasteKosten.length,
-    })
+    const summary = await loadVasteLastenSummary(supabase)
+    return NextResponse.json(summary)
   } catch (err) {
     console.error('[/api/subscriptions]', err)
     return NextResponse.json({ error: 'Interne fout' }, { status: 500 })

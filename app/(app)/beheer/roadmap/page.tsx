@@ -699,7 +699,7 @@ const FASE_D_FEATURES: readonly Feature[] = [
     afhankelijkheden: [
       'Supabase Auth (laatste login tracking)',
       'app/api/household/ (huishouden-systeem)',
-      'app/(app)/identity/delen/ (delen-functionaliteit)',
+      'app/api/share/ (deel-functionaliteit)',
       'document vault (feature #16, optioneel)',
       'meldingen-systeem',
       'email systeem (Supabase of externe provider)',

@@ -453,24 +453,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 11: Delen page route accessible ───────────────────────────────────
-  {
-    id: 'delen-page-accessible',
-    name: 'Delen pagina: /identity/delen bereikbaar',
-    category: CAT,
-    description: '/identity/delen route geeft 200 of auth redirect',
-    priority: 'high',
-    estimatedDurationMs: 1000,
-    async fn() {
-      const res = await fetchNoRedirect('/identity/delen')
-      assert(
-        res.status === 200 || isRedirect(res.status),
-        `Expected 200 or redirect for /identity/delen, got ${res.status}`,
-      )
-    },
-  },
-
-  // ── Step 12: Jaaroverzicht page route accessible ───────────────────────────
+  // ── Step 11: Jaaroverzicht page route accessible ───────────────────────────
   {
     id: 'delen-jaaroverzicht-accessible',
     name: 'Jaaroverzicht pagina: /identity/jaaroverzicht bereikbaar',

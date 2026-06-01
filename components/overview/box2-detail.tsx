@@ -7,10 +7,10 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
 
 /**
- * Box2Detail — compacte Box 2-sectie (aanmerkelijk belang / DGA) op
- * /overzicht/belasting. Wordt door de pagina alléén gerenderd wanneer er
- * daadwerkelijk aanmerkelijk belang is (deelneming-asset aanwezig —
- * server-side bepaald). Toont uitsluitend de **privé-impact**: het
+ * Box2Detail — compacte Box 2-sectie (aanmerkelijk belang / DGA) op de
+ * Box 2-subpagina /overzicht/belasting/box2. Wordt door de pagina alléén
+ * gerenderd wanneer er daadwerkelijk aanmerkelijk belang is (deelneming-asset
+ * aanwezig — server-side bepaald). Toont uitsluitend de **privé-impact**: het
  * personal/eigen Box 2-resultaat, nooit het gecombineerde/zakelijke.
  *
  * Hergebruikt de pure engine lib/box2-data.ts via /api/household/box2 —

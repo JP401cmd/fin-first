@@ -34,14 +34,6 @@ describe('JaarruimteCard — render', () => {
     expect(screen.getByText(/belasting-besparing/i)).toBeTruthy()
   })
 
-  it('linkt naar /core/belasting voor volledige Box 1-berekening', () => {
-    const { container } = render(
-      <JaarruimteCard grossYearlyIncome={50_000} />,
-    )
-    const link = container.querySelector('a[href="/core/belasting"]')
-    expect(link).toBeTruthy()
-  })
-
   it('toont formule-disclaimer in footer', () => {
     render(<JaarruimteCard grossYearlyIncome={50_000} />)
     expect(screen.getByText(/13.3%/)).toBeTruthy()

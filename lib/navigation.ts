@@ -41,7 +41,6 @@ export const identityNav: ModuleNavConfig = {
     { label: 'Profiel', href: '/identity/profiel' },
     { label: 'Instellingen', href: '/identity/instellingen' },
     { label: 'Koppelingen', href: '/identity/koppelingen' },
-    { label: 'Delen', href: '/identity/delen' },
   ],
 }
 
@@ -61,7 +60,6 @@ export const mijnNav: ModuleNavConfig = {
     { label: 'Uiterlijk', href: '/mijn/uiterlijk' },
     { label: 'Privacy', href: '/mijn/privacy' },
     { label: 'Koppelingen', href: '/mijn/koppelingen' },
-    { label: 'Delen', href: '/mijn/delen' },
     { label: 'Geavanceerd', href: '/mijn/geavanceerd' },
   ],
 }

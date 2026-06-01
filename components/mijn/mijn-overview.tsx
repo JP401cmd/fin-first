@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import {
   User,
-  Users,
   Shield,
   Link2,
   Palette,
   Bell,
   Settings2,
   Share2,
+  CalendarCheck,
   ArrowRight,
   type LucideIcon,
 } from 'lucide-react'
@@ -43,14 +43,6 @@ const ROUTES: SubRoute[] = [
     text: 'text-stone-700',
   },
   {
-    href: '/mijn/delen',
-    label: 'Partner & delen',
-    description: 'Read-only toegang voor partner of adviseur.',
-    Icon: Users,
-    bg: 'bg-violet-50',
-    text: 'text-violet-700',
-  },
-  {
     href: '/mijn/privacy',
     label: 'Privacy',
     description: 'Welke data slaan we op en wie kan het zien?',
@@ -81,6 +73,14 @@ const ROUTES: SubRoute[] = [
     Icon: Bell,
     bg: 'bg-rose-50',
     text: 'text-rose-700',
+  },
+  {
+    href: '/mijn/checkins',
+    label: 'Check-ins',
+    description: 'Tijdlijn van al je maandelijkse geldcheck-ins.',
+    Icon: CalendarCheck,
+    bg: 'bg-violet-50',
+    text: 'text-violet-700',
   },
   {
     href: '/rapportages',

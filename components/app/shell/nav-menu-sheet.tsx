@@ -136,24 +136,49 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
                   {subs.map((sub) => {
                     const subActive = isActive(sub.href)
                     const status = statusForHref(sub.href, leverScores)
+                    // Geneste box-subpagina's: alleen tonen wanneer de gebruiker
+                    // op dit sub-item (of een kind) staat — contextueel 3e niveau.
+                    const showChildren =
+                      sub.children && sub.children.length > 0 && subActive
                     return (
-                      <Link
-                        key={sub.href}
-                        href={sub.href}
-                        onClick={onClose}
-                        className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors ${
-                          subActive ? c.subActive : c.subIdle
-                        }`}
-                      >
-                        <span className="text-[13px] font-medium">{sub.label}</span>
-                        {status && (
-                          <span
-                            className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass[status]}`}
-                            aria-hidden="true"
-                            title={statusTitle[status]}
-                          />
+                      <div key={sub.href}>
+                        <Link
+                          href={sub.href}
+                          onClick={onClose}
+                          className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors ${
+                            subActive ? c.subActive : c.subIdle
+                          }`}
+                        >
+                          <span className="text-[13px] font-medium">{sub.label}</span>
+                          {status && (
+                            <span
+                              className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass[status]}`}
+                              aria-hidden="true"
+                              title={statusTitle[status]}
+                            />
+                          )}
+                        </Link>
+                        {showChildren && (
+                          <div className="mt-0.5 ml-3 pl-3 border-l border-[var(--border-ed)] grid grid-cols-1 gap-0.5">
+                            {sub.children!.map((child) => {
+                              const childActive = isActive(child.href)
+                              return (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  onClick={onClose}
+                                  aria-current={childActive ? 'page' : undefined}
+                                  className={`px-3 py-1.5 rounded-lg text-[12px] transition-colors ${
+                                    childActive ? c.subActive : c.subIdle
+                                  }`}
+                                >
+                                  {child.label}
+                                </Link>
+                              )
+                            })}
+                          </div>
                         )}
-                      </Link>
+                      </div>
                     )
                   })}
                 </div>

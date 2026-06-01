@@ -94,7 +94,7 @@ export const WIDGET_CLASSIFICATION: Record<string, WidgetClassification> = {
   beslissingspatronen:      'insight',       // → /will (improve patterns)
   vrijheidsdagen_maand:     'insight',       // → /will (maintain momentum)
   wilskracht:               'insight',       // → /will (improve score)
-  berichten:                'insight',       // → /berichten (read articles)
+  berichten:                'insight',       // → /nieuws (read articles)
   rebalancing:              'insight',       // → /core/assets (rebalance portfolio)
   fee_analyzer:             'insight',       // onClick → fee detail modal
   hypotheek_vs_beleggen:    'insight',       // → /core/debts (decide strategy)

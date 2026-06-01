@@ -57,7 +57,7 @@ interface CachedNews {
 async function getCachedNews(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-): Promise<NewsItem[] | null> {
+): Promise<{ items: NewsItem[]; generatedAt: string } | null> {
   const { data } = await supabase
     .from('app_settings')
     .select('value')
@@ -77,7 +77,7 @@ async function getCachedNews(
 
     if (ageHours > CACHE_TTL_HOURS) return null
 
-    return cached.items
+    return { items: cached.items, generatedAt: cached.generatedAt }
   } catch {
     return null
   }
@@ -282,6 +282,7 @@ export async function GET(request: Request) {
         cached: false,
         editionNr,
         jaargang,
+        generatedAt: new Date().toISOString(),
         refreshesRemaining: refreshStatus.remaining,
       })
     }
@@ -294,10 +295,11 @@ export async function GET(request: Request) {
     if (cached) {
       const refreshStatus = await checkRefreshLimit(supabase, user.id)
       return NextResponse.json({
-        items: cached,
+        items: cached.items,
         cached: true,
         editionNr,
         jaargang,
+        generatedAt: cached.generatedAt,
         refreshesRemaining: refreshStatus.remaining,
       })
     }

@@ -88,7 +88,9 @@ export async function loadTopMarketBriefing(
     id: `market:${typeof top.id === 'string' ? top.id : 'news'}`,
     category: 'market',
     text: truncate(`${headline}${impact}`, MAX_TEXT_LENGTH),
-    href: '/berichten',
+    // Een markt-briefje komt uit de financiële krant op /nieuws, dus de klik
+    // leidt terug naar het nieuws (niet naar het berichtencentrum /berichten).
+    href: '/nieuws',
     hefboom: CATEGORY_HEFBOOM[category],
   }
 }

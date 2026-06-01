@@ -1,23 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
-import { loadDashboardData } from '@/lib/dashboard-data-loader'
-import { buildTemporalContext } from '@/lib/briefing/temporal'
 import { BerichtenClient } from '@/components/berichten/berichten-client'
 
-export default async function BerichtenPage() {
-  const supabase = await createClient()
-
-  // Load dashboard data (userName + aiEnabled now included — no extra queries needed)
-  const { dashboardData, userName, aiEnabled } = await loadDashboardData(supabase)
-
-  // Build temporal context for the briefing
-  const temporal = buildTemporalContext()
-
-  return (
-    <BerichtenClient
-      dashboardData={dashboardData}
-      temporal={temporal}
-      userName={userName ?? undefined}
-      aiEnabled={aiEnabled}
-    />
-  )
+// Berichtencentrum — alle meldingen die de gebruiker ontvangt, op één plek.
+// De financiële krant leeft op /nieuws, de briefing op /overzicht. Alle data
+// komt client-side uit de NotificationProvider + de 30-daagse history-fetch,
+// dus deze pagina hoeft geen server-data te laden.
+export default function BerichtenPage() {
+  return <BerichtenClient />
 }

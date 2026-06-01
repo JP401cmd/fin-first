@@ -1,0 +1,37 @@
+import type { Metadata } from 'next'
+import { createClient } from '@/lib/supabase/server'
+import { loadWillData } from '@/lib/will-data-loader'
+import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
+import { DoelenView } from '@/components/future/doelen-view'
+
+export const metadata: Metadata = {
+  title: 'Doelen — TriFinity',
+  description:
+    'Je financiële doelen met status-flags — sparen, aflossen, vermogensgroei en je vrijheidsgetal bereiken.',
+}
+
+/**
+ * /toekomst/doelen — eigen subroute voor de Doelen-view.
+ *
+ * Onderdeel van de tijdas-landing + navigatiekaarten-architectuur: de
+ * tijdas op /toekomst is de landing, en Doelen krijgt een eigen
+ * bookmarkbare subpagina. Laadt alleen de Will-data die DoelenView nodig
+ * heeft (goals + goalProgresses) — niet meer dan nodig.
+ *
+ * De prop-opbouw is 1-op-1 overgenomen uit de oude ToekomstPage (de
+ * doelenView-tak van ToekomstTabs).
+ */
+export default async function ToekomstDoelenPage() {
+  const supabase = await createClient()
+  const willData = await loadWillData(supabase)
+
+  return (
+    <>
+      <ToekomstSubpageShell kicker="Toekomst" title="Doelen" />
+      <DoelenView
+        goals={willData.goals}
+        goalProgresses={willData.goalProgresses}
+      />
+    </>
+  )
+}

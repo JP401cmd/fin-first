@@ -84,6 +84,7 @@ export function ArchiveSection() {
           editionNr={selectedEdition.edition_nr}
           jaargang={selectedEdition.jaargang}
           dateline={dateline}
+          articleCount={articles.length}
         />
 
         {articles.length > 0 && (

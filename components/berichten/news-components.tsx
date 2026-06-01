@@ -136,9 +136,6 @@ export function HeroNewsArticle({ item, isRead, onMarkRead, readOnly }: {
   onMarkRead: (id: string) => void
   readOnly?: boolean
 }) {
-  const firstLetter = item.summary.charAt(0)
-  const restOfSummary = item.summary.slice(1)
-
   return (
     <article className={`mb-8 transition-opacity duration-300 ${isRead && !readOnly ? 'opacity-70' : ''}`}>
       <div className="mb-3 flex items-center gap-3">
@@ -160,14 +157,8 @@ export function HeroNewsArticle({ item, isRead, onMarkRead, readOnly }: {
         {item.headline}
       </h2>
 
-      <p className="mt-3 font-source-serif text-base leading-relaxed text-[var(--ink-2)] sm:text-lg">
-        <span
-          className="float-left mr-2 font-playfair text-[3.2rem] font-bold leading-[0.8] text-[var(--ink)]"
-          aria-hidden="true"
-        >
-          {firstLetter}
-        </span>
-        <span aria-label={item.summary}>{restOfSummary}</span>
+      <p className="mt-3 font-source-serif text-base leading-relaxed text-[var(--ink-2)] first-letter:float-left first-letter:mr-2 first-letter:font-playfair first-letter:text-[3.2rem] first-letter:font-bold first-letter:leading-[0.8] first-letter:text-[var(--ink)] sm:text-lg">
+        {item.summary}
       </p>
 
       <div className="mt-3 flex items-center gap-1 clear-left">
@@ -210,7 +201,7 @@ export function NewsArticle({ item, isRead, onMarkRead, readOnly }: {
   readOnly?: boolean
 }) {
   return (
-    <article className={`flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)] transition-opacity transition-shadow duration-300 hover:shadow-[var(--s1)] ${isRead && !readOnly ? 'opacity-70' : ''}`}>
+    <article className={`flex h-full flex-col transition-opacity duration-300 ${isRead && !readOnly ? 'opacity-70' : ''}`}>
       <div className="mb-2.5 flex items-center gap-3">
         <CategoryBadge category={item.category} />
         {!isRead && !readOnly && (
@@ -291,7 +282,7 @@ export function NewsSkeletonLoader() {
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="flex flex-col rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]"
+            className="flex h-full flex-col"
           >
             <div className="mb-2.5 h-5 w-20 animate-pulse rounded-full bg-[var(--subtle)]" />
             <div className="space-y-1.5">

@@ -1,7 +1,6 @@
 'use client'
 
-import Link from 'next/link'
-import { ArrowUpDown, ArrowRight, TrendingUp, TrendingDown, Minus, Receipt } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { RecurringItem } from './vaste-kosten-analyse'
@@ -63,21 +62,29 @@ function MiniSparkline({
 
 interface CashflowSectionProps {
   data: DashboardData
-  subscriptions: RecurringItem[]
-  vasteKosten: RecurringItem[]
-  totalMonthlySubscriptions: number
-  totalMonthlyVasteKosten: number
-  totalMonthly: number
-  userProfile: { full_name: string | null } | null
-  loadingRecurring: boolean
-  onCancellationOpen: (metadata: CancellationMetadata) => void
-  onRefresh: () => Promise<void>
+  /**
+   * Legacy WillLanding-props. De samenvatting rendert alleen op basis van
+   * `data`; deze blijven optioneel zodat bestaande callers blijven
+   * compileren zonder ze door te geven.
+   */
+  subscriptions?: RecurringItem[]
+  vasteKosten?: RecurringItem[]
+  totalMonthlySubscriptions?: number
+  totalMonthlyVasteKosten?: number
+  totalMonthly?: number
+  userProfile?: { full_name: string | null } | null
+  loadingRecurring?: boolean
+  onCancellationOpen?: (metadata: CancellationMetadata) => void
+  onRefresh?: () => Promise<void>
 }
 
-export function CashflowSection({
-  data,
-  totalMonthly,
-}: CashflowSectionProps) {
+/**
+ * CashflowSection — compacte cashflow-samenvatting (spaarquote 6m,
+ * maandelijks netto, uitgaventrend). Leeft bovenaan de hefboom-pagina
+ * /overzicht/cashflow. De vaste-lasten-teaser is bewust verwijderd: die
+ * data zit al onder de "Vaste lasten"-tab van diezelfde pagina.
+ */
+export function CashflowSection({ data }: CashflowSectionProps) {
   const { monthlyIncome, monthlyExpenses, savingsRate6m, savingsHistory, expenseHistory } = data
   const monthlyCashflow = monthlyIncome - monthlyExpenses
   const isPositiveCashflow = monthlyCashflow >= 0
@@ -90,28 +97,9 @@ export function CashflowSection({
       : TrendingDown
 
   return (
-    <section id="cashflow" className="mt-10 scroll-mt-24" aria-label="Cashflow">
-      {/* ── Section header ── */}
-      <div className="mb-4 flex items-center justify-between px-1">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-wil-50">
-            <ArrowUpDown className="h-4 w-4 text-wil-600" />
-          </div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.06em] text-[var(--ink-2)]">
-            Cashflow
-          </h2>
-        </div>
-        <Link
-          href="/overzicht/cashflow"
-          className="group flex items-center gap-1 text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink)]"
-        >
-          Budgetten beheren
-          <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      </div>
-
-      {/* ── Summary strip: spaarquote + cashflow ── */}
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <section aria-label="Cashflow-samenvatting">
+      {/* ── Samenvatting: spaarquote + maandelijks netto + uitgaventrend ── */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {/* Spaarquote card */}
         <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
           <div className="flex items-center justify-between">
@@ -196,28 +184,6 @@ export function CashflowSection({
           </div>
         )}
       </div>
-
-      {/* ── Vaste lasten — link naar de canonieke plek (/overzicht/cashflow) ──
-          De volledige vaste-kosten-analyse leeft op de Cashflow-hefboom-
-          pagina (Vaste-lasten-tab); hier alleen een compacte teaser zodat
-          de dashboard-sectie niet dubbelt met die pagina. */}
-      {totalMonthly > 0 && (
-        <Link
-          href="/overzicht/cashflow?view=vaste-lasten"
-          className="group flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-colors hover:border-[var(--ink-3)]"
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-violet-50 text-violet-700 shrink-0">
-            <Receipt className="h-4 w-4" aria-hidden="true" />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-[var(--ink)]">Vaste lasten &amp; abonnementen</p>
-            <p className="text-[11px] text-[var(--ink-3)]">
-              <MaskedAmount value={totalMonthly} className="font-mono tabular-nums" />/mnd — bekijk de analyse
-            </p>
-          </div>
-          <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      )}
     </section>
   )
 }
