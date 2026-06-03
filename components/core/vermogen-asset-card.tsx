@@ -33,6 +33,8 @@ import { useToast } from '@/components/app/toast-provider'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { triggerAssetSync } from '@/lib/integrations/trigger-sync'
+import { OwnershipBadge } from '@/components/app/ownership-toggle'
+import { formatOwnershipSubline, type Perspective, type Provenance } from '@/lib/household-data'
 import { findDeepenings } from './category-deepening-registry'
 import { AssetAppChip } from './asset-app-chip'
 import { CardKpiStrip } from './card-kpi-strip'
@@ -95,6 +97,20 @@ interface VermogenAssetCardProps {
   onEditClick: (asset: Asset) => void
   /** Opent de detail-pane met de ValuationModal direct open (URL: `?asset=<id>&via=revalue`). */
   onRevalueClick: (asset: Asset) => void
+  // ── Huishoud-perspectief (optioneel; solo-gedrag identiek aan voorheen) ──
+  /** Actief perspectief — bepaalt of de waarde op aandeel of vol getoond wordt. */
+  perspective?: Perspective
+  /** Naam van de partner voor de OwnershipBadge (provenance='partner'). */
+  partnerName?: string | null
+  /** Herkomst van het item ('eigen'|'partner'|'gezamenlijk') uit de loader. */
+  provenance?: Provenance
+  /** Aandeel-fractie (0-1) van dit item in dit perspectief (gedeelde items). */
+  shareFraction?: number
+  /**
+   * Aggregaatrij (privacy='totalen'): rendert als één niet-bewerkbare
+   * "Partner vermogen (totaal)"-kaart, zonder bewerk-/herwaardeer-acties.
+   */
+  aggregated?: boolean
 }
 
 // ── Component ───────────────────────────────────────────────
@@ -108,6 +124,11 @@ export function VermogenAssetCard({
   staggerIndex = 0,
   onEditClick,
   onRevalueClick,
+  perspective = 'personal',
+  partnerName,
+  provenance,
+  shareFraction,
+  aggregated = false,
 }: VermogenAssetCardProps) {
   const router = useRouter()
   const { addToast } = useToast()
@@ -165,6 +186,55 @@ export function VermogenAssetCard({
     }
   }, [connection, syncing, addToast, masked, asset.name, router])
 
+  // Perspectief-correcte waarde: gedeeld item buiten huishouden → aandeel.
+  // (Inclusiepercentage is door de caller al niet apart toegepast op deze
+  // kaartwaarde; we tonen de volledige item-waarde × aandeel, consistent met
+  // de subline uit `formatOwnershipSubline`.)
+  const rawValue = Number(asset.current_value) || 0
+  const isShared = asset.ownership === 'shared'
+  const displayValue =
+    isShared && perspective !== 'household' ? rawValue * (shareFraction ?? 1) : rawValue
+  const ownershipSubline = formatOwnershipSubline(
+    { ownership: asset.ownership, _myShareFraction: shareFraction },
+    perspective,
+    rawValue,
+  )
+
+  // ── Aggregaatrij (privacy='totalen') ─────────────────────────
+  // Eén niet-bewerkbare "Partner vermogen (totaal)"-kaart: geen klik-flow,
+  // geen bewerk-/herwaardeer-acties, geen KPI-strip. Toont alleen het totaal.
+  if (aggregated) {
+    return (
+      <div
+        className="card-editorial animate-fade-up relative w-full"
+        style={{ '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties}
+        data-testid="asset-card-aggregated"
+      >
+        <div className="relative z-10 h-[3px] w-full" style={{ backgroundColor: accentColor }} />
+        <div className="relative z-10 flex w-full items-center gap-3 p-3 text-left sm:p-4">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-[var(--subtle)]">
+            <Icon className="h-4 w-4" style={{ color: accentColor }} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="truncate text-sm font-semibold text-[var(--ink)]">{asset.name}</p>
+              <OwnershipBadge provenance="partner" partnerName={partnerName} perspective={perspective} />
+            </div>
+            <p
+              className="truncate text-[11px] italic text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Totaal — privé samengevat
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <MaskedAmount value={rawValue} tone="kern" className="text-sm font-bold" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       className="card-editorial animate-fade-up relative w-full"
@@ -195,6 +265,12 @@ export function VermogenAssetCard({
               {asset.name}
             </p>
             {connection && <ConnectionIndicator connection={connection} />}
+            <OwnershipBadge
+              provenance={provenance}
+              ownership={provenance ? undefined : asset.ownership}
+              partnerName={partnerName}
+              perspective={perspective}
+            />
           </div>
           {/* Sub-meta in italic Source Serif (mini-artikel-blueprint) */}
           <p
@@ -223,9 +299,18 @@ export function VermogenAssetCard({
                   'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
               }}
             >
-              <MaskedAmount value={asset.current_value} tone="kern" className="text-sm font-bold" />
+              <MaskedAmount value={displayValue} tone="kern" className="text-sm font-bold" />
             </span>
           </p>
+          {ownershipSubline && (
+            <p
+              className="mt-0.5 text-[10px] italic text-[var(--ink-4)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              data-testid="asset-ownership-subline"
+            >
+              {ownershipSubline}
+            </p>
+          )}
         </div>
       </button>
 

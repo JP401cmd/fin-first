@@ -31,6 +31,7 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { computeLeverScores } from '@/components/app/shell/lever-scores'
 import { CoachBubble } from '@/components/app/coach-bubble'
+import { parseCoachConfig } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
 import { ViewModeProvider } from '@/components/app/view-mode-provider'
@@ -82,6 +83,7 @@ export default async function AppLayout({
     budgetCountRes,
     budgetHealthRes,
     budgetTxRes,
+    coachConfigRes,
   ] = await Promise.all([
     // profile-select bevat alleen velden voor sidebar/feature-access/theming.
     supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type').eq('id', user.id).single(),
@@ -120,6 +122,9 @@ export default async function AppLayout({
       const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
       return supabase.from('transactions').select('budget_id, amount').eq('user_id', user.id).not('budget_id', 'is', null).gte('date', monthStart).lt('date', monthEnd)
     })(),
+    // Coach-config: per-regel overrides + globale timing/label voor de CoachBubble.
+    // Beheerd via /beheer/coach. maybeSingle: rij hoeft niet te bestaan (dan defaults).
+    supabase.from('app_settings').select('value').eq('key', 'coach_config').maybeSingle(),
   ])
 
   const profile = profileRes.data
@@ -295,6 +300,10 @@ export default async function AppLayout({
     hasGoals: sidebarActionCount > 0,
   }
 
+  // ── Coach-config (overrides + timing + label) ───────────
+  // Genormaliseerd: lege/corrupte config → identiek gedrag aan defaults.
+  const coachConfig = parseCoachConfig(coachConfigRes.data?.value)
+
   // ── Deferred onboarding fields (feature #830) ─────────
   // Velden die de gebruiker expliciet heeft overgeslagen met "Later invullen"
   // tijdens onboarding. Doorgestuurd naar de coach-bubble voor gerichte
@@ -398,7 +407,14 @@ export default async function AppLayout({
                         <ChatPromptDeeplink />
                       </Suspense>
                       <Suspense fallback={null}>
-                        <CoachBubble dataGaps={coachDataGaps} deferredFields={coachDeferredFields} />
+                        <CoachBubble
+                          dataGaps={coachDataGaps}
+                          deferredFields={coachDeferredFields}
+                          overrides={coachConfig.rules}
+                          delayMs={coachConfig.timing.delayMs}
+                          autoDismissMs={coachConfig.timing.autoDismissMs}
+                          headerLabel={coachConfig.headerLabel}
+                        />
                       </Suspense>
                     </div>
                   </DashboardTypeProvider>

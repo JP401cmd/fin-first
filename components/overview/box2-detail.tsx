@@ -5,16 +5,18 @@ import { Calculator, ChevronDown, ChevronUp, Clock, Info, Building2, AlertTriang
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
+import { usePerspective } from '@/components/app/perspective-provider'
 
 /**
  * Box2Detail — compacte Box 2-sectie (aanmerkelijk belang / DGA) op de
  * Box 2-subpagina /overzicht/belasting/box2. Wordt door de pagina alléén
- * gerenderd wanneer er daadwerkelijk aanmerkelijk belang is (deelneming-asset
- * aanwezig — server-side bepaald). Toont uitsluitend de **privé-impact**: het
- * personal/eigen Box 2-resultaat, nooit het gecombineerde/zakelijke.
+ * gerenderd wanneer er daadwerkelijk aanmerkelijk belang is (server-side
+ * bepaald). Box 2 is per-persoon: in de partner-view tonen we het Box 2-
+ * resultaat van de partner, anders het eigen resultaat.
  *
- * Hergebruikt de pure engine lib/box2-data.ts via /api/household/box2 —
- * geen logica-duplicatie. Spiegelt het patroon van box3-detail.tsx.
+ * Databron blijft het bestaande /api/household/box2-endpoint (per-persoon AB/
+ * DGA, pure engine lib/box2-data.ts — geen logica-duplicatie). We herhalen de
+ * fetch op een in-sessie perspectief-wissel en selecteren de juiste persoon.
  */
 
 interface PartnerEntry {
@@ -28,8 +30,18 @@ interface Box2ApiResponse {
   partners?: PartnerEntry[]
 }
 
-/** Privé-resultaat in beide modi (single: personal; household: eigen partner-entry). */
-function selectPersonal(data: Box2ApiResponse): Box2Result | null {
+/**
+ * Selecteer het Box 2-resultaat voor het gevraagde perspectief.
+ * - personal/household → eigen resultaat (single: personal; household: eigen entry).
+ * - partner            → het Box 2-resultaat van de partner.
+ */
+function selectForPerspective(
+  data: Box2ApiResponse,
+  perspective: 'personal' | 'household' | 'partner',
+): Box2Result | null {
+  if (perspective === 'partner') {
+    return data.partners?.find((p) => !p.isCurrentUser)?.result ?? null
+  }
   return (
     data.personal ??
     data.partners?.find((p) => p.isCurrentUser)?.result ??
@@ -98,6 +110,7 @@ function Row({
 }
 
 export function Box2Detail({ year = 2026 }: { year?: number }) {
+  const { perspective, perspectiveVersion } = usePerspective()
   const [result, setResult] = useState<Box2Result | null>(null)
   const [loading, setLoading] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
@@ -106,10 +119,11 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
     fetch(`/api/household/box2?year=${year}`)
       .then((r) => r.json())
       .then((data: Box2ApiResponse) => {
-        if (!cancelled) setResult(selectPersonal(data))
+        if (!cancelled) setResult(selectForPerspective(data, perspective))
       })
       .catch(() => {
         /* stil falen */
@@ -120,7 +134,8 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
     return () => {
       cancelled = true
     }
-  }, [year])
+    // Herhaal op perspectief-wissel zodat partner-view het partner-resultaat toont.
+  }, [year, perspective, perspectiveVersion])
 
   if (loading) {
     return (

@@ -21,6 +21,7 @@ CREATE OR REPLACE FUNCTION get_partner_privacy_level(
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
+SET search_path = public
 AS $$
   SELECT COALESCE(
     (SELECT privacy_settings->>p_category

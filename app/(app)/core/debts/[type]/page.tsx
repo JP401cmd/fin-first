@@ -5,6 +5,8 @@ import {
   type Debt,
   type DebtType,
 } from '@/lib/debt-data'
+import { getServerPerspective } from '@/lib/household/server-perspective'
+import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import { loadKpiContextRefs } from '@/lib/kpi-context'
 import {
   loadConnectionsByDebtIds,
@@ -29,6 +31,13 @@ const VALID_DEBT_TYPES = Object.keys(DEBT_TYPE_LABELS) as DebtType[]
  */
 function isValidDebtType(value: string): value is DebtType {
   return (VALID_DEBT_TYPES as string[]).includes(value)
+}
+
+/** Schuldrij zoals de perspectief-loader hem levert (rij + stempels). */
+type DebtCategoryRow = Debt & {
+  _provenance: 'eigen' | 'partner' | 'gezamenlijk'
+  _myShareFraction: number
+  _aggregated?: boolean
 }
 
 // ── Page ─────────────────────────────────────────────────────
@@ -63,19 +72,37 @@ export default async function DebtCategoryServerPage({
     notFound()
   }
 
-  const { data, error } = await supabase
-    .from('debts')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('debt_type', type)
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true })
+  // Perspectief-bewuste eerste paint: lees de cookie en haal de schulden uit
+  // de gedeelde loader (eigen + gedeeld + privacy-gated partner, reeds
+  // gestempeld met provenance + aandeel). Vervangt de bespoke
+  // user_id/ownership-query.
+  const perspective = await getServerPerspective()
 
-  if (error) {
-    return <DebtCategoryError type={type} detail={error.message} />
+  let perspectiveData
+  try {
+    perspectiveData = await loadPerspectiveData(supabase, perspective)
+  } catch (err) {
+    return (
+      <DebtCategoryError
+        type={type}
+        detail={err instanceof Error ? err.message : 'onbekende fout'}
+      />
+    )
   }
 
-  const debts = (data ?? []) as Debt[]
+  const context = perspectiveData.context
+  // Eén categorie: filter op type, sluit privacy-aggregaatrijen uit (die horen
+  // op het overzicht thuis, niet in één debt_type), actief + saldo > 0,
+  // en bewaar de oorspronkelijke sort_order.
+  const debts = (perspectiveData.debts as unknown as DebtCategoryRow[])
+    .filter(
+      (d) =>
+        !d._aggregated &&
+        d.debt_type === type &&
+        d.is_active &&
+        Number(d.current_balance) > 0,
+    )
+    .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0)) as unknown as Debt[]
 
   // KPI-context refs voor LTV (mortgage → linked asset waarde) en
   // overige type-specifieke berekeningen. Falen we hier, dan tonen de
@@ -116,6 +143,8 @@ export default async function DebtCategoryServerPage({
         initialConnectionsByDebtId={connectionsByDebtId}
         initialDebtSparklines={debtSparklines}
         initialHistoryData={historyData ?? undefined}
+        initialPerspective={perspective}
+        initialContext={context}
       />
     </>
   )

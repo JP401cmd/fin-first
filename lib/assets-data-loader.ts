@@ -7,8 +7,19 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadEntitySparklines } from './load-entity-sparklines'
 import { loadKpiContextRefs, type KpiContextRefs } from './kpi-context'
 import { loadConnectionsByAssetIds, type AssetConnectionSummary } from './connections-data'
+import { loadPerspectiveData } from './household/perspective-loader'
+import type { Perspective } from './household-data'
 
 // ── Types ──────────────────────────────────────────────────────
+
+/** Huishoud-context die de client nodig heeft om aandeel/badges te renderen. */
+export interface AssetsPerspectiveContext {
+  userId: string
+  hasHousehold: boolean
+  partnerId: string | null
+  partnerName: string | null
+  mySharePct: number
+}
 
 export interface AssetsPageData {
   assets: Array<Record<string, unknown>>
@@ -24,11 +35,18 @@ export interface AssetsPageData {
   kpiRefs: KpiContextRefs | null
   /** Actieve externe koppeling (Bitvavo, broker, wallet) per asset-ID. */
   connectionsByAssetId: Record<string, AssetConnectionSummary>
+  /** Perspectief waarmee de assets gestempeld zijn (eigen/huishouden/partner). */
+  perspective: Perspective
+  /** Huishoud-context voor aandeel-/badge-rendering op de kaarten. */
+  context: AssetsPerspectiveContext
 }
 
 // ── Loader ─────────────────────────────────────────────────────
 
-export const loadAssetsData = cache(async (supabase: SupabaseClient): Promise<AssetsPageData> => {
+export const loadAssetsData = cache(async (
+  supabase: SupabaseClient,
+  perspective: Perspective = 'personal',
+): Promise<AssetsPageData> => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
@@ -36,12 +54,11 @@ export const loadAssetsData = cache(async (supabase: SupabaseClient): Promise<As
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
 
-  // Parallel fetch all data
-  const [assetsRes, mortgageRes, txRes, bankLinksRes, profileRes, valuationsRes] = await Promise.all([
-    supabase
-      .from('assets')
-      .select('*')
-      .order('sort_order', { ascending: true }),
+  // Bezittingen komen uit de perspectief-loader (single source of truth voor
+  // ownership-/privacy-filtering). De rest (hypotheken, transacties,
+  // bankkoppelingen, profiel, waarderingen) blijft een directe query.
+  const [perspectiveData, mortgageRes, txRes, bankLinksRes, profileRes, valuationsRes] = await Promise.all([
+    loadPerspectiveData(supabase, perspective),
     supabase
       .from('debts')
       .select('id, name, current_balance, linked_asset_id')
@@ -69,7 +86,11 @@ export const loadAssetsData = cache(async (supabase: SupabaseClient): Promise<As
       .order('valuation_date', { ascending: true }),
   ])
 
-  const assets = (assetsRes.data ?? []) as Array<Record<string, unknown>>
+  // Sorteer op sort_order (de loader sorteert niet) zodat de volgorde gelijk
+  // blijft aan de oude directe query.
+  const assets = [...perspectiveData.assets].sort(
+    (a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0),
+  ) as Array<Record<string, unknown>>
   const mortgages = (mortgageRes.data ?? []) as AssetsPageData['mortgages']
   const budgetingActive = profileRes.data?.budgeting_active !== false
 
@@ -95,6 +116,7 @@ export const loadAssetsData = cache(async (supabase: SupabaseClient): Promise<As
   // Zelfde data als de categorie-pagina laadt zodat `<VermogenAssetCard>`
   // op deze overview identiek rendert als op `/core/assets/[type]`.
   const assetIds = assets
+    .filter((a) => a._aggregated !== true)
     .map((a) => a.id as string | undefined)
     .filter((id): id is string => typeof id === 'string')
 
@@ -112,6 +134,8 @@ export const loadAssetsData = cache(async (supabase: SupabaseClient): Promise<As
   const kpiRefs = kpiRefsResult.status === 'fulfilled' ? kpiRefsResult.value : null
   const connectionsByAssetId = connectionsResult.status === 'fulfilled' ? connectionsResult.value : {}
 
+  const ctx = perspectiveData.context
+
   return {
     assets,
     mortgages,
@@ -122,5 +146,13 @@ export const loadAssetsData = cache(async (supabase: SupabaseClient): Promise<As
     assetSparklines,
     kpiRefs,
     connectionsByAssetId,
+    perspective: perspectiveData.perspective,
+    context: {
+      userId: ctx.userId,
+      hasHousehold: ctx.hasHousehold,
+      partnerId: ctx.partnerId,
+      partnerName: ctx.partnerName,
+      mySharePct: ctx.mySharePct,
+    },
   }
 })

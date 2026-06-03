@@ -42,7 +42,7 @@ import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
-import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { SpendingConfidenceBadge, SpendingVarianceDetailPanel, calculateSpendingVariance, type SpendingVarianceData } from '@/components/app/spending-confidence-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { GoalForm } from '@/components/app/goal-form'
@@ -57,7 +57,8 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
-import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
+import { SPLIT_MODE_LABELS, type SplitMode, type PrivacySettings } from '@/lib/household-data'
+import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
 import { Users } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -651,7 +652,42 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const pathname = usePathname()
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
-  const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
+  // Huishoud-context komt uit de foundation-loader (single source of truth voor
+  // partner/aandeel/privacy). We berekenen geen privacy meer zelf via een eigen
+  // /api/household/partner-privacy-roundtrip.
+  const [partnerPrivacy, setPartnerPrivacy] = useState<PrivacySettings | null>(null)
+  const [householdShare, setHouseholdShare] = useState<{
+    hasHousehold: boolean
+    mySharePct: number
+    splitMode: SplitMode
+    partnerName: string | null
+  } | null>(null)
+  const hiddenCategories = useMemo(
+    () =>
+      partnerPrivacy
+        ? (Object.keys(partnerPrivacy) as (keyof PrivacySettings)[]).filter(
+            (k) => partnerPrivacy[k] === 'hidden',
+          )
+        : [],
+    [partnerPrivacy],
+  )
+  useEffect(() => {
+    let cancelled = false
+    const supabase = createClient()
+    loadPerspectiveContext(supabase)
+      .then((ctx) => {
+        if (cancelled) return
+        setPartnerPrivacy(ctx.partnerPrivacy)
+        setHouseholdShare({
+          hasHousehold: ctx.hasHousehold,
+          mySharePct: ctx.mySharePct,
+          splitMode: ctx.splitMode,
+          partnerName: ctx.partnerName,
+        })
+      })
+      .catch(() => { /* non-critical: solo-user fallback */ })
+    return () => { cancelled = true }
+  }, [perspectiveSignal])
   const { openWithMessage } = useChatContext()
   const [budgets, setBudgets] = useState<BudgetWithChildren[]>(initialData?.budgets ?? [])
   const [loading, setLoading] = useState(!initialData)
@@ -983,24 +1019,20 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         return
       }
 
-      // Apply privacy filtering in household mode (Feature #537)
+      // Apply privacy filtering in household mode (Feature #537).
+      // Privacy komt uit de foundation-context (geen eigen
+      // /api/household/partner-privacy-roundtrip meer). De directe budgets-query
+      // levert via RLS al alleen eigen-persoonlijk + gedeeld; deze filter is een
+      // extra vangnet wanneer de partner 'budgets' op 'hidden' heeft staan.
       let filteredBudgetData = data as Budget[]
-      if (perspective === 'household') {
-        try {
-          const { data: { user } } = await supabase.auth.getUser()
-          if (signal?.aborted) return
-          if (user) {
-            const ppRes = await fetch('/api/household/partner-privacy')
-            if (ppRes.ok) {
-              const ppData = await ppRes.json()
-              if (ppData.partnerPrivacy?.budgets === 'hidden') {
-                filteredBudgetData = filteredBudgetData.filter(
-                  b => b.user_id === user.id || b.ownership === 'shared'
-                )
-              }
-            }
-          }
-        } catch { /* non-critical */ }
+      if (perspective === 'household' && partnerPrivacy?.budgets === 'hidden') {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (signal?.aborted) return
+        if (user) {
+          filteredBudgetData = filteredBudgetData.filter(
+            b => b.user_id === user.id || b.ownership === 'shared'
+          )
+        }
       }
 
       const parents = filteredBudgetData.filter((b) => !b.parent_id)
@@ -1020,7 +1052,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     } finally {
       if (!signal?.aborted) setLoading(false)
     }
-  }, [perspective])
+  }, [perspective, partnerPrivacy])
 
   const loadGoals = useCallback(async () => {
     const supabase = createClient()
@@ -2181,46 +2213,37 @@ function BudgetDetailModal({
   const [showForecastModal, setShowForecastModal] = useState(false)
   const [budgetPartnerSplit, setBudgetPartnerSplit] = useState<{ splitMode: SplitMode; mySharePct: number; myName: string; partnerName: string } | null>(null)
 
-  // Fetch household split for shared budget per-partner freedom time
+  // Household split voor gedeelde-budget vrijheidstijd per partner — uit de
+  // foundation-context (geen eigen /api/household/status + /settings-roundtrips).
   useEffect(() => {
     if (perspective !== 'household' || budget.ownership !== 'shared') {
       setBudgetPartnerSplit(null)
       return
     }
-    const controller = new AbortController()
+    let cancelled = false
     async function loadSplit() {
       try {
-        const [statusRes, settingsRes] = await Promise.all([
-          fetch('/api/household/status', { signal: controller.signal }),
-          fetch('/api/household/settings', { signal: controller.signal }),
-        ])
-        if (controller.signal.aborted) return
-        if (!statusRes.ok || !settingsRes.ok) return
-        const status = await statusRes.json()
-        const settings = await settingsRes.json()
         const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (controller.signal.aborted) return
-        const splitMode: SplitMode = settings.split_mode || 'equal'
-        const mySharePct = computeSharePct(
-          { splitMode, customSplitPct: settings.custom_split_pct ?? null, primaryPayerId: settings.primary_payer_id ?? null },
-          user?.id ?? '',
-        )
-        const myMember = (status.members ?? []).find((m: { is_current_user: boolean }) => m.is_current_user)
-        const partnerMember = (status.members ?? []).find((m: { is_current_user: boolean }) => !m.is_current_user)
+        const ctx = await loadPerspectiveContext(supabase)
+        if (cancelled || !ctx.hasHousehold) return
+        const { data: myProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', ctx.userId)
+          .maybeSingle()
+        if (cancelled) return
         setBudgetPartnerSplit({
-          splitMode,
-          mySharePct,
-          myName: myMember?.full_name || 'Jij',
-          partnerName: partnerMember?.full_name || 'Partner',
+          splitMode: ctx.splitMode,
+          mySharePct: ctx.mySharePct,
+          myName: (myProfile as { full_name?: string | null } | null)?.full_name || 'Jij',
+          partnerName: ctx.partnerName || 'Partner',
         })
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+      } catch {
         // Non-critical
       }
     }
     loadSplit()
-    return () => controller.abort()
+    return () => { cancelled = true }
   }, [perspective, budget.ownership])
   type FullTx = { id: string; account_id: string; budget_id: string | null; date: string; amount: number; description: string; counterparty_name: string | null; counterparty_iban: string | null; is_income: boolean; notes: string | null; category_source: string; is_split?: boolean }
   const [txToEdit, setTxToEdit] = useState<FullTx | null>(null)
@@ -2482,8 +2505,12 @@ function BudgetDetailModal({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              {perspective === 'household' && budget.ownership === 'shared' && (
-                <OwnershipBadge ownership="shared" />
+              {perspective !== 'personal' && budget.ownership === 'shared' && (
+                <OwnershipBadge
+                  provenance="gezamenlijk"
+                  partnerName={budgetPartnerSplit?.partnerName ?? null}
+                  perspective={perspective}
+                />
               )}
             </div>
             {budget.description && <p className="truncate text-xs text-[var(--ink-3)]">{budget.description}</p>}

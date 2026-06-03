@@ -35,6 +35,8 @@ import {
   type HousingStrategyConfig,
   type HousingContext,
 } from '@/lib/housing-strategy'
+import { loadPerspectiveData } from '@/lib/household/perspective-loader'
+import type { Perspective } from '@/lib/household-data'
 
 // Snapshot type for resilience trend data
 export type SnapshotForTrend = {
@@ -187,7 +189,18 @@ function buildTaxData(
   return { box3Bezittingen, box3Tax, heffingsvrijVermogen, rendementsgrondslag }
 }
 
-export async function loadHorizonData(supabase: SupabaseClient): Promise<HorizonPageData> {
+export async function loadHorizonData(
+  supabase: SupabaseClient,
+  /**
+   * Perspectief (eigen / huishouden / partner). Optioneel + default 'personal'
+   * zodat bestaande callers byte-identiek blijven. Alleen wanneer 'household'
+   * of 'partner' worden de FIRE-vermogensaggregaten (totalAssets/totalDebts/
+   * monthlyContributions) + de assets/debts-arrays via loadPerspectiveData
+   * herberekend op het gevraagde aandeel. Health-score, housing-context en
+   * Box 3 blijven op de eigen ruwe data — die zijn persoonlijk van aard.
+   */
+  perspective: Perspective = 'personal',
+): Promise<HorizonPageData> {
   const now = new Date()
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
   const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
@@ -397,13 +410,46 @@ export async function loadHorizonData(supabase: SupabaseClient): Promise<Horizon
   // Berekeningsparameters uit profiel
   const fireParams = resolveFireParams(profile)
 
+  // ── Perspectief-aware FIRE-vermogensaggregaten ────────────────────
+  // Default 'personal' → byte-identiek aan voorheen. Bij 'household'/'partner'
+  // herberekenen we totalAssets/totalDebts/monthlyContributions op het aandeel
+  // dat in dat perspectief telt (via loadPerspectiveData; privacy reeds
+  // server-side toegepast). De rest van de loader (health, housing, Box 3)
+  // blijft op de eigen ruwe data — die metrics zijn persoonlijk van aard.
+  let fireTotalAssets = totalAssets
+  let fireTotalDebts = totalDebts
+  let fireMonthlyContributions = monthlyContributions
+  if (perspective !== 'personal') {
+    try {
+      const pd = await loadPerspectiveData(supabase, perspective)
+      const share = (item: { ownership?: string; _myShareFraction?: number }, raw: number): number =>
+        item.ownership === 'shared' && perspective !== 'household'
+          ? raw * (item._myShareFraction ?? 1)
+          : raw
+      fireTotalAssets = pd.assets.reduce((s, a) => {
+        const raw = Number(a.current_value) * ((Number(a.net_worth_inclusion_pct) || 100) / 100)
+        return s + share(a, raw)
+      }, 0) + unlinkedCash
+      fireTotalDebts = pd.debts.reduce((s, d) => {
+        const raw = Number(d.current_balance) * ((Number(d.net_worth_inclusion_pct) || 100) / 100)
+        return s + share(d, raw)
+      }, 0)
+      fireMonthlyContributions = pd.assets.reduce((s, a) => {
+        const raw = Number(a.monthly_contribution) || 0
+        return s + share(a, raw)
+      }, 0)
+    } catch {
+      // Perspectief-laden faalt (geen huishouden / RLS) → val terug op eigen data.
+    }
+  }
+
   // Build the effective FIRE input
   const effectiveInput: FinancialInput = {
-    totalAssets,
-    totalDebts,
+    totalAssets: fireTotalAssets,
+    totalDebts: fireTotalDebts,
     monthlyIncome: effectiveMonthlyIncome,
     monthlyExpenses: effectiveMonthlyExpenses,
-    monthlyContributions,
+    monthlyContributions: fireMonthlyContributions,
     yearlyMustExpenses: yearlyRetirementExpenses,
     dateOfBirth: dob,
   }

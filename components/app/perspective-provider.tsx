@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export type Perspective = 'personal' | 'household' | 'partner'
@@ -29,6 +30,17 @@ interface PerspectiveContextType {
 }
 
 const PERSPECTIVE_STORAGE_KEY = 'trifinity_perspective'
+/** Cookie gelezen door server-componenten via getServerPerspective(). */
+const PERSPECTIVE_COOKIE = 'tf_perspective'
+
+/**
+ * Schrijf het perspectief als cookie zodat server-loaders het meteen kennen.
+ * path=/ + ~1 jaar geldig + SameSite=Lax.
+ */
+function storePerspectiveCookie(p: Perspective) {
+  if (typeof document === 'undefined') return
+  document.cookie = `${PERSPECTIVE_COOKIE}=${p}; path=/; max-age=31536000; samesite=lax`
+}
 
 const PerspectiveContext = createContext<PerspectiveContextType>({
   perspective: 'personal',
@@ -108,6 +120,7 @@ export function usePerspectiveAbort(perspective: Perspective): AbortSignal {
 }
 
 export function PerspectiveProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
   const [perspective, setLocalPerspective] = useState<Perspective>('personal')
   const [isHousehold, setIsHousehold] = useState(false)
   const [availablePerspectives, setAvailablePerspectives] = useState<PerspectiveOption[]>([
@@ -146,6 +159,9 @@ export function PerspectiveProvider({ children }: { children: ReactNode }) {
           setAvailablePerspectives(available)
           setPartnerName(data.partnerName)
           storePerspective(validPerspective)
+          // Houd de server-cookie in sync met het resolved perspectief, zodat
+          // server-componenten meteen correct renderen (ook vóór een switch).
+          storePerspectiveCookie(validPerspective)
         } else {
           // Fall back to localStorage
           setLocalPerspective(getStoredPerspective())
@@ -165,7 +181,12 @@ export function PerspectiveProvider({ children }: { children: ReactNode }) {
     // Optimistic local update — always immediate
     setLocalPerspective(newPerspective)
     storePerspective(newPerspective)
+    storePerspectiveCookie(newPerspective)
     setPerspectiveVersion(v => v + 1)
+
+    // Soft re-render van server-componenten met het nieuwe perspectief
+    // (leest de zojuist gezette cookie). Voorkomt "eigen-data-flits".
+    router.refresh()
 
     // Cancel any in-flight server-sync request before starting a new one
     patchControllerRef.current?.abort()
@@ -183,7 +204,7 @@ export function PerspectiveProvider({ children }: { children: ReactNode }) {
     } catch {
       // AbortError or network error — local storage is the fallback
     }
-  }, [])
+  }, [router])
 
   // Stable context value — without memoization the inline object literal
   // changes identity on every parent render and re-renders all consumers.

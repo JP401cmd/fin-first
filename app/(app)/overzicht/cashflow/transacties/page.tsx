@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
+import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-banner'
 import { TransactiesGeldstroom } from '@/components/overview/transacties-geldstroom'
@@ -21,7 +22,8 @@ export const metadata: Metadata = {
  */
 export default async function OverzichtCashflowTransactiesPage() {
   const supabase = await createClient()
-  const { transactions, monthLabel, accountCount } = await loadCashflowData(supabase)
+  const perspective = await getServerPerspective()
+  const { transactions, monthLabel, accountCount } = await loadCashflowData(supabase, perspective)
 
   return (
     <>

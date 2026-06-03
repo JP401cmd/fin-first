@@ -15,7 +15,12 @@ import {
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
-import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import {
+  loadPerspectiveData,
+  type PerspectiveContext,
+} from '@/lib/household/perspective-loader'
+import { formatOwnershipSubline } from '@/lib/household-data'
 import { DebtPayoffStrategy } from '@/components/core/deepenings/debt-payoff-strategy'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -41,6 +46,20 @@ import { computeDebtKpi } from '@/lib/debt-kpi'
 import type { KpiPair } from '@/lib/asset-kpi'
 
 // ── Types ───────────────────────────────────────────────────
+
+/**
+ * Een schuld zoals de perspectief-loader hem stempelt: de rauwe DB-rij plus
+ * provenance + aandeel + eventuele privacy-aggregaatvlag. `current_balance`
+ * blijft altijd de VOLLEDIGE saldo-waarde — het aandeel zit in
+ * `_myShareFraction` zodat de aflos-engine op volledige balances kan draaien
+ * (fractionele amortisatie is onzin) terwijl headline-cijfers wel schalen.
+ */
+type PerspectiveDebt = Debt & {
+  _provenance: 'eigen' | 'partner' | 'gezamenlijk'
+  _myShareFraction: number
+  _aggregated?: boolean
+  _aggregatedCount?: number
+}
 
 const DEBT_ITEM_NOUN: Record<DebtType, string> = {
   mortgage: 'hypotheek',
@@ -105,7 +124,8 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
 
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [quickAddInitialType, setQuickAddInitialType] = useState<DebtType | null>(null)
-  const [debts, setDebts] = useState<Debt[]>([])
+  const [debts, setDebts] = useState<PerspectiveDebt[]>([])
+  const [ctx, setCtx] = useState<PerspectiveContext | null>(null)
   const [valuationsByDebtId, setValuationsByDebtId] = useState<Record<string, Valuation[]>>({})
   const [userAssets, setUserAssets] = useState<Asset[]>([])
   // Per-debt sparkline-historie (12 maanden) voor de breuklijn-overlay op
@@ -121,52 +141,28 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
 
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
-  const { hiddenCategories } = usePartnerPrivacy()
 
   // ── Data laden ─────────────────────────────────────────────
+  //
+  // Eén bron van waarheid: de perspectief-loader levert eigen + gedeelde +
+  // (privacy-gated) partner-schulden, reeds gestempeld met `_provenance` en
+  // `_myShareFraction`. Geen bespoke ownership-query of handmatige
+  // partner-privacy-fetch meer — de loader past privacy server-side toe
+  // (partner 'hidden' → partner-schulden simpelweg afwezig; 'totals' → één
+  // aggregaatrij met `_aggregated:true`).
 
   const loadDebts = useCallback(async (signal?: AbortSignal) => {
     try {
       const supabase = createClient()
-      let query = supabase
-        .from('debts')
-        .select('*')
-      if (perspective === 'personal') {
-        query = query.eq('ownership', 'personal')
-      }
-      const { data, error: fetchError } = await query.order('sort_order', { ascending: true })
-
+      const { debts: loadedDebts, context } = await loadPerspectiveData(supabase, perspective)
       if (signal?.aborted) return
-      if (fetchError) throw fetchError
 
-      if (!data || data.length === 0) {
-        setDebts([])
-        setLoading(false)
-        return
-      }
-
-      // Privacy-filter in household-modus (Feature #537) — partners die
-      // hun schulden hebben verborgen blijven onzichtbaar voor de huidige
-      // user-perspective.
-      let filteredData = data as Debt[]
-      if (perspective === 'household') {
-        try {
-          const { data: { user } } = await supabase.auth.getUser()
-          if (signal?.aborted) return
-          if (user) {
-            const ppRes = await fetch('/api/household/partner-privacy')
-            if (ppRes.ok) {
-              const ppData = await ppRes.json()
-              if (ppData.partnerPrivacy?.debts === 'hidden') {
-                filteredData = filteredData.filter(
-                  d => d.user_id === user.id || d.ownership === 'shared'
-                )
-              }
-            }
-          }
-        } catch { /* non-critical */ }
-      }
-      setDebts(filteredData)
+      // sort_order behouden zoals de oude query (loader sorteert niet).
+      const sorted = [...loadedDebts].sort(
+        (a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0),
+      )
+      setCtx(context)
+      setDebts(sorted as unknown as PerspectiveDebt[])
     } catch (err) {
       console.error('Error loading debts:', err)
       if (!signal?.aborted) setError('Kon schulden niet laden. Probeer het opnieuw.')
@@ -215,7 +211,7 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
   // Failure is non-fataal: lege map → kaarten zonder breuklijn-overlay.
   useEffect(() => {
     const activeDebtIds = debts
-      .filter((d) => d.is_active && Number(d.current_balance) > 0)
+      .filter((d) => !d._aggregated && d.is_active && Number(d.current_balance) > 0)
       .map((d) => d.id)
     if (activeDebtIds.length === 0) {
       setDebtSparklines({})
@@ -336,33 +332,80 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
 
   // ── Afgeleide waarden ──────────────────────────────────────
 
-  const activeDebts = debts.filter((d) => d.is_active && Number(d.current_balance) > 0)
-  const totalBalance = activeDebts.reduce((s, d) => s + Number(d.current_balance), 0)
-  const totalMonthlyPayment = activeDebts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
-  // Gewogen gemiddelde rente — met current_balance als weegfactor, zodat
-  // grote hypotheken zwaarder meetellen dan een kleine creditcard.
-  const weightedAvgInterest = totalBalance > 0
-    ? activeDebts.reduce((s, d) => s + Number(d.interest_rate ?? 0) * Number(d.current_balance), 0) / totalBalance
+  // Het perspectief-correcte aandeel van een waarde: gedeelde items schalen
+  // mee in eigen/partner-view (`* _myShareFraction`), in huishouden-view en
+  // voor persoonlijke items telt de volle waarde. Aggregaatrijen (privacy
+  // 'totalen') dragen ownership 'personal' + fractie 1 → volle som.
+  const shareOf = useCallback(
+    (debt: PerspectiveDebt, raw: number): number =>
+      debt.ownership === 'shared' && perspective !== 'household'
+        ? raw * (debt._myShareFraction ?? 1)
+        : raw,
+    [perspective],
+  )
+
+  // Privacy-aggregaatrijen (één "Partner schulden (totaal)"-kaart) staan los
+  // van de echte, bewerkbare schulden. Echte schulden voeden grouping, KPI's,
+  // sparklines en de aflos-engine; de aggregaatrij rendert als losse kaart.
+  const aggregatedDebts = debts.filter((d) => d._aggregated)
+  const realDebts = debts.filter((d) => !d._aggregated)
+  const activeDebts = realDebts.filter((d) => d.is_active && Number(d.current_balance) > 0)
+
+  // Headline-totalen schalen mee met het perspectief (aandeel van gedeeld).
+  // De aggregaatrij draagt zijn volledige (reeds gesommeerde) saldo mee.
+  const totalBalance =
+    activeDebts.reduce((s, d) => s + shareOf(d, Number(d.current_balance)), 0) +
+    aggregatedDebts.reduce((s, d) => s + Number(d.current_balance), 0)
+  const totalMonthlyPayment = activeDebts.reduce(
+    (s, d) => s + shareOf(d, Number(d.monthly_payment ?? 0)),
+    0,
+  )
+  // Gewogen gemiddelde rente — met (aandeel-gewogen) current_balance als
+  // weegfactor, zodat grote hypotheken zwaarder meetellen dan een kleine
+  // creditcard. Aggregaatrijen hebben geen rente-detail en blijven buiten
+  // de weging.
+  const interestWeightBase = activeDebts.reduce(
+    (s, d) => s + shareOf(d, Number(d.current_balance)),
+    0,
+  )
+  const weightedAvgInterest = interestWeightBase > 0
+    ? activeDebts.reduce(
+        (s, d) => s + Number(d.interest_rate ?? 0) * shareOf(d, Number(d.current_balance)),
+        0,
+      ) / interestWeightBase
     : 0
 
-  // Group by type — analoog aan `assets-client.tsx` (regel 250-261)
+  // Group by type — analoog aan `assets-client.tsx`. Per-type totaal is
+  // perspectief-correct (aandeel-gewogen) zodat de CategoryGroupHeader hetzelfde
+  // cijfer toont als de headline optelt.
   const byType = (Object.keys(DEBT_TYPE_LABELS) as DebtType[]).reduce(
     (acc, type) => {
       const items = activeDebts.filter(d => d.debt_type === type)
       acc[type] = {
         debts: items,
-        total: items.reduce((s, d) => s + Number(d.current_balance), 0),
+        total: items.reduce((s, d) => s + shareOf(d, Number(d.current_balance)), 0),
       }
       return acc
     },
-    {} as Record<DebtType, { debts: Debt[]; total: number }>,
+    {} as Record<DebtType, { debts: PerspectiveDebt[]; total: number }>,
   )
+
+  // "Partner schulden privé"-notice: in huishouden/partner-view met partner
+  // maar geen enkele partner-schuld zichtbaar (privacy 'hidden' → loader laat
+  // ze weg, geen aggregaatrij). We berekenen de privacy niet meer zelf; de
+  // afwezigheid van partner-data ís het signaal.
+  const partnerDebtsHidden =
+    !!ctx?.hasHousehold &&
+    perspective !== 'personal' &&
+    !debts.some((d) => d._provenance === 'partner')
 
   // ── KPI's per schuld (zelfde patroon als debt-category-page) ──
   // userAssets levert linked_asset_id + current_value voor mortgage LTV.
   // computeDebtKpi heeft alleen DebtKpiContext nodig.
   const kpiByDebtId = useMemo(() => {
-    const ctx = buildKpiContext({
+    // KPI's draaien op de VOLLEDIGE saldo's (LTV, rente, looptijd zijn niet
+    // perspectief-afhankelijk). Het aandeel zit alleen in de headline/subline.
+    const kpiCtx = buildKpiContext({
       assets: userAssets.map((a) => ({
         id: a.id,
         asset_type: a.asset_type,
@@ -379,7 +422,7 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
     }).debt
     const map = new Map<string, KpiPair>()
     for (const debt of activeDebts) {
-      const pair = computeDebtKpi(debt, ctx)
+      const pair = computeDebtKpi(debt, kpiCtx)
       if (pair.primary || pair.secondary) {
         map.set(debt.id, pair)
       }
@@ -442,8 +485,8 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
           maand na maand. Een lagere <GlossaryTerm term="schuldgraad">schuldgraad</GlossaryTerm> betekent meer financiële speelruimte.
         </EditorialDeck>
 
-        {perspective === 'household' && hiddenCategories.includes('debts') && (
-          <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['debts']} />
+        {partnerDebtsHidden && (
+          <PrivacyHiddenNotice hiddenCategories={['debts']} forCategories={['debts']} />
         )}
       </header>
 
@@ -511,8 +554,17 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
           {/* ── Content ── */}
           {aflosrouteOpen && (
             <div className="p-4 sm:p-6">
+              {/* De aflos-engine draait ALTIJD op volledige huishoud-saldo's —
+                  fractionele amortisatie is onzin. `activeDebts` dragen het
+                  volledige `current_balance`; het aandeel zit enkel in de
+                  headline. In een huishouden maken we dat expliciet. */}
+              {ctx?.hasHousehold && (
+                <p className="mb-3 text-[11px] italic text-[var(--ink-3)]">
+                  Aflosroute toont het hele huishouden.
+                </p>
+              )}
               <DebtPayoffStrategy
-                debts={activeDebts}
+                debts={activeDebts as unknown as Debt[]}
                 initialStrategy={strategieFromUrl}
                 kicker="Aflosroute"
                 onStrategyChange={setStrategieInUrl}
@@ -584,6 +636,14 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
                     onEditClick={handleDebtEdit}
                     onRevalueClick={handleDebtRevalue}
                     staggerIndex={idx}
+                    provenance={debt._provenance}
+                    perspective={perspective}
+                    partnerName={ctx?.partnerName}
+                    ownershipSubline={formatOwnershipSubline(
+                      debt,
+                      perspective,
+                      Number(debt.current_balance),
+                    )}
                   />
                 ))}
                 <AddCategoryCard
@@ -598,6 +658,33 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
             </div>
           )
         })}
+
+        {/* ═══ Partner-aggregaat (privacy 'totalen') ═══════════════
+            Wanneer de partner alleen totalen deelt, levert de loader één
+            niet-bewerkbare aggregaatrij ("Partner schulden (totaal)"). Geen
+            categorie-grouping — losse read-only kaart, alleen in
+            huishouden/partner-view. Respecteert de actieve type-filter niet
+            (er is geen echte debt_type). */}
+        {!debtTypeFilter && aggregatedDebts.length > 0 && (
+          <div id="debt-group-partner-aggregaat" className="scroll-mt-24">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {aggregatedDebts.map((debt, idx) => (
+                <VermogenDebtCard
+                  key={debt.id}
+                  debt={debt}
+                  onClick={() => {}}
+                  onEditClick={() => {}}
+                  onRevalueClick={() => {}}
+                  staggerIndex={idx}
+                  aggregated
+                  provenance="partner"
+                  perspective={perspective}
+                  partnerName={ctx?.partnerName}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ═══ Detail-pane — uniforme slide-in flow (driewegregel kind="pane")
@@ -608,7 +695,7 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
         debt={selectedDebt}
         valuations={selectedDebt ? valuationsByDebtId[selectedDebt.id] : undefined}
         userAssets={userAssets}
-        allDebts={debts}
+        allDebts={realDebts}
         dailyExpenses={0}
         onClose={() => setSelectedDebtId(null)}
         onChanged={() => {

@@ -3,86 +3,36 @@
 import { useEffect, useState, useCallback } from 'react'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { formatFireAge } from '@/lib/horizon-data'
 import { usePerspective } from '@/components/app/perspective-provider'
-import { SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
+import { SPLIT_MODE_LABELS } from '@/lib/household-data'
+import { createClient } from '@/lib/supabase/client'
 import {
-  Users, TrendingUp, Hourglass, Percent, Target, User,
-  ArrowRight, Clock, PiggyBank, Wallet, Info, Settings2,
+  buildHouseholdProjectionInput,
+  type HouseholdProjectionResult,
+  type HouseholdFireProjectionData,
+  type HouseholdPartnerProjection,
+} from '@/lib/household-projection'
+import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import {
+  Users, TrendingUp, Percent, Target, User,
+  Clock, PiggyBank, Wallet, Info, Settings2,
 } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
-// Types matching the API response
-interface PartnerFinancials {
-  userId: string
-  fullName: string | null
-  isCurrentUser: boolean
-  totalAssets: number
-  totalDebts: number
-  monthlyIncome: number
-  monthlyExpenses: number
-  monthlyContributions: number
-  yearlyMustExpenses: number
-  dateOfBirth: string | null
-  netWorth: number
-  sharedAssetsValue: number
-  sharedDebtsValue: number
-}
-
-interface FireProjectionData {
-  fireTarget: number
-  netWorth: number
-  freedomPercentage: number
-  fireAge: number | null
-  currentAge: number | null
-  fireDate: string
-  countdownDays: number
-  freedomYears: number
-  freedomMonths: number
-  monthlyPassiveIncome: number
-  monthlySavings: number
-  savingsRate: number
-}
-
-interface PartnerProjection {
-  userId: string
-  fullName: string | null
-  isCurrentUser: boolean
-  financials: PartnerFinancials
-  projection: FireProjectionData
-}
-
-interface HouseholdFireData {
-  hasHousehold: boolean
-  householdName: string
-  splitMode: SplitMode
-  customSplitPct: number | null
-  combined: {
-    projection: FireProjectionData
-  }
-  partners: PartnerProjection[]
-  comparison: {
-    combinedNetWorth: number
-    combinedMonthlyIncome: number
-    combinedMonthlyExpenses: number
-    combinedMonthlySavings: number
-    combinedSavingsRate: number
-    combinedFireTarget: number
-    combinedFreedomPercentage: number
-    sharedFireTarget: number
-    individualFireTargets: Array<{
-      userId: string
-      fullName: string | null
-      fireTarget: number
-      fireAge: number | null
-      freedomPercentage: number
-    }>
-  }
-}
+// Local aliases so the existing JSX (which references these names) keeps working.
+// The single source of truth is now lib/household-projection.ts.
+type FireProjectionData = HouseholdFireProjectionData
+type PartnerProjection = HouseholdPartnerProjection
+type HouseholdFireData = HouseholdProjectionResult
 
 /**
  * HouseholdFireSection - Displays combined and individual FIRE projections
  * for household members. Shows side-by-side partner comparison.
+ *
+ * Data komt nu uit buildHouseholdProjectionInput (lib/household-projection.ts):
+ * twee runUnifiedProjection-runs (per partner) + een gecombineerde unified
+ * projectie op de head-age-as met dual-AOW. Reageert op perspectief-wissels
+ * door te herladen via de browser-client.
  *
  * Renders on /horizon page when user has a household.
  */
@@ -90,24 +40,17 @@ export function HouseholdFireSection() {
   const [data, setData] = useState<HouseholdFireData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { perspective } = usePerspective()
+  const { perspective, perspectiveVersion } = usePerspective()
 
   const loadData = useCallback(async () => {
     try {
-      const res = await fetch('/api/household/fire-projections')
-      if (!res.ok) {
-        if (res.status === 401) {
-          setData(null)
-          return
-        }
-        throw new Error('Kon huishoudgegevens niet laden')
-      }
-      const json = await res.json()
-      if (!json.hasHousehold) {
+      const supabase = createClient()
+      const result = await buildHouseholdProjectionInput(supabase)
+      if (!result.hasHousehold) {
         setData(null)
         return
       }
-      setData(json)
+      setData(result)
     } catch (err) {
       console.error('Error loading household FIRE data:', err)
       setError('Kon huishouden FIRE-gegevens niet laden')
@@ -116,7 +59,8 @@ export function HouseholdFireSection() {
     }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  // Re-load on mount and whenever the perspective changes in-session.
+  useEffect(() => { loadData() }, [loadData, perspectiveVersion])
 
   // Don't render anything if no household
   if (!loading && !data) return null
@@ -253,6 +197,17 @@ export function HouseholdFireSection() {
           Gecombineerd inkomen, gecombineerde uitgaven. Gedeeld en individueel FIRE-doel (verdeling: {splitLabel}).
         </p>
       </div>
+
+      {/* Partner-privacy edge case: partner verbergt vermogen → de gecombineerde
+          projectie valt terug op enkel jouw cijfers. Toon een subtiele indicatie. */}
+      {data.partnerDataHidden && (
+        <div className="mb-4" data-testid="household-fire-privacy-notice">
+          <PrivacyHiddenNotice hiddenCategories={['assets']} />
+          <p className="mt-1.5 text-xs text-[var(--ink-4)]">
+            Je partner deelt het vermogen niet, dus de gecombineerde FIRE-projectie is gebaseerd op jouw gegevens. Vraag je partner om vermogen te delen voor een volledig huishoudbeeld.
+          </p>
+        </div>
+      )}
 
       {/* Combined Household Hero Card */}
       <div className="rounded-[var(--r-lg)] border-2 border-horizon-200 bg-gradient-to-br from-horizon-50 to-white p-6" data-testid="household-combined-card">

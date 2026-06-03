@@ -23,6 +23,12 @@ import { CategoryTabs, type CategoryTab } from './category-tabs'
 import { CategoryHistoryChart } from './category-history-chart'
 import type { CategoryHistoryData } from '@/lib/load-category-history'
 import { createClient } from '@/lib/supabase/client'
+import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
+import {
+  loadPerspectiveData,
+  type PerspectiveContext,
+} from '@/lib/household/perspective-loader'
+import { formatOwnershipSubline, type Perspective } from '@/lib/household-data'
 
 // Lazy-load: deze overlays openen pas op user-actie. Houdt hun JS-chunk uit
 // het initial-bundle → snellere mobile-LCP op de hero.
@@ -113,6 +119,24 @@ interface DebtCategoryPageProps {
    * zijn eigen empty-state — pagina blijft functioneel.
    */
   initialHistoryData?: CategoryHistoryData
+  /**
+   * Perspectief van de server-eerste-paint (uit `getServerPerspective()`).
+   * De client her-laadt via de browser-client zodra de gebruiker tijdens de
+   * sessie van perspectief wisselt. Default 'personal' (solo).
+   */
+  initialPerspective?: Perspective
+  /**
+   * Huishoud-context van de eerste paint (partnernaam, aandeel-%, …). Wordt
+   * vervangen wanneer de client her-laadt op een perspectief-switch.
+   */
+  initialContext?: PerspectiveContext
+}
+
+/** Schuldrij met perspectief-stempels (rij + provenance + aandeel). */
+type PerspectiveDebt = Debt & {
+  _provenance: 'eigen' | 'partner' | 'gezamenlijk'
+  _myShareFraction: number
+  _aggregated?: boolean
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -141,12 +165,55 @@ export function DebtCategoryPage({
   initialConnectionsByDebtId,
   initialDebtSparklines,
   initialHistoryData,
+  initialPerspective = 'personal',
+  initialContext,
 }: DebtCategoryPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { activeModules } = useFeatureAccess()
 
-  const debts = initialDebts
+  // ── Perspectief-bewuste schuldenlijst ──────────────────────
+  // Eerste paint komt van de server (initialDebts, in het server-perspectief).
+  // Bij een in-sessie perspectief-switch her-laden we via de browser-client
+  // zodat badges, aandeel-sublines en het hero-totaal meebewegen. Solo-gebruik
+  // raakt dit pad nooit (perspective blijft 'personal' === initialPerspective).
+  const { perspective } = usePerspective()
+  const perspectiveSignal = usePerspectiveAbort(perspective)
+  const [debts, setDebts] = useState<PerspectiveDebt[]>(
+    initialDebts as unknown as PerspectiveDebt[],
+  )
+  const [ctx, setCtx] = useState<PerspectiveContext | null>(initialContext ?? null)
+
+  useEffect(() => {
+    // Eerste render in het server-perspectief gebruikt de props ongewijzigd —
+    // geen dubbele fetch, geen flits.
+    if (perspective === initialPerspective) {
+      setDebts(initialDebts as unknown as PerspectiveDebt[])
+      setCtx(initialContext ?? null)
+      return
+    }
+    const signal = perspectiveSignal
+    const supabase = createClient()
+    loadPerspectiveData(supabase, perspective)
+      .then(({ debts: loaded, context }) => {
+        if (signal.aborted) return
+        const filtered = (loaded as unknown as PerspectiveDebt[])
+          .filter(
+            (d) =>
+              !d._aggregated &&
+              d.debt_type === type &&
+              d.is_active &&
+              Number(d.current_balance) > 0,
+          )
+          .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+        setCtx(context)
+        setDebts(filtered)
+      })
+      .catch(() => {
+        // Non-fataal: behoud de huidige lijst bij een laadfout.
+      })
+  }, [perspective, initialPerspective, initialDebts, initialContext, type, perspectiveSignal])
+
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   // URL-driven pane-state: `?debt=<id>` opent de slide-in pane voor die
   // schuld. Consistent met asset-category-page.tsx; `debt` is al de
@@ -273,9 +340,20 @@ export function DebtCategoryPage({
     }
   }, [handleTabChange, requestedTab, tabs])
 
+  // Hero-totaal is perspectief-correct: gedeelde schulden tellen in
+  // eigen/partner-view alleen met hun aandeel mee (`_myShareFraction`), in
+  // huishouden-view (en voor persoonlijke items) telt de volle waarde.
   const total = useMemo(
-    () => debts.reduce((sum, debt) => sum + Number(debt.current_balance), 0),
-    [debts],
+    () =>
+      debts.reduce((sum, debt) => {
+        const raw = Number(debt.current_balance)
+        const v =
+          debt.ownership === 'shared' && perspective !== 'household'
+            ? raw * (debt._myShareFraction ?? 1)
+            : raw
+        return sum + v
+      }, 0),
+    [debts, perspective],
   )
   const count = debts.length
   const isItemsTab = activeTabKey === ITEMS_TAB_KEY
@@ -286,7 +364,7 @@ export function DebtCategoryPage({
   // valt LTV stilzwijgend weg — overige KPI's (rente, looptijd, benutting)
   // werken op lokale velden en blijven beschikbaar.
   const kpiByDebtId = useMemo(() => {
-    const ctx = initialKpiRefs
+    const kpiCtx = initialKpiRefs
       ? buildKpiContext({
           assets: initialKpiRefs.assets as unknown as Parameters<typeof buildKpiContext>[0]['assets'],
           debts: initialKpiRefs.debts as unknown as Parameters<typeof buildKpiContext>[0]['debts'],
@@ -295,7 +373,7 @@ export function DebtCategoryPage({
       : {}
     const map = new Map<string, KpiPair>()
     for (const debt of debts) {
-      const pair = computeDebtKpi(debt, ctx)
+      const pair = computeDebtKpi(debt, kpiCtx)
       if (pair.primary || pair.secondary) {
         map.set(debt.id, pair)
       }
@@ -378,6 +456,8 @@ export function DebtCategoryPage({
                 onEditClick={handleDebtEdit}
                 onRevalueClick={handleDebtRevalue}
                 onAddClick={() => setQuickAddOpen(true)}
+                perspective={perspective}
+                partnerName={ctx?.partnerName ?? null}
               />
 
               {initialHistoryData && (
@@ -555,7 +635,7 @@ function DebtCategoryHero({ type, total, count }: DebtCategoryHeroProps) {
 
 interface DebtItemsTabProps {
   type: DebtType
-  debts: Debt[]
+  debts: PerspectiveDebt[]
   kpiByDebtId?: Map<string, KpiPair>
   connectionsByDebtId?: Record<string, AssetConnectionSummary>
   sparklinesByDebtId?: Record<string, number[]>
@@ -563,6 +643,10 @@ interface DebtItemsTabProps {
   onEditClick: (debtId: string) => void
   onRevalueClick: (debtId: string) => void
   onAddClick: () => void
+  /** Actief perspectief — voor de herkomst-badge + aandeel-subline. */
+  perspective: Perspective
+  /** Partnernaam voor de partner-badge. */
+  partnerName: string | null
 }
 
 function DebtItemsTab({
@@ -575,6 +659,8 @@ function DebtItemsTab({
   onEditClick,
   onRevalueClick,
   onAddClick,
+  perspective,
+  partnerName,
 }: DebtItemsTabProps) {
   if (debts.length === 0) {
     return <EmptyDebtsState type={type} onAddClick={onAddClick} />
@@ -593,6 +679,14 @@ function DebtItemsTab({
           onEditClick={onEditClick}
           onRevalueClick={onRevalueClick}
           staggerIndex={idx}
+          provenance={debt._provenance}
+          perspective={perspective}
+          partnerName={partnerName}
+          ownershipSubline={formatOwnershipSubline(
+            debt,
+            perspective,
+            Number(debt.current_balance),
+          )}
         />
       ))}
       <AddCategoryCard

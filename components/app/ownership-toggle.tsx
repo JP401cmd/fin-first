@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { User, Users, AlertTriangle } from 'lucide-react'
+import type { Provenance, Perspective } from '@/lib/household-data'
 
 export type OwnershipType = 'personal' | 'shared'
 
@@ -128,19 +129,71 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
 }
 
 /**
- * OwnershipBadge — small indicator badge for list views.
+ * OwnershipBadge — "van wie is dit"-indicator voor lijst-/kaartweergaven.
+ *
+ * Drie staten op basis van `provenance` (uit `deriveProvenance`):
+ *  - `gezamenlijk` → Users-icoon, "Gezamenlijk" (kern-tint) — altijd getoond
+ *  - `partner`     → partnernaam ?? "Partner" (horizon-tint)
+ *  - `eigen`       → "Eigen" in huishouden/partner-view; **null** in personal-view (ruis)
+ *
+ * Backwards compatible: legacy call-sites die alleen `ownership` doorgeven blijven
+ * werken (shared → gezamenlijk, personal → eigen). De `data-testid`
+ * "ownership-badge-shared" blijft behouden voor bestaande tests.
  */
-export function OwnershipBadge({ ownership }: { ownership: OwnershipType }) {
-  if (ownership !== 'shared') return null
+export function OwnershipBadge({
+  ownership,
+  provenance,
+  partnerName,
+  perspective,
+}: {
+  /** Legacy: gebruikt wanneer geen expliciete `provenance` is gegeven. */
+  ownership?: OwnershipType
+  /** Voorkeur: expliciete herkomst uit deriveProvenance(). */
+  provenance?: Provenance
+  partnerName?: string | null
+  perspective?: Perspective
+}) {
+  const prov: Provenance =
+    provenance ?? (ownership === 'shared' ? 'gezamenlijk' : 'eigen')
 
+  // "Eigen" is ruis in het persoonlijke perspectief (alles is daar van jou).
+  if (prov === 'eigen' && (!perspective || perspective === 'personal')) return null
+
+  if (prov === 'gezamenlijk') {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 rounded-full bg-kern-50 px-1.5 py-0.5 text-[10px] font-medium text-kern-700 border border-kern-200"
+        data-testid="ownership-badge-shared"
+        title="Gezamenlijk met je huishouden"
+      >
+        <Users className="h-2.5 w-2.5" />
+        Gezamenlijk
+      </span>
+    )
+  }
+
+  if (prov === 'partner') {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 rounded-full bg-horizon-50 px-1.5 py-0.5 text-[10px] font-medium text-horizon-700 border border-horizon-200"
+        data-testid="ownership-badge-partner"
+        title={`Van ${partnerName ?? 'je partner'}`}
+      >
+        <User className="h-2.5 w-2.5" />
+        {partnerName ?? 'Partner'}
+      </span>
+    )
+  }
+
+  // prov === 'eigen' in huishouden/partner-perspectief
   return (
     <span
-      className="inline-flex items-center gap-0.5 rounded-full bg-kern-50 px-1.5 py-0.5 text-[10px] font-medium text-kern-700 border border-kern-200"
-      data-testid="ownership-badge-shared"
-      title="Gedeeld met huishouden"
+      className="inline-flex items-center gap-0.5 rounded-full bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ink-3)] border border-[var(--border-ed)]"
+      data-testid="ownership-badge-eigen"
+      title="Van jou"
     >
-      <Users className="h-2.5 w-2.5" />
-      Gedeeld
+      <User className="h-2.5 w-2.5" />
+      Eigen
     </span>
   )
 }

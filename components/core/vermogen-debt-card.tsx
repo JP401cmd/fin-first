@@ -26,8 +26,10 @@ import { CardKpiStrip } from './card-kpi-strip'
 import { ConnectionIndicator } from './connection-indicator'
 import { CardTintOverlay } from './card-tint-overlay'
 import { VermogenCardActionButton } from './vermogen-card-action-button'
+import { OwnershipBadge } from '@/components/app/ownership-toggle'
 import type { KpiPair } from '@/lib/asset-kpi'
 import type { AssetConnectionSummary } from '@/lib/connections-data'
+import type { Perspective, Provenance } from '@/lib/household-data'
 
 // ── Constants ───────────────────────────────────────────────
 
@@ -78,6 +80,25 @@ interface VermogenDebtCardProps {
   onEditClick: (debtId: string) => void
   /** Opent de detail-pane met de ValuationModal direct open (URL: `?debt=<id>&via=revalue`). */
   onRevalueClick: (debtId: string) => void
+  // ── Huishouden-perspectief (optioneel; solo-gebruik blijft identiek) ──
+  /** Herkomst-stempel uit de perspectief-loader → toont de OwnershipBadge. */
+  provenance?: Provenance
+  /** Actief perspectief — bepaalt of de "Eigen"-badge ruis is (personal). */
+  perspective?: Perspective
+  /** Partnernaam voor de partner-badge. */
+  partnerName?: string | null
+  /**
+   * "Jouw aandeel: € X" / "Aandeel partner: € X"-subregel voor gedeelde
+   * schulden in eigen/partner-view. `null`/leeg → niet getoond. De caller
+   * berekent dit via `formatOwnershipSubline`.
+   */
+  ownershipSubline?: string | null
+  /**
+   * Privacy-aggregaatrij ("Partner schulden (totaal)"): rendert read-only —
+   * geen klik-navigatie, geen actie-rij, geen KPI-strip. De `current_balance`
+   * is het gesommeerde partner-totaal.
+   */
+  aggregated?: boolean
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -101,6 +122,11 @@ export function VermogenDebtCard({
   staggerIndex = 0,
   onEditClick,
   onRevalueClick,
+  provenance,
+  perspective,
+  partnerName,
+  ownershipSubline,
+  aggregated = false,
 }: VermogenDebtCardProps) {
   const { flashClass } = useFlashChange(debt.current_balance)
   const Icon = DEBT_ICONS[debt.debt_type]
@@ -114,6 +140,57 @@ export function VermogenDebtCard({
     subtitleParts.push(formatRate(debt.interest_rate))
   }
   const subtitle = subtitleParts.join(' · ') // joined with middle dot
+
+  // ── Privacy-aggregaatkaart ───────────────────────────────────
+  // Eén niet-bewerkbare "Partner schulden (totaal)"-kaart: de partner deelt
+  // alleen totalen, dus geen klik-navigatie, actie-rij of KPI-strip.
+  if (aggregated) {
+    return (
+      <div
+        className="card-editorial animate-fade-up relative w-full"
+        style={{ '--stagger': `${staggerIndex * 60}ms` } as React.CSSProperties}
+        data-testid="debt-card-aggregated"
+      >
+        <div
+          className="relative z-10 h-[3px] w-full"
+          style={{ backgroundColor: DEBT_ACCENT_COLOR }}
+        />
+        <div className="relative z-10 flex w-full items-center gap-3 p-3 sm:p-4">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-red-100">
+            <Icon className="h-4 w-4 text-red-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="truncate text-sm font-semibold text-[var(--ink)]">
+                {debt.name}
+              </p>
+              <OwnershipBadge
+                provenance={provenance ?? 'partner'}
+                partnerName={partnerName}
+                perspective={perspective}
+              />
+            </div>
+            <p
+              className="truncate text-[11px] italic text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Alleen totaal gedeeld
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-negative">
+              <MaskedAmount
+                value={Math.abs(debt.current_balance)}
+                signPrefix="-"
+                tone="kern"
+                className="text-sm font-bold"
+              />
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -145,6 +222,15 @@ export function VermogenDebtCard({
             <p className="truncate text-sm font-semibold text-[var(--ink)]">
               {debt.name}
             </p>
+            {/* Herkomst-badge (gezamenlijk / partner / eigen). Null in
+                personal-view voor eigen items — geen ruis. */}
+            {provenance && (
+              <OwnershipBadge
+                provenance={provenance}
+                partnerName={partnerName}
+                perspective={perspective}
+              />
+            )}
             {connection && <ConnectionIndicator connection={connection} />}
           </div>
           {/* Sub-meta in italic Source Serif (mini-artikel-blueprint) */}
@@ -155,6 +241,12 @@ export function VermogenDebtCard({
             {DEBT_TYPE_LABELS[debt.debt_type]}
             {subtitle ? ` · ${subtitle}` : ''}
           </p>
+          {/* "Jouw aandeel" / "Aandeel partner" voor gedeelde schulden. */}
+          {ownershipSubline && (
+            <p className="truncate text-[11px] font-medium text-[var(--ink-4)]">
+              {ownershipSubline}
+            </p>
+          )}
         </div>
 
         {/* Right: balance (negatief, met highlight-marker als hoofdcijfer) + monthly payment */}

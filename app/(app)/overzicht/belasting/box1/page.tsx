@@ -2,14 +2,22 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { Clock } from 'lucide-react'
+import { Clock, Users, EyeOff } from 'lucide-react'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
 import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page-header'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { getServerPerspective } from '@/lib/household/server-perspective'
+import { loadPerspectiveTransactions } from '@/lib/household/perspective-loader'
 
 export const metadata: Metadata = {
   title: 'Box 1 · Werk + woning — TriFinity',
   description: 'Belasting over werk en woning — plus je onbenutte jaarruimte (pensioenaftrek).',
+}
+
+/** Netto-maandinkomen → geschat bruto-jaarinkomen via marginaal tarief. */
+function netMonthlyToGrossYearly(netMonthly: number, marg: number): number {
+  if (netMonthly <= 0 || marg <= 0 || marg >= 1) return 0
+  return (netMonthly * 12) / (1 - marg)
 }
 
 /**
@@ -20,29 +28,48 @@ export const metadata: Metadata = {
  * hebben:
  *  1. Een snelle indicatie van de Box 1-druk (bruto-inkomen × marginaal).
  *  2. De jaarruimte-actie: onbenutte pensioen-aftrekruimte waarmee je Box
- *     1-belasting kunt verlagen via een lijfrente-inleg. Dit is de
- *     "inspiratie"/actie die voorheen op de belasting-landing stond.
+ *     1-belasting kunt verlagen via een lijfrente-inleg.
+ *
+ * Box 1 is per-persoon (jaarruimte heeft een eigen cap per persoon). In de
+ * huishoud-view tonen we daarom TWEE JaarruimteCards naast elkaar — die van
+ * jou en die van je partner — gevoed uit het privacy-gated partner-inkomen
+ * van het fundament. Deelt de partner geen inkomen → graceful melding.
  */
 export default async function BelastingBox1Page() {
   const supabase = await createClient()
+  const perspective = await getServerPerspective()
   const horizonData = await loadHorizonData(supabase)
 
   // Box 1-schatting (zelfde benadering als de landing-KPI): netto ≈ bruto ×
   // (1 − marginaal) → bruto ≈ netto / (1 − marginaal); druk ≈ bruto × marginaal.
-  let box1Tax: number | null = null
-  let grossYearly = 0
   const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
   const marg = horizonData.fireParams?.marginaalTarief ?? 0.3697
-  if (netMonthly > 0 && marg > 0 && marg < 1) {
-    grossYearly = (netMonthly * 12) / (1 - marg)
-    box1Tax = Math.round(grossYearly * marg)
-  }
+  const grossYearly = netMonthlyToGrossYearly(netMonthly, marg)
+  const box1Tax = grossYearly > 0 ? Math.round(grossYearly * marg) : null
 
   // Vrijheidstijd-equivalent ("Geld is opgeslagen tijd"): hoeveel dagen
   // vrijheid kost deze heffing? Dagelijkse uitgaven uit dezelfde bron als
   // de rest van de app; 0 → geen vertaling (we tonen de regel dan niet).
   const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
   const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+
+  // Huishoud-view: partner-jaarruimte. Partner-inkomen is privacy-gated en
+  // komt uit het fundament (income-RPC). null → partner deelt geen inkomen.
+  let isHousehold = false
+  let partnerName: string | null = null
+  let partnerGrossYearly: number | null = null
+  if (perspective === 'household' || perspective === 'partner') {
+    const tx = await loadPerspectiveTransactions(supabase, 'household')
+    isHousehold = tx.context.hasHousehold
+    partnerName = tx.context.partnerName
+    if (isHousehold) {
+      partnerGrossYearly =
+        tx.partnerMonthlyIncome != null
+          ? netMonthlyToGrossYearly(tx.partnerMonthlyIncome, marg)
+          : null
+    }
+  }
+  const showTwoCards = isHousehold && perspective !== 'partner'
 
   return (
     <>
@@ -65,13 +92,53 @@ export default async function BelastingBox1Page() {
         </section>
       )}
 
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 pb-8">
-        <JaarruimteCard
-          grossYearlyIncome={grossYearly}
-          pensioenAangroei={0}
-          marginaalTarief={marg}
-        />
-      </section>
+      {showTwoCards ? (
+        <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 pb-8">
+          <div className="mb-3 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+            <Users className="h-3.5 w-3.5" aria-hidden="true" />
+            Jaarruimte per persoon
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <div className="mb-1.5 text-xs font-semibold text-[var(--ink-2)]">Jij</div>
+              <JaarruimteCard
+                grossYearlyIncome={grossYearly}
+                pensioenAangroei={0}
+                marginaalTarief={marg}
+              />
+            </div>
+            <div>
+              <div className="mb-1.5 text-xs font-semibold text-[var(--ink-2)]">
+                {partnerName ?? 'Partner'}
+              </div>
+              {partnerGrossYearly != null ? (
+                <JaarruimteCard
+                  grossYearlyIncome={partnerGrossYearly}
+                  pensioenAangroei={0}
+                  marginaalTarief={marg}
+                />
+              ) : (
+                <div className="flex items-start gap-2 rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-4 sm:p-5 text-xs text-[var(--ink-2)]">
+                  <EyeOff className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--ink-3)]" aria-hidden="true" />
+                  <span>
+                    {partnerName ?? 'Je partner'} deelt geen inkomen, dus we
+                    kunnen de jaarruimte niet berekenen. Vraag je partner om het
+                    inkomen te delen voor een gezamenlijk Box 1-beeld.
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 pb-8">
+          <JaarruimteCard
+            grossYearlyIncome={grossYearly}
+            pensioenAangroei={0}
+            marginaalTarief={marg}
+          />
+        </section>
+      )}
     </>
   )
 }

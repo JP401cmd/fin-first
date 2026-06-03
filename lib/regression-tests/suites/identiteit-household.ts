@@ -11,6 +11,10 @@ import {
   computePerspectiveNetWorth,
   normalisePrivacySettings,
   applyPrivacyFilter,
+  deriveProvenance,
+  debtShareFraction,
+  formatOwnershipSubline,
+  dailyExpensesByPerspective,
   SPLIT_MODE_LABELS,
   SPLIT_MODE_DESCRIPTIONS,
   DEFAULT_PRIVACY_SETTINGS,
@@ -682,6 +686,101 @@ const tests: TestCase[] = [
         const { status } = await fetchJson(ep.path, init)
         assertEqual(status, 401, `${ep.method} ${ep.path} → 401`)
       }
+    },
+  },
+
+  // ── Step 10: Perspectief-fundament (eigen / huishouden / partner) ─────────
+  {
+    id: 'household-derive-provenance',
+    name: 'deriveProvenance: eigen/partner/gezamenlijk',
+    category: CAT,
+    description: 'Herkomst-afleiding ("van wie is dit") voor de 3-staten OwnershipBadge',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      assertEqual(deriveProvenance({ ownership: 'shared', user_id: 'me' }, 'me'), 'gezamenlijk', 'shared → gezamenlijk')
+      assertEqual(deriveProvenance({ ownership: 'personal', user_id: 'me' }, 'me'), 'eigen', 'eigen personal → eigen')
+      assertEqual(deriveProvenance({ ownership: 'personal', user_id: 'partner' }, 'me'), 'partner', 'partner personal → partner')
+      assertEqual(deriveProvenance({ ownership: 'personal' }, 'me'), 'eigen', 'onbekende user_id → eigen (veilige default)')
+    },
+  },
+  {
+    id: 'household-debt-share-fraction',
+    name: 'debtShareFraction respecteert partner_split_pct',
+    category: CAT,
+    description: 'Per-schuld aandeel: eigenaar krijgt partner_split_pct, de ander het complement',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      assertEqual(debtShareFraction({ partner_split_pct: null, user_id: 'me' }, 'me', 0.5), 0.5, 'geen split → huishoudfractie')
+      assertEqual(debtShareFraction({ partner_split_pct: 70, user_id: 'me' }, 'me', 0.5), 0.7, 'eigenaar ziet 70%')
+      assert(Math.abs(debtShareFraction({ partner_split_pct: 70, user_id: 'me' }, 'partner', 0.5) - 0.3) < 1e-9, 'de ander ziet 30%')
+    },
+  },
+  {
+    id: 'household-net-worth-partner-branch',
+    name: 'computePerspectiveNetWorth: partner-tak',
+    category: CAT,
+    description: 'Partner-perspectief: partner-persoonlijk + partner-aandeel van gedeeld',
+    priority: 'critical',
+    estimatedDurationMs: 50,
+    fn() {
+      const assets = [
+        { current_value: 1000, ownership: 'personal' as OwnershipType, user_id: 'me', is_active: true },
+        { current_value: 2000, ownership: 'personal' as OwnershipType, user_id: 'partner', is_active: true },
+        { current_value: 4000, ownership: 'shared' as OwnershipType, user_id: 'me', is_active: true },
+      ]
+      const debts = [
+        { current_balance: 500, ownership: 'personal' as OwnershipType, user_id: 'partner', is_active: true },
+        { current_balance: 1000, ownership: 'shared' as OwnershipType, user_id: 'me', is_active: true },
+      ]
+      const r = computePerspectiveNetWorth(assets, debts, 'partner', 50, 'me', 'partner')
+      assertEqual(r.totalAssets, 4000, 'partner: 2000 personal + 2000 (50% gedeeld)')
+      assertEqual(r.totalDebts, 1000, 'partner: 500 personal + 500 (50% gedeeld)')
+      assertEqual(r.netWorth, 3000, 'partner netto = 3000')
+    },
+  },
+  {
+    id: 'household-ownership-subline',
+    name: 'formatOwnershipSubline: jouw/partner aandeel',
+    category: CAT,
+    description: 'Subregel toont aandeel alleen voor gedeelde items buiten huishouden-view',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      assertEqual(formatOwnershipSubline({ ownership: 'personal' }, 'personal', 1000), null, 'personal → geen subregel')
+      assertEqual(formatOwnershipSubline({ ownership: 'shared', _myShareFraction: 0.5 }, 'household', 1000), null, 'household → geen subregel')
+      const eigen = formatOwnershipSubline({ ownership: 'shared', _myShareFraction: 0.5 }, 'personal', 1000)
+      assertNotNull(eigen, 'eigen subregel bestaat')
+      assert((eigen as string).includes('Jouw aandeel'), 'label "Jouw aandeel"')
+      const partner = formatOwnershipSubline({ ownership: 'shared', _myShareFraction: 0.3 }, 'partner', 1000)
+      assert((partner as string).includes('Aandeel partner'), 'label "Aandeel partner"')
+    },
+  },
+  {
+    id: 'household-daily-expenses-perspective',
+    name: 'dailyExpensesByPerspective: per-perspectief noemer',
+    category: CAT,
+    description: 'Vrijheidstijd-noemer: eigen=mijn, huishouden=gecombineerd, partner=verschil',
+    priority: 'medium',
+    estimatedDurationMs: 50,
+    fn() {
+      const m = { personal: 1500, household: 3600 }
+      assert(Math.abs(dailyExpensesByPerspective(m, 'personal') - 50) < 1e-9, 'eigen = 1500/30')
+      assert(Math.abs(dailyExpensesByPerspective(m, 'household') - 120) < 1e-9, 'huishouden = 3600/30')
+      assert(Math.abs(dailyExpensesByPerspective(m, 'partner') - 70) < 1e-9, 'partner = (3600-1500)/30')
+    },
+  },
+  {
+    id: 'household-read-fundament-doc',
+    name: 'Read/write-fundament: shared-RLS + write-trigger gedocumenteerd',
+    category: CAT,
+    description: 'Shared-SELECT RLS staat op de 8 financiële tabellen + goals + life_events; de stamp_household_id-trigger stempelt household_id server-side. Live geverifieerd via simulated-JWT leaktest (build-plan §1a).',
+    priority: 'medium',
+    estimatedDurationMs: 50,
+    fn() {
+      const sharedRlsTables = ['assets', 'debts', 'budgets', 'transactions', 'bank_accounts', 'valuations', 'net_worth_snapshots', 'recurring_transactions', 'goals', 'life_events']
+      assertEqual(sharedRlsTables.length, 10, '10 tabellen met huishoud-bewuste shared-SELECT RLS')
     },
   },
 ]

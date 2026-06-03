@@ -56,8 +56,9 @@ function MaybeBottomSheet({
   )
 }
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
-import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
-import { usePartnerPrivacy, filterPartnerItems, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import { usePerspective, usePerspectiveAbort, type Perspective } from '@/components/app/perspective-provider'
+import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import {
   type Asset,
   type AssetType,
@@ -88,9 +89,49 @@ import { buildKpiContext } from '@/lib/kpi-context'
 import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { loadConnectionsByAssetIds, type AssetConnectionSummary } from '@/lib/connections-data'
-import type { AssetsPageData } from '@/lib/assets-data-loader'
+import type { AssetsPageData, AssetsPerspectiveContext } from '@/lib/assets-data-loader'
+import type { Provenance } from '@/lib/household-data'
 
 type Mortgage = { id: string; name: string; current_balance: number; linked_asset_id: string | null }
+
+/**
+ * Asset zoals geleverd door de perspectief-loader: het ruwe DB-record plus de
+ * huishoud-stempels (`_provenance`, `_myShareFraction`, optioneel `_aggregated`
+ * voor een privacy-'totalen'-aggregaatrij). De loader past ownership-/privacy-
+ * filtering al toe; deze component leest alleen de stempels uit.
+ */
+type PerspectiveAsset = Asset & {
+  _provenance?: Provenance
+  _myShareFraction?: number
+  _aggregated?: boolean
+  _aggregatedCount?: number
+}
+
+const SOLO_ASSETS_CONTEXT: AssetsPerspectiveContext = {
+  userId: '',
+  hasHousehold: false,
+  partnerId: null,
+  partnerName: null,
+  mySharePct: 100,
+}
+
+/**
+ * Perspectief-correcte waarde van een asset: bij een gedeeld item buiten het
+ * huishoud-perspectief telt alleen het aandeel-fractie (`_myShareFraction`)
+ * mee; in huishoud-perspectief telt een gedeeld item één keer op volle waarde.
+ *
+ * NB: deze overzicht-pagina toont (net als voorheen) de volledige
+ * `current_value` — `net_worth_inclusion_pct` wordt hier bewust NIET toegepast
+ * (dat is een netto-vermogen-concept op /core, niet op de bezittingenlijst).
+ * Zo blijft het solo-gedrag byte-identiek aan voorheen.
+ */
+function perspectiveAssetValue(asset: PerspectiveAsset, perspective: Perspective): number {
+  const raw = Number(asset.current_value) || 0
+  if (asset.ownership === 'shared' && perspective !== 'household') {
+    return raw * (asset._myShareFraction ?? 1)
+  }
+  return raw
+}
 
 const ASSET_ITEM_NOUN: Record<AssetType, [string, string]> = {
   cash: ['rekening', 'rekeningen'],
@@ -146,9 +187,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   // types tonen in de cards-grid en in de projection-chart. Wordt aangestuurd
   // door klikken op rijen in de Verdeling-tabel onderaan.
   const [selectedTypes, setSelectedTypes] = useState<Set<AssetType>>(new Set())
-  const [assets, setAssets] = useState<Asset[]>(() => {
+  const [assets, setAssets] = useState<PerspectiveAsset[]>(() => {
     if (!initialData) return []
-    const rawAssets = initialData.assets as unknown as Asset[]
+    const rawAssets = initialData.assets as unknown as PerspectiveAsset[]
     // Sync cash asset values with bank_account balances (bank_account is more up-to-date)
     if (initialData.linkedBankAccounts.length > 0) {
       const balanceMap = new Map(initialData.linkedBankAccounts.map(ba => [ba.linked_asset_id, Number(ba.balance)]))
@@ -161,6 +202,11 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     }
     return rawAssets
   })
+  // Huishoud-context — bron voor partnernaam + aandeel-rendering op kaarten en
+  // voor de PrivacyHiddenNotice. Komt mee uit de perspectief-loader.
+  const [hhContext, setHhContext] = useState<AssetsPerspectiveContext>(
+    initialData?.context ?? SOLO_ASSETS_CONTEXT,
+  )
   const [mortgages, setMortgages] = useState<Mortgage[]>(initialData?.mortgages ?? [])
   const [linkedBankAccounts, setLinkedBankAccounts] = useState<Map<string, { id: string; linked_asset_id: string }>>(
     initialData
@@ -201,49 +247,32 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   const [connectionsByAssetId, setConnectionsByAssetId] = useState<Record<string, AssetConnectionSummary>>({})
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
-  const { partnerPrivacy, hiddenCategories } = usePartnerPrivacy()
 
   const loadAssets = useCallback(async (signal?: AbortSignal) => {
     try {
       const supabase = createClient()
-      let query = supabase
-        .from('assets')
-        .select('*')
-      if (perspective === 'personal') {
-        query = query.or('ownership.eq.personal,ownership.is.null')
-      }
-      const { data, error: fetchError } = await query
-        .order('sort_order', { ascending: true })
+      // Bron van waarheid voor ownership-/privacy-filtering: de perspectief-
+      // loader. Levert eigen + (perspectief-gewogen) gedeelde + (privacy-gated)
+      // partner-items, reeds gestempeld met `_provenance`/`_myShareFraction`.
+      const perspectiveData = await loadPerspectiveData(supabase, perspective)
 
       if (signal?.aborted) return // Discard stale results
-      if (fetchError) throw fetchError
 
-      if (!data || data.length === 0) {
-        setAssets([])
-        setLoading(false)
-        return
-      }
+      setHhContext({
+        userId: perspectiveData.context.userId,
+        hasHousehold: perspectiveData.context.hasHousehold,
+        partnerId: perspectiveData.context.partnerId,
+        partnerName: perspectiveData.context.partnerName,
+        mySharePct: perspectiveData.context.mySharePct,
+      })
 
-      // Apply privacy filtering in household mode (Feature #537)
-      let filteredData = data as Asset[]
-      const { data: { user } } = await supabase.auth.getUser()
-      if (signal?.aborted) return
-      if (perspective === 'household' && user) {
-        try {
-          const ppRes = await fetch('/api/household/partner-privacy')
-          if (ppRes.ok) {
-            const ppData = await ppRes.json()
-            if (ppData.partnerPrivacy?.assets === 'hidden') {
-              filteredData = filteredData.filter(
-                a => a.user_id === user.id || a.ownership === 'shared'
-              )
-            }
-          }
-        } catch { /* non-critical */ }
-      }
-      setAssets(filteredData)
+      const loadedAssets = [...perspectiveData.assets].sort(
+        (a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0),
+      ) as unknown as PerspectiveAsset[]
+      setAssets(loadedAssets)
 
       // Load linked mortgages + daily expenses for freedom-time + bank account links
+      const { data: { user } } = await supabase.auth.getUser()
       if (signal?.aborted) return
       if (user) {
         const now = new Date()
@@ -323,22 +352,42 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   }, [loadAssets, perspectiveSignal])
 
   const activeAssets = assets.filter((a) => a.is_active !== false)
-  const totalValue = activeAssets.reduce((s, a) => s + Number(a.current_value), 0)
-  const totalPurchase = activeAssets.reduce((s, a) => s + Number(a.purchase_value), 0)
-  const totalMonthlyContrib = activeAssets.reduce((s, a) => s + Number(a.monthly_contribution), 0)
+  // Aandeel-fractie voor purchase/inleg-aggregaten: bij gedeelde items buiten
+  // het huishoud-perspectief telt alleen het aandeel van deze viewer mee
+  // (spiegelt `perspectiveAssetValue` maar zonder inclusiepercentage — dat is
+  // een waarde-concept, geen aankoop-/inlegconcept).
+  const shareFractionFor = useCallback(
+    (a: PerspectiveAsset) =>
+      a.ownership === 'shared' && perspective !== 'household' ? (a._myShareFraction ?? 1) : 1,
+    [perspective],
+  )
+  const totalValue = activeAssets.reduce((s, a) => s + perspectiveAssetValue(a, perspective), 0)
+  const totalPurchase = activeAssets.reduce((s, a) => s + Number(a.purchase_value) * shareFractionFor(a), 0)
+  const totalMonthlyContrib = activeAssets.reduce((s, a) => s + Number(a.monthly_contribution) * shareFractionFor(a), 0)
 
-  // Group by type
+  // Group by type — totalen zijn perspectief-gewogen (gedeeld telt op aandeel
+  // buiten huishouden, vol in huishouden).
   const byType = useMemo(() => {
-    const map = {} as Record<AssetType, { assets: Asset[]; total: number }>
+    const map = {} as Record<AssetType, { assets: PerspectiveAsset[]; total: number }>
     for (const type of Object.keys(ASSET_TYPE_LABELS) as AssetType[]) {
       const typeAssets = activeAssets.filter((a) => a.asset_type === type)
       map[type] = {
         assets: typeAssets,
-        total: typeAssets.reduce((s, a) => s + Number(a.current_value), 0),
+        total: typeAssets.reduce((s, a) => s + perspectiveAssetValue(a, perspective), 0),
       }
     }
     return map
-  }, [activeAssets])
+  }, [activeAssets, perspective])
+
+  // Partner-vermogen verborgen? Heuristiek per directive: in huishouden-/partner-
+  // perspectief met een partner levert de loader géén partner-provenance item
+  // wanneer de partner `assets: 'hidden'` heeft ingesteld. Toon dan de subtiele
+  // PrivacyHiddenNotice. (De loader doet de privacy-filtering; wij berekenen
+  // hier niets meer zelf.)
+  const partnerAssetsHidden =
+    hhContext.hasHousehold &&
+    (perspective === 'household' || perspective === 'partner') &&
+    !activeAssets.some((a) => a._provenance === 'partner')
 
   // ── KPI's per asset (zelfde patroon als asset-category-page) ──
   // Context-build uit lokale state: assets (huidige user) + mortgages
@@ -376,7 +425,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   // Zelfde data als de categorie-pagina laadt zodat `<VermogenAssetCard>`
   // op deze overview identiek rendert als op `/core/assets/[type]`.
   useEffect(() => {
-    const ids = activeAssets.map((a) => a.id)
+    // Aggregaatrijen (privacy='totalen') hebben geen echt entity-ID — sla ze
+    // over voor sparkline-/connection-fetches.
+    const ids = activeAssets.filter((a) => a._aggregated !== true).map((a) => a.id)
     if (ids.length === 0) {
       setAssetSparklines({})
       setConnectionsByAssetId({})
@@ -395,10 +446,25 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     return () => { cancelled = true }
   }, [activeAssets])
 
-  // Portfolio projection
+  // Portfolio projection — perspectief-gewogen: gedeelde items buiten het
+  // huishouden projecteren op het aandeel van deze viewer (waarde + inleg
+  // pre-geschaald) zodat de projectie coherent is met `totalValue`.
+  const projectionAssets = useMemo(
+    () =>
+      activeAssets.map((a) => {
+        const f = shareFractionFor(a)
+        if (f === 1) return a
+        return {
+          ...a,
+          current_value: Number(a.current_value) * f,
+          monthly_contribution: Number(a.monthly_contribution) * f,
+        }
+      }),
+    [activeAssets, shareFractionFor],
+  )
   const projection = useMemo(
-    () => projectPortfolio(activeAssets, projectionYears * 12),
-    [activeAssets, projectionYears],
+    () => projectPortfolio(projectionAssets, projectionYears * 12),
+    [projectionAssets, projectionYears],
   )
   const futureValue = projection.length > 0 ? projection[projection.length - 1].total : totalValue
   const projectedGrowth = futureValue - totalValue
@@ -519,8 +585,8 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           {activeAssets.length > 0 && ` ${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'} bij elkaar — gewogen naar inclusiepercentage.`}
         </EditorialDeck>
 
-        {perspective === 'household' && hiddenCategories.includes('assets') && (
-          <PrivacyHiddenNotice hiddenCategories={hiddenCategories} forCategories={['assets']} />
+        {partnerAssetsHidden && (
+          <PrivacyHiddenNotice hiddenCategories={['assets']} forCategories={['assets']} />
         )}
       </header>
 
@@ -750,6 +816,11 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                     onEditClick={handleAssetEdit}
                     onRevalueClick={handleAssetRevalue}
                     staggerIndex={idx}
+                    perspective={perspective}
+                    partnerName={hhContext.partnerName}
+                    provenance={asset._provenance}
+                    shareFraction={asset._myShareFraction}
+                    aggregated={asset._aggregated}
                   />
                 ))}
                 <AddCategoryCard

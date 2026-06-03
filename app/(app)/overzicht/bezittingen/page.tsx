@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadAssetsData } from '@/lib/assets-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { getServerPerspective } from '@/lib/household/server-perspective'
+import type { Perspective } from '@/lib/household-data'
 import { BezittingenView } from '@/components/overview/bezittingen-view'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { CompoundInsightCard, COMPOUND_INSIGHT_ID } from '@/components/overview/compound-insight-card'
@@ -28,9 +30,12 @@ export const metadata: Metadata = {
  * op verzoek verwijderd; de categorie-lijst in AssetsPage toont de
  * bezittingen weer in hun oorspronkelijke groepering.
  */
-async function tryLoadAssetsData(supabase: Awaited<ReturnType<typeof createClient>>) {
+async function tryLoadAssetsData(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  perspective: Perspective,
+) {
   try {
-    return await loadAssetsData(supabase)
+    return await loadAssetsData(supabase, perspective)
   } catch {
     return undefined
   }
@@ -38,8 +43,9 @@ async function tryLoadAssetsData(supabase: Awaited<ReturnType<typeof createClien
 
 export default async function OverzichtBezittingenPage() {
   const supabase = await createClient()
+  const perspective = await getServerPerspective()
   const [assetsData, horizonData] = await Promise.all([
-    tryLoadAssetsData(supabase),
+    tryLoadAssetsData(supabase, perspective),
     loadHorizonData(supabase).catch(() => null),
   ])
 

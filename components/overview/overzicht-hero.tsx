@@ -178,9 +178,19 @@ export function OverzichtHero({
     )
   }
 
+  // Telling die we REFEREREN — moet exact gelijk zijn aan /toekomst/doelen.
+  // DoelenView telt alle doelen met progress (loader filtert al op
+  // niet-voltooid + capt op 5). De cap van 3 hieronder geldt ALLEEN voor de
+  // getoonde kaarten, niet voor dit getal; anders zou /overzicht "3" tonen
+  // terwijl de Doelen-pagina er "4" laat zien.
+  const activeGoalCount = (goals ?? []).filter(
+    (_, i) => (goalProgresses?.[i] ?? null) != null,
+  ).length
+
   // Bouw doelen-display: koppel goals met hun progress op index, sorteer
   // achterop-achter doelen eerst, skip voltooide. Type-guard predicate
-  // narrowt zodat we daarna geen non-null assertions nodig hebben.
+  // narrowt zodat we daarna geen non-null assertions nodig hebben. Gecapt op
+  // de 3 belangrijkste kaarten — het getal hierboven blijft het wáre totaal.
   const goalDisplay = (goals ?? [])
     .map((g, i) => ({ goal: g, progress: goalProgresses?.[i] ?? null }))
     .filter(
@@ -215,9 +225,9 @@ export function OverzichtHero({
         {goalDisplay.length > 0 && (
           <p className="mt-2 text-sm sm:text-base text-[var(--ink-2)]">
             <strong className="font-semibold text-[var(--ink)]">
-              {goalDisplay.length}
+              {activeGoalCount}
             </strong>{' '}
-            {goalDisplay.length === 1 ? 'actief doel' : 'actieve doelen'} — kijk
+            {activeGoalCount === 1 ? 'actief doel' : 'actieve doelen'} — kijk
             hoever je bent.
           </p>
         )}
@@ -278,7 +288,7 @@ export function OverzichtHero({
             defaultContent={
               <>
                 {goalDisplay.length > 0 ? (
-                  <VoortgangDoelenCard items={goalDisplay} />
+                  <VoortgangDoelenCard items={goalDisplay} totalActive={activeGoalCount} />
                 ) : (
                   <DoelenEmptyState />
                 )}

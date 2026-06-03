@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
+import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { CashflowSection } from '@/components/will/cashflow-section'
 import { CashflowForecast } from '@/components/overview/cashflow-forecast'
@@ -21,9 +22,10 @@ export const metadata: Metadata = {
  */
 export default async function OverzichtCashflowForecastPage() {
   const supabase = await createClient()
+  const perspective = await getServerPerspective()
   const [dashboardResult, cashflow] = await Promise.all([
     loadDashboardData(supabase),
-    loadCashflowData(supabase),
+    loadCashflowData(supabase, perspective),
   ])
   const { dashboardData } = dashboardResult
 

@@ -3,8 +3,53 @@
  * Pure functions for perspective-aware financial calculations and cost splitting.
  */
 
+import { formatCurrency } from '@/lib/format'
+
 export type SplitMode = 'equal' | 'income_ratio' | 'custom' | 'one_carries_all'
 export type OwnershipType = 'personal' | 'shared'
+
+/** De drie perspectieven waarmee de hele app gefilterd kan worden. */
+export type Perspective = 'personal' | 'household' | 'partner'
+
+/** "Van wie is dit": afgeleid uit ownership + user_id t.o.v. de huidige gebruiker. */
+export type Provenance = 'eigen' | 'partner' | 'gezamenlijk'
+
+/**
+ * Bepaal de herkomst ("van wie is dit") van een item voor de UI-badge.
+ *
+ * - `shared` → altijd `gezamenlijk` (huishouden)
+ * - `personal` van de huidige gebruiker → `eigen`
+ * - `personal` van iemand anders → `partner`
+ *
+ * Centraal afgeleid zodat geen enkel domein dit zelf herberekent.
+ */
+export function deriveProvenance(
+  item: { ownership: OwnershipType; user_id?: string },
+  currentUserId?: string,
+): Provenance {
+  if (item.ownership === 'shared') return 'gezamenlijk'
+  if (item.user_id && currentUserId && item.user_id !== currentUserId) return 'partner'
+  return 'eigen'
+}
+
+/**
+ * Het aandeel (0-1) dat een gegeven viewer draagt van een (gedeelde) schuld.
+ *
+ * `partner_split_pct` is het percentage van de EIGENAAR van de schuld (`user_id`).
+ * De andere partner draagt het complement. Zonder split-% valt het terug op de
+ * huishoud-brede fractie. Hergebruikt door bezittingen/schulden/tax/FIRE zodat
+ * de attributie overal identiek is.
+ */
+export function debtShareFraction(
+  debt: { partner_split_pct?: number | null; user_id?: string },
+  viewerId: string | undefined,
+  householdShareFraction: number,
+): number {
+  if (debt.partner_split_pct == null) return householdShareFraction
+  const ownerFraction = debt.partner_split_pct / 100
+  if (debt.user_id && viewerId && debt.user_id === viewerId) return ownerFraction
+  return 1 - ownerFraction
+}
 
 export const SPLIT_MODE_LABELS: Record<SplitMode, string> = {
   equal: '50/50',
@@ -24,11 +69,6 @@ interface HouseholdSettings {
   splitMode: SplitMode
   customSplitPct: number | null // 0-100, percentage for primary user
   primaryPayerId: string | null
-}
-
-interface PerspectiveData<T extends { ownership: OwnershipType }> {
-  items: T[]
-  perspective: 'personal' | 'household'
 }
 
 /**
@@ -111,9 +151,10 @@ export function filterByPerspective<T extends { ownership: OwnershipType; user_i
 export function computePerspectiveNetWorth(
   assets: Array<{ current_value: number; ownership: OwnershipType; user_id?: string; is_active?: boolean }>,
   debts: Array<{ current_balance: number; ownership: OwnershipType; user_id?: string; is_active?: boolean; partner_split_pct?: number | null }>,
-  perspective: 'personal' | 'household',
+  perspective: Perspective,
   mySharePct: number,
   userId?: string,
+  partnerId?: string,
 ): {
   totalAssets: number
   totalDebts: number
@@ -127,6 +168,39 @@ export function computePerspectiveNetWorth(
 } {
   const activeAssets = assets.filter((a) => a.is_active !== false)
   const activeDebts = debts.filter((d) => d.is_active !== false)
+
+  // ── Partner-perspectief: spiegel van personal, maar attribueert de
+  //    PERSOONLIJKE items van de partner + het partner-aandeel van gedeeld. ──
+  if (perspective === 'partner') {
+    const partnerShareFraction = 1 - mySharePct / 100
+    const partnerPersonalAssets = activeAssets
+      .filter((a) => a.ownership === 'personal' && a.user_id === partnerId)
+      .reduce((sum, a) => sum + a.current_value, 0)
+    const partnerPersonalDebts = activeDebts
+      .filter((d) => d.ownership === 'personal' && d.user_id === partnerId)
+      .reduce((sum, d) => sum + d.current_balance, 0)
+    const sharedAssetsTotal = activeAssets
+      .filter((a) => a.ownership === 'shared')
+      .reduce((sum, a) => sum + a.current_value, 0)
+    const sharedDebtItemsP = activeDebts.filter((d) => d.ownership === 'shared')
+    const sharedDebtsTotal = sharedDebtItemsP.reduce((sum, d) => sum + d.current_balance, 0)
+    const partnerSharedAssets = sharedAssetsTotal * partnerShareFraction
+    const partnerSharedDebts = sharedDebtItemsP.reduce((sum, d) => {
+      const f = d.partner_split_pct != null ? 1 - d.partner_split_pct / 100 : partnerShareFraction
+      return sum + d.current_balance * f
+    }, 0)
+    return {
+      totalAssets: partnerPersonalAssets + partnerSharedAssets,
+      totalDebts: partnerPersonalDebts + partnerSharedDebts,
+      netWorth: partnerPersonalAssets + partnerSharedAssets - (partnerPersonalDebts + partnerSharedDebts),
+      personalAssets: partnerPersonalAssets,
+      personalDebts: partnerPersonalDebts,
+      sharedAssets: sharedAssetsTotal,
+      sharedDebts: sharedDebtsTotal,
+      myShareOfSharedAssets: partnerSharedAssets,
+      myShareOfSharedDebts: partnerSharedDebts,
+    }
+  }
 
   const personalAssets = activeAssets
     .filter((a) => a.ownership === 'personal' && (perspective === 'household' || a.user_id === userId))
@@ -296,4 +370,49 @@ export function applyPrivacyFilter<T extends Record<string, unknown>>(
   } as T
 
   return { items: [aggregated], aggregatedTotal: total, isAggregated: true }
+}
+
+// ── Provenance / aandeel-presentatie ─────────────────────────────────────
+
+/**
+ * "Jouw aandeel"-subregel voor een (gedeelde) kaart.
+ *
+ * - Persoonlijke items → null (geen subregel; volledig van de viewer).
+ * - Huishouden-perspectief → null (de kaart toont al de volledige waarde).
+ * - Personal/partner-perspectief op een gedeeld item → "Jouw aandeel: €X" resp.
+ *   "Aandeel partner: €X" op basis van `_myShareFraction` (door de loader gestempeld).
+ *
+ * Centraal zodat bezittingen/schulden/cashflow exact dezelfde subregel tonen.
+ */
+export function formatOwnershipSubline(
+  item: { ownership: OwnershipType; _myShareFraction?: number },
+  perspective: Perspective,
+  fullValue: number,
+): string | null {
+  if (item.ownership !== 'shared') return null
+  if (perspective === 'household') return null
+  const fraction = item._myShareFraction ?? 0.5
+  const share = fullValue * fraction
+  const label = perspective === 'partner' ? 'Aandeel partner' : 'Jouw aandeel'
+  return `${label}: ${formatCurrency(share)}`
+}
+
+/**
+ * Perspectief-correcte dag-uitgaven voor vrijheidstijd-berekeningen.
+ *
+ * `calculateFreedomTime` moet de juiste noemer krijgen: eigen = mijn dag-uitgaven,
+ * huishouden = gecombineerd, partner = het deel dat niet van mij is (afgeleid als
+ * `household - personal` wanneer geen expliciete partner-waarde beschikbaar is).
+ */
+export function dailyExpensesByPerspective(
+  monthly: { personal: number; household: number; partner?: number },
+  perspective: Perspective,
+): number {
+  const m =
+    perspective === 'household'
+      ? monthly.household
+      : perspective === 'partner'
+        ? monthly.partner ?? Math.max(monthly.household - monthly.personal, 0)
+        : monthly.personal
+  return m / 30
 }

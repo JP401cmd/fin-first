@@ -47,6 +47,29 @@ describe('VoortgangDoelenCard', () => {
     expect(screen.getByText('1 doel actief')).toBeTruthy()
   })
 
+  it('toont totalActive in header wanneer kaarten gecapt zijn', () => {
+    // 3 getoonde kaarten maar 4 actieve doelen totaal — de kop moet het
+    // wáre aantal tonen (gelijk aan /toekomst/doelen), niet de cap.
+    const items = [
+      { goal: makeGoal('1', 'Huis'), progress: makeProgress(62, false) },
+      { goal: makeGoal('2', 'Buffer'), progress: makeProgress(40, false) },
+      { goal: makeGoal('3', 'FIRE'), progress: makeProgress(18, true) },
+    ]
+    render(<VoortgangDoelenCard items={items} totalActive={4} />)
+    expect(screen.getByText('4 doelen actief')).toBeTruthy()
+    // Maar nog steeds maar 3 kaarten/rijen getoond.
+    expect(screen.queryByText('5 doelen actief')).toBeNull()
+  })
+
+  it('valt terug op items.length zonder totalActive', () => {
+    const items = [
+      { goal: makeGoal('1', 'Vrijheid'), progress: makeProgress(50, true) },
+      { goal: makeGoal('2', 'Huis'), progress: makeProgress(30, false) },
+    ]
+    render(<VoortgangDoelenCard items={items} />)
+    expect(screen.getByText('2 doelen actief')).toBeTruthy()
+  })
+
   it('rendert per doel: naam + percentage + bar', () => {
     const items = [
       { goal: makeGoal('1', 'Vrijheid'), progress: makeProgress(50, true) },

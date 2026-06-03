@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
+import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
 import { CashflowKalender } from '@/components/overview/cashflow-kalender'
@@ -19,7 +20,8 @@ export const metadata: Metadata = {
  */
 export default async function OverzichtCashflowVasteLastenPage() {
   const supabase = await createClient()
-  const { recurrings, fullName } = await loadCashflowData(supabase)
+  const perspective = await getServerPerspective()
+  const { recurrings, fullName } = await loadCashflowData(supabase, perspective)
 
   return (
     <>

@@ -6,6 +6,12 @@
  * naam + percentage + voortgang-bar. Maximaal 3 doelen getoond (al
  * gefilterd door caller). Klik op "Bekijk →" navigateert naar
  * /toekomst voor goal-management.
+ *
+ * `totalActive`: het wáre aantal actieve doelen (gelijk aan wat
+ * /toekomst/doelen telt). De kaart toont dit getal in de kop, terwijl
+ * `items` doelbewust gecapt is op de 3 belangrijkste. Zo refereert
+ * /overzicht hetzelfde aantal als de Doelen-pagina, ook al toont het er
+ * minder kaarten. Valt terug op `items.length` als het niet meegegeven is.
  */
 
 import Link from 'next/link'
@@ -22,9 +28,12 @@ export type GoalProgress = {
 
 export function VoortgangDoelenCard({
   items,
+  totalActive,
 }: {
   items: Array<{ goal: GoalWithBudget; progress: GoalProgress | null }>
+  totalActive?: number
 }) {
+  const count = totalActive ?? items.length
   return (
     <article className="flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
       <header className="flex items-center justify-between mb-3">
@@ -34,7 +43,7 @@ export function VoortgangDoelenCard({
           </div>
           <div className="mt-0.5 text-lg sm:text-xl font-semibold text-[var(--ink)] flex items-center gap-2">
             <Target className="w-5 h-5 text-[var(--ink-3)]" />
-            {items.length} {items.length === 1 ? 'doel actief' : 'doelen actief'}
+            {count} {count === 1 ? 'doel actief' : 'doelen actief'}
           </div>
         </div>
         <Link

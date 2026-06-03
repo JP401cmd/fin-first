@@ -1,24 +1,31 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Calculator, ChevronDown, ChevronUp, Clock, Info, Layers, Users } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Calculator, ChevronDown, ChevronUp, Clock, Info, Layers, Users, EyeOff } from 'lucide-react'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { BOX3_TOOLTIPS, type Box3Result } from '@/lib/box3-data'
+import { BOX3_TOOLTIPS, type Box3Result, type TaxYear } from '@/lib/box3-data'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
+import { usePerspective } from '@/components/app/perspective-provider'
+import { createClient } from '@/lib/supabase/client'
+import { loadPerspectiveBox3, type PerspectiveBox3Data } from '@/lib/household-tax'
 
 /**
  * Box3Detail — compacte, inklapbare Box 3-berekening op de Box 3-subpagina
  * /overzicht/belasting/box3.
  *
- * Vervangt het volledige (1393-regel) BelastingPage-embed door alleen het
- * Box 3-rekenwerk: een samenvatting (belasting + vrijheidsdagen) plus een
- * uitklapbaar "Berekeningsstappen"-blok. De zware rekenlogica blijft de
- * pure `lib/box3-data.ts`-engine, geserveerd via /api/household/box3 — geen
- * duplicatie.
+ * Databron = het huishoud-fundament (`loadPerspectiveBox3` → `loadPerspectiveData`
+ * → ONGEWIJZIGDE `calculateBox3`/`optimizePartnerAllocation`). Geen bespoke
+ * ownership-filtering of handmatige privacy-fetch meer — dat doet de loader.
  *
- * Subtiel: standaard ingeklapt. Box 2 / partner-optimalisatie /
- * asset-classificatie volgen in een latere "diepe belasting"-iteratie.
+ * Eerste paint komt server-side via `initialData`. Bij een in-sessie
+ * perspectief-wissel herlaadt deze component via de BROWSER-client. Wordt
+ * `initialData` weggelaten (legacy/tests), dan valt het terug op de oude
+ * /api/household/box3-fetch zodat bestaande callers blijven werken.
+ *
+ * Toont, naast de eigen Box 3-belasting: berekeningsstappen, vermogens-
+ * classificatie, partner-optimalisatie ("optimale verdeling spaart €X t.o.v.
+ * ieder apart") en — bij een partner die niets deelt — een privacy-melding.
  */
 
 interface PartnerEntry {
@@ -42,14 +49,41 @@ interface Box3ApiResponse {
   dailyExpenses?: number
 }
 
-/** Kies het privé-resultaat in beide modi: single → personal; household
- *  → de partner-entry van de huidige gebruiker. */
-function selectPersonal(data: Box3ApiResponse): Box3Result | null {
-  return (
-    data.personal ??
-    data.partners?.find((p) => p.isCurrentUser)?.result ??
-    null
-  )
+/** Genormaliseerde view-shape — gevoed door fundament óf legacy-API. */
+interface Box3View {
+  result: Box3Result | null
+  hasHousehold: boolean
+  optimalAllocation?: { totalTax: number; savingsVsEqual: number }
+  dailyExpenses: number
+  partnerDataHidden: boolean
+  partnerName: string | null
+}
+
+/** Map de fundament-data naar de view-shape. */
+function fromPerspectiveData(d: PerspectiveBox3Data): Box3View {
+  return {
+    result: d.personal,
+    hasHousehold: d.hasHousehold,
+    optimalAllocation: d.optimalAllocation,
+    dailyExpenses: d.dailyExpenses,
+    partnerDataHidden: d.partnerDataHidden,
+    partnerName: d.partnerName,
+  }
+}
+
+/** Map de legacy /api/household/box3-respons naar de view-shape. */
+function fromLegacyApi(data: Box3ApiResponse): Box3View {
+  return {
+    result:
+      data.personal ??
+      data.partners?.find((p) => p.isCurrentUser)?.result ??
+      null,
+    hasHousehold: !!data.hasHousehold,
+    optimalAllocation: data.optimalAllocation,
+    dailyExpenses: data.dailyExpenses ?? 0,
+    partnerDataHidden: false,
+    partnerName: null,
+  }
 }
 
 function formatPct(value: number): string {
@@ -121,23 +155,63 @@ function CalcRow({
   )
 }
 
-export function Box3Detail({ year = 2026 }: { year?: number }) {
-  const [result, setResult] = useState<Box3Result | null>(null)
-  const [api, setApi] = useState<Box3ApiResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+export function Box3Detail({
+  year = 2026,
+  initialData,
+}: {
+  year?: number
+  /** Server-berekende Box 3-data (eerste paint). Weggelaten → legacy-fetch. */
+  initialData?: PerspectiveBox3Data
+}) {
+  const { perspective, perspectiveVersion } = usePerspective()
+  const [view, setView] = useState<Box3View | null>(
+    initialData ? fromPerspectiveData(initialData) : null,
+  )
+  const [loading, setLoading] = useState(!initialData)
   const [showDetails, setShowDetails] = useState(false)
   const [showClassificatie, setShowClassificatie] = useState(false)
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
 
+  // Herlaad bij een in-sessie perspectief-wissel via het fundament (browser-
+  // client). Slaat de eerste render over wanneer `initialData` al server-side
+  // het juiste perspectief leverde.
+  const reloadFromFoundation = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      const data = await loadPerspectiveBox3(supabase, perspective, year as TaxYear)
+      setView(fromPerspectiveData(data))
+    } catch {
+      /* stil falen — behoud vorige view */
+    } finally {
+      setLoading(false)
+    }
+  }, [perspective, year])
+
   useEffect(() => {
     let cancelled = false
+
+    // Pad A — prop-gevoed (fundament). Eerste render gebruikt initialData;
+    // daarna herladen we alleen op een perspectief-wissel.
+    if (initialData) {
+      if (perspectiveVersion === 0) {
+        setView(fromPerspectiveData(initialData))
+        setLoading(false)
+        return
+      }
+      reloadFromFoundation()
+      return () => {
+        cancelled = true
+      }
+    }
+
+    // Pad B — legacy-fetch (geen initialData; bv. oude callers/tests).
+    setLoading(true)
     fetch(`/api/household/box3?year=${year}`)
       .then((r) => r.json())
       .then((data: Box3ApiResponse) => {
         if (cancelled) return
-        setApi(data)
-        setResult(selectPersonal(data))
+        setView(fromLegacyApi(data))
       })
       .catch(() => {
         /* stil falen — sectie blijft leeg */
@@ -148,13 +222,17 @@ export function Box3Detail({ year = 2026 }: { year?: number }) {
     return () => {
       cancelled = true
     }
-  }, [year])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, perspectiveVersion])
 
-  // 3a partner-optimalisatie: alleen household + daadwerkelijke besparing.
-  const optimal = api?.optimalAllocation
-  const dailyExpenses = api?.dailyExpenses ?? 0
+  const result = view?.result ?? null
+
+  // Partner-optimalisatie: alleen household + daadwerkelijke besparing.
+  const optimal = view?.optimalAllocation
+  const dailyExpenses = view?.dailyExpenses ?? 0
   const showPartnerOptim =
-    !!api?.hasHousehold && !!optimal && optimal.savingsVsEqual > 0
+    !!view?.hasHousehold && !!optimal && optimal.savingsVsEqual > 0
+  const partnerDataHidden = !!view?.partnerDataHidden
 
   if (loading) {
     return (
@@ -194,6 +272,21 @@ export function Box3Detail({ year = 2026 }: { year?: number }) {
             <GlossaryTerm term="box_3">Box 3</GlossaryTerm>-vermogen met het{' '}
             <GlossaryTerm term="forfaitair_rendement">forfaitair rendement</GlossaryTerm>.
           </p>
+
+          {/* Privacy: partner deelt geen vermogen → graceful degradation. We
+              tonen het eigen resultaat (single-person) + deze melding i.p.v.
+              stilzwijgend een onjuist gecombineerd bedrag. */}
+          {partnerDataHidden && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-xs text-[var(--ink-2)]">
+              <EyeOff className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--ink-3)]" aria-hidden="true" />
+              <span>
+                {view?.partnerName ?? 'Je partner'} deelt geen vermogen, dus dit
+                is alleen jouw Box 3. Vraag je partner om minimaal{' '}
+                <strong>totalen</strong> te delen voor een gezamenlijke
+                berekening en de optimale verdeling.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Uitklapbare berekeningsstappen */}
@@ -329,7 +422,7 @@ export function Box3Detail({ year = 2026 }: { year?: number }) {
           </div>
         )}
 
-        {/* 3a — Partner-optimalisatie (alleen household + besparing > 0) */}
+        {/* Partner-optimalisatie (alleen household + besparing > 0) */}
         {showPartnerOptim && optimal && (
           <div className="border-t border-emerald-200 bg-emerald-50/50 px-4 py-4 sm:px-5">
             <div className="flex items-center gap-2 mb-1">
@@ -338,15 +431,19 @@ export function Box3Detail({ year = 2026 }: { year?: number }) {
                 Partner-optimalisatie
               </span>
             </div>
-            <p className="text-xs text-[var(--ink-2)] leading-snug">
-              Door je Box 3-vermogen fiscaal optimaal over jou en je partner te
-              verdelen bespaar je{' '}
-              <strong className="text-emerald-700">{fc(optimal.savingsVsEqual)}</strong>{' '}
-              per jaar
+            <p className="text-sm text-[var(--ink)] leading-snug">
+              Optimale verdeling spaart{' '}
+              <strong className="text-emerald-700 tabular-nums">{fc(optimal.savingsVsEqual)}</strong>{' '}
+              t.o.v. ieder apart
               {dailyExpenses > 0 && (
                 <> — zo&apos;n {Math.round(optimal.savingsVsEqual / dailyExpenses)} vrijheidsdagen</>
               )}
-              {' '}t.o.v. een 50/50-verdeling.
+              .
+            </p>
+            <p className="mt-1 text-xs text-[var(--ink-2)] leading-snug">
+              Als fiscaal partners mag je het Box 3-vermogen onderling verdelen;
+              door het slim te verdelen benut je beide heffingsvrije vermogens
+              optimaal.
             </p>
           </div>
         )}
