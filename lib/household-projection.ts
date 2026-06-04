@@ -146,6 +146,8 @@ export interface HouseholdProjectionResult {
     combinedFireTarget: number
     combinedFreedomPercentage: number
     sharedFireTarget: number
+    /** Gecombineerde jaarlijkse uitgaven ná pensioen (FIRE-uitgaven). */
+    combinedRetirementExpenses: number
     individualFireTargets: Array<{
       userId: string
       fullName: string | null
@@ -746,17 +748,16 @@ export async function buildHouseholdProjectionInput(
     s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0) + partnerAggDebtsExtra
   const combinedNetWorth = combinedNetWorthAssets - combinedNetWorthDebts
 
-  // Inkomen: eigen uit transacties + partner uit de privacy-gated income-RPC.
-  const combinedMonthlyIncome = memberIds.reduce((s, id) => {
-    if (id === user.id) return s + memberIncome(id)
-    return s + (partnerMonthlyIncomeShared ?? memberIncome(id))
-  }, 0)
-  const combinedMonthlyExpenses = memberIds.reduce((s, id) => s + memberExpenses(id), 0)
+  // Inkomen/uitgaven/inleg + netto vermogen worden gesommeerd uit de per-partner
+  // entries (summary-gebaseerd) zodat BEIDE partners EXACT dezelfde gecombineerde
+  // kerngetallen zien — geen asymmetrische "eigen-transacties vs partner-RPC"-mix.
+  const combinedMonthlyIncome = partners.reduce((s, p) => s + p.financials.monthlyIncome, 0)
+  const combinedMonthlyExpenses = partners.reduce((s, p) => s + p.financials.monthlyExpenses, 0)
   const combinedMonthlySavings = combinedMonthlyIncome - combinedMonthlyExpenses
   const combinedSavingsRate = combinedMonthlyIncome > 0
     ? (combinedMonthlySavings / combinedMonthlyIncome) * 100
     : 0
-  const combinedMonthlyContributions = combinedAssets.reduce((s, a) => s + Number(a.monthly_contribution), 0)
+  const combinedMonthlyContributions = partners.reduce((s, p) => s + p.financials.monthlyContributions, 0)
 
   // Gecombineerde yearly expenses: alle essentiële budgetten één keer.
   const combinedYearlyExpenses = computeCombinedYearlyExpenses(allBudgets, profiles, memberIds, combinedMonthlyExpenses, combinedMonthlyIncome)
@@ -839,6 +840,7 @@ export async function buildHouseholdProjectionInput(
       combinedFireTarget: combinedProjection.fireTarget,
       combinedFreedomPercentage: combinedProjection.freedomPercentage,
       sharedFireTarget: combinedProjection.fireTarget,
+      combinedRetirementExpenses: Math.round(combinedYearlyExpenses),
       individualFireTargets: partners.map(p => ({
         userId: p.userId,
         fullName: p.fullName,
@@ -1027,6 +1029,7 @@ function emptyComparison(): HouseholdProjectionResult['comparison'] {
     combinedFireTarget: 0,
     combinedFreedomPercentage: 0,
     sharedFireTarget: 0,
+    combinedRetirementExpenses: 0,
     individualFireTargets: [],
   }
 }

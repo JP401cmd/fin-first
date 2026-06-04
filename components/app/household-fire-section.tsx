@@ -42,8 +42,11 @@ export function HouseholdFireSection() {
   const [error, setError] = useState<string | null>(null)
   const { perspective, perspectiveVersion } = usePerspective()
   // Alle hooks MOETEN vóór elke conditionele return staan (rules-of-hooks).
-  // inViewRef/hasEntered worden pas verderop in de JSX gebruikt.
-  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 1100 })
+  const { ref: inViewRef } = useInViewAnimation({ duration: 1100 })
+  // Balken renderen DIRECT op hun eindbreedte. De in-view-flag bleef 'false'
+  // wanneer je naar de (lange) sectie scrolt vóór de sectie-top in beeld komt
+  // — dan stonden alle vergelijkings-/voortgangsbalken op 0% (leeg).
+  const hasEntered = true
 
   const loadData = useCallback(async () => {
     try {
@@ -278,7 +281,7 @@ export function HouseholdFireSection() {
       </div>
 
       {/* Combined Financial Summary */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="household-combined-financials">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" data-testid="household-combined-financials">
         <FinancialCard
           icon={<PiggyBank className="h-4 w-4 text-horizon-600" />}
           label="Gecomb. vermogen"
@@ -311,6 +314,13 @@ export function HouseholdFireSection() {
           label="Spaarquote"
           value={`${comparison.combinedSavingsRate.toFixed(1)}%`}
           testId="combined-savings-rate"
+        />
+        <FinancialCard
+          icon={<Clock className="h-4 w-4 text-horizon-600" />}
+          label="Na pensioen"
+          value={<MaskedAmount value={Math.round(comparison.combinedRetirementExpenses / 12)} tone="horizon" />}
+          suffix="/mnd"
+          testId="combined-retirement-expenses"
         />
       </div>
 
@@ -410,22 +420,35 @@ export function HouseholdFireSection() {
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-500" />
               <div className="text-sm text-horizon-800">
                 <p className="font-medium">Samen sterker</p>
-                <p className="mt-1 text-horizon-700/80">
-                  {combined.projection.fireAge !== null && partners.every(p => p.projection.fireAge !== null) ? (
-                    (() => {
-                      const avgIndividual = partners.reduce((sum, p) => sum + (p.projection.fireAge ?? 0), 0) / partners.length
-                      const diff = Math.round(avgIndividual - combined.projection.fireAge!)
-                      if (diff > 0) {
-                        return `Als huishouden bereiken jullie FIRE ${diff} jaar eerder dan het gemiddelde van jullie individuele projecties. Samenwerking loont!`
-                      } else if (diff < 0) {
-                        return `De individuele FIRE-doelen liggen dichter bij dan het gezamenlijke doel. Overweeg om uitgaven te optimaliseren als huishouden.`
-                      }
-                      return `Jullie gezamenlijke en individuele FIRE-leeftijden liggen dicht bij elkaar.`
-                    })()
-                  ) : (
-                    `Jullie gecombineerde netto vermogen is ${formatCurrency(comparison.combinedNetWorth)}, dat is ${comparison.combinedFreedomPercentage.toFixed(1)}% richting volledige vrijheid voor het huishouden.`
-                  )}
-                </p>
+                {combined.projection.fireAge !== null && partners.every(p => p.projection.fireAge !== null) ? (
+                  (() => {
+                    const avgIndividual = partners.reduce((sum, p) => sum + (p.projection.fireAge ?? 0), 0) / partners.length
+                    const diff = Math.round(avgIndividual - combined.projection.fireAge!)
+                    const retireYr = formatCurrency(comparison.combinedRetirementExpenses)
+                    return (
+                      <>
+                        <p className="mt-1 text-horizon-700/80">
+                          {diff > 0
+                            ? `Als huishouden bereiken jullie FIRE ${diff} jaar eerder dan het gemiddelde van jullie individuele projecties.`
+                            : diff < 0
+                              ? `De gezamenlijke FIRE-leeftijd ligt ${Math.abs(diff)} jaar later dan het gemiddelde van jullie individuele projecties.`
+                              : `Jullie gezamenlijke en individuele FIRE-leeftijden liggen dicht bij elkaar.`}
+                        </p>
+                        <p className="mt-1.5 text-xs leading-relaxed text-horizon-700/70">
+                          {diff > 0
+                            ? `Hoe kan dat? Jullie bundelen vermogen én inkomen, terwijl de gedeelde (vaste) lasten samen worden gedragen — in het huishouden tellen die maar één keer mee. De gezamenlijke uitgaven na pensioen (${retireYr}/jaar) zijn daardoor lager dan de som van twee losse huishoudens, dus jullie gebundelde vermogen bereikt het FIRE-doel sneller.`
+                            : diff < 0
+                              ? `Dat komt doordat de gezamenlijke uitgaven na pensioen (${retireYr}/jaar) — en daarmee het gezamenlijke FIRE-doel — relatief hoger uitvallen dan ieders eigen aandeel. Lagere gedeelde lasten brengen de gezamenlijke FIRE-leeftijd omlaag.`
+                              : `Jullie gebundelde vermogen en de gezamenlijke uitgaven na pensioen (${retireYr}/jaar) houden elkaar ongeveer in balans met jullie individuele projecties.`}
+                        </p>
+                      </>
+                    )
+                  })()
+                ) : (
+                  <p className="mt-1 text-horizon-700/80">
+                    {`Jullie gecombineerde netto vermogen is ${formatCurrency(comparison.combinedNetWorth)}, dat is ${comparison.combinedFreedomPercentage.toFixed(1)}% richting volledige vrijheid voor het huishouden.`}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -782,40 +805,46 @@ function ComparisonBar({
   values,
   testId,
   invertColors = false,
-  hasEntered,
 }: {
   label: string
   values: Array<{ name: string; value: number; formatted: string }>
   testId: string
   invertColors?: boolean
-  hasEntered: boolean
+  /** @deprecated balken renderen nu direct (niet meer achter een in-view-flag). */
+  hasEntered?: boolean
 }) {
   const maxValue = Math.max(...values.map(v => Math.abs(v.value)), 1)
+  // Winnaar = hoogste waarde, of laagste bij "lager is beter" (FIRE-leeftijd).
+  const best = invertColors
+    ? Math.min(...values.map(v => v.value))
+    : Math.max(...values.map(v => v.value))
+  const allEqual = values.every(v => v.value === values[0]?.value)
 
   return (
     <div className="mb-4 last:mb-0" data-testid={testId}>
-      <p className="mb-1.5 text-xs font-medium text-[var(--ink-3)]">{label}</p>
-      <div className="space-y-1.5">
+      <p className="mb-2 text-xs font-medium text-[var(--ink-3)]">{label}</p>
+      <div className="space-y-2">
         {values.map((v, i) => {
-          const pct = maxValue > 0 ? (Math.abs(v.value) / maxValue) * 100 : 0
-          const isLeading = Math.abs(v.value) >= Math.abs(values[1 - i]?.value ?? 0)
-          const barColor = invertColors
-            ? (isLeading ? 'bg-amber-400' : 'bg-emerald-400')
-            : (i === 0 ? 'bg-horizon-400' : 'bg-wil-400')
+          const pct = Math.max((Math.abs(v.value) / maxValue) * 100, 3)
+          const isWinner = !allEqual && v.value === best
+          const barColor = i === 0 ? 'bg-horizon-500' : 'bg-wil-500'
 
           return (
-            <div key={v.name} className="flex items-center gap-2">
-              <span className="w-16 shrink-0 text-xs text-[var(--ink-3)] truncate">{v.name}</span>
-              <div className="h-5 flex-1 overflow-hidden rounded-full bg-[var(--border-ed)]">
+            <div key={v.name} className="flex items-center gap-3">
+              <span className="w-20 shrink-0 truncate text-xs text-[var(--ink-2)]">{v.name}</span>
+              <div className="relative h-6 flex-1 overflow-hidden rounded-md bg-[var(--subtle)]">
                 <div
-                  className={`h-full rounded-full ${barColor}`}
-                  style={{
-                    width: hasEntered ? `${Math.max(pct, 2)}%` : '0%',
-                    transition: hasEntered ? `width 700ms cubic-bezier(.22,1,.36,1) ${i * 80}ms` : 'none',
-                  }}
+                  className={`h-full rounded-md ${barColor} ${isWinner ? '' : 'opacity-50'} transition-[width] duration-700 ease-out`}
+                  style={{ width: `${pct}%` }}
                 />
               </div>
-              <span className="w-20 shrink-0 text-right text-xs font-medium text-[var(--ink-2)]">{v.formatted}</span>
+              <span
+                className={`w-24 shrink-0 text-right font-mono text-xs tabular-nums ${
+                  isWinner ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-3)]'
+                }`}
+              >
+                {v.formatted}
+              </span>
             </div>
           )
         })}
