@@ -135,8 +135,10 @@ export function VermogenAssetCard({
   const { masked } = useMaskedAmounts()
   const { flashClass } = useFlashChange(asset.current_value)
   const { activeModules } = useFeatureAccess()
-  const Icon = ASSET_ICONS[asset.asset_type]
-  const accentColor = ASSET_TYPE_COLORS[asset.asset_type]
+  // Aggregaatrijen (privacy='totalen', partner-totaal) hebben géén asset_type;
+  // val dan terug op een veilig icoon/kleur zodat de kaart niet crasht.
+  const Icon = ASSET_ICONS[asset.asset_type] ?? Wallet
+  const accentColor = ASSET_TYPE_COLORS[asset.asset_type] ?? ASSET_TYPE_COLORS.other
 
   // App-koppeling — leest direct uit de asset zelf via de registry-helper.
   // Geen separate state, geen junction-tabel: het bezit bepaalt de app-status.
