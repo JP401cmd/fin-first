@@ -40,6 +40,8 @@ import {
   type NavModule,
 } from '@/lib/module-registry'
 import { useSidebarCollapsed } from '@/lib/hooks/use-sidebar-collapsed'
+import { usePerspective } from '@/components/app/perspective-provider'
+import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { LeverCompassCollapsed, type LeverScores, type LeverStatus } from '@/components/app/shell/lever-compass'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
@@ -335,6 +337,8 @@ export function Sidebar({
         onToggle={() => setCollapsed(!collapsed)}
       />
 
+      <SidebarPerspectiveBadge collapsed={collapsed} />
+
       <ModulesSection
         collapsed={collapsed}
         activeModule={activeModule}
@@ -452,6 +456,44 @@ function SearchTrigger() {
       <Search className="w-3.5 h-3.5" aria-hidden />
       <span className="font-mono text-[10px] uppercase tracking-[0.15em]">⌘K</span>
     </button>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Weergave-badge (perspectief: eigen / huishouden / partner)
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Toont de weergave-badge bovenaan de sidebar — alleen voor leden van een
+ * huishouden (self-gating via PerspectiveSwitcher + isHousehold). Expanded:
+ * kicker "Weergave" + pill. Collapsed: alleen de icoon-pill (gecentreerd).
+ */
+function SidebarPerspectiveBadge({ collapsed }: { collapsed: boolean }) {
+  const { isHousehold, loading } = usePerspective()
+  if (loading || !isHousehold) return null
+
+  if (collapsed) {
+    return (
+      <div className="flex justify-center py-2 border-b border-[var(--border-ed)]">
+        <PerspectiveSwitcher compact menuAlign="left" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-4 py-3 border-b border-[var(--border-ed)]">
+      <div className="flex items-center gap-2.5 mb-1.5">
+        <span
+          aria-hidden
+          className="inline-block w-7 h-px"
+          style={{ background: 'var(--color-horizon-500)' }}
+        />
+        <span className="text-[10px] font-mono uppercase tracking-[0.20em] text-[var(--ink-2)]">
+          Weergave
+        </span>
+      </div>
+      <PerspectiveSwitcher menuAlign="left" />
+    </div>
   )
 }
 

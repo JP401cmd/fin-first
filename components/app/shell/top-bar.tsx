@@ -39,6 +39,7 @@ import { Activity, ArrowLeft, Bell, Newspaper } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavStack, type TopBarKind } from './nav-stack-provider'
 import { PrivacyToggle } from '@/components/app/privacy-toggle'
+import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
@@ -101,8 +102,9 @@ type TopBarProps = {
  * - Bell: opent `NotificationModal` via `useNotifications().openModal`.
  *   Toont badge met `unreadCount` (cap '9+').
  * - Avatar: tap toont dropdown met Identiteit / Rapportages / Sync nu +
- *   Sync-rapport (2-kolom-grid) / Beheer (superadmin) / Uitloggen. Geen
- *   perspective-switcher (leeft in `/identity/profiel`) — houdt cluster compact.
+ *   Sync-rapport (2-kolom-grid) / Beheer (superadmin) / Uitloggen.
+ * - Weergave-badge (`PerspectiveSwitcher`, compact): eerste item in de cluster,
+ *   self-gating — alleen zichtbaar voor leden van een huishouden.
  */
 function TopBarUtilities({ email, role }: { email: string; role?: string }) {
   const { unreadCount, openModal } = useNotifications()
@@ -131,6 +133,9 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
 
   return (
     <div className="flex items-center gap-0.5">
+      {/* Weergave-badge (eigen/huishouden/partner) — alleen voor huishoudens. */}
+      <PerspectiveSwitcher compact menuAlign="right" />
+
       {/* Vier-hefbomen-kompas — compact dots, expand on tap */}
       <LeverCompassMobile scores={leverScores} />
 

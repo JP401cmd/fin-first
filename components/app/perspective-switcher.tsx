@@ -2,7 +2,20 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { usePerspective, type Perspective } from '@/components/app/perspective-provider'
-import { Users, User, UserCheck } from 'lucide-react'
+import { Users, User, UserCheck, Check, ChevronDown } from 'lucide-react'
+
+/**
+ * PerspectiveSwitcher — de "weergave-badge": toont én wisselt het actieve
+ * perspectief (Eigen / Huishouden / Partner). Verschijnt alleen voor leden van
+ * een huishouden (self-gating). Gerenderd in de sidebar (desktop) en de
+ * mobiele TopBar zodat altijd zichtbaar is welke weergave actief is.
+ *
+ * Stijl (ui/ux-skill): een `rounded-full` pill-badge — de enige toegestane
+ * ronde vorm. Tint per perspectief, consistent met OwnershipBadge:
+ *   • Eigen      → neutraal (ink/subtle)
+ *   • Huishouden → kern-tint
+ *   • Partner    → horizon-tint
+ */
 
 const perspectiveIcons: Record<Perspective, typeof Users> = {
   personal: User,
@@ -10,74 +23,83 @@ const perspectiveIcons: Record<Perspective, typeof Users> = {
   partner: UserCheck,
 }
 
-const perspectiveColors: Record<Perspective, string> = {
-  personal: 'text-[var(--ink-2)]',
-  household: 'text-kern-600',
-  partner: 'text-[var(--ink-2)]',
+/** Pill-tint per perspectief (badge-achtergrond + rand + tekst). */
+const pillTint: Record<Perspective, string> = {
+  personal: 'bg-[var(--subtle)] border-[var(--border-md)] text-[var(--ink-2)]',
+  household: 'bg-kern-50 border-kern-300 text-kern-800',
+  partner: 'bg-horizon-50 border-horizon-300 text-horizon-800',
 }
 
-const perspectiveActiveColors: Record<Perspective, string> = {
-  personal: 'bg-[var(--subtle)] border-[var(--border-md)] text-[var(--ink)]',
-  household: 'bg-kern-50 border-kern-300 text-kern-900',
-  partner: 'bg-[var(--subtle)] border-[var(--border-md)] text-[var(--ink)]',
-}
-
-export function PerspectiveSwitcher() {
+export function PerspectiveSwitcher({
+  compact = false,
+  menuAlign = 'right',
+}: {
+  /** Icoon-only pill (collapsed sidebar / mobiele TopBar). */
+  compact?: boolean
+  /** Uitlijning van het dropdown-menu t.o.v. de trigger. */
+  menuAlign?: 'left' | 'right'
+} = {}) {
   const { perspective, isHousehold, availablePerspectives, setPerspective, loading } = usePerspective()
   const [open, setOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLDivElement>(null)
 
-  // Close dropdown on outside click
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setOpen(false)
-      }
+    if (!open) return
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
-    if (open) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onEsc)
     }
   }, [open])
 
-  // Don't show switcher if user is solo (no household)
-  if (!isHousehold && !loading) return null
+  // Self-gating: alleen tonen voor leden van een huishouden.
+  if (loading || !isHousehold) return null
 
-  // Still loading
-  if (loading) return null
-
-  const currentOption = availablePerspectives.find(p => p.id === perspective) ?? availablePerspectives[0]
+  const current = availablePerspectives.find((p) => p.id === perspective) ?? availablePerspectives[0]
   const Icon = perspectiveIcons[perspective]
 
   return (
-    <div className="relative" ref={dropdownRef} data-testid="perspective-switcher">
-      {/* Trigger button */}
+    <div className="relative" ref={ref} data-testid="perspective-switcher">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all hover:shadow-[var(--s0)] ${perspectiveActiveColors[perspective]}`}
+        className={`inline-flex items-center gap-1.5 rounded-full border transition-all hover:shadow-[var(--s0)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink)] ${pillTint[perspective]} ${
+          compact ? 'h-8 w-8 justify-center' : 'px-2.5 py-1 text-xs font-medium'
+        }`}
         data-testid="perspective-switcher-trigger"
-        aria-label="Perspectief wisselen"
-        title={`Perspectief: ${currentOption.label}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Weergave: ${current.label}`}
+        title={`Weergave: ${current.label}`}
       >
-        <Icon className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">{currentOption.label}</span>
-        <svg
-          className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        {!compact && (
+          <>
+            <span className="truncate">{current.label}</span>
+            <ChevronDown
+              className={`h-3 w-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+          </>
+        )}
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]" data-testid="perspective-dropdown">
+        <div
+          role="menu"
+          className={`absolute ${menuAlign === 'left' ? 'left-0' : 'right-0'} top-full z-50 mt-1 w-56 border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]`}
+          data-testid="perspective-dropdown"
+        >
           <div className="px-3 py-2 border-b border-[var(--border-ed)]">
-            <p className="text-[10px] font-semibold tracking-wider text-[var(--ink-3)] uppercase">
-              Perspectief
+            <p className="text-[10px] font-mono font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
+              Weergave
             </p>
           </div>
           {availablePerspectives.map((option) => {
@@ -86,34 +108,32 @@ export function PerspectiveSwitcher() {
             return (
               <button
                 key={option.id}
+                type="button"
+                role="menuitem"
                 onClick={() => {
                   setPerspective(option.id)
                   setOpen(false)
                 }}
                 className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                  isActive
-                    ? 'bg-[var(--subtle)]'
-                    : 'hover:bg-[var(--subtle)]'
+                  isActive ? 'bg-[var(--subtle)]' : 'hover:bg-[var(--subtle)]'
                 }`}
                 data-testid={`perspective-option-${option.id}`}
                 data-active={isActive ? 'true' : 'false'}
               >
-                <div className={`flex h-7 w-7 items-center justify-center rounded-full ${
-                  isActive ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--subtle)] text-[var(--ink-3)]'
-                }`}>
-                  <OptionIcon className="h-3.5 w-3.5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${isActive ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                    isActive ? 'bg-[var(--ink)] text-[var(--paper)]' : 'bg-[var(--subtle)] text-[var(--ink-3)]'
+                  }`}
+                >
+                  <OptionIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-sm font-medium ${isActive ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
                     {option.label}
-                  </p>
-                  <p className="text-[11px] text-[var(--ink-3)] truncate">{option.description}</p>
-                </div>
-                {isActive && (
-                  <svg className="h-4 w-4 text-[var(--ink)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
+                  </span>
+                  <span className="block truncate text-[11px] text-[var(--ink-3)]">{option.description}</span>
+                </span>
+                {isActive && <Check className="h-4 w-4 shrink-0 text-[var(--ink)]" aria-hidden="true" />}
               </button>
             )
           })}
