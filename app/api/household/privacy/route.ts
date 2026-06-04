@@ -236,3 +236,12 @@ export async function PATCH(request: NextRequest) {
     dbPrivacySettings: dbSettings,
   })
 }
+
+/**
+ * POST /api/household/privacy
+ * Alias of PATCH — the privacy UI (components/mijn/household-privacy-settings.tsx)
+ * saves via POST. Without this handler Next.js returns 405 → "Opslaan mislukt".
+ */
+export async function POST(request: NextRequest) {
+  return PATCH(request)
+}

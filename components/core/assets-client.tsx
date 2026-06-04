@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
-  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon, ExternalLink,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon, ExternalLink, Users,
 } from 'lucide-react'
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -388,6 +388,15 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     hhContext.hasHousehold &&
     (perspective === 'household' || perspective === 'partner') &&
     !activeAssets.some((a) => a._provenance === 'partner')
+
+  // Partner-aggregaatrijen (privacy='totalen') hebben géén asset_type en vallen
+  // daardoor buiten `byType`. Toon ze apart in een eigen "Van je partner"-sectie
+  // zodat het partner-aandeel zichtbaar is (anders telt het wél mee in het
+  // totaal maar zie je nergens wáár het vandaan komt).
+  const partnerAggregateAssets = useMemo(
+    () => activeAssets.filter((a) => a._aggregated === true && a._provenance === 'partner'),
+    [activeAssets],
+  )
 
   // ── KPI's per asset (zelfde patroon als asset-category-page) ──
   // Context-build uit lokale state: assets (huidige user) + mortgages
@@ -835,6 +844,37 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
             </div>
           )
         })}
+
+        {/* Van je partner — privacy='totalen' levert één aggregaat-kaart per
+            categorie (geen asset_type), die buiten de type-groepen valt. Apart
+            tonen zodat het partner-aandeel zichtbaar is in huishouden/partner-view. */}
+        {!assetTypeFilter && partnerAggregateAssets.length > 0 && (
+          <div id="asset-group-partner" className="scroll-mt-24">
+            <div className="flex items-center gap-2 pt-2 pb-2.5">
+              <span className="text-horizon-600"><Users className="h-4 w-4" /></span>
+              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                {hhContext.partnerName ? `Van ${hhContext.partnerName}` : 'Van je partner'}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {partnerAggregateAssets.map((asset, idx) => (
+                <VermogenAssetCard
+                  key={asset.id}
+                  asset={asset}
+                  onClick={handleAssetClick}
+                  onEditClick={handleAssetEdit}
+                  onRevalueClick={handleAssetRevalue}
+                  staggerIndex={idx}
+                  perspective={perspective}
+                  partnerName={hhContext.partnerName}
+                  provenance={asset._provenance}
+                  shareFraction={asset._myShareFraction}
+                  aggregated={asset._aggregated}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Asset detail/edit/revalue — uniforme slide-in pane (driewegregel
