@@ -58,10 +58,33 @@ import { computeSharePct, type SplitMode } from '@/lib/household-data'
 // ── Result types ────────────────────────────────────────────────────────────
 
 /** Per-partner FIRE-uitkomst (mirror van het oude API-formaat voor de UI). */
+/**
+ * Persisted FIRE-samenvatting van een lid (in profiles.fire_summary). De partner
+ * leest deze zodat de partnerkaart EXACT de cijfers toont die het lid zelf ziet
+ * (i.p.v. een herberekening uit gegate fragmenten).
+ */
+export interface HouseholdFireSummary {
+  projection: HouseholdFireProjectionData
+  financials: {
+    totalAssets: number
+    totalDebts: number
+    netWorth: number
+    monthlyIncome: number
+    monthlyExpenses: number
+    monthlyContributions: number
+    yearlyMustExpenses: number
+    dateOfBirth: string | null
+    sharedAssetsValue: number
+    sharedDebtsValue: number
+  }
+}
+
 export interface HouseholdPartnerProjection {
   userId: string
   fullName: string | null
   isCurrentUser: boolean
+  /** Lid verbergt z'n toekomst-gegevens voor het huishouden. */
+  futureHidden: boolean
   financials: {
     userId: string
     fullName: string | null
@@ -138,6 +161,8 @@ export interface HouseholdProjectionResult {
    * misleidende projectie.
    */
   partnerDataHidden: boolean
+  /** True wanneer de partner z'n volledige TOEKOMST-gegevens verbergt. */
+  partnerFutureHidden: boolean
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -236,6 +261,10 @@ interface MemberProfile {
   estimated_monthly_expenses: number | null
   household_type: string | null
   number_of_children: number | null
+  /** Lid verbergt z'n toekomst-gegevens voor het huishouden (privacy 'future'='hidden'). */
+  future_hidden?: boolean
+  /** Persisted eigen FIRE-samenvatting (door het lid zelf berekend). */
+  fire_summary?: HouseholdFireSummary | null
 }
 
 /** Bouw een AOW-income-cashflow voor een partner op de gevraagde tijdas. */
@@ -287,6 +316,7 @@ export async function buildHouseholdProjectionInput(
     partners: [],
     comparison: emptyComparison(),
     partnerDataHidden: false,
+    partnerFutureHidden: false,
   }
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -371,21 +401,26 @@ export async function buildHouseholdProjectionInput(
   for (const ev of [...ownAndSharedEvents, ...partnerPersonalEvents]) eventsById.set(ev.id, ev)
   const allEvents = [...eventsById.values()]
 
+  const partnerId = memberIds.find(id => id !== user.id) ?? null
+  // Toekomst-privacy: verbergt de partner z'n toekomst-gegevens, dan negeren we
+  // ALLE partner-data voor deze (toekomst-)projectie: assets/debts/income/events.
+  const partnerProfileRow = profiles.find(p => p.id === partnerId) ?? null
+  const partnerFutureHidden = partnerProfileRow?.future_hidden === true
+
   // Partner-persoonlijke assets/debts (privacy-gated): 'full' → itemized rijen
-  // (bruikbaar voor de unified engine); 'totals' → één aggregaatrij met het
-  // totaal; 'hidden' → niets.
-  const rawPartnerAssets = (partnerAssetsRes.data ?? []) as Array<Record<string, unknown>>
-  const rawPartnerDebts = (partnerDebtsRes.data ?? []) as Array<Record<string, unknown>>
+  // (bruikbaar voor de unified engine); 'totals' → één aggregaatrij; 'hidden' →
+  // niets. Toekomst verborgen → alles leeg.
+  const rawPartnerAssets = partnerFutureHidden ? [] : ((partnerAssetsRes.data ?? []) as Array<Record<string, unknown>>)
+  const rawPartnerDebts = partnerFutureHidden ? [] : ((partnerDebtsRes.data ?? []) as Array<Record<string, unknown>>)
   const partnerAssets = rawPartnerAssets.filter(r => r._aggregated !== true) as unknown as Asset[]
   const partnerDebts = rawPartnerDebts.filter(r => r._aggregated !== true) as unknown as Debt[]
   // Aggregaat-totaal (privacy='totals') — gebruikt wanneer er geen itemized rijen zijn.
   const partnerAssetsAggTotal = rawPartnerAssets.find(r => r._aggregated === true)?.current_value as number | undefined
   const partnerDebtsAggTotal = rawPartnerDebts.find(r => r._aggregated === true)?.current_balance as number | undefined
-  // Partner-maandinkomen uit de income-RPC (toont bij 'full'/'totals'; null bij 'hidden').
-  const partnerIncomeRow = (partnerIncomeRes.data ?? [])[0] as { monthly_income?: number } | undefined
+  // Partner-maandinkomen uit de income-RPC (toont bij 'full'/'totals'; null bij 'hidden'/verborgen).
+  const partnerIncomeRow = partnerFutureHidden ? undefined : ((partnerIncomeRes.data ?? [])[0] as { monthly_income?: number } | undefined)
   const partnerMonthlyIncomeShared = partnerIncomeRow?.monthly_income != null ? Number(partnerIncomeRow.monthly_income) : null
 
-  const partnerId = memberIds.find(id => id !== user.id) ?? null
   const partnerHasItemizedAssets = partnerAssets.length > 0
   const partnerHasAggregate = partnerAssetsAggTotal != null
   // Verborgen = partner deelt vermogen NIET (geen itemized én geen aggregaat).
@@ -607,26 +642,41 @@ export async function buildHouseholdProjectionInput(
       projection = emptyProjection(netWorth, monthlyIncome, monthlyExpenses, yearlyExpenses, currentAge)
     }
 
+    // Partnerkaart toont de EIGEN (persisted) cijfers van de partner zodat ze
+    // exact overeenkomen met wat de partner zelf ziet. Verborgen → geen cijfers;
+    // nog geen summary (partner heeft /toekomst nog niet geladen) → herberekening.
+    const futureHidden = !isMe && profile?.future_hidden === true
+    const summary = (!isMe && !futureHidden)
+      ? ((profile?.fire_summary as HouseholdFireSummary | null | undefined) ?? null)
+      : null
+
+    const recomputedFinancials = {
+      userId: memberId,
+      fullName: profile?.full_name ?? null,
+      isCurrentUser,
+      totalAssets: Math.round(totalAssets),
+      totalDebts: Math.round(totalDebts),
+      monthlyIncome: Math.round(monthlyIncome),
+      monthlyExpenses: Math.round(monthlyExpenses),
+      monthlyContributions: Math.round(monthlyContributions),
+      yearlyMustExpenses: Math.round(yearlyExpenses),
+      dateOfBirth: dob,
+      netWorth: Math.round(netWorth),
+      sharedAssetsValue: Math.round(sharedAssetsValue),
+      sharedDebtsValue: Math.round(sharedDebtsValue),
+    }
+
     return {
       userId: memberId,
       fullName: profile?.full_name ?? null,
       isCurrentUser,
-      financials: {
-        userId: memberId,
-        fullName: profile?.full_name ?? null,
-        isCurrentUser,
-        totalAssets: Math.round(totalAssets),
-        totalDebts: Math.round(totalDebts),
-        monthlyIncome: Math.round(monthlyIncome),
-        monthlyExpenses: Math.round(monthlyExpenses),
-        monthlyContributions: Math.round(monthlyContributions),
-        yearlyMustExpenses: Math.round(yearlyExpenses),
-        dateOfBirth: dob,
-        netWorth: Math.round(netWorth),
-        sharedAssetsValue: Math.round(sharedAssetsValue),
-        sharedDebtsValue: Math.round(sharedDebtsValue),
-      },
-      projection,
+      futureHidden,
+      financials: summary
+        ? { userId: memberId, fullName: profile?.full_name ?? null, isCurrentUser, ...summary.financials }
+        : recomputedFinancials,
+      projection: futureHidden
+        ? emptyProjection(0, 0, 0, 0, null)
+        : (summary?.projection ?? projection),
       settings: {
         currentAge,
         expectedReturn: profile?.expected_return ?? null,
@@ -638,6 +688,31 @@ export async function buildHouseholdProjectionInput(
       lifeEvents: memberLifeEvents,
     }
   })
+
+  // Persist de EIGEN summary zodat de partner exact deze cijfers ziet.
+  const mineEntry = partners.find(p => p.isCurrentUser)
+  if (mineEntry) {
+    const summaryToStore: HouseholdFireSummary = {
+      projection: mineEntry.projection,
+      financials: {
+        totalAssets: mineEntry.financials.totalAssets,
+        totalDebts: mineEntry.financials.totalDebts,
+        netWorth: mineEntry.financials.netWorth,
+        monthlyIncome: mineEntry.financials.monthlyIncome,
+        monthlyExpenses: mineEntry.financials.monthlyExpenses,
+        monthlyContributions: mineEntry.financials.monthlyContributions,
+        yearlyMustExpenses: mineEntry.financials.yearlyMustExpenses,
+        dateOfBirth: mineEntry.financials.dateOfBirth,
+        sharedAssetsValue: mineEntry.financials.sharedAssetsValue,
+        sharedDebtsValue: mineEntry.financials.sharedDebtsValue,
+      },
+    }
+    try {
+      await supabase.from('profiles').update({ fire_summary: summaryToStore }).eq('id', user.id)
+    } catch {
+      // Persisteren is niet kritisch voor de weergave.
+    }
+  }
 
   // ── Gecombineerde projectie op de head-age (oudste partner) ─────────────────
   // Verzamel alle DOBs; head = oudste (vroegste DOB).
@@ -773,6 +848,7 @@ export async function buildHouseholdProjectionInput(
       })),
     },
     partnerDataHidden,
+    partnerFutureHidden,
   }
 }
 

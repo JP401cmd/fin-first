@@ -15,7 +15,7 @@ import {
 import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import {
   Users, TrendingUp, Percent, Target, User,
-  Clock, PiggyBank, Wallet, Info, Settings2,
+  Clock, PiggyBank, Wallet, Info, Settings2, EyeOff,
 } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -629,6 +629,30 @@ function PartnerCard({
     : { border: 'border-wil-200', bg: 'bg-wil-50/30', accent: 'text-wil-700', icon: 'bg-wil-100 text-wil-600', bar: 'from-wil-600 to-wil-400' }
 
   const name = partner.fullName ?? (partner.isCurrentUser ? 'Jij' : 'Partner')
+
+  // Partner verbergt z'n toekomstgegevens → geen cijfers tonen, alleen melding.
+  if (partner.futureHidden) {
+    return (
+      <div
+        className={`rounded-[var(--r-lg)] border ${colors.border} ${colors.bg} p-5`}
+        data-testid={`partner-card-${partner.isCurrentUser ? 'self' : 'other'}`}
+      >
+        <div className="mb-3 flex items-center gap-2">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${colors.icon}`}>
+            <User className="h-4 w-4" />
+          </div>
+          <p className={`text-sm font-semibold ${colors.accent}`}>{name}</p>
+        </div>
+        <div className="flex items-start gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3" data-testid="partner-future-hidden">
+          <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-4)]" aria-hidden />
+          <p className="text-xs text-[var(--ink-3)] leading-relaxed">
+            {name} deelt geen toekomstgegevens met het huishouden. Instellingen,
+            gebeurtenissen en FIRE-projectie zijn verborgen.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

@@ -132,12 +132,15 @@ export async function GET() {
   const dbSettings = raw ? (isDutchFormat(raw) ? toDb(raw) : { ...DEFAULT_DB_PRIVACY, ...raw }) : DEFAULT_DB_PRIVACY
   const uiSettings = raw ? (isDutchFormat(raw) ? { ...DEFAULT_UI_PRIVACY, ...raw as Record<UiCategory, UiLevel> } : toUi(raw)) : DEFAULT_UI_PRIVACY
 
+  // Toekomst-privacy (binair): transparant | verborgen. Standaard transparant.
+  const futureVal = raw?.future === 'hidden' ? 'hidden' : 'transparent'
+
   return NextResponse.json({
     householdId: membership.household_id,
     // UI-facing (Dutch) — used by the frontend
-    privacySettings: uiSettings,
+    privacySettings: { ...uiSettings, future: futureVal },
     // DB-facing (English) — canonical format
-    dbPrivacySettings: dbSettings,
+    dbPrivacySettings: { ...dbSettings, future: futureVal },
     defaults: DEFAULT_UI_PRIVACY,
     dbDefaults: DEFAULT_DB_PRIVACY,
   })
@@ -208,10 +211,15 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Geen huishouden gevonden' }, { status: 404 })
   }
 
+  // Toekomst-privacy (binair) meenemen — accepteert NL/EN.
+  const rawFuture = (privacySettings as Record<string, string>).future ?? (privacySettings as Record<string, string>).toekomst
+  const futureVal = (rawFuture === 'hidden' || rawFuture === 'verborgen') ? 'hidden' : 'transparent'
+  const storedSettings = { ...dbSettings, future: futureVal }
+
   // Store in DB format (English keys) in household_members.privacy_settings
   const { error: memberError } = await supabase
     .from('household_members')
-    .update({ privacy_settings: dbSettings })
+    .update({ privacy_settings: storedSettings })
     .eq('id', membership.id)
 
   if (memberError) {
@@ -220,7 +228,7 @@ export async function PATCH(request: NextRequest) {
       .from('app_settings')
       .upsert({
         key: `household_privacy:${user.id}`,
-        value: dbSettings,
+        value: storedSettings,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'key' })
 
@@ -232,8 +240,8 @@ export async function PATCH(request: NextRequest) {
   return NextResponse.json({
     success: true,
     message: 'Privacy-instellingen opgeslagen',
-    privacySettings: uiSettings,
-    dbPrivacySettings: dbSettings,
+    privacySettings: { ...uiSettings, future: futureVal },
+    dbPrivacySettings: storedSettings,
   })
 }
 

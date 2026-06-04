@@ -55,6 +55,9 @@ export function HouseholdPrivacySettings() {
   const [loading, setLoading] = useState(true)
   const [privacy, setPrivacy] = useState<PrivacySettings>(DEFAULT_PRIVACY)
   const [saved, setSaved] = useState<PrivacySettings>(DEFAULT_PRIVACY)
+  // Toekomst-gegevens: transparant (gedeeld) of verborgen (niets delen voor /toekomst).
+  const [future, setFuture] = useState<'transparent' | 'hidden'>('transparent')
+  const [savedFuture, setSavedFuture] = useState<'transparent' | 'hidden'>('transparent')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -70,6 +73,9 @@ export function HouseholdPrivacySettings() {
           if (data.privacySettings) {
             setPrivacy(data.privacySettings)
             setSaved(data.privacySettings)
+            const f = data.privacySettings.future === 'hidden' ? 'hidden' : 'transparent'
+            setFuture(f)
+            setSavedFuture(f)
           }
         }
       } catch {
@@ -90,21 +96,22 @@ export function HouseholdPrivacySettings() {
       const res = await fetch('/api/household/privacy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ privacySettings: privacy }),
+        body: JSON.stringify({ privacySettings: { ...privacy, future } }),
       })
       if (!res.ok) throw new Error('save failed')
       setSaved({ ...privacy })
+      setSavedFuture(future)
       setMessage({ type: 'success', text: 'Privacy-instellingen opgeslagen!' })
       setTimeout(() => setMessage(null), 3000)
     } catch {
       setMessage({ type: 'error', text: 'Opslaan mislukt. Probeer opnieuw.' })
     }
     setSaving(false)
-  }, [privacy])
+  }, [privacy, future])
 
   if (loading || !hasHousehold) return null
 
-  const dirty = JSON.stringify(privacy) !== JSON.stringify(saved)
+  const dirty = JSON.stringify(privacy) !== JSON.stringify(saved) || future !== savedFuture
 
   return (
     <section
@@ -143,6 +150,50 @@ export function HouseholdPrivacySettings() {
             <strong>Verborgen</strong> — volledig afgeschermd
           </span>
         </div>
+      </div>
+
+      {/* Toekomst-gegevens: transparant of verborgen (hoofdschakelaar voor /toekomst). */}
+      <div className="mb-4 rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4" data-testid="future-privacy-toggle">
+        <div className="mb-2 flex items-center gap-2.5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-wil-50">
+            <Shield className="h-3.5 w-3.5 text-wil-600" aria-hidden="true" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--ink)]">Toekomst-gegevens</h3>
+            <p className="text-xs text-[var(--ink-3)]">Instellingen, gebeurtenissen en FIRE-projectie op de Toekomst-pagina</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {([
+            { val: 'transparent', label: 'Transparant', icon: Eye },
+            { val: 'hidden', label: 'Verborgen', icon: EyeOff },
+          ] as const).map((opt) => {
+            const isActive = future === opt.val
+            const Icon = opt.icon
+            return (
+              <button
+                key={opt.val}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setFuture(opt.val)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                  isActive
+                    ? opt.val === 'transparent'
+                      ? 'bg-wil-50 text-wil-700 border border-wil-300'
+                      : 'bg-red-50 text-red-700 border border-red-300'
+                    : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-[11px] text-[var(--ink-4)] leading-relaxed">
+          Bij <strong>Verborgen</strong> deelt je partner geen van jouw toekomst-gegevens
+          (instellingen, gebeurtenissen, FIRE-projectie) in de huishoudweergave.
+        </p>
       </div>
 
       <div className="space-y-3">
