@@ -120,11 +120,13 @@ export async function loadPerspectiveContext(
   const customSplitPct = household?.custom_split_pct ?? null
   const primaryPayerId = household?.primary_payer_id ?? null
 
-  const { data: partnerProfile } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', partner.user_id)
-    .maybeSingle()
+  // Profiles RLS is own-only; lees de partnernaam via de huishoud-RPC
+  // (anders blijft de naam leeg en valt de badge terug op "Partner").
+  const { data: memberProfiles } = await supabase.rpc('household_member_profiles')
+  const partnerProfile =
+    (memberProfiles as Array<{ id: string; full_name: string | null }> | null)?.find(
+      (m) => m.id === partner.user_id,
+    ) ?? null
 
   // income_ratio heeft beide inkomens nodig. We lezen voorlopig de
   // income-budgetten (zoals /api/household/data). De cashflow-fase

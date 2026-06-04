@@ -587,6 +587,32 @@ function FinancialCard({
   )
 }
 
+const RETIREMENT_METHOD_LABELS: Record<string, string> = {
+  essential_budgets: 'Essentiële budgetten',
+  custom_amount: 'Aangepast bedrag',
+  current_expenses: 'Huidige uitgaven',
+  percentage_income: '% van inkomen',
+}
+
+function endStrategyLabel(strategy: string, endAge: number | null): string {
+  switch (strategy) {
+    case 'perpetual': return 'Eeuwigdurend'
+    case 'legacy': return 'Nalaten'
+    case 'deplete': return endAge ? `Opmaken (${endAge})` : 'Opmaken'
+    default: return strategy
+  }
+}
+
+/** Compacte instellingen-chip voor de partner-vergelijking. */
+function SettingChip({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] text-[var(--ink-2)]">
+      <span className="text-[var(--ink-4)]">{label}:</span>
+      <span className="font-medium">{value}</span>
+    </span>
+  )
+}
+
 function PartnerCard({
   partner,
   partnerIndex,
@@ -686,6 +712,40 @@ function PartnerCard({
           <div className="flex justify-between text-horizon-600/70">
             <span>Gedeeld vermogen (aandeel)</span>
             <span className="font-mono tabular-nums font-medium">{<MaskedAmount value={partner.financials.sharedAssetsValue} tone="horizon" />}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Compacte instellingen + levensgebeurtenissen (klein weergegeven) */}
+      <div className="mt-3 space-y-2 border-t border-[var(--border-ed)] pt-2.5">
+        <div>
+          <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--ink-4)]">Instellingen</p>
+          <div className="flex flex-wrap gap-1" data-testid={`partner-settings-${partner.isCurrentUser ? 'self' : 'other'}`}>
+            {partner.settings.currentAge !== null && <SettingChip label="Leeftijd" value={`${partner.settings.currentAge} jr`} />}
+            {partner.settings.expectedReturn !== null && <SettingChip label="Rendement" value={`${(partner.settings.expectedReturn * 100).toFixed(1)}%`} />}
+            {partner.settings.inflationRate !== null && <SettingChip label="Inflatie" value={`${(partner.settings.inflationRate * 100).toFixed(1)}%`} />}
+            {partner.settings.retirementExpenseMethod && (
+              <SettingChip label="Pensioenuitgaven" value={RETIREMENT_METHOD_LABELS[partner.settings.retirementExpenseMethod] ?? partner.settings.retirementExpenseMethod} />
+            )}
+            {partner.settings.fireEndStrategy && (
+              <SettingChip label="Einde" value={endStrategyLabel(partner.settings.fireEndStrategy, partner.settings.fireEndAge)} />
+            )}
+          </div>
+        </div>
+        {partner.lifeEvents.length > 0 && (
+          <div>
+            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--ink-4)]">Gebeurtenissen</p>
+            <div className="flex flex-wrap gap-1" data-testid={`partner-events-${partner.isCurrentUser ? 'self' : 'other'}`}>
+              {partner.lifeEvents.map(ev => (
+                <span
+                  key={ev.id}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-1.5 py-0.5 text-[10px] text-[var(--ink-2)]"
+                >
+                  {ev.ownership === 'shared' && <Users className="h-2.5 w-2.5 text-kern-600" aria-hidden />}
+                  {ev.name}{ev.targetAge != null ? ` · ${ev.targetAge}j` : ''}
+                </span>
+              ))}
+            </div>
           </div>
         )}
       </div>

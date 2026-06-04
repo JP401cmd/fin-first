@@ -75,6 +75,17 @@ export interface HouseholdPartnerProjection {
     sharedDebtsValue: number
   }
   projection: HouseholdFireProjectionData
+  /** Compacte instellingen voor de partner-vergelijking (klein weergegeven). */
+  settings: {
+    currentAge: number | null
+    expectedReturn: number | null
+    inflationRate: number | null
+    retirementExpenseMethod: string | null
+    fireEndStrategy: string | null
+    fireEndAge: number | null
+  }
+  /** Levensgebeurtenissen van dit lid (eigen + gedeeld), compact. */
+  lifeEvents: Array<{ id: string; name: string; targetAge: number | null; ownership: 'personal' | 'shared' }>
 }
 
 /** FIRE-projectie-uitkomst, gevuld vanuit de unified engine. */
@@ -309,10 +320,9 @@ export async function buildHouseholdProjectionInput(
     partnerAssetsRes,
     partnerDebtsRes,
   ] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('id, full_name, date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, household_type, number_of_children')
-      .in('id', memberIds),
+    // Profiles RLS is own-only; de RPC levert (privacy-respecterend) de
+    // projectie-velden van ALLE huishoudleden — incl. partner-DOB/-naam.
+    supabase.rpc('household_member_profiles'),
     supabase.from('assets').select('*').eq('is_active', true),
     supabase.from('debts').select('*').eq('is_active', true),
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id, user_id, ownership'),
@@ -488,6 +498,17 @@ export async function buildHouseholdProjectionInput(
     const dob = profile?.date_of_birth ?? null
     const currentAge = dob ? ageAtDate(dob) : null
 
+    // Levensgebeurtenissen van dit lid (eigen + gedeeld) voor de compacte
+    // partner-vergelijking.
+    const memberLifeEvents = allEvents
+      .filter(ev => ev.user_id === memberId || ev.ownership === 'shared')
+      .map(ev => ({
+        id: ev.id,
+        name: ev.name,
+        targetAge: ev.target_age ?? null,
+        ownership: (ev.ownership ?? 'personal') as 'personal' | 'shared',
+      }))
+
     // FIRE-projectie via unified engine (alleen wanneer DOB bekend).
     const fireParams = profile ? resolveFireParams(profile) : { grossReturn: DEFAULT_RETURN, inflationRate: INFLATION, effectiveSwr: HOUSEHOLD_SWR, box3Method: 'forfaitair' as Box3Method }
     const fireStrategy = profile ? resolveFireStrategyWithOverride(profile) : DEFAULT_FIRE_STRATEGY
@@ -545,6 +566,15 @@ export async function buildHouseholdProjectionInput(
         sharedDebtsValue: Math.round(sharedDebtsValue),
       },
       projection,
+      settings: {
+        currentAge,
+        expectedReturn: profile?.expected_return ?? null,
+        inflationRate: profile?.inflation_rate ?? null,
+        retirementExpenseMethod: profile?.retirement_expense_method ?? null,
+        fireEndStrategy: profile?.fire_end_strategy ?? null,
+        fireEndAge: profile?.fire_end_age ?? null,
+      },
+      lifeEvents: memberLifeEvents,
     }
   })
 
