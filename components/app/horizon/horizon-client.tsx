@@ -2354,15 +2354,19 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   /** Drag-and-drop: update event target_age when dragged to a new position on the timeline. */
   async function handleEventDragEnd(eventId: string, newAge: number) {
     const ev = events.find(e => e.id === eventId)
-    if (!ev || ev.target_age === newAge) return
+    // target_age is een integer-kolom; drag-posities kunnen fractioneel zijn
+    // (bv. 59.5) → afronden, anders weigert Postgres de update ("invalid input
+    // syntax for type integer").
+    const roundedAge = Math.round(newAge)
+    if (!ev || ev.target_age === roundedAge) return
 
     const originalAge = ev.target_age
 
     // Optimistic local update for instant feedback
-    setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: newAge } : e))
+    setEvents(prev => prev.map(e => e.id === eventId ? { ...e, target_age: roundedAge } : e))
 
     const supabase = createClient()
-    const { error } = await supabase.from('life_events').update({ target_age: newAge }).eq('id', eventId)
+    const { error } = await supabase.from('life_events').update({ target_age: roundedAge }).eq('id', eventId)
     if (error) {
       console.error('Failed to update life event age:', error)
       // Revert optimistic update
