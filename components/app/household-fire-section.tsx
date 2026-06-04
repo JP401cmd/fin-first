@@ -41,6 +41,9 @@ export function HouseholdFireSection() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { perspective, perspectiveVersion } = usePerspective()
+  // Alle hooks MOETEN vóór elke conditionele return staan (rules-of-hooks).
+  // inViewRef/hasEntered worden pas verderop in de JSX gebruikt.
+  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 1100 })
 
   const loadData = useCallback(async () => {
     try {
@@ -89,7 +92,6 @@ export function HouseholdFireSection() {
 
   const { combined, partners, comparison, householdName, splitMode } = data
   const hasMultiplePartners = partners.length >= 2
-  const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 1100 })
   const currentUserPartner = partners.find(p => p.isCurrentUser)
   const splitLabel = SPLIT_MODE_LABELS[splitMode] ?? splitMode
 
