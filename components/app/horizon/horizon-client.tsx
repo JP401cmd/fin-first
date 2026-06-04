@@ -6,21 +6,20 @@ import Link from 'next/link'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
-import { previewEventCashflows, lifeEventsToCashflows, type SimCashflow } from '@/lib/fire-simulation'
+import { previewEventCashflows, lifeEventsToCashflows, type SimCashflow, type SimRow } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
-  computeFireProjection, computeFireRange, projectForward,
+  computeFireProjection, computeFireRange,
   formatFireAge, formatCountdown,
   computeLifeEventImpact, ageAtDate, deriveCountdown,
   runMonteCarlo,
   LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, berekenKinderopvangNetto, kinderbijslagPerMaand, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
-  type ProjectionMonth,
   type LifeEvent, type LifeEventImpact, splitLifeEvents, computeLifeEventNetImpact,
   type MonteCarloResult, type CatalogField,
   type UserDefinedCashflow,
@@ -66,6 +65,10 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
+import {
+  buildHouseholdProjectionInput,
+  type HouseholdProjectionResult,
+} from '@/lib/household-projection'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, ResilienceContextMessage, ResilienceTrendChart, FireAgeContextMessage, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
@@ -173,6 +176,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [partnerHero, setPartnerHero] = useState<HouseholdHeroData | null>(null)
   const [householdInput, setHouseholdInput] = useState<FinancialInput | null>(null)
   const [householdOverlays, setHouseholdOverlays] = useState<HouseholdPartnerOverlay[] | null>(null)
+  // Partner-projectie-pad (voor het wisselen van de hoofdlijn in partner-view).
+  // `rows` is leeg wanneer de partner alleen 'totals' deelt of z'n toekomst
+  // verbergt — dan tonen we geen partner-lijn (graceful degrade).
+  const [partnerLine, setPartnerLine] = useState<{
+    rows: SimRow[]
+    fireAge: number | null
+    fireAgeFractional: number | null
+    currentAge: number | null
+  } | null>(null)
+  // Levensgebeurtenissen van de PARTNER (read-only markers op de grafiek in
+  // huishouden- + partner-view). Alleen naam + leeftijd + icoon — nooit
+  // bewerkbaar (geen sourceId), nooit de partner's natuurlijke mijlpalen.
+  const [partnerLifeEvents, setPartnerLifeEvents] = useState<
+    Array<{ id: string; name: string; targetAge: number | null; icon?: string }>
+  >([])
   const [fireParams, setFireParams] = useState<FireParams>(initialData.fireParams)
   const [wsConfig, setWsConfig] = useState<{ strategy: WithdrawalStrategyType; floor: number; ceiling: number } | null>(
     initialData?.withdrawalStrategy
@@ -731,26 +749,38 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
   }, [input, initialData.events])
 
-  // Fetch household/partner FIRE data when perspective changes
+  // Laad huishouden-/partner-FIRE-data bij perspectief-wissel.
+  //
+  // BRON VAN WAARHEID: buildHouseholdProjectionInput — DEZELFDE engine die de
+  // HouseholdFireSection en de gecombineerde FIRE-leeftijd voedt. Hierdoor komt
+  // de gecombineerde lijn in de grafiek EXACT overeen met de getoonde
+  // gezamenlijke FIRE-leeftijd (de oude /api/household/fire-projections gebruikte
+  // de lichtgewicht projectForward → inconsistente lijn).
   useEffect(() => {
     if (!isHouseholdView && !isPartnerView) {
       setHouseholdHero(null)
       setPartnerHero(null)
       setHouseholdInput(null)
       setHouseholdOverlays(null)
+      setPartnerLine(null)
+      setPartnerLifeEvents([])
       return
     }
+    let cancelled = false
     async function loadHouseholdData() {
       try {
-        const res = await fetch('/api/household/fire-projections')
-        if (!res.ok) return
-        const data = await res.json()
-        if (!data.hasHousehold) return
+        const supabase = createClient()
+        const result: HouseholdProjectionResult = await buildHouseholdProjectionInput(supabase)
+        if (cancelled) return
+        if (!result.hasHousehold) return
+
+        // Niet-huidige partner-entry (voor partner-lijn + partner-events).
+        const partnerEntry = result.partners.find(p => !p.isCurrentUser) ?? null
 
         if (isHouseholdView) {
-          const cp = data.combined.projection
+          const cp = result.combined.projection
           setHouseholdHero({
-            householdName: data.householdName,
+            householdName: result.householdName,
             fireAge: cp.fireAge,
             fireTarget: cp.fireTarget,
             freedomPercentage: cp.freedomPercentage,
@@ -760,54 +790,42 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             freedomMonths: cp.freedomMonths,
             savingsRate: cp.savingsRate,
           })
-          // Store combined household FinancialInput for Monte Carlo / backtest
-          if (data.combined.input) {
-            setHouseholdInput(data.combined.input as FinancialInput)
-          }
-          // Build household overlays: per-partner + combined trajectory lines
-          const PARTNER_COLORS = ['#0d9488', '#7c3aed'] // teal, purple
+          // Gecombineerde FinancialInput voor het backtesting-/Monte-Carlo-modal
+          // (huishouden-perspectief). Afgeleid uit dezelfde combined-projectie
+          // zodat het modal het gezamenlijke vermogen backtest i.p.v. eigen-data.
+          const oldestDob = result.partners
+            .map(p => p.financials.dateOfBirth)
+            .filter((d): d is string => !!d)
+            .sort((a, b) => a.localeCompare(b))[0] ?? null
+          setHouseholdInput({
+            totalAssets: result.comparison.combinedNetWorth,
+            totalDebts: 0,
+            monthlyIncome: result.comparison.combinedMonthlyIncome,
+            monthlyExpenses: result.comparison.combinedMonthlyExpenses,
+            yearlyMustExpenses: result.comparison.combinedRetirementExpenses,
+            monthlyContributions: cp.monthlySavings,
+            dateOfBirth: oldestDob,
+          })
+          // Huishouden-view: ALLEEN de gecombineerde (gestreepte, gouden) lijn
+          // als overlay — NIET een aparte per-partner-lijn (de eigen lijn is de
+          // hoofdlijn). Het pad komt 1-op-1 uit de unified combined-projectie.
           const overlays: HouseholdPartnerOverlay[] = []
-          if (data.partners && Array.isArray(data.partners)) {
-            for (let i = 0; i < data.partners.length; i++) {
-              const p = data.partners[i]
-              if (!p.input) continue
-              const partnerInput = p.input as FinancialInput
-              const proj = projectForward(partnerInput, 480) // 40 years
-              const pts: [number, number][] = proj
-                .filter((m: ProjectionMonth) => m.age !== null)
-                .map((m: ProjectionMonth) => [m.age as number, m.netWorth] as [number, number])
-                .filter((_: [number, number], idx: number) => idx % 12 === 0)
-              overlays.push({
-                name: p.fullName ?? `Partner ${i + 1}`,
-                color: PARTNER_COLORS[i] ?? PARTNER_COLORS[0],
-                points: pts,
-                fireAge: p.projection?.fireAge ?? null,
-              })
-            }
-          }
-          // Combined household trajectory (dashed line)
-          if (data.combined?.input) {
-            const combinedInput = data.combined.input as FinancialInput
-            const proj = projectForward(combinedInput, 480)
-            const pts: [number, number][] = proj
-              .filter((m: ProjectionMonth) => m.age !== null)
-              .map((m: ProjectionMonth) => [m.age as number, m.netWorth] as [number, number])
-              .filter((_: [number, number], idx: number) => idx % 12 === 0)
+          if (result.combined.rows.length > 0) {
             overlays.push({
               name: 'Gezamenlijk',
               color: '#8a6e42', // horizon gold
-              points: pts,
+              points: result.combined.rows.map(r => [r.age, r.endPortfolio] as [number, number]),
               fireAge: cp.fireAge,
               isDashed: true,
             })
           }
           setHouseholdOverlays(overlays.length > 0 ? overlays : null)
-
           setPartnerHero(null)
-        } else if (isPartnerView && data.partner2) {
-          const pp = data.partner2.projection
+          setPartnerLine(null)
+        } else if (isPartnerView && partnerEntry) {
+          const pp = partnerEntry.projection
           setPartnerHero({
-            householdName: data.partner2.name ?? 'Partner',
+            householdName: partnerEntry.fullName ?? partnerName ?? 'Partner',
             fireAge: pp.fireAge,
             fireTarget: pp.fireTarget,
             freedomPercentage: pp.freedomPercentage,
@@ -819,13 +837,39 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           })
           setHouseholdHero(null)
           setHouseholdOverlays(null)
+          setHouseholdInput(null)
+          // Partner-view: vervang de hoofdlijn door het partner-pad zodat de
+          // as + FIRE-markers op de partner uitlijnen. Leeg pad ('totals' of
+          // toekomst verborgen) → null → degradeer naar de eigen lijn.
+          setPartnerLine(
+            partnerEntry.rows.length > 0
+              ? {
+                  rows: partnerEntry.rows,
+                  fireAge: pp.fireAge,
+                  fireAgeFractional: partnerEntry.fireAgeFractional,
+                  currentAge: partnerEntry.settings.currentAge,
+                }
+              : null,
+          )
         }
+
+        // Partner-levensgebeurtenissen (read-only markers) — in zowel
+        // huishouden- als partner-view. Alleen de PERSOONLIJKE events van de
+        // partner (gedeelde events tonen we al via de eigen overlay).
+        setPartnerLifeEvents(
+          partnerEntry
+            ? partnerEntry.lifeEvents
+                .filter(ev => ev.ownership !== 'shared')
+                .map(ev => ({ id: ev.id, name: ev.name, targetAge: ev.targetAge, icon: ev.icon }))
+            : [],
+        )
       } catch {
-        // Non-critical — fallback to personal data
+        // Niet kritisch — val terug op persoonlijke data.
       }
     }
     loadHouseholdData()
-  }, [isHouseholdView, isPartnerView])
+    return () => { cancelled = true }
+  }, [isHouseholdView, isPartnerView, partnerName])
 
   // Compute effective input: base data from DB
   const effectiveInput: FinancialInput | null = input
@@ -966,10 +1010,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const COLOR_NAT_DEBT = 'var(--color-kern-500, #6b4339)'
   const COLOR_NAT_SIM = 'var(--ink-2, #4a453d)'
   const COLOR_NAT_DANGER = 'var(--negative, #b91c1c)'
+  // Distinctieve partner-kleur voor read-only partner-event-markers (teal) —
+  // verschilt van eigen events (goud/bruin) en natuurlijke mijlpalen.
+  const COLOR_PARTNER_EVENT = '#0d9488'
 
   const chartEventOverlay = useMemo<ChartEventOverlay[]>(() => {
     const out: ChartEventOverlay[] = []
-    if (showLifeEvents) {
+    // Partner-view met een precies partner-pad: de hoofdlijn IS de partner z'n
+    // lijn, dus de EIGEN events + natuurlijke mijlpalen (op de eigen as) horen
+    // er niet bij — we tonen dan uitsluitend de partner-events. Bij privacy-
+    // degrade (geen partner-pad) val je terug op de eigen lijn + eigen events.
+    const showOwnEvents = !(isPartnerView && partnerLine !== null)
+    if (showLifeEvents && showOwnEvents) {
       for (const ev of events) {
         if (ev.target_age == null) continue
         const side = lifeEventSide(ev)
@@ -987,7 +1039,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         })
       }
     }
-    if (showNaturalMilestones) {
+    if (showNaturalMilestones && showOwnEvents) {
       for (const m of naturalMilestones) {
         const side = naturalMilestoneSide(m)
         const color =
@@ -1010,8 +1062,30 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         })
       }
     }
+    // Partner-levensgebeurtenissen als READ-ONLY markers (huishouden- +
+    // partner-view). Distinctieve partner-kleur (teal) zodat ze visueel
+    // verschillen van de eigen events (goud/bruin) én van natuurlijke
+    // mijlpalen. Géén sourceId → de click/drag-handlers raken niets aan
+    // (de viewer kan de events van de partner niet bewerken). Alleen
+    // PERSOONLIJKE partner-events; gedeelde + natuurlijke mijlpalen niet.
+    if ((isHouseholdView || isPartnerView) && partnerLifeEvents.length > 0) {
+      for (const ev of partnerLifeEvents) {
+        if (ev.targetAge == null) continue
+        out.push({
+          id: `partner-${ev.id}`,
+          label: ev.name,
+          age: ev.targetAge,
+          side: 'above',
+          color: COLOR_PARTNER_EVENT,
+          icon: ev.icon || 'Calendar',
+          kind: 'life_event',
+          // GEEN sourceId + readOnly → geen edit/drag-routing (read-only marker).
+          readOnly: true,
+        })
+      }
+    }
     return out
-  }, [showLifeEvents, showNaturalMilestones, events, naturalMilestones])
+  }, [showLifeEvents, showNaturalMilestones, events, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents])
 
   // ── Natuurlijke-mijlpaal info-sheet state ─────────────────────────────
   const [selectedNaturalMilestone, setSelectedNaturalMilestone] =
@@ -1028,6 +1102,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // krant-stijl info-sheet.
   const handleChartEventClick = useCallback(
     (id: string, kind: 'life_event' | 'natural') => {
+      // Read-only partner-marker (id-prefix 'partner-'): geen edit-pane openen —
+      // de viewer mag de levensgebeurtenissen van de partner niet bewerken.
+      if (id.startsWith('partner-')) return
       if (kind === 'life_event') {
         setEventPaneEditingId(id)
         setEventPaneMode('view')
@@ -1265,6 +1342,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireParams.grossReturn, fireParams.inflationRate, simCashflows, fireStrategy, withdrawalStrategyConfig, debts, initialData.assets, initialData.box3Method, initialData.hasPartner, initialData.unlinkedCash])
 
   const effectiveSimRows = isAowStopActive && aowStopSimResult ? aowStopSimResult.rows : (simResult?.rows ?? [])
+  // Partner-view: vervang de hoofdlijn door het PARTNER-pad (eigen as + FIRE-
+  // markers op de partner). Alleen wanneer er een precies partner-pad is
+  // (`partnerLine` niet-null); anders degraderen we naar de eigen lijn zodat de
+  // grafiek nooit leeg/kapot is. In persoonlijk + huishouden-view blijft de
+  // hoofdlijn de EIGEN lijn (huishouden voegt de gecombineerde overlay toe).
+  const usePartnerMainLine = isPartnerView && partnerLine !== null
   const aowAgeIntForDepletion = Math.ceil(userAowAge.fractional)
   const depletionAge = isAowStopActive && aowStopSimResult
     ? aowStopSimResult.rows.find(r => r.age >= aowAgeIntForDepletion && r.endPortfolio <= 0)?.age ?? null
@@ -3100,27 +3183,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         >
                           <SimChart
                             key={planningMode}
-                            rows={isAowStopActive ? effectiveSimRows : simResult.rows}
-                            fireAge={isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge}
-                            fireAgeFractional={isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional}
-                            currentAge={currentAge ?? 30}
+                            rows={usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? effectiveSimRows : simResult.rows)}
+                            fireAge={usePartnerMainLine ? partnerLine!.fireAge : (isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge)}
+                            fireAgeFractional={usePartnerMainLine ? partnerLine!.fireAgeFractional : (isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional)}
+                            currentAge={usePartnerMainLine ? (partnerLine!.currentAge ?? currentAge ?? 30) : (currentAge ?? 30)}
                             endAge={simResult.displayEndAge}
                             cashflows={simCashflows}
                             fireTarget={simResult.requiredFirePortfolio}
                             strategy={simResult.strategy}
                             targetEndPortfolio={simResult.targetEndPortfolio}
-                            scenarioOverlays={isAowStopActive ? undefined : [
+                            scenarioOverlays={(isAowStopActive || usePartnerMainLine) ? undefined : [
                               ...(scenarioOverlays ?? []),
                               ...scenarioOverlayDataList.map(d => d.overlay),
                             ]}
-                            monteCarloOverlay={isAowStopActive ? undefined : monteCarloOverlay}
+                            monteCarloOverlay={(isAowStopActive || usePartnerMainLine) ? undefined : monteCarloOverlay}
                             dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
-                            householdOverlays={isHouseholdView ? householdOverlays ?? undefined : undefined}
+                            householdOverlays={householdOverlays ?? undefined}
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             aowAgeFractional={userAowAge.fractional}
                             planningMode={planningMode}
-                            showDepletionWarning={isAowStopActive}
+                            showDepletionWarning={isAowStopActive && !usePartnerMainLine}
                             eventOverlay={chartEventOverlay}
                             onEventClick={handleChartEventClick}
                             onEventDragEnd={handleChartEventDragEnd}

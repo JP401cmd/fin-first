@@ -42,6 +42,7 @@ import { NL_AOW_AGE } from '@/lib/constants'
 import {
   lifeEventsToCashflows,
   type SimCashflow,
+  type SimRow,
 } from '@/lib/fire-simulation'
 import {
   runUnifiedProjection,
@@ -101,6 +102,15 @@ export interface HouseholdPartnerProjection {
     sharedDebtsValue: number
   }
   projection: HouseholdFireProjectionData
+  /**
+   * Volledige projectie-pad (vermogen per leeftijd) zodat de Horizon-grafiek
+   * EXACT dezelfde lijn kan tekenen als deze projectie. Leeg (`[]`) wanneer er
+   * geen precieze itemized projectie is (partner deelt alleen 'totals', toekomst
+   * verborgen, of geen DOB/uitgaven).
+   */
+  rows: SimRow[]
+  /** Fractionele FIRE-leeftijd horend bij `rows` (voor de FIRE-marker op de as). */
+  fireAgeFractional: number | null
   /** Compacte instellingen voor de partner-vergelijking (klein weergegeven). */
   settings: {
     currentAge: number | null
@@ -111,7 +121,7 @@ export interface HouseholdPartnerProjection {
     fireEndAge: number | null
   }
   /** Levensgebeurtenissen van dit lid (eigen + gedeeld), compact. */
-  lifeEvents: Array<{ id: string; name: string; targetAge: number | null; ownership: 'personal' | 'shared' }>
+  lifeEvents: Array<{ id: string; name: string; targetAge: number | null; ownership: 'personal' | 'shared'; icon?: string }>
 }
 
 /** FIRE-projectie-uitkomst, gevuld vanuit de unified engine. */
@@ -135,7 +145,18 @@ export interface HouseholdProjectionResult {
   householdName: string
   splitMode: SplitMode
   customSplitPct: number | null
-  combined: { projection: HouseholdFireProjectionData }
+  combined: {
+    projection: HouseholdFireProjectionData
+    /**
+     * Volledige gecombineerde projectie-pad (vermogen per leeftijd op de
+     * head-age-as) zodat de Horizon-grafiek de gezamenlijke lijn EXACT
+     * consistent met deze projectie tekent. Leeg (`[]`) bij privacy-degrade
+     * (partner deelt alleen 'totals'/verborgen) of ontbrekende DOB/uitgaven.
+     */
+    rows: SimRow[]
+    /** Fractionele gecombineerde FIRE-leeftijd horend bij `rows`. */
+    fireAgeFractional: number | null
+  }
   partners: HouseholdPartnerProjection[]
   comparison: {
     combinedNetWorth: number
@@ -314,7 +335,7 @@ export async function buildHouseholdProjectionInput(
     householdName: '',
     splitMode: 'equal',
     customSplitPct: null,
-    combined: { projection: emptyProjection() },
+    combined: { projection: emptyProjection(), rows: [], fireAgeFractional: null },
     partners: [],
     comparison: emptyComparison(),
     partnerDataHidden: false,
@@ -586,6 +607,7 @@ export async function buildHouseholdProjectionInput(
         name: ev.name,
         targetAge: ev.target_age ?? null,
         ownership: (ev.ownership ?? 'personal') as 'personal' | 'shared',
+        icon: ev.icon ?? undefined,
       }))
 
     // FIRE-projectie.
@@ -598,9 +620,14 @@ export async function buildHouseholdProjectionInput(
     }
 
     let projection: HouseholdFireProjectionData
+    // Projectie-pad (vermogen per leeftijd) — alleen gevuld bij een volledige
+    // itemized unified-projectie; bij 'totals'/leeg blijft dit `[]` zodat de
+    // grafiek geen onnauwkeurige lijn tekent.
+    let projectionRows: SimRow[] = []
+    let projectionFireAgeFractional: number | null = null
     if (isOtherAggregateOnly && currentAge !== null && yearlyExpenses > 0) {
       // Partner deelt alleen totalen → lichte projectie op de gedeelde totalen
-      // (geen itemized rijen voor de unified engine beschikbaar).
+      // (geen itemized rijen voor de unified engine beschikbaar). Geen precies pad.
       const fin: FinancialInput = {
         totalAssets,
         totalDebts,
@@ -640,6 +667,8 @@ export async function buildHouseholdProjectionInput(
       }
       const sim = toSimResult(runUnifiedProjection(input))
       projection = simResultToProjection(netWorth, monthlyIncome, monthlyExpenses, yearlyExpenses, currentAge, sim)
+      projectionRows = sim.rows
+      projectionFireAgeFractional = sim.fireAgeFractional
     } else {
       projection = emptyProjection(netWorth, monthlyIncome, monthlyExpenses, yearlyExpenses, currentAge)
     }
@@ -679,6 +708,10 @@ export async function buildHouseholdProjectionInput(
       projection: futureHidden
         ? emptyProjection(0, 0, 0, 0, null)
         : (summary?.projection ?? projection),
+      // Het pad volgt de zelf-berekende unified-projectie (niet de persisted
+      // summary, die alleen scalars bevat). Verborgen toekomst → geen lijn.
+      rows: futureHidden ? [] : projectionRows,
+      fireAgeFractional: futureHidden ? null : projectionFireAgeFractional,
       settings: {
         currentAge,
         expectedReturn: profile?.expected_return ?? null,
@@ -769,6 +802,10 @@ export async function buildHouseholdProjectionInput(
   const headFireStrategy = headProfile ? resolveFireStrategyWithOverride(headProfile) : DEFAULT_FIRE_STRATEGY
 
   let combinedProjection: HouseholdFireProjectionData
+  // Gecombineerd projectie-pad — alleen gevuld bij de volledige itemized unified-
+  // run; bij 'totals'/privacy-degrade blijft dit `[]` (geen onnauwkeurige lijn).
+  let combinedRows: SimRow[] = []
+  let combinedFireAgeFractional: number | null = null
   if (partnerAggregateOnly && headAge !== null && combinedYearlyExpenses > 0) {
     // Partner deelt alleen totalen → lichte gecombineerde projectie op de totalen
     // (geen itemized partner-rijen voor de unified engine beschikbaar).
@@ -817,6 +854,8 @@ export async function buildHouseholdProjectionInput(
     combinedProjection = simResultToProjection(
       combinedNetWorth, combinedMonthlyIncome, combinedMonthlyExpenses, combinedYearlyExpenses, headAge, sim,
     )
+    combinedRows = sim.rows
+    combinedFireAgeFractional = sim.fireAgeFractional
   } else {
     // Graceful degrade: partner-data verborgen of geen DOB → val terug op de
     // eigen individuele projectie als combined-benadering.
@@ -829,7 +868,11 @@ export async function buildHouseholdProjectionInput(
     householdName,
     splitMode,
     customSplitPct,
-    combined: { projection: combinedProjection },
+    combined: {
+      projection: combinedProjection,
+      rows: combinedRows,
+      fireAgeFractional: combinedFireAgeFractional,
+    },
     partners,
     comparison: {
       combinedNetWorth: Math.round(combinedNetWorth),

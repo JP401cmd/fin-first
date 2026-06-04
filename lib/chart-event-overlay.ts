@@ -34,6 +34,13 @@ export interface ChartEventOverlay {
   kind: ChartEventKind
   /** Doorgegeven aan de click-handler — bron-asset/debt voor natural milestones */
   sourceId?: string
+  /**
+   * Read-only marker (bv. een levensgebeurtenis van de PARTNER in
+   * huishouden-/partner-perspectief). Niet sleepbaar en niet bewerkbaar — de
+   * viewer mag de gegevens van de partner niet wijzigen. De host kan dit
+   * gebruiken om klik-routing te onderdrukken; de marker-laag schakelt drag uit.
+   */
+  readOnly?: boolean
 }
 
 /**

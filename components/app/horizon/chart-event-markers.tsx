@@ -210,7 +210,7 @@ export function ChartEventMarkers({
         const tickStartY = isAbove ? cy + r : cy - r
         const tickEndY = isAbove ? chartTopY : chartBottomY
 
-        const canDrag = !!onEventDragEnd && p.kind === 'life_event'
+        const canDrag = !!onEventDragEnd && p.kind === 'life_event' && !p.readOnly
         const cursor = isDragging
           ? 'grabbing'
           : canDrag
