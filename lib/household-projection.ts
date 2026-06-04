@@ -31,9 +31,12 @@ import type { Debt } from '@/lib/debt-data'
 import {
   ageAtDate,
   computeAowMonthly,
+  computeFireProjection,
   DEFAULT_RETURN,
   INFLATION,
   type LifeEvent,
+  type FinancialInput,
+  type FireProjection,
 } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import {
@@ -196,6 +199,24 @@ function simResultToProjection(
   }
 }
 
+/** Map de lichtgewicht FireProjection (computeFireProjection) naar de UI-shape. */
+function fireProjectionToHousehold(fp: FireProjection): HouseholdFireProjectionData {
+  return {
+    fireTarget: fp.fireTarget,
+    netWorth: fp.netWorth,
+    freedomPercentage: fp.freedomPercentage,
+    fireAge: fp.fireAge,
+    currentAge: fp.currentAge,
+    fireDate: fp.fireDate,
+    countdownDays: fp.countdownDays,
+    freedomYears: fp.freedomYears,
+    freedomMonths: fp.freedomMonths,
+    monthlyPassiveIncome: fp.monthlyPassiveIncome,
+    monthlySavings: fp.monthlySavings,
+    savingsRate: fp.savingsRate,
+  }
+}
+
 /**
  * Profiel-shape die zowel resolveFireParams/resolveFireStrategyWithOverride als
  * de retirement-expense-berekening nodig hebben. Per-member opgehaald.
@@ -319,6 +340,8 @@ export async function buildHouseholdProjectionInput(
     eventsRes,
     partnerAssetsRes,
     partnerDebtsRes,
+    partnerIncomeRes,
+    partnerEventsRes,
   ] = await Promise.all([
     // Profiles RLS is own-only; de RPC levert (privacy-respecterend) de
     // projectie-velden van ALLE huishoudleden — incl. partner-DOB/-naam.
@@ -330,6 +353,10 @@ export async function buildHouseholdProjectionInput(
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, metadata, user_id, ownership').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase.rpc('household_partner_items', { p_category: 'assets' }),
     supabase.rpc('household_partner_items', { p_category: 'debts' }),
+    // Partner-maandinkomen (privacy-gated; 'hidden' → leeg).
+    supabase.rpc('household_partner_items', { p_category: 'income' }),
+    // Partner-levensgebeurtenissen (RLS-blind anders; gedeeld binnen huishouden).
+    supabase.rpc('household_partner_life_events'),
   ])
 
   const profiles = (profilesRes.data ?? []) as MemberProfile[]
@@ -337,24 +364,32 @@ export async function buildHouseholdProjectionInput(
   const baseDebts = (baseDebtsRes.data ?? []) as Debt[]
   const allBudgets = (budgetsRes.data ?? []) as Array<{ id: string; name: string; default_limit: number; interval: string; budget_type: string; is_essential: boolean; parent_id: string | null; user_id: string; ownership: 'personal' | 'shared' }>
   const allTransactions = (txRes.data ?? []) as Array<{ amount: number; user_id: string; date: string }>
-  const allEvents = (eventsRes.data ?? []) as Array<LifeEvent & { user_id?: string; ownership?: 'personal' | 'shared' }>
+  // Levensgebeurtenissen: eigen + gedeeld (RLS) ∪ partner-persoonlijk (RPC), dedup op id.
+  const ownAndSharedEvents = (eventsRes.data ?? []) as Array<LifeEvent & { user_id?: string; ownership?: 'personal' | 'shared' }>
+  const partnerPersonalEvents = (partnerEventsRes.data ?? []) as Array<LifeEvent & { user_id?: string; ownership?: 'personal' | 'shared' }>
+  const eventsById = new Map<string, LifeEvent & { user_id?: string; ownership?: 'personal' | 'shared' }>()
+  for (const ev of [...ownAndSharedEvents, ...partnerPersonalEvents]) eventsById.set(ev.id, ev)
+  const allEvents = [...eventsById.values()]
 
-  // Partner-persoonlijke assets/debts (privacy-gated). Een aggregaatrij
-  // (privacy='totals') levert wel een waarde maar geen per-asset detail —
-  // onbruikbaar voor de unified engine, dus we behandelen 'totals'/'hidden'
-  // hetzelfde: graceful degrade naar partnerDataHidden.
+  // Partner-persoonlijke assets/debts (privacy-gated): 'full' → itemized rijen
+  // (bruikbaar voor de unified engine); 'totals' → één aggregaatrij met het
+  // totaal; 'hidden' → niets.
   const rawPartnerAssets = (partnerAssetsRes.data ?? []) as Array<Record<string, unknown>>
   const rawPartnerDebts = (partnerDebtsRes.data ?? []) as Array<Record<string, unknown>>
-  const partnerAssetsAggregated = rawPartnerAssets.some(r => r._aggregated === true)
-  // Bruikbare (volledige) partner-rijen — alleen non-aggregated tellen mee in de engine.
   const partnerAssets = rawPartnerAssets.filter(r => r._aggregated !== true) as unknown as Asset[]
   const partnerDebts = rawPartnerDebts.filter(r => r._aggregated !== true) as unknown as Debt[]
+  // Aggregaat-totaal (privacy='totals') — gebruikt wanneer er geen itemized rijen zijn.
+  const partnerAssetsAggTotal = rawPartnerAssets.find(r => r._aggregated === true)?.current_value as number | undefined
+  const partnerDebtsAggTotal = rawPartnerDebts.find(r => r._aggregated === true)?.current_balance as number | undefined
+  // Partner-maandinkomen uit de income-RPC (toont bij 'full'/'totals'; null bij 'hidden').
+  const partnerIncomeRow = (partnerIncomeRes.data ?? [])[0] as { monthly_income?: number } | undefined
+  const partnerMonthlyIncomeShared = partnerIncomeRow?.monthly_income != null ? Number(partnerIncomeRow.monthly_income) : null
 
-  // Heeft de partner überhaupt persoonlijk vermogen gedeeld? Wanneer een ander
-  // lid persoonlijke assets heeft maar de RPC niets (bruikbaars) teruggeeft,
-  // is het privacy-gated.
   const partnerId = memberIds.find(id => id !== user.id) ?? null
-  const partnerDataHidden = partnerAssetsAggregated && partnerAssets.length === 0
+  const partnerHasItemizedAssets = partnerAssets.length > 0
+  const partnerHasAggregate = partnerAssetsAggTotal != null
+  // Verborgen = partner deelt vermogen NIET (geen itemized én geen aggregaat).
+  const partnerDataHidden = !partnerHasItemizedAssets && !partnerHasAggregate
 
   // ── Per-member income (voor split-mode income_ratio + comparison) ──
   const now = new Date()
@@ -460,6 +495,9 @@ export async function buildHouseholdProjectionInput(
     // - eigen partner (current user): basisset bevat z'n persoonlijke + gedeeld.
     // - andere partner: partner-persoonlijke (RPC) + gedeeld.
     const isMe = isCurrentUser
+    // Andere partner die ALLEEN totalen deelt (privacy='totals'): geen itemized
+    // rijen, wel een aggregaat-totaal. Dan rekenen we op de totalen.
+    const isOtherAggregateOnly = !isMe && !partnerHasItemizedAssets && partnerHasAggregate
     const personalAssets = isMe
       ? baseAssets.filter(a => a.ownership === 'personal')
       : partnerAssets.filter(a => (a as Asset).ownership === 'personal')
@@ -469,15 +507,18 @@ export async function buildHouseholdProjectionInput(
     const sharedAssets = baseAssets.filter(a => a.ownership === 'shared')
     const sharedDebts = baseDebts.filter(d => d.ownership === 'shared')
 
-    // Gewogen totalen voor financials + freedom %.
-    const personalAssetsVal = personalAssets.reduce((s, a) =>
-      s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+    // Gewogen totalen voor financials + freedom %. Bij een partner die alleen
+    // TOTALEN deelt, gebruiken we het aggregaat-totaal i.p.v. itemized rijen.
+    const personalAssetsVal = isOtherAggregateOnly
+      ? (partnerAssetsAggTotal ?? 0)
+      : personalAssets.reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
     const sharedAssetsValue = sharedAssets.reduce((s, a) =>
       s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0) * shareFraction
     const totalAssets = personalAssetsVal + sharedAssetsValue
 
-    const personalDebtsVal = personalDebts.reduce((s, d) =>
-      s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
+    const personalDebtsVal = isOtherAggregateOnly
+      ? (partnerDebtsAggTotal ?? 0)
+      : personalDebts.reduce((s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
     const sharedDebtsValue = sharedDebts.reduce((s, d) => {
       const bal = Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100)
       if (d.partner_split_pct != null) {
@@ -490,7 +531,8 @@ export async function buildHouseholdProjectionInput(
     const totalDebts = personalDebtsVal + sharedDebtsValue
     const netWorth = totalAssets - totalDebts
 
-    const monthlyIncome = myIncome
+    // Inkomen: eigen uit transacties; partner uit de (privacy-gated) income-RPC.
+    const monthlyIncome = isMe ? myIncome : (partnerMonthlyIncomeShared ?? myIncome)
     const monthlyExpenses = memberExpenses(memberId)
     const monthlyContributions = personalAssets.reduce((s, a) => s + Number(a.monthly_contribution), 0)
       + sharedAssets.reduce((s, a) => s + Number(a.monthly_contribution), 0) * shareFraction
@@ -509,14 +551,33 @@ export async function buildHouseholdProjectionInput(
         ownership: (ev.ownership ?? 'personal') as 'personal' | 'shared',
       }))
 
-    // FIRE-projectie via unified engine (alleen wanneer DOB bekend).
+    // FIRE-projectie.
     const fireParams = profile ? resolveFireParams(profile) : { grossReturn: DEFAULT_RETURN, inflationRate: INFLATION, effectiveSwr: HOUSEHOLD_SWR, box3Method: 'forfaitair' as Box3Method }
     const fireStrategy = profile ? resolveFireStrategyWithOverride(profile) : DEFAULT_FIRE_STRATEGY
     const hasPartnerTax = (profile?.household_type === 'samenwonend' || profile?.household_type === 'getrouwd')
+    const strategyOpts = {
+      strategy: (profile?.fire_end_strategy ?? undefined) as 'perpetual' | 'legacy' | 'deplete' | undefined,
+      endAge: profile?.fire_end_age ?? undefined,
+    }
 
     let projection: HouseholdFireProjectionData
-    if (currentAge !== null && yearlyExpenses > 0) {
-      // Assets/debts naar aandeel: shared op shareFraction (downscale current_value)
+    if (isOtherAggregateOnly && currentAge !== null && yearlyExpenses > 0) {
+      // Partner deelt alleen totalen → lichte projectie op de gedeelde totalen
+      // (geen itemized rijen voor de unified engine beschikbaar).
+      const fin: FinancialInput = {
+        totalAssets,
+        totalDebts,
+        monthlyIncome,
+        monthlyExpenses,
+        monthlyContributions,
+        yearlyMustExpenses: yearlyExpenses,
+        dateOfBirth: dob,
+      }
+      projection = fireProjectionToHousehold(
+        computeFireProjection(fin, fireParams.grossReturn, fireParams.effectiveSwr, fireParams.inflationRate, strategyOpts),
+      )
+    } else if (!isOtherAggregateOnly && currentAge !== null && yearlyExpenses > 0) {
+      // Volledige (itemized) projectie via de unified engine.
       const projAssets = scaleSharedAssets(personalAssets, sharedAssets, shareFraction)
       const projDebts = scaleSharedDebts(personalDebts, sharedDebts, shareFraction, memberId)
       // Eigen AOW als cashflow op de eigen as.
@@ -598,13 +659,23 @@ export async function buildHouseholdProjectionInput(
   const combinedAssets: Asset[] = [...myPersonalAssets, ...partnerAssets, ...sharedAssetsAll]
   const combinedDebts: Debt[] = [...myPersonalDebts, ...partnerDebts, ...sharedDebtsAll]
 
+  // Partner deelt alleen TOTALEN (geen itemized rijen) → tel het aggregaat-
+  // totaal apart mee in het gecombineerde vermogen.
+  const partnerAggregateOnly = !partnerHasItemizedAssets && partnerHasAggregate
+  const partnerAggAssetsExtra = partnerAggregateOnly ? (partnerAssetsAggTotal ?? 0) : 0
+  const partnerAggDebtsExtra = partnerAggregateOnly ? (partnerDebtsAggTotal ?? 0) : 0
+
   const combinedNetWorthAssets = combinedAssets.reduce((s, a) =>
-    s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+    s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0) + partnerAggAssetsExtra
   const combinedNetWorthDebts = combinedDebts.reduce((s, d) =>
-    s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
+    s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0) + partnerAggDebtsExtra
   const combinedNetWorth = combinedNetWorthAssets - combinedNetWorthDebts
 
-  const combinedMonthlyIncome = memberIds.reduce((s, id) => s + memberIncome(id), 0)
+  // Inkomen: eigen uit transacties + partner uit de privacy-gated income-RPC.
+  const combinedMonthlyIncome = memberIds.reduce((s, id) => {
+    if (id === user.id) return s + memberIncome(id)
+    return s + (partnerMonthlyIncomeShared ?? memberIncome(id))
+  }, 0)
   const combinedMonthlyExpenses = memberIds.reduce((s, id) => s + memberExpenses(id), 0)
   const combinedMonthlySavings = combinedMonthlyIncome - combinedMonthlyExpenses
   const combinedSavingsRate = combinedMonthlyIncome > 0
@@ -622,7 +693,25 @@ export async function buildHouseholdProjectionInput(
   const headFireStrategy = headProfile ? resolveFireStrategyWithOverride(headProfile) : DEFAULT_FIRE_STRATEGY
 
   let combinedProjection: HouseholdFireProjectionData
-  if (headAge !== null && combinedYearlyExpenses > 0 && !partnerDataHidden) {
+  if (partnerAggregateOnly && headAge !== null && combinedYearlyExpenses > 0) {
+    // Partner deelt alleen totalen → lichte gecombineerde projectie op de totalen
+    // (geen itemized partner-rijen voor de unified engine beschikbaar).
+    const fin: FinancialInput = {
+      totalAssets: combinedNetWorthAssets,
+      totalDebts: combinedNetWorthDebts,
+      monthlyIncome: combinedMonthlyIncome,
+      monthlyExpenses: combinedMonthlyExpenses,
+      monthlyContributions: combinedMonthlyContributions,
+      yearlyMustExpenses: combinedYearlyExpenses,
+      dateOfBirth: headDobEntry!.dob,
+    }
+    combinedProjection = fireProjectionToHousehold(
+      computeFireProjection(fin, headFireParams.grossReturn, headFireParams.effectiveSwr, headFireParams.inflationRate, {
+        strategy: (headProfile?.fire_end_strategy ?? undefined) as 'perpetual' | 'legacy' | 'deplete' | undefined,
+        endAge: headProfile?.fire_end_age ?? undefined,
+      }),
+    )
+  } else if (headAge !== null && combinedYearlyExpenses > 0 && !partnerDataHidden) {
     const cashflows = buildCombinedCashflows({
       combinedEvents,
       headAge,
