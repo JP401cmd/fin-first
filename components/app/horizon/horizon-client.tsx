@@ -68,7 +68,9 @@ import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import {
   buildHouseholdProjectionInput,
   type HouseholdProjectionResult,
+  type HouseholdRetirementMethod,
 } from '@/lib/household-projection'
+import { HouseholdRetirementPane } from '@/components/app/horizon/household-retirement-pane'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, ResilienceContextMessage, ResilienceTrendChart, FireAgeContextMessage, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
@@ -172,7 +174,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const { triggerDream, phase } = useDreamTransition()
   const { masked } = useMaskedAmounts()
   const { addToast } = useToast()
-  const { perspective, partnerName, perspectiveVersion } = usePerspective()
+  const { perspective, partnerName, perspectiveVersion, refreshData } = usePerspective()
   const isHouseholdView = perspective === 'household'
   const isPartnerView = perspective === 'partner'
   const [householdHero, setHouseholdHero] = useState<HouseholdHeroData | null>(null)
@@ -304,6 +306,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // Kassabon modal state
   const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
   const [uitgavenPaneOpen, setUitgavenPaneOpen] = useState(false)
+  // Huishoud-aanpasflow (uitgave na pensioen) — geopend vanaf de "Na pensioen"-KPI
+  // in huishoudweergave. candidates/method komen uit de combined-projectie.
+  const [householdRetireOpen, setHouseholdRetireOpen] = useState(false)
+  const [householdRetireInfo, setHouseholdRetireInfo] = useState<{
+    candidates: { autoShared: number; sumPartners: number; custom: number | null }
+    method: HouseholdRetirementMethod
+  } | null>(null)
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
   const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view' | 'edit'>('catalog')
@@ -767,6 +776,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       setHouseholdOverlays(null)
       setPartnerLine(null)
       setPartnerLifeEvents([])
+      setHouseholdRetireInfo(null)
       return
     }
     let cancelled = false
@@ -825,6 +835,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             })
           }
           setHouseholdOverlays(overlays.length > 0 ? overlays : null)
+          setHouseholdRetireInfo({
+            candidates: result.comparison.householdRetirementCandidates,
+            method: result.comparison.householdRetirementMethod,
+          })
           setPartnerHero(null)
           setPartnerLine(null)
         } else if (isPartnerView && partnerEntry) {
@@ -845,6 +859,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           setHouseholdHero(null)
           setHouseholdOverlays(null)
           setHouseholdInput(null)
+          setHouseholdRetireInfo(null)
           // Partner-view: vervang de hoofdlijn door het partner-pad zodat de
           // as + FIRE-markers op de partner uitlijnen. Leeg pad ('totals' of
           // toekomst verborgen) → null → degradeer naar de eigen lijn.
@@ -2705,7 +2720,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
               type="button"
-              onClick={() => setUitgavenPaneOpen(true)}
+              onClick={() => {
+                if (isHouseholdView) setHouseholdRetireOpen(true)
+                else setUitgavenPaneOpen(true)
+              }}
               className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-retirement-expense"
               title={
@@ -2857,7 +2875,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
               type="button"
-              onClick={() => setUitgavenPaneOpen(true)}
+              onClick={() => {
+                if (isHouseholdView) setHouseholdRetireOpen(true)
+                else setUitgavenPaneOpen(true)
+              }}
               className="p-3 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-retirement-expense"
             >
@@ -6666,6 +6687,19 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         housingStrategy={initialData.housingStrategy}
       />
       <UitgavenPane open={uitgavenPaneOpen} onClose={() => { setUitgavenPaneOpen(false); loadData() }} />
+
+      {/* Huishoud-aanpasflow — geopend vanaf de "Na pensioen"-KPI in huishoudweergave.
+          onSaved bumpt de perspectief-versie zodat hero + grafiek + huishoud-FIRE-sectie
+          meteen het nieuwe gezamenlijke bedrag tonen. */}
+      {householdRetireInfo && (
+        <HouseholdRetirementPane
+          open={householdRetireOpen}
+          onClose={() => setHouseholdRetireOpen(false)}
+          candidates={householdRetireInfo.candidates}
+          currentMethod={householdRetireInfo.method}
+          onSaved={refreshData}
+        />
+      )}
       {input && fireParams && fireStrategy && withdrawalStrategyConfig && (
         <EventPane
           open={eventPaneOpen}
