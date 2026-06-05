@@ -169,7 +169,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const { triggerDream, phase } = useDreamTransition()
   const { masked } = useMaskedAmounts()
   const { addToast } = useToast()
-  const { perspective, partnerName } = usePerspective()
+  const { perspective, partnerName, perspectiveVersion } = usePerspective()
   const isHouseholdView = perspective === 'household'
   const isPartnerView = perspective === 'partner'
   const [householdHero, setHouseholdHero] = useState<HouseholdHeroData | null>(null)
@@ -869,7 +869,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
     loadHouseholdData()
     return () => { cancelled = true }
-  }, [isHouseholdView, isPartnerView, partnerName])
+    // perspectiveVersion: herlaad ook na een data-wijziging (bv. aangepaste
+    // huishoud-uitgave na pensioen) zodat hero + grafieklijn meteen bijwerken.
+  }, [isHouseholdView, isPartnerView, partnerName, perspectiveVersion])
 
   // Compute effective input: base data from DB
   const effectiveInput: FinancialInput | null = input

@@ -43,7 +43,7 @@ export function HouseholdFireSection() {
   const [error, setError] = useState<string | null>(null)
   // Aanpas-pane voor de huishoud-brede uitgave ná pensioen.
   const [retireOpen, setRetireOpen] = useState(false)
-  const { perspective, perspectiveVersion } = usePerspective()
+  const { perspective, perspectiveVersion, refreshData } = usePerspective()
   // Alle hooks MOETEN vóór elke conditionele return staan (rules-of-hooks).
   const { ref: inViewRef } = useInViewAnimation({ duration: 1100 })
   // Balken renderen DIRECT op hun eindbreedte. De in-view-flag bleef 'false'
@@ -554,7 +554,10 @@ export function HouseholdFireSection() {
             onClose={() => setRetireOpen(false)}
             candidates={comparison.householdRetirementCandidates}
             currentMethod={comparison.householdRetirementMethod}
-            onSaved={loadData}
+            onSaved={() => {
+              loadData()
+              refreshData()
+            }}
           />
         </div>
       )}

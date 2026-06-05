@@ -27,6 +27,13 @@ interface PerspectiveContextType {
   loading: boolean
   /** Monotonically increasing version counter — increments on each perspective switch */
   perspectiveVersion: number
+  /**
+   * Bump `perspectiveVersion` zonder van perspectief te wisselen — signaal
+   * "perspectief-afhankelijke data is gewijzigd, herlaad". Gebruikt o.a. nadat
+   * de huishoud-uitgave-na-pensioen is aangepast, zodat zowel de hero/grafiek
+   * bovenaan als de huishoud-FIRE-sectie meteen verversen.
+   */
+  refreshData: () => void
 }
 
 const PERSPECTIVE_STORAGE_KEY = 'trifinity_perspective'
@@ -50,6 +57,7 @@ const PerspectiveContext = createContext<PerspectiveContextType>({
   partnerName: null,
   loading: true,
   perspectiveVersion: 0,
+  refreshData: () => {},
 })
 
 export function usePerspective() {
@@ -206,6 +214,13 @@ export function PerspectiveProvider({ children }: { children: ReactNode }) {
     }
   }, [router])
 
+  // Verversen zonder perspectief-wissel — bump alleen de versie-teller zodat
+  // perspectief-afhankelijke effecten (hero/grafiek + huishoud-FIRE-sectie)
+  // opnieuw laden. Géén router.refresh/PATCH (voorkomt server-flits).
+  const refreshData = useCallback(() => {
+    setPerspectiveVersion(v => v + 1)
+  }, [])
+
   // Stable context value — without memoization the inline object literal
   // changes identity on every parent render and re-renders all consumers.
   const value = useMemo(
@@ -217,8 +232,9 @@ export function PerspectiveProvider({ children }: { children: ReactNode }) {
       partnerName,
       loading,
       perspectiveVersion,
+      refreshData,
     }),
-    [perspective, isHousehold, availablePerspectives, setPerspective, partnerName, loading, perspectiveVersion],
+    [perspective, isHousehold, availablePerspectives, setPerspective, partnerName, loading, perspectiveVersion, refreshData],
   )
 
   return (
