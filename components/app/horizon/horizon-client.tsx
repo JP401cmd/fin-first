@@ -163,6 +163,9 @@ interface HouseholdHeroData {
   freedomYears: number
   freedomMonths: number
   savingsRate: number
+  /** Jaarlijkse uitgave ná pensioen voor dit perspectief (huishouden = gecombineerd,
+   *  methode-afhankelijk; partner = diens eigen bedrag). Voedt de "Na pensioen"-KPI. */
+  retirementExpense: number
 }
 
 export default function HorizonPage({ initialData }: { initialData: HorizonPageData }) {
@@ -789,6 +792,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             freedomYears: cp.freedomYears,
             freedomMonths: cp.freedomMonths,
             savingsRate: cp.savingsRate,
+            // Methode-afhankelijke gecombineerde uitgave na pensioen (auto/som/eigen).
+            retirementExpense: result.comparison.combinedRetirementExpenses,
           })
           // Gecombineerde FinancialInput voor het backtesting-/Monte-Carlo-modal
           // (huishouden-perspectief). Afgeleid uit dezelfde combined-projectie
@@ -834,6 +839,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             freedomYears: pp.freedomYears,
             freedomMonths: pp.freedomMonths,
             savingsRate: pp.savingsRate,
+            // Eigen uitgave na pensioen van de partner.
+            retirementExpense: partnerEntry.financials.yearlyMustExpenses ?? 0,
           })
           setHouseholdHero(null)
           setHouseholdOverlays(null)
@@ -2702,11 +2709,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-retirement-expense"
               title={
-                retirementMethod === 'custom_amount'
-                  ? 'Zelf samengesteld — aanpassen of herzien'
-                  : retirementMethod === 'current_income'
-                    ? 'Op basis van huidig inkomen — verfijnen'
-                    : 'Op basis van essentiële budgetten — verfijnen'
+                hasPerspectiveHero
+                  ? (isPartnerView
+                      ? `Uitgave na pensioen van ${perspectiveHero!.householdName}`
+                      : 'Gezamenlijke uitgave na pensioen — pas de methode aan in de huishoud-FIRE-sectie')
+                  : retirementMethod === 'custom_amount'
+                    ? 'Zelf samengesteld — aanpassen of herzien'
+                    : retirementMethod === 'current_income'
+                      ? 'Op basis van huidig inkomen — verfijnen'
+                      : 'Op basis van essentiële budgetten — verfijnen'
               }
             >
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
@@ -2717,7 +2728,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
-                <MaskedAmount value={input?.yearlyMustExpenses ?? 0} tone="horizon" monoWhenVisible={false} />
+                <MaskedAmount value={hasPerspectiveHero ? perspectiveHero!.retirementExpense : (input?.yearlyMustExpenses ?? 0)} tone="horizon" monoWhenVisible={false} />
               </div>
               <div
                 className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -2858,7 +2869,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 className="text-[18px] font-black leading-none tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
-                <MaskedAmount value={input?.yearlyMustExpenses ?? 0} tone="horizon" monoWhenVisible={false} />
+                <MaskedAmount value={hasPerspectiveHero ? perspectiveHero!.retirementExpense : (input?.yearlyMustExpenses ?? 0)} tone="horizon" monoWhenVisible={false} />
               </div>
               <div
                 className="italic text-[10px] text-[var(--ink-3)] mt-1"
