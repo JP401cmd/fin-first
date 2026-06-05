@@ -13,6 +13,7 @@ import {
   type HouseholdPartnerProjection,
 } from '@/lib/household-projection'
 import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import { HouseholdRetirementPane } from '@/components/app/horizon/household-retirement-pane'
 import {
   Users, TrendingUp, Percent, Target, User,
   Clock, PiggyBank, Wallet, Info, Settings2, EyeOff,
@@ -40,6 +41,8 @@ export function HouseholdFireSection() {
   const [data, setData] = useState<HouseholdFireData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Aanpas-pane voor de huishoud-brede uitgave ná pensioen.
+  const [retireOpen, setRetireOpen] = useState(false)
   const { perspective, perspectiveVersion } = usePerspective()
   // Alle hooks MOETEN vóór elke conditionele return staan (rules-of-hooks).
   const { ref: inViewRef } = useInViewAnimation({ duration: 1100 })
@@ -473,6 +476,24 @@ export function HouseholdFireSection() {
                                   </span>
                                 </dd>
                               </div>
+                              {/* Actieve methode + aanpas-affordance */}
+                              <div className="flex items-baseline justify-between gap-3">
+                                <span className="text-[10px] italic text-horizon-700/60">
+                                  {comparison.householdRetirementMethod === 'auto_shared'
+                                    ? 'automatisch (gedeelde lasten 1×)'
+                                    : comparison.householdRetirementMethod === 'sum_partners'
+                                      ? 'som van de 2'
+                                      : 'eigen bedrag'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setRetireOpen(true)}
+                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-horizon-700 hover:text-horizon-900"
+                                >
+                                  <Settings2 className="h-3 w-3" aria-hidden />
+                                  Aanpassen
+                                </button>
+                              </div>
                               {verschil > 0 && (
                                 <div className="flex items-baseline justify-between gap-3 border-t-2 border-double border-horizon-300 pt-1">
                                   <dt className="text-xs font-medium text-horizon-900">Verschil — samen minder</dt>
@@ -525,6 +546,16 @@ export function HouseholdFireSection() {
               </div>
             </div>
           </div>
+
+          {/* Aanpas-pane voor de huishoud-brede uitgave ná pensioen.
+              Alleen gemount in de multi-partner-tak waar `comparison` zinvol is. */}
+          <HouseholdRetirementPane
+            open={retireOpen}
+            onClose={() => setRetireOpen(false)}
+            candidates={comparison.householdRetirementCandidates}
+            currentMethod={comparison.householdRetirementMethod}
+            onSaved={loadData}
+          />
         </div>
       )}
 
