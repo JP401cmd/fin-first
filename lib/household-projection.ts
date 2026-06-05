@@ -59,6 +59,14 @@ import { computeSharePct, type SplitMode } from '@/lib/household-data'
 
 // ── Result types ────────────────────────────────────────────────────────────
 
+/**
+ * Methode voor de huishoud-brede uitgave ná pensioen (aanpasbaar door beide
+ * partners). `auto_shared` (default) = gedeelde vaste lasten één keer;
+ * `sum_partners` = som van beide individuele uitgaven; `custom_amount` = zelf
+ * samengesteld/ingevoerd bedrag.
+ */
+export type HouseholdRetirementMethod = 'auto_shared' | 'sum_partners' | 'custom_amount'
+
 /** Per-partner FIRE-uitkomst (mirror van het oude API-formaat voor de UI). */
 /**
  * Persisted FIRE-samenvatting van een lid (in profiles.fire_summary). De partner
@@ -191,6 +199,13 @@ export interface HouseholdProjectionResult {
     sharedEssentialBudgets: Array<{ name: string; yearlyAmount: number }>
     /** Som van `sharedEssentialBudgets` (= wat je samen één keer i.p.v. twee keer draagt). */
     sharedEssentialYearly: number
+    /** Actieve methode voor de huishoud-uitgave ná pensioen (aanpasbaar). */
+    householdRetirementMethod: HouseholdRetirementMethod
+    /**
+     * De drie kandidaatbedragen (per jaar) zodat de aanpas-UI live previews kan
+     * tonen: automatisch 'samen' / som van de 2 / eigen bedrag (null = nog niet gezet).
+     */
+    householdRetirementCandidates: { autoShared: number; sumPartners: number; custom: number | null }
   }
   /**
    * True wanneer de partner z'n financiële data (vermogen/DOB) afschermt
@@ -408,7 +423,7 @@ export async function buildHouseholdProjectionInput(
   const [householdRes, membersRes] = await Promise.all([
     supabase
       .from('households')
-      .select('name, split_mode, custom_split_pct, primary_payer_id')
+      .select('name, split_mode, custom_split_pct, primary_payer_id, retirement_expense_method, retirement_expense_custom_amount')
       .eq('id', householdId)
       .maybeSingle(),
     supabase
@@ -430,6 +445,13 @@ export async function buildHouseholdProjectionInput(
   const customSplitPct = householdRes.data?.custom_split_pct ?? null
   const primaryPayerId = householdRes.data?.primary_payer_id ?? null
   const householdName = (householdRes.data?.name as string | null) ?? 'Huishouden'
+
+  // Huishoud-brede uitgave-na-pensioen: aanpasbaar door beide partners.
+  // Default (null) = auto_shared (gedeelde vaste lasten één keer).
+  const retirementMethod = (householdRes.data?.retirement_expense_method ?? 'auto_shared') as HouseholdRetirementMethod
+  const retirementCustomAmount = householdRes.data?.retirement_expense_custom_amount != null
+    ? Number(householdRes.data.retirement_expense_custom_amount)
+    : null
 
   // ── Financiële data: eigen-RLS levert eigen-persoonlijk + ALLE gedeeld ──
   // Partner-persoonlijke data komt privacy-gated uit de RPC. Wanneer de partner
@@ -842,8 +864,19 @@ export async function buildHouseholdProjectionInput(
     : 0
   const combinedMonthlyContributions = partners.reduce((s, p) => s + p.financials.monthlyContributions, 0)
 
-  // Gecombineerde yearly expenses: alle essentiële budgetten één keer.
-  const combinedYearlyExpenses = computeCombinedYearlyExpenses(allBudgets, profiles, memberIds, combinedMonthlyExpenses, combinedMonthlyIncome)
+  // Gecombineerde yearly expenses — drie kandidaten, methode-afhankelijk:
+  //  • auto_shared (default): alle essentiële budgetten één keer (gedeelde 1×)
+  //  • sum_partners: som van beide individuele uitgaven na pensioen
+  //  • custom_amount: door het huishouden zelf samengesteld/ingevoerd bedrag
+  const autoSharedYearly = computeCombinedYearlyExpenses(allBudgets, profiles, memberIds, combinedMonthlyExpenses, combinedMonthlyIncome)
+  const sumPartnersYearly = partners.reduce((s, p) => s + (p.financials.yearlyMustExpenses ?? 0), 0)
+  const customYearly = retirementCustomAmount != null && retirementCustomAmount > 0 ? retirementCustomAmount : 0
+  const combinedYearlyExpenses =
+    retirementMethod === 'custom_amount' && customYearly > 0
+      ? customYearly
+      : retirementMethod === 'sum_partners'
+        ? sumPartnersYearly
+        : autoSharedYearly
 
   // Gedeelde essentiële (vaste) lasten — de concrete kosten die in het huishouden
   // maar één keer meetellen i.p.v. twee keer (onderbouwt "Samen sterker").
@@ -953,6 +986,12 @@ export async function buildHouseholdProjectionInput(
       })),
       sharedEssentialBudgets: sharedEssentialDetail.items,
       sharedEssentialYearly: Math.round(sharedEssentialDetail.total),
+      householdRetirementMethod: retirementMethod,
+      householdRetirementCandidates: {
+        autoShared: Math.round(autoSharedYearly),
+        sumPartners: Math.round(sumPartnersYearly),
+        custom: customYearly > 0 ? Math.round(customYearly) : null,
+      },
     },
     partnerDataHidden,
     partnerFutureHidden,
@@ -1167,5 +1206,7 @@ function emptyComparison(): HouseholdProjectionResult['comparison'] {
     individualRetirementExpenses: [],
     sharedEssentialBudgets: [],
     sharedEssentialYearly: 0,
+    householdRetirementMethod: 'auto_shared',
+    householdRetirementCandidates: { autoShared: 0, sumPartners: 0, custom: null },
   }
 }
