@@ -87,6 +87,15 @@ export interface HouseholdFireSummary {
     sharedAssetsValue: number
     sharedDebtsValue: number
   }
+  /**
+   * Het EIGEN projectie-pad (vermogen per leeftijd) van het lid, zodat de
+   * partner-weergave de ECHTE FIRE-lijn van de partner kan tekenen (incl.
+   * afbouw na FIRE) i.p.v. een lichte accumulatie-benadering. Optioneel voor
+   * achterwaartse compat met oudere opgeslagen summaries (vóór deze toevoeging).
+   */
+  rows?: SimRow[]
+  /** Fractionele FIRE-leeftijd horend bij `rows` (voor de marker op de as). */
+  fireAgeFractional?: number | null
 }
 
 export interface HouseholdPartnerProjection {
@@ -780,10 +789,15 @@ export async function buildHouseholdProjectionInput(
       projection: futureHidden
         ? emptyProjection(0, 0, 0, 0, null)
         : (summary?.projection ?? projection),
-      // Het pad volgt de zelf-berekende unified-projectie (niet de persisted
-      // summary, die alleen scalars bevat). Verborgen toekomst → geen lijn.
-      rows: futureHidden ? [] : projectionRows,
-      fireAgeFractional: futureHidden ? null : projectionFireAgeFractional,
+      // Partner-pad: gebruik het ECHTE persisted pad van de partner (summary.rows)
+      // zodat de partner-lijn exact klopt — ook bij privacy 'totals', waar de
+      // eigen recompute (projectionRows) slechts een lichte benadering is. Eigen
+      // entry en partners zonder summary vallen terug op de recompute. Verborgen
+      // toekomst → geen lijn.
+      rows: futureHidden ? [] : (!isMe && summary?.rows && summary.rows.length > 0 ? summary.rows : projectionRows),
+      fireAgeFractional: futureHidden
+        ? null
+        : (!isMe && summary?.rows && summary.rows.length > 0 ? (summary.fireAgeFractional ?? null) : projectionFireAgeFractional),
       settings: {
         currentAge,
         expectedReturn: profile?.expected_return ?? null,
@@ -813,6 +827,10 @@ export async function buildHouseholdProjectionInput(
         sharedAssetsValue: mineEntry.financials.sharedAssetsValue,
         sharedDebtsValue: mineEntry.financials.sharedDebtsValue,
       },
+      // Het echte projectie-pad meenemen zodat de partner-weergave de exacte
+      // FIRE-lijn van dit lid kan tekenen (consistent met de FIRE-marker).
+      rows: mineEntry.rows,
+      fireAgeFractional: mineEntry.fireAgeFractional,
     }
     try {
       await supabase.from('profiles').update({ fire_summary: summaryToStore }).eq('id', user.id)
