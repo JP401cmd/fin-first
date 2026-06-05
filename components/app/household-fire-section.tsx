@@ -43,6 +43,8 @@ export function HouseholdFireSection() {
   const [error, setError] = useState<string | null>(null)
   // Aanpas-pane voor de huishoud-brede uitgave ná pensioen.
   const [retireOpen, setRetireOpen] = useState(false)
+  // Toon/verberg de uitgangspunten-uitleg (i) bij "Samen sterker".
+  const [showAssumptions, setShowAssumptions] = useState(false)
   const { perspective, perspectiveVersion, refreshData } = usePerspective()
   // Alle hooks MOETEN vóór elke conditionele return staan (rules-of-hooks).
   const { ref: inViewRef } = useInViewAnimation({ duration: 1100 })
@@ -422,7 +424,77 @@ export function HouseholdFireSection() {
             <div className="flex items-start gap-3">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-500" />
               <div className="w-full min-w-0 text-sm text-horizon-800">
-                <p className="font-medium">Samen sterker</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-medium">Samen sterker</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAssumptions(v => !v)}
+                    aria-expanded={showAssumptions}
+                    aria-label="Uitgangspunten van de gezamenlijke berekening"
+                    title="Uitgangspunten"
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full text-horizon-700/70 transition-colors hover:text-horizon-900"
+                  >
+                    <Info className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+                {showAssumptions && (() => {
+                  const withDob = partners.filter(p => p.financials.dateOfBirth)
+                  const oldest = withDob.length > 0
+                    ? [...withDob].sort((a, b) => (a.financials.dateOfBirth ?? '').localeCompare(b.financials.dateOfBirth ?? ''))[0]
+                    : null
+                  const oldestName = oldest ? (oldest.fullName ?? (oldest.isCurrentUser ? 'jij' : 'je partner')) : null
+                  const ret = oldest?.settings.expectedReturn != null ? `rendement ${(oldest.settings.expectedReturn * 100).toFixed(1)}%` : null
+                  const infl = oldest?.settings.inflationRate != null ? `inflatie ${(oldest.settings.inflationRate * 100).toFixed(1)}%` : null
+                  const strat = oldest?.settings.fireEndStrategy
+                    ? endStrategyLabel(oldest.settings.fireEndStrategy, oldest.settings.fireEndAge)
+                    : null
+                  const methodLabel = HOUSEHOLD_RETIREMENT_METHOD_LABELS[comparison.householdRetirementMethod] ?? comparison.householdRetirementMethod
+                  const swrPct = comparison.combinedFireTarget > 0
+                    ? (comparison.combinedRetirementExpenses / comparison.combinedFireTarget) * 100
+                    : null
+                  return (
+                    <div
+                      className="mt-2 rounded-[var(--r-lg)] border border-horizon-200/70 bg-[var(--paper)] p-3 text-[11px] leading-relaxed text-horizon-800/90"
+                      data-testid="samen-sterker-uitgangspunten"
+                    >
+                      <p className="mb-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-horizon-700/70">
+                        Uitgangspunten van de gezamenlijke berekening
+                      </p>
+                      <ul className="list-disc space-y-1.5 pl-4 marker:text-horizon-400">
+                        <li>
+                          De gezamenlijke projectie rekent met de instellingen van de oudste partner
+                          {oldestName ? ` (${oldestName})` : ''}
+                          {strat || ret || infl
+                            ? `: ${[strat, ret, infl].filter(Boolean).join(' · ')}.`
+                            : '.'}
+                        </li>
+                        <li>
+                          De tijdas volgt de leeftijd van de oudste partner; de AOW van de jongste wordt
+                          naar die as omgerekend (dual-AOW).
+                        </li>
+                        <li>
+                          Het persoonlijke vermogen van beiden telt mee, plus het gedeelde vermogen —
+                          dat laatste één keer.
+                        </li>
+                        <li>
+                          Uitgave na pensioen: <strong>{methodLabel}</strong> —{' '}
+                          <span className="font-mono tabular-nums">{formatCurrency(comparison.combinedRetirementExpenses)}</span>/jaar.
+                          Gedeelde vaste lasten tellen één keer mee, niet dubbel.
+                        </li>
+                        {swrPct != null && (
+                          <li>
+                            Veilige onttrekking: <strong>{swrPct.toFixed(1)}%</strong> per jaar — de jaarlijkse
+                            uitgave ÷ dit percentage is het FIRE-doel.
+                          </li>
+                        )}
+                        <li>
+                          Deelt een partner alleen <strong>Totalen</strong>, dan is diens bijdrage een
+                          benadering; bij <strong>Volledig</strong> is alles exact.
+                        </li>
+                      </ul>
+                    </div>
+                  )
+                })()}
                 {combined.projection.fireAge !== null && partners.every(p => p.projection.fireAge !== null) ? (
                   (() => {
                     const avgIndividual = partners.reduce((sum, p) => sum + (p.projection.fireAge ?? 0), 0) / partners.length
@@ -721,7 +793,15 @@ const RETIREMENT_METHOD_LABELS: Record<string, string> = {
   essential_budgets: 'Essentiële budgetten',
   custom_amount: 'Aangepast bedrag',
   current_expenses: 'Huidige uitgaven',
+  current_income: 'Behoud van inkomen',
   percentage_income: '% van inkomen',
+}
+
+/** Labels voor de huishoud-brede uitgave-na-pensioen-methode (i bij "Samen sterker"). */
+const HOUSEHOLD_RETIREMENT_METHOD_LABELS: Record<string, string> = {
+  auto_shared: 'Automatisch — gedeelde vaste lasten één keer',
+  sum_partners: 'Som van beide individuele uitgaven',
+  custom_amount: 'Zelf samengesteld bedrag',
 }
 
 function endStrategyLabel(strategy: string, endAge: number | null): string {
