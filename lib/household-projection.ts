@@ -177,6 +177,20 @@ export interface HouseholdProjectionResult {
       fireAge: number | null
       freedomPercentage: number
     }>
+    /**
+     * Jaarlijkse uitgave ná pensioen per lid — de basis onder ieders eigen
+     * FIRE-projectie. De som hiervan is wat twee aparte huishoudens samen nodig
+     * zouden hebben; het verschil met `combinedRetirementExpenses` is de winst
+     * van samenwonen (gedeelde vaste lasten één keer i.p.v. twee keer).
+     */
+    individualRetirementExpenses: Array<{ userId: string; fullName: string | null; amount: number }>
+    /**
+     * De gedeelde essentiële (vaste) lasten die in de huishoudweergave maar
+     * één keer meetellen — de concrete kosten achter "Samen sterker".
+     */
+    sharedEssentialBudgets: Array<{ name: string; yearlyAmount: number }>
+    /** Som van `sharedEssentialBudgets` (= wat je samen één keer i.p.v. twee keer draagt). */
+    sharedEssentialYearly: number
   }
   /**
    * True wanneer de partner z'n financiële data (vermogen/DOB) afschermt
@@ -831,6 +845,10 @@ export async function buildHouseholdProjectionInput(
   // Gecombineerde yearly expenses: alle essentiële budgetten één keer.
   const combinedYearlyExpenses = computeCombinedYearlyExpenses(allBudgets, profiles, memberIds, combinedMonthlyExpenses, combinedMonthlyIncome)
 
+  // Gedeelde essentiële (vaste) lasten — de concrete kosten die in het huishouden
+  // maar één keer meetellen i.p.v. twee keer (onderbouwt "Samen sterker").
+  const sharedEssentialDetail = computeSharedEssentialBudgets(allBudgets)
+
   // Combined cashflows: persoonlijke + gedeelde events op de head-age-as +
   // dual-AOW (head AOW op headAge, partner AOW omgerekend naar head-as).
   const headProfile = headDobEntry ? profiles.find(p => p.id === headDobEntry.id) ?? null : null
@@ -928,6 +946,13 @@ export async function buildHouseholdProjectionInput(
         fireAge: p.projection.fireAge,
         freedomPercentage: p.projection.freedomPercentage,
       })),
+      individualRetirementExpenses: partners.map(p => ({
+        userId: p.userId,
+        fullName: p.fullName,
+        amount: Math.round(p.financials.yearlyMustExpenses ?? 0),
+      })),
+      sharedEssentialBudgets: sharedEssentialDetail.items,
+      sharedEssentialYearly: Math.round(sharedEssentialDetail.total),
     },
     partnerDataHidden,
     partnerFutureHidden,
@@ -1069,6 +1094,34 @@ function computeCombinedYearlyExpenses(
   return combinedMonthlyIncome * 12 * 0.7
 }
 
+/**
+ * Lijst + som van de GEDEELDE essentiële (vaste) lasten. Dit zijn precies de
+ * kosten die in de huishoudweergave één keer meetellen, maar die elk lid apart
+ * volledig zou dragen — de structurele bron van de "Samen sterker"-winst.
+ * Hergebruikt computeYearlyMustExpenses zodat de parent/child-logica identiek is
+ * aan de rest van de app.
+ */
+function computeSharedEssentialBudgets(
+  allBudgets: Array<{ id: string; name: string; default_limit: number; interval: string; budget_type: string; is_essential: boolean; parent_id: string | null; user_id: string; ownership: 'personal' | 'shared' }>,
+): { items: Array<{ name: string; yearlyAmount: number }>; total: number } {
+  const essentialParents = allBudgets.filter(
+    b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null && b.ownership === 'shared',
+  )
+  const children = allBudgets.filter(
+    b => b.parent_id !== null && !['archive', 'income', 'savings'].includes(b.budget_type) && b.ownership === 'shared',
+  )
+  const { yearlyMustExpenses, expenseItems } = computeYearlyMustExpenses(
+    essentialParents as never,
+    children as never,
+  )
+  return {
+    items: expenseItems
+      .filter(it => it.annualAmount > 0)
+      .map(it => ({ name: it.name, yearlyAmount: Math.round(it.annualAmount) })),
+    total: yearlyMustExpenses,
+  }
+}
+
 // ── Lege/fallback-structuren ──────────────────────────────────────────────────
 
 function emptyProjection(
@@ -1111,5 +1164,8 @@ function emptyComparison(): HouseholdProjectionResult['comparison'] {
     sharedFireTarget: 0,
     combinedRetirementExpenses: 0,
     individualFireTargets: [],
+    individualRetirementExpenses: [],
+    sharedEssentialBudgets: [],
+    sharedEssentialYearly: 0,
   }
 }

@@ -414,17 +414,23 @@ export function HouseholdFireSection() {
             />
           </div>
 
-          {/* Combined vs Individual insight */}
+          {/* Combined vs Individual insight — onderbouwd met de rekensom */}
           <div className="mt-4 rounded-[var(--r-lg)] border border-horizon-100 bg-horizon-50/50 p-4" data-testid="household-insight">
             <div className="flex items-start gap-3">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-500" />
-              <div className="text-sm text-horizon-800">
+              <div className="w-full min-w-0 text-sm text-horizon-800">
                 <p className="font-medium">Samen sterker</p>
                 {combined.projection.fireAge !== null && partners.every(p => p.projection.fireAge !== null) ? (
                   (() => {
                     const avgIndividual = partners.reduce((sum, p) => sum + (p.projection.fireAge ?? 0), 0) / partners.length
                     const diff = Math.round(avgIndividual - combined.projection.fireAge!)
-                    const retireYr = formatCurrency(comparison.combinedRetirementExpenses)
+                    const indiv = comparison.individualRetirementExpenses
+                    const sumIndiv = indiv.reduce((s, p) => s + p.amount, 0)
+                    const verschil = sumIndiv - comparison.combinedRetirementExpenses
+                    const showSum =
+                      indiv.length >= 2 &&
+                      indiv.every(p => p.amount > 0) &&
+                      comparison.combinedRetirementExpenses > 0
                     return (
                       <>
                         <p className="mt-1 text-horizon-700/80">
@@ -435,12 +441,79 @@ export function HouseholdFireSection() {
                               : `Jullie gezamenlijke en individuele FIRE-leeftijden liggen dicht bij elkaar.`}
                         </p>
                         <p className="mt-1.5 text-xs leading-relaxed text-horizon-700/70">
-                          {diff > 0
-                            ? `Hoe kan dat? Jullie bundelen vermogen én inkomen, terwijl de gedeelde (vaste) lasten samen worden gedragen — in het huishouden tellen die maar één keer mee. De gezamenlijke uitgaven na pensioen (${retireYr}/jaar) zijn daardoor lager dan de som van twee losse huishoudens, dus jullie gebundelde vermogen bereikt het FIRE-doel sneller.`
-                            : diff < 0
-                              ? `Dat komt doordat de gezamenlijke uitgaven na pensioen (${retireYr}/jaar) — en daarmee het gezamenlijke FIRE-doel — relatief hoger uitvallen dan ieders eigen aandeel. Lagere gedeelde lasten brengen de gezamenlijke FIRE-leeftijd omlaag.`
-                              : `Jullie gebundelde vermogen en de gezamenlijke uitgaven na pensioen (${retireYr}/jaar) houden elkaar ongeveer in balans met jullie individuele projecties.`}
+                          De reden zit in de uitgaven ná pensioen: gedeelde vaste lasten draag je samen,
+                          dus die tellen in het huishouden maar één keer mee in plaats van twee keer.
                         </p>
+
+                        {/* De rekensom: uitgaven ná pensioen, apart vs samen (per jaar) */}
+                        {showSum && (
+                          <div
+                            className="mt-3 rounded-[var(--r-lg)] border border-horizon-200/70 bg-[var(--paper)] p-3"
+                            data-testid="samen-sterker-rekensom"
+                          >
+                            <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-horizon-700/70">
+                              Uitgaven ná pensioen · per jaar
+                            </p>
+                            <dl className="mt-2 space-y-1">
+                              {indiv.map((p) => (
+                                <div key={p.userId} className="flex items-baseline justify-between gap-3">
+                                  <dt className="text-xs text-horizon-800/80">{p.fullName ?? 'Partner'} — apart</dt>
+                                  <dd className="font-mono tabular-nums text-xs text-horizon-800">{formatCurrency(p.amount)}</dd>
+                                </div>
+                              ))}
+                              <div className="flex items-baseline justify-between gap-3 border-t border-horizon-200/70 pt-1">
+                                <dt className="text-xs text-horizon-800/80">Twee aparte huishoudens</dt>
+                                <dd className="font-mono tabular-nums text-xs text-horizon-800">{formatCurrency(sumIndiv)}</dd>
+                              </div>
+                              <div className="flex items-baseline justify-between gap-3">
+                                <dt className="text-xs font-medium text-horizon-900">Samen als huishouden</dt>
+                                <dd className="font-mono tabular-nums text-xs font-semibold text-horizon-900">
+                                  <span className="bg-[linear-gradient(transparent_60%,var(--color-horizon-200)_60%)] px-0.5">
+                                    {formatCurrency(comparison.combinedRetirementExpenses)}
+                                  </span>
+                                </dd>
+                              </div>
+                              {verschil > 0 && (
+                                <div className="flex items-baseline justify-between gap-3 border-t-2 border-double border-horizon-300 pt-1">
+                                  <dt className="text-xs font-medium text-horizon-900">Verschil — samen minder</dt>
+                                  <dd className="font-mono tabular-nums text-xs font-semibold text-positive">
+                                    −{formatCurrency(verschil)}
+                                  </dd>
+                                </div>
+                              )}
+                            </dl>
+                          </div>
+                        )}
+
+                        {/* Welke kosten tellen maar één keer mee? */}
+                        {comparison.sharedEssentialBudgets.length > 0 && (
+                          <div className="mt-3" data-testid="samen-sterker-gedeelde-lasten">
+                            <p className="text-xs font-medium text-horizon-900">Welke kosten tel je samen maar één keer?</p>
+                            <p className="mt-0.5 text-[11px] leading-relaxed text-horizon-700/70">
+                              Dit komt vooral doordat je deze gedeelde vaste lasten samen draagt — in het huishouden tellen ze één keer mee:
+                            </p>
+                            <ul className="mt-1.5 space-y-0.5">
+                              {comparison.sharedEssentialBudgets.map((b, i) => (
+                                <li key={i} className="flex items-baseline justify-between gap-3">
+                                  <span className="text-xs text-horizon-800/80">{b.name}</span>
+                                  <span className="font-mono tabular-nums text-xs text-horizon-800">
+                                    {formatCurrency(b.yearlyAmount)}
+                                    <span className="text-horizon-700/50">/jaar</span>
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                            {comparison.sharedEssentialYearly > 0 && (
+                              <p className="mt-1.5 text-[11px] text-horizon-700/70">
+                                Samen{' '}
+                                <span className="font-mono tabular-nums font-medium text-horizon-900">
+                                  {formatCurrency(comparison.sharedEssentialYearly)}/jaar
+                                </span>{' '}
+                                die je één keer opzij zet in plaats van dubbel.
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </>
                     )
                   })()
