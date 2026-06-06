@@ -528,12 +528,13 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   }, [initialAssetId, loading, assets, requestedAssetId, setSelectedAssetId])
 
   function handleAssetClick(asset: Asset) {
-    // Klik op de kaart-body opent de view-modal op de categoriepagina van het
-    // item: `/core/assets/[type]?asset=<id>`. De categoriepagina leest `?asset=`
-    // zelf uit de URL en opent daar de detail-pane (view-mode). `router.push`
-    // (geen replace) zodat browser-Back terugkeert naar dit overzicht.
-    // Snelle acties (Herwaarderen / Bewerken) openen bewust WÉL ter plekke —
-    // zie handleAssetRevalue / handleAssetEdit.
+    // Cash-rekeningen wonen op de cashflow-pagina: open daar met focus op de
+    // gekozen rekening (#rekening-<assetId>). Andere asset-types openen de
+    // detail-pane op hun categoriepagina zoals voorheen.
+    if (asset.asset_type === 'cash') {
+      router.push(`/overzicht/cashflow#rekening-${asset.id}`)
+      return
+    }
     router.push(`/core/assets/${asset.asset_type}?asset=${asset.id}`)
   }
 
@@ -806,7 +807,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
               {/* Group header — gedeelde component (zie debts/page.tsx):
                   icoon + label + chevron = link naar /core/assets/[type]. */}
               <CategoryGroupHeader
-                href={`/core/assets/${type}`}
+                href={type === 'cash' ? '/overzicht/cashflow' : `/core/assets/${type}`}
                 label={ASSET_TYPE_LABELS[type]}
                 iconName={groupIcon}
                 iconColor={groupColor}

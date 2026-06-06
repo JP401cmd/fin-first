@@ -317,35 +317,39 @@ export function VermogenAssetCard({
       </button>
 
       {/* Actie-rij — tussen hoofdregel en KPI-strip. Eigen interactieve regio
-          met aparte <button>s — geen nested buttons (a11y). */}
-      <div
-        role="group"
-        aria-label={`Acties voor ${asset.name}`}
-        className="relative z-10 flex items-center justify-end gap-2 border-t border-[var(--border-md)]/40 px-3 py-2 sm:px-4"
-      >
-        {hasActiveConnection ? (
+          met aparte <button>s — geen nested buttons (a11y).
+          Cash-rekeningen hebben geen edit/revalue acties: beheer loopt via
+          de cashflow-pagina. */}
+      {asset.asset_type !== 'cash' && (
+        <div
+          role="group"
+          aria-label={`Acties voor ${asset.name}`}
+          className="relative z-10 flex items-center justify-end gap-2 border-t border-[var(--border-md)]/40 px-3 py-2 sm:px-4"
+        >
+          {hasActiveConnection ? (
+            <VermogenCardActionButton
+              icon={RefreshCw}
+              label="Synchroniseren"
+              onClick={handleSync}
+              spinning={syncing}
+              ariaLabel={`${asset.name} synchroniseren`}
+            />
+          ) : (
+            <VermogenCardActionButton
+              icon={RefreshCw}
+              label="Herwaarderen"
+              onClick={() => onRevalueClick(asset)}
+              ariaLabel={`${asset.name} herwaarderen`}
+            />
+          )}
           <VermogenCardActionButton
-            icon={RefreshCw}
-            label="Synchroniseren"
-            onClick={handleSync}
-            spinning={syncing}
-            ariaLabel={`${asset.name} synchroniseren`}
+            icon={Pencil}
+            label="Bewerken"
+            onClick={() => onEditClick(asset)}
+            ariaLabel={`${asset.name} bewerken`}
           />
-        ) : (
-          <VermogenCardActionButton
-            icon={RefreshCw}
-            label="Herwaarderen"
-            onClick={() => onRevalueClick(asset)}
-            ariaLabel={`${asset.name} herwaarderen`}
-          />
-        )}
-        <VermogenCardActionButton
-          icon={Pencil}
-          label="Bewerken"
-          onClick={() => onEditClick(asset)}
-          ariaLabel={`${asset.name} bewerken`}
-        />
-      </div>
+        </div>
+      )}
 
       {kpiPair && (kpiPair.primary || kpiPair.secondary) ? (
         <div className="relative z-10">
