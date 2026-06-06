@@ -34,4 +34,17 @@ describe('useCoachSuggestion', () => {
     expect(result.current.suggestion).toBeNull()
     expect(localStorage.getItem('trifinity_coach_dismissed_suggestions')).toContain('gap_bank')
   })
+
+  it('toont geen nieuwe suggestie na dismiss (dismissedThisMount-guard)', () => {
+    const { result, rerender } = renderHook(
+      ({ gaps }) => useCoachSuggestion({ dataGaps: gaps, delayMs: 0 }),
+      { initialProps: { gaps: fullGaps({ hasBank: false }) } },
+    )
+    act(() => { vi.advanceTimersByTime(0) })
+    expect(result.current.suggestion?.key).toBe('gap_bank')
+    act(() => { result.current.dismiss() })
+    rerender({ gaps: fullGaps({ hasBank: false, hasAssets: false }) })
+    act(() => { vi.advanceTimersByTime(0) })
+    expect(result.current.suggestion).toBeNull()
+  })
 })
