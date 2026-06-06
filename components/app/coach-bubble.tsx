@@ -14,6 +14,7 @@ import {
   type DeferredField,
   type CoachOverrides,
 } from '@/lib/coach-suggestions'
+import type { ModuleId } from '@/lib/module-registry'
 
 // Re-export for backwards-compatible imports from this module.
 export type { CoachDataGaps, DeferredField } from '@/lib/coach-suggestions'
@@ -77,6 +78,13 @@ export type CoachBubbleProps = {
    * 'coach_config'. Beheerd via /beheer/coach.
    */
   overrides?: CoachOverrides
+  /**
+   * Actieve modules van de gebruiker. Gate-t de module-gekoppelde data-gap-
+   * suggesties (schulden/transacties/holdings/ISIN/FIRE/levensgebeurtenissen):
+   * een gap verschijnt alleen als de bijbehorende module actief is. Wanneer
+   * niet meegegeven, vindt geen module-gating plaats.
+   */
+  activeModules?: ModuleId[]
   /** Vertraging vóór de bubble verschijnt (ms). Default 1500. */
   delayMs?: number
   /** Tijd waarna de bubble automatisch sluit (ms). Default 45000. */
@@ -106,6 +114,7 @@ export function CoachBubble({
   dataGaps,
   deferredFields,
   overrides,
+  activeModules,
   delayMs = DEFAULT_COACH_TIMING.delayMs,
   autoDismissMs = DEFAULT_COACH_TIMING.autoDismissMs,
   headerLabel = DEFAULT_COACH_HEADER,
@@ -128,7 +137,7 @@ export function CoachBubble({
     migrateLegacyDismissal()
 
     const dismissed = getDismissedKeys()
-    const suggestion = getFirstUndismissedSuggestion(dataGaps, pathname, dismissed, deferredFields, overrides)
+    const suggestion = getFirstUndismissedSuggestion(dataGaps, pathname, dismissed, deferredFields, overrides, activeModules)
 
     if (!suggestion) return
 
@@ -142,9 +151,9 @@ export function CoachBubble({
     }, delayMs)
 
     return () => clearTimeout(timer)
-  // Re-evaluate when pathname changes (client navigation), dataGaps, deferredFields, overrides or delay change
+  // Re-evaluate when pathname changes (client navigation), dataGaps, deferredFields, overrides, activeModules or delay change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, dataGaps, deferredFields, overrides, delayMs])
+  }, [pathname, dataGaps, deferredFields, overrides, activeModules, delayMs])
 
   // Auto-dismiss na de geconfigureerde duur
   useEffect(() => {

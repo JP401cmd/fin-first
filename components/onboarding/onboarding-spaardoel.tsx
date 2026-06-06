@@ -319,7 +319,7 @@ export function OnboardingSpaardoel({
       kicker="Spaardoel"
       romanNum="v."
       title={headline}
-      deck="Een spaardoel maakt je richting concreet. Sla over kan altijd — je past het later aan in De Toekomst."
+      deck="Met een spaardoel bepaal je zelf hoeveel vrijheid je opzijzet. Sla over kan altijd — je past het later aan in De Toekomst."
       factsPanel={
         <FactsPanel
           stat="76%"

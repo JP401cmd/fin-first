@@ -139,7 +139,7 @@ export function BerichtenClient() {
   const pathname = usePathname()
   const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/berichten']
 
-  const { nudges, markAsRead, refresh } = useNotifications()
+  const { markAsRead, refresh } = useNotifications()
 
   const [history, setHistory] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
@@ -173,7 +173,6 @@ export function BerichtenClient() {
     // The provider only knows the last 7 days, so mark every unread item in
     // the 30-day window in a single PATCH (the union avoids a read-modify-
     // write race), then refresh the provider so the bell badge resyncs.
-    // Nudges live outside `history`, so they're intentionally left untouched.
     const unreadIds = history.filter((n) => !n.read).map((n) => n.id)
     if (unreadIds.length === 0) return
     setHistory((prev) => prev.map((n) => ({ ...n, read: true })))
@@ -188,8 +187,8 @@ export function BerichtenClient() {
 
   // ── Counts ──────────────────────────────────────────────────────────
   const historyUnread = history.filter((n) => !n.read).length
-  const displayUnread = historyUnread + nudges.length
-  const totalCount = history.length + nudges.length
+  const displayUnread = historyUnread
+  const totalCount = history.length
 
   // ── Partition (filter → urgent / today / earlier) ───────────────────
   const showItem = (n: Notification) => filter === 'all' || !n.read
@@ -218,7 +217,7 @@ export function BerichtenClient() {
   }
 
   const hasVisibleItems =
-    nudges.length > 0 || urgent.length > 0 || todayItems.length > 0 || earlierGroups.length > 0
+    urgent.length > 0 || todayItems.length > 0 || earlierGroups.length > 0
 
   const metaLeft =
     totalCount === 0
@@ -297,21 +296,6 @@ export function BerichtenClient() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)]">
-            {/* Nog in te vullen (nudges) — altijd zichtbaar, ook bij filter */}
-            {nudges.length > 0 && (
-              <div>
-                <GroupBar label="Nog in te vullen" tone="todo" />
-                {nudges.map((notification) => (
-                  <NotificationItem
-                    key={notification.id}
-                    notification={notification}
-                    onRead={handleMarkAsRead}
-                    onClose={() => {}}
-                  />
-                ))}
-              </div>
-            )}
-
             {/* Dringend */}
             {urgent.length > 0 && (
               <div>

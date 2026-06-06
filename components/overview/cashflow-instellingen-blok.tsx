@@ -20,6 +20,20 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
   // consistent met de inkomen/uitgaven-driehoek (recomputeTriple).
   const computedRate = computedIncome > 0 ? ((computedIncome - computedExpenses) / computedIncome) * 100 : 0
 
+  // 6-maands basis voor de spaarquote-kassabon: som van inkomsten/uitgaven over
+  // de laatste 6 maand-slots (transacties). Dit maakt de getoonde spaarquote
+  // herleidbaar tot een echte 6-maands transactie-grondslag i.p.v. een enkel
+  // maandgemiddelde. De laatste 6 entries zijn de meest recente (oudste →
+  // nieuwste reeks).
+  const sixMonth = useMemo(() => {
+    const last6 = data.monthlyBreakdown.slice(-6)
+    const income = last6.reduce((s, m) => s + m.income, 0)
+    const expenses = last6.reduce((s, m) => s + m.expenses, 0)
+    const saved = income - expenses
+    const rate = income > 0 ? (saved / income) * 100 : 0
+    return { months: last6, income, expenses, saved, rate }
+  }, [data.monthlyBreakdown])
+
   const [triple, setTriple] = useState({
     monthlyIncome: data.incomeSource === 'manual' && data.netMonthlyIncome > 0 ? data.netMonthlyIncome : computedIncome,
     monthlyExpenses: data.expensesSource === 'manual' ? data.estimatedMonthlyExpenses : computedExpenses,
@@ -100,10 +114,23 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
 
       <BottomSheet open={sheet === 'income'} onClose={() => setSheet(null)} title="Geschat jaarinkomen">
         <div className="space-y-3 p-4">
+          <p className="text-[11px] text-[var(--ink-3)]">Berekend uit je transacties van de afgelopen 12 maanden.</p>
           <KassabonShell>
-            <div className="flex items-center justify-between"><span>Berekend (12 mnd)</span>
-              <span className="font-bold tabular-nums"><MaskedAmount value={data.estimatedAnnualIncome} tone="kern" /></span></div>
-            <p className="mt-1 text-[10px] text-[var(--ink-4)]">≈ €{computedIncome.toLocaleString('nl-NL')}/mnd</p>
+            <div className="space-y-1.5">
+              {data.monthlyBreakdown.map((m, i) => (
+                <div key={`${m.label}-${i}`} className="flex items-center justify-between">
+                  <span className="text-[var(--ink-2)] capitalize">{m.label}</span>
+                  <span className="tabular-nums"><MaskedAmount value={m.income} tone="kern" /></span>
+                </div>
+              ))}
+              <div className="mt-2 border-t border-dashed border-[var(--border-md)] pt-2">
+                <div className="flex items-center justify-between font-bold">
+                  <span>Totaal (12 mnd)</span>
+                  <span className="tabular-nums"><MaskedAmount value={data.estimatedAnnualIncome} tone="kern" /></span>
+                </div>
+                <p className="mt-1 text-[10px] text-[var(--ink-4)]">≈ €{computedIncome.toLocaleString('nl-NL')}/mnd</p>
+              </div>
+            </div>
           </KassabonShell>
           <ChoiceRow computedLabel={`Gebruik berekend (€${computedIncome.toLocaleString('nl-NL')}/mnd)`}
             isManual={incomeManual} onUseComputed={() => useComputed('income')}
@@ -125,11 +152,28 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
 
       <BottomSheet open={sheet === 'savings'} onClose={() => setSheet(null)} title="Spaarquote">
         <div className="space-y-3 p-4">
+          <p className="text-[11px] text-[var(--ink-3)]">Berekend over je transacties van de afgelopen 6 maanden.</p>
           <KassabonShell>
-            <div className="flex items-center justify-between"><span>Inkomen</span><span className="tabular-nums"><MaskedAmount value={triple.monthlyIncome} tone="kern" /></span></div>
-            <div className="flex items-center justify-between"><span>Uitgaven</span><span className="tabular-nums">−<MaskedAmount value={triple.monthlyExpenses} tone="kern" /></span></div>
-            <div className="mt-2 flex items-center justify-between border-t border-dashed border-[var(--border-md)] pt-2 font-bold">
-              <span>Spaarquote</span><span className="tabular-nums">{Math.round(triple.savingsRate)}%</span></div>
+            <div className="space-y-1.5">
+              {sixMonth.months.map((m, i) => {
+                const net = m.income - m.expenses
+                return (
+                  <div key={`${m.label}-${i}`} className="flex items-center justify-between text-[var(--ink-3)]">
+                    <span className="capitalize">{m.label}</span>
+                    <span className="tabular-nums">
+                      <MaskedAmount value={net} tone="kern" signPrefix={net >= 0 ? '+' : ''} className="text-[11px]" />
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-2 space-y-1 border-t border-dashed border-[var(--border-md)] pt-2">
+              <div className="flex items-center justify-between"><span>Σ Inkomen (6 mnd)</span><span className="tabular-nums"><MaskedAmount value={sixMonth.income} tone="kern" /></span></div>
+              <div className="flex items-center justify-between"><span>Σ Uitgaven (6 mnd)</span><span className="tabular-nums">−<MaskedAmount value={sixMonth.expenses} tone="kern" /></span></div>
+              <div className="flex items-center justify-between"><span>Gespaard</span><span className="tabular-nums"><MaskedAmount value={sixMonth.saved} tone="kern" signPrefix={sixMonth.saved >= 0 ? '+' : ''} /></span></div>
+              <div className="mt-1 flex items-center justify-between border-t border-dashed border-[var(--border-md)] pt-1.5 font-bold">
+                <span>Spaarquote</span><span className="tabular-nums">{Math.round(sixMonth.rate)}%</span></div>
+            </div>
           </KassabonShell>
           <ChoiceRow computedLabel={`Gebruik berekend (${Math.round(computedRate)}%)`}
             isManual={expensesManual} onUseComputed={() => useComputed('expenses')}

@@ -23,6 +23,14 @@ export interface CashflowSettingsData {
   expensesSource: 'auto' | 'manual'
   /** Transaction-computed monthly expenses (distinct from estimatedMonthlyExpenses = stored profile value). */
   computedMonthlyExpenses: number
+  /**
+   * Vaste 12-maands reeks (oudste → nieuwste) van inkomsten/uitgaven per
+   * kalendermaand, rechtstreeks uit `loadCoreData` (transfer-gefilterde
+   * transacties, geen extra query). De inkomen-kassabon toont alle 12 rijen;
+   * de spaarquote-kassabon gebruikt de laatste 6; de hefboomkaarten gebruiken
+   * 'm als trend-achtergrond.
+   */
+  monthlyBreakdown: { label: string; income: number; expenses: number }[]
 }
 
 /**
@@ -101,5 +109,8 @@ export async function loadCashflowSettingsData(
     // override gelijk is aan het ingevoerde bedrag. extHalfYearExpenses komt
     // puur uit transacties, dus de kassabon toont "berekend" los van "handmatig".
     computedMonthlyExpenses: Math.round(core.savingsReceiptData.extHalfYearExpenses / 6),
+    // Per-maand reeks (12 slots, oudste → nieuwste) uit dezelfde core-load —
+    // serializable en zonder extra DB-round-trip.
+    monthlyBreakdown: core.monthlyIncomeExpenseSeries,
   }
 }

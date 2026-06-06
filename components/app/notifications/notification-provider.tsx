@@ -6,7 +6,6 @@ import type { Notification } from '@/app/api/notifications/route'
 type NotificationContextType = {
   notifications: Notification[]
   history: Notification[]
-  nudges: Notification[]
   unreadCount: number
   loading: boolean
   isModalOpen: boolean
@@ -28,7 +27,6 @@ export function useNotifications() {
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [history, setHistory] = useState<Notification[]>([])
-  const [nudges, setNudges] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -46,7 +44,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const data = await res.json()
       setNotifications(data.notifications ?? [])
       setHistory(data.history ?? [])
-      setNudges(data.nudges ?? [])
       setUnreadCount(data.unreadCount ?? 0)
     } catch {
       // Silent fail — progressive enhancement
@@ -115,7 +112,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       value={{
         notifications,
         history,
-        nudges,
         unreadCount,
         loading,
         isModalOpen,

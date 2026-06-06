@@ -56,9 +56,19 @@ export default function SignupPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
-        <h1 className="mb-6 text-center text-2xl font-bold text-zinc-900">
+        <h1 className="mb-2 text-center text-2xl font-bold text-zinc-900">
           Account aanmaken
         </h1>
+
+        {/* Philosofie-haak + tijd-tot-waarde: zet de toon ("geld is opgeslagen
+            tijd") en geeft een eerlijke verwachting voordat de gebruiker begint.
+            Sobere copy, geen uitroeptekens — in lijn met de coach-stem. */}
+        <p className="mb-1 text-center text-sm italic text-zinc-600">
+          Geld is opgeslagen tijd &mdash; we vertalen je geld naar jaren vrijheid.
+        </p>
+        <p className="mb-6 text-center text-xs text-zinc-400">
+          Account aanmaken duurt een minuut, je profiel klaar in ~5 minuten.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

@@ -48,6 +48,17 @@ export interface CorePageData {
   incomeMonths: number
   incomeByMonth: { month: string; amount: number }[]
 
+  /**
+   * Vaste 12-slots reeks (oudste → nieuwste) van inkomsten én uitgaven per
+   * kalendermaand, gebouwd uit dezelfde transfer-gefilterde 12-maands
+   * transacties (`realIncome12`/`realExpense12`). Elke slot is een echte
+   * kalendermaand binnen het venster, ook als er geen transacties waren (dan
+   * 0). `label` is de nl-NL korte maandnaam ('jan', 'feb', …). Voedt de
+   * cashflow-kassabonnen (12-mnd inkomen, 6-mnd spaarquote) en de
+   * trend-achtergrond op de hefboomkaarten zonder een extra query.
+   */
+  monthlyIncomeExpenseSeries: { label: string; income: number; expenses: number }[]
+
   // Savings rate
   savingsRate6m: number
   savingsRateMonths: number
@@ -475,6 +486,38 @@ export const loadCoreData = cache(async function loadCoreData(
   const sortedIncomeMonths = Object.entries(incomeMonthMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, amount]) => ({ month, amount }))
+
+  // ── Vaste 12-slots inkomsten/uitgaven-reeks per kalendermaand ──
+  // Hergebruikt EXACT dezelfde transfer-gefilterde transacties als hierboven
+  // (realIncome12/realExpense12, geladen in batch 1) — geen extra query. We
+  // bouwen 12 vaste maand-slots (oudste → nieuwste, t/m de huidige maand) zodat
+  // de kassabonnen en de kaart-achtergronden een lege maand als 0 tonen i.p.v.
+  // 'm over te slaan. Sommeert per maand; uitgaven als positieve bedragen.
+  const seriesMonthKeys: { key: string; label: string }[] = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth() - i, 1))
+    seriesMonthKeys.push({
+      key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
+      label: d.toLocaleDateString('nl-NL', { month: 'short' }),
+    })
+  }
+  const seriesIncomeByMonth = new Map<string, number>()
+  for (const tx of realIncome12) {
+    const d = new Date(tx.date)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    seriesIncomeByMonth.set(key, (seriesIncomeByMonth.get(key) ?? 0) + Number(tx.amount))
+  }
+  const seriesExpensesByMonth = new Map<string, number>()
+  for (const tx of realExpense12) {
+    const d = new Date(tx.date)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    seriesExpensesByMonth.set(key, (seriesExpensesByMonth.get(key) ?? 0) + Math.abs(Number(tx.amount)))
+  }
+  const monthlyIncomeExpenseSeries = seriesMonthKeys.map(({ key, label }) => ({
+    label,
+    income: Math.round(seriesIncomeByMonth.get(key) ?? 0),
+    expenses: Math.round(seriesExpensesByMonth.get(key) ?? 0),
+  }))
 
   // ── Last 6 months expenses & savings rate (rolling average) ──
   const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1))
@@ -1054,6 +1097,7 @@ export const loadCoreData = cache(async function loadCoreData(
 
     incomeMonths: actualIncomeMonths,
     incomeByMonth: sortedIncomeMonths,
+    monthlyIncomeExpenseSeries,
 
     savingsRate6m: Math.round(computedSavingsRate6m * 10) / 10,
     savingsRateMonths: savingsRateDataMonths,

@@ -110,8 +110,8 @@ export function OnboardingKlaar({
       title={headline}
       deck={
         hasOptionalData
-          ? "Een korte samenvatting van wat je hebt ingevuld. Je past alles later aan vanuit je dashboard."
-          : "Je hebt de basis gelegd — de rest vul je aan in je eigen tempo vanuit je dashboard."
+          ? "Dit is je startpunt — vanaf hier vertaal ik je geld naar vrijheid. Alles blijft aanpasbaar vanuit je dashboard."
+          : "Je hebt de basis gelegd — vanaf hier laat ik je vrijheid groeien, in je eigen tempo vanuit je dashboard."
       }
       // Geen apart facts-paneel — recap zelf is de payoff.
       // We renderen een lege div als placeholder zodat de grid-kolom op
@@ -200,15 +200,32 @@ export function OnboardingKlaar({
                 Vul je later aan
               </span>
             ) : (
-              <span
-                className="block text-[22px] sm:text-[28px] font-black leading-none tabular-nums tracking-[-0.02em]"
-                style={{
-                  fontFamily: 'var(--font-playfair, Georgia, serif)',
-                  color: netWorth < 0 ? 'var(--negative)' : 'var(--ink)',
-                }}
-              >
-                {formatCurrency(netWorth)}
-              </span>
+              <>
+                <span
+                  className="block text-[22px] sm:text-[28px] font-black leading-none tabular-nums tracking-[-0.02em]"
+                  style={{
+                    fontFamily: 'var(--font-playfair, Georgia, serif)',
+                    color: netWorth < 0 ? 'var(--negative)' : 'var(--ink)',
+                  }}
+                >
+                  {formatCurrency(netWorth)}
+                </span>
+                {/* Tastbare eerste "win": kwalitatieve vrijheids-vertaling onder
+                    het vermogen. Bewust GEEN cijfer-vertaling (X jaar vrijheid):
+                    de onboarding verzamelt geen uitgaven-/dagkosten-cijfer om door
+                    te delen (estimated_monthly_expenses wordt nooit ingevuld in
+                    deze flow), dus elk getal zou verzonnen zijn. Alleen tonen bij
+                    positief vermogen — bij €0 of een tekort zou "opgebouwde
+                    vrijheid" misleidend zijn. */}
+                {netWorth > 0 && (
+                  <span
+                    className="mt-1.5 block text-[11px] italic leading-snug text-[var(--ink-3)]"
+                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                  >
+                    Je eerste vrijheid staat op de teller &mdash; vanaf hier laat ik &lsquo;m groeien.
+                  </span>
+                )}
+              </>
             )
           }
         />

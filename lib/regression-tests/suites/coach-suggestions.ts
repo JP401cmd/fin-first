@@ -19,12 +19,34 @@ const CAT = 'coach.suggestions'
 
 /** Alle data-gaten gevuld (geen gap-suggestie zou matchen). */
 function fullGaps(): CoachDataGaps {
-  return { hasBank: true, hasAssets: true, hasBudgets: true, hasGoals: true }
+  return {
+    hasBank: true,
+    hasAssets: true,
+    hasBudgets: true,
+    hasGoals: true,
+    hasDebts: true,
+    hasTransactions: true,
+    hasHoldings: true,
+    hasHoldingsWithIsin: true,
+    hasFireParams: true,
+    hasLifeEvents: true,
+  }
 }
 
 /** Alle data-gaten open. */
 function emptyGaps(): CoachDataGaps {
-  return { hasBank: false, hasAssets: false, hasBudgets: false, hasGoals: false }
+  return {
+    hasBank: false,
+    hasAssets: false,
+    hasBudgets: false,
+    hasGoals: false,
+    hasDebts: false,
+    hasTransactions: false,
+    hasHoldings: false,
+    hasHoldingsWithIsin: false,
+    hasFireParams: false,
+    hasLifeEvents: false,
+  }
 }
 
 const NO_DISMISS = new Set<string>()
@@ -73,7 +95,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 50,
     fn() {
       // Geen bank (gap_bank zou matchen) maar ook bezittingen overgeslagen
-      const gaps: CoachDataGaps = { hasBank: false, hasAssets: false, hasBudgets: false, hasGoals: false }
+      const gaps: CoachDataGaps = { ...emptyGaps(), hasBudgets: false, hasGoals: false }
       const s = getFirstUndismissedSuggestion(gaps, '/will', NO_DISMISS, ['assets'])
       assertNotNull(s, 'Er is een suggestie')
       assertEqual(s.key, 'deferred_assets', 'deferred_assets wint van gap_bank')
@@ -155,8 +177,9 @@ const tests: TestCase[] = [
     estimatedDurationMs: 50,
     fn() {
       const overrides: CoachOverrides = { gap_bank: { enabled: false } }
-      // Zowel bank als bezittingen ontbreken
-      const gaps: CoachDataGaps = { hasBank: false, hasAssets: false, hasBudgets: true, hasGoals: true }
+      // Zowel bank als bezittingen ontbreken; nieuwe gaps satisfied zodat
+      // gap_assets de eerstvolgende open gap blijft.
+      const gaps: CoachDataGaps = { ...fullGaps(), hasBank: false, hasAssets: false }
       const s = getFirstUndismissedSuggestion(gaps, '/will', NO_DISMISS, [], overrides)
       assertEqual(s?.key, 'gap_assets', 'gap_assets wint nadat gap_bank is uitgeschakeld')
     },
@@ -171,7 +194,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      const gaps: CoachDataGaps = { hasBank: false, hasAssets: false, hasBudgets: true, hasGoals: true }
+      const gaps: CoachDataGaps = { ...fullGaps(), hasBank: false, hasAssets: false }
       const dismissed = new Set<string>(['gap_bank'])
       const s = getFirstUndismissedSuggestion(gaps, '/will', dismissed, [])
       assertEqual(s?.key, 'gap_assets', 'gap_assets wint nadat gap_bank is weggeklikt')

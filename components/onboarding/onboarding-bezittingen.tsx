@@ -232,7 +232,7 @@ export function OnboardingBezittingen({
         kicker="Bezit"
         romanNum="iv."
         title={headline}
-        deck="Voor je dashboard. Skip kan altijd."
+        deck="Samen tonen ze hoeveel vrijheid je al hebt opgebouwd. Skip kan altijd."
         factsPanel={
           <FactsPanel
             {...factsProps}

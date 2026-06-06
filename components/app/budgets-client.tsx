@@ -1962,7 +1962,11 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
               closeNewBudgetPane()
               loadBudgets()
               loadSpending()
-              addToast({ type: 'success', title: 'Budget aangemaakt' })
+              addToast({
+                type: 'success',
+                title: 'Je hebt je budget opgezet',
+                message: 'Zo bepaal je zelf hoeveel vrijheid je elke maand opzijzet.',
+              })
             }}
           />
         </ShellOverlay>

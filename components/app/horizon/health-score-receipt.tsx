@@ -1,10 +1,12 @@
 'use client'
 
-import { useMemo, useId } from 'react'
+import { useMemo, useId, useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Lightbulb, ArrowRight } from 'lucide-react'
+import { Lightbulb, ArrowRight, MessageSquare, ListPlus, Check, Loader2 } from 'lucide-react'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { BottomSheet } from '@/components/app/bottom-sheet'
+import { useChatContext } from '@/components/app/chat/chat-provider'
 import type { HealthScore, HealthPillar } from '@/lib/financial-health'
 
 // ── Color helpers (spec: groen >70, amber 40-70, rood <40) ──
@@ -37,6 +39,20 @@ function scoreLabelNl(score: number): string {
   if (score > 70) return 'Sterk'
   if (score >= 40) return 'Gemiddeld'
   return 'Zwak'
+}
+
+/**
+ * Context-prompt voor Will met het oordeel + de suggestie van de pijler, zodat
+ * hij gericht dieper kan kijken naar concrete acties (i.p.v. een lege chat).
+ */
+function buildWillContext(pillar: HealthPillar): string {
+  const oordeel = scoreLabelNl(pillar.score)
+  return [
+    `Mijn financiële gezondheid — pijler "${pillar.name}": score ${pillar.score}/100 (${oordeel}).`,
+    `Huidige waarde: ${pillar.rawValue}. ${pillar.explanation}`,
+    `De app suggereert nu: "${pillar.improvementTip}".`,
+    `Kijk hier dieper naar: wat kan ik concreet doen om deze pijler te verbeteren, en wat levert dat op in vrijheidstijd? Geef een paar concrete acties.`,
+  ].join(' ')
 }
 
 // ── Trend indicator ──────────────────────────────────────────
@@ -227,10 +243,13 @@ function PillarRadarChart({
 
 function PillarBar({
   pillar,
+  onCreateAction,
 }: {
   pillar: HealthPillar
+  onCreateAction: (pillar: HealthPillar) => void
 }) {
   const label = scoreLabelNl(pillar.score)
+  const { openWithMessage } = useChatContext()
 
   return (
     <div
@@ -304,10 +323,10 @@ function PillarBar({
         </div>
       </div>
 
-      {/* Improvement tip + action link */}
+      {/* Improvement tip + acties (navigeer · bespreek met Will · maak actie) */}
       <div className="mt-2 flex items-start gap-1.5">
         <Lightbulb className="h-3 w-3 text-horizon-500 mt-0.5 shrink-0" aria-hidden="true" />
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] text-[var(--ink-2)] leading-snug">{pillar.improvementTip}</p>
           <Link
             href={pillar.actionHref}
@@ -319,6 +338,28 @@ function PillarBar({
             </span>
             <ArrowRight className="h-2.5 w-2.5 transition-transform group-hover/tip:translate-x-0.5" aria-hidden="true" />
           </Link>
+
+          {/* Twee extra knoppen per pijler */}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => openWithMessage(buildWillContext(pillar))}
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--color-wil-300)] bg-[var(--color-wil-50)] px-2.5 py-1 text-[10px] font-medium text-[var(--color-wil-700)] transition-colors hover:bg-[var(--color-wil-100)]"
+              aria-label={`Bespreek ${pillar.name} met Will`}
+            >
+              <MessageSquare className="h-3 w-3" aria-hidden="true" />
+              Bespreek met Will
+            </button>
+            <button
+              type="button"
+              onClick={() => onCreateAction(pillar)}
+              className="inline-flex items-center gap-1 rounded-full border border-horizon-300 bg-horizon-50 px-2.5 py-1 text-[10px] font-medium text-horizon-700 transition-colors hover:bg-horizon-100"
+              aria-label={`Maak een actie van: ${pillar.name}`}
+            >
+              <ListPlus className="h-3 w-3" aria-hidden="true" />
+              Maak er een actie van
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -354,6 +395,9 @@ export function HealthScoreReceipt({
     () => [...health.pillars].sort((a, b) => a.score - b.score),
     [health.pillars],
   )
+
+  // Welke pijler staat open in de "maak er een actie van"-popup.
+  const [actionPillar, setActionPillar] = useState<HealthPillar | null>(null)
 
   // Count pillars by category
   const strongCount = health.pillars.filter(p => p.score > 70).length
@@ -451,7 +495,7 @@ export function HealthScoreReceipt({
       <div className="space-y-2">
         <h3 className="text-xs font-semibold text-[var(--ink-2)]">Pilaren (zwakste eerst)</h3>
         {sorted.map(pillar => (
-          <PillarBar key={pillar.id} pillar={pillar} />
+          <PillarBar key={pillar.id} pillar={pillar} onCreateAction={setActionPillar} />
         ))}
       </div>
 
@@ -470,6 +514,177 @@ export function HealthScoreReceipt({
 
       {/* Optional footer (e.g. backtesting link) */}
       {footer}
+
+      {/* Popup: maak een actie van de pijler-suggestie */}
+      <PillarActionPopup pillar={actionPillar} onClose={() => setActionPillar(null)} />
     </div>
+  )
+}
+
+// ── Pillar action popup ──────────────────────────────────────
+// "Maak er een actie van": neemt de pijler-suggestie over als bewerkbare
+// actie en slaat 'm op via POST /api/ai/actions. Genest in de receipt-sheet.
+
+function PillarActionPopup({
+  pillar,
+  onClose,
+}: {
+  pillar: HealthPillar | null
+  onClose: () => void
+}) {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [freedomDays, setFreedomDays] = useState('0')
+  const [saving, setSaving] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Reset de velden telkens wanneer een andere pijler wordt geopend.
+  useEffect(() => {
+    if (pillar) {
+      setTitle(pillar.actionLabel)
+      setDescription(pillar.improvementTip)
+      setFreedomDays('0')
+      setDone(false)
+      setError(null)
+    }
+  }, [pillar])
+
+  const save = useCallback(async () => {
+    if (!title.trim() || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/ai/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          freedom_days_impact: Number(freedomDays) || 0,
+          source: 'manual',
+        }),
+      })
+      if (!res.ok) throw new Error('save failed')
+      setDone(true)
+    } catch {
+      setError('Kon de actie niet opslaan. Probeer het opnieuw.')
+    } finally {
+      setSaving(false)
+    }
+  }, [title, description, freedomDays, saving])
+
+  return (
+    <BottomSheet open={!!pillar} onClose={onClose} title="Maak er een actie van" size="sm">
+      {pillar && (
+        <div className="space-y-4 pb-2">
+          {done ? (
+            <div className="py-4 text-center">
+              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--positive)]/10">
+                <Check className="h-5 w-5 text-positive" aria-hidden="true" />
+              </div>
+              <p className="font-serif text-base text-[var(--ink)]">Toegevoegd aan je acties</p>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">Je vindt &apos;m terug bij Tips &amp; acties.</p>
+              <div className="mt-4 flex justify-center gap-2">
+                <Link
+                  href="/overzicht/tips"
+                  className="inline-flex items-center gap-1 rounded-full bg-horizon-500 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-horizon-600"
+                >
+                  Bekijk je acties
+                  <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-full border border-[var(--border-ed)] px-3.5 py-2 text-xs font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+                >
+                  Sluiten
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-[var(--r-sm)] border border-[var(--border-ed)] border-l-2 border-l-horizon-500 bg-[var(--paper)] p-3">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
+                  {pillar.name} · {scoreLabelNl(pillar.score)} ({pillar.score}/100)
+                </div>
+                <p className="mt-1 text-xs leading-snug text-[var(--ink-2)]">{pillar.improvementTip}</p>
+              </div>
+
+              <div>
+                <label htmlFor="pillar-action-title" className="mb-1 block text-[11px] font-medium text-[var(--ink-2)]">
+                  Actie
+                </label>
+                <input
+                  id="pillar-action-title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Wat ga je doen?"
+                  className="w-full rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-horizon-500 focus:outline-none focus:ring-1 focus:ring-horizon-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="pillar-action-desc" className="mb-1 block text-[11px] font-medium text-[var(--ink-2)]">
+                  Toelichting <span className="text-[var(--ink-4)]">(optioneel)</span>
+                </label>
+                <textarea
+                  id="pillar-action-desc"
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full resize-none rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink-2)] focus:border-horizon-500 focus:outline-none focus:ring-1 focus:ring-horizon-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="pillar-action-days" className="mb-1 block text-[11px] font-medium text-[var(--ink-2)]">
+                  Vrijheidswinst <span className="text-[var(--ink-4)]">(dagen/jaar — schatting)</span>
+                </label>
+                <input
+                  id="pillar-action-days"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={freedomDays}
+                  onChange={(e) => setFreedomDays(e.target.value)}
+                  className="w-28 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] focus:border-horizon-500 focus:outline-none focus:ring-1 focus:ring-horizon-500"
+                />
+              </div>
+
+              {error && (
+                <p className="text-xs text-negative" role="alert">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={saving || !title.trim()}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-horizon-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-horizon-600 disabled:opacity-50"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <ListPlus className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  Voeg toe aan acties
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-full border border-[var(--border-ed)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+                >
+                  Annuleren
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </BottomSheet>
   )
 }

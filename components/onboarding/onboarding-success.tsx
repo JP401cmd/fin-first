@@ -65,7 +65,8 @@ export function OnboardingSuccess({
           </p>
         ) : (
           <p>
-            Ik ben Will, je persoonlijke financiële coach. Ik begeleid je door drie
+            Ik ben Will, je persoonlijke financiële coach. Je eerste vrijheid staat
+            op de teller &mdash; vanaf hier laat ik &lsquo;m groeien, door drie
             perspectieven naar financiële vrijheid.
           </p>
         )}

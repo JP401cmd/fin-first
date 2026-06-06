@@ -67,16 +67,18 @@ export interface HealthScore {
 }
 
 // ── Pillar action mapping ────────────────────────────────────
-// Each pillar links to the page where the user can take action.
+// Elke pijler krijgt een verb-first "doe"-CTA (geen passief "X bekijken")
+// die de gebruiker van inzicht → naar de hefboom-pagina brengt waar de
+// daad plaatsvindt. Sluit aan op de vrijheids-loop (zie tips-lijst).
 
 const PILLAR_ACTION: Record<string, { href: string; label: string }> = {
-  savings_rate:      { href: '/overzicht/cashflow',    label: 'Cashflow bekijken' },
-  debt_ratio:        { href: '/overzicht/schulden',    label: 'Schulden bekijken' },
-  emergency_fund:    { href: '/overzicht/bezittingen', label: 'Noodfonds opbouwen' },
-  fire_progress:     { href: '/toekomst',              label: 'Vrijheidspad bekijken' },
-  diversification:   { href: '/overzicht/bezittingen', label: 'Bezittingen bekijken' },
-  budget_discipline: { href: '/overzicht/cashflow',    label: 'Budgetten beheren' },
-  tax_optimization:  { href: '/overzicht/belasting',   label: 'Belasting bekijken' },
+  savings_rate:      { href: '/overzicht/cashflow',    label: 'Verhoog je spaarquote' },
+  debt_ratio:        { href: '/overzicht/schulden',    label: 'Versnel je aflossing' },
+  emergency_fund:    { href: '/overzicht/bezittingen', label: 'Bouw je noodfonds' },
+  fire_progress:     { href: '/toekomst',              label: 'Versnel je vrijheid' },
+  diversification:   { href: '/overzicht/bezittingen', label: 'Spreid je vermogen' },
+  budget_discipline: { href: '/overzicht/cashflow',    label: 'Stel je budget bij' },
+  tax_optimization:  { href: '/overzicht/belasting',   label: 'Optimaliseer je belasting' },
 }
 
 // ── Score curves ─────────────────────────────────────────────

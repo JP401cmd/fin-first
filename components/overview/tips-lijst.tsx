@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Check, Clock, ThumbsDown, Loader2, MessageCircle } from 'lucide-react'
+import { Sparkles, Check, Clock, ThumbsDown, Loader2, MessageCircle, ArrowRight, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import type { Recommendation } from '@/lib/recommendation-data'
+import { deepLinkForRecommendation } from '@/lib/recommendation-deep-link'
 
 /**
  * TipsLijst — toptips bovenaan /overzicht/tips. Toont pending +
@@ -159,6 +160,10 @@ function TipCard({
   const days = rec.freedom_days_per_year ?? 0
   const monthly = rec.euro_impact_monthly
   const isReadyAgain = rec.status === 'postponed'
+  // Sluit de vrijheids-loop: breng de gebruiker van inzicht → naar de plek
+  // waar de wijziging écht doorgevoerd wordt (budget/bezit/schuld). De
+  // helper ligt al klaar maar werd nergens in de UI gerenderd.
+  const deepLink = deepLinkForRecommendation(rec)
   return (
     <li className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 shadow-[var(--s0)]">
       <div className="flex items-start gap-2">
@@ -228,6 +233,22 @@ function TipCard({
           Negeren
         </button>
       </div>
+
+      {deepLink && (
+        <Link
+          href={deepLink.href}
+          target={deepLink.isExternal ? '_blank' : undefined}
+          rel={deepLink.isExternal ? 'noopener noreferrer' : undefined}
+          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-wil-700 transition-colors hover:text-wil-800"
+        >
+          {deepLink.label}
+          {deepLink.isExternal ? (
+            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+          ) : (
+            <ArrowRight className="h-3 w-3" aria-hidden="true" />
+          )}
+        </Link>
+      )}
     </li>
   )
 }

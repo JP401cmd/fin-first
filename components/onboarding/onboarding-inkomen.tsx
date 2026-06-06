@@ -179,7 +179,7 @@ export function OnboardingInkomen({
       kicker="Inkomen"
       romanNum="iii."
       title={headline}
-      deck="Schat liever te laag dan te hoog — je past het later aan."
+      deck="Je inkomen bepaalt je tempo naar vrijheid — hoeveel je elke maand opzij kunt zetten. Schat liever te laag; je past het later aan."
       factsPanel={
         <FactsPanel
           stat="€3.350"

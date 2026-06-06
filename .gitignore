@@ -72,3 +72,6 @@ signin2.yaml
 
 # local debug screenshots / scratch
 .tmp/
+
+# superpowers brainstorm visual-companion working dir (generated)
+.superpowers/

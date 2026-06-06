@@ -31,7 +31,7 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { computeLeverScores } from '@/components/app/shell/lever-scores'
 import { CoachBubble } from '@/components/app/coach-bubble'
-import { parseCoachConfig } from '@/lib/coach-suggestions'
+import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
 import { ViewModeProvider } from '@/components/app/view-mode-provider'
@@ -85,8 +85,10 @@ export default async function AppLayout({
     budgetTxRes,
     coachConfigRes,
   ] = await Promise.all([
-    // profile-select bevat alleen velden voor sidebar/feature-access/theming.
-    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type').eq('id', user.id).single(),
+    // profile-select bevat velden voor sidebar/feature-access/theming.
+    // expected_return + inflation_rate voeden de coach-data-gap `hasFireParams`
+    // — meegenomen in deze bestaande query i.p.v. een extra round-trip.
+    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type, expected_return, inflation_rate').eq('id', user.id).single(),
     // assets: `asset_type, net_worth_inclusion_pct` voor sidebar netWorth
     // (weighted). De tracking-flags voeden `getActiveAppKeys()` voor de
     // sidebar apps-strip: een app verschijnt alleen als minstens één
@@ -292,12 +294,62 @@ export default async function AppLayout({
 
   // ── Coach-bubble data gaps ──────────────────────────────
   // Lichtgewicht signalen voor de post-onboarding coach-bubble.
-  // Prioriteit: bank > assets > budget > goals (zie feature #792).
-  const coachDataGaps = {
+  // Volgorde (eerste open gap wint): bank > assets > debts > budget >
+  // transactions > holdings > isin > goals > fire-params > life-events.
+  //
+  // De laatste zes signalen absorberen de setup-prompts die voorheen als
+  // module-nudges bestonden (dat systeem is inmiddels verwijderd, zonder
+  // dekkingsgat). De detectie-logica:
+  //   - hasTransactions:      transactions, ≥1 rij
+  //   - hasHoldings/WithIsin: investment_holdings is_active, isin
+  //   - hasFireParams:        expected_return||inflation_rate
+  //   - hasLifeEvents:        life_events is_active, excl. 'aow'
+  // hasDebts hergebruikt de reeds-geladen debtRows (is_active=true)
+  // i.p.v. een eigen query.
+  //
+  // Module-gating: per-module queries draaien alleen wanneer die module actief
+  // is. Inactieve modules krijgen het signaal default `true`, zodat hun gap niet
+  // kan vuren (de coach gate-t óók op activeModules — dubbele veiligheid).
+  const coachHasTransactionsModule = activeModules.includes('budgetteren')
+  const coachHasHoldingsModule = activeModules.includes('aandelenregistratie')
+  const coachHasFireModule = activeModules.includes('toekomstplannen')
+
+  const [coachTxRes, coachHoldingsRes, coachLifeEventsRes] = await Promise.all([
+    coachHasTransactionsModule
+      ? supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+      : Promise.resolve(null),
+    coachHasHoldingsModule
+      ? supabase.from('investment_holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true)
+      : Promise.resolve(null),
+    coachHasFireModule
+      ? supabase.from('life_events').select('id, event_type').eq('user_id', user.id).eq('is_active', true)
+      : Promise.resolve(null),
+  ])
+
+  // Holdings: hasHoldings = ≥1 rij; hasHoldingsWithIsin = minstens één met
+  // een niet-lege isin.
+  const coachHoldings = coachHoldingsRes?.data ?? []
+  // Life events: 'aow' is een afgeleide systeem-gebeurtenis, niet door de
+  // gebruiker gepland — uitgesloten.
+  const coachLifeEvents = (coachLifeEventsRes?.data ?? []).filter(e => e.event_type !== 'aow')
+
+  const coachDataGaps: CoachDataGaps = {
     hasBank: assetRows.some(a => a.asset_type === 'cash'),
     hasAssets: assetRows.length > 0,
     hasBudgets: (budgetCountRes.count ?? 0) > 0,
     hasGoals: sidebarActionCount > 0,
+    // Schulden: hergebruik reeds-geladen debtRows (is_active=true).
+    hasDebts: debtRows.length > 0,
+    // Per-module signalen: default `true` wanneer de module uit staat → gap vuurt niet.
+    hasTransactions: coachHasTransactionsModule ? (coachTxRes?.count ?? 0) > 0 : true,
+    hasHoldings: coachHasHoldingsModule ? coachHoldings.length > 0 : true,
+    hasHoldingsWithIsin: coachHasHoldingsModule
+      ? coachHoldings.some(h => h.isin !== null && h.isin !== '')
+      : true,
+    hasFireParams: coachHasFireModule
+      ? (profile?.expected_return != null || profile?.inflation_rate != null)
+      : true,
+    hasLifeEvents: coachHasFireModule ? coachLifeEvents.length > 0 : true,
   }
 
   // ── Coach-config (overrides + timing + label) ───────────
@@ -411,6 +463,7 @@ export default async function AppLayout({
                           dataGaps={coachDataGaps}
                           deferredFields={coachDeferredFields}
                           overrides={coachConfig.rules}
+                          activeModules={activeModules}
                           delayMs={coachConfig.timing.delayMs}
                           autoDismissMs={coachConfig.timing.autoDismissMs}
                           headerLabel={coachConfig.headerLabel}

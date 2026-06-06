@@ -173,4 +173,33 @@ describe('TipsLijst', () => {
     )
     expect(screen.getByText(/Eerder uitgesteld/i)).toBeInTheDocument()
   })
+
+  it('rendert een deep-link CTA naar de plek van handelen (related veld wint)', () => {
+    render(
+      <TipsLijst
+        recommendations={[
+          baseRec({ id: 'r1', title: 'Streaming-tip', related_budget_slug: 'streaming' }),
+        ]}
+      />,
+    )
+    const cta = screen.getByRole('link', { name: /Open budget/i })
+    expect(cta).toHaveAttribute('href', '/overzicht/cashflow?budget=streaming')
+  })
+
+  it('valt terug op een type-gebaseerde deep-link CTA zonder related veld', () => {
+    render(
+      <TipsLijst
+        recommendations={[
+          baseRec({
+            id: 'r1',
+            title: 'Schuld-tip',
+            recommendation_type: 'debt_acceleration',
+            related_budget_slug: null,
+          }),
+        ]}
+      />,
+    )
+    const cta = screen.getByRole('link', { name: /Open schulden/i })
+    expect(cta).toHaveAttribute('href', '/overzicht/schulden')
+  })
 })

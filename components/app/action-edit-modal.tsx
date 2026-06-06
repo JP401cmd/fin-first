@@ -80,7 +80,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={!isEditable}
-            className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
+            className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
           />
         </div>
 
@@ -92,7 +92,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
             onChange={(e) => setDescription(e.target.value)}
             disabled={!isEditable}
             rows={2}
-            className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
+            className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
           />
         </div>
 
@@ -107,7 +107,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               disabled={!isEditable}
               min="0"
               step="0.1"
-              className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
             />
           </div>
           <div>
@@ -119,7 +119,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               disabled={!isEditable}
               min="0"
               step="1"
-              className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
             />
           </div>
         </div>
@@ -135,7 +135,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               value={scheduledWeek}
               onChange={(e) => setScheduledWeek(e.target.value)}
               disabled={!isEditable}
-              className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
             >
               <option value="">Niet ingepland</option>
               {weekOptions.map((w) => (
@@ -150,7 +150,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               disabled={!isEditable}
-              className="w-full rounded-md border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
+              className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-wil-300 focus:outline-none focus:ring-1 focus:ring-wil-300 disabled:bg-[var(--subtle)] disabled:text-[var(--ink-3)]"
             />
           </div>
         </div>
@@ -165,7 +165,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
                 type="button"
                 onClick={() => isEditable && setPriority(p)}
                 disabled={!isEditable}
-                className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${
+                className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
                   priority >= p
                     ? 'bg-wil-500 text-white'
                     : 'bg-[var(--paper)] text-[var(--ink-3)] ring-1 ring-zinc-200 hover:bg-wil-50'
@@ -179,7 +179,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
 
         {/* Linked recommendation */}
         {action.recommendation?.title && (
-          <div className="rounded-lg bg-[var(--subtle)] px-3 py-2">
+          <div className="bg-[var(--subtle)] px-3 py-2">
             <span className="text-[11px] text-[var(--ink-3)]">Via aanbeveling:</span>
             <p className="text-xs font-medium text-[var(--ink-2)]">{action.recommendation.title}</p>
           </div>
@@ -195,7 +195,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               <button
                 type="button"
                 onClick={() => onStatusChange('completed')}
-                className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-positive transition-colors hover:bg-[var(--positive)]/10"
               >
                 <Check className="h-3.5 w-3.5" />
                 Afronden
@@ -203,7 +203,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               <button
                 type="button"
                 onClick={() => onStatusChange('rejected')}
-                className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-red-500"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-negative"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Afwijzen
@@ -214,7 +214,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
             <button
               type="button"
               onClick={() => onStatusChange('open')}
-              className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-wil-600 transition-colors hover:bg-wil-50"
             >
               Heropenen
             </button>
@@ -226,7 +226,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
+            className="px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
           >
             Sluiten
           </button>
@@ -235,7 +235,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               type="button"
               onClick={handleSave}
               disabled={saving || !title.trim()}
-              className="rounded-lg bg-wil-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
+              className="bg-wil-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600 disabled:opacity-50"
             >
               {saving ? 'Opslaan...' : 'Opslaan'}
             </button>

@@ -39,9 +39,16 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
-      <h1 className="mb-6 text-center text-2xl font-bold text-zinc-900">
+      <h1 className="mb-2 text-center text-2xl font-bold text-zinc-900">
         Inloggen bij TriFinity
       </h1>
+
+      {/* Philosofie-haak: houdt de "geld is opgeslagen tijd"-stem ook bij
+          terugkeer vast. Sobere één-regel, geen tijd-cue (inloggen is geen
+          getting-started-moment). */}
+      <p className="mb-6 text-center text-sm italic text-zinc-600">
+        Welkom terug bij je vrijheid in tijd.
+      </p>
 
       {isExpired && (
         <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3" data-testid="session-expired-banner">

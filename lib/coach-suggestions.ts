@@ -19,6 +19,8 @@
  * Spiegelt het patroon van lib/nudge-definitions.ts.
  */
 
+import type { ModuleId } from '@/lib/module-registry'
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 export type CoachSuggestion = {
@@ -37,7 +39,13 @@ type SuggestionContent = {
 
 /**
  * Data-gap signalen vanuit de server-layout. Bepalen welke contextuele
- * suggestie de coach toont. Prioriteit: bank > assets > budget > goals.
+ * suggestie de coach toont. Prioriteit (eerste open gap wint):
+ * bank > assets > debts > budget > transactions > holdings > isin >
+ * goals > fire-params > life-events.
+ *
+ * De laatste zes signalen absorberen de setup-prompts die voorheen alleen
+ * als module-nudges bestonden (lib/nudge-definitions.ts), zodat het
+ * nudge-systeem later zonder dekkingsgat verwijderd kan worden.
  */
 export type CoachDataGaps = {
   /** Heeft de gebruiker minstens één bankrekening (asset type=cash)? */
@@ -48,6 +56,18 @@ export type CoachDataGaps = {
   hasBudgets: boolean
   /** Heeft de gebruiker openstaande acties/doelen? */
   hasGoals: boolean
+  /** Heeft de gebruiker minstens één actieve schuld? */
+  hasDebts: boolean
+  /** Heeft de gebruiker minstens één transactie? */
+  hasTransactions: boolean
+  /** Heeft de gebruiker minstens één actieve belegging (holding)? */
+  hasHoldings: boolean
+  /** Heeft minstens één holding een ISIN-code gekoppeld? */
+  hasHoldingsWithIsin: boolean
+  /** Heeft de gebruiker FIRE-parameters ingesteld (verwacht rendement / inflatie)? */
+  hasFireParams: boolean
+  /** Heeft de gebruiker minstens één actieve levensgebeurtenis? */
+  hasLifeEvents: boolean
 }
 
 /**
@@ -144,9 +164,9 @@ export const DEFERRED_FIELD_SUGGESTIONS: DeferredRule[] = [
     resolved: () => false,
     suggestion: {
       message:
-        'Je hebt je inkomen overgeslagen bij het instellen. Vul het in voor een nauwkeuriger financieel beeld.',
-      cta: 'Inkomen invullen',
-      ctaHref: '/identity/profiel',
+        'Vul je inkomen aan, dan laat ik zien hoeveel vrijheid je elke maand opbouwt.',
+      cta: 'Inkomen aanvullen',
+      ctaHref: '/mijn/profiel',
     },
   },
   {
@@ -156,9 +176,9 @@ export const DEFERRED_FIELD_SUGGESTIONS: DeferredRule[] = [
     resolved: (gaps) => gaps.hasAssets,
     suggestion: {
       message:
-        'Je hebt je bezittingen overgeslagen bij het instellen. Voeg ze toe voor een compleet vermogensoverzicht.',
+        'Voeg je bezittingen toe — dan vertaal ik je vermogen meteen naar jaren vrijheid.',
       cta: 'Bezittingen toevoegen',
-      ctaHref: '/core/assets',
+      ctaHref: '/overzicht/bezittingen',
     },
   },
   {
@@ -168,9 +188,9 @@ export const DEFERRED_FIELD_SUGGESTIONS: DeferredRule[] = [
     resolved: (gaps) => gaps.hasGoals,
     suggestion: {
       message:
-        'Je hebt je spaardoel overgeslagen bij het instellen. Een concreet doel helpt je sneller sparen.',
-      cta: 'Spaardoel instellen',
-      ctaHref: '/will',
+        'Eén concreet doel maakt je vrijheid tastbaar. Stel het in en volg je voortgang.',
+      cta: 'Doel instellen',
+      ctaHref: '/toekomst/doelen',
     },
   },
 ]
@@ -180,6 +200,13 @@ type DataGapRule = {
   condition: string
   check: (gaps: CoachDataGaps) => boolean
   suggestion: SuggestionContent
+  /**
+   * Optionele module-koppeling. Wanneer gezet, verschijnt deze gap-suggestie
+   * alleen als de bijbehorende module actief is (zie `activeModules`-parameter
+   * van getFirstUndismissedSuggestion). Spiegelt de module-gating van de
+   * nudges (lib/nudge-definitions.ts). Geen moduleId → altijd toepasselijk.
+   */
+  moduleId?: ModuleId
 }
 
 export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
@@ -189,7 +216,7 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     check: (g) => !g.hasBank,
     suggestion: {
       message:
-        'Koppel je bank voor automatisch inzicht — je transacties worden vanzelf geïmporteerd en gecategoriseerd.',
+        'Koppel je bank, dan houd ik je uitgaven automatisch bij — minder typewerk, meer zicht op je vrijheid.',
       cta: 'Bank koppelen',
       ctaHref: '/core/cash/connect',
     },
@@ -200,9 +227,20 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     check: (g) => !g.hasAssets,
     suggestion: {
       message:
-        'Voeg je vermogen toe — spaargeld, beleggingen, je woning — voor een compleet financieel beeld.',
+        'Spaargeld, beleggingen, je huis — samen tonen ze hoeveel vrijheid je al hebt opgebouwd. Voeg ze toe.',
       cta: 'Vermogen toevoegen',
-      ctaHref: '/core/assets',
+      ctaHref: '/overzicht/bezittingen',
+    },
+  },
+  {
+    key: 'gap_debts',
+    condition: 'Geen enkele schuld geregistreerd (module Vermogensregistratie actief).',
+    moduleId: 'vermogensregistratie',
+    check: (g) => !g.hasDebts,
+    suggestion: {
+      message: 'Breng je schulden in kaart — elke afgeloste euro koop je vrijheid terug.',
+      cta: 'Schuld toevoegen',
+      ctaHref: '/overzicht/schulden',
     },
   },
   {
@@ -210,9 +248,43 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     condition: 'Geen top-level budget ingesteld.',
     check: (g) => !g.hasBudgets,
     suggestion: {
-      message: 'Stel je eerste budget in om grip te krijgen op je maandelijkse uitgaven.',
+      message: 'Met een budget bepaal je zelf hoeveel vrijheid je elke maand opzijzet. Stel je eerste in.',
       cta: 'Budget instellen',
-      ctaHref: '/core/budgets',
+      ctaHref: '/overzicht/cashflow',
+    },
+  },
+  {
+    key: 'gap_transactions',
+    condition: 'Geen enkele transactie geïmporteerd (module Budgetteren actief).',
+    moduleId: 'budgetteren',
+    check: (g) => !g.hasTransactions,
+    suggestion: {
+      message:
+        'Importeer je transacties, dan houd ik je uitgaven — en je vrijheid — automatisch bij.',
+      cta: 'Transacties importeren',
+      ctaHref: '/core/cash/import',
+    },
+  },
+  {
+    key: 'gap_holdings',
+    condition: 'Geen enkele belegging geregistreerd (module Aandelenregistratie actief).',
+    moduleId: 'aandelenregistratie',
+    check: (g) => !g.hasHoldings,
+    suggestion: {
+      message: 'Registreer je beleggingen — dan zie ik hoeveel vrijheid je portefeuille opbouwt.',
+      cta: 'Beleggingen toevoegen',
+      ctaHref: '/core/assets/holdings',
+    },
+  },
+  {
+    key: 'gap_isin',
+    condition: 'Beleggingen geregistreerd, maar nog geen ISIN-codes gekoppeld (module Aandelenregistratie actief).',
+    moduleId: 'aandelenregistratie',
+    check: (g) => g.hasHoldings && !g.hasHoldingsWithIsin,
+    suggestion: {
+      message: 'Koppel ISIN-codes voor automatische koersupdates van je holdings.',
+      cta: 'ISIN koppelen',
+      ctaHref: '/core/assets/holdings',
     },
   },
   {
@@ -220,9 +292,31 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     condition: 'Geen openstaande acties/doelen.',
     check: (g) => !g.hasGoals,
     suggestion: {
-      message: 'Stel je financiële doelen in — zo weet je precies waar je naartoe werkt.',
-      cta: 'Doelen bekijken',
-      ctaHref: '/will',
+      message: 'Een doel maakt zichtbaar waar je naartoe werkt — en hoeveel vrijheid je ervoor terugkrijgt.',
+      cta: 'Doel instellen',
+      ctaHref: '/toekomst/doelen',
+    },
+  },
+  {
+    key: 'gap_fire_params',
+    condition: 'Geen verwacht rendement / inflatie ingesteld (module Toekomstplannen actief).',
+    moduleId: 'toekomstplannen',
+    check: (g) => !g.hasFireParams,
+    suggestion: {
+      message: 'Stel je verwacht rendement in, dan klopt je vrijheidsprojectie met jouw situatie.',
+      cta: 'Rendement instellen',
+      ctaHref: '/identity/instellingen',
+    },
+  },
+  {
+    key: 'gap_life_events',
+    condition: 'Geen levensgebeurtenissen gepland (module Toekomstplannen actief).',
+    moduleId: 'toekomstplannen',
+    check: (g) => !g.hasLifeEvents,
+    suggestion: {
+      message: 'Plan je levensgebeurtenissen — ze bepalen mee wanneer je vrij bent.',
+      cta: 'Gebeurtenis toevoegen',
+      ctaHref: '/toekomst/gebeurtenissen',
     },
   },
 ]
@@ -235,50 +329,52 @@ type PathRule = {
 }
 
 export const PATH_SUGGESTIONS: PathRule[] = [
+  // Volgorde = specifiek → breed: de specifieke /overzicht/*-paden staan
+  // vóór de brede /overzicht-fallback (anders zou /overzicht die afvangen).
   {
-    pathPrefix: '/core/budgets',
+    pathPrefix: '/overzicht/cashflow',
     key: 'path_budgets',
-    condition: 'Op een pagina onder /core/budgets.',
+    condition: 'Op een pagina onder /overzicht/cashflow.',
     suggestion: {
-      message: 'Voeg je eerste budget toe om grip te krijgen op je uitgaven.',
+      message: 'Hier bepaal je hoeveel vrijheid je elke maand opzijzet. Voeg je eerste budget toe.',
       cta: 'Budget toevoegen',
     },
   },
   {
-    pathPrefix: '/core/debts',
+    pathPrefix: '/overzicht/schulden',
     key: 'path_debts',
-    condition: 'Op een pagina onder /core/debts.',
+    condition: 'Op een pagina onder /overzicht/schulden.',
     suggestion: {
-      message: 'Registreer je schulden om je aflosstrategie in kaart te brengen.',
+      message: 'Elke afgeloste euro koop je vrijheid terug. Breng je schulden in kaart en kies een strategie.',
       cta: 'Schuld toevoegen',
     },
   },
   {
-    pathPrefix: '/core',
-    key: 'path_core',
-    condition: 'Op een pagina onder /core (en niet onder een specifieker /core-pad hierboven).',
-    suggestion: {
-      message:
-        'Dit is je financieel fundament. Voeg bezittingen en schulden toe voor een compleet overzicht.',
-      cta: 'Overzicht bekijken',
-    },
-  },
-  {
-    pathPrefix: '/will',
+    pathPrefix: '/overzicht/tips',
     key: 'path_will',
-    condition: 'Op een pagina onder /will.',
+    condition: 'Op een pagina onder /overzicht/tips.',
     suggestion: {
-      message: 'Hier vind je gepersonaliseerde tips en acties om je financiële doelen te bereiken.',
+      message: 'Hier staan je tips — elke afgeronde actie levert je dagen vrijheid op.',
       cta: 'Tips bekijken',
     },
   },
   {
-    pathPrefix: '/horizon',
-    key: 'path_horizon',
-    condition: 'Op een pagina onder /horizon.',
+    pathPrefix: '/overzicht',
+    key: 'path_core',
+    condition: 'Op een pagina onder /overzicht (en niet onder een specifieker /overzicht-pad hierboven).',
     suggestion: {
-      message: "Ontdek wanneer je financieel vrij kunt zijn en speel met scenario's.",
-      cta: 'Projectie bekijken',
+      message:
+        'Dit is je fundament. Hoe completer je bezittingen en schulden, hoe scherper ik je vrijheid laat zien.',
+      cta: 'Naar je overzicht',
+    },
+  },
+  {
+    pathPrefix: '/toekomst',
+    key: 'path_horizon',
+    condition: 'Op een pagina onder /toekomst.',
+    suggestion: {
+      message: "Ontdek wanneer je vrij kunt zijn — en speel met scenario's om die dag dichterbij te halen.",
+      cta: 'Bekijk je tijdas',
     },
   },
   {
@@ -286,8 +382,8 @@ export const PATH_SUGGESTIONS: PathRule[] = [
     key: 'path_nieuws',
     condition: 'Op een pagina onder /nieuws.',
     suggestion: {
-      message: 'Je persoonlijke financiële krant staat klaar. Lees het laatste nieuws.',
-      cta: 'Eerste artikel lezen',
+      message: 'Je financiële krant staat klaar — even bijlezen.',
+      cta: 'Open de krant',
     },
   },
 ]
@@ -296,9 +392,9 @@ export const DEFAULT_SUGGESTION: { key: string; condition: string; suggestion: S
   key: 'default',
   condition: 'Altijd van toepassing — wint alleen als geen enkele andere regel matcht.',
   suggestion: {
-    message: 'Welkom! Verken de app en ontdek wat je financiële vrijheid betekent.',
+    message: 'Welkom. Geld is opgeslagen tijd — ik help je zien hoeveel vrijheid het je geeft.',
     cta: 'Aan de slag',
-    ctaHref: '/core',
+    ctaHref: '/overzicht',
   },
 }
 
@@ -329,6 +425,11 @@ function applyOverride(
  * Admin-overrides bepalen de getoonde tekst/CTA en kunnen een regel
  * uitschakelen (overrides[key].enabled === false → overgeslagen).
  *
+ * `activeModules` gate-t alleen de data-gap-laag: een data-gap-regel met een
+ * `moduleId` wordt overgeslagen wanneer die module niet actief is (spiegelt de
+ * module-gating van de nudges). Is `activeModules` undefined, dan vindt geen
+ * gating plaats (achterwaarts compatibel).
+ *
  * Retourneert null als alle toepasselijke regels al gezien of uitgeschakeld zijn.
  */
 export function getFirstUndismissedSuggestion(
@@ -337,6 +438,7 @@ export function getFirstUndismissedSuggestion(
   dismissed: Set<string>,
   deferredFields?: DeferredField[],
   overrides?: CoachOverrides,
+  activeModules?: ModuleId[],
 ): CoachSuggestion | null {
   const isEnabled = (key: string) => overrides?.[key]?.enabled !== false
 
@@ -354,9 +456,14 @@ export function getFirstUndismissedSuggestion(
     }
   }
 
-  // 1. Data-gap suggesties
+  // 1. Data-gap suggesties — module-gated wanneer activeModules is meegegeven
   if (dataGaps) {
     for (const entry of DATA_GAP_SUGGESTIONS) {
+      // Module-gating: sla over wanneer de regel aan een module hangt die niet
+      // actief is. Alleen toegepast als activeModules expliciet is meegegeven.
+      if (entry.moduleId && activeModules && !activeModules.includes(entry.moduleId)) {
+        continue
+      }
       if (entry.check(dataGaps) && !dismissed.has(entry.key) && isEnabled(entry.key)) {
         return applyOverride(entry.key, entry.suggestion, overrides)
       }

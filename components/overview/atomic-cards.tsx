@@ -110,14 +110,14 @@ function AtomicCard({
     return (
       <Link
         href={entry.href}
-        className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 hover:border-[var(--ink-3)] hover:shadow-sm transition-all block"
+        className="border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 hover:border-[var(--ink-3)] hover:shadow-sm transition-all block"
       >
         {inner}
       </Link>
     )
   }
   return (
-    <article className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4">
+    <article className="border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4">
       {inner}
     </article>
   )

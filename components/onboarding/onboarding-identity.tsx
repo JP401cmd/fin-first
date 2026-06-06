@@ -169,7 +169,7 @@ export function OnboardingIdentity({
       kicker="Profiel"
       romanNum="ii."
       title={headline}
-      deck="Zodat we de bedragen op jouw situatie kunnen afstemmen."
+      deck="Zo vertaal ik je bedragen naar jouw vrijheid in tijd — op maat van je situatie."
       factsPanel={
         <FactsPanel stat={factsStat} sub={factsSub} source={factsSource} />
       }

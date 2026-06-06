@@ -20,6 +20,7 @@ import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { ValuationModal } from '@/components/core/assets-client'
 import { VermogenAssetCard } from '@/components/core/vermogen-asset-card'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
+import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import type { Asset } from '@/lib/asset-data'
 import type { Provenance } from '@/lib/household-data'
 
@@ -76,6 +77,11 @@ export function CashOverview({
   const [accounts, setAccounts] = useState<Account[]>([])
   const [cashAssets, setCashAssets] = useState<StampedAsset[]>([])
   const [bankByAsset, setBankByAsset] = useState<Record<string, string>>({}) // asset.id -> bank_account.id (budget-tracked)
+  // Per-asset waardeverloop (12 maandwaarden) voor de breuklijn-overlay op de
+  // rekening-kaarten — zelfde bron als de bezittingen-pagina (`assets-client`),
+  // zodat het silhouet op cashflow identiek is. Failure/lege map → vlakke
+  // overlay (huidige gedrag), geen crash.
+  const [cashSparklines, setCashSparklines] = useState<Record<string, number[]>>({})
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
   const [revalueAsset, setRevalueAsset] = useState<Asset | null>(null)
   const [budgets, setBudgets] = useState<BudgetRow[]>([])
@@ -178,6 +184,32 @@ export function CashOverview({
     }
     setBankByAsset(map)
   }, [showAllCashAccounts, perspective])
+
+  // Waardeverloop-sparklines voor de rekening-kaarten — exact dezelfde fetch
+  // als de bezittingen-pagina (`assets-client.tsx`): `loadEntitySparklines`
+  // op `balance_snapshots` per asset-ID. Alleen actief in de brede modus.
+  // Aggregaatrijen (privacy='totalen') hebben geen echt entity-ID en worden
+  // overgeslagen. Failure is non-fataal: lege map → vlakke overlay.
+  useEffect(() => {
+    if (!showAllCashAccounts) return
+    const ids = cashAssets
+      .filter((a) => a._aggregated !== true)
+      .map((a) => a.id)
+    if (ids.length === 0) {
+      setCashSparklines({})
+      return
+    }
+    const supabase = createClient()
+    let cancelled = false
+    loadEntitySparklines(supabase, 'asset', ids)
+      .then((map) => {
+        if (!cancelled) setCashSparklines(map)
+      })
+      .catch(() => {
+        if (!cancelled) setCashSparklines({})
+      })
+    return () => { cancelled = true }
+  }, [showAllCashAccounts, cashAssets])
 
   // Account-IDs die de geldstroom-aggregaties mogen voeden. Wanneer er geen
   // budget-tracked rekeningen zijn, slaan we de transactions-query over —
@@ -676,6 +708,7 @@ export function CashOverview({
                 <div key={a.id} id={`rekening-${a.id}`} className="scroll-mt-24">
                   <VermogenAssetCard
                     asset={a as Asset}
+                    sparklineValues={cashSparklines[a.id]}
                     onClick={(asset) => {
                       const bankId = bankByAsset[asset.id]
                       if (bankId) setDetailAccountId(bankId)

@@ -1,8 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { shouldAlert } from '@/lib/budget-alerts'
-import { getActiveNudges, type NudgeDataState, type NudgeOverrides } from '@/lib/nudge-definitions'
-import type { ModuleId } from '@/lib/module-registry'
 import { shouldSendWozReminder, WOZ_REMINDER_TEMPLATE } from '@/lib/notifications/woz-reminder'
 import { shouldSendPensionReminder, PENSION_REMINDER_TEMPLATE } from '@/lib/notifications/pension-reminder'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
@@ -17,7 +15,6 @@ export type NotificationType =
   | 'partner_transaction'
   | 'horizon'
   | 'holding_alert'
-  | 'module_nudge'
   | 'briefing'
 
 export type Notification = {
@@ -71,7 +68,7 @@ export async function GET(request: NextRequest) {
       budget: true, sync: true,
       recommendation: true, levelup: true,
       partner_transaction: true, horizon: true,
-      holding_alert: true, module_nudge: true, briefing: true,
+      holding_alert: true, briefing: true,
     }
     const prefs: Record<string, boolean> = prefsRes.data?.value
       ? { ...defaultPrefs, ...JSON.parse(prefsRes.data.value) }
@@ -624,7 +621,7 @@ export async function GET(request: NextRequest) {
 
     // ── 7. Horizon alerts (FIRE aandachtspunten) ─────────────────────
 
-    // Profile is used by both horizon alerts and module nudges, so hoist it
+    // Profile is hoisted here so the horizon alerts below can read it
     let profile: { date_of_birth?: string; expected_return?: number; inflation_rate?: number; active_modules?: string[] } | null = null
 
     try {
@@ -835,72 +832,6 @@ export async function GET(request: NextRequest) {
       console.error('Holding alert notification error:', err)
     }
 
-    // ── 9. Module nudges (onboarding guidance) ──────────────────────
-
-    let nudgeNotifications: Notification[] = []
-
-    try {
-      const [
-        nudgeAssetsRes,
-        nudgeDebtsRes,
-        nudgeBudgetsRes,
-        nudgeTransactionsRes,
-        nudgeHoldingsRes,
-        nudgeGoalsRes,
-        nudgeLifeEventsRes,
-        nudgeBankConnsRes,
-        nudgeOverridesRes,
-      ] = await Promise.all([
-        supabase.from('assets').select('id').eq('user_id', user.id).eq('is_active', true).limit(1),
-        supabase.from('debts').select('id').eq('user_id', user.id).eq('is_active', true).limit(1),
-        supabase.from('budgets').select('id').eq('user_id', user.id).is('parent_id', null).limit(1),
-        supabase.from('transactions').select('id').eq('user_id', user.id).limit(1),
-        supabase.from('investment_holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true),
-        supabase.from('goals').select('id').eq('user_id', user.id).limit(1),
-        supabase.from('life_events').select('id, event_type').eq('user_id', user.id).eq('is_active', true),
-        supabase.from('bank_connections').select('id, status').eq('user_id', user.id),
-        supabase.from('app_settings').select('value').eq('key', 'nudge_overrides').maybeSingle(),
-      ])
-
-      const nudgeHoldings = nudgeHoldingsRes.data ?? []
-      const nudgeLifeEvents = (nudgeLifeEventsRes.data ?? []).filter(e => e.event_type !== 'aow')
-      const nudgeOverrides: NudgeOverrides = nudgeOverridesRes.data?.value
-        ? JSON.parse(nudgeOverridesRes.data.value)
-        : {}
-
-      const nudgeState: NudgeDataState = {
-        hasAssets: (nudgeAssetsRes.data?.length ?? 0) > 0,
-        hasDebts: (nudgeDebtsRes.data?.length ?? 0) > 0,
-        hasBudgets: (nudgeBudgetsRes.data?.length ?? 0) > 0,
-        hasTransactions: (nudgeTransactionsRes.data?.length ?? 0) > 0,
-        hasActiveBankConnection: (nudgeBankConnsRes.data ?? []).some((c: { status: string }) => c.status === 'authorized'),
-        hasHoldings: nudgeHoldings.length > 0,
-        hasHoldingsWithIsin: nudgeHoldings.some((h: { isin: string | null }) => h.isin !== null && h.isin !== ''),
-        hasGoals: (nudgeGoalsRes.data?.length ?? 0) > 0,
-        hasLifeEvents: nudgeLifeEvents.length > 0,
-        hasFireParams: profile?.expected_return != null || profile?.inflation_rate != null,
-        activeModules: (profile?.active_modules as ModuleId[]) ?? [],
-        dismissedNudgeIds: new Set(readIds.filter((id: string) => id.startsWith('nudge_'))),
-      }
-
-      const activeNudges = getActiveNudges(nudgeState, nudgeOverrides)
-      nudgeNotifications = activeNudges.map((nudge) => ({
-        id: `nudge_${nudge.key}`,
-        type: 'module_nudge' as NotificationType,
-        priority: nudge.priority,
-        title: nudge.title,
-        description: nudge.description,
-        icon: nudge.icon,
-        color: 'amber',
-        createdAt: new Date().toISOString(),
-        read: false,
-        actionUrl: nudge.href,
-        metadata: { moduleId: nudge.moduleId },
-      }))
-    } catch (err) {
-      console.error('Module nudge notification error:', err)
-    }
-
     // Sort by priority (lower = higher priority)
     notifications.sort((a, b) => a.priority - b.priority)
 
@@ -968,8 +899,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       notifications: filtered,
       history: returnHistory,
-      unreadCount: filtered.filter((n) => !n.read).length + nudgeNotifications.length,
-      nudges: nudgeNotifications,
+      unreadCount: filtered.filter((n) => !n.read).length,
     })
   } catch (err) {
     console.error('Notifications error:', err)
@@ -1068,7 +998,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const validTypes = ['budget', 'sync', 'recommendation', 'levelup', 'partner_transaction', 'horizon', 'holding_alert', 'module_nudge', 'briefing']
+    const validTypes = ['budget', 'sync', 'recommendation', 'levelup', 'partner_transaction', 'horizon', 'holding_alert', 'briefing']
     const sanitized: Record<string, boolean> = {}
     for (const key of validTypes) {
       sanitized[key] = preferences[key] !== false

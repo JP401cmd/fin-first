@@ -113,7 +113,6 @@ function CollapsedDayGroup({
 export function NotificationModal() {
   const {
     history,
-    nudges,
     unreadCount,
     loading,
     isModalOpen,
@@ -217,7 +216,7 @@ export function NotificationModal() {
             <div className="flex items-center justify-center py-12">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-md)] border-t-[var(--ink-2)]" />
             </div>
-          ) : history.length === 0 && nudges.length === 0 ? (
+          ) : history.length === 0 ? (
             /* ── Empty state ───────────────────────────────── */
             <div className="flex flex-col items-center gap-4 px-8 py-16 text-center">
               <p className="font-[family-name:var(--font-inter)] text-[14px] text-[var(--ink-3)]">
@@ -229,28 +228,6 @@ export function NotificationModal() {
             </div>
           ) : (
             <div>
-              {/* ── NOG IN TE VULLEN sectie ──────────────────── */}
-              {nudges.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between border-b border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/60 px-5 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                      <span className="font-[family-name:var(--font-inter)] text-[10px] font-bold uppercase tracking-[.1em] text-amber-600">
-                        Nog in te vullen
-                      </span>
-                    </div>
-                  </div>
-                  {nudges.map((notification) => (
-                    <NotificationItem
-                      key={notification.id}
-                      notification={notification}
-                      onRead={markAsRead}
-                      onClose={closeModal}
-                    />
-                  ))}
-                </div>
-              )}
-
               {/* ── DRINGEND sectie ──────────────────────────── */}
               {urgent.length > 0 && (
                 <div>

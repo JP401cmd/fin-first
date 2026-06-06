@@ -286,7 +286,6 @@ Eigen layout `app/(app)/beheer/layout.tsx`. Alleen toegankelijk voor `profile.ro
 | `/beheer/migration`                  | `app/(app)/beheer/migration/page.tsx`                    | Datamigratie-tools.                                       |
 | `/beheer/module-guide`               | `app/(app)/beheer/module-guide/page.tsx`                 | Module-gids editor.                                       |
 | `/beheer/nieuws`                     | `app/(app)/beheer/nieuws/page.tsx`                       | Nieuws-feed beheer.                                       |
-| `/beheer/nudges`                     | `app/(app)/beheer/nudges/page.tsx`                       | Nudges-engine.                                            |
 | `/beheer/prompts`                    | `app/(app)/beheer/prompts/page.tsx`                      | AI-prompts beheer.                                        |
 | `/beheer/propositie`                 | `app/(app)/beheer/propositie/page.tsx`                   | Marketing-propositie.                                     |
 | `/beheer/regressietest`              | `app/(app)/beheer/regressietest/page.tsx`                | Regressie-test runner.                                    |

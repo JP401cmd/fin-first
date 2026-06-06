@@ -91,9 +91,9 @@ const tests: TestCase[] = [
       const validTypes = [
         'budget', 'streak', 'sync', 'recommendation',
         'insight', 'badge', 'levelup', 'partner_transaction',
-        'horizon', 'holding_alert', 'module_nudge',
+        'horizon', 'holding_alert',
       ]
-      assertEqual(validTypes.length, 11, '11 valid notification preference types')
+      assertEqual(validTypes.length, 10, '10 valid notification preference types')
       // Each must be a non-empty string
       for (const t of validTypes) {
         assert(t.length > 0, `Type "${t}" is non-empty`)
@@ -162,21 +162,20 @@ const tests: TestCase[] = [
   },
   {
     id: 'notif-notification-type-enum',
-    name: 'NotificationType bevat alle 11 typen',
+    name: 'NotificationType bevat alle 10 typen',
     category: CAT,
-    description: 'NotificationType union omvat budget, streak, sync, recommendation, insight, badge, levelup, partner_transaction, horizon, holding_alert, module_nudge',
+    description: 'NotificationType union omvat budget, streak, sync, recommendation, insight, badge, levelup, partner_transaction, horizon, holding_alert',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
       const allTypes = [
         'budget', 'streak', 'sync', 'recommendation', 'insight',
         'badge', 'levelup', 'partner_transaction', 'horizon', 'holding_alert',
-        'module_nudge',
       ]
-      assertEqual(allTypes.length, 11, '11 notification types')
+      assertEqual(allTypes.length, 10, '10 notification types')
       // Verify uniqueness
       const unique = new Set(allTypes)
-      assertEqual(unique.size, 11, 'All types are unique')
+      assertEqual(unique.size, 10, 'All types are unique')
     },
   },
   {
@@ -248,7 +247,7 @@ const tests: TestCase[] = [
   // ──────────────── Step 5: notificatie weergave in de UI ──────────────────────
   {
     id: 'notif-module-map-completeness',
-    name: 'MODULE_MAP bevat mapping voor alle 11 NotificationTypes',
+    name: 'MODULE_MAP bevat mapping voor alle 10 NotificationTypes',
     category: CAT,
     description: 'NotificationItem component mapt elk type naar module label en CSS variabelen',
     priority: 'high',
@@ -266,10 +265,9 @@ const tests: TestCase[] = [
         partner_transaction: { label: 'DE KERN' },
         horizon:             { label: 'DE HORIZON' },
         holding_alert:       { label: 'DE KERN' },
-        module_nudge:        { label: 'INVULLEN' },
       }
       const keys = Object.keys(moduleMap)
-      assertEqual(keys.length, 11, '11 types in MODULE_MAP')
+      assertEqual(keys.length, 10, '10 types in MODULE_MAP')
       // Verify each has a valid module label
       const validLabels = ['DE KERN', 'DE WIL', 'DE HORIZON']
       for (const [type, info] of Object.entries(moduleMap)) {
