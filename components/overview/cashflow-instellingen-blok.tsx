@@ -15,7 +15,10 @@ type Sheet = null | 'income' | 'expenses' | 'savings'
 export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData }) {
   const computedIncome = Math.round(data.estimatedAnnualIncome / 12)
   const computedExpenses = data.computedMonthlyExpenses // transactie-berekend (NIET de manual estimatedMonthlyExpenses)
-  const computedRate = data.savingsRate6m
+  // Spaarquote = afgeleid van het getoonde inkomen − uitgaven, zodat "gebruik
+  // berekend" precies op het getoonde % uitkomt (geen sprong). Dit blijft
+  // consistent met de inkomen/uitgaven-driehoek (recomputeTriple).
+  const computedRate = computedIncome > 0 ? ((computedIncome - computedExpenses) / computedIncome) * 100 : 0
 
   const [triple, setTriple] = useState({
     monthlyIncome: data.incomeSource === 'manual' && data.netMonthlyIncome > 0 ? data.netMonthlyIncome : computedIncome,
