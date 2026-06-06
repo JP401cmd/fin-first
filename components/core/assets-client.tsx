@@ -2816,7 +2816,7 @@ export function AssetForm({
       current_value: Number(currentValue) || 0,
       purchase_value: isCashType ? Number(currentValue) || 0 : Number(purchaseValue) || 0,
       purchase_date: isCashType ? null : purchaseDate || null,
-      expected_return: isCashType ? 0 : (depreciationRate && Number(depreciationRate) > 0 ? 0 : Number(expectedReturn) || 0),
+      expected_return: (depreciationRate && Number(depreciationRate) > 0 ? 0 : Number(expectedReturn) || 0),
       monthly_contribution: isCashType ? 0 : Number(monthlyContribution) || 0,
       institution: institution || null,
       account_number: isCashType ? (iban || null) : null,
