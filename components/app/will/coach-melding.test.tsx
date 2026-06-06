@@ -44,4 +44,15 @@ describe('CoachMelding', () => {
     expect(onCtaActivate).toHaveBeenCalledTimes(1)
     expect(onOpenChat).not.toHaveBeenCalled()
   })
+
+  it('toont de cursor alleen wanneer showCursor true', () => {
+    const { rerender } = render(
+      <CoachMelding {...base} showCursor={false} onClose={vi.fn()} onCtaActivate={vi.fn()} onOpenChat={vi.fn()} />,
+    )
+    expect(screen.queryByText('▮')).not.toBeInTheDocument()
+    rerender(
+      <CoachMelding {...base} showCursor={true} onClose={vi.fn()} onCtaActivate={vi.fn()} onOpenChat={vi.fn()} />,
+    )
+    expect(screen.getByText('▮')).toBeInTheDocument()
+  })
 })
