@@ -31,17 +31,14 @@ import type { Debt } from '@/lib/debt-data'
 import {
   ageAtDate,
   computeAowMonthly,
-  computeFireProjection,
-  projectForward,
   DEFAULT_RETURN,
   INFLATION,
   type LifeEvent,
-  type FinancialInput,
-  type FireProjection,
 } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import {
   lifeEventsToCashflows,
+  runSimulation,
   type SimCashflow,
   type SimRow,
 } from '@/lib/fire-simulation'
@@ -284,59 +281,6 @@ function simResultToProjection(
     monthlySavings: Math.round(monthlySavings),
     savingsRate,
   }
-}
-
-/** Map de lichtgewicht FireProjection (computeFireProjection) naar de UI-shape. */
-function fireProjectionToHousehold(fp: FireProjection): HouseholdFireProjectionData {
-  return {
-    fireTarget: fp.fireTarget,
-    netWorth: fp.netWorth,
-    freedomPercentage: fp.freedomPercentage,
-    fireAge: fp.fireAge,
-    currentAge: fp.currentAge,
-    fireDate: fp.fireDate,
-    countdownDays: fp.countdownDays,
-    freedomYears: fp.freedomYears,
-    freedomMonths: fp.freedomMonths,
-    monthlyPassiveIncome: fp.monthlyPassiveIncome,
-    monthlySavings: fp.monthlySavings,
-    savingsRate: fp.savingsRate,
-  }
-}
-
-/**
- * Bouw een vereenvoudigd projectie-pad uit TOTALEN via projectForward — de
- * pad-companion van computeFireProjection. Gebruikt voor de grafiek-lijn wanneer
- * er GEEN itemized unified-projectie is (partner deelt alleen 'totals'), zodat de
- * lijn tóch verschijnt én consistent is met de getoonde (lichte) FIRE-leeftijd.
- * Levert jaarlijkse SimRow-punten (alleen age + endPortfolio gevuld — de grafiek
- * gebruikt enkel die twee voor de lijn).
- */
-function projectTotalsToSimRows(input: FinancialInput, currentAge: number, endAge: number): SimRow[] {
-  const months = Math.max(12, Math.round((endAge - currentAge) * 12))
-  const proj = projectForward(input, months)
-  const rows: SimRow[] = []
-  for (let i = 0; i < proj.length; i += 12) {
-    const m = proj[i]
-    if (m.age == null) continue
-    const nw = m.netWorth
-    rows.push({
-      age: m.age,
-      phase: 'accumulation',
-      startPortfolio: nw,
-      growth: 0,
-      savings: 0,
-      withdrawal: 0,
-      cashflowNet: 0,
-      oneTimeNet: 0,
-      endPortfolio: nw,
-      grossIncome: 0,
-      grossExpenses: 0,
-      flowIn: 0,
-      flowOut: 0,
-    })
-  }
-  return rows
 }
 
 /**
@@ -701,26 +645,29 @@ export async function buildHouseholdProjectionInput(
     }
 
     let projection: HouseholdFireProjectionData
-    // Projectie-pad (vermogen per leeftijd) voor de grafieklijn. Bij itemized
-    // ('full') komt dit uit de unified engine; bij 'totals' uit projectForward
-    // op de totalen (consistent met de lichte FIRE-leeftijd). Leeg → geen lijn.
+    // Projectie-pad (vermogen per leeftijd) voor de grafieklijn. Bij 'totals'
+    // draaien we een TOTALEN-simulatie via dezelfde runSimulation-engine als de
+    // itemized tak — dus mét afbouw na FIRE volgens de eindstrategie (deplete →
+    // dalend naar einde, perpetual → vlak, legacy → naar nalatenschap). Leeg → geen lijn.
     let projectionRows: SimRow[] = []
     let projectionFireAgeFractional: number | null = null
     if (isOtherAggregateOnly && currentAge !== null && yearlyExpenses > 0) {
-      // Partner deelt alleen totalen → lichte projectie + pad uit de totalen.
-      const fin: FinancialInput = {
-        totalAssets,
-        totalDebts,
-        monthlyIncome,
-        monthlyExpenses,
-        monthlyContributions,
-        yearlyMustExpenses: yearlyExpenses,
-        dateOfBirth: dob,
-      }
-      const fp = computeFireProjection(fin, fireParams.grossReturn, fireParams.effectiveSwr, fireParams.inflationRate, strategyOpts)
-      projection = fireProjectionToHousehold(fp)
-      projectionRows = projectTotalsToSimRows(fin, currentAge, fireStrategy.endAge)
-      projectionFireAgeFractional = fp.fireAge
+      // Partner deelt alleen totalen → totalen-simulatie (geen itemized cashflows).
+      const sim = runSimulation(
+        currentAge,
+        fireStrategy.endAge,
+        netWorth,
+        yearlyExpenses,
+        monthlyContributions * 12,
+        fireParams.grossReturn,
+        'nl_box3',
+        fireParams.inflationRate,
+        [],
+        fireStrategy,
+      )
+      projection = simResultToProjection(netWorth, monthlyIncome, monthlyExpenses, yearlyExpenses, currentAge, sim)
+      projectionRows = sim.rows
+      projectionFireAgeFractional = sim.fireAgeFractional
     } else if (!isOtherAggregateOnly && currentAge !== null && yearlyExpenses > 0) {
       // Volledige (itemized) projectie via de unified engine.
       const projAssets = scaleSharedAssets(personalAssets, sharedAssets, shareFraction)
@@ -908,28 +855,30 @@ export async function buildHouseholdProjectionInput(
 
   let combinedProjection: HouseholdFireProjectionData
   // Gecombineerd projectie-pad voor de grafieklijn. Bij itemized ('full') uit de
-  // unified engine; bij 'totals' uit projectForward op de gecombineerde totalen
-  // (consistent met de lichte gecombineerde FIRE-leeftijd). Leeg → geen lijn.
+  // unified engine; bij 'totals' uit een TOTALEN-simulatie via dezelfde
+  // runSimulation-engine — dus mét afbouw na FIRE volgens de eindstrategie van de
+  // oudste partner (deplete → dalend, perpetual → vlak, legacy → naar nalatenschap).
   let combinedRows: SimRow[] = []
   let combinedFireAgeFractional: number | null = null
   if (partnerAggregateOnly && headAge !== null && combinedYearlyExpenses > 0) {
-    // Partner deelt alleen totalen → lichte gecombineerde projectie + pad uit de totalen.
-    const fin: FinancialInput = {
-      totalAssets: combinedNetWorthAssets,
-      totalDebts: combinedNetWorthDebts,
-      monthlyIncome: combinedMonthlyIncome,
-      monthlyExpenses: combinedMonthlyExpenses,
-      monthlyContributions: combinedMonthlyContributions,
-      yearlyMustExpenses: combinedYearlyExpenses,
-      dateOfBirth: headDobEntry!.dob,
-    }
-    const cfp = computeFireProjection(fin, headFireParams.grossReturn, headFireParams.effectiveSwr, headFireParams.inflationRate, {
-      strategy: (headProfile?.fire_end_strategy ?? undefined) as 'perpetual' | 'legacy' | 'deplete' | undefined,
-      endAge: headProfile?.fire_end_age ?? undefined,
-    })
-    combinedProjection = fireProjectionToHousehold(cfp)
-    combinedRows = projectTotalsToSimRows(fin, headAge, headFireStrategy.endAge)
-    combinedFireAgeFractional = cfp.fireAge
+    // Partner deelt alleen totalen → gecombineerde totalen-simulatie (geen itemized cashflows).
+    const sim = runSimulation(
+      headAge,
+      headFireStrategy.endAge,
+      combinedNetWorth,
+      combinedYearlyExpenses,
+      combinedMonthlyContributions * 12,
+      headFireParams.grossReturn,
+      'nl_box3',
+      headFireParams.inflationRate,
+      [],
+      headFireStrategy,
+    )
+    combinedProjection = simResultToProjection(
+      combinedNetWorth, combinedMonthlyIncome, combinedMonthlyExpenses, combinedYearlyExpenses, headAge, sim,
+    )
+    combinedRows = sim.rows
+    combinedFireAgeFractional = sim.fireAgeFractional
   } else if (headAge !== null && combinedYearlyExpenses > 0 && !partnerDataHidden) {
     const cashflows = buildCombinedCashflows({
       combinedEvents,
