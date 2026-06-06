@@ -16,6 +16,9 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { buildCashRekeningen, type CashRekening } from '@/lib/cash-rekeningen'
+import { AssetPane } from '@/components/app/core/assets/asset-pane'
+import type { Asset } from '@/lib/asset-data'
 
 const DynCashAccountView = dynamic(
   () => import('@/components/app/cash-account-view').then(m => ({ default: m.CashAccountView })),
@@ -54,13 +57,18 @@ export function CashOverview({
   onNavigateToAccount,
   hideAccountsSection = false,
   hideQuickActions = false,
+  showAllCashAccounts = false,
 }: {
   embedded?: boolean
   onNavigateToAccount?: (accountId: string) => void
   hideAccountsSection?: boolean
   hideQuickActions?: boolean
+  showAllCashAccounts?: boolean
 }) {
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [cashAssets, setCashAssets] = useState<Asset[]>([])
+  const [allBankAccounts, setAllBankAccounts] = useState<Account[]>([])
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
   const [budgets, setBudgets] = useState<BudgetRow[]>([])
   const [transactions, setTransactions] = useState<TxAgg[]>([])
   const [loading, setLoading] = useState(true)
@@ -132,6 +140,33 @@ export function CashOverview({
       setAccounts(filtered as Account[])
     }
   }, [perspective])
+
+  // Laadt ALLE cash-rekeningen (bank-gekoppeld én handmatige cash-assets) —
+  // los van `has_budget_tracking`. Voedt de asset-gedreven rekeningenlijst die
+  // alleen actief is wanneer `showAllCashAccounts` aanstaat; de
+  // geldstroom-aggregatie blijft op de budget-tracked `accounts` draaien.
+  const loadAllCashRekeningen = useCallback(async () => {
+    if (!showAllCashAccounts) return
+    const supabase = createClient()
+
+    let assetsQ = supabase
+      .from('assets')
+      .select('*')
+      .eq('asset_type', 'cash')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+    if (perspective === 'personal') assetsQ = assetsQ.eq('ownership', 'personal')
+
+    let banksQ = supabase
+      .from('bank_accounts')
+      .select('id, name, balance, iban, bank_name, linked_asset_id')
+      .eq('is_active', true)
+    if (perspective === 'personal') banksQ = banksQ.eq('ownership', 'personal')
+
+    const [{ data: assetsData }, { data: banksData }] = await Promise.all([assetsQ, banksQ])
+    if (assetsData) setCashAssets(assetsData as Asset[])
+    if (banksData) setAllBankAccounts(banksData as Account[])
+  }, [showAllCashAccounts, perspective])
 
   // Account-IDs die de geldstroom-aggregaties mogen voeden. Wanneer er geen
   // budget-tracked rekeningen zijn, slaan we de transactions-query over —
@@ -261,7 +296,8 @@ export function CashOverview({
   useEffect(() => {
     setLoading(true)
     Promise.all([loadAccounts(), loadBudgets()]).then(() => setLoading(false))
-  }, [loadAccounts, loadBudgets])
+    void loadAllCashRekeningen()
+  }, [loadAccounts, loadBudgets, loadAllCashRekeningen])
 
   useEffect(() => {
     loadTransactions()
@@ -308,6 +344,50 @@ export function CashOverview({
 
   // Aggregations
   const totalBalance = useMemo(() => accounts.reduce((s, a) => s + Number(a.balance), 0), [accounts])
+
+  // Asset-gedreven rekeningenlijst — alleen wanneer `showAllCashAccounts`
+  // aanstaat. Verenigt cash-assets met hun gekoppelde bank_account, zodat
+  // zowel bank-rekeningen als handmatige cash-posten getoond worden.
+  const rekeningen = useMemo<CashRekening[]>(() => {
+    if (!showAllCashAccounts) return []
+    return buildCashRekeningen(
+      cashAssets.map((a) => ({
+        id: a.id,
+        name: a.name,
+        current_value: Number(a.current_value),
+        institution: a.institution ?? null,
+        has_budget_tracking: (a as { has_budget_tracking?: boolean | null }).has_budget_tracking ?? null,
+      })),
+      allBankAccounts.map((b) => ({
+        id: b.id,
+        name: b.name,
+        balance: Number(b.balance),
+        iban: (b as { iban?: string | null }).iban ?? null,
+        bank_name: (b as { bank_name?: string | null }).bank_name ?? null,
+        linked_asset_id: (b as { linked_asset_id?: string | null }).linked_asset_id ?? null,
+      })),
+    )
+  }, [showAllCashAccounts, cashAssets, allBankAccounts])
+
+  const rekeningenTotal = useMemo(() => rekeningen.reduce((s, r) => s + r.balance, 0), [rekeningen])
+
+  // Hash-focus: wanneer de URL een `#rekening-<assetId>`-anker bevat, scroll
+  // de bijbehorende kaart in beeld en geef hem een tijdelijke ring-highlight.
+  // Alleen actief in de brede (showAllCashAccounts) modus.
+  useEffect(() => {
+    if (!showAllCashAccounts || rekeningen.length === 0) return
+    if (typeof window === 'undefined') return
+    const hash = window.location.hash
+    if (!hash.startsWith('#rekening-')) return
+    const el = document.getElementById(hash.slice(1))
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('ring-2', 'ring-kern-400', 'ring-offset-2')
+    const t = window.setTimeout(() => {
+      el.classList.remove('ring-2', 'ring-kern-400', 'ring-offset-2')
+    }, 2400)
+    return () => window.clearTimeout(t)
+  }, [showAllCashAccounts, rekeningen])
 
   const nonTransferTx = useMemo(
     () => transactions.filter((t) => t.transaction_type !== 'transfer'),
@@ -606,65 +686,123 @@ export function CashOverview({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-          {accounts.map((acc) => {
-            const sharePct = totalBalance > 0 ? (Number(acc.balance) / totalBalance) * 100 : 0
-            const useCallback = embedded && onNavigateToAccount
-            const Wrapper = (embedded ? 'button' : Link) as any
-            const wrapperProps = useCallback
-              ? { type: 'button' as const, onClick: () => onNavigateToAccount(acc.id) }
-              : embedded
-                ? { type: 'button' as const, onClick: () => setDetailAccountId(acc.id) }
-                : { href: `/core/assets/cash/${acc.id}` }
-            return (
-              <Wrapper
-                key={acc.id}
-                {...wrapperProps as any}
-                className="group card-editorial overflow-hidden p-0 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
-              >
-                <div className="flex h-1 items-stretch">
-                  <div className="w-1 bg-kern-500" />
-                  <div className="flex-1" />
-                </div>
-                <div className="p-3 sm:p-5">
-                  <div className="mb-2 flex items-center gap-2.5">
-                    <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
-                      <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-kern-600" />
+          {showAllCashAccounts
+            ? rekeningen.map((r) => {
+                const sharePct = rekeningenTotal > 0 ? (r.balance / rekeningenTotal) * 100 : 0
+                return (
+                  <button
+                    key={r.assetId}
+                    id={`rekening-${r.assetId}`}
+                    type="button"
+                    onClick={() => {
+                      if (r.bankAccountId) setDetailAccountId(r.bankAccountId)
+                      else setEditingAsset(cashAssets.find((a) => a.id === r.assetId) ?? null)
+                    }}
+                    className="group card-editorial scroll-mt-24 overflow-hidden p-0 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
+                  >
+                    <div className="flex h-1 items-stretch">
+                      <div className="w-1 bg-kern-500" />
+                      <div className="flex-1" />
                     </div>
-                    <p className="text-sm font-semibold text-[var(--ink-2)]">{acc.name}</p>
-                  </div>
+                    <div className="p-3 sm:p-5">
+                      <div className="mb-2 flex items-center gap-2.5">
+                        <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+                          <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-kern-600" />
+                        </div>
+                        <p className="text-sm font-semibold text-[var(--ink-2)]">{r.name}</p>
+                      </div>
 
-                  {(acc.iban || acc.bank_name) && (
-                    <p className="mb-2 text-xs text-[var(--ink-3)]">
-                      {acc.iban}{acc.iban && acc.bank_name ? ' · ' : ''}{acc.bank_name}
-                    </p>
-                  )}
+                      {(r.iban || r.bankName) && (
+                        <p className="mb-2 text-xs text-[var(--ink-3)]">
+                          {r.iban}{r.iban && r.bankName ? ' · ' : ''}{r.bankName}
+                        </p>
+                      )}
 
-                  <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
-                    {<MaskedAmount value={Number(acc.balance)} tone="kern" decimals />}
-                  </p>
+                      <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
+                        {<MaskedAmount value={r.balance} tone="kern" decimals />}
+                      </p>
 
-                  <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
-                    <div
-                      className="h-full rounded-full bg-kern-300"
-                      style={{ width: `${Math.max(sharePct, 2)}%` }}
-                    />
-                  </div>
-                  <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
-                    {sharePct.toFixed(0)}% van totaal
-                  </p>
+                      <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                        <div
+                          className="h-full rounded-full bg-kern-300"
+                          style={{ width: `${Math.max(sharePct, 2)}%` }}
+                        />
+                      </div>
+                      <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+                        {sharePct.toFixed(0)}% van totaal
+                      </p>
 
-                  <FreedomTimeBadge amount={Number(acc.balance)} className="mt-2" />
+                      <FreedomTimeBadge amount={r.balance} className="mt-2" />
 
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">
-                      Bekijk rekening
-                    </span>
-                    <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
-                  </div>
-                </div>
-              </Wrapper>
-            )
-          })}
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">
+                          {r.bankAccountId ? 'Bekijk rekening' : 'Bewerk rekening'}
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+                      </div>
+                    </div>
+                  </button>
+                )
+              })
+            : accounts.map((acc) => {
+                const sharePct = totalBalance > 0 ? (Number(acc.balance) / totalBalance) * 100 : 0
+                const useCallbackNav = embedded && onNavigateToAccount
+                const Wrapper = (embedded ? 'button' : Link) as any
+                const wrapperProps = useCallbackNav
+                  ? { type: 'button' as const, onClick: () => onNavigateToAccount(acc.id) }
+                  : embedded
+                    ? { type: 'button' as const, onClick: () => setDetailAccountId(acc.id) }
+                    : { href: `/core/assets/cash/${acc.id}` }
+                return (
+                  <Wrapper
+                    key={acc.id}
+                    {...wrapperProps as any}
+                    className="group card-editorial overflow-hidden p-0 text-left transition-all hover:shadow-[var(--s1)] hover:-translate-y-px"
+                  >
+                    <div className="flex h-1 items-stretch">
+                      <div className="w-1 bg-kern-500" />
+                      <div className="flex-1" />
+                    </div>
+                    <div className="p-3 sm:p-5">
+                      <div className="mb-2 flex items-center gap-2.5">
+                        <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[var(--r)] bg-[var(--subtle)] group-hover:bg-kern-50">
+                          <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-kern-600" />
+                        </div>
+                        <p className="text-sm font-semibold text-[var(--ink-2)]">{acc.name}</p>
+                      </div>
+
+                      {(acc.iban || acc.bank_name) && (
+                        <p className="mb-2 text-xs text-[var(--ink-3)]">
+                          {acc.iban}{acc.iban && acc.bank_name ? ' · ' : ''}{acc.bank_name}
+                        </p>
+                      )}
+
+                      <p className="font-mono text-2xl font-bold tabular-nums text-[var(--ink)]">
+                        {<MaskedAmount value={Number(acc.balance)} tone="kern" decimals />}
+                      </p>
+
+                      <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
+                        <div
+                          className="h-full rounded-full bg-kern-300"
+                          style={{ width: `${Math.max(sharePct, 2)}%` }}
+                        />
+                      </div>
+                      <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+                        {sharePct.toFixed(0)}% van totaal
+                      </p>
+
+                      <FreedomTimeBadge amount={Number(acc.balance)} className="mt-2" />
+
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="label-editorial text-kern-600 opacity-0 transition-opacity group-hover:opacity-100">
+                          Bekijk rekening
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-[var(--ink-4)] transition-colors group-hover:text-kern-500" />
+                      </div>
+                    </div>
+                  </Wrapper>
+                )
+              })}
         </div>
       </section>
       )}
@@ -1006,6 +1144,15 @@ export function CashOverview({
             </div>
           </div>
         </div>
+      )}
+
+      {/* === Edit-pane voor handmatige cash-assets (brede modus) === */}
+      {editingAsset && (
+        <AssetPane
+          asset={editingAsset}
+          onClose={() => setEditingAsset(null)}
+          onChanged={() => { void loadAllCashRekeningen() }}
+        />
       )}
     </div>
   )
