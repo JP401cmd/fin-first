@@ -1448,6 +1448,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     : { countdownYears: fire?.countdownYears ?? 0, countdownMonths: fire?.countdownMonths ?? 0,
         countdownDays: fire?.countdownDays ?? 0, fireDate: fire?.fireDate ?? 'Niet haalbaar' }
 
+  // Eén bron van waarheid voor de PERSOONLIJKE FIRE: de hero-projectie (deze
+  // pagina, runUnifiedProjection) is leidend. We geven 'm door aan de
+  // huishoud-sectie zodat de "Jouw FIRE-projectie"-kaart EXACT dezelfde
+  // leeftijd + doelbedrag toont (i.p.v. een eigen, afwijkende herberekening).
+  const personalHeroProjection = simResult
+    ? (() => {
+        const nw = (effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)
+        const yexp = effectiveInput?.yearlyMustExpenses ?? 0
+        const yof = yexp > 0 ? nw / yexp : 0
+        return {
+          fireAge: simResult.fireAge,
+          fireAgeFractional: simResult.fireAgeFractional,
+          fireTarget: simResult.requiredFirePortfolio,
+          freedomPercentage: effectiveFreedomPct,
+          fireDate: effectiveCountdown.fireDate,
+          freedomYears: Math.max(0, Math.floor(yof)),
+          freedomMonths: Math.max(0, Math.round((yof - Math.floor(yof)) * 12)),
+        }
+      })()
+    : null
+
   // Scenario overlays for SimChart (only when expanded + data available)
   const scenarioOverlays = scenariosExpanded && scenarioData ? scenarioData : undefined
 
@@ -3694,7 +3715,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
 
       {/* === 5. Household FIRE Projections === */}
-      <HouseholdFireSection />
+      <HouseholdFireSection personalProjection={personalHeroProjection} />
 
 
 

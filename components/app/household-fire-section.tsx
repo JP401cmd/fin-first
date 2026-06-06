@@ -37,7 +37,26 @@ type HouseholdFireData = HouseholdProjectionResult
  *
  * Renders on /horizon page when user has a household.
  */
-export function HouseholdFireSection() {
+/**
+ * Eén bron van waarheid voor de persoonlijke FIRE-kaart: de hero-projectie van
+ * /toekomst (runUnifiedProjection) wordt doorgegeven zodat "Jouw FIRE-projectie"
+ * EXACT dezelfde leeftijd + doelbedrag toont als de hero erboven.
+ */
+type PersonalProjectionOverride = {
+  fireAge: number | null
+  fireAgeFractional: number | null
+  fireTarget: number
+  freedomPercentage: number
+  fireDate: string
+  freedomYears: number
+  freedomMonths: number
+}
+
+export function HouseholdFireSection({
+  personalProjection,
+}: {
+  personalProjection?: PersonalProjectionOverride | null
+} = {}) {
   const [data, setData] = useState<HouseholdFireData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -128,6 +147,10 @@ export function HouseholdFireSection() {
 
   // Personal perspective: show only the user's individual FIRE age
   if (isPersonalView && currentUserPartner) {
+    // Bron van waarheid = de hero-projectie (indien doorgegeven), zodat de kaart
+    // EXACT dezelfde leeftijd + doelbedrag toont als de hero. Anders de eigen
+    // huishoud-projectie-entry (fallback).
+    const pp = personalProjection ?? currentUserPartner.projection
     return (
       <section className="mt-10" data-testid="household-fire-section">
         <div ref={inViewRef}>
@@ -162,25 +185,25 @@ export function HouseholdFireSection() {
               <div>
                 <p className="text-[10px] font-medium text-horizon-600/50 uppercase">Vrijheid</p>
                 <p className="text-2xl font-bold text-horizon-700" data-testid="personal-freedom-pct">
-                  {currentUserPartner.projection.freedomPercentage.toFixed(1)}%
+                  {pp.freedomPercentage.toFixed(1)}%
                 </p>
               </div>
               <div>
                 <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE leeftijd</p>
                 <p className="text-2xl font-bold text-horizon-700" data-testid="personal-fire-age">
-                  {currentUserPartner.projection.fireAge !== null ? Math.round(currentUserPartner.projection.fireAge) : '-'}
+                  {pp.fireAge !== null ? Math.round(pp.fireAge) : '-'}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE-doel</p>
                 <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="personal-fire-target">
-                  {<MaskedAmount value={currentUserPartner.projection.fireTarget} tone="horizon" />}
+                  {<MaskedAmount value={pp.fireTarget} tone="horizon" />}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] font-medium text-horizon-600/50 uppercase">Vrijheidstijd</p>
                 <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="personal-freedom-time">
-                  {currentUserPartner.projection.freedomYears}j {currentUserPartner.projection.freedomMonths}mnd
+                  {pp.freedomYears}j {pp.freedomMonths}mnd
                 </p>
               </div>
             </div>
@@ -191,7 +214,7 @@ export function HouseholdFireSection() {
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-horizon-600 to-horizon-400"
                   style={{
-                    width: hasEntered ? `${Math.max(Math.min(currentUserPartner.projection.freedomPercentage, 100), 0)}%` : '0%',
+                    width: hasEntered ? `${Math.max(Math.min(pp.freedomPercentage, 100), 0)}%` : '0%',
                     transition: hasEntered ? 'width 1000ms cubic-bezier(.22,1,.36,1)' : 'none',
                   }}
                   data-testid="personal-progress-bar"
@@ -199,7 +222,7 @@ export function HouseholdFireSection() {
               </div>
               <div className="mt-1 flex justify-between text-[10px] text-horizon-400">
                 <span>0%</span>
-                <span>{currentUserPartner.projection.fireDate}</span>
+                <span>{pp.fireDate}</span>
                 <span>100%</span>
               </div>
             </div>
