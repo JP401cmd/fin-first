@@ -39,7 +39,7 @@ describe('KoppelRekeningBanner', () => {
         a.getAttribute('href'),
       )
       expect(links).toContain('/core/cash/connect')
-      expect(links).toContain('/core/assets/cash')
+      expect(links).toContain('/overzicht/cashflow')
     })
   })
 })

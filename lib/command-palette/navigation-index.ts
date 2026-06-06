@@ -25,7 +25,7 @@ const KERN_PAGES: StaticPage[] = [
   { label: 'Bezittingen',               sublabel: 'Alle activa per categorie',          href: '/core/assets',                           icon: Wallet,      module: 'kern' },
   { label: 'Schulden',                  sublabel: 'Hypotheken en leningen',             href: '/core/debts',                            icon: CreditCard,  module: 'kern' },
 
-  { label: 'Cash',                      sublabel: 'Bank- en spaarrekeningen',           href: '/core/assets/cash',                      icon: Banknote,    module: 'kern' },
+  { label: 'Cash',                      sublabel: 'Bank- en spaarrekeningen',           href: '/overzicht/cashflow',                    icon: Banknote,    module: 'kern' },
   { label: 'Beleggingen',               sublabel: 'Aandelen en fondsen',                href: '/core/assets/investment',                icon: TrendingUp,  module: 'kern',  requiredModule: 'vermogensregistratie' },
   { label: 'Crypto',                    sublabel: 'Crypto-portefeuille',                href: '/core/assets/crypto',                    icon: Coins,       module: 'kern',  requiredModule: 'vermogensregistratie' },
   { label: 'Eigen huis',                sublabel: 'Woning en WOZ',                      href: '/core/assets/eigen_huis',                icon: Building2,   module: 'kern',  requiredModule: 'vermogensregistratie' },

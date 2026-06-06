@@ -26,7 +26,7 @@ export const GOAL_GUIDE_DISPLAY_ORDER: readonly GoalSlug[] = [
 export const DEFAULT_GOAL_GUIDE_STEPS: Record<GoalSlug, ModuleGuideStep[]> = {
   'grip-uitgaven': [
     { key: 'gu_income', label: 'Voer je netto-inkomen in', href: '/identity/profiel#income' },
-    { key: 'gu_cash', label: 'Voeg je betaalrekening toe', href: '/core/assets/cash' },
+    { key: 'gu_cash', label: 'Voeg je betaalrekening toe', href: '/overzicht/cashflow' },
     { key: 'gu_budgets', label: 'Stel 3 budgetten in', href: '/core/budgets' },
     { key: 'gu_first_import', label: 'Importeer je eerste afschrift', href: '/core/cash/connect' },
     { key: 'gu_review_month', label: 'Bekijk je maand-overzicht', href: '/core/checkin' },

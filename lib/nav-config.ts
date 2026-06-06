@@ -138,7 +138,7 @@ export const navGroups: NavGroup[] = [
 export type OverviewAppItem = NavItem & { appKey: string }
 
 export const OVERVIEW_APP_SUBROUTES: OverviewAppItem[] = [
-  { label: 'Budgetteren', href: '/core/assets/cash?tab=budgetteren', appKey: 'budgetteren' },
+  { label: 'Budgetteren', href: '/overzicht/cashflow/budget', appKey: 'budgetteren' },
   { label: 'Aandelen holdings', href: '/core/assets/investment?tab=aandelen-holdings', appKey: 'aandelen-holdings' },
   { label: 'Crypto holdings', href: '/core/assets/crypto?tab=crypto-holdings', appKey: 'crypto-holdings' },
   { label: 'Hypotheekplanner', href: '/core/debts/mortgage?tab=hypotheekplanner', appKey: 'hypotheekplanner' },

@@ -29,7 +29,7 @@ const KEYWORD_CTA_MAP: { patterns: RegExp[]; href: string; label: string }[] = [
   { patterns: [/\bbelasting\b/, /\bbox 3\b/, /\bbox3\b/, /\bfiscaal/], href: '/core/belasting', label: 'Belasting bekijken' },
   { patterns: [/\btransact/, /\bbankzak/, /\bbetaling/], href: '/core/cash', label: 'Transacties bekijken' },
   { patterns: [/\babonnement/, /\bvaste lasten\b/, /\bsubscript/], href: '/core/cash', label: 'Vaste lasten bekijken' },
-  { patterns: [/\bnoodfonds\b/, /\bbuffer\b/, /\bvangnet\b/], href: '/core/assets/cash', label: 'Noodfonds opbouwen' },
+  { patterns: [/\bnoodfonds\b/, /\bbuffer\b/, /\bvangnet\b/], href: '/overzicht/cashflow', label: 'Noodfonds opbouwen' },
   { patterns: [/\bdoel\b/, /\bdoelen\b/, /\bstreefbedrag\b/], href: '/will', label: 'Doelen bekijken' },
 ]
 

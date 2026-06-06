@@ -185,7 +185,7 @@ const MODULES: ModuleEntry[] = [
       // Bron: components/core/category-deepening-registry.ts. `appKey` matcht
       // de slug uit `getDeepeningSlug()` zodat de Sidebar kan filteren op
       // welke apps daadwerkelijk een gekoppeld asset/debt hebben.
-      { label: 'Budgetteren',       href: '/core/assets/cash?tab=budgetteren',               appKey: 'budgetteren' },
+      { label: 'Budgetteren',       href: '/overzicht/cashflow/budget',                      appKey: 'budgetteren' },
       { label: 'Aandelen holdings', href: '/core/assets/investment?tab=aandelen-holdings',   appKey: 'aandelen-holdings' },
       { label: 'Crypto holdings',   href: '/core/assets/crypto?tab=crypto-holdings',         appKey: 'crypto-holdings' },
       { label: 'Hypotheekplanner',  href: '/core/debts/mortgage?tab=hypotheekplanner',       appKey: 'hypotheekplanner' },

@@ -133,7 +133,7 @@ export const HuishoudenActiviteitWidget = memo(function HuishoudenActiviteitWidg
       </div>
       {hasMore && (
         <Link
-          href="/core/assets/cash"
+          href="/overzicht/cashflow"
           className="mt-2 flex items-center justify-center gap-1 text-xs text-kern-600 hover:text-kern-700 font-medium"
         >
           Meer bekijken <ArrowRight className="h-3 w-3" />

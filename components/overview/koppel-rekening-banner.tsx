@@ -84,7 +84,7 @@ export function KoppelRekeningBanner({
           Extra bank koppelen
         </Link>
         <Link
-          href="/core/assets/cash"
+          href="/overzicht/cashflow"
           className="inline-flex items-center gap-1 text-[var(--ink-3)] hover:text-[var(--ink-2)]"
         >
           <Settings className="w-3 h-3" aria-hidden="true" />

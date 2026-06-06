@@ -51,7 +51,7 @@ export const DEFAULT_STANDARD_GUIDE_STEPS: readonly StandardGuideStep[] = [
   {
     key: 'sg_cash',
     label: 'Voeg je spaarrekening(en) toe',
-    href: '/core/assets/cash',
+    href: '/overzicht/cashflow',
     autoComplete: (data) =>
       (data.assetsByType.find((t) => t.type === 'cash')?.value ?? 0) > 0,
   },

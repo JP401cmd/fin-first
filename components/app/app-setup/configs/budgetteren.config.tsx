@@ -91,7 +91,7 @@ function CashSourceSelector({
         <p className="font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
           Je hebt nog geen cash-rekening. Voeg er één toe via je{' '}
           <a
-            href="/core/assets/cash"
+            href="/overzicht/cashflow"
             className="underline decoration-[var(--ink-3)] underline-offset-2 hover:decoration-[var(--ink)]"
           >
             Kern-bezittingen
