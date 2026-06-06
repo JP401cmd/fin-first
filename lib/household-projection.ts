@@ -493,6 +493,25 @@ export async function buildHouseholdProjectionInput(
     memberMonthlyExpenses.set(id, exp)
   }
 
+  // Geëxtrapoleerd JAARinkomen van de HUIDIGE gebruiker uit 12 maanden transacties
+  // — EXACT dezelfde formule als de /toekomst-hero (som laatste 12 mnd ÷ actieve
+  // maanden × 12). Nodig zodat de 'current_income'-uitgave-na-pensioen + FIRE-leeftijd
+  // van de gebruiker matchen tussen de hero en de huishoud-sectie (anders gebruikte
+  // de sectie het huidige-maand-inkomen → afwijkende FIRE-leeftijd). Partner-tx zijn
+  // niet zichtbaar (RLS) → die houdt de profiel/RPC-fallback via memberIncome.
+  const currentUserId = user.id
+  const twelveMoAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString().split('T')[0]
+  const ownIncomeTx = allTransactions.filter(t => t.user_id === currentUserId && Number(t.amount) > 0 && t.date >= twelveMoAgo)
+  const ownLast12Income = ownIncomeTx.reduce((s, t) => s + Number(t.amount), 0)
+  let ownExtrapolatedAnnualIncome = ownLast12Income
+  if (ownIncomeTx.length > 0 && ownLast12Income > 0) {
+    const earliest = ownIncomeTx.reduce((min, t) => (t.date < min ? t.date : min), ownIncomeTx[0].date)
+    const earliestD = new Date(earliest)
+    const incomeMonths = Math.max(1, Math.min(12,
+      (now.getFullYear() - earliestD.getFullYear()) * 12 + (now.getMonth() - earliestD.getMonth())))
+    if (incomeMonths < 12) ownExtrapolatedAnnualIncome = (ownLast12Income / incomeMonths) * 12
+  }
+
   // Profiel-fallback voor income/expenses wanneer er geen transacties zijn.
   function memberIncome(id: string): number {
     const fromTx = memberMonthlyIncome.get(id) ?? 0
@@ -547,7 +566,11 @@ export async function buildHouseholdProjectionInput(
     // Gedeelde budgetten naar aandeel: benadering — pas shareFraction toe op het
     // gedeelde deel. We splitsen niet per-budget, maar de meeste must-expenses
     // zijn gedeeld; shareFraction op het totaal benadert dit redelijk.
-    const incomeYear = memberIncome(memberId) * 12
+    // Voor de huidige gebruiker: het geëxtrapoleerde 12-maands jaarinkomen (matcht
+    // de hero); voor de partner het profiel/RPC-inkomen (tx niet zichtbaar).
+    const incomeYear = (memberId === currentUserId && ownExtrapolatedAnnualIncome > 0)
+      ? ownExtrapolatedAnnualIncome
+      : memberIncome(memberId) * 12
     const retire = computeRetirementExpenses(
       (p?.retirement_expense_method as RetirementExpenseMethod | null) ?? null,
       yearlyMustExpenses,
