@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
-import { ageAtDate } from '@/lib/horizon-data'
+import { ageAtDate, computeFireProjection } from '@/lib/horizon-data'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 
@@ -64,6 +64,28 @@ export default async function ToekomstGebeurtenissenPage() {
     grossYearlyIncome: (ei.monthlyIncome ?? 0) * 12,
   }
 
+  // Baseline FIRE-projectie voor de EventPane impact-preview — zelfde
+  // strategy-aware aanroep als /horizon (computeFireProjection met strategy +
+  // endAge) zodat de "vs. baseline"-delta klopt met de gekozen eindstrategie.
+  const baselineFire = computeFireProjection(
+    ei,
+    horizonData.fireParams.grossReturn,
+    horizonData.fireParams.effectiveSwr,
+    undefined,
+    { strategy: horizonData.fireStrategy.strategy, endAge: horizonData.fireStrategy.endAge },
+  )
+
+  // Prop-bundle voor de herstelde EventPane (catalogus + bewerken vrije events).
+  const eventPaneData = {
+    baselineInput: ei,
+    baselineFire,
+    fireParams: horizonData.fireParams,
+    fireStrategy: horizonData.fireStrategy,
+    withdrawalStrategy: horizonData.withdrawalStrategy,
+    endAge: horizonData.fireStrategy.endAge ?? 90,
+    householdMode: horizonData.hasPartner ?? false,
+  }
+
   return (
     <>
       <ToekomstSubpageShell kicker="Toekomst" title="Gebeurtenissen" />
@@ -75,6 +97,7 @@ export default async function ToekomstGebeurtenissenPage() {
           (horizonData.avgIncome6m - horizonData.avgExpenses6m) * 12,
         )}
         strategieData={strategieData}
+        eventPaneData={eventPaneData}
       />
     </>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   Baby,
@@ -15,19 +15,39 @@ import {
   TrendingUp,
   Pencil,
   Sparkles,
+  Plus,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-import type { LifeEvent } from '@/lib/horizon-data'
-import { ScenarioBibliotheek } from './scenario-bibliotheek'
+import type { LifeEvent, FinancialInput, FireProjection } from '@/lib/horizon-data'
+import type { FireParams } from '@/lib/fire-params'
+import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { useViewMode } from '@/components/app/view-mode-provider'
 import { computeEventImpact } from '@/lib/event-impact'
-import { EventBewerkenSheet } from './event-bewerken-sheet'
 import {
   isStrategyManagedEvent,
   STRATEGY_BADGE_LABEL,
   type ManagedStrategy,
 } from '@/lib/strategy-events'
 import { StrategieEditors, type StrategieEditorsData } from './strategie/strategie-editors'
+
+// EventPane = herstelde toevoeg/bewerk-flow uit /horizon (catalogus + Praat met
+// Will + 3-blokken-editor). Dynamisch geladen zodat de pagina-bundle licht blijft.
+const EventPane = dynamic(() =>
+  import('@/components/app/horizon/event-pane').then(m => ({ default: m.EventPane })),
+  { ssr: false }
+)
+
+/** Prop-bundle die de EventPane van baseline-data voorziet (server-geleverd). */
+export interface EventPaneData {
+  baselineInput: FinancialInput
+  baselineFire: FireProjection | null
+  fireParams: FireParams
+  fireStrategy: FireStrategyConfig
+  withdrawalStrategy: WithdrawalStrategyConfig
+  endAge: number
+  householdMode: boolean
+}
 
 /**
  * GebeurtenissenView — content voor Gebeurtenissen-tab op /toekomst.
@@ -135,11 +155,11 @@ export function GebeurtenissenView({
   currentAge,
   annualSavings,
   strategieData,
+  eventPaneData,
 }: {
   events: LifeEvent[]
   /** Huidige leeftijd uit DOB — nodig om scenario-defaults op te baseren
-   *  (target_age = currentAge + N). Wanneer null: ScenarioBibliotheek
-   *  toont een vriendelijke fout-melding. */
+   *  (target_age = currentAge + N). */
   currentAge?: number | null
   /** Jaarlijks netto overschot (income - expenses × 12). Basis voor
    *  EventImpactBadge — plan F-5 vergelijk-modus MVP. Wanneer 0 of
@@ -147,13 +167,17 @@ export function GebeurtenissenView({
   annualSavings?: number
   /** Baseline + lookup-data voor de levensstrategie-editors (AOW/Pensioen/Huis). */
   strategieData: StrategieEditorsData
+  /** Baseline-data voor de EventPane (toevoegen + bewerken vrije events). */
+  eventPaneData: EventPaneData
 }) {
-  // ScenarioBibliotheek = scenario-tool → alleen in 'plannen'-modus
+  // EventPane (toevoegen/bewerken) = scenario-tool → alleen in 'plannen'-modus
   // zichtbaar (plan A-5). Niveau-A "Kijken"-gebruikers zien dan een
   // rustige lijst van bestaande events zonder edit-knoppen.
   const { isPlannen } = useViewMode()
-  // Edit-state: welk event wordt bewerkt (null = sheet dicht).
-  const [editingEvent, setEditingEvent] = useState<LifeEvent | null>(null)
+  // EventPane-state: catalog (nieuw) of view (bestaand vrij event bekijken/bewerken).
+  const [eventPaneOpen, setEventPaneOpen] = useState(false)
+  const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
+  const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view'>('catalog')
   // Welke levensstrategie-modal is open (null = dicht).
   const [openStrategy, setOpenStrategy] = useState<ManagedStrategy | null>(null)
   const router = useRouter()
@@ -177,11 +201,23 @@ export function GebeurtenissenView({
   }
 
   // Routeert een klik op een event-kaart: strategie-beheerde events openen hun
-  // strategie-modal; vrije events de generieke quick-edit sheet.
+  // eigen rijke editor; vrije events de herstelde EventPane (view → edit).
   function openEventOrStrategy(event: LifeEvent) {
     const managed = isStrategyManagedEvent(event)
-    if (managed) setOpenStrategy(managed)
-    else setEditingEvent(event)
+    if (managed) {
+      setOpenStrategy(managed)
+    } else {
+      setEventPaneEditingId(event.id)
+      setEventPaneMode('view')
+      setEventPaneOpen(true)
+    }
+  }
+
+  // Opent de EventPane in catalog-mode (nieuw event toevoegen).
+  function openCatalog() {
+    setEventPaneEditingId(null)
+    setEventPaneMode('catalog')
+    setEventPaneOpen(true)
   }
   // Sort events op target_date (alfabet als fallback). Events met datum
   // tonen we eerst chronologisch, daarna events met alleen target_age,
@@ -213,7 +249,16 @@ export function GebeurtenissenView({
                 : `${sorted.length} gebeurtenis${sorted.length === 1 ? '' : 'sen'}`}
             </h2>
           </div>
-          {isPlannen && <ScenarioBibliotheek currentAge={currentAge ?? null} />}
+          {isPlannen && (
+            <button
+              type="button"
+              onClick={openCatalog}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
+            >
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              Levensgebeurtenis toevoegen
+            </button>
+          )}
         </header>
 
         {sorted.length === 0 ? (
@@ -223,13 +268,14 @@ export function GebeurtenissenView({
               kind, erfenis, verhuizing, ZZP-start, deeltijd of een andere
               levenskeuze.
             </p>
-            <Link
-              href="/toekomst/whatif"
+            <button
+              type="button"
+              onClick={openCatalog}
               className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
             >
               Eerste gebeurtenis toevoegen
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
-            </Link>
+            </button>
           </article>
         ) : (
           // Verticale tijdlijn: doorlopende streep links met een bolletje
@@ -290,8 +336,8 @@ export function GebeurtenissenView({
                   : impact?.tone === 'gain'
                     ? 'border-emerald-400 text-emerald-700'
                     : 'border-[var(--ink-3)] text-[var(--ink-2)]'
-              // Plannen-modus: content-kaart wordt button die
-              // EventBewerkenSheet opent. Kijken-modus: gewone div.
+              // Plannen-modus: content-kaart wordt button die de EventPane
+              // (vrij event) of strategie-editor opent. Kijken-modus: gewone div.
               const cardClass =
                 'flex-1 min-w-0 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left'
               const CardEl: React.ElementType = isPlannen ? 'button' : 'div'
@@ -412,25 +458,21 @@ export function GebeurtenissenView({
         </div>
       </div>
 
-      <p className="text-[11px] italic text-[var(--ink-3)]">
-        Native sheet/pane voor bewerken van gebeurtenissen en strategieën
-        komt in volgende iteratie. Voor nu: gebruik de tijdas (
-        <Link href="/toekomst" className="underline">
-          tab Tijdas
-        </Link>
-        ) of Wat-Als (
-        <Link href="/toekomst/whatif" className="underline">
-          /toekomst/whatif
-        </Link>
-        ).
-      </p>
-
-      {editingEvent && (
-        <EventBewerkenSheet
-          event={editingEvent}
-          onClose={() => setEditingEvent(null)}
-        />
-      )}
+      <EventPane
+        open={eventPaneOpen}
+        onClose={() => setEventPaneOpen(false)}
+        editingId={eventPaneEditingId}
+        initialMode={eventPaneMode}
+        events={events}
+        baselineInput={eventPaneData.baselineInput}
+        baselineFire={eventPaneData.baselineFire}
+        fireParams={eventPaneData.fireParams}
+        fireStrategy={eventPaneData.fireStrategy}
+        withdrawalStrategy={eventPaneData.withdrawalStrategy}
+        endAge={eventPaneData.endAge}
+        householdMode={eventPaneData.householdMode}
+        onChanged={() => router.refresh()}
+      />
 
       <StrategieEditors
         open={openStrategy}

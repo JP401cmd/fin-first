@@ -1,13 +1,17 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { GebeurtenissenView } from './gebeurtenissen-view'
-import type { LifeEvent } from '@/lib/horizon-data'
+import { GebeurtenissenView, type EventPaneData } from './gebeurtenissen-view'
+import type { LifeEvent, FinancialInput } from '@/lib/horizon-data'
+import type { FireParams } from '@/lib/fire-params'
+import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { StrategieEditorsData } from './strategie/strategie-editors'
 
-// GebeurtenissenView mount ScenarioBibliotheek (plan F-3) + de strategie-launcher
-// die next/navigation + supabase client gebruiken. Mock beide zodat de view zelf
-// in isolatie test-baar blijft. (Zonder ViewModeProvider is isPlannen = false,
-// dus de kaarten renderen als niet-interactieve divs.)
+// GebeurtenissenView mount de EventPane (dynamisch, ssr:false → rendert niets in
+// jsdom) + de strategie-launcher die next/navigation + supabase client gebruiken.
+// Mock beide zodat de view zelf in isolatie test-baar blijft. (Zonder
+// ViewModeProvider is isPlannen = false, dus de kaarten renderen als
+// niet-interactieve divs.)
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
@@ -32,12 +36,31 @@ const mockStrategieData: StrategieEditorsData = {
   grossYearlyIncome: 0,
 }
 
+// EventPane wordt dynamisch (ssr:false) geladen en rendert daardoor niets in de
+// jsdom-test; de baseline-velden worden dus nooit echt uitgelezen. Minimale
+// type-correcte stubs volstaan.
+const mockEventPaneData: EventPaneData = {
+  baselineInput: {} as FinancialInput,
+  baselineFire: null,
+  fireParams: {} as FireParams,
+  fireStrategy: {} as FireStrategyConfig,
+  withdrawalStrategy: {} as WithdrawalStrategyConfig,
+  endAge: 90,
+  householdMode: false,
+}
+
 function renderView(props: {
   events: LifeEvent[]
   currentAge?: number | null
   annualSavings?: number
 }) {
-  return render(<GebeurtenissenView {...props} strategieData={mockStrategieData} />)
+  return render(
+    <GebeurtenissenView
+      {...props}
+      strategieData={mockStrategieData}
+      eventPaneData={mockEventPaneData}
+    />,
+  )
 }
 
 function mockEvent(overrides: Partial<LifeEvent> = {}): LifeEvent {

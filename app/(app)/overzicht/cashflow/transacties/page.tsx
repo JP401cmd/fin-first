@@ -4,26 +4,25 @@ import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-banner'
-import { TransactiesGeldstroom } from '@/components/overview/transacties-geldstroom'
-import { CashflowSankey } from '@/components/overview/cashflow-sankey'
-import { TransactiesFeed } from '@/components/app/transacties-feed'
+import { TransactiesAnalyse } from '@/components/overview/transacties/transacties-analyse'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
   title: 'Transacties — TriFinity',
-  description: 'Inkomsten en uitgaven van deze maand — onderdeel van cashflow.',
+  description: 'Analyseer je transacties per periode: geldstroom, top-tegenpartijen en patronen.',
 }
 
 /**
- * /overzicht/cashflow/transacties — losse Transacties-pagina (was de
- * "Transacties"-tab). Koppel-banner + geldstroom-KPIs + sankey + feed,
- * gevoed door de gedeelde cashflow-loader.
+ * /overzicht/cashflow/transacties — periode-gestuurde transactie-analyse.
+ * De analyse is een client-component (TransactiesAnalyse) die zélf data ophaalt
+ * per gekozen periode; de server levert enkel het accountCount voor de
+ * koppel-banner (uit de gedeelde, gecachte cashflow-loader).
  */
 export default async function OverzichtCashflowTransactiesPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const { transactions, monthLabel, accountCount } = await loadCashflowData(supabase, perspective)
+  const { accountCount } = await loadCashflowData(supabase, perspective)
 
   return (
     <>
@@ -36,9 +35,7 @@ export default async function OverzichtCashflowTransactiesPage() {
       </div>
       <div className="mx-auto max-w-6xl space-y-6 px-4 pt-4 sm:px-6">
         <KoppelRekeningBanner accountCount={accountCount} />
-        <TransactiesGeldstroom transactions={transactions} monthLabel={monthLabel} />
-        <CashflowSankey transactions={transactions} monthLabel={monthLabel} />
-        <TransactiesFeed transactions={transactions} monthLabel={monthLabel} />
+        <TransactiesAnalyse />
       </div>
     </>
   )

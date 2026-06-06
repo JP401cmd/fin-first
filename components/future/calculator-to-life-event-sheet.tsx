@@ -21,19 +21,29 @@ export function CalculatorToLifeEventSheet({
   defaultName,
   defaultAmount,
   defaultAge,
+  defaultImpactKind = 'one_time_cost',
+  defaultDurationMonths = 0,
   onClose,
 }: {
   defaultName: string
   defaultAmount: number
   defaultAge: number | null
+  /**
+   * Voorgeselecteerd impact-type. Standaard 'one_time_cost' (rekenhulp-uitkomst).
+   * Beslishulp-opties zetten dit expliciet: beleggen → monthly_income,
+   * noodfonds → monthly_cost, etc.
+   */
+  defaultImpactKind?: LifeEventImpactKind
+  /** Voorgevulde duur in maanden voor maandelijkse impact (0 = doorlopend). */
+  defaultDurationMonths?: number
   onClose: () => void
 }) {
   const router = useRouter()
   const [name, setName] = useState(defaultName)
-  const [impactKind, setImpactKind] = useState<LifeEventImpactKind>('one_time_cost')
+  const [impactKind, setImpactKind] = useState<LifeEventImpactKind>(defaultImpactKind)
   const [amount, setAmount] = useState(String(Math.round(Math.abs(defaultAmount)) || 0))
   const [age, setAge] = useState(defaultAge != null ? String(defaultAge) : '')
-  const [durationMonths, setDurationMonths] = useState('0')
+  const [durationMonths, setDurationMonths] = useState(String(Math.max(0, Math.round(defaultDurationMonths))))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

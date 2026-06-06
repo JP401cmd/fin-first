@@ -6,6 +6,8 @@ import { loadWillData } from '@/lib/will-data-loader'
 import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
 import { PrintTijdasButton } from '@/components/future/print-tijdas-button'
+import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -113,7 +115,8 @@ export default async function ToekomstPage({
               Geld is opgeslagen tijd — kies wat je later met die tijd doet.
             </p>
           </div>
-          <div className="shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
+            <PageInfoButton description={PAGE_INFO['/toekomst'] ?? ''} />
             <PrintTijdasButton />
           </div>
         </header>

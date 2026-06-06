@@ -113,7 +113,7 @@ export const BLUEPRINTS: BlueprintMeta[] = [
     description:
       'Multi-step met romeinse stappen-balk, progress-bar en navigatie-balk.',
     module: 'kern',
-    routeExample: '/core/checkin, /identity/gids',
+    routeExample: '/core/checkin, /onboarding',
     group: 'page-type',
   },
   {

@@ -10,8 +10,8 @@ const CAT = 'identiteit.navigatie'
 const IDENTITY_NAV_TABS = [
   { label: 'Overzicht', href: '/identity' },
   { label: 'Profiel', href: '/identity/profiel' },
-  { label: 'Gids', href: '/identity/gids' },
   { label: 'Instellingen', href: '/identity/instellingen' },
+  { label: 'Koppelingen', href: '/identity/koppelingen' },
 ]
 
 // ── Redirect mappings ─────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ const tests: TestCase[] = [
     id: 'id-nav-tabs-count',
     name: 'Identity navigatie: 4 tabs zichtbaar',
     category: CAT,
-    description: 'identityNav bevat exact 4 items: Overzicht, Profiel, Gids, Instellingen',
+    description: 'identityNav bevat exact 4 items: Overzicht, Profiel, Instellingen, Koppelingen',
     priority: 'critical',
     estimatedDurationMs: 200,
     fn() {
@@ -122,8 +122,8 @@ const tests: TestCase[] = [
       const labels = IDENTITY_NAV_TABS.map(t => t.label)
       assertEqual(labels[0], 'Overzicht', 'Tab 1')
       assertEqual(labels[1], 'Profiel', 'Tab 2')
-      assertEqual(labels[2], 'Gids', 'Tab 3')
-      assertEqual(labels[3], 'Instellingen', 'Tab 4')
+      assertEqual(labels[2], 'Instellingen', 'Tab 3')
+      assertEqual(labels[3], 'Koppelingen', 'Tab 4')
     },
   },
 
@@ -211,10 +211,10 @@ const tests: TestCase[] = [
       // Test each nav tab route
       assertEqual(findActiveTab('/identity'), 'Overzicht', '/identity → Overzicht')
       assertEqual(findActiveTab('/identity/profiel'), 'Profiel', '/identity/profiel → Profiel')
-      assertEqual(findActiveTab('/identity/gids'), 'Gids', '/identity/gids → Gids')
+      assertEqual(findActiveTab('/identity/koppelingen'), 'Koppelingen', '/identity/koppelingen → Koppelingen')
       assertEqual(findActiveTab('/identity/instellingen'), 'Instellingen', '/identity/instellingen → Instellingen')
       // Sub-routes should map to parent tab
-      assertEqual(findActiveTab('/identity/gids/kern'), 'Gids', '/identity/gids/kern → Gids')
+      assertEqual(findActiveTab('/identity/instellingen/notificaties'), 'Instellingen', '/identity/instellingen/notificaties → Instellingen')
     },
   },
 
@@ -241,8 +241,8 @@ const tests: TestCase[] = [
       const layoutPaths = [
         '/identity',
         '/identity/profiel',
-        '/identity/gids',
         '/identity/instellingen',
+        '/identity/koppelingen',
       ]
       // All use the same layout.tsx which imports identityNav
       assertEqual(layoutPaths.length, 4, 'Layout wraps all 4 identity pages')
@@ -257,7 +257,7 @@ const tests: TestCase[] = [
       assertEqual(navConfig.module, 'Identiteit', 'Module naam')
       assertEqual(navConfig.basePath, '/identity', 'Base path')
       assertEqual(navConfig.color, 'teal', 'Module kleur')
-      assertEqual(navConfig.items.length, 5, 'Aantal nav items')
+      assertEqual(navConfig.items.length, 4, 'Aantal nav items')
     },
   },
 

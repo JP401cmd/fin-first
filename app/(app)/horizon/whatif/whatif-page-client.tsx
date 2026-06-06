@@ -51,6 +51,7 @@ import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-
 import { EventsTimeline } from '@/components/app/horizon/events-timeline'
 import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
+import { WhatIfBeslishulp } from '@/components/app/horizon/whatif-beslishulp'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import {
   deriveOverridesFromEvents,
@@ -1255,6 +1256,14 @@ export default function WhatIfPage() {
             events={events}
             setEvents={setEvents}
             currentAge={currentAge ?? 30}
+          />
+
+          {/* Beslishulp — "Wat doe je met €X/mnd extra?" (beleggen/aflossen/noodfonds) */}
+          <WhatIfBeslishulp
+            baseInput={whatIfUnifiedInput}
+            scenarioEvents={scenarioActiveEvents}
+            currentAge={currentAge ?? 30}
+            debts={fullDebts}
           />
 
           {/* Marktbias — per-asset-groep rendement-delta */}

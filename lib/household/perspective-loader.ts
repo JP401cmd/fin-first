@@ -317,27 +317,46 @@ export interface PerspectiveTransactions {
  *   • household → beide partners (gedeeld één keer; partner-persoonlijk via RPC)
  *   • partner   → partner-persoonlijk (privacy-gated) + partner-aandeel van gedeeld
  *
- * `opts.since` (ISO-datum) windowt de query — geef bv. 13 maanden terug mee.
+ * `opts.since` / `opts.until` (ISO-datum 'yyyy-mm-dd', beide inclusief) windowen de
+ * query — geef bv. 13 maanden terug mee. De partner-RPC is NIET datum-begrensd, dus
+ * dezelfde window wordt na samenstellen ook op de partnerrijen toegepast.
  * Partner-persoonlijke transacties komen privacy-gated uit de RPC: bij 'totals'
  * is dat één aggregaatrij met `total_income`/`total_expense` (`_aggregated:true`).
  */
 export async function loadPerspectiveTransactions(
   supabase: SupabaseClient,
   perspective: Perspective,
-  opts?: { since?: string },
+  opts?: { since?: string; until?: string },
 ): Promise<PerspectiveTransactions> {
   const context = await loadPerspectiveContext(supabase)
 
   let query = supabase.from('transactions').select('*')
   if (opts?.since) query = query.gte('date', opts.since)
+  if (opts?.until) query = query.lte('date', opts.until)
   const { data } = await query
   const base = (data ?? []) as Record<string, unknown>[]
+
+  // De partner-RPC (`household_partner_items('transactions')`) is niet datum-
+  // begrensd. Pas dezelfde [since, until]-window toe op de SAMENGESTELDE lijst
+  // zodat partnerrijen het venster respecteren. Privacy-'totalen'-aggregaten
+  // (`_aggregated`) dragen geen `date` en passeren altijd.
+  const inWindow = (rows: PerspectiveItem[]): PerspectiveItem[] => {
+    if (!opts?.since && !opts?.until) return rows
+    return rows.filter((r) => {
+      if (r._aggregated) return true
+      const date = r.date as string | undefined
+      if (!date) return true
+      if (opts.since && date < opts.since) return false
+      if (opts.until && date > opts.until) return false
+      return true
+    })
+  }
 
   if (!context.hasHousehold || perspective === 'personal') {
     return {
       perspective,
       context,
-      transactions: stamp(base, 'personal', context, 'transaction'),
+      transactions: inWindow(stamp(base, 'personal', context, 'transaction')),
       partnerMonthlyIncome: null,
     }
   }
@@ -355,7 +374,7 @@ export async function loadPerspectiveTransactions(
     return {
       perspective,
       context,
-      transactions: [...stamp(base, 'household', context, 'transaction'), ...partnerTxns],
+      transactions: inWindow([...stamp(base, 'household', context, 'transaction'), ...partnerTxns]),
       partnerMonthlyIncome,
     }
   }
@@ -365,7 +384,7 @@ export async function loadPerspectiveTransactions(
   return {
     perspective,
     context,
-    transactions: [...partnerTxns, ...stamp(sharedOnly, 'partner', context, 'transaction')],
+    transactions: inWindow([...partnerTxns, ...stamp(sharedOnly, 'partner', context, 'transaction')]),
     partnerMonthlyIncome,
   }
 }

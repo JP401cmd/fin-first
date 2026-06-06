@@ -14,11 +14,15 @@ export const metadata: Metadata = {
 
 /**
  * /mijn/uiterlijk — uiterlijk-instellingen (plan A-2 ontmantelen van
- * legacy settings-monster, voltooid).
+ * legacy settings-monster, voltooid; daarna C5 "scope-discipline"-reorg).
  *
- * Alle weergave-blokken van de oude monolith leven nu hier: palet,
- * typografie, module-accent, budget-categorie-tints, fase-kleuren en
- * categoriekaart-tinten. Iedere sectie heeft een eigen standaard-knop.
+ * Alle weergave-blokken van de oude monolith leven hier. De PAGINA leidt
+ * met de twee essentiële keuzes — Palet (wisselt het hele token-systeem)
+ * en Typografie (leesbaarheid) — en stopt de diepe maatwerk-pickers
+ * (module-accenten, budget-tints, fase-kleuren, categoriekaart-tinten)
+ * weg in een standaard-dichte "Geavanceerd"-disclosure. Niets is
+ * verwijderd: alle providers, persistence en standaard-knoppen blijven;
+ * de diepe instellingen zijn één klik onder "Geavanceerd" bereikbaar.
  */
 export default function MijnUiterlijkPage() {
   return (
@@ -33,34 +37,65 @@ export default function MijnUiterlijkPage() {
             Hoe ziet TriFinity eruit?
           </h1>
           <p className="mt-2 text-sm text-[var(--ink-2)] leading-relaxed">
-            Wissel tussen de drie cream-paletten. Je keuze wordt lokaal
-            opgeslagen en geldt voor alle pagina&apos;s.
+            Wissel tussen de drie cream-paletten. Je keuze wordt opgeslagen
+            en geldt voor alle pagina&apos;s. Fijnregelen kan onder
+            &ldquo;Geavanceerd&rdquo;.
           </p>
         </header>
 
+        {/* Essentieel — Palet wisselt het complete token-systeem in één klik. */}
         <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
           <PalettePicker />
         </div>
 
+        {/* Essentieel — Typografie stuurt leesbaarheid van de hele app. */}
         <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
           <FontPicker />
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-          <ModuleAccentPicker />
-        </div>
+        {/*
+          Geavanceerd — diepe maatwerk-kleurpickers, standaard ingeklapt.
+          <details> = nul JS, server-renderbaar; opent op klik. Editorial:
+          scherpe hoeken, --ink/--paper tokens, Kicker-label als summary.
+          Elke onderliggende picker behoudt zijn eigen standaard-knop.
+        */}
+        <details className="group mt-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] sm:px-6">
+            <span>
+              <span className="block text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+                Geavanceerd
+              </span>
+              <span className="mt-0.5 block text-sm text-[var(--ink-2)]">
+                Module-accenten, budget-tints, fase-kleuren en
+                categoriekaart-tinten fijnregelen
+              </span>
+            </span>
+            <span
+              aria-hidden="true"
+              className="shrink-0 text-[11px] italic text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              <span className="group-open:hidden">Openen +</span>
+              <span className="hidden group-open:inline">Sluiten −</span>
+            </span>
+          </summary>
 
-        <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-          <BudgetTintPicker />
-        </div>
+          <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+            <ModuleAccentPicker />
+          </div>
 
-        <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-          <PhaseColorPicker />
-        </div>
+          <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+            <BudgetTintPicker />
+          </div>
 
-        <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-          <CategoryTintPicker />
-        </div>
+          <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+            <PhaseColorPicker />
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+            <CategoryTintPicker />
+          </div>
+        </details>
 
         <p className="mt-6 text-[11px] italic text-[var(--ink-3)]">
           Wijzigingen worden direct toegepast en gesynct met je account. Elke sectie heeft een eigen

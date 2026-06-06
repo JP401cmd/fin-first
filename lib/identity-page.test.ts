@@ -349,16 +349,7 @@ describe('Identity — Feature roadmap per fase', () => {
   })
 })
 
-// ── Step 9: Gids link-kaart ────────────────────────────────────────────
-
-describe('Identity — Gids link-kaart', () => {
-  it('navigates to /identity/gids', () => {
-    const gidsHref = '/identity/gids'
-    expect(gidsHref).toBe('/identity/gids')
-  })
-})
-
-// ── Step 10: computeSovereigntyLevel comprehensive ─────────────────────
+// ── Step 9: computeSovereigntyLevel comprehensive ─────────────────────
 
 describe('Identity — computeSovereigntyLevel', () => {
   it('returns -2 for negative netWorth with consumer debt', () => {

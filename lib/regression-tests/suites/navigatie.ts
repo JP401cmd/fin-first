@@ -12,8 +12,8 @@ const NAV_ITEMS = [
   { label: 'Overzicht (Horizon)', href: '/horizon' },
   { label: 'Overzicht (Identiteit)', href: '/identity' },
   { label: 'Profiel', href: '/identity/profiel' },
-  { label: 'Gids', href: '/identity/gids' },
   { label: 'Instellingen', href: '/identity/instellingen' },
+  { label: 'Koppelingen', href: '/identity/koppelingen' },
 ]
 
 // ── Redirect mappings (source → expected target) ─────────────────────────────

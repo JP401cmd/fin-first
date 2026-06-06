@@ -3,7 +3,17 @@
 import { useMemo, useState } from 'react'
 import { Search, ArrowDown, ArrowUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import type { AnalysisTransaction } from '@/lib/transaction-insights'
 
+/**
+ * Smalle rij-vorm die de cashflow-Sankey + geldstroom-weergaven gebruiken.
+ *
+ * BEWAAR DEZE EXPORT: `lib/cashflow-data-loader.ts`,
+ * `components/overview/cashflow-sankey.tsx` en
+ * `components/overview/transacties-geldstroom.tsx` importeren dit type. De feed
+ * zelf draait inmiddels op het rijkere `AnalysisTransaction`-type (zie props),
+ * maar `TransactionRow` blijft bestaan voor die afnemers.
+ */
 export type TransactionRow = {
   id: string
   date: string // ISO yyyy-mm-dd
@@ -14,6 +24,9 @@ export type TransactionRow = {
 }
 
 type FilterMode = 'all' | 'expense' | 'income'
+
+/** Budget-pill-selectie: alles, niet-gecategoriseerd, of een concreet budget-id. */
+type BudgetFilter = 'all' | 'uncategorized' | string
 
 const FILTERS: { id: FilterMode; label: string }[] = [
   { id: 'all', label: 'Alles' },
@@ -30,26 +43,48 @@ function formatDayHeader(iso: string): string {
   }).format(d)
 }
 
+/** Gedeelde pill-styling — spiegelt de rekening-filter exact. */
+function pillClass(active: boolean): string {
+  return [
+    'px-2 py-1 rounded font-semibold transition-colors',
+    active
+      ? 'bg-[var(--ink)] text-[var(--paper)]'
+      : 'bg-[var(--subtle)] text-[var(--ink-2)] hover:bg-[var(--border-ed)]',
+  ].join(' ')
+}
+
+interface Props {
+  transactions: AnalysisTransaction[]
+  /** Leesbaar periode-label, getoond in de header (vervangt het oude monthLabel). */
+  periodLabel?: string
+  /** Budget-opties voor de budget-filter. Leeg/weggelaten → budget-filter verborgen. */
+  budgetOptions?: { id: string; name: string }[]
+  /** Rij-klik-handler. Ontbreekt → rijen zijn niet-interactief. */
+  onSelect?: (tx: AnalysisTransaction) => void
+}
+
 /**
- * Transactie-feed: list-view van transacties met filter + zoek + dag-
- * groepering + totaal-counter. Stand-alone client-component zonder
- * data-fetching — krijgt transactions als prop.
+ * Transactie-feed: list-view van transacties met type-filter, zoek,
+ * rekening-filter, budget-filter, dag-groepering en totaal-counter.
+ * Pure presentatie-component zonder data-fetching — krijgt transactions als
+ * prop (bedragen zijn al perspectief-geschaald door de parent).
  *
- * Gebruikt door de toekomstige CashflowViewSwitcher op
- * /overzicht/cashflow?view=transacties.
+ * Gerenderd op de transactie-analysepagina
+ * (/overzicht/cashflow/transacties). Rijen zijn klikbaar wanneer `onSelect`
+ * is meegegeven.
  */
 export function TransactiesFeed({
   transactions,
-  monthLabel,
-}: {
-  transactions: TransactionRow[]
-  monthLabel?: string
-}) {
+  periodLabel,
+  budgetOptions,
+  onSelect,
+}: Props) {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [query, setQuery] = useState('')
   const [accountFilter, setAccountFilter] = useState<string>('all')
+  const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all')
 
-  // Verzamel unieke rekening-namen voor de account-filter dropdown.
+  // Verzamel unieke rekening-namen voor de rekening-filter.
   const accounts = useMemo(() => {
     const set = new Set<string>()
     for (const tx of transactions) {
@@ -58,19 +93,30 @@ export function TransactiesFeed({
     return Array.from(set).sort()
   }, [transactions])
 
+  // Budget-filter alleen tonen als de parent budget-opties meegeeft.
+  const showBudgetFilter = Boolean(budgetOptions && budgetOptions.length > 0)
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return transactions.filter((tx) => {
       if (filter === 'expense' && tx.amount >= 0) return false
       if (filter === 'income' && tx.amount < 0) return false
       if (accountFilter !== 'all' && tx.account_name !== accountFilter) return false
-      if (q && !tx.description.toLowerCase().includes(q)) return false
+      if (budgetFilter === 'uncategorized' && tx.budget_id) return false
+      if (budgetFilter !== 'all' && budgetFilter !== 'uncategorized' && tx.budget_id !== budgetFilter) {
+        return false
+      }
+      if (q) {
+        const inDescription = tx.description.toLowerCase().includes(q)
+        const inCounterparty = (tx.counterparty_name ?? '').toLowerCase().includes(q)
+        if (!inDescription && !inCounterparty) return false
+      }
       return true
     })
-  }, [transactions, filter, query, accountFilter])
+  }, [transactions, filter, query, accountFilter, budgetFilter])
 
   const grouped = useMemo(() => {
-    const map = new Map<string, TransactionRow[]>()
+    const map = new Map<string, AnalysisTransaction[]>()
     for (const tx of filtered) {
       const existing = map.get(tx.date) ?? []
       existing.push(tx)
@@ -96,9 +142,9 @@ export function TransactiesFeed({
           <h2 className="text-lg sm:text-xl font-semibold text-[var(--ink)]">
             Transacties
           </h2>
-          {monthLabel && (
+          {periodLabel && (
             <span className="text-[10px] uppercase tracking-[0.12em] font-mono text-[var(--ink-3)]">
-              {monthLabel}
+              {periodLabel}
             </span>
           )}
         </div>
@@ -165,12 +211,7 @@ export function TransactiesFeed({
               type="button"
               onClick={() => setAccountFilter('all')}
               aria-pressed={accountFilter === 'all'}
-              className={[
-                'px-2 py-1 rounded font-semibold transition-colors',
-                accountFilter === 'all'
-                  ? 'bg-[var(--ink)] text-[var(--paper)]'
-                  : 'bg-[var(--subtle)] text-[var(--ink-2)] hover:bg-[var(--border-ed)]',
-              ].join(' ')}
+              className={pillClass(accountFilter === 'all')}
             >
               Alle
             </button>
@@ -180,14 +221,43 @@ export function TransactiesFeed({
                 type="button"
                 onClick={() => setAccountFilter(acc)}
                 aria-pressed={accountFilter === acc}
-                className={[
-                  'px-2 py-1 rounded font-semibold transition-colors',
-                  accountFilter === acc
-                    ? 'bg-[var(--ink)] text-[var(--paper)]'
-                    : 'bg-[var(--subtle)] text-[var(--ink-2)] hover:bg-[var(--border-ed)]',
-                ].join(' ')}
+                className={pillClass(accountFilter === acc)}
               >
                 {acc}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Budget-filter — alleen tonen als de parent budget-opties meegeeft. */}
+        {showBudgetFilter && (
+          <div className="flex flex-wrap items-center gap-1 text-xs">
+            <span className="text-[var(--ink-3)] font-medium mr-1">Categorie:</span>
+            <button
+              type="button"
+              onClick={() => setBudgetFilter('all')}
+              aria-pressed={budgetFilter === 'all'}
+              className={pillClass(budgetFilter === 'all')}
+            >
+              Alle
+            </button>
+            <button
+              type="button"
+              onClick={() => setBudgetFilter('uncategorized')}
+              aria-pressed={budgetFilter === 'uncategorized'}
+              className={pillClass(budgetFilter === 'uncategorized')}
+            >
+              Zonder categorie
+            </button>
+            {budgetOptions!.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setBudgetFilter(b.id)}
+                aria-pressed={budgetFilter === b.id}
+                className={pillClass(budgetFilter === b.id)}
+              >
+                {b.name}
               </button>
             ))}
           </div>
@@ -220,46 +290,7 @@ export function TransactiesFeed({
               </div>
               <ul className="divide-y divide-[var(--border-ed)]">
                 {rows.map((tx) => (
-                  <li
-                    key={tx.id}
-                    role="listitem"
-                    className="flex items-center gap-3 py-2.5"
-                  >
-                    <span
-                      className={[
-                        'shrink-0 w-7 h-7 rounded-lg flex items-center justify-center',
-                        tx.amount < 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
-                      ].join(' ')}
-                      aria-hidden
-                    >
-                      {tx.amount < 0 ? <ArrowDown className="w-4 h-4" /> : <ArrowUp className="w-4 h-4" />}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-[var(--ink)] truncate">
-                        {tx.description}
-                      </div>
-                      <div className="text-[11px] text-[var(--ink-3)] truncate flex items-center gap-1.5">
-                        {tx.account_name && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--subtle)] text-[var(--ink-2)] font-medium">
-                            {tx.account_name}
-                          </span>
-                        )}
-                        {tx.category && <span>{tx.category}</span>}
-                        {!tx.account_name && !tx.category && (
-                          <span className="italic">Geen rekening</span>
-                        )}
-                      </div>
-                    </div>
-                    <span
-                      className={[
-                        'font-mono text-sm font-semibold shrink-0',
-                        tx.amount < 0 ? 'text-[var(--ink)]' : 'text-emerald-700',
-                      ].join(' ')}
-                    >
-                      {tx.amount < 0 ? '−' : '+'}
-                      {formatCurrency(Math.abs(tx.amount))}
-                    </span>
-                  </li>
+                  <TransactionListRow key={tx.id} tx={tx} onSelect={onSelect} />
                 ))}
               </ul>
             </div>
@@ -284,5 +315,86 @@ export function TransactiesFeed({
         </footer>
       )}
     </section>
+  )
+}
+
+/**
+ * Eén transactie-rij. Klikbaar (als `<button>`) wanneer `onSelect` is
+ * meegegeven; anders een niet-interactief `<li>` met de oude opmaak. De
+ * binnen-layout (in/uit-pijl, omschrijving, rekening-badge + categorie, bedrag)
+ * is in beide gevallen identiek.
+ */
+function TransactionListRow({
+  tx,
+  onSelect,
+}: {
+  tx: AnalysisTransaction
+  onSelect?: (tx: AnalysisTransaction) => void
+}) {
+  // Tegenpartij alleen tonen als die afwijkt van de omschrijving — anders ruis.
+  const counterparty = tx.counterparty_name?.trim()
+  const showCounterparty =
+    Boolean(counterparty) && counterparty!.toLowerCase() !== tx.description.trim().toLowerCase()
+
+  const content = (
+    <>
+      <span
+        className={[
+          'shrink-0 w-7 h-7 rounded-lg flex items-center justify-center',
+          tx.amount < 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700',
+        ].join(' ')}
+        aria-hidden
+      >
+        {tx.amount < 0 ? <ArrowDown className="w-4 h-4" /> : <ArrowUp className="w-4 h-4" />}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-[var(--ink)] truncate">
+          {tx.description}
+        </div>
+        {showCounterparty && (
+          <div className="text-[11px] text-[var(--ink-3)] truncate">{counterparty}</div>
+        )}
+        <div className="text-[11px] text-[var(--ink-3)] truncate flex items-center gap-1.5">
+          {tx.account_name && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--subtle)] text-[var(--ink-2)] font-medium">
+              {tx.account_name}
+            </span>
+          )}
+          {tx.category && <span>{tx.category}</span>}
+          {!tx.account_name && !tx.category && (
+            <span className="italic">Geen rekening</span>
+          )}
+        </div>
+      </div>
+      <span
+        className={[
+          'font-mono text-sm font-semibold shrink-0',
+          tx.amount < 0 ? 'text-[var(--ink)]' : 'text-emerald-700',
+        ].join(' ')}
+      >
+        {tx.amount < 0 ? '−' : '+'}
+        {formatCurrency(Math.abs(tx.amount))}
+      </span>
+    </>
+  )
+
+  if (onSelect) {
+    return (
+      <li role="listitem">
+        <button
+          type="button"
+          onClick={() => onSelect(tx)}
+          className="w-full flex items-center gap-3 py-2.5 text-left rounded-lg hover:bg-[var(--subtle)] focus:outline-2 focus:outline-[var(--ink)] focus:outline-offset-1 transition-colors"
+        >
+          {content}
+        </button>
+      </li>
+    )
+  }
+
+  return (
+    <li role="listitem" className="flex items-center gap-3 py-2.5">
+      {content}
+    </li>
   )
 }
