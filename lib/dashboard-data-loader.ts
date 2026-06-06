@@ -73,6 +73,7 @@ import {
   buildCategoryAppLinks,
   type CategoryAppLink,
 } from '@/lib/category-app-nav'
+import { resolveEffectiveIncomeExpenses } from './effective-financials'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -166,7 +167,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('*').eq('is_active', true),
     supabase.from('debts').select('*').eq('is_active', true),
-    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config').single(),
+    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, income_source, expenses_source').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
@@ -225,8 +226,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Fallback to profile estimates for users without transactions
   const profileMonthlyIncome = Number(profileResult.data?.net_monthly_income ?? 0)
   const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
-  const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
-  const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
+  const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
+    resolveEffectiveIncomeExpenses(profileResult.data ?? {}, monthlyIncome, monthlyExpenses)
 
   // Previous month income/expenses for cashflow comparison widget
   let prevMonthIncome = 0

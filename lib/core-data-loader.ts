@@ -27,6 +27,7 @@ import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import type { Perspective } from '@/lib/household-data'
+import { resolveEffectiveIncomeExpenses } from './effective-financials'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -400,7 +401,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .limit(1),
     supabase
       .from('profiles')
-      .select('full_name, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, fire_end_strategy, fire_end_age, fire_legacy_amount, date_of_birth')
+      .select('full_name, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, fire_end_strategy, fire_end_age, fire_legacy_amount, date_of_birth, income_source, expenses_source')
       .single(),
     supabase
       .from('bank_accounts')
@@ -434,8 +435,8 @@ export const loadCoreData = cache(async function loadCoreData(
   // Fallback to profile estimates for users without transactions
   const profileMonthlyIncome = Number(profileResult.data?.net_monthly_income ?? 0)
   const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
-  const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
-  const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
+  const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
+    resolveEffectiveIncomeExpenses(profileResult.data ?? {}, monthlyIncome, monthlyExpenses)
   const budgetingActive = profileResult.data?.budgeting_active !== false
   // Module-toggle is verwijderd uit Trifinity; alle modules zijn altijd actief
   // op data-niveau. App-zichtbaarheid in de sidebar wordt afgeleid van

@@ -37,6 +37,7 @@ import {
 } from '@/lib/housing-strategy'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import type { Perspective } from '@/lib/household-data'
+import { resolveEffectiveIncomeExpenses } from './effective-financials'
 
 // Snapshot type for resilience trend data
 export type SnapshotForTrend = {
@@ -234,7 +235,7 @@ export async function loadHorizonData(
     // duplicate pair on the same table.
     supabase.from('assets').select('*').eq('is_active', true).limit(500),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
@@ -333,8 +334,8 @@ export async function loadHorizonData(
   // Fallback to profile estimates for users without transactions
   const profileMonthlyIncome = Number(profile.net_monthly_income ?? 0)
   const profileMonthlyExpenses = Number(profile.estimated_monthly_expenses ?? 0)
-  const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
-  const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
+  const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
+    resolveEffectiveIncomeExpenses(profile ?? {}, monthlyIncome, monthlyExpenses)
 
   // 6-month average income/expenses for stable resilience calculation
   let totalIncome6m = 0
