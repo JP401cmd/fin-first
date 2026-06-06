@@ -30,7 +30,6 @@ import type { ComponentType } from 'react'
 import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 import type { ModuleId } from '@/lib/module-registry'
-import { CashBudgetterenTab } from './deepenings/cash-budgetteren-tab'
 import { InvestmentHoldingsTab } from './deepenings/investment-holdings-tab'
 import { CryptoHoldingsTab } from './deepenings/crypto-holdings-tab'
 import { HypotheekplannerTab } from './deepenings/hypotheekplanner-tab'
@@ -101,17 +100,6 @@ export interface DeepeningEntry {
  * (mortgage-only) via `has_hypotheekplanner_tracking`.
  */
 export const CATEGORY_DEEPENINGS: DeepeningEntry[] = [
-  {
-    type: 'cash',
-    kind: 'asset',
-    label: 'Budgetteren',
-    moduleId: 'budgetteren',
-    tipStripCopy:
-      'Activeer Budgetteren om uitgaven per rekening te volgen en je spaarquote automatisch te berekenen.',
-    isItemTracked: (item) =>
-      'has_budget_tracking' in item && item.has_budget_tracking === true,
-    toggleEndpoint: '/api/assets/toggle-budget',
-  },
   {
     type: 'investment',
     kind: 'asset',
@@ -342,7 +330,6 @@ const DEEPENING_COMPONENTS: Partial<
   Record<'asset' | 'debt', Partial<Record<AssetType | DebtType, DeepeningComponentMap>>>
 > = {
   asset: {
-    cash: CashBudgetterenTab,
     investment: InvestmentHoldingsTab,
     crypto: CryptoHoldingsTab,
     // `eigen_huis` heeft één app (Hypotheekplanner) — single-component vorm.
