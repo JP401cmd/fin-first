@@ -463,11 +463,15 @@ export const SimChart = memo(function SimChart({
     return null
   }, [hoveredAge, allPts, PAD.top, yScale])
 
-  /** Determine the colour for the crosshair dot based on phase */
+  /** Determine the colour for the crosshair dot based on phase.
+   *  De stip zit ÓP de hoofdlijn, dus hij volgt de hoofdlijn-kleur: bij een
+   *  mainLineColor-override (partner-view = teal) krijgt de stip diezelfde kleur,
+   *  anders de fase-afhankelijke opbouw/afbouw-kleur (mainStrokeAcc/mainStrokeDec
+   *  vallen terug op COLOR_OPBOUW/COLOR_AFBOUW wanneer er geen override is). */
   const crosshairDotColor = useMemo(() => {
-    if (!hoveredRow) return COLOR_OPBOUW
-    return hoveredRow.phase === 'retirement' ? COLOR_AFBOUW : COLOR_OPBOUW
-  }, [hoveredRow, COLOR_OPBOUW, COLOR_AFBOUW])
+    if (!hoveredRow) return mainStrokeAcc
+    return hoveredRow.phase === 'retirement' ? mainStrokeDec : mainStrokeAcc
+  }, [hoveredRow, mainStrokeAcc, mainStrokeDec])
 
   return (
     <div ref={ref} className="relative">
