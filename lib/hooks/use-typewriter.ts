@@ -19,12 +19,12 @@ export function useTypewriter(
   opts: { cps?: number; start?: boolean } = {},
 ): { shown: string; done: boolean } {
   const { cps = DEFAULT_CPS, start = true } = opts
-  const msPerChar = 1000 / cps
   const [count, setCount] = useState(0)
   const [done, setDone] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    const msPerChar = 1000 / cps
     setCount(0)
     setDone(false)
     if (!start) return
@@ -54,7 +54,7 @@ export function useTypewriter(
     timerRef.current = setTimeout(step, msPerChar)
 
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-  }, [text, start, msPerChar])
+  }, [text, start, cps])
 
   return { shown: text.slice(0, count), done }
 }

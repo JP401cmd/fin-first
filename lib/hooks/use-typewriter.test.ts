@@ -29,4 +29,19 @@ describe('useTypewriter', () => {
     expect(result.current.shown).toBe('')
     expect(result.current.done).toBe(false)
   })
+
+  it('reset wanneer text halverwege het typen wijzigt', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as unknown as MediaQueryList)
+    const { result, rerender } = renderHook(
+      ({ text }) => useTypewriter(text, { cps: 100 }),
+      { initialProps: { text: 'abc' } },
+    )
+    act(() => { vi.advanceTimersByTime(10) })
+    expect(result.current.shown).toBe('a')
+    rerender({ text: 'xy' })
+    expect(result.current.shown).toBe('')
+    expect(result.current.done).toBe(false)
+    act(() => { vi.advanceTimersByTime(10) })
+    expect(result.current.shown).toBe('x')
+  })
 })
