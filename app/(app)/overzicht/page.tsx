@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadWillData } from '@/lib/will-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { getServerPerspective } from '@/lib/household/server-perspective'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
 import {
@@ -42,11 +43,16 @@ export const metadata: Metadata = {
  */
 export default async function OverzichtPage() {
   const supabase = await createClient()
+  // Actieve weergave (Eigen / Huishouden / Partner) uit de tf_perspective-cookie.
+  // loadHorizonData rekent dan de kerngetallen (vermogen, hefbomen, vrijheid) om
+  // naar het gekozen perspectief; op een wissel re-rendert deze server-page via
+  // router.refresh() (PerspectiveProvider) met de nieuwe cookie.
+  const perspective = await getServerPerspective()
 
   const [dashboardResult, willData, horizonData] = await Promise.all([
     loadDashboardData(supabase),
     loadWillData(supabase),
-    loadHorizonData(supabase),
+    loadHorizonData(supabase, perspective),
   ])
 
   const {
@@ -55,6 +61,15 @@ export default async function OverzichtPage() {
     allWidgetPrefs,
     userName,
   } = dashboardResult
+
+  // Perspectief-override voor de getallen die uit dashboardData komen (cashflow-
+  // tegel + freedom-time-uitgaven). Vermogen/schulden/vrijheid% komen al
+  // perspectief-correct uit horizonData.healthScoreInput. Null in eigen weergave
+  // → alles byte-identiek aan voorheen.
+  const perspectiveOverride =
+    perspective === 'household' ? dashboardData.householdOverrides
+    : perspective === 'partner' ? dashboardData.partnerOverrides
+    : null
 
   const health = horizonData?.healthScore ?? null
   const freedomPct = horizonData?.healthScoreInput?.freedomPct ?? null
@@ -104,7 +119,11 @@ export default async function OverzichtPage() {
     ? {
         bezittingen: horizonData.healthScoreInput.totalAssets,
         schulden: horizonData.healthScoreInput.totalDebts,
-        cashflow: horizonData.healthScoreInput.savingsRate6m,
+        // Cashflow-tegel: in huishoud-/partnerweergave de spaarquote uit de
+        // override-inkomsten/-uitgaven; anders de eigen 6-maands spaarquote.
+        cashflow: perspectiveOverride && perspectiveOverride.monthlyIncome > 0
+          ? Math.round(((perspectiveOverride.monthlyIncome - perspectiveOverride.monthlyExpenses) / perspectiveOverride.monthlyIncome) * 100)
+          : horizonData.healthScoreInput.savingsRate6m,
         belasting: horizonData.healthScoreInput.taxData?.box3Tax ?? null,
       }
     : undefined
@@ -134,7 +153,10 @@ export default async function OverzichtPage() {
     new Date(),
     marketEntry ?? undefined,
   )
-  const freedomTotal = computeFreedomTotal(currentNetWorth, dashboardData.monthlyExpenses ?? 0)
+  // Freedom-time: netto vermogen (perspectief-correct) ÷ dagelijkse uitgaven.
+  // In huishoud-/partnerweergave de bijbehorende maanduitgaven gebruiken.
+  const freedomMonthlyExpenses = perspectiveOverride?.monthlyExpenses ?? dashboardData.monthlyExpenses ?? 0
+  const freedomTotal = computeFreedomTotal(currentNetWorth, freedomMonthlyExpenses)
   let briefingEntries = composedBriefing
   let briefingRefreshedAt: string | null = null
   let briefingCanRefresh = false
@@ -145,7 +167,11 @@ export default async function OverzichtPage() {
     netWorthHistory,
   )
   let briefingHeadline: string | null = null
-  if (authUser.user?.id) {
+  // Weekly snapshot + briefing-freeze blijven PERSOONLIJK: het is een per-user
+  // weekverhaal en de freeze schrijft naar de eigen rij. In huishoud-/partner-
+  // weergave geen snapshot-write; freedomHero wordt live uit het perspectief
+  // berekend (currentNetWorth + perspectief-uitgaven hierboven).
+  if (authUser.user?.id && perspective === 'personal') {
     // NB: bij het eerste bezoek van een nieuwe ISO-week schrijft dit de
     // snapshot weg tíjdens de RSC-render. Dat is bewust en veilig: het is een
     // pure data-`.update()` (zet geen cookies, dus geen "cookies can only be

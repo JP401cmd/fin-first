@@ -42,6 +42,7 @@ import { BudgetSparkline, SparklineWithLabel, type SparklineDataPoint } from '@/
 import { computeBudgetForecast, getConfidenceLabel, getConfidenceColors, type BudgetForecast } from '@/lib/budget-forecast'
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { SpendingConfidenceBadge, SpendingVarianceDetailPanel, calculateSpendingVariance, type SpendingVarianceData } from '@/components/app/spending-confidence-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
@@ -127,13 +128,14 @@ function BudgetEditorialHeader({
         description={pageInfoText}
         className="absolute right-0 top-0"
       />
-      <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
+      <div className="flex flex-wrap items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
         <span
           aria-hidden
           className="inline-block h-px w-7 shrink-0"
           style={{ background: 'var(--module-active-500)' }}
         />
         Budgetteren {periodKicker && `· ${periodKicker}`}
+        <PerspectiveContextLabel className="normal-case tracking-normal" />
       </div>
 
       <h1

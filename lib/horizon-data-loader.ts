@@ -532,7 +532,13 @@ export async function loadHorizonData(
   const emergencyFundMonths = avgExpenses6m > 0 ? liquidAssets / avgExpenses6m : 0
 
   // ── freedomPct: strategy-adjusted FIRE target (same as dashboard) ──
-  const netWorth = totalAssets - totalDebts
+  // Bij huishoud-/partnerweergave rekenen we met de perspectief-totalen
+  // (fireTotalAssets/fireTotalDebts bevatten al partner-aandeel + gedeeld) zodat
+  // netto vermogen, freedomPct én de healthScoreInput-totalen kloppen voor de
+  // gekozen weergave. Eigen weergave blijft byte-identiek (zelfde totalAssets/Debts).
+  const perspectiveTotalAssets = perspective !== 'personal' ? fireTotalAssets : totalAssets
+  const perspectiveTotalDebts = perspective !== 'personal' ? fireTotalDebts : totalDebts
+  const netWorth = perspectiveTotalAssets - perspectiveTotalDebts
   const fireSwr = fireParams.effectiveSwr
   const currentAge = dob ? ageAtDate(dob) : null
   const yearsInRetirement = (fireStrategy.strategy === 'deplete' && currentAge != null)
@@ -585,8 +591,8 @@ export async function loadHorizonData(
 
   const healthScoreInput: HealthScoreInput = {
     savingsRate6m,
-    totalAssets,
-    totalDebts,
+    totalAssets: perspectiveTotalAssets,
+    totalDebts: perspectiveTotalDebts,
     emergencyFundMonths,
     freedomPct,
     assetTypeCount,

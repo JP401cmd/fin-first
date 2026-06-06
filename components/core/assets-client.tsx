@@ -57,6 +57,7 @@ function MaybeBottomSheet({
 }
 import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { usePerspective, usePerspectiveAbort, type Perspective } from '@/components/app/perspective-provider'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import {
@@ -583,7 +584,10 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           description={pageInfoText}
           className="absolute right-0 top-0"
         />
-        <Kicker size="large">Bezittingen · opgeslagen vrijheid</Kicker>
+        <div className="flex flex-wrap items-center gap-2">
+          <Kicker size="large">Bezittingen · opgeslagen vrijheid</Kicker>
+          <PerspectiveContextLabel />
+        </div>
 
         <EditorialHeadline emphasis="vrijheid" size="lg">
           Opgeslagen vrijheid
@@ -2507,7 +2511,9 @@ function ProjectionChart({
   const chartH = h - pad.top - pad.bottom
 
   const rawMax = Math.max(...data.map((d) => d.total), currentValue)
-  if (rawMax <= 0) return <div className="flex h-40 items-center justify-center text-xs text-[var(--ink-3)]">Geen data</div>
+  // `!(rawMax > 0)` also catches NaN/Infinity — a plain `rawMax <= 0` lets a
+  // non-finite max through (NaN <= 0 is false), which would emit NaN y-coords.
+  if (!(rawMax > 0) || !Number.isFinite(rawMax)) return <div className="flex h-40 items-center justify-center text-xs text-[var(--ink-3)]">Geen data</div>
   const maxVal = rawMax * 1.05
   const maxMonth = data.length
 

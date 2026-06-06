@@ -7,6 +7,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { BOX3_TOOLTIPS, type Box3Result, type TaxYear } from '@/lib/box3-data'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { createClient } from '@/lib/supabase/client'
 import { loadPerspectiveBox3, type PerspectiveBox3Data } from '@/lib/household-tax'
 
@@ -252,8 +253,11 @@ export function Box3Detail({
       <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
         {/* Samenvatting */}
         <div className="p-4 sm:p-5">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Box 3 — vermogensbelasting {result.year}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+              Box 3 — vermogensbelasting {result.year}
+            </div>
+            <PerspectiveContextLabel />
           </div>
           <div className="mt-1 flex items-baseline gap-2 flex-wrap">
             <span className="font-serif text-2xl font-semibold text-[var(--ink)] tabular-nums">

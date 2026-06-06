@@ -24,6 +24,7 @@ import { CategoryHistoryChart } from './category-history-chart'
 import type { CategoryHistoryData } from '@/lib/load-category-history'
 import { createClient } from '@/lib/supabase/client'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import {
   loadPerspectiveData,
   type PerspectiveContext,
@@ -576,6 +577,7 @@ function DebtCategoryHero({ type, total, count }: DebtCategoryHeroProps) {
             style={{ background: 'var(--negative)' }}
           />
           {DEBT_TYPE_LABELS[type]}
+          <PerspectiveContextLabel className="normal-case tracking-normal" />
         </div>
 
         {/* Hoofdbedrag (restschuld) met halve transparante streep */}

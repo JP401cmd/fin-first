@@ -32,6 +32,7 @@ import {
   useHeroRailState,
 } from './hero-widget-rail'
 import { ViewModeToggle, useViewMode } from '@/components/app/view-mode-provider'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { OnboardingNudges } from './onboarding-nudges'
 import { CompoundInsightCard } from './compound-insight-card'
 import { PrintOverzichtButton } from './print-overzicht-button'
@@ -215,8 +216,13 @@ export function OverzichtHero({
       </div>
 
       <header className="mb-6 pr-12 sm:pr-16">
-        <div className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-4)]">
-          {dateLabel}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-4)]">
+            {dateLabel}
+          </span>
+          {/* Maakt duidelijk wanneer de getallen van het huishouden/partner zijn
+              (verborgen in eigen weergave). */}
+          <PerspectiveContextLabel />
         </div>
         <h1 className="mt-1 font-serif text-2xl md:text-3xl font-semibold text-[var(--ink)] leading-tight">
           {greeting}
