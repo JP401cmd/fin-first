@@ -45,9 +45,10 @@ describe('WillHome', () => {
     expect(screen.getByText(/Koppel je bank/i)).toBeInTheDocument()
   })
 
-  it('× sluit de melding zonder de chat te openen', () => {
+  it('× sluit de melding zonder de chat te openen', async () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
     render(<WillHome dataGaps={gaps({ hasBank: false })} delayMs={0} autoDismissMs={999999} />)
+    await act(async () => {})
     act(() => { vi.advanceTimersByTime(400) })
     fireEvent.click(screen.getByRole('button', { name: /Sluiten/i }))
     expect(open).not.toHaveBeenCalled()

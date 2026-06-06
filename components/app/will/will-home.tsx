@@ -16,6 +16,8 @@ import {
 import type { ModuleId } from '@/lib/module-registry'
 
 const THINK_MS = 400
+// Hoeveel px de avatar in de melding-kop "indockt" t.o.v. de strookhoogte.
+const AVATAR_DOCK_OFFSET = 30
 const POSTPONED_PROMPT =
   'Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met de belangrijkste.'
 
@@ -76,7 +78,7 @@ export function WillHome({
   const [rise, setRise] = useState(80)
   useLayoutEffect(() => {
     if (mode === 'melding' && strookRef.current) {
-      setRise(Math.max(0, strookRef.current.offsetHeight - 30))
+      setRise(Math.max(0, strookRef.current.offsetHeight - AVATAR_DOCK_OFFSET))
     }
   }, [mode, suggestion?.key, shown, done])
 

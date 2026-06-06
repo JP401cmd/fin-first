@@ -1,6 +1,7 @@
 .willhome {
   position: fixed;
   z-index: 50;
+  /* eerste right = fallback; tweede = sidebar-bewust (calc + custom prop) */
   right: 1rem;
   bottom: calc(var(--bottom-nav-height) + 1.5rem);
   right: calc(1rem + var(--chat-sidebar-width, 0px));
