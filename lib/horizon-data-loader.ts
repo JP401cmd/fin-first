@@ -332,7 +332,6 @@ export async function loadHorizonData(
   }
 
   // Fallback to profile estimates for users without transactions
-  const profileMonthlyIncome = Number(profile.net_monthly_income ?? 0)
   const profileMonthlyExpenses = Number(profile.estimated_monthly_expenses ?? 0)
   const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
     resolveEffectiveIncomeExpenses(profile ?? {}, monthlyIncome, monthlyExpenses)

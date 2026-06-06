@@ -356,14 +356,6 @@ export function CashOverview({
   // Aggregations
   const totalBalance = useMemo(() => accounts.reduce((s, a) => s + Number(a.balance), 0), [accounts])
 
-  // Totaal over alle cash-assets in dit perspectief — VermogenAssetCard
-  // verzorgt zelf de waarde-weergave per kaart, dus dit is alleen beschikbaar
-  // als de caller een totaal/aandeel nodig heeft.
-  const cashAssetsTotal = useMemo(
-    () => cashAssets.reduce((s, a) => s + (Number(a.current_value) || 0), 0),
-    [cashAssets],
-  )
-
   // Hash-focus: wanneer de URL een `#rekening-<assetId>`-anker bevat, scroll
   // de bijbehorende kaart in beeld en geef hem een tijdelijke ring-highlight.
   // Alleen actief in de brede (showAllCashAccounts) modus.

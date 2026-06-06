@@ -224,7 +224,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   // Fallback to profile estimates for users without transactions
-  const profileMonthlyIncome = Number(profileResult.data?.net_monthly_income ?? 0)
   const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
   const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
     resolveEffectiveIncomeExpenses(profileResult.data ?? {}, monthlyIncome, monthlyExpenses)
