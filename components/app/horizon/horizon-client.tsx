@@ -182,6 +182,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [partnerHero, setPartnerHero] = useState<HouseholdHeroData | null>(null)
   const [householdInput, setHouseholdInput] = useState<FinancialInput | null>(null)
   const [householdOverlays, setHouseholdOverlays] = useState<HouseholdPartnerOverlay[] | null>(null)
+  // Gezamenlijke lijn als HOOFDLIJN in huishoudweergave (matcht de hero-FIRE),
+  // zodat de prominente lijn + marker het huishouden tonen i.p.v. de eigen lijn.
+  const [householdMainLine, setHouseholdMainLine] = useState<{
+    rows: SimRow[]
+    fireAge: number | null
+    fireAgeFractional: number | null
+    currentAge: number | null
+  } | null>(null)
   // Partner-projectie-pad (voor het wisselen van de hoofdlijn in partner-view).
   // `rows` is leeg wanneer de partner alleen 'totals' deelt of z'n toekomst
   // verbergt — dan tonen we geen partner-lijn (graceful degrade).
@@ -775,6 +783,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       setPartnerHero(null)
       setHouseholdInput(null)
       setHouseholdOverlays(null)
+      setHouseholdMainLine(null)
       setPartnerLine(null)
       setPartnerLifeEvents([])
       setHouseholdRetireInfo(null)
@@ -822,21 +831,38 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             monthlyContributions: cp.monthlySavings,
             dateOfBirth: oldestDob,
           })
-          // Huishouden-view: ALLEEN de gecombineerde (gestreepte, gouden) lijn
-          // als overlay — NIET een aparte per-partner-lijn (de eigen lijn is de
-          // hoofdlijn). Het pad komt 1-op-1 uit de unified combined-projectie.
-          const overlays: HouseholdPartnerOverlay[] = []
+          // Huishouden-view: de GECOMBINEERDE lijn is de HOOFDLIJN (matcht de
+          // hero-FIRE-leeftijd), zodat de prominente lijn + marker het huishouden
+          // tonen i.p.v. de eigen lijn (die anders een afwijkende FIRE-leeftijd
+          // liet zien). Het pad komt 1-op-1 uit de unified combined-projectie.
           if (result.combined.rows.length > 0) {
-            overlays.push({
-              name: 'Gezamenlijk',
-              color: '#8a6e42', // horizon gold
-              points: result.combined.rows.map(r => [r.age, r.endPortfolio] as [number, number]),
+            setHouseholdMainLine({
+              rows: result.combined.rows,
               fireAge: cp.fireAge,
               fireAgeFractional: result.combined.fireAgeFractional,
+              currentAge: cp.currentAge,
+            })
+          } else {
+            setHouseholdMainLine(null)
+          }
+          // Eigen lijn als overlay — ALLEEN wanneer de huidige gebruiker de oudste
+          // partner (head) is, zodat de leeftijds-as klopt (de gecombineerde lijn
+          // loopt op de head-as). Bron = household-projectie (matcht de partnerkaart),
+          // niet de losse pagina-sim. Anders tonen we enkel de gezamenlijke lijn.
+          const me = result.partners.find(p => p.isCurrentUser)
+          const headCurrentAge = Math.max(...result.partners.map(p => p.settings.currentAge ?? 0))
+          const ownOverlays: HouseholdPartnerOverlay[] = []
+          if (me && me.rows.length > 0 && (me.settings.currentAge ?? 0) >= headCurrentAge) {
+            ownOverlays.push({
+              name: 'Jouw projectie',
+              color: '#b89968', // lichter horizon
+              points: me.rows.map(r => [r.age, r.endPortfolio] as [number, number]),
+              fireAge: me.projection.fireAge,
+              fireAgeFractional: me.fireAgeFractional,
               isDashed: true,
             })
           }
-          setHouseholdOverlays(overlays.length > 0 ? overlays : null)
+          setHouseholdOverlays(ownOverlays.length > 0 ? ownOverlays : null)
           setHouseholdRetireInfo({
             candidates: result.comparison.householdRetirementCandidates,
             method: result.comparison.householdRetirementMethod,
@@ -860,6 +886,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           })
           setHouseholdHero(null)
           setHouseholdOverlays(null)
+          setHouseholdMainLine(null)
           setHouseholdInput(null)
           setHouseholdRetireInfo(null)
           // Partner-view: vervang de hoofdlijn door het partner-pad zodat de
@@ -1374,6 +1401,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // grafiek nooit leeg/kapot is. In persoonlijk + huishouden-view blijft de
   // hoofdlijn de EIGEN lijn (huishouden voegt de gecombineerde overlay toe).
   const usePartnerMainLine = isPartnerView && partnerLine !== null
+  // Huishouden-view: de gecombineerde lijn is de hoofdlijn (matcht de hero-FIRE).
+  const useHouseholdMainLine = isHouseholdView && householdMainLine !== null
   const aowAgeIntForDepletion = Math.ceil(userAowAge.fractional)
   const depletionAge = isAowStopActive && aowStopSimResult
     ? aowStopSimResult.rows.find(r => r.age >= aowAgeIntForDepletion && r.endPortfolio <= 0)?.age ?? null
@@ -3220,27 +3249,28 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         >
                           <SimChart
                             key={planningMode}
-                            rows={usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? effectiveSimRows : simResult.rows)}
-                            fireAge={usePartnerMainLine ? partnerLine!.fireAge : (isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge)}
-                            fireAgeFractional={usePartnerMainLine ? partnerLine!.fireAgeFractional : (isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional)}
-                            currentAge={usePartnerMainLine ? (partnerLine!.currentAge ?? currentAge ?? 30) : (currentAge ?? 30)}
+                            rows={useHouseholdMainLine ? householdMainLine!.rows : usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? effectiveSimRows : simResult.rows)}
+                            fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge)}
+                            fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional)}
+                            currentAge={useHouseholdMainLine ? (householdMainLine!.currentAge ?? currentAge ?? 30) : usePartnerMainLine ? (partnerLine!.currentAge ?? currentAge ?? 30) : (currentAge ?? 30)}
                             endAge={simResult.displayEndAge}
                             cashflows={simCashflows}
                             fireTarget={simResult.requiredFirePortfolio}
                             strategy={simResult.strategy}
                             targetEndPortfolio={simResult.targetEndPortfolio}
-                            scenarioOverlays={(isAowStopActive || usePartnerMainLine) ? undefined : [
+                            mainLineLabel={useHouseholdMainLine ? 'Gezamenlijk' : usePartnerMainLine ? (partnerName ?? 'Partner') : undefined}
+                            scenarioOverlays={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : [
                               ...(scenarioOverlays ?? []),
                               ...scenarioOverlayDataList.map(d => d.overlay),
                             ]}
-                            monteCarloOverlay={(isAowStopActive || usePartnerMainLine) ? undefined : monteCarloOverlay}
+                            monteCarloOverlay={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : monteCarloOverlay}
                             dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
                             householdOverlays={householdOverlays ?? undefined}
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             aowAgeFractional={userAowAge.fractional}
                             planningMode={planningMode}
-                            showDepletionWarning={isAowStopActive && !usePartnerMainLine}
+                            showDepletionWarning={isAowStopActive && !usePartnerMainLine && !useHouseholdMainLine}
                             eventOverlay={chartEventOverlay}
                             onEventClick={handleChartEventClick}
                             onEventDragEnd={handleChartEventDragEnd}

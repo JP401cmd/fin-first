@@ -103,6 +103,29 @@ export function HouseholdFireSection() {
   const currentUserPartner = partners.find(p => p.isCurrentUser)
   const splitLabel = SPLIT_MODE_LABELS[splitMode] ?? splitMode
 
+  // Gecombineerde FIRE uitgedrukt als kalenderjaar + ieders leeftijd dán.
+  // De combined `fireAge` is de leeftijd van de OUDSTE partner (de head, wiens
+  // tijdas de gezamenlijke projectie volgt). Die los tonen naast ieders eigen
+  // leeftijd is appels-met-peren: het zijn leeftijden van verschillende mensen.
+  // We vertalen het daarom naar één kalenderjaar waarin beiden kunnen stoppen,
+  // met de leeftijd van elke partner in dat jaar.
+  const headCurrentAge = Math.max(...partners.map(p => p.settings.currentAge ?? 0))
+  const combinedFireAge = combined.projection.fireAge
+  const yearsToCombinedFire = combinedFireAge != null && headCurrentAge > 0 ? combinedFireAge - headCurrentAge : null
+  const combinedFireYear = (() => {
+    // Liefst het jaar uit fireDate parsen; anders huidig jaar + jaren-tot-FIRE.
+    const m = combined.projection.fireDate?.match(/\b(20\d{2})\b/)
+    if (m) return Number(m[1])
+    if (yearsToCombinedFire != null) return new Date().getFullYear() + Math.round(yearsToCombinedFire)
+    return null
+  })()
+  const partnerAgesAtCombinedFire = yearsToCombinedFire != null
+    ? partners.map(p => ({
+        name: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
+        age: Math.round((p.settings.currentAge ?? 0) + yearsToCombinedFire),
+      }))
+    : []
+
   // Personal perspective: show only the user's individual FIRE age
   if (isPersonalView && currentUserPartner) {
     return (
@@ -240,12 +263,25 @@ export function HouseholdFireSection() {
             </p>
           </div>
 
-          {/* Combined FIRE Age */}
+          {/* Combined FIRE — uitgedrukt als kalenderjaar (niet als leeftijd van
+              één persoon). Sub-line toont ieders leeftijd in dat jaar. */}
           <div>
-            <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE leeftijd</p>
-            <p className="text-2xl font-bold text-horizon-700" data-testid="combined-fire-age">
-              {combined.projection.fireAge !== null ? Math.round(combined.projection.fireAge) : '-'}
-            </p>
+            <p className="text-[10px] font-medium text-horizon-600/50 uppercase">Samen vrij in</p>
+            {combinedFireYear !== null && partnerAgesAtCombinedFire.length > 0 ? (
+              <>
+                <p className="text-2xl font-bold text-horizon-700" data-testid="combined-fire-age">
+                  {combinedFireYear}
+                </p>
+                <p className="mt-0.5 text-[11px] text-horizon-600/60" data-testid="combined-fire-ages">
+                  {partnerAgesAtCombinedFire.map(pa => `${pa.name} ${pa.age}`).join(' · ')}
+                </p>
+              </>
+            ) : (
+              // Fallback: niet haalbaar / leeftijden ontbreken → toon de leeftijd.
+              <p className="text-2xl font-bold text-horizon-700" data-testid="combined-fire-age">
+                {combinedFireAge !== null ? `${Math.round(combinedFireAge)} jaar` : '-'}
+              </p>
+            )}
           </div>
 
           {/* Combined FIRE Target */}
@@ -351,10 +387,12 @@ export function HouseholdFireSection() {
             ))}
           </div>
 
-          {/* 3-way FIRE Age Comparison */}
+          {/* 3-way FIRE-jaar vergelijking (kalenderjaren, niet leeftijden) */}
           <FireAgeComparison
             combined={combined}
             partners={partners}
+            combinedFireYear={combinedFireYear}
+            partnerAgesAtCombinedFire={partnerAgesAtCombinedFire}
             hasEntered={hasEntered}
           />
 
@@ -497,8 +535,6 @@ export function HouseholdFireSection() {
                 })()}
                 {combined.projection.fireAge !== null && partners.every(p => p.projection.fireAge !== null) ? (
                   (() => {
-                    const avgIndividual = partners.reduce((sum, p) => sum + (p.projection.fireAge ?? 0), 0) / partners.length
-                    const diff = Math.round(avgIndividual - combined.projection.fireAge!)
                     const indiv = comparison.individualRetirementExpenses
                     const sumIndiv = indiv.reduce((s, p) => s + p.amount, 0)
                     const verschil = sumIndiv - comparison.combinedRetirementExpenses
@@ -506,18 +542,55 @@ export function HouseholdFireSection() {
                       indiv.length >= 2 &&
                       indiv.every(p => p.amount > 0) &&
                       comparison.combinedRetirementExpenses > 0
+
+                    // Eerste zin: vergelijk het GEZAMENLIJKE FIRE-jaar met ieders
+                    // SOLO FIRE-jaar (niet leeftijd-rekenkunde tussen verschillende
+                    // mensen). Per partner bepalen of het gezamenlijke pad voor hen
+                    // eerder of later valt dan solo.
+                    const partnerYears = partners.map(p => {
+                      const m = p.projection.fireDate?.match(/\b(20\d{2})\b/)
+                      return {
+                        name: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
+                        soloYear: m ? Number(m[1]) : null,
+                      }
+                    })
+                    const earlierForHousehold = combinedFireYear != null
+                      ? partnerYears.filter(p => p.soloYear != null && combinedFireYear < p.soloYear)
+                      : []
+                    const laterForHousehold = combinedFireYear != null
+                      ? partnerYears.filter(p => p.soloYear != null && combinedFireYear > p.soloYear)
+                      : []
+                    // Bouw een feitelijke zin op basis van wat we betrouwbaar weten.
+                    let firstSentence: string
+                    if (combinedFireYear == null) {
+                      firstSentence = 'Door jullie vermogen en inkomen te bundelen verschuift voor ieder het moment waarop je kunt stoppen.'
+                    } else if (earlierForHousehold.length > 0 && laterForHousehold.length > 0) {
+                      firstSentence = `Samen kunnen jullie stoppen in ${combinedFireYear} — ${laterForHousehold[0]!.name} iets later en ${earlierForHousehold[0]!.name} eerder dan solo.`
+                    } else if (earlierForHousehold.length > 0 && laterForHousehold.length === 0) {
+                      firstSentence = `Samen kunnen jullie stoppen in ${combinedFireYear} — voor ${earlierForHousehold.map(p => p.name).join(' en ')} eerder dan solo, door jullie vermogen en inkomen te bundelen.`
+                    } else if (laterForHousehold.length > 0 && earlierForHousehold.length === 0) {
+                      firstSentence = `Samen kunnen jullie stoppen in ${combinedFireYear} — voor ${laterForHousehold.map(p => p.name).join(' en ')} iets later dan solo, maar dan stoppen jullie wél samen.`
+                    } else {
+                      firstSentence = `Samen kunnen jullie stoppen in ${combinedFireYear}; door jullie vermogen en inkomen te bundelen verschuift voor ieder het moment waarop je kunt stoppen.`
+                    }
+
+                    // Tweede zin: hangt af van de gekozen uitgave-na-pensioen-methode.
+                    // De oude tekst klopte alleen bij `auto_shared` (gedeelde lasten
+                    // tellen één keer). Bij `sum_partners` tellen ze juist dubbel.
+                    const reasonSentence =
+                      comparison.householdRetirementMethod === 'sum_partners'
+                        ? 'Jullie uitgave ná pensioen is hier de optelsom van beide partners; het gezamenlijke pad bundelt jullie vermogen en inkomen, maar de gedeelde lasten tellen dan dubbel.'
+                        : comparison.householdRetirementMethod === 'custom_amount'
+                          ? 'Jullie hebben de gezamenlijke uitgave ná pensioen zelf ingesteld.'
+                          : 'De reden zit in de uitgaven ná pensioen: gedeelde vaste lasten draag je samen, dus die tellen in het huishouden maar één keer mee in plaats van twee keer.'
+
                     return (
                       <>
                         <p className="mt-1 text-horizon-700/80">
-                          {diff > 0
-                            ? `Als huishouden bereiken jullie FIRE ${diff} jaar eerder dan het gemiddelde van jullie individuele projecties.`
-                            : diff < 0
-                              ? `De gezamenlijke FIRE-leeftijd ligt ${Math.abs(diff)} jaar later dan het gemiddelde van jullie individuele projecties.`
-                              : `Jullie gezamenlijke en individuele FIRE-leeftijden liggen dicht bij elkaar.`}
+                          {firstSentence}
                         </p>
                         <p className="mt-1.5 text-xs leading-relaxed text-horizon-700/70">
-                          De reden zit in de uitgaven ná pensioen: gedeelde vaste lasten draag je samen,
-                          dus die tellen in het huishouden maar één keer mee in plaats van twee keer.
+                          {reasonSentence}
                         </p>
 
                         {/* De rekensom: uitgaven ná pensioen, apart vs samen (per jaar) */}
@@ -656,34 +729,54 @@ export function HouseholdFireSection() {
 function FireAgeComparison({
   combined,
   partners,
+  combinedFireYear,
+  partnerAgesAtCombinedFire,
   hasEntered,
 }: {
   combined: { projection: FireProjectionData }
   partners: PartnerProjection[]
+  /** Kalenderjaar waarin het huishouden samen kan stoppen (null = niet haalbaar). */
+  combinedFireYear: number | null
+  /** Leeftijd van elke partner in `combinedFireYear` (voor de sub-line van de gezamenlijke kaart). */
+  partnerAgesAtCombinedFire: Array<{ name: string; age: number }>
   hasEntered: boolean
 }) {
-  // Build entries: each partner + combined
-  type Entry = { label: string; fireAge: number | null; fireDate: string; color: string; isCombined?: boolean }
+  // Parse het SOLO FIRE-jaar van een partner uit z'n fireDate (bv. "jun 2042").
+  function parseYear(fireDate: string): number | null {
+    const m = fireDate?.match(/\b(20\d{2})\b/)
+    return m ? Number(m[1]) : null
+  }
+
+  // Vergelijk KALENDERJAREN (niet leeftijden): per partner z'n solo-jaar, plus
+  // het gezamenlijke jaar. Elke kaart toont een jaar als hoofdgetal en de
+  // bijbehorende leeftijd(en) op de sub-line.
+  type Entry = { label: string; year: number | null; subLabel: string; color: string; isCombined?: boolean }
   const entries: Entry[] = [
-    ...partners.map((p, i) => ({
-      label: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
-      fireAge: p.projection.fireAge,
-      fireDate: p.projection.fireDate,
-      color: i === 0 ? 'horizon' : 'wil',
-    })),
+    ...partners.map((p, i): Entry => {
+      const name = p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner')
+      const soloAge = p.projection.fireAge !== null ? Math.round(p.projection.fireAge) : null
+      return {
+        label: name,
+        year: parseYear(p.projection.fireDate),
+        subLabel: soloAge !== null ? `${name} is dan ${soloAge}` : 'niet haalbaar',
+        color: i === 0 ? 'horizon' : 'wil',
+      }
+    }),
     {
       label: 'Gezamenlijk',
-      fireAge: combined.projection.fireAge,
-      fireDate: combined.projection.fireDate,
+      year: combinedFireYear,
+      subLabel: partnerAgesAtCombinedFire.length > 0
+        ? partnerAgesAtCombinedFire.map(pa => `${pa.name} ${pa.age}`).join(' · ')
+        : 'niet haalbaar',
       color: 'emerald',
       isCombined: true,
     },
   ]
 
-  // Find the earliest FIRE age (best)
-  const validAges = entries.filter(e => e.fireAge !== null).map(e => e.fireAge as number)
-  const earliestAge = validAges.length > 0 ? Math.min(...validAges) : null
-  const maxAge = validAges.length > 0 ? Math.max(...validAges) : null
+  // Vroegste én laatste JAAR (voor de "Vroegst"-badge en de relatieve balk).
+  const validYears = entries.filter(e => e.year !== null).map(e => e.year as number)
+  const earliestYear = validYears.length > 0 ? Math.min(...validYears) : null
+  const maxYear = validYears.length > 0 ? Math.max(...validYears) : null
 
   const colorMap: Record<string, { bg: string; border: string; text: string; badge: string }> = {
     horizon: { bg: 'bg-horizon-50', border: 'border-horizon-300', text: 'text-horizon-700', badge: 'bg-horizon-100 text-horizon-700' },
@@ -693,19 +786,23 @@ function FireAgeComparison({
 
   return (
     <div className="mt-4 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-5" data-testid="fire-age-comparison">
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-1 flex items-center gap-2">
         <Clock className="h-3.5 w-3.5 text-[var(--ink-3)]" />
         <h4 className="text-xs font-semibold tracking-[0.15em] text-[var(--ink-3)] uppercase">
-          FIRE-leeftijd vergelijking
+          Wanneer kan iedereen stoppen?
         </h4>
       </div>
+      <p className="mb-4 text-[11px] leading-relaxed text-[var(--ink-3)]">
+        Een gezamenlijk jaar waarop jullie allebei kunnen stoppen — ieder met de eigen leeftijd op dat moment.
+      </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {entries.map((entry) => {
           const colors = colorMap[entry.color] ?? colorMap.horizon
-          const isEarliest = entry.fireAge !== null && earliestAge !== null && Math.round(entry.fireAge) === Math.round(earliestAge)
-          const diffMonths = entry.fireAge !== null && earliestAge !== null
-            ? Math.round((entry.fireAge - earliestAge) * 12)
+          // Vroegst = het laagste (eerste) JAAR onder de drie.
+          const isEarliest = entry.year !== null && earliestYear !== null && entry.year === earliestYear
+          const yearsLater = entry.year !== null && earliestYear !== null
+            ? entry.year - earliestYear
             : null
 
           return (
@@ -717,7 +814,7 @@ function FireAgeComparison({
               data-testid={`fire-age-entry-${entry.isCombined ? 'combined' : entry.label.toLowerCase()}`}
               title={entry.isCombined ? 'Berekend op basis van gecombineerd vermogen, inkomsten en uitgaven van het huishouden' : undefined}
             >
-              {/* Earliest badge */}
+              {/* Vroegst-badge — op basis van het eerste KALENDERJAAR. */}
               {isEarliest && (
                 <span className={`absolute -top-2.5 right-3 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${colors.badge}`}>
                   ✦ Vroegst
@@ -726,31 +823,30 @@ function FireAgeComparison({
 
               <p className="mb-1 text-[10px] font-medium text-[var(--ink-3)] uppercase">{entry.label}</p>
 
+              {/* Hoofdgetal = KALENDERJAAR (niet leeftijd). */}
               <p className={`font-mono text-3xl font-bold tabular-nums ${isEarliest ? colors.text : 'text-[var(--ink)]'}`}>
-                {entry.fireAge !== null ? Math.round(entry.fireAge) : '-'}
+                {entry.year !== null ? entry.year : '-'}
               </p>
+              {/* Sub-line = leeftijd(en) op dat moment. */}
               <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
-                {entry.fireAge !== null ? 'jaar' : 'niet haalbaar'}
+                {entry.year !== null ? entry.subLabel : 'niet haalbaar'}
               </p>
 
-              {/* Difference from earliest */}
-              {diffMonths !== null && diffMonths > 0 && (
+              {/* Verschil t.o.v. het vroegste jaar. */}
+              {yearsLater !== null && yearsLater > 0 && (
                 <p className="mt-2 text-[10px] text-[var(--ink-4)]">
-                  +{Math.floor(diffMonths / 12)}j {diffMonths % 12}mnd t.o.v. vroegste
+                  +{yearsLater} jaar t.o.v. vroegste
                 </p>
               )}
 
-              {/* FIRE date */}
-              <p className="mt-1 text-[10px] text-[var(--ink-4)]">{entry.fireDate}</p>
-
-              {/* Visual bar representing relative fire age */}
-              {maxAge !== null && earliestAge !== null && entry.fireAge !== null && maxAge > earliestAge && (
+              {/* Relatieve balk: vroeger jaar = vollere balk. */}
+              {maxYear !== null && earliestYear !== null && entry.year !== null && maxYear > earliestYear && (
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-ed)]">
                   <div
                     className={`h-full rounded-full ${isEarliest ? 'bg-emerald-400' : 'bg-[var(--border-md)]'}`}
                     style={{
                       width: hasEntered
-                        ? `${Math.max(100 - ((entry.fireAge - earliestAge) / (maxAge - earliestAge)) * 100, 5)}%`
+                        ? `${Math.max(100 - ((entry.year - earliestYear) / (maxYear - earliestYear)) * 100, 5)}%`
                         : '0%',
                       transition: hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none',
                     }}

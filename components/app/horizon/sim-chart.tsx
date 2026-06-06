@@ -59,6 +59,7 @@ export const SimChart = memo(function SimChart({
   baselineFireAge,
   dailyExpenseRate,
   householdOverlays,
+  mainLineLabel,
   visibleMinAge,
   visibleMaxAge,
   aowAgeFractional,
@@ -90,6 +91,9 @@ export const SimChart = memo(function SimChart({
   dailyExpenseRate?: number
   /** Optional partner trajectories for household perspective */
   householdOverlays?: HouseholdPartnerOverlay[]
+  /** Label voor de HOOFDLIJN in de legenda (bv. "Gezamenlijk" / partnernaam).
+   *  Wanneer gezet toont de legenda welke lijn de dikke hoofdlijn is. */
+  mainLineLabel?: string
   /** Zoomed visible range (optional — defaults to full range) */
   visibleMinAge?: number
   visibleMaxAge?: number
@@ -1205,10 +1209,25 @@ export const SimChart = memo(function SimChart({
         )
       })()}
 
-      {/* Household partner legend */}
-      {householdOverlays && householdOverlays.length > 0 && (
+      {/* Hoofdlijn- + household-legenda: maakt duidelijk welke lijn wat is. */}
+      {(mainLineLabel || (householdOverlays && householdOverlays.length > 0)) && (
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4">
-          {householdOverlays.map(overlay => (
+          {mainLineLabel && (
+            <div className="flex items-center gap-1.5">
+              <svg width="20" height="8" className="shrink-0">
+                <line x1="0" y1="4" x2="20" y2="4" stroke={COLOR_OPBOUW} strokeWidth={2.5} strokeLinecap="round" />
+              </svg>
+              <span className="text-[10px] font-medium text-[var(--ink-3)]">
+                {mainLineLabel}
+                {(fireAgeFractional ?? fireAge) !== null && (
+                  <span className="ml-1 font-mono text-[var(--ink-4)]">
+                    ({Math.round((fireAgeFractional ?? fireAge) as number)}j)
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+          {(householdOverlays ?? []).map(overlay => (
             <div key={overlay.name} className="flex items-center gap-1.5">
               <svg width="20" height="8" className="shrink-0">
                 <line
