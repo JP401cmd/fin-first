@@ -60,6 +60,7 @@ export const SimChart = memo(function SimChart({
   dailyExpenseRate,
   householdOverlays,
   mainLineLabel,
+  mainLineColor,
   visibleMinAge,
   visibleMaxAge,
   aowAgeFractional,
@@ -94,6 +95,9 @@ export const SimChart = memo(function SimChart({
   /** Label voor de HOOFDLIJN in de legenda (bv. "Gezamenlijk" / partnernaam).
    *  Wanneer gezet toont de legenda welke lijn de dikke hoofdlijn is. */
   mainLineLabel?: string
+  /** Optionele kleur-override voor de HOOFDLIJN (bv. partner-projectie teal,
+   *  gelijk aan de partner-event-markers). Default = opbouw-goud/afbouw-bruin. */
+  mainLineColor?: string
   /** Zoomed visible range (optional — defaults to full range) */
   visibleMinAge?: number
   visibleMaxAge?: number
@@ -309,6 +313,11 @@ export const SimChart = memo(function SimChart({
   // Module-kleuren: Horizon goud voor opbouw/inkomen, Kern bruin voor afbouw/uitgaven
   const COLOR_OPBOUW = 'var(--hor-t, #8a6e42)'
   const COLOR_AFBOUW = 'var(--kern-t, #58362d)'
+  // Optionele hoofdlijn-kleur-override (bv. partner-projectie = teal, gelijk aan de
+  // partner-event-markers). Raakt alleen de hoofdlijn + FIRE-stip + legenda-swatch;
+  // cashflow-/event-markers houden hun eigen kleur.
+  const mainStrokeAcc = mainLineColor ?? COLOR_OPBOUW
+  const mainStrokeDec = mainLineColor ?? (!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW)
 
   const yTicks = [0, 0.33, 0.66, 1.0].map(f => ({
     val: maxVal * f,
@@ -780,7 +789,7 @@ export const SimChart = memo(function SimChart({
           <path
             d={pointsToPath(accPts)}
             fill="none"
-            stroke={COLOR_OPBOUW}
+            stroke={mainStrokeAcc}
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -796,7 +805,7 @@ export const SimChart = memo(function SimChart({
           <path
             d={pointsToPath(decPts)}
             fill="none"
-            stroke={!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW}
+            stroke={mainStrokeDec}
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -874,7 +883,7 @@ export const SimChart = memo(function SimChart({
         {/* Dot at FIRE junction (hidden in pensioen mode) */}
         {!isPensioenMode && xFire !== null && yFireDot !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
           <circle cx={xFire} cy={yFireDot} r={5}
-            fill={COLOR_OPBOUW} stroke="var(--paper)" strokeWidth={1.5} />
+            fill={mainStrokeAcc} stroke="var(--paper)" strokeWidth={1.5} />
         )}
 
         {/* One-time cashflow markers with amount labels */}
@@ -1215,7 +1224,7 @@ export const SimChart = memo(function SimChart({
           {mainLineLabel && (
             <div className="flex items-center gap-1.5">
               <svg width="20" height="8" className="shrink-0">
-                <line x1="0" y1="4" x2="20" y2="4" stroke={COLOR_OPBOUW} strokeWidth={2.5} strokeLinecap="round" />
+                <line x1="0" y1="4" x2="20" y2="4" stroke={mainStrokeAcc} strokeWidth={2.5} strokeLinecap="round" />
               </svg>
               <span className="text-[10px] font-medium text-[var(--ink-3)]">
                 {mainLineLabel}
