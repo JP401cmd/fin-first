@@ -96,6 +96,10 @@ export async function loadCashflowSettingsData(
     },
     incomeSource: (profile?.income_source as 'auto' | 'manual') ?? 'auto',
     expensesSource: (profile?.expenses_source as 'auto' | 'manual') ?? 'auto',
-    computedMonthlyExpenses: rf.monthlyExpenses,
+    // Transactie-berekend (6-mnd gemiddelde), bewust NIET rf.monthlyExpenses —
+    // dat is de effectieve (post-resolver) waarde die bij een handmatige
+    // override gelijk is aan het ingevoerde bedrag. extHalfYearExpenses komt
+    // puur uit transacties, dus de kassabon toont "berekend" los van "handmatig".
+    computedMonthlyExpenses: Math.round(core.savingsReceiptData.extHalfYearExpenses / 6),
   }
 }
