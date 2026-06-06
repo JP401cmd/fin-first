@@ -111,6 +111,8 @@ interface VermogenAssetCardProps {
    * "Partner vermogen (totaal)"-kaart, zonder bewerk-/herwaardeer-acties.
    */
   aggregated?: boolean
+  /** Verberg de bewerk-/herwaardeer-actierij (bv. cash op bezittingen — beheer loopt via cashflow). */
+  hideActions?: boolean
 }
 
 // ── Component ───────────────────────────────────────────────
@@ -129,6 +131,7 @@ export function VermogenAssetCard({
   provenance,
   shareFraction,
   aggregated = false,
+  hideActions = false,
 }: VermogenAssetCardProps) {
   const router = useRouter()
   const { addToast } = useToast()
@@ -320,7 +323,7 @@ export function VermogenAssetCard({
           met aparte <button>s — geen nested buttons (a11y).
           Cash-rekeningen hebben geen edit/revalue acties: beheer loopt via
           de cashflow-pagina. */}
-      {asset.asset_type !== 'cash' && (
+      {!hideActions && (
         <div
           role="group"
           aria-label={`Acties voor ${asset.name}`}

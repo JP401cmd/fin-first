@@ -835,6 +835,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                     provenance={asset._provenance}
                     shareFraction={asset._myShareFraction}
                     aggregated={asset._aggregated}
+                    hideActions={type === 'cash'}
                   />
                 ))}
                 <AddCategoryCard
