@@ -15,10 +15,11 @@ type Sheet = null | 'income' | 'expenses' | 'savings'
 export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData }) {
   const computedIncome = Math.round(data.estimatedAnnualIncome / 12)
   const computedExpenses = data.computedMonthlyExpenses // transactie-berekend (NIET de manual estimatedMonthlyExpenses)
-  // Spaarquote = afgeleid van het getoonde inkomen − uitgaven, zodat "gebruik
-  // berekend" precies op het getoonde % uitkomt (geen sprong). Dit blijft
-  // consistent met de inkomen/uitgaven-driehoek (recomputeTriple).
-  const computedRate = computedIncome > 0 ? ((computedIncome - computedExpenses) / computedIncome) * 100 : 0
+  // rawSavingsRate voedt de interactieve driehoek (recomputeTriple): rate =
+  // (inkomen − uitgaven) / inkomen. De GETOONDE "berekend"-spaarquote is echter
+  // de canonieke 6-maands savingsRate6m (zelfde getal als de rest van de app),
+  // die ook spaarbudgetten + schuldaflossing meerekent.
+  const rawSavingsRate = computedIncome > 0 ? ((computedIncome - computedExpenses) / computedIncome) * 100 : 0
 
   // 6-maands basis voor de spaarquote-kassabon: som van inkomsten/uitgaven over
   // de laatste 6 maand-slots (transacties). Dit maakt de getoonde spaarquote
@@ -37,7 +38,7 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
   const [triple, setTriple] = useState({
     monthlyIncome: data.incomeSource === 'manual' && data.netMonthlyIncome > 0 ? data.netMonthlyIncome : computedIncome,
     monthlyExpenses: data.expensesSource === 'manual' ? data.estimatedMonthlyExpenses : computedExpenses,
-    savingsRate: computedRate,
+    savingsRate: rawSavingsRate,
   })
   const [lastEdited, setLastEdited] = useState<LastEdited>('expenses')
   const [incomeManual, setIncomeManual] = useState(data.incomeSource === 'manual')
@@ -94,8 +95,8 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
           value={<MaskedAmount value={triple.monthlyIncome * 12} tone="kern" />} manual={incomeManual}
           sub={`€${Math.round(triple.monthlyIncome).toLocaleString('nl-NL')}/mnd`} onClick={() => setSheet('income')} />
         <SettingCard icon={<Target className="h-4 w-4" />} label="Spaarquote"
-          value={`${Math.round(triple.savingsRate)}%`} manual={expensesManual}
-          sub={data.budgetingActive ? '6-mnd gemiddelde' : 'schatting'} onClick={() => setSheet('savings')} />
+          value={`${expensesManual ? Math.round(triple.savingsRate) : Math.round(data.savingsRate6m)}%`} manual={expensesManual}
+          sub="laatste 6 maanden" onClick={() => setSheet('savings')} />
         <SettingCard icon={<ShoppingCart className="h-4 w-4" />} label="Geschatte uitgaven"
           value={<MaskedAmount value={triple.monthlyExpenses} tone="kern" />} manual={expensesManual}
           sub="per maand" onClick={() => setSheet('expenses')} />
@@ -140,9 +141,23 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
 
       <BottomSheet open={sheet === 'expenses'} onClose={() => setSheet(null)} title="Geschatte uitgaven">
         <div className="space-y-3 p-4">
+          <p className="text-[11px] text-[var(--ink-3)]">Gemiddelde over je transacties van de afgelopen 6 maanden.</p>
           <KassabonShell>
-            <div className="flex items-center justify-between"><span>Berekend</span>
-              <span className="font-bold tabular-nums"><MaskedAmount value={computedExpenses} tone="kern" /></span></div>
+            <div className="space-y-1.5">
+              {data.monthlyBreakdown.slice(-6).map((m, i) => (
+                <div key={`${m.label}-${i}`} className="flex items-center justify-between text-[var(--ink-3)]">
+                  <span className="capitalize">{m.label}</span>
+                  <span className="tabular-nums"><MaskedAmount value={m.expenses} tone="kern" className="text-[11px]" /></span>
+                </div>
+              ))}
+              <div className="mt-2 border-t border-dashed border-[var(--border-md)] pt-2">
+                <div className="flex items-center justify-between font-bold">
+                  <span>Σ Uitgaven (6 mnd)</span>
+                  <span className="tabular-nums"><MaskedAmount value={data.monthlyBreakdown.slice(-6).reduce((s, m) => s + m.expenses, 0)} tone="kern" /></span>
+                </div>
+                <p className="mt-1 text-[10px] text-[var(--ink-4)]">≈ €{Math.round(computedExpenses).toLocaleString('nl-NL')}/mnd</p>
+              </div>
+            </div>
           </KassabonShell>
           <ChoiceRow computedLabel={`Gebruik berekend (€${Math.round(computedExpenses).toLocaleString('nl-NL')}/mnd)`}
             isManual={expensesManual} onUseComputed={() => useComputed('expenses')}
@@ -170,12 +185,18 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
             <div className="mt-2 space-y-1 border-t border-dashed border-[var(--border-md)] pt-2">
               <div className="flex items-center justify-between"><span>Σ Inkomen (6 mnd)</span><span className="tabular-nums"><MaskedAmount value={sixMonth.income} tone="kern" /></span></div>
               <div className="flex items-center justify-between"><span>Σ Uitgaven (6 mnd)</span><span className="tabular-nums">−<MaskedAmount value={sixMonth.expenses} tone="kern" /></span></div>
-              <div className="flex items-center justify-between"><span>Gespaard</span><span className="tabular-nums"><MaskedAmount value={sixMonth.saved} tone="kern" signPrefix={sixMonth.saved >= 0 ? '+' : ''} /></span></div>
+              {data.savingsBudgetTotal6m > 0 && (
+                <div className="flex items-center justify-between text-[var(--ink-3)]"><span>+ Sparen in budgetten</span><span className="tabular-nums"><MaskedAmount value={data.savingsBudgetTotal6m} tone="kern" /></span></div>
+              )}
+              {data.debtAflossingTotal6m > 0 && (
+                <div className="flex items-center justify-between text-[var(--ink-3)]"><span>+ Schuldaflossing</span><span className="tabular-nums"><MaskedAmount value={data.debtAflossingTotal6m} tone="kern" /></span></div>
+              )}
+              <div className="flex items-center justify-between"><span>Gespaard</span><span className="tabular-nums"><MaskedAmount value={sixMonth.saved + data.savingsBudgetTotal6m + data.debtAflossingTotal6m} tone="kern" signPrefix={(sixMonth.saved + data.savingsBudgetTotal6m + data.debtAflossingTotal6m) >= 0 ? '+' : ''} /></span></div>
               <div className="mt-1 flex items-center justify-between border-t border-dashed border-[var(--border-md)] pt-1.5 font-bold">
-                <span>Spaarquote</span><span className="tabular-nums">{Math.round(sixMonth.rate)}%</span></div>
+                <span>Spaarquote</span><span className="tabular-nums">{Math.round(data.savingsRate6m)}%</span></div>
             </div>
           </KassabonShell>
-          <ChoiceRow computedLabel={`Gebruik berekend (${Math.round(computedRate)}%)`}
+          <ChoiceRow computedLabel={`Gebruik berekend (${Math.round(data.savingsRate6m)}%)`}
             isManual={expensesManual} onUseComputed={() => useComputed('expenses')}
             manualValue={Math.round(triple.savingsRate)} onManual={(v) => editField('savingsRate', v)} unit="%" />
           <p className="text-[11px] text-[var(--ink-4)]">Een handmatige spaarquote past je geschatte uitgaven aan (inkomen blijft gelijk).</p>
