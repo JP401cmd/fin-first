@@ -3280,9 +3280,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             strategy={simResult.strategy}
                             targetEndPortfolio={simResult.targetEndPortfolio}
                             mainLineLabel={useHouseholdMainLine ? 'Gezamenlijk' : usePartnerMainLine ? (partnerName ?? 'Partner') : undefined}
-                            // Partner-projectie krijgt dezelfde teal als de partner-event-markers,
-                            // zodat de lijn + de partner-gebeurtenissen visueel bij elkaar horen.
-                            mainLineColor={usePartnerMainLine ? COLOR_PARTNER_EVENT : undefined}
+                            // Partner- én huishoud-projectie krijgen dezelfde teal als de
+                            // partner-event-markers, zodat de lijn + de partner-gebeurtenissen
+                            // visueel bij elkaar horen. FIRE-annotaties blijven goud (COLOR_OPBOUW).
+                            mainLineColor={(usePartnerMainLine || useHouseholdMainLine) ? COLOR_PARTNER_EVENT : undefined}
                             scenarioOverlays={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : [
                               ...(scenarioOverlays ?? []),
                               ...scenarioOverlayDataList.map(d => d.overlay),
