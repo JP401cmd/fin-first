@@ -10,8 +10,7 @@ describe('sanitizeCashSettingsInput', () => {
       retirement_expense_method: 'custom_amount',
       retirement_expense_custom_amount: 30000,
       target_savings_rate: 30,
-      // @ts-expect-error extra veld wordt genegeerd
-      hack: 'DROP TABLE',
+      hack: 'DROP TABLE', // onbekend veld wordt genegeerd (Record<string, unknown> accepteert het)
     })
     expect(out).toEqual({
       net_monthly_income: 3500,
