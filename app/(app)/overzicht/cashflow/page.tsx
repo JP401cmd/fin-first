@@ -9,6 +9,9 @@ import { CashflowLandingCards } from '@/components/overview/cashflow-landing-car
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { InflationImpactCard, INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
+import { CashOverview } from '@/components/app/cash-overview'
+import { loadCashflowSettingsData } from '@/lib/cashflow-settings-data'
+import { CashflowInstellingenBlok } from '@/components/overview/cashflow-instellingen-blok'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -33,10 +36,11 @@ export const metadata: Metadata = {
 export default async function OverzichtCashflowPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const [dashboardResult, cashflow, vasteLasten] = await Promise.all([
+  const [dashboardResult, cashflow, vasteLasten, settings] = await Promise.all([
     loadDashboardData(supabase),
     loadCashflowData(supabase, perspective),
     loadVasteLastenSummary(supabase),
+    loadCashflowSettingsData(supabase),
   ])
   const { dashboardData } = dashboardResult
   const cards = buildCashflowCards(dashboardData, cashflow, vasteLasten)
@@ -80,6 +84,16 @@ export default async function OverzichtCashflowPage() {
       {cashflow.baselineExpenses >= 500 && (
         <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
           <InflationImpactCard monthlyExpenses={cashflow.baselineExpenses} />
+        </section>
+      )}
+
+      <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <CashOverview embedded showAllCashAccounts />
+      </section>
+
+      {settings && (
+        <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
+          <CashflowInstellingenBlok data={settings} />
         </section>
       )}
     </>
