@@ -40,6 +40,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { ValuationModal } from '@/components/core/assets-client'
 
 type Transaction = {
   id: string
@@ -206,9 +207,11 @@ export function CashAccountView({
   const [showAssetEdit, setShowAssetEdit] = useState(false)
   const [linkedAsset, setLinkedAsset] = useState<{
     id: string; name: string; current_value: number; institution: string | null;
-    account_number: string | null; subtype: string | null; net_worth_inclusion_pct: number
+    account_number: string | null; subtype: string | null; net_worth_inclusion_pct: number;
+    expected_return: number
   } | null>(null)
   const [assetSaving, setAssetSaving] = useState(false)
+  const [showRevalue, setShowRevalue] = useState(false)
 
   const hasActiveFilters = filterSearch !== '' || filterType !== 'all' || filterBudgetId !== 'all'
 
@@ -864,7 +867,7 @@ export function CashAccountView({
     const supabase = createClient()
     const { data } = await supabase
       .from('assets')
-      .select('id, name, current_value, institution, account_number, subtype, net_worth_inclusion_pct')
+      .select('id, name, current_value, institution, account_number, subtype, net_worth_inclusion_pct, expected_return')
       .eq('id', account.linked_asset_id)
       .maybeSingle()
     setLinkedAsset(data)
@@ -872,28 +875,17 @@ export function CashAccountView({
 
   useEffect(() => { loadLinkedAsset() }, [loadLinkedAsset])
 
-  async function handleSaveAsset(formData: {
-    name: string; current_value: number; iban: string; bank_name: string;
-    subtype: string; net_worth_inclusion_pct: number
-  }) {
+  async function handleSaveAsset(formData: { name: string; expected_return: number }) {
     if (!linkedAsset || !account) return
     setAssetSaving(true)
     const supabase = createClient()
     await supabase.from('assets').update({
       name: formData.name,
-      current_value: formData.current_value,
-      account_number: formData.iban || null,
-      institution: formData.bank_name || null,
-      subtype: formData.subtype || null,
-      net_worth_inclusion_pct: formData.net_worth_inclusion_pct,
+      expected_return: formData.expected_return,
     }).eq('id', linkedAsset.id)
-    // Sync bank_account too
+    // Sync the bank_account display name with the asset name
     await supabase.from('bank_accounts').update({
       name: formData.name,
-      iban: formData.iban || null,
-      bank_name: formData.bank_name || null,
-      account_type: formData.subtype || 'checking',
-      balance: formData.current_value,
     }).eq('id', account.id)
     setAssetSaving(false)
     setShowAssetEdit(false)
@@ -2238,13 +2230,34 @@ export function CashAccountView({
           <div className="p-6">
             <AssetEditForm
               asset={linkedAsset}
+              account={account}
               saving={assetSaving}
+              bankConnectEnabled={gcEnabled}
+              gcAccounts={gcAccounts}
+              onSync={() => { loadAccount(); loadGcAccounts() }}
+              onDisconnectBank={() => loadGcAccounts()}
+              onReauthorize={() => router.push('/core/cash/connect')}
+              onRevalue={() => setShowRevalue(true)}
               onSave={handleSaveAsset}
               onCancel={() => setShowAssetEdit(false)}
               onDisconnect={() => { setShowAssetEdit(false); handleDisconnectTracking() }}
             />
           </div>
         </BottomSheet>
+      )}
+
+      {/* Herwaardeer-modal voor het gekoppelde saldo */}
+      {linkedAsset && showRevalue && (
+        <ValuationModal
+          entityType="asset"
+          entityId={linkedAsset.id}
+          entityName={linkedAsset.name}
+          entitySubtype="cash"
+          currentValue={linkedAsset.current_value}
+          netWorthInclusionPct={linkedAsset.net_worth_inclusion_pct}
+          onClose={() => setShowRevalue(false)}
+          onSaved={() => { setShowRevalue(false); loadAccount(); loadLinkedAsset() }}
+        />
       )}
 
       {/* Transfer confirm sheet */}
@@ -2361,95 +2374,141 @@ export function CashAccountView({
   )
 }
 
-/** Lightweight inline form for editing the linked asset */
+type GcAccount = {
+  id: string
+  external_account_id: string
+  iban: string | null
+  account_name: string | null
+  last_synced_at: string | null
+  daily_requests: number
+  rate_limit_reset_date: string | null
+  is_active: boolean
+  bank_account_id: string | null
+  bank_connections: {
+    provider_name: string
+    provider_logo: string | null
+    token_expires_at: string | null
+    status: string
+  }
+}
+
+/**
+ * Vereenvoudigd bewerkscherm voor een budget-gekoppelde cash-rekening.
+ * Vier secties: Naam, Bank-koppeling/status, Saldo + herwaarderen, Verwacht rendement.
+ * Saldo wijzigt uitsluitend via de ValuationModal (herwaarderen) — niet hier direct.
+ */
 function AssetEditForm({
   asset,
+  account,
   saving,
+  bankConnectEnabled,
+  gcAccounts,
+  onSync,
+  onDisconnectBank,
+  onReauthorize,
+  onRevalue,
   onSave,
   onCancel,
   onDisconnect,
 }: {
-  asset: { id: string; name: string; current_value: number; institution: string | null; account_number: string | null; subtype: string | null; net_worth_inclusion_pct: number }
+  asset: { id: string; name: string; current_value: number; institution: string | null; account_number: string | null; subtype: string | null; net_worth_inclusion_pct: number; expected_return: number }
+  account: Account
   saving: boolean
-  onSave: (data: { name: string; current_value: number; iban: string; bank_name: string; subtype: string; net_worth_inclusion_pct: number }) => void
+  bankConnectEnabled: boolean
+  gcAccounts: GcAccount[]
+  onSync: () => void
+  onDisconnectBank: () => void
+  onReauthorize: () => void
+  onRevalue: () => void
+  onSave: (data: { name: string; expected_return: number }) => void
   onCancel: () => void
   onDisconnect: () => void
 }) {
   const [name, setName] = useState(asset.name)
-  const [currentValue, setCurrentValue] = useState(String(asset.current_value))
-  const [iban, setIban] = useState(asset.account_number ?? '')
-  const [bankName, setBankName] = useState(asset.institution ?? '')
-  const [subtype, setSubtype] = useState(asset.subtype ?? 'checking')
-  const [nwPct, setNwPct] = useState(String(asset.net_worth_inclusion_pct ?? 100))
+  const [expectedReturn, setExpectedReturn] = useState(String(asset.expected_return ?? 0))
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
+
+  // Alleen koppelingen die bij déze bankrekening horen tonen.
+  const linkedConnections = bankConnectEnabled
+    ? gcAccounts.filter((acc) => acc.bank_account_id === account.id)
+    : []
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Huidig saldo</label>
-          <input
-            type="number"
-            value={currentValue}
-            onChange={(e) => setCurrentValue(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm font-mono tabular-nums"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">IBAN</label>
-          <input
-            value={iban}
-            onChange={(e) => setIban(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm"
-            placeholder="NL00 BANK 0000 0000 00"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Bank naam</label>
-          <input
-            value={bankName}
-            onChange={(e) => setBankName(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Type</label>
-          <select
-            value={subtype}
-            onChange={(e) => setSubtype(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm"
-          >
-            {ACCOUNT_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Net worth inclusie %</label>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            value={nwPct}
-            onChange={(e) => setNwPct(e.target.value)}
-            className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm font-mono tabular-nums"
-          />
-        </div>
+      {/* 1. Naam */}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Naam</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm"
+        />
+        {(account.iban || account.bank_name) && (
+          <p className="mt-1.5 text-xs text-[var(--ink-4)]">
+            {[account.iban, account.bank_name].filter(Boolean).join(' · ')}
+          </p>
+        )}
       </div>
 
-      {/* Transacties loskoppelen */}
+      {/* 2. Bank-koppeling / status */}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Bankverbinding</label>
+        {linkedConnections.length > 0 ? (
+          <div className="space-y-3">
+            {linkedConnections.map((acc) => (
+              <ConnectedAccountCard
+                key={acc.id}
+                account={acc}
+                onSync={onSync}
+                onDisconnect={onDisconnectBank}
+                onReauthorize={onReauthorize}
+              />
+            ))}
+          </div>
+        ) : (
+          <Link
+            href="/core/cash/connect"
+            className="flex items-center justify-center gap-2 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-3 text-sm font-medium text-[var(--ink-2)] transition-colors hover:border-kern-300 hover:bg-kern-50 hover:text-kern-700"
+          >
+            <Link2 className="h-4 w-4" />
+            Koppel een bank
+          </Link>
+        )}
+      </div>
+
+      {/* 3. Saldo + herwaarderen */}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Saldo</label>
+        <div className="flex items-center gap-3">
+          <p className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+            {formatCurrency(asset.current_value)}
+          </p>
+          <button
+            type="button"
+            onClick={onRevalue}
+            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[var(--border-md)] px-3 py-2.5 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Herwaardeer
+          </button>
+        </div>
+        <p className="mt-1.5 text-xs text-[var(--ink-4)]">Pas het saldo aan via een herwaardering.</p>
+      </div>
+
+      {/* 4. Verwacht rendement */}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Verwacht rendement (% p.j.)</label>
+        <input
+          type="number"
+          step="0.1"
+          value={expectedReturn}
+          onChange={(e) => setExpectedReturn(e.target.value)}
+          className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5 text-sm font-mono tabular-nums"
+          placeholder="0"
+        />
+      </div>
+
+      {/* Budgetteren uitschakelen */}
       <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
         {!confirmDisconnect ? (
           <button
@@ -2495,11 +2554,7 @@ function AssetEditForm({
         <button
           onClick={() => onSave({
             name,
-            current_value: Number(currentValue) || 0,
-            iban,
-            bank_name: bankName,
-            subtype,
-            net_worth_inclusion_pct: Number(nwPct) ?? 100,
+            expected_return: Number(expectedReturn) || 0,
           })}
           disabled={saving || !name.trim()}
           className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
