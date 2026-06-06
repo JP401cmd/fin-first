@@ -129,7 +129,9 @@ export function VermogenDebtCard({
   aggregated = false,
 }: VermogenDebtCardProps) {
   const { flashClass } = useFlashChange(debt.current_balance)
-  const Icon = DEBT_ICONS[debt.debt_type]
+  // Fallback-icoon: de partner-aggregaatrij (privacy 'totalen') heeft geen
+  // debt_type → DEBT_ICONS[undefined] zou undefined zijn (crash).
+  const Icon = DEBT_ICONS[debt.debt_type] ?? DEBT_ICONS.other
 
   // Build subtitle parts: repayment type + interest rate
   const subtitleParts: string[] = []
@@ -238,7 +240,7 @@ export function VermogenDebtCard({
             className="truncate text-[11px] italic text-[var(--ink-3)]"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
-            {DEBT_TYPE_LABELS[debt.debt_type]}
+            {DEBT_TYPE_LABELS[debt.debt_type] ?? ''}
             {subtitle ? ` · ${subtitle}` : ''}
           </p>
           {/* "Jouw aandeel" / "Aandeel partner" voor gedeelde schulden. */}
