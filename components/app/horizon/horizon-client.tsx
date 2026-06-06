@@ -831,6 +831,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               color: '#8a6e42', // horizon gold
               points: result.combined.rows.map(r => [r.age, r.endPortfolio] as [number, number]),
               fireAge: cp.fireAge,
+              fireAgeFractional: result.combined.fireAgeFractional,
               isDashed: true,
             })
           }

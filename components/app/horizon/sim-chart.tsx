@@ -23,6 +23,9 @@ export type HouseholdPartnerOverlay = {
   color: string
   points: [number, number][]  // [age, netWorth]
   fireAge: number | null
+  /** Fractionele FIRE-leeftijd (bv. 52.7) — plaatst de FIRE-stip exact op de
+   *  lijn i.p.v. op de afgeronde leeftijd, net als de hoofdlijn. */
+  fireAgeFractional?: number | null
   /** If true, renders as dashed line (used for combined household line) */
   isDashed?: boolean
 }
@@ -740,19 +743,30 @@ export const SimChart = memo(function SimChart({
                   ...(overlay.isDashed ? {} : { strokeDasharray: '1', strokeDashoffset: hasEntered ? 0 : 1 }),
                 }}
               />
-              {/* Partner FIRE age dot */}
-              {overlay.fireAge !== null && overlay.fireAge >= currentAge && overlay.fireAge <= endAge && (
-                <circle
-                  cx={PAD.left + xScale(overlay.fireAge)}
-                  cy={PAD.top + yScale(
-                    overlay.points.find(([a]) => Math.abs(a - overlay.fireAge!) < 1)?.[1] ?? 0
-                  )}
-                  r={3}
-                  fill={overlay.color}
-                  opacity={hasEntered ? 0.8 : 0}
-                  style={{ transition: 'opacity 0.4s ease 1s' }}
-                />
-              )}
+              {/* Partner/gezamenlijk FIRE-punt — op de fractionele leeftijd zodat
+                  de stip exact op de lijn valt (geïnterpoleerde y), net als de hoofdlijn. */}
+              {(() => {
+                const fa = overlay.fireAgeFractional ?? overlay.fireAge
+                if (fa === null || fa < currentAge || fa > endAge) return null
+                const lo = Math.floor(fa)
+                const hi = Math.ceil(fa)
+                const frac = fa - lo
+                const yLo = overlay.points.find(([a]) => a === lo)?.[1]
+                const yHi = overlay.points.find(([a]) => a === hi)?.[1]
+                const yVal = yLo != null && yHi != null
+                  ? yLo + frac * (yHi - yLo)
+                  : (overlay.points.find(([a]) => Math.abs(a - fa) < 1)?.[1] ?? 0)
+                return (
+                  <circle
+                    cx={PAD.left + xScale(fa)}
+                    cy={PAD.top + yScale(yVal)}
+                    r={3}
+                    fill={overlay.color}
+                    opacity={hasEntered ? 0.8 : 0}
+                    style={{ transition: 'opacity 0.4s ease 1s' }}
+                  />
+                )
+              })()}
             </g>
           )
         )}
