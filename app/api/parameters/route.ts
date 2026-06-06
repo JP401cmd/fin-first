@@ -65,14 +65,25 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Ongeldig verzoek' }, { status: 400 })
   }
 
-  const expectedReturn = Number(body.expected_return)
-  const inflationRate = Number(body.inflation_rate)
-
-  if (isNaN(expectedReturn) || expectedReturn < 0.01 || expectedReturn > 0.15) {
-    return NextResponse.json({ error: 'Verwacht rendement moet tussen 1% en 15% liggen' }, { status: 400 })
+  // Valideer return/inflatie alleen wanneer ze in de body zitten — zo kan de
+  // cashflow-pagina deelpatches sturen (bv. alleen net_monthly_income) zonder
+  // dat de parameters-validatie afketst op ontbrekende velden. De parameters-
+  // instellingenpagina stuurt beide altijd mee, dus die blijft identiek werken.
+  let expectedReturn: number | undefined
+  if (body.expected_return !== undefined) {
+    const n = Number(body.expected_return)
+    if (isNaN(n) || n < 0.01 || n > 0.15) {
+      return NextResponse.json({ error: 'Verwacht rendement moet tussen 1% en 15% liggen' }, { status: 400 })
+    }
+    expectedReturn = n
   }
-  if (isNaN(inflationRate) || inflationRate < 0 || inflationRate > 0.08) {
-    return NextResponse.json({ error: 'Inflatie moet tussen 0% en 8% liggen' }, { status: 400 })
+  let inflationRate: number | undefined
+  if (body.inflation_rate !== undefined) {
+    const n = Number(body.inflation_rate)
+    if (isNaN(n) || n < 0 || n > 0.08) {
+      return NextResponse.json({ error: 'Inflatie moet tussen 0% en 8% liggen' }, { status: 400 })
+    }
+    inflationRate = n
   }
 
   // Validate box3_method if provided
@@ -96,9 +107,13 @@ export async function PUT(request: NextRequest) {
 
   const updateData: Record<string, unknown> = {
     id: user.id,
-    expected_return: expectedReturn,
-    inflation_rate: inflationRate,
     updated_at: new Date().toISOString(),
+  }
+  if (expectedReturn !== undefined) {
+    updateData.expected_return = expectedReturn
+  }
+  if (inflationRate !== undefined) {
+    updateData.inflation_rate = inflationRate
   }
   if (box3Method !== undefined) {
     updateData.box3_method = box3Method
@@ -127,8 +142,8 @@ export async function PUT(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    expected_return: expectedReturn,
-    inflation_rate: inflationRate,
+    expected_return: expectedReturn ?? null,
+    inflation_rate: inflationRate ?? null,
     box3_method: box3Method ?? 'forfaitair',
     marginaal_tarief: marginaalTarief !== undefined ? marginaalTarief : null,
     ...cashSettings,
