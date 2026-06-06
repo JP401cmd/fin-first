@@ -918,6 +918,21 @@ export async function buildHouseholdProjectionInput(
     combinedProjection = mine ?? emptyProjection(combinedNetWorth, combinedMonthlyIncome, combinedMonthlyExpenses, combinedYearlyExpenses, headAge)
   }
 
+  // Persisteer de gecombineerde samenvatting op het huishouden, zodat dashboard-
+  // FIRE-widgets exact dezelfde huishoud-cijfers tonen als /toekomst (i.p.v. een
+  // tweede berekening). Members-scoped RPC; niet kritisch voor de weergave.
+  try {
+    await supabase.rpc('set_household_combined_summary', {
+      p_summary: {
+        projection: combinedProjection,
+        retirementExpenses: Math.round(combinedYearlyExpenses),
+        netWorth: Math.round(combinedNetWorth),
+      },
+    })
+  } catch {
+    // Persisteren is niet kritisch.
+  }
+
   return {
     hasHousehold: true,
     householdName,

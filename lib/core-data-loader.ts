@@ -25,6 +25,8 @@ import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
 import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { loadPerspectiveData } from '@/lib/household/perspective-loader'
+import type { Perspective } from '@/lib/household-data'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -186,6 +188,17 @@ export interface CorePageData {
 
 export const loadCoreData = cache(async function loadCoreData(
   supabase: SupabaseClient,
+  /**
+   * Perspectief (eigen / huishouden / partner). Optioneel + default 'personal'
+   * zodat bestaande callers byte-identiek blijven. React `cache()` keyt op de
+   * argumenten, dus een tweede call met een ander perspectief dedupliceert niet
+   * met de eerste. Alleen bij 'household'/'partner' worden de HEADLINE-totalen
+   * (netto vermogen, totaal bezittingen/schulden, FIRE-voortgang) herberekend
+   * via `loadPerspectiveData`. De registratie-LIJSTEN (assetsList/debtsList/
+   * fullAssets/cashAccounts) blijven altijd de eigen items — die dragen zelf de
+   * OwnershipBadges. Spiegelt `loadHorizonData`'s perspectief-aware aanpak.
+   */
+  perspective: Perspective = 'personal',
 ): Promise<CorePageData> {
   const now = new Date()
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
@@ -562,8 +575,42 @@ export const loadCoreData = cache(async function loadCoreData(
   const totalCashValue = allCashAssets.reduce((s, a) => s + a.balance, 0) + unlinkedCash
   const totalNonCashAssets = totalAssets - totalCashValue
 
-  const effectiveTotalAssets = hasVermogen ? totalAssets : totalCashValue
-  const effectiveTotalDebts = hasVermogen ? totalDebts : 0
+  let effectiveTotalAssets = hasVermogen ? totalAssets : totalCashValue
+  let effectiveTotalDebts = hasVermogen ? totalDebts : 0
+
+  // ── Perspectief-aware HEADLINE-totalen ────────────────────────────
+  // Default 'personal' → byte-identiek aan voorheen. Bij 'household'/'partner'
+  // herberekenen we ENKEL de headline-financials (netto vermogen, totaal
+  // bezittingen/schulden → ook FIRE-voortgang) op het aandeel dat in dat
+  // perspectief telt, via loadPerspectiveData (privacy reeds server-side
+  // toegepast). De registratie-lijsten hieronder (assetsList/debtsList/
+  // fullAssets/cashAccounts) blijven ONGEWIJZIGD de eigen items. Spiegelt de
+  // share()-helper van horizon-data-loader: gedeeld × _myShareFraction voor
+  // partner, vol voor huishouden; + unlinkedCash zoals Horizon. Faalt het
+  // laden (geen huishouden / RLS) → val terug op de eigen totalen.
+  if (perspective !== 'personal' && hasVermogen) {
+    try {
+      const pd = await loadPerspectiveData(supabase, perspective)
+      const share = (
+        item: { ownership?: string; _myShareFraction?: number },
+        raw: number,
+      ): number =>
+        item.ownership === 'shared' && perspective !== 'household'
+          ? raw * (item._myShareFraction ?? 1)
+          : raw
+      effectiveTotalAssets =
+        pd.assets.reduce((s, a) => {
+          const raw = Number(a.current_value) * ((Number(a.net_worth_inclusion_pct) || 100) / 100)
+          return s + share(a, raw)
+        }, 0) + unlinkedCash
+      effectiveTotalDebts = pd.debts.reduce((s, d) => {
+        const raw = Number(d.current_balance) * ((Number(d.net_worth_inclusion_pct) || 100) / 100)
+        return s + share(d, raw)
+      }, 0)
+    } catch {
+      // Perspectief-laden faalt → behoud de eigen totalen (byte-identiek).
+    }
+  }
 
   const rawFinancials = {
     monthlyIncome: effectiveMonthlyIncome,

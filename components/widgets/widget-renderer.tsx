@@ -522,21 +522,36 @@ export interface DashboardData {
   prevMonthSavingsBudgetSpent: number
   // Whether user actively chose to budget during onboarding
   budgetingActive: boolean
-  // Household perspective overrides (null if no household)
+  // Household perspective overrides (null if no household).
+  // FIRE-velden komen uit de gepersisteerde gecombineerde samenvatting
+  // (households.combined_fire_summary) zodat ze EXACT matchen met /toekomst.
   householdOverrides: {
     netWorth: number
     totalAssets: number
     totalDebts: number
     monthlyExpenses: number
     monthlyIncome: number
+    freedomPct?: number
+    fireTarget?: number
+    fireAge?: number | null
+    fireAgeFractional?: number | null
+    countdownDays?: number
+    monthlyPassiveIncome?: number
   } | null
-  // Partner perspective overrides (null if no household)
+  // Partner perspective overrides (null if no household).
+  // FIRE-velden uit de fire_summary van de partner (profiles, via RPC).
   partnerOverrides: {
     netWorth: number
     totalAssets: number
     totalDebts: number
     monthlyExpenses: number
     monthlyIncome: number
+    freedomPct?: number
+    fireTarget?: number
+    fireAge?: number | null
+    fireAgeFractional?: number | null
+    countdownDays?: number
+    monthlyPassiveIncome?: number
   } | null
   // Household activity feed — recent shared transactions from both partners
   householdActivity: HouseholdActivityItem[]

@@ -7,9 +7,10 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
-import { ArrowUpDown, TrendingUp, ShoppingCart, PiggyBank, CreditCard } from 'lucide-react'
+import { ArrowUpDown, TrendingUp, ShoppingCart, PiggyBank, CreditCard, Users, UserCheck } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { usePerspective } from '@/components/app/perspective-provider'
 
 interface Props {
   size: WidgetSize
@@ -179,14 +180,28 @@ function ComparisonBar({ label, current, previous, color, hasEntered }: Comparis
 // ── Main widget ──
 
 export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }: Props) {
-  const { monthlyIncome, monthlyExpenses, budgetTotals, prevMonthIncome, prevMonthExpenses } = data
+  const { perspective, partnerName } = usePerspective()
+  const isHouseholdView = perspective === 'household' && data.householdOverrides != null
+  const isPartnerView = perspective === 'partner' && data.partnerOverrides != null
+
+  // Use perspective-appropriate data overrides for the headline cashflow metrics
+  const overrides = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
+  const monthlyIncome = overrides ? overrides.monthlyIncome : data.monthlyIncome
+  const monthlyExpenses = overrides ? overrides.monthlyExpenses : data.monthlyExpenses
+  const { budgetTotals, prevMonthIncome, prevMonthExpenses } = data
   const cashFlow = monthlyIncome - monthlyExpenses
   const isPositive = cashFlow >= 0
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
 
+  const kickerLabel = isHouseholdView
+    ? 'Cashflow Maand — Huishouden'
+    : isPartnerView
+      ? `Cashflow Maand — ${partnerName ?? 'Partner'}`
+      : 'Cashflow Maand'
+
   if (monthlyIncome === 0 && monthlyExpenses === 0) {
     return (
-      <WidgetShell module="kern" size={size} kicker="Cashflow Maand" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <WidgetEmpty icon={ArrowUpDown} message="Importeer transacties om je maandelijkse cashflow te zien." />
       </WidgetShell>
     )
@@ -194,7 +209,7 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
 
   if (size === 'mini') {
     return (
-      <WidgetShell module="kern" size="mini" kicker="Cashflow Maand" href={href}>
+      <WidgetShell module="kern" size="mini" kicker={kickerLabel} href={href}>
         <p className={`leading-none truncate ${isPositive ? 'text-positive' : 'text-negative'}`}>
           <MaskedAmount
             value={cashFlow}
@@ -219,7 +234,13 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   // ── Quarter-size: compact cashflow amount + freedom days label ──
   if (size === 'quarter') {
     return (
-      <WidgetShell module="kern" size={size} kicker="Cashflow Maand" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
+        {(isHouseholdView || isPartnerView) && (
+          <div className="mb-1 flex items-center gap-1 text-[10px] text-kern-600">
+            {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+            {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+          </div>
+        )}
         <p className={isPositive ? 'text-positive' : 'text-negative'}>
           <MaskedAmount
             value={cashFlow}
@@ -242,9 +263,15 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   // ── Half-size: horizontal layout — left cashflow, right breakdown ──
   if (size === 'half') {
     return (
-      <WidgetShell module="kern" size={size} kicker="Cashflow Maand" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
+            {(isHouseholdView || isPartnerView) && (
+              <div className="mb-1 flex items-center gap-1 text-[10px] text-kern-600">
+                {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+                {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+              </div>
+            )}
             <p className={isPositive ? 'text-[var(--ink)]' : 'text-negative'}>
               <MaskedAmount
                 value={cashFlow}
@@ -292,11 +319,18 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   // ── Full-size: categories + comparison + freedom time ──
 
   const prevCashFlow = prevMonthIncome - prevMonthExpenses
-  const hasPrevMonth = prevMonthIncome > 0 || prevMonthExpenses > 0
+  // Vorige-maand vergelijking is per-gebruiker historie — alleen tonen in eigen perspectief
+  const hasPrevMonth = !isHouseholdView && !isPartnerView && (prevMonthIncome > 0 || prevMonthExpenses > 0)
 
   return (
-    <WidgetShell module="kern" size={size} kicker="Cashflow Maand" href={href}>
+    <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
       <div ref={inViewRef}>
+        {(isHouseholdView || isPartnerView) && (
+          <div className="mb-1.5 flex items-center gap-1 text-[11px] text-kern-600">
+            {isPartnerView ? <UserCheck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+            {isPartnerView ? (partnerName ?? 'Partner') : 'Gecombineerd huishouden'}
+          </div>
+        )}
         {/* ── Netto cashflow hero ── */}
         <div className="flex items-end justify-between">
           <div>

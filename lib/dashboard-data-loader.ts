@@ -1268,7 +1268,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       if (membership?.household_id) {
         cachedHouseholdId = membership.household_id
         // Get partner's personal asset/debt totals via RPC + partner's privacy settings
-        const [partnerTotalsRes, partnerMemberRes] = await Promise.all([
+        const [partnerTotalsRes, partnerMemberRes, combinedRes, memberProfilesRes] = await Promise.all([
           supabase.rpc('household_partner_totals'),
           supabase
             .from('household_members')
@@ -1276,6 +1276,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
             .eq('household_id', membership.household_id)
             .neq('user_id', authUser!.id)
             .maybeSingle(),
+          // FIRE-cijfers die /toekomst exact matchen: gecombineerd uit households,
+          // partner uit diens fire_summary (gated via de RPC).
+          supabase.from('households').select('combined_fire_summary').eq('id', membership.household_id).maybeSingle(),
+          supabase.rpc('household_member_profiles'),
         ])
         const pt = partnerTotalsRes.data?.[0] ?? null
         // Parse partner's privacy settings (Feature #537)
@@ -1301,6 +1305,26 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
           // Household net worth = user's totals + partner's personal totals
           // (shared items are already included in user's totals)
+          // FIRE-scalars uit de gepersisteerde samenvattingen (matchen /toekomst):
+          // huishouden uit households.combined_fire_summary, partner uit diens
+          // fire_summary (null bij toekomst-verborgen → geen FIRE-velden → widget
+          // valt terug op eigen data).
+          type FireProj = { fireTarget?: number; freedomPercentage?: number; fireAge?: number | null; countdownDays?: number; monthlyPassiveIncome?: number }
+          const combinedProj = ((combinedRes.data?.combined_fire_summary as { projection?: FireProj } | null)?.projection) ?? null
+          const partnerProfileRow = (memberProfilesRes.data as Array<{ id: string; fire_summary?: { projection?: FireProj } | null }> | null)?.find((p) => p.id !== authUser!.id) ?? null
+          const partnerProj = partnerProfileRow?.fire_summary?.projection ?? null
+          const fireFields = (proj: FireProj | null) =>
+            proj
+              ? {
+                  freedomPct: proj.freedomPercentage,
+                  fireTarget: proj.fireTarget,
+                  fireAge: proj.fireAge ?? null,
+                  fireAgeFractional: proj.fireAge ?? null,
+                  countdownDays: proj.countdownDays,
+                  monthlyPassiveIncome: proj.monthlyPassiveIncome,
+                }
+              : {}
+
           householdOverrides = {
             netWorth: netWorth + partnerAssets - partnerDebts,
             totalAssets: totalAssets + partnerAssets,
@@ -1309,6 +1333,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
             // (these represent the household's tracked expenses from the user's bank accounts)
             monthlyExpenses: effectiveMonthlyExpenses,
             monthlyIncome: effectiveMonthlyIncome,
+            ...fireFields(combinedProj),
           }
 
           // Partner-only perspective: show partner's individual data
@@ -1319,6 +1344,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
             // Use partner's tracked income/expenses if available, otherwise approximate
             monthlyExpenses: partnerMonthlyExpenses > 0 ? partnerMonthlyExpenses : effectiveMonthlyExpenses,
             monthlyIncome: partnerMonthlyIncome > 0 ? partnerMonthlyIncome : effectiveMonthlyIncome,
+            ...fireFields(partnerProj),
           }
         }
       }

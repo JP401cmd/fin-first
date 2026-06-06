@@ -1,3 +1,5 @@
+'use client'
+
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
@@ -5,7 +7,8 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
-import { PiggyBank } from 'lucide-react'
+import { PiggyBank, Users, UserCheck } from 'lucide-react'
+import { usePerspective } from '@/components/app/perspective-provider'
 
 interface Props {
   size: WidgetSize
@@ -14,14 +17,39 @@ interface Props {
 }
 
 export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, href }: Props) {
-  const { monthlyIncome, monthlyExpenses, monthlySavingsBudgetSpent } = data
-  const savings = monthlyIncome - monthlyExpenses + monthlySavingsBudgetSpent
-  const rate = data.savingsRate6m
+  const { perspective, partnerName } = usePerspective()
+  const isHouseholdView = perspective === 'household' && data.householdOverrides != null
+  const isPartnerView = perspective === 'partner' && data.partnerOverrides != null
+
+  // Use perspective-appropriate data overrides for the headline savings metrics
+  const overrides = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
+  const monthlyIncome = overrides ? overrides.monthlyIncome : data.monthlyIncome
+  const monthlyExpenses = overrides ? overrides.monthlyExpenses : data.monthlyExpenses
+  const { monthlySavingsBudgetSpent } = data
+
+  // Savings-bedrag: in huishoud-/partnerweergave komt er geen eigen budget-spent bij —
+  // de override-cijfers zijn al de gecombineerde inkomsten/uitgaven.
+  const savings = overrides
+    ? monthlyIncome - monthlyExpenses
+    : monthlyIncome - monthlyExpenses + monthlySavingsBudgetSpent
+
+  // Spaarquote-percentage:
+  // - Eigen perspectief: behoud de bestaande (preciezere) savingsRate6m-berekening.
+  // - Huishoud/partner: bereken het tarief uit de override inkomsten/uitgaven.
+  const rate = overrides
+    ? (monthlyIncome > 0 ? Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100) : 0)
+    : data.savingsRate6m
   const isPositive = rate >= 0
+
+  const kickerLabel = isHouseholdView
+    ? 'Spaarquote — Huishouden'
+    : isPartnerView
+      ? `Spaarquote — ${partnerName ?? 'Partner'}`
+      : 'Spaarquote'
 
   if (monthlyIncome === 0 && rate === 0) {
     return (
-      <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <WidgetEmpty icon={PiggyBank} message="Stel budgetten in om je spaarquote te berekenen." />
       </WidgetShell>
     )
@@ -29,7 +57,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
 
   if (size === 'mini') {
     return (
-      <WidgetShell module="kern" size="mini" kicker="Spaarquote" href={href}>
+      <WidgetShell module="kern" size="mini" kicker={kickerLabel} href={href}>
         <>
           <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${isPositive ? 'text-positive' : 'text-negative'}`}>
             {rate.toFixed(1)}%
@@ -45,7 +73,13 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
   // ── Quarter-size: groot percentage + kleur + mini progress bar ──
   if (size === 'quarter') {
     return (
-      <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
+        {(isHouseholdView || isPartnerView) && (
+          <div className="mb-1 flex items-center gap-1 text-[10px] text-kern-600">
+            {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+            {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+          </div>
+        )}
         <p className={`font-mono text-lg font-semibold tabular-nums ${isPositive ? 'text-positive' : 'text-negative'}`}>
           {rate.toFixed(1)}%
         </p>
@@ -66,11 +100,12 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
   // ── Vorige maand vergelijking ──
+  // Historie en maand-op-maand-delta zijn per-gebruiker — alleen in eigen perspectief tonen.
   const { prevMonthIncome, prevMonthExpenses, prevMonthSavingsBudgetSpent } = data
   const prevSavings = prevMonthIncome - prevMonthExpenses + prevMonthSavingsBudgetSpent
   const prevRate = prevMonthIncome > 0 ? (prevSavings / prevMonthIncome) * 100 : 0
   const delta = rate - prevRate
-  const hasPrevData = prevMonthIncome > 0
+  const hasPrevData = !isHouseholdView && !isPartnerView && prevMonthIncome > 0
 
   // ── Full-size: sparkline + averages + FIRE benchmark ──
   if (size === 'full') {
@@ -120,8 +155,17 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
     }).join(' ')
     const benchmarkY = svgH - ((fireBenchmark - minVal) / range) * svgH
 
+    // Sparkline, gemiddelden en YoY zijn per-gebruiker historie — verbergen in huishoud/partner.
+    const showHistory = !isHouseholdView && !isPartnerView
+
     return (
-      <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
+        {(isHouseholdView || isPartnerView) && (
+          <div className="mb-1.5 flex items-center gap-1 text-[11px] text-kern-600">
+            {isPartnerView ? <UserCheck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+            {isPartnerView ? (partnerName ?? 'Partner') : 'Gecombineerd huishouden'}
+          </div>
+        )}
         {/* Percentage + bar + bedrag (stacked vertically for 2-col full) */}
         <div>
           <p className={`font-mono text-2xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-negative'}`}>
@@ -153,7 +197,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
         </div>
 
         {/* Sparkline — full width below content */}
-        {sparkData.length >= 2 && (
+        {showHistory && sparkData.length >= 2 && (
           <div className="mt-3">
             <svg width="100%" height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} preserveAspectRatio="none" className="overflow-visible">
               {/* FIRE benchmark lijn */}
@@ -191,16 +235,16 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
 
         {/* Gemiddelden + benchmark + year comparison */}
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-[var(--ink-3)] font-mono tabular-nums">
-          {avg3m !== null && (
+          {showHistory && avg3m !== null && (
             <span>3m: {avg3m.toFixed(1)}%</span>
           )}
-          {avg6m !== null && (
+          {showHistory && avg6m !== null && (
             <span>· 6m: {avg6m.toFixed(1)}%</span>
           )}
-          <span className="text-[var(--ink-4)]">· FIRE: {fireBenchmark}%+</span>
+          <span className="text-[var(--ink-4)]">{showHistory ? '· ' : ''}FIRE: {fireBenchmark}%+</span>
         </div>
         {/* Year-over-year comparison */}
-        {estimatedRates.length >= 12 && (() => {
+        {showHistory && estimatedRates.length >= 12 && (() => {
           const thisYear = estimatedRates.slice(-6).reduce((a, b) => a + b, 0) / 6
           const lastYear = estimatedRates.slice(-12, -6).reduce((a, b) => a + b, 0) / 6
           const yoyDelta = thisYear - lastYear
@@ -216,9 +260,15 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
 
   // ── Half-size: horizontal layout — left percentage, right details ──
   return (
-    <WidgetShell module="kern" size={size} kicker="Spaarquote" href={href}>
+    <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
       <div className="flex gap-3 h-full">
         <div className="flex-1 min-w-0 flex flex-col justify-center">
+          {(isHouseholdView || isPartnerView) && (
+            <div className="mb-1 flex items-center gap-1 text-[10px] text-kern-600">
+              {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+              {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+            </div>
+          )}
           <p className={`font-mono text-xl font-semibold tabular-nums ${isPositive ? 'text-[var(--ink)]' : 'text-negative'}`}>
             {rate.toFixed(1)}%
           </p>

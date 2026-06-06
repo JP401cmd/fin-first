@@ -12,6 +12,9 @@ import { hasBox2Relevance } from '@/lib/box2-relevance'
 import { pillarStatus } from '@/lib/leverage-status'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
+import { getServerPerspective } from '@/lib/household/server-perspective'
+import { loadPerspectiveBox3 } from '@/lib/household-tax'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 
 export const metadata: Metadata = {
   title: 'Belasting — TriFinity',
@@ -40,9 +43,36 @@ export const metadata: Metadata = {
  */
 export default async function OverzichtBelastingPage() {
   const supabase = await createClient()
+  const perspective = await getServerPerspective()
   const horizonData = await loadHorizonData(supabase)
 
-  const box3Tax = horizonData.healthScoreInput.taxData?.box3Tax ?? null
+  // Box 3 is de ÉNIGE box die we op de hub perspectief-bewust kunnen tonen:
+  // NL-belasting is per-persoon, maar fiscaal partners verdelen Box 3-vermogen,
+  // dus een huishoud-/partner-totaal is fiscaal zinvol. We hergebruiken exact de
+  // loader van de Box 3-subpagina (`loadPerspectiveBox3` → `loadPerspectiveData`
+  // → ONGEWIJZIGDE `calculateBox3`). Box 1 (jaarruimte) en Box 2 blijven
+  // per-persoon — de deep box1-pagina toont zelf al een 2-koloms huishoudbeeld.
+  let box3Tax = horizonData.healthScoreInput.taxData?.box3Tax ?? null
+  let box3PerspectiveAware = false
+  if (perspective !== 'personal') {
+    try {
+      const box3Data = await loadPerspectiveBox3(supabase, perspective, 2026)
+      // household → gecombineerd huishoud-totaal; partner → partner-resultaat
+      // (loadPerspectiveBox3 zet `personal` in partner-view op het partner-
+      // resultaat). Bij graceful degradation (partner deelt geen vermogen) is
+      // `combined` undefined → val terug op het eigen Box 3-bedrag.
+      const perspectiveTax =
+        perspective === 'household'
+          ? box3Data.combined?.tax ?? null
+          : box3Data.personal.tax
+      if (perspectiveTax != null) {
+        box3Tax = perspectiveTax
+        box3PerspectiveAware = !(perspective === 'household' && box3Data.combined == null)
+      }
+    } catch {
+      // Perspectief-laden faalt (geen huishouden / RLS) → behoud eigen Box 3.
+    }
+  }
 
   // Aanmerkelijk belang (Box 2): relevant zodra de gebruiker een deelneming,
   // DGA-vordering óf DGA-schuld heeft — dezelfde detectie-breedte als de Box 2-
@@ -126,6 +156,14 @@ export default async function OverzichtBelastingPage() {
     <>
       <NavStackMeta title="Belasting" bottomBar={{ kind: 'tabs' }} />
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        {/* Perspectief-chip ALLEEN tonen wanneer minstens de Box 3-tegel het
+            perspectief weerspiegelt — anders zou de chip suggereren dat ook de
+            per-persoon-boxen (1 & 2) huishoud-cijfers tonen, wat misleidend is. */}
+        {box3PerspectiveAware && (
+          <div className="mb-2">
+            <PerspectiveContextLabel />
+          </div>
+        )}
         <PageInfoButton
           description={PAGE_INFO['/overzicht/belasting'] ?? ''}
           className="absolute right-4 top-4 sm:right-6"

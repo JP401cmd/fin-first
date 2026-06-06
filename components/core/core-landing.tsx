@@ -21,6 +21,7 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import type { QuickAddIntent } from '@/lib/quick-add/types'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthPillar } from '@/lib/financial-health'
 import { GlossaryTerm, PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -477,6 +478,9 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
             style={{ background: 'var(--module-active-500)' }}
           />
           Kern · vermogen &amp; schulden
+          {/* Perspectief-chip: maakt zichtbaar dat de headline-getallen van het
+              huishouden/de partner zijn. Rendert null in eigen/solo-weergave. */}
+          <PerspectiveContextLabel className="ml-1" />
         </div>
         <h1
           className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"

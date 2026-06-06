@@ -1,9 +1,13 @@
+'use client'
+
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
+import { Users, UserCheck } from 'lucide-react'
+import { usePerspective } from '@/components/app/perspective-provider'
 
 interface Props {
   size: WidgetSize
@@ -12,11 +16,26 @@ interface Props {
 }
 
 export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }: Props) {
-  const { totalDebts, totalAssets, monthlyExpenses, budgetTotals } = data
+  const { perspective, partnerName } = usePerspective()
+  const isHouseholdView = perspective === 'household' && data.householdOverrides != null
+  const isPartnerView = perspective === 'partner' && data.partnerOverrides != null
+
+  // Use perspective-appropriate data overrides for the headline + ratio metrics
+  const overrides = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
+  const totalDebts = overrides ? overrides.totalDebts : data.totalDebts
+  const totalAssets = overrides ? overrides.totalAssets : data.totalAssets
+  const monthlyExpenses = overrides ? overrides.monthlyExpenses : data.monthlyExpenses
+  const { budgetTotals } = data
+
+  const kickerLabel = isHouseholdView
+    ? 'Schulden — Huishouden'
+    : isPartnerView
+      ? `Schulden — ${partnerName ?? 'Partner'}`
+      : 'Schulden'
 
   if (size === 'mini') {
     return (
-      <WidgetShell module="kern" size="mini" kicker="Schulden" href={href}>
+      <WidgetShell module="kern" size="mini" kicker={kickerLabel} href={href}>
         <p className="text-negative leading-none truncate">
           <MaskedAmount value={totalDebts} tone="kern" className="text-[15px] font-semibold" />
         </p>
@@ -36,8 +55,14 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
   // ── Quarter-size: compact amount + freedom time + ratio bar ────
   if (size === 'quarter') {
     return (
-      <WidgetShell module="kern" size={size} kicker="Schulden" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <div>
+          {(isHouseholdView || isPartnerView) && (
+            <div className="mb-1 flex items-center gap-1 text-[10px] text-kern-600">
+              {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+              {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+            </div>
+          )}
           <p className={totalDebts > 0 ? 'text-negative' : 'text-positive'}>
             <MaskedAmount
               value={totalDebts}
@@ -68,14 +93,21 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
     )
   }
 
-  const monthlyRepayment = budgetTotals.debt.spent
+  // Aflossing komt uit het eigen budget — hoort bij eigen items, niet bij het huishoud-totaal.
+  const monthlyRepayment = (isHouseholdView || isPartnerView) ? 0 : budgetTotals.debt.spent
 
   // ── Half-size: horizontal layout — left metric, right ratio bar ────
   if (size === 'half') {
     return (
-      <WidgetShell module="kern" size={size} kicker="Schulden" href={href}>
+      <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <div className="flex gap-3 h-full">
           <div className="flex-1 min-w-0 flex flex-col justify-center">
+            {(isHouseholdView || isPartnerView) && (
+              <div className="mb-1 flex items-center gap-1 text-[10px] text-kern-600">
+                {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+                {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+              </div>
+            )}
             <p className={totalDebts > 0 ? 'text-negative' : 'text-positive'}>
               <MaskedAmount
                 value={totalDebts}
@@ -131,7 +163,13 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
 
   // ── Full-size: enriched breakdown with freedom framing ────
   return (
-    <WidgetShell module="kern" size={size} kicker="Schulden" href={href}>
+    <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
+      {(isHouseholdView || isPartnerView) && (
+        <div className="mb-1.5 flex items-center gap-1 text-[11px] text-kern-600">
+          {isPartnerView ? <UserCheck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+          {isPartnerView ? (partnerName ?? 'Partner') : 'Gecombineerd huishouden'}
+        </div>
+      )}
       <p className={totalDebts > 0 ? 'text-negative' : 'text-positive'}>
         <MaskedAmount
           value={totalDebts}

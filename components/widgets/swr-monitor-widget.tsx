@@ -1,8 +1,13 @@
+'use client'
+
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { BOX3_DRAG } from '@/lib/constants'
+import { Users, UserCheck } from 'lucide-react'
+import { usePerspective } from '@/components/app/perspective-provider'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 interface Props {
   size: WidgetSize
@@ -27,21 +32,42 @@ function formatPct(value: number, decimals = 2): string {
 }
 
 export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, href }: Props) {
-  const { grossReturn, inflationRate, netWorth, monthlyExpenses, fireTarget } = data
+  // ── Perspective-aware withdrawal monitor ───────────────────────
+  // Only adopt household/partner figures when the persisted FIRE summary
+  // exists. The SWR *rate* itself derives from the user's return/inflation
+  // parameters (universal), so only netWorth + expenses are overridden.
+  const { perspective, partnerName } = usePerspective()
+  const isHouseholdView = perspective === 'household' && data.householdOverrides?.fireTarget != null
+  const isPartnerView = perspective === 'partner' && data.partnerOverrides?.fireTarget != null
+  const ov = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
+  const isShared = isHouseholdView || isPartnerView
+
+  const { grossReturn, inflationRate } = data
+  const netWorth = ov?.netWorth ?? data.netWorth
+  const monthlyExpenses = ov?.monthlyExpenses ?? data.monthlyExpenses
+  // Monthly passive income at the effective SWR (perspective-aware portfolio).
+  const monthlyPassiveIncome = ov?.monthlyPassiveIncome ?? null
 
   // Effective SWR from user's parameters
   const effectiveSwr = Math.max(0.001, grossReturn - BOX3_DRAG - inflationRate)
 
-  // Actual withdrawal rate: what the user would withdraw per year
+  // Actual withdrawal rate: what the user/household would withdraw per year
   const yearlyExpenses = monthlyExpenses * 12
   const actualWithdrawal = netWorth > 0 ? yearlyExpenses / netWorth : 0
 
   const status = swrStatus(effectiveSwr)
 
+  const baseKicker = 'SWR Monitor'
+  const kicker = isHouseholdView
+    ? `${baseKicker} — Huishouden`
+    : isPartnerView
+      ? `${baseKicker} — ${partnerName ?? 'Partner'}`
+      : baseKicker
+
   // ── Mini: SWR percentage ──────────────────────────────────
   if (size === 'mini') {
     return (
-      <WidgetShell module="horizon" size="mini" kicker="SWR Monitor" href={href}>
+      <WidgetShell module="horizon" size="mini" kicker={kicker} href={href}>
         <p className={`font-mono text-[15px] font-semibold tabular-nums leading-none truncate ${status.color}`}>
           {formatPct(effectiveSwr)}
         </p>
@@ -52,7 +78,13 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
   // ── Quarter: SWR + status indicator ───────────────────────
   if (size === 'quarter') {
     return (
-      <WidgetShell module="horizon" size={size} kicker="SWR Monitor" href={href}>
+      <WidgetShell module="horizon" size={size} kicker={kicker} href={href}>
+        {isShared && (
+          <div className="mb-0.5 flex items-center gap-1 text-[10px] text-horizon-600">
+            {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+            {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <p className={`font-mono text-xl font-semibold tabular-nums ${status.color}`}>
             {formatPct(effectiveSwr)}
@@ -77,7 +109,13 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
     const nlSwrPct = (NL_SWR_DEFAULT / gaugeMax) * 100
 
     return (
-      <WidgetShell module="horizon" size={size} kicker="SWR Monitor" href={href}>
+      <WidgetShell module="horizon" size={size} kicker={kicker} href={href}>
+        {isShared && (
+          <div className="mb-1 flex items-center gap-1 text-[10px] text-horizon-600">
+            {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+            {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+          </div>
+        )}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <p className={`font-mono text-lg font-semibold tabular-nums ${status.color}`}>
@@ -135,6 +173,11 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
   // FIRE multiplier = 1 / SWR
   const multiplier = 1 / effectiveSwr
 
+  // Monthly passive income at the effective SWR. Shared views use the
+  // persisted figure when available; otherwise derive from the
+  // perspective-aware portfolio so it stays consistent across perspectives.
+  const displayPassiveMonthly = monthlyPassiveIncome ?? (netWorth > 0 ? (netWorth * effectiveSwr) / 12 : 0)
+
   // Scenario: what if return changes ±1%
   const swrOptimistic = Math.max(0.001, (grossReturn + 0.01) - BOX3_DRAG - inflationRate)
   const swrPessimistic = Math.max(0.001, (grossReturn - 0.01) - BOX3_DRAG - inflationRate)
@@ -143,8 +186,14 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
   const withdrawalSafe = actualWithdrawal <= effectiveSwr
 
   return (
-    <WidgetShell module="horizon" size={size} kicker="SWR Monitor" href={href}>
+    <WidgetShell module="horizon" size={size} kicker={kicker} href={href}>
       <div className="space-y-2">
+        {isShared && (
+          <div className="flex items-center gap-1 text-[11px] text-horizon-600">
+            {isPartnerView ? <UserCheck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+            {isPartnerView ? (partnerName ?? 'Partner') : 'Gecombineerd huishouden'}
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -218,6 +267,16 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
         </div>
 
         <div className="border-t border-dashed border-[var(--border-ed)]" />
+
+        {/* Passief inkomen op SWR — perspectief-bewust portfolio */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-[var(--ink-3)]">Passief inkomen/mnd</p>
+          <span className="font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
+            {netWorth > 0
+              ? <MaskedAmount value={displayPassiveMonthly} tone="horizon" className="text-sm font-semibold" />
+              : '—'}
+          </span>
+        </div>
 
         {/* Current withdrawal check */}
         <div className="flex items-center justify-between">

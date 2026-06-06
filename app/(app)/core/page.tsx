@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { loadCoreData } from '@/lib/core-data-loader'
+import { getServerPerspective } from '@/lib/household/server-perspective'
 import { CoreLanding } from '@/components/core/core-landing'
 
 /**
@@ -12,9 +13,10 @@ import { CoreLanding } from '@/components/core/core-landing'
  */
 export default async function CoreServerPage() {
   const supabase = await createClient()
+  const perspective = await getServerPerspective()
 
   try {
-    const coreData = await loadCoreData(supabase)
+    const coreData = await loadCoreData(supabase, perspective)
     return <CoreLanding initialData={coreData} />
   } catch (err) {
     return <CoreLandingError detail={err instanceof Error ? err.message : null} />

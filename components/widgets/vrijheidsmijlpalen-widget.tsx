@@ -1,8 +1,11 @@
+'use client'
+
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { CheckCircle2, Circle, Flag } from 'lucide-react'
+import { CheckCircle2, Circle, Flag, Users, UserCheck } from 'lucide-react'
+import { usePerspective } from '@/components/app/perspective-provider'
 
 interface Props {
   size: WidgetSize
@@ -25,24 +28,46 @@ function yearsToDate(years: number): string {
 }
 
 export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
-  const { freedomPct, fireTarget, netWorth, fireProjResult, simRequiredPortfolio, simFireCountdown } = data
-  const effectiveFire = simRequiredPortfolio ?? fireTarget
-  const effectivePct = effectiveFire > 0 ? Math.min((netWorth / effectiveFire) * 100, 100) : freedomPct
+  // ── Perspective-aware milestones ───────────────────────────────
+  // Milestones are fractions of the FIRE target — override netWorth +
+  // fireTarget only when the persisted FIRE summary exists.
+  const { perspective, partnerName } = usePerspective()
+  const isHouseholdView = perspective === 'household' && data.householdOverrides?.fireTarget != null
+  const isPartnerView = perspective === 'partner' && data.partnerOverrides?.fireTarget != null
+  const ov = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
+  const isShared = isHouseholdView || isPartnerView
 
-  // Monthly savings approximation using countdown
+  const { freedomPct, fireTarget, fireProjResult, simRequiredPortfolio, simFireCountdown } = data
+  const netWorth = ov?.netWorth ?? data.netWorth
+  const effectiveFire = ov?.fireTarget ?? simRequiredPortfolio ?? fireTarget
+  const effectivePct = effectiveFire > 0
+    ? Math.min((netWorth / effectiveFire) * 100, 100)
+    : (ov?.freedomPct ?? freedomPct)
+
+  // Monthly savings approximation using the personal countdown — used purely
+  // to estimate milestone dates, which are per-user and therefore suppressed
+  // in household/partner views (no shared savings cadence exists).
   const cd = simFireCountdown ?? fireProjResult
   const countdownYears = cd.countdownYears + cd.countdownMonths / 12
-  const monthlySavingsApprox = countdownYears > 0 && effectiveFire > 0
+  const monthlySavingsApprox = !isShared && countdownYears > 0 && effectiveFire > 0
     ? (effectiveFire - netWorth) / (countdownYears * 12)
     : 0
 
   const getMilestoneDate = (targetPct: number): string | null => {
+    if (isShared) return null // date projection is per-user only
     const targetAmount = effectiveFire * (targetPct / 100)
     if (netWorth >= targetAmount) return null // Already reached
     if (monthlySavingsApprox <= 0) return null
     const monthsNeeded = (targetAmount - netWorth) / monthlySavingsApprox
     return yearsToDate(monthsNeeded / 12)
   }
+
+  const baseKicker = 'Vrijheidsmijlpalen'
+  const kicker = isHouseholdView
+    ? `${baseKicker} — Huishouden`
+    : isPartnerView
+      ? `${baseKicker} — ${partnerName ?? 'Partner'}`
+      : baseKicker
 
   const activeMilestoneIdx = MILESTONES.findIndex(m => effectivePct < m.pct)
   const nextMilestone = activeMilestoneIdx >= 0 ? MILESTONES[activeMilestoneIdx] : null
@@ -52,7 +77,7 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
   if (size === 'mini') {
     const miniLabel = nextMilestone ? nextMilestone.label : 'Bereikt!'
     return (
-      <WidgetShell module="horizon" size="mini" kicker="Vrijheidsmijlpalen" href={href}>
+      <WidgetShell module="horizon" size="mini" kicker={kicker} href={href}>
         <p className="text-[13px] font-semibold text-[var(--ink)] leading-none truncate">
           {miniLabel}
         </p>
@@ -63,7 +88,13 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
   if (size === 'quarter') {
     const fullyFree = effectivePct >= 100
     return (
-      <WidgetShell module="horizon" size={size} kicker="Vrijheidsmijlpalen" href={href}>
+      <WidgetShell module="horizon" size={size} kicker={kicker} href={href}>
+        {isShared && (
+          <div className="mb-0.5 flex items-center gap-1 text-[10px] text-horizon-600">
+            {isPartnerView ? <UserCheck className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+            {isPartnerView ? (partnerName ?? 'Partner') : 'Huishouden'}
+          </div>
+        )}
         <div className="mt-1 flex items-center gap-2">
           <Flag className="h-3.5 w-3.5 text-horizon-500 shrink-0" />
           <span className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
@@ -82,7 +113,13 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
   }
 
   return (
-    <WidgetShell module="horizon" size={size} kicker="Vrijheidsmijlpalen" href={href}>
+    <WidgetShell module="horizon" size={size} kicker={kicker} href={href}>
+      {isShared && (
+        <div className="mb-1 flex items-center gap-1 text-[11px] text-horizon-600">
+          {isPartnerView ? <UserCheck className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+          {isPartnerView ? (partnerName ?? 'Partner') : 'Gecombineerd huishouden'}
+        </div>
+      )}
       <div className={`${size === 'half' ? 'space-y-1' : 'mt-1 space-y-1.5'}`}>
         {MILESTONES.map((m, i) => {
           const reached = effectivePct >= m.pct
