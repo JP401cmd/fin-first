@@ -6,6 +6,7 @@ import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 
 /**
  * Box2Detail — compacte Box 2-sectie (aanmerkelijk belang / DGA) op de
@@ -159,8 +160,11 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
       <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
         {/* Samenvatting — privé */}
         <div className="p-4 sm:p-5">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Box 2 — aanmerkelijk belang {result.year} · privé
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+              Box 2 — aanmerkelijk belang {result.year} · privé
+            </div>
+            <PerspectiveContextLabel />
           </div>
           <div className="mt-1 flex items-baseline gap-2 flex-wrap">
             <span className="font-serif text-2xl font-semibold text-[var(--ink)] tabular-nums">

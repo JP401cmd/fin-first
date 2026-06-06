@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { formatCurrency } from '@/lib/format'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import type { TransactionRow } from '@/components/app/transacties-feed'
 
 /**
@@ -70,9 +71,12 @@ export function TransactiesGeldstroom({
   return (
     <section className="mb-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
       <header className="px-4 sm:px-6 pt-4 pb-2 flex items-baseline justify-between gap-2">
-        <h3 className="text-[10px] uppercase tracking-[0.18em] font-mono font-semibold text-[var(--ink-2)]">
-          Geldstroom
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-[10px] uppercase tracking-[0.18em] font-mono font-semibold text-[var(--ink-2)]">
+            Geldstroom
+          </h3>
+          <PerspectiveContextLabel className="normal-case tracking-normal" />
+        </div>
         {monthLabel && (
           <span
             className="text-[11px] italic text-[var(--ink-4)]"

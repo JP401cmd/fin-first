@@ -72,6 +72,7 @@ import {
 } from '@/lib/household-projection'
 import { HouseholdRetirementPane } from '@/components/app/horizon/household-retirement-pane'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { PensionParseSummaryCard, PensionPdfDownloadLink, PensionInstructionPanel, KpiTooltip, ExploreCard, ResilienceContextMessage, ResilienceTrendChart, FireAgeContextMessage, FireAgeTrendChart, computeCumulativeImpacts, type PensionParseSummaryResult, type SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -2550,6 +2551,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             style={{ background: 'var(--module-active-500)' }}
           />
           Horizon · jouw vrijheidshorizon
+          <PerspectiveContextLabel className="normal-case tracking-normal" />
         </div>
         {/* Headline met italic-em "vrij" in Horizon-700 */}
         <h1

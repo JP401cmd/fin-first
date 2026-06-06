@@ -15,6 +15,7 @@ import {
 } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import {
   loadPerspectiveData,
@@ -474,7 +475,10 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
           description={pageInfoText}
           className="absolute right-0 top-0"
         />
-        <Kicker size="large">Schulden · vrijheid die je terugkoopt</Kicker>
+        <div className="flex items-center gap-2">
+          <Kicker size="large">Schulden · vrijheid die je terugkoopt</Kicker>
+          <PerspectiveContextLabel className="normal-case tracking-normal" />
+        </div>
 
         <EditorialHeadline emphasis="terugkoopt" size="lg">
           Vrijheid die je terugkoopt

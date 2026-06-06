@@ -6,6 +6,7 @@ import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildCashflowCards } from '@/lib/cashflow-cards'
 import { CashflowLandingCards } from '@/components/overview/cashflow-landing-cards'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { InflationImpactCard, INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
@@ -64,6 +65,7 @@ export default async function OverzichtCashflowPage() {
           <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-[var(--ink-2)]">
             Je geldstroom
           </span>
+          <PerspectiveContextLabel />
         </div>
         <p
           className="mb-4 max-w-[60ch] border-l-2 pl-3 font-serif text-sm italic text-[var(--ink-2)]"

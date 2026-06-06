@@ -8,6 +8,7 @@ import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadPerspectiveTransactions } from '@/lib/household/perspective-loader'
+import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 
 export const metadata: Metadata = {
   title: 'Box 1 · Werk + woning — TriFinity',
@@ -94,9 +95,12 @@ export default async function BelastingBox1Page() {
 
       {showTwoCards ? (
         <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 pb-8">
-          <div className="mb-3 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            <Users className="h-3.5 w-3.5" aria-hidden="true" />
-            Jaarruimte per persoon
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+              Jaarruimte per persoon
+            </div>
+            <PerspectiveContextLabel className="normal-case tracking-normal" />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
