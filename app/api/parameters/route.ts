@@ -16,7 +16,7 @@ export async function GET() {
   let data: Record<string, unknown> | null = null
   const { data: d1, error: e1 } = await supabase
     .from('profiles')
-    .select('expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate')
+    .select('expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate, income_source, expenses_source')
     .eq('id', user.id)
     .single()
 
@@ -45,6 +45,8 @@ export async function GET() {
     retirement_expense_method: data?.retirement_expense_method ?? 'essential_budgets',
     retirement_expense_custom_amount: Number(data?.retirement_expense_custom_amount ?? 0),
     target_savings_rate: data?.target_savings_rate ?? null,
+    income_source: data?.income_source ?? 'auto',
+    expenses_source: data?.expenses_source ?? 'auto',
   })
 }
 

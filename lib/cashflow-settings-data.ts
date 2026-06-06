@@ -17,6 +17,12 @@ export interface CashflowSettingsData {
   effectiveSwr: number
   inflationRate: number
   fireStrategy: { strategy: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'; endAge: number }
+  /** Whether income comes from DB field ('manual') or transaction-computed average ('auto'). */
+  incomeSource: 'auto' | 'manual'
+  /** Whether expenses come from DB field ('manual') or transaction-computed average ('auto'). */
+  expensesSource: 'auto' | 'manual'
+  /** Transaction-computed monthly expenses (distinct from estimatedMonthlyExpenses = stored profile value). */
+  computedMonthlyExpenses: number
 }
 
 /**
@@ -43,7 +49,7 @@ export async function loadCashflowSettingsData(
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'date_of_birth, target_savings_rate, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount',
+      'date_of_birth, target_savings_rate, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, income_source, expenses_source',
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -88,5 +94,8 @@ export async function loadCashflowSettingsData(
       strategy: core.fireStrategy.strategy,
       endAge: core.fireStrategy.endAge,
     },
+    incomeSource: (profile?.income_source as 'auto' | 'manual') ?? 'auto',
+    expensesSource: (profile?.expenses_source as 'auto' | 'manual') ?? 'auto',
+    computedMonthlyExpenses: rf.monthlyExpenses,
   }
 }

@@ -14,6 +14,8 @@ export interface SanitizedCashSettings {
   retirement_expense_method?: RetirementExpenseMethod
   retirement_expense_custom_amount?: number
   target_savings_rate?: number | null
+  income_source?: string
+  expenses_source?: string
 }
 
 /**
@@ -48,6 +50,13 @@ export function sanitizeCashSettingsInput(body: Record<string, unknown>): Saniti
     } else {
       const n = Number(body.target_savings_rate)
       if (Number.isFinite(n) && n >= 0 && n <= 100) out.target_savings_rate = n
+    }
+  }
+
+  for (const key of ['income_source', 'expenses_source'] as const) {
+    if (body[key] !== undefined) {
+      const v = String(body[key])
+      if (v === 'auto' || v === 'manual') out[key] = v
     }
   }
 
