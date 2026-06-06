@@ -30,7 +30,7 @@ import {
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { computeLeverScores } from '@/components/app/shell/lever-scores'
-import { CoachBubble } from '@/components/app/coach-bubble'
+import { WillHome } from '@/components/app/will/will-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
@@ -459,7 +459,7 @@ export default async function AppLayout({
                         <ChatPromptDeeplink />
                       </Suspense>
                       <Suspense fallback={null}>
-                        <CoachBubble
+                        <WillHome
                           dataGaps={coachDataGaps}
                           deferredFields={coachDeferredFields}
                           overrides={coachConfig.rules}

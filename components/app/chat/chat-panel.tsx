@@ -12,8 +12,8 @@ import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
 import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown } from 'lucide-react'
 import type { SuggestRecommendationResult } from '@/lib/ai/tools/suggest-recommendation'
-import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { ChatVisualizationCard } from './chat-visualization-card'
+import '@/components/app/will/will-home.css' // wh-melding-in keyframe (corner-grow entree, gedeeld met WillHome)
 import type { VisualizationOutput } from '@/lib/ai/tools/show-visualization'
 
 /* ── Wft Disclaimer ───────────────────────────────────────────────── */
@@ -76,7 +76,6 @@ type DomainConfig = {
   placeholder: string
   greeting: string
   greetingDescription: string
-  fabBg: string
   fabAvatar: (size: number) => React.ReactNode
   headerColor: string
   bubbleBg: string
@@ -91,7 +90,6 @@ const WILL_CONFIG: DomainConfig = {
   placeholder: 'Vraag Will iets...',
   greeting: 'Hoi, ik ben Will',
   greetingDescription: 'Ik help je met al je financiele vragen — van budgetten tot FIRE-projecties.',
-  fabBg: 'bg-white/60 backdrop-blur-sm',
   fabAvatar: (size: number) => <WillDots size={size} />,
   headerColor: 'text-wil-600',
   bubbleBg: 'bg-wil-50',
@@ -379,7 +377,7 @@ function QuickActionChips({
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, toggle, openWithMessage, pendingMessage, clearPendingMessage, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage } = useChatContext()
+  const { isOpen, close, pendingMessage, clearPendingMessage, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage } = useChatContext()
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -416,10 +414,6 @@ export function ChatPanel() {
   // beslissen. Geen expire-on-close meer.
   const [recDecisions, setRecDecisions] = useState<Map<string, RecommendationDecision>>(new Map())
   const [loadingRec, setLoadingRec] = useState<{ id: string; kind: 'accept' | 'postpone' | 'reject' } | null>(null)
-
-  // Badge-count op de FAB: postponed voorstellen die over hun
-  // terugkomdatum zijn. Discoverability voor de herbekijk-flow.
-  const [postponedReady, setPostponedReady] = useState(0)
 
   // Modal state
   const [editAction, setEditAction] = useState<Action | null>(null)
@@ -592,32 +586,6 @@ export function ChatPanel() {
     },
     [recDecisions],
   )
-
-  // Postponed-ready badge: laad bij mount en wanneer de chat sluit (na
-  // mogelijke nieuwe postpones). Polling is bewust gemist — een minuutje
-  // achterloop maakt voor deze nudge niet uit.
-  const fetchPostponedReady = useCallback(async () => {
-    try {
-      const res = await fetch('/api/ai/recommendations/postponed-ready', {
-        cache: 'no-store',
-      })
-      if (!res.ok) return
-      const { count } = await res.json() as { count: number }
-      setPostponedReady(count)
-    } catch {
-      // silently fail — badge is informational
-    }
-  }, [])
-
-  useEffect(() => {
-    void fetchPostponedReady()
-  }, [fetchPostponedReady])
-
-  useEffect(() => {
-    // Refresh wanneer de chat sluit — gebruiker kan voorstellen uitgesteld
-    // hebben in deze sessie of er nieuwe inzichten zijn.
-    if (!isOpen) void fetchPostponedReady()
-  }, [isOpen, fetchPostponedReady])
 
   /* ── Modal handlers ───────────────────────────────────────────── */
 
@@ -816,51 +784,14 @@ export function ChatPanel() {
     clearError()
   }, [clearError])
 
-  /* ── FAB ──────────────────────────────────────────────────────── */
-
-  if (!isOpen) {
-    const hasPostponedReady = postponedReady > 0
-    const fabAria = hasPostponedReady
-      ? `Open chat met ${config.name} — ${postponedReady} uitgestelde tip${postponedReady === 1 ? '' : 's'} klaar`
-      : `Open chat met ${config.name}`
-    const onFabClick = () => {
-      if (hasPostponedReady) {
-        // Auto-kick-off: open chat met herbekijk-prompt zodat Will
-        // direct begint met de openstaande herbeoordelingen.
-        openWithMessage(
-          'Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met de belangrijkste.',
-        )
-      } else {
-        toggle()
-      }
-    }
-
-    return (
-      <div className="fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] z-50 md:bottom-6" style={{ right: 'calc(1.5rem + var(--chat-sidebar-width, 0px))' }}>
-        <button
-          onClick={onFabClick}
-          className={`relative flex h-14 w-14 items-center justify-center rounded-full ${config.fabBg} text-wil-600 shadow-[var(--s1)] transition-all hover:scale-105 active:scale-95`}
-          aria-label={fabAria}
-        >
-          {config.fabAvatar(36)}
-          {hasPostponedReady && (
-            <span
-              aria-hidden="true"
-              className="absolute -top-1.5 -left-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-wil-600 px-1.5 text-[11px] font-semibold text-white shadow-md ring-2 ring-[var(--paper)]"
-            >
-              {postponedReady > 9 ? '9+' : postponedReady}
-            </span>
-          )}
-        </button>
-        <AiPrivacyIndicator size={12} className="absolute -top-1 -right-1 rounded-full bg-[var(--paper)] p-0.5 shadow-sm" />
-      </div>
-    )
-  }
+  // De launcher (FAB) leeft nu in WillHome — die toont de bubbel én opent de chat.
+  // Wanneer de chat gesloten is, rendert ChatPanel niets.
+  if (!isOpen) return null
 
   // Panel classes differ between floating (default) and pinned (sidebar) mode
   const panelClasses = isPinned
     ? 'fixed top-0 right-0 z-50 flex h-screen w-[420px] flex-col bg-[var(--paper)] shadow-2xl border-l border-[var(--border-ed)]'
-    : 'fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col bg-[var(--paper)] shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-[var(--r-lg)] md:border md:border-[var(--border-ed)]'
+    : 'fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col bg-[var(--paper)] shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-[var(--r-lg)] md:border md:border-[var(--border-ed)] md:origin-bottom-right motion-safe:md:animate-[wh-melding-in_280ms_cubic-bezier(.2,.8,.2,1)]'
 
   return (
     <>
