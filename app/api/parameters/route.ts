@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { sanitizeCashSettingsInput } from '@/lib/cashflow-settings'
 
 // ── GET — Lees berekeningsparameters uit profiles ─────────────────────
 
@@ -15,7 +16,7 @@ export async function GET() {
   let data: Record<string, unknown> | null = null
   const { data: d1, error: e1 } = await supabase
     .from('profiles')
-    .select('expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income')
+    .select('expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate')
     .eq('id', user.id)
     .single()
 
@@ -40,6 +41,10 @@ export async function GET() {
     box3_method: data?.box3_method ?? 'forfaitair',
     marginaal_tarief: data?.marginaal_tarief ?? null,
     net_monthly_income: data?.net_monthly_income ?? null,
+    estimated_monthly_expenses: Number(data?.estimated_monthly_expenses ?? 0),
+    retirement_expense_method: data?.retirement_expense_method ?? 'essential_budgets',
+    retirement_expense_custom_amount: Number(data?.retirement_expense_custom_amount ?? 0),
+    target_savings_rate: data?.target_savings_rate ?? null,
   })
 }
 
@@ -53,7 +58,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
   }
 
-  let body: { expected_return?: unknown; inflation_rate?: unknown; box3_method?: unknown; marginaal_tarief?: unknown }
+  let body: Record<string, unknown>
   try {
     body = await request.json()
   } catch {
@@ -102,6 +107,9 @@ export async function PUT(request: NextRequest) {
     updateData.marginaal_tarief = marginaalTarief
   }
 
+  const cashSettings = sanitizeCashSettingsInput(body)
+  Object.assign(updateData, cashSettings)
+
   let { error } = await supabase
     .from('profiles')
     .upsert(updateData)
@@ -123,5 +131,6 @@ export async function PUT(request: NextRequest) {
     inflation_rate: inflationRate,
     box3_method: box3Method ?? 'forfaitair',
     marginaal_tarief: marginaalTarief !== undefined ? marginaalTarief : null,
+    ...cashSettings,
   })
 }
