@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import {
   ASSET_TYPE_LABELS,
@@ -83,6 +83,10 @@ export default async function AssetCategoryServerPage({
   params: Promise<{ type: string }>
 }) {
   const { type } = await params
+
+  // Cash heeft nu een eigen landing op de cashflow-route — stuur door vóór
+  // de validatiecheck zodat andere asset-types onveranderd blijven.
+  if (type === 'cash') redirect('/overzicht/cashflow')
 
   if (!isValidAssetType(type)) {
     notFound()

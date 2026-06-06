@@ -1,28 +1,26 @@
-'use client'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
 
-import { use } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { CashAccountView } from '@/components/app/cash-account-view'
-import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-
-export default function CashAccountDetailPage({
+/**
+ * De per-rekening detailpagina is opgegaan in de cashflow-landing. We mappen
+ * de bank_account-id naar zijn gekoppelde asset en sturen door naar de focus-
+ * weergave op /overzicht/cashflow. Zonder mapping: gewoon de landing.
+ */
+export default async function CashAccountRedirect({
   params,
 }: {
   params: Promise<{ accountId: string }>
 }) {
-  const { accountId } = use(params)
-  const searchParams = useSearchParams()
-  const month = searchParams.get('month') ?? undefined
+  const { accountId } = await params
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('bank_accounts')
+    .select('linked_asset_id')
+    .eq('id', accountId)
+    .maybeSingle()
 
-  return (
-    <>
-      <NavStackMeta title="Cash-rekening" />
-      <CashAccountView
-        accountId={accountId}
-        backHref="/core/assets"
-        backLabel="Vermogen"
-        initialMonth={month}
-      />
-    </>
-  )
+  if (data?.linked_asset_id) {
+    redirect(`/overzicht/cashflow#rekening-${data.linked_asset_id}`)
+  }
+  redirect('/overzicht/cashflow')
 }
