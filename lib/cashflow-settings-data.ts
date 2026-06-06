@@ -23,6 +23,10 @@ export interface CashflowSettingsData {
   expensesSource: 'auto' | 'manual'
   /** Transaction-computed monthly expenses (distinct from estimatedMonthlyExpenses = stored profile value). */
   computedMonthlyExpenses: number
+  /** 6-maands spaarbudget-stortingen (correctie-component van savingsRate6m). */
+  savingsBudgetTotal6m: number
+  /** 6-maands schuldaflossing (correctie-component van savingsRate6m). */
+  debtAflossingTotal6m: number
   /**
    * Vaste 12-maands reeks (oudste → nieuwste) van inkomsten/uitgaven per
    * kalendermaand, rechtstreeks uit `loadCoreData` (transfer-gefilterde
@@ -112,5 +116,7 @@ export async function loadCashflowSettingsData(
     // Per-maand reeks (12 slots, oudste → nieuwste) uit dezelfde core-load —
     // serializable en zonder extra DB-round-trip.
     monthlyBreakdown: core.monthlyIncomeExpenseSeries,
+    savingsBudgetTotal6m: core.savingsBudgetTotal6m,
+    debtAflossingTotal6m: core.debtAflossingTotal6m,
   }
 }
