@@ -9,6 +9,7 @@
  * 5. Edge cases: endAge = fireAge, laag rendement, negatief reëel rendement
  */
 
+import { describe, it, expect } from 'vitest'
 import { runSimulation, type SimCashflow, type SimRow } from '@/lib/fire-simulation'
 import { runUnifiedProjection, type UnifiedProjectionInput, type UnifiedProjectionRow } from '@/lib/unified-projection'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
@@ -20,14 +21,23 @@ function makeUnifiedInput(overrides: Partial<UnifiedProjectionInput> & {
   endAge?: number
   yearlyExpenses?: number
   annualSavings?: number
+  /** Helper-only: startwaarde van de standaard investment-asset (geen UnifiedProjectionInput-veld) */
+  currentPortfolio?: number
 }): UnifiedProjectionInput {
   const currentAge = overrides.currentAge ?? 40
   const endAge = overrides.endAge ?? 90
+  const annualSavings = overrides.annualSavings ?? 24_000
   return {
     currentAge,
-    aowAge: overrides.aowAge ?? 67,
+    endAge,
     yearlyExpenses: overrides.yearlyExpenses ?? 36_000,
-    annualSavings: overrides.annualSavings ?? 24_000,
+    annualSavings,
+    // Cashflow-metadata-velden — beïnvloeden alleen cashFlowSummary, niet de
+    // FIRE-projectie/binary-search. 0 reproduceert het oorspronkelijke gedrag
+    // (engine behandelde undefined al als 0).
+    monthlySurplus: overrides.monthlySurplus ?? 0,
+    monthlyIncome: overrides.monthlyIncome ?? 0,
+    incomeGrowthRate: overrides.incomeGrowthRate ?? 0,
     grossReturn: overrides.grossReturn ?? 0.07,
     inflationRate: overrides.inflationRate ?? 0.02,
     box3Method: overrides.box3Method ?? 'forfaitair',
@@ -38,7 +48,7 @@ function makeUnifiedInput(overrides: Partial<UnifiedProjectionInput> & {
     assets: overrides.assets ?? [{
       id: 'a1', user_id: 'u1', name: 'Beleggingen', asset_type: 'investment',
       current_value: overrides.currentPortfolio ?? 200_000,
-      monthly_contribution: (overrides.annualSavings ?? 24_000) / 12,
+      monthly_contribution: annualSavings / 12,
       expected_return: (overrides.grossReturn ?? 0.07) * 100, // expected_return in % in DB
       is_active: true, created_at: '', updated_at: '',
     }] as any[],

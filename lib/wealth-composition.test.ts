@@ -21,7 +21,6 @@ function makeAsset(overrides: Partial<Asset> & { asset_type: Asset['asset_type']
     id: 'test-asset',
     user_id: 'test',
     name: 'Test Asset',
-    asset_type: overrides.asset_type,
     current_value: 10000,
     purchase_value: 10000,
     purchase_date: '2020-01-01',

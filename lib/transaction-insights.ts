@@ -298,3 +298,91 @@ export function periodTrend(
     expensePct: pct(current.expense, previous.expense),
   }
 }
+
+// ── Uitgaven-heatmap (GitHub-stijl kalender) ─────────────────────────────────
+
+const MONTH_ABBR = [
+  'jan', 'feb', 'mrt', 'apr', 'mei', 'jun',
+  'jul', 'aug', 'sep', 'okt', 'nov', 'dec',
+]
+
+export interface HeatmapWindow {
+  start: string
+  end: string
+}
+
+/** Vast venster van 12 kalendermaanden t/m de vorige maand (los van de periode). */
+export function resolveHeatmapWindow(now: Date): HeatmapWindow {
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const end = new Date(y, m, 0) // dag 0 van deze maand = laatste dag vorige maand
+  const start = new Date(y, m - 12, 1) // eerste dag, 12 maanden eerder
+  return { start: iso(start), end: iso(end) }
+}
+
+/** Uitgaven per kalenderdag (ISO 'yyyy-mm-dd' → bedrag); transfers/inkomsten uitgesloten. */
+export function spendByDay(txns: AnalysisTransaction[]): Map<string, number> {
+  const m = new Map<string, number>()
+  for (const t of txns) {
+    if (t.transaction_type === 'transfer') continue
+    if (!(t.amount < 0)) continue
+    m.set(t.date, (m.get(t.date) ?? 0) + Math.abs(t.amount))
+  }
+  return m
+}
+
+export interface HeatCell {
+  /** ISO-datum, of null voor opvul-cellen buiten [start, end]. */
+  date: string | null
+  amount: number
+}
+
+export interface HeatmapGrid {
+  /** Kolommen = weken (maandag-eerst); elke kolom = 7 cellen (ma…zo). */
+  weeks: HeatCell[][]
+  /** Maand-labels boven de kolom waar een nieuwe maand begint. */
+  monthLabels: { col: number; label: string }[]
+}
+
+/** Bouw een GitHub-achtige week×dag-rooster voor [start, end] met dag-bedragen. */
+export function buildHeatmapWeeks(
+  start: string,
+  end: string,
+  daily: Map<string, number>,
+): HeatmapGrid {
+  const startD = parseLocalDate(start)
+  const endD = parseLocalDate(end)
+  // gridStart = maandag op/voor start; gridEnd = zondag op/na end.
+  const gridStart = new Date(startD)
+  gridStart.setDate(gridStart.getDate() - ((gridStart.getDay() + 6) % 7))
+  const gridEnd = new Date(endD)
+  gridEnd.setDate(gridEnd.getDate() + (6 - ((gridEnd.getDay() + 6) % 7)))
+
+  const weeks: HeatCell[][] = []
+  const monthLabels: { col: number; label: string }[] = []
+  const cur = new Date(gridStart)
+  let col = 0
+  let prevMonth = -1
+  while (cur <= gridEnd) {
+    const column: HeatCell[] = []
+    let firstActiveMonth: number | null = null
+    for (let r = 0; r < 7; r++) {
+      const active = cur >= startD && cur <= endD
+      if (active) {
+        const isoDate = iso(cur)
+        column.push({ date: isoDate, amount: daily.get(isoDate) ?? 0 })
+        if (firstActiveMonth === null) firstActiveMonth = cur.getMonth()
+      } else {
+        column.push({ date: null, amount: 0 })
+      }
+      cur.setDate(cur.getDate() + 1)
+    }
+    if (firstActiveMonth !== null && firstActiveMonth !== prevMonth) {
+      monthLabels.push({ col, label: MONTH_ABBR[firstActiveMonth] })
+      prevMonth = firstActiveMonth
+    }
+    weeks.push(column)
+    col++
+  }
+  return { weeks, monthLabels }
+}

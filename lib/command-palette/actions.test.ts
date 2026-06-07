@@ -71,7 +71,7 @@ describe('buildActionItems — perspectief-acties', () => {
       makeCtx({ currentPerspective: 'personal', setPerspective }),
       [],
     )
-    items.find((i) => i.id === 'action:perspective-partner')!.run()
+    items.find((i) => i.id === 'action:perspective-partner')!.run!()
     expect(setPerspective).toHaveBeenCalledWith('partner')
   })
 
@@ -81,15 +81,15 @@ describe('buildActionItems — perspectief-acties', () => {
       makeCtx({ currentPerspective: 'household', setPerspective }),
       [],
     )
-    items.find((i) => i.id === 'action:perspective-household')!.run()
+    items.find((i) => i.id === 'action:perspective-household')!.run!()
     expect(setPerspective).not.toHaveBeenCalled()
   })
 
   it('elke optie sluit het palette na klik', () => {
     const closePalette = vi.fn()
     const items = buildActionItems(makeCtx({ closePalette }), [])
-    items.find((i) => i.id === 'action:perspective-personal')!.run()
-    items.find((i) => i.id === 'action:perspective-household')!.run()
+    items.find((i) => i.id === 'action:perspective-personal')!.run!()
+    items.find((i) => i.id === 'action:perspective-household')!.run!()
     expect(closePalette).toHaveBeenCalledTimes(2)
   })
 

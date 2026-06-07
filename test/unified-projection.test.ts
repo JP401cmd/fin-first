@@ -365,7 +365,7 @@ describe('C. Heffingsvrij vermogen', () => {
 describe('D. Schuldaflossing', () => {
   it('D1: annuïteit produceert aflopend saldo per jaar', () => {
     const debt = makeDebt({
-      debt_type: 'persoonlijke_lening',
+      debt_type: 'personal_loan',
       current_balance: 50_000,
       interest_rate: 5,
       monthly_payment: 943, // ~10yr annuity on 50k at 5%
@@ -393,7 +393,7 @@ describe('D. Schuldaflossing', () => {
 
   it('D2: lineair produceert gelijkmatige aflossing', () => {
     const debt = makeDebt({
-      debt_type: 'persoonlijke_lening',
+      debt_type: 'personal_loan',
       current_balance: 60_000,
       interest_rate: 4,
       monthly_payment: 600, // ~principal + interest
@@ -409,7 +409,7 @@ describe('D. Schuldaflossing', () => {
 
   it('D3: aflossingsvrij — saldo blijft constant, alleen rente', () => {
     const debt = makeDebt({
-      debt_type: 'hypotheek',
+      debt_type: 'mortgage',
       current_balance: 200_000,
       interest_rate: 3,
       monthly_payment: 500,
@@ -428,7 +428,7 @@ describe('D. Schuldaflossing', () => {
 
   it('D4: inactive debts worden genegeerd', () => {
     const debt = makeDebt({
-      debt_type: 'persoonlijke_lening',
+      debt_type: 'personal_loan',
       current_balance: 10_000,
       is_active: false,
     })
@@ -439,7 +439,7 @@ describe('D. Schuldaflossing', () => {
   it('D5: computeWeightedDebtTotal respecteert net_worth_inclusion_pct', () => {
     const debt = makeDebt({
       id: 'debt-50pct',
-      debt_type: 'hypotheek',
+      debt_type: 'mortgage',
       current_balance: 100_000,
       net_worth_inclusion_pct: 50,
       repayment_type: 'aflossingsvrij',
@@ -900,7 +900,7 @@ describe('I. Edge cases', () => {
     const input = makeInput({
       assets: [makeAsset({ asset_type: 'savings', current_value: 5_000, expected_return: 1 })],
       debts: [makeDebt({
-        debt_type: 'persoonlijke_lening',
+        debt_type: 'personal_loan',
         current_balance: 50_000,
         interest_rate: 8,
         monthly_payment: 300,
@@ -1212,7 +1212,7 @@ describe('K. Integratietests', () => {
     const withDebt = runUnifiedProjection(makeInput({
       ...baseParams,
       debts: [makeDebt({
-        debt_type: 'persoonlijke_lening',
+        debt_type: 'personal_loan',
         current_balance: 50_000,
         interest_rate: 5,
         monthly_payment: 500,

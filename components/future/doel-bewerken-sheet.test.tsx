@@ -38,7 +38,7 @@ const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockRefresh = vi.fn()
 
-function mockEq(fn: ReturnType<typeof vi.fn>) {
+function mockEq(fn: () => unknown) {
   return () => fn()
 }
 

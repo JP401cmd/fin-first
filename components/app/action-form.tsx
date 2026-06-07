@@ -56,7 +56,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md p-1 text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)]"
+          className="rounded-md p-1 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
         >
           <X className="h-4 w-4" />
         </button>
@@ -139,7 +139,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
                   className={`flex-1 rounded-md py-2 text-xs font-medium transition-colors ${
                     priority >= p
                       ? 'bg-wil-500 text-white'
-                      : 'bg-[var(--paper)] text-[var(--ink-3)] ring-1 ring-zinc-200 hover:bg-wil-50'
+                      : 'bg-[var(--paper)] text-[var(--ink-3)] ring-1 ring-[var(--border-ed)] hover:bg-wil-50'
                   }`}
                 >
                   {p}
@@ -162,7 +162,7 @@ export function ActionForm({ onSubmit, onCancel }: ActionFormProps) {
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
+          className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)]"
         >
           Annuleren
         </button>

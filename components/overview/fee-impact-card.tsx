@@ -60,27 +60,27 @@ export function FeeImpactCard({
   if (!visible) return null
 
   return (
-    <article className="relative rounded-2xl border border-[var(--border-ed)] bg-gradient-to-br from-rose-50/60 to-stone-50 p-4 sm:p-6">
+    <article className="relative rounded-2xl border border-[var(--border-ed)] bg-gradient-to-br from-[var(--negative)]/8 to-[var(--subtle)] p-4 sm:p-6">
       <button
         type="button"
         onClick={hide}
         aria-label="Inzicht minimaliseren"
         title="Minimaliseren"
-        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full text-rose-700/70 transition-colors hover:bg-rose-100 hover:text-rose-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700"
+        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full text-[var(--negative)]/70 transition-colors hover:bg-[var(--negative)]/15 hover:text-[var(--negative)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--negative)]"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
       <header className="flex items-start gap-3 mb-4 pr-7">
-        <span className="inline-flex w-9 h-9 rounded-lg bg-rose-100 text-rose-700 items-center justify-center shrink-0">
+        <span className="inline-flex w-9 h-9 rounded-lg bg-[var(--negative)]/15 text-[var(--negative)] items-center justify-center shrink-0">
           <Percent className="w-4 h-4" aria-hidden="true" />
         </span>
         <div className="flex-1">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-rose-700">
+          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--negative)]">
             Wat kosten fees je?
           </div>
           <h3 className="font-serif text-lg sm:text-xl text-[var(--ink)] mt-0.5 leading-snug">
             {extraFeePct.toFixed(1)}% extra beheerkosten kost je{' '}
-            <span className="text-rose-700">{formatCurrency(Math.round(cost))}</span>{' '}
+            <span className="text-[var(--negative)]">{formatCurrency(Math.round(cost))}</span>{' '}
             over {years} jaar
           </h3>
           <p className="text-xs text-[var(--ink-2)] mt-1 leading-snug">
@@ -112,7 +112,7 @@ export function FeeImpactCard({
           <span className="text-[11px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)]">
             Extra beheerkosten
           </span>
-          <span className="text-xs font-semibold text-rose-700 tabular-nums">
+          <span className="text-xs font-semibold text-[var(--negative)] tabular-nums">
             {extraFeePct.toFixed(1)}%
           </span>
         </div>
@@ -124,7 +124,7 @@ export function FeeImpactCard({
           value={extraFeePct}
           onChange={(e) => setExtraFeePct(Number(e.target.value))}
           aria-label="Extra beheerkosten in procent"
-          className="w-full accent-rose-600"
+          className="w-full accent-[var(--negative)]"
         />
         <div className="flex items-center justify-between text-[10px] text-[var(--ink-3)] mt-1 tabular-nums">
           <span>0%</span>
@@ -134,7 +134,7 @@ export function FeeImpactCard({
       </label>
 
       {cost > 0 && (
-        <div className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-rose-100 text-rose-800">
+        <div className="mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-[var(--negative)]/15 text-[var(--negative)]">
           <TrendingDown className="w-3.5 h-3.5" aria-hidden="true" />
           {costPct}% van je eindwaarde gaat naar fees
         </div>
@@ -155,8 +155,8 @@ function BarVisualization({
   tone: 'positive' | 'negative'
 }) {
   const fillColor =
-    tone === 'positive' ? 'bg-emerald-500' : 'bg-rose-500'
-  const textColor = tone === 'positive' ? 'text-emerald-700' : 'text-rose-700'
+    tone === 'positive' ? 'bg-[var(--positive)]' : 'bg-[var(--negative)]'
+  const textColor = tone === 'positive' ? 'text-positive' : 'text-negative'
   return (
     <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-3">
       <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--ink-3)] mb-1.5 truncate">

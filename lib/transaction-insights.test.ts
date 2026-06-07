@@ -8,6 +8,9 @@ import {
   spendByWeekday,
   periodTrend,
   counterpartyKey,
+  resolveHeatmapWindow,
+  spendByDay,
+  buildHeatmapWeeks,
   type AnalysisTransaction,
 } from './transaction-insights'
 
@@ -243,5 +246,66 @@ describe('periodTrend', () => {
     const t = periodTrend(cur, prev)
     expect(t.expensePct).toBeNull()
     expect(t.incomePct).toBeNull()
+  })
+})
+
+// ── resolveHeatmapWindow ─────────────────────────────────────────────────────
+
+describe('resolveHeatmapWindow (12 maanden t/m vorige maand)', () => {
+  it('juni 2026 → jun 2025 t/m mei 2026', () => {
+    const w = resolveHeatmapWindow(NOW)
+    expect(w.start).toBe('2025-06-01')
+    expect(w.end).toBe('2026-05-31')
+  })
+  it('januari 2026 → heel 2025', () => {
+    const w = resolveHeatmapWindow(new Date(2026, 0, 10))
+    expect(w.start).toBe('2025-01-01')
+    expect(w.end).toBe('2025-12-31')
+  })
+})
+
+// ── spendByDay ───────────────────────────────────────────────────────────────
+
+describe('spendByDay', () => {
+  it('sommeert uitgaven per dag, sluit inkomsten en transfers uit', () => {
+    const m = spendByDay([
+      tx({ amount: -100, date: '2026-05-10' }),
+      tx({ amount: -50, date: '2026-05-10' }),
+      tx({ amount: 200, date: '2026-05-10' }), // inkomst → genegeerd
+      tx({ amount: -30, date: '2026-05-11', transaction_type: 'transfer' }), // transfer → genegeerd
+    ])
+    expect(m.get('2026-05-10')).toBe(150)
+    expect(m.has('2026-05-11')).toBe(false)
+  })
+})
+
+// ── buildHeatmapWeeks ────────────────────────────────────────────────────────
+
+describe('buildHeatmapWeeks', () => {
+  it('bouwt week-kolommen (ma-eerst) met bedragen en maand-labels', () => {
+    const daily = new Map<string, number>([['2026-05-05', 40]])
+    const { weeks, monthLabels } = buildHeatmapWeeks('2026-05-04', '2026-05-17', daily)
+    expect(weeks).toHaveLength(2) // ma 4 mei … zo 17 mei = 2 volle weken
+    expect(weeks[0]).toHaveLength(7)
+    expect(weeks[0][0].date).toBe('2026-05-04') // maandag
+    expect(weeks[0][0].amount).toBe(0)
+    expect(weeks[0][1].date).toBe('2026-05-05') // dinsdag
+    expect(weeks[0][1].amount).toBe(40)
+    expect(weeks[1][6].date).toBe('2026-05-17') // zondag
+    expect(monthLabels).toEqual([{ col: 0, label: 'mei' }])
+  })
+
+  it('vult dagen vóór de start als inactieve (null) cellen', () => {
+    // start = dinsdag → de maandag-cel vóór de start is inactief.
+    const { weeks } = buildHeatmapWeeks('2026-05-05', '2026-05-17', new Map())
+    expect(weeks[0][0].date).toBeNull()
+    expect(weeks[0][1].date).toBe('2026-05-05')
+  })
+
+  it('labelt elke nieuwe maand bij een maandgrens', () => {
+    const { monthLabels } = buildHeatmapWeeks('2026-04-27', '2026-05-10', new Map())
+    // kolom 0 begint in april, kolom 1 (week van 4 mei) start in mei.
+    expect(monthLabels[0]).toEqual({ col: 0, label: 'apr' })
+    expect(monthLabels.some((l) => l.label === 'mei')).toBe(true)
   })
 })

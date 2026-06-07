@@ -60,8 +60,9 @@ describe('Box3Detail', () => {
     await waitFor(() => {
       expect(screen.getByText(/Box 3 — vermogensbelasting 2026/i)).toBeTruthy()
     })
-    // €705 belasting ergens zichtbaar
-    expect(screen.getByText(/705/)).toBeTruthy()
+    // €705 belasting ergens zichtbaar (kan op meerdere plekken voorkomen sinds
+    // de tegenbewijs-simulator óók de forfaitaire heffing toont).
+    expect(screen.getAllByText(/705/).length).toBeGreaterThan(0)
     expect(screen.getByText(/7 vrijheidsdagen/)).toBeTruthy()
   })
 
@@ -73,7 +74,9 @@ describe('Box3Detail', () => {
     expect(screen.queryByText('Rendementsgrondslag')).toBeNull()
     fireEvent.click(screen.getByText('Berekeningsstappen'))
     expect(screen.getByText('Rendementsgrondslag')).toBeTruthy()
-    expect(screen.getByText(/Voordeel uit sparen en beleggen/)).toBeTruthy()
+    // "Voordeel uit sparen en beleggen" staat zowel in de berekeningsstappen
+    // als in de altijd-zichtbare forfaitaire-opbouw-sectie (3.1).
+    expect(screen.getAllByText(/Voordeel uit sparen en beleggen/).length).toBeGreaterThan(0)
   })
 
   it('pakt eigen partner-resultaat in household-modus (geen personal-key)', async () => {
@@ -86,7 +89,7 @@ describe('Box3Detail', () => {
       ],
     })
     render(<Box3Detail year={2026} />)
-    await waitFor(() => expect(screen.getByText(/321/)).toBeTruthy())
+    await waitFor(() => expect(screen.getAllByText(/321/).length).toBeGreaterThan(0))
     expect(screen.queryByText(/8\.888/)).toBeNull()
   })
 

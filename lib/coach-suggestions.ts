@@ -359,6 +359,47 @@ export const PATH_SUGGESTIONS: PathRule[] = [
     },
   },
   {
+    pathPrefix: '/overzicht/belasting/box1',
+    key: 'path_belasting_box1',
+    condition: 'Op een pagina onder /overzicht/belasting/box1.',
+    suggestion: {
+      message:
+        'Je grootste Box 1-kans is je jaarruimte — benut hem vóór 31 december en koop vrijheid terug.',
+      cta: 'Bekijk jaarruimte',
+    },
+  },
+  {
+    pathPrefix: '/overzicht/belasting/box2',
+    key: 'path_belasting_box2',
+    condition: 'Op een pagina onder /overzicht/belasting/box2.',
+    suggestion: {
+      message:
+        'Hou je rekening-courant onder €500k en time je dividend slim rond de jaarwisseling.',
+      cta: 'Bekijk Box 2',
+    },
+  },
+  {
+    pathPrefix: '/overzicht/belasting/box3',
+    key: 'path_belasting_box3',
+    condition: 'Op een pagina onder /overzicht/belasting/box3.',
+    suggestion: {
+      message:
+        'Betaal je niet te veel over je vermogen? Vergelijk forfaitair met je werkelijke rendement.',
+      cta: 'Vergelijk tegenbewijs',
+    },
+  },
+  {
+    pathPrefix: '/overzicht/belasting',
+    key: 'path_belasting',
+    condition:
+      'Op de belasting-hub onder /overzicht/belasting (en niet onder een specifieker box-pad hierboven).',
+    suggestion: {
+      message:
+        'Hier zie je je totale fiscale plaatje en waar de meeste vrijheid te winnen valt.',
+      cta: 'Bekijk je belasting',
+    },
+  },
+  {
     pathPrefix: '/overzicht',
     key: 'path_core',
     condition: 'Op een pagina onder /overzicht (en niet onder een specifieker /overzicht-pad hierboven).',

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { usePerspective } from '@/components/app/perspective-provider'
 import {
   resolvePeriodWindow,
+  resolveHeatmapWindow,
   summarizeFlow,
   newCounterparties,
   counterpartyKey,
@@ -30,6 +31,8 @@ import { GrootsteUitgaven } from './grootste-uitgaven'
 import { NieuweTegenpartijen } from './nieuwe-tegenpartijen'
 import { WeekdagPatroon } from './weekdag-patroon'
 import { PeriodeTrend } from './periode-trend'
+import { UitgavenHeatmap } from './uitgaven-heatmap'
+import { TransactieDetailSheet } from './transactie-detail-sheet'
 
 /**
  * TransactiesAnalyse — periode-gestuurde transactie-analyse op
@@ -110,6 +113,28 @@ function monthsBefore(iso: string, months: number): string {
   return `${yy}-${mm}-${dd}`
 }
 
+const WEEKDAY_FULL = [
+  'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag',
+]
+const NL_WEEKDAY_ABBR = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'] // index = Date.getDay()
+const NL_MONTH_ABBR = [
+  'jan', 'feb', 'mrt', 'apr', 'mei', 'jun',
+  'jul', 'aug', 'sep', 'okt', 'nov', 'dec',
+]
+
+/** Weekdag-index (0 = maandag … 6 = zondag) van een ISO-datum, lokaal geparsed. */
+function weekdayIndex(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return (new Date(y, m - 1, d).getDay() + 6) % 7
+}
+
+/** "za 14 feb 2026" — titel voor de dagweergave. */
+function formatDayTitle(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return iso
+  return `${NL_WEEKDAY_ABBR[new Date(y, m - 1, d).getDay()]} ${d} ${NL_MONTH_ABBR[m - 1]} ${y}`
+}
+
 export function TransactiesAnalyse() {
   const { perspective } = usePerspective()
 
@@ -117,6 +142,7 @@ export function TransactiesAnalyse() {
   const [offset, setOffset] = useState(0)
 
   const [rawTxns, setRawTxns] = useState<PerspectiveItem[]>([])
+  const [rawHeatmap, setRawHeatmap] = useState<PerspectiveItem[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [accountMap, setAccountMap] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -125,10 +151,15 @@ export function TransactiesAnalyse() {
 
   const [editTx, setEditTx] = useState<FullTransaction | null>(null)
   const [drillCp, setDrillCp] = useState<{ name: string; iban: string | null } | null>(null)
+  const [listDetail, setListDetail] = useState<
+    { kind: 'day'; date: string } | { kind: 'weekday'; index: number } | null
+  >(null)
   const [reloadKey, setReloadKey] = useState(0)
 
   // Venster voor de gekozen periode + kalender-offset.
   const periodWindow = useMemo(() => resolvePeriodWindow(period, offset, new Date()), [period, offset])
+  // Vast heatmap-venster: 12 maanden t/m vorige maand (los van de periode-keuze).
+  const heatmapWindow = useMemo(() => resolveHeatmapWindow(new Date()), [])
 
   // ── Data laden bij periode-/perspectief-wissel ──────────────────────────
   useEffect(() => {
@@ -176,6 +207,28 @@ export function TransactiesAnalyse() {
     }
   }, [perspective, periodWindow.since, periodWindow.until, reloadKey])
 
+  // ── Heatmap-data: vast 12-maands-venster, los van de periode-keuze ────────
+  useEffect(() => {
+    let cancelled = false
+    async function loadHeatmap() {
+      const supabase = createClient()
+      try {
+        const res = await loadPerspectiveTransactions(supabase, perspective, {
+          since: heatmapWindow.start,
+          until: heatmapWindow.end,
+        })
+        if (cancelled) return
+        setRawHeatmap(res.transactions)
+      } catch {
+        if (!cancelled) setRawHeatmap([])
+      }
+    }
+    loadHeatmap()
+    return () => {
+      cancelled = true
+    }
+  }, [perspective, heatmapWindow.start, heatmapWindow.end, reloadKey])
+
   // ── Afgeleide data ──────────────────────────────────────────────────────
   const budgetMap = useMemo(() => {
     const m = new Map<string, string>()
@@ -198,6 +251,17 @@ export function TransactiesAnalyse() {
         .map((t) => mapRow(t, perspective, budgetMap, accountMap))
         .filter((t): t is AnalysisTransaction => t !== null),
     [rawTxns, perspective, budgetMap, accountMap],
+  )
+
+  // Heatmap-transacties (vast 12-maands-venster), met budget-/rekening-namen
+  // zodra die geladen zijn — voedt zowel de heatmap-visualisatie als de
+  // dagweergave bij een klik op een cel.
+  const heatmapTxns = useMemo(
+    () =>
+      rawHeatmap
+        .map((t) => mapRow(t, perspective, budgetMap, accountMap))
+        .filter((t): t is AnalysisTransaction => t !== null),
+    [rawHeatmap, perspective, budgetMap, accountMap],
   )
 
   // Tegenpartijen die vóór de periode al voorkwamen (zelfde perspectief-lens) —
@@ -244,6 +308,21 @@ export function TransactiesAnalyse() {
       .map((id) => ({ id, name: budgetMap.get(id) ?? 'Onbekend' }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [currentTxns, budgetMap])
+
+  // Detail-selectie: dag (uit de heatmap) of weekdag (uit het weekdag-patroon).
+  // Als filter bewaard (niet als snapshot) zodat de lijst meeschuift na een
+  // bewerking/herlaad.
+  const detailTxns = useMemo(() => {
+    if (!listDetail) return []
+    if (listDetail.kind === 'day') return heatmapTxns.filter((t) => t.date === listDetail.date)
+    return currentTxns.filter((t) => weekdayIndex(t.date) === listDetail.index)
+  }, [listDetail, heatmapTxns, currentTxns])
+
+  const detailTitle = !listDetail
+    ? ''
+    : listDetail.kind === 'day'
+      ? formatDayTitle(listDetail.date)
+      : `${WEEKDAY_FULL[listDetail.index]} · ${periodWindow.label}`
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const onPeriodChange = useCallback((p: PeriodKind) => {
@@ -299,25 +378,38 @@ export function TransactiesAnalyse() {
         </Card>
       ) : (
         <>
-          <Card>
-            {hasPartnerTotals && (
-              <p className="mb-3 border-l-2 border-[var(--border-md)] pl-3 text-xs italic text-[var(--ink-3)]">
-                Je partner deelt alleen totalen. Diens persoonlijke transacties tellen niet mee in
-                dit periodeoverzicht.
-              </p>
-            )}
-            <GeldstroomGauge summary={currentSummary} />
-            {currentSummary.income === 0 && currentSummary.expense === 0 && (
-              <p className="text-sm text-[var(--ink-3)]">Geen transacties in deze periode.</p>
-            )}
-          </Card>
+          <div className="grid gap-5 lg:grid-cols-3">
+            <Card className="lg:col-span-1">
+              {hasPartnerTotals && (
+                <p className="mb-3 border-l-2 border-[var(--border-md)] pl-3 text-xs italic text-[var(--ink-3)]">
+                  Je partner deelt alleen totalen. Diens persoonlijke transacties tellen niet mee in
+                  dit periodeoverzicht.
+                </p>
+              )}
+              <GeldstroomGauge summary={currentSummary} />
+              {currentSummary.income === 0 && currentSummary.expense === 0 && (
+                <p className="text-sm text-[var(--ink-3)]">Geen transacties in deze periode.</p>
+              )}
+            </Card>
+            <Card className="lg:col-span-2">
+              <UitgavenHeatmap
+                transactions={heatmapTxns}
+                start={heatmapWindow.start}
+                end={heatmapWindow.end}
+                onSelectDay={(date) => setListDetail({ kind: 'day', date })}
+              />
+            </Card>
+          </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
             <Card>
               <PeriodeTrend current={currentSummary} previous={prevSummary} />
             </Card>
             <Card>
-              <WeekdagPatroon transactions={currentTxns} />
+              <WeekdagPatroon
+                transactions={currentTxns}
+                onSelectWeekday={(index) => setListDetail({ kind: 'weekday', index })}
+              />
             </Card>
           </div>
 
@@ -375,13 +467,26 @@ export function TransactiesAnalyse() {
           />
         </BottomSheet>
       )}
+
+      {/* Dag- / weekdag-weergave (heatmap-cel of weekdag-staaf) */}
+      {listDetail && (
+        <BottomSheet open onClose={() => setListDetail(null)} title={detailTitle} size="lg">
+          <TransactieDetailSheet
+            transactions={detailTxns}
+            showDate={listDetail.kind === 'weekday'}
+            onSelectTx={openEdit}
+          />
+        </BottomSheet>
+      )}
     </div>
   )
 }
 
-function Card({ children }: { children: React.ReactNode }) {
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+    <section
+      className={`rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6 ${className}`}
+    >
       {children}
     </section>
   )

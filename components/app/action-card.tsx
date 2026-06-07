@@ -141,8 +141,8 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
             title={action.status === 'completed' ? 'Heropenen' : action.status === 'rejected' ? 'Afgewezen' : 'Afronden'}
             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 disabled:opacity-50 ${justCompleted ? 'scale-125' : ''}`}
             style={{
-              borderColor: action.status === 'completed' ? 'var(--color-emerald-500)' : action.status === 'postponed' ? 'var(--color-amber-400)' : 'var(--border-md)',
-              backgroundColor: action.status === 'completed' ? 'var(--color-emerald-500)' : 'transparent',
+              borderColor: action.status === 'completed' ? 'var(--positive)' : action.status === 'postponed' ? 'var(--color-amber-400)' : 'var(--border-md)',
+              backgroundColor: action.status === 'completed' ? 'var(--positive)' : 'transparent',
             }}
           >
             {action.status === 'completed' && (
@@ -261,7 +261,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
                   onClick={() => setShowReject(true)}
                   disabled={isLoading}
                   title="Afwijzen"
-                  className="flex h-6 w-6 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-negative disabled:opacity-50"
+                  className="flex h-6 w-6 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-negative disabled:opacity-50"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -332,7 +332,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
                 setShowReject(true)
               }}
               disabled={isLoading}
-              className="flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-negative disabled:opacity-50"
+              className="flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-negative disabled:opacity-50"
             >
               <X className="h-4 w-4" />
             </button>
@@ -384,7 +384,7 @@ export function ActionCard({ action, onStatusChange, onUpdate, onCancellationOpe
               <button
                 type="button"
                 onClick={() => setShowReject(false)}
-                className="px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
+                className="px-3 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)]"
               >
                 Annuleren
               </button>

@@ -50,7 +50,7 @@ export function BriefingCard({ module = 'cross', href, onClick, onEngage, onFeed
           <button
             type="button"
             onClick={(e) => handleFeedback(true, e)}
-            className="p-1 rounded-md text-[var(--ink-4)] hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+            className="p-1 rounded-md text-[var(--ink-4)] hover:text-[var(--positive)] hover:bg-[var(--positive)]/10 transition-colors"
             aria-label="Positieve feedback"
           >
             <ThumbsUp className="h-3 w-3" />
@@ -58,7 +58,7 @@ export function BriefingCard({ module = 'cross', href, onClick, onEngage, onFeed
           <button
             type="button"
             onClick={(e) => handleFeedback(false, e)}
-            className="p-1 rounded-md text-[var(--ink-4)] hover:text-red-500 hover:bg-red-50 transition-colors"
+            className="p-1 rounded-md text-[var(--ink-4)] hover:text-[var(--negative)] hover:bg-[var(--negative)]/10 transition-colors"
             aria-label="Negatieve feedback"
           >
             <ThumbsDown className="h-3 w-3" />

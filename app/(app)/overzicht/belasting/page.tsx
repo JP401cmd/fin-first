@@ -15,6 +15,23 @@ import { PAGE_INFO } from '@/lib/page-info-content'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
+import { computeBox1Tax } from '@/lib/box1-tax'
+import { buildTaxOverview } from '@/lib/tax-overview'
+import { getTaxDeadlines } from '@/lib/tax-calendar'
+import { HubTotaleDruk } from '@/components/overview/belasting/hub-totale-druk'
+import { HubVerdeling } from '@/components/overview/belasting/hub-verdeling'
+import { HubKansen } from '@/components/overview/belasting/hub-kansen'
+import { HubKalender } from '@/components/overview/belasting/hub-kalender'
+import { HubStroom } from '@/components/overview/belasting/hub-stroom'
+import { HubStelselradar } from '@/components/overview/belasting/hub-stelselradar'
+import { Reveal } from '@/components/landing/reveal'
+import {
+  Kicker,
+  EditorialHeadline,
+  EditorialDeck,
+  SectionLabel,
+  ScenarioCallout,
+} from '@/components/editorial'
 
 export const metadata: Metadata = {
   title: 'Belasting — TriFinity',
@@ -54,6 +71,9 @@ export default async function OverzichtBelastingPage() {
   // per-persoon — de deep box1-pagina toont zelf al een 2-koloms huishoudbeeld.
   let box3Tax = horizonData.healthScoreInput.taxData?.box3Tax ?? null
   let box3PerspectiveAware = false
+  // Optimale partner-allocatie levert een Box 3-besparingssignaal voor C4 — in
+  // household-view berekent loadPerspectiveBox3 dit als `savingsVsEqual`.
+  let partnerAllocatieSavings = 0
   if (perspective !== 'personal') {
     try {
       const box3Data = await loadPerspectiveBox3(supabase, perspective, 2026)
@@ -69,6 +89,7 @@ export default async function OverzichtBelastingPage() {
         box3Tax = perspectiveTax
         box3PerspectiveAware = !(perspective === 'household' && box3Data.combined == null)
       }
+      partnerAllocatieSavings = box3Data.optimalAllocation?.savingsVsEqual ?? 0
     } catch {
       // Perspectief-laden faalt (geen huishouden / RLS) → behoud eigen Box 3.
     }
@@ -84,16 +105,24 @@ export default async function OverzichtBelastingPage() {
   } = await supabase.auth.getUser()
   const hasAanmerkelijkBelang = user ? await hasBox2Relevance(supabase, user.id) : false
 
+  // Dag-uitgaven voor de vrijheidstijd-omrekening (maandbudget / 30). Fallback
+  // op €100/dag zodat de vrijheidstijd nooit door nul deelt.
+  const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
+  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 100
+
   // Box 1-schatting: netto-maandinkomen ≈ bruto × (1 − marginaal_tarief),
-  // dus bruto ≈ netto / (1 − marginaal). Box 1-druk ≈ bruto × marginaal.
-  // Versimpelde benadering — voldoende voor de KPI-tegel, niet voor aangifte.
+  // dus bruto ≈ netto / (1 − marginaal). We leiden zo het bruto-jaarinkomen af
+  // en voeden dat aan de pure Box 1-engine (`computeBox1Tax`) voor een
+  // accuratere heffing dan een platte bruto × marginaal — voldoende voor de
+  // KPI-tegel, niet voor aangifte.
   let box1Tax: number | null = null
   let grossYearly = 0
   const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
   const marg = horizonData.fireParams?.marginaalTarief ?? 0.3697
   if (netMonthly > 0 && marg > 0 && marg < 1) {
     grossYearly = (netMonthly * 12) / (1 - marg)
-    box1Tax = Math.round(grossYearly * marg)
+    const box1 = computeBox1Tax({ grossYearlyIncome: grossYearly, year: 2026, dailyExpenses })
+    box1Tax = Math.round(box1.tax)
   }
 
   // Box 1-status uit onbenutte jaarruimte: een onbenutte ruimte is een
@@ -121,6 +150,34 @@ export default async function OverzichtBelastingPage() {
         : box3Status === 'bad'
           ? 'Box 3-actie nodig'
           : null
+
+  // ── Hub-overzicht (C1/C2/C4/C7) ────────────────────────────────
+  // Jaarruimte-besparing = onbenutte ruimte × marginaal tarief (lijfrente-
+  // aftrek bespaart belasting tegen je marginale tarief).
+  const jaarruimteSavings = jaarruimte.hasData && marg > 0
+    ? Math.round(jaarruimte.jaarruimte * marg)
+    : 0
+
+  // Box 2 bewust BUITEN het totaal: we laden de echte Box 2-heffing niet op de
+  // hub (per-persoon, vereist eigen berekening). Bij aanmerkelijk belang
+  // annoteren we het totaal met "excl. Box 2".
+  const overview = buildTaxOverview({
+    box1Tax,
+    box2Tax: null,
+    box3Tax,
+    grossYearlyIncome: grossYearly > 0 ? grossYearly : null,
+    marginalRate: marg,
+    dailyExpenses,
+    jaarruimte:
+      jaarruimte.hasData && jaarruimte.jaarruimte > 0
+        ? { amount: jaarruimte.jaarruimte, savings: jaarruimteSavings }
+        : null,
+    partnerAllocatie:
+      partnerAllocatieSavings > 0 ? { savings: partnerAllocatieSavings } : null,
+  })
+
+  // Fiscale kalender — runtime-klok als 'now' (server-component mag dat).
+  const deadlines = getTaxDeadlines(new Date(), 2026)
 
   const cards: BelastingBoxCard[] = [
     {
@@ -155,24 +212,106 @@ export default async function OverzichtBelastingPage() {
   return (
     <>
       <NavStackMeta title="Belasting" bottomBar={{ kind: 'tabs' }} />
-      <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        {/* Perspectief-chip ALLEEN tonen wanneer minstens de Box 3-tegel het
-            perspectief weerspiegelt — anders zou de chip suggereren dat ook de
-            per-persoon-boxen (1 & 2) huishoud-cijfers tonen, wat misleidend is. */}
-        {box3PerspectiveAware && (
-          <div className="mb-2">
-            <PerspectiveContextLabel />
-          </div>
-        )}
+
+      {/* ── Editorial masthead ─────────────────────────────────────────
+          Kicker-eyebrow + redactionele deck zetten de toon: belasting als
+          vierde hefboom, vertaald naar vrijheidstijd. */}
+      <header className="relative mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
         <PageInfoButton
           description={PAGE_INFO['/overzicht/belasting'] ?? ''}
-          className="absolute right-4 top-4 sm:right-6"
+          className="absolute right-4 top-6 sm:right-6 sm:top-8"
+        />
+        <Kicker size="large" className="pr-10">
+          De vierde hefboom · Belasting {new Date().getFullYear()}
+        </Kicker>
+        <EditorialHeadline level="h1" size="lg" emphasis="vrijheid" className="mt-4 text-[var(--ink)]">
+          Drie boxen, één rekening — betaald in vrijheid
+        </EditorialHeadline>
+        <div className="mt-4 max-w-[62ch]">
+          <EditorialDeck>
+            Wat de fiscus jaarlijks afroomt is óók vrijheidstijd. Drie boxen,
+            één som — hieronder zie je waar de hefboom het zwaarst weegt en waar
+            ruimte ligt om vrijheid terug te kopen.
+          </EditorialDeck>
+        </div>
+      </header>
+
+      {/* Drie box-kaarten — gedeelde viz, ongewijzigd gedrag. */}
+      <div className="mx-auto max-w-6xl">
+        <BelastingBoxCards
+          cards={cards}
+          totalNote={hasAanmerkelijkBelang ? 'excl. Box 2' : undefined}
         />
       </div>
-      <BelastingBoxCards
-        cards={cards}
-        totalNote={hasAanmerkelijkBelang ? 'excl. Box 2' : undefined}
-      />
+
+      {/* Hub-secties onder de box-kaarten: druk (C1) → verdeling (C2) →
+          kansen (C4) → kalender (C5) → stroom (C7) → vooruitblik (C8).
+          Royale verticale ritmiek; elke sectie reveal't bij binnenkomst. */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 pb-16 sm:pb-20">
+        {/* I · De druk */}
+        <Reveal className="pt-10 sm:pt-14">
+          <SectionLabel num="I">De druk</SectionLabel>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[var(--rule-soft)] border border-[var(--rule-soft)]">
+            <HubTotaleDruk
+              overview={overview}
+              dailyExpenses={dailyExpenses}
+              exclBox2={hasAanmerkelijkBelang}
+              box3PerspectiveAware={box3PerspectiveAware}
+            />
+            <HubVerdeling overview={overview} />
+          </div>
+          {/* Perspectief-/eerlijkheidsannotatie als ScenarioCallout — vervangt
+              de losse chip-strip + verzamelt de "indicatie, geen advies"-voetregel.
+              De perspectief-chip (box3PerspectiveAware) blijft behouden: de chip
+              zelf self-gate't in de eigen weergave, en deze callout-tekst legt uit
+              wat het perspectief betekent. */}
+          <div className="mt-5">
+            {box3PerspectiveAware && (
+              <div className="mb-3">
+                <PerspectiveContextLabel />
+              </div>
+            )}
+            <ScenarioCallout title="Indicatie, geen advies.">
+              {box3PerspectiveAware
+                ? ' Box 1 wordt per persoon berekend; Box 3 volgt je gekozen weergave. '
+                : ' Een schatting op basis van je gegevens — geen aangifte. '}
+              {hasAanmerkelijkBelang
+                ? 'Box 2 (aanmerkelijk belang) staat buiten dit totaal.'
+                : ''}
+            </ScenarioCallout>
+          </div>
+        </Reveal>
+
+        {/* II · De kansen */}
+        {overview.opportunities.length > 0 && (
+          <Reveal className="pt-12 sm:pt-16">
+            <SectionLabel num="II">De kansen</SectionLabel>
+            <HubKansen opportunities={overview.opportunities} />
+          </Reveal>
+        )}
+
+        {/* III · De kalender */}
+        {deadlines.length > 0 && (
+          <Reveal className="pt-12 sm:pt-16">
+            <SectionLabel num="III">De kalender</SectionLabel>
+            <HubKalender deadlines={deadlines} />
+          </Reveal>
+        )}
+
+        {/* IV · Bruto → netto (alleen wanneer Box 1 bekend is) */}
+        {box1Tax != null && grossYearly > 0 && (
+          <Reveal className="pt-12 sm:pt-16">
+            <SectionLabel num="IV">Van bruto naar netto</SectionLabel>
+            <HubStroom grossYearly={grossYearly} box1Tax={box1Tax} />
+          </Reveal>
+        )}
+
+        {/* V · De vooruitblik (stelselradar, statisch educatief) */}
+        <Reveal className="pt-12 sm:pt-16">
+          <SectionLabel num="V">De vooruitblik</SectionLabel>
+          <HubStelselradar />
+        </Reveal>
+      </div>
     </>
   )
 }

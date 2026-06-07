@@ -4,12 +4,26 @@ import { useState, useEffect, useCallback } from 'react'
 import { Calculator, ChevronDown, ChevronUp, Clock, Info, Layers, Users, EyeOff } from 'lucide-react'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { BOX3_TOOLTIPS, type Box3Result, type TaxYear } from '@/lib/box3-data'
+import {
+  BOX3_TOOLTIPS,
+  type Box3Result,
+  type TaxYear,
+  type PartnerAllocation,
+} from '@/lib/box3-data'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
+import { Kicker } from '@/components/editorial'
+import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { createClient } from '@/lib/supabase/client'
 import { loadPerspectiveBox3, type PerspectiveBox3Data } from '@/lib/household-tax'
+import { Box3Opbouw } from '@/components/overview/belasting/box3-opbouw'
+import { Box3Heffingsvrij } from '@/components/overview/belasting/box3-heffingsvrij'
+import { Box3Mix } from '@/components/overview/belasting/box3-mix'
+import { Box3TegenbewijsCard } from '@/components/overview/belasting/box3-tegenbewijs-card'
+import { Box3PartnerSlider } from '@/components/overview/belasting/box3-partner-slider'
+import { Box3Peildatum } from '@/components/overview/belasting/box3-peildatum'
+import { Box3Stelsel2028 } from '@/components/overview/belasting/box3-stelsel2028'
 
 /**
  * Box3Detail — compacte, inklapbare Box 3-berekening op de Box 3-subpagina
@@ -28,6 +42,10 @@ import { loadPerspectiveBox3, type PerspectiveBox3Data } from '@/lib/household-t
  * classificatie, partner-optimalisatie ("optimale verdeling spaart €X t.o.v.
  * ieder apart") en — bij een partner die niets deelt — een privacy-melding.
  */
+
+// Box 3-accent (teal) + editorial fonts — functioneel, alléén ter onderscheiding.
+const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
+const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 
 interface PartnerEntry {
   isCurrentUser: boolean
@@ -50,14 +68,33 @@ interface Box3ApiResponse {
   dailyExpenses?: number
 }
 
-/** Genormaliseerde view-shape — gevoed door fundament óf legacy-API. */
+/**
+ * Genormaliseerde view-shape — gevoed door fundament óf legacy-API.
+ *
+ * We dragen nu de VOLLEDIGE `optimalAllocation` (PartnerAllocation) plus het
+ * gecombineerde resultaat door, zodat de partner-verdeel-slider (3.6) live de
+ * totale heffing bij een gekozen verdeling kan tonen naast de optimale.
+ */
 interface Box3View {
   result: Box3Result | null
   hasHousehold: boolean
-  optimalAllocation?: { totalTax: number; savingsVsEqual: number }
+  /**
+   * Besparing-samenvatting voor de bestaande partner-optimalisatie-melding —
+   * beide databronnen leveren dit (legacy = narrow {totalTax, savingsVsEqual}).
+   */
+  optimalSavings?: { totalTax: number; savingsVsEqual: number }
+  /**
+   * Volledige optimale verdeling — nodig voor de verdeel-slider (3.6). Alleen
+   * het fundament-pad levert dit; legacy laat het weg → slider verschijnt niet.
+   */
+  optimalAllocation?: PartnerAllocation
+  /** Gecombineerd huishoud-resultaat (bron van de gezamenlijke totalen). */
+  combined?: Box3Result
   dailyExpenses: number
   partnerDataHidden: boolean
   partnerName: string | null
+  currentUserName: string
+  year: TaxYear
 }
 
 /** Map de fundament-data naar de view-shape. */
@@ -65,25 +102,42 @@ function fromPerspectiveData(d: PerspectiveBox3Data): Box3View {
   return {
     result: d.personal,
     hasHousehold: d.hasHousehold,
+    optimalSavings: d.optimalAllocation
+      ? {
+          totalTax: d.optimalAllocation.totalTax,
+          savingsVsEqual: d.optimalAllocation.savingsVsEqual,
+        }
+      : undefined,
     optimalAllocation: d.optimalAllocation,
+    combined: d.combined,
     dailyExpenses: d.dailyExpenses,
     partnerDataHidden: d.partnerDataHidden,
     partnerName: d.partnerName,
+    currentUserName: d.currentUserName,
+    year: d.year,
   }
 }
 
 /** Map de legacy /api/household/box3-respons naar de view-shape. */
-function fromLegacyApi(data: Box3ApiResponse): Box3View {
+function fromLegacyApi(data: Box3ApiResponse, year: TaxYear): Box3View {
+  const result =
+    data.personal ??
+    data.partners?.find((p) => p.isCurrentUser)?.result ??
+    null
   return {
-    result:
-      data.personal ??
-      data.partners?.find((p) => p.isCurrentUser)?.result ??
-      null,
+    result,
     hasHousehold: !!data.hasHousehold,
-    optimalAllocation: data.optimalAllocation,
+    // Legacy levert de besparing-samenvatting wél (melding blijft werken)…
+    optimalSavings: data.optimalAllocation,
+    // …maar niet de volledige PartnerAllocation; de slider (3.6) verschijnt dan
+    // niet (zie showPartnerSlider hieronder).
+    optimalAllocation: undefined,
+    combined: data.combined,
     dailyExpenses: data.dailyExpenses ?? 0,
     partnerDataHidden: false,
     partnerName: null,
+    currentUserName: 'Jij',
+    year,
   }
 }
 
@@ -98,15 +152,18 @@ function InfoTooltip({ text }: { text: string }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--subtle)] text-[var(--ink-3)] hover:bg-violet-100 transition-colors"
+        className="ml-1 inline-flex h-4 w-4 items-center justify-center bg-[var(--subtle)] text-[var(--ink-3)] hover:bg-[color-mix(in_srgb,var(--color-teal-500)_14%,transparent)] hover:text-[var(--color-teal-700)] transition-colors"
         aria-label="Meer informatie"
       >
         <Info className="h-3 w-3" />
       </button>
       {open && (
-        <span className="absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-xs text-[var(--ink-2)] shadow-md">
+        <span
+          className="absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 border border-[var(--ink)] bg-[var(--paper)] p-3 text-xs text-[var(--ink-2)] shadow-md"
+          style={{ fontFamily: SOURCE_SERIF }}
+        >
           {text}
-          <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--paper)]" />
+          <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--ink)]" />
         </span>
       )}
     </span>
@@ -136,7 +193,11 @@ function CalcRow({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-3 ${highlight ? 'rounded-lg bg-violet-50 px-2 py-1.5 -mx-2' : ''}`}
+      className={`flex items-center justify-between gap-3 ${
+        highlight
+          ? '-mx-2 px-2 py-1.5 border-l-2 border-[var(--color-teal-500)] bg-[color-mix(in_srgb,var(--color-teal-500)_8%,transparent)]'
+          : ''
+      }`}
     >
       <span
         className={`text-xs ${muted ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'} ${bold ? 'font-semibold' : ''}`}
@@ -173,6 +234,9 @@ export function Box3Detail({
   const [showClassificatie, setShowClassificatie] = useState(false)
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
+  // Entrée-reveal voor het hero-cijfer (rise-in, 250ms). Respecteert
+  // prefers-reduced-motion via de hook (hasEntered = true bij reduced motion).
+  const { ref: heroRef, hasEntered } = useInViewAnimation({ duration: 250 })
 
   // Herlaad bij een in-sessie perspectief-wissel via het fundament (browser-
   // client). Slaat de eerste render over wanneer `initialData` al server-side
@@ -212,7 +276,7 @@ export function Box3Detail({
       .then((r) => r.json())
       .then((data: Box3ApiResponse) => {
         if (cancelled) return
-        setView(fromLegacyApi(data))
+        setView(fromLegacyApi(data, year as TaxYear))
       })
       .catch(() => {
         /* stil falen — sectie blijft leeg */
@@ -228,19 +292,31 @@ export function Box3Detail({
 
   const result = view?.result ?? null
 
-  // Partner-optimalisatie: alleen household + daadwerkelijke besparing.
+  // Partner-optimalisatie-melding: alleen household + daadwerkelijke besparing.
+  const optimalSavings = view?.optimalSavings
   const optimal = view?.optimalAllocation
+  const combined = view?.combined
   const dailyExpenses = view?.dailyExpenses ?? 0
   const showPartnerOptim =
-    !!view?.hasHousehold && !!optimal && optimal.savingsVsEqual > 0
+    !!view?.hasHousehold && !!optimalSavings && optimalSavings.savingsVsEqual > 0
   const partnerDataHidden = !!view?.partnerDataHidden
+
+  // Partner-verdeel-slider (3.6): alleen household, niet bij verborgen partner-
+  // data, en alleen als we de volledige optimale verdeling + gecombineerde
+  // totalen hebben (fundament-pad; legacy-API levert die niet).
+  const showPartnerSlider =
+    !!view?.hasHousehold &&
+    !partnerDataHidden &&
+    !!optimal &&
+    !!combined &&
+    combined.totaalSpaargeld + combined.totaalBeleggingen > 0
 
   if (loading) {
     return (
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
-        <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-5 animate-pulse">
-          <div className="h-4 w-40 bg-[var(--subtle)] rounded mb-3" />
-          <div className="h-8 w-32 bg-[var(--subtle)] rounded" />
+        <div className="border border-[var(--ink)] bg-[var(--paper)] p-5 animate-pulse">
+          <div className="h-4 w-40 bg-[var(--subtle)] mb-3" />
+          <div className="h-9 w-32 bg-[var(--subtle)]" />
         </div>
       </section>
     )
@@ -250,28 +326,45 @@ export function Box3Detail({
 
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
-      <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
-        {/* Samenvatting */}
-        <div className="p-4 sm:p-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-              Box 3 — vermogensbelasting {result.year}
-            </div>
+      <div className="border border-[var(--ink)] bg-[var(--paper)] overflow-hidden">
+        {/* Samenvatting — editorial hero met Playfair-cijfer */}
+        <div className="p-5 sm:p-7">
+          <div className="flex flex-wrap items-center gap-3">
+            <Kicker>Box 3 — vermogensbelasting {result.year}</Kicker>
             <PerspectiveContextLabel />
           </div>
-          <div className="mt-1 flex items-baseline gap-2 flex-wrap">
-            <span className="font-serif text-2xl font-semibold text-[var(--ink)] tabular-nums">
+          <div
+            ref={heroRef}
+            className="mt-3 flex items-baseline gap-3 flex-wrap"
+            style={{
+              opacity: hasEntered ? 1 : 0,
+              transform: hasEntered ? 'translateY(0)' : 'translateY(8px)',
+              transition: 'opacity 250ms ease-out, transform 250ms cubic-bezier(.22,1,.36,1)',
+            }}
+          >
+            <span
+              className="text-[40px] sm:text-[52px] font-black leading-[0.9] tracking-[-0.02em] tabular-nums text-[var(--ink)]"
+              style={{ fontFamily: PLAYFAIR }}
+            >
               {fc(result.tax)}
             </span>
-            <span className="text-xs text-[var(--ink-3)]">per jaar</span>
+            <span
+              className="italic text-sm text-[var(--ink-3)]"
+              style={{ fontFamily: SOURCE_SERIF }}
+            >
+              per jaar
+            </span>
             {result.freedomDays > 0 && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-[var(--ink-3)]">
+              <span className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
                 <Clock className="h-3 w-3" aria-hidden="true" />
                 {result.freedomDays} vrijheidsdagen
               </span>
             )}
           </div>
-          <p className="mt-1.5 text-xs text-[var(--ink-2)] leading-snug">
+          <p
+            className="mt-3 max-w-[58ch] text-sm italic leading-snug text-[var(--ink-2)]"
+            style={{ fontFamily: SOURCE_SERIF }}
+          >
             Berekend over {fc(result.totaalSpaargeld + result.totaalBeleggingen)}{' '}
             <GlossaryTerm term="box_3">Box 3</GlossaryTerm>-vermogen met het{' '}
             <GlossaryTerm term="forfaitair_rendement">forfaitair rendement</GlossaryTerm>.
@@ -281,7 +374,7 @@ export function Box3Detail({
               tonen het eigen resultaat (single-person) + deze melding i.p.v.
               stilzwijgend een onjuist gecombineerd bedrag. */}
           {partnerDataHidden && (
-            <div className="mt-3 flex items-start gap-2 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-xs text-[var(--ink-2)]">
+            <div className="mt-4 flex items-start gap-2 border border-[var(--ink)] border-l-4 border-l-[var(--ink-3)] bg-[var(--subtle)] px-3 py-2.5 text-xs text-[var(--ink-2)]">
               <EyeOff className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--ink-3)]" aria-hidden="true" />
               <span>
                 {view?.partnerName ?? 'Je partner'} deelt geen vermogen, dus dit
@@ -298,10 +391,10 @@ export function Box3Detail({
           type="button"
           onClick={() => setShowDetails((s) => !s)}
           aria-expanded={showDetails}
-          className="flex w-full items-center justify-between border-t border-[var(--border-ed)] p-4 sm:px-5 hover:bg-[var(--subtle)] transition-colors"
+          className="flex w-full items-center justify-between border-t border-[var(--ink)] p-4 sm:px-7 hover:bg-[var(--subtle)] transition-colors"
         >
-          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-            <Calculator className="h-4 w-4 text-violet-600" aria-hidden="true" />
+          <span className="flex items-center gap-2.5 text-sm font-semibold text-[var(--ink)]">
+            <Calculator className="h-4 w-4 text-[var(--color-teal-600)]" aria-hidden="true" />
             Berekeningsstappen
           </span>
           {showDetails ? (
@@ -312,14 +405,14 @@ export function Box3Detail({
         </button>
 
         {showDetails && (
-          <div className="border-t border-[var(--border-ed)] px-4 py-4 sm:px-5">
+          <div className="border-t border-[var(--ink)] px-4 py-5 sm:px-7">
             <div className="space-y-3">
               <CalcRow label="Totaal spaargeld" value={result.totaalSpaargeld} fc={fc} />
               <CalcRow label="Totaal beleggingen" value={result.totaalBeleggingen} fc={fc} />
               {result.totaalUitgesloten > 0 && (
                 <CalcRow label="Uitgesloten (Box 1/2)" value={result.totaalUitgesloten} muted fc={fc} />
               )}
-              <div className="h-px bg-[var(--border-ed)]" />
+              <div className="h-px bg-[var(--rule-soft)]" />
               <CalcRow label="Box 3 schulden" value={result.totaalBox3Schulden} fc={fc} />
               <CalcRow
                 label={`Schuldendrempel (${result.hasPartner ? 'partner' : 'single'})`}
@@ -329,7 +422,7 @@ export function Box3Detail({
                 fc={fc}
               />
               <CalcRow label="Aftrekbare schulden" value={result.aftrekbareSchulden} fc={fc} />
-              <div className="h-px bg-[var(--border-ed)]" />
+              <div className="h-px bg-[var(--rule-soft)]" />
               <CalcRow
                 label="Forfaitair rendement spaargeld"
                 value={result.forfaitairSpaargeld}
@@ -339,7 +432,7 @@ export function Box3Detail({
               <CalcRow label="Forfaitair rendement beleggingen" value={result.forfaitairBeleggingen} fc={fc} />
               <CalcRow label="Forfaitair rendement schulden" value={result.forfaitairSchulden} negative fc={fc} />
               <CalcRow label="Voordeel uit sparen en beleggen" value={result.voordeelUitSparen} bold fc={fc} />
-              <div className="h-px bg-[var(--border-ed)]" />
+              <div className="h-px bg-[var(--rule-soft)]" />
               <CalcRow
                 label="Rendementsgrondslag"
                 value={result.rendementsgrondslag}
@@ -357,7 +450,7 @@ export function Box3Detail({
               <CalcRow label="Effectief rendement" pct={result.effectiefRendement} fc={fc} />
               <CalcRow label="Box 3 inkomen" value={result.box3Income} fc={fc} />
               <CalcRow label={`Tarief ${formatPct(result.params.tarief)}`} fc={fc} />
-              <div className="h-px bg-[var(--border-ed)]" />
+              <div className="h-px bg-[var(--rule-soft)]" />
               <CalcRow label="Box 3 belasting" value={result.tax} bold highlight fc={fc} />
             </div>
           </div>
@@ -368,10 +461,10 @@ export function Box3Detail({
           type="button"
           onClick={() => setShowClassificatie((s) => !s)}
           aria-expanded={showClassificatie}
-          className="flex w-full items-center justify-between border-t border-[var(--border-ed)] p-4 sm:px-5 hover:bg-[var(--subtle)] transition-colors"
+          className="flex w-full items-center justify-between border-t border-[var(--ink)] p-4 sm:px-7 hover:bg-[var(--subtle)] transition-colors"
         >
-          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-            <Layers className="h-4 w-4 text-violet-600" aria-hidden="true" />
+          <span className="flex items-center gap-2.5 text-sm font-semibold text-[var(--ink)]">
+            <Layers className="h-4 w-4 text-[var(--color-teal-600)]" aria-hidden="true" />
             Hoe is je vermogen ingedeeld?
           </span>
           {showClassificatie ? (
@@ -381,7 +474,7 @@ export function Box3Detail({
           )}
         </button>
         {showClassificatie && (
-          <div className="border-t border-[var(--border-ed)] px-4 py-4 sm:px-5 space-y-2">
+          <div className="border-t border-[var(--ink)] px-4 py-5 sm:px-7 space-y-2">
             {result.assetClassifications.map((ac, i) => (
               <ClassRow
                 key={`a-${i}`}
@@ -396,9 +489,9 @@ export function Box3Detail({
                 }
                 dotClass={
                   ac.category === 'spaargeld'
-                    ? 'bg-sky-500'
+                    ? 'bg-[var(--color-teal-500)]'
                     : ac.category === 'beleggingen'
-                      ? 'bg-amber-500'
+                      ? 'bg-[color-mix(in_srgb,var(--color-teal-500)_50%,transparent)]'
                       : 'bg-[var(--ink-4)]'
                 }
                 muted={ac.category === null}
@@ -416,7 +509,7 @@ export function Box3Detail({
                     name={dc.debt.name}
                     amount={Number(dc.debt.current_balance)}
                     categoryLabel={dc.inBox3 ? 'Box 3' : 'Uitgesloten'}
-                    dotClass={dc.inBox3 ? 'bg-rose-500' : 'bg-[var(--ink-4)]'}
+                    dotClass={dc.inBox3 ? 'bg-[var(--color-red-500)]' : 'bg-[var(--ink-4)]'}
                     muted={!dc.inBox3}
                     fc={fc}
                   />
@@ -426,25 +519,71 @@ export function Box3Detail({
           </div>
         )}
 
+        {/* 3.1 — Forfaitaire opbouw als gestapelde staaf */}
+        <Box3Opbouw result={result} fc={fc} />
+
+        {/* 3.3 — Heffingsvrij-vermogen-gauge */}
+        <Box3Heffingsvrij result={result} fc={fc} />
+
+        {/* 3.4 — Vermogensmix spaargeld vs. beleggingen */}
+        <Box3Mix result={result} />
+
+        {/* 3.2 ★ — Tegenbewijs-simulator (werkelijk vs. forfaitair) */}
+        <Box3TegenbewijsCard result={result} />
+
+        {/* 3.6 — Partner-verdeel-slider (alleen household, volledige data) */}
+        {showPartnerSlider && optimal && combined && (
+          <Box3PartnerSlider
+            totaalSpaargeld={combined.totaalSpaargeld}
+            totaalBeleggingen={combined.totaalBeleggingen}
+            totaalBox3Schulden={combined.totaalBox3Schulden}
+            optimalAllocation={optimal}
+            year={view!.year}
+            dailyExpenses={dailyExpenses}
+            currentUserName={view?.currentUserName}
+            partnerName={view?.partnerName}
+          />
+        )}
+
+        {/* 3.5 — Peildatum & arbitragevenster */}
+        <Box3Peildatum year={result.year} />
+
+        {/* 3.10 — Het nieuwe stelsel (beoogd 2028) */}
+        <Box3Stelsel2028 />
+
         {/* Partner-optimalisatie (alleen household + besparing > 0) */}
-        {showPartnerOptim && optimal && (
-          <div className="border-t border-emerald-200 bg-emerald-50/50 px-4 py-4 sm:px-5">
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="h-4 w-4 text-emerald-700" aria-hidden="true" />
-              <span className="text-sm font-semibold text-emerald-800">
+        {showPartnerOptim && optimalSavings && (
+          <div
+            className="border-t border-[var(--ink)] px-5 py-5 sm:px-7"
+            style={{
+              borderLeftWidth: '4px',
+              borderLeftColor: 'var(--positive)',
+              background: 'color-mix(in srgb, var(--positive) 6%, transparent)',
+            }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="h-4 w-4 text-[var(--positive)]" aria-hidden="true" />
+              <span
+                className="text-[10px] uppercase tracking-[0.20em] font-mono font-semibold text-[var(--positive)]"
+              >
                 Partner-optimalisatie
               </span>
             </div>
-            <p className="text-sm text-[var(--ink)] leading-snug">
+            <p
+              className="text-base italic leading-snug text-[var(--ink)]"
+              style={{ fontFamily: SOURCE_SERIF }}
+            >
               Optimale verdeling spaart{' '}
-              <strong className="text-emerald-700 tabular-nums">{fc(optimal.savingsVsEqual)}</strong>{' '}
+              <strong className="not-italic font-bold text-[var(--positive)] tabular-nums font-mono">
+                {fc(optimalSavings.savingsVsEqual)}
+              </strong>{' '}
               t.o.v. ieder apart
               {dailyExpenses > 0 && (
-                <> — zo&apos;n {Math.round(optimal.savingsVsEqual / dailyExpenses)} vrijheidsdagen</>
+                <> — zo&apos;n {Math.round(optimalSavings.savingsVsEqual / dailyExpenses)} vrijheidsdagen</>
               )}
               .
             </p>
-            <p className="mt-1 text-xs text-[var(--ink-2)] leading-snug">
+            <p className="mt-2 text-xs text-[var(--ink-2)] leading-snug">
               Als fiscaal partners mag je het Box 3-vermogen onderling verdelen;
               door het slim te verdelen benut je beide heffingsvrije vermogens
               optimaal.
@@ -474,7 +613,7 @@ function ClassRow({
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="flex items-center gap-2 min-w-0">
-        <span className={`h-2 w-2 rounded-full shrink-0 ${dotClass}`} aria-hidden="true" />
+        <span className={`h-2.5 w-2.5 rounded-[2px] shrink-0 ${dotClass}`} aria-hidden="true" />
         <span className={`text-xs truncate ${muted ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'}`}>
           {name}
         </span>

@@ -4,6 +4,7 @@
 import { z } from 'zod'
 import { tool } from 'ai'
 import type { TemporalContext, PreviousBriefingSummary, BriefingLongTermMemory, PhaseTransitionInfo } from '@/lib/briefing/types'
+import { getTaxDeadlines } from '@/lib/tax-calendar'
 
 // ── System Prompt Builder ───────────────────────────────────
 
@@ -25,6 +26,7 @@ export function buildBriefingSystemPrompt(
   const longTermBlock = formatLongTermMemory(longTermMemory)
   const phaseTransitionBlock = formatPhaseTransition(phaseTransition)
   const frequencyBlock = formatBriefingFrequency(briefingFrequency)
+  const taxBlock = formatTaxSignals(temporal)
 
   // Card count range based on frequency
   const cardRange = getCardCountRange(briefingFrequency)
@@ -157,7 +159,7 @@ Default href per card type:
 Vandaag: ${temporal.date}, dag ${temporal.dayOfMonth} van de maand, ${temporal.dayOfWeek}.
 ${temporalGuidance}
 ${temporal.seasonalNotes.length > 0 ? `\nActueel: ${temporal.seasonalNotes.join('; ')}` : ''}
-${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}${longTermBlock ? `\n${longTermBlock}\n` : ''}${userPreferences ? `\n${userPreferences}\n` : ''}${frequencyBlock ? `\n${frequencyBlock}\n` : ''}${phaseTransitionBlock ? `\n${phaseTransitionBlock}\n` : ''}
+${taxBlock ? `\n${taxBlock}\n` : ''}${directivesBlock ? `\n${directivesBlock}\n` : ''}${previousBlock ? `\n${previousBlock}\n` : ''}${longTermBlock ? `\n${longTermBlock}\n` : ''}${userPreferences ? `\n${userPreferences}\n` : ''}${frequencyBlock ? `\n${frequencyBlock}\n` : ''}${phaseTransitionBlock ? `\n${phaseTransitionBlock}\n` : ''}
 == FASE-BEWUST ==
 Gebruikersfase: ${phase} (sovereignty level ${level})
 ${phaseEmphasis}
@@ -412,6 +414,57 @@ function getPhaseEmphasis(phase: string): string {
 - Gebruik showLifeEvent voor toekomstplanning en legacy-events
 - Withdrawal strategie en legacy planning`
   }
+}
+
+/**
+ * Bouwt het fiscale-signalen instructieblok voor Will.
+ *
+ * Twee signalen, beide via BESTAANDE kaart-tools (geen nieuwe componenten):
+ *  1. Deadline-afteller (showCountdown) naar de eerstvolgende fiscale deadline,
+ *     berekend met de runtime-datum via getTaxDeadlines. Alleen instructie tijdens
+ *     een relevant venster (deadline binnen 90 dagen) zodat de afteller actueel is.
+ *  2. Box 3-heffing in vrijheidstijd (showInsight). CRUCIAAL: deze instructie is
+ *     SELF-GATING — Will toont de kaart alleen als de data een "BOX 3 BELASTING:"
+ *     regel bevat. Zonder financiële bron staat dat cijfer niet in de prompt, dus
+ *     produceert het model geen Box 3-kaart en blijft het no-finance-pad ongewijzigd.
+ *
+ * Het countdown-deel is puur temporeel (alleen de kalender-lib) en voegt geen
+ * financieel cijfer toe; de afteller is dus veilig ook zonder finance-bronnen.
+ */
+function formatTaxSignals(temporal: TemporalContext): string {
+  // Parse de runtime-datum uit de temporal-context (yyyy-mm-dd).
+  const now = new Date(`${temporal.date}T00:00:00Z`)
+  if (Number.isNaN(now.getTime())) return ''
+
+  const deadlines = getTaxDeadlines(now)
+  const next = deadlines[0]
+  if (!next) return ''
+
+  const lines: string[] = ['== FISCALE SIGNALEN ==']
+
+  // ── 1. Deadline-afteller — alleen tijdens een relevant venster ─────
+  // Buiten 90 dagen is een afteller niet urgent; dan geen countdown-instructie
+  // (de Box 3-inzicht-regel hieronder blijft altijd staan, maar is self-gating).
+  if (next.daysUntil <= 90) {
+    const boxLabel = next.box != null ? ` (Box ${next.box})` : ''
+    lines.push(
+      `Eerstvolgende fiscale deadline: "${next.label}"${boxLabel} over ${next.daysUntil} ${next.daysUntil === 1 ? 'dag' : 'dagen'} (${next.date}).`,
+    )
+    lines.push(
+      `INSTRUCTIE: Toon hiervoor een showCountdown met label "${next.label}", days=${next.daysUntil}, module "kern" en href="/overzicht/belasting". Gebruik sublabel voor extra context (bijv. de datum). Plaats deze afteller op een logische plek, niet als allereerste card.`,
+    )
+  } else {
+    lines.push(
+      `Eerstvolgende fiscale deadline: "${next.label}" pas over ${next.daysUntil} dagen (${next.date}) — nog niet urgent, geen afteller nodig.`,
+    )
+  }
+
+  // ── 2. Box 3-heffing in vrijheidstijd — SELF-GATING op datapresentie ─
+  lines.push(
+    'INSTRUCTIE (alleen als de data hieronder een regel "BOX 3 BELASTING: €..." bevat): toon één showInsight die deze jaarlijkse Box 3-heffing vertaalt naar vrijheidstijd ("deze belasting kost je ongeveer X dagen/maanden vrijheid per jaar"), met emphasis "observation", href="/overzicht/belasting" en ctaLabel="Belasting bekijken". Frame het als vrijheid die je terugverdient door slimme peildatum-planning, niet als droge belasting. Staat er GEEN "BOX 3 BELASTING:" regel in de data, sla dit inzicht dan volledig over — toon dan niets fiscaals over een bedrag.',
+  )
+
+  return lines.join('\n')
 }
 
 function getTemporalGuidance(temporal: TemporalContext): string {

@@ -28,6 +28,15 @@ export function useChatContext() {
   return ctx
 }
 
+/**
+ * Niet-throwende variant: retourneert null buiten een ChatProvider (bv. in
+ * unit-tests of SSR-fragmenten). Voor leaf-componenten die de chat optioneel
+ * aansturen en hun parent-tree niet mogen laten crashen.
+ */
+export function useChatContextOptional() {
+  return useContext(ChatContext)
+}
+
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)

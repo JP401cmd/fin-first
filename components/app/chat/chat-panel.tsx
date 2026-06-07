@@ -791,7 +791,7 @@ export function ChatPanel() {
   // Panel classes differ between floating (default) and pinned (sidebar) mode
   const panelClasses = isPinned
     ? 'fixed top-0 right-0 z-50 flex h-screen w-[420px] flex-col bg-[var(--paper)] shadow-2xl border-l border-[var(--border-ed)]'
-    : 'fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col bg-[var(--paper)] shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-[var(--r-lg)] md:border md:border-[var(--border-ed)] md:origin-bottom-right motion-safe:md:animate-[wh-melding-in_280ms_cubic-bezier(.2,.8,.2,1)]'
+    : 'fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col bg-[var(--paper)] shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-[var(--r-lg)] md:border md:border-[var(--border-ed)] md:origin-bottom-right motion-safe:md:animate-[wh-melding-in_560ms_cubic-bezier(.2,.8,.2,1)]'
 
   return (
     <>

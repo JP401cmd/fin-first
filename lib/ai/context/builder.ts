@@ -5,6 +5,8 @@ import { buildWilContext } from './wil-context'
 import { buildHorizonContext } from './horizon-context'
 import { buildSpendingPatternsContext } from './spending-patterns-context'
 import { buildBudgetInsightsContext } from './budget-insights-context'
+import { buildTaxContext } from './tax-context'
+import { buildAandachtspuntenContext } from './aandachtspunten-context'
 import { ALL_MODULES, MODULE_CATALOG, type ModuleId } from '@/lib/module-registry'
 
 /**
@@ -27,18 +29,20 @@ export async function buildContext(supabase: SupabaseClient): Promise<string> {
     activeModules = (profile?.active_modules as ModuleId[] | null) ?? ALL_MODULES
   }
 
-  const [shared, kern, wil, horizon, patterns, budgetInsights] = await Promise.all([
+  const [shared, kern, wil, horizon, patterns, budgetInsights, tax, aandachtspunten] = await Promise.all([
     buildSharedContext(supabase),
     budgetingActive ? buildKernContext(supabase) : Promise.resolve(''),
     buildWilContext(supabase, budgetingActive, activeModules),
     buildHorizonContext(supabase),
     budgetingActive ? buildSpendingPatternsContext(supabase) : Promise.resolve(''),
     budgetingActive ? buildBudgetInsightsContext(supabase) : Promise.resolve(''),
+    buildTaxContext(supabase),
+    buildAandachtspuntenContext(supabase),
   ])
 
   const moduleSection = buildModuleAwarenessSection(activeModules)
 
-  return [moduleSection, shared, kern, wil, horizon, patterns, budgetInsights].filter(Boolean).join('\n')
+  return [moduleSection, shared, kern, wil, horizon, patterns, budgetInsights, tax, aandachtspunten].filter(Boolean).join('\n')
 }
 
 /**

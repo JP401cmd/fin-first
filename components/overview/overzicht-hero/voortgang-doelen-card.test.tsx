@@ -21,7 +21,7 @@ function makeGoal(id: string, name: string): GoalWithBudget {
     target_date: '2030-12-31',
     created_at: new Date().toISOString(),
     is_active: true,
-  } as GoalWithBudget
+  } as unknown as GoalWithBudget
 }
 
 function makeProgress(pct: number, onTrack: boolean): GoalProgress {

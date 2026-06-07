@@ -407,11 +407,14 @@ export function generateBox3Optimizations(
 
   // Tip 4: Groene beleggingen
   if (result.totaalBeleggingen > 20_000 && result.tax > 0) {
-    const groenVrijstelling = input.hasPartner ? 145_014 : 72_507
+    // 2026-vrijstelling: € 26.715 p.p. / € 53.430 fiscale partners (laatste
+    // aantrekkelijke jaar). De regeling bouwt sterk af: in 2027 resteert nog
+    // slechts ± € 200 p.p. en per 2028 vervalt de vrijstelling volledig.
+    const groenVrijstelling = input.hasPartner ? 53_430 : 26_715
     tips.push({
       id: 'groene-beleggingen',
       title: 'Groene beleggingen',
-      description: `Groene beleggingen (ASN Groenprojectenfonds e.d.) zijn tot ${formatEur(groenVrijstelling)} vrijgesteld van Box 3. Check of je beleggingen hiervoor in aanmerking komen.`,
+      description: `Groene beleggingen (ASN Groenprojectenfonds e.d.) zijn in 2026 tot ${formatEur(groenVrijstelling)} vrijgesteld van Box 3 — plus een kleine heffingskorting. Let op: dit is het laatste gunstige jaar. In 2027 daalt de vrijstelling naar circa € 200 en per 2028 vervalt de regeling. Check of je beleggingen hiervoor in aanmerking komen.`,
       savings: 0,
       freedomDays: 0,
     })

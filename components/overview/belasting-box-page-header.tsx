@@ -3,6 +3,9 @@ import { ArrowLeft } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
+const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
+const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
+
 /**
  * Gedeelde editorial-header voor de box-subpagina's onder
  * /overzicht/belasting. Geeft elke box-pagina dezelfde context: een
@@ -38,8 +41,20 @@ export function BelastingBoxPageHeader({
       <div className="mt-2 text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
         Box {number}
       </div>
-      <h1 className="font-serif text-2xl text-[var(--ink)] mt-0.5">{title}</h1>
-      <p className="mt-1 text-sm text-[var(--ink-2)] max-w-2xl leading-snug">{subtitle}</p>
+      {/* Playfair voor de paginatitel — consistent met alle andere hero-koppen. */}
+      <h1
+        className="text-2xl font-black leading-tight tracking-[-0.02em] text-[var(--ink)] mt-0.5"
+        style={{ fontFamily: PLAYFAIR }}
+      >
+        {title}
+      </h1>
+      {/* Source Serif italic — deck-patroon (consistent met EditorialDeck). */}
+      <p
+        className="mt-1 text-sm italic text-[var(--ink-2)] max-w-2xl leading-snug"
+        style={{ fontFamily: SOURCE_SERIF }}
+      >
+        {subtitle}
+      </p>
     </section>
   )
 }

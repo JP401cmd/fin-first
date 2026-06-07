@@ -229,7 +229,8 @@ describe('Profiel — Woningtype en energielabel', () => {
   })
 
   it('empty selection maps to null', () => {
-    const value = '' || null
+    const selection: string = ''
+    const value = selection || null
     expect(value).toBeNull()
   })
 })
@@ -239,7 +240,8 @@ describe('Profiel — Woningtype en energielabel', () => {
 describe('Profiel — Numerieke validatie', () => {
   it('net_monthly_income converts to number or null', () => {
     expect(Number('3200')).toBe(3200)
-    expect('' ? Number('') : null).toBeNull()
+    const empty: string = ''
+    expect(empty ? Number(empty) : null).toBeNull()
   })
 
   it('net_monthly_income input has min=0', () => {

@@ -5,8 +5,10 @@
  * - Dividend uit deelnemingen
  * - Vervreemdingswinst (verkoop aandelen)
  *
- * Tarief 2025/2026: 24,5% tot €67.804, daarboven 33%.
- * Met fiscaal partner: grens verdubbelt naar €135.608.
+ * Tarief 2025/2026: 24,5% in de eerste schijf, daarboven 31%
+ * (het toptarief is per 2025 verlaagd van 33% naar 31%).
+ * Eerste-schijfgrens: 2025 €67.804 (partner €135.608),
+ * 2026 €68.843 (partner €137.686 — fiscaal partner verdubbelt de grens).
  *
  * Pure functions, no Supabase dependency. Follows the pattern of box3-data.ts.
  */
@@ -18,9 +20,9 @@ export type { TaxYear } from './box3-data'
 
 export interface Box2Params {
   tariefLaag: number    // 24,5%
-  tariefHoog: number    // 33%
-  grens: number         // €67.804 (single)
-  grensPartner: number  // €135.608 (with fiscal partner)
+  tariefHoog: number    // 31% (toptarief per 2025 verlaagd van 33%)
+  grens: number         // eerste-schijfgrens (single)
+  grensPartner: number  // eerste-schijfgrens met fiscaal partner (verdubbeld)
 }
 
 export interface Box2Deelneming {
@@ -81,15 +83,15 @@ export interface Box2Result {
 export const BOX2_PARAMS: Record<TaxYear, Box2Params> = {
   2025: {
     tariefLaag: 0.245,
-    tariefHoog: 0.33,
+    tariefHoog: 0.31,
     grens: 67_804,
     grensPartner: 135_608,
   },
   2026: {
     tariefLaag: 0.245,
-    tariefHoog: 0.33,
-    grens: 67_804,
-    grensPartner: 135_608,
+    tariefHoog: 0.31,
+    grens: 68_843,
+    grensPartner: 137_686,
   },
 }
 
@@ -99,10 +101,10 @@ export const DGA_LENING_DREMPEL = 500_000
 export const BOX2_TOOLTIPS: Record<string, string> = {
   box2: 'Box 2 belast inkomen uit aanmerkelijk belang — dividend en verkoopwinst van deelnemingen (≥5%).',
   aanmerkelijkBelang: 'Je hebt een aanmerkelijk belang als je (direct of indirect) 5% of meer van de aandelen bezit.',
-  tariefStaffel: 'Tot €67.804 betaal je 24,5%. Daarboven geldt 33%. Met fiscaal partner verdubbelt de grens.',
+  tariefStaffel: 'In de eerste schijf betaal je 24,5% (2026 tot €68.843; 2025 tot €67.804). Daarboven geldt 31% — het toptarief is per 2025 verlaagd van 33% naar 31%. Met fiscaal partner verdubbelt de eerste-schijfgrens (2026 €137.686).',
   dividend: 'Winstuitkering die je ontvangt van een BV of deelneming waarin je aanmerkelijk belang hebt.',
   vervreemdingswinst: 'Winst bij verkoop van je aandelen: verkoopprijs minus verkrijgingsprijs.',
-  fiscaalPartner: 'Met een fiscaal partner verdubbelt de grens voor het lage tarief naar €135.608.',
+  fiscaalPartner: 'Met een fiscaal partner verdubbelt de eerste-schijfgrens voor het lage tarief (2026 naar €137.686, 2025 €135.608).',
   wetExcessiefLenen: 'De Wet excessief lenen bij eigen vennootschap belast leningen boven €500.000 van je BV als fictief regulier voordeel in Box 2. Het bovenmatige deel wordt belast tegen Box 2 tarieven.',
 }
 

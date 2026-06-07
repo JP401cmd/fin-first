@@ -33,12 +33,8 @@ function makeAsset(
   return {
     id: `test-${Math.random().toString(36).slice(2, 8)}`,
     user_id: 'test',
-    asset_type: overrides.asset_type,
-    name: overrides.name,
-    current_value: overrides.current_value,
     purchase_value: overrides.current_value,
     purchase_date: null,
-    expected_return: overrides.expected_return,
     monthly_contribution: overrides.monthly_contribution ?? 0,
     institution: null,
     account_number: null,
@@ -85,10 +81,8 @@ function makeDebt(
   return {
     id: `test-debt-${Math.random().toString(36).slice(2, 8)}`,
     user_id: 'test',
-    name: overrides.name,
     debt_type: overrides.debt_type ?? 'personal_loan',
     original_amount: overrides.original_amount ?? overrides.current_balance,
-    current_balance: overrides.current_balance,
     interest_rate: overrides.interest_rate ?? 5,
     minimum_payment: overrides.minimum_payment ?? 0,
     monthly_payment: overrides.monthly_payment ?? 500,

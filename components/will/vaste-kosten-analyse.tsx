@@ -296,7 +296,7 @@ export function VasteKostenAnalyse({
                     onClick={(e) => handleSubscriptionOpzeg(sub, e)}
                     aria-label={`${sub.name} opzeggen`}
                     title="Opzeggen"
-                    className="flex shrink-0 items-center self-stretch border-l border-[var(--border-ed)] px-3 text-[var(--ink-4)] transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wil-500 dark:hover:bg-red-950"
+                    className="flex shrink-0 items-center self-stretch border-l border-[var(--border-ed)] px-3 text-[var(--ink-4)] transition-colors hover:bg-[var(--negative)]/10 hover:text-[var(--negative)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-wil-500"
                   >
                     <Ban className="h-3.5 w-3.5" />
                   </button>

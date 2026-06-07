@@ -130,7 +130,7 @@ export function buildCategoryAppLinks(
         kind: 'asset',
         categoryLabel: ASSET_TYPE_LABELS[type] ?? type,
         appLabel: entry.label,
-        href: `/core/assets/${type}?tab=${slug}`,
+        href: `/overzicht/bezittingen/${type}?tab=${slug}`,
         iconName: ASSET_TYPE_ICONS[type] ?? 'Circle',
         itemCount: tracked.length,
       })
@@ -147,7 +147,7 @@ export function buildCategoryAppLinks(
         kind: 'debt',
         categoryLabel: DEBT_TYPE_LABELS[type] ?? type,
         appLabel: entry.label,
-        href: `/core/debts/${type}?tab=${slug}`,
+        href: `/overzicht/schulden/${type}?tab=${slug}`,
         iconName: DEBT_TYPE_ICONS[type] ?? 'CircleDot',
         itemCount: tracked.length,
       })

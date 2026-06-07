@@ -9,7 +9,7 @@ function mockResult(overrides: Partial<Box2Result> = {}): Box2Result {
   return {
     year: 2026,
     hasPartner: false,
-    params: { tariefLaag: 0.245, tariefHoog: 0.33, grens: 67804, grensPartner: 135608 } as Box2Result['params'],
+    params: { tariefLaag: 0.245, tariefHoog: 0.31, grens: 68843, grensPartner: 137686 } as Box2Result['params'],
     perDeelneming: [{ name: 'Holding BV', dividend: 20000, disposalGain: 0, totalIncome: 20000, shareOfTotal: 1 }],
     totalDividend: 20000,
     totalDisposalGain: 0,

@@ -168,7 +168,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
                 className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
                   priority >= p
                     ? 'bg-wil-500 text-white'
-                    : 'bg-[var(--paper)] text-[var(--ink-3)] ring-1 ring-zinc-200 hover:bg-wil-50'
+                    : 'bg-[var(--paper)] text-[var(--ink-3)] ring-1 ring-[var(--border-ed)] hover:bg-wil-50'
                 } disabled:opacity-60`}
               >
                 {p}
@@ -203,7 +203,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
               <button
                 type="button"
                 onClick={() => onStatusChange('rejected')}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100 hover:text-negative"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-negative"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Afwijzen
@@ -226,7 +226,7 @@ export function ActionEditModal({ action, onClose, onSave, onStatusChange }: Act
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-zinc-100"
+            className="px-4 py-2 text-sm font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)]"
           >
             Sluiten
           </button>

@@ -46,15 +46,27 @@ export default async function BelastingBox2Page() {
   )
 }
 
-/** Rustige empty-state voor gebruikers zonder deelneming-asset. */
+const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
+
+/** Rustige empty-state voor gebruikers zonder deelneming-asset.
+ *  Scherpe hoeken conform het editorial design-systeem (geen rounded-2xl/full). */
 function Box2EmptyState() {
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
-      <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8 text-center">
-        <span className="mx-auto mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-violet-50 text-violet-700">
+      <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8 text-center">
+        {/* Icoon-wrapper: scherp vierkant, violet CSS-var — geen bare Tailwind violet-50. */}
+        <span
+          className="mx-auto mb-3 inline-flex h-11 w-11 items-center justify-center"
+          style={{ background: 'color-mix(in srgb, #7c3aed 10%, transparent)', color: '#7c3aed' }}
+        >
           <Building2 className="h-5 w-5" aria-hidden="true" />
         </span>
-        <h2 className="font-serif text-lg text-[var(--ink)]">Geen aanmerkelijk belang gevonden</h2>
+        <h2
+          className="text-lg font-black tracking-[-0.01em] text-[var(--ink)]"
+          style={{ fontFamily: PLAYFAIR }}
+        >
+          Geen aanmerkelijk belang gevonden
+        </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-[var(--ink-2)] leading-relaxed">
           Box 2 geldt voor directeur-grootaandeelhouders en houders van ≥ 5% van
           de aandelen in een vennootschap. Heb je een eigen BV of een
@@ -63,7 +75,8 @@ function Box2EmptyState() {
         </p>
         <Link
           href="/overzicht/bezittingen"
-          className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-violet-700 hover:text-violet-800 transition-colors"
+          className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold transition-colors"
+          style={{ color: '#7c3aed' }}
         >
           Beheer je bezittingen
           <ArrowRight className="h-4 w-4" aria-hidden="true" />

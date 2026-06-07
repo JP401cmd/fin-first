@@ -1,0 +1,234 @@
+/**
+ * Generieke aandachtspunten-laag — PURE (geen Supabase, geen React).
+ *
+ * Eén genormaliseerd `Aandachtspunt`-type waarmee app-brede signalen
+ * (belasting-kansen, NIBUD-budgetoverschrijdingen, dure schulden) op TWEE
+ * manieren bruikbaar worden:
+ *
+ *   (a) ACTIE  — `aandachtspuntToActionPayload` levert exact de body voor
+ *               POST /api/ai/actions. Deterministisch, los van Will.
+ *   (b) BUS     — dezelfde laag voedt Will als chat-context (zie
+ *               aandachtspunten-loader.ts → collectAandachtspunten).
+ *
+ * Dit bestand bevat alleen de adapters + de payload-mapping; de Supabase-
+ * assemblage zit in `aandachtspunten-loader.ts`. Zo blijft de rekenkern
+ * testbaar zonder DB (zie aandachtspunten.test.ts).
+ */
+
+import type { TaxOpportunity } from './tax-overview'
+import type { Debt } from './debt-data'
+
+// ── Type ─────────────────────────────────────────────────────
+
+export type AandachtspuntDomain = 'tax' | 'budget' | 'debt'
+
+export interface Aandachtspunt {
+  /** Namespaced id: '{domain}:{bron-id}'. Stabiel over re-loads. */
+  id: string
+  domain: AandachtspuntDomain
+  title: string
+  description?: string
+  /** Geschatte besparing in EUR/jaar. 0 = onbekend (toch tonen). */
+  savings: number
+  /** Maandelijkse euro-impact, indien bekend. */
+  euroImpactMonthly?: number
+  /** Vrijheidsdagen-equivalent van de jaarbesparing. */
+  freedomDays: number
+  /** Vrije-tekst deadline ('31 dec') of ISO-datum. */
+  deadline?: string
+  /** Bron-link naar de verdiepingspagina. */
+  href: string
+  /** Optionele prioriteit-hint (hoger = belangrijker). */
+  priority?: number
+}
+
+// ── Action-payload mapping ───────────────────────────────────
+
+export interface AandachtspuntActionPayload {
+  title: string
+  description: string
+  freedom_days_impact: number
+  euro_impact_monthly?: number
+  due_date?: string
+  priority_score?: number
+  metadata: {
+    kind: 'aandachtspunt'
+    domain: AandachtspuntDomain
+    aandachtspunt_id: string
+  }
+}
+
+/**
+ * Detecteer of een deadline een echte (parsebare) datum is. Vrije teksten als
+ * '31 dec' parsen niet betrouwbaar en mogen NIET als due_date doorgaan — die
+ * laten we weg. Alleen ISO-achtige strings (YYYY-MM-DD…) accepteren we.
+ */
+function toDueDate(deadline: string | undefined): string | undefined {
+  if (!deadline) return undefined
+  // Alleen een ISO-datumvorm accepteren (YYYY-MM-DD, evt. met tijd).
+  if (!/^\d{4}-\d{2}-\d{2}/.test(deadline)) return undefined
+  const t = Date.parse(deadline)
+  if (Number.isNaN(t)) return undefined
+  // Normaliseer naar YYYY-MM-DD.
+  return new Date(t).toISOString().split('T')[0]
+}
+
+/** EUR-bedrag in nl-NL-stijl, hele euro's — server-safe (geen format.ts-import nodig). */
+function euro(value: number): string {
+  return new Intl.NumberFormat('nl-NL', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0)
+}
+
+/**
+ * Zet een `Aandachtspunt` om naar de body voor POST /api/ai/actions.
+ *
+ * - title           → a.title
+ * - description      → €-besparing + vrijheidsdagen + (deadline) + bron-link
+ * - freedom_days_impact → afgerond a.freedomDays
+ * - euro_impact_monthly → a.euroImpactMonthly, anders savings/12 (indien >0)
+ * - due_date         → alleen wanneer deadline een echte datum is
+ * - priority_score   → a.priority (indien gezet)
+ * - metadata         → herkomst-stempel zodat de actie traceerbaar blijft
+ */
+export function aandachtspuntToActionPayload(a: Aandachtspunt): AandachtspuntActionPayload {
+  const freedomDays = Math.round(a.freedomDays || 0)
+
+  // Beschrijving opbouwen — alleen zinvolle onderdelen.
+  const descParts: string[] = []
+  if (a.savings > 0) {
+    descParts.push(`Bespaar ~${euro(a.savings)} per jaar`)
+  }
+  if (freedomDays > 0) {
+    descParts.push(`~${freedomDays} ${freedomDays === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'}`)
+  }
+  if (a.deadline) {
+    descParts.push(`Deadline: ${a.deadline}`)
+  }
+  let description = descParts.join(' · ')
+  description = description ? `${description}.` : ''
+  // Bron-link altijd meegeven zodat de actie terugleidt naar de verdieping.
+  description = description
+    ? `${description} Meer: ${a.href}`
+    : `Meer: ${a.href}`
+
+  const euroImpactMonthly =
+    a.euroImpactMonthly ?? (a.savings > 0 ? Math.round((a.savings / 12) * 100) / 100 : undefined)
+
+  const dueDate = toDueDate(a.deadline)
+
+  const payload: AandachtspuntActionPayload = {
+    title: a.title,
+    description,
+    freedom_days_impact: freedomDays,
+    metadata: {
+      kind: 'aandachtspunt',
+      domain: a.domain,
+      aandachtspunt_id: a.id,
+    },
+  }
+  if (euroImpactMonthly != null) payload.euro_impact_monthly = euroImpactMonthly
+  if (dueDate) payload.due_date = dueDate
+  if (a.priority != null) payload.priority_score = a.priority
+
+  return payload
+}
+
+// ── Adapters (PURE) ──────────────────────────────────────────
+
+/**
+ * Belasting-kansen (uit `buildTaxOverview(...).opportunities`) → aandachtspunten.
+ * Behoudt savings/freedomDays/deadline/href 1-op-1; id krijgt 'tax:'-namespace.
+ */
+export function taxOpportunitiesToAandachtspunten(opps: TaxOpportunity[]): Aandachtspunt[] {
+  return opps.map((opp) => ({
+    id: `tax:${opp.id}`,
+    domain: 'tax' as const,
+    title: opp.title,
+    savings: opp.savings,
+    freedomDays: opp.freedomDays,
+    deadline: opp.deadline,
+    href: opp.href,
+  }))
+}
+
+/** Minimale benchmark-vorm die de budget-adapter nodig heeft (subset van NibudBenchmark). */
+export interface BudgetBenchmarkLike {
+  nibud_category_name: string
+  /** Overschrijding in EUR/maand (positief = boven NIBUD-norm). */
+  delta: number
+  freedom_days_potential: number
+  mapped_budget_slug?: string | null
+}
+
+/**
+ * NIBUD-budgetoverschrijdingen → aandachtspunten.
+ *
+ * - Alleen categorieën BOVEN de norm (delta > 0) — een budget onder de norm is
+ *   geen aandachtspunt.
+ * - savings = delta × 12 (maand-overschrijding → jaarbesparing-potentieel).
+ * - freedomDays = freedom_days_potential (al per jaar berekend door NIBUD).
+ * - euroImpactMonthly = delta (de maandelijkse overschrijding).
+ * - id-namespace 'budget:' op slug (fallback op categorienaam).
+ */
+export function budgetBenchmarksToAandachtspunten(
+  benchmarks: BudgetBenchmarkLike[],
+): Aandachtspunt[] {
+  return benchmarks
+    .filter((b) => b.delta > 0)
+    .map((b) => {
+      const key = b.mapped_budget_slug || b.nibud_category_name
+      const monthly = Math.round(b.delta * 100) / 100
+      return {
+        id: `budget:${key}`,
+        domain: 'budget' as const,
+        title: `Bespaar op ${b.nibud_category_name}`,
+        savings: Math.round(b.delta * 12 * 100) / 100,
+        euroImpactMonthly: monthly,
+        freedomDays: b.freedom_days_potential,
+        href: '/overzicht/cashflow',
+      }
+    })
+}
+
+/**
+ * Rente-drempel waarboven een schuld een versneld-aflossen-aandachtspunt wordt.
+ * Onder deze grens (bv. studielening, lage hypotheek) loont versneld aflossen
+ * fiscaal/rationeel zelden — niet als aandachtspunt opvoeren.
+ */
+export const DEBT_INTEREST_THRESHOLD = 4
+
+/**
+ * Actieve schulden met betekenisvolle rente → "versneld aflossen"-aandachtspunten.
+ *
+ * - Alleen `is_active`, `current_balance > 0` EN `interest_rate >= DEBT_INTEREST_THRESHOLD`.
+ *   (Lage-rente hypotheek/studielening worden zo niet over-agressief opgevoerd.)
+ * - savings = current_balance × (interest_rate / 100) — de jaarlijkse rentelast
+ *   die je terugkoopt als je de schuld wegwerkt.
+ * - freedomDays = savings / dailyExpenses (0 als dailyExpenses ≤ 0).
+ * - id-namespace 'debt:' op debt.id.
+ */
+export function debtsToAandachtspunten(debts: Debt[], dailyExpenses: number): Aandachtspunt[] {
+  const result: Aandachtspunt[] = []
+  for (const debt of debts) {
+    if (!debt.is_active) continue
+    const balance = Number(debt.current_balance) || 0
+    const rate = Number(debt.interest_rate) || 0
+    if (balance <= 0 || rate < DEBT_INTEREST_THRESHOLD) continue
+
+    const savings = Math.round(balance * (rate / 100) * 100) / 100
+    const freedomDays = dailyExpenses > 0 ? Math.round(savings / dailyExpenses) : 0
+    result.push({
+      id: `debt:${debt.id}`,
+      domain: 'debt',
+      title: `Versneld aflossen: ${debt.name}`,
+      savings,
+      freedomDays,
+      href: '/overzicht/schulden',
+    })
+  }
+  return result
+}
