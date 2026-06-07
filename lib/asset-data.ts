@@ -494,9 +494,14 @@ export function projectPortfolio(
     return {
       asset: a,
       rows: projectAsset(
-        Number(a.current_value),
-        depreciation ? 0 : Number(a.expected_return),
-        Number(a.monthly_contribution),
+        // `|| 0` guards against asset-like rows that omit numeric fields — e.g.
+        // the column-sparse aggregated partner row from `household_partner_items`
+        // (privacy='totals'), which carries only current_value. Without this an
+        // undefined expected_return/monthly_contribution becomes NaN and poisons
+        // every projected total.
+        Number(a.current_value) || 0,
+        depreciation ? 0 : Number(a.expected_return) || 0,
+        Number(a.monthly_contribution) || 0,
         months,
         undefined,
         depreciation,

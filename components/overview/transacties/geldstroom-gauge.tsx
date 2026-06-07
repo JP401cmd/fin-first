@@ -7,11 +7,14 @@ import type { FlowSummary } from '@/lib/transaction-insights'
 /**
  * GeldstroomGauge — de headline van de transactie-analysepagina.
  *
- * Een horizontale links→rechts verhoudingsmeter: bijschrijvingen (inkomsten,
- * links, income-kleur) tegenover afschrijvingen (uitgaven, rechts,
- * expense-kleur). Het splitspunt weerspiegelt income / (income + expense).
- * Daaronder een 4-up KPI-grid (Inkomen / Uitgaven / Saldo / Spaarquote)
- * in dezelfde editorial KPI-stijl als `transacties-geldstroom.tsx`.
+ * Een halfronde naald-meter (speedometer) die de verhouding bijschrijvingen ↔
+ * afschrijvingen toont: de boog loopt van links (rood — uitgaven domineren) via
+ * amber (in balans) naar rechts (groen — inkomsten/sparen domineren). De naald
+ * wijst naar `income / (income + expense)`; de spaarquote staat als grote
+ * leeswaarde onder de meter. Daaronder een KPI-rij (Inkomen / Uitgaven / Saldo).
+ *
+ * Stijl (Editorial Finance): ingetogen palet uit onze income/expense/horizon-
+ * tokens i.p.v. een regenboog; dunne naald in inkt-kleur; Playfair-leeswaarde.
  *
  * Presentational: enkel een `FlowSummary` in, geen data-fetching. Bij volledig
  * geen activiteit (income === 0 && expense === 0) rendert het niets.
@@ -20,87 +23,146 @@ import type { FlowSummary } from '@/lib/transaction-insights'
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 
+// Geometrie van de halve boog (viewBox 0 0 200 124).
+const CX = 100
+const CY = 96
+const R = 78
+const BAND = 13
+
+// 5 boog-segmenten, links→rechts: donkerrood → rood → amber → groen → donkergroen.
+const SEGMENT_COLORS = [
+  'var(--color-expense-600)',
+  'var(--color-expense-400)',
+  'var(--color-horizon-400)',
+  'var(--color-income-500)',
+  'var(--color-income-600)',
+]
+
+function polar(angleDeg: number, radius: number): { x: number; y: number } {
+  const a = (angleDeg * Math.PI) / 180
+  return { x: CX + radius * Math.cos(a), y: CY - radius * Math.sin(a) }
+}
+
+/** Boog van startDeg naar endDeg (180°=links … 0°=rechts), over de bovenkant. */
+function arcPath(startDeg: number, endDeg: number, radius: number): string {
+  const s = polar(startDeg, radius)
+  const e = polar(endDeg, radius)
+  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${radius} ${radius} 0 0 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`
+}
+
+function savingsRateLabel(rate: number): string {
+  if (rate >= 30) return 'sterk'
+  if (rate >= 15) return 'gezond'
+  return 'laag'
+}
+
 export function GeldstroomGauge({ summary }: { summary: FlowSummary }) {
   const { income, expense, net, savingsRate } = summary
 
-  // Animeer de meter-split op mount: start in het midden (50/50) en zwel uit
-  // naar de werkelijke verhouding via een CSS-width-transition.
-  const [entered, setEntered] = useState(false)
+  const total = income + expense
+  const targetShare = total > 0 ? income / total : 0.5
+
+  // Animeer de naald van het midden (0.5) naar de werkelijke verhouding.
+  const [share, setShare] = useState(0.5)
   useEffect(() => {
-    const id = requestAnimationFrame(() => setEntered(true))
-    return () => cancelAnimationFrame(id)
-  }, [])
+    let raf = 0
+    let startTs = 0
+    const from = 0.5
+    const duration = 700
+    const tick = (ts: number) => {
+      if (!startTs) startTs = ts
+      const t = Math.min(1, (ts - startTs) / duration)
+      const eased = 1 - Math.pow(1 - t, 3) // easeOutCubic
+      setShare(from + (targetShare - from) * eased)
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [targetShare])
 
   // Verberg bij volledig geen transactie-activiteit.
   if (income === 0 && expense === 0) {
     return null
   }
 
-  const total = income + expense
-  // Aandeel inkomsten links; bij total 0 (onmogelijk hier, maar veilig) 50%.
-  const incomeShare = total > 0 ? (income / total) * 100 : 50
-  // Vóór de mount-animatie staat de split in het midden.
-  const leftWidth = entered ? incomeShare : 50
+  // Naaldhoek: 180° (links/rood) bij share 0, 0° (rechts/groen) bij share 1.
+  const needleAngle = 180 - share * 180
+  const tip = polar(needleAngle, R - 16)
 
   return (
     <div className="space-y-3">
-      {/* Verhoudingsmeter */}
-      <div>
-        {/* Uiteinde-labels met bedragen */}
-        <div className="mb-1.5 flex items-baseline justify-between">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--color-income-700)]">
-              In
-            </span>
-            <MaskedAmount
-              value={income}
-              tone="inherit"
-              className="text-xs font-semibold text-[var(--color-income-700)]"
-            />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <MaskedAmount
-              value={expense}
-              tone="inherit"
-              className="text-xs font-semibold text-[var(--color-expense-600)]"
-            />
-            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--color-expense-600)]">
-              Uit
-            </span>
-          </div>
-        </div>
+      {/* Halfronde naald-meter */}
+      <div className="mx-auto w-full" style={{ maxWidth: 340 }}>
+        <svg viewBox="0 0 200 124" className="h-auto w-full" role="img" aria-label={`Verhouding inkomsten/uitgaven: ${Math.round(targetShare * 100)}% inkomsten`}>
+          {/* Gekleurde boog-segmenten */}
+          {SEGMENT_COLORS.map((color, i) => {
+            const start = 180 - 36 * i
+            const end = 180 - 36 * (i + 1)
+            return (
+              <path
+                key={i}
+                d={arcPath(start, end, R)}
+                fill="none"
+                stroke={color}
+                strokeWidth={BAND}
+                strokeLinecap="butt"
+              />
+            )
+          })}
 
-        {/* Bar: twee segmenten + dunne centrale marker op de split */}
-        <div
-          className="relative flex h-3.5 w-full overflow-hidden border border-[var(--border-ed)]"
-          role="img"
-          aria-label={`Inkomsten versus uitgaven: ${Math.round(incomeShare)}% inkomsten`}
-        >
+          {/* Naald + hub */}
+          <line
+            x1={CX}
+            y1={CY}
+            x2={tip.x.toFixed(2)}
+            y2={tip.y.toFixed(2)}
+            stroke="var(--ink)"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
+          <circle cx={CX} cy={CY} r={6} fill="var(--ink)" />
+          <circle cx={CX} cy={CY} r={2.5} fill="var(--paper)" />
+
+          {/* Uiteinde-labels */}
+          <text
+            x={CX - R - BAND / 2}
+            y={CY + 16}
+            textAnchor="start"
+            className="font-mono uppercase"
+            style={{ fontSize: 9, letterSpacing: '0.12em', fill: 'var(--color-expense-600)' }}
+          >
+            Uit
+          </text>
+          <text
+            x={CX + R + BAND / 2}
+            y={CY + 16}
+            textAnchor="end"
+            className="font-mono uppercase"
+            style={{ fontSize: 9, letterSpacing: '0.12em', fill: 'var(--color-income-600)' }}
+          >
+            In
+          </text>
+        </svg>
+
+        {/* Leeswaarde: spaarquote */}
+        <div className="-mt-1 text-center">
           <div
-            className="h-full bg-[var(--color-income-500)]"
-            style={{
-              width: `${leftWidth}%`,
-              transition: 'width 700ms cubic-bezier(.22,1,.36,1)',
-            }}
-          />
+            className="text-[28px] font-black leading-none tabular-nums text-[var(--ink)]"
+            style={{ fontFamily: PLAYFAIR }}
+          >
+            {savingsRate}%
+          </div>
           <div
-            className="h-full flex-1 bg-[var(--color-expense-400)]"
-            style={{ transition: 'width 700ms cubic-bezier(.22,1,.36,1)' }}
-          />
-          {/* Centrale split-marker */}
-          <span
-            aria-hidden
-            className="absolute top-0 h-full w-px bg-[var(--paper)]"
-            style={{
-              left: `${leftWidth}%`,
-              transition: 'left 700ms cubic-bezier(.22,1,.36,1)',
-            }}
-          />
+            className="mt-0.5 text-[11px] italic text-[var(--ink-3)]"
+            style={{ fontFamily: SOURCE_SERIF }}
+          >
+            spaarquote · {savingsRateLabel(savingsRate)}
+          </div>
         </div>
       </div>
 
-      {/* 4-up KPI-grid */}
-      <div className="grid grid-cols-2 border-t border-b border-[var(--border-ed)] sm:grid-cols-4">
+      {/* KPI-rij: Inkomen / Uitgaven / Saldo */}
+      <div className="grid grid-cols-3 border-t border-b border-[var(--border-ed)]">
         <KpiCell label="Inkomen" sub="ontvangen" tone="positive">
           <MaskedAmount value={income} tone="inherit" monoWhenVisible={false} />
         </KpiCell>
@@ -115,18 +177,9 @@ export function GeldstroomGauge({ summary }: { summary: FlowSummary }) {
             signPrefix={net > 0 ? '+' : ''}
           />
         </KpiCell>
-        <KpiCell label="Spaarquote" sub={savingsRateLabel(savingsRate)} tone="neutral">
-          {`${savingsRate}%`}
-        </KpiCell>
       </div>
     </div>
   )
-}
-
-function savingsRateLabel(rate: number): string {
-  if (rate >= 30) return 'sterk'
-  if (rate >= 15) return 'gezond'
-  return 'laag'
 }
 
 function KpiCell({
@@ -154,12 +207,12 @@ function KpiCell({
         : 'text-[var(--ink-3)]'
 
   return (
-    <div className="p-3 sm:p-4 border-r border-[var(--border-ed)] last:border-r-0 [&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0">
+    <div className="p-3 sm:p-4 border-r border-[var(--border-ed)] last:border-r-0">
       <div className={`mb-1.5 text-[10px] font-mono uppercase tracking-[0.18em] ${labelColor}`}>
         {label}
       </div>
       <div
-        className={`text-[20px] sm:text-[24px] font-black leading-none tracking-[-0.02em] tabular-nums ${valueColor}`}
+        className={`text-[18px] sm:text-[22px] font-black leading-none tracking-[-0.02em] tabular-nums ${valueColor}`}
         style={{ fontFamily: PLAYFAIR }}
       >
         {children}

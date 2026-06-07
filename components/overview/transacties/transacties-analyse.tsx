@@ -101,9 +101,13 @@ function mapRow(
 }
 
 function monthsBefore(iso: string, months: number): string {
-  const d = new Date(iso)
-  d.setMonth(d.getMonth() - months)
-  return d.toISOString().split('T')[0]
+  // Lokaal rekenen (geen UTC-round-trip) — consistent met transaction-insights.
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(y, m - 1 - months, d)
+  const yy = dt.getFullYear()
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
 }
 
 export function TransactiesAnalyse() {
@@ -113,7 +117,6 @@ export function TransactiesAnalyse() {
   const [offset, setOffset] = useState(0)
 
   const [rawTxns, setRawTxns] = useState<PerspectiveItem[]>([])
-  const [priorKeys, setPriorKeys] = useState<Set<string>>(new Set())
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [accountMap, setAccountMap] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -135,20 +138,19 @@ export function TransactiesAnalyse() {
 
     async function load() {
       const supabase = createClient()
-      const priorStart = monthsBefore(periodWindow.since, 12)
+      // Eén perspectief-correct venster: 12 maanden vóór de periode t/m het
+      // periode-einde. Dekt de huidige periode (gauge/feed), de vorige periode
+      // (trend) én de prior-historie (nieuwe-tegenpartij-detectie) in één keer,
+      // zónder een losse RLS-query die het perspectief zou omzeilen.
+      const fetchSince = monthsBefore(periodWindow.since, 12)
       try {
-        const [txResult, budgetsResult, accountsResult, priorResult] = await Promise.all([
+        const [txResult, budgetsResult, accountsResult] = await Promise.all([
           loadPerspectiveTransactions(supabase, perspective, {
-            since: periodWindow.prevSince,
+            since: fetchSince,
             until: periodWindow.until,
           }),
           supabase.from('budgets').select('*').order('sort_order', { ascending: true }),
           supabase.from('bank_accounts').select('id, name'),
-          supabase
-            .from('transactions')
-            .select('counterparty_name, counterparty_iban')
-            .gte('date', priorStart)
-            .lt('date', periodWindow.since),
         ])
         if (cancelled) return
 
@@ -156,18 +158,10 @@ export function TransactiesAnalyse() {
         for (const a of (accountsResult.data ?? []) as Array<{ id: string; name: string }>) {
           accMap.set(a.id, a.name)
         }
-        const keys = new Set<string>()
-        for (const r of (priorResult.data ?? []) as Array<{
-          counterparty_name: string | null
-          counterparty_iban: string | null
-        }>) {
-          keys.add(counterpartyKey(r.counterparty_name, r.counterparty_iban))
-        }
 
         setRawTxns(txResult.transactions)
         setBudgets((budgetsResult.data ?? []) as Budget[])
         setAccountMap(accMap)
-        setPriorKeys(keys)
         setHasLoadedOnce(true)
       } catch {
         if (!cancelled) setError('Kon transacties niet laden. Probeer het opnieuw.')
@@ -180,7 +174,7 @@ export function TransactiesAnalyse() {
     return () => {
       cancelled = true
     }
-  }, [perspective, periodWindow.since, periodWindow.until, periodWindow.prevSince, reloadKey])
+  }, [perspective, periodWindow.since, periodWindow.until, reloadKey])
 
   // ── Afgeleide data ──────────────────────────────────────────────────────
   const budgetMap = useMemo(() => {
@@ -204,6 +198,29 @@ export function TransactiesAnalyse() {
         .map((t) => mapRow(t, perspective, budgetMap, accountMap))
         .filter((t): t is AnalysisTransaction => t !== null),
     [rawTxns, perspective, budgetMap, accountMap],
+  )
+
+  // Tegenpartijen die vóór de periode al voorkwamen (zelfde perspectief-lens) —
+  // voor "nieuwe tegenpartijen". Afgeleid uit hetzelfde gevenster i.p.v. een
+  // losse RLS-query die het perspectief zou omzeilen.
+  const priorKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const t of allMapped) {
+      if (t.date < periodWindow.since) {
+        const k = counterpartyKey(t.counterparty_name, t.counterparty_iban)
+        if (k !== '__unknown__') keys.add(k)
+      }
+    }
+    return keys
+  }, [allMapped, periodWindow.since])
+
+  // Deelt de partner enkel totalen (privacy='totals')? Dan levert de RPC één
+  // aggregaatrij zonder regel-detail én zonder periode-window — die kunnen we
+  // niet eerlijk in dit periodeoverzicht verrekenen. We melden het i.p.v. de
+  // huishoud-cijfers stilzwijgend te onderrapporteren.
+  const hasPartnerTotals = useMemo(
+    () => perspective === 'household' && rawTxns.some((t) => t._aggregated === true),
+    [perspective, rawTxns],
   )
 
   const currentTxns = useMemo(
@@ -283,6 +300,12 @@ export function TransactiesAnalyse() {
       ) : (
         <>
           <Card>
+            {hasPartnerTotals && (
+              <p className="mb-3 border-l-2 border-[var(--border-md)] pl-3 text-xs italic text-[var(--ink-3)]">
+                Je partner deelt alleen totalen. Diens persoonlijke transacties tellen niet mee in
+                dit periodeoverzicht.
+              </p>
+            )}
             <GeldstroomGauge summary={currentSummary} />
             {currentSummary.income === 0 && currentSummary.expense === 0 && (
               <p className="text-sm text-[var(--ink-3)]">Geen transacties in deze periode.</p>

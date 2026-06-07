@@ -115,7 +115,15 @@
       "Bash(python -c \"import sys,json; users=json.load\\(sys.stdin\\).get\\('users',[]\\); matches=[u for u in users if u.get\\('email',''\\).lower\\(\\)=='liesbuddingh@gmail.com']; print\\(json.dumps\\(matches[0] if matches else {'error':'not found'}, indent=2\\)\\)\")",
       "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(json.dumps\\(data, indent=2\\)\\)\")",
       "Bash(python -c \"import sys,json; print\\(json.dumps\\(json.load\\(sys.stdin\\), indent=2\\)\\)\")",
-      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(json.dumps\\([{'id':r['id'],'full_name':r['full_name'],'active_subscriptions':r['active_subscriptions'],'commercial_tier':r['commercial_tier']} for r in data], indent=2\\)\\)\")"
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(json.dumps\\([{'id':r['id'],'full_name':r['full_name'],'active_subscriptions':r['active_subscriptions'],'commercial_tier':r['commercial_tier']} for r in data], indent=2\\)\\)\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" -Recurse -Depth 2)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\janpa\\\\cd\\\\development\\\\fin\" -Directory)",
+      "Bash(Select-Object Name)",
+      "mcp__supabase__get_advisors",
+      "PowerShell(npx vitest run lib/household-data.test.ts)",
+      "PowerShell(npx tsc --noEmit)",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-String -Pattern 'transacties-feed|cashflow/transacties|cashflow-data-loader|cashflow-sankey|transacties-geldstroom' | ForEach-Object { $_.Line })"
     ]
   },
   "enableAllProjectMcpServers": true,
