@@ -58,6 +58,7 @@ export type CSVPreset = {
   fxAmountColumn?: number
   fxCurrencyColumn?: number
   fxRateColumn?: number
+  uniqueRefColumn?: number // per-rij unieke referentie (bv. Rabobank "Volgnr") → extra hash-entropie
 }
 
 export const CSV_PRESETS: CSVPreset[] = [
@@ -94,6 +95,7 @@ export const CSV_PRESETS: CSVPreset[] = [
     fxAmountColumn: 23,
     fxCurrencyColumn: 24,
     fxRateColumn: 25,
+    uniqueRefColumn: 3, // Volgnr — uniek per transactie (voorkomt valse hash-collisions)
   },
   {
     id: 'abn',

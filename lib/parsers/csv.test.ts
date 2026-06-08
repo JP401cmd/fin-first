@@ -55,3 +55,29 @@ describe('parseCSV rabobank extra velden', () => {
     expect(t.fx_rate).toBeCloseTo(0.93457)
   })
 })
+
+describe('parseCSV import_hash — Volgnr-entropie', () => {
+  // Identieke datum/bedrag/Omschrijving-1, alleen Volgnr (kolom 3) verschilt.
+  const ROW_A = '"NL60RABO0330370596","EUR","RABONL2U","000000000000000001","2026-03-01","2026-03-01","-10,00","+100,00","","Albert Heijn","","","","bc","","","","","","ARNHEM, 6826MJ, NLD, 10:43"," ","","","","",""'
+  const ROW_B = '"NL60RABO0330370596","EUR","RABONL2U","000000000000000002","2026-03-01","2026-03-01","-10,00","+90,00","","Albert Heijn","","","","bc","","","","","","ARNHEM, 6826MJ, NLD, 10:43"," ","","","","",""'
+
+  it('verschillend Volgnr → verschillende import_hash (échte distinct-transacties botsen niet)', async () => {
+    const [a] = await parseCSV([HEADER, ROW_A].join('\n'), RABO)
+    const [b] = await parseCSV([HEADER, ROW_B].join('\n'), RABO)
+    expect(a.import_hash).not.toBe(b.import_hash)
+  })
+
+  it('zelfde Volgnr → zelfde import_hash (re-import-detectie blijft werken)', async () => {
+    const [a] = await parseCSV([HEADER, ROW_A].join('\n'), RABO)
+    const [a2] = await parseCSV([HEADER, ROW_A].join('\n'), RABO)
+    expect(a.import_hash).toBe(a2.import_hash)
+  })
+
+  it('preset zonder uniqueRefColumn (ING) → ongewijzigd gedrag (backward-compat)', async () => {
+    const IH = 'Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutatiesoort;Mededelingen'
+    const R = '20260301;Albert Heijn;NL60RABO0330370596;NL92ABNA0311015505;ba;Af;10,00;Betaalautomaat;Boodschappen'
+    const [x] = await parseCSV([IH, R].join('\n'), ING)
+    const [y] = await parseCSV([IH, R].join('\n'), ING)
+    expect(x.import_hash).toBe(y.import_hash)
+  })
+})

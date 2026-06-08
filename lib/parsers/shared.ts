@@ -21,10 +21,15 @@ export type ParsedTransaction = {
 
 /**
  * Compute a simple hash for duplicate detection.
- * Uses date + amount + first 100 chars of description.
+ * Uses date + amount + first 100 chars of description, plus optional `extra`
+ * entropy (bv. een unieke bank-volgnummer zoals Rabobank `Volgnr`) zodat twee
+ * écht-verschillende transacties met identieke datum/bedrag/omschrijving toch
+ * een unieke hash krijgen (de unieke index `(user_id, import_hash)` blokkeert ze
+ * anders). `extra` weggelaten → identiek gedrag als voorheen (backward-compat).
  */
-export async function computeHash(date: string, amount: number, description: string): Promise<string> {
-  const input = `${date}|${amount}|${description.slice(0, 100)}`
+export async function computeHash(date: string, amount: number, description: string, extra?: string): Promise<string> {
+  const base = `${date}|${amount}|${description.slice(0, 100)}`
+  const input = extra ? `${base}|${extra}` : base
   const encoder = new TextEncoder()
   const data = encoder.encode(input)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)

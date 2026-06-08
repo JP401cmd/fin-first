@@ -144,7 +144,10 @@ export async function parseCSV(
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
 
     const cleanDescription = description.replace(/\s+/g, ' ').trim() || 'Geen omschrijving'
-    const hash = await computeHash(date, amount, cleanDescription)
+    // Extra entropie (bv. Rabobank-Volgnr) zodat twee écht-verschillende transacties
+    // met identieke datum/bedrag/omschrijving toch een unieke import_hash krijgen.
+    const uniqueRef = preset.uniqueRefColumn != null ? (fields[preset.uniqueRefColumn] ?? '').trim() : ''
+    const hash = await computeHash(date, amount, cleanDescription, uniqueRef || undefined)
 
     const bankCodeVal = preset.bankCodeColumn != null ? (fields[preset.bankCodeColumn] ?? '').trim() : ''
     const balanceVal = preset.balanceColumn != null ? (fields[preset.balanceColumn] ?? '').trim() : ''
