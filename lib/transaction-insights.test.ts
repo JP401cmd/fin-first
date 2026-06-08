@@ -32,6 +32,11 @@ function tx(partial: Partial<AnalysisTransaction>): AnalysisTransaction {
     account_name: partial.account_name ?? null,
     is_income: partial.is_income ?? false,
     transaction_type: partial.transaction_type ?? null,
+    running_balance: partial.running_balance ?? null,
+    creditor_id: partial.creditor_id ?? null,
+    fx_amount: partial.fx_amount ?? null,
+    fx_currency: partial.fx_currency ?? null,
+    fx_rate: partial.fx_rate ?? null,
   }
 }
 

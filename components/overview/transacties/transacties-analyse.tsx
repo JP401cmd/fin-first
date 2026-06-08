@@ -20,7 +20,7 @@ import {
 } from '@/lib/household/perspective-loader'
 import type { Perspective } from '@/lib/household-data'
 import type { Budget } from '@/lib/budget-data'
-import { TransactiesFeed } from '@/components/app/transacties-feed'
+import { TransactieTijdlijn } from './transactie-tijdlijn'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
@@ -67,6 +67,8 @@ type FullTransaction = {
 
 type BudgetGroup = { parent: Budget; children: Budget[] }
 
+type AccountOption = { id: string; name: string; bankName: string | null; ibanTail: string | null; connected: boolean }
+
 /** Aandeel (0-1) waarmee een item in dit perspectief telt — spiegelt cashflow-data-loader. */
 function shareOf(item: PerspectiveItem, perspective: Perspective): number {
   if (item.ownership === 'shared' && perspective !== 'household') {
@@ -100,6 +102,11 @@ function mapRow(
     account_name: account_id ? accountMap.get(account_id) ?? null : null,
     is_income: Boolean(item.is_income),
     transaction_type: (item.transaction_type as string | null) ?? null,
+    running_balance: item.running_balance != null ? Number(item.running_balance) : null,
+    creditor_id: (item.creditor_id as string | null) ?? null,
+    fx_amount: item.fx_amount != null ? Number(item.fx_amount) : null,
+    fx_currency: (item.fx_currency as string | null) ?? null,
+    fx_rate: item.fx_rate != null ? Number(item.fx_rate) : null,
   }
 }
 
@@ -145,6 +152,8 @@ export function TransactiesAnalyse() {
   const [rawHeatmap, setRawHeatmap] = useState<PerspectiveItem[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [accountMap, setAccountMap] = useState<Map<string, string>>(new Map())
+  const [accounts, setAccounts] = useState<AccountOption[]>([])
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -175,24 +184,51 @@ export function TransactiesAnalyse() {
       // zónder een losse RLS-query die het perspectief zou omzeilen.
       const fetchSince = monthsBefore(periodWindow.since, 12)
       try {
-        const [txResult, budgetsResult, accountsResult] = await Promise.all([
+        const [txResult, budgetsResult, accountsResult, connectionsResult] = await Promise.all([
           loadPerspectiveTransactions(supabase, perspective, {
             since: fetchSince,
             until: periodWindow.until,
           }),
           supabase.from('budgets').select('*').order('sort_order', { ascending: true }),
-          supabase.from('bank_accounts').select('id, name'),
+          supabase
+            .from('bank_accounts')
+            .select('id, name, bank_name, iban, sort_order')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true }),
+          supabase
+            .from('bank_connection_accounts')
+            .select('bank_account_id')
+            .eq('is_active', true),
         ])
         if (cancelled) return
 
+        const connRows = (connectionsResult.data ?? []) as Array<{ bank_account_id: string }>
+        const connectedIds = new Set<string>(connRows.map((r) => r.bank_account_id))
+
+        const accRows = (accountsResult.data ?? []) as Array<{
+          id: string
+          name: string
+          bank_name: string | null
+          iban: string | null
+          sort_order: number | null
+        }>
         const accMap = new Map<string, string>()
-        for (const a of (accountsResult.data ?? []) as Array<{ id: string; name: string }>) {
+        const accList: AccountOption[] = []
+        for (const a of accRows) {
           accMap.set(a.id, a.name)
+          accList.push({
+            id: a.id,
+            name: a.name,
+            bankName: a.bank_name ?? null,
+            ibanTail: a.iban ? a.iban.replace(/\s/g, '').slice(-4) : null,
+            connected: connectedIds.has(a.id),
+          })
         }
 
         setRawTxns(txResult.transactions)
         setBudgets((budgetsResult.data ?? []) as Budget[])
         setAccountMap(accMap)
+        setAccounts(accList)
         setHasLoadedOnce(true)
       } catch {
         if (!cancelled) setError('Kon transacties niet laden. Probeer het opnieuw.')
@@ -300,14 +336,21 @@ export function TransactiesAnalyse() {
   const prevSummary = useMemo(() => summarizeFlow(prevTxns), [prevTxns])
   const newCps = useMemo(() => newCounterparties(currentTxns, priorKeys), [currentTxns, priorKeys])
 
-  // Budget-opties voor de feed-filter: budgetten die in de periode voorkomen.
-  const budgetOptions = useMemo(() => {
-    const ids = new Set<string>()
-    for (const t of currentTxns) if (t.budget_id) ids.add(t.budget_id)
-    return Array.from(ids)
-      .map((id) => ({ id, name: budgetMap.get(id) ?? 'Onbekend' }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [currentTxns, budgetMap])
+  // Lengte van de gekozen periode in dagen (lokaal geparsed) — voedt de
+  // vrijheidsdag-omrekening in de tijdlijn (gem. dag-uitgave over het venster).
+  const periodDays = useMemo(() => {
+    const [ys, ms, ds] = periodWindow.since.split('-').map(Number)
+    const [yu, mu, du] = periodWindow.until.split('-').map(Number)
+    const a = new Date(ys, ms - 1, ds).getTime()
+    const b = new Date(yu, mu - 1, du).getTime()
+    return Math.max(1, Math.round((b - a) / 86400000) + 1)
+  }, [periodWindow.since, periodWindow.until])
+
+  // Rekening-filter voor de tijdlijn (null = alle rekeningen).
+  const accountFiltered = useMemo(
+    () => (selectedAccountId ? currentTxns.filter((t) => t.account_id === selectedAccountId) : currentTxns),
+    [currentTxns, selectedAccountId],
+  )
 
   // Detail-selectie: dag (uit de heatmap) of weekdag (uit het weekdag-patroon).
   // Als filter bewaard (niet als snapshot) zodat de lijst meeschuift na een
@@ -426,10 +469,12 @@ export function TransactiesAnalyse() {
             <NieuweTegenpartijen items={newCps} onSelect={setDrillCp} />
           </Card>
 
-          <TransactiesFeed
-            transactions={currentTxns}
-            periodLabel={periodWindow.label}
-            budgetOptions={budgetOptions}
+          <TransactieTijdlijn
+            transactions={accountFiltered}
+            windowDays={periodDays}
+            accounts={accounts}
+            selectedAccountId={selectedAccountId}
+            onSelectAccount={setSelectedAccountId}
             onSelect={openEdit}
           />
 

@@ -29,6 +29,11 @@ export interface AnalysisTransaction {
   account_name: string | null
   is_income: boolean
   transaction_type: string | null
+  running_balance: number | null
+  creditor_id: string | null
+  fx_amount: number | null
+  fx_currency: string | null
+  fx_rate: number | null
 }
 
 export interface PeriodWindow {
