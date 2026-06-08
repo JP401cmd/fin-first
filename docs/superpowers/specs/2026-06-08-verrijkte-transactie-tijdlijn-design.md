@@ -89,6 +89,13 @@ meer dan TriFinity bewaart:
 
 ## 4. Datamodel-wijzigingen (Tier B, "alles in één")
 
+> **Correctie (post-implementatie):** `transaction_type` heeft een CHECK-constraint
+> (`NULL | transfer | joint_transfer | salary | refund | other`) — het is de *semantische*
+> type-kolom (transfer-uitsluiting in totalen), GEEN vrij tekstveld. De ruwe Rabobank-`Code`
+> (`bc`/`ei`/`id`…) gaat daarom in een **nieuwe `bank_code text`-kolom**; `transaction_type`
+> blijft `null` bij CSV-import. `deriveType()` leest `bank_code` (niet `transaction_type`).
+> Lees hieronder "transaction_type ← Code" overal als "**bank_code ← Code**".
+
 ### 4.1 Migratie — `transactions`
 Voeg toe (allemaal nullable; bestaande/demo-rijen blijven geldig):
 
