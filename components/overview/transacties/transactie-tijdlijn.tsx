@@ -1,11 +1,14 @@
 'use client'
-import { useMemo } from 'react'
-import { Repeat, Link2, FileText, CreditCard, RefreshCw, Smartphone, ArrowLeftRight, ArrowDownLeft, Landmark } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import Link from 'next/link'
+import { Repeat, Link2, FileText, CreditCard, RefreshCw, Smartphone, ArrowLeftRight, ArrowDownLeft, Landmark, Search, SlidersHorizontal, X } from 'lucide-react'
 import {
   cleanMerchantName, deriveType, parseLocationTime, avgDailyExpense,
-  freedomDays, detectRecurring, groupByDay, monogram, type TxKind,
+  freedomDays, detectRecurring, groupByDay, monogram, parseSmartQuery, type TxKind,
 } from '@/lib/transaction-display'
-import { formatCurrencyDecimals } from '@/lib/format'
+import { formatCurrencyDecimals, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 import type { AnalysisTransaction } from '@/lib/transaction-insights'
 
 // Editorial iconen (Lucide, scherp, gedempt) — GEEN emoji. Type uit deriveType().kind.
@@ -14,7 +17,10 @@ const TYPE_ICON: Record<TxKind, typeof CreditCard | null> = {
   bijschrijving: ArrowDownLeft, betaalverzoek: ArrowLeftRight, bankkosten: Landmark, onbekend: null,
 }
 
-type AccountOption = { id: string; name: string; bankName: string | null; ibanTail: string | null; connected: boolean }
+export type AccountOption = { id: string; name: string; bankName: string | null; ibanTail: string | null; connected: boolean }
+type Direction = 'all' | 'expense' | 'income'
+type SortKey = 'date' | 'amount' | 'merchant'
+
 interface Props {
   transactions: AnalysisTransaction[]
   windowDays: number
@@ -37,13 +43,88 @@ function freedomLabel(days: number): string {
   return `≈ ${v} vrijheidsdag${days >= 2 ? 'en' : ''}`
 }
 
+// nl-NL bedrag-formatter voor de FX-subregel (vreemde valuta, geen euro-glyph).
+const FX_FMT = new Intl.NumberFormat('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 export function TransactieTijdlijn({ transactions, windowDays, accounts, selectedAccountId, onSelectAccount, onSelect }: Props) {
+  const { masked } = useMaskedAmounts()
+
+  // ── Filter-state ───────────────────────────────────────────────────────────
+  const [query, setQuery] = useState('')
+  const [direction, setDirection] = useState<Direction>('all')
+  const [onlyRecurring, setOnlyRecurring] = useState(false)
+  const [onlyTransfers, setOnlyTransfers] = useState(false)
+  const [amountMin, setAmountMin] = useState<number | null>(null)
+  const [amountMax, setAmountMax] = useState<number | null>(null)
+  const [sort, setSort] = useState<SortKey>('date')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  // Slimme zoekopdracht — alléén tekst/bedrag/richting, GEEN datum-facetten
+  // (de PeriodeSelector bovenaan de pagina is de enige tijdsbron).
+  const smart = useMemo(() => parseSmartQuery(query, new Date()), [query])
+
+  // Basisdata blijft op de VOLLEDIGE window berekend (vrijheidsbasis + terugkerend-detectie).
   const daily = useMemo(() => avgDailyExpense(transactions, windowDays), [transactions, windowDays])
   const recurring = useMemo(
     () => detectRecurring(transactions.map((t) => ({ id: t.id, counterparty_name: t.counterparty_name, counterparty_iban: t.counterparty_iban, creditor_id: t.creditor_id, amount: t.amount, date: t.date }))),
     [transactions],
   )
-  const groups = useMemo(() => groupByDay(transactions), [transactions])
+
+  // Effectieve filters: expliciete chip/slider wint van de slimme-zoek-afgeleide.
+  const effDirection: Exclude<Direction, 'all'> | null =
+    direction !== 'all' ? direction : smart.direction
+  const effMin = amountMin ?? smart.amountMin
+  const effMax = amountMax ?? smart.amountMax
+  const text = smart.text.toLowerCase()
+
+  const filtered = useMemo(() => {
+    const out = transactions.filter((t) => {
+      if (effDirection === 'expense' && t.amount >= 0) return false
+      if (effDirection === 'income' && t.amount <= 0) return false
+      if (onlyRecurring && !recurring.has(t.id)) return false
+      if (onlyTransfers) {
+        const isTransfer = t.transaction_type === 'transfer' || deriveType(t.transaction_type, t.counterparty_name, t.amount).kind === 'betaalverzoek'
+        if (!isTransfer) return false
+      }
+      const abs = Math.abs(t.amount)
+      if (effMin != null && abs < effMin) return false
+      if (effMax != null && abs > effMax) return false
+      if (text) {
+        const clean = cleanMerchantName(t.counterparty_name).toLowerCase()
+        const desc = (t.description ?? '').toLowerCase()
+        const raw = (t.counterparty_name ?? '').toLowerCase()
+        if (!clean.includes(text) && !desc.includes(text) && !raw.includes(text)) return false
+      }
+      return true
+    })
+    return out
+  }, [transactions, effDirection, onlyRecurring, onlyTransfers, effMin, effMax, text, recurring])
+
+  // Groepeer de gefilterde set per dag; sorteer dan per dag-groep op de keuze.
+  const groups = useMemo(() => {
+    const g = groupByDay(filtered)
+    if (sort === 'amount') {
+      for (const day of g) day.rows = [...day.rows].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+    } else if (sort === 'merchant') {
+      for (const day of g) day.rows = [...day.rows].sort((a, b) =>
+        cleanMerchantName(a.counterparty_name).localeCompare(cleanMerchantName(b.counterparty_name), 'nl'))
+    }
+    return g
+  }, [filtered, sort])
+
+  const filterActive =
+    direction !== 'all' || onlyRecurring || onlyTransfers || amountMin != null || amountMax != null ||
+    sort !== 'date' || query.trim() !== ''
+
+  function clearAll() {
+    setQuery('')
+    setDirection('all')
+    setOnlyRecurring(false)
+    setOnlyTransfers(false)
+    setAmountMin(null)
+    setAmountMax(null)
+    setSort('date')
+  }
 
   return (
     <section className="border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
@@ -56,23 +137,198 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
           ))}
         </div>
       )}
-      <div role="list" className="space-y-4">
-        {groups.map((g) => (
-          <div key={g.date}>
-            <div className="flex items-baseline justify-between border-b border-[var(--ink)] pb-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">{dayHeader(g.date)}</span>
-              <span className="font-mono text-[11px] text-[var(--ink-3)] tabular-nums">
-                {g.incomeTotal - g.expenseTotal >= 0 ? '+' : '−'} {formatCurrencyDecimals(Math.abs(g.incomeTotal - g.expenseTotal))}
-                {daily > 0 && <span className="text-[var(--color-kern-700)]"> · {freedomLabel(freedomDays(g.expenseTotal, daily))}</span>}
-              </span>
-            </div>
-            <ul className="divide-y divide-dotted divide-[var(--border-ed)]">
-              {g.rows.map((t) => <Row key={t.id} t={t} recurring={recurring.has(t.id)} onSelect={onSelect} />)}
-            </ul>
-          </div>
-        ))}
+
+      {/* Slimme zoekbalk */}
+      <div className="relative mb-3">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--ink-3)]" aria-hidden />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Zoek transacties"
+          placeholder='Zoek of typ "hornbach boven 50"…'
+          className="min-h-[44px] w-full border border-[var(--border-ed)] bg-[var(--paper)] pl-9 pr-3 py-2 font-mono text-[13px] italic text-[var(--ink)] placeholder:italic placeholder:text-[var(--ink-3)] focus:outline-2 focus:outline-[var(--ink)]"
+        />
       </div>
+
+      {/* Quick-chips */}
+      <div className="mb-3 flex flex-wrap items-center gap-1">
+        <Chip label="Alles" active={direction === 'all'} onClick={() => setDirection('all')} />
+        <Chip label="Uitgaven" active={direction === 'expense'} onClick={() => setDirection('expense')} />
+        <Chip label="Inkomsten" active={direction === 'income'} onClick={() => setDirection('income')} />
+        <Chip label="Terugkerend" active={onlyRecurring} onClick={() => setOnlyRecurring((v) => !v)} toggle />
+        <Chip label="Overboekingen" active={onlyTransfers} onClick={() => setOnlyTransfers((v) => !v)} toggle />
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(true)}
+          aria-haspopup="dialog"
+          className="ml-auto inline-flex items-center gap-1.5 min-h-[44px] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--ink-2)] border border-[var(--border-ed)] hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
+        >
+          <SlidersHorizontal className="h-3 w-3" aria-hidden />
+          Filters
+        </button>
+      </div>
+
+      {/* Actieve-filter-chips + wissen */}
+      {filterActive && (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          {query.trim() !== '' && <ActiveChip label={`"${query.trim()}"`} onRemove={() => setQuery('')} />}
+          {direction === 'expense' && <ActiveChip label="Uitgaven" onRemove={() => setDirection('all')} />}
+          {direction === 'income' && <ActiveChip label="Inkomsten" onRemove={() => setDirection('all')} />}
+          {onlyRecurring && <ActiveChip label="Terugkerend" onRemove={() => setOnlyRecurring(false)} />}
+          {onlyTransfers && <ActiveChip label="Overboekingen" onRemove={() => setOnlyTransfers(false)} />}
+          {amountMin != null && <ActiveChip label={`≥ ${FX_FMT.format(amountMin)}`} onRemove={() => setAmountMin(null)} />}
+          {amountMax != null && <ActiveChip label={`≤ ${FX_FMT.format(amountMax)}`} onRemove={() => setAmountMax(null)} />}
+          {sort !== 'date' && <ActiveChip label={sort === 'amount' ? 'Sortering: bedrag' : 'Sortering: winkel'} onRemove={() => setSort('date')} />}
+          <button
+            type="button"
+            onClick={clearAll}
+            className="ml-1 min-h-[44px] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)] underline hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
+          >
+            Alles wissen
+          </button>
+        </div>
+      )}
+
+      {transactions.length === 0 ? (
+        <FirstUseEmpty />
+      ) : filtered.length === 0 ? (
+        <NoResultsEmpty onClear={clearAll} />
+      ) : (
+        <div role="list" className="space-y-4">
+          {groups.map((g) => (
+            <div key={g.date}>
+              <div className="flex items-baseline justify-between border-b border-[var(--ink)] pb-1">
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]" aria-label={dayHeader(g.date)}>{dayHeader(g.date)}</span>
+                <span className="font-mono text-[11px] text-[var(--ink-3)] tabular-nums">
+                  {g.incomeTotal - g.expenseTotal >= 0 ? '+' : '−'} {masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrencyDecimals(Math.abs(g.incomeTotal - g.expenseTotal))}
+                  {daily > 0 && <span className="text-[var(--color-kern-700)]"> · {freedomLabel(freedomDays(g.expenseTotal, daily))}</span>}
+                </span>
+              </div>
+              <ul className="divide-y divide-dotted divide-[var(--border-ed)]">
+                {g.rows.map((t) => <Row key={t.id} t={t} recurring={recurring.has(t.id)} onSelect={onSelect} masked={masked} />)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filters bottom-sheet */}
+      <BottomSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filters" size="sm">
+        <div className="space-y-5 px-5 py-4">
+          <fieldset>
+            <legend className="mb-2 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">Bedrag</legend>
+            <div className="flex items-center gap-2">
+              <input
+                type="number" inputMode="decimal" min={0} value={amountMin ?? ''}
+                onChange={(e) => setAmountMin(e.target.value === '' ? null : Number(e.target.value))}
+                aria-label="Minimumbedrag" placeholder="min"
+                className="min-h-[44px] w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-mono text-[13px] text-[var(--ink)] tabular-nums focus:outline-2 focus:outline-[var(--ink)]"
+              />
+              <span className="font-mono text-[11px] text-[var(--ink-3)]">tot</span>
+              <input
+                type="number" inputMode="decimal" min={0} value={amountMax ?? ''}
+                onChange={(e) => setAmountMax(e.target.value === '' ? null : Number(e.target.value))}
+                aria-label="Maximumbedrag" placeholder="max"
+                className="min-h-[44px] w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-mono text-[13px] text-[var(--ink)] tabular-nums focus:outline-2 focus:outline-[var(--ink)]"
+              />
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="mb-2 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">Sorteren</legend>
+            <div className="flex flex-wrap gap-1">
+              <Chip label="Datum" active={sort === 'date'} onClick={() => setSort('date')} />
+              <Chip label="Bedrag" active={sort === 'amount'} onClick={() => setSort('amount')} />
+              <Chip label="Winkel" active={sort === 'merchant'} onClick={() => setSort('merchant')} />
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="mb-2 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">Alleen</legend>
+            <Chip label="Terugkerend" active={onlyRecurring} onClick={() => setOnlyRecurring((v) => !v)} toggle />
+          </fieldset>
+
+          <div className="flex items-center justify-between border-t border-[var(--border-ed)] pt-4">
+            <span className="font-mono text-[11px] text-[var(--ink-3)] tabular-nums">{filtered.length} resultaten</span>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="min-h-[44px] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--ink-2)] border border-[var(--border-ed)] hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
+            >
+              Alles wissen
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
     </section>
+  )
+}
+
+function Chip({ label, active, onClick, toggle }: { label: string; active: boolean; onClick: () => void; toggle?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={['inline-flex items-center min-h-[44px] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] border focus-visible:outline-2 focus-visible:outline-[var(--ink)]',
+        active
+          ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]'
+          : `bg-[var(--paper)] ${toggle ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'} border-[var(--border-ed)] hover:bg-[var(--subtle)]`].join(' ')}
+    >
+      {label}
+    </button>
+  )
+}
+
+function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 border border-[var(--border-ed)] bg-[var(--subtle)] pl-2 pr-1 py-0.5 font-mono text-[10px] text-[var(--ink-2)]">
+      <span className="tabular-nums">{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Verwijder filter ${label}`}
+        className="inline-flex h-5 w-5 items-center justify-center text-[var(--ink-3)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
+      >
+        <X className="h-3 w-3" aria-hidden />
+      </button>
+    </span>
+  )
+}
+
+function FirstUseEmpty() {
+  return (
+    <div className="flex flex-col items-center gap-2 py-12 text-center">
+      <h3 className="font-serif text-[18px] font-semibold text-[var(--ink)]">Nog geen transacties.</h3>
+      <p className="max-w-xs font-serif text-[13px] italic text-[var(--ink-3)]">
+        Koppel je bank of importeer een bestand om je geldstroom als opgeslagen tijd te zien.
+      </p>
+      <Link
+        href="/overzicht/bezittingen/cash"
+        className="mt-1 min-h-[44px] inline-flex items-center px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--ink-2)] border border-[var(--border-ed)] hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
+      >
+        Koppel of importeer
+      </Link>
+    </div>
+  )
+}
+
+function NoResultsEmpty({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-12 text-center">
+      <h3 className="font-serif text-[18px] font-semibold text-[var(--ink)]">Geen resultaten.</h3>
+      <p className="max-w-xs font-serif text-[13px] italic text-[var(--ink-3)]">
+        Geen transacties passen bij deze filters in deze periode.
+      </p>
+      <button
+        type="button"
+        onClick={onClear}
+        className="mt-1 min-h-[44px] inline-flex items-center px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--ink-2)] border border-[var(--border-ed)] hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
+      >
+        Wis filters
+      </button>
+    </div>
   )
 }
 
@@ -88,7 +344,7 @@ function AccountButton({ active, label, onClick, connected }: { active: boolean;
   )
 }
 
-function Row({ t, recurring, onSelect }: { t: AnalysisTransaction; recurring: boolean; onSelect?: (tx: AnalysisTransaction) => void }) {
+function Row({ t, recurring, onSelect, masked }: { t: AnalysisTransaction; recurring: boolean; onSelect?: (tx: AnalysisTransaction) => void; masked: boolean }) {
   const name = cleanMerchantName(t.counterparty_name)
   const type = deriveType(t.transaction_type, t.counterparty_name, t.amount)
   const TypeIcon = TYPE_ICON[type.kind]
@@ -110,13 +366,13 @@ function Row({ t, recurring, onSelect }: { t: AnalysisTransaction; recurring: bo
       </span>
       <span className="flex-none text-right">
         <span className={['block font-mono text-[14px] tabular-nums', income ? 'text-[var(--positive)]' : 'text-[var(--ink)]'].join(' ')}>
-          {income ? '+' : '−'} {formatCurrencyDecimals(Math.abs(t.amount))}
+          {income ? '+' : '−'} {masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrencyDecimals(Math.abs(t.amount))}
         </span>
         {t.running_balance != null && (
-          <span className="block font-mono text-[10px] text-[var(--ink-4)] tabular-nums">saldo {formatCurrencyDecimals(t.running_balance)}</span>
+          <span className="block font-mono text-[10px] text-[var(--ink-4)] tabular-nums">saldo {masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrencyDecimals(t.running_balance)}</span>
         )}
         {t.fx_amount != null && t.fx_currency && (
-          <span className="block font-mono text-[9px] text-[var(--ink-4)]">{t.fx_currency} {t.fx_amount}{t.fx_rate ? ` @ ${t.fx_rate}` : ''}</span>
+          <span className="block font-mono text-[9px] text-[var(--ink-4)] tabular-nums">{t.fx_currency} {FX_FMT.format(t.fx_amount)}{t.fx_rate ? ` @ ${FX_FMT.format(t.fx_rate)}` : ''}</span>
         )}
       </span>
     </>

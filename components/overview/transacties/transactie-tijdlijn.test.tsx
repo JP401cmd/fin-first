@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import { TransactieTijdlijn } from './transactie-tijdlijn'
 import type { AnalysisTransaction } from '@/lib/transaction-insights'
@@ -24,5 +24,25 @@ describe('TransactieTijdlijn', () => {
     expect(screen.getByText(/saldo/i)).toBeInTheDocument()
     rerender(<TransactieTijdlijn transactions={[{ ...base, running_balance: null }]} windowDays={30} accounts={[]} selectedAccountId={null} onSelectAccount={() => {}} />)
     expect(screen.queryByText(/saldo/i)).not.toBeInTheDocument()
+  })
+  it('filtert op Inkomsten-chip', () => {
+    const txns: AnalysisTransaction[] = [
+      { ...base, id: 'x', amount: -10, counterparty_name: 'Uitgave', description: 'desc-x' },
+      { ...base, id: 'y', amount: 50, counterparty_name: 'Inkomst', description: 'desc-y', transaction_type: 'cb', is_income: true },
+    ]
+    render(<TransactieTijdlijn transactions={txns} windowDays={30} accounts={[]} selectedAccountId={null} onSelectAccount={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: /inkomsten/i }))
+    expect(screen.getByText('Inkomst')).toBeInTheDocument()
+    expect(screen.queryByText('Uitgave')).not.toBeInTheDocument()
+  })
+  it('zoekt op naam', () => {
+    const txns: AnalysisTransaction[] = [
+      { ...base, id: 'x', amount: -10, counterparty_name: 'Hornbach Duiven', description: 'x' },
+      { ...base, id: 'y', amount: -5, counterparty_name: 'Albert Heijn 1032', description: 'y' },
+    ]
+    render(<TransactieTijdlijn transactions={txns} windowDays={30} accounts={[]} selectedAccountId={null} onSelectAccount={() => {}} />)
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'albert' } })
+    expect(screen.getByText('Albert Heijn')).toBeInTheDocument()
+    expect(screen.queryByText('Hornbach')).not.toBeInTheDocument()
   })
 })
