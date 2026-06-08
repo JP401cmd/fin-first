@@ -10,6 +10,17 @@
 
 **Conventies:** test = `npx vitest run <pad>`; types = `npx tsc --noEmit`. Commit per taak. Migraties via de Supabase MCP `apply_migration` (DDL gaat direct naar remote; kolommen vóór bouwen verifiëren — `reference_supabase_migration_drift`).
 
+**Scope-verfijning (leidend):**
+- Deze wijziging **vervangt puur de transactietabel** op de pagina. **Géén proza** eromheen (geen
+  masthead/deck/colofon/headline) — alleen **de tabel + filters + zoekbalk** in ui/ux-stijl. De
+  showcase-mockups waren presentatie; de echte component is kaal.
+- **De tijdsbepaling bovenaan de pagina (`PeriodeSelector`) is de enige tijdsbron.** De tabel krijgt
+  **geen eigen periode-/datum-control**; hij rendert exact `currentTxns` van het gekozen venster.
+  Smart-search past **alleen** tekst + bedrag + richting toe — **nooit** datum (anders vecht het met de
+  periode bovenaan).
+- **Iconen in editorial stijl:** Lucide-iconen (scherp, gedempt `--ink-3`, klein `h-3 w-3`), **geen
+  emoji** — niet voor type, terugkerend, of rekening-bron.
+
 ---
 
 ## Fase 1 — Datafundament (migratie + import-uitbreiding)
@@ -977,12 +988,19 @@ Schrijf de volledige component (≈180-220 regels). Begin met deze skelet-struct
 ```tsx
 'use client'
 import { useMemo } from 'react'
+import { Repeat, Link2, FileText, CreditCard, RefreshCw, Smartphone, ArrowLeftRight, ArrowDownLeft, Landmark } from 'lucide-react'
 import {
   cleanMerchantName, deriveType, parseLocationTime, avgDailyExpense,
-  freedomDays, detectRecurring, groupByDay, monogram,
+  freedomDays, detectRecurring, groupByDay, monogram, type TxKind,
 } from '@/lib/transaction-display'
 import { formatCurrency } from '@/lib/format'
 import type { AnalysisTransaction } from '@/lib/transaction-insights'
+
+// Editorial iconen (Lucide, scherp, gedempt) — GEEN emoji. Type uit deriveType().kind.
+const TYPE_ICON: Record<TxKind, typeof CreditCard | null> = {
+  pin: CreditCard, incasso: RefreshCw, ideal: Smartphone, overboeking: ArrowLeftRight,
+  bijschrijving: ArrowDownLeft, betaalverzoek: ArrowLeftRight, bankkosten: Landmark, onbekend: null,
+}
 
 type AccountOption = { id: string; name: string; bankName: string | null; ibanTail: string | null; connected: boolean }
 interface Props {
@@ -1022,8 +1040,8 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
         <div className="mb-4 flex flex-wrap gap-1 text-xs" role="group" aria-label="Kies rekening">
           <AccountButton active={selectedAccountId === null} label="Alle rekeningen" onClick={() => onSelectAccount(null)} />
           {accounts.map((a) => (
-            <AccountButton key={a.id} active={selectedAccountId === a.id}
-              label={`${a.connected ? '🔗' : '📄'} ${a.name}`} onClick={() => onSelectAccount(a.id)} />
+            <AccountButton key={a.id} active={selectedAccountId === a.id} connected={a.connected}
+              label={a.name} onClick={() => onSelectAccount(a.id)} />
           ))}
         </div>
       )}
@@ -1047,11 +1065,13 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
   )
 }
 
-function AccountButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+function AccountButton({ active, label, onClick, connected }: { active: boolean; label: string; onClick: () => void; connected?: boolean }) {
+  const SrcIcon = connected === undefined ? null : connected ? Link2 : FileText
   return (
     <button type="button" onClick={onClick} aria-pressed={active}
-      className={['min-h-[36px] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] border',
+      className={['inline-flex items-center gap-1.5 min-h-[44px] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] border',
         active ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]' : 'bg-[var(--paper)] text-[var(--ink-3)] border-[var(--border-ed)]'].join(' ')}>
+      {SrcIcon && <SrcIcon className="h-3 w-3" aria-hidden />}
       {label}
     </button>
   )
@@ -1060,6 +1080,7 @@ function AccountButton({ active, label, onClick }: { active: boolean; label: str
 function Row({ t, recurring, onSelect }: { t: AnalysisTransaction; recurring: boolean; onSelect?: (tx: AnalysisTransaction) => void }) {
   const name = cleanMerchantName(t.counterparty_name)
   const type = deriveType(t.transaction_type, t.counterparty_name, t.amount)
+  const TypeIcon = TYPE_ICON[type.kind]
   const loc = parseLocationTime(t.description)
   const sub = loc.place ? `${loc.place}${loc.time ? ` · ${loc.time}` : ''}` : t.description
   const income = t.amount > 0
@@ -1071,8 +1092,8 @@ function Row({ t, recurring, onSelect }: { t: AnalysisTransaction; recurring: bo
       <span className="flex-1 min-w-0">
         <span className="flex items-center gap-1.5">
           <span className="font-serif font-semibold text-[14.5px] text-[var(--ink)] truncate">{name}</span>
-          <span className="font-mono text-[9px] text-[var(--ink-3)]">{type.glyph}</span>
-          {recurring && <span className="font-mono text-[8px] uppercase tracking-[0.06em] border border-[var(--kern-200)] text-[var(--kern-700)] px-1">🔁</span>}
+          {TypeIcon && <TypeIcon className="h-3 w-3 flex-none text-[var(--ink-3)]" aria-label={type.label} />}
+          {recurring && <Repeat className="h-3 w-3 flex-none text-[var(--kern-700)]" aria-label="terugkerend" />}
         </span>
         <span className="block text-[11px] italic text-[var(--ink-3)] truncate">{sub}</span>
       </span>
@@ -1200,13 +1221,23 @@ Run: `npx vitest run components/overview/transacties/transactie-tijdlijn.test.ts
 - [ ] **Step 3: Implementeer**
 
 In `TransactieTijdlijn`:
-- Lokale state `query`, `direction: 'all'|'expense'|'income'`, `onlyRecurring`, `amountMin/Max`, `dateFrom/To`, `sort`.
-- `const smart = useMemo(() => parseSmartQuery(query, new Date()), [query])` — combineer met de chip-state (chip wint bij conflict; smart vult aan).
-- `const filtered = useMemo(() => transactions.filter(t => …), [transactions, query, direction, onlyRecurring, …])`: pas direction, bedrag-range, datum-range, recurring (via `recurring`-set) en tekst (over `cleanMerchantName`, ruwe `description`, `counterparty_name`) toe. Groepeer dan `filtered` i.p.v. `transactions`.
-- **Quick-chips** boven de feed: Alles · Uitgaven · Inkomsten · 🔁 Terugkerend · ↔ Overboekingen (laatste = `transaction_type==='transfer' || type.kind==='betaalverzoek'`) + knop "⚙ Filters".
-- **Smart-search** input erboven (`type="search"`, italic placeholder met voorbeeld).
-- **Filters-sheet** via `<ShellOverlay kind="sheet">` (of bestaande `BottomSheet`): bedrag-range-slider (module-thumb), periode-presets, sorteer-keuze, "Alles wissen". Live resultaat-aantal.
-- **URL-state**: lees/schrijf `?rekening=&type=&zoek=` via `useSearchParams()` + `router.replace()`; `selectedAccountId` (uit Task 13) hoort hier ook in. Actieve filters als verwijderbare chips + "Alles wissen".
+- Lokale state `query`, `direction: 'all'|'expense'|'income'`, `onlyRecurring`, `amountMin/Max`, `sort`.
+  **Geen datum-/periode-state** — de `PeriodeSelector` bovenaan de pagina is de enige tijdsbron.
+- `const smart = useMemo(() => parseSmartQuery(query, new Date()), [query])` — gebruik **alleen**
+  `smart.text`, `smart.amountMin/Max` en `smart.direction`. **Negeer `smart.dateFrom/dateTo` bewust**
+  (datum komt van de periode bovenaan; nooit overschrijven).
+- `const filtered = useMemo(() => transactions.filter(t => …), [transactions, query, direction, onlyRecurring, …])`: pas direction, bedrag-range, recurring (via `recurring`-set) en tekst (over `cleanMerchantName`, ruwe `description`, `counterparty_name`) toe. **Geen datum-filter.** Groepeer dan `filtered` i.p.v. `transactions`.
+- **Quick-chips** boven de feed (platte tekstlabels, scherp, ink-actief): `Alles` · `Uitgaven` ·
+  `Inkomsten` · `Terugkerend` · `Overboekingen` (laatste = `transaction_type==='transfer' || type.kind==='betaalverzoek'`)
+  + een **Filters**-knop met Lucide `SlidersHorizontal` (`h-3 w-3`).
+- **Zoekbalk** erboven (`type="search"`, italic placeholder met voorbeeld, `Search`-icoon van Lucide links,
+  scherp, `border-[var(--border-ed)]`).
+- **Filters-sheet** via `<ShellOverlay kind="sheet">` (of bestaande `BottomSheet`): bedrag-range-slider
+  (module-thumb), sorteer-keuze (datum/bedrag/winkel), terugkerend-toggle, "Alles wissen". Live
+  resultaat-aantal. **Geen periode-/datum-control in de sheet** (die zit bovenaan de pagina).
+- **URL-state**: lees/schrijf `?rekening=&type=&zoek=` via `useSearchParams()` + `router.replace()`;
+  `selectedAccountId` (uit Task 13) hoort hier ook in. Actieve filters als verwijderbare chips +
+  "Alles wissen". **Geen** `?periode=` (eigendom van de pagina-`PeriodeSelector`).
 
 - [ ] **Step 4: Run test + tsc**
 

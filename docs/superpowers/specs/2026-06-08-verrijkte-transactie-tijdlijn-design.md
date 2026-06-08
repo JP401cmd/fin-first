@@ -70,6 +70,10 @@ meer dan TriFinity bewaart:
 
 ## 3. Huisstijl-conformiteit (Editorial Finance)
 
+- **Kaal — vervangt puur de tabel.** Geen masthead/deck/colofon/headline-proza. Alleen de tabel + filters
+  + zoekbalk. De showcase-mockups waren presentatie; de component is sober.
+- **Tijd komt van bovenaan.** De pagina-`PeriodeSelector` is de enige tijdsbron; de tabel heeft géén
+  eigen periode-control.
 - **Scherpe hoeken** overal; alleen monogram blijft een scherp vierkant (geen `rounded-*`).
 - **Fonts:** Playfair Display (winkelnaam), Source Serif 4 (italic sub/meta), DM Mono (bedragen, kickers,
   saldo) met `tabular-nums`.
@@ -183,15 +187,17 @@ detail-kop in de sheet met lopend saldo, `creditor_id`, FX en IBAN.
 ## 7. Rij-anatomie (definitief)
 
 ```
-[ MONOGRAM ] | Winkelnaam (Playfair 14.5) · type-glyph · [🔁]/[↔]      |  − €70,76   ← DM Mono, centen gedimd
+[ MONOGRAM ] | Winkelnaam (Playfair 14.5) · type-icoon · [terugkerend]  |  − €70,76   ← DM Mono, centen gedimd
 [ scherp □ ] | locatie · tijd  (italic Source Serif, ruw als titel)    |  saldo €901,63  ← gedimd, als aanwezig
              | [FX: CHF 1,00 @ 0,935]  (alleen bij fx_*)               |
 ```
 
 - Monogram: 33px scherp vierkant, `--kern-50` bg, DM Mono initialen `--kern-700`.
-- Inkomst/terugbetaling: naam + bedrag in `--positive`, glyph `↗`.
-- Overboeking (`linked_transfer_id` of betaalverzoek): glyph `↔`.
-- Terugkerend: `🔁`-badge (klein, mono, Kern-200-rand).
+- **Iconen = editorial Lucide** (scherp, gedempt `--ink-3`, `h-3 w-3`), **geen emoji**. Type → kleine
+  Lucide-icoon per `kind` (pin=`CreditCard`, incasso=`RefreshCw`, iDEAL=`Smartphone`, overboeking/
+  betaalverzoek=`ArrowLeftRight`, bijschrijving=`ArrowDownLeft`, bankkosten=`Landmark`).
+- Inkomst/terugbetaling: naam + bedrag in `--positive`, teken `+`.
+- Terugkerend: Lucide `Repeat` (klein, Kern-700).
 - **Graceful degradation:** ontbreekt `running_balance`/`transaction_type`/`fx_*` (bv. demo-data of
   ING-import) → die elementen renderen simpelweg niet. De rij blijft kloppen ("Tier A"-look); na
   her-import van de echte Rabobank-CSV lichten ze vanzelf op.
@@ -207,20 +213,22 @@ Mono kicker links (sticky bij scroll), rechts subtotaal (`−`/`+`) + vrijheidst
 ## 9. Filtering & zoeken
 
 - **Rekening-selector (eersterangs)** — bovenaan de tijdlijn: segmented control / dropdown met "Alle
-  rekeningen" + elke actieve `bank_accounts`-rij (naam + `bank_name`/IBAN-staart). **Bron-badge**: een
-  rekening is **🔗 gekoppeld** als er een actieve rij in `bank_connection_accounts`
-  (`bank_account_id = account.id`) bestaat — anders **📄 handmatig/CSV**. `last_synced_at` voedt een
+  rekeningen" + elke actieve `bank_accounts`-rij (naam + `bank_name`/IBAN-staart). **Bron-badge** (Lucide,
+  geen emoji): een rekening is **gekoppeld** (`Link2`) als er een actieve rij in `bank_connection_accounts`
+  (`bank_account_id = account.id`) bestaat — anders **handmatig/CSV** (`FileText`). `last_synced_at` voedt een
   "laatst gesynct"-label op gekoppelde rekeningen. De selector filtert de feed op `account_id`; één account
   geselecteerd → alle dag-subtotalen/zoek/filters opereren binnen die rekening. Bron-agnostisch: beide
   soorten rekeningen zijn `bank_accounts`-rijen en hun transacties dragen `account_id`. Selectie zit in de
   URL-state (`?rekening=<id>`). Vervangt de oude inline rekening-pills uit `TransactiesFeed`.
-- **Quick-chips** (sharp, ink-actief): Alles · Uitgaven · Inkomsten · 🔁 Terugkerend · ↔ Overboekingen.
-  **Geen** budget/categorie-chips.
+- **Quick-chips** (sharp, ink-actief, platte tekstlabels): Alles · Uitgaven · Inkomsten · Terugkerend ·
+  Overboekingen. **Geen** budget/categorie-chips.
 - **Filters-bottom-sheet** (`ShellOverlay kind="sheet"`): type (in/uit/alles), bedrag-range (slider met
-  module-thumb), periode (presets `deze maand/vorige/dit jaar` + aangepast), rekening (multi), sorteer
-  (datum/bedrag/winkel). Live resultaat-aantal.
-- **Smart-search**: `parseSmartQuery` → facetten; fallback vrije tekst over `cleanName` + ruwe
-  omschrijving + counterparty.
+  module-thumb), terugkerend-toggle, sorteer (datum/bedrag/winkel). Live resultaat-aantal. **Geen
+  periode-/datum-control en geen rekening-multi** — periode komt van de `PeriodeSelector` bovenaan, rekening
+  van de eersterangs rekening-selector.
+- **Smart-search**: `parseSmartQuery` → facetten (tekst + bedrag + richting). **Datum-facetten worden
+  bewust genegeerd** zodat zoeken de periode bovenaan niet overschrijft. Fallback vrije tekst over
+  `cleanName` + ruwe omschrijving + counterparty.
 - **URL-filterstate**: actieve filters in query-params (deelbaar, terug-knop herstelt) — conform
   huisstijl search/filter-regel. Actieve filters als verwijderbare chips + "Alles wissen".
 
