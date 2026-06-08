@@ -20,7 +20,7 @@ import {
 } from '@/lib/household/perspective-loader'
 import type { Perspective } from '@/lib/household-data'
 import type { Budget } from '@/lib/budget-data'
-import { TransactieTijdlijn } from './transactie-tijdlijn'
+import { TransactieTijdlijn, type AccountOption } from './transactie-tijdlijn'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
@@ -66,8 +66,6 @@ type FullTransaction = {
 }
 
 type BudgetGroup = { parent: Budget; children: Budget[] }
-
-type AccountOption = { id: string; name: string; bankName: string | null; ibanTail: string | null; connected: boolean }
 
 /** Aandeel (0-1) waarmee een item in dit perspectief telt — spiegelt cashflow-data-loader. */
 function shareOf(item: PerspectiveItem, perspective: Perspective): number {
