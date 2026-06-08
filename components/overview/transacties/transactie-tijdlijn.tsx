@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Repeat, Link2, FileText, CreditCard, RefreshCw, Smartphone, ArrowLeftRight, ArrowDownLeft, Landmark, Search, SlidersHorizontal, X } from 'lucide-react'
 import {
@@ -46,6 +46,11 @@ function freedomLabel(days: number): string {
 // nl-NL bedrag-formatter voor de FX-subregel (vreemde valuta, geen euro-glyph).
 const FX_FMT = new Intl.NumberFormat('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+// Begrens het aantal gerenderde rijen. Jaarweergave kan honderden transacties
+// bevatten; een grote feed-DOM maakt de bottom-sheet open/close-reflow (scroll-lock
+// + focus-trap) onevenredig duur. Pagineren houdt de DOM klein. "Toon meer" verhoogt.
+const ROW_PAGE = 50
+
 export function TransactieTijdlijn({ transactions, windowDays, accounts, selectedAccountId, onSelectAccount, onSelect }: Props) {
   const { masked } = useMaskedAmounts()
 
@@ -58,6 +63,7 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
   const [amountMax, setAmountMax] = useState<number | null>(null)
   const [sort, setSort] = useState<SortKey>('date')
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(ROW_PAGE)
 
   // Slimme zoekopdracht — alléén tekst/bedrag/richting, GEEN datum-facetten
   // (de PeriodeSelector bovenaan de pagina is de enige tijdsbron).
@@ -111,6 +117,27 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
     }
     return g
   }, [filtered, sort])
+
+  // Reset de paginatie wanneer de gefilterde set wijzigt (periode/filter/zoek).
+  useEffect(() => { setVisibleCount(ROW_PAGE) }, [filtered])
+
+  // Begrens tot `visibleCount` rijen over de dag-groepen heen — houdt de DOM klein
+  // (en daarmee de open/close-reflow van de bottom-sheet goedkoop).
+  const cappedGroups = useMemo(() => {
+    let budget = visibleCount
+    const out: typeof groups = []
+    for (const g of groups) {
+      if (budget <= 0) break
+      if (g.rows.length <= budget) {
+        out.push(g)
+        budget -= g.rows.length
+      } else {
+        out.push({ ...g, rows: g.rows.slice(0, budget) })
+        budget = 0
+      }
+    }
+    return out
+  }, [groups, visibleCount])
 
   const filterActive =
     direction !== 'all' || onlyRecurring || onlyTransfers || amountMin != null || amountMax != null ||
@@ -196,7 +223,7 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
         <NoResultsEmpty onClear={clearAll} />
       ) : (
         <div role="list" className="space-y-4">
-          {groups.map((g) => (
+          {cappedGroups.map((g) => (
             <div key={g.date}>
               <div className="flex items-baseline justify-between border-b border-[var(--ink)] pb-1">
                 <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]" aria-label={dayHeader(g.date)}>{dayHeader(g.date)}</span>
@@ -210,6 +237,15 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
               </ul>
             </div>
           ))}
+          {filtered.length > visibleCount && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((n) => n + ROW_PAGE)}
+              className="mt-1 min-h-[44px] w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--ink-2)] hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-[var(--ink)]"
+            >
+              Toon meer · {filtered.length - visibleCount} resterend
+            </button>
+          )}
         </div>
       )}
 
@@ -344,7 +380,10 @@ function AccountButton({ active, label, onClick, connected }: { active: boolean;
   )
 }
 
-function Row({ t, recurring, onSelect, masked }: { t: AnalysisTransaction; recurring: boolean; onSelect?: (tx: AnalysisTransaction) => void; masked: boolean }) {
+// React.memo: rijen her-renderen niet bij parent-re-renders (bv. het openen/sluiten
+// van het bewerk-paneel via `editTx`-state). Props zijn stabiel (t-ref, boolean,
+// stabiele onSelect-callback), dus de shallow-compare slaat de re-render over.
+const Row = memo(function Row({ t, recurring, onSelect, masked }: { t: AnalysisTransaction; recurring: boolean; onSelect?: (tx: AnalysisTransaction) => void; masked: boolean }) {
   const name = cleanMerchantName(t.counterparty_name)
   const type = deriveType(t.bank_code, t.counterparty_name, t.amount)
   const TypeIcon = TYPE_ICON[type.kind]
@@ -387,4 +426,4 @@ function Row({ t, recurring, onSelect, masked }: { t: AnalysisTransaction; recur
     )
   }
   return <li className="flex items-center gap-3 py-2.5">{content}</li>
-}
+})
