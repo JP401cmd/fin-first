@@ -70,3 +70,85 @@ export function freedomLabel(days: number): string {
   return `${days} ${days === 1 ? 'dag' : 'dagen'}`
 }
 
+// ── Kandidaat-model + selectie ─────────────────────────────────────────
+
+export type StarterTheme =
+  | 'vermogen' | 'sparen' | 'uitgaven' | 'doelen'
+  | 'schulden' | 'acties' | 'fire' | 'algemeen'
+
+export interface StarterVariant {
+  vraag: string
+  actie: string
+  context: string
+  vrijheidstijd?: string
+}
+
+export interface StarterCandidate {
+  id: string
+  theme: StarterTheme
+  sentiment: 'positive' | 'neutral' | 'alert'
+  /** Relevantie 0..100 (magnitude-gedreven). */
+  score: number
+  /** 2-4 formuleringen; de engine roteert per maand. */
+  variants: Array<(v: Voice) => StarterVariant>
+}
+
+const MAX_STARTERS = 5
+const MIN_STARTERS = 2
+const MAX_PER_THEME = 2
+
+function materialize(c: StarterCandidate, v: Voice, monthIndex: number): GesprekStarterData {
+  const n = c.variants.length
+  const idx = ((monthIndex % n) + n) % n // veilig voor negatieve monthIndex
+  const variant = c.variants[idx](v)
+  return {
+    id: c.id,
+    sentiment: c.sentiment,
+    vraag: variant.vraag,
+    context: variant.context,
+    actie: variant.actie,
+    vrijheidstijd: variant.vrijheidstijd,
+  }
+}
+
+/**
+ * Kies de te tonen starters: score-gesorteerd, max 2 per thema, min 2
+ * (aangevuld uit fallback), max 5. Variant gekozen via maand-rotatie.
+ */
+export function selectStarters(
+  candidates: StarterCandidate[],
+  voice: Voice,
+  monthIndex: number,
+  fallback: StarterCandidate[],
+): GesprekStarterData[] {
+  const sorted = [...candidates].sort(
+    (a, b) => b.score - a.score || a.id.localeCompare(b.id),
+  )
+
+  const perTheme: Record<string, number> = {}
+  const chosen: StarterCandidate[] = []
+  for (const c of sorted) {
+    if (chosen.length >= MAX_STARTERS) break
+    const used = perTheme[c.theme] || 0
+    if (used >= MAX_PER_THEME) continue
+    perTheme[c.theme] = used + 1
+    chosen.push(c)
+  }
+
+  for (const f of fallback) {
+    if (chosen.length >= MIN_STARTERS) break
+    if (chosen.some(c => c.id === f.id)) continue
+    chosen.push(f)
+  }
+
+  return chosen.slice(0, MAX_STARTERS).map(c => materialize(c, voice, monthIndex))
+}
+
+// ── Util ───────────────────────────────────────────────────────────────
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n))
+}
+
+// suppress unused-variable warning — clamp is used by Task 3+ detectors
+void clamp
+
