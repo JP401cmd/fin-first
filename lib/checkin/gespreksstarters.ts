@@ -99,6 +99,7 @@ const MAX_PER_THEME = 2
 
 function materialize(c: StarterCandidate, v: Voice, monthIndex: number): GesprekStarterData {
   const n = c.variants.length
+  if (n === 0) throw new Error(`StarterCandidate "${c.id}" heeft geen varianten`)
   const idx = ((monthIndex % n) + n) % n // veilig voor negatieve monthIndex
   const variant = c.variants[idx](v)
   return {
@@ -112,8 +113,9 @@ function materialize(c: StarterCandidate, v: Voice, monthIndex: number): Gesprek
 }
 
 /**
- * Kies de te tonen starters: score-gesorteerd, max 2 per thema, min 2
- * (aangevuld uit fallback), max 5. Variant gekozen via maand-rotatie.
+ * Kies de te tonen starters: score-gesorteerd, max 2 per thema, en aangevuld
+ * tot MIN_STARTERS uit fallback (best-effort — niet gegarandeerd als de
+ * fallback-lijst te kort is), max 5. Variant gekozen via maand-rotatie.
  */
 export function selectStarters(
   candidates: StarterCandidate[],

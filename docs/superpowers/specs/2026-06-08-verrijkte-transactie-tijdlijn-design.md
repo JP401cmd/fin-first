@@ -56,6 +56,8 @@ meer dan TriFinity bewaart:
 - Lens-schakelaar-scaffold (alleen **Tijdlijn** actief; Kassabonnen/Kalender als latere, aparte specs).
 - Pure displaylogica in nieuwe `lib/transaction-display.ts` (volledig unit-getest).
 - Import-uitbreiding: migratie + `ParsedTransaction` + Rabobank-preset + `parseCSV` + import-persistentie.
+- **Rekening-selector** (eersterangs): kies één cash-rekening of "alle". Bron-agnostisch — werkt voor
+  zowel **🔗 gekoppelde** (auto-sync) als **📄 handmatig/CSV** rekeningen.
 - Filtering (quick-chips + Filters-bottom-sheet) + smart-search + URL-filterstate.
 
 **Out of scope (expliciet)**
@@ -114,10 +116,13 @@ Breid uit met: `running_balance`, `creditor_id`, `fx_amount`, `fx_currency`, `fx
 ### 4.4 Import-persistentie (`app/(app)/core/cash/import/page.tsx`)
 Het insert-statement schrijft de nieuwe kolommen mee. Ontbrekende waarden → `null`.
 
-### 4.5 Perspectief-loader (RISICO — verifiëren)
-`TransactiesAnalyse` laadt via `loadPerspectiveTransactions` (dual-use RPC, `lib/household/perspective-loader.ts`).
-De nieuwe kolommen moeten in de RPC-select/het item terugkomen. **Vóór bouwen checken** of de RPC `select *`
-doet (dan gratis) of een vaste kolomlijst (dan RPC/migratie aanpassen). Eigendoms-/privacy-aggregatie ongemoeid.
+### 4.5 Perspectief-loader (grotendeels opgelost)
+`TransactiesAnalyse` laadt via `loadPerspectiveTransactions` (`lib/household/perspective-loader.ts`). De
+basisquery is `supabase.from('transactions').select('*')` (regel 333) — de **nieuwe kolommen stromen dus
+automatisch mee** voor eigen + huishoud-base transacties. Géén RPC-aanpassing nodig voor solo/eigen gebruik.
+Enige open punt (niet-blokkerend): de partner-persoonlijke RPC `household_partner_items('transactions')`
+moet de kolommen teruggeven als die intern een vaste kolomlijst hanteert; alleen relevant in huishoud-
+/partner-perspectief.
 
 ---
 
@@ -201,6 +206,14 @@ Mono kicker links (sticky bij scroll), rechts subtotaal (`−`/`+`) + vrijheidst
 
 ## 9. Filtering & zoeken
 
+- **Rekening-selector (eersterangs)** — bovenaan de tijdlijn: segmented control / dropdown met "Alle
+  rekeningen" + elke actieve `bank_accounts`-rij (naam + `bank_name`/IBAN-staart). **Bron-badge**: een
+  rekening is **🔗 gekoppeld** als er een actieve rij in `bank_connection_accounts`
+  (`bank_account_id = account.id`) bestaat — anders **📄 handmatig/CSV**. `last_synced_at` voedt een
+  "laatst gesynct"-label op gekoppelde rekeningen. De selector filtert de feed op `account_id`; één account
+  geselecteerd → alle dag-subtotalen/zoek/filters opereren binnen die rekening. Bron-agnostisch: beide
+  soorten rekeningen zijn `bank_accounts`-rijen en hun transacties dragen `account_id`. Selectie zit in de
+  URL-state (`?rekening=<id>`). Vervangt de oude inline rekening-pills uit `TransactiesFeed`.
 - **Quick-chips** (sharp, ink-actief): Alles · Uitgaven · Inkomsten · 🔁 Terugkerend · ↔ Overboekingen.
   **Geen** budget/categorie-chips.
 - **Filters-bottom-sheet** (`ShellOverlay kind="sheet"`): type (in/uit/alles), bedrag-range (slider met
