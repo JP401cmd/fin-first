@@ -219,6 +219,8 @@ describe('nieuwe detectoren A', () => {
   it('fire-versnelling fires when fireAge dropped >= 1 year', () => {
     const out = buildGespreksstarters(baseInput({ fireAge: 52, prevFireAge: 54 }))
     expect(ids(out)).toContain('fire-versnelling')
+    const hit = out.find(o => o.id === 'fire-versnelling')
+    expect(hit!.sentiment).toBe('positive')
   })
   it('fire-vertraging fires when fireAge rose >= 1 year (alert)', () => {
     const out = buildGespreksstarters(baseInput({ fireAge: 56, prevFireAge: 54 }))

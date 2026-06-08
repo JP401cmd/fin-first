@@ -395,7 +395,7 @@ const detectDoelen: Detector = (i) => {
       score: 30,
       variants: [
         (v) => ({
-          vraag: `${v.poss === 'je' ? 'Je' : 'Jullie'} doel "${closest.name}" staat op ${closest.pct.toFixed(0)}%. Welk concreet bedrag ${v.kun} ${v.subj} per maand opzij leggen om sneller op koers te komen?`,
+          vraag: `${v.subjCap} doel "${closest.name}" staat op ${closest.pct.toFixed(0)}%. Welk concreet bedrag ${v.kun} ${v.subj} per maand opzij leggen om sneller op koers te komen?`,
           context: `Doel "${closest.name}" is net gestart.`,
           actie: `Stel ${v.samen} een automatische maandstorting in.`,
         }),
@@ -507,7 +507,7 @@ const detectFire: Detector = (i) => {
   if (i.fireAge == null || i.prevFireAge == null) return []
   const delta = i.fireAge - i.prevFireAge // negatief = eerder vrij
   if (delta <= -1) {
-    const yrs = Math.abs(delta)
+    const yrs = Math.round(Math.abs(delta))
     return [{
       id: 'fire-versnelling', theme: 'fire', sentiment: 'positive',
       score: clamp(yrs * 20, 20, 90),
@@ -526,13 +526,13 @@ const detectFire: Detector = (i) => {
     }]
   }
   if (delta >= 1) {
-    const yrs = delta
+    const yrs = Math.round(delta)
     return [{
       id: 'fire-vertraging', theme: 'fire', sentiment: 'alert',
       score: clamp(yrs * 20 + 5, 25, 90),
       variants: [
         (v) => ({
-          vraag: `${v.poss === 'je' ? 'Je' : 'Jullie'} geschatte FIRE-leeftijd schoof ${yrs} jaar op (naar ${i.fireAge}). Is er iets veranderd dat ${v.subj} ${v.samen} ${v.wilt} bespreken?`,
+          vraag: `${v.subjCap} geschatte FIRE-leeftijd schoof ${yrs} jaar op (naar ${i.fireAge}). Is er iets veranderd dat ${v.subj} ${v.samen} ${v.wilt} bespreken?`,
           context: `FIRE-leeftijd: ${i.prevFireAge} → ${i.fireAge}.`,
           actie: `Kijk ${v.samen} of het door uitgaven of een eenmalige post komt.`,
         }),
@@ -548,7 +548,6 @@ const detectFire: Detector = (i) => {
 }
 
 const detectSpaarquoteTrend: Detector = (i) => {
-  if (i.monthlyIncome <= 0) return []
   if (i.savingsRate6m >= 25) {
     return [{
       id: 'spaarquote-sterk', theme: 'sparen', sentiment: 'positive',
