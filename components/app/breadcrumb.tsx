@@ -122,10 +122,35 @@ export function Breadcrumb({
 }
 
 /**
+ * Canonieke breadcrumb-trails voor legacy-routes waar de URL-afgeleide trail
+ * naar verouderde `/core/*`-links zou wijzen of een tussenlaag mist. De canonieke
+ * nav is Overzicht/Toekomst/Mijn; `/core/**` zijn legacy backing-routes.
+ */
+const CANONICAL_TRAILS: Record<string, BreadcrumbSegment[]> = {
+  '/core/cash/import': [
+    { label: 'Overzicht', href: '/overzicht' },
+    { label: 'Bezittingen', href: '/overzicht/bezittingen' },
+    { label: 'Cash', href: '/overzicht/bezittingen/cash' },
+    { label: 'Importeren', href: '/core/cash/import' },
+  ],
+}
+
+/** Legacy root-segmenten → canonieke href voor de eerste crumb. */
+const CANONICAL_ROOT_HREF: Record<string, string> = {
+  '/core': '/overzicht',
+  '/will': '/overzicht',
+  '/horizon': '/toekomst',
+  '/identity': '/mijn',
+}
+
+/**
  * Builds breadcrumb segments from a URL pathname.
- * /core/cash/import → [{ label: 'Overzicht', href: '/core' }, { label: 'Cash', href: '/core/cash' }, { label: 'Importeren', href: '/core/cash/import' }]
+ * /core/cash/import → [Overzicht /overzicht, Bezittingen …, Cash …, Importeren …]
  */
 function buildBreadcrumbs(pathname: string): BreadcrumbSegment[] {
+  const trail = CANONICAL_TRAILS[pathname]
+  if (trail) return trail
+
   const parts = pathname.split('/').filter(Boolean)
   const segments: BreadcrumbSegment[] = []
 
@@ -133,7 +158,7 @@ function buildBreadcrumbs(pathname: string): BreadcrumbSegment[] {
   for (const part of parts) {
     href += `/${part}`
     const label = segmentLabels[part] ?? part.charAt(0).toUpperCase() + part.slice(1)
-    segments.push({ label, href })
+    segments.push({ label, href: CANONICAL_ROOT_HREF[href] ?? href })
   }
 
   return segments
