@@ -1081,7 +1081,33 @@ export default function ImportPage() {
       return true
     })
 
-    const insertRows = toImportDeduped.map((r) => ({
+    // Filter tegen hashes die AL in de DB staan voor deze gebruiker. De "Dubbelingen"-
+    // stap matcht op (datum, bedrag, omschrijving), maar de unieke index hasht
+    // `description[:100]` (`transactions_import_hash_idx` op (user_id, import_hash),
+    // partieel WHERE import_hash IS NOT NULL). Die divergentie laat hash-collisions
+    // erdoor glippen, waardoor één rij een hele batch van 100 laat falen (ON CONFLICT
+    // kan de partiële index niet inferren). Haal de bestaande hashes op en sla die rijen
+    // over — zo loopt geen enkele batch op de unieke index stuk.
+    const existingHashSet = new Set<string>()
+    for (let from = 0; ; from += 1000) {
+      const { data: hashPage } = await supabase
+        .from('transactions')
+        .select('import_hash')
+        .eq('user_id', user!.id)
+        .not('import_hash', 'is', null)
+        .range(from, from + 999)
+      const pageRows = (hashPage ?? []) as { import_hash: string }[]
+      for (const h of pageRows) existingHashSet.add(h.import_hash)
+      if (pageRows.length < 1000) break
+    }
+    const finalRows = toImportDeduped.filter((r) => !existingHashSet.has(r.import_hash))
+    if (finalRows.length < toImportDeduped.length) {
+      // Reflecteer de extra overslagen in de UI-tellers (hergebruikt de skipImport-telling
+      // → tonen als "overgeslagen", niet als "mislukt").
+      setRows((prev) => prev.map((row) => existingHashSet.has(row.import_hash) ? { ...row, skipImport: true } : row))
+    }
+
+    const insertRows = finalRows.map((r) => ({
       user_id: user!.id,
       account_id: selectedAccountId,
       date: r.date,
@@ -1193,6 +1219,7 @@ export default function ImportPage() {
     setRetrying(true)
     setError("")
     const supabase = createClient()
+    const { data: { user: retryUser } } = await supabase.auth.getUser()
     const remaining: typeof failedBatches = []
 
     for (const fb of failedBatches) {
@@ -1203,8 +1230,24 @@ export default function ImportPage() {
       let ok = true
       let errMsg = ""
       try {
-        const { error: insertError } = await supabase.from("transactions").insert(fb.rows)
-        if (insertError) { ok = false; errMsg = insertError.message }
+        // Sla rijen over waarvan de hash al bestaat (dé reden dat de batch faalde) en
+        // importeer alleen de resterende — anders faalt de retry identiek (plain insert
+        // van dezelfde batch loopt opnieuw op de unieke index stuk).
+        const batchHashes = fb.rows.map((row) => (row as { import_hash: string }).import_hash)
+        const existing = new Set<string>()
+        if (retryUser) {
+          const { data: ex } = await supabase
+            .from("transactions")
+            .select("import_hash")
+            .eq("user_id", retryUser.id)
+            .in("import_hash", batchHashes)
+          for (const e of (ex ?? []) as { import_hash: string }[]) existing.add(e.import_hash)
+        }
+        const survivors = fb.rows.filter((row) => !existing.has((row as { import_hash: string }).import_hash))
+        if (survivors.length > 0) {
+          const { error: insertError } = await supabase.from("transactions").insert(survivors)
+          if (insertError) { ok = false; errMsg = insertError.message }
+        }
       } catch (err) {
         ok = false
         errMsg = err instanceof Error ? err.message : "Onbekende fout"
