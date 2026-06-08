@@ -1095,11 +1095,11 @@ export default function ImportPage() {
       import_hash: r.import_hash,
       reference: r.reference,
       transaction_type: r.isTransfer ? 'transfer' : r.transaction_type,
-      running_balance: r.running_balance ?? null,
-      creditor_id: r.creditor_id ?? null,
-      fx_amount: r.fx_amount ?? null,
-      fx_currency: r.fx_currency ?? null,
-      fx_rate: r.fx_rate ?? null,
+      running_balance: r.running_balance,
+      creditor_id: r.creditor_id,
+      fx_amount: r.fx_amount,
+      fx_currency: r.fx_currency,
+      fx_rate: r.fx_rate,
     }))
 
     const BATCH_SIZE = 100

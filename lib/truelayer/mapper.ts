@@ -21,8 +21,9 @@ export async function mapTransaction(tl: TLTransaction): Promise<ParsedTransacti
     counterparty_iban: null,
     reference: tl.transaction_id ?? null,
     transaction_type: tl.transaction_category ?? tl.transaction_type ?? null,
-    running_balance: null,
+    running_balance: tl.running_balance?.amount ?? null,
     creditor_id: null,
+    // fx/creditor niet beschikbaar uit TrueLayer; CSV-import vult deze.
     fx_amount: null,
     fx_currency: null,
     fx_rate: null,

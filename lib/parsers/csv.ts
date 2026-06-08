@@ -40,7 +40,21 @@ function parseAmount(value: string): number {
   if (value.includes(',')) {
     value = value.replace(/\./g, '').replace(',', '.')
   }
-  return parseFloat(value) || 0
+  const n = parseFloat(value)
+  return Number.isNaN(n) ? 0 : n
+}
+
+/**
+ * Parse an optional Dutch-format amount; null for empty or unparseable cells.
+ */
+function parseOptionalAmount(value: string): number | null {
+  value = value.replace(/['"]/g, '').trim()
+  if (!value) return null
+  if (value.includes(',')) {
+    value = value.replace(/\./g, '').replace(',', '.')
+  }
+  const n = parseFloat(value)
+  return Number.isNaN(n) ? null : n
 }
 
 /**
@@ -133,11 +147,11 @@ export async function parseCSV(
     const hash = await computeHash(date, amount, cleanDescription)
 
     const typeVal = preset.typeColumn != null ? (fields[preset.typeColumn] ?? '').trim() : ''
-    const balanceVal = preset.balanceColumn != null ? fields[preset.balanceColumn] ?? '' : ''
+    const balanceVal = preset.balanceColumn != null ? (fields[preset.balanceColumn] ?? '').trim() : ''
     const creditorVal = preset.creditorColumn != null ? (fields[preset.creditorColumn] ?? '').trim() : ''
-    const fxAmtVal = preset.fxAmountColumn != null ? fields[preset.fxAmountColumn] ?? '' : ''
+    const fxAmtVal = preset.fxAmountColumn != null ? (fields[preset.fxAmountColumn] ?? '').trim() : ''
     const fxCurVal = preset.fxCurrencyColumn != null ? (fields[preset.fxCurrencyColumn] ?? '').trim() : ''
-    const fxRateVal = preset.fxRateColumn != null ? fields[preset.fxRateColumn] ?? '' : ''
+    const fxRateVal = preset.fxRateColumn != null ? (fields[preset.fxRateColumn] ?? '').trim() : ''
 
     transactions.push({
       date,
@@ -147,11 +161,11 @@ export async function parseCSV(
       counterparty_iban: iban?.trim() || null,
       reference: reference?.trim() || null,
       transaction_type: typeVal || null,
-      running_balance: balanceVal.trim() ? parseAmount(balanceVal) : null,
+      running_balance: parseOptionalAmount(balanceVal),
       creditor_id: creditorVal || null,
-      fx_amount: fxAmtVal.trim() ? parseAmount(fxAmtVal) : null,
+      fx_amount: parseOptionalAmount(fxAmtVal),
       fx_currency: fxCurVal || null,
-      fx_rate: fxRateVal.trim() ? parseAmount(fxRateVal) : null,
+      fx_rate: parseOptionalAmount(fxRateVal),
       import_hash: hash,
     })
   }
