@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { computeFireAge } from '@/lib/checkin/fire-age'
 
 const MONTH_NAMES = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
@@ -108,26 +109,16 @@ export async function GET() {
   const completedActionsCount = completedActions.length
   const freedomDaysWon = completedActions.reduce((s, a) => s + (a.freedom_days || 0), 0)
 
-  // FIRE age estimate (simple calculation)
-  let fireAge: number | null = null
+  // FIRE age estimate — gedeelde helper (lib/checkin/fire-age.ts)
   const profile = profileRes.data
-  if (profile?.date_of_birth && netWorth > 0 && monthlyExpenses > 0) {
-    const yearlyExpenses = monthlyExpenses * 12
-    const swr = 0.04 // Safe withdrawal rate
-    const fireTarget = yearlyExpenses / swr
-    const annualSavings = (monthlyIncome - monthlyExpenses) * 12
-    const expectedReturn = profile.expected_return || 0.07
-
-    if (annualSavings > 0) {
-      // Simple years-to-FIRE calculation
-      const yearsToFire = Math.log((fireTarget * expectedReturn + annualSavings) / (netWorth * expectedReturn + annualSavings)) / Math.log(1 + expectedReturn)
-      const birthDate = new Date(profile.date_of_birth)
-      const currentAge = (now.getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-      if (isFinite(yearsToFire) && yearsToFire > 0) {
-        fireAge = Math.round(currentAge + yearsToFire)
-      }
-    }
-  }
+  const fireAge = computeFireAge({
+    dateOfBirth: profile?.date_of_birth ?? null,
+    netWorth,
+    monthlyIncome,
+    monthlyExpenses,
+    expectedReturn: profile?.expected_return ?? null,
+    now,
+  })
 
   return NextResponse.json({
     monthLabel: MONTH_NAMES[currentMonth],
