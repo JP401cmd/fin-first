@@ -14,10 +14,10 @@ describe('TransactieTijdlijn', () => {
   it('toont opgeschoonde naam + bedrag', () => {
     render(<TransactieTijdlijn transactions={[base]} windowDays={30} accounts={[]} selectedAccountId={null} onSelectAccount={() => {}} />)
     expect(screen.getByText('Hornbach')).toBeInTheDocument()
-    // formatCurrency rondt af op hele euro's (app-conventie): €70,76 → "€ 71".
-    // Het bedrag verschijnt zowel in de dagkop-totaal als op de regel; assert op
-    // de cijfers (niet het euro-glyph, dat een non-breaking space kan dragen).
-    expect(screen.getAllByText(/71/).length).toBeGreaterThan(0)
+    // Transacties tonen centen (formatCurrencyDecimals): €70,76. Het bedrag staat
+    // zowel in het dagkop-totaal als op de regel; assert op de cijfers (niet het
+    // euro-glyph, dat een non-breaking space kan dragen).
+    expect(screen.getAllByText(/70,76/).length).toBeGreaterThan(0)
   })
   it('toont lopend saldo alleen als aanwezig (graceful degradation)', () => {
     const { rerender } = render(<TransactieTijdlijn transactions={[base]} windowDays={30} accounts={[]} selectedAccountId={null} onSelectAccount={() => {}} />)

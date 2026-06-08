@@ -5,7 +5,7 @@ import {
   cleanMerchantName, deriveType, parseLocationTime, avgDailyExpense,
   freedomDays, detectRecurring, groupByDay, monogram, type TxKind,
 } from '@/lib/transaction-display'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrencyDecimals } from '@/lib/format'
 import type { AnalysisTransaction } from '@/lib/transaction-insights'
 
 // Editorial iconen (Lucide, scherp, gedempt) — GEEN emoji. Type uit deriveType().kind.
@@ -62,7 +62,7 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
             <div className="flex items-baseline justify-between border-b border-[var(--ink)] pb-1">
               <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">{dayHeader(g.date)}</span>
               <span className="font-mono text-[11px] text-[var(--ink-3)] tabular-nums">
-                {g.incomeTotal - g.expenseTotal >= 0 ? '+' : '−'} {formatCurrency(Math.abs(g.incomeTotal - g.expenseTotal))}
+                {g.incomeTotal - g.expenseTotal >= 0 ? '+' : '−'} {formatCurrencyDecimals(Math.abs(g.incomeTotal - g.expenseTotal))}
                 {daily > 0 && <span className="text-[var(--color-kern-700)]"> · {freedomLabel(freedomDays(g.expenseTotal, daily))}</span>}
               </span>
             </div>
@@ -110,10 +110,10 @@ function Row({ t, recurring, onSelect }: { t: AnalysisTransaction; recurring: bo
       </span>
       <span className="flex-none text-right">
         <span className={['block font-mono text-[14px] tabular-nums', income ? 'text-[var(--positive)]' : 'text-[var(--ink)]'].join(' ')}>
-          {income ? '+' : '−'} {formatCurrency(Math.abs(t.amount))}
+          {income ? '+' : '−'} {formatCurrencyDecimals(Math.abs(t.amount))}
         </span>
         {t.running_balance != null && (
-          <span className="block font-mono text-[10px] text-[var(--ink-4)] tabular-nums">saldo {formatCurrency(t.running_balance)}</span>
+          <span className="block font-mono text-[10px] text-[var(--ink-4)] tabular-nums">saldo {formatCurrencyDecimals(t.running_balance)}</span>
         )}
         {t.fx_amount != null && t.fx_currency && (
           <span className="block font-mono text-[9px] text-[var(--ink-4)]">{t.fx_currency} {t.fx_amount}{t.fx_rate ? ` @ ${t.fx_rate}` : ''}</span>
