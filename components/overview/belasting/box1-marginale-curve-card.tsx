@@ -23,10 +23,9 @@ import { Kicker } from '@/components/editorial'
  * Vormgeving: editorial — papier + ink-hiërarchie, scherpe hoeken, Kicker +
  * Playfair eigen-tarief-callout. Server-compatible (geen hooks). marginalRateAt
  * is een pure functie, dus de sampling kan veilig op de server gebeuren.
- * Box 1-kleur amber (#b45309).
+ * De box-accentkleur komt uit de route-layout via `var(--module-active-*)`.
  */
 
-const BOX1_COLOR = '#b45309'
 const SAMPLE_MAX = 120_000
 const SAMPLE_STEP = 2_000
 
@@ -101,7 +100,7 @@ export function Box1MarginaleCurveCard({
         data={data}
         cliffs={cliffs}
         referenceRate={0.5}
-        colorVar={BOX1_COLOR}
+        colorVar="var(--module-active-500)"
       />
 
       {eigenMarginaal != null && eigenInkomen != null && (
@@ -115,7 +114,7 @@ export function Box1MarginaleCurveCard({
           </span>
           <span
             className="text-[22px] font-black tabular-nums tracking-[-0.01em] leading-none"
-            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: BOX1_COLOR }}
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--module-active-700)' }}
           >
             {(eigenMarginaal * 100).toFixed(1)}%
           </span>

@@ -34,7 +34,6 @@ import { WillHome } from '@/components/app/will/will-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
-import { ViewModeProvider } from '@/components/app/view-mode-provider'
 import {
   generateAllColorVars,
   DEFAULT_MODULE_COLORS,
@@ -423,7 +422,6 @@ export default async function AppLayout({
               <NotificationProvider>
               <GlobalSyncProvider>
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
-                  <ViewModeProvider>
                   <DashboardTypeProvider>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
                       {/* Skip-link — eerste tab-stop voor keyboard- en
@@ -471,7 +469,6 @@ export default async function AppLayout({
                       </Suspense>
                     </div>
                   </DashboardTypeProvider>
-                  </ViewModeProvider>
                 </ModuleColorProvider>
                 <NotificationModal />
               </GlobalSyncProvider>

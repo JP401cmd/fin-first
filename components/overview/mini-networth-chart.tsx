@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { computeConfidenceBand } from '@/lib/confidence-band'
 
 /**
@@ -57,6 +58,11 @@ export function MiniNetWorthChart({
    */
   simRequiredPortfolio?: number | null
 }) {
+  // Netto vermogen + eindbedrag zijn saldi → honoreren de privacy-toggle.
+  // Hook vóór elke early-return aangeroepen (rules-of-hooks). De numerieke
+  // chart-coördinaten blijven ongemoeid; alleen de zichtbare bedrag-tekst maskt.
+  const { masked } = useMaskedAmounts()
+
   // SVG-dimensies
   const W = 420
   const H = 140
@@ -242,11 +248,11 @@ export function MiniNetWorthChart({
           Netto vermogen door de tijd
         </span>
         <span className="text-xs font-mono tabular-nums text-[var(--ink-3)]">
-          → {formatCurrency(endValue)} bij {endLabel.toLowerCase()}
+          → {formatMaskedCurrency(endValue, masked)} bij {endLabel.toLowerCase()}
         </span>
       </header>
       <div className="font-serif text-xl font-semibold text-[var(--ink)] tabular-nums">
-        {formatCurrency(currentNetWorth)}
+        {formatMaskedCurrency(currentNetWorth, masked)}
       </div>
       <Link
         href="/toekomst"

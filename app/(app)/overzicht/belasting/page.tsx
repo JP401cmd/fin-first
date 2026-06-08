@@ -236,12 +236,10 @@ export default async function OverzichtBelastingPage() {
         </div>
       </header>
 
-      {/* Drie box-kaarten — gedeelde viz, ongewijzigd gedrag. */}
+      {/* Drie box-kaarten — gedeelde viz, ongewijzigd gedrag. De kaart-header
+          toont geen totaal meer; "excl. Box 2" staat in de Sectie I-callout. */}
       <div className="mx-auto max-w-6xl">
-        <BelastingBoxCards
-          cards={cards}
-          totalNote={hasAanmerkelijkBelang ? 'excl. Box 2' : undefined}
-        />
+        <BelastingBoxCards cards={cards} />
       </div>
 
       {/* Hub-secties onder de box-kaarten: druk (C1) → verdeling (C2) →

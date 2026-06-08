@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { MiniNetWorthChart } from './mini-networth-chart'
+import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
 /**
  * Tests voor MiniNetWorthChart — compacte projectie-chart naast Health
@@ -270,5 +273,65 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
     // Zoek paths met stroke-dasharray (history is dashed, projectie niet)
     const paths = container.querySelectorAll('path[stroke-dasharray]')
     expect(paths.length).toBeGreaterThan(0)
+  })
+})
+
+describe('MiniNetWorthChart — privacy-masking voor saldi', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  function renderMasked(ui: ReactElement) {
+    window.localStorage.setItem(PRIVACY_MASKED_STORAGE_KEY, 'true')
+    return render(<PrivacyProvider>{ui}</PrivacyProvider>)
+  }
+
+  it('toont het netto-vermogen + eindbedrag zichtbaar wanneer NIET gemaskeerd', () => {
+    const { container } = render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={187_400}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 187_400)}
+        simRequiredPortfolio={915_600}
+      />,
+    )
+    expect(container.textContent).toContain('187')
+    expect(container.textContent).toContain('915')
+  })
+
+  it('maskeert het netto-vermogen-headline en het eindbedrag bij privacy aan', () => {
+    const { container } = renderMasked(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={187_400}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 187_400)}
+        simRequiredPortfolio={915_600}
+      />,
+    )
+    expect(container.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(container.textContent).not.toContain('187')
+    expect(container.textContent).not.toContain('915')
+  })
+
+  it('houdt leeftijd-labels (Vrijheid / Vandaag) zichtbaar bij masking', () => {
+    const { container } = renderMasked(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={187_400}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 187_400)}
+      />,
+    )
+    // Leeftijden zijn geen saldo en blijven leesbaar.
+    expect(container.textContent).toMatch(/Vrijheid 52/)
+    expect(container.textContent).toMatch(/Vandaag.*35/)
   })
 })

@@ -5,6 +5,8 @@
  * (app/api/checkin/gespreksstarters/route.ts) haalt data op, stelt
  * GespreksstartersInput samen en roept buildGespreksstarters() aan.
  */
+// Engine-uitvoertype: wordt door buildGespreksstarters() geproduceerd en
+// door de route (app/api/checkin/gespreksstarters/route.ts) afgenomen.
 import type { GesprekStarterData } from '@/lib/checkin-types'
 
 // ── Voice (aanspreekvorm) ──────────────────────────────────────────────
@@ -44,14 +46,8 @@ export function buildVoice(audience: Audience): Voice {
 
 // ── Freedom-time helpers (verplaatst uit de route) ─────────────────────
 
-export function formatEUR(n: number): string {
-  return new Intl.NumberFormat('nl-NL', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(n)
-}
+// EUR-formattering hergebruikt de canonieke helper (incl. NaN-guard) i.p.v. dupliceren.
+export { formatCurrency as formatEUR } from '@/lib/format'
 
 export function freedomDays(amount: number, dailyExpenses: number): number {
   if (dailyExpenses <= 0) return 0

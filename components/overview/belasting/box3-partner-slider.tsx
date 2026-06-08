@@ -30,7 +30,8 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
  * fundament). Privacy-bewust via formatMaskedCurrency.
  */
 
-const TEAL = 'var(--color-teal-500)'
+// Box-accent via de actieve module-context (de box-layout zet --module-active-*).
+const ACCENT_700 = 'var(--module-active-700)'
 
 export function Box3PartnerSlider({
   totaalSpaargeld,
@@ -93,7 +94,7 @@ export function Box3PartnerSlider({
     <div className="border-t border-[var(--ink)] px-4 py-5 sm:px-7">
       <Box3SectionHeader num="3.6">
         <span className="inline-flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5" style={{ color: TEAL }} aria-hidden="true" />
+          <Users className="h-3.5 w-3.5" style={{ color: ACCENT_700 }} aria-hidden="true" />
           Verdeel het vermogen
         </span>
       </Box3SectionHeader>
@@ -123,7 +124,7 @@ export function Box3PartnerSlider({
           step={5}
           value={pct}
           onChange={(e) => setPct(Number(e.target.value))}
-          className="w-full accent-[var(--color-teal-600)]"
+          className="w-full accent-[var(--module-active-500)]"
           aria-label={`Aandeel ${currentUserName}: ${pct} procent`}
         />
         <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-[var(--ink-4)]">
@@ -147,9 +148,9 @@ export function Box3PartnerSlider({
         </div>
         <div
           className="px-4 py-3"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--color-teal-500) 6%, transparent)' }}
+          style={{ backgroundColor: 'color-mix(in srgb, var(--module-active-500) 6%, transparent)' }}
         >
-          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-teal-700)]">
+          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--module-active-700)]">
             Optimaal (≈ {optimalPctP1}/{100 - optimalPctP1})
           </div>
           <div
@@ -164,7 +165,7 @@ export function Box3PartnerSlider({
       {/* Verdict */}
       {isOptimal ? (
         <p
-          className="mt-4 text-base italic leading-snug text-[var(--color-teal-700)]"
+          className="mt-4 text-base italic leading-snug text-[var(--positive)]"
           style={{ fontFamily: SOURCE_SERIF }}
         >
           Dit is de optimale verdeling — je benut beide heffingsvrije vermogens

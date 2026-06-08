@@ -61,13 +61,13 @@ export function Box2Leengrens({
           label="van de leengrens benut"
           sublabel={fc(dgaLeningenTotal)}
           thresholdLabel={`grens ${fc(dgaLeningenDrempel)}`}
-          colorVar="var(--color-violet-600, #7c3aed)"
+          colorVar="var(--module-active-500)"
         />
 
         <div className="min-w-0 flex-1 space-y-2.5">
           {isOver ? (
             <>
-              <div className="border border-red-300 bg-red-50 px-3 py-2.5 text-xs leading-snug text-red-900">
+              <div className="border border-[var(--ink)] border-l-4 border-l-[var(--negative)] bg-[color-mix(in_srgb,var(--negative)_6%,transparent)] px-3 py-2.5 text-xs leading-snug text-[var(--ink-2)]">
                 Je leent{' '}
                 <span className="font-mono tabular-nums font-semibold">{fc(dgaLeningenExcess)}</span>{' '}
                 méér dan de drempel van {fc(dgaLeningenDrempel)}. Over dat
@@ -92,7 +92,7 @@ export function Box2Leengrens({
                     Extra Box 2-heffing
                   </div>
                   <div
-                    className="mt-1 text-[19px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--color-red-600,#dc2626)]"
+                    className="mt-1 text-[19px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--negative)]"
                     style={{ fontFamily: PLAYFAIR }}
                   >
                     {fc(dgaExcessTax)}

@@ -17,10 +17,10 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
  *   • Kosten worden aftrekbaar; één vlak tarief (± 36%).
  *
  * Status: wetsvoorstel, beoogde invoering 2028. Presentational, geen props.
- * Box 3-kleur (teal) als accent.
+ * Box-accent via de actieve module-context (`--module-active-*`).
  */
 
-const TEAL = 'var(--color-teal-500)'
+const ACCENT_700 = 'var(--module-active-700)'
 
 function Pijler({
   icon,
@@ -36,13 +36,13 @@ function Pijler({
   return (
     <div className="border border-[var(--ink)] bg-[var(--paper)] p-4">
       <div className="flex items-center gap-2 text-[var(--ink)]">
-        <span className="text-[var(--color-teal-600)]" aria-hidden="true">
+        <span style={{ color: ACCENT_700 }} aria-hidden="true">
           {icon}
         </span>
         <span className="text-sm font-semibold">{scope}</span>
       </div>
       <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-2)]">
-        <ArrowRight className="h-3.5 w-3.5 text-[var(--color-teal-600)]" aria-hidden="true" />
+        <ArrowRight className="h-3.5 w-3.5" style={{ color: ACCENT_700 }} aria-hidden="true" />
         {kind}
       </div>
       <p
@@ -64,9 +64,9 @@ export function Box3Stelsel2028() {
           <span
             className="border px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.12em]"
             style={{
-              color: 'var(--color-teal-700)',
-              borderColor: 'color-mix(in srgb, var(--color-teal-500) 40%, transparent)',
-              backgroundColor: 'color-mix(in srgb, var(--color-teal-500) 10%, transparent)',
+              color: 'var(--module-active-700)',
+              borderColor: 'color-mix(in srgb, var(--module-active-500) 40%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--module-active-500) 10%, transparent)',
             }}
           >
             wetsvoorstel · beoogd 2028
@@ -103,12 +103,12 @@ export function Box3Stelsel2028() {
         style={{
           borderColor: 'var(--ink)',
           borderLeftWidth: '4px',
-          borderLeftColor: 'var(--color-teal-500)',
-          backgroundColor: 'color-mix(in srgb, var(--color-teal-500) 6%, transparent)',
+          borderLeftColor: 'var(--module-active-500)',
+          backgroundColor: 'color-mix(in srgb, var(--module-active-500) 6%, transparent)',
         }}
       >
         <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--ink)]">
-          <Calculator className="h-3.5 w-3.5" style={{ color: TEAL }} aria-hidden="true" />
+          <Calculator className="h-3.5 w-3.5" style={{ color: ACCENT_700 }} aria-hidden="true" />
           Wat verandert er nog meer
         </span>
         <ul className="mt-2 ml-4 list-disc space-y-1">

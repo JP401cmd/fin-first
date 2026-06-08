@@ -13,10 +13,9 @@ import { Kicker } from '@/components/editorial'
  * Vormgeving: editorial — papier + ink-hiërarchie, scherpe hoeken, mono
  * bedragen, Playfair totaal-regel. Server-compatible (geen hooks). De
  * uitleg-teksten komen uit BOX1_TOOLTIPS (één bron van waarheid in
- * lib/box1-tax.ts). Box 1-kleur amber (#b45309).
+ * lib/box1-tax.ts). De box-accentkleur komt uit de route-layout via
+ * `var(--module-active-*)`.
  */
-
-const BOX1_COLOR = '#b45309'
 
 interface KortingRij {
   label: string
@@ -75,7 +74,7 @@ export function Box1Heffingskortingen({ result }: { result: Box1Result }) {
               </span>
               <span
                 className="font-mono text-sm font-semibold tabular-nums shrink-0"
-                style={{ color: rij.bedrag > 0 ? BOX1_COLOR : 'var(--ink-4)' }}
+                style={{ color: rij.bedrag > 0 ? 'var(--module-active-700)' : 'var(--ink-4)' }}
               >
                 {rij.bedrag > 0 ? '−' : ''}
                 {formatCurrency(rij.bedrag)}

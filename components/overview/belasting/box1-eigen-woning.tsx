@@ -20,10 +20,10 @@ import { Kicker } from '@/components/editorial'
  *
  * Vormgeving: editorial — papier + ink-hiërarchie, scherpe hoeken, Kicker +
  * Playfair netto-saldo. Alleen renderen wanneer er een eigen woning is
- * (wozValue > 0). Box 1-kleur amber (#b45309). Server-compatible (geen hooks).
+ * (wozValue > 0). De box-accentkleur komt uit de route-layout via
+ * `var(--module-active-*)`; saldo/forfait/aftrek zijn semantisch gekleurd.
+ * Server-compatible (geen hooks).
  */
-
-const BOX1_COLOR = '#b45309'
 
 export function Box1EigenWoning({
   result,
@@ -69,12 +69,12 @@ export function Box1EigenWoning({
           {
             label: 'Eigenwoningforfait (bijtelling)',
             value: forfait,
-            colorVar: '#dc2626',
+            colorVar: 'var(--negative)',
           },
           {
             label: 'Hypotheekrenteaftrek',
             value: aftrek,
-            colorVar: '#059669',
+            colorVar: 'var(--positive)',
             isWinner: aftrek > forfait,
           },
         ]}
@@ -82,14 +82,14 @@ export function Box1EigenWoning({
 
       {/* Wet Hillen apart — alleen relevant wanneer forfait > rente. */}
       {hillen > 0 && (
-        <div className="mt-5 border border-[var(--border-ed)] border-l-[3px] border-l-[#b45309] bg-[var(--subtle)] p-3.5">
+        <div className="mt-5 border border-[var(--border-ed)] border-l-[3px] border-l-[var(--module-active-500)] bg-[var(--subtle)] p-3.5">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-[11px] uppercase tracking-[0.08em] font-mono font-semibold text-[var(--ink-2)]">
               Wet Hillen-aftrek
             </span>
             <span
               className="font-mono text-sm font-semibold tabular-nums"
-              style={{ color: BOX1_COLOR }}
+              style={{ color: 'var(--positive)' }}
             >
               −{formatCurrency(hillen)}
             </span>
@@ -110,7 +110,7 @@ export function Box1EigenWoning({
           </span>
           <span
             className="text-[22px] font-black tabular-nums tracking-[-0.01em] leading-none shrink-0"
-            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: isAftrekpost ? '#059669' : '#dc2626' }}
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: isAftrekpost ? 'var(--positive)' : 'var(--negative)' }}
           >
             {isAftrekpost ? '−' : '+'}
             {formatCurrency(Math.abs(saldo))}
@@ -118,7 +118,7 @@ export function Box1EigenWoning({
         </div>
         {freedom && belastingEffect > 0 && (
           <div className="mt-2 flex items-center gap-1.5 text-sm text-[var(--ink-2)]">
-            <Clock className="h-4 w-4 shrink-0" style={{ color: BOX1_COLOR }} aria-hidden="true" />
+            <Clock className="h-4 w-4 shrink-0" style={{ color: 'var(--module-active-700)' }} aria-hidden="true" />
             {isAftrekpost ? 'levert je' : 'kost je'} ≈{' '}
             <span className="font-medium text-[var(--ink)]">{freedom}</span> aan vrijheid
             {isAftrekpost ? ' terug' : ''}

@@ -26,10 +26,10 @@ import { Kicker } from '@/components/editorial'
  *
  * Vormgeving: editorial — papier + ink-hiërarchie, scherpe hoeken, Playfair
  * bedragen, mono labels. Balken groeien in via `useInViewAnimation` (entree-
- * reveal, respecteert prefers-reduced-motion). Box 1-kleur amber (#b45309).
+ * reveal, respecteert prefers-reduced-motion). De box-accentkleur komt uit de
+ * route-layout via `var(--module-active-*)`; semantische waarden (heffing,
+ * kortingen) blijven semantisch.
  */
-
-const BOX1_COLOR = '#b45309'
 
 interface WaterfallStap {
   label: string
@@ -117,10 +117,10 @@ export function Box1Waterfall({
 
           const barColor =
             stap.kind === 'aftrek'
-              ? '#dc2626' // rood: wat de schatkist afroomt
+              ? 'var(--negative)' // wat de schatkist afroomt (kost)
               : stap.kind === 'bijtelling'
-                ? '#059669' // groen: wat je terugkrijgt
-                : BOX1_COLOR // amber: loon en netto
+                ? 'var(--positive)' // wat je terugkrijgt (voordeel)
+                : 'var(--module-active-500)' // box-accent: loon en netto
 
           return (
             <div key={i} className="flex flex-col gap-1.5">
@@ -168,7 +168,7 @@ export function Box1Waterfall({
 
       {freedom && (
         <div className="mt-5 flex items-center gap-1.5 border-t border-[var(--border-ed)] pt-3 text-sm text-[var(--ink-2)]">
-          <Clock className="h-4 w-4 shrink-0" style={{ color: BOX1_COLOR }} aria-hidden="true" />
+          <Clock className="h-4 w-4 shrink-0" style={{ color: 'var(--module-active-700)' }} aria-hidden="true" />
           Je netto besteedbare inkomen is ≈{' '}
           <span className="font-medium text-[var(--ink)]">{freedom}</span> aan vrijheid per jaar.
         </div>

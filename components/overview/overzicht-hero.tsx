@@ -31,7 +31,6 @@ import {
   HeroWidgetRail,
   useHeroRailState,
 } from './hero-widget-rail'
-import { ViewModeToggle, useViewMode } from '@/components/app/view-mode-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { OnboardingNudges } from './onboarding-nudges'
 import { CompoundInsightCard } from './compound-insight-card'
@@ -155,9 +154,6 @@ export function OverzichtHero({
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
   const rail = useHeroRailState(activeWidgets ?? [])
-  // Plannen-modus exposeert power-user-tools (Bewerken-toggle).
-  // Kijken-modus toont alleen content, geen edit-acties (plan A-5).
-  const { isPlannen } = useViewMode()
 
   // Memoize once per mount — datum + groet wisselen zelden tijdens een
   // sessie. Voorkomt onnodige Intl-formatter-instances bij elke re-render.
@@ -204,8 +200,7 @@ export function OverzichtHero({
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
       <div className="absolute right-4 top-6 sm:right-6 sm:top-8 flex items-center gap-2">
-        <ViewModeToggle />
-        {dashboardData && isPlannen && (
+        {dashboardData && (
           <HeroEditToggle
             isEditing={rail.isEditing}
             onToggle={() => rail.setIsEditing(!rail.isEditing)}
@@ -228,15 +223,6 @@ export function OverzichtHero({
           {greeting}
           {userName ? `, ${userName}` : ''}
         </h1>
-        {goalDisplay.length > 0 && (
-          <p className="mt-2 text-sm sm:text-base text-[var(--ink-2)]">
-            <strong className="font-semibold text-[var(--ink)]">
-              {activeGoalCount}
-            </strong>{' '}
-            {activeGoalCount === 1 ? 'actief doel' : 'actieve doelen'} — kijk
-            hoever je bent.
-          </p>
-        )}
       </header>
 
       {(hasDob !== undefined || hasAssets !== undefined || hasGoals !== undefined) && (
@@ -283,9 +269,7 @@ export function OverzichtHero({
       <div className="mt-3 sm:mt-4">
         {dashboardData && activeWidgets && allWidgetPrefs ? (
           <HeroWidgetRail
-            // Edit-mode forceren naar false in Kijken — voorkomt dat user
-            // vast komt te zitten in edit-mode na mode-switch (plan A-5).
-            isEditing={isPlannen && rail.isEditing}
+            isEditing={rail.isEditing}
             onEditModeChange={rail.setIsEditing}
             hasActiveWidgets={rail.hasActiveWidgets}
             activeWidgets={activeWidgets}

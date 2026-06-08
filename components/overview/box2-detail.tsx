@@ -1,22 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calculator, ChevronDown, ChevronUp, Clock, Info, Building2, AlertTriangle } from 'lucide-react'
+import { Calculator, ChevronDown, ChevronUp, Clock, Building2, AlertTriangle } from 'lucide-react'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { Kicker } from '@/components/editorial'
+import { Kicker, HighlightMark } from '@/components/editorial'
+import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 import { Box2GecombineerdeDruk } from '@/components/overview/belasting/box2-gecombineerde-druk'
 import { Box2DividendSimulator } from '@/components/overview/belasting/box2-dividend-simulator'
 import { Box2Leengrens } from '@/components/overview/belasting/box2-leengrens'
 
 const PLAYFAIR = 'var(--font-display, var(--font-playfair, Georgia, serif))'
-const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
-/** Box 2-accent (violet) — alléén ter onderscheiding van de drie boxen. */
-const BOX2_ACCENT = 'var(--color-violet-600, #7c3aed)'
 
 /**
  * Box2Detail — compacte Box 2-sectie (aanmerkelijk belang / DGA) op de
@@ -64,31 +62,6 @@ function formatPct(value: number): string {
   return (value * 100).toFixed(1) + '%'
 }
 
-function InfoTooltip({ text }: { text: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="ml-1 inline-flex h-4 w-4 items-center justify-center bg-[var(--subtle)] text-[var(--ink-3)] transition-colors hover:bg-[color-mix(in_srgb,var(--color-violet-600,#7c3aed)_14%,transparent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-        aria-label="Meer informatie"
-      >
-        <Info className="h-3 w-3" />
-      </button>
-      {open && (
-        <span
-          className="absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 border border-[var(--ink)] bg-[var(--paper)] p-3 text-xs leading-snug text-[var(--ink-2)] shadow-[0_2px_0_var(--ink)]"
-          style={{ fontFamily: SOURCE_SERIF }}
-        >
-          {text}
-          <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--ink)]" />
-        </span>
-      )}
-    </span>
-  )
-}
-
 function Row({
   label,
   value,
@@ -120,14 +93,15 @@ function Row({
     </div>
   )
 
-  // Highlight-rij = eindresultaat: scherp violet-getint kader met linker-accent.
+  // Highlight-rij = eindresultaat: scherp box-getint kader met linker-accent
+  // (volgt de actieve module-kleur via --module-active-*).
   if (highlight) {
     return (
       <div
         className="-mx-2 px-3 py-1.5"
         style={{
-          background: 'color-mix(in srgb, var(--color-violet-600, #7c3aed) 8%, transparent)',
-          borderLeft: '3px solid var(--color-violet-600, #7c3aed)',
+          background: 'color-mix(in srgb, var(--module-active-500) 8%, transparent)',
+          borderLeft: '3px solid var(--module-active-500)',
         }}
       >
         {rowInner}
@@ -194,8 +168,8 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
           transform: hasEntered ? 'translateY(0)' : 'translateY(12px)',
         }}
       >
-        {/* Box 2-accent: 3px violet strip ter onderscheiding van de drie boxen */}
-        <div aria-hidden className="h-[3px] w-full" style={{ background: BOX2_ACCENT }} />
+        {/* Box-accent: 3px strip ter onderscheiding van de drie boxen (violet op Box 2 via --module-active-*) */}
+        <div aria-hidden className="h-[3px] w-full" style={{ background: 'var(--module-active-500)' }} />
 
         {/* Samenvatting — privé. Eén hero-getal (Playfair) → context → detail. */}
         <div className="p-5 sm:p-6">
@@ -208,7 +182,7 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
               className="text-[34px] sm:text-[44px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
               style={{ fontFamily: PLAYFAIR }}
             >
-              {fc(result.totalTaxInclDga)}
+              <HighlightMark>{fc(result.totalTaxInclDga)}</HighlightMark>
             </span>
             <span className="text-xs font-mono uppercase tracking-[0.12em] text-[var(--ink-3)]">per jaar</span>
           </div>
@@ -220,17 +194,17 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
           )}
           <p
             className="mt-3 max-w-[58ch] border-l-2 pl-3.5 text-sm italic leading-snug text-[var(--ink-2)]"
-            style={{ fontFamily: 'var(--font-serif, Georgia, serif)', borderColor: BOX2_ACCENT }}
+            style={{ fontFamily: 'var(--font-serif, Georgia, serif)', borderColor: 'var(--module-active-500)' }}
           >
             Belasting in privé over dividend + vervreemdingswinst uit je
             aanmerkelijk belang (≥ 5%-deelneming).
           </p>
         </div>
 
-        {/* DGA-waarschuwing — status amber, scherp kader */}
+        {/* DGA-waarschuwing — signaleert extra verschuldigde heffing → semantisch negatief, scherp kader */}
         {hasDga && (
-          <div className="mx-5 sm:mx-6 mb-2 flex items-start gap-2 border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs leading-snug text-amber-900">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="mx-5 sm:mx-6 mb-2 flex items-start gap-2 border border-[var(--ink)] border-l-4 border-l-[var(--negative)] bg-[color-mix(in_srgb,var(--negative)_6%,transparent)] px-3 py-2.5 text-xs leading-snug text-[var(--ink-2)]">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[var(--negative)]" aria-hidden="true" />
             <span>
               Je leent meer dan{' '}
               <span className="font-mono tabular-nums font-semibold">{fc(result.dgaLeningenDrempel)}</span>{' '}
@@ -250,7 +224,7 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
           className="flex min-h-[52px] w-full items-center justify-between border-t border-[var(--ink)] px-5 py-3.5 sm:px-6 transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ink)]"
         >
           <span className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-            <Calculator className="h-4 w-4" style={{ color: BOX2_ACCENT }} aria-hidden="true" />
+            <Calculator className="h-4 w-4" style={{ color: 'var(--module-active-700)' }} aria-hidden="true" />
             Berekeningsstappen
           </span>
           {showDetails ? (

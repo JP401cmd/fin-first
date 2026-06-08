@@ -22,7 +22,6 @@ import type { LifeEvent, FinancialInput, FireProjection } from '@/lib/horizon-da
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
-import { useViewMode } from '@/components/app/view-mode-provider'
 import { computeEventImpact } from '@/lib/event-impact'
 import {
   isStrategyManagedEvent,
@@ -173,7 +172,6 @@ export function GebeurtenissenView({
   // EventPane (toevoegen/bewerken) = scenario-tool → alleen in 'plannen'-modus
   // zichtbaar (plan A-5). Niveau-A "Kijken"-gebruikers zien dan een
   // rustige lijst van bestaande events zonder edit-knoppen.
-  const { isPlannen } = useViewMode()
   // EventPane-state: catalog (nieuw) of view (bestaand vrij event bekijken/bewerken).
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
@@ -249,16 +247,14 @@ export function GebeurtenissenView({
                 : `${sorted.length} gebeurtenis${sorted.length === 1 ? '' : 'sen'}`}
             </h2>
           </div>
-          {isPlannen && (
-            <button
-              type="button"
-              onClick={openCatalog}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
-            >
-              <Plus className="w-4 h-4" aria-hidden="true" />
-              Levensgebeurtenis toevoegen
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={openCatalog}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--ink)] bg-[var(--ink)] text-[var(--paper)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--ink-2)] transition-colors"
+          >
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            Levensgebeurtenis toevoegen
+          </button>
         </header>
 
         {sorted.length === 0 ? (
@@ -336,22 +332,19 @@ export function GebeurtenissenView({
                   : impact?.tone === 'gain'
                     ? 'border-emerald-400 text-emerald-700'
                     : 'border-[var(--ink-3)] text-[var(--ink-2)]'
-              // Plannen-modus: content-kaart wordt button die de EventPane
-              // (vrij event) of strategie-editor opent. Kijken-modus: gewone div.
+              // Content-kaart is een button die de EventPane (vrij event)
+              // of strategie-editor opent.
               const cardClass =
                 'flex-1 min-w-0 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left'
-              const CardEl: React.ElementType = isPlannen ? 'button' : 'div'
               const managed = isStrategyManagedEvent(event)
-              const cardProps = isPlannen
-                ? {
-                    type: 'button' as const,
-                    onClick: () => openEventOrStrategy(event),
-                    'aria-label': managed
-                      ? `Open ${STRATEGY_BADGE_LABEL[managed]}`
-                      : `Bewerk ${event.name}`,
-                    className: `${cardClass} w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
-                  }
-                : { className: cardClass }
+              const cardProps = {
+                type: 'button' as const,
+                onClick: () => openEventOrStrategy(event),
+                'aria-label': managed
+                  ? `Open ${STRATEGY_BADGE_LABEL[managed]}`
+                  : `Bewerk ${event.name}`,
+                className: `${cardClass} w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
+              }
               return (
                 <li key={event.id} className="relative flex gap-4 pb-6 last:pb-0">
                   {/* Bolletje met event-icoon, zit op de streep */}
@@ -361,13 +354,13 @@ export function GebeurtenissenView({
                     <Icon className="w-4 h-4" aria-hidden="true" />
                   </span>
 
-                  <CardEl {...cardProps}>
+                  <button {...cardProps}>
                     <div className="text-[11px] text-[var(--ink-3)] mb-0.5">
                       {formatEventDate(event)}
                     </div>
                     <h3 className="text-sm font-semibold text-[var(--ink)] truncate inline-flex items-center gap-1.5">
                       {event.name}
-                      {isPlannen && !managed && (
+                      {!managed && (
                         <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
                       )}
                       {managed && (
@@ -391,7 +384,7 @@ export function GebeurtenissenView({
                         {impact.displayLabel}
                       </div>
                     )}
-                  </CardEl>
+                  </button>
                 </li>
               )
             })}
@@ -432,15 +425,13 @@ export function GebeurtenissenView({
                 <p className="text-xs text-[var(--ink-2)] leading-snug flex-1">
                   {strat.description}
                 </p>
-                {isPlannen && (
-                  <span className="mt-3 text-[11px] font-semibold text-violet-700 inline-flex items-center gap-1">
-                    Configureren
-                    <ArrowRight className="w-3 h-3" aria-hidden="true" />
-                  </span>
-                )}
+                <span className="mt-3 text-[11px] font-semibold text-violet-700 inline-flex items-center gap-1">
+                  Configureren
+                  <ArrowRight className="w-3 h-3" aria-hidden="true" />
+                </span>
               </>
             )
-            return isPlannen ? (
+            return (
               <button
                 key={strat.key}
                 type="button"
@@ -449,10 +440,6 @@ export function GebeurtenissenView({
               >
                 {inner}
               </button>
-            ) : (
-              <div key={strat.key} className={cls}>
-                {inner}
-              </div>
             )
           })}
         </div>
@@ -479,7 +466,7 @@ export function GebeurtenissenView({
         onClose={closeStrategy}
         events={events}
         data={strategieData}
-        readOnly={!isPlannen}
+        readOnly={false}
       />
     </section>
   )

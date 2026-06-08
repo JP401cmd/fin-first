@@ -9,9 +9,8 @@ import type { StrategieEditorsData } from './strategie/strategie-editors'
 
 // GebeurtenissenView mount de EventPane (dynamisch, ssr:false → rendert niets in
 // jsdom) + de strategie-launcher die next/navigation + supabase client gebruiken.
-// Mock beide zodat de view zelf in isolatie test-baar blijft. (Zonder
-// ViewModeProvider is isPlannen = false, dus de kaarten renderen als
-// niet-interactieve divs.)
+// Mock beide zodat de view zelf in isolatie test-baar blijft. (Kaarten zijn
+// altijd interactieve buttons — geen Kijken/Plannen-modus meer.)
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),

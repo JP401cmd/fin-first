@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Clock } from 'lucide-react'
+import { Clock, AlertTriangle } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { Kicker, ScenarioCallout } from '@/components/editorial'
@@ -25,8 +25,10 @@ import { BOX2_PARAMS, type Box2Params, type TaxYear } from '@/lib/box2-data'
  */
 
 const PLAYFAIR = 'var(--font-display, var(--font-playfair, Georgia, serif))'
-const BOX2_COLOR = 'var(--color-violet-600, #7c3aed)'
-const BOX2_HOOG_COLOR = 'color-mix(in srgb, var(--color-violet-600, #7c3aed) 55%, var(--paper))'
+// Schijf-segmenten volgen de actieve module-kleur (violet op de Box 2-pagina):
+// lage schijf = vol accent, hoge schijf = zachter accent.
+const BOX2_COLOR = 'var(--module-active-600)'
+const BOX2_HOOG_COLOR = 'var(--module-active-400)'
 
 interface SplitResult {
   inLow: number
@@ -119,7 +121,7 @@ export function Box2DividendSimulator({
           step={1000}
           value={dividend}
           onChange={(e) => setDividend(Number(e.target.value))}
-          className="h-11 w-full cursor-pointer accent-violet-600"
+          className="h-11 w-full cursor-pointer accent-[var(--module-active-500)]"
           aria-valuetext={formatCurrency(dividend)}
         />
         <div className="mt-0.5 flex justify-between text-[10px] font-mono tabular-nums text-[var(--ink-4)]">
@@ -169,14 +171,17 @@ export function Box2DividendSimulator({
         </div>
       </div>
 
-      {/* Verdict-regel — scherp kader, status amber bij hoge schijf */}
+      {/* Verdict-regel — scherp kader; hoge schijf = semantisch negatief (meer heffing) */}
       <div
-        className={`flex items-start gap-2 border px-3 py-2.5 text-xs leading-snug ${
+        className={`flex items-start gap-2 px-3 py-2.5 text-xs leading-snug ${
           r.inHighBracket
-            ? 'border-amber-300 bg-amber-50 text-amber-900'
-            : 'border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)]'
+            ? 'border border-[var(--ink)] border-l-4 border-l-[var(--negative)] bg-[color-mix(in_srgb,var(--negative)_6%,transparent)] text-[var(--ink-2)]'
+            : 'border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)]'
         }`}
       >
+        {r.inHighBracket && (
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[var(--negative)]" aria-hidden="true" />
+        )}
         <span>
           {r.inHighBracket ? (
             <>
@@ -200,8 +205,9 @@ export function Box2DividendSimulator({
       <div className="mt-4 grid grid-cols-3 gap-2 text-center">
         <div className="border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-2.5">
           <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-[var(--ink-4)]">Box 2-heffing</div>
+          {/* Hoofdresultaat van de simulator: box-accent (--module-active-*) i.p.v. neutraal ink. */}
           <div
-            className="mt-1 text-[19px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
+            className="mt-1 text-[19px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--module-active-700)]"
             style={{ fontFamily: PLAYFAIR }}
           >
             {formatCurrency(r.totalTax)}

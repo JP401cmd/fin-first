@@ -72,6 +72,48 @@
   --color-horizon-900: oklch(0.414 0.0537 76.6);
   --color-horizon-950: oklch(0.292 0.0364 76.6);
 
+  /* ── Belasting box-triade (functionele box-codering) ──
+     Box 1 = amber (#b45309 = -700), Box 2 = violet (#7c3aed = -600),
+     Box 3 = teal (#0d9488 = -600). Tailwind-scales, expliciet als hex zodat ze
+     onafhankelijk resolven. Hub-multi-box-componenten gebruiken var(--color-boxN-*)
+     direct; box-detailpagina's krijgen ze via --module-active-* (zie box-layouts).
+     Conventie: tekst = -700, accent/streep/border/fill = -500, highlight = -200. */
+  --color-box1-50:  #fffbeb;
+  --color-box1-100: #fef3c7;
+  --color-box1-200: #fde68a;
+  --color-box1-300: #fcd34d;
+  --color-box1-400: #fbbf24;
+  --color-box1-500: #f59e0b;
+  --color-box1-600: #d97706;
+  --color-box1-700: #b45309;
+  --color-box1-800: #92400e;
+  --color-box1-900: #78350f;
+  --color-box1-950: #451a03;
+
+  --color-box2-50:  #f5f3ff;
+  --color-box2-100: #ede9fe;
+  --color-box2-200: #ddd6fe;
+  --color-box2-300: #c4b5fd;
+  --color-box2-400: #a78bfa;
+  --color-box2-500: #8b5cf6;
+  --color-box2-600: #7c3aed;
+  --color-box2-700: #6d28d9;
+  --color-box2-800: #5b21b6;
+  --color-box2-900: #4c1d95;
+  --color-box2-950: #2e1065;
+
+  --color-box3-50:  #f0fdfa;
+  --color-box3-100: #ccfbf1;
+  --color-box3-200: #99f6e4;
+  --color-box3-300: #5eead4;
+  --color-box3-400: #2dd4bf;
+  --color-box3-500: #14b8a6;
+  --color-box3-600: #0d9488;
+  --color-box3-700: #0f766e;
+  --color-box3-800: #115e59;
+  --color-box3-900: #134e4a;
+  --color-box3-950: #042f2e;
+
   /* ── Module-active CSS-variabelen (default = ink-shades, override per route layout) ──
      Module-routes (/core, /will, /horizon) overschrijven deze met hun eigen module-shades.
      Cross-module-routes (/dashboard, /identity, /rapportages, /berichten, /nieuws, /beheer)

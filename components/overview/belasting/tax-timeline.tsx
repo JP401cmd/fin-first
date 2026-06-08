@@ -33,11 +33,11 @@ interface TaxTimelineProps {
   items: TaxTimelineItem[]
 }
 
-/** Box → accentkleur (brief: Box 1 amber, Box 2 violet, Box 3 teal). */
+/** Box → accentkleur via de belasting-box-triade-tokens (amber/violet/teal). */
 const BOX_COLOR: Record<1 | 2 | 3, string> = {
-  1: 'var(--color-amber-700, #b45309)',
-  2: 'var(--color-violet-600, #7c3aed)',
-  3: 'var(--color-teal-600, #0d9488)',
+  1: 'var(--color-box1-700)',
+  2: 'var(--color-box2-600)',
+  3: 'var(--color-box3-600)',
 }
 
 function colorFor(box?: 1 | 2 | 3): string {

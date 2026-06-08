@@ -1,7 +1,7 @@
 import { Clock } from 'lucide-react'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { TaxOverviewResult } from '@/lib/tax-overview'
-import { Kicker } from '@/components/editorial'
+import { Kicker, HighlightMark } from '@/components/editorial'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
@@ -53,14 +53,18 @@ export function HubTotaleDruk({
     <article className="bg-[var(--paper)] p-5 sm:p-6 flex flex-col">
       <Kicker>Totale druk · {new Date().getFullYear()}</Kicker>
 
-      {/* Hero-cijfer in Playfair — papier-zwaar, tabular-nums. */}
+      {/* Hero-cijfer in Playfair — papier-zwaar, tabular-nums. Op de hub is dit
+          de gouden "universele uitkomst": HighlightMark zet er de gouden marker
+          onder (--module-active-200 is hier de hub-highlight, niet box-codering). */}
       <div className="mt-4 flex items-baseline gap-3 flex-wrap">
-        <span
-          className="font-black leading-[0.9] tracking-[-0.03em] tabular-nums text-[40px] sm:text-[52px] text-[var(--ink)]"
-          style={{ fontFamily: PLAYFAIR }}
-        >
-          {formatCurrency(Math.round(total))}
-        </span>
+        <HighlightMark>
+          <span
+            className="font-black leading-[0.9] tracking-[-0.03em] tabular-nums text-[40px] sm:text-[52px] text-[var(--ink)]"
+            style={{ fontFamily: PLAYFAIR }}
+          >
+            {formatCurrency(Math.round(total))}
+          </span>
+        </HighlightMark>
         <span
           className="italic text-sm text-[var(--ink-3)]"
           style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}

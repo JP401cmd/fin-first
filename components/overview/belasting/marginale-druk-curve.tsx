@@ -21,7 +21,8 @@ import { formatCurrency } from '@/lib/format'
  * de globale prefers-reduced-motion-regel automatisch uitgezet.
  *
  * Kleur komt binnen via `colorVar` (caller geeft box-/module-kleur, default
- * de Kern-amber). Toegankelijk via role + aria-label op de svg.
+ * de actieve module-kleur uit de route-layout). Toegankelijk via role +
+ * aria-label op de svg.
  */
 
 export interface MarginaleDrukPunt {
@@ -45,7 +46,7 @@ export interface MarginaleDrukCurveProps {
   cliffs?: MarginaleDrukCliff[]
   /** Referentielijn-tarief (fractie 0–1), default 0.5 (= "50%"). */
   referenceRate?: number
-  /** CSS-kleur(variabele) voor de curve, default Kern-amber. */
+  /** CSS-kleur(variabele) voor de curve, default de actieve module-kleur. */
   colorVar?: string
   /** Hoogte van de SVG in px (viewBox-eenheden), default 220. */
   height?: number
@@ -58,7 +59,7 @@ export function MarginaleDrukCurve({
   data,
   cliffs = [],
   referenceRate = 0.5,
-  colorVar = 'var(--kern-500, #d97706)',
+  colorVar = 'var(--module-active-500, var(--ink))',
   height = 220,
 }: MarginaleDrukCurveProps) {
   // SVG-grid — vaste viewBox-breedte; hoogte via prop.

@@ -12,7 +12,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { HealthScore, HealthPillar } from '@/lib/financial-health'
 import { HEFBOOM_CONFIG, type Hefboom } from '@/lib/hefboom-config'
 import { LeverageCard } from '@/components/overview/leverage-card'
@@ -103,6 +104,10 @@ export function HefbomenNav({
   // tap of hover (we gebruiken alleen state-based toggle voor consistente UX).
   const [expandedKey, setExpandedKey] = useState<HefboomKey | null>(null)
 
+  // Euro-totalen (bezittingen/schulden/belasting) zijn saldi en honoreren de
+  // privacy-toggle. Het cashflow-percentage is géén saldo en blijft zichtbaar.
+  const { masked } = useMaskedAmounts()
+
   return (
     <nav
       aria-label="Vier hefbomen"
@@ -123,8 +128,8 @@ export function HefbomenNav({
           ? key === 'cashflow'
             ? `${Math.round(totalValue)}%`
             : key === 'belasting'
-              ? `${formatCurrency(totalValue)}/jr`
-              : formatCurrency(totalValue)
+              ? `${formatMaskedCurrency(totalValue, masked)}/jr`
+              : formatMaskedCurrency(totalValue, masked)
           : ''
         const subText = statusSubText(key, status, pillar)
         const expanded = expandedKey === key

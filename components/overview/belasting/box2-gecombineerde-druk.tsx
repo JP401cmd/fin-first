@@ -55,8 +55,10 @@ const SCENARIOS: Scenario[] = [
   { label: 'Vpb hoog (25,8%) + Box 2 hoog (31%)', vpb: VPB_HOOG, box2: BOX2_HOOG },
 ]
 
-const BOX2_COLOR = 'var(--color-violet-600, #7c3aed)'
-const BOX1_COLOR = 'var(--color-amber-600, #b45309)'
+// Box 2-balk volgt de actieve module-kleur (violet op de Box 2-pagina).
+const BOX2_COLOR = 'var(--module-active-600)'
+// Box 1-vergelijkingsbaseline: neutraal ink — géén amber op de Box 2-pagina.
+const BOX1_COLOR = 'var(--ink-3)'
 
 export function Box2GecombineerdeDruk() {
   const min = combined(VPB_LAAG, BOX2_LAAG)
@@ -117,16 +119,17 @@ export function Box2GecombineerdeDruk() {
                 </td>
               </tr>
             ))}
-            {/* ComparisonRow-highlight: de Box 1-referentie als geselecteerde rij */}
+            {/* ComparisonRow-highlight: de Box 1-referentie als geselecteerde rij
+                — box-getint via de actieve module-kleur (--module-active-*). */}
             <tr
               className="border-t border-[var(--ink)]"
               style={{
-                background: 'color-mix(in srgb, var(--color-violet-600, #7c3aed) 8%, transparent)',
+                background: 'color-mix(in srgb, var(--module-active-500) 8%, transparent)',
               }}
             >
               <td
                 className="px-3 py-2 text-[var(--ink-2)]"
-                style={{ borderLeft: `3px solid ${BOX2_COLOR}` }}
+                style={{ borderLeft: '3px solid var(--module-active-500)' }}
               >
                 Referentie: loon in Box 1 (toptarief)
               </td>

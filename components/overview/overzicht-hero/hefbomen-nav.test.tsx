@@ -1,7 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { HefbomenNav, HefbomenLegenda } from './hefbomen-nav'
 import type { HealthScore } from '@/lib/financial-health'
+import type { HefbomenTotals } from './hefbomen-nav'
+import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
 /**
  * Tests voor HefbomenNav — 4-tegel-rij op /overzicht hero met
@@ -135,6 +139,65 @@ describe('HefbomenNav', () => {
     const { container } = render(<HefbomenNav health={mockHealth()} />)
     const nav = container.querySelector('nav')
     expect(nav?.getAttribute('aria-label')).toBe('Vier hefbomen')
+  })
+})
+
+describe('HefbomenNav — privacy-masking voor saldi', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  // Seed de masked-voorkeur en render binnen de echte PrivacyProvider, zodat
+  // de integratie (context → formatter) net als in de app getest wordt.
+  function renderMasked(ui: ReactElement) {
+    window.localStorage.setItem(PRIVACY_MASKED_STORAGE_KEY, 'true')
+    return render(<PrivacyProvider>{ui}</PrivacyProvider>)
+  }
+
+  const totals: HefbomenTotals = {
+    bezittingen: 250_000,
+    schulden: 120_000,
+    cashflow: 42,
+    belasting: 1_500,
+  }
+
+  it('toont geformatteerde euro-totalen wanneer NIET gemaskeerd', () => {
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} totals={totals} />,
+    )
+    expect(container.textContent).toContain('250.000')
+    expect(container.textContent).toContain('120.000')
+    expect(container.textContent).toContain('1.500')
+    // Cashflow is een percentage (geen saldo) — altijd zichtbaar.
+    expect(container.textContent).toContain('42%')
+  })
+
+  it('maskeert de euro-saldi (bezittingen/schulden/belasting) wanneer privacy aan', () => {
+    const { container } = render(
+      <PrivacyProvider>
+        <HefbomenNav health={mockHealth()} totals={totals} />
+      </PrivacyProvider>,
+    )
+    // Baseline: zonder seed is masked=false → euro's zichtbaar. Dit borgt dat
+    // de volgende (geseede) render het verschil daadwerkelijk aantoont.
+    expect(container.textContent).toContain('250.000')
+  })
+
+  it('vervangt euro-saldi door de bullet-placeholder en lekt geen cijfers', () => {
+    const { container } = renderMasked(
+      <HefbomenNav health={mockHealth()} totals={totals} />,
+    )
+    expect(container.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(container.textContent).not.toContain('250.000')
+    expect(container.textContent).not.toContain('120.000')
+    expect(container.textContent).not.toContain('1.500')
+  })
+
+  it('laat het cashflow-percentage zichtbaar (geen saldo) bij masking', () => {
+    const { container } = renderMasked(
+      <HefbomenNav health={mockHealth()} totals={totals} />,
+    )
+    expect(container.textContent).toContain('42%')
   })
 })
 

@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { TrendingUp, ArrowRight, Plus, X } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatMaskedCurrency } from '@/lib/format'
 import { compareCompound } from '@/lib/compound-projection'
 import { useInsightVisibility } from '@/lib/hooks/use-insight-visibility'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 /** Canonieke id voor InsightToggleButton — match met page-mounting. */
 export const COMPOUND_INSIGHT_ID = 'compound-insight'
@@ -43,6 +44,10 @@ export function CompoundInsightCard({
   // om het compound-effect dynamisch te ervaren.
   const [monthly, setMonthly] = useState(monthlyContribution)
   const { visible, hide } = useInsightVisibility(COMPOUND_INSIGHT_ID)
+  // liquidCash en de afgeleide projectie-bedragen zijn saldo-gevoelig en
+  // honoreren de privacy-toggle. De slider-invoer (monthly) is eigen keuze,
+  // geen saldo, en blijft zichtbaar zodat de slider bruikbaar blijft.
+  const { masked } = useMaskedAmounts()
 
   const result = compareCompound({
     principal: liquidCash,
@@ -83,7 +88,7 @@ export function CompoundInsightCard({
             Het effect van samengestelde rente
           </div>
           <h3 className="font-serif text-base sm:text-lg text-[var(--ink)] mt-0.5">
-            Wat doet je {formatCurrency(liquidCash)} over {HORIZON_YEARS} jaar?
+            Wat doet je {formatMaskedCurrency(liquidCash, masked)} over {HORIZON_YEARS} jaar?
           </h3>
         </div>
       </header>
@@ -129,7 +134,7 @@ export function CompoundInsightCard({
               className="w-full max-w-[80px] rounded-t-lg bg-[var(--neutral-change)] flex items-end justify-center text-[10px] font-semibold text-[var(--ink)] pb-1"
               style={{ height: `${consPct}%` }}
             >
-              {Math.round((result.conservative / 1000))}k
+              {masked ? '•••' : `${Math.round(result.conservative / 1000)}k`}
             </div>
           </div>
           <div className="mt-2 text-center">
@@ -140,7 +145,7 @@ export function CompoundInsightCard({
               {(CONSERVATIVE_RATE * 100).toFixed(1)}% per jaar
             </div>
             <div className="mt-1 font-serif font-semibold text-[var(--ink-2)] tabular-nums">
-              {formatCurrency(result.conservative)}
+              {formatMaskedCurrency(result.conservative, masked)}
             </div>
           </div>
         </div>
@@ -151,7 +156,7 @@ export function CompoundInsightCard({
               className="w-full max-w-[80px] rounded-t-lg bg-gradient-to-t from-[var(--positive)] to-[var(--positive)]/80 flex items-end justify-center text-[10px] font-semibold text-white pb-1 shadow-sm"
               style={{ height: `${ambPct}%` }}
             >
-              {Math.round(result.ambitious / 1000)}k
+              {masked ? '•••' : `${Math.round(result.ambitious / 1000)}k`}
             </div>
           </div>
           <div className="mt-2 text-center">
@@ -162,7 +167,7 @@ export function CompoundInsightCard({
               {(AMBITIOUS_RATE * 100).toFixed(0)}% per jaar
             </div>
             <div className="mt-1 font-serif font-semibold text-[var(--positive)] tabular-nums">
-              {formatCurrency(result.ambitious)}
+              {formatMaskedCurrency(result.ambitious, masked)}
             </div>
           </div>
         </div>
@@ -174,7 +179,7 @@ export function CompoundInsightCard({
             Het verschil
           </div>
           <div className="font-serif text-lg sm:text-xl font-bold text-[var(--positive)] tabular-nums">
-            +{formatCurrency(result.difference)}
+            {masked ? formatMaskedCurrency(result.difference, masked) : `+${formatCurrency(result.difference)}`}
           </div>
         </div>
         <Link

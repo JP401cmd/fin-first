@@ -4,8 +4,7 @@ import { DoelenView } from './doelen-view'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 
 // DoelenView mount DoelToevoegenSheet die next/navigation + supabase
-// client gebruikt. Mock beide zodat de view in isolatie test-baar
-// blijft. Hook useViewMode valt zonder provider terug op default.
+// client gebruikt. Mock beide zodat de view in isolatie test-baar blijft.
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }))
@@ -43,11 +42,12 @@ function mockGoal(overrides: Partial<GoalWithBudget> = {}): GoalWithBudget {
 }
 
 describe('DoelenView — basis-render', () => {
-  it('rendert empty-state met hint in Kijken-modus', () => {
-    // Default useViewMode → isPlannen=false → italic Plannen-modus-hint.
+  it('rendert empty-state met toevoeg-CTA', () => {
+    // Toevoeg-affordance is altijd zichtbaar (geen Kijken/Plannen-modus meer).
     render(<DoelenView goals={[]} goalProgresses={[]} />)
     expect(screen.getByText('Nog geen doelen')).toBeTruthy()
-    expect(screen.getByText(/Activeer Plannen-modus/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Doel toevoegen' })).toBeTruthy()
+    expect(screen.queryByText(/Activeer Plannen-modus/)).toBeNull()
   })
 
   it('rendert doel-cards met naam en bedragen', () => {

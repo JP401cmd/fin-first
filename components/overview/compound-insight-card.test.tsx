@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { CompoundInsightCard } from './compound-insight-card'
+import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
 describe('CompoundInsightCard — render', () => {
   it('rendert niets bij €0 liquidCash (geen dramatic-delta)', () => {
@@ -80,6 +83,43 @@ describe('CompoundInsightCard — interactieve slider', () => {
     expect(slider.getAttribute('min')).toBe('0')
     expect(slider.getAttribute('max')).toBe('1000')
     expect(slider.getAttribute('step')).toBe('25')
+  })
+})
+
+describe('CompoundInsightCard — privacy-masking voor saldi', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  function renderMasked(ui: ReactElement) {
+    window.localStorage.setItem(PRIVACY_MASKED_STORAGE_KEY, 'true')
+    return render(<PrivacyProvider>{ui}</PrivacyProvider>)
+  }
+
+  it('toont het liquide-cash-saldo zichtbaar wanneer NIET gemaskeerd', () => {
+    const { container } = render(<CompoundInsightCard liquidCash={45_000} />)
+    expect(container.textContent).toContain('45.000')
+  })
+
+  it('maskeert het liquide-cash-saldo wanneer privacy aan', () => {
+    const { container } = renderMasked(<CompoundInsightCard liquidCash={45_000} />)
+    expect(container.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(container.textContent).not.toContain('45.000')
+  })
+
+  it('maskeert ook de afgeleide projectie-bedragen (geen magnitude-lek)', () => {
+    const { container } = renderMasked(<CompoundInsightCard liquidCash={45_000} />)
+    // liquidCash + conservative + ambitious + difference = 4 saldo-achtige
+    // bedragen die allemaal de bullet-placeholder krijgen.
+    const hits = container.textContent?.match(/••••••/g) ?? []
+    expect(hits.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('houdt de slider-invoerwaarde zichtbaar (eigen keuze, geen saldo)', () => {
+    const { container } = renderMasked(
+      <CompoundInsightCard liquidCash={45_000} monthlyContribution={250} />,
+    )
+    expect(container.textContent).toMatch(/250.*\/mnd/)
   })
 
   it('minimaliseer-knop verbergt de card en schrijft id naar localStorage', () => {

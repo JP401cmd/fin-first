@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight, Briefcase, Building2, PiggyBank, Receipt, type LucideIcon } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import { Kicker } from '@/components/editorial'
 import {
   LEVERAGE_STATUS_DOT,
   LEVERAGE_STATUS_LABEL,
@@ -52,45 +53,25 @@ const BOX_ICON: Record<string, LucideIcon> = {
   '3': PiggyBank,
 }
 
-export function BelastingBoxCards({
-  cards,
-  totalNote,
-}: {
-  cards: BelastingBoxCard[]
-  /**
-   * Optionele kanttekening onder "Geschatte druk" — bv. "excl. Box 2" wanneer
-   * een box (Box 2/DGA) wel relevant is maar zijn bedrag niet in het
-   * jaartotaal is meegerekend. Houdt het totaal eerlijk i.p.v. stil onvolledig.
-   */
-  totalNote?: string
-}) {
-  const totalDruk = cards.reduce((sum, c) => sum + (c.tax ?? 0), 0)
+// Per-box coderingskleur voor de icoon-tegel. De hub heeft een NEUTRAAL-ink
+// context (--module-active is hier ink), dus zetten we de box-kleuren DIRECT
+// via de --color-box{n}-* tokens: lichte tegel-achtergrond (50) + ink-streng
+// box-kleur voor het icoon (700). Box 1 amber, Box 2 violet, Box 3 teal.
+const BOX_TILE: Record<string, { bg: string; fg: string }> = {
+  '1': { bg: 'bg-[var(--color-box1-50)]', fg: 'text-[var(--color-box1-700)]' },
+  '2': { bg: 'bg-[var(--color-box2-50)]', fg: 'text-[var(--color-box2-700)]' },
+  '3': { bg: 'bg-[var(--color-box3-50)]', fg: 'text-[var(--color-box3-700)]' },
+}
 
+export function BelastingBoxCards({ cards }: { cards: BelastingBoxCard[] }) {
+  // De editorial masthead op de hub-pagina is dé hero; deze rij hoeft alleen
+  // nog een rustige kicker. Het jaartotaal is bewust verdwenen (het staat als
+  // grote uitkomst in Sectie I, en "excl. Box 2" in de Sectie I-callout).
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2">
-      <header className="mb-4 flex items-baseline justify-between gap-3 flex-wrap">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Belasting — overzicht
-          </div>
-          <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            Drie boxen, één jaartotaal
-          </h2>
-        </div>
-        {totalDruk > 0 && (
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
-              Geschatte druk
-            </div>
-            <div className="font-serif font-semibold text-[var(--ink)] tabular-nums">
-              {formatCurrency(Math.round(totalDruk))}/jr
-            </div>
-            {totalNote && (
-              <div className="text-[10px] text-[var(--ink-4)] italic">{totalNote}</div>
-            )}
-          </div>
-        )}
-      </header>
+      <div className="mb-4">
+        <Kicker>De drie boxen</Kicker>
+      </div>
 
       <nav
         aria-label="Drie belastingboxen"
@@ -106,12 +87,14 @@ export function BelastingBoxCards({
 
 function BoxCard({ number, label, href, tax, status, statusText, subtitle }: BelastingBoxCard) {
   const Icon = BOX_ICON[number] ?? Receipt
+  // Per-box coderingskleur voor de icoon-tegel (val terug op Box 3 bij onbekend).
+  const tile = BOX_TILE[number] ?? BOX_TILE['3']
   const hasValue = tax != null && tax > 0
 
   return (
     <Link
       href={href}
-      className="group relative flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
+      className="group relative flex flex-col border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
     >
       <span
         className={`absolute right-2.5 top-2.5 sm:right-3 sm:top-3 w-2 h-2 rounded-full ${LEVERAGE_STATUS_DOT[status]}`}
@@ -120,7 +103,7 @@ function BoxCard({ number, label, href, tax, status, statusText, subtitle }: Bel
       />
       <header className="flex items-center gap-2 mb-2">
         <span
-          className="inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-violet-50 text-violet-700"
+          className={`inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 ${tile.bg} ${tile.fg}`}
           aria-hidden="true"
         >
           <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -130,7 +113,7 @@ function BoxCard({ number, label, href, tax, status, statusText, subtitle }: Bel
         </div>
       </header>
       <div className="text-sm font-semibold text-[var(--ink)] mb-0.5">{label}</div>
-      <div className="font-serif text-lg sm:text-xl font-semibold text-[var(--ink)] tabular-nums">
+      <div className="font-mono text-lg sm:text-xl font-semibold text-[var(--ink)] tabular-nums">
         {hasValue ? `${formatCurrency(Math.round(tax))}/jr` : '—'}
       </div>
       <p className="mt-1 text-xs text-[var(--ink-2)] leading-snug">{subtitle}</p>

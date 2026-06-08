@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Calculator, ChevronDown, ChevronUp, Clock, Info, Layers, Users, EyeOff } from 'lucide-react'
+import { Calculator, ChevronDown, ChevronUp, Clock, Layers, Users, EyeOff } from 'lucide-react'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
@@ -11,7 +11,8 @@ import {
   type PartnerAllocation,
 } from '@/lib/box3-data'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
-import { Kicker } from '@/components/editorial'
+import { Kicker, HighlightMark } from '@/components/editorial'
+import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
@@ -145,31 +146,6 @@ function formatPct(value: number): string {
   return (value * 100).toFixed(2) + '%'
 }
 
-function InfoTooltip({ text }: { text: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="ml-1 inline-flex h-4 w-4 items-center justify-center bg-[var(--subtle)] text-[var(--ink-3)] hover:bg-[color-mix(in_srgb,var(--color-teal-500)_14%,transparent)] hover:text-[var(--color-teal-700)] transition-colors"
-        aria-label="Meer informatie"
-      >
-        <Info className="h-3 w-3" />
-      </button>
-      {open && (
-        <span
-          className="absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 border border-[var(--ink)] bg-[var(--paper)] p-3 text-xs text-[var(--ink-2)] shadow-md"
-          style={{ fontFamily: SOURCE_SERIF }}
-        >
-          {text}
-          <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-[var(--ink)]" />
-        </span>
-      )}
-    </span>
-  )
-}
-
 function CalcRow({
   label,
   value,
@@ -195,7 +171,7 @@ function CalcRow({
     <div
       className={`flex items-center justify-between gap-3 ${
         highlight
-          ? '-mx-2 px-2 py-1.5 border-l-2 border-[var(--color-teal-500)] bg-[color-mix(in_srgb,var(--color-teal-500)_8%,transparent)]'
+          ? '-mx-2 px-2 py-1.5 border-l-2 border-[var(--module-active-500)] bg-[color-mix(in_srgb,var(--module-active-500)_8%,transparent)]'
           : ''
       }`}
     >
@@ -346,7 +322,7 @@ export function Box3Detail({
               className="text-[40px] sm:text-[52px] font-black leading-[0.9] tracking-[-0.02em] tabular-nums text-[var(--ink)]"
               style={{ fontFamily: PLAYFAIR }}
             >
-              {fc(result.tax)}
+              <HighlightMark>{fc(result.tax)}</HighlightMark>
             </span>
             <span
               className="italic text-sm text-[var(--ink-3)]"
@@ -394,7 +370,7 @@ export function Box3Detail({
           className="flex w-full items-center justify-between border-t border-[var(--ink)] p-4 sm:px-7 hover:bg-[var(--subtle)] transition-colors"
         >
           <span className="flex items-center gap-2.5 text-sm font-semibold text-[var(--ink)]">
-            <Calculator className="h-4 w-4 text-[var(--color-teal-600)]" aria-hidden="true" />
+            <Calculator className="h-4 w-4 text-[var(--module-active-700)]" aria-hidden="true" />
             Berekeningsstappen
           </span>
           {showDetails ? (
@@ -464,7 +440,7 @@ export function Box3Detail({
           className="flex w-full items-center justify-between border-t border-[var(--ink)] p-4 sm:px-7 hover:bg-[var(--subtle)] transition-colors"
         >
           <span className="flex items-center gap-2.5 text-sm font-semibold text-[var(--ink)]">
-            <Layers className="h-4 w-4 text-[var(--color-teal-600)]" aria-hidden="true" />
+            <Layers className="h-4 w-4 text-[var(--module-active-700)]" aria-hidden="true" />
             Hoe is je vermogen ingedeeld?
           </span>
           {showClassificatie ? (
@@ -489,9 +465,9 @@ export function Box3Detail({
                 }
                 dotClass={
                   ac.category === 'spaargeld'
-                    ? 'bg-[var(--color-teal-500)]'
+                    ? 'bg-[var(--module-active-500)]'
                     : ac.category === 'beleggingen'
-                      ? 'bg-[color-mix(in_srgb,var(--color-teal-500)_50%,transparent)]'
+                      ? 'bg-[color-mix(in_srgb,var(--module-active-500)_50%,transparent)]'
                       : 'bg-[var(--ink-4)]'
                 }
                 muted={ac.category === null}
@@ -509,7 +485,7 @@ export function Box3Detail({
                     name={dc.debt.name}
                     amount={Number(dc.debt.current_balance)}
                     categoryLabel={dc.inBox3 ? 'Box 3' : 'Uitgesloten'}
-                    dotClass={dc.inBox3 ? 'bg-[var(--color-red-500)]' : 'bg-[var(--ink-4)]'}
+                    dotClass={dc.inBox3 ? 'bg-[var(--negative)]' : 'bg-[var(--ink-4)]'}
                     muted={!dc.inBox3}
                     fc={fc}
                   />
@@ -613,7 +589,7 @@ function ClassRow({
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="flex items-center gap-2 min-w-0">
-        <span className={`h-2.5 w-2.5 rounded-[2px] shrink-0 ${dotClass}`} aria-hidden="true" />
+        <span className={`h-2.5 w-2.5 shrink-0 ${dotClass}`} aria-hidden="true" />
         <span className={`text-xs truncate ${muted ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'}`}>
           {name}
         </span>

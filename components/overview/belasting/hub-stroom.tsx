@@ -7,17 +7,22 @@ const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
  * HubStroom (C7) — lichtgewicht stroom bruto → −heffing → netto.
  *
  * Een eenvoudige mini-waterfall met divs (geen zware sankey): één scherpe balk
- * met het heffings-deel als gekleurd segment (amber, Box 1) en het netto-deel
- * als rest (teal — wat overblijft, vrijheid). Eronder drie cijfer-kolommen
- * (bruto / heffing / netto) in Playfair. Bewust geen perspectief: Box 1 is
- * per-persoon en bruto/heffing zijn de Box 1-schatting van de gebruiker zelf.
+ * met het heffings-deel als gekleurd segment en het netto-deel als rest.
+ * Eronder drie cijfer-kolommen (bruto / heffing / netto) in Playfair. Bewust
+ * geen perspectief: Box 1 is per-persoon en bruto/heffing zijn de Box 1-
+ * schatting van de gebruiker zelf.
+ *
+ * Kleur is hier SEMANTISCH, niet box-codering: heffing = wat de fiscus afroomt
+ * (--negative), netto = wat overblijft / vrijheid (--positive). Box-codering
+ * (amber/teal) zou hier verwarren omdat de balk geen box-verdeling toont maar
+ * een kost/behoud-stroom. Bruto blijft ink.
  *
  * Alleen tonen wanneer bruto bekend is (caller gate: box1 + grossYearly > 0).
  * Server-compatible.
  */
 
-const BOX1_COLOR = '#b45309' // amber — heffing
-const NET_COLOR = '#0d9488' // teal — wat overblijft (vrijheid)
+const HEFFING_COLOR = 'var(--negative)' // wat de fiscus afroomt (kost)
+const NET_COLOR = 'var(--positive)' // wat overblijft (vrijheid)
 
 export function HubStroom({
   grossYearly,
@@ -39,7 +44,8 @@ export function HubStroom({
     <article className="bg-[var(--paper)] border border-[var(--border-ed)] p-5 sm:p-6">
       <Kicker>Van bruto naar netto · Box 1</Kicker>
 
-      {/* Mini-waterfall: heffing (amber) + netto (teal) — scherpe randen. */}
+      {/* Mini-waterfall: heffing (negatief/kost) + netto (positief/behoud) —
+          semantische kleuren, scherpe randen. */}
       <div
         className="mt-4 flex h-5 w-full overflow-hidden bg-[var(--subtle)] border border-[var(--rule-soft)]"
         role="img"
@@ -49,7 +55,7 @@ export function HubStroom({
       >
         <div
           className="h-full"
-          style={{ width: `${heffingPct}%`, backgroundColor: BOX1_COLOR }}
+          style={{ width: `${heffingPct}%`, backgroundColor: HEFFING_COLOR }}
           title={`Heffing: ${formatCurrency(heffing)}`}
         />
         <div
@@ -62,7 +68,7 @@ export function HubStroom({
       {/* Drie cijfer-kolommen — Playfair, top/bottom rules, mono-kickers. */}
       <div className="mt-5 grid grid-cols-3 border-t border-b border-[var(--ink)]">
         <StroomCol label="Bruto" amount={Math.round(grossYearly)} color="var(--ink)" />
-        <StroomCol label="− Heffing" amount={Math.round(heffing)} color={BOX1_COLOR} divider />
+        <StroomCol label="− Heffing" amount={Math.round(heffing)} color={HEFFING_COLOR} divider />
         <StroomCol label="Netto" amount={Math.round(netto)} color={NET_COLOR} divider />
       </div>
 

@@ -12,12 +12,12 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
  * forfait, beleggingen een veel hoger. De mix bepaalt dus mede je
  * effectieve heffing — niet alleen het totale vermogen.
  *
- * Presentational: caller geeft het perspectief-correcte `result`. Box 3-kleur
- * (teal) via colorVar.
+ * Presentational: caller geeft het perspectief-correcte `result`. Box-kleur
+ * via de actieve module-context (`--module-active-*`).
  */
 
-const SPAARGELD = 'var(--color-teal-500)'
-const BELEGGINGEN = 'color-mix(in srgb, var(--color-teal-500) 50%, transparent)'
+const SPAARGELD = 'var(--module-active-600)'
+const BELEGGINGEN = 'var(--module-active-400)'
 
 function formatPct(value: number): string {
   return (value * 100).toFixed(2) + '%'

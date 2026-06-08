@@ -67,20 +67,13 @@ describe('BelastingBoxCards — render', () => {
     expect(screen.getAllByText('—').length).toBe(3)
   })
 
-  it('toont totale druk-stat wanneer minimaal één box > 0', () => {
+  it('toont de kicker "De drie boxen" en géén dubbel jaartotaal in de kaart-header', () => {
     render(<BelastingBoxCards cards={makeCards()} />)
-    expect(screen.getByText('Geschatte druk')).toBeTruthy()
-    // 12.000 (Box 1) + 3.500 (Box 3) = 15.500
-    expect(screen.getByText(/€\s*15\.500.*\/jr/)).toBeTruthy()
-  })
-
-  it('verbergt totale druk bij geen data', () => {
-    render(
-      <BelastingBoxCards
-        cards={makeCards({ '1': { tax: null }, '2': { tax: null }, '3': { tax: null } })}
-      />,
-    )
+    expect(screen.getByText('De drie boxen')).toBeTruthy()
+    // Het jaartotaal is bewust verplaatst naar Sectie I (HubTotaleDruk); de
+    // kaart-header dupliceert het niet langer (was "Geschatte druk €15.500/jr").
     expect(screen.queryByText('Geschatte druk')).toBeNull()
+    expect(screen.queryByText(/€\s*15\.500/)).toBeNull()
   })
 
   it('toont status-substext per box', () => {

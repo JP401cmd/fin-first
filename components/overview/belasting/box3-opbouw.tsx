@@ -19,12 +19,14 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
  * schuld-correctie + het effectieve rendement toe in een onderschrift.
  *
  * Presentational: caller geeft het reeds-berekende perspectief-correcte
- * `result` door. Box 3-kleur (teal) via colorVar.
+ * `result` door. Box-kleur via de actieve module-context (`--module-active-*`).
  */
 
-const TEAL = 'var(--color-teal-500)'
-const TEAL_SOFT = 'color-mix(in srgb, var(--color-teal-500) 55%, transparent)'
-const SCHULD = 'var(--color-red-500)'
+// Spaargeld krijgt de vollere accent-stop, beleggingen de lichtere — schulden
+// blijven semantisch negatief (nooit box-kleur).
+const SPAARGELD = 'var(--module-active-600)'
+const BELEGGINGEN = 'var(--module-active-400)'
+const SCHULD = 'var(--negative)'
 
 function formatPct(value: number): string {
   return (value * 100).toFixed(2) + '%'
@@ -45,8 +47,8 @@ export function Box3Opbouw({
   if (forfaitairSpaargeld <= 0 && forfaitairBeleggingen <= 0) return null
 
   const segments = [
-    { label: 'Forfait spaargeld', value: forfaitairSpaargeld, colorVar: TEAL },
-    { label: 'Forfait beleggingen', value: forfaitairBeleggingen, colorVar: TEAL_SOFT },
+    { label: 'Forfait spaargeld', value: forfaitairSpaargeld, colorVar: SPAARGELD },
+    { label: 'Forfait beleggingen', value: forfaitairBeleggingen, colorVar: BELEGGINGEN },
   ]
 
   return (
@@ -60,7 +62,7 @@ export function Box3Opbouw({
         <div className="mt-2.5 flex items-center justify-between gap-3 text-xs">
           <span className="flex items-center gap-2 text-[var(--ink-2)]">
             <span
-              className="block h-2.5 w-2.5 shrink-0 rounded-[2px]"
+              className="block h-2.5 w-2.5 shrink-0"
               style={{ backgroundColor: SCHULD }}
               aria-hidden="true"
             />

@@ -15,8 +15,8 @@ import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadPerspectiveTransactions } from '@/lib/household/perspective-loader'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { Kicker, SectionLabel, FiguresStrip } from '@/components/editorial'
+import { Reveal } from '@/components/landing/reveal'
 
-const BOX1_COLOR = '#b45309'
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
 export const metadata: Metadata = {
@@ -146,50 +146,59 @@ export default async function BelastingBox1Page() {
       />
 
       {box1Result != null && (
-        <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-2">
-          <Box1DrukHero result={box1Result} dailyExpenses={dailyExpenses} />
-        </section>
+        <Reveal>
+          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-2">
+            <Box1DrukHero result={box1Result} dailyExpenses={dailyExpenses} />
+          </section>
+        </Reveal>
       )}
 
       {/* 1.2 + 1.4: waterfall + heffingskortingen naast elkaar op groot scherm */}
       {box1Result != null && (
-        <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
-          <SectionLabel num="I">De rekensom van je inkomen</SectionLabel>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Box1Waterfall result={box1Result} dailyExpenses={dailyExpenses} />
-            <Box1Heffingskortingen result={box1Result} />
-          </div>
-        </section>
+        <Reveal>
+          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
+            <SectionLabel num="I">De rekensom van je inkomen</SectionLabel>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Box1Waterfall result={box1Result} dailyExpenses={dailyExpenses} />
+              <Box1Heffingskortingen result={box1Result} />
+            </div>
+          </section>
+        </Reveal>
       )}
 
       {/* 1.3: marginale-druk-curve */}
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
-        <SectionLabel num="II">Wat je extra euro waard is</SectionLabel>
-        <Box1MarginaleCurveCard
-          year={2026}
-          grossYearlyIncome={grossYearly > 0 ? grossYearly : undefined}
-        />
-      </section>
+      <Reveal>
+        <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
+          <SectionLabel num="II">Wat je extra euro waard is</SectionLabel>
+          <Box1MarginaleCurveCard
+            year={2026}
+            grossYearlyIncome={grossYearly > 0 ? grossYearly : undefined}
+          />
+        </section>
+      </Reveal>
 
       {/* 1.6: eigen woning — alleen wanneer er een eigen woning is */}
       {box1Result != null && hasEigenWoning && (
-        <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
-          <SectionLabel num="III">Je eigen woning</SectionLabel>
-          <Box1EigenWoning result={box1Result} dailyExpenses={dailyExpenses} />
-        </section>
+        <Reveal>
+          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
+            <SectionLabel num="III">Je eigen woning</SectionLabel>
+            <Box1EigenWoning result={box1Result} dailyExpenses={dailyExpenses} />
+          </section>
+        </Reveal>
       )}
 
       {/* 1.5: jaarruimte gauge + simulator (per persoon) */}
       {showTwoCards ? (
-        <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10">
-          <SectionLabel num="IV">
-            <span className="inline-flex items-center gap-1.5">
-              <Users className="h-3 w-3" aria-hidden="true" />
-              Jaarruimte per persoon
-              <PerspectiveContextLabel className="normal-case tracking-normal" />
-            </span>
-          </SectionLabel>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <Reveal>
+          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10">
+            <SectionLabel num="IV">
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="h-3 w-3" aria-hidden="true" />
+                Jaarruimte per persoon
+                <PerspectiveContextLabel className="normal-case tracking-normal" />
+              </span>
+            </SectionLabel>
+            <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Kicker className="mb-2">Jij</Kicker>
               <JaarruimteCard
@@ -221,19 +230,22 @@ export default async function BelastingBox1Page() {
                 </div>
               )}
             </div>
-          </div>
-        </section>
+            </div>
+          </section>
+        </Reveal>
       ) : (
-        <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10">
-          <SectionLabel num="IV">Je jaarruimte benutten</SectionLabel>
-          <JaarruimteCard
-            grossYearlyIncome={grossYearly}
-            pensioenAangroei={0}
-            marginaalTarief={marg}
-            year={2026}
-            dailyExpenses={dailyExpenses}
-          />
-        </section>
+        <Reveal>
+          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10">
+            <SectionLabel num="IV">Je jaarruimte benutten</SectionLabel>
+            <JaarruimteCard
+              grossYearlyIncome={grossYearly}
+              pensioenAangroei={0}
+              marginaalTarief={marg}
+              year={2026}
+              dailyExpenses={dailyExpenses}
+            />
+          </section>
+        </Reveal>
       )}
     </>
   )
@@ -268,7 +280,7 @@ function Box1DrukHero({
       </div>
       {freedom && (
         <div className="mt-2 flex items-center gap-1.5 text-sm text-[var(--ink-2)]">
-          <Clock className="w-4 h-4 shrink-0" style={{ color: BOX1_COLOR }} aria-hidden="true" />
+          <Clock className="w-4 h-4 shrink-0" style={{ color: 'var(--module-active-700)' }} aria-hidden="true" />
           <span>
             kost je ≈ <span className="font-medium text-[var(--ink)]">{freedom}</span> aan vrijheid
           </span>

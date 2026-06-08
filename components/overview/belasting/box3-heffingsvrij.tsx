@@ -19,11 +19,13 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
  * eerste belaste euro": het effectieve tarief × het forfait dat over de
  * eerste euro boven de voet wordt geheven, uitgedrukt in vrijheidstijd.
  *
- * Presentational: caller geeft het perspectief-correcte `result`. Box 3-kleur
- * (teal) via colorVar.
+ * Presentational: caller geeft het perspectief-correcte `result`. Box-kleur
+ * via de actieve module-context (`--module-active-*`).
  */
 
-const TEAL = 'var(--color-teal-500)'
+// Gauge-vulling op de 500-stop; het Clock-icoon op de donkerdere 700-stop.
+const ACCENT_500 = 'var(--module-active-500)'
+const ACCENT_700 = 'var(--module-active-700)'
 
 export function Box3Heffingsvrij({
   result,
@@ -56,7 +58,7 @@ export function Box3Heffingsvrij({
           max={heffingsvrij}
           label="voet benut"
           sublabel={`${fc(benut)} / ${fc(heffingsvrij)}`}
-          colorVar={TEAL}
+          colorVar={ACCENT_500}
           thresholdLabel={result.hasPartner ? 'voet (partner)' : 'voet (single)'}
         />
 
@@ -81,7 +83,7 @@ export function Box3Heffingsvrij({
                 {freedomDaysPerThousand >= 0.5 && (
                   <span className="inline-flex items-center gap-1 not-italic text-[var(--ink-3)]">
                     {' '}
-                    <Clock className="h-3 w-3" aria-hidden="true" />
+                    <Clock className="h-3 w-3" style={{ color: ACCENT_700 }} aria-hidden="true" />
                     {formatFreedomTimeString(
                       calculateFreedomTime(taxPerThousandAbove, result.dailyExpenses),
                       'short',

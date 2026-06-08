@@ -5,7 +5,7 @@ interface Bar {
   label: string
   /** Numerieke waarde — bepaalt de staaflengte op de gedeelde schaal. */
   value: number
-  /** Module-/box-kleur als CSS-variabele, bv. "var(--color-amber-500)". */
+  /** Module-/box-kleur als CSS-variabele, bv. "var(--module-active-500)". */
   colorVar: string
   /** Markeert de gunstigste optie → subtiele accent-rand. */
   isWinner?: boolean

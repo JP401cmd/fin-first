@@ -54,10 +54,13 @@ function Box2EmptyState() {
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
       <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-6 sm:p-8 text-center">
-        {/* Icoon-wrapper: scherp vierkant, violet CSS-var — geen bare Tailwind violet-50. */}
+        {/* Icoon-wrapper: scherp vierkant, box-accent via de actieve module-kleur (violet op de Box 2-pagina). */}
         <span
           className="mx-auto mb-3 inline-flex h-11 w-11 items-center justify-center"
-          style={{ background: 'color-mix(in srgb, #7c3aed 10%, transparent)', color: '#7c3aed' }}
+          style={{
+            background: 'color-mix(in srgb, var(--module-active-500) 10%, transparent)',
+            color: 'var(--module-active-700)',
+          }}
         >
           <Building2 className="h-5 w-5" aria-hidden="true" />
         </span>
@@ -76,7 +79,7 @@ function Box2EmptyState() {
         <Link
           href="/overzicht/bezittingen"
           className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold transition-colors"
-          style={{ color: '#7c3aed' }}
+          style={{ color: 'var(--module-active-700)' }}
         >
           Beheer je bezittingen
           <ArrowRight className="h-4 w-4" aria-hidden="true" />

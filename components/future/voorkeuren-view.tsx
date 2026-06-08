@@ -8,7 +8,6 @@ import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { useViewMode } from '@/components/app/view-mode-provider'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
 import { AfbouwOverzichtCard } from './afbouw-overzicht-card'
@@ -112,7 +111,6 @@ export function VoorkeurenView({
   potBalances: Record<WealthGroup, number>
 }) {
   const router = useRouter()
-  const { isPlannen } = useViewMode()
   // Inline-editor state voor de markt-aannames (inflatie/rendement).
   const [editing, setEditing] = useState<
     | null
@@ -132,8 +130,7 @@ export function VoorkeurenView({
     subtitle: 'Onbekende strategie',
   }
 
-  const openRegel = (id: RegelId) =>
-    isPlannen ? () => setEditingRegel(id) : undefined
+  const openRegel = (id: RegelId) => () => setEditingRegel(id)
 
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8 space-y-8">
@@ -165,7 +162,6 @@ export function VoorkeurenView({
             Icon={SlidersHorizontal}
             badge={`Tot ${fireStrategy.endAge} jaar`}
             onEdit={openRegel('eindstrategie')}
-            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Onttrekkingsstrategie"
@@ -178,7 +174,6 @@ export function VoorkeurenView({
                 : undefined
             }
             onEdit={openRegel('onttrekkingsstrategie')}
-            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Onttrekkingsvolgorde"
@@ -187,7 +182,6 @@ export function VoorkeurenView({
             Icon={SlidersHorizontal}
             badge="Potten"
             onEdit={openRegel('onttrekkingsvolgorde')}
-            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Verdeling bij toename"
@@ -196,7 +190,6 @@ export function VoorkeurenView({
             Icon={SlidersHorizontal}
             badge="Potten"
             onEdit={openRegel('verdeling-toename')}
-            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Onttrekking bij afname"
@@ -205,7 +198,6 @@ export function VoorkeurenView({
             Icon={SlidersHorizontal}
             badge="Potten"
             onEdit={openRegel('onttrekking-afname')}
-            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
         </div>
       </div>
@@ -239,18 +231,14 @@ export function VoorkeurenView({
             subtitle="Jaarlijkse prijsstijging — index alle bedragen"
             Icon={TrendingUp}
             badge="Per jaar"
-            onEdit={
-              isPlannen
-                ? () =>
-                    setEditing({
-                      title: 'Inflatie',
-                      column: 'inflation_rate',
-                      currentValuePct: fireParams.inflationRate * 100,
-                      helperText: 'NL-default 2.5% per jaar. Past op alle euro-bedragen in de projectie.',
-                    })
-                : undefined
+            onEdit={() =>
+              setEditing({
+                title: 'Inflatie',
+                column: 'inflation_rate',
+                currentValuePct: fireParams.inflationRate * 100,
+                helperText: 'NL-default 2.5% per jaar. Past op alle euro-bedragen in de projectie.',
+              })
             }
-            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label="Bruto rendement"
@@ -258,18 +246,14 @@ export function VoorkeurenView({
             subtitle="Verwacht jaarrendement op het belegbaar vermogen"
             Icon={TrendingUp}
             badge="Per jaar"
-            onEdit={
-              isPlannen
-                ? () =>
-                    setEditing({
-                      title: 'Bruto rendement',
-                      column: 'expected_return',
-                      currentValuePct: fireParams.grossReturn * 100,
-                      helperText: 'Wereldwijde aandelen-historie: ~6-8%. Conservatief: 4-5%. Voorkeur per asset-groep op /overzicht/bezittingen.',
-                    })
-                : undefined
+            onEdit={() =>
+              setEditing({
+                title: 'Bruto rendement',
+                column: 'expected_return',
+                currentValuePct: fireParams.grossReturn * 100,
+                helperText: 'Wereldwijde aandelen-historie: ~6-8%. Conservatief: 4-5%. Voorkeur per asset-groep op /overzicht/bezittingen.',
+              })
             }
-            hint={isPlannen ? undefined : 'Alleen in Plannen-modus'}
           />
           <VoorkeurCard
             label={
@@ -292,9 +276,8 @@ export function VoorkeurenView({
       </div>
 
       <p className="text-[11px] italic text-[var(--ink-3)]">
-        {isPlannen
-          ? 'Klik op een regel of markt-aanname om uitleg, instellingen en impact te zien en bij te werken.'
-          : 'Activeer Plannen-modus om de regels en markt-aannames bij te werken.'}
+        Klik op een regel of markt-aanname om uitleg, instellingen en impact te
+        zien en bij te werken.
       </p>
 
       {/* Afbouw-overzicht — eindsaldo bij fireAge vs endAge. */}

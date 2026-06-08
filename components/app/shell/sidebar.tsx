@@ -40,6 +40,8 @@ import {
   type NavModule,
 } from '@/lib/module-registry'
 import { useSidebarCollapsed } from '@/lib/hooks/use-sidebar-collapsed'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { formatNetWorthShort } from '@/lib/net-worth-format'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { LeverCompassCollapsed, type LeverScores, type LeverStatus } from '@/components/app/shell/lever-compass'
@@ -242,23 +244,6 @@ const FOOTER_LINKS: FooterLink[] = [
 ]
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Format netto-vermogen als "€ 142k" / "€ 1,2M". Geen decimals; bewust kort
- * zodat de mono-strip rechts compact blijft.
- */
-function formatNetWorthShort(value: number): string {
-  const abs = Math.abs(value)
-  if (abs >= 1_000_000) {
-    const m = value / 1_000_000
-    const rounded = Math.round(m * 10) / 10
-    return `€ ${rounded.toString().replace('.', ',')}M`
-  }
-  if (abs >= 1_000) {
-    return `€ ${Math.round(value / 1_000)}k`
-  }
-  return `€ ${Math.round(value)}`
-}
 
 /**
  * Map een module-key naar inline CSS-vars zodat children `var(--module-active-*)`
@@ -518,8 +503,11 @@ function ModulesSection({
   actionCount: number
   leverScores: LeverScores
 }) {
+  // Netto vermogen is een saldo → honoreert de privacy-toggle (Bedragen
+  // verbergen). Bij masked toont formatNetWorthShort de bullet-placeholder.
+  const { masked } = useMaskedAmounts()
   const metrics: Record<NavModule, string> = {
-    kern: formatNetWorthShort(netWorth),
+    kern: formatNetWorthShort(netWorth, masked),
     wil: actionCount > 0 ? `· ${actionCount}` : '·',
     horizon: '·',
   }

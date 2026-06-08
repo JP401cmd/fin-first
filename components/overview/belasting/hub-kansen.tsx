@@ -24,10 +24,13 @@ const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
  * Bewust presentationeel/server-compatible (geen hooks, geen fetching).
  */
 
+// Per-box coderingskleur (badge-tekst + linker-streep + besparings-bar) via de
+// --color-box{n}-700 tokens. De hub heeft een neutraal-ink context, dus de
+// box-kleuren worden hier direct gezet (niet via --module-active).
 const BOX_BADGE: Record<1 | 2 | 3, { label: string; color: string }> = {
-  1: { label: 'Box 1', color: '#b45309' }, // amber
-  2: { label: 'Box 2', color: '#7c3aed' }, // violet
-  3: { label: 'Box 3', color: '#0d9488' }, // teal
+  1: { label: 'Box 1', color: 'var(--color-box1-700)' }, // amber
+  2: { label: 'Box 2', color: 'var(--color-box2-700)' }, // violet
+  3: { label: 'Box 3', color: 'var(--color-box3-700)' }, // teal
 }
 
 export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }) {

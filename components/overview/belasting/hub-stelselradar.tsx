@@ -22,10 +22,13 @@ interface StelselItem {
   box: 1 | 2 | 3 | null
 }
 
+// Per-box coderingskleur voor de jaar-chip + linker-streep via de
+// --color-box{n}-700 tokens. De hub heeft een neutraal-ink context, dus de
+// box-kleuren worden hier direct gezet (niet via --module-active).
 const BOX_COLOR: Record<1 | 2 | 3, string> = {
-  1: '#b45309', // amber
-  2: '#7c3aed', // violet
-  3: '#0d9488', // teal
+  1: 'var(--color-box1-700)', // amber
+  2: 'var(--color-box2-700)', // violet
+  3: 'var(--color-box3-700)', // teal
 }
 
 function accentFor(box: 1 | 2 | 3 | null): string {

@@ -27,8 +27,12 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
  * formatMaskedCurrency.
  */
 
-const TEAL = 'var(--color-teal-500)'
-const TEAL_SOFT = 'color-mix(in srgb, var(--color-teal-500) 45%, transparent)'
+// Box-accent via de actieve module-context. De gunstigste/werkelijke staaf
+// krijgt de vollere 600-stop, de forfaitaire de lichtere 400-stop. De
+// werkelijke besparing blijft semantisch (--positive), nooit box-kleur.
+const ACCENT_STRONG = 'var(--module-active-600)'
+const ACCENT_SOFT = 'var(--module-active-400)'
+const ACCENT_700 = 'var(--module-active-700)'
 
 function formatPct1(value: number): string {
   return value.toFixed(1).replace('.', ',') + '%'
@@ -51,7 +55,7 @@ export function Box3TegenbewijsCard({ result }: { result: Box3Result }) {
     <div className="border-t border-[var(--ink)] px-4 py-5 sm:px-7">
       <Box3SectionHeader num="3.2">
         <span className="inline-flex items-center gap-1.5">
-          <Scale className="h-3.5 w-3.5" style={{ color: TEAL }} aria-hidden="true" />
+          <Scale className="h-3.5 w-3.5" style={{ color: ACCENT_700 }} aria-hidden="true" />
           Tegenbewijs-simulator
         </span>
       </Box3SectionHeader>
@@ -82,7 +86,7 @@ export function Box3TegenbewijsCard({ result }: { result: Box3Result }) {
           step={0.5}
           value={rendementPct}
           onChange={(e) => setRendementPct(Number(e.target.value))}
-          className="w-full accent-[var(--color-teal-600)]"
+          className="w-full accent-[var(--module-active-500)]"
           aria-valuetext={`${formatPct1(rendementPct)} werkelijk rendement`}
         />
         <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-[var(--ink-4)]">
@@ -97,13 +101,13 @@ export function Box3TegenbewijsCard({ result }: { result: Box3Result }) {
           {
             label: 'Forfaitaire heffing',
             value: Math.round(cmp.forfaitaireHeffing),
-            colorVar: TEAL_SOFT,
+            colorVar: ACCENT_SOFT,
             isWinner: !werkelijkIsGunstig,
           },
           {
             label: 'Heffing op werkelijk rendement',
             value: Math.round(cmp.werkelijkeHeffing),
-            colorVar: TEAL,
+            colorVar: ACCENT_STRONG,
             isWinner: werkelijkIsGunstig,
           },
         ]}
@@ -115,12 +119,12 @@ export function Box3TegenbewijsCard({ result }: { result: Box3Result }) {
         className="mt-4 border px-4 py-3.5"
         style={{
           borderColor: werkelijkIsGunstig
-            ? 'color-mix(in srgb, var(--color-teal-500) 45%, var(--ink))'
+            ? 'color-mix(in srgb, var(--module-active-500) 45%, var(--ink))'
             : 'var(--ink)',
           borderLeftWidth: '4px',
-          borderLeftColor: werkelijkIsGunstig ? 'var(--color-teal-500)' : 'var(--ink-3)',
+          borderLeftColor: werkelijkIsGunstig ? 'var(--module-active-500)' : 'var(--ink-3)',
           backgroundColor: werkelijkIsGunstig
-            ? 'color-mix(in srgb, var(--color-teal-500) 7%, transparent)'
+            ? 'color-mix(in srgb, var(--module-active-500) 7%, transparent)'
             : 'var(--subtle)',
         }}
       >
@@ -130,7 +134,7 @@ export function Box3TegenbewijsCard({ result }: { result: Box3Result }) {
             style={{ fontFamily: SOURCE_SERIF }}
           >
             Werkelijk rendement is lager — tegenbewijs bespaart{' '}
-            <span className="not-italic font-mono tabular-nums font-bold text-[var(--color-teal-700)]">
+            <span className="not-italic font-mono tabular-nums font-bold text-[var(--positive)]">
               {fc(Math.round(cmp.besparing))}
             </span>
             {!masked && cmp.freedomDays >= 0.5 && (

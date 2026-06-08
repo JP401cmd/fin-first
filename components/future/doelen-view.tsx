@@ -6,7 +6,6 @@ import { formatCurrency } from '@/lib/format'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
 import { DoelBewerkenSheet } from './doel-bewerken-sheet'
-import { useViewMode } from '@/components/app/view-mode-provider'
 import { ProgressMilestones } from '@/components/editorial/progress-milestones'
 
 /**
@@ -57,7 +56,6 @@ export function DoelenView({
   goalProgresses: GoalDisplay['progress'][]
 }) {
   // DoelToevoegenSheet = scenario-tool → alleen in Plannen-modus (plan A-5).
-  const { isPlannen } = useViewMode()
   // Edit-sheet state: het volledige Goal-object wordt doorgegeven zodat
   // de bewerken-sheet een GoalForm (volledig edit met asset/debt-link)
   // kan openen zonder extra DB-fetch.
@@ -91,14 +89,7 @@ export function DoelenView({
             bereiken. Doelen worden hier zichtbaar met status-flags zodat
             je weet hoe je ervoor staat.
           </p>
-          {isPlannen ? (
-            <DoelToevoegenSheet />
-          ) : (
-            <p className="text-xs italic text-[var(--ink-3)]">
-              Activeer Plannen-modus rechtsboven om je eerste doel toe te
-              voegen.
-            </p>
-          )}
+          <DoelToevoegenSheet />
         </article>
       </section>
     )
@@ -115,34 +106,28 @@ export function DoelenView({
             {display.length} {display.length === 1 ? 'actief doel' : 'actieve doelen'}
           </h2>
         </div>
-        {isPlannen && <DoelToevoegenSheet />}
+        <DoelToevoegenSheet />
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {display.map(({ goal, progress }) => {
           const status = statusFor(progress)
           const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
-          // Card wordt button in Plannen-modus (opent edit-sheet),
-          // gewone article in Kijken (read-only). Geen genest-Link.
+          // Kaart is een button die de edit-sheet opent. Geen genest-Link.
           const cardClass =
             'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 text-left w-full'
-          const CardEl: React.ElementType = isPlannen ? 'button' : 'article'
-          const cardProps = isPlannen
-            ? {
-                type: 'button' as const,
-                onClick: () => setEditingGoal(goal),
-                'aria-label': `Bewerk doel ${goal.name}`,
-                className: `${cardClass} hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
-              }
-            : { className: cardClass }
+          const cardProps = {
+            type: 'button' as const,
+            onClick: () => setEditingGoal(goal),
+            'aria-label': `Bewerk doel ${goal.name}`,
+            className: `${cardClass} hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
+          }
           return (
-            <CardEl key={goal.id} {...cardProps}>
+            <button key={goal.id} {...cardProps}>
               <header className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0 truncate inline-flex items-center gap-1.5">
                   {goal.name}
-                  {isPlannen && (
-                    <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
-                  )}
+                  <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
                 </h3>
                 <span
                   className={`text-[10px] uppercase tracking-[0.08em] font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.color} shrink-0`}
@@ -186,15 +171,14 @@ export function DoelenView({
                   <span className="text-[var(--ink-3)]">{progress.eta}</span>
                 )}
               </div>
-            </CardEl>
+            </button>
           )
         })}
       </div>
 
       <p className="mt-6 text-[11px] italic text-[var(--ink-3)]">
-        {isPlannen
-          ? 'Klik op een doel om voortgang bij te werken of het te verwijderen. Volledige edit van naam/bedrag/datum via /will.'
-          : 'Activeer Plannen-modus om doelen bij te werken.'}
+        Klik op een doel om voortgang bij te werken of het te verwijderen.
+        Volledige edit van naam/bedrag/datum via /will.
       </p>
 
       {editingGoal && (
