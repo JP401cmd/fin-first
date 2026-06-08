@@ -151,6 +151,415 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n))
 }
 
-// suppress unused-variable warning — clamp is used by Task 3+ detectors
-void clamp
+// ── Input ──────────────────────────────────────────────────────────────
+
+export interface GespreksstartersInput {
+  audience: Audience
+  /** Absolute maandteller (year*12 + month) → rotatie schuift elke maand. */
+  monthIndex: number
+
+  netWorth: number
+  netWorthTrend: number          // laatste − vorige snapshot
+  prevNetWorth: number
+  monthlyIncome: number
+  monthlyExpenses: number
+  prevMonthIncome: number
+  prevMonthExpenses: number
+  monthlySavings: number
+  prevMonthlySavings: number
+  savingsRate6m: number
+  dailyExpenses: number
+
+  goals: Array<{
+    name: string; current: number; target: number;
+    completed: boolean; targetDate: string | null
+  }>
+  totalDebts: number
+  debtCount: number
+  completedActionsThisMonth: number
+  completedActionsFreedomDays: number
+  pendingActionsCount: number
+
+  fireAge: number | null
+  prevFireAge: number | null
+  expensesByCategory: Array<{ name: string; amount: number; prevAmount: number; limit: number | null }>
+  newRecurring: Array<{ name: string; monthlyAmount: number }>
+  topAsset: { name: string; value: number } | null
+}
+
+type Detector = (input: GespreksstartersInput) => StarterCandidate[]
+
+// ── Behouden detectoren ────────────────────────────────────────────────
+
+const detectVermogen: Detector = (i) => {
+  if (i.dailyExpenses <= 0 || i.netWorthTrend === 0) return []
+  const days = freedomDays(i.netWorthTrend, i.dailyExpenses)
+  if (i.netWorthTrend > 0) {
+    const eur = formatEUR(i.netWorthTrend)
+    return [{
+      id: 'vermogen-groei', theme: 'vermogen', sentiment: 'positive',
+      score: clamp(days * 1.5, 5, 100),
+      variants: [
+        (v) => ({
+          vraag: `${v.subjCap} ${v.poss} vermogen is gegroeid met ${eur} — dat zijn ${days} extra vrijheidsdagen. Waar willen ${v.subj} die vrijheid aan besteden?`,
+          context: `Netto vermogen steeg van ${formatEUR(i.prevNetWorth)} naar ${formatEUR(i.netWorth)}.`,
+          actie: `Bespreek ${v.samen} wat de volgende financiële mijlpaal zou kunnen zijn.`,
+          vrijheidstijd: freedomLabel(days),
+        }),
+        (v) => ({
+          vraag: `${eur} erbij deze maand — ${freedomLabel(days)} dichter bij volledige vrijheid. Wat ${v.hebt} ${v.subj} goed gedaan?`,
+          context: `Vermogensgroei van ${eur} sinds de vorige check-in.`,
+          actie: `Benoem ${v.samen} de keuze die het meeste bijdroeg.`,
+          vrijheidstijd: freedomLabel(days),
+        }),
+        (v) => ({
+          vraag: `${v.subjCap} ${v.poss} vermogen groeide met ${eur}. Verandert dat hoe ${v.subj} naar ${v.poss} doelen ${v.wilt} kijken?`,
+          context: `Van ${formatEUR(i.prevNetWorth)} naar ${formatEUR(i.netWorth)}.`,
+          actie: `Toets ${v.samen} of een doel sneller haalbaar is geworden.`,
+          vrijheidstijd: freedomLabel(days),
+        }),
+      ],
+    }]
+  }
+  const eur = formatEUR(Math.abs(i.netWorthTrend))
+  return [{
+    id: 'vermogen-daling', theme: 'vermogen', sentiment: 'alert',
+    score: clamp(days * 1.5 + 10, 15, 100),
+    variants: [
+      (v) => ({
+        vraag: `${v.subjCap} ${v.poss} vermogen is deze maand ${eur} gedaald. Hoe ${v.voelt} daarover, en is er een oorzaak die ${v.subj} ${v.samen} ${v.wilt} aanpakken?`,
+        context: `Netto vermogen daalde met ${eur} (${days} vrijheidsdagen).`,
+        actie: `Kijk ${v.samen} of het eenmalig was of structureel.`,
+        vrijheidstijd: freedomLabel(days),
+      }),
+      (v) => ({
+        vraag: `${eur} eraf deze maand. Was dat een bewuste investering of een tegenvaller?`,
+        context: `Vermogensdaling van ${eur} sinds de vorige check-in.`,
+        actie: `Bepaal ${v.samen} of er actie nodig is.`,
+        vrijheidstijd: freedomLabel(days),
+      }),
+    ],
+  }]
+}
+
+const detectSparenVergelijking: Detector = (i) => {
+  if (i.monthlySavings > 0 && i.prevMonthlySavings > 0) {
+    const delta = i.monthlySavings - i.prevMonthlySavings
+    if (delta > 50) {
+      const extraDays = freedomDays(delta * 12, i.dailyExpenses)
+      const eur = formatEUR(delta)
+      return [{
+        id: 'sparen-stijging', theme: 'sparen', sentiment: 'positive',
+        score: clamp(delta / 8, 10, 90),
+        variants: [
+          (v) => ({
+            vraag: `${v.subjCap} ${v.hebt} deze maand ${eur} meer gespaard dan vorige maand. Op jaarbasis is dat ${freedomLabel(extraDays)} extra vrijheid. Welke keuze maakte het verschil?`,
+            context: `Spaarquote: ${i.savingsRate6m.toFixed(0)}% (6-maands).`,
+            actie: `Bespreek welke uitgaven ${v.subj} bewust ${v.hebt} verminderd.`,
+            vrijheidstijd: freedomLabel(extraDays),
+          }),
+          (v) => ({
+            vraag: `${eur} meer opzij dan vorige maand — ${freedomLabel(extraDays)} extra vrijheid per jaar. Houdbaar?`,
+            context: `Maandbesparing steeg met ${eur}.`,
+            actie: `Toets ${v.samen} of dit tempo vol te houden is.`,
+            vrijheidstijd: freedomLabel(extraDays),
+          }),
+        ],
+      }]
+    }
+    if (delta < -50) {
+      const eur = formatEUR(i.monthlySavings)
+      const prev = formatEUR(i.prevMonthlySavings)
+      return [{
+        id: 'sparen-daling', theme: 'sparen', sentiment: 'neutral',
+        score: clamp(Math.abs(delta) / 12, 8, 70),
+        variants: [
+          (v) => ({
+            vraag: `De maandelijkse besparing daalde van ${prev} naar ${eur}. Was dat een bewuste keuze, of onverwachte kosten?`,
+            context: `Verschil: ${formatEUR(delta)} minder gespaard.`,
+            actie: `Kijk ${v.samen} of ${v.subj} volgende maand terug ${v.wilt} naar het oude niveau.`,
+          }),
+          (v) => ({
+            vraag: `${prev} → ${eur} gespaard. Wat veranderde er deze maand?`,
+            context: `Maandbesparing daalde met ${formatEUR(Math.abs(delta))}.`,
+            actie: `Benoem ${v.samen} de grootste verschuiving.`,
+          }),
+        ],
+      }]
+    }
+    return []
+  }
+  if (i.monthlySavings <= 0 && i.monthlyIncome > 0) {
+    return [{
+      id: 'negatief-sparen', theme: 'sparen', sentiment: 'alert',
+      score: 78,
+      variants: [
+        (v) => ({
+          vraag: `Deze maand ${v.hebt} ${v.subj} meer uitgegeven dan er binnenkwam. Dat kan bewust zijn — maar is het hoe ${v.subj} het ${v.wilt}? Welk klein bedrag zou volgende maand wél opzij kunnen?`,
+          context: `Uitgaven (${formatEUR(i.monthlyExpenses)}) overschreden inkomen (${formatEUR(i.monthlyIncome)}).`,
+          actie: `Spreek ${v.samen} een realistisch minimaal spaarbedrag af.`,
+        }),
+        (v) => ({
+          vraag: `Rood deze maand: ${formatEUR(i.monthlyExpenses - i.monthlyIncome)} meer uit dan in. Eenmalig of een patroon?`,
+          context: `Inkomen ${formatEUR(i.monthlyIncome)} vs uitgaven ${formatEUR(i.monthlyExpenses)}.`,
+          actie: `Bepaal ${v.samen} één concrete bijsturing.`,
+        }),
+      ],
+    }]
+  }
+  return []
+}
+
+const detectUitgaven: Detector = (i) => {
+  if (i.prevMonthExpenses <= 0 || i.monthlyExpenses <= 0) return []
+  const change = ((i.monthlyExpenses - i.prevMonthExpenses) / i.prevMonthExpenses) * 100
+  if (change > 15) {
+    const extra = i.monthlyExpenses - i.prevMonthExpenses
+    const days = freedomDays(extra * 12, i.dailyExpenses)
+    return [{
+      id: 'uitgaven-stijging', theme: 'uitgaven', sentiment: 'neutral',
+      score: clamp(change, 15, 85),
+      variants: [
+        (v) => ({
+          vraag: `${v.subjCap} ${v.poss} uitgaven zijn ${change.toFixed(0)}% hoger dan vorige maand. Dat verschil (${formatEUR(extra)}) is op jaarbasis ${freedomLabel(days)}. Welke uitgaven voelden waardevol?`,
+          context: `Van ${formatEUR(i.prevMonthExpenses)} naar ${formatEUR(i.monthlyExpenses)}.`,
+          actie: `Loop ${v.samen} de grootste categorieën door.`,
+        }),
+        (v) => ({
+          vraag: `${formatEUR(extra)} meer uitgegeven dan vorige maand (+${change.toFixed(0)}%). Bewust of geslopen?`,
+          context: `Maanduitgaven stegen naar ${formatEUR(i.monthlyExpenses)}.`,
+          actie: `Markeer ${v.samen} wat de moeite waard was.`,
+        }),
+      ],
+    }]
+  }
+  if (change < -10) {
+    const saved = i.prevMonthExpenses - i.monthlyExpenses
+    const days = freedomDays(saved, i.dailyExpenses)
+    return [{
+      id: 'uitgaven-daling', theme: 'uitgaven', sentiment: 'positive',
+      score: clamp(days * 2, 10, 85),
+      variants: [
+        (v) => ({
+          vraag: `${v.subjCap} ${v.hebt} ${formatEUR(saved)} minder uitgegeven dan vorige maand — ${days} vrijheidsdagen gewonnen! Wat ${v.hebt} ${v.subj} anders gedaan?`,
+          context: `Uitgaven daalden ${Math.abs(change).toFixed(0)}%.`,
+          actie: `Bespreek of ${v.subj} dit patroon ${v.wilt} vasthouden.`,
+          vrijheidstijd: `${days} dagen`,
+        }),
+        (v) => ({
+          vraag: `${formatEUR(saved)} minder uitgegeven — ${freedomLabel(days)} vrijheid erbij. Welke gewoonte hielp?`,
+          context: `Uitgaven daalden ${Math.abs(change).toFixed(0)}% t.o.v. vorige maand.`,
+          actie: `Leg ${v.samen} vast wat ${v.subj} wilt herhalen.`,
+          vrijheidstijd: `${days} dagen`,
+        }),
+      ],
+    }]
+  }
+  return []
+}
+
+const detectDoelen: Detector = (i) => {
+  const active = i.goals.filter(g => !g.completed && g.target > 0)
+  if (active.length === 0) return []
+  const closest = active
+    .map(g => ({ ...g, pct: (g.current / g.target) * 100 }))
+    .sort((a, b) => b.pct - a.pct)[0]
+  if (closest.pct >= 50 && closest.pct < 100) {
+    const remaining = closest.target - closest.current
+    const days = i.dailyExpenses > 0 ? freedomDays(remaining, i.dailyExpenses) : 0
+    return [{
+      id: 'doel-bijna', theme: 'doelen', sentiment: 'positive',
+      score: clamp(closest.pct, 50, 95),
+      variants: [
+        (v) => ({
+          vraag: `${v.subjCap} ${v.bent} al ${closest.pct.toFixed(0)}% op weg naar "${closest.name}". Nog ${formatEUR(remaining)} te gaan! Hoe ${v.wilt} ${v.subj} dit ${v.samen} vieren als het lukt?`,
+          context: `Doel "${closest.name}": ${formatEUR(closest.current)} van ${formatEUR(closest.target)}.`,
+          actie: `Spreek een kleine beloning af bij het bereiken.`,
+          vrijheidstijd: days > 0 ? freedomLabel(days) : undefined,
+        }),
+        (v) => ({
+          vraag: `"${closest.name}" staat op ${closest.pct.toFixed(0)}%. Wat is de laatste zet om het af te maken?`,
+          context: `Nog ${formatEUR(remaining)} tot het doel.`,
+          actie: `Plan ${v.samen} de resterende stortingen.`,
+          vrijheidstijd: days > 0 ? freedomLabel(days) : undefined,
+        }),
+      ],
+    }]
+  }
+  if (closest.pct < 20) {
+    return [{
+      id: 'doel-start', theme: 'doelen', sentiment: 'neutral',
+      score: 30,
+      variants: [
+        (v) => ({
+          vraag: `${v.poss === 'je' ? 'Je' : 'Jullie'} doel "${closest.name}" staat op ${closest.pct.toFixed(0)}%. Welk concreet bedrag kunnen ${v.subj} per maand opzij leggen om sneller op koers te komen?`,
+          context: `Doel "${closest.name}" is net gestart.`,
+          actie: `Stel ${v.samen} een automatische maandstorting in.`,
+        }),
+        (v) => ({
+          vraag: `"${closest.name}" is net begonnen. Wat maakt dit doel belangrijk genoeg om vol te houden?`,
+          context: `Voortgang: ${closest.pct.toFixed(0)}%.`,
+          actie: `Benoem ${v.samen} het "waarom" achter dit doel.`,
+        }),
+      ],
+    }]
+  }
+  return []
+}
+
+const detectSchulden: Detector = (i) => {
+  if (i.debtCount <= 0 || i.totalDebts <= 0 || i.dailyExpenses <= 0) return []
+  const days = freedomDays(i.totalDebts, i.dailyExpenses)
+  return [{
+    id: 'schulden-vrijheid', theme: 'schulden', sentiment: 'neutral',
+    score: clamp(days / 3, 10, 60),
+    variants: [
+      (v) => ({
+        vraag: `${v.subjCap} ${v.poss} totale schuld is ${formatEUR(i.totalDebts)} — dat is ${freedomLabel(days)} aan vrijheid die ${v.subj} nog terugkopen. Welke schuld ${v.wilt} ${v.subj} het eerste aanpakken?`,
+        context: `${i.debtCount} ${i.debtCount === 1 ? 'schuld' : 'schulden'}, totaal ${formatEUR(i.totalDebts)}.`,
+        actie: `Bespreek ${v.samen} een extra aflossing op de duurste schuld.`,
+        vrijheidstijd: freedomLabel(days),
+      }),
+      (v) => ({
+        vraag: `${formatEUR(i.totalDebts)} schuld = ${freedomLabel(days)} teruggekochte vrijheid. Welke aflossing geeft de meeste rust?`,
+        context: `Totale schuldenlast over ${i.debtCount} ${i.debtCount === 1 ? 'schuld' : 'schulden'}.`,
+        actie: `Kies ${v.samen} de eerstvolgende schuld om op te focussen.`,
+        vrijheidstijd: freedomLabel(days),
+      }),
+    ],
+  }]
+}
+
+const detectActies: Detector = (i) => {
+  if (i.completedActionsThisMonth > 0) {
+    const fd = i.completedActionsFreedomDays
+    const n = i.completedActionsThisMonth
+    return [{
+      id: 'acties-momentum', theme: 'acties', sentiment: 'positive',
+      score: clamp(fd * 2 + n * 5, 15, 85),
+      variants: [
+        (v) => ({
+          vraag: `${v.subjCap} ${v.hebt} deze maand ${n} ${n === 1 ? 'actie' : 'acties'} afgerond${fd > 0 ? ` en ${fd} vrijheidsdagen verdiend` : ''}. Welke had de meeste impact?`,
+          context: `${n} afgeronde ${n === 1 ? 'actie' : 'acties'} deze maand.`,
+          actie: `Kies ${v.samen} de volgende actie.`,
+          vrijheidstijd: fd > 0 ? `${fd} dagen` : undefined,
+        }),
+        (v) => ({
+          vraag: `${n} ${n === 1 ? 'actie' : 'acties'} afgevinkt deze maand. Wat gaf het beste gevoel?`,
+          context: `Afgeronde acties: ${n}.`,
+          actie: `Plan ${v.samen} de volgende stap.`,
+          vrijheidstijd: fd > 0 ? `${fd} dagen` : undefined,
+        }),
+      ],
+    }]
+  }
+  if (i.pendingActionsCount > 0) {
+    const n = i.pendingActionsCount
+    return [{
+      id: 'acties-openstaand', theme: 'acties', sentiment: 'neutral',
+      score: 25,
+      variants: [
+        (v) => ({
+          vraag: `Er staan ${n} openstaande ${n === 1 ? 'actie' : 'acties'} klaar. Welke ${v.wilt} ${v.subj} deze maand ${v.samen} oppakken?`,
+          context: `${n} aanbevolen acties wachten.`,
+          actie: `Kies ${v.samen} 1 actie en plan een moment.`,
+        }),
+        (v) => ({
+          vraag: `${n} acties op de plank. Welke geeft de grootste sprong richting vrijheid?`,
+          context: `${n} openstaande aanbevelingen.`,
+          actie: `Prioriteer ${v.samen} de eerstvolgende.`,
+        }),
+      ],
+    }]
+  }
+  return []
+}
+
+const detectSparenVrijheid: Detector = (i) => {
+  if (i.monthlySavings <= 100 || i.dailyExpenses <= 0) return []
+  const days = freedomDays(i.monthlySavings, i.dailyExpenses)
+  return [{
+    id: 'sparen-vrijheid', theme: 'sparen', sentiment: 'positive',
+    score: clamp(days * 1.5, 8, 70),
+    variants: [
+      (v) => ({
+        vraag: `${v.subjCap} ${v.hebt} deze maand ${formatEUR(i.monthlySavings)} gespaard — dat zijn ${days} nieuwe vrijheidsdagen. Hoe ${v.voelt} daarover?`,
+        context: `Spaarquote: ${i.savingsRate6m.toFixed(0)}% van het inkomen.`,
+        actie: `Bespreek of ${v.subj} tevreden ${v.bent} of ${v.wilt} versnellen.`,
+        vrijheidstijd: `${days} dagen`,
+      }),
+      (v) => ({
+        vraag: `${formatEUR(i.monthlySavings)} opzij = ${days} vrijheidsdagen erbij. Tevreden met dit tempo?`,
+        context: `6-maands spaarquote: ${i.savingsRate6m.toFixed(0)}%.`,
+        actie: `Bepaal ${v.samen} of het tempo omhoog kan.`,
+        vrijheidstijd: `${days} dagen`,
+      }),
+    ],
+  }]
+}
+
+// ── Fallback (geroteerd) ───────────────────────────────────────────────
+function buildFallback(_i: GespreksstartersInput): StarterCandidate[] {
+  return [
+    {
+      id: 'algemeen-dromen', theme: 'algemeen', sentiment: 'positive', score: 0,
+      variants: [
+        (v) => ({
+          vraag: `Als ${v.subj} volledig financieel vrij ${v.bent}, hoe ziet een ideale dinsdag eruit?`,
+          context: 'Reflectiemoment over levensdoelen.',
+          actie: `Schrijf ${v.audience === 'household' ? 'allebei onafhankelijk' : ''} 3 dingen op die ${v.subj} dan zou doen.`,
+        }),
+        (v) => ({
+          vraag: `Stel: geld is geen zorg meer. Wat verandert er morgen in ${v.poss} dag?`,
+          context: 'Visie op vrijheid.',
+          actie: `Noteer ${v.samen} één ding dat ${v.subj} nú al kan proeven.`,
+        }),
+      ],
+    },
+    {
+      id: 'algemeen-waarden', theme: 'algemeen', sentiment: 'neutral', score: 0,
+      variants: [
+        (v) => ({
+          vraag: `Welke uitgave van afgelopen maand bracht ${v.subj} het meeste voldoening? En welke het minste?`,
+          context: 'Reflectie over bewust besteden.',
+          actie: `Identificeer ${v.samen} een terugkerende uitgave die niet bijdraagt.`,
+        }),
+        (v) => ({
+          vraag: `Welke euro van vorige maand zou ${v.subj} zo weer uitgeven — en welke niet?`,
+          context: 'Waarden achter bestedingen.',
+          actie: `Kies ${v.samen} één uitgave om te schrappen of te vieren.`,
+        }),
+      ],
+    },
+  ]
+}
+
+// ── Hoofdentry ─────────────────────────────────────────────────────────
+const DETECTORS: Detector[] = [
+  detectVermogen,
+  detectSparenVergelijking,
+  detectUitgaven,
+  detectDoelen,
+  detectSchulden,
+  detectActies,
+  detectSparenVrijheid,
+]
+
+export function buildGespreksstarters(input: GespreksstartersInput): GesprekStarterData[] {
+  const voice = buildVoice(input.audience)
+  const candidates = DETECTORS.flatMap(d => d(input))
+  return selectStarters(candidates, voice, input.monthIndex, buildFallback(input))
+}
+
+/** Alle onderwerp-id's die de engine kan produceren (voor tests/registry). */
+export const STARTER_IDS = [
+  'vermogen-groei', 'vermogen-daling',
+  'sparen-stijging', 'sparen-daling', 'negatief-sparen',
+  'uitgaven-stijging', 'uitgaven-daling',
+  'doel-bijna', 'doel-start',
+  'schulden-vrijheid',
+  'acties-momentum', 'acties-openstaand',
+  'sparen-vrijheid',
+  'algemeen-dromen', 'algemeen-waarden',
+] as const
 

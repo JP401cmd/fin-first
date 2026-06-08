@@ -141,3 +141,70 @@ describe('selectStarters', () => {
     expect(selectStarters([cand('r', 'sparen', 50)], v, 0, [])[0].vraag).toBe('r-A')
   })
 })
+
+import {
+  buildGespreksstarters,
+  type GespreksstartersInput,
+} from './gespreksstarters'
+
+// Basis-input zonder enkele trigger; tests zetten per geval velden aan.
+function baseInput(over: Partial<GespreksstartersInput> = {}): GespreksstartersInput {
+  return {
+    audience: 'household',
+    monthIndex: 0,
+    netWorth: 100000,
+    netWorthTrend: 0,
+    prevNetWorth: 100000,
+    monthlyIncome: 4000,
+    monthlyExpenses: 3000,
+    prevMonthIncome: 4000,
+    prevMonthExpenses: 3000,
+    monthlySavings: 1000,
+    prevMonthlySavings: 1000,
+    savingsRate6m: 20,
+    dailyExpenses: 100,
+    goals: [],
+    totalDebts: 0,
+    debtCount: 0,
+    completedActionsThisMonth: 0,
+    completedActionsFreedomDays: 0,
+    pendingActionsCount: 0,
+    fireAge: null,
+    prevFireAge: null,
+    expensesByCategory: [],
+    newRecurring: [],
+    topAsset: null,
+    ...over,
+  }
+}
+
+function ids(out: { id: string }[]): string[] {
+  return out.map(o => o.id)
+}
+
+describe('behouden detectoren', () => {
+  it('vermogen-groei fires on positive trend', () => {
+    const out = buildGespreksstarters(baseInput({ netWorthTrend: 3000, prevNetWorth: 97000 }))
+    expect(ids(out)).toContain('vermogen-groei')
+  })
+  it('vermogen-daling fires on negative trend with alert sentiment', () => {
+    const out = buildGespreksstarters(baseInput({ netWorthTrend: -3000, prevNetWorth: 103000 }))
+    const hit = out.find(o => o.id === 'vermogen-daling')
+    expect(hit).toBeDefined()
+    expect(hit!.sentiment).toBe('alert')
+  })
+  it('negatief-sparen fires when savings <= 0', () => {
+    const out = buildGespreksstarters(baseInput({
+      monthlySavings: -200, monthlyIncome: 3000, monthlyExpenses: 3200, prevMonthlySavings: 100,
+    }))
+    expect(ids(out)).toContain('negatief-sparen')
+  })
+  it('schulden-vrijheid fires when debts exist', () => {
+    const out = buildGespreksstarters(baseInput({ totalDebts: 20000, debtCount: 2 }))
+    expect(ids(out)).toContain('schulden-vrijheid')
+  })
+  it('sparen-vrijheid fires when monthly savings > 100', () => {
+    const out = buildGespreksstarters(baseInput({ monthlySavings: 1200 }))
+    expect(ids(out)).toContain('sparen-vrijheid')
+  })
+})
