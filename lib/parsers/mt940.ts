@@ -84,6 +84,7 @@ export async function parseMT940(content: string): Promise<ParsedTransaction[]> 
         counterparty_iban: extractCounterpartyIban(details),
         reference: extractReference(details),
         transaction_type: tx.transactionType || null,
+        bank_code: null,
         running_balance: null,
         creditor_id: null,
         fx_amount: null,

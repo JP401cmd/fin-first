@@ -146,7 +146,7 @@ export async function parseCSV(
     const cleanDescription = description.replace(/\s+/g, ' ').trim() || 'Geen omschrijving'
     const hash = await computeHash(date, amount, cleanDescription)
 
-    const typeVal = preset.typeColumn != null ? (fields[preset.typeColumn] ?? '').trim() : ''
+    const bankCodeVal = preset.bankCodeColumn != null ? (fields[preset.bankCodeColumn] ?? '').trim() : ''
     const balanceVal = preset.balanceColumn != null ? (fields[preset.balanceColumn] ?? '').trim() : ''
     const creditorVal = preset.creditorColumn != null ? (fields[preset.creditorColumn] ?? '').trim() : ''
     const fxAmtVal = preset.fxAmountColumn != null ? (fields[preset.fxAmountColumn] ?? '').trim() : ''
@@ -160,7 +160,8 @@ export async function parseCSV(
       counterparty_name: counterparty?.trim() || null,
       counterparty_iban: iban?.trim() || null,
       reference: reference?.trim() || null,
-      transaction_type: typeVal || null,
+      transaction_type: null,
+      bank_code: bankCodeVal || null,
       running_balance: parseOptionalAmount(balanceVal),
       creditor_id: creditorVal || null,
       fx_amount: parseOptionalAmount(fxAmtVal),

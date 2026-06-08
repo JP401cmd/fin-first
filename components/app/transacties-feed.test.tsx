@@ -22,6 +22,7 @@ function atx(p: Partial<AnalysisTransaction>): AnalysisTransaction {
     account_name: p.account_name ?? null,
     is_income: p.is_income ?? false,
     transaction_type: p.transaction_type ?? null,
+    bank_code: p.bank_code ?? null,
     running_balance: p.running_balance ?? null,
     creditor_id: p.creditor_id ?? null,
     fx_amount: p.fx_amount ?? null,

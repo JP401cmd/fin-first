@@ -1095,6 +1095,7 @@ export default function ImportPage() {
       import_hash: r.import_hash,
       reference: r.reference,
       transaction_type: r.isTransfer ? 'transfer' : r.transaction_type,
+      bank_code: r.bank_code ?? null,
       running_balance: r.running_balance,
       creditor_id: r.creditor_id,
       fx_amount: r.fx_amount,

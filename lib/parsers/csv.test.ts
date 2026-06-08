@@ -19,7 +19,7 @@ describe('parseCSV ING preset — nieuwe velden zijn null zonder kolomconfigurat
   const ING_HEADER = 'Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutatiesoort;Mededelingen'
   const ING_ROW    = '20260101;Albert Heijn;NL60RABO0330370596;NL92ABNA0311015505;ba;Af;12,50;Betaalautomaat;Boodschappen'
 
-  it('velden running_balance, creditor_id, fx_amount, fx_currency, fx_rate, transaction_type zijn null', async () => {
+  it('velden running_balance, creditor_id, fx_amount, fx_currency, fx_rate, transaction_type, bank_code zijn null', async () => {
     const txns = await parseCSV([ING_HEADER, ING_ROW].join('\n'), ING)
     expect(txns).toHaveLength(1)
     const t = txns[0]
@@ -29,24 +29,27 @@ describe('parseCSV ING preset — nieuwe velden zijn null zonder kolomconfigurat
     expect(t.fx_currency).toBeNull()
     expect(t.fx_rate).toBeNull()
     expect(t.transaction_type).toBeNull()
+    expect(t.bank_code).toBeNull()
   })
 })
 
 describe('parseCSV rabobank extra velden', () => {
-  it('mapt Code, Saldo, Incassant ID', async () => {
+  it('mapt Code naar bank_code, Saldo, Incassant ID; transaction_type is null', async () => {
     const txns = await parseCSV([HEADER, INCASSO].join('\n'), RABO)
     expect(txns).toHaveLength(1)
     const t = txns[0]
-    expect(t.transaction_type).toBe('ei')
+    expect(t.bank_code).toBe('ei')
+    expect(t.transaction_type).toBeNull()
     expect(t.running_balance).toBeCloseTo(936.35)
     expect(t.creditor_id).toBe('LU96ZZZ0000000000000000058')
     expect(t.fx_amount).toBeNull()
   })
 
-  it('mapt FX-velden bij vreemde valuta', async () => {
+  it('mapt FX-velden bij vreemde valuta; bank_code correct; transaction_type is null', async () => {
     const txns = await parseCSV([HEADER, FX].join('\n'), RABO)
     const t = txns[0]
-    expect(t.transaction_type).toBe('bc')
+    expect(t.bank_code).toBe('bc')
+    expect(t.transaction_type).toBeNull()
     expect(t.fx_amount).toBeCloseTo(1.0)
     expect(t.fx_currency).toBe('CHF')
     expect(t.fx_rate).toBeCloseTo(0.93457)

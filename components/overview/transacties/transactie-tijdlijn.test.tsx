@@ -6,7 +6,7 @@ import type { AnalysisTransaction } from '@/lib/transaction-insights'
 const base: AnalysisTransaction = {
   id: '1', date: '2026-01-19', amount: -70.76, description: 'DUIVEN, 6921RJ, NLD, 14:10',
   counterparty_name: 'Hornbach Duiven', counterparty_iban: null, budget_id: null, category: null,
-  account_id: 'acc1', account_name: 'Betaal', is_income: false, transaction_type: 'bc',
+  account_id: 'acc1', account_name: 'Betaal', is_income: false, transaction_type: null, bank_code: 'bc',
   running_balance: 901.63, creditor_id: null, fx_amount: null, fx_currency: null, fx_rate: null,
 }
 
@@ -28,7 +28,7 @@ describe('TransactieTijdlijn', () => {
   it('filtert op Inkomsten-chip', () => {
     const txns: AnalysisTransaction[] = [
       { ...base, id: 'x', amount: -10, counterparty_name: 'Uitgave', description: 'desc-x' },
-      { ...base, id: 'y', amount: 50, counterparty_name: 'Inkomst', description: 'desc-y', transaction_type: 'cb', is_income: true },
+      { ...base, id: 'y', amount: 50, counterparty_name: 'Inkomst', description: 'desc-y', transaction_type: null, bank_code: 'cb', is_income: true },
     ]
     render(<TransactieTijdlijn transactions={txns} windowDays={30} accounts={[]} selectedAccountId={null} onSelectAccount={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: /inkomsten/i }))

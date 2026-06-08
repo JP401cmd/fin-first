@@ -83,7 +83,7 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
       if (effDirection === 'income' && t.amount <= 0) return false
       if (onlyRecurring && !recurring.has(t.id)) return false
       if (onlyTransfers) {
-        const isTransfer = t.transaction_type === 'transfer' || deriveType(t.transaction_type, t.counterparty_name, t.amount).kind === 'betaalverzoek'
+        const isTransfer = t.transaction_type === 'transfer' || deriveType(t.bank_code, t.counterparty_name, t.amount).kind === 'betaalverzoek'
         if (!isTransfer) return false
       }
       const abs = Math.abs(t.amount)
@@ -346,7 +346,7 @@ function AccountButton({ active, label, onClick, connected }: { active: boolean;
 
 function Row({ t, recurring, onSelect, masked }: { t: AnalysisTransaction; recurring: boolean; onSelect?: (tx: AnalysisTransaction) => void; masked: boolean }) {
   const name = cleanMerchantName(t.counterparty_name)
-  const type = deriveType(t.transaction_type, t.counterparty_name, t.amount)
+  const type = deriveType(t.bank_code, t.counterparty_name, t.amount)
   const TypeIcon = TYPE_ICON[type.kind]
   const loc = parseLocationTime(t.description)
   const sub = loc.place ? `${loc.place}${loc.time ? ` · ${loc.time}` : ''}` : t.description

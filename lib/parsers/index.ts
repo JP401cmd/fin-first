@@ -52,7 +52,7 @@ export type CSVPreset = {
   signDebitValue?: string // value in signColumn that means debit/expense (e.g. "Af")
   statusColumn?: number // column to check for row filtering
   statusFilterValue?: string // only include rows where statusColumn equals this value
-  typeColumn?: number
+  bankCodeColumn?: number
   balanceColumn?: number
   creditorColumn?: number
   fxAmountColumn?: number
@@ -88,7 +88,7 @@ export const CSV_PRESETS: CSVPreset[] = [
     referenceColumn: 16,
     dateFormat: 'YYYY-MM-DD',
     hasHeader: true,
-    typeColumn: 13,
+    bankCodeColumn: 13,
     balanceColumn: 7,
     creditorColumn: 17,
     fxAmountColumn: 23,

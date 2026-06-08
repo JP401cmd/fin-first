@@ -100,6 +100,7 @@ function mapRow(
     account_name: account_id ? accountMap.get(account_id) ?? null : null,
     is_income: Boolean(item.is_income),
     transaction_type: (item.transaction_type as string | null) ?? null,
+    bank_code: (item.bank_code as string | null) ?? null,
     running_balance: item.running_balance != null ? Number(item.running_balance) : null,
     creditor_id: (item.creditor_id as string | null) ?? null,
     fx_amount: item.fx_amount != null ? Number(item.fx_amount) : null,
