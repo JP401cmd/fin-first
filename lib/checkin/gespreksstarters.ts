@@ -47,7 +47,9 @@ export function buildVoice(audience: Audience): Voice {
 // ── Freedom-time helpers (verplaatst uit de route) ─────────────────────
 
 // EUR-formattering hergebruikt de canonieke helper (incl. NaN-guard) i.p.v. dupliceren.
-export { formatCurrency as formatEUR } from '@/lib/format'
+// Geïmporteerd als lokale naam zodat detectoren in deze module formatEUR(...) kunnen aanroepen.
+import { formatCurrency as formatEUR } from '@/lib/format'
+export { formatEUR }
 
 export function freedomDays(amount: number, dailyExpenses: number): number {
   if (dailyExpenses <= 0) return 0
