@@ -10,6 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-08-checkin-reflectievragen-diversificatie-design.md`
 
+> **Uitvoeringsnotitie (correctie tijdens implementatie, commit 36dc7b25):** De `Voice`
+> is uitgebreid met inversie-vormen `heb`/`wil`/`kun` (naast `hebt`/`wilt`/`bent`) omdat
+> Nederlands in vraag-inversie de 2e-persoons "-t" laat vallen ("je hebt" → "heb je",
+> "je wilt" → "wil je", "je kunt" → "kun je"). In geïnverteerde posities (werkwoord vóór
+> het onderwerp) gebruiken templates `v.heb`/`v.wil`/`v.kun`; in niet-geïnverteerde
+> posities blijven `v.hebt`/`v.wilt`/`v.bent`. De template-strings in Task 3 en Task 5
+> hieronder zijn op die plekken naar de inversie-vorm gebracht.
+
 ---
 
 ## Bestandsoverzicht
@@ -1237,7 +1245,7 @@ const detectDoelDeadline: Detector = (i) => {
     score: clamp(60 - g.daysUntil + (75 - g.pct), 15, 88),
     variants: [
       (v) => ({
-        vraag: `Doel "${g.name}" heeft nog ${g.daysUntil} dagen te gaan en staat op ${g.pct.toFixed(0)}%. Is de deadline nog haalbaar, of ${v.wilt} ${v.subj} 'm bijstellen?`,
+        vraag: `Doel "${g.name}" heeft nog ${g.daysUntil} dagen te gaan en staat op ${g.pct.toFixed(0)}%. Is de deadline nog haalbaar, of ${v.wil} ${v.subj} 'm bijstellen?`,
         context: `Nog ${formatEUR(remaining)} tot "${g.name}", deadline over ${g.daysUntil} dagen.`,
         actie: `Beslis ${v.samen}: tempo verhogen of deadline verschuiven.`,
       }),
@@ -1259,7 +1267,7 @@ const detectVermogensconcentratie: Detector = (i) => {
     score: clamp(pct - 50, 10, 70),
     variants: [
       (v) => ({
-        vraag: `"${i.topAsset!.name}" is ${pct.toFixed(0)}% van ${v.poss} vermogen. Voelt die concentratie comfortabel, of ${v.wilt} ${v.subj} meer spreiding?`,
+        vraag: `"${i.topAsset!.name}" is ${pct.toFixed(0)}% van ${v.poss} vermogen. Voelt die concentratie comfortabel, of ${v.wil} ${v.subj} meer spreiding?`,
         context: `${formatEUR(i.topAsset!.value)} van ${formatEUR(i.netWorth)} netto vermogen.`,
         actie: `Bespreek ${v.samen} of spreiding gewenst is.`,
       }),
@@ -1287,7 +1295,7 @@ const detectMijlpaal: Detector = (i) => {
     score: clamp(100 - (remaining / (next * 0.05)) * 30, 40, 80),
     variants: [
       (v) => ({
-        vraag: `Nog ${formatEUR(remaining)} en ${v.subj} ${v.hebt} de mijlpaal van ${formatEUR(next)} bereikt. Hoe ${v.wilt} ${v.subj} dat ${v.samen} markeren?`,
+        vraag: `Nog ${formatEUR(remaining)} en ${v.subj} ${v.hebt} de mijlpaal van ${formatEUR(next)} bereikt. Hoe ${v.wil} ${v.subj} dat ${v.samen} markeren?`,
         context: `Netto vermogen ${formatEUR(i.netWorth)}, volgende mijlpaal ${formatEUR(next)}.`,
         actie: `Spreek ${v.samen} een klein vier-moment af bij ${formatEUR(next)}.`,
         vrijheidstijd: days > 0 ? freedomLabel(days) : undefined,
@@ -1381,6 +1389,10 @@ describe('buildGespreksstarters — contracten', () => {
     }))
     const blob = out.map(o => `${o.vraag} ${o.actie} ${o.context}`).join(' ').toLowerCase()
     expect(blob).not.toContain('jullie')
+    // ook geen onjuiste NL-inversievormen (Voice heb/wil/kun)
+    for (const bad of ['willen je', 'hebt je', 'kunnen je', 'wilt je', 'hebben je']) {
+      expect(blob).not.toContain(bad)
+    }
   })
 
   it('household output uses "jullie" somewhere', () => {
