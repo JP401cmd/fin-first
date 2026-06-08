@@ -261,7 +261,8 @@ Mono kicker links (sticky bij scroll), rechts subtotaal (`−`/`+`) + vrijheidst
 
 ## 13. Risico's & open punten
 
-- **Perspectief-RPC** moet de nieuwe kolommen teruggeven (4.5) — kan een RPC-update vergen.
+- **Perspectief-RPC**: basisquery is `select('*')` → eigen/huishoud-base krijgt de nieuwe kolommen gratis
+  (4.5). Alleen de partner-persoonlijke RPC kan een update vergen; niet-blokkerend voor solo/eigen gebruik.
 - **Her-import** nodig om Tier-B-velden te vullen; bestaande rijen blijven Tier-A tot her-import. Bewust
   geaccepteerd (graceful degradation).
 - **Code-mapping `bg`/`cb`/`ba`** semantiek bij randgevallen (retour `ba` = positief; `cb` = diverse
