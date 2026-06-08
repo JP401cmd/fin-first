@@ -10,6 +10,11 @@ export type ParsedTransaction = {
   counterparty_iban: string | null
   reference: string | null
   transaction_type: string | null
+  running_balance: number | null
+  creditor_id: string | null
+  fx_amount: number | null
+  fx_currency: string | null
+  fx_rate: number | null
   import_hash: string
 }
 

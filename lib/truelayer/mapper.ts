@@ -21,6 +21,11 @@ export async function mapTransaction(tl: TLTransaction): Promise<ParsedTransacti
     counterparty_iban: null,
     reference: tl.transaction_id ?? null,
     transaction_type: tl.transaction_category ?? tl.transaction_type ?? null,
+    running_balance: null,
+    creditor_id: null,
+    fx_amount: null,
+    fx_currency: null,
+    fx_rate: null,
     import_hash,
   }
 }
