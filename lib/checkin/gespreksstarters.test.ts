@@ -278,3 +278,69 @@ describe('nieuwe detectoren B', () => {
     expect(ids(out)).not.toContain('mijlpaal-nadering')
   })
 })
+
+describe('buildGespreksstarters — contracten', () => {
+  it('always returns at least 2 and at most 5', () => {
+    const empty = buildGespreksstarters(baseInput())
+    expect(empty.length).toBeGreaterThanOrEqual(2)
+    const loaded = buildGespreksstarters(baseInput({
+      netWorthTrend: 5000, prevNetWorth: 95000,
+      monthlySavings: 1500, prevMonthlySavings: 800,
+      totalDebts: 30000, debtCount: 2,
+      completedActionsThisMonth: 2, completedActionsFreedomDays: 10,
+      savingsRate6m: 30, fireAge: 50, prevFireAge: 53,
+    }))
+    expect(loaded.length).toBeLessThanOrEqual(5)
+  })
+
+  it('solo output never leaks "jullie"', () => {
+    const out = buildGespreksstarters(baseInput({
+      audience: 'solo',
+      netWorthTrend: 4000, prevNetWorth: 96000,
+      totalDebts: 15000, debtCount: 1,
+      monthlySavings: 900,
+    }))
+    const blob = out.map(o => `${o.vraag} ${o.actie} ${o.context}`).join(' ').toLowerCase()
+    expect(blob).not.toContain('jullie')
+    // ook geen onjuiste NL-inversievormen (Voice heb/wil/kun)
+    for (const bad of ['willen je', 'hebt je', 'kunnen je', 'wilt je', 'hebben je']) {
+      expect(blob).not.toContain(bad)
+    }
+  })
+
+  it('household output uses "jullie" somewhere', () => {
+    const out = buildGespreksstarters(baseInput({
+      audience: 'household', netWorthTrend: 4000, prevNetWorth: 96000,
+    }))
+    const blob = out.map(o => o.vraag).join(' ').toLowerCase()
+    expect(blob).toContain('jullie')
+  })
+
+  it('is deterministic for same input + monthIndex', () => {
+    const a = buildGespreksstarters(baseInput({ monthIndex: 7, netWorthTrend: 3000, prevNetWorth: 97000 }))
+    const b = buildGespreksstarters(baseInput({ monthIndex: 7, netWorthTrend: 3000, prevNetWorth: 97000 }))
+    expect(a).toEqual(b)
+  })
+
+  it('different monthIndex yields a different phrasing for a stable topic', () => {
+    const m0 = buildGespreksstarters(baseInput({ monthIndex: 0, netWorthTrend: 3000, prevNetWorth: 97000 }))
+    const m1 = buildGespreksstarters(baseInput({ monthIndex: 1, netWorthTrend: 3000, prevNetWorth: 97000 }))
+    const q0 = m0.find(o => o.id === 'vermogen-groei')!.vraag
+    const q1 = m1.find(o => o.id === 'vermogen-groei')!.vraag
+    expect(q0).not.toBe(q1)
+  })
+
+  it('mijlpaal-nadering does not fire above the largest milestone', () => {
+    const out = buildGespreksstarters(baseInput({ netWorth: 1500000 }))
+    expect(out.map(o => o.id)).not.toContain('mijlpaal-nadering')
+  })
+
+  it('doel-deadline does not fire for a near-complete goal', () => {
+    const soon = new Date()
+    soon.setDate(soon.getDate() + 10)
+    const out = buildGespreksstarters(baseInput({
+      goals: [{ name: 'Bijna klaar', current: 1800, target: 2000, completed: false, targetDate: soon.toISOString().slice(0, 10) }],
+    }))
+    expect(out.map(o => o.id)).not.toContain('doel-deadline')
+  })
+})
