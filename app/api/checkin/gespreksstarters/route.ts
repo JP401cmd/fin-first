@@ -24,17 +24,16 @@ export async function GET() {
   const threeMonthsAgo = new Date(currentYear, currentMonth - 3, 1).toISOString().slice(0, 10)
 
   const [
-    assetsRes, debtsRes, curIncomeRes, curExpenseRes, prevIncomeRes, prevExpenseRes,
+    assetsRes, debtsRes, curIncomeRes, prevIncomeRes,
     goalsRes, budgetsRes, actionsRes, snapshotsRes,
     income6mRes, expense6mRes, profileRes,
     curCatRes, prevCatRes, recurringRes, perspective,
+    prevFireAge,
   ] = await Promise.all([
     supabase.from('assets').select('name, current_value').eq('user_id', user.id),
     supabase.from('debts').select('current_balance, name, debt_type, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('user_id', user.id),
     supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', false).gte('date', monthStart).lt('date', monthEnd),
     supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', prevMonthStart).lt('date', prevMonthEnd),
-    supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', false).gte('date', prevMonthStart).lt('date', prevMonthEnd),
     supabase.from('goals').select('name, current_value, target_value, is_completed, target_date').eq('user_id', user.id),
     supabase.from('budgets').select('name, monthly_limit, budget_type').eq('user_id', user.id).eq('budget_type', 'expense'),
     supabase.from('actions').select('id, freedom_days, is_completed, completed_at').eq('user_id', user.id),
@@ -46,6 +45,7 @@ export async function GET() {
     supabase.from('transactions').select('amount, category').eq('user_id', user.id).eq('is_income', false).gte('date', prevMonthStart).lt('date', monthStart),
     supabase.from('transactions').select('amount, counterparty_name, description, date').eq('user_id', user.id).eq('is_income', false).gte('date', threeMonthsAgo).lt('date', monthEnd),
     loadPerspectiveContext(supabase),
+    loadPrevFireAge(supabase, user.id, currentYear, currentMonth),
   ])
 
   // ── Kernmetrics ──────────────────────────────────────────────────────
@@ -55,9 +55,9 @@ export async function GET() {
   const netWorth = totalAssets - totalDebts
 
   const monthlyIncome = (curIncomeRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const monthlyExpenses = (curExpenseRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const monthlyExpenses = (curCatRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
   const prevMonthIncome = (prevIncomeRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const prevMonthExpenses = (prevExpenseRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const prevMonthExpenses = (prevCatRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
   const monthlySavings = monthlyIncome - monthlyExpenses
   const prevMonthlySavings = prevMonthIncome - prevMonthExpenses
   const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
@@ -96,8 +96,6 @@ export async function GET() {
     netWorth, monthlyIncome, monthlyExpenses,
     expectedReturn: profile?.expected_return ?? null, now,
   })
-  const prevFireAge = await loadPrevFireAge(supabase, user.id, currentYear, currentMonth)
-
   // Categorie-uitgaven (huidig vs vorige maand) + budgetlimieten
   const budgetLimits: Record<string, number> = {}
   for (const b of budgetsRes.data || []) {
@@ -113,9 +111,9 @@ export async function GET() {
     limit: budgetLimits[name] ?? null,
   }))
 
-  // Nieuwe vaste lasten: tegenpartij met >=2 voorkomens in 3 mnd én eerste
-  // voorkomen >= 2 maanden geleden (dus pas recent begonnen).
-  const newRecurring = detectNewRecurring(recurringRes.data || [], monthStart)
+  // Nieuwe vaste lasten: tegenpartij die deze maand én vorige maand voorkomt,
+  // maar niet daarvóór binnen het venster (dus pas vorige maand begonnen).
+  const newRecurring = detectNewRecurring(recurringRes.data || [], monthStart, prevMonthStart)
 
   // Grootste bezitting
   const topAsset = assets.length > 0
@@ -157,22 +155,29 @@ function sumByCategory(rows: { amount: number | null; category: string | null }[
 function detectNewRecurring(
   rows: { amount: number | null; counterparty_name: string | null; description: string | null; date: string }[],
   monthStart: string,
+  prevMonthStart: string,
 ): { name: string; monthlyAmount: number }[] {
-  const map: Record<string, { total: number; count: number; first: string; inCurrent: boolean }> = {}
+  const map: Record<string, { total: number; count: number; inCurrent: boolean; inPrev: boolean; inOlder: boolean }> = {}
   for (const t of rows) {
     const key = t.counterparty_name || t.description || 'Onbekend'
-    if (!map[key]) map[key] = { total: 0, count: 0, first: t.date, inCurrent: false }
-    map[key].total += Math.abs(t.amount || 0)
-    map[key].count += 1
-    if (t.date < map[key].first) map[key].first = t.date
-    if (t.date >= monthStart) map[key].inCurrent = true
+    if (!map[key]) map[key] = { total: 0, count: 0, inCurrent: false, inPrev: false, inOlder: false }
+    const amt = Math.abs(t.amount || 0)
+    if (t.date >= monthStart) {
+      map[key].inCurrent = true
+      map[key].total += amt
+      map[key].count += 1
+    } else if (t.date >= prevMonthStart) {
+      map[key].inPrev = true
+    } else {
+      map[key].inOlder = true
+    }
   }
   const out: { name: string; monthlyAmount: number }[] = []
   for (const [name, d] of Object.entries(map)) {
-    // recurring (>=2x), zichtbaar deze maand, en pas recent begonnen (eerste
-    // voorkomen ná het begin van de 3-maands-window → niet "oud").
-    if (d.count >= 2 && d.inCurrent && d.first >= monthStart) {
-      out.push({ name, monthlyAmount: Math.round(d.total / d.count) })
+    // Nieuw én terugkerend: aanwezig deze maand én vorige maand, maar niet
+    // daarvóór (binnen het venster) → de vaste last is vorige maand begonnen.
+    if (d.inCurrent && d.inPrev && !d.inOlder) {
+      out.push({ name, monthlyAmount: d.count > 0 ? Math.round(d.total / d.count) : 0 })
     }
   }
   return out
