@@ -330,11 +330,25 @@ export async function loadPerspectiveTransactions(
 ): Promise<PerspectiveTransactions> {
   const context = await loadPerspectiveContext(supabase)
 
-  let query = supabase.from('transactions').select('*')
-  if (opts?.since) query = query.gte('date', opts.since)
-  if (opts?.until) query = query.lte('date', opts.until)
-  const { data } = await query
-  const base = (data ?? []) as Record<string, unknown>[]
+  // Pagineer: PostgREST kapt standaard af op 1000 rijen. Power-users met >1000
+  // transacties in het venster (jaaroverzicht, 12-maands-heatmap) kregen anders een
+  // afgekapte, niet-deterministische set — de laatste transacties én de recente
+  // heatmap-dagen ontbraken (de afkap viel exact op de 1000e rij). Haal alle pagina's
+  // op, nieuwste eerst, zodat het volledige venster geladen wordt.
+  const base: Record<string, unknown>[] = []
+  for (let from = 0; ; from += 1000) {
+    let query = supabase
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false })
+      .range(from, from + 999)
+    if (opts?.since) query = query.gte('date', opts.since)
+    if (opts?.until) query = query.lte('date', opts.until)
+    const { data } = await query
+    const page = (data ?? []) as Record<string, unknown>[]
+    base.push(...page)
+    if (page.length < 1000) break
+  }
 
   // De partner-RPC (`household_partner_items('transactions')`) is niet datum-
   // begrensd. Pas dezelfde [since, until]-window toe op de SAMENGESTELDE lijst
