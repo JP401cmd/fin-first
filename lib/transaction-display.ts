@@ -198,7 +198,7 @@ export function parseSmartQuery(query: string, now: Date): SmartQuery {
   let dateTo: string | null = null
   let direction: 'expense' | 'income' | null = null
 
-  const amt = (v: string) => parseFloat(v.replace('.', '').replace(',', '.'))
+  const amt = (v: string) => parseFloat(v.replace(/\./g, '').replace(',', '.'))
   s = s.replace(/\b(boven|>|meer dan)\s*€?\s*([\d.,]+)/g, (_, __, v) => { amountMin = amt(v); return ' ' })
   s = s.replace(/\b(onder|<|minder dan)\s*€?\s*([\d.,]+)/g, (_, __, v) => { amountMax = amt(v); return ' ' })
 
