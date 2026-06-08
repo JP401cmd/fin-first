@@ -252,3 +252,29 @@ describe('nieuwe detectoren A', () => {
     expect(ids(out)).toContain('nieuwe-vaste-last')
   })
 })
+
+describe('nieuwe detectoren B', () => {
+  // monthIndex high so these score-rank without theme collisions
+  it('doel-deadline fires for goal <60d away and <75%', () => {
+    const soon = new Date()
+    soon.setDate(soon.getDate() + 20)
+    const out = buildGespreksstarters(baseInput({
+      goals: [{ name: 'Vakantie', current: 500, target: 2000, completed: false, targetDate: soon.toISOString().slice(0, 10) }],
+    }))
+    expect(ids(out)).toContain('doel-deadline')
+  })
+  it('vermogensconcentratie fires when top asset > 60% of net worth', () => {
+    const out = buildGespreksstarters(baseInput({
+      netWorth: 100000, topAsset: { name: 'Eigen huis', value: 75000 },
+    }))
+    expect(ids(out)).toContain('vermogensconcentratie')
+  })
+  it('mijlpaal-nadering fires when net worth within 5% under next milestone', () => {
+    const out = buildGespreksstarters(baseInput({ netWorth: 96000 })) // next 100k, 4% remaining
+    expect(ids(out)).toContain('mijlpaal-nadering')
+  })
+  it('mijlpaal-nadering does NOT fire far from a milestone', () => {
+    const out = buildGespreksstarters(baseInput({ netWorth: 62000 }))
+    expect(ids(out)).not.toContain('mijlpaal-nadering')
+  })
+})

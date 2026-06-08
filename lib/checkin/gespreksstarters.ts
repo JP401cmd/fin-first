@@ -640,6 +640,96 @@ const detectNieuweVasteLast: Detector = (i) => {
   }]
 }
 
+// ── Nieuwe detectoren B ────────────────────────────────────────────────
+
+const detectDoelDeadline: Detector = (i) => {
+  const today = new Date()
+  const todayStr = today.toISOString().slice(0, 10)
+  const candidates = i.goals
+    .filter(g => !g.completed && g.targetDate && g.targetDate >= todayStr && g.target > 0)
+    .map(g => {
+      const daysUntil = Math.ceil(
+        (new Date(g.targetDate as string).getTime() - today.getTime()) / 86400000,
+      )
+      const pct = (g.current / g.target) * 100
+      return { ...g, daysUntil, pct }
+    })
+    .filter(g => g.daysUntil <= 60 && g.pct < 75)
+    .sort((a, b) => a.daysUntil - b.daysUntil)
+  const g = candidates[0]
+  if (!g) return []
+  const remaining = g.target - g.current
+  return [{
+    id: 'doel-deadline', theme: 'doelen',
+    sentiment: g.daysUntil <= 14 ? 'alert' : 'neutral',
+    score: clamp(60 - g.daysUntil + (75 - g.pct), 15, 88),
+    variants: [
+      (v) => ({
+        vraag: `Doel "${g.name}" heeft nog ${g.daysUntil} dagen te gaan en staat op ${g.pct.toFixed(0)}%. Is de deadline nog haalbaar, of ${v.wil} ${v.subj} 'm bijstellen?`,
+        context: `Nog ${formatEUR(remaining)} tot "${g.name}", deadline over ${g.daysUntil} dagen.`,
+        actie: `Beslis ${v.samen}: tempo verhogen of deadline verschuiven.`,
+      }),
+      (v) => ({
+        vraag: `"${g.name}" loopt af over ${g.daysUntil} dagen (nu ${g.pct.toFixed(0)}%). Wat is realistisch?`,
+        context: `Resterend: ${formatEUR(remaining)}.`,
+        actie: `Maak ${v.samen} een realistisch eindplan voor dit doel.`,
+      }),
+    ],
+  }]
+}
+
+const detectVermogensconcentratie: Detector = (i) => {
+  if (!i.topAsset || i.netWorth <= 0) return []
+  const pct = (i.topAsset.value / i.netWorth) * 100
+  if (pct < 60) return []
+  return [{
+    id: 'vermogensconcentratie', theme: 'vermogen', sentiment: 'neutral',
+    score: clamp(pct - 50, 10, 70),
+    variants: [
+      (v) => ({
+        vraag: `"${i.topAsset!.name}" is ${pct.toFixed(0)}% van ${v.poss} vermogen. Voelt die concentratie comfortabel, of ${v.wil} ${v.subj} meer spreiding?`,
+        context: `${formatEUR(i.topAsset!.value)} van ${formatEUR(i.netWorth)} netto vermogen.`,
+        actie: `Bespreek ${v.samen} of spreiding gewenst is.`,
+      }),
+      (v) => ({
+        vraag: `Het grootste deel van ${v.poss} vermogen (${pct.toFixed(0)}%) zit in "${i.topAsset!.name}". Wat als die waarde sterk schommelt?`,
+        context: `Concentratie: ${pct.toFixed(0)}% in één post.`,
+        actie: `Weeg ${v.samen} het risico van die concentratie.`,
+      }),
+    ],
+  }]
+}
+
+const MILESTONE_STEPS = [10000, 25000, 50000, 100000, 250000, 500000, 1000000]
+
+const detectMijlpaal: Detector = (i) => {
+  if (i.netWorth <= 0) return []
+  const next = MILESTONE_STEPS.find(m => m > i.netWorth)
+  if (!next) return []
+  const remaining = next - i.netWorth
+  // Alleen "dichtbij": binnen 5% onder de volgende mijlpaal.
+  if (remaining > next * 0.05) return []
+  const days = freedomDays(remaining, i.dailyExpenses)
+  return [{
+    id: 'mijlpaal-nadering', theme: 'vermogen', sentiment: 'positive',
+    score: clamp(100 - (remaining / (next * 0.05)) * 30, 40, 80),
+    variants: [
+      (v) => ({
+        vraag: `Nog ${formatEUR(remaining)} en ${v.subj} ${v.hebt} de mijlpaal van ${formatEUR(next)} bereikt. Hoe ${v.wil} ${v.subj} dat ${v.samen} markeren?`,
+        context: `Netto vermogen ${formatEUR(i.netWorth)}, volgende mijlpaal ${formatEUR(next)}.`,
+        actie: `Spreek ${v.samen} een klein vier-moment af bij ${formatEUR(next)}.`,
+        vrijheidstijd: days > 0 ? freedomLabel(days) : undefined,
+      }),
+      (v) => ({
+        vraag: `${formatEUR(next)} is bijna in zicht — nog ${formatEUR(remaining)}. Wat betekent die mijlpaal voor ${v.subj}?`,
+        context: `Nog ${formatEUR(remaining)} tot ${formatEUR(next)}.`,
+        actie: `Benoem ${v.samen} wat de volgende mijlpaal symboliseert.`,
+        vrijheidstijd: days > 0 ? freedomLabel(days) : undefined,
+      }),
+    ],
+  }]
+}
+
 // ── Fallback (geroteerd) ───────────────────────────────────────────────
 function buildFallback(_i: GespreksstartersInput): StarterCandidate[] {
   return [
@@ -689,6 +779,9 @@ const DETECTORS: Detector[] = [
   detectSpaarquoteTrend,
   detectBudgetcategorie,
   detectNieuweVasteLast,
+  detectDoelDeadline,
+  detectVermogensconcentratie,
+  detectMijlpaal,
 ]
 
 export function buildGespreksstarters(input: GespreksstartersInput): GesprekStarterData[] {
@@ -710,6 +803,9 @@ export const STARTER_IDS = [
   'spaarquote-sterk', 'spaarquote-laag',
   'budgetcategorie-uitschieter',
   'nieuwe-vaste-last',
+  'doel-deadline',
+  'vermogensconcentratie',
+  'mijlpaal-nadering',
   'algemeen-dromen', 'algemeen-waarden',
 ] as const
 
