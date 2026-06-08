@@ -8,6 +8,7 @@ import type { CheckinSnapshot } from '@/lib/checkin-types'
 import type { Aandachtspunt } from '@/lib/checkin-types'
 import type { GesprekStarterData } from '@/lib/checkin-types'
 import { unauthenticatedFetch } from '../server-runner'
+import { STARTER_IDS, buildGespreksstarters, type GespreksstartersInput } from '@/lib/checkin/gespreksstarters'
 
 const CAT = 'checkin.flow'
 
@@ -937,31 +938,44 @@ const tests: TestCase[] = [
   },
 
   {
-    id: 'checkin-gespreksstarters-data-driven', name: 'Gespreksstarters: data-driven starter IDs', category: CAT,
-    description: 'Route generates starters with known IDs based on financial data patterns',
+    id: 'checkin-gespreksstarters-id-registry', name: 'Gespreksstarters: id-registry uit engine', category: CAT,
+    description: 'STARTER_IDS bevat de behouden + nieuwe onderwerpen en is uniek',
     priority: 'medium', estimatedDurationMs: 100,
     fn() {
-      // Verify all known starter IDs from the route
-      const knownIds = [
-        'vermogen-groei', 'vermogen-daling',
-        'sparen-stijging', 'sparen-daling', 'negatief-sparen',
-        'uitgaven-stijging', 'uitgaven-daling',
-        'doel-bijna', 'doel-start',
-        'schulden-vrijheid',
-        'acties-momentum', 'acties-openstaand',
-        'sparen-vrijheid',
-        'algemeen-dromen', 'algemeen-waarden',
-      ]
-      assertEqual(knownIds.length, 15, '15 known starter IDs')
+      const unique = new Set(STARTER_IDS)
+      assertEqual(unique.size, STARTER_IDS.length, 'alle starter-ids zijn uniek')
+      const ids = [...STARTER_IDS] as string[]
+      // Behouden onderwerpen
+      for (const id of ['vermogen-groei', 'vermogen-daling', 'sparen-stijging', 'schulden-vrijheid', 'algemeen-dromen']) {
+        assertIncludes(ids, id, `bevat ${id}`)
+      }
+      // Nieuwe onderwerpen
+      for (const id of ['fire-versnelling', 'spaarquote-sterk', 'budgetcategorie-uitschieter', 'nieuwe-vaste-last', 'doel-deadline', 'vermogensconcentratie', 'mijlpaal-nadering']) {
+        assertIncludes(ids, id, `bevat nieuw onderwerp ${id}`)
+      }
+    },
+  },
+  {
+    id: 'checkin-gespreksstarters-voice-contract', name: 'Gespreksstarters: solo vs huishouden aanspreekvorm', category: CAT,
+    description: 'Solo-output lekt geen "jullie"; huishouden gebruikt "jullie"',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      const base: GespreksstartersInput = {
+        audience: 'solo', monthIndex: 0,
+        netWorth: 100000, netWorthTrend: 4000, prevNetWorth: 96000,
+        monthlyIncome: 4000, monthlyExpenses: 3000, prevMonthIncome: 4000, prevMonthExpenses: 3000,
+        monthlySavings: 1000, prevMonthlySavings: 1000, savingsRate6m: 20, dailyExpenses: 100,
+        goals: [], totalDebts: 15000, debtCount: 1,
+        completedActionsThisMonth: 0, completedActionsFreedomDays: 0, pendingActionsCount: 0,
+        fireAge: null, prevFireAge: null, expensesByCategory: [], newRecurring: [], topAsset: null,
+      }
+      const solo = buildGespreksstarters(base)
+        .map(s => `${s.vraag} ${s.actie} ${s.context}`).join(' ').toLowerCase()
+      assert(!solo.includes('jullie'), 'solo-output bevat geen "jullie"')
 
-      // Verify no duplicates
-      const unique = new Set(knownIds)
-      assertEqual(unique.size, knownIds.length, 'all starter IDs are unique')
-
-      // Verify opposite pairs exist (groei vs daling)
-      assert(knownIds.includes('vermogen-groei') && knownIds.includes('vermogen-daling'), 'vermogen pair exists')
-      assert(knownIds.includes('sparen-stijging') && knownIds.includes('sparen-daling'), 'sparen pair exists')
-      assert(knownIds.includes('uitgaven-stijging') && knownIds.includes('uitgaven-daling'), 'uitgaven pair exists')
+      const household = buildGespreksstarters({ ...base, audience: 'household' })
+        .map(s => s.vraag).join(' ').toLowerCase()
+      assert(household.includes('jullie'), 'huishouden-output bevat "jullie"')
     },
   },
 
