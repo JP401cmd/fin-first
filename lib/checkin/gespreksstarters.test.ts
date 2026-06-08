@@ -214,3 +214,39 @@ describe('behouden detectoren', () => {
     expect(ids(out)).toContain('sparen-vrijheid')
   })
 })
+
+describe('nieuwe detectoren A', () => {
+  it('fire-versnelling fires when fireAge dropped >= 1 year', () => {
+    const out = buildGespreksstarters(baseInput({ fireAge: 52, prevFireAge: 54 }))
+    expect(ids(out)).toContain('fire-versnelling')
+  })
+  it('fire-vertraging fires when fireAge rose >= 1 year (alert)', () => {
+    const out = buildGespreksstarters(baseInput({ fireAge: 56, prevFireAge: 54 }))
+    const hit = out.find(o => o.id === 'fire-vertraging')
+    expect(hit).toBeDefined()
+    expect(hit!.sentiment).toBe('alert')
+  })
+  it('spaarquote-sterk fires when 6m rate >= 25%', () => {
+    const out = buildGespreksstarters(baseInput({ savingsRate6m: 32 }))
+    expect(ids(out)).toContain('spaarquote-sterk')
+  })
+  it('spaarquote-laag fires when 6m rate between 0 and 10', () => {
+    const out = buildGespreksstarters(baseInput({ savingsRate6m: 6 }))
+    expect(ids(out)).toContain('spaarquote-laag')
+  })
+  it('budgetcategorie-uitschieter fires on largest over-limit category', () => {
+    const out = buildGespreksstarters(baseInput({
+      expensesByCategory: [
+        { name: 'Boodschappen', amount: 650, prevAmount: 500, limit: 500 },
+        { name: 'Kleding', amount: 120, prevAmount: 100, limit: 200 },
+      ],
+    }))
+    expect(ids(out)).toContain('budgetcategorie-uitschieter')
+  })
+  it('nieuwe-vaste-last fires when a new recurring expense exists', () => {
+    const out = buildGespreksstarters(baseInput({
+      newRecurring: [{ name: 'Spotify', monthlyAmount: 12 }],
+    }))
+    expect(ids(out)).toContain('nieuwe-vaste-last')
+  })
+})

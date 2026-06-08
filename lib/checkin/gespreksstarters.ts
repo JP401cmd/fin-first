@@ -501,6 +501,146 @@ const detectSparenVrijheid: Detector = (i) => {
   }]
 }
 
+// ── Nieuwe detectoren A ────────────────────────────────────────────────
+
+const detectFire: Detector = (i) => {
+  if (i.fireAge == null || i.prevFireAge == null) return []
+  const delta = i.fireAge - i.prevFireAge // negatief = eerder vrij
+  if (delta <= -1) {
+    const yrs = Math.abs(delta)
+    return [{
+      id: 'fire-versnelling', theme: 'fire', sentiment: 'positive',
+      score: clamp(yrs * 20, 20, 90),
+      variants: [
+        (v) => ({
+          vraag: `${v.subjCap} ${v.bent} ${yrs} jaar dichter bij volledige vrijheid dan vorige maand (FIRE rond ${i.fireAge}). Wat zette dat in beweging?`,
+          context: `Geschatte FIRE-leeftijd: ${i.prevFireAge} → ${i.fireAge}.`,
+          actie: `Benoem ${v.samen} de keuze die het meeste hielp.`,
+        }),
+        (v) => ({
+          vraag: `FIRE schoof ${yrs} jaar naar voren. Hoe ${v.voelt} bij dat tempo?`,
+          context: `FIRE-leeftijd daalde naar ${i.fireAge}.`,
+          actie: `Bespreek of ${v.subj} dit tempo ${v.wilt} vasthouden.`,
+        }),
+      ],
+    }]
+  }
+  if (delta >= 1) {
+    const yrs = delta
+    return [{
+      id: 'fire-vertraging', theme: 'fire', sentiment: 'alert',
+      score: clamp(yrs * 20 + 5, 25, 90),
+      variants: [
+        (v) => ({
+          vraag: `${v.poss === 'je' ? 'Je' : 'Jullie'} geschatte FIRE-leeftijd schoof ${yrs} jaar op (naar ${i.fireAge}). Is er iets veranderd dat ${v.subj} ${v.samen} ${v.wilt} bespreken?`,
+          context: `FIRE-leeftijd: ${i.prevFireAge} → ${i.fireAge}.`,
+          actie: `Kijk ${v.samen} of het door uitgaven of een eenmalige post komt.`,
+        }),
+        (v) => ({
+          vraag: `Volledige vrijheid kwam ${yrs} jaar verder weg te liggen. Eenmalig of structureel?`,
+          context: `FIRE-leeftijd steeg naar ${i.fireAge}.`,
+          actie: `Bepaal ${v.samen} of bijsturen nodig is.`,
+        }),
+      ],
+    }]
+  }
+  return []
+}
+
+const detectSpaarquoteTrend: Detector = (i) => {
+  if (i.monthlyIncome <= 0) return []
+  if (i.savingsRate6m >= 25) {
+    return [{
+      id: 'spaarquote-sterk', theme: 'sparen', sentiment: 'positive',
+      score: clamp(i.savingsRate6m, 25, 80),
+      variants: [
+        (v) => ({
+          vraag: `${v.subjCap} ${v.poss} spaarquote staat op ${i.savingsRate6m.toFixed(0)}% over 6 maanden — flink boven gemiddeld. Wat maakt dat mogelijk?`,
+          context: `6-maands spaarquote: ${i.savingsRate6m.toFixed(0)}%.`,
+          actie: `Bespreek ${v.samen} of dit comfortabel voelt of te streng.`,
+        }),
+        (v) => ({
+          vraag: `${i.savingsRate6m.toFixed(0)}% spaarquote — sterk. Voelt de balans tussen nu en later goed?`,
+          context: `Gemiddeld over 6 maanden.`,
+          actie: `Toets ${v.samen} of ${v.subj} ook genoeg ${v.subj === 'je' ? 'geniet' : 'genieten'}.`,
+        }),
+      ],
+    }]
+  }
+  if (i.savingsRate6m > 0 && i.savingsRate6m < 10) {
+    return [{
+      id: 'spaarquote-laag', theme: 'sparen', sentiment: 'neutral',
+      score: clamp(15 - i.savingsRate6m, 8, 55),
+      variants: [
+        (v) => ({
+          vraag: `${v.subjCap} ${v.poss} spaarquote ligt op ${i.savingsRate6m.toFixed(0)}% over 6 maanden. Welke kleine stap zou die kunnen verhogen?`,
+          context: `6-maands spaarquote: ${i.savingsRate6m.toFixed(0)}%.`,
+          actie: `Kies ${v.samen} één uitgave om bij te sturen.`,
+        }),
+        (v) => ({
+          vraag: `Met ${i.savingsRate6m.toFixed(0)}% spaarquote bouwt vrijheid langzaam op. Bewuste keuze of ruimte voor meer?`,
+          context: `Gemiddeld over 6 maanden.`,
+          actie: `Bepaal ${v.samen} een haalbaar streefpercentage.`,
+        }),
+      ],
+    }]
+  }
+  return []
+}
+
+const detectBudgetcategorie: Detector = (i) => {
+  const over = i.expensesByCategory
+    .filter(c => c.limit != null && c.limit > 0 && c.amount > c.limit)
+    .map(c => ({ ...c, over: c.amount - (c.limit as number) }))
+    .sort((a, b) => b.over - a.over)[0]
+  if (!over) return []
+  const pctOver = Math.round((over.over / (over.limit as number)) * 100)
+  const days = freedomDays(over.over, i.dailyExpenses)
+  return [{
+    id: 'budgetcategorie-uitschieter', theme: 'uitgaven', sentiment: 'neutral',
+    score: clamp(pctOver, 10, 80),
+    variants: [
+      (v) => ({
+        vraag: `"${over.name}" ging het meest over budget deze maand (${formatEUR(over.amount)} van ${formatEUR(over.limit as number)}). Wat zat daarachter?`,
+        context: `${pctOver}% over budget in ${over.name}.`,
+        actie: `Bespreek ${v.samen} of het budget of het gedrag moet bijstellen.`,
+        vrijheidstijd: days > 0 ? `${days} dagen` : undefined,
+      }),
+      (v) => ({
+        vraag: `${over.name} schoot er ${formatEUR(over.over)} overheen. Eenmalig, of structureel te krap begroot?`,
+        context: `${formatEUR(over.amount)} t.o.v. ${formatEUR(over.limit as number)} budget.`,
+        actie: `Beslis ${v.samen}: budget verhogen of uitgave verlagen.`,
+        vrijheidstijd: days > 0 ? `${days} dagen` : undefined,
+      }),
+    ],
+  }]
+}
+
+const detectNieuweVasteLast: Detector = (i) => {
+  if (i.newRecurring.length === 0) return []
+  const top = [...i.newRecurring].sort((a, b) => b.monthlyAmount - a.monthlyAmount)[0]
+  const annual = top.monthlyAmount * 12
+  const days = freedomDays(annual, i.dailyExpenses)
+  return [{
+    id: 'nieuwe-vaste-last', theme: 'uitgaven', sentiment: 'neutral',
+    score: clamp(days, 8, 60),
+    variants: [
+      (v) => ({
+        vraag: `Er is een nieuwe vaste last: ${top.name} (${formatEUR(top.monthlyAmount)}/maand = ${freedomLabel(days)} per jaar). Is die bewust en de moeite waard?`,
+        context: `Nieuw terugkerend: ${top.name}.`,
+        actie: `Bevestig ${v.samen} of ${v.subj} ${top.name} ${v.wilt} houden.`,
+        vrijheidstijd: freedomLabel(days),
+      }),
+      (v) => ({
+        vraag: `${top.name} is een nieuwe maandelijkse uitgave (${formatEUR(top.monthlyAmount)}). Op jaarbasis ${freedomLabel(days)} vrijheid — past dat?`,
+        context: `Nieuwe vaste last gedetecteerd.`,
+        actie: `Toets ${v.samen} of dit abonnement blijft.`,
+        vrijheidstijd: freedomLabel(days),
+      }),
+    ],
+  }]
+}
+
 // ── Fallback (geroteerd) ───────────────────────────────────────────────
 function buildFallback(_i: GespreksstartersInput): StarterCandidate[] {
   return [
@@ -546,6 +686,10 @@ const DETECTORS: Detector[] = [
   detectSchulden,
   detectActies,
   detectSparenVrijheid,
+  detectFire,
+  detectSpaarquoteTrend,
+  detectBudgetcategorie,
+  detectNieuweVasteLast,
 ]
 
 export function buildGespreksstarters(input: GespreksstartersInput): GesprekStarterData[] {
@@ -563,6 +707,10 @@ export const STARTER_IDS = [
   'schulden-vrijheid',
   'acties-momentum', 'acties-openstaand',
   'sparen-vrijheid',
+  'fire-versnelling', 'fire-vertraging',
+  'spaarquote-sterk', 'spaarquote-laag',
+  'budgetcategorie-uitschieter',
+  'nieuwe-vaste-last',
   'algemeen-dromen', 'algemeen-waarden',
 ] as const
 
