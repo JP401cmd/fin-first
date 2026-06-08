@@ -84,6 +84,7 @@ export async function parseOFX(content: string): Promise<ParsedTransaction[]> {
       reference: fitid || null,
       transaction_type: trnType || null,
       bank_code: null,
+      bank_seq: null,
       running_balance: null,
       creditor_id: null,
       fx_amount: null,

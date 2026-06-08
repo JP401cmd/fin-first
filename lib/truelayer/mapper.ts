@@ -22,6 +22,10 @@ export async function mapTransaction(tl: TLTransaction): Promise<ParsedTransacti
     reference: tl.transaction_id ?? null,
     transaction_type: tl.transaction_category ?? tl.transaction_type ?? null,
     bank_code: null,
+    // transaction_id staat al in `reference`; bewust niet als bank_seq omdat een
+    // pending→posted id-wissel (zelfde datum/bedrag/omschrijving) anders een valse
+    // "nieuwe" rij zou worden in de samengestelde unieke index.
+    bank_seq: null,
     running_balance: tl.running_balance?.amount ?? null,
     creditor_id: null,
     // fx/creditor niet beschikbaar uit TrueLayer; CSV-import vult deze.

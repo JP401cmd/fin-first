@@ -48,6 +48,20 @@ type ImportRow = ParsedTransaction & {
   userManuallyChanged?: boolean
 }
 
+/**
+ * Harde dedup-sleutel die de samengestelde unieke DB-index
+ * `(user_id, import_hash, coalesce(bank_seq, ''))` exact spiegelt.
+ *
+ * Distinct-maar-identieke transacties (zelfde import_hash, ander Volgnr/bank_seq)
+ * krijgen verschillende sleutels → kunnen naast elkaar bestaan. Re-imports (zelfde
+ * import_hash én bank_seq) vallen samen → worden overgeslagen. Gebruik dit voor de
+ * in-file dedup, de pre-insert safety-net en het filter tegen reeds-bestaande rijen,
+ * zodat geen enkele insert op de unieke index stukloopt en geen distinct-rij sneuvelt.
+ */
+function rowDedupKey(r: { import_hash: string; bank_seq: string | null }): string {
+  return `${r.import_hash}|${r.bank_seq ?? ''}`
+}
+
 type BulkApplyPrompt = {
   targetIndex: number
   matchField: 'counterparty_iban' | 'counterparty_name' | 'description'
@@ -599,13 +613,15 @@ export default function ImportPage() {
         }
       }
 
-      // Phase 3: within-file dedup — same hash appearing more than once in the import
-      // (e.g. two identical transactions on the same day from the same merchant)
+      // Phase 3: within-file dedup — dezelfde (import_hash, bank_seq) meer dan eens in de
+      // import (echt-identieke regel). Composite-sleutel: distinct-maar-identieke transacties
+      // (zelfde datum/bedrag/omschrijving, ander Volgnr) blijven beide staan.
       const seenInFile = new Set<string>()
       const applyFileDedup = (r: ImportRow) => {
-        if (r.isDuplicate) { seenInFile.add(r.import_hash); return r }
-        if (seenInFile.has(r.import_hash)) return { ...r, isDuplicate: true, skipImport: true }
-        seenInFile.add(r.import_hash)
+        const key = rowDedupKey(r)
+        if (r.isDuplicate) { seenInFile.add(key); return r }
+        if (seenInFile.has(key)) return { ...r, isDuplicate: true, skipImport: true }
+        seenInFile.add(key)
         return r
       }
 
@@ -1073,38 +1089,39 @@ export default function ImportPage() {
 
     const toImport = rows.filter((r) => !r.skipImport)
 
-    // Safety net: remove any duplicate hashes that may have slipped through the check
+    // Safety net: verwijder echt-identieke regels (zelfde import_hash én bank_seq) die door de
+    // check zijn geglipt. Composite-sleutel houdt distinct-maar-identieke transacties intact.
     const seenHashes = new Set<string>()
     const toImportDeduped = toImport.filter((r) => {
-      if (seenHashes.has(r.import_hash)) return false
-      seenHashes.add(r.import_hash)
+      const key = rowDedupKey(r)
+      if (seenHashes.has(key)) return false
+      seenHashes.add(key)
       return true
     })
 
-    // Filter tegen hashes die AL in de DB staan voor deze gebruiker. De "Dubbelingen"-
-    // stap matcht op (datum, bedrag, omschrijving), maar de unieke index hasht
-    // `description[:100]` (`transactions_import_hash_idx` op (user_id, import_hash),
-    // partieel WHERE import_hash IS NOT NULL). Die divergentie laat hash-collisions
-    // erdoor glippen, waardoor één rij een hele batch van 100 laat falen (ON CONFLICT
-    // kan de partiële index niet inferren). Haal de bestaande hashes op en sla die rijen
-    // over — zo loopt geen enkele batch op de unieke index stuk.
+    // Filter tegen rijen die AL in de DB staan voor deze gebruiker. De unieke index is
+    // `transactions_import_hash_idx` op (user_id, import_hash, coalesce(bank_seq, ''))
+    // (partieel WHERE import_hash IS NOT NULL). Eén botsing laat anders een hele batch van
+    // 100 falen (ON CONFLICT kan de partiële index niet inferren). Haal de bestaande
+    // (import_hash, bank_seq)-paren op en sla die rijen over — zo loopt geen enkele batch
+    // op de unieke index stuk en blijven distinct-rijen (zelfde hash, ander Volgnr) wél door.
     const existingHashSet = new Set<string>()
     for (let from = 0; ; from += 1000) {
       const { data: hashPage } = await supabase
         .from('transactions')
-        .select('import_hash')
+        .select('import_hash, bank_seq')
         .eq('user_id', user!.id)
         .not('import_hash', 'is', null)
         .range(from, from + 999)
-      const pageRows = (hashPage ?? []) as { import_hash: string }[]
-      for (const h of pageRows) existingHashSet.add(h.import_hash)
+      const pageRows = (hashPage ?? []) as { import_hash: string; bank_seq: string | null }[]
+      for (const h of pageRows) existingHashSet.add(rowDedupKey(h))
       if (pageRows.length < 1000) break
     }
-    const finalRows = toImportDeduped.filter((r) => !existingHashSet.has(r.import_hash))
+    const finalRows = toImportDeduped.filter((r) => !existingHashSet.has(rowDedupKey(r)))
     if (finalRows.length < toImportDeduped.length) {
       // Reflecteer de extra overslagen in de UI-tellers (hergebruikt de skipImport-telling
       // → tonen als "overgeslagen", niet als "mislukt").
-      setRows((prev) => prev.map((row) => existingHashSet.has(row.import_hash) ? { ...row, skipImport: true } : row))
+      setRows((prev) => prev.map((row) => existingHashSet.has(rowDedupKey(row)) ? { ...row, skipImport: true } : row))
     }
 
     const insertRows = finalRows.map((r) => ({
@@ -1122,6 +1139,7 @@ export default function ImportPage() {
       reference: r.reference,
       transaction_type: r.isTransfer ? 'transfer' : r.transaction_type,
       bank_code: r.bank_code ?? null,
+      bank_seq: r.bank_seq ?? null,
       running_balance: r.running_balance,
       creditor_id: r.creditor_id,
       fx_amount: r.fx_amount,
@@ -1230,20 +1248,21 @@ export default function ImportPage() {
       let ok = true
       let errMsg = ""
       try {
-        // Sla rijen over waarvan de hash al bestaat (dé reden dat de batch faalde) en
-        // importeer alleen de resterende — anders faalt de retry identiek (plain insert
-        // van dezelfde batch loopt opnieuw op de unieke index stuk).
+        // Sla rijen over die al bestaan (dé reden dat de batch faalde) en importeer alleen
+        // de resterende — anders faalt de retry identiek (plain insert van dezelfde batch
+        // loopt opnieuw op de unieke index stuk). Match op (import_hash, bank_seq) zodat
+        // distinct-rijen (zelfde hash, ander Volgnr) niet onterecht worden overgeslagen.
         const batchHashes = fb.rows.map((row) => (row as { import_hash: string }).import_hash)
         const existing = new Set<string>()
         if (retryUser) {
           const { data: ex } = await supabase
             .from("transactions")
-            .select("import_hash")
+            .select("import_hash, bank_seq")
             .eq("user_id", retryUser.id)
             .in("import_hash", batchHashes)
-          for (const e of (ex ?? []) as { import_hash: string }[]) existing.add(e.import_hash)
+          for (const e of (ex ?? []) as { import_hash: string; bank_seq: string | null }[]) existing.add(rowDedupKey(e))
         }
-        const survivors = fb.rows.filter((row) => !existing.has((row as { import_hash: string }).import_hash))
+        const survivors = fb.rows.filter((row) => !existing.has(rowDedupKey(row as { import_hash: string; bank_seq: string | null })))
         if (survivors.length > 0) {
           const { error: insertError } = await supabase.from("transactions").insert(survivors)
           if (insertError) { ok = false; errMsg = insertError.message }
@@ -2186,7 +2205,10 @@ export default function ImportPage() {
       {step === 4 &&
         (() => {
           const skippedCount = rows.filter((r) => r.skipImport).length
-          const importedCount = toImportCount - importProgress.failed
+          // Race-vrije bron van waarheid: importProgress.total = insertRows.length (synchroon
+          // gezet vóór insert), failed = werkelijk mislukte rijen. toImportCount hangt af van
+          // een asynchrone setRows-flush en telt eventueel rijen mee die nooit zijn ingevoegd.
+          const importedCount = importProgress.total - importProgress.failed
           return (
             <div className="rounded-[var(--r-lg)] border border-emerald-200 bg-emerald-50 p-8 text-center">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">

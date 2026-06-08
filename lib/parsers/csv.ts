@@ -144,10 +144,12 @@ export async function parseCSV(
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
 
     const cleanDescription = description.replace(/\s+/g, ' ').trim() || 'Geen omschrijving'
-    // Extra entropie (bv. Rabobank-Volgnr) zodat twee écht-verschillende transacties
-    // met identieke datum/bedrag/omschrijving toch een unieke import_hash krijgen.
+    // import_hash blijft stabiel (date|amount|description) → betrouwbare re-import-detectie.
+    // De per-rij unieke referentie (bv. Rabobank-Volgnr) gaat naar bank_seq, zodat twee
+    // écht-verschillende transacties met identieke datum/bedrag/omschrijving naast elkaar
+    // kunnen bestaan via de samengestelde unieke index (user_id, import_hash, bank_seq).
     const uniqueRef = preset.uniqueRefColumn != null ? (fields[preset.uniqueRefColumn] ?? '').trim() : ''
-    const hash = await computeHash(date, amount, cleanDescription, uniqueRef || undefined)
+    const hash = await computeHash(date, amount, cleanDescription)
 
     const bankCodeVal = preset.bankCodeColumn != null ? (fields[preset.bankCodeColumn] ?? '').trim() : ''
     const balanceVal = preset.balanceColumn != null ? (fields[preset.balanceColumn] ?? '').trim() : ''
@@ -165,6 +167,7 @@ export async function parseCSV(
       reference: reference?.trim() || null,
       transaction_type: null,
       bank_code: bankCodeVal || null,
+      bank_seq: uniqueRef || null,
       running_balance: parseOptionalAmount(balanceVal),
       creditor_id: creditorVal || null,
       fx_amount: parseOptionalAmount(fxAmtVal),

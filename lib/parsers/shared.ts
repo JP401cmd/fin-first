@@ -11,6 +11,14 @@ export type ParsedTransaction = {
   reference: string | null
   transaction_type: string | null
   bank_code: string | null
+  /**
+   * Per-rij unieke bank-referentie (bv. Rabobank `Volgnr`). NIET in import_hash:
+   * de hash blijft stabiel (date|amount|description) zodat re-imports betrouwbaar
+   * gedetecteerd worden. bank_seq onderscheidt écht-verschillende transacties met
+   * identieke datum/bedrag/omschrijving via de samengestelde unieke index
+   * `(user_id, import_hash, coalesce(bank_seq, ''))`.
+   */
+  bank_seq: string | null
   running_balance: number | null
   creditor_id: string | null
   fx_amount: number | null
@@ -20,16 +28,14 @@ export type ParsedTransaction = {
 }
 
 /**
- * Compute a simple hash for duplicate detection.
- * Uses date + amount + first 100 chars of description, plus optional `extra`
- * entropy (bv. een unieke bank-volgnummer zoals Rabobank `Volgnr`) zodat twee
- * écht-verschillende transacties met identieke datum/bedrag/omschrijving toch
- * een unieke hash krijgen (de unieke index `(user_id, import_hash)` blokkeert ze
- * anders). `extra` weggelaten → identiek gedrag als voorheen (backward-compat).
+ * Compute a stable hash for duplicate detection.
+ * Uses date + amount + first 100 chars of description. Bewust GEEN extra entropie
+ * (zoals Volgnr) hierin — dan zou re-import-detectie breken en zou bestaande data
+ * een migratie-gat krijgen. Distinct-maar-identieke transacties worden onderscheiden
+ * via de aparte `bank_seq`-kolom in de samengestelde unieke index, niet via de hash.
  */
-export async function computeHash(date: string, amount: number, description: string, extra?: string): Promise<string> {
-  const base = `${date}|${amount}|${description.slice(0, 100)}`
-  const input = extra ? `${base}|${extra}` : base
+export async function computeHash(date: string, amount: number, description: string): Promise<string> {
+  const input = `${date}|${amount}|${description.slice(0, 100)}`
   const encoder = new TextEncoder()
   const data = encoder.encode(input)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)

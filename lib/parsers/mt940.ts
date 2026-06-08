@@ -85,6 +85,7 @@ export async function parseMT940(content: string): Promise<ParsedTransaction[]> 
         reference: extractReference(details),
         transaction_type: tx.transactionType || null,
         bank_code: null,
+        bank_seq: null,
         running_balance: null,
         creditor_id: null,
         fx_amount: null,
