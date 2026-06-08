@@ -132,6 +132,13 @@ export async function parseCSV(
     const cleanDescription = description.replace(/\s+/g, ' ').trim() || 'Geen omschrijving'
     const hash = await computeHash(date, amount, cleanDescription)
 
+    const typeVal = preset.typeColumn != null ? (fields[preset.typeColumn] ?? '').trim() : ''
+    const balanceVal = preset.balanceColumn != null ? fields[preset.balanceColumn] ?? '' : ''
+    const creditorVal = preset.creditorColumn != null ? (fields[preset.creditorColumn] ?? '').trim() : ''
+    const fxAmtVal = preset.fxAmountColumn != null ? fields[preset.fxAmountColumn] ?? '' : ''
+    const fxCurVal = preset.fxCurrencyColumn != null ? (fields[preset.fxCurrencyColumn] ?? '').trim() : ''
+    const fxRateVal = preset.fxRateColumn != null ? fields[preset.fxRateColumn] ?? '' : ''
+
     transactions.push({
       date,
       amount,
@@ -139,7 +146,12 @@ export async function parseCSV(
       counterparty_name: counterparty?.trim() || null,
       counterparty_iban: iban?.trim() || null,
       reference: reference?.trim() || null,
-      transaction_type: null,
+      transaction_type: typeVal || null,
+      running_balance: balanceVal.trim() ? parseAmount(balanceVal) : null,
+      creditor_id: creditorVal || null,
+      fx_amount: fxAmtVal.trim() ? parseAmount(fxAmtVal) : null,
+      fx_currency: fxCurVal || null,
+      fx_rate: fxRateVal.trim() ? parseAmount(fxRateVal) : null,
       import_hash: hash,
     })
   }
