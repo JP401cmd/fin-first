@@ -6,7 +6,6 @@ import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
-import { recomputeFireFromSettings } from '@/lib/cashflow-settings'
 import { recomputeTriple, type LastEdited } from '@/lib/cashflow-overrides'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 
@@ -44,15 +43,11 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
   const [incomeManual, setIncomeManual] = useState(data.incomeSource === 'manual')
   const [expensesManual, setExpensesManual] = useState(data.expensesSource === 'manual')
   const [sheet, setSheet] = useState<Sheet>(null)
-  const [saving, setSaving] = useState(false)
 
   const persist = useCallback(async (patch: Record<string, number | string | null>) => {
-    setSaving(true)
-    try {
-      await fetch('/api/parameters', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
-      })
-    } finally { setSaving(false) }
+    await fetch('/api/parameters', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    })
   }, [])
 
   const editField = (field: 'income' | 'expenses' | 'savingsRate', value: number) => {
@@ -76,17 +71,6 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
     }
   }
 
-  const projection = useMemo(() => recomputeFireFromSettings(
-    data.fireInput,
-    { monthlyIncome: triple.monthlyIncome, monthlyExpenses: triple.monthlyExpenses },
-    {
-      grossReturn: data.grossReturn, effectiveSwr: data.effectiveSwr, inflationRate: data.inflationRate,
-      retirementMethod: data.retirementExpenseMethod, retirementCustomAmount: data.retirementCustomAmount,
-      budgetingActive: data.budgetingActive, yearlyMustExpenses: data.fireInput.yearlyMustExpenses,
-      fireStrategy: data.fireStrategy,
-    },
-  ), [data, triple])
-
   return (
     <section className="mt-5 sm:mt-8">
       <div className="mb-4"><Kicker>Instellingen &amp; toekomst</Kicker></div>
@@ -100,17 +84,6 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
         <SettingCard icon={<ShoppingCart className="h-4 w-4" />} label="Geschatte uitgaven"
           value={<MaskedAmount value={triple.monthlyExpenses} tone="kern" />} manual={expensesManual}
           sub="per maand" onClick={() => setSheet('expenses')} />
-      </div>
-
-      <div className="mt-3 flex items-center gap-2 rounded-[var(--r)] border-l-2 border-[var(--module-active-500)] bg-[var(--subtle)]/40 px-3 py-2">
-        <span className="text-sm">&#x26A1;</span>
-        <p className="text-sm text-[var(--ink-2)]">
-          Met deze waarden bereik je volledige vrijheid{' '}
-          <strong className="font-semibold text-[var(--ink)]">
-            {projection.fireAge != null ? `rond je ${Math.round(projection.fireAge)}e (${projection.fireDate})` : projection.fireDate}
-          </strong>
-          {saving && <span className="ml-2 text-[11px] text-[var(--ink-4)]">opslaan…</span>}
-        </p>
       </div>
 
       <BottomSheet open={sheet === 'income'} onClose={() => setSheet(null)} title="Geschat jaarinkomen">
