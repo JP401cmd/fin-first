@@ -22,6 +22,7 @@ import { type Budget } from '@/lib/budget-data'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { localMonthBounds } from '@/lib/month-range'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
 import { type RecurringTransaction, getExpectedMonthlyTotal, getNextOccurrence, formatSchedule } from '@/lib/recurring-data'
 import { BillCalendar, type CalendarTransaction } from '@/components/app/bill-calendar'
@@ -221,8 +222,10 @@ export function CashAccountView({
     setFilterBudgetId('all')
   }
 
-  const monthStart = monthDate.toISOString().split('T')[0]
-  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1).toISOString().split('T')[0]
+  // Tijdzone-veilige maandgrenzen (zie localMonthBounds): NIET via toISOString,
+  // dat schuift in UTC+ tijdzones een dag terug en laat de laatste dag van de
+  // vorige maand mee-tellen (bv. 31-juli-salaris in augustus).
+  const { start: monthStart, end: monthEnd } = localMonthBounds(monthDate)
   const monthLabel = monthDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 
   const loadBudgets = useCallback(async (signal?: AbortSignal) => {

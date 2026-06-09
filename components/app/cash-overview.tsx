@@ -21,6 +21,7 @@ import { ValuationModal } from '@/components/core/assets-client'
 import { VermogenAssetCard } from '@/components/core/vermogen-asset-card'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import type { Asset } from '@/lib/asset-data'
 import type { Provenance } from '@/lib/household-data'
 
@@ -67,12 +68,17 @@ export function CashOverview({
   hideAccountsSection = false,
   hideQuickActions = false,
   showAllCashAccounts = false,
+  showMonthLinks = false,
 }: {
   embedded?: boolean
   onNavigateToAccount?: (accountId: string) => void
   hideAccountsSection?: boolean
   hideQuickActions?: boolean
   showAllCashAccounts?: boolean
+  /** Toont in de geldstroom-banner twee deeplinks (Budget/Transacties) die de
+   *  geselecteerde maand meenemen via `?maand=YYYY-MM`. Alleen aangezet op de
+   *  cashflow-landing; de cash-categoriepagina blijft zonder deze links. */
+  showMonthLinks?: boolean
 }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [cashAssets, setCashAssets] = useState<StampedAsset[]>([])
@@ -120,15 +126,22 @@ export function CashOverview({
 
   const { perspective } = usePerspective()
 
-  const monthStart = useMemo(() => monthDate.toISOString().split('T')[0], [monthDate])
-  const monthEnd = useMemo(() => {
-    const d = new Date(monthDate)
-    d.setMonth(d.getMonth() + 1)
-    return d.toISOString().split('T')[0]
-  }, [monthDate])
+  // Tijdzone-veilige maandgrenzen (zie localMonthBounds): NIET via toISOString,
+  // dat schuift in UTC+ tijdzones een dag terug en laat een 31-juli-salaris in
+  // het augustus-overzicht lekken.
+  const monthStart = useMemo(() => localMonthBounds(monthDate).start, [monthDate])
+  const monthEnd = useMemo(() => localMonthBounds(monthDate).end, [monthDate])
 
   const monthLabel = useMemo(
     () => monthDate.toLocaleDateString('nl-NL', { year: 'numeric', month: 'long' }),
+    [monthDate],
+  )
+
+  // `YYYY-MM` van de geselecteerde maand voor de deeplinks — lokaal opgebouwd
+  // (NIET via toISOString, dat schuift in UTC+ tijdzones een dag terug en kan
+  // de maand verkeerd zetten).
+  const monthParam = useMemo(
+    () => `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`,
     [monthDate],
   )
 
@@ -258,9 +271,9 @@ export function CashOverview({
       return
     }
     const supabase = createClient()
-    const start = new Date(monthDate.getFullYear(), monthDate.getMonth() - 12, 1)
-      .toISOString()
-      .split('T')[0]
+    // Lokale YYYY-MM-DD grens (zie localMonthBounds: toISOString schuift in UTC+
+    // tijdzones een dag terug).
+    const start = localMonthStart(new Date(monthDate.getFullYear(), monthDate.getMonth() - 12, 1))
     let q = supabase
       .from('transactions')
       .select('amount, is_income, transaction_type, date')
@@ -818,7 +831,25 @@ export function CashOverview({
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-            <Kicker>Geldstroom</Kicker>
+            <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+              {showMonthLinks && (
+                <>
+                  <Link
+                    href={`/overzicht/cashflow/budget?maand=${monthParam}`}
+                    className="inline-flex items-center gap-1 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)]"
+                  >
+                    Naar budget <ArrowRight className="h-3 w-3" />
+                  </Link>
+                  <Link
+                    href={`/overzicht/cashflow/transacties?maand=${monthParam}`}
+                    className="inline-flex items-center gap-1 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)]"
+                  >
+                    Naar transacties <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </>
+              )}
+              <Kicker>Geldstroom</Kicker>
+            </div>
           </div>
 
           {/* Figures-strip totalen — 4 kolommen: Inkomen / Uitgaven / Saldo / Spaarquote */}
