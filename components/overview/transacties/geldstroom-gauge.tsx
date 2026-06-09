@@ -166,13 +166,13 @@ export function GeldstroomGauge({ summary }: { summary: FlowSummary }) {
           verticale ruimte dan een stack. */}
       <div className="grid grid-cols-3 border-t border-b border-[var(--border-ed)] text-center">
         <KpiCell label="Inkomen" tone="positive">
-          <MaskedAmount value={income} tone="inherit" />
+          <MaskedAmount value={income} tone="inherit" decimals />
         </KpiCell>
         <KpiCell label="Uitgaven" tone="negative">
-          <MaskedAmount value={expense} tone="inherit" />
+          <MaskedAmount value={expense} tone="inherit" decimals />
         </KpiCell>
         <KpiCell label="Saldo" tone={net >= 0 ? 'positive' : 'negative'}>
-          <MaskedAmount value={net} tone="inherit" signPrefix={net > 0 ? '+' : ''} />
+          <MaskedAmount value={net} tone="inherit" decimals signPrefix={net > 0 ? '+' : ''} />
         </KpiCell>
       </div>
     </div>
