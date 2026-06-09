@@ -7,6 +7,7 @@ import { AnalysisSection } from './analysis-section'
 import { runPhaseStressTests, type StressTestResult } from '@/lib/phase-stress-test'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,7 +16,7 @@ interface StressTestSectionProps {
   expectedReturn: number
   inflationRate: number
   yearlyExpenses: number
-  /** Context prefix for "Vraag Will" — scenario results are appended automatically */
+  /** Context prefix for "Bespreek met Will" — scenario results are appended automatically */
   willContextPrefix: string
 }
 
@@ -57,12 +58,12 @@ export const StressTestSection = memo(function StressTestSection({
 
   // Build the "Vraag Will" context from computed results
   const willContext = results
-    ? `${willContextPrefix} Stresstest resultaten: ${results
+    ? `${willContextPrefix} Stresstest resultaten (veerkracht = aandeel van je verwachte eindvermogen dat ná de schok overblijft, géén kans): ${results
         .map(
           (r) =>
-            `${r.scenario.label}: ${formatCurrency(r.endPortfolioDelta)} (${Math.round(r.estimatedSuccessRate * 100)}%)`,
+            `${r.scenario.label}: effect ${formatCurrency(r.endPortfolioDelta)}, veerkracht ${Math.round(r.estimatedSuccessRate * 100)}%`,
         )
-        .join(', ')}`
+        .join('; ')}`
     : willContextPrefix
 
   const loading = results === null && rows.length > 0
@@ -95,7 +96,11 @@ export const StressTestSection = memo(function StressTestSection({
       willContext={willContext}
     >
       {results && results.length > 0 && (
-        <div className="-mx-1 overflow-x-auto">
+        <div className="space-y-2">
+          <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
+            Deterministische schokken op je basisprojectie — geen kansverdeling zoals Monte Carlo. Elk scenario past één extreme aanname toe en toont het effect op je eindvermogen.
+          </p>
+          <div className="-mx-1 overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[var(--border-ed)] text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
@@ -104,7 +109,12 @@ export const StressTestSection = memo(function StressTestSection({
                   Beschrijving
                 </th>
                 <th className="px-1 pb-2 text-right">Effect</th>
-                <th className="px-1 pb-2 text-right">Kans</th>
+                <th className="px-1 pb-2 text-right">
+                  <span className="inline-flex items-center justify-end gap-0.5">
+                    Veerkracht
+                    <InfoTooltip text="Veerkracht = welk deel van je verwachte eindvermogen overblijft ná deze ene schok. Het is één vast scenario, geen kansberekening. 0% betekent dat je vermogen in dit scenario opraakt vóór het einde van de fase." />
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -157,6 +167,7 @@ export const StressTestSection = memo(function StressTestSection({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </AnalysisSection>

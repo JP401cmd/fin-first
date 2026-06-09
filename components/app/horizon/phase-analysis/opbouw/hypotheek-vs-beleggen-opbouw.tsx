@@ -1,7 +1,7 @@
 'use client'
 
-import { memo, useMemo } from 'react'
-import { Scale } from 'lucide-react'
+import { memo, useMemo, useState, useDeferredValue } from 'react'
+import { Scale, Minus, Plus } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import {
@@ -17,8 +17,8 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 
 interface HypotheekVsBeleggenOpbouwProps {
   debts: Debt[]
+  /** Monthly net income — used for the extra-payment slider upper bound. */
   monthlyIncome: number
-  monthlyExpenses: number
   expectedReturn: number
   inflationRate: number
   currentAge?: number
@@ -34,14 +34,39 @@ interface HypotheekVsBeleggenOpbouwProps {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Default extra monthly amount for the comparison. */
-const DEFAULT_EXTRA_BEDRAG = 200
+/** Step size for the extra-payment slider and the default-rounding (€). */
+const STAP = 25
+
+/** Fallback extra monthly amount when no real surplus is known (€). */
+const FALLBACK_EXTRA_BEDRAG = 200
+
+/** Lower bound for the default derived from surplus (€). */
+const MIN_DEFAULT_EXTRA = 50
+
+/** Upper bound for the default derived from surplus (€). */
+const MAX_DEFAULT_EXTRA = 1000
 
 /** Default marginal income tax rate for NL (schijf 1, 2025/2026). */
 const DEFAULT_MARGINAAL_TARIEF = 0.3697
 
 /** Comparison horizon in years. */
 const HORIZON_JAREN = 10
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+/**
+ * Derive the default extra monthly amount from the real monthly surplus
+ * (annualSavings / 12), rounded to the nearest €50 and clamped to [50, 1000].
+ * Falls back to €200 when there is no positive surplus.
+ */
+function deriveDefaultExtra(annualSavings: number | undefined): number {
+  const monthlySurplus = (annualSavings ?? 0) / 12
+  if (monthlySurplus <= 0) return FALLBACK_EXTRA_BEDRAG
+  const rounded = Math.round(monthlySurplus / 50) * 50
+  return clamp(rounded, MIN_DEFAULT_EXTRA, MAX_DEFAULT_EXTRA)
+}
 
 /**
  * Map the debt-data RepaymentType (Dutch naming) to the hypotheek-vs-beleggen
@@ -118,7 +143,6 @@ export const HypotheekVsBeleggenOpbouw = memo(
   function HypotheekVsBeleggenOpbouw({
     debts,
     monthlyIncome,
-    monthlyExpenses,
     expectedReturn,
     inflationRate,
     currentAge,
@@ -138,12 +162,25 @@ export const HypotheekVsBeleggenOpbouw = memo(
       [debts],
     )
 
+    // Adjustable extra monthly amount — default = real monthly surplus, rounded.
+    const [extraBedrag, setExtraBedrag] = useState(() => deriveDefaultExtra(annualSavings))
+
+    // Slider upper bound: at least €1.000, scaling with 30% of monthly income.
+    const sliderMax = useMemo(
+      () => Math.round(Math.max(1000, (monthlyIncome ?? 0) * 0.3) / STAP) * STAP,
+      [monthlyIncome],
+    )
+
+    // Defer the heavy recompute (amortisation schedules + binary search + 2× runSimulation)
+    // so dragging the slider stays responsive — the sim runs on the settled value.
+    const deferredExtra = useDeferredValue(extraBedrag)
+
     // Build params and run comparison (memoised to avoid recalculation)
     const result = useMemo<HvBResult | null>(() => {
       if (!mortgage) return null
 
       const params: HvBParams = {
-        extraBedrag: DEFAULT_EXTRA_BEDRAG,
+        extraBedrag: deferredExtra,
         hypotheekBalance: mortgage.current_balance,
         // interest_rate is stored as a percentage (e.g. 3.8 for 3.8%)
         // but HvBParams.rente expects a percentage too (see generateSchedule)
@@ -167,6 +204,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
       return compareMortgageVsInvest(params)
     }, [
       mortgage,
+      deferredExtra,
       expectedReturn,
       inflationRate,
       currentAge,
@@ -203,11 +241,23 @@ export const HypotheekVsBeleggenOpbouw = memo(
     const restLooptijdMaanden = estimateRestLooptijd(mortgage)
     const restLooptijdJaren = Math.round(restLooptijdMaanden / 12)
 
+    // ── Rich Will-context: gekozen bedrag + aanbeveling + hypotheekgegevens ──
+    const willContext = [
+      `Hypotheek vs. beleggen: ${formatCurrency(extraBedrag)}/mnd extra over ${HORIZON_JAREN} jaar.`,
+      `Aanbeveling: ${result.aanbeveling}. Verschil (beleggen − aflossen): ${formatCurrency(result.verschil)}. Omslagpunt: ${(result.breakevenRendement * 100).toFixed(1)}% bruto rendement.`,
+      result.fireImpactMaanden != null
+        ? `FIRE-impact: ${result.fireImpactMaanden > 0 ? '+' : ''}${result.fireImpactMaanden} maanden (${result.fireImpactMaanden > 0 ? 'beleggen brengt FIRE dichterbij' : result.fireImpactMaanden < 0 ? 'aflossen brengt FIRE dichterbij' : 'gelijk'}).`
+        : '',
+      `Hypotheek: saldo ${formatCurrency(mortgage.current_balance)}, rente ${mortgage.interest_rate.toFixed(2)}%, restlooptijd ${restLooptijdJaren} jaar, type ${mortgage.repayment_type ?? 'annuïteit'}.`,
+    ]
+      .filter(Boolean)
+      .join(' ')
+
     return (
       <AnalysisSection
         title="Hypotheek vs. beleggen"
         icon={Scale}
-        willContext={`Hypotheek vs. beleggen: ${formatCurrency(DEFAULT_EXTRA_BEDRAG)}/mnd extra. Aanbeveling: ${result.aanbeveling}. Verschil: ${formatCurrency(result.verschil)}. Breakeven: ${(result.breakevenRendement * 100).toFixed(1)}%.${result.fireImpactMaanden != null ? ` FIRE-impact: ${result.fireImpactMaanden > 0 ? '+' : ''}${result.fireImpactMaanden} maanden.` : ''}`}
+        willContext={willContext}
       >
         <div className="space-y-3">
           {/* ── Mortgage context strip ────────────────────────── */}
@@ -229,12 +279,19 @@ export const HypotheekVsBeleggenOpbouw = memo(
               <span className="font-medium text-[var(--ink-2)]">{mortgage.repayment_type ?? 'annuïteit'}</span>
             </span>
           </div>
+          {/* ── Extra-bedrag regelaar ─────────────────────────── */}
+          <ExtraBedragControl
+            extraBedrag={extraBedrag}
+            onChange={setExtraBedrag}
+            max={sliderMax}
+          />
+
           {/* ── Scenario cards ────────────────────────────────── */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {/* Aflossen scenario */}
             <ScenarioCard
               title="Extra aflossen"
-              subtitle={`${formatCurrency(DEFAULT_EXTRA_BEDRAG)}/mnd op hypotheek`}
+              subtitle={`${formatCurrency(extraBedrag)}/mnd op hypotheek`}
               endValue={result.aflossing.eindwaarde}
               netBenefit={result.aflossing.nettoVoordeel}
               benefitLabel="Rentebesparing"
@@ -244,7 +301,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
             {/* Beleggen scenario */}
             <ScenarioCard
               title="Extra beleggen"
-              subtitle={`${formatCurrency(DEFAULT_EXTRA_BEDRAG)}/mnd investeren`}
+              subtitle={`${formatCurrency(extraBedrag)}/mnd investeren`}
               endValue={result.beleggen.eindwaarde}
               netBenefit={result.beleggen.nettoVoordeel}
               benefitLabel="Verwacht rendement"
@@ -331,6 +388,74 @@ export const HypotheekVsBeleggenOpbouw = memo(
 )
 
 // ── Sub-components ───────────────────────────────────────────────────────────
+
+/**
+ * Editorial-styled control for the adjustable extra monthly amount.
+ * Range slider (step €25) flanked by −/+ stepper buttons. Module colours
+ * (horizon), ink tokens, and font-mono tabular-nums for the amount.
+ */
+const ExtraBedragControl = memo(function ExtraBedragControl({
+  extraBedrag,
+  onChange,
+  max,
+}: {
+  extraBedrag: number
+  onChange: (value: number) => void
+  max: number
+}) {
+  const clampValue = (v: number) => clamp(Math.round(v / STAP) * STAP, 0, max)
+
+  return (
+    <div className="rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2.5">
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs font-medium text-[var(--ink-3)]">
+          Extra per maand
+        </span>
+        <span className="font-mono text-sm font-semibold tabular-nums text-[var(--color-horizon-600)]">
+          {formatCurrency(extraBedrag)}
+        </span>
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Verlaag extra bedrag"
+          onClick={() => onChange(clampValue(extraBedrag - STAP))}
+          disabled={extraBedrag <= 0}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]/50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+
+        <input
+          type="range"
+          min={0}
+          max={max}
+          step={STAP}
+          value={extraBedrag}
+          onChange={(e) => onChange(clampValue(Number(e.target.value)))}
+          aria-label="Extra bedrag per maand"
+          className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-[var(--border-ed)] accent-[var(--color-horizon-600)]"
+        />
+
+        <button
+          type="button"
+          aria-label="Verhoog extra bedrag"
+          onClick={() => onChange(clampValue(extraBedrag + STAP))}
+          disabled={extraBedrag >= max}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]/50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <p className="mt-1.5 text-[10px] leading-snug text-[var(--ink-4)]">
+        Standaard op je maandelijkse overschot. Pas aan om te zien hoe extra
+        aflossen of beleggen je vrijheid be&iuml;nvloedt.
+      </p>
+    </div>
+  )
+})
 
 /** Card for a single scenario (aflossen or beleggen). */
 const ScenarioCard = memo(function ScenarioCard({

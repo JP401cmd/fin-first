@@ -14,8 +14,9 @@ import { parseOFX } from '@/lib/parsers/ofx'
 import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { categorizeTransaction, isOwnAccountTransfer, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
-import type { Budget } from '@/lib/budget-data'
+import { categorizeTransaction, isOwnAccountTransfer, isWalletTransferType, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
+import { type Budget, resolveEigenRekeningBudgetId } from '@/lib/budget-data'
+import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { useToast } from '@/components/app/toast-provider'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -147,6 +148,8 @@ export default function ImportPage() {
   const [selectedAccountId, setSelectedAccountId] = useState('')
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [budgetGroups, setBudgetGroups] = useState<{ parent: Budget; children: Budget[] }[]>([])
+  // Eigen-rekening-post waar herkende verschuivingen op landen (archive → telt niet mee).
+  const eigenRekeningBudgetId = useMemo(() => resolveEigenRekeningBudgetId(budgets), [budgets])
   const [rows, setRows] = useState<ImportRow[]>([])
   const [loading, setLoading] = useState(true)
   const [parsing, setParsing] = useState(false)
@@ -169,6 +172,7 @@ export default function ImportPage() {
   const [corrections, setCorrections] = useState<CategoryCorrection[]>([])
   const [freqMap, setFreqMap] = useState<Map<string, FrequencyMatch>>(new Map())
   const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
+  const [ownNamePatterns, setOwnNamePatterns] = useState<string[]>([])
   const [aiSuggestions, setAiSuggestions] = useState<Map<string, AISuggestion>>(new Map())
   const [aiLoading, setAiLoading] = useState(false)
   const [aiReady, setAiReady] = useState(false)
@@ -197,7 +201,7 @@ export default function ImportPage() {
         supabase.from('bank_accounts').select('id, name, iban').eq('is_active', true).order('sort_order'),
         supabase.from('budgets').select('*').order('sort_order'),
         supabase.from('category_corrections').select('match_field, match_value, budget_id'),
-        user ? supabase.from('user_own_ibans').select('iban').eq('user_id', user.id) : Promise.resolve({ data: [], error: null }),
+        user ? supabase.from('user_own_ibans').select('match_type, match_value, iban').eq('user_id', user.id) : Promise.resolve({ data: [], error: null }),
       ])
 
       const anyError = accountsRes.error || budgetsRes.error || correctionsRes.error
@@ -213,12 +217,13 @@ export default function ImportPage() {
         if (accountsRes.data.length > 0) {
           setSelectedAccountId(accountsRes.data[0].id)
         }
-        const ibansFromAccounts = (accountsRes.data as Account[])
-          .map((a) => a.iban)
-          .filter(Boolean)
-          .map((i) => i!.replace(/\s/g, '').toUpperCase())
-        const ibansFromOwn = (ownIbansRes.data ?? []).map((r: { iban: string }) => r.iban.replace(/\s/g, '').toUpperCase())
-        setOwnIbans(new Set([...ibansFromAccounts, ...ibansFromOwn]))
+        const bankIbans = (accountsRes.data as Account[]).map((a) => a.iban)
+        const ids = buildOwnAccountIdentifiers(
+          (ownIbansRes.data ?? []) as { match_type?: string | null; match_value?: string | null; iban?: string | null }[],
+          bankIbans,
+        )
+        setOwnIbans(ids.ibans)
+        setOwnNamePatterns(ids.namePatterns)
       }
 
       if (budgetsRes.data) {
@@ -743,9 +748,10 @@ export default function ImportPage() {
       }
 
       const importRows: ImportRow[] = parsed.map((tx) => {
-        const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
+        const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans, tx.counterparty_name, ownNamePatterns)
+          || isWalletTransferType(tx.source_type, csvPreset.transferTypeValues)
         const cat = isTransfer
-          ? { budget_id: null, confidence: 1.0, budgetName: null, category_source: 'transfer' }
+          ? { budget_id: eigenRekeningBudgetId, confidence: 1.0, budgetName: 'Eigen rekening', category_source: 'transfer' }
           : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections, undefined, tx.counterparty_iban, freqMap)
         return {
           ...tx,
@@ -793,9 +799,10 @@ export default function ImportPage() {
       }
 
       const importRows: ImportRow[] = parsed.map((tx) => {
-        const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
+        const isTransfer = isOwnAccountTransfer(tx.counterparty_iban, ownIbans, tx.counterparty_name, ownNamePatterns)
+          || isWalletTransferType(tx.source_type, csvPreset.transferTypeValues)
         const cat = isTransfer
-          ? { budget_id: null, confidence: 1.0, budgetName: null, category_source: 'transfer' }
+          ? { budget_id: eigenRekeningBudgetId, confidence: 1.0, budgetName: 'Eigen rekening', category_source: 'transfer' }
           : categorizeTransaction(tx.description, tx.counterparty_name, tx.amount, budgets, corrections, undefined, tx.counterparty_iban, freqMap)
         return {
           ...tx,
@@ -930,21 +937,26 @@ export default function ImportPage() {
     })
   }
 
-  // Feature #191: Mark all rows with same counterparty_iban as transfer + persist IBAN
+  // Markeer alle rijen van dezelfde eigen rekening als verschuiving + onthoud de regel.
+  // Match op IBAN als die er is, anders op tegenpartij-naam (bv. PayPal zonder IBAN).
   function markRowsAsTransfer(triggerIndex: number) {
     const triggerRow = rows[triggerIndex]
     if (!triggerRow) return
 
-    const iban = triggerRow.counterparty_iban?.replace(/\s/g, '').toUpperCase()
+    const iban = triggerRow.counterparty_iban?.replace(/\s/g, '').toUpperCase() || ''
+    const nameKey = (triggerRow.counterparty_name ?? '').trim().toLowerCase()
+    const matchByName = !iban && !!nameKey
 
     // Count matching rows (including the trigger row)
     let matchCount = 0
     setRows((prev) => prev.map((r, i) => {
-      const rowIban = r.counterparty_iban?.replace(/\s/g, '').toUpperCase()
-      const matches = i === triggerIndex || (iban && rowIban === iban && !r.isTransfer)
+      const rowIban = r.counterparty_iban?.replace(/\s/g, '').toUpperCase() || ''
+      const rowName = (r.counterparty_name ?? '').trim().toLowerCase()
+      const matches = i === triggerIndex
+        || (!r.isTransfer && (matchByName ? rowName === nameKey : (!!iban && rowIban === iban)))
       if (matches) {
         matchCount++
-        return { ...r, isTransfer: true, transaction_type: 'transfer', budget_id: null, budgetName: null, category_source: 'transfer' }
+        return { ...r, isTransfer: true, transaction_type: 'transfer', budget_id: eigenRekeningBudgetId, budgetName: 'Eigen rekening', category_source: 'transfer' }
       }
       return r
     }))
@@ -956,34 +968,41 @@ export default function ImportPage() {
       addToast({ type: 'success', title: 'Transactie gemarkeerd als eigen overboeking', duration: 3000 })
     }
 
-    // Persist IBAN to user_own_ibans for future imports
-    if (iban) {
-      void (async () => {
-        try {
-          const supabase = createClient()
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) return
-          // Upsert: only insert if not already present
-          const { data: existing } = await supabase
-            .from('user_own_ibans')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('iban', iban)
-            .maybeSingle()
-          if (!existing) {
-            await supabase.from('user_own_ibans').insert({
-              user_id: user.id,
-              iban,
-              label: triggerRow.counterparty_name || null,
-            })
-            // Also add to local ownIbans set for immediate re-use
-            setOwnIbans((prev) => new Set([...prev, iban]))
+    // Onthoud de regel voor toekomstige imports: op IBAN indien aanwezig, anders op naam.
+    void (async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const matchType = iban ? 'iban' : 'name'
+        const matchValue = iban || nameKey
+        if (!matchValue) return
+        const { data: existing } = await supabase
+          .from('user_own_ibans')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('match_type', matchType)
+          .eq('match_value', matchValue)
+          .maybeSingle()
+        if (!existing) {
+          await supabase.from('user_own_ibans').insert({
+            user_id: user.id,
+            iban: iban || null,
+            match_type: matchType,
+            match_value: matchValue,
+            label: triggerRow.counterparty_name || null,
+          })
+          // Lokale set/patterns direct bijwerken voor hergebruik binnen dezelfde sessie.
+          if (matchType === 'iban') {
+            setOwnIbans((prev) => new Set([...prev, matchValue]))
+          } else {
+            setOwnNamePatterns((prev) => (prev.includes(matchValue) ? prev : [...prev, matchValue]))
           }
-        } catch {
-          // Silent fail — IBAN will still be marked locally
         }
-      })()
-    }
+      } catch {
+        // Silent fail — markering blijft lokaal behouden
+      }
+    })()
   }
 
   function saveCorrectionRule(matchField: CategoryCorrection['match_field'], matchValue: string, budgetId: string) {
@@ -1132,7 +1151,9 @@ export default function ImportPage() {
       description: r.description,
       counterparty_name: r.counterparty_name,
       counterparty_iban: r.counterparty_iban,
-      budget_id: r.isTransfer ? null : r.budget_id,
+      // Transfers landen op de "Eigen rekening"-post (archive → telt niet mee); de
+      // map-blokken/markRowsAsTransfer hebben budget_id al op die post gezet.
+      budget_id: r.budget_id,
       is_income: r.amount > 0,
       category_source: r.isTransfer ? 'transfer' : (r.category_source ?? (r.aiAccepted ? 'ai' : r.budget_id ? 'rule' : 'import')),
       import_hash: r.import_hash,

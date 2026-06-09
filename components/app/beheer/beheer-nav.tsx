@@ -12,6 +12,7 @@ const tabs = [
   { label: 'Meldingen', href: '/beheer/meldingen' },
   { label: 'Rekenhulp-meldingen', href: '/beheer/calculator-reports', activeClass: 'border-violet-500 text-violet-700' },
   { label: 'Coach', href: '/beheer/coach', activeClass: 'border-wil-500 text-wil-700' },
+  { label: 'Welkomstgids', href: '/beheer/welkom', activeClass: 'border-kern-500 text-kern-700' },
   { label: 'Toegang', href: '/beheer/toegang', activeClass: 'border-[var(--ink)] text-[var(--ink)]' },
   { label: 'Database', href: '/beheer/migration' },
   { label: 'Mobile Preview', href: '/beheer/testdata#mobile-preview' },

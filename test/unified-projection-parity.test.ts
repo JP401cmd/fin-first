@@ -422,7 +422,12 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     // eliminates Box 3 drag for years, causing larger differences vs the old engine's
     // flat BOX3_DRAG. Large portfolios (Willem, Lisa) are within 1 year.
     const TOLERANCE: Record<PersonaKey, number> = {
-      daan: 8,      // starter with tiny portfolio, heffingsvrij eliminates drag for years
+      daan: 12,     // starter with tiny portfolio, heffingsvrij eliminates drag for years.
+                    //   Bovendien indexeert de unified engine het jaarlijkse sparen nu met
+                    //   inflatie (income × spaarquote groeit nominaal mee) — een bewuste
+                    //   unified-only verbetering die de oude vlakke runSimulation mist.
+                    //   Bij Daan's ~40-jarige opbouwhorizon compoundt dat het sterkst →
+                    //   FIRE meerdere jaren eerder dan de (te pessimistische) oude engine.
       lisa: 5,      // moderate portfolio + legacy strategy; engine-engine drift
                     //   na de legacy PV-discount-fix (correct preserve van geïndexeerde
                     //   nalatenschap i.p.v. de oude deplete-achtige fallback)

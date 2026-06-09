@@ -38,6 +38,7 @@ import {
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
+import { resolveSavingsSource } from './savings-source'
 
 // Snapshot type for resilience trend data
 export type SnapshotForTrend = {
@@ -91,6 +92,11 @@ export interface HorizonPageData {
   /** Maandelijks surplus uit budget-data (avgIncome6m - avgExpenses6m), null
    *  als budgetteren-module uit staat of geen surplus. Voor setup-pane summary. */
   monthlySurplusFromBudget: number | null
+  /** Jaarlijks spaarbedrag afgeleid van de cashflow-pagina: inkomen × spaarquote
+   *  (berekend óf overschreven, incl. spaarbudgetten + schuldaflossing). Primaire
+   *  spaarbron voor de FIRE-prognose wanneer er geen handmatige spaar-override is.
+   *  Zie lib/savings-source.ts — spiegelt het instellingenblok op /overzicht/cashflow. */
+  baseAnnualSavingsFromCashflow: number
   /** Retirement-expense methode uit profile (raw, mogelijk null bij nieuwe users). */
   retirementExpenseMethod: RetirementExpenseMethod | null
   /** Retirement-expense custom amount uit profile (null als methode != custom_amount). */
@@ -522,6 +528,19 @@ export async function loadHorizonData(
     savingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
   }
 
+  // Canonieke spaarbron voor de FIRE-prognose: inkomen × spaarquote, exact zoals
+  // het instellingenblok onderaan /overzicht/cashflow het toont (berekend óf
+  // overschreven, incl. spaarbudgetten + schuldaflossing).
+  const sources = profile as { income_source?: string | null; expenses_source?: string | null }
+  const { baseAnnualSavings: baseAnnualSavingsFromCashflow } = resolveSavingsSource({
+    incomeSource: sources.income_source,
+    expensesSource: sources.expenses_source,
+    netMonthlyIncome: Number(profile.net_monthly_income ?? 0),
+    estimatedAnnualIncome: extrapolatedIncome,
+    estimatedMonthlyExpenses: profileMonthlyExpenses,
+    savingsRate6m,
+  })
+
   // ── emergencyFundMonths: actual liquid assets (same as dashboard) ──
   const liquidAssets = (fullAssetsResult.data ?? [])
     .filter(a => {
@@ -722,6 +741,7 @@ export async function loadHorizonData(
     monthlySavingsOverride,
     monthlyContributionFromAssets,
     monthlySurplusFromBudget,
+    baseAnnualSavingsFromCashflow,
     retirementExpenseMethod: (profile.retirement_expense_method as RetirementExpenseMethod | null) ?? null,
     retirementExpenseCustomAmount: profile.retirement_expense_custom_amount ?? null,
     housingStrategy,

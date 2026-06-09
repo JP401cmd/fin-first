@@ -14,6 +14,9 @@ export interface FireSavingsPanelProps {
   monthlyContributionFromAssets: number | null
   /** Berekend uit 6m-transactie-surplus als budgetteren-module actief is. Null als module uit of geen surplus. */
   monthlySurplusFromBudget: number | null
+  /** Spaarquote × inkomen per maand uit de cashflow-pagina — exact het bedrag dat
+   *  de prognose gebruikt als deze override leeg is. Null als nog onbekend. */
+  baseMonthlySavingsFromCashflow: number | null
   /** Of de Budgetteren-module actief is. Bepaalt of we de budget-summary tonen. */
   budgetingActive: boolean
 }
@@ -22,12 +25,13 @@ export function FireSavingsPanel({
   value,
   onChange,
   monthlyContributionFromAssets,
-  monthlySurplusFromBudget,
-  budgetingActive,
+  baseMonthlySavingsFromCashflow,
 }: FireSavingsPanelProps) {
   const { override } = value
 
-  const hasBudgetSurplus = budgetingActive && monthlySurplusFromBudget != null && monthlySurplusFromBudget > 0
+  // Primaire berekende waarde = spaarquote × inkomen uit de cashflow-pagina.
+  // Dit is exact wat de prognose gebruikt als de override leeg blijft.
+  const hasCashflowSavings = baseMonthlySavingsFromCashflow != null && baseMonthlySavingsFromCashflow > 0
   const hasAssetContribution = monthlyContributionFromAssets != null && monthlyContributionFromAssets > 0
 
   const overrideNum = override === '' ? null : Number(override)
@@ -43,13 +47,14 @@ export function FireSavingsPanel({
       <div className="mb-4 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
         <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">Berekende waarde</p>
         <div className="mt-1 font-sans text-[13px] text-[var(--ink-2)]">
-          {hasBudgetSurplus ? (
+          {hasCashflowSavings ? (
             <>
-              Je houdt momenteel{' '}
+              Op basis van je <span className="font-semibold text-[var(--ink)]">spaarquote en inkomen</span> uit Cashflow
+              zet je momenteel{' '}
               <span className="font-semibold text-[var(--ink)]">
-                <MaskedAmount value={monthlySurplusFromBudget!} tone="ink" />
+                <MaskedAmount value={baseMonthlySavingsFromCashflow!} tone="ink" />
               </span>
-              /maand over op basis van je inkomen en uitgaven.
+              /maand opzij. Dit gebruikt de prognose als je hieronder niets invult.
             </>
           ) : hasAssetContribution ? (
             <>
@@ -61,7 +66,7 @@ export function FireSavingsPanel({
             </>
           ) : (
             <span className="italic text-[var(--ink-3)]">
-              Nog niet bekend &mdash; vul hieronder zelf in hoeveel je per maand opzij zet.
+              Nog niet bekend &mdash; stel je inkomen en spaarquote in op de Cashflow-pagina, of vul hieronder zelf in.
             </span>
           )}
         </div>
@@ -78,8 +83,8 @@ export function FireSavingsPanel({
           step={50}
           value={override}
           onChange={e => onChange({ ...value, override: e.target.value })}
-          placeholder={hasBudgetSurplus
-            ? `Standaard: ${Math.round(monthlySurplusFromBudget!)}`
+          placeholder={hasCashflowSavings
+            ? `Standaard: ${Math.round(baseMonthlySavingsFromCashflow!)}`
             : hasAssetContribution
               ? `Standaard: ${Math.round(monthlyContributionFromAssets!)}`
               : 'bv. 500'}
@@ -92,7 +97,7 @@ export function FireSavingsPanel({
         )}
         {!overrideActive && (
           <p className="mt-1.5 font-sans text-[11px] text-[var(--ink-3)]">
-            Laat leeg om de berekende waarde te gebruiken.
+            Laat leeg om je spaarquote &times; inkomen uit Cashflow te gebruiken.
           </p>
         )}
       </div>

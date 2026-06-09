@@ -74,6 +74,7 @@ import {
   type CategoryAppLink,
 } from '@/lib/category-app-nav'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
+import { resolveSavingsSource } from './savings-source'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -167,7 +168,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('*').eq('is_active', true),
     supabase.from('debts').select('*').eq('is_active', true),
-    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, income_source, expenses_source').single(),
+    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, income_source, expenses_source, monthly_savings_override').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
@@ -542,6 +543,23 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
 
   const yearlyExpenses = effectiveMonthlyExpenses * 12
+
+  // Spaarbron voor de FIRE-prognose — gelijk aan /toekomst en /overzicht/cashflow.
+  // Prioriteit: handmatige override → inkomen × spaarquote → asset-aggregaat.
+  // De unified engine indexeert dit jaarbedrag zelf met inflatie.
+  const dashboardSavingsOverrideRaw = (profileResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override
+  const dashboardSavingsOverride = dashboardSavingsOverrideRaw == null ? null : Number(dashboardSavingsOverrideRaw)
+  const { baseAnnualSavings: dashboardBaseAnnualSavings } = resolveSavingsSource({
+    incomeSource: (profileResult.data as { income_source?: string | null } | null)?.income_source,
+    expensesSource: (profileResult.data as { expenses_source?: string | null } | null)?.expenses_source,
+    netMonthlyIncome: Number(profileResult.data?.net_monthly_income ?? 0),
+    estimatedAnnualIncome: extrapolatedIncome,
+    estimatedMonthlyExpenses: profileMonthlyExpenses,
+    savingsRate6m,
+  })
+  const dashboardAnnualSavings = dashboardSavingsOverride != null && dashboardSavingsOverride >= 0
+    ? dashboardSavingsOverride * 12
+    : (dashboardBaseAnnualSavings > 0 ? dashboardBaseAnnualSavings : monthlyContributions * 12)
   const fireStrategy = resolveFireStrategyWithOverride(profileResult.data ?? {})
   const dob = profileResult.data?.date_of_birth ?? null
   const currentAge = dob ? ageAtDate(dob) : null
@@ -627,7 +645,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         endAge: effectiveStrategy.endAge,
         yearlyExpenses: dashboardYearlyExpenses,
         currentLiquidPortfolio: dashboardLiquidEstimate,
-        annualSavings: monthlyContributions * 12,
+        annualSavings: dashboardAnnualSavings,
         // Cashflow-gebaseerde phase-detectie (zie horizon-data-loader).
         currentNetCashflowYearly: (effectiveMonthlyIncome - effectiveMonthlyExpenses) * 12,
       })
@@ -642,8 +660,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         currentAge,
         endAge: effectiveStrategy.endAge,
         yearlyExpenses: dashboardYearlyExpenses,
-        annualSavings: monthlyContributions * 12,
-        monthlySurplus: monthlyContributions,
+        annualSavings: dashboardAnnualSavings,
+        monthlySurplus: dashboardAnnualSavings / 12,
         monthlyIncome: effectiveMonthlyIncome,
         incomeGrowthRate: 0,  // conservatief: geen inkomensgroei in FIRE simulatie
         grossReturn: fireParams.grossReturn,

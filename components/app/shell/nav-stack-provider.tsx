@@ -31,6 +31,7 @@ import {
   type ReactNode,
 } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { shouldLogViewTransitionError } from './view-transition-utils'
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -440,11 +441,12 @@ function startViewTransition(callback: () => void): void {
   }
   const transition = doc.startViewTransition(callback)
   // De View Transitions API heeft drie promises (ready/finished/updateCallbackDone)
-  // die alle drie met AbortError rejecten als de transitie wordt geskipped door
-  // een nieuwe transitie. Skipped is verwacht en functioneel onschadelijk; alle
-  // drie swallowen voorkomt unhandled-rejection-spam in de Next.js dev-overlay.
+  // die rejecten zodra de transitie wordt geskipped — door een nieuwe transitie
+  // (AbortError) of doordat het document hidden/niet-active was (InvalidStateError).
+  // Beide zijn verwacht en functioneel onschadelijk (de mutatie draait alsnog);
+  // alle drie swallowen voorkomt rejection-spam in de Next.js dev-overlay.
   const swallow = (err: unknown) => {
-    if (err instanceof Error && err.name !== 'AbortError') {
+    if (shouldLogViewTransitionError(err)) {
       console.error('[nav-stack] view transition error:', err)
     }
   }

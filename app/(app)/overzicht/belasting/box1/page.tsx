@@ -6,7 +6,9 @@ import { Clock, Users, EyeOff } from 'lucide-react'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
 import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page-header'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
-import { computeBox1Tax, type Box1Result } from '@/lib/box1-tax'
+import { computeBox1Tax, grossFromNet, type Box1Result } from '@/lib/box1-tax'
+import { resolveBox1GrossIncome, type Box1IncomeResolution } from '@/lib/box1-income'
+import { Box1GrossIncomeEditor } from '@/components/overview/belasting/box1-gross-income-editor'
 import { Box1Waterfall } from '@/components/overview/belasting/box1-waterfall'
 import { Box1MarginaleCurveCard } from '@/components/overview/belasting/box1-marginale-curve-card'
 import { Box1Heffingskortingen } from '@/components/overview/belasting/box1-heffingskortingen'
@@ -22,12 +24,6 @@ const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 export const metadata: Metadata = {
   title: 'Box 1 · Werk + woning — TriFinity',
   description: 'Belasting over werk en woning — plus je onbenutte jaarruimte (pensioenaftrek).',
-}
-
-/** Netto-maandinkomen → geschat bruto-jaarinkomen via marginaal tarief. */
-function netMonthlyToGrossYearly(netMonthly: number, marg: number): number {
-  if (netMonthly <= 0 || marg <= 0 || marg >= 1) return 0
-  return (netMonthly * 12) / (1 - marg)
 }
 
 /** Geschatte aftrekbare hypotheekrente per jaar uit een mortgage-debt. */
@@ -61,12 +57,18 @@ function estimateMortgageRente(
 export default async function BelastingBox1Page() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   const horizonData = await loadHorizonData(supabase)
 
-  // Box 1-inkomen: netto ≈ bruto × (1 − marginaal) → bruto ≈ netto / (1 − marginaal).
-  const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
+  // Box 1-bruto-inkomen: handmatige Box 1-override, anders de cashflow-netto-
+  // jaarschatting omgerekend naar bruto via de Box 1-motor (grossFromNet).
+  const income: Box1IncomeResolution = user
+    ? await resolveBox1GrossIncome(supabase, user.id, 2026)
+    : { grossYearly: 0, estimateGross: 0, estimateNetYearly: 0, isManual: false }
+  const grossYearly = income.grossYearly
   const marg = horizonData.fireParams?.marginaalTarief ?? 0.3697
-  const grossYearly = netMonthlyToGrossYearly(netMonthly, marg)
 
   // Vrijheidstijd-equivalent ("Geld is opgeslagen tijd"). Dagelijkse uitgaven
   // uit dezelfde bron als de rest van de app; 0 → geen vertaling.
@@ -129,7 +131,7 @@ export default async function BelastingBox1Page() {
     if (isHousehold) {
       partnerGrossYearly =
         tx.partnerMonthlyIncome != null
-          ? netMonthlyToGrossYearly(tx.partnerMonthlyIncome, marg)
+          ? grossFromNet(Math.round(tx.partnerMonthlyIncome * 12), 2026)
           : null
     }
   }
@@ -148,7 +150,7 @@ export default async function BelastingBox1Page() {
       {box1Result != null && (
         <Reveal>
           <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-2">
-            <Box1DrukHero result={box1Result} dailyExpenses={dailyExpenses} />
+            <Box1DrukHero result={box1Result} dailyExpenses={dailyExpenses} income={income} />
           </section>
         </Reveal>
       )}
@@ -257,10 +259,13 @@ export default async function BelastingBox1Page() {
 function Box1DrukHero({
   result,
   dailyExpenses,
+  income,
 }: {
   result: Box1Result
   /** Dagelijkse uitgaven voor de vrijheidstijd-vertaling; 0 → geen regel. */
   dailyExpenses: number
+  /** Bruto-inkomen-resolutie voor de aanpasbare "Geschat bruto"-figuur. */
+  income: Box1IncomeResolution
 }) {
   const freedom =
     dailyExpenses > 0
@@ -291,8 +296,15 @@ function Box1DrukHero({
         figures={[
           {
             kicker: 'Geschat bruto',
-            amount: formatCurrency(Math.round(result.grossYearlyIncome)),
-            sub: 'per jaar',
+            amount: (
+              <Box1GrossIncomeEditor
+                grossYearly={income.grossYearly}
+                estimateGross={income.estimateGross}
+                estimateNetYearly={income.estimateNetYearly}
+                isManual={income.isManual}
+              />
+            ),
+            sub: income.isManual ? 'handmatig · per jaar' : 'geschat · tik om te wijzigen',
           },
           {
             kicker: 'Effectief tarief',

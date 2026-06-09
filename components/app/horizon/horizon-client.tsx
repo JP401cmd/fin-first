@@ -495,6 +495,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           hasPartner: initialData.hasPartner,
           bankAccountCash: initialData.unlinkedCash,
           monthlySavingsOverride,
+          baseAnnualSavingsFromCashflow: initialData.baseAnnualSavingsFromCashflow,
           housingStrategy: initialData.housingStrategy,
         }
       : null,
@@ -2586,6 +2587,43 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const fireNotReachable = effectiveCountdown.fireDate === 'Niet haalbaar'
   const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
 
+  // ── Paginabrede gating: voorkeuren-eerst ─────────────────────────────
+  // Zolang de gebruiker de FIRE-prognose-voorkeuren niet heeft ingesteld,
+  // vervangen we de VOLLEDIGE pagina-body (KPI-hero, vrijheidsbalk, grafiek
+  // en alle onderliggende secties) door één setup-melding. De setup-pane
+  // blijft hier gemount zodat de CTA hem in-place opent; na save flipt
+  // hasCompletedHorizonSetup en verschijnt de volledige pagina zonder reload.
+  // (Deze guard staat ná alle hooks zodat de hook-volgorde stabiel blijft.)
+  if (!hasCompletedHorizonSetup) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+        <HorizonFireIntroCard
+          kernEmpty={kernEmpty}
+          onOpenSetup={() => setSetupPaneOpen(true)}
+        />
+        <HorizonSetupPane
+          key={setupPaneOpen ? 'horizonSetup-open' : 'horizonSetup-closed'}
+          open={setupPaneOpen}
+          onClose={() => setSetupPaneOpen(false)}
+          onCompleted={(saved) => {
+            setHasCompletedHorizonSetup(true)
+            setMonthlySavingsOverride(saved.monthlySavingsOverride)
+          }}
+          initialMonthlySavingsOverride={monthlySavingsOverride}
+          monthlyContributionFromAssets={initialData.monthlyContributionFromAssets}
+          monthlySurplusFromBudget={initialData.monthlySurplusFromBudget}
+          baseMonthlySavingsFromCashflow={initialData.baseAnnualSavingsFromCashflow > 0 ? Math.round(initialData.baseAnnualSavingsFromCashflow / 12) : null}
+          budgetingActive={initialData.budgetingActive}
+          initialEndStrategy={initialData.fireStrategy.strategy}
+          initialEndAge={initialData.fireStrategy.endAge}
+          initialLegacyAmount={initialData.fireStrategy.legacyAmount}
+          initialRetirementMethod={initialData.retirementExpenseMethod}
+          initialRetirementCustomAmount={initialData.retirementExpenseCustomAmount}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-6xl py-5 sm:py-8">
       {/* === Editorial header — blueprint Type 1 (Module-landing) === */}
@@ -2965,11 +3003,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             </div>
           )}
 
-          {/* Grafiekgedeelte — vervangen door intro-card zolang de gebruiker
-              de setup-pane niet heeft doorlopen + opgeslagen. */}
-          {!hasCompletedHorizonSetup ? (
-            <HorizonFireIntroCard kernEmpty={kernEmpty} />
-          ) : !simResult && !loading ? (
+          {/* Grafiekgedeelte. De !hasCompletedHorizonSetup-staat wordt
+              paginabreed afgevangen door de guard-clause bovenaan de render,
+              dus hier hoeven we alleen de geladen/lege/gevulde staten te tonen. */}
+          {!simResult && !loading ? (
             <div className="py-8" style={{ minHeight: 320 }}>
               {simError ? (
                 <WidgetEmpty
@@ -6744,6 +6781,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         initialMonthlySavingsOverride={monthlySavingsOverride}
         monthlyContributionFromAssets={initialData.monthlyContributionFromAssets}
         monthlySurplusFromBudget={initialData.monthlySurplusFromBudget}
+        baseMonthlySavingsFromCashflow={initialData.baseAnnualSavingsFromCashflow > 0 ? Math.round(initialData.baseAnnualSavingsFromCashflow / 12) : null}
         budgetingActive={initialData.budgetingActive}
         initialEndStrategy={initialData.fireStrategy.strategy}
         initialEndAge={initialData.fireStrategy.endAge}

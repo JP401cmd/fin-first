@@ -69,7 +69,10 @@ export const SORRAnalyse = memo(function SORRAnalyse({
   const [state, setState] = useState<SORRState | null>(null)
 
   const yearsInPhase = Math.max(1, Math.round(endAge - startAge))
-  const yearlyCashflow = -(yearlyWithdrawal - yearlyAowIncome)
+  // `yearlyWithdrawal` (= row.withdrawal) is ALREADY the net portfolio outflow —
+  // AOW is netted out exactly once upstream by the withdrawal strategy. Do not
+  // subtract it again here (C1), otherwise SORR success rates run optimistic.
+  const yearlyCashflow = -yearlyWithdrawal
 
   // Lazy compute: defer past first paint
   useEffect(() => {
@@ -142,9 +145,13 @@ export const SORRAnalyse = memo(function SORRAnalyse({
       loading={loading}
       willContext={
         state
-          ? `SORR analyse: baseline slagingskans ${Math.round(state.baseline.successRate * 100)}%. ` +
-            `Crash jaar 1: ${crashScenario ? Math.round(crashScenario.successRate * 100) : '?'}%. ` +
-            `Aanbevolen buffer: ${formatCurrency(state.recommendedBuffer.amount)}.`
+          ? `Volgorde-risico (SORR) onttrekkingsfase (${Math.round(startAge)}→${Math.round(endAge)}): ` +
+            `baseline slagingskans ${Math.round(state.baseline.successRate * 100)}% bij ${formatCurrency(yearlyWithdrawal)}/jaar ` +
+            `netto portfolio-onttrekking${yearlyAowIncome > 0 ? ` (bovenop ${formatCurrency(yearlyAowIncome)} AOW)` : ''}. ` +
+            `Een crash van −20% in jaar 1 brengt de slagingskans naar ${crashScenario ? Math.round(crashScenario.successRate * 100) : '?'}%` +
+            `${crashScenario && crashScenario.yearsLostVsBaseline > 0 ? ` (portfolio gaat ${crashScenario.yearsLostVsBaseline} jaar korter mee)` : ''}. ` +
+            `Aanbevolen cash buffer voor de eerste jaren: ${formatCurrency(state.recommendedBuffer.amount)}` +
+            `${state.recommendedBuffer.months > 0 ? ` (${state.recommendedBuffer.months} maanden uitgaven)` : ''}.`
           : 'SORR analyse (laden...)'
       }
     >

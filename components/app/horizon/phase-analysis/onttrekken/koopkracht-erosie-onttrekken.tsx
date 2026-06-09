@@ -5,6 +5,7 @@ import { ArrowDownRight, CheckCircle2, Shield, TrendingDown, AlertTriangle } fro
 import { formatCurrency, formatCurrencyDecimals } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,13 +30,21 @@ interface ComputedState {
   totalErosiePct: number
   reeelLaatsteJaar: number
   levensstijlKostTekst: string
+  /** Of er een inflatiebestendig (AOW) deel is dat niet erodeert */
+  hasInflationProofPart: boolean
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
  * Compute purchasing power erosion rows at 5-year intervals.
- * Nominal withdrawal stays the same; real value decreases with inflation.
+ *
+ * IMPORTANT (C4): only the NON-indexed portfolio withdrawal erodes. AOW (and
+ * indexed pension) is inflation-proof — by law the AOW is annually indexed, so
+ * its real value is preserved. We therefore deflate ONLY `yearlyWithdrawal` and
+ * keep `yearlyAowIncome` at constant real value. The reported real income is
+ * `yearlyWithdrawal / deflator + yearlyAowIncome`, and the erosion percentage is
+ * computed against the total income so the user sees the blended effect.
  */
 function computeErosie(
   yearlyWithdrawal: number,
@@ -47,6 +56,12 @@ function computeErosie(
   const totalIncome = yearlyWithdrawal + yearlyAowIncome
   const durationYears = Math.max(Math.round(endAge - startAge), 1)
   const rows: ErosieRow[] = []
+
+  // Real income at year y: only the portfolio part erodes; AOW keeps its value.
+  const reeelAtYear = (y: number): number => {
+    const deflator = Math.pow(1 + inflationRate, y)
+    return yearlyWithdrawal / deflator + yearlyAowIncome
+  }
 
   // Start row
   rows.push({
@@ -60,8 +75,7 @@ function computeErosie(
   // Every 5th year
   for (let y = 5; y < durationYears; y += 5) {
     const age = Math.round(startAge) + y
-    const deflator = Math.pow(1 + inflationRate, y)
-    const reeel = totalIncome / deflator
+    const reeel = reeelAtYear(y)
 
     rows.push({
       leeftijd: age,
@@ -76,8 +90,7 @@ function computeErosie(
   const lastYear = durationYears
   const lastAge = Math.round(startAge) + lastYear
   if (rows[rows.length - 1].jaar !== lastYear) {
-    const deflator = Math.pow(1 + inflationRate, lastYear)
-    const reeel = totalIncome / deflator
+    const reeel = reeelAtYear(lastYear)
     rows.push({
       leeftijd: lastAge,
       jaar: lastYear,
@@ -88,15 +101,17 @@ function computeErosie(
   }
 
   // Overall stats
-  const finalDeflator = Math.pow(1 + inflationRate, durationYears)
-  const reeelLaatsteJaar = Math.round(totalIncome / finalDeflator)
+  const reeelLaatsteJaar = Math.round(reeelAtYear(durationYears))
   const totalErosiePct = Math.round((1 - reeelLaatsteJaar / totalIncome) * 100)
 
-  // Future cost of current lifestyle
-  const levensstijlKostNominaal = Math.round(totalIncome * finalDeflator)
-  const levensstijlKostTekst = `Je levensstijl kost over ${durationYears} jaar ${formatCurrency(levensstijlKostNominaal)}/jaar in toekomstige euro's`
+  // Future cost of current lifestyle (nominal cost to keep TODAY's purchasing
+  // power): only the portfolio part needs to grow with inflation; AOW already
+  // indexes itself, so it stays at its current level in this nominal view.
+  const finalDeflator = Math.pow(1 + inflationRate, durationYears)
+  const levensstijlKostNominaal = Math.round(yearlyWithdrawal * finalDeflator + yearlyAowIncome)
+  const levensstijlKostTekst = `Om je huidige koopkracht vast te houden, moet je portfolio-deel over ${durationYears} jaar ${formatCurrency(levensstijlKostNominaal)}/jaar opleveren in toekomstige euro's`
 
-  return { rows, totalErosiePct, reeelLaatsteJaar, levensstijlKostTekst }
+  return { rows, totalErosiePct, reeelLaatsteJaar, levensstijlKostTekst, hasInflationProofPart: yearlyAowIncome > 0 }
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -203,9 +218,10 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
       loading={loading}
       willContext={
         state
-          ? `Koopkrachterosie: ${durationYears} jaar, inflatie ${(inflationRate * 100).toFixed(1)}%, ` +
-            `totaal erosie ${state.totalErosiePct}%, ` +
-            `reeel ${formatCurrency(state.reeelLaatsteJaar)}/jaar aan het eind`
+          ? `Koopkrachterosie over ${durationYears} jaar bij ${(inflationRate * 100).toFixed(1)}% inflatie: ` +
+            `alleen het portfolio-deel (${formatCurrency(yearlyWithdrawal)}/jaar) erodeert; ` +
+            `${yearlyAowIncome > 0 ? `AOW (${formatCurrency(yearlyAowIncome)}/jaar) is geïndexeerd en blijft koopkrachtvast. ` : ''}` +
+            `Blended koopkrachtverlies ${state.totalErosiePct}%: ${formatCurrency(totalIncome)}/jaar nu is straks nog ${formatCurrency(state.reeelLaatsteJaar)}/jaar waard in huidige euro's.`
           : 'Koopkrachterosie (laden...)'
       }
     >
@@ -214,8 +230,9 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
           {/* ── Summary stat ──────────────────────────────────── */}
           <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-3">
             <div className="flex items-baseline justify-between">
-              <span className="text-xs text-[var(--ink-3)]">
+              <span className="flex items-center text-xs text-[var(--ink-3)]">
                 Koopkrachtverlies na {durationYears} jaar
+                <InfoTooltip text="Alleen je portfolio-onttrekking erodeert door inflatie. AOW (en een geïndexeerd pensioen) is wettelijk jaarlijks geïndexeerd en houdt zijn koopkracht vast — dat deel erodeert niet. Het getoonde percentage is het gemengde (blended) effect over je hele inkomen." />
               </span>
               <span className="font-mono text-lg tabular-nums font-bold text-[var(--negative)]">
                 &minus;{state.totalErosiePct}%
@@ -227,6 +244,11 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
                 {<MaskedAmount value={state.reeelLaatsteJaar} tone="horizon" />}
               </span>{' '}
               waard in huidige euro&apos;s
+              {state.hasInflationProofPart && (
+                <>
+                  {' '}&mdash; je AO-deel ({<MaskedAmount value={yearlyAowIncome} tone="horizon" />}/jaar) blijft koopkrachtvast
+                </>
+              )}
             </p>
           </div>
 

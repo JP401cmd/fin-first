@@ -79,16 +79,19 @@ interface HorizonFireSimInput {
   /** Totaal saldo van ontkoppelde bankrekeningen (niet gekoppeld aan assets) */
   bankAccountCash?: number
   /** Handmatige spaargeld-override uit profiles.monthly_savings_override.
-   *  Indien gezet (non-null), wordt deze waarde × 12 gebruikt als annualSavings
-   *  in plaats van het asset-contributie-aggregaat. Fallback voor users met
-   *  Budgetteren-module uit of zonder asset-contributies. */
+   *  Indien gezet (non-null), wint deze waarde × 12 als annualSavings boven
+   *  de cashflow-spaarquote en het asset-contributie-aggregaat. */
   monthlySavingsOverride?: number | null
+  /** Jaarlijks spaarbedrag afgeleid van de cashflow-pagina (inkomen × spaarquote,
+   *  incl. spaarbudgetten + schuldaflossing). Primaire spaarbron wanneer er geen
+   *  handmatige monthlySavingsOverride is. Zie lib/savings-source.ts. */
+  baseAnnualSavingsFromCashflow?: number | null
   /** Eigen-woning-strategie uit profiles.housing_strategy_config. Default include_full. */
   housingStrategy?: HousingStrategyConfig
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, housingStrategy } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
   const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[] } | null>(() => {
@@ -104,13 +107,18 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const yearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : 0
     if (yearlyExpenses <= 0) return null
 
-    // annualSavings — override wint over asset-aggregaat zodat users zonder
-    // monthly_contribution op assets (bv. Budgetteren-module uit) een
-    // werkende prognose krijgen.
-    const effectiveMonthlyContrib = monthlySavingsOverride != null && monthlySavingsOverride >= 0
-      ? monthlySavingsOverride
-      : (monthlyContributions ?? 0)
-    const annualSavings = effectiveMonthlyContrib * 12
+    // annualSavings — prioriteit:
+    //   1. expliciete spaar-override uit de FIRE-setup (monthlySavingsOverride × 12)
+    //   2. cashflow-spaarquote × inkomen (baseAnnualSavingsFromCashflow) — de
+    //      canonieke bron, gelijk aan wat /overzicht/cashflow toont
+    //   3. asset-contributie-aggregaat (legacy fallback voor lege data)
+    // De engine indexeert dit jaarbedrag zelf met inflatie over de opbouwjaren.
+    const annualSavings = monthlySavingsOverride != null && monthlySavingsOverride >= 0
+      ? monthlySavingsOverride * 12
+      : (baseAnnualSavingsFromCashflow != null && baseAnnualSavingsFromCashflow > 0
+          ? baseAnnualSavingsFromCashflow
+          : (monthlyContributions ?? 0) * 12)
+    const monthlySurplus = annualSavings / 12
 
     const grossReturn = grossReturnParam ?? DEFAULT_RETURN
     const inflationRate = inflationParam ?? INFLATION
@@ -157,7 +165,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       endAge: simEndAge,
       yearlyExpenses,
       annualSavings,
-      monthlySurplus: effectiveMonthlyContrib,
+      monthlySurplus,
       monthlyIncome: monthlyIncome ?? 0,
       incomeGrowthRate: 0,  // conservatief: geen inkomensgroei in FIRE simulatie
       grossReturn,
@@ -197,7 +205,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     }
 
     return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: unifiedResult.rows }
-  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, housingStrategy])
+  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)

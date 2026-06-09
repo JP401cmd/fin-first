@@ -544,10 +544,14 @@ describe('F. FIRE-detectie', () => {
   })
 
   it('F3: onvoldoende vermogen en besparingen → fireReachable: false', () => {
+    // Robuust onhaalbaar: zelfs met geïndexeerd sparen blijft het vermogen ver
+    // onder het (geïndexeerde) deplete-doel — ook in het laatste jaar. Voorkomt
+    // dat het degenererende deplete-staart-randgeval (1 jaar resterend) per
+    // ongeluk "haalbaar" wordt.
     const input = makeInput({
       assets: [makeAsset({ asset_type: 'investment', current_value: 10_000, expected_return: 3 })],
       annualSavings: 500,
-      yearlyExpenses: 50_000,
+      yearlyExpenses: 100_000,
       currentAge: 60,
       endAge: 90,
     })
@@ -1280,5 +1284,95 @@ describe('deplete end portfolio convergence (#bug-fix)', () => {
     const lastRow = result.rows[result.rows.length - 1]
     // End portfolio should be approximately 0, not deeply negative
     expect(lastRow.netWorth).toBeGreaterThan(-50_000)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Section M: Spaarquote-bron — indexatie + aflossing-dubbeltel-guard
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('M. Spaarquote-bron: indexatie + aflossing-guard', () => {
+  it('M1: savings wordt geïndexeerd met inflatie over de opbouwjaren', () => {
+    const input = {
+      ...makeInput({
+        assets: [makeAsset({ asset_type: 'investment', current_value: 100_000, expected_return: 7, monthly_contribution: 0 })],
+        debts: [],
+        annualSavings: 10_000,
+        inflationRate: 0.02,
+        currentAge: 35,
+        endAge: 60,
+        yearlyExpenses: 36_000,
+        strategyConfig: { strategy: 'deplete' as const, endAge: 60, legacyAmount: 0 },
+      }),
+      skipFireDetection: true,
+    }
+    const result = runUnifiedProjection(input)
+    const acc = result.rows.filter(r => r.phase === 'accumulation')
+    expect(acc.length).toBeGreaterThan(5)
+    expect(acc[0].savings).toBe(10_000) // jaar 0: geen indexatie
+    expect(acc[1].savings).toBe(Math.round(10_000 * 1.02))
+    expect(acc[5].savings).toBe(Math.round(10_000 * Math.pow(1.02, 5)))
+  })
+
+  it('M2: aflossing van een meegerekende schuld wordt niet dubbel geteld', () => {
+    const base = {
+      assets: [makeAsset({ asset_type: 'investment', current_value: 100_000, expected_return: 7, monthly_contribution: 0 })],
+      annualSavings: 20_000,
+      inflationRate: 0, // geen indexatie → zuivere jaar-0 vergelijking
+      currentAge: 35,
+      endAge: 60,
+      yearlyExpenses: 36_000,
+      strategyConfig: { strategy: 'deplete' as const, endAge: 60, legacyAmount: 0 },
+    }
+    const debt = makeDebt({
+      debt_type: 'mortgage',
+      current_balance: 200_000,
+      interest_rate: 3,
+      monthly_payment: 1_000,
+      repayment_type: 'annuiteit',
+      net_worth_inclusion_pct: 100,
+    })
+    const flagged = runUnifiedProjection({
+      ...makeInput({ ...base, debts: [{ ...debt, include_aflossing_in_savings: true }] }),
+      skipFireDetection: true,
+    })
+    const unflagged = runUnifiedProjection({
+      ...makeInput({ ...base, debts: [{ ...debt, include_aflossing_in_savings: false }] }),
+      skipFireDetection: true,
+    })
+
+    const cFlagged = flagged.rows[0].assetBuckets.investment!.contributions
+    const cUnflagged = unflagged.rows[0].assetBuckets.investment!.contributions
+    const debtId = Object.keys(unflagged.rows[0].debtBalances)[0]
+    const principalPaid = unflagged.rows[0].debtBalances[debtId].principalPaid
+
+    expect(principalPaid).toBeGreaterThan(0)
+    // Meegerekende schuld: portefeuille-inleg verlaagd met exact de afgeloste hoofdsom
+    expect(Math.abs((cUnflagged - cFlagged) - principalPaid)).toBeLessThanOrEqual(1)
+    // Het savings-veld (totaal gespaard) is in beide gevallen gelijk
+    expect(flagged.rows[0].savings).toBe(unflagged.rows[0].savings)
+  })
+
+  it('M3: niet-meegerekende schuld laat de portefeuille-inleg ongemoeid', () => {
+    const base = {
+      assets: [makeAsset({ asset_type: 'investment', current_value: 100_000, expected_return: 7, monthly_contribution: 0 })],
+      annualSavings: 20_000,
+      inflationRate: 0,
+      currentAge: 35,
+      endAge: 60,
+      yearlyExpenses: 36_000,
+      strategyConfig: { strategy: 'deplete' as const, endAge: 60, legacyAmount: 0 },
+    }
+    const noDebt = runUnifiedProjection({ ...makeInput({ ...base, debts: [] }), skipFireDetection: true })
+    const unflaggedDebt = runUnifiedProjection({
+      ...makeInput({
+        ...base,
+        debts: [makeDebt({ debt_type: 'mortgage', current_balance: 200_000, interest_rate: 3, monthly_payment: 1_000, repayment_type: 'annuiteit', include_aflossing_in_savings: false })],
+      }),
+      skipFireDetection: true,
+    })
+    // Zonder de vlag verandert de portefeuille-inleg niet t.o.v. geen schuld
+    expect(unflaggedDebt.rows[0].assetBuckets.investment!.contributions)
+      .toBe(noDebt.rows[0].assetBuckets.investment!.contributions)
   })
 })

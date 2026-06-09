@@ -1,18 +1,30 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { deleteAllUserData } from '@/lib/seed-persona'
 
 /**
  * POST /api/account/delete
  *
- * Deletes all user data (full cascade) and signs out the user.
- * This performs application-level deletion of all financial data,
- * user badges, streaks, feature visits, holdings, and profile data.
+ * Two modes (auth is always required — 401 otherwise):
  *
- * Note: The auth.users record is NOT deleted (requires service_role key).
- * Database-level ON DELETE CASCADE on auth.users(id) would handle that
- * if the auth user were deleted via admin API.
+ *  - default ("reset"): wipes all user financial data (full cascade) and
+ *    resets the profile to a clean onboarding state, then signs out. The
+ *    auth.users record is kept, so the user can start over.
+ *
+ *  - mode: 'delete' (full account deletion): wipes all user data AND deletes
+ *    the auth.users record via the service-role admin API, after verifying a
+ *    typed confirmation (`confirm` must equal the user's own e-mail). After
+ *    this the user can no longer log in. Irreversible.
+ *
+ * Both modes return { success, deletionSummary }.
  */
-export async function POST() {
+function getServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  return createServiceClient(url, serviceKey)
+}
+
+export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -20,11 +32,46 @@ export async function POST() {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const body = (await request.json().catch(() => ({}))) as
+    | { mode?: string; confirm?: string }
+    | null
+  const fullDelete = body?.mode === 'delete'
+
+  // Full deletion requires the user to retype their own e-mail as confirmation.
+  if (fullDelete) {
+    const confirm = (body?.confirm ?? '').trim().toLowerCase()
+    if (!confirm || confirm !== (user.email ?? '').toLowerCase()) {
+      return Response.json(
+        { error: 'Bevestiging komt niet overeen met je e-mailadres' },
+        { status: 400 },
+      )
+    }
+  }
+
   try {
-    // Step 1: Delete all user financial data (including badges, streaks, holdings, etc.)
+    // Step 1: Delete all user financial data (badges, streaks, holdings, etc.)
     const deletionSummary = await deleteAllUserData(supabase, user.id)
 
-    // Step 2: Delete or reset the profile
+    if (fullDelete) {
+      // Step 2a: Remove the auth account itself (service-role). DB-level
+      // ON DELETE CASCADE on auth.users(id) clears anything left.
+      const service = getServiceClient()
+      const { error: authDeleteError } = await service.auth.admin.deleteUser(user.id)
+      if (authDeleteError) {
+        console.error('Auth user delete error:', authDeleteError)
+        return Response.json({ error: authDeleteError.message }, { status: 500 })
+      }
+      // Best-effort sign-out of the current session cookies.
+      await supabase.auth.signOut().catch(() => {})
+
+      return Response.json({
+        success: true,
+        message: 'Account permanently deleted',
+        deletionSummary,
+      })
+    }
+
+    // Step 2b (reset path): reset the profile to a clean onboarding state.
     const { error: profileError } = await supabase
       .from('profiles')
       .update({

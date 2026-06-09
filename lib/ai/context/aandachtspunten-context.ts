@@ -8,6 +8,7 @@ const DOMAIN_LABEL: Record<AandachtspuntDomain, string> = {
   tax: 'belasting',
   budget: 'budget',
   debt: 'schuld',
+  asset: 'vermogen',
 }
 
 /**

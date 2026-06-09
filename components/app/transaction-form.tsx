@@ -5,7 +5,7 @@ import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, 
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
-import type { Budget } from '@/lib/budget-data'
+import { buildBudgetSelectEntries, type Budget } from '@/lib/budget-data'
 import { FREQUENCY_LABELS } from '@/lib/recurring-data'
 
 type Transaction = {
@@ -552,17 +552,21 @@ export function TransactionForm({
                   className="w-full rounded-lg border border-[var(--border-md)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
                 >
                   <option value="">Niet gecategoriseerd</option>
-                  {budgetGroups
-                    .filter((group) => group.children.length > 0)
-                    .map((group) => (
-                    <optgroup key={group.parent.id} label={group.parent.name}>
-                      {group.children.map((child) => (
-                        <option key={child.id} value={child.id}>
-                          {child.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
+                  {buildBudgetSelectEntries(budgetGroups).map((entry) =>
+                    entry.kind === 'group' ? (
+                      <optgroup key={entry.id} label={entry.label}>
+                        {entry.options.map((child) => (
+                          <option key={child.id} value={child.id}>
+                            {child.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    )
+                  )}
                 </select>
                 {isEdit && transaction && (transaction.category_source === 'ai' || transaction.category_source === 'rule') && transaction.budget_id && (
                   <p className="mt-1.5 flex items-center gap-1.5 text-xs text-wil-700" data-testid="suggested-category-notice">
@@ -624,13 +628,17 @@ export function TransactionForm({
                               className="w-full rounded-[var(--r-sm)] border border-[var(--border-md)] px-2 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
                             >
                               <option value="">Geen budget</option>
-                              {budgetGroups.filter(g => g.children.length > 0).map(group => (
-                                <optgroup key={group.parent.id} label={group.parent.name}>
-                                  {group.children.map(child => (
-                                    <option key={child.id} value={child.id}>{child.name}</option>
-                                  ))}
-                                </optgroup>
-                              ))}
+                              {buildBudgetSelectEntries(budgetGroups).map(entry =>
+                                entry.kind === 'group' ? (
+                                  <optgroup key={entry.id} label={entry.label}>
+                                    {entry.options.map(child => (
+                                      <option key={child.id} value={child.id}>{child.name}</option>
+                                    ))}
+                                  </optgroup>
+                                ) : (
+                                  <option key={entry.id} value={entry.id}>{entry.name}</option>
+                                )
+                              )}
                             </select>
                             <div className="flex gap-2">
                               <div className="relative w-28">

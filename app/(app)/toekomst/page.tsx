@@ -117,19 +117,24 @@ export default async function ToekomstPage({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <PageInfoButton description={PAGE_INFO['/toekomst'] ?? ''} />
-            <PrintTijdasButton />
+            {horizonData.hasCompletedHorizonSetup && <PrintTijdasButton />}
           </div>
         </header>
 
-        <ToekomstNavCards
-          goals={willData.goals}
-          goalProgresses={willData.goalProgresses}
-          events={horizonData.events}
-          fireStrategy={horizonData.fireStrategy}
-          withdrawalStrategy={horizonData.withdrawalStrategy}
-          fireParams={horizonData.fireParams}
-          calculatorCount={calculatorCount}
-        />
+        {/* Navkaarten + tijdas-projectie tonen we pas zodra de FIRE-voorkeuren
+            zijn ingesteld. Daarvoor staat in <HorizonPage> één paginabrede
+            setup-melding; alleen deze header blijft erboven staan. */}
+        {horizonData.hasCompletedHorizonSetup && (
+          <ToekomstNavCards
+            goals={willData.goals}
+            goalProgresses={willData.goalProgresses}
+            events={horizonData.events}
+            fireStrategy={horizonData.fireStrategy}
+            withdrawalStrategy={horizonData.withdrawalStrategy}
+            fireParams={horizonData.fireParams}
+            calculatorCount={calculatorCount}
+          />
+        )}
       </section>
 
       <HorizonPage initialData={horizonData} />

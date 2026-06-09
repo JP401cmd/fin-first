@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -143,9 +144,23 @@ function formatDayTitle(iso: string): string {
 
 export function TransactiesAnalyse() {
   const { perspective } = usePerspective()
+  const searchParams = useSearchParams()
 
-  const [period, setPeriod] = useState<PeriodKind>('30d')
-  const [offset, setOffset] = useState(0)
+  // Deeplink vanaf de geldstroom-banner (/overzicht/cashflow) opent een
+  // specifieke kalendermaand via `?maand=YYYY-MM` → periode 'month' + de offset
+  // (aantal maanden) t.o.v. de huidige maand. Eénmalig bij mount uitgelezen;
+  // daarna stuurt de periode-selector de state. Geen param → huidig gedrag (30d).
+  const [period, setPeriod] = useState<PeriodKind>(() =>
+    /^\d{4}-\d{2}$/.test(searchParams.get('maand') ?? '') ? 'month' : '30d',
+  )
+  const [offset, setOffset] = useState(() => {
+    const maand = searchParams.get('maand')
+    if (!maand || !/^\d{4}-\d{2}$/.test(maand)) return 0
+    const [y, m] = maand.split('-').map(Number)
+    if (!y || m < 1 || m > 12) return 0
+    const now = new Date()
+    return (y - now.getFullYear()) * 12 + (m - 1 - now.getMonth())
+  })
 
   const [rawTxns, setRawTxns] = useState<PerspectiveItem[]>([])
   const [rawHeatmap, setRawHeatmap] = useState<PerspectiveItem[]>([])

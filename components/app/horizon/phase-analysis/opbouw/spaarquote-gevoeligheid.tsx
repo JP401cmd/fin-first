@@ -17,6 +17,9 @@ interface SpaarquoteGevoeligheidProps {
   expectedReturn: number  // e.g. 0.07
   inflationRate: number   // e.g. 0.02
   yearlyExpenses: number
+  /** FIRE target portfolio (€). When provided, the FIRE-age cascade uses this as
+   *  the target instead of the hardcoded 4%-rule on expenses. */
+  fireTarget?: number
   cashflows?: SimCashflow[]
   /** Actual savings rate percentage (0-100), e.g. from kern page. When provided, shown in header. */
   savingsRate?: number | null
@@ -49,12 +52,16 @@ function computeFireAgeForSavings(
   currentAge: number,
   cashflows?: SimCashflow[],
   maxAge: number = 90,
+  fireTargetOverride?: number,
 ): { fireAge: number | null; portfolioAtFire: number } {
   if (yearlyExpenses <= 0) return { fireAge: null, portfolioAtFire: currentPortfolio }
 
-  // SWR-based FIRE target (4% rule, NL standard)
-  const swr = 0.04
-  const fireTarget = yearlyExpenses / swr
+  // FIRE target: prefer the app-resolved target (from effectiveSwr), fall back to
+  // the 4%-rule (NL standard). A non-4% SWR shifts the target and thus the FIRE age.
+  const fireTarget =
+    fireTargetOverride != null && fireTargetOverride > 0
+      ? fireTargetOverride
+      : yearlyExpenses / 0.04
 
   let portfolio = currentPortfolio
   const realReturn = expectedReturn - inflationRate
@@ -107,11 +114,23 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
   expectedReturn,
   inflationRate,
   yearlyExpenses,
+  fireTarget,
   cashflows,
   savingsRate,
   monthlyIncome,
 }: SpaarquoteGevoeligheidProps) {
   const [scenarios, setScenarios] = useState<ScenarioRow[] | null>(null)
+
+  // Resolve the FIRE target: prefer the app-resolved value, fall back to 4%-rule.
+  const resolvedFireTarget = fireTarget != null && fireTarget > 0
+    ? fireTarget
+    : yearlyExpenses > 0
+      ? yearlyExpenses / 0.04
+      : 0
+  // Effective SWR implied by the resolved target (for the Will-context).
+  const resolvedSwr = yearlyExpenses > 0 && resolvedFireTarget > 0
+    ? yearlyExpenses / resolvedFireTarget
+    : 0.04
 
   // Derive actual savings rate: prefer explicit prop, fall back to income-based computation
   const effectiveSavingsRate = savingsRate != null && savingsRate > 0
@@ -129,8 +148,9 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
     expectedReturn,
     inflationRate,
     yearlyExpenses,
+    fireTarget: resolvedFireTarget,
     cashflows,
-  }), [annualSavings, currentAge, fireAge, currentPortfolio, expectedReturn, inflationRate, yearlyExpenses, cashflows])
+  }), [annualSavings, currentAge, fireAge, currentPortfolio, expectedReturn, inflationRate, yearlyExpenses, resolvedFireTarget, cashflows])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -148,6 +168,8 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
         params.inflationRate,
         params.currentAge,
         params.cashflows,
+        90,
+        params.fireTarget,
       )
       // Use the external fireAge if available (more accurate), otherwise our computed one
       const referenceFireAge = params.fireAge ?? baseComputedFireAge
@@ -164,6 +186,8 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
           params.inflationRate,
           params.currentAge,
           params.cashflows,
+          90,
+          params.fireTarget,
         )
 
         // Verschil in jaren t.o.v. huidig scenario (use reference for base, delta from that)
@@ -222,7 +246,18 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
   }
 
   const willContext = scenarios
-    ? `Spaarquote gevoeligheid: ${scenarios.map(s => `${s.label} → FIRE ${s.fireAge ?? '–'}`).join(', ')}.`
+    ? [
+        effectiveSavingsRate != null
+          ? `Spaarquote gevoeligheid. Huidige spaarquote: ${effectiveSavingsRate.toFixed(1)}% (${formatCurrency(Math.round(annualSavings / 12))}/mnd).`
+          : 'Spaarquote gevoeligheid.',
+        `Gebruikte SWR: ${(resolvedSwr * 100).toFixed(1)}%; FIRE-doel: ${formatCurrency(Math.round(resolvedFireTarget))}.`,
+        `Scenario's: ${scenarios
+          .map(
+            (s) =>
+              `${s.label} (${formatCurrency(s.monthlySavings)}/mnd) → FIRE ${s.fireAge != null ? `${s.fireAge} jr` : '90+'}, eindvermogen ${formatCurrency(Math.round(s.eindVermogen))}`,
+          )
+          .join('; ')}.`,
+      ].join(' ')
     : 'Spaarquote gevoeligheid: berekening...'
 
   return (

@@ -4,6 +4,7 @@ import {
   marginalRateAt,
   effectiveRateAt,
   schijftariefOp,
+  grossFromNet,
   BOX1_PARAMS,
 } from './box1-tax'
 
@@ -241,6 +242,46 @@ describe('computeBox1Tax — clamps & edge cases', () => {
   it('freedomDays = 0 bij ontbrekende dailyExpenses', () => {
     const r = computeBox1Tax({ grossYearlyIncome: 70_000, year: 2026 })
     expect(r.freedomDays).toBe(0)
+  })
+})
+
+describe('grossFromNet — netto → bruto inversie', () => {
+  it('rondreis: bruto → netto → bruto reproduceert het bruto (zonder eigen woning)', () => {
+    for (const gross of [25_000, 45_000, 70_000, 120_000, 250_000]) {
+      const netto = computeBox1Tax({ grossYearlyIncome: gross, year: 2026 }).nettoBesteedbaar
+      const terug = grossFromNet(netto, 2026)
+      // Op euro-niveau nauwkeurig (bisectie + afronding).
+      expect(terug).toBeCloseTo(gross, -1)
+      expect(Math.abs(terug - gross)).toBeLessThanOrEqual(2)
+    }
+  })
+
+  it('bruto is hoger dan het netto-doel (er wordt belasting geheven)', () => {
+    const bruto = grossFromNet(40_000, 2026)
+    expect(bruto).toBeGreaterThan(40_000)
+  })
+
+  it('is monotoon: hoger netto → hoger bruto', () => {
+    expect(grossFromNet(50_000, 2026)).toBeGreaterThan(grossFromNet(30_000, 2026))
+  })
+
+  it('overschat NIET zoals de platte marginaal-opslag', () => {
+    // Platte methode: netto / (1 − marginaal). Bij een netto van 40k zit het
+    // marginale tarief rond schijf 2 → flink hoger bruto dan de echte inversie.
+    const netto = 40_000
+    const marg = marginalRateAt(grossFromNet(netto, 2026), 2026)
+    const plat = netto / (1 - marg)
+    expect(grossFromNet(netto, 2026)).toBeLessThan(plat)
+  })
+
+  it('returnt 0 bij netto ≤ 0', () => {
+    expect(grossFromNet(0, 2026)).toBe(0)
+    expect(grossFromNet(-1_000, 2026)).toBe(0)
+  })
+
+  it('AOW-variant geeft een lager bruto voor hetzelfde netto (minder belasting)', () => {
+    const netto = 30_000
+    expect(grossFromNet(netto, 2026, { aow: true })).toBeLessThan(grossFromNet(netto, 2026))
   })
 })
 

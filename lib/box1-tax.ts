@@ -388,3 +388,46 @@ export function schijftariefOp(income: number, year: Box1TaxYear, aow?: boolean)
   const schijven = aow ? params.schijvenAow : params.schijven
   return schijftariefBij(income, schijven)
 }
+
+// ── Netto → bruto inversie ───────────────────────────────────
+
+/**
+ * Inverteert de Box 1-motor: zoekt het bruto-jaarinkomen waarvoor het netto
+ * besteedbaar inkomen (bruto − Box 1-belasting) ≈ `targetNetYearly`.
+ *
+ * Gebruikt de echte schijven + heffingskortingen, BEWUST ZONDER eigen woning:
+ * de bron is take-home salaris (netto loon op de rekening), niet een fiscaal
+ * woning-saldo. De eigen woning wordt daarna apart in de echte Box 1-som
+ * verrekend. Netto is monotoon stijgend in bruto, dus een binaire zoek
+ * convergeert betrouwbaar. Resultaat is op hele euro's afgerond.
+ *
+ * Nauwkeuriger dan een platte `netto / (1 − marginaal tarief)`-opslag: die
+ * overschat bruto omdat het marginale tarief boven het gemiddelde tarief ligt.
+ */
+export function grossFromNet(
+  targetNetYearly: number,
+  year: Box1TaxYear,
+  opts?: { aow?: boolean },
+): number {
+  if (!(targetNetYearly > 0)) return 0
+  const netAt = (gross: number): number =>
+    computeBox1Core({ grossYearlyIncome: gross, year, aow: opts?.aow }).nettoBesteedbaar
+
+  // Bruto ≥ netto (belasting ≥ 0). Onder de bovengrens van een ruime gok
+  // verdubbelen tot netAt(hi) het doel haalt (defensief; tax < 100%).
+  let lo = targetNetYearly
+  let hi = targetNetYearly * 2 + 20_000
+  let guard = 0
+  while (netAt(hi) < targetNetYearly && guard < 60) {
+    hi *= 1.5
+    guard++
+  }
+
+  // 60 bisecties op [lo, hi] convergeren ruim onder een cent.
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2
+    if (netAt(mid) < targetNetYearly) lo = mid
+    else hi = mid
+  }
+  return Math.round((lo + hi) / 2)
+}

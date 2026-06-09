@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   frequencyMatch,
   categorizeTransaction,
+  isOwnAccountTransfer,
+  isWalletTransferType,
   type FrequencyMatch,
 } from './categorize'
 import type { Budget } from '@/lib/budget-data'
@@ -147,5 +149,73 @@ describe('categorizeTransaction with freqMap', () => {
       budgets,
     )
     expect(result.budget_id).toBe('b-food')
+  })
+
+  it('detects an own-account transfer via name pattern (Priority 0)', () => {
+    const result = categorizeTransaction(
+      'Opwaardering PayPal',
+      'PayPal (Europe) S.a.r.l. et Cie',
+      -50,
+      budgets,
+      undefined,
+      undefined, // no own IBANs
+      null,
+      undefined,
+      ['paypal'], // ownNamePatterns
+    )
+    expect(result.isTransfer).toBe(true)
+    expect(result.category_source).toBe('transfer')
+    expect(result.budget_id).toBeNull()
+  })
+})
+
+// ── isOwnAccountTransfer ──────────────────────────────────────────────
+
+describe('isOwnAccountTransfer', () => {
+  const ownIbans = new Set(['NL02INGB0001234567', 'NL91ABNA0417164300'])
+
+  it('matches a counterparty IBAN in the own-IBAN set (normalized)', () => {
+    expect(isOwnAccountTransfer('NL02 INGB 0001234567', ownIbans)).toBe(true)
+  })
+
+  it('does not match an unknown IBAN', () => {
+    expect(isOwnAccountTransfer('NL99RABO0123456789', ownIbans)).toBe(false)
+  })
+
+  it('matches a counterparty name against a name pattern (case-insensitive)', () => {
+    expect(
+      isOwnAccountTransfer(null, ownIbans, 'PayPal (Europe) S.a.r.l.', ['paypal']),
+    ).toBe(true)
+  })
+
+  it('returns false when neither IBAN nor name matches', () => {
+    expect(
+      isOwnAccountTransfer('NL99RABO0123456789', ownIbans, 'Albert Heijn', ['paypal']),
+    ).toBe(false)
+  })
+
+  it('returns false for null IBAN with no name patterns', () => {
+    expect(isOwnAccountTransfer(null, ownIbans)).toBe(false)
+  })
+})
+
+// ── isWalletTransferType ──────────────────────────────────────────────
+
+describe('isWalletTransferType', () => {
+  const values = ['Bank Deposit to PP Account', 'Algemene opname']
+
+  it('matches a known wallet transfer type (case-insensitive)', () => {
+    expect(isWalletTransferType('bank deposit to pp account', values)).toBe(true)
+    expect(isWalletTransferType('Algemene opname', values)).toBe(true)
+  })
+
+  it('does not match a regular payment type', () => {
+    expect(isWalletTransferType('Algemene betaling', values)).toBe(false)
+  })
+
+  it('returns false for null/empty source type or no configured values', () => {
+    expect(isWalletTransferType(null, values)).toBe(false)
+    expect(isWalletTransferType('Algemene opname', undefined)).toBe(false)
+    expect(isWalletTransferType('Algemene opname', [])).toBe(false)
   })
 })

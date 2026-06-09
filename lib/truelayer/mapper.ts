@@ -21,6 +21,7 @@ export async function mapTransaction(tl: TLTransaction): Promise<ParsedTransacti
     counterparty_iban: null,
     reference: tl.transaction_id ?? null,
     transaction_type: tl.transaction_category ?? tl.transaction_type ?? null,
+    source_type: null,
     bank_code: null,
     // transaction_id staat al in `reference`; bewust niet als bank_seq omdat een
     // pending→posted id-wissel (zelfde datum/bedrag/omschrijving) anders een valse

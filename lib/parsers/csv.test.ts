@@ -6,6 +6,8 @@ const ING = CSV_PRESETS.find((p) => p.id === 'ing')!
 
 const RABO = CSV_PRESETS.find((p) => p.id === 'rabobank')!
 
+const PAYPAL = CSV_PRESETS.find((p) => p.id === 'paypal')!
+
 const HEADER =
   '"IBAN/BBAN","Munt","BIC","Volgnr","Datum","Rentedatum","Bedrag","Saldo na trn","Tegenrekening IBAN/BBAN","Naam tegenpartij","Naam uiteindelijke partij","Naam initiërende partij","BIC tegenpartij","Code","Batch ID","Transactiereferentie","Machtigingskenmerk","Incassant ID","Betalingskenmerk","Omschrijving-1","Omschrijving-2","Omschrijving-3","Reden retour","Oorspr bedrag","Oorspr munt","Koers"'
 
@@ -54,6 +56,62 @@ describe('parseCSV rabobank extra velden', () => {
     expect(t.fx_amount).toBeCloseTo(1.0)
     expect(t.fx_currency).toBe('CHF')
     expect(t.fx_rate).toBeCloseTo(0.93457)
+  })
+})
+
+describe('parseCSV PayPal — Type-kolom landt in source_type', () => {
+  // PayPal-kolommen: Datum(0), Tijd(1), Tijdzone(2), Naam(3), Type(4), Status(5),
+  // Valuta(6), Bruto(7), Kosten(8), Netto(9), Saldo(10), Ref(11), Transactie-ID(12)
+  const PP_HEADER = '"Datum","Tijd","Tijdzone","Naam","Type","Status","Valuta","Bruto","Kosten","Netto","Saldo","Ref","Transactie-ID"'
+  const PP_WITHDRAW = '"05/03/2026","12:00:00","CET","","Algemene opname","Voltooid","EUR","-50,00","0,00","-50,00","10,00","","REF1"'
+  const PP_PAYMENT = '"06/03/2026","13:00:00","CET","Bol.com","Algemene betaling","Voltooid","EUR","-30,00","0,00","-30,00","-20,00","","REF2"'
+
+  it('leest Type in source_type (opname = verschuiving, betaling = uitgave)', async () => {
+    const txns = await parseCSV([PP_HEADER, PP_WITHDRAW, PP_PAYMENT].join('\n'), PAYPAL)
+    expect(txns).toHaveLength(2)
+    expect(txns[0].source_type).toBe('Algemene opname')
+    expect(txns[0].amount).toBeCloseTo(-50)
+    expect(txns[1].source_type).toBe('Algemene betaling')
+    expect(txns[1].counterparty_name).toBe('Bol.com')
+  })
+
+  it('niet-PayPal presets laten source_type null', async () => {
+    const [t] = await parseCSV([HEADER, INCASSO].join('\n'), RABO)
+    expect(t.source_type).toBeNull()
+  })
+})
+
+describe('parseCSV PayPal — datumscheidingsteken-tolerantie (NL-export)', () => {
+  // PayPal NL exporteert datums vaak als DD-MM-YYYY (koppelteken), terwijl de preset
+  // DD/MM/YYYY aangeeft. parseDate moet beide scheidingstekens aankunnen i.p.v. de
+  // hele import te laten crashen op een ontbrekende '/'.
+  const PP_HEADER = '"Datum","Tijd","Tijdzone","Naam","Type","Status","Valuta","Bruto","Kosten","Netto","Saldo","Ref","Transactie-ID"'
+
+  it('parseert DD-MM-YYYY ook onder de DD/MM/YYYY-preset', async () => {
+    const row = '"19-03-2026","13:00:00","CET","Bol.com","Algemene betaling","Voltooid","EUR","-30,00","0,00","-30,00","-20,00","","REF9"'
+    const txns = await parseCSV([PP_HEADER, row].join('\n'), PAYPAL)
+    expect(txns).toHaveLength(1)
+    expect(txns[0].date).toBe('2026-03-19')
+  })
+
+  it('parseert enkel-cijferige dag/maand met koppelteken (5-3-2026)', async () => {
+    const row = '"5-3-2026","13:00:00","CET","Bol.com","Algemene betaling","Voltooid","EUR","-30,00","0,00","-30,00","-20,00","","REF10"'
+    const txns = await parseCSV([PP_HEADER, row].join('\n'), PAYPAL)
+    expect(txns).toHaveLength(1)
+    expect(txns[0].date).toBe('2026-03-05')
+  })
+
+  it('blijft DD/MM/YYYY met schuine streep ondersteunen', async () => {
+    const row = '"06/03/2026","13:00:00","CET","Bol.com","Algemene betaling","Voltooid","EUR","-30,00","0,00","-30,00","-20,00","","REF11"'
+    const txns = await parseCSV([PP_HEADER, row].join('\n'), PAYPAL)
+    expect(txns).toHaveLength(1)
+    expect(txns[0].date).toBe('2026-03-06')
+  })
+
+  it('slaat een rij met onbruikbare datum over zonder de import te laten crashen', async () => {
+    const bad = '"onbekend","13:00:00","CET","X","Algemene betaling","Voltooid","EUR","-1,00","0,00","-1,00","0,00","","REFX"'
+    const txns = await parseCSV([PP_HEADER, bad].join('\n'), PAYPAL)
+    expect(txns).toHaveLength(0)
   })
 })
 

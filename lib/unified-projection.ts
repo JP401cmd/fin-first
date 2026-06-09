@@ -539,6 +539,11 @@ interface RunningDebt {
   repaymentType: RepaymentType
   /** Net worth inclusion percentage (0-100) */
   netWorthInclusionPct: number
+  /** Telt de aflossing van deze schuld mee in de spaarquote
+   *  (debts.include_aflossing_in_savings)? Zo ja, dan wordt de jaarlijkse
+   *  hoofdsom-aflossing van de portefeuille-inleg afgetrokken om dubbeltelling
+   *  met de spaarquote-afgeleide inleg te voorkomen. */
+  includeAflossingInSavings: boolean
   /** Is de schuld al volledig afgelost? */
   paidOff: boolean
 }
@@ -611,6 +616,7 @@ export function initRunningDebts(debts: Debt[]): RunningDebt[] {
       monthlyPayment,
       repaymentType,
       netWorthInclusionPct: debt.net_worth_inclusion_pct ?? 100,
+      includeAflossingInSavings: debt.include_aflossing_in_savings ?? false,
       paidOff: balance <= 0,
     }
   })
@@ -1513,18 +1519,34 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       totalBaseContributions += b.annualContribution
     }
 
-    // Surplus = extra savings beyond what's already allocated per bucket + recurring cashflows.
-    // annualSavings is the user's total savings capacity (income - expenses).
-    // Per-bucket annualContribution already covers each bucket's monthly_contribution share,
-    // so surplus must only contain the EXCESS (annualSavings - totalBaseContributions)
-    // plus recurring cashflow net. This prevents double-counting of contributions (#518).
-    const surplus = (annualSavings - totalBaseContributions) + cashflowNet
+    // ── Debt schedule FIRST — we need dit jaar's aflossing vóór de surplus
+    //    berekening om dubbeltelling met de spaarquote te voorkomen. ──
+    const { debtBalances } = computeYearlyDebtSchedule(runningDebts)
+
+    // Spaargeld geïndexeerd: de spaarquote-afgeleide jaarinleg (income ×
+    // spaarquote) stijgt nominaal mee met inflatie over de opbouwjaren.
+    const indexedSavings = annualSavings * Math.pow(1 + inflationRate, year)
+
+    // Aflossing van schulden die ín de spaarquote zijn meegerekend zit AL in de
+    // krimpende schuldlijn (dat verhoogt het netto vermogen vanzelf). Diezelfde
+    // euro's dus NIET óók als portefeuille-inleg meetellen — anders dubbeltelling.
+    // Gewogen naar net-worth-inclusie, net als de spaarquote-correctie in de loaders.
+    let flaggedAflossing = 0
+    for (const rd of runningDebts) {
+      if (!rd.includeAflossingInSavings) continue
+      const db = debtBalances[rd.debtId]
+      if (db) flaggedAflossing += db.principalPaid * (rd.netWorthInclusionPct / 100)
+    }
+    const portfolioInflow = indexedSavings - flaggedAflossing
+
+    // Surplus = portefeuille-inleg boven de per-bucket basis-contributies +
+    // terugkerende kasstromen. De basis-contributies (monthly_contribution)
+    // sturen alleen de bucket-allocatie; het totaal wordt door portfolioInflow
+    // bepaald. Dit voorkomt dubbeltelling van contributies (#518).
+    const surplus = (portfolioInflow - totalBaseContributions) + cashflowNet
 
     // Compute per-asset growth with surplus allocation
     const assetBuckets = computeYearlyAssetGrowth(runningBuckets, surplus, hasPartner)
-
-    // Compute debt schedule
-    const { debtBalances } = computeYearlyDebtSchedule(runningDebts)
 
     // Compute start-of-year net worth from bucket start values and debt start balances
     let startTotalAssets = 0
@@ -1563,8 +1585,8 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
       totalDebts: Math.round(totalDebtsValue),
       netWorth: Math.round(netWorth),
       startNetWorth: Math.round(preOneTimeNetWorth),
-      grossIncome: Math.round(annualSavings + yearlyExpenses),
-      savings: Math.round(annualSavings),
+      grossIncome: Math.round(indexedSavings + yearlyExpenses),
+      savings: Math.round(indexedSavings),
       withdrawal: 0,
       withdrawalByType: {},
       cashflowNet: Math.round(cashflowNet),
@@ -1651,7 +1673,7 @@ export function runUnifiedProjection(input: UnifiedProjectionInput): UnifiedProj
     const excess = Math.round(currentNetWorth - firePortfolio)
     if (excess > 0) {
       const lastRow = accRows[accRows.length - 1]
-      lastRow.savings = Math.round(annualSavings * t)
+      lastRow.savings = Math.round(lastRow.savings * t)
       lastRow.totalGrowth = Math.round(lastRow.totalGrowth * t)
       lastRow.netWorth -= excess
       lastRow.totalAssets -= excess

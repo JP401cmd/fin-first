@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TriFinity — ArchiMate-architectuurplaat</title>
+<style>
+  :root{
+    color-scheme:light;
+    --bg:#f4f3ef; --paper:#fff; --ink:#1d1b18; --muted:#6c675f; --line:#e4e0d8;
+    --shadow:0 1px 2px rgba(20,18,15,.05),0 10px 30px rgba(20,18,15,.07);
+    --shadow-lg:0 16px 48px rgba(20,18,15,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 20px 70px}
+  header.hero{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  header.hero::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:linear-gradient(90deg,#cdbd6e,#74c293,#4fc4c7,#a99fe0)}
+  .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  h1{margin:7px 0 4px;font-size:24px;letter-spacing:-.01em}
+  .philo{color:var(--muted);font-style:italic;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:12.5px;max-width:80ch}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:18px;margin:14px 2px 8px;align-items:flex-start}
+  .lg{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+  .lg .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-right:2px}
+  .lk{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#46423b}
+  .sw{width:13px;height:11px;border-radius:3px;border:1px solid rgba(0,0,0,.18)}
+  .rl{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#46423b}
+  .rl svg{display:block}
+  .hint{font-size:11.5px;color:var(--muted)}
+  .hint kbd{background:var(--paper);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-family:inherit;font-size:11px}
+
+  .stage{background:var(--paper);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:8px;overflow:auto;margin-top:8px}
+  svg.plate{width:100%;height:auto;display:block;min-width:1040px}
+
+  /* svg element styling */
+  .node{cursor:pointer}
+  .node .box{transition:filter .12s,opacity .12s}
+  .node:hover .box{filter:brightness(.97)}
+  .node text{pointer-events:none;fill:#23211d}
+  .glyph{pointer-events:none}
+  .container-lbl{font-weight:700}
+  .edge path{fill:none;stroke:#5f5b54;stroke-width:1.4}
+  .edge.realization path,.edge.access path,.edge.influence path{stroke-dasharray:5 4}
+  .edge.access path{stroke-dasharray:1.5 3.5}
+  .edge .elabel{font-size:11px;fill:#4a463f}
+  .edge .ebg{fill:#fff;opacity:.86}
+
+  /* highlight */
+  body.has-sel .node .box{opacity:.32}
+  body.has-sel .node.is-active .box{opacity:1}
+  body.has-sel .node.is-linked .box{opacity:1}
+  .node.is-active .box{stroke-width:2.4}
+  body.has-sel .node text{opacity:.32}
+  body.has-sel .node.is-active text,body.has-sel .node.is-linked text{opacity:1}
+  body.has-sel .node.is-active .glyph,body.has-sel .node.is-linked .glyph{opacity:1}
+  body.has-sel .node .glyph{opacity:.32}
+  body.has-sel .edge{opacity:.12}
+  body.has-sel .edge.is-hl{opacity:1}
+  body.has-sel .edge.is-hl path{stroke:#1d1b18;stroke-width:1.9}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 2px 0;flex-wrap:wrap}
+  .resetbtn{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
+  .resetbtn:hover{background:var(--bg)} .resetbtn[hidden]{display:none}
+  footer.foot{margin-top:18px;color:var(--muted);font-size:11.5px;text-align:center;line-height:1.7}
+
+  /* drawer */
+  .scrim{position:fixed;inset:0;background:rgba(20,18,15,.32);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(430px,93vw);background:var(--paper);border-left:1px solid var(--line);box-shadow:var(--shadow-lg);transform:translateX(102%);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:50;display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .dh{padding:18px 20px 13px;border-bottom:1px solid var(--line);position:relative}
+  .dh .typ{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;color:#fff;display:inline-block;padding:3px 9px;border-radius:6px;background:#6c675f}
+  .dh h2{margin:10px 0 0;font-size:20px;line-height:1.18}
+  .dclose{position:absolute;top:13px;right:13px;width:31px;height:31px;border-radius:9px;border:1px solid var(--line);background:var(--paper);cursor:pointer;font-size:16px;color:var(--muted)}
+  .dclose:hover{background:var(--bg);color:var(--ink)}
+  .db{padding:16px 20px 40px;overflow:auto}
+  .db p.lead{margin:0 0 16px;font-size:13.5px;color:#34302b}
+  .sec{margin-bottom:17px}
+  .sec h4{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{font-size:11px;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:3px 8px;font-family:ui-monospace,Menlo,monospace;color:#3c3833}
+  .lc{display:flex;flex-direction:column;gap:6px}
+  .lchip{display:flex;align-items:center;gap:9px;border:1px solid var(--line);background:var(--paper);border-radius:9px;padding:7px 10px;cursor:pointer;font:inherit;font-size:12px;text-align:left;color:var(--ink)}
+  .lchip:hover{background:var(--bg)}
+  .lchip .rel{margin-left:auto;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .lchip .sw{flex:0 0 auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">TriFinity · ArchiMate-architectuurplaat</div>
+    <h1>TriFinity in ArchiMate-notatie</h1>
+    <p class="philo">"Geld is opgeslagen tijd — elke euro vertegenwoordigt een stukje levenstijd."</p>
+    <p class="sub">Gelaagd model: motivatie → business → applicatieservices → de TriFinity-applicatie met capabilities → technologie → data → externe systemen. Klik op een element om te verdiepen; de gekoppelde elementen en relaties lichten op.</p>
+  </header>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="toolbar">
+    <button class="resetbtn" id="reset" hidden>✕ Selectie wissen</button>
+    <span class="hint"><kbd>klik</kbd> element = verdiepen + relaties markeren · <kbd>Esc</kbd> sluiten</span>
+  </div>
+
+  <div class="stage"><svg class="plate" id="plate" viewBox="0 0 1480 1300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ArchiMate-plaat van TriFinity"></svg></div>
+
+  <footer class="foot" id="foot"></footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="dh"><span class="typ" id="d-typ"></span><h2 id="d-title"></h2><button class="dclose" id="d-close" aria-label="Sluiten">✕</button></div>
+  <div class="db" id="d-body"></div>
+</aside>
+
+<script>
+/* ════ Kleuren & ArchiMate-types per laag ════ */
+const KIND={
+  motiv:{fill:"#ddd6f5",stroke:"#a99fe0",typ:"Motivatie",glyph:"req"},
+  bizrole:{fill:"#fcf6cf",stroke:"#cdbd6e",typ:"Business · rol",glyph:"role"},
+  bizproc:{fill:"#fcf6cf",stroke:"#cdbd6e",typ:"Business · proces",glyph:"proc"},
+  appsvc:{fill:"#c8ecd4",stroke:"#5fb487",typ:"Applicatie · service",glyph:"svc"},
+  appcomp:{fill:"#b6eff0",stroke:"#3fb8bb",typ:"Applicatie · component",glyph:"comp"},
+  appcap:{fill:"#dbf6f6",stroke:"#6fcccd",typ:"Applicatie · capability (module)",glyph:"cap"},
+  tech:{fill:"#d2efe9",stroke:"#5cab9d",typ:"Technologie · service",glyph:"tech"},
+  data:{fill:"#d7e9fb",stroke:"#86b1e6",typ:"Data · object",glyph:"data"},
+  ext:{fill:"#e7e9ee",stroke:"#9aa3b2",typ:"Extern systeem",glyph:"node"},
+  group:{fill:"#f0f0ee",stroke:"#bdbab2",typ:"Groep",glyph:"none"},
+};
+
+/* ════ Nodes (geometrie + detail), afgeleid uit fin@0.71.0 ════ */
+const N={
+  /* Motivatie */
+  "m-filo":{x:705,y:36,w:300,h:58,k:"motiv",t:"Geld is opgeslagen tijd",
+    lead:"De kerndriver van TriFinity. Elke euro boven €100 wordt ook getoond als vrijheidstijd — dagen, maanden, jaren financiële onafhankelijkheid.",items:["Driver / principe","€ → vrijheidstijd","time-framing"]},
+  "m-principes":{x:1020,y:36,w:185,h:58,k:"motiv",t:"Ontwerpprincipes",
+    lead:"Vijf principes die elke laag sturen: vrijheidstijd-equivalent, time-framing boven financiële termen, één filosofie over alle schermen, progressive disclosure, en domeinen die in bestaande patronen pluggen.",items:["5 principes","filosofie-consistentie"]},
+  "m-soeverein":{x:1220,y:36,w:222,h:58,k:"motiv",t:"Soevereiniteitsmodel",
+    lead:"Vier niveaus Recovery → Stability → Momentum → Mastery (niveau −2 t/m 6). Bepaalt progressive disclosure: functionaliteit speelt vrij naarmate de financiële basis groeit.",items:["Recovery","Stability","Momentum","Mastery","FeatureGate"]},
+
+  /* Business */
+  "b-actor":{x:40,y:140,w:210,h:60,k:"bizrole",t:"Gebruiker — regisseur van eigen vrijheid",
+    lead:"De gebruiker bestuurt het proces. De app vertaalt diens financiële situatie naar vrijheidstijd en volgende stappen.",items:["business rol","huishouden mogelijk"]},
+  "b-main":{x:40,y:250,w:250,h:526,k:"bizproc",t:"Persoonlijke financiën regisseren",
+    lead:"Het overkoepelende bedrijfsproces richting volledige vrijheid. Bestaat uit zes deelprocessen die elk door een applicatieservice worden bediend.",items:["composiet proces","6 deelprocessen"]},
+  "sp-registreren":{x:320,y:250,w:210,h:66,k:"bizproc",t:"Registreren & importeren",
+    lead:"Inkomsten, uitgaven, bezittingen en beleggingen vastleggen — handmatig, via bank-import (MT940/CSV/OFX) of via bank-connect.",items:["/core/cash","/core/cash/import","onboarding-extract"]},
+  "sp-budget":{x:320,y:342,w:210,h:66,k:"bizproc",t:"Budgetteren",
+    lead:"Budgetten opstellen en bewaken; uitgaven getoond als 'dagen deze maand'. Vier visualisatiemodi.",items:["/core/budgets","/overzicht/cashflow/budget"]},
+  "sp-vermogen":{x:320,y:434,w:210,h:66,k:"bizproc",t:"Vermogen & beleggingen beheren",
+    lead:"Bezittingen, aandelen en crypto beheren, waarderen en herbalanceren. Nettovermogen als 'jaren vrijheid'.",items:["/core/assets","/core/assets/holdings","/core/assets/crypto"]},
+  "sp-plannen":{x:320,y:526,w:210,h:66,k:"bizproc",t:"Plannen & simuleren (FIRE)",
+    lead:"FIRE-doel bepalen, scenario's en what-if doorrekenen, opnamestrategie en pensioen.",items:["/horizon","/horizon/whatif","/toekomst/doelen"]},
+  "sp-inzicht":{x:320,y:618,w:210,h:66,k:"bizproc",t:"Inzicht & acties",
+    lead:"Aanbevelingen, volgende stappen, patronen en maandelijkse check-ins — de motor achter 'wat nu te doen'.",items:["/overzicht","next-steps","checkin"]},
+  "sp-delen":{x:320,y:710,w:210,h:66,k:"bizproc",t:"Delen & rapporteren",
+    lead:"Rapporten, jaaroverzicht, freedom-card delen en gezamenlijk huishouden.",items:["/rapportages","year-in-review","household"]},
+
+  /* Applicatieservices (groen) */
+  "as-import":{x:590,y:250,w:215,h:66,k:"appsvc",t:"Import- & koppeldienst",
+    lead:"Levert import en synchronisatie van transacties, saldi en holdings uit banken, exchanges en bestanden.",items:["/api/bank-connect","/api/recurring","/api/detect-recurring","lib/parsers"]},
+  "as-budget":{x:590,y:342,w:215,h:66,k:"appsvc",t:"Budgetteringsdienst",
+    lead:"Budgetten, varianties, trends en dagelijkse uitgaventempo.",items:["/api/budgets","/api/budget-trends","/api/budget-variance","/api/daily-expense-rate"]},
+  "as-vermogen":{x:590,y:434,w:215,h:66,k:"appsvc",t:"Vermogens- & beleggingsdienst",
+    lead:"Bezittingen, holdings, dividenden, koersen, alerts en herbalancering.",items:["/api/assets","/api/holdings","/api/crypto","/api/rebalancing","/api/prices"]},
+  "as-planning":{x:590,y:526,w:215,h:66,k:"appsvc",t:"Planningsdienst (FIRE)",
+    lead:"FIRE-doelrekening, scenario's, what-if, opnamestrategie en pensioen.",items:["/api/fire-settings","/api/scenarios","/api/whatif","/api/withdrawal-strategy"]},
+  "as-coach":{x:590,y:618,w:215,h:66,k:"appsvc",t:"Inzicht- & coachingsdienst",
+    lead:"AI-coaching, aanbevelingen, volgende stappen, perspectief en de dagelijkse briefing.",items:["/api/ai/recommendations","/api/next-steps","/api/briefing","/api/perspective"]},
+  "as-rapport":{x:590,y:710,w:215,h:66,k:"appsvc",t:"Rapportage- & deeldienst",
+    lead:"Balans-, budget-, vermogens- en planrapporten, snapshots, export, jaaroverzicht en delen.",items:["/api/report/*","/api/snapshots","/api/export","/api/share"]},
+
+  /* Applicatiecomponent + capabilities */
+  "app-comp":{x:830,y:250,w:400,h:526,k:"appcomp",t:"TriFinity-applicatie",
+    lead:"Eén Next.js 16 / React 19-applicatie (geen aparte backend): 372 API-route-handlers, 698 componenten, 12 context-providers, PWA via Serwist. Realiseert alle applicatieservices en bevat de zes kernmodules als capabilities.",
+    items:["Next.js 16","React 19","372 API-routes","698 componenten","Vercel AI SDK","Zod + PII-filter"]},
+  "cap-budget":{x:848,y:322,w:172,h:62,k:"appcap",t:"Budgetteren",lead:"Kernmodule budgetbeheer met vier visualisatiemodi.",items:["module: budgetteren"]},
+  "cap-vermogen":{x:1040,y:322,w:172,h:62,k:"appcap",t:"Vermogensregistratie",lead:"Kernmodule bezittingen & nettovermogen.",items:["module: vermogensregistratie"]},
+  "cap-aandelen":{x:848,y:398,w:172,h:62,k:"appcap",t:"Aandelenregistratie",lead:"Kernmodule beleggingen, crypto, koersen en dividenden.",items:["module: aandelenregistratie"]},
+  "cap-inzicht":{x:1040,y:398,w:172,h:62,k:"appcap",t:"Inzicht & Acties",lead:"Kernmodule aanbevelingen, volgende stappen en patronen.",items:["module: inzicht_acties"]},
+  "cap-toekomst":{x:848,y:474,w:172,h:62,k:"appcap",t:"Toekomstplannen",lead:"Kernmodule FIRE, scenario's en simulaties.",items:["module: toekomstplannen"]},
+  "cap-nieuws":{x:1040,y:474,w:172,h:62,k:"appcap",t:"Nieuws",lead:"Kernmodule gepersonaliseerde financiële nieuwsfeed.",items:["module: nieuws"]},
+
+  /* Technologie (rechts, rij-uitgelijnd) */
+  "t-supabase":{x:1262,y:250,w:178,h:66,k:"tech",t:"Supabase — DB/Auth/Realtime",
+    lead:"PostgreSQL 17 met Row Level Security (47 tabellen, 88 migraties), Supabase Auth (JWT) en Realtime-subscriptions.",items:["PostgreSQL 17","RLS","Auth (JWT)","Realtime","postgres.js"]},
+  "t-aigateway":{x:1262,y:342,w:178,h:66,k:"tech",t:"AI-gateway (Vercel AI SDK)",
+    lead:"Provider-agnostische AI-laag; model omschakelbaar tussen Anthropic, OpenAI en Mistral via beheer.",items:["ai (Vercel AI SDK)","streaming + tools","Zod tool-schemas"]},
+  "t-bankconnect":{x:1262,y:434,w:178,h:66,k:"tech",t:"Bank-connect (TrueLayer)",
+    lead:"Open banking via TrueLayer (PSD2): autorisatie, saldi en periodieke sync.",items:["lib/truelayer","auth-link","sync"]},
+  "t-bankimport":{x:1262,y:526,w:178,h:66,k:"tech",t:"Bank-import (MT940/CSV/OFX)",
+    lead:"Bestandsparsers met duplicaatdetectie en automatische categorisatie.",items:["mt940js","lib/parsers/*","pdf.js"]},
+  "t-marktdata":{x:1262,y:618,w:178,h:66,k:"tech",t:"Marktdata & exchange-adapters",
+    lead:"Koersen/fundamentals (CoinGecko, FMP) en exchange-/wallet-synchronisatie (Bitvavo, Coinbase, Kraken, Blockchair).",items:["exchange-adapter","coingecko-client","fmp-client","wallet-sync"]},
+  "t-platform":{x:1262,y:710,w:178,h:66,k:"tech",t:"Platform (Vercel + PWA)",
+    lead:"Hosting en Speed Insights op Vercel; offline-laag via Serwist service worker.",items:["Vercel","Serwist PWA","Speed Insights"]},
+
+  /* Data */
+  "data-cont":{x:740,y:858,w:500,h:196,k:"group",t:"TriFinity-gegevens (informatieobjecten)",lead:"De data-objecten waarmee de applicatie werkt — beheerd in Supabase Postgres met RLS.",items:["47 tabellen","RLS","88 migraties"]},
+  "do-transactie":{x:760,y:922,w:150,h:54,k:"data",t:"Transactie",lead:"Inkomsten/uitgaven en terugkerende lasten.",items:["transactions","recurring_transactions","bank_accounts"]},
+  "do-bezitting":{x:920,y:922,w:150,h:54,k:"data",t:"Bezitting",lead:"Bezittingen, schulden en waarderingen.",items:["assets","debts","valuations"]},
+  "do-holding":{x:1080,y:922,w:150,h:54,k:"data",t:"Holding",lead:"Aandelen-, fonds- en crypto-posities met koersen.",items:["holdings","crypto_holdings","holding_prices"]},
+  "do-budget":{x:760,y:986,w:150,h:54,k:"data",t:"Budget",lead:"Budgetten en categorieën.",items:["budgets"]},
+  "do-doel":{x:920,y:986,w:150,h:54,k:"data",t:"Doel & gebeurtenis",lead:"Doelen, levensgebeurtenissen en FIRE-parameters.",items:["goals","life_events"]},
+  "do-meta":{x:1080,y:986,w:150,h:54,k:"data",t:"Metagegevens & snapshots",lead:"Snapshots, profielen en metagegevens die de objecten verbinden.",items:["net_worth_snapshots","balance_snapshots","profiles"]},
+
+  /* Externe systemen (groep) */
+  "ext-group":{x:740,y:1100,w:500,h:150,k:"group",t:"Externe systemen",lead:"Off-platform diensten die TriFinity inkoppelt via de technologielaag.",items:[]},
+  "ext-claude":{x:760,y:1158,w:150,h:50,k:"ext",t:"Anthropic Claude",lead:"Primaire AI-provider (+ OpenAI, Mistral als alternatief).",items:["@ai-sdk/anthropic"]},
+  "ext-truelayer":{x:920,y:1158,w:150,h:50,k:"ext",t:"TrueLayer (PSD2)",lead:"Open-banking-aggregator voor bankrekeningen en saldi.",items:["TrueLayer API"]},
+  "ext-exchanges":{x:1080,y:1158,w:150,h:50,k:"ext",t:"Crypto-exchanges",lead:"Bitvavo, Coinbase, Kraken en on-chain via Blockchair.",items:["Bitvavo","Coinbase","Kraken"]},
+  "ext-marktdata":{x:840,y:1196,w:150,h:46,k:"ext",t:"CoinGecko / FMP",lead:"Koersen en fundamentals voor crypto en effecten.",items:["CoinGecko","FMP"]},
+  "ext-vercel":{x:1000,y:1196,w:150,h:46,k:"ext",t:"Vercel-platform",lead:"Hosting, edge en observability.",items:["Vercel"]},
+};
+
+/* ════ Edges (getypeerde relaties) ════ */
+const E=[
+  /* assignment */
+  {f:"b-actor",t:"b-main",type:"assignment",label:"Voert uit",fs:"B",ts:"T"},
+  /* composition: hoofdproces bestaat uit deelprocessen */
+  ...["sp-registreren","sp-budget","sp-vermogen","sp-plannen","sp-inzicht","sp-delen"].map((id,i)=>(
+    {f:"b-main",t:id,type:"composition",fs:"R",ts:"L",fy:N[id].y+N[id].h/2})),
+  /* serving: applicatieservice bedient deelproces */
+  ...[["as-import","sp-registreren"],["as-budget","sp-budget"],["as-vermogen","sp-vermogen"],["as-planning","sp-plannen"],["as-coach","sp-inzicht"],["as-rapport","sp-delen"]]
+     .map(([s,p],i)=>({f:s,t:p,type:"serving",fs:"L",ts:"R",label:i===0?"Bedient":null})),
+  /* realization: applicatie realiseert services */
+  ...["as-import","as-budget","as-vermogen","as-planning","as-coach","as-rapport"]
+     .map((s,i)=>({f:"app-comp",t:s,type:"realization",fs:"L",ts:"R",fy:N[s].y+N[s].h/2,label:i===0?"Realiseert":null})),
+  /* serving: technologie bedient applicatie */
+  ...["t-supabase","t-aigateway","t-bankconnect","t-bankimport","t-marktdata","t-platform"]
+     .map((tn,i)=>({f:tn,t:"app-comp",type:"serving",fs:"L",ts:"R",ty:N[tn].y+N[tn].h/2,label:i===0?"Bedient":null})),
+  /* realization: voldoet aan motivatie */
+  {f:"app-comp",t:"m-filo",type:"realization",fs:"T",ts:"B",fx:900,label:"Voldoet aan"},
+  {f:"app-comp",t:"m-principes",type:"realization",fs:"T",ts:"B",fx:1090},
+  {f:"app-comp",t:"m-soeverein",type:"realization",fs:"T",ts:"B",fx:1170,tx:1331},
+  /* access: applicatie leest/schrijft data */
+  {f:"app-comp",t:"data-cont",type:"access",fs:"B",ts:"T",fx:1030,tx:1030,label:"Leest en schrijft",rw:true},
+  /* data: verbonden met (composition) */
+  {f:"do-meta",t:"do-holding",type:"composition",fs:"T",ts:"B",label:"Verbonden met"},
+  /* serving: externe systemen bedienen technologie (groep) */
+  {f:"ext-group",t:"t-platform",type:"serving",fs:"T",ts:"B",fx:1180,tx:1351,label:"Bedient"},
+];
+
+/* ════ SVG helpers ════ */
+const SVGNS="http://www.w3.org/2000/svg";
+const plate=document.getElementById("plate");
+function svg(tag,attrs){const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+function anchor(id,side,override){const n=N[id];let x=n.x,y=n.y;
+  if(side==="L"){x=n.x;y=override!=null?override:n.y+n.h/2;}
+  else if(side==="R"){x=n.x+n.w;y=override!=null?override:n.y+n.h/2;}
+  else if(side==="T"){y=n.y;x=override!=null?override:n.x+n.w/2;}
+  else if(side==="B"){y=n.y+n.h;x=override!=null?override:n.x+n.w/2;}
+  return {x,y};}
+function wrap(s,max){const w=s.split(" ");const lines=[];let cur="";
+  for(const word of w){if((cur+" "+word).trim().length>max){if(cur)lines.push(cur);cur=word;}else cur=(cur+" "+word).trim();}
+  if(cur)lines.push(cur);return lines;}
+
+/* glyphs in top-right corner */
+function glyph(kind,x,y){ // x,y = top-right corner of node
+  const g=svg("g",{class:"glyph",transform:`translate(${x-20},${y+6})`});
+  const st="#3a3a3a",col=KIND[kindOf(kind)] ;
+  const gl=KIND[kind] ? null : null;
+  const type=kind; // here kind is glyph name
+  const add=(t,a)=>{a.fill=a.fill||"none";a.stroke=a.stroke||st;a["stroke-width"]=a["stroke-width"]||1.3;g.appendChild(svg(t,a));};
+  if(type==="proc"){g.appendChild(svg("path",{d:"M0,1 L9,1 L13,5 L9,9 L0,9 Z",fill:"none",stroke:st,"stroke-width":1.3}));}
+  else if(type==="role"){g.appendChild(svg("circle",{cx:4,cy:3,r:3,fill:"none",stroke:st,"stroke-width":1.3}));g.appendChild(svg("rect",{x:0,y:7,width:13,height:5,rx:2,fill:"none",stroke:st,"stroke-width":1.3}));}
+  else if(type==="svc"){g.appendChild(svg("rect",{x:0,y:2,width:14,height:8,rx:4,fill:"none",stroke:st,"stroke-width":1.3}));}
+  else if(type==="comp"){g.appendChild(svg("rect",{x:3,y:0,width:11,height:11,fill:"none",stroke:st,"stroke-width":1.3}));g.appendChild(svg("rect",{x:0,y:2,width:5,height:3,fill:"#fff",stroke:st,"stroke-width":1.2}));g.appendChild(svg("rect",{x:0,y:6,width:5,height:3,fill:"#fff",stroke:st,"stroke-width":1.2}));}
+  else if(type==="cap"){g.appendChild(svg("path",{d:"M1,9 L6,2 L11,9",fill:"none",stroke:st,"stroke-width":1.4}));}
+  else if(type==="tech"){g.appendChild(svg("path",{d:"M0,3 L6,0 L12,3 L6,6 Z",fill:"none",stroke:st,"stroke-width":1.2}));g.appendChild(svg("path",{d:"M0,3 L0,9 L6,12 L6,6",fill:"none",stroke:st,"stroke-width":1.2}));g.appendChild(svg("path",{d:"M12,3 L12,9 L6,12",fill:"none",stroke:st,"stroke-width":1.2}));}
+  else if(type==="data"){g.appendChild(svg("rect",{x:0,y:1,width:14,height:10,fill:"none",stroke:st,"stroke-width":1.3}));g.appendChild(svg("rect",{x:0,y:1,width:14,height:3,fill:st,stroke:"none"}));}
+  else if(type==="req"){g.appendChild(svg("path",{d:"M0,1 L11,1 L14,4 L14,11 L0,11 Z",fill:"none",stroke:st,"stroke-width":1.3}));}
+  else if(type==="node"){g.appendChild(svg("path",{d:"M0,3 L3,0 L13,0 L13,8 L10,11 L0,11 Z",fill:"none",stroke:st,"stroke-width":1.2}));g.appendChild(svg("path",{d:"M0,3 L10,3 L13,0 M10,3 L10,11",fill:"none",stroke:st,"stroke-width":1}));}
+  return g;
+}
+function kindOf(){return "motiv";}
+
+/* ════ render edges ════ */
+function buildPath(e){
+  const a=anchor(e.f,e.fs, e.fs==="L"||e.fs==="R"?e.fy:e.fx);
+  const b=anchor(e.t,e.ts, e.ts==="L"||e.ts==="R"?e.ty:e.tx);
+  let pts=[a];
+  if(e.via)e.via.forEach(p=>pts.push({x:p[0],y:p[1]}));
+  pts.push(b);
+  // orthogonal Z if direct & both differ
+  if(!e.via && pts.length===2){
+    const dx=Math.abs(a.x-b.x),dy=Math.abs(a.y-b.y);
+    if(dx>2&&dy>2){
+      if(e.fs==="L"||e.fs==="R"){const mx=(a.x+b.x)/2;pts=[a,{x:mx,y:a.y},{x:mx,y:b.y},b];}
+      else{const my=(a.y+b.y)/2;pts=[a,{x:a.x,y:my},{x:b.x,y:my},b];}
+    }
+  }
+  return {d:"M"+pts.map(p=>p.x+","+p.y).join(" L"),mid:pts[Math.floor((pts.length-1)/2)],a,b,pts};
+}
+function midpoint(pp){const i=Math.floor((pp.length-1)/2);return {x:(pp[i].x+pp[i+1].x)/2,y:(pp[i].y+pp[i+1].y)/2};}
+
+const edgesG=svg("g",{class:"edges"});plate.appendChild(edgesG);
+const nodesG=svg("g",{class:"nodes"});plate.appendChild(nodesG);
+
+E.forEach((e,i)=>{
+  e._id="e"+i;
+  const bp=buildPath(e);
+  const g=svg("g",{class:"edge "+e.type,"data-from":e.f,"data-to":e.t});
+  const markers={serving:"url(#mk-arrow)",assignment:"url(#mk-arrow)",realization:"url(#mk-tri)",access:"url(#mk-acc)",composition:""};
+  const path=svg("path",{d:bp.d});
+  if(e.type==="serving"||e.type==="assignment")path.setAttribute("marker-end","url(#mk-arrow)");
+  if(e.type==="realization")path.setAttribute("marker-end","url(#mk-tri)");
+  if(e.type==="access"){path.setAttribute("marker-end","url(#mk-acc)");if(e.rw)path.setAttribute("marker-start","url(#mk-acc)");}
+  if(e.type==="composition")path.setAttribute("marker-start","url(#mk-diamond)");
+  if(e.type==="assignment")path.setAttribute("marker-start","url(#mk-ball)");
+  g.appendChild(path);
+  if(e.label){const m=midpoint(bp.pts);const tw=e.label.length*6.2+8;
+    g.appendChild(svg("rect",{class:"ebg",x:m.x-tw/2,y:m.y-9,width:tw,height:15,rx:3}));
+    const tx=svg("text",{class:"elabel",x:m.x,y:m.y+2,"text-anchor":"middle"});tx.textContent=e.label;g.appendChild(tx);}
+  edgesG.appendChild(g);
+});
+
+/* ════ render nodes ════ */
+const order=Object.keys(N); // containers first if needed: groups already before children in object order? ensure groups drawn first
+order.sort((a,b)=>{const ga=N[a].k==="group"||N[a].k==="appcomp",gb=N[b].k==="group"||N[b].k==="appcomp";return (gb?1:0)-(ga?1:0);});
+order.forEach(id=>{
+  const n=N[id],kd=KIND[n.k];
+  const g=svg("g",{class:"node","data-id":id});
+  const rx=(n.k==="appsvc"||n.k==="tech")?16:(n.k==="motiv"?9:7);
+  const box=svg("rect",{class:"box",x:n.x,y:n.y,width:n.w,height:n.h,rx:rx,fill:kd.fill,stroke:kd.stroke,"stroke-width":1.5});
+  g.appendChild(box);
+  if(kd.glyph!=="none")g.appendChild(glyph(kd.glyph,n.x+n.w,n.y));
+  // title
+  const isContainer=(n.k==="group"||n.k==="appcomp");
+  const cx=n.x+n.w/2;
+  if(isContainer){
+    const tx=svg("text",{x:n.x+14,y:n.y+22,class:"container-lbl","font-size":13.5,"text-anchor":"start"});tx.textContent=n.t;g.appendChild(tx);
+    if(n.k==="appcomp"){const sub=svg("text",{x:n.x+14,y:n.y+40,"font-size":11,fill:"#5b7d7e","text-anchor":"start"});sub.textContent="Kernmodules (capabilities):";g.appendChild(sub);
+      const note=svg("text",{x:n.x+14,y:n.y+n.h-16,"font-size":10.5,fill:"#5b7d7e"});note.textContent="372 API-routes · 698 componenten · 12 providers";g.appendChild(note);}
+  }else{
+    const lines=wrap(n.t, n.w<160?17:24);
+    const fs=n.w<160?11.5:12.5;
+    const startY=n.y+n.h/2-(lines.length-1)*(fs+1)/2+fs/2-1;
+    lines.forEach((ln,i)=>{const tx=svg("text",{x:cx,y:startY+i*(fs+2),"text-anchor":"middle","font-size":fs,"font-weight":600});tx.textContent=ln;g.appendChild(tx);});
+  }
+  g.addEventListener("click",ev=>{ev.stopPropagation();select(id);});
+  nodesG.appendChild(g);
+});
+
+/* ════ defs: markers ════ */
+const defs=svg("defs",{});
+defs.innerHTML=`
+ <marker id="mk-arrow" markerWidth="12" markerHeight="12" refX="8.5" refY="4" orient="auto"><path d="M0,0 L8.5,4 L0,8" fill="none" stroke="#5f5b54" stroke-width="1.4"/></marker>
+ <marker id="mk-tri" markerWidth="14" markerHeight="12" refX="10" refY="5" orient="auto"><path d="M1,1 L10,5 L1,9 Z" fill="#fff" stroke="#5f5b54" stroke-width="1.3"/></marker>
+ <marker id="mk-diamond" markerWidth="16" markerHeight="12" refX="1" refY="5" orient="auto"><path d="M1,5 L6,1 L11,5 L6,9 Z" fill="#5f5b54" stroke="#5f5b54"/></marker>
+ <marker id="mk-ball" markerWidth="10" markerHeight="10" refX="3" refY="4" orient="auto"><circle cx="3.5" cy="4" r="2.6" fill="#5f5b54"/></marker>
+ <marker id="mk-acc" markerWidth="11" markerHeight="11" refX="7" refY="4" orient="auto"><path d="M1,1 L7,4 L1,7" fill="none" stroke="#5f5b54" stroke-width="1.2"/></marker>`;
+plate.insertBefore(defs,plate.firstChild);
+
+/* ════ legend ════ */
+const LAYERS=[["motiv","Motivatie"],["bizproc","Business"],["appsvc","Applicatieservice"],["appcomp","Applicatie"],["tech","Technologie"],["data","Data"],["ext","Extern"]];
+const RELS=[["Realiseert","M2,8 L20,8","5 4","tri"],["Bedient","M2,8 L20,8","","arr"],["Voert uit","M2,8 L20,8","","ball"],["Leest/schrijft","M2,8 L20,8","1.5 3","acc"],["Bestaat uit","M2,8 L20,8","","dia"]];
+(function(){const L=document.getElementById("legend");
+  const g1=document.createElement("div");g1.className="lg";g1.innerHTML='<span class="lab">Lagen</span>';
+  LAYERS.forEach(([k,lab])=>{const s=document.createElement("span");s.className="lk";s.innerHTML=`<i class="sw" style="background:${KIND[k].fill};border-color:${KIND[k].stroke}"></i>${lab}`;g1.appendChild(s);});
+  const g2=document.createElement("div");g2.className="lg";g2.innerHTML='<span class="lab">Relaties</span>';
+  RELS.forEach(([lab,d,dash,mk])=>{const s=document.createElement("span");s.className="rl";
+    const m={tri:'marker-end="url(#lg-tri)"',arr:'marker-end="url(#lg-arr)"',ball:'marker-start="url(#lg-ball)" marker-end="url(#lg-arr)"',acc:'marker-end="url(#lg-arr)"',dia:'marker-start="url(#lg-dia)"'}[mk];
+    s.innerHTML=`<svg width="24" height="14"><defs>
+      <marker id="lg-arr" markerWidth="11" markerHeight="11" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#5f5b54" stroke-width="1.3"/></marker>
+      <marker id="lg-tri" markerWidth="13" markerHeight="11" refX="9" refY="5" orient="auto"><path d="M1,1 L9,5 L1,9 Z" fill="#fff" stroke="#5f5b54" stroke-width="1.2"/></marker>
+      <marker id="lg-dia" markerWidth="15" markerHeight="11" refX="1" refY="5" orient="auto"><path d="M1,5 L6,1 L11,5 L6,9 Z" fill="#5f5b54"/></marker>
+      <marker id="lg-ball" markerWidth="9" markerHeight="9" refX="3" refY="4" orient="auto"><circle cx="3.5" cy="4" r="2.4" fill="#5f5b54"/></marker>
+      </defs><path d="${d}" fill="none" stroke="#5f5b54" stroke-width="1.4" stroke-dasharray="${dash}" ${m}/></svg>${lab}`;
+    g2.appendChild(s);});
+  L.appendChild(g1);L.appendChild(g2);
+})();
+
+/* ════ interactiviteit ════ */
+const REL_NL={assignment:"Voert uit",composition:"Bestaat uit",serving:"Bedient / gebruikt",realization:"Realiseert",access:"Leest / schrijft"};
+function neighbours(id){const out=[];E.forEach(e=>{if(e.f===id)out.push({other:e.t,rel:e.type,dir:"→"});else if(e.t===id)out.push({other:e.f,rel:e.type,dir:"←"});});return out;}
+let current=null;
+function select(id){current=id;document.body.classList.add("has-sel");
+  const nb=neighbours(id);const linked=new Set(nb.map(x=>x.other));
+  document.querySelectorAll(".node").forEach(g=>{const gid=g.getAttribute("data-id");
+    g.classList.toggle("is-active",gid===id);g.classList.toggle("is-linked",linked.has(gid));});
+  document.querySelectorAll(".edge").forEach(g=>{const hl=g.getAttribute("data-from")===id||g.getAttribute("data-to")===id;g.classList.toggle("is-hl",hl);});
+  openDrawer(id,nb);document.getElementById("reset").hidden=false;}
+function clearSel(){current=null;document.body.classList.remove("has-sel");
+  document.querySelectorAll(".node").forEach(g=>g.classList.remove("is-active","is-linked"));
+  document.querySelectorAll(".edge").forEach(g=>g.classList.remove("is-hl"));
+  closeDrawer();document.getElementById("reset").hidden=true;}
+function el(t,c,h){const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;}
+function openDrawer(id,nb){const n=N[id],kd=KIND[n.k];
+  const typ=document.getElementById("d-typ");typ.textContent=kd.typ;typ.style.background=kd.stroke;
+  document.getElementById("d-title").textContent=n.t;
+  const body=document.getElementById("d-body");body.innerHTML="";
+  body.appendChild(el("p","lead",n.lead||""));
+  if(n.items&&n.items.length){const s=el("div","sec");s.appendChild(el("h4",null,"Bevat / verwijst naar"));
+    const tg=el("div","tags");n.items.forEach(it=>tg.appendChild(el("span","tag",it)));s.appendChild(tg);body.appendChild(s);}
+  if(nb&&nb.length){const s=el("div","sec");s.appendChild(el("h4",null,"Relaties"));
+    const lc=el("div","lc");nb.forEach(x=>{const o=N[x.other];const c=el("button","lchip");
+      c.innerHTML=`<i class="sw" style="background:${KIND[o.k].fill};border-color:${KIND[o.k].stroke}"></i>${o.t}<span class="rel">${REL_NL[x.rel]} ${x.dir}</span>`;
+      c.addEventListener("click",()=>select(x.other));lc.appendChild(c);});s.appendChild(lc);body.appendChild(s);}
+  document.getElementById("drawer").classList.add("open");document.getElementById("drawer").setAttribute("aria-hidden","false");
+  document.getElementById("scrim").classList.add("open");}
+function closeDrawer(){document.getElementById("drawer").classList.remove("open");document.getElementById("drawer").setAttribute("aria-hidden","true");document.getElementById("scrim").classList.remove("open");}
+document.getElementById("scrim").addEventListener("click",clearSel);
+document.getElementById("d-close").addEventListener("click",clearSel);
+document.getElementById("reset").addEventListener("click",clearSel);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")clearSel();});
+document.getElementById("foot").innerHTML="ArchiMate-stijl plaat · afgeleid uit de TriFinity-repo (fin@0.71.0, snapshot 2026-06-07) · zelfstandig, geen externe data. Notatie: business (geel), applicatie (groen/cyaan), technologie (teal), data (blauw), motivatie (paars).";
+</script>
+</body>
+</html>

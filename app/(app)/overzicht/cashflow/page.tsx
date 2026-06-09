@@ -87,7 +87,7 @@ export default async function OverzichtCashflowPage() {
         </section>
       )}
 
-      <CashOverview embedded showAllCashAccounts />
+      <CashOverview embedded showAllCashAccounts showMonthLinks />
 
       {settings && (
         <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">

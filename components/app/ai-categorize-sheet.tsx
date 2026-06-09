@@ -2,11 +2,20 @@
 
 import { useState, useCallback } from 'react'
 import {
-  Loader2, CheckCircle, HelpCircle, Check, ChevronDown, GitFork, Sparkles,
+  Loader2, CheckCircle, HelpCircle, Check, ChevronDown, GitFork, Sparkles, Wand2, ArrowLeftRight,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
-import type { Budget } from '@/lib/budget-data'
+import { buildBudgetSelectEntries, resolveEigenRekeningBudgetId, type Budget } from '@/lib/budget-data'
+import { buildFrequencyMap, type CategoryCorrection } from '@/lib/parsers/categorize'
+import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
+import {
+  computeAutoCategorization,
+  computeOwnAccountDetection,
+  type AutoCatContext,
+  type AutoCatTx,
+  type AutoAssignment,
+} from '@/lib/auto-categorize'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +97,17 @@ function formatDate(dateStr: string): string {
 
 const SHOW_MORE_STEP = 20
 
+/** Map een sheet-transactie naar de minimale vorm voor de auto-categorisatie. */
+function toAutoCatTx(tx: Transaction): AutoCatTx {
+  return {
+    id: tx.id,
+    description: tx.description,
+    counterparty_name: tx.counterparty_name,
+    counterparty_iban: tx.counterparty_iban,
+    amount: tx.amount,
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AICategorizeSheet({
@@ -100,7 +120,7 @@ export function AICategorizeSheet({
   monthLabel,
   currentUserId,
 }: Props) {
-  const [phase, setPhase] = useState<'choice' | 'ai' | 'review' | 'saving' | 'success'>('choice')
+  const [phase, setPhase] = useState<'choice' | 'ai' | 'review' | 'saving' | 'applying' | 'success'>('choice')
   const [rows, setRows] = useState<RowState[]>([])
   const [aiError, setAiError] = useState<string | null>(null)
   const [showCount, setShowCount] = useState(SHOW_MORE_STEP)
@@ -109,6 +129,14 @@ export function AICategorizeSheet({
   const [bulkUpdated, setBulkUpdated] = useState(0)
   const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
   const [aiBatchProgress, setAiBatchProgress] = useState({ current: 0, total: 0 })
+  // Auto-flows (optie 3 & 4): foutmelding op de choice-fase + resultaat-samenvatting.
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [autoSummary, setAutoSummary] = useState<{
+    mode: 'rules' | 'own'
+    ruleCount: number
+    transferCount: number
+    unmatchedCount: number
+  } | null>(null)
 
   // ── Scope-toggle state (optional feature; only shown when accountId or
   //    currentUserId is provided so we know which transactions to fetch). ──
@@ -283,6 +311,92 @@ export function AICategorizeSheet({
       makeRule: false,
     })))
     setPhase('review')
+  }
+
+  // ── Automatisch indelen (optie 3 & 4) ─────────────────────────────────────
+
+  /** Laadt regels, geschiedenis en eigen-rekening-identifiers voor de auto-flows. */
+  const loadAutoCatContext = useCallback(async (): Promise<AutoCatContext> => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Je bent niet (meer) ingelogd.')
+
+    const [corrRes, ownRes, bankRes, freqMap] = await Promise.all([
+      supabase.from('category_corrections').select('match_field, match_value, budget_id'),
+      supabase.from('user_own_ibans').select('match_type, match_value, iban').eq('user_id', user.id),
+      supabase.from('bank_accounts').select('iban').eq('is_active', true),
+      buildFrequencyMap(user.id, supabase),
+    ])
+
+    const ids = buildOwnAccountIdentifiers(
+      (ownRes.data ?? []) as { match_type?: string | null; match_value?: string | null; iban?: string | null }[],
+      ((bankRes.data ?? []) as { iban: string | null }[]).map((b) => b.iban),
+    )
+
+    return {
+      budgets,
+      corrections: (corrRes.data ?? []) as CategoryCorrection[],
+      freqMap,
+      ownIbans: ids.ibans,
+      ownNamePatterns: ids.namePatterns,
+      eigenRekeningBudgetId: resolveEigenRekeningBudgetId(budgets),
+    }
+  }, [budgets])
+
+  /** Schrijft de toewijzingen gebatcht weg: één update per budget/bron/transfer. */
+  async function applyAssignments(assignments: AutoAssignment[]): Promise<void> {
+    if (assignments.length === 0) return
+    const supabase = createClient()
+    const groups = new Map<string, { ids: string[]; budget_id: string; category_source: string; isTransfer: boolean }>()
+    for (const a of assignments) {
+      const key = `${a.budget_id}|${a.category_source}|${a.isTransfer ? 'T' : 'F'}`
+      const g = groups.get(key) ?? { ids: [], budget_id: a.budget_id, category_source: a.category_source, isTransfer: a.isTransfer }
+      g.ids.push(a.id)
+      groups.set(key, g)
+    }
+    for (const g of groups.values()) {
+      const update: Record<string, unknown> = { budget_id: g.budget_id, category_source: g.category_source }
+      if (g.isTransfer) update.transaction_type = 'transfer'
+      // Chunk om de PostgREST URL-lengte te respecteren bij grote selecties.
+      for (let i = 0; i < g.ids.length; i += 200) {
+        const { error } = await supabase.from('transactions').update(update).in('id', g.ids.slice(i, i + 200))
+        if (error) throw new Error(error.message)
+      }
+    }
+  }
+
+  /** Optie 3 — slimme regels: volledige keten, direct toepassen. */
+  async function runSmartRules() {
+    setActionError(null)
+    setPhase('applying')
+    try {
+      const ctx = await loadAutoCatContext()
+      const result = computeAutoCategorization(activeTransactions.map(toAutoCatTx), ctx)
+      await applyAssignments(result.assignments)
+      setAutoSummary({ mode: 'rules', ruleCount: result.ruleCount, transferCount: result.transferCount, unmatchedCount: result.unmatchedCount })
+      setSavedCount(result.ruleCount + result.transferCount)
+      setPhase('success')
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Automatisch indelen lukte niet. Probeer het opnieuw.')
+      setPhase('choice')
+    }
+  }
+
+  /** Optie 4 — eigen rekening herkennen: alleen overboekingen, direct toepassen. */
+  async function runOwnAccountDetection() {
+    setActionError(null)
+    setPhase('applying')
+    try {
+      const ctx = await loadAutoCatContext()
+      const result = computeOwnAccountDetection(activeTransactions.map(toAutoCatTx), ctx)
+      await applyAssignments(result.assignments)
+      setAutoSummary({ mode: 'own', ruleCount: 0, transferCount: result.transferCount, unmatchedCount: result.unmatchedCount })
+      setSavedCount(result.transferCount)
+      setPhase('success')
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Eigen rekening herkennen lukte niet. Probeer het opnieuw.')
+      setPhase('choice')
+    }
   }
 
   // ── Row actions ───────────────────────────────────────────────────────────
@@ -492,6 +606,11 @@ export function AICategorizeSheet({
       {/* ── Choice ── */}
       {phase === 'choice' && (
         <div className="flex flex-col gap-5 py-5">
+          {actionError && (
+            <div role="alert" className="rounded-[var(--r)] border border-orange-200 bg-orange-50 px-3 py-2.5 text-[11px] text-orange-700">
+              {actionError}
+            </div>
+          )}
           <p className="text-sm text-[var(--ink-2)]">
             <strong className="text-[var(--ink)] font-mono tabular-nums">{activeTransactions.length}</strong>{' '}
             {activeTransactions.length === 1 ? 'transactie' : 'transacties'} zonder categorie
@@ -577,6 +696,49 @@ export function AICategorizeSheet({
               </p>
             </div>
           </button>
+
+          {/* Slimme regels (optie 3) */}
+          <button
+            type="button"
+            onClick={() => void runSmartRules()}
+            disabled={loadingAll || activeTransactions.length === 0}
+            className="flex items-start gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-4 text-left transition-all hover:border-[var(--border-md)] hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-[var(--border-ed)]"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--subtle)]">
+              <Wand2 className="h-4 w-4 text-[var(--ink-2)]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[var(--ink)]">Slimme regels</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                Deel direct in op basis van je regels, je eerdere keuzes en herkende tegenpartijen — zonder AI. Eigen-rekening-overboekingen worden meteen herkend.
+              </p>
+            </div>
+          </button>
+
+          {/* Eigen rekening herkennen (optie 4) */}
+          <button
+            type="button"
+            onClick={() => void runOwnAccountDetection()}
+            disabled={loadingAll || activeTransactions.length === 0}
+            className="flex items-start gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-4 text-left transition-all hover:border-[var(--border-md)] hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-[var(--border-ed)]"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--subtle)]">
+              <ArrowLeftRight className="h-4 w-4 text-[var(--ink-2)]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[var(--ink)]">Eigen rekening herkennen</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                Markeer overboekingen tussen je eigen rekeningen (spaarpot, PayPal, broker) zodat ze niet als uitgave of inkomen meetellen.
+              </p>
+            </div>
+          </button>
+
+          {/* Scheiding: automatisch (↑) vs. zelf doen (↓) */}
+          <div className="flex items-center gap-3" aria-hidden="true">
+            <div className="h-px flex-1 bg-[var(--border-ed)]" />
+            <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">of zelf</span>
+            <div className="h-px flex-1 bg-[var(--border-ed)]" />
+          </div>
 
           {/* Handmatig */}
           <button
@@ -757,6 +919,14 @@ export function AICategorizeSheet({
         </div>
       )}
 
+      {/* ── Applying (auto-flows: optie 3 & 4) ── */}
+      {phase === 'applying' && (
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <Loader2 className="h-7 w-7 animate-spin text-kern-500" />
+          <p className="text-sm text-[var(--ink-3)]">Bezig met indelen…</p>
+        </div>
+      )}
+
       {/* ── Success ── */}
       {phase === 'success' && (
         <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
@@ -765,16 +935,41 @@ export function AICategorizeSheet({
           </div>
           <div>
             <p className="text-lg font-bold font-[var(--font-playfair)] text-[var(--ink)]">Klaar</p>
-            <p className="mt-2 text-sm text-[var(--ink-2)]">
-              {savedCount} {savedCount === 1 ? 'transactie' : 'transacties'} gecategoriseerd
-            </p>
-            {ruleCount > 0 && (
-              <p className="mt-1 text-xs text-[var(--ink-3)]">
-                {ruleCount} {ruleCount === 1 ? 'regel' : 'regels'} aangemaakt
-                {bulkUpdated > 0 && (
-                  <> — {bulkUpdated} eerder{bulkUpdated === 1 ? 'e transactie' : 'e transacties'} automatisch gecategoriseerd</>
+            {autoSummary ? (
+              autoSummary.mode === 'rules' ? (
+                <>
+                  <p className="mt-2 text-sm text-[var(--ink-2)]">
+                    {savedCount === 0
+                      ? 'Niets kon automatisch ingedeeld worden'
+                      : <>{savedCount} {savedCount === 1 ? 'transactie' : 'transacties'} ingedeeld</>}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--ink-3)]">
+                    {autoSummary.ruleCount} op regels
+                    {autoSummary.transferCount > 0 && <> · {autoSummary.transferCount} als eigen rekening</>}
+                    {autoSummary.unmatchedCount > 0 && <> · {autoSummary.unmatchedCount} nog open voor Will of handmatig</>}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-[var(--ink-2)]">
+                  {autoSummary.transferCount === 0
+                    ? 'Geen eigen-rekening-overboekingen gevonden'
+                    : <>{autoSummary.transferCount} {autoSummary.transferCount === 1 ? 'transactie' : 'transacties'} herkend als eigen rekening</>}
+                </p>
+              )
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-[var(--ink-2)]">
+                  {savedCount} {savedCount === 1 ? 'transactie' : 'transacties'} gecategoriseerd
+                </p>
+                {ruleCount > 0 && (
+                  <p className="mt-1 text-xs text-[var(--ink-3)]">
+                    {ruleCount} {ruleCount === 1 ? 'regel' : 'regels'} aangemaakt
+                    {bulkUpdated > 0 && (
+                      <> — {bulkUpdated} eerder{bulkUpdated === 1 ? 'e transactie' : 'e transacties'} automatisch gecategoriseerd</>
+                    )}
+                  </p>
                 )}
-              </p>
+              </>
             )}
           </div>
           <button
@@ -782,7 +977,7 @@ export function AICategorizeSheet({
             onClick={onSaved}
             className="rounded-[var(--r)] bg-kern-600 px-6 py-2 text-sm font-medium text-white hover:bg-kern-700"
           >
-            Sluiten
+            Terug naar budgetten
           </button>
         </div>
       )}
@@ -898,15 +1093,17 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
             className="flex-1 rounded border border-[var(--border-ed)] px-2 py-2 min-h-[44px] text-xs outline-none focus:border-kern-500"
           >
             <option value="">Kies handmatig</option>
-            {budgetGroups
-              .filter((g) => g.children.length > 0)
-              .map((g) => (
-                <optgroup key={g.parent.id} label={g.parent.name}>
-                  {g.children.map((c) => (
+            {buildBudgetSelectEntries(budgetGroups).map((entry) =>
+              entry.kind === 'group' ? (
+                <optgroup key={entry.id} label={entry.label}>
+                  {entry.options.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </optgroup>
-              ))}
+              ) : (
+                <option key={entry.id} value={entry.id}>{entry.name}</option>
+              )
+            )}
           </select>
         </div>
       )}
@@ -938,15 +1135,17 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
             aria-label="Andere categorie kiezen"
           >
             <option value="">— Andere categorie kiezen —</option>
-            {budgetGroups
-              .filter((g) => g.children.length > 0)
-              .map((g) => (
-                <optgroup key={g.parent.id} label={g.parent.name}>
-                  {g.children.map((c) => (
+            {buildBudgetSelectEntries(budgetGroups).map((entry) =>
+              entry.kind === 'group' ? (
+                <optgroup key={entry.id} label={entry.label}>
+                  {entry.options.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </optgroup>
-              ))}
+              ) : (
+                <option key={entry.id} value={entry.id}>{entry.name}</option>
+              )
+            )}
           </select>
         </div>
       )}

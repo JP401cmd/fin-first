@@ -17,13 +17,14 @@ function parseDate(value: string, format: string): string {
     return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`
   }
 
-  if (format === 'DD-MM-YYYY') {
-    const [d, m, y] = value.split('-')
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
-  }
-
-  if (format === 'DD/MM/YYYY') {
-    const [d, m, y] = value.split('/')
+  // Dag-maand-jaar: tolereer zowel '/' als '-' als scheidingsteken. PayPal NL
+  // exporteert datums als DD-MM-YYYY terwijl de preset DD/MM/YYYY aangeeft (en
+  // andersom); splits daarom op beide. Een onvolledige datum geeft de ruwe waarde
+  // terug — die faalt de YYYY-MM-DD-controle in parseCSV en wordt netjes
+  // overgeslagen i.p.v. de hele import te laten crashen op een undefined deel.
+  if (format === 'DD-MM-YYYY' || format === 'DD/MM/YYYY') {
+    const [d, m, y] = value.split(/[/-]/)
+    if (!d || !m || !y) return value
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
   }
 
@@ -117,6 +118,7 @@ export async function parseCSV(
     const counterparty = preset.counterpartyColumn != null ? (fields[preset.counterpartyColumn] ?? null) : null
     const iban = preset.ibanColumn != null ? (fields[preset.ibanColumn] ?? null) : null
     const reference = preset.referenceColumn != null ? (fields[preset.referenceColumn] ?? null) : null
+    const sourceType = preset.transferTypeColumn != null ? (fields[preset.transferTypeColumn] ?? null) : null
 
     if (!dateStr || (!amountStr && !preset.debitColumn)) continue
 
@@ -166,6 +168,7 @@ export async function parseCSV(
       counterparty_iban: iban?.trim() || null,
       reference: reference?.trim() || null,
       transaction_type: null,
+      source_type: sourceType?.trim() || null,
       bank_code: bankCodeVal || null,
       bank_seq: uniqueRef || null,
       running_balance: parseOptionalAmount(balanceVal),

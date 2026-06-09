@@ -56,6 +56,7 @@ export const mijnNav: ModuleNavConfig = {
   items: [
     { label: 'Overzicht', href: '/mijn' },
     { label: 'Profiel', href: '/mijn/profiel' },
+    { label: 'Account', href: '/mijn/account' },
     { label: 'Notificaties', href: '/mijn/notificaties' },
     { label: 'Uiterlijk', href: '/mijn/uiterlijk' },
     { label: 'Privacy', href: '/mijn/privacy' },

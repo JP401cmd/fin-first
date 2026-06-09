@@ -17,10 +17,11 @@
 
 import type { TaxOpportunity } from './tax-overview'
 import type { Debt } from './debt-data'
+import type { Asset, AssetType } from './asset-data'
 
 // ── Type ─────────────────────────────────────────────────────
 
-export type AandachtspuntDomain = 'tax' | 'budget' | 'debt'
+export type AandachtspuntDomain = 'tax' | 'budget' | 'debt' | 'asset'
 
 export interface Aandachtspunt {
   /** Namespaced id: '{domain}:{bron-id}'. Stabiel over re-loads. */
@@ -231,4 +232,72 @@ export function debtsToAandachtspunten(debts: Debt[], dailyExpenses: number): Aa
     })
   }
   return result
+}
+
+// ── Asset-adapter (PURE) ─────────────────────────────────────
+
+/**
+ * Asset-types die als direct-opneembaar spaargeld tellen — gelijk aan de
+ * 'spaargeld'-groep in `WEALTH_GROUPS` (lib/wealth-composition.ts). Bewust
+ * geïnlined zodat deze pure adapter de zware wealth-composition-module niet
+ * hoeft te importeren.
+ */
+const LIQUID_SAVINGS_TYPES: AssetType[] = ['cash', 'savings']
+
+/** Aanbevolen noodbuffer in maanden uitgaven — gangbare vuistregel. */
+export const CASH_BUFFER_MONTHS = 6
+
+/**
+ * Minimaal overschot bóven de buffer (EUR) voordat cash-drag een aandachtspunt
+ * wordt. Onder deze grens is het effect te klein om op te voeren.
+ */
+export const MIN_CASH_EXCESS = 5_000
+
+/**
+ * Overtollig spaargeld (bóven een gezonde noodbuffer) → "zet overtollig
+ * spaargeld aan het werk"-aandachtspunt.
+ *
+ * Feitelijke, Wft-veilige framing: stilstaand spaargeld verliest jaarlijks
+ * koopkracht door inflatie. We doen GEEN beleggings-/productaanbeveling — dat
+ * blijft bewust aan de gebruiker (+ een erkend adviseur). Het aandachtspunt
+ * benoemt alleen de kans en kwantificeert het koopkrachtverlies.
+ *
+ * - Alleen actieve assets in de spaargeld-groep (cash + savings).
+ * - buffer = CASH_BUFFER_MONTHS × maanduitgaven (= CASH_BUFFER_MONTHS × 30 × daguitgaven).
+ * - excess = spaargeld − buffer; alleen bij excess ≥ MIN_CASH_EXCESS.
+ * - savings = excess × inflatie (jaarlijks koopkrachtverlies dat je voorkomt).
+ * - freedomDays = savings / daguitgaven.
+ *
+ * Faalt zacht: bij ontbrekende dag-uitgaven of inflatie ≤ 0 → geen aandachtspunt
+ * (we verzinnen geen buffer uit het niets).
+ */
+export function assetsToAandachtspunten(
+  assets: Asset[],
+  dailyExpenses: number,
+  inflationRate: number,
+): Aandachtspunt[] {
+  if (dailyExpenses <= 0 || inflationRate <= 0) return []
+
+  const spaargeld = assets
+    .filter((a) => a.is_active && LIQUID_SAVINGS_TYPES.includes(a.asset_type))
+    .reduce((sum, a) => sum + (Number(a.current_value) || 0), 0)
+
+  const buffer = CASH_BUFFER_MONTHS * 30 * dailyExpenses
+  const excess = spaargeld - buffer
+  if (excess < MIN_CASH_EXCESS) return []
+
+  const savings = Math.round(excess * inflationRate)
+  if (savings <= 0) return []
+  const freedomDays = Math.round(savings / dailyExpenses)
+
+  return [
+    {
+      id: 'asset:cash-drag',
+      domain: 'asset',
+      title: 'Zet overtollig spaargeld aan het werk',
+      savings,
+      freedomDays,
+      href: '/overzicht/bezittingen',
+    },
+  ]
 }

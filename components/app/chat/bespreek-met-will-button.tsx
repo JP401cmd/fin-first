@@ -35,7 +35,7 @@ export function BesprekMetWillButton({
   function handleClick() {
     if (!chat) return
     const slot = vraag ?? 'Wat betekent dit voor mijn situatie, en moet ik er nu al op anticiperen?'
-    const message = `Ik wil dit fiscale onderwerp met je bespreken: "${onderwerp}".${
+    const message = `Ik wil het volgende onderwerp met je bespreken: "${onderwerp}".${
       detail ? ` ${detail}` : ''
     } ${slot}`
     chat.openWithMessage(message)

@@ -78,8 +78,14 @@ export function ManualTransferSheet({
       return
     }
 
-    // Generate a shared transfer UUID to link both sides
-    const transferGroupId = crypto.randomUUID()
+    // Eigen-rekening-post (archive → telt niet mee) waar de verschuiving op landt.
+    const { data: eigenBudget } = await supabase
+      .from('budgets')
+      .select('id')
+      .eq('slug', 'eigen-rekening-sub')
+      .limit(1)
+      .maybeSingle()
+    const eigenBudgetId = eigenBudget?.id ?? null
 
     // Insert debit side (van-rekening, negatief bedrag)
     const { data: debitTx, error: debitError } = await supabase
@@ -92,7 +98,8 @@ export function ManualTransferSheet({
         description: form.description.trim(),
         is_income: false,
         transaction_type: 'transfer',
-        category_source: 'manual',
+        category_source: 'transfer',
+        budget_id: eigenBudgetId,
         is_split: false,
       })
       .select('id')
@@ -115,7 +122,8 @@ export function ManualTransferSheet({
         description: form.description.trim(),
         is_income: true,
         transaction_type: 'transfer',
-        category_source: 'manual',
+        category_source: 'transfer',
+        budget_id: eigenBudgetId,
         is_split: false,
         linked_transfer_id: debitTx.id,
       })

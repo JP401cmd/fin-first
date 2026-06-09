@@ -252,6 +252,66 @@ export function getDefaultBudgets(): SeedBudget[] {
   ]
 }
 
+/** Minimale vorm van een budget-groep (hoofdcategorie + subbudgetten) voor de keuzelijst. */
+export type BudgetSelectGroup = {
+  parent: { id: string; name: string; budget_type: Budget['budget_type'] }
+  children: { id: string; name: string }[]
+}
+
+/** Eén regel in een budget-keuzelijst: óf een optgroup-kop met opties, óf een losse optie. */
+export type BudgetSelectEntry =
+  | { kind: 'group'; id: string; label: string; options: { id: string; name: string }[] }
+  | { kind: 'option'; id: string; name: string }
+
+/**
+ * Bouw de keuzelijst voor het toewijzen van een transactie aan een budget.
+ *
+ * Normale hoofdcategorieën met subbudgetten worden als <optgroup> getoond — de
+ * hoofdcategorie zelf is dan een niet-selecteerbaar label en de subbudgetten zijn
+ * de selecteerbare opties.
+ *
+ * Archive-"emmers" zoals **Eigen rekening** zijn conceptueel één platte categorie.
+ * Hun subpost(en) worden als losse, direct-selecteerbare opties getoond (geen
+ * optgroup-kop). Anders verschijnt "Eigen rekening" als niet-klikbare kop met een
+ * gelijknamig subitem eronder — waardoor het lijkt alsof de eigen rekening "niet
+ * te kiezen" is. Heeft de emmer (nog) geen subpost, dan valt de optie terug op de
+ * hoofdpost zelf (zelfde fallback als `resolveEigenRekeningBudgetId`).
+ */
+export function buildBudgetSelectEntries(groups: BudgetSelectGroup[]): BudgetSelectEntry[] {
+  const entries: BudgetSelectEntry[] = []
+  for (const group of groups) {
+    if (group.parent.budget_type === 'archive') {
+      const leaves = group.children.length > 0 ? group.children : [group.parent]
+      for (const leaf of leaves) {
+        entries.push({ kind: 'option', id: leaf.id, name: leaf.name })
+      }
+    } else if (group.children.length > 0) {
+      entries.push({
+        kind: 'group',
+        id: group.parent.id,
+        label: group.parent.name,
+        options: group.children.map((c) => ({ id: c.id, name: c.name })),
+      })
+    }
+  }
+  return entries
+}
+
+/**
+ * Resolve de budget-id van de "Eigen rekening"-post (archive) waar
+ * eigen-rekening-verschuivingen op landen. Voorkeur voor de leaf-subpost
+ * (`eigen-rekening-sub`), val terug op de parent (`eigen-rekening`); null als
+ * geen van beide bestaat.
+ */
+export function resolveEigenRekeningBudgetId(
+  budgets: { id: string; slug: string | null }[],
+): string | null {
+  const sub = budgets.find((b) => b.slug === BUDGET_SLUGS.EIGEN_REKENING_SUB)
+  if (sub) return sub.id
+  const parent = budgets.find((b) => b.slug === BUDGET_SLUGS.EIGEN_REKENING)
+  return parent?.id ?? null
+}
+
 /**
  * Generates mock spending data for budgets in a given month.
  * Returns a map of budget name -> spent amount.

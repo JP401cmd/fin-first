@@ -682,7 +682,13 @@ export function runMonteCarloAtAges(
 export interface FindCriticalSWRInput {
   startPortfolio: number
   yearsInPhase: number
-  yearlyAowIncome: number
+  /**
+   * @deprecated AOW is funded OUTSIDE the portfolio and is already netted out
+   * of the withdrawal upstream (see lib/withdrawal-strategy.ts). The critical
+   * SWR returned here is a NET portfolio withdrawal rate, so this field is no
+   * longer used in the cashflow. Kept optional for call-site compatibility.
+   */
+  yearlyAowIncome?: number
   expectedReturn: number
   volatility: number
   inflationRate: number
@@ -699,6 +705,14 @@ export interface FindCriticalSWRInput {
  * binary search. Returns the maximum withdrawal rate that still achieves
  * the target success rate (default 95%).
  *
+ * SEMANTICS (C1): the SWR is a NET portfolio withdrawal rate — i.e.
+ * `netPortfolioWithdrawal / startPortfolio`. AOW/pension is funded outside the
+ * portfolio and has ALREADY been netted out of the withdrawal exactly once
+ * upstream (applyWithdrawalStrategy → `max(0, expenses - recurringIncome)`).
+ * The binary search therefore treats `mid × startPortfolio` as the net outflow
+ * and does NOT subtract AOW again — doing so would understate the outflow and
+ * yield an over-optimistic (too high) critical rate.
+ *
  * Uses max 6 iterations with 200 sims each for a balance between accuracy
  * and performance (~1200 total simulations).
  *
@@ -708,7 +722,6 @@ export function findCriticalSWR(input: FindCriticalSWRInput): number {
   const {
     startPortfolio,
     yearsInPhase,
-    yearlyAowIncome,
     expectedReturn,
     volatility,
     inflationRate,
@@ -731,8 +744,10 @@ export function findCriticalSWR(input: FindCriticalSWRInput): number {
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const mid = (low + high) / 2
+    // `mid × startPortfolio` IS the net portfolio outflow (AOW already netted
+    // once upstream). Do not subtract AOW again.
     const yearlyWithdrawal = mid * startPortfolio
-    const yearlyCashflow = -(yearlyWithdrawal - yearlyAowIncome)
+    const yearlyCashflow = -yearlyWithdrawal
 
     const result = runPhaseMonteCarlo({
       startPortfolio,

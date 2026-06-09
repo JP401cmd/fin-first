@@ -61,6 +61,7 @@ nul
 # auth state (contains tokens)
 auth-state.json
 auth_result.json
+auth.json
 
 # Claude Code harness-local state — never commit
 .claude/scheduled_tasks.lock

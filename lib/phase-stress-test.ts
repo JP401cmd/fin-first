@@ -93,7 +93,11 @@ export interface StressTestResult {
   depletionAge: number | null
   /** Samenvatting voor UI-weergave */
   impactSummary: string
-  /** Geschat succespercentage onder stress (vereenvoudigd) */
+  /**
+   * Veerkracht (0–1): het aandeel van je verwachte basis-eindvermogen dat ná
+   * deze ene deterministische schok overblijft. 0 = je vermogen raakt op vóór
+   * het einde van de fase. Dit is GEEN kansverdeling/Monte-Carlo-waarschijnlijkheid.
+   */
   estimatedSuccessRate: number
 }
 
@@ -516,12 +520,13 @@ export function applyStressScenario(
   const delta = result.endPortfolio - baseEndPortfolio
   const impactSummary = generateImpactSummary(scenario, result.endPortfolio, delta)
 
-  // Geschat succespercentage: vereenvoudigd model
+  // Veerkracht (0–1): aandeel van het verwachte eindvermogen dat ná de schok
+  // overblijft. Deterministisch — geen kans/waarschijnlijkheid.
   let estimatedSuccessRate: number
   if (!result.survives) {
     estimatedSuccessRate = 0
   } else if (baseEndPortfolio > 0) {
-    estimatedSuccessRate = Math.max(0.1, 1 - Math.abs(delta) / baseEndPortfolio)
+    estimatedSuccessRate = Math.max(0, 1 - Math.abs(delta) / baseEndPortfolio)
   } else {
     // Basisgeval al op nul — stress maakt het niet erger qua percentage
     estimatedSuccessRate = result.endPortfolio >= 0 ? 1 : 0

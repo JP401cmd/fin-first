@@ -16,6 +16,7 @@ import {
 } from '@/lib/phase-monte-carlo'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { SimCashflow } from '@/lib/fire-simulation'
+import type { TransitionScenario } from '@/components/app/horizon/phase-modal-overgang'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -24,13 +25,22 @@ export interface MonteCarloOvergangProps {
   startPortfolio: number
   startAge: number
   endAge: number
+  /**
+   * Jaarlijkse portfolio-onttrekking tijdens de overgang. In het gap-scenario
+   * = volledige uitgaven; in het shortfall-scenario = max(uitgaven − AOW, 0).
+   * De modal levert al de scenario-juiste waarde aan.
+   */
   yearlyWithdrawal: number
   expectedReturn: number
   inflationRate: number
   cashflows?: SimCashflow[]
-  /** FIRE age for display in no-gap message */
+  /** Welk overgangsscenario actief is — bepaalt labels en onttrekkingssemantiek */
+  transitionScenario?: TransitionScenario
+  /** Jaarlijks AOW-inkomen (alleen relevant in het shortfall-scenario) */
+  yearlyAowIncome?: number
+  /** FIRE age for display in no-phase message */
   fireAge?: number
-  /** AOW age for display in no-gap message */
+  /** AOW age for display in no-phase message */
   aowAge?: number
 }
 
@@ -75,6 +85,8 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
   expectedReturn,
   inflationRate,
   cashflows,
+  transitionScenario,
+  yearlyAowIncome,
   fireAge,
   aowAge,
 }: MonteCarloOvergangProps) {
@@ -82,13 +94,18 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
   const [state, setState] = useState<MCComputedState | null>(null)
 
   const yearsInPhase = Math.max(Math.round(endAge - startAge), 1)
+  const isShortfall = transitionScenario === 'shortfall'
 
-  // ── No transition gap: FIRE age >= AOW age ──────────────────────────────
-  const noGap = startAge >= endAge || (fireAge != null && aowAge != null && fireAge >= aowAge)
+  // ── No transition phase: only when there is genuinely no duration.
+  // A phase exists whenever endAge > startAge — both gap (FIRE→AOW) and
+  // shortfall (AOW→FIRE) have a real bridge to simulate. The old
+  // `fireAge >= aowAge` term wrongly declared the shortfall scenario "no
+  // phase" while the rest of the modal rendered its analysis. (B1)
+  const noPhase = endAge <= startAge
 
   // Lazy compute: defer MC past the first paint so modal opens instantly
   useEffect(() => {
-    if (noGap || yearsInPhase <= 0) return
+    if (noPhase || yearsInPhase <= 0) return
 
     const timer = setTimeout(() => {
       const baseInput = {
@@ -138,18 +155,18 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
     expectedReturn,
     inflationRate,
     cashflows,
-    noGap,
+    noPhase,
   ])
 
   const loading = state === null
 
-  // ── No-gap message: FIRE age >= AOW age ─────────────────────────────────
-  if (noGap) {
+  // ── No-phase message: only when there is genuinely no duration ──────────
+  if (noPhase) {
     return (
       <AnalysisSection
         title="Monte Carlo simulatie"
         icon={BarChart3}
-        willContext="Monte Carlo overgangsfase: geen overgangsfase — FIRE-leeftijd ligt op of na AOW-leeftijd."
+        willContext="Monte Carlo overgangsfase: geen overgangsfase — FIRE-leeftijd en AOW-leeftijd vallen samen, er is geen periode om te overbruggen."
       >
         <div className="flex items-start gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--positive)]/5 p-4">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--positive)]" />
@@ -159,14 +176,19 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
             </p>
             <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
               {fireAge != null && aowAge != null
-                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) ligt op of na je AOW-leeftijd (${Math.round(aowAge)}). Er is geen periode waarin je volledig van je portfolio leeft zonder AOW-inkomen — de Monte Carlo simulatie voor de overgangsfase is daarom niet relevant.`
-                : 'Je FIRE-leeftijd ligt op of na je AOW-leeftijd. Er is geen overgangsfase om te simuleren.'}
+                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) en je AOW-leeftijd (${Math.round(aowAge)}) vallen samen — er is geen periode om te overbruggen, dus de Monte Carlo simulatie voor de overgangsfase is niet relevant.`
+                : 'FIRE-leeftijd en AOW-leeftijd vallen samen. Er is geen overgangsfase om te simuleren.'}
             </p>
           </div>
         </div>
       </AnalysisSection>
     )
   }
+
+  // Scenario-aware labels: in shortfall the bridge runs AOW→FIRE (end = FIRE),
+  // in gap it runs FIRE→AOW (end = AOW). The portfolio outflow is what the
+  // modal passed as yearlyWithdrawal (gap: full expenses; shortfall: expenses − AOW).
+  const endLabel = isShortfall ? 'bij FIRE' : 'bij AOW'
 
   return (
     <AnalysisSection
@@ -175,9 +197,12 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
       loading={loading}
       willContext={
         state
-          ? `Monte Carlo overgangsfase: slagingskans ${Math.round(state.main.successRate * 100)}%, ` +
-            `mediaan eindvermogen ${formatMaskedCurrency(state.main.medianEndPortfolio, masked)}, ` +
-            `pessimistisch eindvermogen ${formatMaskedCurrency(state.main.p10EndPortfolio, masked)}, ` +
+          ? `Monte Carlo ${isShortfall ? 'overgangsfase (AOW → FIRE, tekort aangevuld vanuit portfolio)' : 'overgangsfase (FIRE → AOW, volledig uit portfolio)'}: ` +
+            `slagingskans ${Math.round(state.main.successRate * 100)}% over ${yearsInPhase} jaar, ` +
+            `jaarlijkse portfolio-onttrekking ${formatMaskedCurrency(Math.round(yearlyWithdrawal), masked)}` +
+            `${isShortfall && yearlyAowIncome ? ` (uitgaven verminderd met AOW van ${formatMaskedCurrency(Math.round(yearlyAowIncome), masked)}/jaar)` : ''}, ` +
+            `mediaan eindvermogen ${formatMaskedCurrency(state.main.medianEndPortfolio, masked)} ${endLabel}, ` +
+            `pessimistisch (p10) ${formatMaskedCurrency(state.main.p10EndPortfolio, masked)}, ` +
             `kritische onttrekkingsgrens ${formatMaskedCurrency(state.kritischeGrens, masked)}/jaar.`
           : 'Monte Carlo simulatie (laden...)'
       }
@@ -217,7 +242,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
               >
                 {Math.round(state.main.successRate * 100)}%
                 <span className="ml-1 text-[11px] text-[var(--ink-4)]">
-                  portfolio &gt; \u20AC50k tot AOW
+                  portfolio &gt; &euro;50k tot {isShortfall ? 'FIRE' : 'AOW'}
                 </span>
               </p>
             </div>
@@ -230,7 +255,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
                 {<MaskedAmount value={state.main.medianEndPortfolio} tone="horizon" />}
                 <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
-                  bij AOW
+                  {endLabel}
                 </span>
               </p>
             </div>
@@ -243,7 +268,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
                 {<MaskedAmount value={state.main.p10EndPortfolio} tone="horizon" />}
                 <span className="ml-1 text-[11px] font-sans text-[var(--ink-4)]">
-                  bij AOW
+                  {endLabel}
                 </span>
               </p>
             </div>

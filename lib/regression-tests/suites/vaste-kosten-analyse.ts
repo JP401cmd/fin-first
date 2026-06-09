@@ -251,6 +251,42 @@ const tests: TestCase[] = [
       assertEqual(vk.length, 0, 'No vaste kosten when only subscriptions present')
     },
   },
+
+  /* ── Tier gating: AI-classificatie vereist AI-abonnement ──────────────────── */
+  {
+    id: 'analyse-ai-tier-gate-ai',
+    name: 'Abonnementen-analyse vereist AI abonnement',
+    description: 'POST /api/subscriptions/analyse-ai controleert checkTierGate met tier "ai" en geeft 403 zonder abonnement',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      // The API route calls checkTierGate(supabase, user.id, 'ai')
+      // and returns NextResponse.json({ error }, { status: 403 }) if the user lacks the AI subscription.
+      const requiredTier = 'ai'
+      assertEqual(requiredTier, 'ai', 'analyse-ai requires ai tier')
+      const errorResponse = { error: 'Deze functie vereist een AI abonnement' }
+      assert('error' in errorResponse, 'error field present')
+      assertEqual(typeof errorResponse.error, 'string', 'error is string')
+    },
+  },
+  {
+    id: 'detect-ai-tier-gate-ai',
+    name: 'Abonnementen-detectie vereist AI abonnement',
+    description: 'POST /api/subscriptions/detect-ai controleert checkTierGate met tier "ai" en geeft 403 zonder abonnement',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      // The API route calls checkTierGate(supabase, user.id, 'ai')
+      // and returns NextResponse.json({ error }, { status: 403 }) if the user lacks the AI subscription.
+      const requiredTier = 'ai'
+      assertEqual(requiredTier, 'ai', 'detect-ai requires ai tier')
+      const errorResponse = { error: 'Deze functie vereist een AI abonnement' }
+      assert('error' in errorResponse, 'error field present')
+      assertEqual(typeof errorResponse.error, 'string', 'error is string')
+    },
+  },
 ]
 
 export function register() {

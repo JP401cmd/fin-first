@@ -7,6 +7,8 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
 import { compareOvergangStrategieen } from '@/lib/phase-analysis'
 import type { Debt } from '@/lib/debt-data'
+import type { SimCashflow } from '@/lib/fire-simulation'
+import type { TransitionScenario } from '@/components/app/horizon/phase-modal-overgang'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -19,13 +21,17 @@ export interface GapAnalyseProps {
   expectedReturn: number
   inflationRate: number
   debts?: Debt[]
-  /** Monthly part-time income during transition. Defaults to ~50% of monthly expenses. */
-  deeltijdInkomen?: number
+  /** Welk overgangsscenario actief is — bepaalt labels en brug/dekking-berekening */
+  transitionScenario?: TransitionScenario
+  /** Jaarlijks AOW-inkomen (shortfall: vult de uitgaven aan; verlaagt de brug) */
+  yearlyAowIncome?: number
+  /** Life-event cashflows tijdens de overgang, voor uitgelijnde strategie-eindsaldo's */
+  cashflows?: SimCashflow[]
   /** Current age of the user, used for accurate debt-in-transition detection */
   currentAge?: number
-  /** FIRE age for display in no-gap message */
+  /** FIRE age for display in no-phase message */
   fireAge?: number
-  /** AOW age for display in no-gap message */
+  /** AOW age for display in no-phase message */
   aowAge?: number
 }
 
@@ -41,17 +47,21 @@ interface StrategieState {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Compute the total inflation-adjusted withdrawal bridge over the transition period.
- * Each year's expenses grow with inflation.
+ * Compute the total inflation-adjusted bridge the portfolio must finance over
+ * the transition period. Each year's portfolio need grows with inflation.
+ *
+ * - Gap (FIRE→AOW): the portfolio finances the full expenses each year.
+ * - Shortfall (AOW→FIRE): AOW already covers part of the expenses, so the
+ *   portfolio only bridges `max(expenses − AOW, 0)`.
  */
 function computeTotalBridge(
-  yearlyExpenses: number,
+  yearlyPortfolioNeed: number,
   years: number,
   inflationRate: number,
 ): number {
   let total = 0
   for (let i = 0; i < years; i++) {
-    total += yearlyExpenses * Math.pow(1 + inflationRate, i)
+    total += yearlyPortfolioNeed * Math.pow(1 + inflationRate, i)
   }
   return Math.round(total)
 }
@@ -92,12 +102,18 @@ function debtsInTransition(
 // ── Component ────────────────────────────────────────────────────────────────
 
 /**
- * Gap analysis for the transition phase with 3 withdrawal strategy options.
+ * Gap analysis for the transition phase with 2 withdrawal strategy options.
  *
- * Displays the total bridge amount needed, current coverage percentage,
- * three strategy cards (gelijkmatig, afbouwend, deeltijdwerk) from
- * `compareOvergangStrategieen`, and a warning if any debts are being
- * paid off during the transition period.
+ * Displays the total bridge amount the portfolio must finance, the coverage
+ * percentage, two strategy cards (gelijkmatig, afbouwend) from
+ * `compareOvergangStrategieen`, and a warning if any debts are being paid off
+ * during the transition period. The standalone DeeltijdwerkImpact section is the
+ * single source of truth for part-time work (B2 — consolidated).
+ *
+ * Works for both scenarios:
+ * - gap (FIRE→AOW): the portfolio finances the full expenses.
+ * - shortfall (AOW→FIRE): AOW supplements, so the portfolio only bridges
+ *   `max(expenses − AOW, 0)`.
  *
  * All computation is deferred via setTimeout to avoid blocking the modal.
  */
@@ -109,69 +125,79 @@ export const GapAnalyse = memo(function GapAnalyse({
   expectedReturn,
   inflationRate,
   debts = [],
-  deeltijdInkomen,
+  transitionScenario,
+  yearlyAowIncome = 0,
+  cashflows,
   currentAge,
   fireAge,
   aowAge,
 }: GapAnalyseProps) {
   const { masked } = useMaskedAmounts()
-  // Default: 50% of monthly expenses as part-time income
-  const effectiveDeeltijdInkomen = deeltijdInkomen ?? Math.round((yearlyExpenses / 12) * 0.5)
   const [state, setState] = useState<StrategieState | null>(null)
 
   const years = Math.max(Math.round(endAge - startAge), 1)
+  const isShortfall = transitionScenario === 'shortfall'
 
-  // ── No gap: FIRE age >= AOW age ──────────────────────────────────────────
-  const noGap = startAge >= endAge || (fireAge != null && aowAge != null && fireAge >= aowAge)
+  // Portfolio need per year: in shortfall AOW covers part of the expenses, so
+  // the portfolio only bridges the remainder. In gap the portfolio finances all. (B1)
+  const yearlyPortfolioNeed = isShortfall
+    ? Math.max(yearlyExpenses - yearlyAowIncome, 0)
+    : yearlyExpenses
+
+  // ── No phase: only when there is genuinely no duration (endAge <= startAge).
+  // A phase exists whenever endAge > startAge — both gap and shortfall have a
+  // real bridge. (B1: removed the wrong `fireAge >= aowAge` term.)
+  const noPhase = endAge <= startAge
 
   // Lazy compute: defer past first paint
   useEffect(() => {
-    if (noGap || years <= 0) return
+    if (noPhase || years <= 0) return
 
     const timer = setTimeout(() => {
+      // Strategies model the portfolio-financed need (so shortfall accounts for AOW).
       const strategies = compareOvergangStrategieen(
         startPortfolio,
         startAge,
         endAge,
-        yearlyExpenses,
+        yearlyPortfolioNeed,
         expectedReturn,
         inflationRate,
-        effectiveDeeltijdInkomen,
+        cashflows ? { cashflows } : undefined,
       )
 
-      const totalBridge = computeTotalBridge(yearlyExpenses, years, inflationRate)
+      const totalBridge = computeTotalBridge(yearlyPortfolioNeed, years, inflationRate)
       const coverage = totalBridge > 0
         ? Math.min((startPortfolio / totalBridge) * 100, 999)
-        : 0
+        : 100 // AOW covers everything → fully covered
 
       setState({ strategies, totalBridge, coverage })
     }, 50)
 
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startPortfolio, startAge, endAge, yearlyExpenses, expectedReturn, inflationRate, effectiveDeeltijdInkomen, noGap])
+  }, [startPortfolio, startAge, endAge, yearlyPortfolioNeed, expectedReturn, inflationRate, cashflows, noPhase])
 
   const transitionDebts = debtsInTransition(debts, startAge, endAge, currentAge)
   const loading = state === null
 
-  // ── No-gap message ────────────────────────────────────────────────────────
-  if (noGap) {
+  // ── No-phase message ────────────────────────────────────────────────────────
+  if (noPhase) {
     return (
       <AnalysisSection
         title="Gap-analyse"
         icon={PieChart}
-        willContext="Gap-analyse overgangsfase: geen gap — FIRE-leeftijd ligt op of na AOW-leeftijd."
+        willContext="Gap-analyse overgangsfase: geen overgangsfase — FIRE-leeftijd en AOW-leeftijd vallen samen, er is niets te overbruggen."
       >
         <div className="flex items-start gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--positive)]/5 p-4">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--positive)]" />
           <div>
             <p className="text-sm font-medium text-[var(--ink)]">
-              Geen gap om te overbruggen
+              Niets om te overbruggen
             </p>
             <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
               {fireAge != null && aowAge != null
-                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) ligt op of na je AOW-leeftijd (${Math.round(aowAge)}). Er is geen periode zonder AOW-inkomen die overbrugd moet worden.`
-                : 'Je FIRE-leeftijd ligt op of na je AOW-leeftijd. Een gap-analyse is niet nodig.'}
+                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) en je AOW-leeftijd (${Math.round(aowAge)}) vallen samen. Er is geen overgangsperiode die overbrugd moet worden.`
+                : 'FIRE-leeftijd en AOW-leeftijd vallen samen. Een gap-analyse is niet nodig.'}
             </p>
           </div>
         </div>
@@ -186,9 +212,12 @@ export const GapAnalyse = memo(function GapAnalyse({
       loading={loading}
       willContext={
         state
-          ? `Gap-analyse overgangsfase: totale brug ${formatMaskedCurrency(state.totalBridge, masked)}, ` +
+          ? `Gap-analyse ${isShortfall ? 'overgangsfase (AOW \u2192 FIRE overbruggen met AOW-aanvulling)' : 'overgangsfase (FIRE \u2192 AOW, volledig uit portfolio)'}: ` +
+            `${isShortfall && yearlyAowIncome > 0 ? `AOW dekt ${formatMaskedCurrency(Math.round(yearlyAowIncome), masked)}/jaar, ` : ''}` +
+            `portfolio overbrugt ${formatMaskedCurrency(Math.round(yearlyPortfolioNeed), masked)}/jaar, ` +
+            `totale brug ${formatMaskedCurrency(state.totalBridge, masked)} over ${years} jaar, ` +
             `dekking ${Math.round(state.coverage)}%, ` +
-            `${state.strategies.filter((s) => s.overleeft).length} van 3 strategie\u00ebn haalbaar.`
+            `${state.strategies.filter((s) => s.overleeft).length} van ${state.strategies.length} strategie\u00ebn haalbaar.`
           : 'Gap-analyse (laden...)'
       }
     >
@@ -196,14 +225,19 @@ export const GapAnalyse = memo(function GapAnalyse({
         <div className="space-y-4">
           {/* ── Key metrics ─────────────────────────────────────── */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {/* Yearly withdrawal needed */}
+            {/* Yearly portfolio withdrawal needed (shortfall: after AOW) */}
             <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
-                Jaarlijkse onttrekking benodigd
+                {isShortfall ? 'Onttrekking na AOW/jaar' : 'Jaarlijkse onttrekking benodigd'}
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
-                {<MaskedAmount value={Math.round(yearlyExpenses)} tone="horizon" />}
+                {<MaskedAmount value={Math.round(yearlyPortfolioNeed)} tone="horizon" />}
               </p>
+              {isShortfall && yearlyAowIncome > 0 && (
+                <p className="mt-0.5 text-[10px] text-[var(--ink-4)]">
+                  AOW dekt {<MaskedAmount value={Math.round(yearlyAowIncome)} tone="horizon" />}/jaar
+                </p>
+              )}
             </div>
 
             {/* Total bridge amount */}
@@ -270,22 +304,10 @@ export const GapAnalyse = memo(function GapAnalyse({
                     </span>
                   </div>
 
-                  {/* Part-time income (only for deeltijdwerk strategy) */}
-                  {s.strategie === 'deeltijdwerk' && (
-                    <div className="mt-2 flex items-baseline justify-between border-t border-dashed border-[var(--border-ed)] pt-2">
-                      <span className="text-xs text-[var(--ink-3)]">
-                        Deeltijdinkomen
-                      </span>
-                      <span className="font-mono text-xs tabular-nums text-[var(--positive)]">
-                        {<MaskedAmount value={effectiveDeeltijdInkomen} tone="horizon" />}/mnd
-                      </span>
-                    </div>
-                  )}
-
-                  {/* End balance at AOW */}
-                  <div className={`flex items-baseline justify-between ${s.strategie === 'deeltijdwerk' ? 'mt-1.5' : 'mt-2 border-t border-dashed border-[var(--border-ed)]'} pt-2`}>
+                  {/* End balance at end of the transition phase */}
+                  <div className="mt-2 flex items-baseline justify-between border-t border-dashed border-[var(--border-ed)] pt-2">
                     <span className="text-xs text-[var(--ink-3)]">
-                      Eindsaldo bij AOW
+                      {isShortfall ? 'Eindsaldo bij FIRE' : 'Eindsaldo bij AOW'}
                     </span>
                     <span
                       className={`font-mono text-xs tabular-nums ${
@@ -337,7 +359,7 @@ export const GapAnalyse = memo(function GapAnalyse({
                     Geen strategie overleeft de overgang
                   </p>
                   <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
-                    Je portfolio van {<MaskedAmount value={Math.round(startPortfolio)} tone="horizon" />} is onvoldoende voor {years} jaar overbrugging. Overweeg langer werken, uitgaven verlagen, of meer deeltijdwerk.
+                    Je portfolio van {<MaskedAmount value={Math.round(startPortfolio)} tone="horizon" />} is onvoldoende voor {years} jaar overbrugging. Overweeg langer werken of uitgaven verlagen — of bekijk de Deeltijdwerk-analyse hieronder.
                   </p>
                 </div>
               </div>

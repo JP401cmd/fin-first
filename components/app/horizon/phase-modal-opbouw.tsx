@@ -18,11 +18,13 @@ import { LifeEventsInPhase } from '@/components/app/horizon/phase-analysis/life-
 import { StressTestSection } from '@/components/app/horizon/phase-analysis/stress-test-section'
 import { MonteCarloOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/monte-carlo-opbouw'
 import { SchuldenSamenvatting } from '@/components/app/horizon/phase-analysis/opbouw/schulden-samenvatting'
-import { GiftenCheck } from '@/components/app/horizon/phase-analysis/opbouw/giften-check'
 import { SpaarquoteGevoeligheid } from '@/components/app/horizon/phase-analysis/opbouw/spaarquote-gevoeligheid'
 import { KoopkrachtErosie } from '@/components/app/horizon/phase-analysis/opbouw/koopkracht-erosie'
 import { HypotheekVsBeleggenOpbouw } from '@/components/app/horizon/phase-analysis/opbouw/hypotheek-vs-beleggen-opbouw'
+import { PhaseIntro } from '@/components/app/horizon/phase-analysis/phase-intro'
+import { PhaseDiscussButton } from '@/components/app/horizon/phase-analysis/phase-discuss-button'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
+import { formatCurrency } from '@/lib/format'
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { UnifiedProjectionRow, AssetBucketDetail } from '@/lib/unified-projection'
 import { ASSET_TYPE_LABELS, type AssetType, type Asset } from '@/lib/asset-data'
@@ -134,11 +136,22 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
     ? accumulationRows[accumulationRows.length - 1].netWorth
     : expectedPortfolioAtFire
 
-  // Debt repayment: reduction in totalDebts over accumulation phase increases netWorth
-  // The waterfall explicitly tracks: savings, growth, box3, events. Debt repayment is implicit
-  // in the net worth change but not captured as a separate flow. We derive it as the reconciliation:
+  // Waterfall identity: start + inleg + rendement − box3 + events ≈ eind.
+  // Debt repayment is NOT a separate wealth flow — paying down a debt moves cash
+  // (an asset) into reduced liabilities, leaving net worth unchanged in the moment;
+  // the build-up is already captured inside savings/netWorth. So we do NOT add a
+  // synthetic "Schuldaflossing" row to the total (that double-counts AND silently
+  // absorbs any real discrepancy). Instead we surface the REAL principal repaid as
+  // an informational, non-summed context line, and show an explicit rounding row
+  // only when the identity drifts materially.
   const waterfallSum = startVermogen + totalInleg + totalRendement - totalBox3 + totalEvents
-  const totalAfgelost = Math.max(0, eindVermogen - waterfallSum)  // debt reduction = NW increase not captured elsewhere
+  const totalAfgelost = accumulationRows.reduce(
+    (sum, r) => sum + Object.values(r.debtBalances).reduce((s, d) => s + (d?.principalPaid ?? 0), 0),
+    0,
+  )
+  // Rounding/reconciliation residual — only material when |drift| > €1.000.
+  const afronding = eindVermogen - waterfallSum
+  const showAfronding = Math.abs(afronding) > 1000
 
   // ── Rendement per wealthgroup ──────────────────────────────────────────
   const growthByType: Partial<Record<AssetType, number>> = {}
@@ -177,6 +190,17 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
     ? Math.round(effectiveMonthlySavings / dailyExpenseRate)
     : null
 
+  // ── Hele-fase-samenvatting voor "Bespreek met Will" (raw formatCurrency) ──
+  // Chat-context, géén gemaskeerde bedragen — Will moet de echte cijfers zien.
+  const phaseSummary = [
+    `Opbouwfase van ${Math.round(currentAge)} tot ${Math.round(fireAge)} jaar (${yearsAccumulation} jaar).`,
+    `Vermogen groeit van ${formatCurrency(Math.round(startVermogen))} naar ${formatCurrency(Math.round(eindVermogen))}.`,
+    `Opgebouwd door inleg ${formatCurrency(Math.round(totalInleg))} en rendement ${formatCurrency(Math.round(totalRendement))}` +
+      (totalBox3 > 0 ? `, na ${formatCurrency(Math.round(totalBox3))} Box 3-belasting.` : '.'),
+    totalAfgelost > 0.5 ? `Waarvan ${formatCurrency(Math.round(totalAfgelost))} schuldaflossing.` : '',
+    `Verwachte FIRE-leeftijd: ${Math.round(fireAge)} jaar.`,
+  ].filter(Boolean).join(' ')
+
   return (
     <ShellOverlay
       open={open}
@@ -188,6 +212,14 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
       <div className="h-[2px] bg-[var(--color-horizon-600)]" />
 
       <div className="p-5 space-y-4">
+        {/* 0. Phase intro — "wat zie ik hier" + filosofie "Geld is opgeslagen tijd" */}
+        <PhaseIntro
+          kicker="OPBOUWFASE"
+          title="Geld is opgeslagen tijd"
+          body="In deze fase groeit je vermogen door wat je inlegt én door het rendement daarop — elke euro die je nu opzij zet, koop je later vrijheid mee. Hieronder zie je hoe inleg en rendement samen je vermogen richting volledige vrijheid stuwen."
+          infoDescription="De opbouwfase loopt van nu tot je FIRE-leeftijd: de jaren waarin je actief vermogen opbouwt. De analyses hieronder laten zien hoe inleg, rendement en Box 3-belasting je vermogen vormen, en welke keuzes (extra sparen, schulden aflossen, hypotheek vs. beleggen) je vrijheid versnellen."
+        />
+
         {/* 1. Phase Chart Zoom — full trajectory with accumulation phase highlighted */}
         {allRows && allRows.length > 2 && (
           <>
@@ -212,11 +244,14 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           </>
         )}
 
-        {/* 2. Fase-header — compact summary line */}
+        {/* 2. Fase-header — compact summary line + top-level "Bespreek met Will" */}
         <div className="text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Opbouw &middot; {<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />} &middot; {yearsAccumulation} jaar
           </p>
+          <div className="mt-2 flex justify-center">
+            <PhaseDiscussButton onderwerp="Mijn opbouwfase" summary={phaseSummary} />
+          </div>
         </div>
 
         {/* 3. Waterval Kassabon — existing receipt waterfall */}
@@ -266,11 +301,15 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
                 negative={totalEvents < 0}
               />
             )}
-            {totalAfgelost > 0.5 && (
+            {showAfronding && (
               <ReceiptRow
-                label="Schuldaflossing"
-                value={<MaskedAmount value={Math.round(totalAfgelost)} tone="horizon" />}
-                positive
+                label="Afronding"
+                value={afronding >= 0
+                  ? <MaskedAmount value={Math.round(afronding)} tone="horizon" />
+                  : <MaskedAmount value={Math.round(Math.abs(afronding))} signPrefix="-" tone="horizon" />}
+                positive={afronding > 0}
+                negative={afronding < 0}
+                subtle
               />
             )}
           </div>
@@ -282,6 +321,18 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
               {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />}
             </span>
           </div>
+
+          {/* Non-summed context: real debt principal repaid during the phase.
+              This is shown for insight, NOT added to the waterfall (it's already
+              reflected in the net-worth build-up via savings). */}
+          {totalAfgelost > 0.5 && (
+            <p className="mt-2 text-center font-sans text-[10px] text-[var(--ink-3)]">
+              waarvan schuldaflossing:{' '}
+              <span className="font-mono tabular-nums">
+                <MaskedAmount value={Math.round(totalAfgelost)} tone="horizon" />
+              </span>
+            </p>
+          )}
         </KassabonShell>
 
         {/* 4. Life Events — events that fall within the accumulation phase */}
@@ -310,20 +361,14 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
         <SchuldenSamenvatting
           debts={debts ?? []}
           annualSavings={yearlySavings}
-        />
-
-        {/* 7. Giften — gift tax analysis and opportunity cost */}
-        <GiftenCheck
-          currentPortfolio={currentNetWorth}
+          annualReturn={expectedReturn}
           yearlyExpenses={yearlyExpenses}
-          annualSavings={yearlySavings}
-          expectedReturn={expectedReturn}
-          inflationRate={inflationRate}
+          fireTarget={fireTarget}
           currentAge={currentAge}
           fireAge={fireAge}
         />
 
-        {/* 8. Spaarquote Gevoeligheid — savings rate sensitivity analysis */}
+        {/* 7. Spaarquote Gevoeligheid — savings rate sensitivity analysis */}
         <SpaarquoteGevoeligheid
           annualSavings={yearlySavings}
           currentAge={currentAge}
@@ -332,16 +377,16 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           expectedReturn={expectedReturn}
           inflationRate={inflationRate}
           yearlyExpenses={yearlyExpenses}
+          fireTarget={fireTarget}
           cashflows={cashflows}
           savingsRate={monthlyIncome && monthlyIncome > 0 ? ((monthlyIncome - (monthlyExpenses ?? 0)) / monthlyIncome) * 100 : null}
           monthlyIncome={monthlyIncome}
         />
 
-        {/* 9. Hypotheek vs Beleggen — mortgage vs investing trade-off */}
+        {/* 8. Hypotheek vs Beleggen — mortgage vs investing trade-off */}
         <HypotheekVsBeleggenOpbouw
           debts={debts ?? []}
           monthlyIncome={monthlyIncome ?? 0}
-          monthlyExpenses={monthlyExpenses ?? 0}
           expectedReturn={expectedReturn}
           inflationRate={inflationRate}
           currentAge={currentAge}
@@ -411,12 +456,12 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
                     <div key={type} className="ml-2 border-l border-dotted border-[var(--border-ed)] pl-2">
                       <AssumptionRow
                         label={`${wealthGroupLabel(type)} rendement`}
-                        value={`~${(avgReturn * 100 / info.years).toFixed(1)}%/jr`}
+                        value={`~${(avgReturn * 100).toFixed(1)}%/jr`}
                       />
                       {avgBox3Rate > 0 && (
                         <AssumptionRow
                           label={`${wealthGroupLabel(type)} Box 3 drag`}
-                          value={`~${(avgBox3Rate * 100 / info.years).toFixed(2)}%/jr`}
+                          value={`~${(avgBox3Rate * 100).toFixed(2)}%/jr`}
                         />
                       )}
                     </div>

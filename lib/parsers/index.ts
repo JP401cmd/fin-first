@@ -59,6 +59,14 @@ export type CSVPreset = {
   fxCurrencyColumn?: number
   fxRateColumn?: number
   uniqueRefColumn?: number // per-rij unieke referentie (bv. Rabobank "Volgnr") → extra hash-entropie
+  /**
+   * Kolom met het bron-specifieke transactietype (bv. PayPal "Type"). Gebruikt om
+   * eigen-rekening-verschuivingen te herkennen op rekeningen zonder bruikbare IBAN:
+   * een rij met source_type ∈ transferTypeValues is een overboeking naar/van een
+   * gekoppelde (bank)rekening, geen echte uitgave/inkomen.
+   */
+  transferTypeColumn?: number
+  transferTypeValues?: string[]
 }
 
 export const CSV_PRESETS: CSVPreset[] = [
@@ -126,6 +134,21 @@ export const CSV_PRESETS: CSVPreset[] = [
     hasHeader: true,
     statusColumn: 5,           // Status kolom
     statusFilterValue: 'Voltooid', // Sla geweigerde / in behandeling transacties over
+    transferTypeColumn: 4,     // "Type" — herkent opwaarderen/opnemen als eigen-rekening-verschuiving
+    // PayPal heeft geen IBAN, dus de opwaardeer/opname-regels worden via dit type herkend.
+    // Defaults dekken NL- en EN-exports; aanpasbaar in het "Mijn rekeningen"-beheer.
+    transferTypeValues: [
+      'Bank Deposit to PP Account',
+      'Algemene opname',
+      'Algemene opname naar bankrekening',
+      'Terugbetaling van algemene opname',
+      'Algemene valutaomrekening',
+      'General Withdrawal',
+      'General Withdrawal from PP account',
+      'General Currency Conversion',
+      'Reversal of General Account Hold',
+      'Bankoverschrijving naar PayPal-rekening',
+    ],
   },
   {
     id: 'custom',

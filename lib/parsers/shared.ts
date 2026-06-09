@@ -10,6 +10,14 @@ export type ParsedTransaction = {
   counterparty_iban: string | null
   reference: string | null
   transaction_type: string | null
+  /**
+   * Bron-specifiek transactietype uit het bestand (bv. PayPal-kolom "Type":
+   * "Bank Deposit to PP Account", "Algemene opname"). Wordt NIET in de DB-kolom
+   * `transaction_type` opgeslagen (die heeft een CHECK-constraint op een vaste
+   * enum) — puur gebruikt tijdens import om eigen-rekening-verschuivingen te
+   * herkennen op rekeningen zonder bruikbare IBAN (zie CSVPreset.transferTypeColumn).
+   */
+  source_type: string | null
   bank_code: string | null
   /**
    * Per-rij unieke bank-referentie (bv. Rabobank `Volgnr`). NIET in import_hash:

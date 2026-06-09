@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
+import { loadCoreData } from '@/lib/core-data-loader'
 import { resolveFireParams } from '@/lib/fire-params'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -19,7 +20,7 @@ const TEMPORAL_LABELS: Record<number, string> = {
  */
 export async function buildSharedContext(supabase: SupabaseClient): Promise<string> {
   // Fetch assets, debts, transactions, user profile, and essential budgets
-  const [assetsResult, debtsResult, transactionsResult, profileResult, essentialBudgetsResult, allChildrenResult] = await Promise.all([
+  const [assetsResult, debtsResult, transactionsResult, profileResult, essentialBudgetsResult, allChildrenResult, coreData] = await Promise.all([
     supabase
       .from('assets')
       .select('current_value')
@@ -43,6 +44,10 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     }),
     supabase.from('budgets').select('*').eq('is_essential', true),
     supabase.from('budgets').select('*').not('parent_id', 'is', null),
+    // Canonieke 6-maands spaarquote — exact dezelfde bron als de cashflow-pagina
+    // (savingsRate6m, incl. sparen in budgetten + schuldaflossing). React-cached,
+    // dus geen dubbele round-trips binnen één request.
+    loadCoreData(supabase),
   ])
 
   const assets = assetsResult.data ?? []
@@ -132,7 +137,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Maandinkomen: ${formatCurrency(effectiveMonthlyIncome)} | Maanduitgaven: ${formatCurrency(effectiveMonthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
     monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${profile?.retirement_expense_method ?? 'essential_budgets'}) — basis voor FIRE & vrijheidsdagen` : null,
-    `Spaarquote: ${formatPercentage(core.savingsRate)} (bewust sparen telt mee als besparing, niet als uitgave)`,
+    `Spaarquote: ${formatPercentage(coreData.savingsRate6m)} — canonieke 6-maands spaarquote incl. sparen in budgetten + schuldaflossing (exact hetzelfde getal als onderaan de cashflow-pagina). Gebruik dit getal letterlijk; herbereken het NIET uit inkomen/uitgaven.`,
     `Dagen vrijheid verdiend per maand: ${core.daysWonPerMonth}`,
     `Vrije dagen per jaar (passief inkomen): ${core.freeDaysPerYear}`,
     `Autonomiescore: ${core.autonomyScore}`,

@@ -25,7 +25,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Pencil, Save, Trash2,
   GitFork, CircleDot, AlertTriangle, CheckCircle2, Heart, LayoutGrid,
-  TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle, FileText, MoveRight,
+  TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle, FileText, MoveRight, ArrowLeftRight,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, BUDGET_SLUGS, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -713,6 +713,14 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   })
   const [periodMode, setPeriodMode] = useState<'maand' | 'ytd' | '12m'>('maand')
   const [monthDate, setMonthDate] = useState(() => {
+    // Deeplink vanaf de geldstroom-banner (/overzicht/cashflow) opent deze
+    // pagina op de daar geselecteerde maand via `?maand=YYYY-MM`. Eénmalig bij
+    // mount uitgelezen; daarna stuurt de maand-selector de state.
+    const maand = searchParams.get('maand')
+    if (maand && /^\d{4}-\d{2}$/.test(maand)) {
+      const [y, m] = maand.split('-').map(Number)
+      if (y && m >= 1 && m <= 12) return new Date(y, m - 1, 1)
+    }
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
@@ -750,6 +758,19 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         const active = (data as { budgeting_active?: boolean | null } | null)?.budgeting_active
         setBudgetingActive(active !== false)
       })
+  }, [])
+
+  // Aantal eigen actieve rekeningen — zodra je er 2+ hebt, tonen we de
+  // "Eigen rekening"-post standaard (verschuivingen ertussen worden automatisch
+  // herkend), i.p.v. weggestopt onder "Verborgen".
+  const [accountCount, setAccountCount] = useState(0)
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('bank_accounts')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_active', true)
+      .then(({ count }) => setAccountCount(count ?? 0))
   }, [])
 
   // Huidige gebruiker — nodig voor AICategorizeSheet's "alle tijden" scope in
@@ -1419,6 +1440,31 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const savingsBudgets = budgets.filter((b) => b.budget_type === 'savings')
   const debtBudgets = budgets.filter((b) => b.budget_type === 'debt')
   const archiveBudgets = budgets.filter((b) => b.budget_type === 'archive')
+  // "Eigen rekening"-post: som van verschuivingen tussen eigen rekeningen deze maand.
+  // Telt nergens mee in inkomen/uitgaven (archive), maar maken we wél zichtbaar.
+  const eigenRekeningParent = archiveBudgets.find((b) => b.slug === BUDGET_SLUGS.EIGEN_REKENING)
+  const eigenRekeningSpent = eigenRekeningParent ? getParentSpent(eigenRekeningParent) : 0
+  // Met 2+ rekeningen is de Eigen rekening-post relevant → toon hem als eigen,
+  // zichtbare sectie en haal hem uit het "Verborgen"-blok (geen dubbeling).
+  const showEigenRekeningProminent = accountCount >= 2 && !!eigenRekeningParent
+  const verborgenBudgets = showEigenRekeningProminent
+    ? archiveBudgets.filter((b) => b.slug !== BUDGET_SLUGS.EIGEN_REKENING)
+    : archiveBudgets
+  const eigenRekeningExplainer = (
+    <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-3.5 py-3">
+      <ArrowLeftRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-4)]" />
+      <div className="text-[12px] leading-relaxed text-[var(--ink-3)]">
+        <span className="font-medium text-[var(--ink-2)]">Eigen rekening</span> verzamelt
+        verschuivingen tussen je eigen rekeningen (bv. sparen, of opwaarderen van PayPal).
+        Deze worden automatisch herkend bij import en{' '}
+        <span className="font-medium text-[var(--ink-2)]">tellen nergens mee</span> als uitgave
+        of inkomen — je stelt er dus geen bedrag voor in.
+        {eigenRekeningSpent > 0 && (
+          <> Deze maand: <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(eigenRekeningSpent)}</span> verschoven.</>
+        )}
+      </div>
+    </div>
+  )
 
   const totalIncome = incomeBudgets.reduce((sum, b) => sum + getParentEffectiveLimit(b), 0)
   const totalIncomeActual = incomeBudgets.reduce((sum, b) => sum + getParentSpent(b), 0)
@@ -1867,7 +1913,22 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
               />
             </div>
           )}
-          {archiveBudgets.length > 0 && (
+          {showEigenRekeningProminent && (
+            <div className="mt-4 sm:mt-8">
+              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">
+                Eigen rekening
+                <span className="ml-1 font-normal normal-case tracking-normal text-[var(--ink-4)]">— verschuivingen, tellen niet mee</span>
+              </h3>
+              {eigenRekeningExplainer}
+              <BudgetTree
+                groups={eigenRekeningParent ? [eigenRekeningParent] : []}
+                spending={spending}
+                budgetType="archive"
+                onNavigate={(id) => openBudgetModal(id)}
+              />
+            </div>
+          )}
+          {verborgenBudgets.length > 0 && (
             <div className="mt-4 sm:mt-8">
               <button
                 type="button"
@@ -1877,17 +1938,25 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 <EyeOff className="h-3.5 w-3.5" />
                 Verborgen
                 <span className="ml-1 text-[10px] normal-case tracking-normal font-normal text-[var(--ink-4)]">
-                  ({archiveBudgets.length} {archiveBudgets.length === 1 ? 'categorie' : 'categorieën'})
+                  ({verborgenBudgets.length} {verborgenBudgets.length === 1 ? 'categorie' : 'categorieën'})
                 </span>
+                {!showEigenRekeningProminent && eigenRekeningSpent > 0 && (
+                  <span className="ml-1 text-[10px] normal-case tracking-normal font-normal text-[var(--ink-3)] tabular-nums">
+                    · {formatCurrency(eigenRekeningSpent)} verschoven
+                  </span>
+                )}
                 <ChevronDown className={`h-3 w-3 transition-transform ${showArchive ? 'rotate-180' : ''}`} />
               </button>
               {showArchive && (
-                <BudgetTree
-                  groups={archiveBudgets}
-                  spending={spending}
-                  budgetType="archive"
-                  onNavigate={(id) => openBudgetModal(id)}
-                />
+                <>
+                  {!showEigenRekeningProminent && eigenRekeningParent && eigenRekeningExplainer}
+                  <BudgetTree
+                    groups={verborgenBudgets}
+                    spending={spending}
+                    budgetType="archive"
+                    onNavigate={(id) => openBudgetModal(id)}
+                  />
+                </>
               )}
             </div>
           )}

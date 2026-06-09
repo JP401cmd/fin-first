@@ -95,8 +95,13 @@ export const EndOfLife = memo(function EndOfLife({
       loading={loading}
       willContext={
         analysis
-          ? `Einde levensfase: eindvermogen ${formatMaskedCurrency(analysis.eindVermogen, masked)} bij ${endAge} jaar. ` +
-            `Strategie: ${strategyLabel}. Netto nalatenschap: ${formatMaskedCurrency(analysis.erfenisIndicatie.nettoBedrag, masked)}.`
+          ? `Einde levensfase bij ${Math.round(endAge)} jaar (strategie: ${strategyLabel}): ` +
+            `eindvermogen ${formatMaskedCurrency(analysis.eindVermogen, masked)}. ` +
+            `Bruto nalatenschap ${formatMaskedCurrency(analysis.erfenisIndicatie.brutoBedrag, masked)}` +
+            `${analysis.erfenisIndicatie.totaalBelasting > 0 ? `, erfbelasting ${formatMaskedCurrency(analysis.erfenisIndicatie.totaalBelasting, masked)}` : ''}, ` +
+            `netto nalatenschap ${formatMaskedCurrency(analysis.erfenisIndicatie.nettoBedrag, masked)} ` +
+            `over ${analysis.erfenisIndicatie.perErfgenaam.length || 'standaard'} erfgena${(analysis.erfenisIndicatie.perErfgenaam.length === 1) ? 'am' : 'men'}.` +
+            `${analysis.partnerVoortzetting ? ` Partner houdt ${formatMaskedCurrency(analysis.partnerVoortzetting.maandelijksBeschikbaar, masked)}/mnd beschikbaar (${analysis.partnerVoortzetting.toereikend ? 'toereikend' : 'tekort'}).` : ''}`
           : 'Einde levensfase (laden...)'
       }
     >
@@ -304,8 +309,8 @@ export const EndOfLife = memo(function EndOfLife({
               </p>
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-2)]">
                 De erfenis-indicatie hierboven is gebaseerd op een standaardverdeling.
-                Vul je huishoudprofiel aan in{' '}
-                <span className="font-semibold">Identiteit → Profiel</span>{' '}
+                Vul je huishoudprofiel aan onder{' '}
+                <span className="font-semibold">Mijn → Profiel</span>{' '}
                 voor een nauwkeurigere berekening van erfbelasting en nalatenschap.
               </p>
             </div>
@@ -316,8 +321,8 @@ export const EndOfLife = memo(function EndOfLife({
             <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] p-2.5">
               <p className="text-[10px] font-medium text-[var(--ink-3)]">
                 Erfgenamen zijn geschat op basis van standaardverdeling. Vul het
-                aantal kinderen aan in{' '}
-                <span className="font-semibold">Identiteit → Profiel</span>{' '}
+                aantal kinderen aan onder{' '}
+                <span className="font-semibold">Mijn → Profiel</span>{' '}
                 voor een nauwkeurigere berekening.
               </p>
             </div>

@@ -16,6 +16,7 @@ import {
 import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 
 // -- Types --------------------------------------------------------------------
 
@@ -69,8 +70,12 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
   const [state, setState] = useState<MCOnttrekkenState | null>(null)
 
   const yearsInPhase = Math.max(1, Math.round(endAge - startAge))
-  // Net yearly cashflow: portfolio perspective (negative = outflow)
-  const yearlyCashflow = -(yearlyWithdrawal - yearlyAowIncome)
+  // Net yearly cashflow: portfolio perspective (negative = outflow).
+  // `yearlyWithdrawal` (= row.withdrawal) is ALREADY the net portfolio outflow —
+  // AOW/pension has been netted out exactly once upstream by the withdrawal
+  // strategy (lib/withdrawal-strategy.ts). Subtracting AOW again here would
+  // understate the outflow and make the success rate over-optimistic (C1).
+  const yearlyCashflow = -yearlyWithdrawal
 
   // ── Relevance check ──────────────────────────────────────────────
   const hasPortfolio = startPortfolio > 0
@@ -155,9 +160,14 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
         !isRelevant
           ? `Monte Carlo simulatie: niet beschikbaar — ${irrelevantReason}`
           : state
-            ? `Monte Carlo onttrekkingsfase: slagingskans ${Math.round(state.main.successRate * 100)}%, ` +
-              `mediaan eindvermogen ${formatCurrency(state.main.medianEndPortfolio)}, ` +
-              `kritische SWR ${(state.criticalSwr * 100).toFixed(1)}%.`
+            ? `Monte Carlo onttrekkingsfase (${yearsInPhase} jaar, ${Math.round(startAge)}→${Math.round(endAge)}): ` +
+              `slagingskans ${Math.round(state.main.successRate * 100)}% bij ${formatCurrency(startPortfolio)} startvermogen ` +
+              `en ${formatCurrency(yearlyWithdrawal)}/jaar netto portfolio-onttrekking` +
+              `${yearlyAowIncome > 0 ? ` (bovenop ${formatCurrency(yearlyAowIncome)} AOW)` : ''}. ` +
+              `Mediaan eindvermogen ${formatCurrency(state.main.medianEndPortfolio)}, ` +
+              `optimistisch (p90) ${formatCurrency(state.main.p90EndPortfolio)}. ` +
+              `Kritische veilige onttrekking ${(state.criticalSwr * 100).toFixed(1)}% bij 95% slagingskans. ` +
+              `Bij +10 jaar leven daalt de slagingskans naar ${Math.round(state.successPlus10 * 100)}%.`
             : 'Monte Carlo simulatie (laden...)'
       }
     >
@@ -179,8 +189,9 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
             <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--ink-4)]" />
             <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
               Deze analyse simuleert 1.000 mogelijke scenario&apos;s voor je onttrekkingsfase.
-              Startend met {<MaskedAmount value={startPortfolio} tone="horizon" />} vermogen en een jaarlijkse onttrekking
-              van {<MaskedAmount value={yearlyWithdrawal} tone="horizon" />}{yearlyAowIncome > 0 ? ` (waarvan ${formatCurrency(yearlyAowIncome)} via AOW)` : ''}.
+              Startend met {<MaskedAmount value={startPortfolio} tone="horizon" />} vermogen en een jaarlijkse
+              portfolio-onttrekking van {<MaskedAmount value={yearlyWithdrawal} tone="horizon" />}
+              {yearlyAowIncome > 0 ? ` (bovenop ${formatCurrency(yearlyAowIncome)} AOW, die buiten je portfolio om loopt)` : ''}.
               De &ldquo;slagingskans&rdquo; toont hoe vaak je vermogen niet opraakt vóór leeftijd {Math.round(endAge)}.
             </p>
           </div>
@@ -240,8 +251,9 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
 
             {/* Kritische SWR */}
             <div className="rounded-[var(--r)] border border-[var(--border-ed)] p-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+              <p className="flex items-center text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
                 Kritische SWR
+                <InfoTooltip text="De maximale jaarlijkse onttrekking uit je portfolio (als percentage van je startvermogen) waarbij je in 95% van de scenario's je vermogen niet voortijdig opmaakt. AOW telt hier niet mee — die komt los van je portfolio. Hoe lager dit getal, hoe veiliger je kunt onttrekken." />
               </p>
               <p className="mt-1 font-mono text-sm tabular-nums text-[var(--ink)]">
                 {(state.criticalSwr * 100).toFixed(1)}%

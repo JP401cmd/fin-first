@@ -365,10 +365,10 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'phase-analysis-overgang-3-strategieen',
-    name: 'Overgang: retourneert exact 3 strategieën',
+    id: 'phase-analysis-overgang-2-strategieen',
+    name: 'Overgang: retourneert exact 2 strategieën',
     category: CAT,
-    description: 'compareOvergangStrategieen geeft gelijkmatig, afbouwend en deeltijdwerk',
+    description: 'compareOvergangStrategieen geeft gelijkmatig en afbouwend (deeltijdwerk is verplaatst naar de zelfstandige analyse)',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
@@ -379,14 +379,13 @@ const tests: TestCase[] = [
         40_000,  // yearlyExpenses
         0.07,    // expectedReturn
         0.02,    // inflationRate
-        1_500,   // deeltijdInkomen
       )
-      assertEqual(result.length, 3, 'exact 3 strategieën')
-      // Verify the three strategy names
+      assertEqual(result.length, 2, 'exact 2 strategieën')
+      // Verify the two strategy names
       const names = result.map(r => r.strategie)
       assert(names.includes('gelijkmatig'), 'bevat gelijkmatig')
       assert(names.includes('afbouwend'), 'bevat afbouwend')
-      assert(names.includes('deeltijdwerk'), 'bevat deeltijdwerk')
+      assert(!names.includes('deeltijdwerk' as never), 'bevat GEEN deeltijdwerk')
       // Each strategy should have 12 years of data (55 to 67)
       for (const strat of result) {
         assertEqual(strat.jaarlijkseOnttrekking.length, 12, `${strat.strategie} heeft 12 jaren`)
@@ -413,11 +412,18 @@ const tests: TestCase[] = [
         0.02,     // inflationRate
         dummyCashflows,
         dummyStrategy,
-        [1, 2, 3, 5],
+        { years: [1, 2, 3, 5] },
       )
       assertGreaterThanOrEqual(result.opties.length, 4, 'minstens 4 opties')
+      // Each option carries a single 3-tier status from the lib
+      for (const o of result.opties) {
+        assert(
+          o.status === 'haalbaar' || o.status === 'krap' || o.status === 'niet-haalbaar',
+          `optie ${o.jarenEerder}j heeft geldige status`,
+        )
+      }
       // For feasible options: more years earlier → more extra savings
-      const feasible = result.opties.filter(o => o.haalbaar)
+      const feasible = result.opties.filter(o => o.status !== 'niet-haalbaar')
       for (let i = 1; i < feasible.length; i++) {
         assertGreaterThanOrEqual(
           feasible[i].extraMaandelijksBesparen,

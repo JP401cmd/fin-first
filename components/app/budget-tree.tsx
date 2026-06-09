@@ -44,7 +44,7 @@ function ChildBar({
 
   return (
     <div
-      className="group cursor-pointer rounded-lg px-3 py-2 transition-colors hover:bg-[var(--subtle)]"
+      className="group cursor-pointer rounded-lg px-3 py-2.5 transition-colors hover:bg-[var(--subtle)]"
       onClick={() => onNavigate(child.id)}
       data-child-id={child.id}
       style={{
@@ -69,7 +69,7 @@ function ChildBar({
       </div>
 
       {/* Row 2: progress bar (aligned with name, after icon column) */}
-      <div className="mt-1.5 pl-[30px]">
+      <div className="mt-2 pl-[30px]">
         <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
           {/* Fill 1 — normaal (0 → threshold) */}
           <div
@@ -183,7 +183,7 @@ function TreeGroup({
     return (
       <div
         ref={inViewRef}
-        className="cursor-pointer rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-shadow hover:shadow-[var(--s0)]"
+        className="cursor-pointer rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-shadow hover:shadow-[var(--s0)]"
         onClick={() => onNavigate(parent.id)}
         style={{
           animation: hasEntered ? 'fadeUp 0.4s ease-out both' : 'none',
@@ -209,7 +209,7 @@ function TreeGroup({
           </span>
         </div>
         {/* Progress bar */}
-        <div className="relative mt-2 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+        <div className="relative mt-3 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
           {/* Fill 1 — normaal */}
           <div
             className="absolute inset-y-0 left-0 rounded-l-full"
@@ -261,7 +261,7 @@ function TreeGroup({
     >
       {/* Collapsed header row — always visible */}
       <div
-        className="flex cursor-pointer items-center gap-3 p-3"
+        className="flex cursor-pointer items-center gap-3 p-4"
         onClick={() => setExpanded((v) => !v)}
       >
         <button
@@ -295,8 +295,8 @@ function TreeGroup({
       </div>
 
       {/* Progress bar under header */}
-      <div className="px-3 pb-3">
-        <div className="relative h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+      <div className="px-4 pb-4">
+        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
           {/* Fill 1 — normaal */}
           <div
             className="absolute inset-y-0 left-0 rounded-l-full"
@@ -336,7 +336,7 @@ function TreeGroup({
 
       {/* Children — shown when expanded */}
       {expanded && (
-        <div className="border-t border-[var(--border-ed)] py-1">
+        <div className="border-t border-[var(--border-ed)] py-1.5">
           {parent.children.map((child, index) => (
             <ChildBar
               key={child.id}
@@ -361,7 +361,7 @@ export function BudgetTree({ groups, spending, budgetType, onNavigate, beschikba
   if (groups.length === 0) return null
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {groups.map((group) => (
         <TreeGroup
           key={group.id}

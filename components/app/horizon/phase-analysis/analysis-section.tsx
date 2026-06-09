@@ -2,7 +2,7 @@
 
 import { useState, memo, type ReactNode } from 'react'
 import { ChevronRight, ChevronDown, type LucideIcon } from 'lucide-react'
-import { AskWillButton } from './ask-will-button'
+import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-will-button'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ interface AnalysisSectionProps {
   defaultOpen?: boolean
   /** Show loading skeleton instead of children */
   loading?: boolean
-  /** Context string sent to Will when "Vraag Will" is clicked */
+  /** Context string sent to Will when "Bespreek met Will" is clicked (becomes the chat detail) */
   willContext?: string
   children: ReactNode
 }
@@ -73,10 +73,11 @@ export const AnalysisSection = memo(function AnalysisSection({
         <div className="border-t border-[var(--border-ed)] px-3 pb-4 pt-3">
           {loading ? <AnalysisSkeleton /> : children}
 
-          {/* "Vraag Will" CTA — only when context is provided and not loading */}
+          {/* "Bespreek met Will" CTA — only when context is provided and not loading.
+              title → onderwerp, willContext → detail (de echte cijfers gaan zo mee de chat in). */}
           {willContext && !loading && (
             <div className="mt-3 flex justify-end">
-              <AskWillButton context={willContext} />
+              <BesprekMetWillButton onderwerp={title} detail={willContext} />
             </div>
           )}
         </div>

@@ -637,7 +637,7 @@ function computePartnerVoortzetting(
 
 // ── 4. Gap-analyse strategieën (Phase 2 — Overgang) ────────────────────────
 
-export type OvergangStrategie = 'gelijkmatig' | 'afbouwend' | 'deeltijdwerk'
+export type OvergangStrategie = 'gelijkmatig' | 'afbouwend'
 
 export interface OvergangStrategieResult {
   strategie: OvergangStrategie
@@ -655,11 +655,59 @@ export interface OvergangStrategieResult {
 }
 
 /**
- * Vergelijk drie transitiestrategieën voor de overgang van opbouw naar onttrekking.
+ * Optionele parameters om de strategie-vergelijking uit te lijnen met de
+ * canonieke unified-projection-kassabon (B3 — engine-parameters uitlijnen).
+ */
+export interface OvergangStrategieOptions {
+  /**
+   * Box 3-drag (decimaal) die op het rendement wordt afgetrokken.
+   * Default {@link BOX3_DRAG} — lever de projectie-aanname om "Eindsaldo bij
+   * AOW" te laten reconciliëren met de kassabon-eindVermogen.
+   */
+  box3Drag?: number
+  /**
+   * Life-event cashflows die tijdens de overgang spelen. Verlagen/verhogen het
+   * eindvermogen net als in de projectie (i.p.v. genegeerd worden).
+   */
+  cashflows?: SimCashflow[]
+}
+
+/**
+ * Bereken de gesigneerde netto life-event-cashflow voor één overgangsjaar.
+ *
+ * Spiegelt de cashflow-resolutie van {@link simulateGapWithIncome} /
+ * `runPhaseMonteCarlo`: recurring loopt zolang `fromAge <= age < toAge`,
+ * one_time alleen op het exacte jaar; income = +, expense = −; indexed groeit
+ * mee met inflatie vanaf `yearIndex 0`.
+ */
+function resolveCashflowsForYear(
+  cashflows: SimCashflow[],
+  age: number,
+  yearIndex: number,
+  inflationRate: number,
+): number {
+  return cashflows
+    .filter((cf) => {
+      if (cf.type === 'one_time') return Math.round(cf.fromAge) === Math.round(age)
+      return cf.fromAge <= age && (cf.toAge == null || cf.toAge > age)
+    })
+    .reduce((sum, cf) => {
+      const sign = cf.direction === 'income' ? 1 : -1
+      const amount = cf.indexed ? cf.amount * Math.pow(1 + inflationRate, yearIndex) : cf.amount
+      return sum + sign * amount
+    }, 0)
+}
+
+/**
+ * Vergelijk twee transitiestrategieën voor de overgang van opbouw naar onttrekking.
  *
  * - Gelijkmatig: vaste onttrekking elk jaar
  * - Afbouwend: hoog starten (1.2×), lineair afbouwen naar 0.8×
- * - Deeltijdwerk: lagere onttrekking door parttime inkomen
+ *
+ * De aparte deeltijdwerk-strategie is verplaatst naar de zelfstandige
+ * `DeeltijdwerkImpact`-analyse (één waarheid). Rendement, Box 3-afslag en
+ * life-event-cashflows zijn uitlijnbaar via {@link OvergangStrategieOptions}
+ * zodat het eindsaldo aansluit op de kassabon-eindVermogen.
  */
 export function compareOvergangStrategieen(
   startPortfolio: number,
@@ -668,27 +716,27 @@ export function compareOvergangStrategieen(
   yearlyExpenses: number,
   expectedReturn: number,
   inflationRate: number,
-  deeltijdInkomen?: number,
+  options?: OvergangStrategieOptions,
 ): OvergangStrategieResult[] {
-  const years = endAge - startAge
+  const years = Math.round(endAge - startAge)
   if (years <= 0) return []
 
-  const netReturn = expectedReturn - BOX3_DRAG
+  const box3Drag = options?.box3Drag ?? BOX3_DRAG
+  const cashflows = options?.cashflows ?? []
+  const netReturn = expectedReturn - box3Drag
 
   const strategies: {
     strategie: OvergangStrategie
     label: string
     description: string
-    getWithdrawal: (yearIndex: number) => { onttrekking: number; deeltijdInkomen: number }
+    getWithdrawal: (yearIndex: number) => number
   }[] = [
     {
       strategie: 'gelijkmatig',
       label: 'Gelijkmatige onttrekking',
       description: 'Elk jaar hetzelfde bedrag onttrekken, geïndexeerd met inflatie.',
-      getWithdrawal: (yearIndex: number) => ({
-        onttrekking: yearlyExpenses * Math.pow(1 + inflationRate, yearIndex),
-        deeltijdInkomen: 0,
-      }),
+      getWithdrawal: (yearIndex: number) =>
+        yearlyExpenses * Math.pow(1 + inflationRate, yearIndex),
     },
     {
       strategie: 'afbouwend',
@@ -699,24 +747,7 @@ export function compareOvergangStrategieen(
         const factor = years > 1
           ? 1.2 - (0.4 * yearIndex) / (years - 1)
           : 1.0
-        return {
-          onttrekking: yearlyExpenses * factor * Math.pow(1 + inflationRate, yearIndex),
-          deeltijdInkomen: 0,
-        }
-      },
-    },
-    {
-      strategie: 'deeltijdwerk',
-      label: 'Deeltijd werken',
-      description: 'Parttime inkomen verlaagt de onttrekking uit vermogen.',
-      getWithdrawal: (yearIndex: number) => {
-        const maandelijksInkomen = deeltijdInkomen ?? 0
-        const jaarInkomen = maandelijksInkomen * 12 * Math.pow(1 + inflationRate, yearIndex)
-        const expenses = yearlyExpenses * Math.pow(1 + inflationRate, yearIndex)
-        return {
-          onttrekking: expenses,
-          deeltijdInkomen: jaarInkomen,
-        }
+        return yearlyExpenses * factor * Math.pow(1 + inflationRate, yearIndex)
       },
     },
   ]
@@ -728,11 +759,11 @@ export function compareOvergangStrategieen(
 
     for (let i = 0; i < years; i++) {
       const age = startAge + i
-      const { onttrekking, deeltijdInkomen: inkomen } = getWithdrawal(i)
-      const nettoOnttrekking = Math.max(0, onttrekking - inkomen)
+      const onttrekking = getWithdrawal(i)
+      const cashflowNet = resolveCashflowsForYear(cashflows, age, i, inflationRate)
 
-      // Portfolio grows, then withdrawal
-      portfolio = portfolio * (1 + netReturn) - nettoOnttrekking
+      // Portfolio grows, then withdrawal, then life-event cashflows
+      portfolio = portfolio * (1 + netReturn) - onttrekking + cashflowNet
 
       if (portfolio < 0) {
         overleeft = false
@@ -742,8 +773,8 @@ export function compareOvergangStrategieen(
       jaarlijkseOnttrekking.push({
         age,
         onttrekking: Math.round(onttrekking),
-        deeltijdInkomen: Math.round(inkomen),
-        nettoOnttrekking: Math.round(nettoOnttrekking),
+        deeltijdInkomen: 0,
+        nettoOnttrekking: Math.round(onttrekking),
       })
     }
 
@@ -760,24 +791,76 @@ export function compareOvergangStrategieen(
 
 // ── 5. Eerder Stoppen Calculator (Phase 2) ─────────────────────────────────
 
+/** Eén feasibility-status, geleverd door de lib (single source of truth). */
+export type EerderStoppenStatus = 'haalbaar' | 'krap' | 'niet-haalbaar'
+
+export interface EerderStoppenOptie {
+  jarenEerder: number
+  nieuwFireAge: number
+  extraMaandelijksBesparen: number
+  /**
+   * 3-tier haalbaarheid — vervangt de losse component-side `feasibilityLevel`:
+   * - 'haalbaar': geen of weinig extra inleg nodig (< 50% van huidige besparing)
+   * - 'krap': substantieel maar binnen de huidige besparing
+   * - 'niet-haalbaar': vereist meer extra inleg dan je nu spaart, of in het verleden
+   */
+  status: EerderStoppenStatus
+}
+
 export interface EerderStoppenResult {
-  opties: {
-    jarenEerder: number
-    nieuwFireAge: number
-    extraMaandelijksBesparen: number
-    haalbaar: boolean
-  }[]
+  opties: EerderStoppenOptie[]
+}
+
+/**
+ * Optionele parameters om "eerder stoppen" uit te lijnen met de canonieke
+ * FIRE-maatstaf van de app (B3 — engine-parameters uitlijnen).
+ */
+export interface EerderStoppenOptions {
+  /** Welke "N jaar eerder"-opties te berekenen. Default [1, 2, 3, 5]. */
+  years?: number[]
+  /**
+   * Vrijheidsmaatstaf (benodigd portfolio bij FIRE). Lever de waarde uit
+   * `resolveFireParams`/`fire.fireTarget` zodat de target consistent is met de
+   * rest van de app i.p.v. een eigen SWR-afleiding.
+   */
+  fireTarget?: number
+  /**
+   * Effectieve SWR (decimaal). Wanneer geen `fireTarget` is gegeven wordt deze
+   * gebruikt om de target af te leiden (`yearlyExpenses / effectiveSwr`).
+   * Default: `expectedReturn − BOX3_DRAG − inflationRate` (gefloored).
+   */
+  effectiveSwr?: number
+}
+
+/**
+ * Bepaal de 3-tier feasibility-status voor een gegeven optie.
+ * Eén definitie, in de lib — de component consumeert deze (geen duplicaat).
+ */
+function deriveEerderStoppenStatus(
+  extraAnnual: number,
+  annualSavings: number,
+  inPast: boolean,
+): EerderStoppenStatus {
+  if (inPast) return 'niet-haalbaar'
+  if (extraAnnual <= 0) return 'haalbaar'
+  if (annualSavings <= 0) return 'niet-haalbaar'
+  if (extraAnnual < annualSavings * 0.5) return 'haalbaar'
+  if (extraAnnual < annualSavings) return 'krap'
+  return 'niet-haalbaar'
 }
 
 /**
  * Bereken hoeveel extra je maandelijks moet sparen om N jaar eerder te stoppen.
  *
- * Gebruikt de sinking-fund formule (geen simulatie) voor performance —
- * deze functie wordt aangeroepen bij elke modal-open.
+ * Gebruikt de sinking-fund formule (geen volledige simulatie) voor performance —
+ * deze functie wordt aangeroepen bij elke modal-open — maar lijnt de
+ * vrijheidsmaatstaf (`fireTarget`/SWR) uit met de rest van de app en verwerkt
+ * life-event cashflows i.p.v. ze te negeren.
  *
  * r = expectedReturn - BOX3_DRAG - inflationRate (reëel rendement na belasting)
- * needed = yearlyExpenses / effectiveSWR
- * projected = currentPortfolio × (1+r)^years + annualSavings × ((1+r)^years - 1) / r
+ * needed = options.fireTarget ?? yearlyExpenses / effectiveSwr
+ * cashflowFV = FV van life-event cashflows tot de doelleeftijd
+ * projected = currentPortfolio × (1+r)^years + annualSavings × ((1+r)^years - 1) / r + cashflowFV
  * gap = needed - projected
  * extraAnnual = gap × r / ((1+r)^years - 1)  [sinking fund]
  */
@@ -789,22 +872,25 @@ export function berekenEerderStoppen(
   currentAnnualSavings: number,
   expectedReturn: number,
   inflationRate: number,
-  _cashflows: SimCashflow[],
+  cashflows: SimCashflow[],
   _strategyConfig: FireStrategyConfig,
-  years?: number[],
+  options?: EerderStoppenOptions,
 ): EerderStoppenResult {
-  const targetYears = years ?? [1, 2, 3, 5]
+  const targetYears = options?.years ?? [1, 2, 3, 5]
 
   // Real return after Box 3 drag and inflation
   const r = expectedReturn - BOX3_DRAG - inflationRate
 
-  // Effective SWR = real return (used to compute FIRE target, consistent with NL_SWR pattern)
-  const effectiveSwr = Math.max(r, 0.001) // floor to avoid division by zero
+  // Effective SWR: caller-provided, else real return (consistent with NL_SWR pattern)
+  const effectiveSwr = Math.max(options?.effectiveSwr ?? r, 0.001) // floor avoids div-by-zero
 
-  // Required portfolio at FIRE (perpetuele formule)
-  const neededPortfolio = yearlyExpenses / effectiveSwr
+  // Required portfolio at FIRE — prefer the app's canonical fireTarget so this
+  // analysis agrees with the hero/kassabon instead of re-deriving its own.
+  const neededPortfolio = options?.fireTarget != null && options.fireTarget > 0
+    ? options.fireTarget
+    : yearlyExpenses / effectiveSwr
 
-  const opties = targetYears.map(n => {
+  const opties: EerderStoppenOptie[] = targetYears.map(n => {
     const nieuwFireAge = currentFireAge - n
     const yearsToTarget = nieuwFireAge - currentAge
 
@@ -814,7 +900,7 @@ export function berekenEerderStoppen(
         jarenEerder: n,
         nieuwFireAge,
         extraMaandelijksBesparen: 0,
-        haalbaar: false,
+        status: 'niet-haalbaar',
       }
     }
 
@@ -829,7 +915,17 @@ export function berekenEerderStoppen(
       ? currentAnnualSavings * (growthFactor - 1) / r
       : currentAnnualSavings * yearsToTarget
 
-    const projectedPortfolio = fvPortfolio + fvSavings
+    // FV of life-event cashflows up to the target age — each net yearly flow
+    // compounds for the remaining years (single source of truth: don't ignore them).
+    const cashflowFV = projectCashflowFV(
+      cashflows,
+      currentAge,
+      yearsToTarget,
+      r,
+      inflationRate,
+    )
+
+    const projectedPortfolio = fvPortfolio + fvSavings + cashflowFV
     const gap = neededPortfolio - projectedPortfolio
 
     if (gap <= 0) {
@@ -838,7 +934,7 @@ export function berekenEerderStoppen(
         jarenEerder: n,
         nieuwFireAge,
         extraMaandelijksBesparen: 0,
-        haalbaar: true,
+        status: 'haalbaar',
       }
     }
 
@@ -849,17 +945,40 @@ export function berekenEerderStoppen(
 
     const extraMonthly = Math.round(extraAnnual / 12)
 
-    // Haalbaar: extra monthly savings must be less than current annual savings
-    // (effectively: you can't more than double your savings rate)
-    const haalbaar = extraAnnual < currentAnnualSavings
-
     return {
       jarenEerder: n,
       nieuwFireAge,
       extraMaandelijksBesparen: extraMonthly,
-      haalbaar,
+      status: deriveEerderStoppenStatus(extraAnnual, currentAnnualSavings, false),
     }
   })
 
   return { opties }
+}
+
+/**
+ * Future value van life-event-cashflows tot de doelleeftijd.
+ *
+ * Elke netto jaarstroom (income +, expense −) groeit met het reële rendement
+ * `r` over de resterende jaren tot `yearsToTarget`. Spiegelt de cashflow-
+ * resolutie van {@link resolveCashflowsForYear}.
+ */
+function projectCashflowFV(
+  cashflows: SimCashflow[],
+  currentAge: number,
+  yearsToTarget: number,
+  r: number,
+  inflationRate: number,
+): number {
+  if (cashflows.length === 0) return 0
+
+  let fv = 0
+  for (let i = 0; i < yearsToTarget; i++) {
+    const age = currentAge + i
+    const net = resolveCashflowsForYear(cashflows, age, i, inflationRate)
+    if (net === 0) continue
+    // Compound the remaining years (payment at end of year i)
+    fv += net * Math.pow(1 + r, yearsToTarget - i - 1)
+  }
+  return fv
 }

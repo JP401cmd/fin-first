@@ -107,9 +107,11 @@ describe('findCriticalSWR – iteratieve MC binary search', () => {
     })
     const criticalSwr = findCriticalSWR(input)
 
-    // Verify: running a full MC at the critical SWR should yield ~95% success
+    // Verify: running a full MC at the critical SWR should yield ~95% success.
+    // De kritische SWR is nu een NETTO portfolio-onttrekkingsrente (AOW is al
+    // bovenstrooms genetto), dus de jaarlijkse uitstroom = criticalSwr × startvermogen.
     const yearlyWithdrawal = criticalSwr * input.startPortfolio
-    const yearlyCashflow = -(yearlyWithdrawal - input.yearlyAowIncome)
+    const yearlyCashflow = -yearlyWithdrawal
 
     const result = runPhaseMonteCarlo({
       startPortfolio: input.startPortfolio,

@@ -22,12 +22,21 @@ export interface HorizonFireIntroCardProps {
   /** Of de Kern ook nog leeg is (assets.length === 0 && debts.length === 0).
    *  Bepaalt of de secondary link "Ga naar Kern voor data" zichtbaar is. */
   kernEmpty: boolean
+  /** Optionele in-place opener voor de setup-pane. Wanneer gegeven opent de
+   *  CTA de pane direct (geen navigatie) — gebruikt door de paginabrede
+   *  gating zodat /toekomst niet naar /horizon springt. Zonder callback valt
+   *  hij terug op de deep-link ?horizonSetup=open. */
+  onOpenSetup?: () => void
 }
 
-export function HorizonFireIntroCard({ kernEmpty }: HorizonFireIntroCardProps) {
+export function HorizonFireIntroCard({ kernEmpty, onOpenSetup }: HorizonFireIntroCardProps) {
   const router = useRouter()
 
   const openSetup = () => {
+    if (onOpenSetup) {
+      onOpenSetup()
+      return
+    }
     router.push('/horizon?horizonSetup=open', { scroll: false })
   }
 

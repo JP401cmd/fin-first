@@ -115,6 +115,7 @@ export const navGroups: NavGroup[] = [
     // bestaande server-pagina's, maar zijn niet meer in de nav.
     items: [
       { label: 'Profiel', href: '/mijn/profiel' },
+      { label: 'Account', href: '/mijn/account' },
       { label: 'Privacy', href: '/mijn/privacy' },
       { label: 'Koppelingen', href: '/mijn/koppelingen' },
       { label: 'Notificaties', href: '/mijn/notificaties' },

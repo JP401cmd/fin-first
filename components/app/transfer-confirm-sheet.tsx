@@ -132,7 +132,7 @@ export function TransferConfirmSheet({
       .from('transactions')
       .update({
         budget_id: selectedBudgetId,
-        category_source: 'user',
+        category_source: 'manual',
       })
       .eq('id', tx.id)
 

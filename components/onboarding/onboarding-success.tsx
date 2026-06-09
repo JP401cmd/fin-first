@@ -1,44 +1,18 @@
 import { WillDots } from '@/components/app/will-dots'
-import { Shield, Zap, Telescope, Newspaper, ListChecks, type LucideIcon } from 'lucide-react'
-import { type ModuleId, getActiveNavModules } from '@/lib/module-registry'
-import type { GoalSlug } from '@/lib/goals/types'
-import { getGoalFirstWinPath } from '@/lib/goals/catalog'
+import { Wallet, Compass, Newspaper, type LucideIcon } from 'lucide-react'
+import { type ModuleId } from '@/lib/module-registry'
 
 export function OnboardingSuccess({
   onDashboard,
   activeModules,
-  goal,
 }: {
   onDashboard: () => void
   activeModules?: ModuleId[]
-  goal?: GoalSlug
 }) {
-  const navModules = getActiveNavModules(activeModules ?? [])
   const isNewsOnly = activeModules?.length === 1 && activeModules[0] === 'nieuws'
 
-  // Filter module cards to only show the nav modules the user activated
-  const visibleCards = isNewsOnly
-    ? []
-    : MODULE_CARDS.filter((c) => navModules.includes(c.navModule))
-
-  // Dynamic CTA label based on goal → first-win page
-  const firstWinPath = goal ? getGoalFirstWinPath(goal) : undefined
-  const ctaLabel = isNewsOnly
-    ? 'Naar de Trifinity Post'
-    : firstWinPath === '/horizon'
-      ? 'Bekijk Toekomst'
-      : firstWinPath === '/core/budgets'
-        ? 'Bekijk je budgetten'
-        : firstWinPath === '/core/debts'
-          ? 'Bekijk je schulden'
-          : firstWinPath === '/core'
-            ? 'Bekijk Overzicht'
-            : navModules.includes('wil')
-              ? 'Bekijk Tips & acties'
-              : 'Bekijk Toekomst'
-
   return (
-    <div className="flex flex-col items-center py-8 text-center sm:py-12">
+    <div className="mx-auto flex w-full max-w-2xl flex-col items-center py-8 text-center sm:py-12">
       {/* Will's avatar — celebration emphasis with subtle pulse */}
       <div className="mb-6 animate-[pulse_3s_ease-in-out_1]">
         <WillDots size={140} />
@@ -57,89 +31,90 @@ export function OnboardingSuccess({
       {/* Editorial divider */}
       <div className="mx-auto mt-8 mb-8 h-px w-16 bg-[var(--border-md)]" />
 
-      {/* Introduction text — adapted for news-only users */}
-      <div className="mx-auto max-w-md font-serif text-sm leading-relaxed text-[var(--ink-3)]">
-        {isNewsOnly ? (
-          <p>
-            Ik ben Will, je persoonlijke financiële coach. Je vindt me elke dag in de Trifinity Post met nieuws en inzichten die relevant zijn voor jouw financiële situatie.
-          </p>
-        ) : (
-          <p>
-            Ik ben Will, je persoonlijke financiële coach. Je eerste vrijheid staat
-            op de teller &mdash; vanaf hier laat ik &lsquo;m groeien, door drie
-            perspectieven naar financiële vrijheid.
-          </p>
-        )}
-      </div>
-
-      {/* News-only card */}
-      {isNewsOnly && (
-        <div className="mt-10 w-full">
-          <NewsCard />
-        </div>
-      )}
-
-      {/* Module cards — only for active nav modules */}
-      {!isNewsOnly && visibleCards.length > 0 && (
-        <div
-          className={`mt-10 grid w-full grid-cols-1 gap-3 ${
-            visibleCards.length === 2
-              ? 'sm:grid-cols-2'
-              : visibleCards.length >= 3
-                ? 'sm:grid-cols-3'
-                : ''
-          }`}
-        >
-          {visibleCards.map((card) => (
-            <ModuleCard key={card.name} {...card} />
-          ))}
-        </div>
-      )}
-
-      {/* Module-guide briefing explanation */}
-      {!isNewsOnly && (
-        <div className="mx-auto mt-10 flex max-w-md items-start gap-3 rounded-xl bg-[var(--subtle)] px-4 py-4 text-left">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-wil-100">
-            <ListChecks className="h-4 w-4 text-wil-600" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-[var(--ink)]">
-              Je dashboard staat klaar!
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
-              Per actieve module vind je een kaart met je eerste stappen. Vink ze af terwijl
-              je de app ontdekt, of sluit een kaart als je er klaar mee bent.
+      {isNewsOnly ? (
+        <>
+          {/* News-only intro + card */}
+          <div className="mx-auto max-w-md font-serif text-sm leading-relaxed text-[var(--ink-3)]">
+            <p>
+              Ik ben Will, je persoonlijke financiële coach. Je vindt me elke dag in de Trifinity Post met nieuws en inzichten die relevant zijn voor jouw financiële situatie.
             </p>
           </div>
-        </div>
+          <div className="mt-10 w-full">
+            <NewsCard />
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Twee modules — overzicht van vandaag + de toekomst */}
+          <h2 className="font-display text-xl font-semibold tracking-tight text-[var(--ink)] sm:text-2xl">
+            Vandaag op orde, <em className="italic text-kern-600">morgen in beeld</em>
+          </h2>
+          <p className="mx-auto mt-3 max-w-md font-serif text-sm leading-relaxed text-[var(--ink-2)] sm:text-base">
+            TriFinity bestaat uit twee modules die naadloos op elkaar aansluiten. Samen geven ze inzicht in waar je nu staat én waar je naartoe gaat.
+          </p>
+
+          <div className="mt-8 grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
+            <ModuleKaart
+              kleur="var(--color-kern-600)"
+              rubriek="Het Overzicht · Vandaag"
+              titel="Wat heb ik, wat geef ik uit?"
+              ondertitel="Alles wat je hebt en uitgeeft, in één rustig beeld."
+              features={[
+                'Bezittingen, schulden, cashflow en belasting',
+                'Dagelijkse briefing met zes inzichten',
+                'Doelen gekoppeld aan échte rekeningen',
+                'Samen-modus voor wie financiën deelt',
+              ]}
+              bgClass="bg-kern-50"
+              borderClass="border-kern-200"
+              iconColor="text-kern-600"
+              Icon={Wallet}
+            />
+            <ModuleKaart
+              kleur="var(--color-horizon-600)"
+              rubriek="De Toekomst · Morgen + later"
+              titel="Wat brengt mijn vrijheid dichterbij?"
+              ondertitel="Levensgebeurtenissen, scenario's en de Rekenhulp van Will."
+              features={[
+                'Tijdas met levensgebeurtenissen (kinderen, verhuizing, pensioen)',
+                'FIRE-prognose met scenario-vergelijking',
+                'Rekenhulp-bibliotheek met 12 kant-en-klare rekenhulpen',
+                'Vraag Will een eigen rekenhulp op maat',
+              ]}
+              bgClass="bg-horizon-50"
+              borderClass="border-horizon-200"
+              iconColor="text-horizon-600"
+              Icon={Compass}
+            />
+          </div>
+        </>
       )}
 
       {/* Will's closing — font-serif italic */}
-      <div className="mx-auto mt-8 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
+      <div className="mx-auto mt-10 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
         <p className="font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
           Veel ontdekkingen! Elke bewuste keuze brengt je dichter bij vrijheid.
         </p>
       </div>
 
-      {/* Decorative color bar — only segments for active nav modules */}
+      {/* Decorative color bar — twee modules (Overzicht + Toekomst) */}
       <div className="mt-8 flex w-full max-w-xs items-center gap-0">
-        {(isNewsOnly || navModules.includes('kern')) && (
-          <div className="h-0.5 flex-1 bg-kern-300" />
-        )}
-        {navModules.includes('wil') && (
+        {isNewsOnly ? (
           <div className="h-0.5 flex-1 bg-wil-300" />
-        )}
-        {navModules.includes('horizon') && (
-          <div className="h-0.5 flex-1 bg-horizon-300" />
+        ) : (
+          <>
+            <div className="h-0.5 flex-1 bg-kern-300" />
+            <div className="h-0.5 flex-1 bg-horizon-300" />
+          </>
         )}
       </div>
 
-      {/* Dashboard button — label and destination adapt to active modules */}
+      {/* CTA — opent het Overzicht (news-only gaat naar de krant) */}
       <button
         onClick={onDashboard}
         className="mt-6 min-h-[48px] w-full max-w-xs rounded-xl bg-kern-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-kern-700 hover:shadow-md active:bg-kern-800 active:shadow-none sm:w-auto sm:min-w-[200px]"
       >
-        {ctaLabel}
+        {isNewsOnly ? 'Naar de Trifinity Post' : 'Ga naar overzicht'}
       </button>
     </div>
   )
@@ -163,64 +138,73 @@ function NewsCard() {
   )
 }
 
-/* ── Module card component ───────────────────────────────── */
+/* ── Module-kaart — krantenrubriek-stijl (mirror van de landingspagina) ── */
 
-function ModuleCard({ name, description, icon: Icon, borderClass, iconBgClass, iconTextClass, nameTextClass }: ModuleCardDef) {
+function ModuleKaart({
+  kleur,
+  rubriek,
+  titel,
+  ondertitel,
+  features,
+  bgClass,
+  borderClass,
+  iconColor,
+  Icon,
+}: {
+  kleur: string
+  rubriek: string
+  titel: string
+  ondertitel: string
+  features: string[]
+  bgClass: string
+  borderClass: string
+  iconColor: string
+  Icon: LucideIcon
+}) {
   return (
-    <div className={`card-editorial flex items-start gap-3 border-l-3 p-4 text-left ${borderClass}`}>
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconBgClass}`}>
-        <Icon className={`h-5 w-5 ${iconTextClass}`} />
+    <div
+      className={`overflow-hidden rounded-[var(--r-lg)] border ${borderClass} bg-[var(--paper)] text-left`}
+    >
+      {/* Kaart-header — krantenrubriek */}
+      <div
+        className={`flex items-center justify-between border-b-2 px-4 py-2.5 ${bgClass}`}
+        style={{ borderBottomColor: kleur }}
+      >
+        <p
+          className="font-sans text-[10px] font-bold uppercase tracking-[0.12em]"
+          style={{ color: kleur }}
+        >
+          {rubriek}
+        </p>
+        <Icon className={`h-4 w-4 ${iconColor}`} aria-hidden="true" />
       </div>
-      <div>
-        <p className={`font-display text-sm font-semibold ${nameTextClass}`}>{name}</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-3)]">{description}</p>
+
+      {/* Titel + ondertitel */}
+      <div className="px-4 py-4">
+        <h3 className="mb-1 font-display text-lg font-bold leading-tight text-[var(--ink)]">
+          {titel}
+        </h3>
+        <p className="font-serif text-sm italic text-[var(--ink-3)]">{ondertitel}</p>
+      </div>
+
+      {/* Features */}
+      <div className="border-t border-dashed border-[var(--border-ed)] px-4 py-4">
+        <ul className="space-y-2">
+          {features.map((f) => (
+            <li
+              key={f}
+              className="flex items-start gap-2 font-serif text-sm text-[var(--ink-2)]"
+            >
+              <span
+                aria-hidden="true"
+                className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: kleur }}
+              />
+              <span>{f}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   )
 }
-
-/* ── Module card data ────────────────────────────────────── */
-
-interface ModuleCardDef {
-  name: string
-  description: string
-  icon: LucideIcon
-  borderClass: string
-  iconBgClass: string
-  iconTextClass: string
-  nameTextClass: string
-  navModule: 'kern' | 'wil' | 'horizon'
-}
-
-const MODULE_CARDS: ModuleCardDef[] = [
-  {
-    name: 'Overzicht',
-    description: 'Ken je werkelijkheid: nettovermogen, bezittingen, schulden en budget.',
-    icon: Shield,
-    borderClass: 'border-kern-400',
-    iconBgClass: 'bg-kern-100',
-    iconTextClass: 'text-kern-700',
-    nameTextClass: 'text-kern-700',
-    navModule: 'kern',
-  },
-  {
-    name: 'Tips & acties',
-    description: 'Neem de regie: gepersonaliseerde tips en acties op basis van jouw data en de wereld om je heen.',
-    icon: Zap,
-    borderClass: 'border-wil-400',
-    iconBgClass: 'bg-wil-100',
-    iconTextClass: 'text-wil-700',
-    nameTextClass: 'text-wil-700',
-    navModule: 'wil',
-  },
-  {
-    name: 'Toekomst',
-    description: "Zie je vrijheid groeien: prognoses, scenario's en het effect van elke keuze.",
-    icon: Telescope,
-    borderClass: 'border-horizon-400',
-    iconBgClass: 'bg-horizon-100',
-    iconTextClass: 'text-horizon-700',
-    nameTextClass: 'text-horizon-700',
-    navModule: 'horizon',
-  },
-]

@@ -24,6 +24,7 @@ import {
   taxOpportunitiesToAandachtspunten,
   budgetBenchmarksToAandachtspunten,
   debtsToAandachtspunten,
+  assetsToAandachtspunten,
 } from './aandachtspunten'
 import { buildTaxOverview } from './tax-overview'
 import { computeBox1Tax } from './box1-tax'
@@ -36,6 +37,7 @@ import {
   calculateBenchmarks,
 } from './nibud/reference-data'
 import type { Debt } from './debt-data'
+import type { Asset } from './asset-data'
 
 // ── Belasting-producent ──────────────────────────────────────
 
@@ -182,6 +184,25 @@ async function collectDebtAandachtspunten(supabase: SupabaseClient): Promise<Aan
   return debtsToAandachtspunten(debts, dailyExpenses)
 }
 
+// ── Asset-producent ──────────────────────────────────────────
+
+/**
+ * Laad actieve assets + maanduitgaven + inflatie en zet overtollig spaargeld
+ * om naar een cash-drag-aandachtspunt. Géén dag-uitgaven-fallback: bij
+ * ontbrekende uitgaven kan geen betekenisvolle noodbuffer worden bepaald, dus
+ * geeft de adapter dan bewust niets terug (i.p.v. een verzonnen buffer).
+ */
+async function collectAssetAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
+  const horizonData = await loadHorizonData(supabase)
+  const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
+  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+  const inflationRate = horizonData.fireParams?.inflationRate ?? 0
+
+  const { data } = await supabase.from('assets').select('*').eq('is_active', true).limit(500)
+  const assets = (data ?? []) as Asset[]
+  return assetsToAandachtspunten(assets, dailyExpenses, inflationRate)
+}
+
 // ── Verzamelaar ──────────────────────────────────────────────
 
 /**
@@ -199,11 +220,12 @@ export async function collectAandachtspunten(
     }
   }
 
-  const [tax, budget, debt] = await Promise.all([
+  const [tax, budget, debt, asset] = await Promise.all([
     safe(() => collectTaxAandachtspunten(supabase)),
     safe(() => collectBudgetAandachtspunten(supabase)),
     safe(() => collectDebtAandachtspunten(supabase)),
+    safe(() => collectAssetAandachtspunten(supabase)),
   ])
 
-  return [...tax, ...budget, ...debt].sort((a, b) => b.savings - a.savings)
+  return [...tax, ...budget, ...debt, ...asset].sort((a, b) => b.savings - a.savings)
 }

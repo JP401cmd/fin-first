@@ -10,8 +10,10 @@ import { memo, useMemo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
-import { formatMaskedCurrency } from '@/lib/format'
+import { formatCurrency, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { PhaseIntro } from '@/components/app/horizon/phase-analysis/phase-intro'
+import { PhaseDiscussButton } from '@/components/app/horizon/phase-analysis/phase-discuss-button'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
@@ -176,6 +178,18 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
   const title = `Onttrekkingsfase \u00b7 ${Math.round(startAge)} \u2192 ${Math.round(endAge)} jaar`
 
   // ── Cumulative aggregates from unified rows ──────────────────────────────
+  // The receipt follows the TRUE wealth identity (verified against the unified
+  // projection rows): eindvermogen = startvermogen + rendement
+  //   − portfolio-onttrekking − Box 3 ± eenmalige kasstromen.
+  //
+  // AOW + pensioen are NOT wealth flows into the portfolio — they fund living
+  // expenses OUTSIDE it (recurring cashflows reduce the needed withdrawal and
+  // are never injected into the portfolio). `row.withdrawal` is therefore the
+  // net portfolio outflow with AOW already netted out exactly once. Showing AOW
+  // as a positive "vermogensaanwas" row while also folding it into a gross
+  // "Levensonderhoud" cancels arithmetically but reads as if AOW grows your
+  // wealth — so we keep income sources in the IncomeSourceBar (coverage) and
+  // out of the receipt (C2).
   const aggregates = useMemo(() => {
     let totalGrowth = 0
     let totalAow = 0
@@ -190,22 +204,45 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
       totalWithdrawal += row.withdrawal
       totalOneTimeCashflows += (row.oneTimeNet || 0)
 
-      // grossIncome includes AOW + pensioen in withdrawal phase
-      // We split: AOW is a known fixed amount; remainder is pensioen
+      // grossIncome includes AOW + pensioen in withdrawal phase. Split for the
+      // IncomeSourceBar only: AOW is a known fixed amount; remainder is pensioen.
       const rowAow = Math.min(row.grossIncome, yearlyAowIncome)
       const rowPensioen = Math.max(row.grossIncome - yearlyAowIncome, 0)
       totalAow += rowAow
       totalPensioen += rowPensioen
     }
 
-    // Portfolio withdrawal = total withdrawal minus what AOW/pensioen covered
+    // Portfolio withdrawal = the net amount drawn from the portfolio (AOW/pensioen
+    // already netted out). This IS the "Levensonderhoud (uit portfolio)" line.
     const portfolioWithdrawal = totalWithdrawal
 
     return { totalGrowth, totalAow, totalPensioen, totalWithdrawal, totalBox3, portfolioWithdrawal, totalOneTimeCashflows }
   }, [withdrawalRows, yearlyAowIncome])
 
-  // Levensonderhoud = withdrawal (what you spend from portfolio) + AOW + pensioen
-  const totalLevensonderhoud = aggregates.totalWithdrawal + aggregates.totalAow + aggregates.totalPensioen
+  // Reconcile the receipt against the actual eindvermogen. Any residual (e.g.
+  // from debt-principal effects on net worth) surfaces as an explicit
+  // "Afronding" row instead of silently hiding in a mislabeled line.
+  const reconstructedEnd =
+    startPortfolio +
+    aggregates.totalGrowth -
+    aggregates.totalWithdrawal -
+    aggregates.totalBox3 +
+    aggregates.totalOneTimeCashflows
+  const afronding = Math.round(endPortfolio - reconstructedEnd)
+  const showAfronding = Math.abs(afronding) > 1000
+
+  // Whole-phase summary for the top-level "Bespreek met Will" button. Uses
+  // plain formatCurrency (chat strings are never masked). Slagingskans/kritische
+  // SWR live in the Monte Carlo section's local state, so they are intentionally
+  // omitted here — the MC section carries those into its own discuss context.
+  const avgAowPerYear = durationYears > 0 ? Math.round(aggregates.totalAow / durationYears) : 0
+  const phaseSummary =
+    `Strategie: ${strategyLabel}. ` +
+    `Vermogen loopt van ${formatCurrency(Math.round(startPortfolio))} naar ${formatCurrency(Math.round(endPortfolio))} over ${durationYears} jaar. ` +
+    `Netto portfolio-onttrekking ${formatCurrency(Math.round(yearlyWithdrawal))}/jaar` +
+    `${avgAowPerYear > 0 ? `, bovenop ${formatCurrency(avgAowPerYear)}/jaar AOW` : ''}. ` +
+    `Cumulatief rendement ${formatCurrency(Math.round(aggregates.totalGrowth))}, Box 3 ${formatCurrency(Math.round(aggregates.totalBox3))}. ` +
+    `${targetEndPortfolio > 0 ? `${strategy === 'pensioen' ? 'Geschatte nalatenschap' : 'Doelvermogen'}: ${formatCurrency(Math.round(targetEndPortfolio))}.` : ''}`
 
   return (
     <ShellOverlay open={open} onClose={onClose} kind="pane" title={title}>
@@ -213,6 +250,14 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
       <div className="h-[2px] w-full bg-[var(--color-kern-500,#8b6914)]" />
 
       <div className="space-y-4 p-5">
+        {/* 0. Uitleg-intro — wat is deze fase & waarom zie je dit */}
+        <PhaseIntro
+          kicker="AFBOUWFASE"
+          title="Nu leef je van opgeslagen tijd"
+          body="Je hebt jarenlang vrijheid opgebouwd; nu leef je ervan. Elke euro die je onttrekt is een stukje teruggekochte levenstijd. De eerste jaren wegen het zwaarst: een tegenvaller vlak na je stop raakt je vermogen blijvend, want je verkoopt op een laag punt zonder herstelkans (volgorde-risico)."
+          infoDescription="Deze analyses laten zien hoelang je vermogen meegaat en welke risico's de afbouwfase bepalen: een Monte Carlo-slagingskans, het volgorde-risico (SORR) van de eerste jaren, koopkrachterosie door inflatie, de keuze huis behouden of verkopen, en je nalatenschap aan het einde."
+        />
+
         {/* 1. PhaseChartZoom — full trajectory with withdrawal phase highlighted */}
         {allRows && allRows.length > 2 && (
           <>
@@ -238,10 +283,11 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
         )}
 
         {/* 2. Fase-header */}
-        <div className="text-center">
+        <div className="flex flex-col items-center gap-2 text-center">
           <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Onttrekken &middot; {<MaskedAmount value={Math.round(startPortfolio)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(endPortfolio)} tone="horizon" />} &middot; {durationYears} jaar
           </p>
+          <PhaseDiscussButton onderwerp="Mijn afbouwfase" summary={phaseSummary} />
         </div>
 
         {/* 3. Kassabon — cashflow receipt */}
@@ -256,7 +302,8 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
             </p>
           </div>
 
-          {/* Extended receipt rows — kasstroomanalyse */}
+          {/* Extended receipt rows — vermogensidentiteit (geen AOW/pensioen als
+              aanwas; die dekken uitgaven en staan in de inkomstenbalk). */}
           <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2">
             <ReceiptRow label="Startvermogen" value={<MaskedAmount value={Math.round(startPortfolio)} tone="horizon" />} />
             <ReceiptRow
@@ -264,23 +311,9 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
               value={<MaskedAmount value={Math.round(aggregates.totalGrowth)} tone="horizon" />}
               positive={aggregates.totalGrowth > 0}
             />
-            {aggregates.totalAow > 0 && (
-              <ReceiptRow
-                label="AOW (cumulatief)"
-                value={<MaskedAmount value={Math.round(aggregates.totalAow)} tone="horizon" />}
-                positive
-              />
-            )}
-            {aggregates.totalPensioen > 0 && (
-              <ReceiptRow
-                label="Pensioen (cumulatief)"
-                value={<MaskedAmount value={Math.round(aggregates.totalPensioen)} tone="horizon" />}
-                positive
-              />
-            )}
             <ReceiptRow
-              label="Levensonderhoud"
-              value={<MaskedAmount value={Math.round(totalLevensonderhoud)} signPrefix="-" tone="horizon" />}
+              label="Onttrokken uit portfolio"
+              value={<MaskedAmount value={Math.round(aggregates.totalWithdrawal)} signPrefix="-" tone="horizon" />}
               negative
             />
             {aggregates.totalBox3 > 0 && (
@@ -299,6 +332,17 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
                 }
                 positive={aggregates.totalOneTimeCashflows > 0}
                 negative={aggregates.totalOneTimeCashflows < 0}
+              />
+            )}
+            {showAfronding && (
+              <ReceiptRow
+                label="Afronding"
+                value={afronding < 0
+                  ? <MaskedAmount value={Math.abs(afronding)} signPrefix="-" tone="horizon" />
+                  : <MaskedAmount value={afronding} tone="horizon" />
+                }
+                positive={afronding > 0}
+                negative={afronding < 0}
               />
             )}
           </div>
@@ -365,6 +409,8 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
             debts={debts ?? []}
             expectedReturn={expectedReturn}
             inflationRate={inflationRate}
+            startAge={startAge}
+            endAge={endAge}
           />
         )}
 

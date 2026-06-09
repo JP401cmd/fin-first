@@ -186,17 +186,48 @@ export function frequencyMatch(
 }
 
 /**
- * Detect whether a transaction is a transfer between own accounts
- * by matching counterparty_iban against the user's own IBAN set.
- * @param counterpartyIban - IBAN of the counterparty
- * @param ownIbans - Set of all own IBANs (bank_accounts + user_own_ibans), uppercased
+ * Detect whether a transaction is a transfer between own accounts.
+ *
+ * Twee signalen:
+ *  1. tegenrekening-IBAN staat in de eigen-IBAN-set (bank_accounts + user_own_ibans);
+ *  2. tegenpartij-naam bevat een geregistreerd naam-patroon — voor eigen rekeningen
+ *     zonder bruikbare IBAN (bv. PayPal, een broker of exchange die op de bankafschrift
+ *     met een naam i.p.v. je eigen IBAN verschijnt).
+ *
+ * @param counterpartyIban - IBAN van de tegenpartij
+ * @param ownIbans - Set van alle eigen IBANs (genormaliseerd: geen spaties, uppercase)
+ * @param counterpartyName - naam van de tegenpartij (optioneel)
+ * @param ownNamePatterns - lowercase naam-patronen die een eigen rekening aanduiden (optioneel)
  */
 export function isOwnAccountTransfer(
   counterpartyIban: string | null,
   ownIbans: Set<string>,
+  counterpartyName?: string | null,
+  ownNamePatterns?: string[],
 ): boolean {
-  if (!counterpartyIban) return false
-  return ownIbans.has(counterpartyIban.replace(/\s/g, '').toUpperCase())
+  if (counterpartyIban && ownIbans.has(counterpartyIban.replace(/\s/g, '').toUpperCase())) {
+    return true
+  }
+  if (counterpartyName && ownNamePatterns && ownNamePatterns.length > 0) {
+    const name = counterpartyName.toLowerCase()
+    if (ownNamePatterns.some((p) => p && name.includes(p))) return true
+  }
+  return false
+}
+
+/**
+ * Detecteer een eigen-rekening-verschuiving op basis van het bron-specifieke
+ * transactietype (bv. PayPal-kolom "Type"). Gebruikt voor rekeningen zonder
+ * bruikbare IBAN: een opwaardeer/opname-regel is een overboeking naar/van een
+ * gekoppelde bankrekening, geen echte uitgave/inkomen.
+ */
+export function isWalletTransferType(
+  sourceType: string | null | undefined,
+  transferTypeValues?: string[],
+): boolean {
+  if (!sourceType || !transferTypeValues || transferTypeValues.length === 0) return false
+  const s = sourceType.trim().toLowerCase()
+  return transferTypeValues.some((v) => v.trim().toLowerCase() === s)
 }
 
 /**
@@ -217,9 +248,13 @@ export function categorizeTransaction(
   ownIbans?: Set<string>,
   counterpartyIban?: string | null,
   freqMap?: Map<string, FrequencyMatch>,
+  ownNamePatterns?: string[],
 ): { budget_id: string | null; confidence: number; budgetName: string | null; isTransfer?: boolean; category_source?: string } {
-  // Priority 0: own-account transfer detection
-  if (ownIbans && counterpartyIban && isOwnAccountTransfer(counterpartyIban, ownIbans)) {
+  // Priority 0: own-account transfer detection (IBAN-set of naam-patroon)
+  if (
+    (ownIbans || ownNamePatterns) &&
+    isOwnAccountTransfer(counterpartyIban ?? null, ownIbans ?? new Set<string>(), counterparty, ownNamePatterns)
+  ) {
     return { budget_id: null, confidence: 1.0, budgetName: null, isTransfer: true, category_source: 'transfer' }
   }
 

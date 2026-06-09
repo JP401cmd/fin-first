@@ -20,11 +20,16 @@ import { MonteCarloOvergang } from '@/components/app/horizon/phase-analysis/over
 import { GapAnalyse } from '@/components/app/horizon/phase-analysis/overgang/gap-analyse'
 import { EerderStoppen } from '@/components/app/horizon/phase-analysis/overgang/eerder-stoppen'
 import { DeeltijdwerkImpact } from '@/components/app/horizon/phase-analysis/overgang/deeltijdwerk-impact'
+import { PhaseIntro } from '@/components/app/horizon/phase-analysis/phase-intro'
+import { PhaseDiscussButton } from '@/components/app/horizon/phase-analysis/phase-discuss-button'
+import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { Debt } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import { BOX3_DRAG } from '@/lib/constants'
+import { formatCurrency } from '@/lib/format'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
@@ -143,12 +148,55 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
     ? transitionRows[transitionRows.length - 1].netWorth
     : Math.max(portfolioAtTransitionStart - totalOnttrekking + totalRendement, 0)
 
+  // ── Canonieke FIRE-maatstaf (uitgelijnd met resolveFireParams) ───────────
+  // horizon-client geeft geen fireTarget aan deze modal door; we leiden hem af
+  // uit dezelfde formule als resolveFireParams zodat "eerder stoppen" en de
+  // strategie-vergelijking dezelfde vrijheidsmaatstaf gebruiken als de rest van
+  // de app: effectiveSwr = grossReturn − Box 3-drag − inflatie.
+  const effectiveSwr = expectedReturn != null
+    ? Math.max(0.001, expectedReturn - BOX3_DRAG - inflationRate)
+    : null
+  const fireTarget = effectiveSwr != null && yearlyExpenses > 0
+    ? yearlyExpenses / effectiveSwr
+    : undefined
+
+  // ── Projectie-gebaseerd dekkingssignaal (B3) ─────────────────────────────
+  // Vervangt de nominale `portfolio ≥ uitgaven×jaren`-check door de echte
+  // projectie-uitkomst: het portfolio dekt de overgang als er bij het einde
+  // van de fase nog een veiligheidsbuffer over is (eindVermogen ≥ buffer),
+  // consistent met Gap-analyse's inflatie-gecorrigeerde dekkingspercentage.
+  const COVERAGE_BUFFER = 25_000
+  const dekkingVoldoende = eindVermogen >= COVERAGE_BUFFER
+
+  // ── Hele-fase-samenvatting voor de top-level "Bespreek met Will" ─────────
+  const shortfallPerYear = Math.max(yearlyExpenses - yearlyAowIncome, 0)
+  const portfolioNeedPerYear = transitionScenario === 'shortfall' ? shortfallPerYear : yearlyExpenses
+  const faseSummary =
+    `Mijn overgangsfase (${transitionScenario === 'gap' ? 'gap: FIRE → AOW, volledig uit portfolio' : 'tekort: AOW → FIRE, AOW vult aan'}). ` +
+    `Van ${formatCurrency(Math.round(startVermogen))} naar ${formatCurrency(Math.round(eindVermogen))} over ${durationYears} jaar ` +
+    `(${Math.round(startAge)} → ${Math.round(endAge)} jaar). ` +
+    `Portfolio overbrugt ${formatCurrency(Math.round(portfolioNeedPerYear))}/jaar` +
+    `${transitionScenario === 'shortfall' && yearlyAowIncome > 0 ? `, AOW dekt ${formatCurrency(Math.round(yearlyAowIncome))}/jaar` : ''}. ` +
+    `${dekkingVoldoende ? 'Mijn vermogen overbrugt deze periode met buffer.' : 'Er dreigt een tekort tijdens de overgang.'}`
+
   return (
     <ShellOverlay open={open} onClose={onClose} kind="pane" title={title}>
       {/* Accent line */}
       <div className="h-[2px] bg-[var(--color-horizon-200)]" />
 
       <div className="space-y-4 p-5">
+        {/* 0. Uitleg-intro — wát de overgangsfase is en wáárom je dit ziet */}
+        <PhaseIntro
+          kicker="OVERGANGSFASE"
+          title="De brug naar je AOW"
+          body={
+            transitionScenario === 'gap'
+              ? 'Tussen het moment dat je stopt met werken en je AOW ingaat, leef je volledig van je opgebouwde vermogen — elke euro die je eerder opzij zette koop je hier vrijheid mee. Deze analyses laten zien of je vermogen die jaren overbrugt.'
+              : 'Je AOW is al ingegaan, maar je volledige vrijheid (FIRE) komt nog. In deze brugperiode vult je vermogen aan wat je AOW niet dekt. Deze analyses laten zien of je vermogen dat tekort overbrugt.'
+          }
+          infoDescription="De overgangsfase is de periode tussen stoppen met werken en het bereiken van je AOW én volledige vrijheid. Omdat AOW en FIRE niet altijd op hetzelfde moment vallen, ontstaat er een brug die je vermogen moet financieren. Hier zie je de kassabon van die jaren, een Monte Carlo simulatie van het risico, strategie-opties, de impact van deeltijdwerk, en wat er nodig is om eerder te stoppen."
+        />
+
         {/* 1. PhaseChartZoom — full trajectory with transition phase highlighted */}
         {allRows && allRows.length > 2 && (
           <>
@@ -174,11 +222,12 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
           </>
         )}
 
-        {/* 2. Fase-header — compact summary line */}
-        <div className="text-center">
-          <p className="font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
+        {/* 2. Fase-header — compact summary line + top-level discuss button */}
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-center font-sans text-sm font-bold text-[var(--ink)] sm:text-base">
             Overgang &middot; {<MaskedAmount value={Math.round(startVermogen)} tone="horizon" />} &rarr; {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />} &middot; {durationYears} jaar
           </p>
+          <PhaseDiscussButton onderwerp="Mijn overgangsfase" summary={faseSummary} />
         </div>
 
         {/* 3. Kassabon — existing GapAnalysis / ShortfallAnalysis */}
@@ -193,8 +242,8 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             totalBox3={totalBox3}
             totalEvents={totalEvents}
             eindVermogen={eindVermogen}
-            yearlyExpenses={yearlyExpenses}
-            portfolioAtTransitionStart={portfolioAtTransitionStart}
+            dekkingVoldoende={dekkingVoldoende}
+            coverageBuffer={COVERAGE_BUFFER}
           />
         ) : (
           <ShortfallAnalysis
@@ -232,6 +281,8 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             expectedReturn={expectedReturn}
             inflationRate={inflationRate}
             cashflows={cashflows}
+            transitionScenario={transitionScenario}
+            yearlyAowIncome={yearlyAowIncome}
             fireAge={fireAge}
             aowAge={aowAge}
           />
@@ -247,6 +298,9 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             expectedReturn={expectedReturn}
             inflationRate={inflationRate}
             debts={debts}
+            transitionScenario={transitionScenario}
+            yearlyAowIncome={yearlyAowIncome}
+            cashflows={cashflows}
             currentAge={currentAge}
             fireAge={fireAge}
             aowAge={aowAge}
@@ -264,6 +318,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             inflationRate={inflationRate}
             transitionScenario={transitionScenario}
             monthlyIncome={monthlyIncome}
+            yearlyAowIncome={yearlyAowIncome}
             cashflows={cashflows}
           />
         )}
@@ -280,6 +335,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
             inflationRate={inflationRate}
             cashflows={cashflows}
             fireStrategy={fireStrategy}
+            fireTarget={fireTarget}
             scenario={transitionScenario}
           />
         )}
@@ -387,8 +443,8 @@ function GapAnalysisKassabon({
   totalBox3,
   totalEvents,
   eindVermogen,
-  yearlyExpenses,
-  portfolioAtTransitionStart,
+  dekkingVoldoende,
+  coverageBuffer,
 }: {
   durationYears: number
   fireAge: number
@@ -399,11 +455,10 @@ function GapAnalysisKassabon({
   totalBox3: number
   totalEvents: number
   eindVermogen: number
-  yearlyExpenses: number
-  portfolioAtTransitionStart: number
+  /** Projectie-gebaseerd dekkingssignaal: eindVermogen ≥ buffer (B3) */
+  dekkingVoldoende: boolean
+  coverageBuffer: number
 }) {
-  const totalExpenses = yearlyExpenses * durationYears
-
   return (
     <KassabonShell>
       {/* Header */}
@@ -454,17 +509,18 @@ function GapAnalysisKassabon({
         </span>
       </div>
 
-      {/* Coverage indicator */}
-      <div className="mt-2">
-        {portfolioAtTransitionStart >= totalExpenses ? (
+      {/* Coverage indicator — projectie-gebaseerd (eindVermogen ≥ buffer) */}
+      <div className="mt-2 flex items-center gap-1">
+        {dekkingVoldoende ? (
           <p className="text-[11px] text-[var(--positive)]">
-            &#10003; Vermogen dekt de overgangsperiode volledig
+            &#10003; Je vermogen overbrugt de hele overgangsperiode — bij AOW houd je {<MaskedAmount value={Math.round(eindVermogen)} tone="horizon" />} over
           </p>
         ) : (
           <p className="text-[11px] text-[var(--negative)]">
-            &#9888; Tekort van {<MaskedAmount value={Math.round(totalExpenses - portfolioAtTransitionStart)} tone="horizon" />} tijdens overgang
+            &#9888; Je vermogen raakt tegen je AOW vrijwel uitgeput (onder {<MaskedAmount value={Math.round(coverageBuffer)} tone="horizon" />} buffer)
           </p>
         )}
+        <InfoTooltip text="Dit signaal volgt de werkelijke projectie: na rendement, onttrekking, Box 3 en life events houd je aan het einde van de overgang vermogen over (boven een veiligheidsbuffer) of niet. Dat sluit aan op het dekkingspercentage in de Gap-analyse hieronder." />
       </div>
     </KassabonShell>
   )

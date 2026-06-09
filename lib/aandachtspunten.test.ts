@@ -4,12 +4,16 @@ import {
   taxOpportunitiesToAandachtspunten,
   budgetBenchmarksToAandachtspunten,
   debtsToAandachtspunten,
+  assetsToAandachtspunten,
   DEBT_INTEREST_THRESHOLD,
+  CASH_BUFFER_MONTHS,
+  MIN_CASH_EXCESS,
   type Aandachtspunt,
   type BudgetBenchmarkLike,
 } from './aandachtspunten'
 import type { TaxOpportunity } from './tax-overview'
 import type { Debt } from './debt-data'
+import type { Asset } from './asset-data'
 
 // ── Fixtures ─────────────────────────────────────────────────
 
@@ -53,6 +57,19 @@ function makeDebt(overrides: Partial<Debt>): Debt {
     has_hypotheekplanner_tracking: false,
     ...overrides,
   }
+}
+
+/** Minimale Asset-factory — de adapter leest alleen is_active/asset_type/current_value. */
+function makeAsset(overrides: Partial<Asset>): Asset {
+  return {
+    id: 'a1',
+    user_id: 'u1',
+    name: 'Spaarrekening',
+    asset_type: 'savings',
+    current_value: 0,
+    is_active: true,
+    ...overrides,
+  } as unknown as Asset
 }
 
 // ── taxOpportunitiesToAandachtspunten ────────────────────────
@@ -169,6 +186,69 @@ describe('debtsToAandachtspunten', () => {
     const result = debtsToAandachtspunten(debts, 0)
     expect(result[0].freedomDays).toBe(0)
     expect(result[0].savings).toBe(700)
+  })
+})
+
+// ── assetsToAandachtspunten ──────────────────────────────────
+
+describe('assetsToAandachtspunten', () => {
+  // dailyExpenses 100 → maanduitgaven 3000 → buffer = 6 × 3000 = €18.000.
+  const DAILY = 100
+  const INFLATION = 0.02
+
+  it('produceert cash-drag bij overtollig spaargeld boven de buffer', () => {
+    const assets = [makeAsset({ asset_type: 'savings', current_value: 50_000 })]
+    const result = assetsToAandachtspunten(assets, DAILY, INFLATION)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      id: 'asset:cash-drag',
+      domain: 'asset',
+      title: 'Zet overtollig spaargeld aan het werk',
+      savings: 640, // (50.000 − 18.000) × 0,02
+      freedomDays: 6, // 640 / 100
+      href: '/overzicht/bezittingen',
+    })
+  })
+
+  it('telt cash + savings samen en negeert beleggingen/overig', () => {
+    const assets = [
+      makeAsset({ id: 'c', asset_type: 'cash', current_value: 10_000 }),
+      makeAsset({ id: 's', asset_type: 'savings', current_value: 40_000 }),
+      makeAsset({ id: 'i', asset_type: 'investment', current_value: 100_000 }),
+    ]
+    const result = assetsToAandachtspunten(assets, DAILY, INFLATION)
+    expect(result).toHaveLength(1)
+    expect(result[0].savings).toBe(640) // alleen 50.000 spaargeld telt mee
+  })
+
+  it('geeft niets bij spaargeld onder de noodbuffer', () => {
+    const assets = [makeAsset({ current_value: 10_000 })] // < €18.000 buffer
+    expect(assetsToAandachtspunten(assets, DAILY, INFLATION)).toEqual([])
+  })
+
+  it('geeft niets wanneer het overschot onder MIN_CASH_EXCESS ligt', () => {
+    const assets = [makeAsset({ current_value: 21_000 })] // excess 3.000 < 5.000
+    expect(assetsToAandachtspunten(assets, DAILY, INFLATION)).toEqual([])
+  })
+
+  it('negeert inactieve assets', () => {
+    const assets = [makeAsset({ current_value: 50_000, is_active: false })]
+    expect(assetsToAandachtspunten(assets, DAILY, INFLATION)).toEqual([])
+  })
+
+  it('geeft niets bij ontbrekende dag-uitgaven (geen verzonnen buffer)', () => {
+    const assets = [makeAsset({ current_value: 50_000 })]
+    expect(assetsToAandachtspunten(assets, 0, INFLATION)).toEqual([])
+  })
+
+  it('geeft niets bij inflatie <= 0', () => {
+    const assets = [makeAsset({ current_value: 50_000 })]
+    expect(assetsToAandachtspunten(assets, DAILY, 0)).toEqual([])
+  })
+
+  it('exporteert tunebare drempels', () => {
+    expect(CASH_BUFFER_MONTHS).toBe(6)
+    expect(MIN_CASH_EXCESS).toBe(5_000)
   })
 })
 

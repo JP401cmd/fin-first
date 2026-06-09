@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
+import { checkTierGate } from '@/lib/require-tier'
 import { detectRecurringTransactions, CATEGORY_LABELS } from '@/lib/recurring-detection'
 import { VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 
@@ -25,6 +26,11 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    }
+
+    const tierGate = await checkTierGate(supabase, user.id, 'ai')
+    if (tierGate) {
+      return NextResponse.json({ error: tierGate.error }, { status: 403 })
     }
 
     const now = new Date()

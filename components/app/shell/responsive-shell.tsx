@@ -23,9 +23,8 @@
  */
 'use client'
 
-import { Suspense, createContext, useContext, useEffect, useState, useMemo, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { WelcomeBanner } from '@/components/app/welcome-banner'
 import { ChatLayoutWrapper } from '@/components/app/chat/chat-layout-wrapper'
 import { FloatingNavButton } from '@/components/app/shell/floating-nav-button'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
@@ -238,9 +237,6 @@ function ShellContent({
       </SidebarPortal>
 
       <ChatLayoutWrapper>
-        <Suspense fallback={null}>
-          <WelcomeBanner />
-        </Suspense>
         <DailyExpenseProvider>
           {/* Single-mount strategie: pre-hydratie (`hydrated=false`) rendert
               Next.js beide branches met de oude Tailwind hide/show-classes —

@@ -121,6 +121,11 @@ export const PAGE_INFO: Record<string, string> = {
     'PSD2-bank, UPO-pensioenoverzicht en crypto-brokerage — telkens een handmatige import minder. ' +
     'Koppel of ontkoppel per dienst.',
 
+  '/mijn/account':
+    'Je abonnement en account op één plek. ' +
+    'Zie welke add-ons (AI, Connected) actief zijn, wijzig e-mail of wachtwoord, log overal uit. ' +
+    'Of verwijder je account definitief in de danger zone.',
+
   // ── Dashboard ───────────────────────────────────────────────────
   '/dashboard':
     'Je persoonlijke overzichtspagina met de belangrijkste financiële inzichten. ' +

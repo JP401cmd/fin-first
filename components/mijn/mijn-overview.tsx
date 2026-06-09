@@ -8,6 +8,7 @@ import {
   Settings2,
   Share2,
   CalendarCheck,
+  CreditCard,
   ArrowRight,
   type LucideIcon,
 } from 'lucide-react'
@@ -41,6 +42,14 @@ const ROUTES: SubRoute[] = [
     Icon: User,
     bg: 'bg-stone-100',
     text: 'text-stone-700',
+  },
+  {
+    href: '/mijn/account',
+    label: 'Account',
+    description: 'Abonnement, e-mail, wachtwoord en account verwijderen.',
+    Icon: CreditCard,
+    bg: 'bg-teal-50',
+    text: 'text-teal-700',
   },
   {
     href: '/mijn/privacy',

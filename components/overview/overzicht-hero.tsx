@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Compass } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -92,6 +92,11 @@ type OverzichtHeroProps = {
    *  allebei nodig. */
   activeWidgets?: WidgetPref[]
   allWidgetPrefs?: WidgetPref[]
+  /** Heeft de gebruiker de FIRE-prognose-voorkeuren ingesteld? Zolang false
+   *  zijn de vermogensgrafiek (overlay-melding), de Voortgang-doelen-card en
+   *  de Vrijheid-strip onbetrouwbaar — die worden dan verborgen/afgedekt met
+   *  een verwijzing naar /toekomst. */
+  hasCompletedHorizonSetup?: boolean
 }
 
 function formatDateNL(): string {
@@ -151,6 +156,7 @@ export function OverzichtHero({
   hasGoals,
   accountAgeDays,
   liquidCash,
+  hasCompletedHorizonSetup = true,
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
   const rail = useHeroRailState(activeWidgets ?? [])
@@ -249,23 +255,62 @@ export function OverzichtHero({
           )}
         </div>
         <div className="lg:col-span-3">
-          <MiniNetWorthChart
-            netWorthHistory={netWorthHistory ?? []}
-            currentNetWorth={currentNetWorth ?? 0}
-            currentAge={currentAge ?? null}
-            fireAge={fireAge ?? null}
-            endAge={endAge ?? null}
-            isPensioenMode={isPensioenMode ?? false}
-            simRows={simRows ?? null}
-            simRequiredPortfolio={simRequiredPortfolio ?? null}
-          />
+          {/* Zonder FIRE-voorkeuren rust de projectie op standaardwaarden en is
+              de curve onbetrouwbaar. We laten de grafiek vervaagd staan met een
+              melding eroverheen die naar /toekomst verwijst. */}
+          <div className="relative h-full">
+            <div
+              className={
+                hasCompletedHorizonSetup
+                  ? ''
+                  : 'pointer-events-none select-none opacity-40 blur-[3px]'
+              }
+              aria-hidden={!hasCompletedHorizonSetup}
+            >
+              <MiniNetWorthChart
+                netWorthHistory={netWorthHistory ?? []}
+                currentNetWorth={currentNetWorth ?? 0}
+                currentAge={currentAge ?? null}
+                fireAge={fireAge ?? null}
+                endAge={endAge ?? null}
+                isPensioenMode={isPensioenMode ?? false}
+                simRows={simRows ?? null}
+                simRequiredPortfolio={simRequiredPortfolio ?? null}
+              />
+            </div>
+            {!hasCompletedHorizonSetup && (
+              <div className="absolute inset-0 flex items-center justify-center p-4">
+                <Link
+                  href="/toekomst"
+                  className="group inline-flex max-w-sm items-center gap-3 border border-[var(--border-md)] bg-[var(--paper)]/95 px-5 py-4 text-left shadow-sm backdrop-blur-sm transition-colors hover:border-[var(--ink-3)]"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--ink)] text-[var(--paper)]">
+                    <Compass className="h-4.5 w-4.5" aria-hidden />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-[var(--ink)]">
+                      Ga naar de toekomst om je voorkeuren in te stellen
+                    </span>
+                    <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-[var(--ink-3)]">
+                      Dan klopt je vrijheidsprojectie met jouw situatie
+                      <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                    </span>
+                  </span>
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Optionele power-user widget-rail OP DEZELFDE PLEK als Voortgang-
+      {/* Voortgang-doelen + Vrijheidsstrip (en de power-user widget-rail op
+          dezelfde plek) tonen we pas zodra de FIRE-voorkeuren zijn ingesteld —
+          anders rusten de vrijheids-percentages op standaardwaarden. */}
+      {hasCompletedHorizonSetup && (
+      /* Optionele power-user widget-rail OP DEZELFDE PLEK als Voortgang-
           doelen + Vrijheidsstrip. Default (geen edit-mode, geen config):
           render gewoon de defaults. Edit-mode of met config: 4-slot grid
-          met widgets uit WIDGET_CATALOG. State leeft in localStorage. */}
+          met widgets uit WIDGET_CATALOG. State leeft in localStorage. */
       <div className="mt-3 sm:mt-4">
         {dashboardData && activeWidgets && allWidgetPrefs ? (
           <HeroWidgetRail
@@ -305,6 +350,7 @@ export function OverzichtHero({
           </>
         )}
       </div>
+      )}
 
       {/* T-4 Dramatic Compound — alleen voor cash-zware users zodat
           we niet alle gebruikers met irrelevante content lastig vallen.

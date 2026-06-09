@@ -20,11 +20,15 @@ function computeFireAgeForSavings(
   currentAge: number,
   cashflows?: SimCashflow[],
   maxAge: number = 90,
+  fireTargetOverride?: number,
 ): { fireAge: number | null; portfolioAtFire: number } {
   if (yearlyExpenses <= 0) return { fireAge: null, portfolioAtFire: currentPortfolio }
 
-  const swr = 0.04
-  const fireTarget = yearlyExpenses / swr
+  // Prefer the app-resolved FIRE target (from effectiveSwr); fall back to 4% rule.
+  const fireTarget =
+    fireTargetOverride != null && fireTargetOverride > 0
+      ? fireTargetOverride
+      : yearlyExpenses / 0.04
 
   let portfolio = currentPortfolio
   const realReturn = expectedReturn - inflationRate
@@ -151,6 +155,42 @@ describe('Spaarquote gevoeligheidsanalyse – regressietest', () => {
     // If null (can't reach FIRE without savings), that's also acceptable
     // as long as portfolioAtFire is still positive
     expect(result.portfolioAtFire).toBeGreaterThan(0)
+  })
+
+  it('Stap 4b: een niet-4%-SWR verschuift de FIRE-leeftijd', () => {
+    // Met de 4%-regel is het FIRE-doel yearlyExpenses/0.04 = 900.000.
+    // Een lagere SWR (bijv. 3,5%) verhoogt het doel (≈ 1.028.571) → later FIRE.
+    // Een hogere SWR (bijv. 5%) verlaagt het doel (720.000) → eerder FIRE.
+    const args = [
+      BASE_PARAMS.currentPortfolio,
+      BASE_PARAMS.annualSavings,
+      BASE_PARAMS.yearlyExpenses,
+      BASE_PARAMS.expectedReturn,
+      BASE_PARAMS.inflationRate,
+      BASE_PARAMS.currentAge,
+      undefined,
+      90,
+    ] as const
+
+    const baseline4pct = computeFireAgeForSavings(...args).fireAge // default 4%
+    const lowerSwr = computeFireAgeForSavings(
+      ...args,
+      BASE_PARAMS.yearlyExpenses / 0.035, // 3,5% SWR → hoger doel
+    ).fireAge
+    const higherSwr = computeFireAgeForSavings(
+      ...args,
+      BASE_PARAMS.yearlyExpenses / 0.05, // 5% SWR → lager doel
+    ).fireAge
+
+    expect(baseline4pct).not.toBeNull()
+    expect(lowerSwr).not.toBeNull()
+    expect(higherSwr).not.toBeNull()
+
+    // Lagere SWR (hoger doel) → niet eerder dan 4%; hogere SWR (lager doel) → niet later.
+    expect(lowerSwr!).toBeGreaterThanOrEqual(baseline4pct!)
+    expect(higherSwr!).toBeLessThanOrEqual(baseline4pct!)
+    // En de SWR maakt daadwerkelijk verschil (niet alle drie identiek).
+    expect(lowerSwr! > baseline4pct! || higherSwr! < baseline4pct!).toBe(true)
   })
 
   it('Stap 5: Eindvermogen op vaste leeftijd stijgt met spaarquote', () => {

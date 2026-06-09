@@ -1,10 +1,11 @@
 'use client'
 
-import { memo, useMemo, useState } from 'react'
-import { Home, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react'
-import { formatMaskedCurrency } from '@/lib/format'
+import { memo, useMemo, useState, useDeferredValue } from 'react'
+import { Home, ChevronRight, ChevronDown, AlertTriangle, Minus, Plus } from 'lucide-react'
+import { formatCurrency, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
+import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 import {
   analyzeHuisVerkopen,
   type HuisVerkopenInput,
@@ -21,6 +22,10 @@ interface HuisVerkopenProps {
   debts: Debt[]
   expectedReturn: number
   inflationRate: number
+  /** Start of the drawdown phase (for deriving the analysis horizon). */
+  startAge?: number
+  /** End of the drawdown phase (for deriving the analysis horizon). */
+  endAge?: number
 }
 
 /** Sensitivity scenario: growth rate + analysis result. */
@@ -28,6 +33,42 @@ interface SensitivityRow {
   groeiPct: number
   result: HuisVerkopenResult
 }
+
+// -- Smart-default heuristics --------------------------------------------------
+
+/**
+ * Derive a market rent estimate from the property value. Dutch residential
+ * gross rental yields sit around 4–5% of the property value per year; we use
+ * 4.5% and convert to a monthly figure, rounded to €25 and clamped to a sane
+ * band. This replaces the previous flat €1.200 default.
+ */
+function deriveDefaultHuur(woningWaarde: number): number {
+  const monthly = (woningWaarde * 0.045) / 12
+  return clampStep(monthly, 500, 4000, HUUR_STAP)
+}
+
+/**
+ * Derive recurring ownership costs (OZB + VvE + onderhoud) as ~1% of the
+ * property value per year, monthly, rounded to €25. Replaces the flat €200.
+ */
+function deriveDefaultOverig(woningWaarde: number): number {
+  const monthly = (woningWaarde * 0.01) / 12
+  return clampStep(monthly, 50, 1500, OVERIG_STAP)
+}
+
+/** Round v to the nearest `step`, then clamp into [min, max]. */
+function clampStep(v: number, min: number, max: number, step: number): number {
+  const rounded = Math.round(v / step) * step
+  return Math.max(min, Math.min(max, rounded))
+}
+
+// Slider granularity / bounds
+const HUUR_STAP = 25
+const OVERIG_STAP = 25
+const GROEI_STAP = 0.005 // 0.5 pp
+const GROEI_MIN = 0
+const GROEI_MAX = 0.06
+const DEFAULT_GROEI = 0.03
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -87,10 +128,22 @@ export const HuisVerkopen = memo(function HuisVerkopen({
   debts,
   expectedReturn,
   inflationRate,
+  startAge,
+  endAge,
 }: HuisVerkopenProps) {
   const { masked } = useMaskedAmounts()
-  // Build base input from assets/debts (shared across all scenarios)
-  const baseInput = useMemo<HuisVerkopenInput | null>(() => {
+
+  // Horizon = the actual drawdown period (endAge − startAge), not a fixed 20.
+  // Fall back to 20 years when the phase ages are unavailable.
+  const horizonJaren = useMemo(() => {
+    if (startAge != null && endAge != null && endAge > startAge) {
+      return Math.max(1, Math.round(endAge - startAge))
+    }
+    return 20
+  }, [startAge, endAge])
+
+  // ── House + mortgage facts (independent of the adjustable assumptions) ──
+  const houseFacts = useMemo(() => {
     const house = assets.find((a) => a.asset_type === 'eigen_huis')
     if (!house) return null
 
@@ -103,19 +156,45 @@ export const HuisVerkopen = memo(function HuisVerkopen({
       (d) => d.debt_type === 'mortgage' && d.is_active && d.current_balance > 0,
     )
 
+    const woningWaarde = house.woz_value ?? house.current_value
     return {
-      woningWaarde: house.woz_value ?? house.current_value,
+      woningWaarde,
+      startWoningWaarde: house.current_value,
       hypotheekResterend: mortgage?.current_balance ?? 0,
       maandlastHypotheek: mortgage?.monthly_payment ?? 0,
-      woningWaardeGroei: 0.03,
-      maandlastOverig: 200, // OZB + VvE + onderhoud estimate
-      verwachteHuur: 1200,
-      verkoopkostenPct: 0.04,
-      horizonJaren: 20,
     }
   }, [assets, debts])
 
-  // Default 3% result
+  // ── Adjustable assumptions with smart, value-derived defaults ──
+  const [huur, setHuur] = useState(() =>
+    houseFacts ? deriveDefaultHuur(houseFacts.woningWaarde) : 1200,
+  )
+  const [groei, setGroei] = useState(DEFAULT_GROEI)
+  const [overigeLasten, setOverigeLasten] = useState(() =>
+    houseFacts ? deriveDefaultOverig(houseFacts.woningWaarde) : 200,
+  )
+
+  // Defer the adjustable inputs so the binary-search-heavy engine does not run
+  // on every slider pixel (analyzeHuisVerkopen runs breakeven search + horizon loop).
+  const deferredHuur = useDeferredValue(huur)
+  const deferredGroei = useDeferredValue(groei)
+  const deferredOverig = useDeferredValue(overigeLasten)
+
+  // Assembled engine input — recomputes reactively from the deferred controls.
+  const baseInput = useMemo<HuisVerkopenInput | null>(() => {
+    if (!houseFacts) return null
+    return {
+      woningWaarde: houseFacts.woningWaarde,
+      hypotheekResterend: houseFacts.hypotheekResterend,
+      maandlastHypotheek: houseFacts.maandlastHypotheek,
+      woningWaardeGroei: deferredGroei,
+      maandlastOverig: deferredOverig,
+      verwachteHuur: deferredHuur,
+      verkoopkostenPct: 0.04,
+      horizonJaren,
+    }
+  }, [houseFacts, deferredGroei, deferredOverig, deferredHuur, horizonJaren])
+
   const result = useMemo<HuisVerkopenResult | null>(() => {
     if (!baseInput) return null
     return analyzeHuisVerkopen(baseInput, expectedReturn, inflationRate)
@@ -170,7 +249,10 @@ export const HuisVerkopen = memo(function HuisVerkopen({
       icon={Home}
       willContext={
         hasHouse
-          ? `Huis verkopen analyse: aanbeveling ${result.aanbeveling}. Verschil: ${formatMaskedCurrency(result.verschil, masked)} over 20 jaar. Breakeven huur: ${formatMaskedCurrency(result.breakevenHuur, masked)}/mnd.`
+          ? `Huis verkopen vs. behouden over ${horizonJaren} jaar (afbouwperiode): aanbeveling "${result.aanbeveling}". ` +
+            `Verschil ${formatMaskedCurrency(result.verschil, masked)} (positief = verkopen voordeliger). ` +
+            `Aannames: huur ${formatCurrency(huur)}/mnd, woningwaardegroei ${(groei * 100).toFixed(1)}%/jaar, overige lasten ${formatCurrency(overigeLasten)}/mnd. ` +
+            `Breakeven-huur ${formatMaskedCurrency(result.breakevenHuur, masked)}/mnd — boven dit bedrag wordt behouden voordeliger.`
           : 'Huis verkopen analyse: niet beschikbaar — geen eigen woning in portefeuille.'
       }
     >
@@ -189,6 +271,44 @@ export const HuisVerkopen = memo(function HuisVerkopen({
 
       {hasHouse && (
       <div className="space-y-3">
+        {/* -- Adjustable assumptions ------------------------------------- */}
+        <div className="space-y-2.5 rounded-[var(--r)] border border-[var(--border-ed)] p-3">
+          <p className="flex items-center text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-4)]">
+            Pas de aannames aan
+            <InfoTooltip text="De aanbeveling hangt sterk af van deze aannames. De startwaarden zijn afgeleid van je woningwaarde (huur ≈ 4,5% per jaar, overige lasten ≈ 1% per jaar). De horizon is gelijk aan je afbouwperiode. Schuif om te zien hoe gevoelig de uitkomst is." />
+          </p>
+          <SliderControl
+            label="Verwachte huur"
+            value={huur}
+            onChange={setHuur}
+            min={500}
+            max={4000}
+            step={HUUR_STAP}
+            format={(v) => `${formatCurrency(v)}/mnd`}
+          />
+          <SliderControl
+            label="Woningwaardegroei"
+            value={groei}
+            onChange={setGroei}
+            min={GROEI_MIN}
+            max={GROEI_MAX}
+            step={GROEI_STAP}
+            format={(v) => `${(v * 100).toFixed(1)}%/jr`}
+          />
+          <SliderControl
+            label="Overige woonlasten"
+            value={overigeLasten}
+            onChange={setOverigeLasten}
+            min={50}
+            max={1500}
+            step={OVERIG_STAP}
+            format={(v) => `${formatCurrency(v)}/mnd`}
+          />
+          <p className="text-[10px] leading-snug text-[var(--ink-4)]">
+            Horizon: {horizonJaren} jaar (je afbouwperiode).
+          </p>
+        </div>
+
         {/* -- Comparison table -------------------------------------------- */}
         <div className="-mx-1 overflow-x-auto">
           <table className="w-full text-xs">
@@ -206,10 +326,10 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                   Maandelijkse woonlasten
                 </td>
                 <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatMonthly(result.behouden.totaleCumulatieveKosten / 20, masked)}
+                  {formatMonthly(result.behouden.totaleCumulatieveKosten / horizonJaren, masked)}
                 </td>
                 <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                  {formatMonthly(result.verkopen.totaleCumulatieveHuur / 20, masked)}
+                  {formatMonthly(result.verkopen.totaleCumulatieveHuur / horizonJaren, masked)}
                 </td>
               </tr>
 
@@ -226,13 +346,18 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                 </td>
               </tr>
 
-              {/* Rendement op vermogen */}
+              {/* Vermogensgroei over de periode — bruto waardegroei van het
+                  productieve vermogen (huis-appreciatie vs. beleggingsgroei
+                  vóór huurbetalingen), zodat beide kolommen vergelijkbaar zijn. */}
               <tr className="border-b border-dashed border-[var(--border-ed)]">
                 <td className="px-1 py-1.5 text-[var(--ink-3)]">
-                  Rendement op vermogen
+                  <span className="inline-flex items-center">
+                    Vermogensgroei (bruto)
+                    <InfoTooltip text="De bruto waardegroei van je productieve vermogen over de periode. Bij behouden: de waardestijging van het huis. Bij verkopen: het beleggingsrendement op de verkoopopbrengst (vóór de betaalde huur). Beide tonen wat je vermogen verdient, los van de woonkosten." />
+                  </span>
                 </td>
                 <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                  {<MaskedAmount value={Math.round(result.behouden.woningWaardeNaHorizon - (assets.find(a => a.asset_type === 'eigen_huis')?.current_value ?? 0))} tone="horizon" />}
+                  {<MaskedAmount value={Math.round(result.behouden.woningWaardeNaHorizon - (houseFacts?.startWoningWaarde ?? 0))} tone="horizon" />}
                 </td>
                 <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
                   {<MaskedAmount value={Math.round(result.verkopen.beleggingswaarde - result.verkopen.nettoVerkoopopbrengst + result.verkopen.totaleCumulatieveHuur)} tone="horizon" />}
@@ -242,7 +367,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
               {/* Netto effect */}
               <tr className="border-t-2 border-[var(--ink)]">
                 <td className="px-1 py-1.5 font-semibold text-[var(--ink)]">
-                  Netto positie na 20 jaar
+                  Netto positie na {horizonJaren} jaar
                 </td>
                 <td
                   className={`px-1 py-1.5 text-right font-mono tabular-nums font-semibold ${
@@ -294,7 +419,8 @@ export const HuisVerkopen = memo(function HuisVerkopen({
                 <tbody>
                   {sensitivityRows.map((row) => {
                     const label = aanbevelingKort(row.result.aanbeveling)
-                    const isBase = row.groeiPct === 0.03
+                    // Highlight the scenario nearest the user's chosen growth rate.
+                    const isBase = Math.abs(row.groeiPct - deferredGroei) < 0.005
                     return (
                       <tr
                         key={row.groeiPct}
@@ -425,7 +551,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
           <p className="mt-2 text-[11px] leading-relaxed text-[var(--ink-3)]">
             {result.aanbeveling === 'verkopen' && (
               <>
-                Bij de huidige uitgangspunten is verkopen en huren over 20 jaar{' '}
+                Bij de huidige uitgangspunten is verkopen en huren over {horizonJaren} jaar{' '}
                 <span className="font-mono tabular-nums text-[var(--positive)]">
                   {<MaskedAmount value={Math.abs(result.verschil)} tone="horizon" />}
                 </span>{' '}
@@ -434,7 +560,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
             )}
             {result.aanbeveling === 'behouden' && (
               <>
-                Bij de huidige uitgangspunten is het huis behouden over 20 jaar{' '}
+                Bij de huidige uitgangspunten is het huis behouden over {horizonJaren} jaar{' '}
                 <span className="font-mono tabular-nums text-[var(--color-kern-500)]">
                   {<MaskedAmount value={Math.abs(result.verschil)} tone="horizon" />}
                 </span>{' '}
@@ -443,7 +569,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
             )}
             {result.aanbeveling === 'gelijk' && (
               <>
-                Beide scenario&apos;s leveren nagenoeg hetzelfde op over 20 jaar.
+                Beide scenario&apos;s leveren nagenoeg hetzelfde op over {horizonJaren} jaar.
                 Kies op basis van woonwensen en risicoprofiel.
               </>
             )}
@@ -483,6 +609,77 @@ function AssumptionRow({ label, value }: { label: string; value: React.ReactNode
     </div>
   )
 }
+
+// ── Adjustable slider control ─────────────────────────────────────────────────
+
+/**
+ * Editorial-styled range slider flanked by −/+ stepper buttons, mirroring the
+ * opbouw hypotheek control. Module colours (horizon) + ink tokens. The `format`
+ * fn renders the live value (e.g. "€1.350/mnd" or "3,0%/jr").
+ */
+const SliderControl = memo(function SliderControl({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  format,
+}: {
+  label: string
+  value: number
+  onChange: (value: number) => void
+  min: number
+  max: number
+  step: number
+  format: (value: number) => string
+}) {
+  const clampValue = (v: number) => {
+    const snapped = Math.round(v / step) * step
+    return Math.max(min, Math.min(max, snapped))
+  }
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs font-medium text-[var(--ink-3)]">{label}</span>
+        <span className="font-mono text-sm font-semibold tabular-nums text-[var(--color-horizon-600)]">
+          {format(value)}
+        </span>
+      </div>
+      <div className="mt-1.5 flex items-center gap-2">
+        <button
+          type="button"
+          aria-label={`Verlaag ${label.toLowerCase()}`}
+          onClick={() => onChange(clampValue(value - step))}
+          disabled={value <= min}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]/50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(clampValue(Number(e.target.value)))}
+          aria-label={label}
+          className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-[var(--border-ed)] accent-[var(--color-horizon-600)]"
+        />
+        <button
+          type="button"
+          aria-label={`Verhoog ${label.toLowerCase()}`}
+          onClick={() => onChange(clampValue(value + step))}
+          disabled={value >= max}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--r)] border border-[var(--border-ed)] text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]/50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  )
+})
 
 // ── Collapsible Aannames section ─────────────────────────────────────────────
 

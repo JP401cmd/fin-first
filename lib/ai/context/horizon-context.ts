@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ASSET_TYPE_LABELS, projectPortfolio, type Asset } from '@/lib/asset-data'
 import { DEBT_TYPE_LABELS, debtProjection, type Debt } from '@/lib/debt-data'
+import { WEALTH_GROUPS, WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
 import { section, formatCurrency } from './formatter'
 
 /**
@@ -36,6 +37,26 @@ export async function buildHorizonContext(supabase: SupabaseClient): Promise<str
       `${a.name} (${ASSET_TYPE_LABELS[a.asset_type]}): ${formatCurrency(Number(a.current_value))} | rendement ${a.expected_return}%/jr | bijdrage ${formatCurrency(Number(a.monthly_contribution))}/mnd`
     )
     parts.push(section('ASSETS', assetLines.join('\n')))
+  }
+
+  // Vermogenssamenstelling per groep (spaargeld / beleggingen / pensioen /
+  // vastgoed / overig). Geeft Will de spaargeld-vs-beleggingen-verhouding zodat
+  // hij allocatie- en cash-drag-tips kan geven zonder zelf per asset te rekenen.
+  if (assets.length > 0) {
+    const groupTotals: Record<WealthGroup, number> = {
+      spaargeld: 0, beleggingen: 0, pensioen: 0, vastgoed: 0, overig: 0,
+    }
+    for (const a of assets) {
+      groupTotals[WEALTH_GROUPS[a.asset_type]] += Number(a.current_value) || 0
+    }
+    const totalAssets = Object.values(groupTotals).reduce((s, v) => s + v, 0)
+    if (totalAssets > 0) {
+      const order: WealthGroup[] = ['spaargeld', 'beleggingen', 'pensioen', 'vastgoed', 'overig']
+      const compLines = order
+        .filter((g) => groupTotals[g] > 0)
+        .map((g) => `${WEALTH_GROUP_LABELS[g]}: ${formatCurrency(groupTotals[g])} (${Math.round((groupTotals[g] / totalAssets) * 100)}%)`)
+      parts.push(section('VERMOGENSSAMENSTELLING', compLines.join('\n')))
+    }
   }
 
   // Debt breakdown with projections

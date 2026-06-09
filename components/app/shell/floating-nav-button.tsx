@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search, LayoutGrid, X } from 'lucide-react'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
 import { NavMenuSheet } from './nav-menu-sheet'
@@ -26,11 +27,20 @@ import { NavMenuSheet } from './nav-menu-sheet'
 export function FloatingNavButton() {
   const [menuOpen, setMenuOpen] = useState(false)
   const cmd = useCommandPalette()
+  const router = useRouter()
 
   const handleAction = (action: 'open-chat' | 'open-account' | 'open-search') => {
-    if (action === 'open-search') cmd.open()
-    // open-chat / open-account worden later gekoppeld aan de juiste handlers
-    // (Will-coach-pane, account-sheet). Voor nu no-op zodat de knop niet crasht.
+    if (action === 'open-search') {
+      cmd.open()
+      return
+    }
+    if (action === 'open-account') {
+      setMenuOpen(false)
+      router.push('/mijn/account')
+      return
+    }
+    // open-chat wordt later gekoppeld aan de Will-coach-pane. Voor nu no-op
+    // zodat de knop niet crasht.
   }
 
   return (

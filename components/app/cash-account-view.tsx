@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
+import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
 import { TransferConfirmSheet } from '@/components/app/transfer-confirm-sheet'
 import { ManualTransferSheet } from '@/components/app/manual-transfer-sheet'
 import { PendingTransferBanner } from '@/components/app/pending-transfer-banner'
@@ -183,6 +184,7 @@ export function CashAccountView({
 
   // Transfer detection state
   const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
+  const [ownNamePatterns, setOwnNamePatterns] = useState<string[]>([])
   const [reviewTransferTxs, setReviewTransferTxs] = useState<Transaction[]>([])
 
   const { perspective } = usePerspective()
@@ -318,7 +320,7 @@ export function CashAccountView({
       const [{ data: allData, error: fetchError }, { data: ownIbanRows }] = await Promise.all([
         accountsQuery,
         user
-          ? supabase.from('user_own_ibans').select('iban').eq('user_id', user.id)
+          ? supabase.from('user_own_ibans').select('match_type, match_value, iban').eq('user_id', user.id)
           : Promise.resolve({ data: [] }),
       ])
 
@@ -350,13 +352,13 @@ export function CashAccountView({
         setAccount(target)
       }
 
-      // Build own IBAN set
-      const ibansFromAccounts = (allData as Account[])
-        .map((a) => a.iban)
-        .filter(Boolean)
-        .map((i) => i!.replace(/\s/g, '').toUpperCase())
-      const ibansFromOwn = (ownIbanRows ?? []).map((r: { iban: string }) => r.iban.replace(/\s/g, '').toUpperCase())
-      setOwnIbans(new Set([...ibansFromAccounts, ...ibansFromOwn]))
+      // Build own-account identifiers (IBANs + naam-patronen)
+      const ids = buildOwnAccountIdentifiers(
+        (ownIbanRows ?? []) as { match_type?: string | null; match_value?: string | null; iban?: string | null }[],
+        (allData as Account[]).map((a) => a.iban),
+      )
+      setOwnIbans(ids.ibans)
+      setOwnNamePatterns(ids.namePatterns)
     } catch (err) {
       console.error('Error loading account:', err)
       if (!signal?.aborted) setError('Kon rekening niet laden. Probeer het opnieuw.')
@@ -1326,8 +1328,8 @@ export function CashAccountView({
             t.transaction_type !== 'transfer' &&
             t.transaction_type !== 'joint_transfer' &&
             !t.budget_id &&
-            !!t.counterparty_iban &&
-            isOwnAccountTransfer(t.counterparty_iban, ownIbans)
+            (!!t.counterparty_iban || !!t.counterparty_name) &&
+            isOwnAccountTransfer(t.counterparty_iban, ownIbans, t.counterparty_name, ownNamePatterns)
         )
         if (pendingTransfers.length === 0) return null
         return (
@@ -1970,7 +1972,7 @@ export function CashAccountView({
                       const amount = Number(tx.amount)
                       const isPositive = amount > 0
                       const isTransfer = tx.transaction_type === 'transfer'
-                      const isPendingTransfer = !isTransfer && tx.transaction_type !== 'joint_transfer' && !tx.budget_id && !!tx.counterparty_iban && isOwnAccountTransfer(tx.counterparty_iban, ownIbans)
+                      const isPendingTransfer = !isTransfer && tx.transaction_type !== 'joint_transfer' && !tx.budget_id && (!!tx.counterparty_iban || !!tx.counterparty_name) && isOwnAccountTransfer(tx.counterparty_iban, ownIbans, tx.counterparty_name, ownNamePatterns)
                       const isSplitTx = !!tx.is_split
                       const isExpanded = expandedSplitId === tx.id
                       const loadedSplits = splitsByTxId[tx.id]

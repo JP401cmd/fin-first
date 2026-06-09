@@ -698,6 +698,14 @@ function TreeSection({
             </button>
           </header>
 
+          {type === 'archive' && parents.length > 0 && (
+            <p className="mb-3 -mt-1 text-[11px] leading-relaxed text-[var(--ink-4)]">
+              <span className="font-medium text-[var(--ink-3)]">Eigen rekening</span> wordt automatisch gevuld
+              door transfer-herkenning (verschuivingen tussen je eigen rekeningen). Je stelt hier geen bedrag
+              voor in — het telt nergens mee.
+            </p>
+          )}
+
           {parents.length === 0 && (
             <p className="py-3 text-xs italic text-[var(--ink-4)]">
               Nog geen {TYPE_LABEL[type].toLowerCase()}. Voeg een hoofdbudget toe.
@@ -733,7 +741,7 @@ function TreeSection({
                           key={child.id}
                           row={child}
                           amountValue={child.amount ?? child.defaultLimit ?? 0}
-                          amountReadOnly={false}
+                          amountReadOnly={child.budgetType === 'archive'}
                           onUpdate={onUpdate}
                           onAmountInput={onAmountInput}
                           onTakeOver={onTakeOver}

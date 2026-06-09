@@ -26,7 +26,6 @@ import type { GoalSlug } from '@/lib/goals/types'
 import {
   GOAL_MODULE_PRESETS,
   INTENT_TO_GOAL_FALLBACK,
-  getGoalFirstWinPath,
   isGoalSlug,
 } from '@/lib/goals/catalog'
 
@@ -1009,22 +1008,12 @@ export default function OnboardingPage() {
         throw new Error(`${data.error || 'Opslaan mislukt'}${detail}`)
       }
 
-      // Pre-generate AI recommendations for goals waar /will het primaire
-      // landingspad is — anders is de pagina leeg bij eerste bezoek.
-      const aiPregenGoals: GoalSlug[] = ['bewust-leven', 'noodfonds']
-      if (state.selectedGoals.some((g) => aiPregenGoals.includes(g))) {
-        // Fire-and-forget: AI-recommendations renderen progressief op de Wil-pagina
-        // via polling. Blokkeer onboarding-success niet op deze LLM-call (typisch 5-15s).
-        fetch('/api/ai/recommendations/initial', { method: 'POST' })
-          .then((res) => {
-            if (!res.ok) {
-              console.error('[onboarding] AI pre-generation returned', res.status, res.statusText)
-            }
-          })
-          .catch((err) => {
-            console.error('[onboarding] AI pre-generation failed:', err)
-          })
-      }
+      // NB: geen AI pre-generatie meer hier. Dat endpoint
+      // (/api/ai/recommendations/initial) zit achter de 'ai'-subscriptie, die
+      // een net-geonboarde gebruiker (active_subscriptions = []) per definitie
+      // niet heeft — de call gaf dus gegarandeerd 403 en een console-error.
+      // AI-aanbevelingen worden on-demand gegenereerd waar de gebruiker écht
+      // AI-toegang heeft (bv. de roadmap-modal), niet blind bij onboarding.
 
       // Complete the progress bar
       setSaveProgress(100)
@@ -1411,21 +1400,21 @@ export default function OnboardingPage() {
             <OnboardingSuccess
               onDashboard={() => {
                 clearLocalStorage()
-                // Primaire goal (eerste in array) bepaalt het first-win-pad;
-                // fallback naar getHomePath als er geen goals zijn (news-only).
-                const primaryGoal = state.selectedGoals[0]
-                const destination = primaryGoal
-                  ? getGoalFirstWinPath(primaryGoal)
-                  : getHomePath(state.activeModules)
+                // News-only gebruikers landen op hun krant; iedereen anders gaat
+                // standaard naar het Overzicht (de knop heet ook "Ga naar overzicht").
+                const isNewsOnly =
+                  state.activeModules.length === 1 && state.activeModules[0] === 'nieuws'
+                const destination = isNewsOnly
+                  ? getHomePath(state.activeModules)
+                  : '/overzicht'
                 // Hard navigation: voorkomt stale-read redirect-loop in (app)/layout.tsx
                 // direct na het wegschrijven van `onboarding_completed = true`. Bij een
                 // soft-navigation kan de server-layout de nét-geschreven row missen en
                 // redirecten naar /onboarding, wat de Suspense-fallback laat knipperen
                 // tot een browser-refresh de sessie opnieuw aligneert.
-                window.location.assign(destination + '?welcome=1')
+                window.location.assign(destination)
               }}
               activeModules={state.activeModules}
-              goal={state.selectedGoals[0]}
             />
           )}
         </StepTransition>

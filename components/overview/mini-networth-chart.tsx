@@ -16,11 +16,11 @@ import { computeConfidenceBand } from '@/lib/confidence-band'
  * twee pagina's.
  *
  * Visueel:
- *  - "Vandaag" landt op ~20% van links zodat er ruime ruimte rechts is
- *    voor de projectie naar vrijheid
- *  - Linker 20%: historisch netto vermogen als **stippellijn** terug
+ *  - "Vandaag" landt op ~38% van links zodat er voldoende ruimte links is
+ *    voor de historie én rechts voor de projectie naar vrijheid
+ *  - Linker ~38%: historisch netto vermogen als **stippellijn** terug
  *    in de tijd (uit `netWorthHistory`)
- *  - Rechter 80%: projectie als **doorlopende lijn** vanaf vandaag naar
+ *  - Rechter ~62%: projectie als **doorlopende lijn** vanaf vandaag naar
  *    vrijheidsmoment (uit `simRows`, gesplitst op fireAge)
  *  - Vandaag-marker (groen) + Vrijheid-marker (violet) met label
  *    "{Vrijheid|Pensioen} {fireAge}"
@@ -73,9 +73,11 @@ export function MiniNetWorthChart({
   const chartW = W - PAD_LEFT - PAD_RIGHT
   const chartH = H - PAD_TOP - PAD_BOTTOM
 
-  // Vandaag staat op 20% van links — rest is projectie naar vrijheid.
-  // Linker 20% is gereserveerd voor historische stippellijn terug in de tijd.
-  const TODAY_X_FRACTION = 0.2
+  // Vandaag staat op ~38% van links — genoeg ruimte voor 12 maanden
+  // historie (links) én een leesbare projectie naar vrijheid (rechts).
+  // Eerder was dit 20%, waardoor het "tot nu"-segment veel te smal werd en
+  // de gerealiseerde tracking onleesbaar tegen de linkerrand plakte.
+  const TODAY_X_FRACTION = 0.38
 
   // Filter de simRows tot het opbouw-segment: vandaag → fireAge (vrijheid).
   // De afbouw-fase leeft op /toekomst — hier tonen we alleen het verhaal
@@ -153,22 +155,29 @@ export function MiniNetWorthChart({
   // minder dan HISTORY_WINDOW_MONTHS punten zijn, schaalt de lijn-lengte
   // proportioneel mee (geen artificiële uitrekking meer).
 
-  // Y-schaal: 0 → max van projectie + history + eindwaarde + P90-top
-  // van de confidence-band zodat de gradient binnen het frame valt.
-  // P90 op endpoint = endValue × (1 + 1.28 × σ × √years). Voor MVP
-  // approximaten we via factor 1.5 = simpel-headroom.
-  const maxProjection = Math.max(...dedupedProjection.map((p) => p.value), 1)
-  const bandHeadroom = maxProjection * 1.5
-  const allValues = [
+  // Y-schaal: 0 → hoogste ECHTE datapunt (history ∪ projectie ∪ eindwaarde)
+  // met een kleine 8%-marge bovenin. Bewust GEEN headroom voor de
+  // confidence-band: een 1,5× band-headroom rekte de as op en drukte het
+  // "tot nu"-segment tegen de vloer. De band klemmen we straks visueel
+  // binnen het frame (valueToYClamped) i.p.v. de schaal eraan op te hangen —
+  // zo houdt de historie maximale verticale ruimte en vult de projectie het
+  // frame zonder dode bovenruimte.
+  const dataPeak = Math.max(
     ...recentHistory.map((h) => h.value),
     ...dedupedProjection.map((p) => p.value),
     endValue,
-    bandHeadroom,
-  ]
-  const maxValue = Math.max(...allValues, 1)
+    1,
+  )
+  const maxValue = dataPeak * 1.08
   const yScale = chartH / maxValue
   function valueToY(v: number) {
     return PAD_TOP + chartH - v * yScale
+  }
+  // Klem een waarde binnen [0, maxValue] vóór projectie naar Y — gebruikt
+  // voor de confidence-band zodat P90 boven de as netjes tegen het plafond
+  // afvlakt i.p.v. buiten beeld te lopen (of de hele as op te rekken).
+  function valueToYClamped(v: number) {
+    return valueToY(Math.min(Math.max(v, 0), maxValue))
   }
 
   // X-mapping:
@@ -224,15 +233,15 @@ export function MiniNetWorthChart({
   const bandPath =
     bandPoints.length >= 2
       ? [
-          // Forward langs P90
+          // Forward langs P90 (geklemd binnen het frame)
           ...bandPoints.map(
             (p, i) =>
-              `${i === 0 ? 'M' : 'L'}${ageToX(p.age).toFixed(1)},${valueToY(p.p90).toFixed(1)}`,
+              `${i === 0 ? 'M' : 'L'}${ageToX(p.age).toFixed(1)},${valueToYClamped(p.p90).toFixed(1)}`,
           ),
-          // Backward langs P10
+          // Backward langs P10 (geklemd binnen het frame)
           ...[...bandPoints].reverse().map(
             (p) =>
-              `L${ageToX(p.age).toFixed(1)},${valueToY(p.p10).toFixed(1)}`,
+              `L${ageToX(p.age).toFixed(1)},${valueToYClamped(p.p10).toFixed(1)}`,
           ),
           'Z',
         ].join(' ')

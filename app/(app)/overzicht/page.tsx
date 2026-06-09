@@ -6,6 +6,7 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
+import { WelcomeGuideBanner } from '@/components/overview/welcome-guide-banner'
 import {
   composeOverviewBriefing,
   computeFreedomTotal,
@@ -223,6 +224,7 @@ export default async function OverzichtPage() {
 
   return (
     <>
+      <WelcomeGuideBanner />
       <CheckinBanner />
       <OverzichtHero
         userName={userName ?? undefined}
@@ -252,6 +254,7 @@ export default async function OverzichtPage() {
         hasGoals={hasGoals}
         accountAgeDays={accountAgeDays}
         liquidCash={liquidCash}
+        hasCompletedHorizonSetup={horizonData?.hasCompletedHorizonSetup ?? true}
       />
     </>
   )

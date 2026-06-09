@@ -19,6 +19,14 @@ interface SchuldenSamenvattingProps {
   annualSavings: number
   /** Annual return rate (e.g. 0.07 for 7%) used for FIRE impact calculation */
   annualReturn?: number
+  /** Annual expenses (€) — used as the freedom yardstick (fallback for fireTarget). */
+  yearlyExpenses?: number
+  /** FIRE target portfolio (€). When provided, freedom impact is measured against this. */
+  fireTarget?: number
+  /** Current age — start of the accumulation horizon for the freed-payment investment. */
+  currentAge?: number
+  /** FIRE age — end of the accumulation horizon. */
+  fireAge?: number | null
 }
 
 interface Scenario {
@@ -32,8 +40,12 @@ interface Scenario {
   monthsEarlier: number
   /** Interest savings in EUR */
   interestSaved: number
-  /** FIRE months impact: freed monthly payment invested grows to save X months */
-  fireMonthsImpact: number
+  /**
+   * Extra wealth at FIRE (€): the monthly payment freed after debt payoff,
+   * invested over the remaining accumulation horizon, compounded to FIRE.
+   * A directly-correct quantity (no fragile months conversion).
+   */
+  extraVermogenBijFire: number
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -136,42 +148,45 @@ function estimatePortfolioPayoff(
 }
 
 /**
- * Calculate FIRE impact in months:
- * After debt payoff, the total monthly payment becomes available for investment.
- * Over the remaining accumulation years, this extra investment compounds and
- * reduces the time to FIRE.
+ * Calculate the extra wealth at FIRE from freeing the debt's monthly payment.
  *
- * Simplified: extra monthly savings × months earlier × compounding factor
- * translates to freedom-months gained.
+ * After a debt is paid off, its monthly payment is no longer owed and can be
+ * invested. We invest that freed payment as an annuity over the remaining
+ * accumulation horizon (from debt payoff until FIRE) and report the future value
+ * at FIRE. This is a directly-correct euro quantity — unlike a "months earlier"
+ * conversion it does not depend on the (fragile) marginal portfolio growth rate
+ * at the FIRE boundary.
+ *
+ * The freed payment only starts working once the debt is gone, so the investing
+ * window is `accumulationMonths − monthsToPayoff` (clamped to ≥ 0).
+ *
+ * @param monthlyPaymentFreed - total monthly payment that becomes investable (€)
+ * @param accumulationMonths  - months from now until FIRE
+ * @param monthsToPayoff      - months until the debt is fully repaid (in this scenario)
+ * @param annualReturn        - expected annual return (e.g. 0.07)
  */
-function calculateFireMonthsImpact(
+function calculateExtraWealthAtFire(
   monthlyPaymentFreed: number,
-  monthsEarlier: number,
+  accumulationMonths: number,
+  monthsToPayoff: number,
   annualReturn: number,
-  annualExpenses: number,
 ): number {
-  if (annualExpenses <= 0 || monthlyPaymentFreed <= 0 || monthsEarlier <= 0) return 0
+  if (monthlyPaymentFreed <= 0 || accumulationMonths <= 0) return 0
 
-  // After debt payoff, the freed monthly payment goes into investments.
-  // Over the months saved, this compounds and creates additional portfolio value.
+  // The freed payment can only be invested after the debt is repaid.
+  const monthsInvesting = Math.max(0, accumulationMonths - monthsToPayoff)
+  if (monthsInvesting <= 0) return 0
+
   const monthlyReturn = annualReturn / 12
-  const monthsInvesting = monthsEarlier
 
-  // Future value of annuity: PMT × ((1+r)^n - 1) / r
-  let portfolioGain: number
+  // Future value of an annuity: PMT × ((1+r)^n − 1) / r
   if (monthlyReturn > 0.0001) {
-    portfolioGain =
+    return Math.round(
       monthlyPaymentFreed *
-      ((Math.pow(1 + monthlyReturn, monthsInvesting) - 1) / monthlyReturn)
-  } else {
-    portfolioGain = monthlyPaymentFreed * monthsInvesting
+        ((Math.pow(1 + monthlyReturn, monthsInvesting) - 1) / monthlyReturn),
+    )
   }
-
-  // Convert portfolio gain to months of freedom (expenses / 12 = monthly cost)
-  const monthlyExpenses = annualExpenses / 12
-  if (monthlyExpenses <= 0) return 0
-
-  return Math.round(portfolioGain / monthlyExpenses)
+  return Math.round(monthlyPaymentFreed * monthsInvesting)
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -190,12 +205,30 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
   debts,
   annualSavings,
   annualReturn = 0.07,
+  yearlyExpenses,
+  fireTarget,
+  currentAge,
+  fireAge,
 }: SchuldenSamenvattingProps) {
   // Filter to active debts with a balance > 0
   const activeDebts = useMemo(
     () => debts.filter((d) => d.is_active && d.current_balance > 0),
     [debts],
   )
+
+  // Freedom yardstick: the FIRE target portfolio. Prefer the app-resolved target,
+  // fall back to the 4%-rule on expenses. NEVER use savings as the yardstick.
+  const resolvedFireTarget = useMemo(() => {
+    if (fireTarget != null && fireTarget > 0) return fireTarget
+    if (yearlyExpenses != null && yearlyExpenses > 0) return yearlyExpenses / 0.04
+    return 0
+  }, [fireTarget, yearlyExpenses])
+
+  // Remaining accumulation horizon in months (now → FIRE).
+  const accumulationMonths = useMemo(() => {
+    if (currentAge == null || fireAge == null) return 0
+    return Math.max(0, Math.round((fireAge - currentAge) * 12))
+  }, [currentAge, fireAge])
 
   // Compute scenarios
   const scenarios = useMemo(() => {
@@ -224,7 +257,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
           extraPerMonth: 0,
           monthsEarlier: 0,
           interestSaved: 0,
-          fireMonthsImpact: 0,
+          extraVermogenBijFire: 0,
         }
       }
 
@@ -235,11 +268,14 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
         baseline.totalInterest - accelerated.totalInterest,
       )
 
-      const fireMonthsImpact = calculateFireMonthsImpact(
+      // After debt payoff, the freed monthly payment is invested over the
+      // remaining accumulation horizon. Accelerated payoff means it starts
+      // working sooner (accelerated.months < baseline.months).
+      const extraVermogenBijFire = calculateExtraWealthAtFire(
         totalMonthlyPayment,
-        monthsEarlier,
+        accumulationMonths,
+        accelerated.months,
         annualReturn,
-        annualSavings - annualSavings * pct, // remaining annual expenses proxy
       )
 
       return {
@@ -248,10 +284,10 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
         extraPerMonth,
         monthsEarlier,
         interestSaved,
-        fireMonthsImpact,
+        extraVermogenBijFire,
       }
     })
-  }, [activeDebts, annualSavings, annualReturn])
+  }, [activeDebts, annualSavings, annualReturn, accumulationMonths])
 
   // Compute baseline total interest (annuity-based)
   const baselineInterest = useMemo(() => {
@@ -301,11 +337,35 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
   // First scenario (10%) is the most achievable — green highlight
   const hasScenarios = scenarios.length > 0 && scenarios.some((s) => s.monthsEarlier > 0)
 
+  // ── Rich Will-context: per-scenario cijfers + FIRE-maatstaf ──────────────
+  // Money via raw formatCurrency (chat context, niet gemaskeerd).
+  const scenarioContext = scenarios
+    .filter((s) => s.extraPerMonth > 0)
+    .map(
+      (s) =>
+        `${s.label} (${formatCurrency(s.extraPerMonth)}/mnd): ` +
+        `${s.monthsEarlier > 0 ? `${s.monthsEarlier} mnd eerder schuldenvrij` : 'geen versnelling'}, ` +
+        `${s.interestSaved > 0 ? `${formatCurrency(s.interestSaved)} rentebesparing` : 'geen rentebesparing'}, ` +
+        `${s.extraVermogenBijFire > 0 ? `+${formatCurrency(s.extraVermogenBijFire)} extra vermogen bij FIRE` : 'geen extra vermogen bij FIRE'}`,
+    )
+    .join('; ')
+
+  const willContext = [
+    `Schulden opbouwfase: ${activeDebts.length} schuld(en), totaal ${formatCurrency(totalDebt)}, maandlast ${formatCurrency(totalMonthlyPayment)}.`,
+    baselineInterest > 0 ? `Totale rentelast bij huidig tempo: ${formatCurrency(baselineInterest)}.` : '',
+    resolvedFireTarget > 0
+      ? `Vrijheidsmaatstaf (FIRE-doel): ${formatCurrency(Math.round(resolvedFireTarget))}; na aflossing wordt de vrijgekomen maandlast belegd over de resterende opbouwhorizon (${Math.round(accumulationMonths / 12)} jaar).`
+      : '',
+    scenarioContext ? `Scenario's: ${scenarioContext}.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <AnalysisSection
       title="Schuldenanalyse"
       icon={Landmark}
-      willContext={`Schulden opbouwfase: ${activeDebts.length} schulden, totaal ${formatCurrency(totalDebt)}, maandlast ${formatCurrency(totalMonthlyPayment)}.`}
+      willContext={willContext}
     >
       <div className="space-y-3">
         {/* ── Total overview ─────────────────────────────────── */}
@@ -395,7 +455,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
                       Rentebesparing
                     </th>
                     <th className="px-2 py-1.5 text-right font-medium text-[var(--ink-3)]">
-                      FIRE-impact
+                      Extra vermogen bij FIRE
                     </th>
                   </tr>
                 </thead>
@@ -440,8 +500,8 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
                             : '–'}
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                          {scenario.fireMonthsImpact > 0
-                            ? `${scenario.fireMonthsImpact} mnd`
+                          {scenario.extraVermogenBijFire > 0
+                            ? <MaskedAmount value={scenario.extraVermogenBijFire} signPrefix="+" tone="horizon" />
                             : '–'}
                         </td>
                       </tr>
@@ -469,7 +529,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
               </table>
             </div>
             <p className="text-[10px] leading-relaxed text-[var(--ink-4)]">
-              Na aflossing gaat je maandlast ({<MaskedAmount value={totalMonthlyPayment} tone="horizon" />}/mnd) naar besparingen — dit versnelt je pad naar FIRE.
+              Na aflossing komt je maandlast ({<MaskedAmount value={totalMonthlyPayment} tone="horizon" />}/mnd) vrij om te beleggen. De kolom &laquo;Extra vermogen bij FIRE&raquo; toont wat die vrijgekomen inleg, belegd tot je FIRE-leeftijd, oplevert.
             </p>
           </div>
         )}

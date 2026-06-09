@@ -41,6 +41,9 @@ export interface HorizonSetupPaneProps {
   monthlyContributionFromAssets: number | null
   /** Budget-surplus (6m gemiddelde). Voor read-only summary als budgetteren actief. */
   monthlySurplusFromBudget: number | null
+  /** Spaarquote × inkomen per maand uit de cashflow-pagina — exact het bedrag dat
+   *  de prognose gebruikt als deze override leeg is. Null als nog onbekend. */
+  baseMonthlySavingsFromCashflow: number | null
   budgetingActive: boolean
 
   /** Initiële eindstrategie uit fireStrategy. */
@@ -60,6 +63,7 @@ export function HorizonSetupPane({
   initialMonthlySavingsOverride,
   monthlyContributionFromAssets,
   monthlySurplusFromBudget,
+  baseMonthlySavingsFromCashflow,
   budgetingActive,
   initialEndStrategy,
   initialEndAge,
@@ -164,6 +168,7 @@ export function HorizonSetupPane({
           onChange={setSavings}
           monthlyContributionFromAssets={monthlyContributionFromAssets}
           monthlySurplusFromBudget={monthlySurplusFromBudget}
+          baseMonthlySavingsFromCashflow={baseMonthlySavingsFromCashflow}
           budgetingActive={budgetingActive}
         />
 

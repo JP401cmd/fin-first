@@ -4,7 +4,7 @@ import { memo, useState, useEffect } from 'react'
 import { TrendingDown, Check, AlertTriangle, X, CheckCircle2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
-import { berekenEerderStoppen } from '@/lib/phase-analysis'
+import { berekenEerderStoppen, type EerderStoppenResult, type EerderStoppenStatus } from '@/lib/phase-analysis'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
@@ -21,39 +21,14 @@ export interface EerderStoppenProps {
   inflationRate: number
   cashflows?: SimCashflow[]
   fireStrategy?: FireStrategyConfig
+  /**
+   * Canonical FIRE target (benodigd vermogen bij FIRE) uit `resolveFireParams`/
+   * `fire.fireTarget`. Lijnt de vrijheidsmaatstaf uit met de rest van de app
+   * i.p.v. een eigen SWR-afleiding. Valt in de lib terug op yearlyExpenses/SWR.
+   */
+  fireTarget?: number
   /** Which transition scenario is active — adjusts title text */
   scenario?: 'gap' | 'shortfall' | 'none'
-}
-
-/**
- * Internal result type from the eerder stoppen calculation.
- */
-interface EerderStoppenState {
-  opties: {
-    jarenEerder: number
-    nieuwFireAge: number
-    extraMaandelijksBesparen: number
-    haalbaar: boolean
-  }[]
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Determine the feasibility class for a given option:
- * - "haalbaar": extra savings are small enough (green)
- * - "krap": extra savings are significant but technically possible (amber)
- * - "niet-haalbaar": extra savings exceed current savings (red)
- */
-function feasibilityLevel(
-  extraMonthly: number,
-  annualSavings: number,
-): 'haalbaar' | 'krap' | 'niet-haalbaar' {
-  if (extraMonthly <= 0) return 'haalbaar'
-  const extraAnnual = extraMonthly * 12
-  if (extraAnnual < annualSavings * 0.5) return 'haalbaar'
-  if (extraAnnual < annualSavings) return 'krap'
-  return 'niet-haalbaar'
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -80,9 +55,10 @@ export const EerderStoppen = memo(function EerderStoppen({
   inflationRate,
   cashflows = [],
   fireStrategy,
+  fireTarget,
   scenario = 'shortfall',
 }: EerderStoppenProps) {
-  const [state, setState] = useState<EerderStoppenState | null>(null)
+  const [state, setState] = useState<EerderStoppenResult | null>(null)
 
   // Lazy compute: defer past first paint
   useEffect(() => {
@@ -97,6 +73,7 @@ export const EerderStoppen = memo(function EerderStoppen({
         inflationRate,
         cashflows,
         fireStrategy ?? DEFAULT_FIRE_STRATEGY,
+        { fireTarget },
       )
 
       setState(result)
@@ -114,6 +91,7 @@ export const EerderStoppen = memo(function EerderStoppen({
     inflationRate,
     cashflows,
     fireStrategy,
+    fireTarget,
   ])
 
   const loading = state === null
@@ -126,8 +104,8 @@ export const EerderStoppen = memo(function EerderStoppen({
   const yearsToFire = currentFireAge - currentAge
   const fireAlreadyClose = yearsToFire <= 2
 
-  // All options require no extra savings — already on track
-  const allAlreadyOnTrack = state !== null && state.opties.every(o => o.extraMaandelijksBesparen <= 0 && o.haalbaar)
+  // All options require no extra savings — already on track (status 'haalbaar' + €0)
+  const allAlreadyOnTrack = state !== null && state.opties.every(o => o.extraMaandelijksBesparen <= 0 && o.status === 'haalbaar')
 
   const notRelevant = fireAlreadyClose || allAlreadyOnTrack
 
@@ -140,12 +118,13 @@ export const EerderStoppen = memo(function EerderStoppen({
         notRelevant
           ? 'Eerder stoppen analyse: niet relevant — FIRE is al op korte termijn bereikbaar'
           : state
-            ? `Eerder stoppen analyse: ${state.opties
+            ? `Eerder stoppen analyse (FIRE-leeftijd nu ${currentFireAge}, doel-vermogen ${fireTarget != null ? formatCurrency(Math.round(fireTarget)) : `${formatCurrency(Math.round(yearlyExpenses))}/jaar uitgaven`}): ` +
+              state.opties
                 .map(
                   (o) =>
-                    `${o.jarenEerder}j eerder = ${formatCurrency(o.extraMaandelijksBesparen)}/mnd extra (${o.haalbaar ? 'haalbaar' : 'niet haalbaar'})`,
+                    `${o.jarenEerder}j eerder (op ${o.nieuwFireAge}) = ${o.extraMaandelijksBesparen > 0 ? `${formatCurrency(o.extraMaandelijksBesparen)}/mnd extra` : 'geen extra inleg'} (${o.status})`,
                 )
-                .join(', ')}`
+                .join('; ')
             : 'Eerder stoppen analyse (laden...)'
       }
     >
@@ -179,34 +158,27 @@ export const EerderStoppen = memo(function EerderStoppen({
                 </tr>
               </thead>
               <tbody>
-                {state.opties.map((optie) => {
-                  const level = feasibilityLevel(
-                    optie.extraMaandelijksBesparen,
-                    annualSavings,
-                  )
-
-                  return (
-                    <tr
-                      key={optie.jarenEerder}
-                      className="border-b border-dashed border-[var(--border-ed)] last:border-b-0"
-                    >
-                      <td className="px-1 py-2 font-mono tabular-nums text-[var(--ink-2)]">
-                        {optie.jarenEerder} jaar
-                      </td>
-                      <td className="px-1 py-2 font-mono tabular-nums text-[var(--ink-2)]">
-                        {optie.nieuwFireAge} jaar
-                      </td>
-                      <td className="px-1 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
-                        {optie.extraMaandelijksBesparen > 0
-                          ? `+${formatCurrency(optie.extraMaandelijksBesparen)}`
-                          : '\u2013'}
-                      </td>
-                      <td className="px-1 py-2 text-center">
-                        <FeasibilityIcon level={level} />
-                      </td>
-                    </tr>
-                  )
-                })}
+                {state.opties.map((optie) => (
+                  <tr
+                    key={optie.jarenEerder}
+                    className="border-b border-dashed border-[var(--border-ed)] last:border-b-0"
+                  >
+                    <td className="px-1 py-2 font-mono tabular-nums text-[var(--ink-2)]">
+                      {optie.jarenEerder} jaar
+                    </td>
+                    <td className="px-1 py-2 font-mono tabular-nums text-[var(--ink-2)]">
+                      {optie.nieuwFireAge} jaar
+                    </td>
+                    <td className="px-1 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
+                      {optie.extraMaandelijksBesparen > 0
+                        ? `+${formatCurrency(optie.extraMaandelijksBesparen)}`
+                        : '\u2013'}
+                    </td>
+                    <td className="px-1 py-2 text-center">
+                      <FeasibilityIcon level={optie.status} />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -229,7 +201,7 @@ export const EerderStoppen = memo(function EerderStoppen({
 const FeasibilityIcon = memo(function FeasibilityIcon({
   level,
 }: {
-  level: 'haalbaar' | 'krap' | 'niet-haalbaar'
+  level: EerderStoppenStatus
 }) {
   switch (level) {
     case 'haalbaar':

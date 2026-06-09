@@ -28,10 +28,13 @@ const PALETTE_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('tf-pale
 // Inline service-worker registratie. Reden voor inline (i.p.v. een client-component
 // in <body>): static-analyzers (PWABuilder, Play Store crawl) parsen alleen HTML —
 // een useEffect-call zien zij niet. Crawlers bezoeken alleen productie-URLs, dus we
-// gaten registratie op productie en saneren in dev (een eerder gebouwde `public/sw.js`
-// is in git getrackt en wordt door `next dev` gewoon geserveerd; zonder de unregister
-// blijft een stale SW alle `/api/*`-requests onderscheppen en breekt HMR de fetches
-// met "Failed to fetch").
+// gaten registratie op productie en saneren in dev. `public/sw.js` is gitignored
+// (zie .gitignore) zodat het NIET in een fresh checkout belandt, maar een lokale
+// `npm run build` laat het bestand wél op schijf achter — en `next dev` serveert
+// alles onder public/. Zonder de unregister blijft zo'n stale SW alle `/api/*`-
+// requests onderscheppen en `/_next/static/*.js`-chunks CacheFirst serveren; dat
+// breekt HMR met "Failed to fetch" én geeft "module factory is not available" zodra
+// Turbopack een chunk herbouwt. Fix bij twijfel: verwijder de lokale public/sw.js.
 //
 // De dev-sanering moet SELF-HEALING zijn: een actieve Serwist-SW serveert
 // `/_next/static/*.js`-chunks CacheFirst. In dev (Turbopack) wijzigt de inhoud van
