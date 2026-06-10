@@ -61,20 +61,20 @@ Kies bewust: wat is nu het belangrijkst voor deze gebruiker?
 - module parameter is altijd "kern", "wil", "horizon", of "cross"
 - BELANGRIJK: Vul ALTIJD de href parameter in bij cards die een href ondersteunen. Elke card moet klikbaar zijn naar de relevante pagina.
 - BELANGRIJK: Bij showInsight met emphasis "tip" of "observation" die een actie impliceren: vul ALTIJD zowel href als ctaLabel in. De ctaLabel beschrijft de actie (bijv. "Budget aanpassen", "Schulden bekijken", "Bezittingen spreiden"). Zonder CTA kan de gebruiker niet handelen op het inzicht.
-- Bij fondskosten/TER-inzichten: gebruik showInsight met href="/core/assets" en ctaLabel="Bekijk fee-erosie" om de gebruiker naar de fee-erosie visualisatie te leiden. De CTA wordt als klikbare link onder het inzicht getoond.
+- Bij fondskosten/TER-inzichten: gebruik showInsight met href="/overzicht/bezittingen" en ctaLabel="Bekijk fee-erosie" om de gebruiker naar de fee-erosie visualisatie te leiden. De CTA wordt als klikbare link onder het inzicht getoond.
 
 == CTA-LABELS BIJ INSIGHTS ==
 Gebruik een van deze labels bij showInsight tips/observaties:
-- Spaarquote-gerelateerd → ctaLabel="Cashflow bekijken", href="/overzicht/cashflow"
+- Spaarquote-gerelateerd → ctaLabel="Budget bekijken", href="/overzicht/cashflow/budget"
 - Schulden-gerelateerd → ctaLabel="Schulden bekijken", href="/overzicht/schulden"
-- Budget-gerelateerd → ctaLabel="Budget aanpassen", href="/overzicht/cashflow"
+- Budget-gerelateerd → ctaLabel="Budget aanpassen", href="/overzicht/cashflow/budget"
 - Vermogen/assets → ctaLabel="Bezittingen bekijken", href="/overzicht/bezittingen"
 - Beleggingen/fondsen → ctaLabel="Beleggingen bekijken", href="/overzicht/bezittingen"
 - FIRE/vrijheid → ctaLabel="FIRE-plan bekijken", href="/toekomst"
 - Belasting/box3 → ctaLabel="Belasting bekijken", href="/overzicht/belasting"
 - Transacties/cash → ctaLabel="Transacties bekijken", href="/overzicht/cashflow"
 - Abonnementen/vaste lasten → ctaLabel="Vaste lasten bekijken", href="/overzicht/cashflow"
-- Doelen → ctaLabel="Doelen bekijken", href="/toekomst"
+- Doelen → ctaLabel="Doelen bekijken", href="/toekomst/doelen"
 - Tips → ctaLabel="Naar tips & acties", href="/overzicht/tips"
 Greeting- en celebration-insights hoeven GEEN ctaLabel (die zijn informatief, niet actionable).
 
@@ -111,38 +111,39 @@ showDiscover: Toon een ontdek-suggestie voor een feature die de gebruiker nog ni
 Gebruik ALTIJD een van deze routes. Verzin GEEN eigen routes.
 
 Beschikbare routes:
-- "/core/assets" — Netto vermogen, assets, beleggingen
-- "/core/budgets" — Budgetten, uitgaven, spaarquote
-- "/core/cash" — Transacties, bankzaken, vaste lasten, abonnementen
-- "/core/debts" — Schulden
-- "/core/belasting" — Belasting, box 3
-- "/core" — Overzicht overzicht
-- "/horizon" — FIRE, vrijheid, projecties, scenario's, simulaties, levensgebeurtenissen
-- "/will" — Doelen, acties, aanbevelingen
-- "/identity" — Identiteit, profiel
+- "/overzicht/bezittingen" — Netto vermogen, assets, beleggingen
+- "/overzicht/cashflow/budget" — Budgetten, uitgaven, spaarquote
+- "/overzicht/cashflow" — Transacties, bankzaken, vaste lasten, abonnementen
+- "/overzicht/schulden" — Schulden
+- "/overzicht/belasting" — Belasting, box 3
+- "/overzicht" — Overzicht
+- "/toekomst" — FIRE, vrijheid, projecties, scenario's, simulaties, levensgebeurtenissen
+- "/toekomst/doelen" — Doelen
+- "/overzicht/tips" — Acties, aanbevelingen
+- "/mijn/profiel" — Profiel
 - "/berichten" — Berichten, notificaties, meldingen
 
 Default href per card type:
-- showMetric (netto vermogen, assets) → "/core/assets"
-- showMetric (spaarquote, budget) → "/core/budgets"
-- showMetric (schulden) → "/core/debts"
-- showBudgetBar → "/core/budgets"
-- showGoalProgress → "/will"
-- showCountdown (salaris) → "/core/cash"
-- showCountdown (FIRE, vrijheid) → "/horizon"
-- showCountdown (belasting) → "/core/belasting"
-- showProgressRing (budget, uitgaven) → "/core/budgets"
-- showProgressRing (FIRE, vrijheid) → "/horizon"
-- showComparison → "/core/budgets"
-- showSparkline (netWorthHistory) → "/core/assets"
-- showSparkline (savingsHistory) → "/core/budgets"
-- showSparkline (expenseHistory) → "/core/budgets"
-- showRecurring → "/core/cash"
-- showLifeEvent → "/horizon"
-- showNextStep → volgt uit de VOLGENDE STAPPEN data (kern→"/core/*", wil→"/will", horizon→"/horizon")
-- showDiscover → de relevante pagina van de feature (bijv. "/core/belasting", "/horizon")
-- showDecisionPatterns → "/will"
-- showFreedomDaysTrend → "/will"
+- showMetric (netto vermogen, assets) → "/overzicht/bezittingen"
+- showMetric (spaarquote, budget) → "/overzicht/cashflow/budget"
+- showMetric (schulden) → "/overzicht/schulden"
+- showBudgetBar → "/overzicht/cashflow/budget"
+- showGoalProgress → "/toekomst/doelen"
+- showCountdown (salaris) → "/overzicht/cashflow"
+- showCountdown (FIRE, vrijheid) → "/toekomst"
+- showCountdown (belasting) → "/overzicht/belasting"
+- showProgressRing (budget, uitgaven) → "/overzicht/cashflow/budget"
+- showProgressRing (FIRE, vrijheid) → "/toekomst"
+- showComparison → "/overzicht/cashflow/budget"
+- showSparkline (netWorthHistory) → "/overzicht/bezittingen"
+- showSparkline (savingsHistory) → "/overzicht/cashflow/budget"
+- showSparkline (expenseHistory) → "/overzicht/cashflow/budget"
+- showRecurring → "/overzicht/cashflow"
+- showLifeEvent → "/toekomst"
+- showNextStep → volgt uit de VOLGENDE STAPPEN data (kern→"/overzicht/*", wil→"/overzicht/tips", horizon→"/toekomst")
+- showDiscover → de relevante pagina van de feature (bijv. "/overzicht/belasting", "/toekomst")
+- showDecisionPatterns → "/overzicht/tips"
+- showFreedomDaysTrend → "/overzicht/tips"
 
 == LAYOUT CONSTRAINTS ==
 - Nooit twee metric-cards direct naast elkaar (wissel af met andere types)
@@ -576,7 +577,7 @@ export const briefingTools = {
       text: z.string().describe('Inzicht tekst (max 2 zinnen, concreet, met getal)'),
       emphasis: z.enum(['greeting', 'observation', 'celebration', 'tip']).optional().describe('Type nadruk'),
       module: moduleEnum.optional().describe('Kleurmodule (default: wil)'),
-      href: z.string().optional().describe('Deep-link naar gerelateerde pagina of visualisatie (bijv. /core/assets)'),
+      href: z.string().optional().describe('Deep-link naar gerelateerde pagina of visualisatie (bijv. /overzicht/bezittingen)'),
       ctaLabel: z.string().optional().describe('CTA-label dat als klikbare link verschijnt (bijv. "Bekijk fee-erosie →")'),
     }),
   }),
@@ -716,7 +717,7 @@ export const briefingTools = {
       })).describe('Patronen met vrijheidsdagen per type'),
       totalDays: z.number().describe('Totaal vrijheidsdagen uit alle patronen'),
       module: moduleEnum.describe('Kleurmodule (gebruik "wil")'),
-      href: z.string().optional().describe('Link, bijv. "/will"'),
+      href: z.string().optional().describe('Link, bijv. "/overzicht/tips"'),
     }),
   }),
 
@@ -730,7 +731,7 @@ export const briefingTools = {
       currentMonthDays: z.number().describe('Vrijheidsdagen gewonnen deze maand'),
       trend: z.enum(['rising', 'falling', 'stable']).describe('Trend richting'),
       module: moduleEnum.describe('Kleurmodule (gebruik "wil")'),
-      href: z.string().optional().describe('Link, bijv. "/will"'),
+      href: z.string().optional().describe('Link, bijv. "/overzicht/tips"'),
     }),
   }),
 }

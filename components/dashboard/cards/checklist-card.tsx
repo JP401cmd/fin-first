@@ -18,7 +18,7 @@ export function ChecklistCard({ spec }: Props) {
           const content = (
             <li key={i} className="flex items-start gap-2 text-xs group/item">
               {item.done ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500 mt-0.5" />
+                <Check className="h-3.5 w-3.5 shrink-0 text-positive mt-0.5" />
               ) : (
                 <Circle className="h-3.5 w-3.5 shrink-0 text-[var(--ink-4)] mt-0.5" />
               )}

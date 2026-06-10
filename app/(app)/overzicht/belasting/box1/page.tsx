@@ -16,7 +16,7 @@ import { Box1EigenWoning } from '@/components/overview/belasting/box1-eigen-woni
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadPerspectiveTransactions } from '@/lib/household/perspective-loader'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { Kicker, SectionLabel, FiguresStrip } from '@/components/editorial'
+import { Kicker, SectionLabel, FiguresStrip, OrnamentColophon } from '@/components/editorial'
 import { Reveal } from '@/components/landing/reveal'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
@@ -249,6 +249,12 @@ export default async function BelastingBox1Page() {
           </section>
         </Reveal>
       )}
+
+      {/* Krant-stijl colophon als pagina-afsluiter — Box 1 heeft geen eigen
+          detail-component (anders dan box2/box3), dus hij staat op de page. */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <OrnamentColophon text="Box 1 · Werk + woning" module="Belasting" />
+      </div>
     </>
   )
 }

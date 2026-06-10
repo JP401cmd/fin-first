@@ -36,6 +36,7 @@ import {
   getNibudReferences,
   calculateBenchmarks,
 } from './nibud/reference-data'
+import { localMonthBounds } from './month-range'
 import type { Debt } from './debt-data'
 import type { Asset } from './asset-data'
 
@@ -108,8 +109,7 @@ async function collectBudgetAandachtspunten(supabase: SupabaseClient): Promise<A
   if (!user) return []
 
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
   const [profileRes, budgetsRes, txRes] = await Promise.all([
     supabase

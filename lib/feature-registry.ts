@@ -2,7 +2,6 @@
 // 16 consolidated features that replace the old 67-feature + 31-tier system.
 // Each feature controls widgets + page sections + old feature IDs.
 
-export type PhaseId = 'recovery' | 'stability' | 'momentum' | 'mastery'
 export type CommercialTier = 'gratis' | 'connected' | 'ai'
 export type FeatureModule = 'kern' | 'wil' | 'horizon' | 'bank' | 'ai'
 
@@ -12,7 +11,6 @@ export interface UnifiedFeature {
   description: string
   module: FeatureModule
   requiredTier: CommercialTier
-  defaultPhase: PhaseId
   /** Widget IDs controlled by this feature */
   widgets: string[]
   /** Old feature IDs that map to this consolidated feature (for migration) */
@@ -30,7 +28,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Vermogen bijhouden, verloop, snapshots, allocatie, prognose',
     module: 'kern',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: ['assets', 'holdings'],
     legacyIds: [
       'widget_assets', 'widget_holdings',
@@ -44,7 +41,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Schulden overzicht, aflosplan en strategieën',
     module: 'kern',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: [],
     legacyIds: ['schulden_aflosplan'],
   },
@@ -54,7 +50,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Budgetcategorieën, optimalisatie, NIBUD benchmark',
     module: 'kern',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: ['budgetten', 'nibud_benchmark', 'spaarquote', 'noodfonds'],
     legacyIds: ['budget_optimalisatie', 'nibud_benchmark'],
   },
@@ -64,7 +59,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Cashflow diagram, maandoverzicht, prognose, vaste lasten',
     module: 'kern',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: ['cash_flow', 'maandoverzicht', 'vaste_lasten'],
     legacyIds: ['cashflow_sankey', 'cashflow_forecast'],
   },
@@ -74,7 +68,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Vermogensbelasting berekening en belastingdrag analyse',
     module: 'kern',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: ['belasting_box3', 'box3_drag'],
     legacyIds: ['widget_belasting', 'widget_box3_drag', 'box3_belasting'],
   },
@@ -84,7 +77,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Financiële doelen instellen, voortgang volgen, ETA-berekening',
     module: 'wil',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: ['doelen'],
     legacyIds: ['doelen_systeem'],
   },
@@ -94,7 +86,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: "FIRE berekening, vrijheidsmijlpalen, scenario's, vermogenspad, passief inkomen",
     module: 'horizon',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: ['fire_prognose', 'vrijheidsmijlpalen', 'vrijheidsscenarios', 'sim_vermogenspad'],
     legacyIds: [
       'fire_projecties',
@@ -109,7 +100,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Monte Carlo simulaties, scenario analyse, financiële gezondheid, backtesting',
     module: 'horizon',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: ['monte_carlo', 'gezondheids_score', 'backtesting_score'],
     legacyIds: [
       'widget_monte_carlo', 'monte_carlo',
@@ -123,7 +113,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Levensgebeurtenissen, withdrawal strategieën, geavanceerde FIRE parameters',
     module: 'horizon',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: ['levensgebeurtenissen'],
     legacyIds: [
       'levensgebeurtenissen', 'withdrawal_strategie',
@@ -136,7 +125,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Inkomsten/uitgaven/spaar/schuld trends, beslissingspatronen',
     module: 'wil',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: ['trend_inkomen', 'trend_uitgaven', 'trend_sparen', 'trend_schulden', 'beslissingspatronen'],
     legacyIds: ['beslissingspatronen'],
   },
@@ -146,7 +134,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'CSV export van alle financiële data',
     module: 'kern',
     requiredTier: 'gratis',
-    defaultPhase: 'recovery',
     widgets: [],
     legacyIds: ['data_export'],
   },
@@ -159,7 +146,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'TrueLayer bankverbinding, automatische import, realtime saldo',
     module: 'bank',
     requiredTier: 'connected',
-    defaultPhase: 'recovery',
     widgets: [],
     legacyIds: [
       'bank_connection', 'auto_import', 'realtime_balance',
@@ -175,7 +161,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'AI Chat met persoonlijkheden (Will/FHIN/FFIN), AI tools',
     module: 'ai',
     requiredTier: 'ai',
-    defaultPhase: 'recovery',
     widgets: ['ai_inzicht'],
     legacyIds: [
       'widget_ai_inzicht', 'ai_chat', 'ai_personalities',
@@ -188,7 +173,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Automatische categorisatie, uitgavenpatronen, abonnementenanalyse',
     module: 'ai',
     requiredTier: 'ai',
-    defaultPhase: 'stability',
     widgets: [],
     legacyIds: [
       'ai_categorize', 'spending_patterns', 'ai_subscriptions',
@@ -201,7 +185,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Persoonlijke aanbevelingen genereren, volgende stappen engine',
     module: 'ai',
     requiredTier: 'ai',
-    defaultPhase: 'recovery',
     widgets: ['voorstellen', 'volgende_stap'],
     legacyIds: [
       'widget_voorstellen', 'ai_recommendations', 'ai_next_steps',
@@ -213,7 +196,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Financiële rapporten genereren',
     module: 'ai',
     requiredTier: 'ai',
-    defaultPhase: 'momentum',
     widgets: [],
     legacyIds: ['ai_report'],
   },
@@ -223,7 +205,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Dagelijkse gepersonaliseerde financiële briefing',
     module: 'ai',
     requiredTier: 'ai',
-    defaultPhase: 'recovery',
     widgets: [],
     legacyIds: [],
   },
@@ -233,7 +214,6 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
     description: 'Gepersonaliseerd financieel nieuws en inzichten',
     module: 'ai',
     requiredTier: 'ai',
-    defaultPhase: 'recovery',
     widgets: [],
     legacyIds: [],
   },
@@ -287,16 +267,4 @@ export function isTierSufficient(userTier: CommercialTier, requiredTier: Commerc
 export function tierIndex(tier: CommercialTier): number {
   const order: CommercialTier[] = ['gratis', 'connected', 'ai']
   return order.indexOf(tier)
-}
-
-// ── Phase ordering helper ────────────────────────────────────────────────────
-
-const PHASE_ORDER: PhaseId[] = ['recovery', 'stability', 'momentum', 'mastery']
-
-export function phaseIndex(phase: PhaseId): number {
-  return PHASE_ORDER.indexOf(phase)
-}
-
-export function isPhaseSufficient(userPhase: PhaseId, requiredPhase: PhaseId): boolean {
-  return phaseIndex(userPhase) >= phaseIndex(requiredPhase)
 }

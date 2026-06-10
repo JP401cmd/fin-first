@@ -1,6 +1,7 @@
 import { streamObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { buildSharedContext } from '@/lib/ai/context/shared-context'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
@@ -438,6 +439,7 @@ Genereer 5-8 Nederlandse financiele nieuwsitems. Begin met minimaal 4 "direct" i
 
       state.complete = true
       await setCachedNews(supabase, user.id, state.items)
+      await recordAiUsage(supabase, user.id, 'news')
 
       // Mark source articles as used so admins can track what's been consumed
       if (sourceArticles.length > 0) {

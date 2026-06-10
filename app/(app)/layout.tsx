@@ -11,11 +11,14 @@ import { ToastProvider } from '@/components/app/toast-provider'
 import { GlobalSyncProvider } from '@/components/sync/global-sync-provider'
 import { PrivacyProvider } from '@/lib/hooks/use-privacy'
 import { SessionMonitor } from '@/components/app/session-monitor'
+import { ErrorReporter } from '@/components/app/error-reporter'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
 import { PerspectiveProvider } from '@/components/app/perspective-provider'
 import { NotificationProvider } from '@/components/app/notifications/notification-provider'
 import { NotificationModal } from '@/components/app/notifications/notification-panel'
 import { ResponsiveShell } from '@/components/app/shell/responsive-shell'
+import { PlatformBanner } from '@/components/app/platform-banner'
+import { parsePlatformStatus } from '@/lib/platform-status'
 import { CommandPaletteProvider } from '@/components/command-palette/command-palette-provider'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
 import { PHASES } from '@/lib/feature-phases'
@@ -76,18 +79,18 @@ export default async function AppLayout({
     assetsRes,
     debtsRes,
     txRes,
-    matrixRes,
     lastLevelRes,
     actionsCountRes,
     budgetCountRes,
     budgetHealthRes,
     budgetTxRes,
     coachConfigRes,
+    platformStatusRes,
   ] = await Promise.all([
     // profile-select bevat velden voor sidebar/feature-access/theming.
     // expected_return + inflation_rate voeden de coach-data-gap `hasFireParams`
     // — meegenomen in deze bestaande query i.p.v. een extra round-trip.
-    supabase.from('profiles').select('role, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type, expected_return, inflation_rate').eq('id', user.id).single(),
+    supabase.from('profiles').select('role, blocked_at, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type, expected_return, inflation_rate').eq('id', user.id).single(),
     // assets: `asset_type, net_worth_inclusion_pct` voor sidebar netWorth
     // (weighted). De tracking-flags voeden `getActiveAppKeys()` voor de
     // sidebar apps-strip: een app verschijnt alleen als minstens één
@@ -102,7 +105,6 @@ export default async function AppLayout({
     // transactions: 3-maand-window voor `computeFeatureAccess` (income/expense
     // signalen voor phase-detectie).
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
-    supabase.from('app_settings').select('value').eq('key', 'unified_feature_matrix').maybeSingle(),
     // Sovereignty level change detection (was sequential — moved into batch)
     supabase.from('app_settings').select('value').eq('key', `last_sovereignty_level_${user.id}`).maybeSingle(),
     // Sidebar-metric: openstaande acties (Wil-module). Status-filter spiegelt
@@ -126,9 +128,20 @@ export default async function AppLayout({
     // Coach-config: per-regel overrides + globale timing/label voor de CoachBubble.
     // Beheerd via /beheer/coach. maybeSingle: rij hoeft niet te bestaan (dan defaults).
     supabase.from('app_settings').select('value').eq('key', 'coach_config').maybeSingle(),
+    // Platform-status: onderhoud/aankondiging (banner) + AI-kill-switch.
+    supabase.from('app_settings').select('value').eq('key', 'platform_status').maybeSingle(),
   ])
 
+  const platformStatus = parsePlatformStatus(platformStatusRes.data?.value as string | undefined)
+
   const profile = profileRes.data
+
+  // Geblokkeerd account: log direct uit. De /logout-pagina wist de sessie
+  // client-side (cookie-mutatie mag niet tijdens server-render) en stuurt door
+  // naar /login?blocked=1 met een melding.
+  if (profile?.blocked_at) {
+    redirect('/logout?reason=blocked')
+  }
 
   if (profile && !profile.onboarding_completed) {
     redirect('/onboarding')
@@ -139,7 +152,6 @@ export default async function AppLayout({
     debts: debtsRes.data ?? [],
     transactions: txRes.data ?? [],
     activeSubscriptions: (profile?.active_subscriptions as string[]) ?? [],
-    matrixJson: matrixRes.data?.value ?? null,
     userFeaturePrefs: (profile?.feature_preferences as Record<string, boolean>) ?? null,
   })
 
@@ -416,6 +428,7 @@ export default async function AppLayout({
         <PrivacyProvider>
         <ToastProvider>
           <SessionMonitor />
+          <ErrorReporter />
           <AutoSnapshotTrigger />
           <PerspectiveProvider>
             <ChatProvider>
@@ -448,6 +461,7 @@ export default async function AppLayout({
                               leverScores: sidebarLeverScores,
                             }}
                           >
+                            <PlatformBanner status={platformStatus} />
                             {children}
                           </ResponsiveShell>
                         </CommandPaletteProvider>

@@ -1,7 +1,7 @@
 /**
  * Loader for the user's existing aangifte-imports.
  *
- * Used by `/identity/koppelingen` to render the "Belastingaangifte"
+ * Used by `/mijn/koppelingen` to render the "Belastingaangifte"
  * section: a list of past imports grouped by `imported_peildatum`,
  * with per-peildatum counts of imported assets and debts.
  *

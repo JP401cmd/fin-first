@@ -167,12 +167,12 @@ describe('GebeurtenissenView — event-impact-badge (plan F-5)', () => {
     expect(screen.queryByText(/jaar vrijheid|mnd vrijheid/i)).toBeNull()
   })
 
-  it('toont gain-tone (emerald) bij erfenis (negatieve one_time_cost)', () => {
+  it('toont gain-tone (positief) bij erfenis (negatieve one_time_cost)', () => {
     const { container } = renderView({
       events: [flatEvent({ one_time_cost: -50000 })],
       annualSavings: 12000,
     })
-    expect(container.querySelector('.bg-emerald-50')).toBeTruthy()
+    expect(container.querySelector('.bg-positive\\/10')).toBeTruthy()
   })
 
   it('toont cost-tone (amber) bij positieve cost', () => {

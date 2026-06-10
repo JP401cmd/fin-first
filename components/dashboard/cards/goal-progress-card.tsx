@@ -19,8 +19,8 @@ export function GoalProgressCard({ spec }: Props) {
           <p className="text-sm font-semibold text-[var(--ink)] line-clamp-1">{spec.name}</p>
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
             spec.onTrack
-              ? 'bg-emerald-50 text-emerald-700'
-              : 'bg-rose-50 text-rose-700'
+              ? 'bg-positive/10 text-positive'
+              : 'bg-negative/10 text-negative'
           }`}>
             {spec.onTrack ? 'On track' : 'Achter'}
           </span>
@@ -36,7 +36,7 @@ export function GoalProgressCard({ spec }: Props) {
         <div className="h-2 w-full rounded-full bg-[var(--subtle)] overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-[800ms] ${
-              spec.onTrack ? 'bg-emerald-500' : 'bg-rose-500'
+              spec.onTrack ? 'bg-positive' : 'bg-negative'
             }`}
             style={{
               width: hasEntered ? `${pct}%` : '0%',

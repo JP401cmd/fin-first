@@ -37,7 +37,13 @@ export default function SignupPage() {
   if (success) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
-        <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg text-center">
+        <div className="w-full max-w-sm">
+        <Link href="/" className="mb-6 flex items-center justify-center">
+          <span className="font-display text-[26px] font-bold leading-none text-zinc-900">t</span>
+          <span className="font-display text-[26px] font-bold leading-none text-amber-600">f.</span>
+          <span className="ml-2.5 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">TriFinity</span>
+        </Link>
+        <div className="w-full rounded-xl bg-white p-8 shadow-lg text-center">
           <h1 className="mb-4 text-2xl font-bold text-zinc-900">Controleer je e-mail</h1>
           <p className="text-zinc-600">
             We hebben je een bevestigingslink gestuurd. Controleer je e-mail om je account te activeren.
@@ -49,13 +55,20 @@ export default function SignupPage() {
             Terug naar inloggen
           </Link>
         </div>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
+      <div className="w-full max-w-sm">
+      <Link href="/" className="mb-6 flex items-center justify-center">
+        <span className="font-display text-[26px] font-bold leading-none text-zinc-900">t</span>
+        <span className="font-display text-[26px] font-bold leading-none text-amber-600">f.</span>
+        <span className="ml-2.5 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">TriFinity</span>
+      </Link>
+      <div className="w-full rounded-xl bg-white p-8 shadow-lg">
         <h1 className="mb-2 text-center text-2xl font-bold text-zinc-900">
           Account aanmaken
         </h1>
@@ -119,6 +132,7 @@ export default function SignupPage() {
             Inloggen
           </Link>
         </p>
+      </div>
       </div>
     </div>
   )

@@ -75,7 +75,6 @@ function makeFinancialInput(overrides: {
     debts: overrides.debts ?? [],
     transactions,
     activeSubscriptions: [],
-    matrixJson: null,
     userFeaturePrefs: null,
   }
 }
@@ -243,12 +242,12 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 8: Doorwerking — sovereignty level ontgrendelt/vergrendelt features ─
+  // ── Step 8: Doorwerking — sovereignty level is puur motivatie, geen gating ──
   {
     id: 'sov-feature-gating',
-    name: 'Sovereignty level ontgrendelt/vergrendelt features',
+    name: 'Sovereignty level stuurt géén feature-toegang (motivatie-only)',
     category: CAT,
-    description: 'Feature access verandert correct bij level-wijziging via computeFeatureAccess',
+    description: 'Feature access is identiek voor recovery- en mastery-gebruikers; level/phase alleen voor weergave',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
@@ -275,32 +274,23 @@ const tests: TestCase[] = [
       assertEqual(masteryAccess.phase, 'mastery', 'mastery phase')
       assertGreaterThanOrEqual(masteryAccess.level, 5, 'mastery level >= 5')
 
-      // Mastery user should have access to MORE features than recovery user
-      const recoveryFeatures = Object.values(recoveryAccess.features)
-      const masteryFeatures = Object.values(masteryAccess.features)
-      const recoveryAccessible = recoveryFeatures.filter(f => f.accessible).length
-      const masteryAccessible = masteryFeatures.filter(f => f.accessible).length
-      assertGreaterThanOrEqual(
-        masteryAccessible,
-        recoveryAccessible,
-        'mastery heeft >= recovery features',
-      )
-
-      // Verify that recovery-phase features are accessible in recovery
-      // and mastery-only features are NOT accessible in recovery
+      // Fase stuurt geen toegang meer: recovery en mastery hebben exact
+      // dezelfde feature-toegang (abonnement + user-toggles zijn de enige assen).
       const recoveryMap = recoveryAccess.features
       const masteryMap = masteryAccess.features
-
-      // Find a feature only available at mastery but not recovery
-      let foundDifference = false
       for (const [id, masteryResult] of Object.entries(masteryMap)) {
         const recoveryResult = recoveryMap[id]
-        if (recoveryResult && !recoveryResult.defaultEnabled && masteryResult.defaultEnabled) {
-          foundDifference = true
-          break
-        }
+        assert(recoveryResult !== undefined, `feature ${id} aanwezig voor recovery-gebruiker`)
+        assertEqual(
+          recoveryResult.accessible,
+          masteryResult.accessible,
+          `feature ${id}: toegang identiek ongeacht sovereignty-fase`,
+        )
       }
-      assert(foundDifference, 'Er moeten features zijn die mastery wel heeft maar recovery niet')
+
+      // Gratis features staan voor beide standaard aan
+      assert(recoveryMap['vermogensbeheer']?.accessible === true, 'vermogensbeheer aan in recovery')
+      assert(masteryMap['vermogensbeheer']?.accessible === true, 'vermogensbeheer aan in mastery')
     },
   },
 

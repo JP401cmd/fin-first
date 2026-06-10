@@ -13,41 +13,9 @@ export type ModuleNavConfig = {
   items: ModuleNavItem[]
 }
 
-export const willNav: ModuleNavConfig = {
-  module: 'Tips & acties',
-  basePath: '/will',
-  color: 'teal',
-  items: [
-    { label: 'Overzicht', href: '/will' },
-  ],
-}
-
-export const horizonNav: ModuleNavConfig = {
-  module: 'Toekomst',
-  basePath: '/horizon',
-  color: 'purple',
-  items: [
-    { label: 'Overzicht', href: '/horizon' },
-    { label: 'Uitgave na pensioen', href: '/horizon?uitgaven=open' },
-  ],
-}
-
-export const identityNav: ModuleNavConfig = {
-  module: 'Identiteit',
-  basePath: '/identity',
-  color: 'teal',
-  items: [
-    { label: 'Overzicht', href: '/identity' },
-    { label: 'Profiel', href: '/identity/profiel' },
-    { label: 'Instellingen', href: '/identity/instellingen' },
-    { label: 'Koppelingen', href: '/identity/koppelingen' },
-  ],
-}
-
 /**
- * Canonieke /mijn-navigatie. Sub-route-stubs (notificaties, uiterlijk,
- * privacy, geavanceerd) redirecten naar legacy /identity/instellingen
- * met de juiste tab geopend \u2014 totdat de monster-pagina is opgesplitst.
+ * Canonieke /mijn-navigatie \u2014 tab-balk binnen de Mijn-sectie
+ * (app/(app)/mijn/layout.tsx). Hoofd-navigatie leeft in lib/nav-config.ts.
  */
 export const mijnNav: ModuleNavConfig = {
   module: 'Mijn',

@@ -9,6 +9,13 @@ import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildBriefingSystemPrompt } from '@/lib/ai/dna/briefing'
 import { getDefaultFullPrompt } from '@/lib/ai/dna'
 import { DEFAULT_EXTRACTION_PROMPT } from '@/lib/ai/extraction-system-prompt'
+import { CATEGORIZE_SYSTEM_PROMPT } from '@/lib/ai/categorize-system-prompt'
+import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
+import { PENSION_PARSE_PROMPT } from '@/lib/ai/pension-parse-prompt'
+import { WHATIF_SUGGEST_PROMPT } from '@/lib/ai/whatif-suggest-prompt'
+import { buildSystemPrompt as buildCalculatorSystemPrompt } from '@/lib/ai/build-calculator'
+import { DEFAULT_AANGIFTE_EXTRACTION_PROMPT } from '@/lib/aangifte/system-prompt'
+import { buildBudgetSuggestionPrompt } from '@/lib/ai/schemas/budget-suggestion-schema'
 
 export async function GET() {
   const supabase = await createClient()
@@ -42,6 +49,10 @@ export async function GET() {
 
   // Combined preview: base + wil (what the chat API actually sends)
   const combinedWil = getDefaultFullPrompt('wil')
+
+  // Dynamic prompts — rendered with representative defaults for the audit view
+  const calculatorContent = buildCalculatorSystemPrompt()
+  const budgetSuggestionContent = buildBudgetSuggestionPrompt(3000, 'samen', 0)
 
   const prompts = [
     {
@@ -126,13 +137,83 @@ export async function GET() {
     },
     {
       id: 'extraction',
-      label: 'Extractie',
-      description: 'Systeem prompt voor het extraheren van gestructureerde financiële data uit vrije tekst.',
+      label: 'Extractie (vrije tekst)',
+      description: 'Systeem prompt voor het extraheren van gestructureerde financiële data uit vrije tekst (onboarding).',
       content: DEFAULT_EXTRACTION_PROMPT,
       source: 'lib/ai/extraction-system-prompt.ts',
-      domain: 'nieuws',
+      domain: 'parsing',
       dynamic: false,
       charCount: DEFAULT_EXTRACTION_PROMPT.length,
+    },
+    {
+      id: 'aangifte-extraction',
+      label: 'Aangifte-extractie (belasting)',
+      description: 'Systeem prompt voor het extraheren van Box 1/2/3-gegevens uit een Nederlandse aangifte inkomstenbelasting.',
+      content: DEFAULT_AANGIFTE_EXTRACTION_PROMPT,
+      source: 'lib/aangifte/system-prompt.ts',
+      domain: 'parsing',
+      dynamic: false,
+      charCount: DEFAULT_AANGIFTE_EXTRACTION_PROMPT.length,
+    },
+    {
+      id: 'categorize',
+      label: 'Transactie-categorisatie',
+      description: 'Systeem prompt dat banktransacties toewijst aan budgetcategorieën (cashflow-import).',
+      content: CATEGORIZE_SYSTEM_PROMPT,
+      source: 'lib/ai/categorize-system-prompt.ts',
+      domain: 'parsing',
+      dynamic: false,
+      charCount: CATEGORIZE_SYSTEM_PROMPT.length,
+    },
+    {
+      id: 'pension-parse',
+      label: 'Pensioen-PDF-parsing',
+      description: 'Instructie voor het uitlezen van een mijnpensioenoverzicht.nl-PDF via Claude vision (AOW, regelingen).',
+      content: PENSION_PARSE_PROMPT,
+      source: 'lib/ai/pension-parse-prompt.ts',
+      domain: 'parsing',
+      dynamic: false,
+      charCount: PENSION_PARSE_PROMPT.length,
+    },
+    {
+      id: 'subscription-detect',
+      label: 'Abonnement-detectie',
+      description: 'Systeem prompt dat bepaalt welke terugkerende betalingen de gebruiker als abonnement zou herkennen.',
+      content: SUBSCRIPTION_DETECT_PROMPT,
+      source: 'lib/ai/subscription-detect-prompt.ts',
+      domain: 'wil',
+      dynamic: false,
+      charCount: SUBSCRIPTION_DETECT_PROMPT.length,
+    },
+    {
+      id: 'whatif-suggest',
+      label: 'Wat-Als gebeurtenis-suggesties',
+      description: 'Systeem prompt dat levensgebeurtenissen suggereert die passen bij een droomscenario-wijziging.',
+      content: WHATIF_SUGGEST_PROMPT,
+      source: 'app/api/whatif/suggest/route.ts',
+      domain: 'wil',
+      dynamic: false,
+      charCount: WHATIF_SUGGEST_PROMPT.length,
+    },
+    {
+      id: 'calculator',
+      label: 'Rekenhulp-bouwer',
+      description: 'Systeem prompt waarmee Will een herbruikbare rekenhulp (CalculatorDefinition) genereert uit een vrije vraag.',
+      content: calculatorContent,
+      source: 'lib/ai/build-calculator.ts',
+      domain: 'horizon',
+      dynamic: false,
+      charCount: calculatorContent.length,
+    },
+    {
+      id: 'budget-suggestions',
+      label: 'Budget-suggesties (onboarding)',
+      description: 'Dynamisch prompt dat het netto maandinkomen verdeelt over de categorieën uit het budgetplan van de gebruiker. Hier getoond met voorbeeldwaarden en de standaard-categorielijst (geen specifiek plan).',
+      content: budgetSuggestionContent,
+      source: 'lib/ai/schemas/budget-suggestion-schema.ts',
+      domain: 'kern',
+      dynamic: true,
+      charCount: budgetSuggestionContent.length,
     },
   ]
 

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { localMonthBounds } from '@/lib/month-range'
 
 export async function GET() {
   const supabase = await createClient()
@@ -7,8 +8,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
 
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10)
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
   // Fetch parent budgets (not archived), current month transactions, and budget_amounts overrides
   const [budgetsRes, transactionsRes, amountsRes] = await Promise.all([

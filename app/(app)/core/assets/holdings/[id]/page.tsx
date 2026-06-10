@@ -149,10 +149,10 @@ export default async function HoldingDetailPage({
             <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">Rendement</p>
             {costBasis > 0 ? (
               <>
-                <p className={`mt-1 text-lg font-bold ${returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`} data-testid="holding-return">
+                <p className={`mt-1 text-lg font-bold ${returnPct >= 0 ? 'text-positive' : 'text-negative'}`} data-testid="holding-return">
                   {returnPct >= 0 ? '+' : ''}{returnPct.toFixed(1)}%
                 </p>
-                <p className={`text-xs font-medium ${returnValue >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p className={`text-xs font-medium ${returnValue >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {returnValue >= 0 ? '+' : ''}{formatCurrency(returnValue, currency)}
                 </p>
               </>

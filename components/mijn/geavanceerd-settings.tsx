@@ -66,9 +66,9 @@ export function GeavanceerdSettings() {
       </section>
 
       {/* ── Gegevens resetten ───────────────────────────────────── */}
-      <section className="rounded-2xl border border-red-200 bg-[var(--paper)] overflow-hidden">
+      <section className="rounded-2xl border border-negative/30 bg-[var(--paper)] overflow-hidden">
         <div className="px-4 sm:px-6 py-4">
-          <h2 className="text-xs font-semibold tracking-[0.15em] text-red-400 uppercase">Gegevens resetten</h2>
+          <h2 className="text-xs font-semibold tracking-[0.15em] text-negative/70 uppercase">Gegevens resetten</h2>
           <p className="mt-1 text-xs text-[var(--ink-3)]">Alle data permanent verwijderen en opnieuw starten</p>
           <p className="mt-3 text-sm text-[var(--ink-3)]">
             Wis al je financiële gegevens en doorloop de onboarding opnieuw. Dit
@@ -79,11 +79,11 @@ export function GeavanceerdSettings() {
             type="button"
             onClick={() => setShowResetDialog(true)}
             disabled={resetting}
-            className="mt-3 rounded-lg border border-red-300 bg-red-50 px-5 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+            className="mt-3 rounded-lg border border-negative/40 bg-negative/10 px-5 py-2 text-sm font-medium text-negative transition-colors hover:bg-negative/20 disabled:opacity-50"
           >
             {resetting ? 'Bezig met wissen…' : 'Alle gegevens wissen'}
           </button>
-          {resetError && <p className="mt-3 text-sm text-red-600">{resetError}</p>}
+          {resetError && <p className="mt-3 text-sm text-negative">{resetError}</p>}
         </div>
       </section>
 
@@ -93,7 +93,7 @@ export function GeavanceerdSettings() {
           <div className="w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-[var(--ink)]">Weet je het zeker?</h3>
             <p className="mt-2 text-sm text-[var(--ink-2)]">
-              Dit wist <span className="font-semibold text-red-600">al je financiële data</span> permanent.
+              Dit wist <span className="font-semibold text-negative">al je financiële data</span> permanent.
               Je wordt teruggeleid naar de onboarding om opnieuw te beginnen.
             </p>
             <div className="mt-6 flex justify-end gap-3">
@@ -118,7 +118,7 @@ export function GeavanceerdSettings() {
                     setResetError('Reset mislukt. Probeer opnieuw.')
                   }
                 }}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+                className="rounded-lg bg-negative px-4 py-2 text-sm font-medium text-white hover:bg-negative/90 transition-colors"
               >
                 Alles wissen
               </button>

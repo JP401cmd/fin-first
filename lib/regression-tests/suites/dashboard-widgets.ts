@@ -5,6 +5,7 @@ import { unauthenticatedFetch } from '../server-runner'
 import {
   WIDGET_CATALOG,
   WIDGET_HREFS,
+  WIDGET_FEATURE_MAP,
   DEFAULT_WIDGET_PREFS,
   BUDGET_WIDGETS,
   mergeWidgetPrefs,
@@ -14,6 +15,7 @@ import {
   type WidgetModule,
   type WidgetSize,
 } from '@/lib/widget-catalog'
+import { UNIFIED_FEATURES } from '@/lib/feature-registry'
 import { reassignOrders, moveWidget } from '@/lib/widget-order'
 import {
   buildDashboardLayout,
@@ -665,16 +667,16 @@ const tests: TestCase[] = [
     id: 'dw-render-feature-gating',
     name: 'Widget rendering: feature gating via WIDGET_FEATURE_MAP',
     category: CAT,
-    description: 'Feature-gated widgets hebben een geldig feature id',
+    description: 'Feature-gated widgets verwijzen naar een geldig unified feature id',
     priority: 'medium',
     estimatedDurationMs: 5,
     fn() {
-      // Widgets met minLevel > -2 of requiredPhase zijn feature-gated
-      const gated = WIDGET_CATALOG.filter(w => w.minLevel > -2 || w.requiredPhase)
-      assertGreaterThan(gated.length, 0, 'er zijn feature-gated widgets')
-      // All gated widgets should have numeric minLevel
-      for (const w of gated) {
-        assert(typeof w.minLevel === 'number', `${w.id} has numeric minLevel`)
+      // Widgets met een feature-mapping zijn gate-baar (abonnement/user-toggle)
+      const mapped = WIDGET_CATALOG.filter(w => WIDGET_FEATURE_MAP[w.id])
+      assertGreaterThan(mapped.length, 0, 'er zijn feature-gemapte widgets')
+      const unifiedIds = new Set(UNIFIED_FEATURES.map(f => f.id))
+      for (const w of mapped) {
+        assert(unifiedIds.has(WIDGET_FEATURE_MAP[w.id]), `${w.id} verwijst naar geldig feature id`)
       }
     },
   },

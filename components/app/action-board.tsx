@@ -8,6 +8,7 @@ import { ActionListModal } from '@/components/app/action-list-modal'
 import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
+import { Kicker } from '@/components/editorial'
 
 const MAX_VISIBLE = 5
 
@@ -188,14 +189,7 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
     return (
       <div className="space-y-4">
         <div className="flex flex-col items-center text-center py-12 px-4 max-w-md mx-auto">
-          <div className="mb-3 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
-            <span
-              aria-hidden
-              className="inline-block h-px w-7"
-              style={{ background: 'var(--module-active-500)' }}
-            />
-            Acties
-          </div>
+          <Kicker className="mb-3">Acties</Kicker>
           <h3
             className="font-bold leading-tight text-[20px] sm:text-[24px]"
             style={{ fontFamily: 'var(--font-playfair, serif)' }}
@@ -243,14 +237,7 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
         </div>
       ) : (
         <div className="flex flex-col items-center text-center py-12 px-4 max-w-md mx-auto">
-          <div className="mb-3 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
-            <span
-              aria-hidden
-              className="inline-block h-px w-7"
-              style={{ background: 'var(--module-active-500)' }}
-            />
-            Acties
-          </div>
+          <Kicker className="mb-3">Acties</Kicker>
           <h3
             className="font-bold leading-tight text-[20px] sm:text-[24px]"
             style={{ fontFamily: 'var(--font-playfair, serif)' }}

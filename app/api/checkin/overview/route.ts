@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { computeFireAge } from '@/lib/checkin/fire-age'
+import { resolveFireParams } from '@/lib/fire-params'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
 const MONTH_NAMES = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
@@ -16,28 +18,36 @@ export async function GET() {
   const currentMonth = now.getMonth()
   const currentYear = now.getFullYear()
 
-  // Current month boundaries
-  const monthStart = new Date(currentYear, currentMonth, 1).toISOString().slice(0, 10)
-  const monthEnd = new Date(currentYear, currentMonth + 1, 1).toISOString().slice(0, 10)
-
-  // Previous month boundaries
-  const prevMonthStart = new Date(currentYear, currentMonth - 1, 1).toISOString().slice(0, 10)
+  // Tijdzone-veilige maandgrenzen (lib/month-range.ts) — lokale datum +
+  // toISOString() schoof de grens in NL een dag terug.
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
+  const prevMonthStart = localMonthStart(new Date(currentYear, currentMonth - 1, 1))
   const prevMonthEnd = monthStart
+  const sixMonthsAgo = localMonthStart(new Date(currentYear, currentMonth - 6, 1))
 
   const prevMonthIdx = currentMonth === 0 ? 11 : currentMonth - 1
 
   // Fetch data in parallel
-  const [assetsRes, debtsRes, curIncomeRes, curExpenseRes, prevExpenseRes, snapshotsRes, actionsRes, profileRes] = await Promise.all([
-    // Total assets
+  const [assetsRes, debtsRes, bankRes, curIncomeRes, curExpenseRes, prevExpenseRes, income6mRes, expense6mRes, snapshotsRes, actionsRes, profileRes] = await Promise.all([
+    // Total assets (actief, met net-worth-weging — zelfde als dashboard)
     supabase
       .from('assets')
-      .select('current_value')
-      .eq('user_id', user.id),
-    // Total debts
+      .select('current_value, net_worth_inclusion_pct')
+      .eq('user_id', user.id)
+      .eq('is_active', true),
+    // Total debts (actief, met net-worth-weging)
     supabase
       .from('debts')
-      .select('current_balance')
-      .eq('user_id', user.id),
+      .select('current_balance, net_worth_inclusion_pct')
+      .eq('user_id', user.id)
+      .eq('is_active', true),
+    // Losse bankrekeningen tellen als cash mee in netto vermogen
+    supabase
+      .from('bank_accounts')
+      .select('balance')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .is('linked_asset_id', null),
     // Current month income
     supabase
       .from('transactions')
@@ -62,6 +72,21 @@ export async function GET() {
       .eq('is_income', false)
       .gte('date', prevMonthStart)
       .lt('date', prevMonthEnd),
+    // 6-maands inkomen/uitgaven voor een stabiele FIRE-leeftijd
+    supabase
+      .from('transactions')
+      .select('amount, transaction_type, date')
+      .eq('user_id', user.id)
+      .eq('is_income', true)
+      .gte('date', sixMonthsAgo)
+      .lt('date', monthEnd),
+    supabase
+      .from('transactions')
+      .select('amount, transaction_type, date')
+      .eq('user_id', user.id)
+      .eq('is_income', false)
+      .gte('date', sixMonthsAgo)
+      .lt('date', monthEnd),
     // Net worth snapshots (last 2)
     supabase
       .from('net_worth_snapshots')
@@ -85,13 +110,40 @@ export async function GET() {
       .maybeSingle(),
   ])
 
-  const totalAssets = (assetsRes.data || []).reduce((s, a) => s + (a.current_value || 0), 0)
-  const totalDebts = (debtsRes.data || []).reduce((s, d) => s + (d.current_balance || 0), 0)
+  // Zelfde inclusieregels als dashboard-data-loader: gewogen met
+  // net_worth_inclusion_pct, plus losse bankrekeningen als cash.
+  const unlinkedCash = (bankRes.data || []).reduce((s, b) => s + Number(b.balance || 0), 0)
+  const totalAssets = (assetsRes.data || []).reduce(
+    (s, a) => s + (a.current_value || 0) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0,
+  ) + unlinkedCash
+  const totalDebts = (debtsRes.data || []).reduce(
+    (s, d) => s + (d.current_balance || 0) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0,
+  )
   const netWorth = totalAssets - totalDebts
 
   const monthlyIncome = (curIncomeRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
   const monthlyExpenses = (curExpenseRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
   const prevMonthExpenses = (prevExpenseRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+
+  // 6-maands gemiddelden (excl. eigen-rekening-transfers, zoals de loaders);
+  // bij minder dan 6 maanden data middelen we over de beschikbare maanden.
+  const isRealTx = (t: { transaction_type?: string | null }) =>
+    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+  const income6mRows = (income6mRes.data || []).filter(isRealTx)
+  const expense6mRows = (expense6mRes.data || []).filter(isRealTx)
+  const income6m = income6mRows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const expenses6m = expense6mRows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const earliest6m = [...income6mRows, ...expense6mRows]
+    .reduce<string | null>((min, t) => (t.date && (!min || t.date < min) ? t.date : min), null)
+  let dataMonths6 = 6
+  if (earliest6m) {
+    const ed = new Date(earliest6m)
+    dataMonths6 = Math.max(1, Math.min(6,
+      (currentYear - ed.getFullYear()) * 12 + (currentMonth - ed.getMonth()),
+    ))
+  }
+  const income6mAvg = income6m / dataMonths6
+  const expenses6mAvg = expenses6m / dataMonths6
 
   // Net worth change from snapshots
   const snapshots = snapshotsRes.data || []
@@ -109,14 +161,18 @@ export async function GET() {
   const completedActionsCount = completedActions.length
   const freedomDaysWon = completedActions.reduce((s, a) => s + (a.freedom_days || 0), 0)
 
-  // FIRE age estimate — gedeelde helper (lib/checkin/fire-age.ts)
+  // FIRE age estimate — gedeelde helper (lib/checkin/fire-age.ts) met
+  // gepersonaliseerde parameters (resolveFireParams) + 6-maands gemiddelden
+  // i.p.v. deze-maand-cijfers (stabieler halverwege de maand).
   const profile = profileRes.data
+  const fireParams = resolveFireParams(profile ?? {})
   const fireAge = computeFireAge({
     dateOfBirth: profile?.date_of_birth ?? null,
     netWorth,
-    monthlyIncome,
-    monthlyExpenses,
-    expectedReturn: profile?.expected_return ?? null,
+    monthlyIncome: income6mAvg,
+    monthlyExpenses: expenses6mAvg,
+    expectedReturn: fireParams.grossReturn,
+    swr: fireParams.effectiveSwr,
     now,
   })
 

@@ -2,11 +2,40 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isSuperAdmin } from '@/lib/admin'
+import { logAdminAction } from '@/lib/admin-audit'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
   return createServiceClient(url, serviceKey)
+}
+
+type ServiceClient = ReturnType<typeof getServiceClient>
+type AuthUser = Awaited<
+  ReturnType<ServiceClient['auth']['admin']['listUsers']>
+>['data']['users'][number]
+
+/**
+ * Zoek een auth-gebruiker op e-mail, gepagineerd. `listUsers()` levert
+ * standaard maar 50 gebruikers per pagina — zonder pagineren zou een lookup
+ * boven 50 accounts stil falen ("niet gevonden" terwijl ze bestaan).
+ */
+async function findAuthUserByEmail(
+  service: ServiceClient,
+  email: string,
+): Promise<AuthUser | null> {
+  const target = email.trim().toLowerCase()
+  if (!target) return null
+  const perPage = 200
+  for (let page = 1; page <= 50; page += 1) {
+    const { data, error } = await service.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+    const users = data?.users ?? []
+    const found = users.find((u) => u.email?.toLowerCase() === target)
+    if (found) return found
+    if (users.length < perPage) return null
+  }
+  return null
 }
 
 /** POST — assign subscriptions to a user */
@@ -35,10 +64,7 @@ export async function POST(req: Request) {
   // Resolve user ID from email if needed
   let targetUserId = userId
   if (!targetUserId && email) {
-    const { data: usersData } = await service.auth.admin.listUsers()
-    const authUser = usersData?.users?.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    )
+    const authUser = await findAuthUserByEmail(service, email)
     if (!authUser) {
       return NextResponse.json({ error: 'Gebruiker niet gevonden' }, { status: 404 })
     }
@@ -62,12 +88,18 @@ export async function POST(req: Request) {
 
   const oldSubs = (profile.active_subscriptions as string[]) ?? []
 
-  // Determine new subscriptions
+  // Determine new subscriptions.
+  // Alleen de betaalde add-ons (connected/ai) worden hier beheerd. Eventuele
+  // andere entries die al op het profiel staan (bv. legacy 'kern'/'wil'/'horizon'
+  // uit oude seeds) blijven behouden — een add-on toggelen mag nooit andere data
+  // uit active_subscriptions verwijderen.
+  const ADDONS = ['connected', 'ai']
   let newSubs: string[]
   if (subscriptions !== undefined) {
-    // New format: explicit subscriptions array
-    const validSubs = ['connected', 'ai']
-    newSubs = subscriptions.filter(s => validSubs.includes(s))
+    // New format: explicit subscriptions array — neem alleen de add-on-selectie over.
+    const requestedAddons = subscriptions.filter((s) => ADDONS.includes(s))
+    const preserved = oldSubs.filter((s) => !ADDONS.includes(s))
+    newSubs = [...preserved, ...requestedAddons]
   } else if (legacyTier) {
     // Legacy format: single tier → convert to subscriptions
     if (legacyTier === 'ai') newSubs = ['ai']
@@ -101,6 +133,15 @@ export async function POST(req: Request) {
     new_tier: newLabel,
   })
 
+  await logAdminAction(service, {
+    actorId: adminUser.id,
+    actorEmail: adminUser.email,
+    action: 'subscription.update',
+    targetUser: targetUserId,
+    targetLabel: email ?? targetUserId,
+    detail: { from: oldLabel, to: newLabel },
+  })
+
   return NextResponse.json({ success: true, oldSubscriptions: oldSubs, newSubscriptions: newSubs })
 }
 
@@ -118,15 +159,16 @@ export async function GET(req: Request) {
   const service = getServiceClient()
 
   if (email) {
-    // Look up user by email via auth.users
-    const { data: usersData, error: usersError } = await service.auth.admin.listUsers()
-    if (usersError) {
-      return NextResponse.json({ error: usersError.message }, { status: 500 })
+    // Look up user by email via auth.users (gepagineerd)
+    let authUser: AuthUser | null
+    try {
+      authUser = await findAuthUserByEmail(service, email)
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : 'Zoeken mislukt' },
+        { status: 500 },
+      )
     }
-
-    const authUser = usersData?.users?.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    )
 
     if (!authUser) {
       return NextResponse.json({ user: null })
@@ -134,7 +176,7 @@ export async function GET(req: Request) {
 
     const { data: profile } = await service
       .from('profiles')
-      .select('id, full_name, active_subscriptions, commercial_tier')
+      .select('id, full_name, role, blocked_at, active_subscriptions, commercial_tier')
       .eq('id', authUser.id)
       .maybeSingle()
 
@@ -144,6 +186,10 @@ export async function GET(req: Request) {
             id: profile.id,
             email: authUser.email,
             name: profile.full_name,
+            role: (profile.role as string) ?? 'user',
+            blockedAt: (profile.blocked_at as string | null) ?? null,
+            createdAt: authUser.created_at ?? null,
+            lastSignInAt: authUser.last_sign_in_at ?? null,
             subscriptions: (profile.active_subscriptions as string[]) ?? [],
             currentTier: profile.commercial_tier,
           }

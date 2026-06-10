@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { recordAiUsage } from '@/lib/ai-credits'
 import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { computeNetWorthProjection } from '@/lib/net-worth-projection'
 import { buildCategorySpending, patternsToInsights, detectSeasonalPatterns, detectTrends, detectAnomalies } from '@/lib/spending-patterns'
@@ -612,6 +613,7 @@ Schrijf in het Nederlands, persoonlijk en bemoedigend. Gebruik de filosofie "gel
           maxOutputTokens: 200,
         })
         aiIntroduction = result.text?.trim() || null
+        await recordAiUsage(supabase, user.id, 'report')
       } catch {
         // AI introduction is optional — report should never fail because of it
       }

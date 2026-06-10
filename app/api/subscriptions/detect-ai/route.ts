@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
 import { detectRecurringTransactions } from '@/lib/recurring-detection'
+import { SUBSCRIPTION_DETECT_PROMPT } from '@/lib/ai/subscription-detect-prompt'
 
 /**
  * POST /api/subscriptions/detect-ai
@@ -149,9 +150,7 @@ export async function POST() {
     const { object } = await generateObject({
       model,
       schema: responseSchema,
-      system: `Je bent een financieel assistent. Je taak is te bepalen welke terugkerende betalingen de gebruiker als "abonnement" zou herkennen: streamingdiensten, apps, software, lidmaatschappen, donaties, telefonie, verzekeringen, nieuwsbrieven met betaling, etc.
-
-Geef ALLEEN de indices terug van patronen die een abonnement zijn. Sluit uit: huur, hypotheek, energierekening, boodschappen, pinbetalingen, salarissen, belasting, incasso's voor leningen.`,
+      system: SUBSCRIPTION_DETECT_PROMPT,
       prompt: `Welke van deze terugkerende betalingen zijn abonnementen?\n\n${patternList}`,
       maxRetries: 1,
     })

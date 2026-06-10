@@ -634,13 +634,13 @@ export function OverzichtClient({
           <UitgangspuntRow
             label="Huidige leeftijd"
             value={currentAge != null ? `${currentAge} jaar` : '—'}
-            href="/identity/profiel"
+            href="/mijn/profiel"
             sourceLabel="profiel"
           />
           <UitgangspuntRow
             label="AOW-leeftijd"
             value={userAowAge > 0 ? `${userAowAge.toFixed(1)} jaar` : '—'}
-            href="/identity/profiel"
+            href="/mijn/profiel"
             sourceLabel="profiel"
           />
           <UitgangspuntRow
@@ -662,7 +662,7 @@ export function OverzichtClient({
           <UitgangspuntRow
             label="Netto inkomen"
             value={`${fc(monthlyIncome)} /mnd`}
-            href="/identity/profiel"
+            href="/mijn/profiel"
             sourceLabel="profiel"
           />
           <UitgangspuntRow

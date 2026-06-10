@@ -115,10 +115,10 @@ function formatRelative(iso: string): string {
     const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const diffDays = Math.round((nowLocal.getTime() - dLocal.getTime()) / (1000 * 60 * 60 * 24))
 
+    // Krant-stijl: dag-aanduidingen voor vandaag/gisteren, daarna de datum
+    // zelf — geen relatieve tijden ("3 dagen geleden").
     if (diffDays === 0) return 'Vandaag'
     if (diffDays === 1) return 'Gisteren'
-    if (diffDays < 7) return `${diffDays} dagen geleden`
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weken geleden`
     return formatDate(iso)
   } catch {
     return iso

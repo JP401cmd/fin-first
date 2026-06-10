@@ -128,7 +128,7 @@ export function AiPrivacySettings() {
               </button>
               {contextMessage && (
                 <span
-                  className={`text-sm ${contextMessage.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}
+                  className={`text-sm ${contextMessage.type === 'success' ? 'text-positive' : 'text-negative'}`}
                 >
                   {contextMessage.text}
                 </span>
@@ -205,8 +205,8 @@ export function AiPrivacySettings() {
           {/* Wat NIET wordt gedeeld */}
           <div className="rounded-xl border border-[var(--border-ed)] p-4">
             <div className="flex items-center gap-2 mb-3">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50">
-                <EyeOff className="h-4 w-4 text-red-500" aria-hidden="true" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-negative/10">
+                <EyeOff className="h-4 w-4 text-negative" aria-hidden="true" />
               </div>
               <h3 className="text-sm font-semibold text-[var(--ink)]">Wat altijd privé blijft</h3>
             </div>
@@ -220,7 +220,7 @@ export function AiPrivacySettings() {
                 'Ruwe transactie-omschrijvingen (alleen categorie + bedrag)',
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red-400" />
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-negative/70" />
                   <span>{item}</span>
                 </li>
               ))}

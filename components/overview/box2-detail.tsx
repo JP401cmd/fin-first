@@ -8,7 +8,7 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { Kicker, HighlightMark } from '@/components/editorial'
+import { Kicker, HighlightMark, OrnamentColophon } from '@/components/editorial'
 import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 import { Box2GecombineerdeDruk } from '@/components/overview/belasting/box2-gecombineerde-druk'
 import { Box2DividendSimulator } from '@/components/overview/belasting/box2-dividend-simulator'
@@ -292,6 +292,9 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
         {/* 2.1 — Gecombineerde druk Vpb + Box 2 (educatief) */}
         <Box2GecombineerdeDruk />
       </div>
+
+      {/* Krant-stijl colophon als pagina-afsluiter. */}
+      <OrnamentColophon text="Box 2 · Aanmerkelijk belang" module="Belasting" />
     </section>
   )
 }

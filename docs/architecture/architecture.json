@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-07T18:30:23.353Z",
-  "generatedDate": "2026-06-07",
+  "generatedAt": "2026-06-10T14:26:17.058Z",
+  "generatedDate": "2026-06-10",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -39,7 +39,7 @@
     "layers": {
       "frontend": "Next.js 16 App Router (React 19, Tailwind v4). Schermen per module, een gedeelde shell met providers, en een grote bibliotheek herbruikbare componenten.",
       "api": "Next.js route handlers — REST per domein. Geen aparte backend; Supabase wordt server-side aangeroepen met RLS.",
-      "domain": "De domein- en AI-logica. Hier wonen de drie generieke mechanismen, de functionele modules en de soevereiniteitsniveaus die functionaliteit progressief vrijspelen.",
+      "domain": "De domein- en AI-logica. Hier wonen de drie generieke mechanismen, de functionele modules (door de gebruiker activeerbaar) en de soevereiniteitsniveaus als motivatie- en voortgangsmodel.",
       "data": "Supabase (PostgreSQL 17) met Row Level Security, realtime en RPC-functies. Schema beheerd via migraties.",
       "integrations": "Externe diensten die de app inkoppelt: AI-providers, bank-import, betalingen en observability."
     },
@@ -70,7 +70,7 @@
       "Elke EUR boven €100 toont ook zijn vrijheidstijd-equivalent.",
       "Time-/vrijheidsframing boven generieke financiële termen.",
       "Eén filosofie over alle schermen, niet \"data + AI-coaching\" ernaast.",
-      "Progressive disclosure via soevereiniteitsniveaus (Recovery → Mastery).",
+      "Zichtbaarheid via module-activatie; soevereiniteitsniveaus (Recovery → Mastery) motiveren — geen gating.",
       "Nieuwe domeinen pluggen in bestaande patronen — geen nieuwe infrastructuur."
     ],
     "extraIntegrations": [
@@ -182,15 +182,15 @@
     }
   },
   "stats": {
-    "routes": 331,
-    "routesProduction": 91,
-    "api": 372,
-    "tables": 47,
-    "migrations": 88,
+    "routes": 317,
+    "routesProduction": 93,
+    "api": 368,
+    "tables": 48,
+    "migrations": 90,
     "integrations": 24,
-    "components": 698,
-    "providers": 12,
-    "contextBuilders": 8,
+    "components": 706,
+    "providers": 11,
+    "contextBuilders": 9,
     "briefingTools": 19,
     "coachLayers": 4,
     "modules": 6,
@@ -218,6 +218,12 @@
     {
       "url": "/beheer/aow-leeftijd",
       "file": "app/(app)/beheer/aow-leeftijd/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/architectuur",
+      "file": "app/(app)/beheer/architectuur/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -270,14 +276,14 @@
       "isTest": true
     },
     {
-      "url": "/beheer/features",
-      "file": "app/(app)/beheer/features/page.tsx",
+      "url": "/beheer/gebruikers",
+      "file": "app/(app)/beheer/gebruikers/page.tsx",
       "group": "beheer",
       "isTest": false
     },
     {
-      "url": "/beheer/meldingen",
-      "file": "app/(app)/beheer/meldingen/page.tsx",
+      "url": "/beheer/jobs",
+      "file": "app/(app)/beheer/jobs/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -300,12 +306,6 @@
       "isTest": false
     },
     {
-      "url": "/beheer/propositie",
-      "file": "app/(app)/beheer/propositie/page.tsx",
-      "group": "beheer",
-      "isTest": false
-    },
-    {
       "url": "/beheer/regressietest",
       "file": "app/(app)/beheer/regressietest/page.tsx",
       "group": "beheer",
@@ -324,32 +324,20 @@
       "isTest": false
     },
     {
-      "url": "/beheer/test-deferred",
-      "file": "app/(app)/beheer/test-deferred/page.tsx",
-      "group": "beheer",
-      "isTest": true
-    },
-    {
       "url": "/beheer/testdata",
       "file": "app/(app)/beheer/testdata/page.tsx",
       "group": "beheer",
       "isTest": true
     },
     {
-      "url": "/beheer/tiers",
-      "file": "app/(app)/beheer/tiers/page.tsx",
-      "group": "beheer",
-      "isTest": false
-    },
-    {
-      "url": "/beheer/toegang",
-      "file": "app/(app)/beheer/toegang/page.tsx",
-      "group": "beheer",
-      "isTest": false
-    },
-    {
       "url": "/beheer/vragenlijsten",
       "file": "app/(app)/beheer/vragenlijsten/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/welkom",
+      "file": "app/(app)/beheer/welkom/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -362,18 +350,6 @@
     {
       "url": "/beheer/widget-presets",
       "file": "app/(app)/beheer/widget-presets/page.tsx",
-      "group": "beheer",
-      "isTest": false
-    },
-    {
-      "url": "/beheer/widgets-test",
-      "file": "app/(app)/beheer/widgets-test/page.tsx",
-      "group": "beheer",
-      "isTest": true
-    },
-    {
-      "url": "/beheer/will-avatar",
-      "file": "app/(app)/beheer/will-avatar/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -552,6 +528,12 @@
       "isTest": false
     },
     {
+      "url": "/functies",
+      "file": "app/functies/page.tsx",
+      "group": "overig",
+      "isTest": false
+    },
+    {
       "url": "/holdings/[id]",
       "file": "app/holdings/[id]/page.tsx",
       "group": "overig",
@@ -630,18 +612,6 @@
       "isTest": false
     },
     {
-      "url": "/identity/koppelingen",
-      "file": "app/(app)/identity/koppelingen/page.tsx",
-      "group": "overig",
-      "isTest": false
-    },
-    {
-      "url": "/identity/profiel",
-      "file": "app/(app)/identity/profiel/page.tsx",
-      "group": "overig",
-      "isTest": false
-    },
-    {
       "url": "/login",
       "file": "app/login/page.tsx",
       "group": "publiek",
@@ -656,6 +626,12 @@
     {
       "url": "/mijn",
       "file": "app/(app)/mijn/page.tsx",
+      "group": "persoonlijk",
+      "isTest": false
+    },
+    {
+      "url": "/mijn/account",
+      "file": "app/(app)/mijn/account/page.tsx",
       "group": "persoonlijk",
       "isTest": false
     },
@@ -812,6 +788,12 @@
     {
       "url": "/page.tsx",
       "file": "app/page.tsx",
+      "group": "overig",
+      "isTest": false
+    },
+    {
+      "url": "/prijzen",
+      "file": "app/prijzen/page.tsx",
       "group": "overig",
       "isTest": false
     },
@@ -1326,20 +1308,8 @@
       "isTest": true
     },
     {
-      "url": "/test-feature-gating",
-      "file": "app/test-feature-gating/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
       "url": "/test-feature-roadmap",
       "file": "app/test-feature-roadmap/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-feature-spotlight",
-      "file": "app/test-feature-spotlight/page.tsx",
       "group": "overig",
       "isTest": true
     },
@@ -1680,18 +1650,6 @@
       "isTest": true
     },
     {
-      "url": "/test-locked-default",
-      "file": "app/test-locked-default/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-locked-features",
-      "file": "app/test-locked-features/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
       "url": "/test-locked-footer",
       "file": "app/test-locked-footer/page.tsx",
       "group": "overig",
@@ -1812,18 +1770,6 @@
       "isTest": true
     },
     {
-      "url": "/test-onboarding-intent",
-      "file": "app/test-onboarding-intent/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-onboarding-intro",
-      "file": "app/test-onboarding-intro/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
       "url": "/test-onboarding-redirect",
       "file": "app/test-onboarding-redirect/page.tsx",
       "group": "overig",
@@ -1856,24 +1802,6 @@
     {
       "url": "/test-onboarding-validation",
       "file": "app/test-onboarding-validation/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-onboarding-workflow",
-      "file": "app/test-onboarding-workflow/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-phase-modal",
-      "file": "app/test-phase-modal/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-phase-transition",
-      "file": "app/test-phase-transition/page.tsx",
       "group": "overig",
       "isTest": true
     },
@@ -2004,12 +1932,6 @@
       "isTest": true
     },
     {
-      "url": "/test-sovereignty-gating",
-      "file": "app/test-sovereignty-gating/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
       "url": "/test-sparkline",
       "file": "app/test-sparkline/page.tsx",
       "group": "overig",
@@ -2036,12 +1958,6 @@
     {
       "url": "/test-spending-variance-confidence",
       "file": "app/test-spending-variance-confidence/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-spotlight-persistence",
-      "file": "app/test-spotlight-persistence/page.tsx",
       "group": "overig",
       "isTest": true
     },
@@ -2090,12 +2006,6 @@
     {
       "url": "/test-will-dots",
       "file": "app/test-will-dots/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-year-in-review",
-      "file": "app/test-year-in-review/page.tsx",
       "group": "overig",
       "isTest": true
     },
@@ -2172,6 +2082,12 @@
       "isTest": false
     },
     {
+      "url": "/veiligheid",
+      "file": "app/veiligheid/page.tsx",
+      "group": "overig",
+      "isTest": false
+    },
+    {
       "url": "/voorwaarden",
       "file": "app/voorwaarden/page.tsx",
       "group": "publiek",
@@ -2207,6 +2123,12 @@
       {
         "url": "/beheer/aow-leeftijd",
         "file": "app/(app)/beheer/aow-leeftijd/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/architectuur",
+        "file": "app/(app)/beheer/architectuur/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -2259,14 +2181,14 @@
         "isTest": true
       },
       {
-        "url": "/beheer/features",
-        "file": "app/(app)/beheer/features/page.tsx",
+        "url": "/beheer/gebruikers",
+        "file": "app/(app)/beheer/gebruikers/page.tsx",
         "group": "beheer",
         "isTest": false
       },
       {
-        "url": "/beheer/meldingen",
-        "file": "app/(app)/beheer/meldingen/page.tsx",
+        "url": "/beheer/jobs",
+        "file": "app/(app)/beheer/jobs/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -2289,12 +2211,6 @@
         "isTest": false
       },
       {
-        "url": "/beheer/propositie",
-        "file": "app/(app)/beheer/propositie/page.tsx",
-        "group": "beheer",
-        "isTest": false
-      },
-      {
         "url": "/beheer/regressietest",
         "file": "app/(app)/beheer/regressietest/page.tsx",
         "group": "beheer",
@@ -2313,32 +2229,20 @@
         "isTest": false
       },
       {
-        "url": "/beheer/test-deferred",
-        "file": "app/(app)/beheer/test-deferred/page.tsx",
-        "group": "beheer",
-        "isTest": true
-      },
-      {
         "url": "/beheer/testdata",
         "file": "app/(app)/beheer/testdata/page.tsx",
         "group": "beheer",
         "isTest": true
       },
       {
-        "url": "/beheer/tiers",
-        "file": "app/(app)/beheer/tiers/page.tsx",
-        "group": "beheer",
-        "isTest": false
-      },
-      {
-        "url": "/beheer/toegang",
-        "file": "app/(app)/beheer/toegang/page.tsx",
-        "group": "beheer",
-        "isTest": false
-      },
-      {
         "url": "/beheer/vragenlijsten",
         "file": "app/(app)/beheer/vragenlijsten/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/welkom",
+        "file": "app/(app)/beheer/welkom/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -2351,18 +2255,6 @@
       {
         "url": "/beheer/widget-presets",
         "file": "app/(app)/beheer/widget-presets/page.tsx",
-        "group": "beheer",
-        "isTest": false
-      },
-      {
-        "url": "/beheer/widgets-test",
-        "file": "app/(app)/beheer/widgets-test/page.tsx",
-        "group": "beheer",
-        "isTest": true
-      },
-      {
-        "url": "/beheer/will-avatar",
-        "file": "app/(app)/beheer/will-avatar/page.tsx",
         "group": "beheer",
         "isTest": false
       }
@@ -2383,6 +2275,12 @@
       {
         "url": "/mijn",
         "file": "app/(app)/mijn/page.tsx",
+        "group": "persoonlijk",
+        "isTest": false
+      },
+      {
+        "url": "/mijn/account",
+        "file": "app/(app)/mijn/account/page.tsx",
         "group": "persoonlijk",
         "isTest": false
       },
@@ -2693,26 +2591,26 @@
         "isTest": false
       },
       {
+        "url": "/functies",
+        "file": "app/functies/page.tsx",
+        "group": "overig",
+        "isTest": false
+      },
+      {
         "url": "/holdings/[id]",
         "file": "app/holdings/[id]/page.tsx",
         "group": "overig",
         "isTest": false
       },
       {
-        "url": "/identity/koppelingen",
-        "file": "app/(app)/identity/koppelingen/page.tsx",
-        "group": "overig",
-        "isTest": false
-      },
-      {
-        "url": "/identity/profiel",
-        "file": "app/(app)/identity/profiel/page.tsx",
-        "group": "overig",
-        "isTest": false
-      },
-      {
         "url": "/page.tsx",
         "file": "app/page.tsx",
+        "group": "overig",
+        "isTest": false
+      },
+      {
+        "url": "/prijzen",
+        "file": "app/prijzen/page.tsx",
         "group": "overig",
         "isTest": false
       },
@@ -3173,20 +3071,8 @@
         "isTest": true
       },
       {
-        "url": "/test-feature-gating",
-        "file": "app/test-feature-gating/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
         "url": "/test-feature-roadmap",
         "file": "app/test-feature-roadmap/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-feature-spotlight",
-        "file": "app/test-feature-spotlight/page.tsx",
         "group": "overig",
         "isTest": true
       },
@@ -3527,18 +3413,6 @@
         "isTest": true
       },
       {
-        "url": "/test-locked-default",
-        "file": "app/test-locked-default/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-locked-features",
-        "file": "app/test-locked-features/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
         "url": "/test-locked-footer",
         "file": "app/test-locked-footer/page.tsx",
         "group": "overig",
@@ -3659,18 +3533,6 @@
         "isTest": true
       },
       {
-        "url": "/test-onboarding-intent",
-        "file": "app/test-onboarding-intent/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-onboarding-intro",
-        "file": "app/test-onboarding-intro/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
         "url": "/test-onboarding-redirect",
         "file": "app/test-onboarding-redirect/page.tsx",
         "group": "overig",
@@ -3703,24 +3565,6 @@
       {
         "url": "/test-onboarding-validation",
         "file": "app/test-onboarding-validation/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-onboarding-workflow",
-        "file": "app/test-onboarding-workflow/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-phase-modal",
-        "file": "app/test-phase-modal/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-phase-transition",
-        "file": "app/test-phase-transition/page.tsx",
         "group": "overig",
         "isTest": true
       },
@@ -3851,12 +3695,6 @@
         "isTest": true
       },
       {
-        "url": "/test-sovereignty-gating",
-        "file": "app/test-sovereignty-gating/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
         "url": "/test-sparkline",
         "file": "app/test-sparkline/page.tsx",
         "group": "overig",
@@ -3883,12 +3721,6 @@
       {
         "url": "/test-spending-variance-confidence",
         "file": "app/test-spending-variance-confidence/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-spotlight-persistence",
-        "file": "app/test-spotlight-persistence/page.tsx",
         "group": "overig",
         "isTest": true
       },
@@ -3941,10 +3773,10 @@
         "isTest": true
       },
       {
-        "url": "/test-year-in-review",
-        "file": "app/test-year-in-review/page.tsx",
+        "url": "/veiligheid",
+        "file": "app/veiligheid/page.tsx",
         "group": "overig",
-        "isTest": true
+        "isTest": false
       }
     ],
     "horizon": [
@@ -4303,15 +4135,6 @@
       ]
     },
     {
-      "url": "/api/admin/feature-access",
-      "file": "app/api/admin/feature-access/route.ts",
-      "domain": "admin",
-      "methods": [
-        "GET",
-        "PUT"
-      ]
-    },
-    {
       "url": "/api/admin/news-active-prompt",
       "file": "app/api/admin/news-active-prompt/route.ts",
       "domain": "admin",
@@ -4441,6 +4264,32 @@
       "methods": [
         "GET",
         "PUT"
+      ]
+    },
+    {
+      "url": "/api/admin/users/block",
+      "file": "app/api/admin/users/block/route.ts",
+      "domain": "admin",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/admin/users/role",
+      "file": "app/api/admin/users/role/route.ts",
+      "domain": "admin",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/admin/welcome-guide",
+      "file": "app/api/admin/welcome-guide/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "PUT",
+        "DELETE"
       ]
     },
     {
@@ -4662,6 +4511,14 @@
       "domain": "bank-connect",
       "methods": [
         "POST"
+      ]
+    },
+    {
+      "url": "/api/belasting/box1-income",
+      "file": "app/api/belasting/box1-income/route.ts",
+      "domain": "belasting",
+      "methods": [
+        "PUT"
       ]
     },
     {
@@ -5602,6 +5459,14 @@
       ]
     },
     {
+      "url": "/api/own-accounts/reclassify",
+      "file": "app/api/own-accounts/reclassify/route.ts",
+      "domain": "own-accounts",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/parameters",
       "file": "app/api/parameters/route.ts",
       "domain": "parameters",
@@ -6318,14 +6183,6 @@
       ]
     },
     {
-      "url": "/api/verify-dashboard-card-order",
-      "file": "app/api/verify-dashboard-card-order/route.ts",
-      "domain": "verify-dashboard-card-order",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
       "url": "/api/verify-dashboard-kpis",
       "file": "app/api/verify-dashboard-kpis/route.ts",
       "domain": "verify-dashboard-kpis",
@@ -6387,16 +6244,6 @@
       "domain": "verify-debt-trajectory",
       "methods": [
         "GET"
-      ]
-    },
-    {
-      "url": "/api/verify-deferred-fields",
-      "file": "app/api/verify-deferred-fields/route.ts",
-      "domain": "verify-deferred-fields",
-      "methods": [
-        "GET",
-        "POST",
-        "DELETE"
       ]
     },
     {
@@ -6509,30 +6356,6 @@
       "url": "/api/verify-enhanced-snapshots",
       "file": "app/api/verify-enhanced-snapshots/route.ts",
       "domain": "verify-enhanced-snapshots",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
-      "url": "/api/verify-feature-gating",
-      "file": "app/api/verify-feature-gating/route.ts",
-      "domain": "verify-feature-gating",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
-      "url": "/api/verify-feature-roadmap",
-      "file": "app/api/verify-feature-roadmap/route.ts",
-      "domain": "verify-feature-roadmap",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
-      "url": "/api/verify-feature-spotlight",
-      "file": "app/api/verify-feature-spotlight/route.ts",
-      "domain": "verify-feature-spotlight",
       "methods": [
         "GET"
       ]
@@ -6860,14 +6683,6 @@
       ]
     },
     {
-      "url": "/api/verify-locked-default",
-      "file": "app/api/verify-locked-default/route.ts",
-      "domain": "verify-locked-default",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
       "url": "/api/verify-locked-footer",
       "file": "app/api/verify-locked-footer/route.ts",
       "domain": "verify-locked-footer",
@@ -6999,14 +6814,6 @@
       "url": "/api/verify-onboarding-reset",
       "file": "app/api/verify-onboarding-reset/route.ts",
       "domain": "verify-onboarding-reset",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
-      "url": "/api/verify-phase-transition",
-      "file": "app/api/verify-phase-transition/route.ts",
-      "domain": "verify-phase-transition",
       "methods": [
         "GET"
       ]
@@ -7181,14 +6988,6 @@
       ]
     },
     {
-      "url": "/api/verify-spotlight-persistence",
-      "file": "app/api/verify-spotlight-persistence/route.ts",
-      "domain": "verify-spotlight-persistence",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
       "url": "/api/verify-transaction-filters",
       "file": "app/api/verify-transaction-filters/route.ts",
       "domain": "verify-transaction-filters",
@@ -7229,17 +7028,18 @@
       ]
     },
     {
-      "url": "/api/verify-year-in-review",
-      "file": "app/api/verify-year-in-review/route.ts",
-      "domain": "verify-year-in-review",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
       "url": "/api/welcome",
       "file": "app/api/welcome/route.ts",
       "domain": "welcome",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "url": "/api/welcome-guide",
+      "file": "app/api/welcome-guide/route.ts",
+      "domain": "welcome-guide",
       "methods": [
         "GET",
         "PUT"
@@ -7293,7 +7093,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 26,
+      "count": 28,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -7382,15 +7182,6 @@
           "domain": "admin",
           "methods": [
             "POST"
-          ]
-        },
-        {
-          "url": "/api/admin/feature-access",
-          "file": "app/api/admin/feature-access/route.ts",
-          "domain": "admin",
-          "methods": [
-            "GET",
-            "PUT"
           ]
         },
         {
@@ -7523,6 +7314,32 @@
           "methods": [
             "GET",
             "PUT"
+          ]
+        },
+        {
+          "url": "/api/admin/users/block",
+          "file": "app/api/admin/users/block/route.ts",
+          "domain": "admin",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/users/role",
+          "file": "app/api/admin/users/role/route.ts",
+          "domain": "admin",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/welcome-guide",
+          "file": "app/api/admin/welcome-guide/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "PUT",
+            "DELETE"
           ]
         }
       ]
@@ -8879,6 +8696,21 @@
       ]
     },
     {
+      "domain": "belasting",
+      "label": "belasting",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/belasting/box1-income",
+          "file": "app/api/belasting/box1-income/route.ts",
+          "domain": "belasting",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "benchmark-comparison",
       "label": "benchmark-comparison",
       "count": 1,
@@ -9354,6 +9186,21 @@
           "methods": [
             "GET",
             "PUT"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "own-accounts",
+      "label": "own-accounts",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/own-accounts/reclassify",
+          "file": "app/api/own-accounts/reclassify/route.ts",
+          "domain": "own-accounts",
+          "methods": [
+            "POST"
           ]
         }
       ]
@@ -10294,21 +10141,6 @@
       ]
     },
     {
-      "domain": "verify-dashboard-card-order",
-      "label": "verify-dashboard-card-order",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-dashboard-card-order",
-          "file": "app/api/verify-dashboard-card-order/route.ts",
-          "domain": "verify-dashboard-card-order",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "verify-dashboard-kpis",
       "label": "verify-dashboard-kpis",
       "count": 1,
@@ -10424,23 +10256,6 @@
           "domain": "verify-debt-trajectory",
           "methods": [
             "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "verify-deferred-fields",
-      "label": "verify-deferred-fields",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-deferred-fields",
-          "file": "app/api/verify-deferred-fields/route.ts",
-          "domain": "verify-deferred-fields",
-          "methods": [
-            "GET",
-            "POST",
-            "DELETE"
           ]
         }
       ]
@@ -10651,51 +10466,6 @@
           "url": "/api/verify-enhanced-snapshots",
           "file": "app/api/verify-enhanced-snapshots/route.ts",
           "domain": "verify-enhanced-snapshots",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "verify-feature-gating",
-      "label": "verify-feature-gating",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-feature-gating",
-          "file": "app/api/verify-feature-gating/route.ts",
-          "domain": "verify-feature-gating",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "verify-feature-roadmap",
-      "label": "verify-feature-roadmap",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-feature-roadmap",
-          "file": "app/api/verify-feature-roadmap/route.ts",
-          "domain": "verify-feature-roadmap",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "verify-feature-spotlight",
-      "label": "verify-feature-spotlight",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-feature-spotlight",
-          "file": "app/api/verify-feature-spotlight/route.ts",
-          "domain": "verify-feature-spotlight",
           "methods": [
             "GET"
           ]
@@ -11298,21 +11068,6 @@
       ]
     },
     {
-      "domain": "verify-locked-default",
-      "label": "verify-locked-default",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-locked-default",
-          "file": "app/api/verify-locked-default/route.ts",
-          "domain": "verify-locked-default",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "verify-locked-footer",
       "label": "verify-locked-footer",
       "count": 1,
@@ -11561,21 +11316,6 @@
           "url": "/api/verify-onboarding-reset",
           "file": "app/api/verify-onboarding-reset/route.ts",
           "domain": "verify-onboarding-reset",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "verify-phase-transition",
-      "label": "verify-phase-transition",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-phase-transition",
-          "file": "app/api/verify-phase-transition/route.ts",
-          "domain": "verify-phase-transition",
           "methods": [
             "GET"
           ]
@@ -11899,21 +11639,6 @@
       ]
     },
     {
-      "domain": "verify-spotlight-persistence",
-      "label": "verify-spotlight-persistence",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-spotlight-persistence",
-          "file": "app/api/verify-spotlight-persistence/route.ts",
-          "domain": "verify-spotlight-persistence",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "verify-transaction-filters",
       "label": "verify-transaction-filters",
       "count": 1,
@@ -11989,21 +11714,6 @@
       ]
     },
     {
-      "domain": "verify-year-in-review",
-      "label": "verify-year-in-review",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-year-in-review",
-          "file": "app/api/verify-year-in-review/route.ts",
-          "domain": "verify-year-in-review",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "welcome",
       "label": "welcome",
       "count": 1,
@@ -12012,6 +11722,22 @@
           "url": "/api/welcome",
           "file": "app/api/welcome/route.ts",
           "domain": "welcome",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "welcome-guide",
+      "label": "welcome-guide",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/welcome-guide",
+          "file": "app/api/welcome-guide/route.ts",
+          "domain": "welcome-guide",
           "methods": [
             "GET",
             "PUT"
@@ -12217,6 +11943,10 @@
         "migration": "supabase/migrations/20260502000003_split_holdings_tables.sql"
       },
       {
+        "name": "job_runs",
+        "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
+      },
+      {
         "name": "life_events",
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
@@ -12289,7 +12019,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 88
+    "migrationCount": 90
   },
   "tablesByDomain": [
     {
@@ -12463,6 +12193,23 @@
       ]
     },
     {
+      "domain": "Overig",
+      "tables": [
+        {
+          "name": "badges",
+          "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
+        },
+        {
+          "name": "external_data_sources",
+          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
+        },
+        {
+          "name": "job_runs",
+          "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
+        }
+      ]
+    },
+    {
       "domain": "Snapshots & historie",
       "tables": [
         {
@@ -12493,19 +12240,6 @@
         {
           "name": "households",
           "migration": "supabase/migrations/20260218000001_add_household_support.sql"
-        }
-      ]
-    },
-    {
-      "domain": "Overig",
-      "tables": [
-        {
-          "name": "badges",
-          "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
-        },
-        {
-          "name": "external_data_sources",
-          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
         }
       ]
     },
@@ -12580,18 +12314,14 @@
     {
       "name": "ToastProvider",
       "source": "@/components/app/toast-provider"
-    },
-    {
-      "name": "ViewModeProvider",
-      "source": "@/components/app/view-mode-provider"
     }
   ],
   "components": {
-    "total": 698,
+    "total": 706,
     "groups": [
       {
         "group": "app",
-        "count": 294,
+        "count": 289,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12609,7 +12339,6 @@
           "animated-progress-bar",
           "app-setup-gate",
           "app-setup-section",
-          "ask-will-button",
           "aspiration-questionnaire",
           "asset-pane",
           "auto-snapshot-trigger",
@@ -12617,6 +12346,7 @@
           "backtesting-modal",
           "balance-history-chart",
           "bank-selector",
+          "beheer-container",
           "beheer-nav",
           "belasting-section",
           "benchmark-comparison-chart",
@@ -12701,7 +12431,6 @@
           "fan-chart",
           "feature-access-provider",
           "feature-gate",
-          "feature-phase-matrix",
           "fee-erosion-chart",
           "fin-table",
           "floating-nav-button",
@@ -12715,7 +12444,6 @@
           "freshness-label.test",
           "full-screen-modal",
           "gap-analyse",
-          "giften-check",
           "goal-detail-modal",
           "goal-form",
           "goal-progress-timeline",
@@ -12759,7 +12487,6 @@
           "level-up-celebration",
           "lever-compass",
           "life-events-in-phase",
-          "locked-features-footer",
           "log-timeline",
           "manual-transfer-sheet",
           "markdown-helpers",
@@ -12789,7 +12516,6 @@
           "notification-item",
           "notification-panel",
           "notification-provider",
-          "ontdekken-section",
           "opzeg-modal",
           "ownership-toggle",
           "page-action-bar",
@@ -12805,6 +12531,8 @@
           "phase-bar",
           "phase-chart-zoom",
           "phase-detail-table",
+          "phase-discuss-button",
+          "phase-intro",
           "phase-modal-onttrekking",
           "phase-modal-opbouw",
           "phase-modal-overgang",
@@ -12867,11 +12595,8 @@
           "use-app-setup-state",
           "use-is-setup-completed",
           "verhuurrendement.config",
-          "view-mode-provider",
-          "view-mode-provider.test",
           "wealth-composition-chart",
           "wealth-composition-chart.test",
-          "welcome-banner",
           "whatif-actions",
           "whatif-beslishulp",
           "whatif-chat",
@@ -12891,7 +12616,7 @@
       },
       {
         "group": "overview",
-        "count": 109,
+        "count": 116,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -12903,6 +12628,7 @@
           "bezittingen-filter.test",
           "bezittingen-view",
           "box1-eigen-woning",
+          "box1-gross-income-editor",
           "box1-heffingskortingen",
           "box1-marginale-curve-card",
           "box1-waterfall",
@@ -12944,6 +12670,7 @@
           "geldstroom-gauge",
           "gepaarde-staven",
           "grootste-uitgaven",
+          "guide-screen-view",
           "health-score-card",
           "health-score-card.test",
           "hefbomen-nav",
@@ -12958,6 +12685,7 @@
           "hub-verdeling",
           "inflation-impact-card",
           "inflation-impact-card.test",
+          "info-tooltip",
           "jaarruimte-card",
           "jaarruimte-card.test",
           "koppel-rekening-banner",
@@ -12989,6 +12717,8 @@
           "tips-teaser",
           "top-tegenpartijen",
           "transactie-detail-sheet",
+          "transactie-tijdlijn",
+          "transactie-tijdlijn.test",
           "transacties-analyse",
           "transacties-geldstroom",
           "transacties-geldstroom.test",
@@ -13001,7 +12731,9 @@
           "vrijheid-strip",
           "vrijheid-strip.test",
           "vrijheidsbriefing-hero",
-          "weekdag-patroon"
+          "weekdag-patroon",
+          "welcome-guide-banner",
+          "welcome-guide-banner.test"
         ]
       },
       {
@@ -13228,14 +12960,18 @@
       },
       {
         "group": "mijn",
-        "count": 21,
+        "count": 25,
         "items": [
+          "abonnement-section",
+          "account-basis-section",
+          "account-client",
           "ai-privacy-settings",
           "ai-privacy-settings.test",
           "budget-tint-picker",
           "budget-tint-picker.test",
           "category-tint-picker",
           "category-tint-picker.test",
+          "danger-zone",
           "font-picker",
           "font-picker.test",
           "geavanceerd-settings",
@@ -13255,19 +12991,16 @@
       },
       {
         "group": "onboarding",
-        "count": 21,
+        "count": 18,
         "items": [
           "aangifte-import-pane",
           "budget-amount-editor",
           "facts-panel",
           "onboarding-bezittingen",
           "onboarding-doel",
-          "onboarding-goal",
           "onboarding-horizon",
           "onboarding-identity",
           "onboarding-inkomen",
-          "onboarding-intent",
-          "onboarding-intro",
           "onboarding-klaar",
           "onboarding-nieuws-only",
           "onboarding-shell",
@@ -13278,6 +13011,25 @@
           "speech-bubble",
           "step-progress",
           "welcome-popup"
+        ]
+      },
+      {
+        "group": "landing",
+        "count": 13,
+        "items": [
+          "demo-mocks",
+          "faq-section",
+          "footer",
+          "functies",
+          "header",
+          "hero",
+          "home",
+          "marketing-page-shell",
+          "pricing-tiers",
+          "reveal",
+          "section-primitives",
+          "slot-cta",
+          "veiligheid"
         ]
       },
       {
@@ -13306,20 +13058,6 @@
           "page-blueprints",
           "page-info-button",
           "progress-milestones"
-        ]
-      },
-      {
-        "group": "landing",
-        "count": 8,
-        "items": [
-          "faq",
-          "features",
-          "footer",
-          "header",
-          "hero",
-          "marketing-page-shell",
-          "pricing",
-          "reveal"
         ]
       },
       {
@@ -13541,6 +13279,10 @@
           "source": "./tax-context"
         },
         {
+          "name": "buildSubscriptionsContext",
+          "source": "./subscriptions-context"
+        },
+        {
           "name": "buildAandachtspuntenContext",
           "source": "./aandachtspunten-context"
         }
@@ -13688,10 +13430,3954 @@
       }
     ]
   },
+  "tableAccess": {
+    "byDomain": {
+      "aandelen-holdings": [
+        {
+          "name": "assets",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        },
+        {
+          "name": "user_feature_visits",
+          "write": true
+        }
+      ],
+      "account": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "activate": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": true
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "admin": [
+        {
+          "name": "aow_leeftijd",
+          "write": true
+        },
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "household_members",
+          "write": false
+        },
+        {
+          "name": "news_articles",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        },
+        {
+          "name": "questionnaire_questions",
+          "write": true
+        },
+        {
+          "name": "questionnaire_sessions",
+          "write": true
+        },
+        {
+          "name": "questionnaires",
+          "write": true
+        }
+      ],
+      "ai": [
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "budgets",
+          "write": true
+        },
+        {
+          "name": "household_members",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
+      "assets": [
+        {
+          "name": "assets",
+          "write": true
+        }
+      ],
+      "bank-connect": [
+        {
+          "name": "app_settings",
+          "write": false
+        },
+        {
+          "name": "assets",
+          "write": true
+        },
+        {
+          "name": "bank_accounts",
+          "write": true
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": true
+        }
+      ],
+      "belasting": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "benchmark-comparison": [
+        {
+          "name": "investment_holdings",
+          "write": false
+        },
+        {
+          "name": "investment_transactions",
+          "write": false
+        },
+        {
+          "name": "valuations",
+          "write": false
+        }
+      ],
+      "briefing": [
+        {
+          "name": "app_settings",
+          "write": false
+        },
+        {
+          "name": "briefing_history",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
+      "budget-trends": [
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "budget-variance": [
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "budgeting-active": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "budgets": [
+        {
+          "name": "budgets",
+          "write": true
+        },
+        {
+          "name": "transactions",
+          "write": true
+        }
+      ],
+      "budgetteren": [
+        {
+          "name": "assets",
+          "write": true
+        },
+        {
+          "name": "budgets",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "user_feature_visits",
+          "write": true
+        }
+      ],
+      "calculators": [
+        {
+          "name": "calculator_likes",
+          "write": true
+        },
+        {
+          "name": "calculator_reports",
+          "write": true
+        },
+        {
+          "name": "custom_calculators",
+          "write": true
+        }
+      ],
+      "cashflow-forecast": [
+        {
+          "name": "bank_accounts",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "recurring_transactions",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "checkin": [
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "goals",
+          "write": false
+        },
+        {
+          "name": "household_members",
+          "write": false
+        },
+        {
+          "name": "life_events",
+          "write": false
+        },
+        {
+          "name": "net_worth_snapshots",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "command-palette": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "crypto_holdings",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "goals",
+          "write": false
+        },
+        {
+          "name": "investment_holdings",
+          "write": false
+        },
+        {
+          "name": "life_events",
+          "write": false
+        }
+      ],
+      "crypto": [
+        {
+          "name": "crypto_transactions",
+          "write": false
+        }
+      ],
+      "crypto-holdings": [
+        {
+          "name": "assets",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        },
+        {
+          "name": "user_feature_visits",
+          "write": true
+        }
+      ],
+      "daily-expense-rate": [
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "dashboard-type": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "debts": [
+        {
+          "name": "debts",
+          "write": true
+        }
+      ],
+      "detect-recurring": [
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "recurring_transactions",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "dividends": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "investment_holdings",
+          "write": false
+        },
+        {
+          "name": "investment_transactions",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        },
+        {
+          "name": "valuations",
+          "write": false
+        }
+      ],
+      "export": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "goals",
+          "write": false
+        },
+        {
+          "name": "net_worth_snapshots",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "feature-preferences": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "feature-visits": [
+        {
+          "name": "user_feature_visits",
+          "write": true
+        }
+      ],
+      "fire-settings": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "goals": [
+        {
+          "name": "goals",
+          "write": true
+        },
+        {
+          "name": "household_members",
+          "write": false
+        },
+        {
+          "name": "valuations",
+          "write": false
+        }
+      ],
+      "goals-guide": [
+        {
+          "name": "app_settings",
+          "write": true
+        }
+      ],
+      "guide-help": [
+        {
+          "name": "app_settings",
+          "write": true
+        }
+      ],
+      "guide-progress": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "life_events",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "health": [
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
+      "holding-alerts": [
+        {
+          "name": "holding_alerts",
+          "write": true
+        }
+      ],
+      "holdings": [
+        {
+          "name": "assets",
+          "write": true
+        },
+        {
+          "name": "crypto_holding_prices",
+          "write": true
+        },
+        {
+          "name": "crypto_holdings",
+          "write": true
+        },
+        {
+          "name": "investment_holding_prices",
+          "write": true
+        },
+        {
+          "name": "investment_holdings",
+          "write": true
+        },
+        {
+          "name": "investment_transactions",
+          "write": true
+        }
+      ],
+      "household": [
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "household_invitations",
+          "write": true
+        },
+        {
+          "name": "household_members",
+          "write": true
+        },
+        {
+          "name": "households",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "housing-strategy": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "hypotheekplanner": [
+        {
+          "name": "debts",
+          "write": true
+        },
+        {
+          "name": "user_feature_visits",
+          "write": true
+        }
+      ],
+      "integrations": [
+        {
+          "name": "exchange_connections",
+          "write": true
+        },
+        {
+          "name": "external_data_sources",
+          "write": true
+        },
+        {
+          "name": "wallet_addresses",
+          "write": true
+        }
+      ],
+      "investment": [
+        {
+          "name": "investment_holdings",
+          "write": false
+        },
+        {
+          "name": "investment_transactions",
+          "write": false
+        }
+      ],
+      "module-guide": [
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "monthly-checkin": [
+        {
+          "name": "app_settings",
+          "write": true
+        }
+      ],
+      "news": [
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "news_articles",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
+      "news-ingest": [
+        {
+          "name": "news_articles",
+          "write": true
+        }
+      ],
+      "next-steps": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "goals",
+          "write": false
+        },
+        {
+          "name": "net_worth_snapshots",
+          "write": false
+        },
+        {
+          "name": "next_step_completions",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "nibud": [
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
+      "notifications": [
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "holding_alerts",
+          "write": false
+        },
+        {
+          "name": "household_members",
+          "write": false
+        },
+        {
+          "name": "investment_holdings",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "target_allocations",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "onboarding": [
+        {
+          "name": "aow_leeftijd",
+          "write": false
+        },
+        {
+          "name": "assets",
+          "write": true
+        },
+        {
+          "name": "balance_snapshots",
+          "write": true
+        },
+        {
+          "name": "bank_accounts",
+          "write": true
+        },
+        {
+          "name": "budgets",
+          "write": true
+        },
+        {
+          "name": "debts",
+          "write": true
+        },
+        {
+          "name": "goals",
+          "write": true
+        },
+        {
+          "name": "life_events",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "onboarding-steps": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "own-accounts": [
+        {
+          "name": "bank_accounts",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": true
+        }
+      ],
+      "parameters": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "partner-notifications": [
+        {
+          "name": "app_settings",
+          "write": true
+        }
+      ],
+      "pension": [
+        {
+          "name": "life_events",
+          "write": true
+        }
+      ],
+      "perspective": [
+        {
+          "name": "household_members",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "portfolio-allocation": [
+        {
+          "name": "investment_holdings",
+          "write": true
+        },
+        {
+          "name": "target_allocations",
+          "write": true
+        }
+      ],
+      "pot-rules": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "questionnaires": [
+        {
+          "name": "questionnaire_responses",
+          "write": true
+        },
+        {
+          "name": "questionnaire_sessions",
+          "write": true
+        },
+        {
+          "name": "questionnaires",
+          "write": false
+        }
+      ],
+      "rebalancing": [
+        {
+          "name": "investment_holdings",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "target_allocations",
+          "write": false
+        }
+      ],
+      "recurring": [
+        {
+          "name": "bank_accounts",
+          "write": false
+        },
+        {
+          "name": "recurring_transactions",
+          "write": true
+        }
+      ],
+      "report": [
+        {
+          "name": "aow_leeftijd",
+          "write": false
+        },
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "bank_accounts",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "crypto_holdings",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "goals",
+          "write": false
+        },
+        {
+          "name": "investment_holdings",
+          "write": false
+        },
+        {
+          "name": "life_events",
+          "write": false
+        },
+        {
+          "name": "net_worth_snapshots",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "retirement-aspirations": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "roadmap": [
+        {
+          "name": "app_settings",
+          "write": true
+        },
+        {
+          "name": "roadmap_features",
+          "write": true
+        }
+      ],
+      "scenarios": [
+        {
+          "name": "app_settings",
+          "write": true
+        }
+      ],
+      "share": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "snapshots": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "balance_snapshots",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "net_worth_snapshots",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "spending-patterns": [
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "standard-guide": [
+        {
+          "name": "app_settings",
+          "write": true
+        }
+      ],
+      "subscriptions": [
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "recurring_transactions",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "uitgaven-na-pensioen": [
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ],
+      "valuations": [
+        {
+          "name": "valuations",
+          "write": false
+        }
+      ],
+      "verhuurrendement": [
+        {
+          "name": "assets",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
+        },
+        {
+          "name": "user_feature_visits",
+          "write": true
+        }
+      ],
+      "welcome": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "welcome-guide": [
+        {
+          "name": "app_settings",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "widget-presets": [
+        {
+          "name": "app_settings",
+          "write": true
+        }
+      ],
+      "widgets": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "withdrawal-strategy": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
+      "year-in-review": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "net_worth_snapshots",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        },
+        {
+          "name": "transactions",
+          "write": false
+        }
+      ]
+    },
+    "byTable": {
+      "profiles": [
+        {
+          "domain": "aandelen-holdings",
+          "label": "aandelen-holdings",
+          "write": true,
+          "routes": [
+            "/api/aandelen-holdings/setup"
+          ]
+        },
+        {
+          "domain": "account",
+          "label": "account",
+          "write": true,
+          "routes": [
+            "/api/account/delete"
+          ]
+        },
+        {
+          "domain": "activate",
+          "label": "activate",
+          "write": true,
+          "routes": [
+            "/api/activate"
+          ]
+        },
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires/[id]/responses",
+            "/api/admin/seed",
+            "/api/admin/tier-assign",
+            "/api/admin/tier-config",
+            "/api/admin/users/block",
+            "/api/admin/users/role"
+          ]
+        },
+        {
+          "domain": "belasting",
+          "label": "belasting",
+          "write": true,
+          "routes": [
+            "/api/belasting/box1-income"
+          ]
+        },
+        {
+          "domain": "budgeting-active",
+          "label": "budgeting-active",
+          "write": true,
+          "routes": [
+            "/api/budgeting-active"
+          ]
+        },
+        {
+          "domain": "crypto-holdings",
+          "label": "Crypto",
+          "write": true,
+          "routes": [
+            "/api/crypto-holdings/setup"
+          ]
+        },
+        {
+          "domain": "dashboard-type",
+          "label": "dashboard-type",
+          "write": true,
+          "routes": [
+            "/api/dashboard-type"
+          ]
+        },
+        {
+          "domain": "feature-preferences",
+          "label": "feature-preferences",
+          "write": true,
+          "routes": [
+            "/api/feature-preferences"
+          ]
+        },
+        {
+          "domain": "fire-settings",
+          "label": "fire-settings",
+          "write": true,
+          "routes": [
+            "/api/fire-settings"
+          ]
+        },
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": true,
+          "routes": [
+            "/api/household/accept",
+            "/api/household/box2",
+            "/api/household/box3",
+            "/api/household/fire-projections",
+            "/api/household/invite",
+            "/api/household/status"
+          ]
+        },
+        {
+          "domain": "housing-strategy",
+          "label": "housing-strategy",
+          "write": true,
+          "routes": [
+            "/api/housing-strategy"
+          ]
+        },
+        {
+          "domain": "module-guide",
+          "label": "module-guide",
+          "write": true,
+          "routes": [
+            "/api/module-guide/progress"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/aangifte-import",
+            "/api/onboarding/reset",
+            "/api/onboarding/save-own-data",
+            "/api/onboarding/seed"
+          ]
+        },
+        {
+          "domain": "onboarding-steps",
+          "label": "onboarding-steps",
+          "write": true,
+          "routes": [
+            "/api/onboarding-steps"
+          ]
+        },
+        {
+          "domain": "parameters",
+          "label": "parameters",
+          "write": true,
+          "routes": [
+            "/api/parameters"
+          ]
+        },
+        {
+          "domain": "perspective",
+          "label": "perspective",
+          "write": true,
+          "routes": [
+            "/api/perspective"
+          ]
+        },
+        {
+          "domain": "pot-rules",
+          "label": "pot-rules",
+          "write": true,
+          "routes": [
+            "/api/pot-rules"
+          ]
+        },
+        {
+          "domain": "retirement-aspirations",
+          "label": "retirement-aspirations",
+          "write": true,
+          "routes": [
+            "/api/retirement-aspirations"
+          ]
+        },
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": true,
+          "routes": [
+            "/api/snapshots",
+            "/api/snapshots/auto",
+            "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "verhuurrendement",
+          "label": "verhuurrendement",
+          "write": true,
+          "routes": [
+            "/api/verhuurrendement/setup"
+          ]
+        },
+        {
+          "domain": "welcome",
+          "label": "welcome",
+          "write": true,
+          "routes": [
+            "/api/welcome"
+          ]
+        },
+        {
+          "domain": "welcome-guide",
+          "label": "welcome-guide",
+          "write": true,
+          "routes": [
+            "/api/welcome-guide"
+          ]
+        },
+        {
+          "domain": "widgets",
+          "label": "widgets",
+          "write": true,
+          "routes": [
+            "/api/widgets"
+          ]
+        },
+        {
+          "domain": "withdrawal-strategy",
+          "label": "withdrawal-strategy",
+          "write": true,
+          "routes": [
+            "/api/withdrawal-strategy"
+          ]
+        },
+        {
+          "domain": "ai",
+          "label": "AI & Coach",
+          "write": false,
+          "routes": [
+            "/api/ai/actions/[id]",
+            "/api/ai/actions/[id]/assign",
+            "/api/ai/chat",
+            "/api/ai/recommendations",
+            "/api/ai/recommendations/initial"
+          ]
+        },
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": false,
+          "routes": [
+            "/api/bank-connect/callback"
+          ]
+        },
+        {
+          "domain": "briefing",
+          "label": "briefing",
+          "write": false,
+          "routes": [
+            "/api/briefing/compose"
+          ]
+        },
+        {
+          "domain": "budgetteren",
+          "label": "budgetteren",
+          "write": false,
+          "routes": [
+            "/api/budgetteren/setup"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/gespreksstarters",
+            "/api/checkin/overview",
+            "/api/checkin/save"
+          ]
+        },
+        {
+          "domain": "guide-progress",
+          "label": "guide-progress",
+          "write": false,
+          "routes": [
+            "/api/guide-progress"
+          ]
+        },
+        {
+          "domain": "health",
+          "label": "health",
+          "write": false,
+          "routes": [
+            "/api/health"
+          ]
+        },
+        {
+          "domain": "news",
+          "label": "news",
+          "write": false,
+          "routes": [
+            "/api/news"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        },
+        {
+          "domain": "nibud",
+          "label": "nibud",
+          "write": false,
+          "routes": [
+            "/api/nibud/benchmark"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "rebalancing",
+          "label": "rebalancing",
+          "write": false,
+          "routes": [
+            "/api/rebalancing/check"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report",
+            "/api/report/balans",
+            "/api/report/budget",
+            "/api/report/persoonlijk-plan",
+            "/api/report/vermogen"
+          ]
+        },
+        {
+          "domain": "share",
+          "label": "share",
+          "write": false,
+          "routes": [
+            "/api/share/freedom-card"
+          ]
+        },
+        {
+          "domain": "subscriptions",
+          "label": "subscriptions",
+          "write": false,
+          "routes": [
+            "/api/subscriptions/advice"
+          ]
+        },
+        {
+          "domain": "uitgaven-na-pensioen",
+          "label": "uitgaven-na-pensioen",
+          "write": false,
+          "routes": [
+            "/api/uitgaven-na-pensioen/context"
+          ]
+        },
+        {
+          "domain": "year-in-review",
+          "label": "year-in-review",
+          "write": false,
+          "routes": [
+            "/api/year-in-review"
+          ]
+        }
+      ],
+      "assets": [
+        {
+          "domain": "aandelen-holdings",
+          "label": "aandelen-holdings",
+          "write": true,
+          "routes": [
+            "/api/aandelen-holdings/setup"
+          ]
+        },
+        {
+          "domain": "assets",
+          "label": "Bezittingen",
+          "write": true,
+          "routes": [
+            "/api/assets/toggle-budget",
+            "/api/assets/toggle-holdings",
+            "/api/assets/toggle-rental",
+            "/api/assets/toggle-woonbalans"
+          ]
+        },
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": true,
+          "routes": [
+            "/api/bank-connect/balances",
+            "/api/bank-connect/callback"
+          ]
+        },
+        {
+          "domain": "budgetteren",
+          "label": "budgetteren",
+          "write": true,
+          "routes": [
+            "/api/budgetteren/setup"
+          ]
+        },
+        {
+          "domain": "crypto-holdings",
+          "label": "Crypto",
+          "write": true,
+          "routes": [
+            "/api/crypto-holdings/setup"
+          ]
+        },
+        {
+          "domain": "holdings",
+          "label": "Beleggingen",
+          "write": true,
+          "routes": [
+            "/api/holdings",
+            "/api/holdings/import",
+            "/api/holdings/refresh-prices/cron"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/aangifte-import",
+            "/api/onboarding/save-own-data"
+          ]
+        },
+        {
+          "domain": "verhuurrendement",
+          "label": "verhuurrendement",
+          "write": true,
+          "routes": [
+            "/api/verhuurrendement/setup"
+          ]
+        },
+        {
+          "domain": "activate",
+          "label": "activate",
+          "write": false,
+          "routes": [
+            "/api/activate"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/gespreksstarters",
+            "/api/checkin/overview"
+          ]
+        },
+        {
+          "domain": "command-palette",
+          "label": "command-palette",
+          "write": false,
+          "routes": [
+            "/api/command-palette/search"
+          ]
+        },
+        {
+          "domain": "dividends",
+          "label": "dividends",
+          "write": false,
+          "routes": [
+            "/api/dividends"
+          ]
+        },
+        {
+          "domain": "export",
+          "label": "export",
+          "write": false,
+          "routes": [
+            "/api/export"
+          ]
+        },
+        {
+          "domain": "guide-progress",
+          "label": "guide-progress",
+          "write": false,
+          "routes": [
+            "/api/guide-progress"
+          ]
+        },
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": false,
+          "routes": [
+            "/api/household/box2",
+            "/api/household/box3",
+            "/api/household/data",
+            "/api/household/fire-projections"
+          ]
+        },
+        {
+          "domain": "housing-strategy",
+          "label": "housing-strategy",
+          "write": false,
+          "routes": [
+            "/api/housing-strategy"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report",
+            "/api/report/balans",
+            "/api/report/vermogen"
+          ]
+        },
+        {
+          "domain": "share",
+          "label": "share",
+          "write": false,
+          "routes": [
+            "/api/share/freedom-card"
+          ]
+        },
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": false,
+          "routes": [
+            "/api/snapshots",
+            "/api/snapshots/auto",
+            "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "year-in-review",
+          "label": "year-in-review",
+          "write": false,
+          "routes": [
+            "/api/year-in-review"
+          ]
+        }
+      ],
+      "user_feature_visits": [
+        {
+          "domain": "aandelen-holdings",
+          "label": "aandelen-holdings",
+          "write": true,
+          "routes": [
+            "/api/aandelen-holdings/setup"
+          ]
+        },
+        {
+          "domain": "budgetteren",
+          "label": "budgetteren",
+          "write": true,
+          "routes": [
+            "/api/budgetteren/setup"
+          ]
+        },
+        {
+          "domain": "crypto-holdings",
+          "label": "Crypto",
+          "write": true,
+          "routes": [
+            "/api/crypto-holdings/setup"
+          ]
+        },
+        {
+          "domain": "feature-visits",
+          "label": "feature-visits",
+          "write": true,
+          "routes": [
+            "/api/feature-visits"
+          ]
+        },
+        {
+          "domain": "hypotheekplanner",
+          "label": "hypotheekplanner",
+          "write": true,
+          "routes": [
+            "/api/hypotheekplanner/setup"
+          ]
+        },
+        {
+          "domain": "verhuurrendement",
+          "label": "verhuurrendement",
+          "write": true,
+          "routes": [
+            "/api/verhuurrendement/setup"
+          ]
+        }
+      ],
+      "debts": [
+        {
+          "domain": "debts",
+          "label": "Schulden",
+          "write": true,
+          "routes": [
+            "/api/debts/toggle-hypotheekplanner"
+          ]
+        },
+        {
+          "domain": "hypotheekplanner",
+          "label": "hypotheekplanner",
+          "write": true,
+          "routes": [
+            "/api/hypotheekplanner/setup"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/aangifte-import",
+            "/api/onboarding/save-own-data"
+          ]
+        },
+        {
+          "domain": "activate",
+          "label": "activate",
+          "write": false,
+          "routes": [
+            "/api/activate"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/gespreksstarters",
+            "/api/checkin/overview"
+          ]
+        },
+        {
+          "domain": "command-palette",
+          "label": "command-palette",
+          "write": false,
+          "routes": [
+            "/api/command-palette/search"
+          ]
+        },
+        {
+          "domain": "export",
+          "label": "export",
+          "write": false,
+          "routes": [
+            "/api/export"
+          ]
+        },
+        {
+          "domain": "guide-progress",
+          "label": "guide-progress",
+          "write": false,
+          "routes": [
+            "/api/guide-progress"
+          ]
+        },
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": false,
+          "routes": [
+            "/api/household/box2",
+            "/api/household/box3",
+            "/api/household/data",
+            "/api/household/fire-projections"
+          ]
+        },
+        {
+          "domain": "housing-strategy",
+          "label": "housing-strategy",
+          "write": false,
+          "routes": [
+            "/api/housing-strategy"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report",
+            "/api/report/balans",
+            "/api/report/vermogen"
+          ]
+        },
+        {
+          "domain": "share",
+          "label": "share",
+          "write": false,
+          "routes": [
+            "/api/share/freedom-card"
+          ]
+        },
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": false,
+          "routes": [
+            "/api/snapshots",
+            "/api/snapshots/auto",
+            "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "year-in-review",
+          "label": "year-in-review",
+          "write": false,
+          "routes": [
+            "/api/year-in-review"
+          ]
+        }
+      ],
+      "transactions": [
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": true,
+          "routes": [
+            "/api/bank-connect/sync"
+          ]
+        },
+        {
+          "domain": "budgets",
+          "label": "Budgetten",
+          "write": true,
+          "routes": [
+            "/api/budgets/[id]"
+          ]
+        },
+        {
+          "domain": "own-accounts",
+          "label": "own-accounts",
+          "write": true,
+          "routes": [
+            "/api/own-accounts/reclassify"
+          ]
+        },
+        {
+          "domain": "activate",
+          "label": "activate",
+          "write": false,
+          "routes": [
+            "/api/activate"
+          ]
+        },
+        {
+          "domain": "budget-trends",
+          "label": "budget-trends",
+          "write": false,
+          "routes": [
+            "/api/budget-trends"
+          ]
+        },
+        {
+          "domain": "budget-variance",
+          "label": "budget-variance",
+          "write": false,
+          "routes": [
+            "/api/budget-variance"
+          ]
+        },
+        {
+          "domain": "cashflow-forecast",
+          "label": "cashflow-forecast",
+          "write": false,
+          "routes": [
+            "/api/cashflow-forecast"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/aandachtspunten",
+            "/api/checkin/budgets",
+            "/api/checkin/gespreksstarters",
+            "/api/checkin/overview",
+            "/api/checkin/upcoming"
+          ]
+        },
+        {
+          "domain": "daily-expense-rate",
+          "label": "daily-expense-rate",
+          "write": false,
+          "routes": [
+            "/api/daily-expense-rate"
+          ]
+        },
+        {
+          "domain": "detect-recurring",
+          "label": "detect-recurring",
+          "write": false,
+          "routes": [
+            "/api/detect-recurring"
+          ]
+        },
+        {
+          "domain": "dividends",
+          "label": "dividends",
+          "write": false,
+          "routes": [
+            "/api/dividends"
+          ]
+        },
+        {
+          "domain": "export",
+          "label": "export",
+          "write": false,
+          "routes": [
+            "/api/export"
+          ]
+        },
+        {
+          "domain": "guide-progress",
+          "label": "guide-progress",
+          "write": false,
+          "routes": [
+            "/api/guide-progress"
+          ]
+        },
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": false,
+          "routes": [
+            "/api/household/fire-projections"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report",
+            "/api/report/balans",
+            "/api/report/budget",
+            "/api/report/vermogen"
+          ]
+        },
+        {
+          "domain": "share",
+          "label": "share",
+          "write": false,
+          "routes": [
+            "/api/share/freedom-card"
+          ]
+        },
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": false,
+          "routes": [
+            "/api/snapshots",
+            "/api/snapshots/auto",
+            "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "spending-patterns",
+          "label": "spending-patterns",
+          "write": false,
+          "routes": [
+            "/api/spending-patterns"
+          ]
+        },
+        {
+          "domain": "subscriptions",
+          "label": "subscriptions",
+          "write": false,
+          "routes": [
+            "/api/subscriptions/advice",
+            "/api/subscriptions/analyse-ai",
+            "/api/subscriptions/detect-ai"
+          ]
+        },
+        {
+          "domain": "uitgaven-na-pensioen",
+          "label": "uitgaven-na-pensioen",
+          "write": false,
+          "routes": [
+            "/api/uitgaven-na-pensioen/context"
+          ]
+        },
+        {
+          "domain": "year-in-review",
+          "label": "year-in-review",
+          "write": false,
+          "routes": [
+            "/api/year-in-review"
+          ]
+        }
+      ],
+      "app_settings": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/ai-features",
+            "/api/admin/briefing-directives",
+            "/api/admin/checkins",
+            "/api/admin/coach",
+            "/api/admin/extraction-prompt",
+            "/api/admin/news-prompt",
+            "/api/admin/news-sources",
+            "/api/admin/settings",
+            "/api/admin/tier-config",
+            "/api/admin/welcome-guide"
+          ]
+        },
+        {
+          "domain": "ai",
+          "label": "AI & Coach",
+          "write": true,
+          "routes": [
+            "/api/ai/actions/[id]"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": true,
+          "routes": [
+            "/api/checkin/gespreksstarters",
+            "/api/checkin/save"
+          ]
+        },
+        {
+          "domain": "goals-guide",
+          "label": "goals-guide",
+          "write": true,
+          "routes": [
+            "/api/goals-guide/settings",
+            "/api/goals-guide/steps"
+          ]
+        },
+        {
+          "domain": "guide-help",
+          "label": "guide-help",
+          "write": true,
+          "routes": [
+            "/api/guide-help/[helpKey]",
+            "/api/guide-help/[helpKey]/screenshots",
+            "/api/guide-help/[helpKey]/screenshots/[filename]"
+          ]
+        },
+        {
+          "domain": "health",
+          "label": "health",
+          "write": true,
+          "routes": [
+            "/api/health"
+          ]
+        },
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": true,
+          "routes": [
+            "/api/household/data",
+            "/api/household/partner-privacy",
+            "/api/household/privacy"
+          ]
+        },
+        {
+          "domain": "module-guide",
+          "label": "module-guide",
+          "write": true,
+          "routes": [
+            "/api/module-guide/settings",
+            "/api/module-guide/steps"
+          ]
+        },
+        {
+          "domain": "monthly-checkin",
+          "label": "monthly-checkin",
+          "write": true,
+          "routes": [
+            "/api/monthly-checkin"
+          ]
+        },
+        {
+          "domain": "news",
+          "label": "news",
+          "write": true,
+          "routes": [
+            "/api/news",
+            "/api/news/read"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": true,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "partner-notifications",
+          "label": "partner-notifications",
+          "write": true,
+          "routes": [
+            "/api/partner-notifications"
+          ]
+        },
+        {
+          "domain": "roadmap",
+          "label": "roadmap",
+          "write": true,
+          "routes": [
+            "/api/roadmap"
+          ]
+        },
+        {
+          "domain": "scenarios",
+          "label": "Scenario’s",
+          "write": true,
+          "routes": [
+            "/api/scenarios"
+          ]
+        },
+        {
+          "domain": "standard-guide",
+          "label": "standard-guide",
+          "write": true,
+          "routes": [
+            "/api/standard-guide/steps"
+          ]
+        },
+        {
+          "domain": "widget-presets",
+          "label": "widget-presets",
+          "write": true,
+          "routes": [
+            "/api/widget-presets"
+          ]
+        },
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": false,
+          "routes": [
+            "/api/bank-connect/providers"
+          ]
+        },
+        {
+          "domain": "briefing",
+          "label": "briefing",
+          "write": false,
+          "routes": [
+            "/api/briefing/compose"
+          ]
+        },
+        {
+          "domain": "welcome-guide",
+          "label": "welcome-guide",
+          "write": false,
+          "routes": [
+            "/api/welcome-guide"
+          ]
+        }
+      ],
+      "aow_leeftijd": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/aow-leeftijd"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": false,
+          "routes": [
+            "/api/onboarding/save-own-data"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report/persoonlijk-plan"
+          ]
+        }
+      ],
+      "household_members": [
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": true,
+          "routes": [
+            "/api/household/accept",
+            "/api/household/box2",
+            "/api/household/box3",
+            "/api/household/data",
+            "/api/household/fire-projections",
+            "/api/household/invite",
+            "/api/household/partner-privacy",
+            "/api/household/privacy",
+            "/api/household/retirement-expense",
+            "/api/household/settings",
+            "/api/household/status"
+          ]
+        },
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": false,
+          "routes": [
+            "/api/admin/checkins"
+          ]
+        },
+        {
+          "domain": "ai",
+          "label": "AI & Coach",
+          "write": false,
+          "routes": [
+            "/api/ai/actions/[id]/assign"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/save"
+          ]
+        },
+        {
+          "domain": "goals",
+          "label": "Doelen",
+          "write": false,
+          "routes": [
+            "/api/goals"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "perspective",
+          "label": "perspective",
+          "write": false,
+          "routes": [
+            "/api/perspective"
+          ]
+        }
+      ],
+      "news_articles": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/news-articles",
+            "/api/admin/news-ingest"
+          ]
+        },
+        {
+          "domain": "news",
+          "label": "news",
+          "write": true,
+          "routes": [
+            "/api/news"
+          ]
+        },
+        {
+          "domain": "news-ingest",
+          "label": "news-ingest",
+          "write": true,
+          "routes": [
+            "/api/news-ingest/cron"
+          ]
+        }
+      ],
+      "questionnaires": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires",
+            "/api/admin/questionnaires/[id]"
+          ]
+        },
+        {
+          "domain": "questionnaires",
+          "label": "Vragenlijsten",
+          "write": false,
+          "routes": [
+            "/api/questionnaires"
+          ]
+        }
+      ],
+      "questionnaire_questions": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires",
+            "/api/admin/questionnaires/[id]",
+            "/api/admin/questionnaires/[id]/responses"
+          ]
+        }
+      ],
+      "questionnaire_sessions": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires/[id]/responses"
+          ]
+        },
+        {
+          "domain": "questionnaires",
+          "label": "Vragenlijsten",
+          "write": true,
+          "routes": [
+            "/api/questionnaires",
+            "/api/questionnaires/[id]/respond",
+            "/api/questionnaires/[id]/session"
+          ]
+        }
+      ],
+      "budgets": [
+        {
+          "domain": "ai",
+          "label": "AI & Coach",
+          "write": true,
+          "routes": [
+            "/api/ai/categorize",
+            "/api/ai/recommendations",
+            "/api/ai/recommendations/[id]",
+            "/api/ai/recommendations/initial"
+          ]
+        },
+        {
+          "domain": "budgets",
+          "label": "Budgetten",
+          "write": true,
+          "routes": [
+            "/api/budgets/[id]",
+            "/api/budgets/favorites"
+          ]
+        },
+        {
+          "domain": "budgetteren",
+          "label": "budgetteren",
+          "write": true,
+          "routes": [
+            "/api/budgetteren/setup"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/save-own-data",
+            "/api/onboarding/suggest-budgets"
+          ]
+        },
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": false,
+          "routes": [
+            "/api/bank-connect/sync"
+          ]
+        },
+        {
+          "domain": "budget-trends",
+          "label": "budget-trends",
+          "write": false,
+          "routes": [
+            "/api/budget-trends"
+          ]
+        },
+        {
+          "domain": "budget-variance",
+          "label": "budget-variance",
+          "write": false,
+          "routes": [
+            "/api/budget-variance"
+          ]
+        },
+        {
+          "domain": "cashflow-forecast",
+          "label": "cashflow-forecast",
+          "write": false,
+          "routes": [
+            "/api/cashflow-forecast"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/aandachtspunten",
+            "/api/checkin/budgets",
+            "/api/checkin/gespreksstarters"
+          ]
+        },
+        {
+          "domain": "command-palette",
+          "label": "command-palette",
+          "write": false,
+          "routes": [
+            "/api/command-palette/search"
+          ]
+        },
+        {
+          "domain": "detect-recurring",
+          "label": "detect-recurring",
+          "write": false,
+          "routes": [
+            "/api/detect-recurring"
+          ]
+        },
+        {
+          "domain": "export",
+          "label": "export",
+          "write": false,
+          "routes": [
+            "/api/export"
+          ]
+        },
+        {
+          "domain": "guide-progress",
+          "label": "guide-progress",
+          "write": false,
+          "routes": [
+            "/api/guide-progress"
+          ]
+        },
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": false,
+          "routes": [
+            "/api/household/box2",
+            "/api/household/box3",
+            "/api/household/data",
+            "/api/household/fire-projections"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        },
+        {
+          "domain": "nibud",
+          "label": "nibud",
+          "write": false,
+          "routes": [
+            "/api/nibud/benchmark"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "own-accounts",
+          "label": "own-accounts",
+          "write": false,
+          "routes": [
+            "/api/own-accounts/reclassify"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report",
+            "/api/report/budget",
+            "/api/report/persoonlijk-plan",
+            "/api/report/vermogen"
+          ]
+        },
+        {
+          "domain": "share",
+          "label": "share",
+          "write": false,
+          "routes": [
+            "/api/share/freedom-card"
+          ]
+        },
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": false,
+          "routes": [
+            "/api/snapshots",
+            "/api/snapshots/auto",
+            "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "spending-patterns",
+          "label": "spending-patterns",
+          "write": false,
+          "routes": [
+            "/api/spending-patterns"
+          ]
+        },
+        {
+          "domain": "subscriptions",
+          "label": "subscriptions",
+          "write": false,
+          "routes": [
+            "/api/subscriptions/analyse-ai",
+            "/api/subscriptions/detect-ai"
+          ]
+        },
+        {
+          "domain": "uitgaven-na-pensioen",
+          "label": "uitgaven-na-pensioen",
+          "write": false,
+          "routes": [
+            "/api/uitgaven-na-pensioen/context"
+          ]
+        },
+        {
+          "domain": "year-in-review",
+          "label": "year-in-review",
+          "write": false,
+          "routes": [
+            "/api/year-in-review"
+          ]
+        }
+      ],
+      "bank_accounts": [
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": true,
+          "routes": [
+            "/api/bank-connect/balances",
+            "/api/bank-connect/callback"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/save-own-data"
+          ]
+        },
+        {
+          "domain": "cashflow-forecast",
+          "label": "cashflow-forecast",
+          "write": false,
+          "routes": [
+            "/api/cashflow-forecast"
+          ]
+        },
+        {
+          "domain": "own-accounts",
+          "label": "own-accounts",
+          "write": false,
+          "routes": [
+            "/api/own-accounts/reclassify"
+          ]
+        },
+        {
+          "domain": "recurring",
+          "label": "recurring",
+          "write": false,
+          "routes": [
+            "/api/recurring"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report/balans"
+          ]
+        }
+      ],
+      "investment_holdings": [
+        {
+          "domain": "holdings",
+          "label": "Beleggingen",
+          "write": true,
+          "routes": [
+            "/api/holdings",
+            "/api/holdings/[id]",
+            "/api/holdings/import",
+            "/api/holdings/refresh-prices",
+            "/api/holdings/refresh-prices/cron"
+          ]
+        },
+        {
+          "domain": "portfolio-allocation",
+          "label": "portfolio-allocation",
+          "write": true,
+          "routes": [
+            "/api/portfolio-allocation"
+          ]
+        },
+        {
+          "domain": "benchmark-comparison",
+          "label": "benchmark-comparison",
+          "write": false,
+          "routes": [
+            "/api/benchmark-comparison"
+          ]
+        },
+        {
+          "domain": "command-palette",
+          "label": "command-palette",
+          "write": false,
+          "routes": [
+            "/api/command-palette/search"
+          ]
+        },
+        {
+          "domain": "dividends",
+          "label": "dividends",
+          "write": false,
+          "routes": [
+            "/api/dividends"
+          ]
+        },
+        {
+          "domain": "investment",
+          "label": "investment",
+          "write": false,
+          "routes": [
+            "/api/investment/holdings/[id]/detail"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "rebalancing",
+          "label": "rebalancing",
+          "write": false,
+          "routes": [
+            "/api/rebalancing/check"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report/vermogen"
+          ]
+        }
+      ],
+      "valuations": [
+        {
+          "domain": "benchmark-comparison",
+          "label": "benchmark-comparison",
+          "write": false,
+          "routes": [
+            "/api/benchmark-comparison"
+          ]
+        },
+        {
+          "domain": "dividends",
+          "label": "dividends",
+          "write": false,
+          "routes": [
+            "/api/dividends"
+          ]
+        },
+        {
+          "domain": "goals",
+          "label": "Doelen",
+          "write": false,
+          "routes": [
+            "/api/goals/history"
+          ]
+        },
+        {
+          "domain": "valuations",
+          "label": "valuations",
+          "write": false,
+          "routes": [
+            "/api/valuations"
+          ]
+        }
+      ],
+      "investment_transactions": [
+        {
+          "domain": "holdings",
+          "label": "Beleggingen",
+          "write": true,
+          "routes": [
+            "/api/holdings/import"
+          ]
+        },
+        {
+          "domain": "benchmark-comparison",
+          "label": "benchmark-comparison",
+          "write": false,
+          "routes": [
+            "/api/benchmark-comparison"
+          ]
+        },
+        {
+          "domain": "dividends",
+          "label": "dividends",
+          "write": false,
+          "routes": [
+            "/api/dividends"
+          ]
+        },
+        {
+          "domain": "investment",
+          "label": "investment",
+          "write": false,
+          "routes": [
+            "/api/investment/holdings/[id]/detail"
+          ]
+        }
+      ],
+      "briefing_history": [
+        {
+          "domain": "briefing",
+          "label": "briefing",
+          "write": true,
+          "routes": [
+            "/api/briefing/history",
+            "/api/briefing/history/[id]"
+          ]
+        }
+      ],
+      "custom_calculators": [
+        {
+          "domain": "calculators",
+          "label": "Calculators",
+          "write": true,
+          "routes": [
+            "/api/calculators/[id]/like",
+            "/api/calculators/[id]/report",
+            "/api/calculators/duplicate",
+            "/api/calculators/publish",
+            "/api/calculators/unpublish"
+          ]
+        }
+      ],
+      "calculator_likes": [
+        {
+          "domain": "calculators",
+          "label": "Calculators",
+          "write": true,
+          "routes": [
+            "/api/calculators/[id]/like"
+          ]
+        }
+      ],
+      "calculator_reports": [
+        {
+          "domain": "calculators",
+          "label": "Calculators",
+          "write": true,
+          "routes": [
+            "/api/calculators/[id]/report"
+          ]
+        }
+      ],
+      "recurring_transactions": [
+        {
+          "domain": "recurring",
+          "label": "recurring",
+          "write": true,
+          "routes": [
+            "/api/recurring",
+            "/api/recurring/[id]"
+          ]
+        },
+        {
+          "domain": "cashflow-forecast",
+          "label": "cashflow-forecast",
+          "write": false,
+          "routes": [
+            "/api/cashflow-forecast"
+          ]
+        },
+        {
+          "domain": "detect-recurring",
+          "label": "detect-recurring",
+          "write": false,
+          "routes": [
+            "/api/detect-recurring"
+          ]
+        },
+        {
+          "domain": "subscriptions",
+          "label": "subscriptions",
+          "write": false,
+          "routes": [
+            "/api/subscriptions/analyse-ai",
+            "/api/subscriptions/detect-ai"
+          ]
+        }
+      ],
+      "goals": [
+        {
+          "domain": "goals",
+          "label": "Doelen",
+          "write": true,
+          "routes": [
+            "/api/goals",
+            "/api/goals/history"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/save-own-data"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/aandachtspunten",
+            "/api/checkin/gespreksstarters"
+          ]
+        },
+        {
+          "domain": "command-palette",
+          "label": "command-palette",
+          "write": false,
+          "routes": [
+            "/api/command-palette/search"
+          ]
+        },
+        {
+          "domain": "export",
+          "label": "export",
+          "write": false,
+          "routes": [
+            "/api/export"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report"
+          ]
+        }
+      ],
+      "net_worth_snapshots": [
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": true,
+          "routes": [
+            "/api/snapshots",
+            "/api/snapshots/auto",
+            "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/gespreksstarters",
+            "/api/checkin/overview"
+          ]
+        },
+        {
+          "domain": "export",
+          "label": "export",
+          "write": false,
+          "routes": [
+            "/api/export"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report"
+          ]
+        },
+        {
+          "domain": "year-in-review",
+          "label": "year-in-review",
+          "write": false,
+          "routes": [
+            "/api/year-in-review"
+          ]
+        }
+      ],
+      "life_events": [
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/save-own-data"
+          ]
+        },
+        {
+          "domain": "pension",
+          "label": "pension",
+          "write": true,
+          "routes": [
+            "/api/pension/storage"
+          ]
+        },
+        {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/upcoming"
+          ]
+        },
+        {
+          "domain": "command-palette",
+          "label": "command-palette",
+          "write": false,
+          "routes": [
+            "/api/command-palette/search"
+          ]
+        },
+        {
+          "domain": "guide-progress",
+          "label": "guide-progress",
+          "write": false,
+          "routes": [
+            "/api/guide-progress"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report/persoonlijk-plan"
+          ]
+        }
+      ],
+      "crypto_holdings": [
+        {
+          "domain": "holdings",
+          "label": "Beleggingen",
+          "write": true,
+          "routes": [
+            "/api/holdings/[id]",
+            "/api/holdings/refresh-prices",
+            "/api/holdings/refresh-prices/cron"
+          ]
+        },
+        {
+          "domain": "command-palette",
+          "label": "command-palette",
+          "write": false,
+          "routes": [
+            "/api/command-palette/search"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report/vermogen"
+          ]
+        }
+      ],
+      "crypto_transactions": [
+        {
+          "domain": "crypto",
+          "label": "Crypto",
+          "write": false,
+          "routes": [
+            "/api/crypto/holdings/[id]/detail"
+          ]
+        }
+      ],
+      "holding_alerts": [
+        {
+          "domain": "holding-alerts",
+          "label": "holding-alerts",
+          "write": true,
+          "routes": [
+            "/api/holding-alerts"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        }
+      ],
+      "investment_holding_prices": [
+        {
+          "domain": "holdings",
+          "label": "Beleggingen",
+          "write": true,
+          "routes": [
+            "/api/holdings/refresh-prices",
+            "/api/holdings/refresh-prices/cron"
+          ]
+        }
+      ],
+      "crypto_holding_prices": [
+        {
+          "domain": "holdings",
+          "label": "Beleggingen",
+          "write": true,
+          "routes": [
+            "/api/holdings/refresh-prices",
+            "/api/holdings/refresh-prices/cron"
+          ]
+        }
+      ],
+      "household_invitations": [
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": true,
+          "routes": [
+            "/api/household/accept",
+            "/api/household/invite",
+            "/api/household/status"
+          ]
+        }
+      ],
+      "households": [
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": true,
+          "routes": [
+            "/api/household/data",
+            "/api/household/fire-projections",
+            "/api/household/invite",
+            "/api/household/retirement-expense",
+            "/api/household/settings",
+            "/api/household/status"
+          ]
+        }
+      ],
+      "exchange_connections": [
+        {
+          "domain": "integrations",
+          "label": "Externe koppelingen",
+          "write": true,
+          "routes": [
+            "/api/integrations/exchanges/[id]",
+            "/api/integrations/exchanges/[id]/sync",
+            "/api/integrations/exchanges/[id]/test",
+            "/api/integrations/exchanges/bitvavo/connect",
+            "/api/integrations/exchanges/coinbase/connect",
+            "/api/integrations/exchanges/kraken/connect"
+          ]
+        }
+      ],
+      "external_data_sources": [
+        {
+          "domain": "integrations",
+          "label": "Externe koppelingen",
+          "write": true,
+          "routes": [
+            "/api/integrations/exchanges/[id]",
+            "/api/integrations/exchanges/[id]/sync",
+            "/api/integrations/wallets",
+            "/api/integrations/wallets/[id]",
+            "/api/integrations/wallets/[id]/sync"
+          ]
+        }
+      ],
+      "wallet_addresses": [
+        {
+          "domain": "integrations",
+          "label": "Externe koppelingen",
+          "write": true,
+          "routes": [
+            "/api/integrations/wallets",
+            "/api/integrations/wallets/[id]",
+            "/api/integrations/wallets/[id]/sync",
+            "/api/integrations/wallets/[id]/test"
+          ]
+        }
+      ],
+      "next_step_completions": [
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": true,
+          "routes": [
+            "/api/next-steps",
+            "/api/next-steps/complete",
+            "/api/next-steps/dismiss"
+          ]
+        }
+      ],
+      "target_allocations": [
+        {
+          "domain": "portfolio-allocation",
+          "label": "portfolio-allocation",
+          "write": true,
+          "routes": [
+            "/api/portfolio-allocation"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "rebalancing",
+          "label": "rebalancing",
+          "write": false,
+          "routes": [
+            "/api/rebalancing/check"
+          ]
+        }
+      ],
+      "balance_snapshots": [
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/aangifte-import"
+          ]
+        },
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": false,
+          "routes": [
+            "/api/snapshots/balances"
+          ]
+        }
+      ],
+      "questionnaire_responses": [
+        {
+          "domain": "questionnaires",
+          "label": "Vragenlijsten",
+          "write": true,
+          "routes": [
+            "/api/questionnaires/[id]/respond"
+          ]
+        }
+      ],
+      "roadmap_features": [
+        {
+          "domain": "roadmap",
+          "label": "roadmap",
+          "write": true,
+          "routes": [
+            "/api/roadmap"
+          ]
+        }
+      ]
+    },
+    "multiWriter": [
+      "app_settings",
+      "assets",
+      "bank_accounts",
+      "budgets",
+      "debts",
+      "goals",
+      "investment_holdings",
+      "life_events",
+      "news_articles",
+      "profiles",
+      "questionnaire_sessions",
+      "transactions",
+      "user_feature_visits"
+    ]
+  },
+  "tableRelations": {
+    "relations": [
+      {
+        "from": "assets",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "bank_accounts",
+        "to": "assets",
+        "column": "linked_asset_id"
+      },
+      {
+        "from": "bank_accounts",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "budgets",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "calculator_likes",
+        "to": "custom_calculators",
+        "column": "calculator_id"
+      },
+      {
+        "from": "calculator_reports",
+        "to": "custom_calculators",
+        "column": "calculator_id"
+      },
+      {
+        "from": "crypto_holding_prices",
+        "to": "crypto_holdings",
+        "column": "holding_id"
+      },
+      {
+        "from": "crypto_holdings",
+        "to": "assets",
+        "column": "asset_id"
+      },
+      {
+        "from": "crypto_holdings",
+        "to": "exchange_connections",
+        "column": "source_exchange_connection_id"
+      },
+      {
+        "from": "crypto_holdings",
+        "to": "wallet_addresses",
+        "column": "source_wallet_address_id"
+      },
+      {
+        "from": "crypto_transactions",
+        "to": "crypto_holdings",
+        "column": "holding_id"
+      },
+      {
+        "from": "debts",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "goals",
+        "to": "assets",
+        "column": "linked_asset_id"
+      },
+      {
+        "from": "goals",
+        "to": "budgets",
+        "column": "budget_id"
+      },
+      {
+        "from": "goals",
+        "to": "debts",
+        "column": "linked_debt_id"
+      },
+      {
+        "from": "holding_alerts",
+        "to": "holdings",
+        "column": "holding_id"
+      },
+      {
+        "from": "holding_prices",
+        "to": "holdings",
+        "column": "holding_id"
+      },
+      {
+        "from": "holding_transactions",
+        "to": "holdings",
+        "column": "holding_id"
+      },
+      {
+        "from": "holdings",
+        "to": "assets",
+        "column": "asset_id"
+      },
+      {
+        "from": "household_invitations",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "household_members",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "investment_holding_prices",
+        "to": "investment_holdings",
+        "column": "holding_id"
+      },
+      {
+        "from": "investment_holdings",
+        "to": "assets",
+        "column": "asset_id"
+      },
+      {
+        "from": "investment_transactions",
+        "to": "investment_holdings",
+        "column": "holding_id"
+      },
+      {
+        "from": "net_worth_snapshots",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "profiles",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "questionnaire_questions",
+        "to": "questionnaires",
+        "column": "questionnaire_id"
+      },
+      {
+        "from": "questionnaire_responses",
+        "to": "questionnaire_questions",
+        "column": "question_id"
+      },
+      {
+        "from": "questionnaire_responses",
+        "to": "questionnaire_sessions",
+        "column": "session_id"
+      },
+      {
+        "from": "questionnaire_sessions",
+        "to": "questionnaires",
+        "column": "questionnaire_id"
+      },
+      {
+        "from": "recurring_transactions",
+        "to": "bank_accounts",
+        "column": "account_id"
+      },
+      {
+        "from": "recurring_transactions",
+        "to": "budgets",
+        "column": "budget_id"
+      },
+      {
+        "from": "recurring_transactions",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "transactions",
+        "to": "bank_accounts",
+        "column": "account_id"
+      },
+      {
+        "from": "transactions",
+        "to": "budgets",
+        "column": "budget_id"
+      },
+      {
+        "from": "transactions",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "user_badges",
+        "to": "badges",
+        "column": "badge_id"
+      },
+      {
+        "from": "valuations",
+        "to": "households",
+        "column": "household_id"
+      },
+      {
+        "from": "wallet_addresses",
+        "to": "assets",
+        "column": "linked_asset_id"
+      }
+    ],
+    "meta": {
+      "profiles": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "assets": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "debts": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "bank_accounts": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "budgets": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "transactions": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "valuations": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "recurring_transactions": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "net_worth_snapshots": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "goals": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "life_events": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "app_settings": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "badges": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "user_badges": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "user_streaks": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "user_feature_visits": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "holdings": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "holding_transactions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "next_step_completions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "households": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "household_members": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "household_invitations": {
+        "user": true,
+        "household": true,
+        "rls": true
+      },
+      "balance_snapshots": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "aow_leeftijd": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "target_allocations": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "holding_prices": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "holding_alerts": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "roadmap_features": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "news_articles": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "questionnaires": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "questionnaire_questions": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "questionnaire_sessions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "questionnaire_responses": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "exchange_connections": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "wallet_addresses": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "external_data_sources": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "investment_holdings": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "crypto_holdings": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "investment_transactions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "crypto_transactions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "investment_holding_prices": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "crypto_holding_prices": {
+        "user": false,
+        "household": false,
+        "rls": true
+      },
+      "briefing_history": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "custom_calculators": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "calculator_likes": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "calculator_reports": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "ai_calculator_usage": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "job_runs": {
+        "user": false,
+        "household": false,
+        "rls": true
+      }
+    }
+  },
+  "adrs": [
+    {
+      "id": "0001-soevereiniteit-is-motivatie",
+      "title": "Soevereiniteit is motivatie, geen feature-gating",
+      "status": "aanvaard",
+      "date": "2026-03-01",
+      "elements": [
+        "m-soeverein",
+        "app-comp"
+      ],
+      "summary": "Soevereiniteitsniveaus (Recovery → Mastery) bepalen niet langer welke functionaliteit zichtbaar is; ze dienen als motivatie- en voortgangsmodel. De gebruiker kiest zelf welke modules actief zijn.",
+      "file": "docs/adr/0001-soevereiniteit-is-motivatie.md"
+    },
+    {
+      "id": "0002-spaarquote-drijft-fire",
+      "title": "Spaarquote × inkomen drijft de FIRE-prognose",
+      "status": "aanvaard",
+      "date": "2026-06-01",
+      "elements": [
+        "as-budget",
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "De sparen-invoer van de FIRE-prognose komt uit de cashflow-spaarquote maal het inkomen, niet uit een losse handmatige spaarwaarde. Eén bron van waarheid van transactie tot vrijheidsdatum.",
+      "file": "docs/adr/0002-spaarquote-drijft-fire.md"
+    },
+    {
+      "id": "0003-supabase-auth-canoniek",
+      "title": "Supabase Auth is het canonieke auth-model",
+      "status": "aanvaard",
+      "date": "2026-06-01",
+      "elements": [
+        "t-supabase",
+        "data-cont"
+      ],
+      "summary": "Authenticatie en autorisatie lopen volledig via Supabase Auth met Row Level Security op `auth.uid()`. De better-auth-scaffolding in `src/lib` is geen onderdeel van het lopende model.",
+      "file": "docs/adr/0003-supabase-auth-canoniek.md"
+    },
+    {
+      "id": "0004-huishouden-via-rls-rpc",
+      "title": "Huishouden-perspectieven via RLS-veilige RPC's",
+      "status": "aanvaard",
+      "date": "2026-06-08",
+      "elements": [
+        "as-huishouden",
+        "t-supabase",
+        "do-huishouden"
+      ],
+      "summary": "Een partner ziet huishoud- en partnergegevens uitsluitend via RPC-functies met een eigendoms- en privacycheck — nooit via directe tabel-selects over de huishoudgrens.",
+      "file": "docs/adr/0004-huishouden-via-rls-rpc.md"
+    },
+    {
+      "id": "0005-android-via-twa",
+      "title": "Android-distributie via TWA (Bubblewrap)",
+      "status": "aanvaard",
+      "date": "2026-05-20",
+      "elements": [
+        "t-platform"
+      ],
+      "summary": "De Android-app is een Trusted Web Activity (TWA) rond de PWA, gegenereerd met Bubblewrap — niet Capacitor of een full-native build.",
+      "file": "docs/adr/0005-android-via-twa.md"
+    }
+  ],
+  "churn": {
+    "sinceDays": 90,
+    "areas": [
+      {
+        "path": "app/(app)/overzicht",
+        "commits": 74
+      },
+      {
+        "path": "lib/ai",
+        "commits": 33
+      },
+      {
+        "path": "app/(app)/toekomst",
+        "commits": 19
+      },
+      {
+        "path": "lib/fire-simulation.ts",
+        "commits": 19
+      },
+      {
+        "path": "app/api/ai",
+        "commits": 11
+      },
+      {
+        "path": "lib/horizon-data.ts",
+        "commits": 9
+      },
+      {
+        "path": "app/api/household",
+        "commits": 5
+      },
+      {
+        "path": "components/horizon",
+        "commits": 3
+      },
+      {
+        "path": "app/api/budgets",
+        "commits": 1
+      },
+      {
+        "path": "app/api/assets",
+        "commits": 1
+      }
+    ],
+    "hotFiles": [
+      {
+        "file": "components/app/horizon/horizon-client.tsx",
+        "loc": 6802,
+        "commits": 100
+      },
+      {
+        "file": "components/app/budgets-client.tsx",
+        "loc": 4463,
+        "commits": 24
+      },
+      {
+        "file": "components/core/assets-client.tsx",
+        "loc": 3822,
+        "commits": 38
+      },
+      {
+        "file": "lib/release-notes.ts",
+        "loc": 2763,
+        "commits": 5
+      },
+      {
+        "file": "components/app/cash-account-view.tsx",
+        "loc": 2574,
+        "commits": 16
+      },
+      {
+        "file": "app/(app)/core/cash/import/page.tsx",
+        "loc": 2405,
+        "commits": 20
+      },
+      {
+        "file": "lib/unified-projection.ts",
+        "loc": 2343,
+        "commits": 25
+      },
+      {
+        "file": "app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx",
+        "loc": 2243,
+        "commits": 30
+      }
+    ]
+  },
   "diff": {
-    "baseline": true,
-    "previousDate": null,
-    "hasChanges": false,
-    "sections": []
-  }
+    "baseline": false,
+    "previousDate": "2026-06-10",
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Schermen",
+        "added": [
+          "/beheer/jobs"
+        ],
+        "removed": []
+      },
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/admin/users/block",
+          "/api/admin/users/role"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Tabellen",
+        "added": [
+          "job_runs"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+1"
+        ],
+        "removed": []
+      }
+    ]
+  },
+  "statsHistory": [
+    {
+      "date": "2026-06-10",
+      "api": 368,
+      "components": 706,
+      "tables": 48,
+      "routesProduction": 93
+    }
+  ]
 }

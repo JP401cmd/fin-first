@@ -1,7 +1,6 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertGreaterThan, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
-import { authenticatedFetch } from '../server-runner'
 import { WIDGET_CATALOG, type WidgetModule, type WidgetSize } from '@/lib/widget-catalog'
 
 const CAT = 'widgets.avatar'
@@ -12,15 +11,6 @@ const ALL_MODULES: WidgetModule[] = ['kern', 'wil', 'horizon', 'cross']
 const ALL_SIZES: WidgetSize[] = ['mini', 'quarter', 'half', 'full']
 const WILL_STATES = ['idle', 'talking', 'thinking', 'listening', 'streaming', 'success', 'error'] as const
 const WILL_SIZES = [24, 48, 80, 120] as const
-
-/** Fetch helper without following redirects */
-async function fetchNoRedirect(path: string): Promise<Response> {
-  return authenticatedFetch(path, { redirect: 'manual' })
-}
-
-function isRedirectOrAuth(status: number): boolean {
-  return status >= 300 && status < 400
-}
 
 const tests: TestCase[] = [
   // ── Step 1: All WIDGET_CATALOG widgets render without crash ────────────
@@ -55,24 +45,6 @@ const tests: TestCase[] = [
       const ids = WIDGET_CATALOG.map(w => w.id)
       const unique = new Set(ids)
       assertEqual(unique.size, ids.length, `Duplicate widget IDs: ${ids.filter((id, i) => ids.indexOf(id) !== i).join(', ')}`)
-    },
-  },
-
-  // ── Step 2: Error boundary (static verification) ──────────────────────
-  {
-    id: 'widgets-error-boundary',
-    name: 'Widget error boundary patroon aanwezig',
-    category: CAT,
-    description: 'Widgets-test pagina gebruikt WidgetErrorBoundary wrapper',
-    priority: 'high',
-    estimatedDurationMs: 500,
-    async fn() {
-      // The widgets-test page should be accessible (even if auth-gated)
-      const res = await fetchNoRedirect('/beheer/widgets-test')
-      assert(
-        res.status === 200 || isRedirectOrAuth(res.status),
-        `Expected 200 or redirect for /beheer/widgets-test, got ${res.status}`,
-      )
     },
   },
 
@@ -198,23 +170,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 8: Light + dark background pages accessible ──────────────────
-  {
-    id: 'will-avatar-page-accessible',
-    name: '/beheer/will-avatar pagina is bereikbaar',
-    category: CAT,
-    description: 'De Will avatar testpagina retourneert 200 of auth redirect',
-    priority: 'critical',
-    estimatedDurationMs: 1000,
-    async fn() {
-      const res = await fetchNoRedirect('/beheer/will-avatar')
-      assert(
-        res.status === 200 || isRedirectOrAuth(res.status),
-        `Expected 200 or redirect for /beheer/will-avatar, got ${res.status}`,
-      )
-    },
-  },
-
+  // ── Step 8: Light + dark metadata per avatar-state ────────────────────
   {
     id: 'will-avatar-light-dark-defined',
     name: 'Will avatar: light + dark backgrounds in page',
@@ -240,23 +196,6 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Additional: minLevel gating ───────────────────────────────────────
-  {
-    id: 'widgets-min-level-range',
-    name: 'Alle widgets hebben geldige minLevel',
-    category: CAT,
-    description: 'minLevel is tussen -2 en 6 voor alle widgets',
-    priority: 'medium',
-    estimatedDurationMs: 5,
-    fn() {
-      for (const w of WIDGET_CATALOG) {
-        assert(
-          w.minLevel >= -2 && w.minLevel <= 6,
-          `Widget ${w.id} has invalid minLevel: ${w.minLevel}`,
-        )
-      }
-    },
-  },
 ]
 
 export function register(): void {

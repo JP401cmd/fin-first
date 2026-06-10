@@ -3,9 +3,10 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Compass } from 'lucide-react'
-import { PageInfoButton } from '@/components/editorial'
+import { EditorialHeadline, Kicker, PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { SectionDivider } from '@/components/app/section-divider'
 import { HealthScoreReceipt } from '@/components/app/horizon/health-score-receipt'
 import type { HealthScore } from '@/lib/financial-health'
 import type { GoalWithBudget } from '@/lib/will-data-loader'
@@ -71,6 +72,9 @@ type OverzichtHeroProps = {
   /** Per-jaar projectie uit `runUnifiedProjection` — zelfde bron als
    *  /toekomst zodat curves overeenkomen. */
   simRows?: { age: number; endPortfolio: number }[] | null
+  /** Geschat maandelijks spaarritme — back-cast voor ontbrekende
+   *  historie-maanden in de mini-vermogen-grafiek. */
+  monthlySavings?: number | null
   /** Heeft de user een geboortejaar gezet? Voor onboarding-nudges. */
   hasDob?: boolean
   /** Heeft de user minimaal 1 actief asset of bank-account? */
@@ -147,6 +151,7 @@ export function OverzichtHero({
   currentNetWorth,
   fireAge,
   simRows,
+  monthlySavings,
   simRequiredPortfolio,
   dashboardData,
   activeWidgets,
@@ -218,17 +223,19 @@ export function OverzichtHero({
 
       <header className="mb-6 pr-12 sm:pr-16">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-4)]">
-            {dateLabel}
-          </span>
+          <Kicker size="large">{dateLabel}</Kicker>
           {/* Maakt duidelijk wanneer de getallen van het huishouden/partner zijn
               (verborgen in eigen weergave). */}
           <PerspectiveContextLabel />
         </div>
-        <h1 className="mt-1 font-serif text-2xl md:text-3xl font-semibold text-[var(--ink)] leading-tight">
-          {greeting}
-          {userName ? `, ${userName}` : ''}
-        </h1>
+        <EditorialHeadline
+          level="h1"
+          size="sm"
+          emphasis={userName || undefined}
+          className="mt-1 text-[var(--ink)]"
+        >
+          {`${greeting}${userName ? `, ${userName}` : ''}`}
+        </EditorialHeadline>
       </header>
 
       {(hasDob !== undefined || hasAssets !== undefined || hasGoals !== undefined) && (
@@ -241,6 +248,11 @@ export function OverzichtHero({
       )}
 
       <HefbomenNav health={health} totals={totals} />
+
+      {/* Subtiele editorial scheiding tussen de hefbomen-rij en de
+          health/chart-rij. `!my-5` tempert de standaard `my-8` van de
+          divider — het hero-ritme blijft compact. */}
+      <SectionDivider className="!my-5" />
 
       {/* Hero-row: Health Score smaller (1/4) + chart breder (3/4), beide
           even hoog via items-stretch + h-full op de cards. Op smaller
@@ -276,6 +288,7 @@ export function OverzichtHero({
                 isPensioenMode={isPensioenMode ?? false}
                 simRows={simRows ?? null}
                 simRequiredPortfolio={simRequiredPortfolio ?? null}
+                monthlySavings={monthlySavings ?? null}
               />
             </div>
             {!hasCompletedHorizonSetup && (

@@ -65,10 +65,10 @@ function getHealthTooltip(
 
 const HEALTH_COLORS: Record<HealthStatus, { text: string; bg: string; dot: string; border: string }> = {
   green: {
-    text: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    dot: 'bg-emerald-500',
-    border: 'border-emerald-200',
+    text: 'text-positive',
+    bg: 'bg-positive/10',
+    dot: 'bg-positive',
+    border: 'border-positive/30',
   },
   amber: {
     text: 'text-amber-600',
@@ -77,10 +77,10 @@ const HEALTH_COLORS: Record<HealthStatus, { text: string; bg: string; dot: strin
     border: 'border-amber-200',
   },
   red: {
-    text: 'text-red-600',
-    bg: 'bg-red-50',
-    dot: 'bg-red-500',
-    border: 'border-red-200',
+    text: 'text-negative',
+    bg: 'bg-negative/10',
+    dot: 'bg-negative',
+    border: 'border-negative/30',
   },
 }
 

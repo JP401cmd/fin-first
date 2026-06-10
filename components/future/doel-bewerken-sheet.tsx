@@ -208,11 +208,11 @@ export function DoelBewerkenSheet({
               de delta weer (Wealthfolio-stijl bijdrage-monitor). */}
           <div
             aria-hidden="true"
-            className="absolute inset-y-0 left-0 bg-emerald-200/70"
+            className="absolute inset-y-0 left-0 bg-positive/20"
             style={{ width: `${oldPct}%` }}
           />
           <div
-            className="relative h-full bg-emerald-500 transition-all duration-300"
+            className="relative h-full bg-positive transition-all duration-300"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -225,7 +225,7 @@ export function DoelBewerkenSheet({
             data-testid="bijdrage-monitor"
             className={`mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
               delta > 0
-                ? 'bg-emerald-50 text-emerald-800'
+                ? 'bg-positive/10 text-positive'
                 : 'bg-amber-50 text-amber-800'
             }`}
           >
@@ -259,7 +259,7 @@ export function DoelBewerkenSheet({
         {targetValue > 0 && validNew >= targetValue && (
           <div
             data-testid="doel-behaald"
-            className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 flex items-center gap-2"
+            className="mb-4 rounded-xl border border-positive/30 bg-positive/10 px-3 py-2 text-xs text-positive flex items-center gap-2"
           >
             <span className="text-base" aria-hidden="true">🎉</span>
             <span>
@@ -291,7 +291,7 @@ export function DoelBewerkenSheet({
                   <p>{s.text}</p>
                   <div className="mt-1 flex items-center gap-2 flex-wrap">
                     {s.impact && (
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-1.5 py-0.5 text-[10px] font-semibold">
+                      <span className="inline-flex items-center rounded-full bg-positive/10 text-positive px-1.5 py-0.5 text-[10px] font-semibold">
                         {s.impact}
                       </span>
                     )}
@@ -312,8 +312,8 @@ export function DoelBewerkenSheet({
         )}
 
         {confirmDelete ? (
-          <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3">
-            <p className="text-xs text-red-800 mb-2">
+          <div className="mb-3 rounded-xl border border-negative/30 bg-negative/10 px-3 py-3">
+            <p className="text-xs text-negative mb-2">
               Weet je zeker dat je &quot;{goalName}&quot; wilt verwijderen?
               Voortgang gaat verloren.
             </p>
@@ -322,7 +322,7 @@ export function DoelBewerkenSheet({
                 type="button"
                 onClick={handleDelete}
                 disabled={saving}
-                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                className="rounded-lg bg-negative px-3 py-1.5 text-xs font-semibold text-white hover:bg-negative/90 transition-colors disabled:opacity-50"
               >
                 {saving ? 'Verwijderen…' : 'Ja, verwijder'}
               </button>
@@ -354,7 +354,7 @@ export function DoelBewerkenSheet({
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center gap-1 text-xs text-red-700 hover:text-red-800 hover:underline"
+              className="inline-flex items-center gap-1 text-xs text-negative hover:underline"
             >
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
               Verwijder doel

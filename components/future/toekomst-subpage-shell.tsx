@@ -13,6 +13,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { Kicker } from '@/components/editorial'
 
 export function ToekomstSubpageShell({
   kicker,
@@ -36,10 +37,8 @@ export function ToekomstSubpageShell({
 
       <header className="mt-3 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            {kicker}
-          </div>
-          <h1 className="font-serif text-xl text-[var(--ink)] mt-1">{title}</h1>
+          <Kicker>{kicker}</Kicker>
+          <h1 className="font-serif text-2xl text-[var(--ink)] mt-1">{title}</h1>
         </div>
         {children}
       </header>

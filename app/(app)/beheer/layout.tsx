@@ -1,7 +1,9 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { BeheerNav } from '@/components/app/beheer/beheer-nav'
+import { BeheerContainer } from '@/components/app/beheer/beheer-container'
 
 export default async function BeheerLayout({
   children,
@@ -12,19 +14,25 @@ export default async function BeheerLayout({
   const isAdmin = await isSuperAdmin(supabase)
 
   if (!isAdmin) {
-    redirect('/will')
+    redirect('/overzicht')
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-12">
+    <BeheerContainer>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-900">Beheer</h1>
-        <p className="mt-1 text-sm text-zinc-500">Systeeminstellingen en beheerschermen</p>
+        <h1 className="text-2xl font-bold text-zinc-900">
+          <Link href="/beheer" className="transition-colors hover:text-zinc-600">
+            Beheer
+          </Link>
+        </h1>
+        <p className="mt-1 text-sm text-zinc-500">
+          Technisch en functioneel beheer, testtools en naslag
+        </p>
       </div>
 
       <BeheerNav />
 
       <div className="mt-6">{children}</div>
-    </div>
+    </BeheerContainer>
   )
 }

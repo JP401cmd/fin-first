@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { tool } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { localMonthBounds } from '@/lib/month-range'
 
 /**
  * Creates a lookup tool that queries real financial data from Supabase.
@@ -49,8 +50,7 @@ export function createLookupTool(supabase: SupabaseClient) {
         }
         case 'budgets': {
           const now = new Date()
-          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-          const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+          const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
           const [budgetsRes, txRes] = await Promise.all([
             supabase

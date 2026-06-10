@@ -1,5 +1,6 @@
 import { streamText, convertToModelMessages, createUIMessageStreamResponse, stepCountIs, type UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/server'
+import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { buildSystemPrompt, type AIDomain, type ChatContext } from '@/lib/ai/dna'
 import { buildContext } from '@/lib/ai/context/builder'
@@ -179,6 +180,7 @@ export async function POST(req: Request) {
       tools,
       stopWhen: stepCountIs(5),
       abortSignal: abortController.signal,
+      onFinish: () => recordAiUsage(supabase, user.id, 'chat'),
     })
 
     /* PII output filter — mask any IBANs/BSNs that slip through in AI output.

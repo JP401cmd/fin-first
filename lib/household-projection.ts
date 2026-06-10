@@ -36,6 +36,7 @@ import {
   type LifeEvent,
 } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'
+import { localMonthStart } from '@/lib/month-range'
 import {
   lifeEventsToCashflows,
   runSimulation,
@@ -476,7 +477,7 @@ export async function buildHouseholdProjectionInput(
 
   // ── Per-member income (voor split-mode income_ratio + comparison) ──
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  const monthStart = localMonthStart(now)
   const memberMonthlyIncome = new Map<string, number>()
   const memberMonthlyExpenses = new Map<string, number>()
   for (const id of memberIds) {
@@ -500,7 +501,10 @@ export async function buildHouseholdProjectionInput(
   // de sectie het huidige-maand-inkomen → afwijkende FIRE-leeftijd). Partner-tx zijn
   // niet zichtbaar (RLS) → die houdt de profiel/RPC-fallback via memberIncome.
   const currentUserId = user.id
-  const twelveMoAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString().split('T')[0]
+  // Dag-niveau rolling 12-mnd-grens (géén maandgrens): bouw de YYYY-MM-DD uit
+  // lokale componenten, anders schuift toISOString() de grens in NL een dag terug.
+  const twelveMoAgoDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+  const twelveMoAgo = `${twelveMoAgoDate.getFullYear()}-${String(twelveMoAgoDate.getMonth() + 1).padStart(2, '0')}-${String(twelveMoAgoDate.getDate()).padStart(2, '0')}`
   const ownIncomeTx = allTransactions.filter(t => t.user_id === currentUserId && Number(t.amount) > 0 && t.date >= twelveMoAgo)
   const ownLast12Income = ownIncomeTx.reduce((s, t) => s + Number(t.amount), 0)
   let ownExtrapolatedAnnualIncome = ownLast12Income

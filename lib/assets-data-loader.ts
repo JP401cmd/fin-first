@@ -8,6 +8,7 @@ import { loadEntitySparklines } from './load-entity-sparklines'
 import { loadKpiContextRefs, type KpiContextRefs } from './kpi-context'
 import { loadConnectionsByAssetIds, type AssetConnectionSummary } from './connections-data'
 import { loadPerspectiveData } from './household/perspective-loader'
+import { localMonthBounds } from './month-range'
 import type { Perspective } from './household-data'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -51,8 +52,7 @@ export const loadAssetsData = cache(async (
   if (!user) throw new Error('Not authenticated')
 
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
   // Bezittingen komen uit de perspectief-loader (single source of truth voor
   // ownership-/privacy-filtering). De rest (hypotheken, transacties,

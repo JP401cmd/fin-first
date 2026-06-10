@@ -31,6 +31,7 @@ import {
   EditorialDeck,
   SectionLabel,
   ScenarioCallout,
+  OrnamentColophon,
 } from '@/components/editorial'
 
 export const metadata: Metadata = {
@@ -309,6 +310,11 @@ export default async function OverzichtBelastingPage() {
           <SectionLabel num="V">De vooruitblik</SectionLabel>
           <HubStelselradar />
         </Reveal>
+
+        {/* Krant-stijl colophon als hub-afsluiter. */}
+        <div className="pt-10 sm:pt-14">
+          <OrnamentColophon text="Drie boxen, één rekening" module="Belasting" />
+        </div>
       </div>
     </>
   )

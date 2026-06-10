@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { localMonthStart } from '@/lib/month-range'
 
 /**
  * GET /api/cashflow-forecast
@@ -21,9 +22,8 @@ export async function GET() {
     }
 
     const now = new Date()
-    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1)
-    const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0]
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+    const threeMonthsAgoStr = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 3, 1))
+    const currentMonthStart = localMonthStart(now)
 
     // Fetch all needed data in parallel
     const [accountsResult, recurringsResult, recentTxResult, budgetsResult] = await Promise.all([

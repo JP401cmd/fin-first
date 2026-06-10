@@ -30,6 +30,35 @@ You have MCP tools available for feature management. Use them directly by callin
 - Always run `npx tsc --noEmit` (and relevant vitest paths) after a multi-file change to catch regressions before reporting "done".
 - Always include a final user-facing summary of what changed and what's next.
 
+## Architectuurpagina (verplicht bijhouden)
+
+`/beheer/architectuur` heeft **vier views** (switcher bovenaan, `?view=`): **Praatplaat** (HLD vanuit gebruikersperspectief), **Plaat** (ArchiMate), **Database** (ERD) en **Berekeningen** (rekenmotoren). Alle volgen één principe — *feiten gescand, betekenis gecureerd, zelf-actualiserend* — en MOETEN meebewegen met wijzigingen. **Laat de documentatie beter achter dan je 'm vond:** raak je een domein/tabel/rekenmotor/functionaliteit, werk dan de bijbehorende curatie/scanner bij in dezelfde PR.
+
+### View 1 — ArchiMate-plaat
+De interactieve ArchiMate-plaat MOET meebewegen met architectuurwijzigingen:
+
+- **Feiten** (tellingen, versie, diff) komen automatisch uit `docs/architecture/architecture.json` — regenereer met `npm run arch:diagram` (draait ook dagelijks). Nooit handmatig tellingen in de plaat zetten.
+- **Topologie** is gecureerd in `lib/architecture/archimate-model.ts`. Werk dit bestand bij wanneer je een **nieuw domein, bedrijfsproces, applicatieservice, technologie-laag, data-object of externe integratie** toevoegt of verwijdert — inclusief lead-tekst en relaties.
+- **Nieuwe functionele module** in `lib/module-registry.ts`? `FUNCTION_SERVICE_MAP` in archimate-model.ts dwingt via het type een koppeling af (compile-fout tot de plaat klopt); de vitest-suite `lib/architecture/archimate-model.test.ts` bewaakt de rest.
+- **Verhaal/annotaties** van het gegenereerde architectuurdocument staan in `scripts/architecture/annotations.mjs` — houd beide consistent (bv. soevereiniteit = motivatie, geen gating).
+
+De plaat heeft vijf lenzen en bijbehorende curatie/scanners — werk de relevante mee:
+
+- **Relaties** (informatie-uitwisseling): de `ENRICH`-map in `buildArchimateModel` (archimate-model.ts) draagt `payload` / `mechanism` / `cadence` / `contractDomains` per relatie. Voeg verrijking toe als je een betekenisvolle datastroom toevoegt; `contractDomains` verwijst naar `/api`-domeinen waarvan de echte routes live worden getoond.
+- **Stromen** (waardeketens): `lib/architecture/archimate-flows.ts`. Voeg/actualiseer een flow als een end-to-end keten verandert; `validateFlows` (getest) dwingt af dat elke stap naar een bestaand element wijst.
+- **Aandachtspunten**: `lib/architecture/archimate-concerns.ts`. Vóég een punt toe bij nieuw structureel risico, **verwíjder het zodra het is opgelost**. `validateConcerns` bewaakt geldige element-verwijzingen.
+- **Datatoegang / Churn / Trend**: volledig gescand door `scripts/architecture/generate.mjs` (`scanTableAccess`, `scanChurn`, `statsHistory`) — niets handmatig.
+- **Besluiten (ADR's)**: voeg `docs/adr/NNNN-titel.md` toe met frontmatter (`status`, `date`, `elements: [...]`). `scanAdrs` pikt ze op en hangt ze aan de genoemde elementen. Zie `docs/adr/README.md`.
+
+### View 2 — Database (ERD)
+Volledig **gescand** — niets handmatig. `scanTableRelations` in `generate.mjs` leest foreign keys (inline + `ALTER`), eigenaarschap (gebruiker/huishouden) en RLS uit `supabase/migrations/*.sql` → `architecture.json.tableRelations`. `lib/architecture/db-model.ts` legt de ERD ruimtelijk neer (domein-kolommen + FK-edges). Een nieuwe tabel/FK/migratie verschijnt vanzelf na `npm run arch:diagram`. Bewaakt door `lib/architecture/db-model.test.ts`.
+
+### View 3 — Berekeningen (rekenmotoren)
+**Gecureerd** in `lib/architecture/calculations.ts`: de motoren die brongegevens omzetten naar afgeleide cijfers (spaarquote, netto vermogen, belastingdruk, FIRE). Werk dit bij wanneer je een **rekenmotor toevoegt/wijzigt of een constante/aanname verandert** — inclusief `inputs`/`outputs`/`formula`/`files`/`functions`/`constants`/`elementIds`. `validateCalculations` (getest) dwingt af dat `elementIds` bestaan en elke calc een bronbestand heeft; gerelateerde aandachtspunten en ADR's worden automatisch via `elementIds`-overlap getoond.
+
+### View 4 — Praatplaat (HLD, gebruikersperspectief)
+**Gecureerd** in `lib/architecture/hld-model.ts`: het verhaal van de app in gewone taal, zodat een **leek het begrijpt als functionaliteiten** ("dit kan de app voor je doen"). Geen techniek/lagen — wel `capabilityGroups` (functionaliteiten per gebruikersdoel, in "ik wil…"-taal), de reis, Will, de soevereiniteitsfasen (als motivatie, niet gating — ADR 0001) en de uitkomst (vrijheid). Werk dit bij wanneer **functionaliteit verschijnt/verdwijnt/van naam verandert**. De `modules` komen uit `MODULE_CATALOG` (gesynct); `validateHldModel` (getest) bewaakt die sync + coherentie. Bewust een HTML-praatplaat (geen SVG/export) — bedoeld om mee te presenteren.
+
 ## Project Specification
 
 <project_specification>

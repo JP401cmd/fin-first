@@ -14,6 +14,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
 
   const isExpired = searchParams.get('expired') === '1'
+  const isBlocked = searchParams.get('blocked') === '1'
   const redirectTo = searchParams.get('redirectTo')
 
   async function handleSubmit(e: React.FormEvent) {
@@ -31,14 +32,20 @@ function LoginForm() {
       setError(error.message)
       setLoading(false)
     } else {
-      // Redirect to the originally requested page or dashboard
-      const destination = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/will'
+      // Redirect to the originally requested page or the app home
+      const destination = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/overzicht'
       router.push(destination)
     }
   }
 
   return (
-    <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
+    <div className="w-full max-w-sm">
+      <Link href="/" className="mb-6 flex items-center justify-center">
+        <span className="font-display text-[26px] font-bold leading-none text-zinc-900">t</span>
+        <span className="font-display text-[26px] font-bold leading-none text-amber-600">f.</span>
+        <span className="ml-2.5 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">TriFinity</span>
+      </Link>
+      <div className="w-full rounded-xl bg-white p-8 shadow-lg">
       <h1 className="mb-2 text-center text-2xl font-bold text-zinc-900">
         Inloggen bij TriFinity
       </h1>
@@ -57,6 +64,17 @@ function LoginForm() {
           </p>
           <p className="mt-1 text-xs text-amber-600">
             Log opnieuw in om verder te gaan{redirectTo ? ' waar je gebleven was' : ''}.
+          </p>
+        </div>
+      )}
+
+      {isBlocked && (
+        <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3" data-testid="account-blocked-banner">
+          <p className="text-sm font-medium text-red-800">
+            Je account is geblokkeerd
+          </p>
+          <p className="mt-1 text-xs text-red-600">
+            Neem contact op met de beheerder als je denkt dat dit niet klopt.
           </p>
         </div>
       )}
@@ -116,6 +134,7 @@ function LoginForm() {
           </Link>
         </p>
       </div>
+      </div>
     </div>
   )
 }
@@ -124,14 +143,21 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
       <Suspense fallback={
-        <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
-          <h1 className="mb-6 text-center text-2xl font-bold text-zinc-900">
-            Inloggen bij TriFinity
-          </h1>
-          <div className="space-y-4">
-            <div className="h-16 animate-pulse rounded-lg bg-zinc-100" />
-            <div className="h-16 animate-pulse rounded-lg bg-zinc-100" />
-            <div className="h-10 animate-pulse rounded-lg bg-zinc-200" />
+        <div className="w-full max-w-sm">
+          <Link href="/" className="mb-6 flex items-center justify-center">
+            <span className="font-display text-[26px] font-bold leading-none text-zinc-900">t</span>
+            <span className="font-display text-[26px] font-bold leading-none text-amber-600">f.</span>
+            <span className="ml-2.5 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">TriFinity</span>
+          </Link>
+          <div className="w-full rounded-xl bg-white p-8 shadow-lg">
+            <h1 className="mb-6 text-center text-2xl font-bold text-zinc-900">
+              Inloggen bij TriFinity
+            </h1>
+            <div className="space-y-4">
+              <div className="h-16 animate-pulse rounded-lg bg-zinc-100" />
+              <div className="h-16 animate-pulse rounded-lg bg-zinc-100" />
+              <div className="h-10 animate-pulse rounded-lg bg-zinc-200" />
+            </div>
           </div>
         </div>
       }>

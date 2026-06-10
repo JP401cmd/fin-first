@@ -24,7 +24,6 @@ export async function GET() {
       transactions: [],
       activeSubscriptions: [],
       userFeaturePrefs: null,
-      matrixJson: null,
     })
     results['compute_empty_user'] = {
       pass: emptyResult.phase === 'recovery' && emptyResult.level === 0,
@@ -46,7 +45,6 @@ export async function GET() {
       ],
       activeSubscriptions: [],
       userFeaturePrefs: null,
-      matrixJson: null,
     })
     // 15000 / (1000/mo) = 15 months covered, freedom% = 15000 / (12000/0.04) = 5%
     // monthsCovered = 15, freedomPct = 5% => level 2 (stability)
@@ -70,7 +68,6 @@ export async function GET() {
       ],
       activeSubscriptions: [],
       userFeaturePrefs: null,
-      matrixJson: null,
     })
     // monthlyExpenses = 2000, netWorth = 100000
     // freedomPct = 100000 / (24000/0.04) = 100000 / 600000 = 16.67%
@@ -95,7 +92,6 @@ export async function GET() {
       ],
       activeSubscriptions: [],
       userFeaturePrefs: null,
-      matrixJson: null,
     })
     // netWorth = 1000 - 5000 = -4000, hasConsumerDebt = true => level -2
     results['compute_recovery_negative'] = {

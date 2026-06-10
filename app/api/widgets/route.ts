@@ -36,7 +36,7 @@ export async function PUT(request: Request) {
     if (!data || data.length === 0) throw new Error('No profile updated')
 
     // Invalidate server-side cache for pages that render widget preferences
-    revalidatePath('/will')
+    revalidatePath('/dashboard')
     revalidatePath('/')
 
     return NextResponse.json({ success: true })

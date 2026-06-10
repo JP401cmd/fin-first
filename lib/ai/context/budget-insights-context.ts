@@ -1,19 +1,22 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, bulletList } from './formatter'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
 /**
  * Budget insights context: alert triggers, 12-month patterns, NIBUD comparison, freedom-time impact.
  * Adds rich budget-specific data for Will to give proactive advice.
  */
 export async function buildBudgetInsightsContext(supabase: SupabaseClient): Promise<string> {
+  // Tijdzone-veilige maandgrenzen. monthEnd is exclusief = de 1e van de
+  // volgende maand; alle queries gebruiken dus .lt(monthEnd) i.p.v. .lte op de
+  // laatste dag (zelfde venster, geen vorige-maand-lek).
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
   // 12 months ago for trend data
-  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
+  const twelveMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 11, 1))
   // 3 months ago for income coverage check
-  const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().split('T')[0]
+  const threeMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 2, 1))
 
   const [budgetsResult, currentTxResult, historicalTxResult, nibudResult, incomeResult, profileResult] = await Promise.all([
     supabase
@@ -25,13 +28,13 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
       .from('transactions')
       .select('budget_id, amount, is_income, transaction_type')
       .gte('date', monthStart)
-      .lte('date', monthEnd)
+      .lt('date', monthEnd)
       .not('budget_id', 'is', null),
     supabase
       .from('transactions')
       .select('budget_id, amount, date, is_income, transaction_type')
       .gte('date', twelveMonthsAgo)
-      .lte('date', monthEnd)
+      .lt('date', monthEnd)
       .not('budget_id', 'is', null),
     supabase
       .from('nibud_reference_data')
@@ -42,7 +45,7 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
       .select('amount, transaction_type')
       .eq('is_income', true)
       .gte('date', threeMonthsAgo)
-      .lte('date', monthEnd),
+      .lt('date', monthEnd),
     supabase
       .from('profiles')
       .select('retirement_expense_method')

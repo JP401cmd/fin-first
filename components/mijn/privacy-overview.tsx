@@ -199,7 +199,7 @@ export function PrivacyOverview() {
           </Link>
           <Link
             href="/mijn/geavanceerd"
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 text-red-800 px-4 py-2.5 text-sm font-semibold hover:bg-red-100 transition-colors"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-negative/30 bg-negative/10 text-negative px-4 py-2.5 text-sm font-semibold hover:bg-negative/20 transition-colors"
           >
             <Trash2 className="w-4 h-4" aria-hidden="true" />
             Account verwijderen

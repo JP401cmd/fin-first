@@ -101,13 +101,13 @@ export async function GET() {
   try {
     const res = await fetch(`${baseUrl}/holdings/invalid-uuid-here`, { redirect: 'manual' })
     const html = await res.text()
-    const hasWillRef = html.includes('/will') || html.includes('Naar De Wil')
+    const hasOverviewRef = html.includes('/overzicht') || html.includes('Naar Overzicht')
     const hasHomeRef = html.includes('Naar startpagina') || html.includes('Naar holdings')
-    const hasNavLinks = hasWillRef && hasHomeRef
+    const hasNavLinks = hasOverviewRef && hasHomeRef
     results.push({
       name: '404 page includes navigation links',
       pass: hasNavLinks,
-      detail: `De Wil link: ${hasWillRef}, Home/holdings link: ${hasHomeRef}`,
+      detail: `Overzicht link: ${hasOverviewRef}, Home/holdings link: ${hasHomeRef}`,
     })
   } catch (e: unknown) {
     results.push({

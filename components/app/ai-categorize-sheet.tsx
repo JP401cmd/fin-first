@@ -1003,7 +1003,7 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
   return (
     <div className={`rounded-[var(--r-lg)] border p-4 transition-colors ${
       accepted
-        ? 'border-emerald-200 bg-emerald-50/30'
+        ? 'border-positive/30 bg-positive/5'
         : 'border-[var(--border-ed)] bg-[var(--paper)]'
     }`}>
       {/* Row header */}
@@ -1017,12 +1017,12 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
         </div>
         <div className="shrink-0 text-right">
           <p className={`font-[var(--font-dm-mono)] text-sm font-medium tabular-nums ${
-            tx.amount > 0 ? 'text-emerald-600' : 'text-[var(--ink)]'
+            tx.amount > 0 ? 'text-positive' : 'text-[var(--ink)]'
           }`}>
             {tx.amount > 0 ? '+' : ''}{formatCurrency(tx.amount)}
           </p>
           {accepted && (
-            <span className="mt-1 flex items-center justify-end gap-0.5 text-[10px] text-emerald-600">
+            <span className="mt-1 flex items-center justify-end gap-0.5 text-[10px] text-positive">
               <Check className="h-3 w-3" />
               Gekeurd
             </span>

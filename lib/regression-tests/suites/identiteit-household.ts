@@ -217,16 +217,16 @@ const tests: TestCase[] = [
     id: 'household-accept-get-redirect',
     name: 'GET /api/household/accept redirect met token',
     category: CAT,
-    description: 'Email link redirect flow stuurt naar /identity met invite_token',
+    description: 'Email link redirect flow stuurt naar /mijn/profiel met invite_token',
     priority: 'medium',
     estimatedDurationMs: 100,
     fn() {
-      // GET handler checks for token and redirects to /identity?invite_token=...
+      // GET handler checks for token and redirects to /mijn/profiel?invite_token=...
       // Token is required, missing token → 400
       const baseUrl = getBaseUrl()
       const token = 'test-token-123'
-      const expectedRedirect = `${baseUrl}/identity?invite_token=${token}`
-      assert(expectedRedirect.includes('/identity?invite_token='), 'Redirect URL bevat invite_token')
+      const expectedRedirect = `${baseUrl}/mijn/profiel?invite_token=${token}`
+      assert(expectedRedirect.includes('/mijn/profiel?invite_token='), 'Redirect URL bevat invite_token')
     },
   },
 

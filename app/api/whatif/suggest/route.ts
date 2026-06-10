@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
+import { WHATIF_SUGGEST_PROMPT } from '@/lib/ai/whatif-suggest-prompt'
 
 const SuggestedEventSchema = z.object({
   event_type: z.string(),
@@ -36,12 +37,7 @@ export async function POST(request: NextRequest) {
       model: anthropic('claude-haiku-4-5-20251001'),
       schema: SuggestionsResponseSchema,
       prompt: body.prompt,
-      system: [
-        'Je bent een financieel assistent voor een Nederlandse personal finance app.',
-        'Je suggereert levensgebeurtenissen die passen bij scenario-wijzigingen.',
-        'Geef realistische bedragen in euro. Wees bondig in je uitleg (max 1 zin).',
-        'Suggereer geen events die al actief zijn.',
-      ].join(' '),
+      system: WHATIF_SUGGEST_PROMPT,
     })
 
     return NextResponse.json({ suggestions: result.object.suggestions })

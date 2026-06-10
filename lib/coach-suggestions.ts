@@ -218,7 +218,7 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
       message:
         'Koppel je bank, dan houd ik je uitgaven automatisch bij — minder typewerk, meer zicht op je vrijheid.',
       cta: 'Bank koppelen',
-      ctaHref: '/core/cash/connect',
+      ctaHref: '/mijn/koppelingen',
     },
   },
   {
@@ -273,7 +273,7 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     suggestion: {
       message: 'Registreer je beleggingen — dan zie ik hoeveel vrijheid je portefeuille opbouwt.',
       cta: 'Beleggingen toevoegen',
-      ctaHref: '/core/assets/holdings',
+      ctaHref: '/overzicht/bezittingen/investment?tab=aandelen-holdings',
     },
   },
   {
@@ -284,7 +284,7 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     suggestion: {
       message: 'Koppel ISIN-codes voor automatische koersupdates van je holdings.',
       cta: 'ISIN koppelen',
-      ctaHref: '/core/assets/holdings',
+      ctaHref: '/overzicht/bezittingen/investment?tab=aandelen-holdings',
     },
   },
   {
@@ -305,7 +305,7 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     suggestion: {
       message: 'Stel je verwacht rendement in, dan klopt je vrijheidsprojectie met jouw situatie.',
       cta: 'Rendement instellen',
-      ctaHref: '/identity/instellingen',
+      ctaHref: '/toekomst/voorkeuren',
     },
   },
   {

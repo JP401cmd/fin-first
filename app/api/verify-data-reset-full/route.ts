@@ -137,7 +137,6 @@ export async function GET() {
       transactions: [],
       activeSubscriptions: [],
       userFeaturePrefs: null,
-      matrixJson: null,
     })
 
     // With no financial data: net worth = 0, monthly expenses = 0, freedom% = 0
@@ -250,7 +249,6 @@ export async function GET() {
         transactions: [],
         activeSubscriptions: [],
         userFeaturePrefs: null,
-        matrixJson: null,
       })
 
       results['full_reset_e2e'] = {

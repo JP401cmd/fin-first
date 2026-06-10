@@ -241,7 +241,7 @@ export function AccountFormModal({
                     <button
                       type="button"
                       onClick={() => removeOwnIban(row.id)}
-                      className="rounded p-0.5 text-[var(--ink-4)] hover:bg-red-50 hover:text-red-500"
+                      className="rounded p-0.5 text-[var(--ink-4)] hover:bg-negative/10 hover:text-negative"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -309,11 +309,11 @@ export function AccountFormModal({
             {account && canDelete ? (
               confirmDelete ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-red-600">Zeker weten?</span>
+                  <span className="text-xs text-negative">Zeker weten?</span>
                   <button
                     type="button"
                     onClick={() => onDelete(account.id)}
-                    className="rounded-[var(--r)] bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+                    className="rounded-[var(--r)] bg-negative px-3 py-1.5 text-xs font-medium text-white hover:bg-negative/90"
                   >
                     Verwijderen
                   </button>
@@ -329,7 +329,7 @@ export function AccountFormModal({
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] px-3 py-1.5 text-xs font-medium text-negative hover:bg-negative/10"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Verwijderen

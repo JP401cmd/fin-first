@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
@@ -9,7 +9,8 @@ import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
  * Tests voor MiniNetWorthChart — compacte projectie-chart naast Health
  * Score. Gebruikt nu simRows uit `runUnifiedProjection` (dezelfde bron
  * als /toekomst) zodat de curve 1:1 matcht. Tests valideren render-
- * states + simRows-injectie + Vrijheid-marker.
+ * states + simRows-injectie + Vrijheid-marker + de twee klikzones
+ * (verleden → popup, toekomst → /toekomst) + geschatte historie.
  */
 
 function buildHistory(values: number[]): { month: string; value: number }[] {
@@ -239,13 +240,13 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         simRows={buildSimRows(35, 52, 100_000)}
       />,
     )
-    // Band is een <path> met fill (geen stroke) en opacity-0.12
+    // Band is een <path> met fill (geen stroke) en lage opacity
     const fillPaths = Array.from(container.querySelectorAll('path[fill]'))
       .filter((p) => p.getAttribute('fill') !== 'none')
     expect(fillPaths.length).toBeGreaterThan(0)
   })
 
-  it('toont legenda-tekst "Onzekerheid (P10–P90)"', () => {
+  it('toont legenda-tekst "Onzekerheid (P40–P60)"', () => {
     render(
       <MiniNetWorthChart
         netWorthHistory={buildHistory([100_000])}
@@ -256,7 +257,7 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         simRows={buildSimRows(35, 52, 100_000)}
       />,
     )
-    expect(screen.getByText(/Onzekerheid \(P10–P90\)/i)).toBeTruthy()
+    expect(screen.getByText(/Onzekerheid \(P40–P60\)/i)).toBeTruthy()
   })
 
   it('historische curve render als stippellijn (strokeDasharray)', () => {
@@ -273,6 +274,133 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
     // Zoek paths met stroke-dasharray (history is dashed, projectie niet)
     const paths = container.querySelectorAll('path[stroke-dasharray]')
     expect(paths.length).toBeGreaterThan(0)
+  })
+})
+
+describe('MiniNetWorthChart — minimaal 3 maanden historie', () => {
+  it('≥3 echte waarderingen → legenda "Historisch" zonder schattings-label', () => {
+    render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([90_000, 95_000, 100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 100_000)}
+        monthlySavings={1_000}
+      />,
+    )
+    expect(screen.getByText('Historisch')).toBeTruthy()
+    expect(screen.queryByText(/deels geschat/)).toBeNull()
+  })
+
+  it('<3 echte waarderingen → maanden aangevuld met geschat verloop', () => {
+    render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 100_000)}
+        monthlySavings={1_000}
+      />,
+    )
+    expect(screen.getByText(/Historisch \(deels geschat\)/)).toBeTruthy()
+  })
+
+  it('zonder enige waardering → volledig geschat verloop van 3 maanden', () => {
+    render(
+      <MiniNetWorthChart
+        netWorthHistory={[]}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simRows={buildSimRows(35, 52, 100_000)}
+        monthlySavings={1_000}
+      />,
+    )
+    expect(screen.getByText(/Historisch \(deels geschat\)/)).toBeTruthy()
+  })
+})
+
+describe('MiniNetWorthChart — klikzones', () => {
+  const props = {
+    netWorthHistory: buildHistory([90_000, 95_000, 100_000]),
+    currentNetWorth: 100_000,
+    currentAge: 35,
+    fireAge: 52,
+    endAge: 67,
+    simRows: buildSimRows(35, 52, 100_000),
+  }
+
+  it('verleden-zone is een button die de verloop-popup opent', () => {
+    render(<MiniNetWorthChart {...props} />)
+    const pastZone = screen.getByRole('button', {
+      name: /verloop van je netto vermogen/i,
+    })
+    expect(pastZone).toBeTruthy()
+    // Popup is dicht vóór klik
+    expect(screen.queryByText('Netto vermogen — verloop')).toBeNull()
+    fireEvent.click(pastZone)
+    // Popup toont titel + maandtabel-kop
+    expect(screen.getByText('Netto vermogen — verloop')).toBeTruthy()
+    expect(screen.getByText('Vandaag')).toBeTruthy()
+  })
+
+  it('toekomst-zone is een link naar /toekomst', () => {
+    const { container } = render(<MiniNetWorthChart {...props} />)
+    const futureZone = container.querySelector(
+      'a[href="/toekomst"][aria-label*="projectie"]',
+    )
+    expect(futureZone).toBeTruthy()
+  })
+
+  it('popup toont geschatte maanden met "geschat"-label', () => {
+    render(
+      <MiniNetWorthChart
+        {...props}
+        netWorthHistory={buildHistory([100_000])}
+        monthlySavings={2_000}
+      />,
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: /verloop van je netto vermogen/i }),
+    )
+    expect(screen.getAllByText('geschat').length).toBeGreaterThan(0)
+  })
+})
+
+describe('MiniNetWorthChart — vrijheid bereikt → doorlopen tot eindleeftijd', () => {
+  it('fireAge ≤ currentAge → projectie tot endAge met "Tot {endAge}"-marker', () => {
+    render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([900_000, 950_000, 1_000_000])}
+        currentNetWorth={1_000_000}
+        currentAge={55}
+        fireAge={50}
+        endAge={90}
+        simRows={buildSimRows(55, 90, 1_000_000, 0.03)}
+      />,
+    )
+    expect(screen.getByText(/Tot 90/)).toBeTruthy()
+    expect(screen.getByText(/Vrijheid bereikt — verloop tot 90/)).toBeTruthy()
+  })
+
+  it('fireAge in de toekomst → weergave stopt bij fireAge (geen endAge-marker)', () => {
+    render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([90_000, 95_000, 100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={90}
+        simRows={buildSimRows(35, 90, 100_000)}
+      />,
+    )
+    expect(screen.getByText(/Vrijheid 52/)).toBeTruthy()
+    expect(screen.queryByText(/Tot 90/)).toBeNull()
   })
 })
 

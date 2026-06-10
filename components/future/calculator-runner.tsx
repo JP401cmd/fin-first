@@ -76,7 +76,7 @@ function PrefillIndicator({
   return (
     <span
       title="Voorgevuld uit jouw eigen gegevens. Pas met de slider aan om een aanname te wijzigen."
-      className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.5 rounded"
+      className="inline-block text-[8.5px] uppercase tracking-[0.1em] font-semibold text-positive bg-positive/10 border border-positive/30 px-1 py-0.5 rounded"
     >
       uit jouw data
     </span>
@@ -238,17 +238,17 @@ function stepFor(kind: CalculatorInput['kind']): number {
 }
 
 const APPLIC_COLORS: Record<string, string> = {
-  yes: 'bg-emerald-500',
+  yes: 'bg-positive',
   maybe: 'bg-amber-400',
-  no: 'bg-red-500',
+  no: 'bg-negative',
 }
 
 const STYLE_ROW_CLASS: Record<string, string> = {
   normal: '',
   subtotal: 'font-semibold border-t border-[var(--ink-3)]',
   total: 'font-bold border-t-2 border-[var(--ink)] border-b-2 border-double',
-  warn: 'bg-red-50/40 text-red-900',
-  good: 'bg-emerald-50/40 text-emerald-900',
+  warn: 'bg-negative/5 text-negative',
+  good: 'bg-positive/5 text-positive',
 }
 
 /**
@@ -423,7 +423,7 @@ export function CalculatorRunner({
           )}
           {result.applicability[activeScenario]?.status === 'no' &&
             result.applicability[activeScenario]?.reason && (
-              <p className="mt-2 flex items-start gap-1.5 text-[11px] text-red-800 bg-red-50/60 border border-red-200 rounded-md px-2 py-1.5">
+              <p className="mt-2 flex items-start gap-1.5 text-[11px] text-negative bg-negative/5 border border-negative/30 rounded-md px-2 py-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
                 <span>{result.applicability[activeScenario]!.reason}</span>
               </p>
@@ -487,7 +487,7 @@ export function CalculatorRunner({
 
       {/* Keuze-conclusie (alleen tonen als er geen narrative is) */}
       {!result.narrative && result.winner && definition.compare && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <div className="flex items-center gap-2 rounded-xl border border-positive/30 bg-positive/10 px-3 py-2 text-sm text-positive">
           <Trophy className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span>
             Op basis van je invoer komt{' '}
@@ -601,7 +601,7 @@ function SectionRows({
                 <td
                   key={s.key}
                   className={`px-4 py-3 text-right tabular-nums font-mono ${
-                    isWinnerCell ? 'text-emerald-700 font-semibold' : 'text-[var(--ink)]'
+                    isWinnerCell ? 'text-positive font-semibold' : 'text-[var(--ink)]'
                   }`}
                 >
                   {formatOutput(v, output.format, output.unit)}

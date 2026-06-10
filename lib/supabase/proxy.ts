@@ -41,9 +41,7 @@ export async function updateSession(request: NextRequest) {
     '/api/health',
     '/api/schema-check',
     '/api/dev-login',
-    '/test-phase-modal',
     '/test-chat',
-    '/test-locked-features',
     '/test-breadcrumb',
     '/test-snapshots',
     '/test-next-steps',
@@ -64,7 +62,6 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-data-isolation',
     '/test-box3-verification',
     '/api/verify-box3',
-    '/test-feature-gating',
     '/test-goal-progress',
     '/api/goals',
     '/test-holding-crud',
@@ -79,14 +76,11 @@ export async function updateSession(request: NextRequest) {
     '/api/apply-migration',
     '/api/verify-schema',
     '/test-migration',
-    '/test-onboarding-workflow',
     '/api/verify-onboarding',
     '/test-bank-import',
     '/test-next-step-dismiss',
     '/test-buy-transaction',
     '/test-sell-transaction',
-    '/test-phase-transition',
-    '/api/verify-phase-transition',
     '/test-onboarding-reset',
     '/api/verify-onboarding-reset',
     '/test-rec-workflow',
@@ -122,8 +116,6 @@ export async function updateSession(request: NextRequest) {
     '/test-dashboard-kpis',
     '/api/verify-dashboard-kpis',
     '/test-budget-modes',
-    '/test-sovereignty-gating',
-    '/api/verify-feature-gating',
     '/test-freedom-time-labels',
     '/api/verify-freedom-time-labels',
     '/api/daily-expense-rate',
@@ -167,15 +159,12 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-chat-history',
     '/test-holding-edit-preservation',
     '/api/verify-holding-edit-preservation',
-    '/test-spotlight-persistence',
-    '/api/verify-spotlight-persistence',
     '/test-multi-tab',
     '/api/verify-multi-tab',
     '/test-budget-form-state',
     '/test-budget-form-state/interactive',
     '/api/verify-budget-form-state',
     '/test-dashboard-card-order',
-    '/api/verify-dashboard-card-order',
     '/test-dismiss-persist',
     '/api/verify-direct-access-assets',
     '/test-direct-access-assets',
@@ -271,18 +260,13 @@ export async function updateSession(request: NextRequest) {
     '/test-philosophical-labels',
     '/test-wil-unique-lens',
     '/api/verify-wil-unique-lens',
-    '/test-locked-default',
-    '/api/verify-locked-default',
     '/test-freedom-days-disambiguation',
     '/api/verify-freedom-days-disambiguation',
-    '/test-feature-spotlight',
-    '/api/verify-feature-spotlight',
     '/test-jouw-pad',
     '/api/verify-jouw-pad',
     '/test-locked-footer',
     '/api/verify-locked-footer',
     '/test-feature-roadmap',
-    '/api/verify-feature-roadmap',
     '/test-collapsible-sections',
     '/api/verify-collapsible-sections',
     '/test-smart-next-step',
@@ -347,8 +331,6 @@ export async function updateSession(request: NextRequest) {
     '/test-household-schema',
     '/api/verify-household-schema',
     '/api/apply-household-migration',
-    '/test-year-in-review',
-    '/api/verify-year-in-review',
     '/test-perspective-switcher',
     '/api/verify-perspective-switcher',
     '/api/apply-perspective-migration',
@@ -398,6 +380,10 @@ export async function updateSession(request: NextRequest) {
 
   // Protected route prefixes that require authentication
   const protectedPrefixes = [
+    '/overzicht',
+    '/toekomst',
+    '/mijn',
+    '/dashboard',
     '/core',
     '/will',
     '/horizon',
@@ -416,11 +402,11 @@ export async function updateSession(request: NextRequest) {
     pathname === prefix || pathname.startsWith(prefix.endsWith('/') ? prefix : prefix + '/')
   )
 
-  // Redirect authenticated users away from public auth pages to dashboard
+  // Redirect authenticated users away from public auth pages to the app
   const authPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password']
   if (user && authPages.includes(pathname)) {
     const url = request.nextUrl.clone()
-    url.pathname = '/will'
+    url.pathname = '/overzicht'
     return NextResponse.redirect(url)
   }
 

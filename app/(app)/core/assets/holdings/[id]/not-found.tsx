@@ -16,7 +16,7 @@ export default function HoldingNotFound() {
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
-            href="/core/assets/holdings"
+            href="/overzicht/bezittingen/investment?tab=aandelen-holdings"
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-kern-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-kern-700 transition-colors"
             data-testid="back-to-holdings-link"
           >

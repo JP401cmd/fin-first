@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
 const MONTH_NAMES = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
@@ -17,8 +18,8 @@ export async function GET() {
   const normalizedMonth = nextMonth > 11 ? 0 : nextMonth
 
   // Fetch recurring transactions (top spending patterns from last 3 months)
-  const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString().slice(0, 10)
-  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10)
+  const threeMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 3, 1))
+  const currentMonthEnd = localMonthBounds(now).end
 
   const { data: recentTransactions } = await supabase
     .from('transactions')

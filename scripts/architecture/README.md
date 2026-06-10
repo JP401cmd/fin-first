@@ -47,6 +47,10 @@ Wat automatisch wordt gelezen (en dus nooit handmatig hoeft):
 - **Schermen** — alle `app/**/page.tsx` (route-groups `(x)` gestript), per module ingedeeld.
 - **API-routes** — alle `app/api/**/route.ts` met gedetecteerde HTTP-methodes.
 - **Tabellen** — `create table …` uit `supabase/migrations/*.sql`.
+- **Datatoegang** — `.from('tabel')`/`.rpc()` per API-route (`scanTableAccess`), met schrijf-detectie en multi-writer-tabellen.
+- **Datarelaties** — foreign keys (inline + `ALTER`), eigenaarschap en RLS uit de migraties (`scanTableRelations`). Voedt de Database-ERD op `/beheer/architectuur`.
+- **ADR's** — `docs/adr/*.md` frontmatter (`scanAdrs`), gehangen aan plaat-elementen.
+- **Churn & trend** — git-log per gebied + grootste bestanden (`scanChurn`) en een rollende `statsHistory`.
 - **Providers** — `<XxxProvider>` uit de app-shell layout.
 - **Componenten** — geteld en gegroepeerd onder `components/`.
 - **Integraties** — afgeleid uit `package.json`, `.env*` en de bank-parsers.

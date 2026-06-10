@@ -37,6 +37,19 @@ export async function POST(req: Request) {
     return Response.json({ error: 'AI model kon niet worden geladen' }, { status: 500 })
   }
 
+  // Plan-bewust: verdeel alleen over de categorieën uit het budgetplan dat de
+  // gebruiker daadwerkelijk heeft (actieve child-budgetten). Valt in de prompt
+  // terug op de volledige standaardlijst als er (nog) geen plan is.
+  const { data: budgetRows } = await supabase
+    .from('budgets')
+    .select('slug')
+    .not('parent_id', 'is', null)
+    .eq('is_archived', false)
+    .order('sort_order', { ascending: true })
+  const planSlugs = (budgetRows ?? [])
+    .map((b) => b.slug)
+    .filter((s): s is string => typeof s === 'string' && s.length > 0)
+
   try {
     const result = await generateObject({
       model,
@@ -46,6 +59,7 @@ export async function POST(req: Request) {
         householdType ?? 'solo',
         numberOfChildren ?? 0,
         context,
+        planSlugs,
       ),
       prompt: 'Genereer realistische maandelijkse budgetbedragen voor dit huishouden.',
     })

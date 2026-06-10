@@ -138,7 +138,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  // Email link redirect flow — redirects to identity page with token
+  // Email link redirect flow — redirects to the profile page with token
+  // (HouseholdSection on /mijn/profiel consumes invite_token from the URL)
   const { searchParams } = new URL(request.url)
   const token = searchParams.get('token')
 
@@ -146,7 +147,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Token is verplicht' }, { status: 400 })
   }
 
-  // Redirect to identity page with the invitation token
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  return NextResponse.redirect(`${baseUrl}/identity?invite_token=${token}`)
+  return NextResponse.redirect(`${baseUrl}/mijn/profiel?invite_token=${token}`)
 }

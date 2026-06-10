@@ -124,7 +124,7 @@ export async function PATCH(
           color: 'emerald',
           createdAt: now,
           read: false,
-          actionUrl: '/will',
+          actionUrl: '/overzicht/tips',
           aiContext: `Mijn partner ${completerName} heeft de actie "${action.title}" afgerond${freedomLabel}. Wat betekent dit voor onze financiële vrijheid?`,
         })
 

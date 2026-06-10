@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { DEFAULT_PRIVACY_SETTINGS } from '@/lib/household-data'
+import { sendEmail, householdInviteEmail } from '@/lib/email'
 
 /**
  * Household Invite API
@@ -153,6 +154,11 @@ export async function POST(request: Request) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const inviteLink = `${baseUrl}/household-invite?token=${invitation.token}`
 
+  // Verstuur de uitnodiging per e-mail (best-effort). Zonder RESEND_API_KEY
+  // wordt dit als 'skipped' gelogd en blijft de link-fallback hieronder werken.
+  const { subject, html } = householdInviteEmail(user.email, inviteLink)
+  const mail = await sendEmail(supabase, { to: trimmedEmail, subject, html })
+
   return NextResponse.json({
     success: true,
     invitation: {
@@ -162,6 +168,7 @@ export async function POST(request: Request) {
       expires_at: invitation.expires_at,
       invite_link: inviteLink,
     },
+    email_sent: mail.ok,
     household_id: householdId,
   })
 }

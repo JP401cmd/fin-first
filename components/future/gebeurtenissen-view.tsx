@@ -321,16 +321,16 @@ export function GebeurtenissenView({
                 impact?.tone === 'cost'
                   ? 'text-amber-700 bg-amber-50'
                   : impact?.tone === 'gain'
-                    ? 'text-emerald-700 bg-emerald-50'
+                    ? 'text-positive bg-positive/10'
                     : 'text-[var(--ink-3)] bg-[var(--subtle)]'
               // Bolletje-kleur volgt de impact-tone zodat de tijdlijn in
-              // één oogopslag kosten (amber) vs. opbrengsten (emerald)
+              // één oogopslag kosten (amber) vs. opbrengsten (positief)
               // toont.
               const nodeColor =
                 impact?.tone === 'cost'
                   ? 'border-amber-400 text-amber-700'
                   : impact?.tone === 'gain'
-                    ? 'border-emerald-400 text-emerald-700'
+                    ? 'border-positive/40 text-positive'
                     : 'border-[var(--ink-3)] text-[var(--ink-2)]'
               // Content-kaart is een button die de EventPane (vrij event)
               // of strategie-editor opent.

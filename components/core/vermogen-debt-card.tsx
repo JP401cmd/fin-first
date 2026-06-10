@@ -34,7 +34,7 @@ import type { Perspective, Provenance } from '@/lib/household-data'
 // ── Constants ───────────────────────────────────────────────
 
 /** Fixed red accent for all debt cards */
-const DEBT_ACCENT_COLOR = '#ef4444'
+const DEBT_ACCENT_COLOR = 'var(--negative)'
 
 // ── Icon mapping ────────────────────────────────────────────
 
@@ -158,8 +158,8 @@ export function VermogenDebtCard({
           style={{ backgroundColor: DEBT_ACCENT_COLOR }}
         />
         <div className="relative z-10 flex w-full items-center gap-3 p-3 sm:p-4">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-red-100">
-            <Icon className="h-4 w-4 text-red-600" />
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-negative/15">
+            <Icon className="h-4 w-4 text-negative" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
@@ -215,8 +215,8 @@ export function VermogenDebtCard({
         className="relative z-10 flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-[var(--subtle)]/30 sm:p-4"
       >
         {/* Left: icon + name + subtitle */}
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-red-100">
-          <Icon className="h-4 w-4 text-red-600" />
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-negative/15">
+          <Icon className="h-4 w-4 text-negative" />
         </div>
 
         <div className="min-w-0 flex-1">

@@ -2,18 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { Newspaper, Save, RotateCcw, Check, AlertCircle, ChevronDown, ChevronUp, Globe, Rss, Plus, Trash2, Database, Search, RefreshCw, FileText } from 'lucide-react'
+import {
+  DEFAULT_WEB_SOURCES,
+  DEFAULT_RSS_FEEDS,
+  type WebSource,
+  type RssFeed,
+} from '@/lib/news-sources'
 
 // ── Types for news sources ───────────────────────────────────────────
-
-interface WebSource {
-  url: string
-  label: string
-}
-
-interface RssFeed {
-  url: string
-  label: string
-}
 
 interface DbArticle {
   id: string
@@ -27,84 +23,6 @@ interface DbArticle {
   potential_impact: string | null
   is_used: boolean
 }
-
-// ── Defaults ─────────────────────────────────────────────────────────
-
-const DEFAULT_WEB_SOURCES: WebSource[] = [
-  // Rijksoverheid — Belastingen & fiscaal
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/belastingplan', label: 'Rijksoverheid — Belastingplan' },
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/inkomstenbelasting', label: 'Rijksoverheid — Inkomstenbelasting' },
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/inkomstenbelasting/plannen-werkelijk-rendement-box-3', label: 'Rijksoverheid — Box 3 werkelijk rendement' },
-  { url: 'https://www.rijksfinancien.nl/belastingplan-2026', label: 'Rijksfinanci\u00ebn — Belastingplan wetteksten' },
-  // Rijksoverheid — Toeslagen
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/toeslagen', label: 'Rijksoverheid — Toeslagen' },
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/huurtoeslag', label: 'Rijksoverheid — Huurtoeslag' },
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/zorgtoeslag', label: 'Rijksoverheid — Zorgtoeslag' },
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/kinderopvangtoeslag', label: 'Rijksoverheid — Kinderopvangtoeslag' },
-  // Rijksoverheid — Inkomen & wonen
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/koopkracht', label: 'Rijksoverheid — Koopkracht' },
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/minimumloon', label: 'Rijksoverheid — Minimumloon' },
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/koopwoning', label: 'Rijksoverheid — Eigen woning / Hypotheek' },
-  // Rijksoverheid — Pensioen & AOW
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/pensioen', label: 'Rijksoverheid — Pensioen' },
-  { url: 'https://www.rijksoverheid.nl/onderwerpen/aow', label: 'Rijksoverheid — AOW' },
-  // Toezichthouders & instituten
-  { url: 'https://www.dnb.nl/actueel/algemeen-nieuws/', label: 'DNB — Algemeen nieuws' },
-  { url: 'https://www.dnb.nl/publicaties/publicaties-dnb/', label: 'DNB — Publicaties' },
-  { url: 'https://www.dnb.nl/voor-de-sector/wet-toekomst-pensioenen/', label: 'DNB — Wet toekomst pensioenen' },
-  { url: 'https://www.afm.nl/nl-nl/sector/actueel', label: 'AFM — Sector actueel' },
-  { url: 'https://www.afm.nl/nl-nl/sector/themas/duurzaamheid/sfdr', label: 'AFM — SFDR duurzaam beleggen' },
-  { url: 'https://www.afm.nl/nl-nl/consumenten/waarschuwingen', label: 'AFM — Waarschuwingen' },
-  { url: 'https://www.cpb.nl/publicaties', label: 'CPB — Publicaties' },
-  { url: 'https://www.cpb.nl/ramingen', label: 'CPB — Ramingen' },
-  // CBS — Statistieken
-  { url: 'https://www.cbs.nl/nl-nl/arbeid-en-inkomen/inkomen-en-bestedingen/cijfers', label: 'CBS — Inkomen en bestedingen' },
-  { url: 'https://www.cbs.nl/nl-nl/economie/prijzen', label: 'CBS — Prijzen (CPI / inflatie)' },
-  // Belastingdienst
-  { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/box-3/box-3', label: 'Belastingdienst — Box 3' },
-  { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/toeslagen', label: 'Belastingdienst — Toeslagen' },
-  // ECB
-  { url: 'https://www.ecb.europa.eu/press/pressconf/html/index.nl.html', label: 'ECB — Monetairbeleidsbeslissingen' },
-]
-
-const DEFAULT_RSS_FEEDS: RssFeed[] = [
-  // Belastingdienst
-  { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/productenoverzicht/producten', label: 'Belastingdienst — Actueel Priv\u00e9' },
-  { url: 'https://www.belastingdienst.nl/wps/wcm/connect/nl/productenoverzicht/producten-ondernemers', label: 'Belastingdienst — Actueel Ondernemers' },
-  // ECB
-  { url: 'https://www.ecb.europa.eu/rss/press.html', label: 'ECB — Persberichten' },
-  // Rijksoverheid — Belastingen & fiscaal
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/belastingplan/nieuws.rss', label: 'Rijksoverheid — Belastingplan nieuws' },
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/belastingplan/documenten.rss', label: 'Rijksoverheid — Belastingplan documenten' },
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/inkomstenbelasting/nieuws.rss', label: 'Rijksoverheid — Inkomstenbelasting nieuws' },
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/inkomstenbelasting/plannen-werkelijk-rendement-box-3/nieuws.rss', label: 'Rijksoverheid — Box 3 werkelijk rendement' },
-  // Rijksoverheid — Toeslagen
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/toeslagen/nieuws.rss', label: 'Rijksoverheid — Toeslagen nieuws' },
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/huurtoeslag/nieuws.rss', label: 'Rijksoverheid — Huurtoeslag nieuws' },
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/zorgtoeslag/nieuws.rss', label: 'Rijksoverheid — Zorgtoeslag nieuws' },
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/kinderopvangtoeslag/nieuws.rss', label: 'Rijksoverheid — Kinderopvangtoeslag nieuws' },
-  // Rijksoverheid — Inkomen & wonen
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/koopkracht/nieuws.rss', label: 'Rijksoverheid — Koopkracht nieuws' },
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/minimumloon/nieuws.rss', label: 'Rijksoverheid — Minimumloon nieuws' },
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/koopwoning/nieuws.rss', label: 'Rijksoverheid — Eigen woning nieuws' },
-  // Rijksoverheid — Pensioen & AOW
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/pensioen/nieuws.rss', label: 'Rijksoverheid — Pensioen nieuws' },
-  { url: 'https://feeds.rijksoverheid.nl/onderwerpen/aow/nieuws.rss', label: 'Rijksoverheid — AOW nieuws' },
-  // Rijksoverheid — Ministeries
-  { url: 'https://feeds.rijksoverheid.nl/ministeries/ministerie-van-financien/nieuws.rss', label: 'Min. Financi\u00ebn — Nieuws' },
-  { url: 'https://feeds.rijksoverheid.nl/ministeries/ministerie-van-financien/kamerstukken.rss', label: 'Min. Financi\u00ebn — Kamerstukken' },
-  { url: 'https://feeds.rijksoverheid.nl/ministeries/ministerie-van-sociale-zaken-en-werkgelegenheid/nieuws.rss', label: 'Min. SZW — Nieuws' },
-  // CPB & CBS
-  { url: 'https://www.cpb.nl/publicaties.rss', label: 'CPB — Alle publicaties' },
-  { url: 'https://www.cbs.nl/nl-nl/rss/inkomen-en-bestedingen', label: 'CBS — Inkomen en bestedingen' },
-  { url: 'https://www.cbs.nl/nl-nl/rss/prijzen', label: 'CBS — Prijzen (inflatie)' },
-  // AFM
-  { url: 'https://www.afm.nl/rss/nl/sector/actueel/rss.xml', label: 'AFM — Nieuws sector' },
-  { url: 'https://www.afm.nl/rss/nl/consumenten/waarschuwingen/rss.xml', label: 'AFM — Waarschuwingen' },
-  // Overig
-  { url: 'https://www.overtoeslagen.nl/actueel/nieuws.rss', label: 'Dienst Toeslagen — Actueel' },
-  { url: 'https://www.dsta.nl/service/rss', label: 'DSTA — Agentschap nieuws' },
-]
 
 // ── Shared input className for consistency ───────────────────────────
 

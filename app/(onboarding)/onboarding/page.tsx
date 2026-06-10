@@ -771,7 +771,7 @@ export default function OnboardingPage() {
 
       if (profile?.onboarding_completed) {
         clearLocalStorage()
-        router.replace('/core')
+        router.replace('/overzicht')
         return
       }
 
@@ -1027,7 +1027,7 @@ export default function OnboardingPage() {
       let message: string
       if (err instanceof DOMException && err.name === 'AbortError') {
         message = 'De server reageert niet. Controleer je internetverbinding en probeer het opnieuw.'
-      } else if (err instanceof TypeError && err.message === 'Failed to fetch') {
+      } else if (err instanceof TypeError && err.message.startsWith('Failed to fetch')) {
         message = 'Geen internetverbinding. Controleer je netwerk en probeer het opnieuw.'
       } else {
         message = err instanceof Error ? err.message : 'Onbekende fout bij opslaan'

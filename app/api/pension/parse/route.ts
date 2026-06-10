@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
+import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel } from '@/lib/ai/config'
 import { generateObject } from 'ai'
 import { z } from 'zod'
+import { PENSION_PARSE_PROMPT } from '@/lib/ai/pension-parse-prompt'
 
 // ── Rate limiting (in-memory, per user) ──
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -98,25 +100,7 @@ export async function POST(req: Request) {
           content: [
             {
               type: 'text',
-              text: `Je bent een expert in het analyseren van Nederlandse pensioenoverzichten van mijnpensioenoverzicht.nl.
-
-Analyseer het bijgevoegde PDF-document en extraheer de volgende gegevens:
-
-1. **AOW-bedrag**: Het verwachte bruto AOW-bedrag per maand. Als het niet vermeld staat, gebruik null.
-2. **Pensioenregelingen**: Voor elke regeling:
-   - fondsNaam: naam van het pensioenfonds
-   - brutoBedrag: bruto maandbedrag in EUR
-   - ingangLeeftijd: leeftijd waarop het pensioen ingaat
-   - isGeindexeerd: of het pensioen waardevast is (geindexeerd)
-   - type: ouderdomspensioen, nabestaandenpensioen, arbeidsongeschiktheidspensioen, of overig
-3. **Nabestaandenpensioen**: Totaalbedrag per maand, of null als niet vermeld.
-4. **Samenvatting**: Een korte samenvatting in 1-2 zinnen.
-
-Let op:
-- Bedragen zijn altijd in EUR per maand (reken jaar naar maand als nodig: deel door 12)
-- Als een bedrag per jaar staat, deel het door 12
-- Scheid ouderdomspensioen van nabestaandenpensioen
-- Als de PDF geen pensioenoverzicht is, geef dan lege regelingen terug en vermeld dat in de samenvatting`,
+              text: PENSION_PARSE_PROMPT,
             },
             {
               type: 'file',
@@ -128,6 +112,7 @@ Let op:
       ],
     })
 
+    await recordAiUsage(supabase, user.id, 'extraction')
     return Response.json(result)
   } catch (err) {
     console.error('[pension/parse] Error:', err)

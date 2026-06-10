@@ -597,6 +597,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     dateOfBirth: profileResult.data?.date_of_birth ?? null,
   }
   const strategyOpts = { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge }
+  // FALLBACK-ONLY: computeFireProjection kent géén life events. De widgets
+  // prefereren overal de unified engine (`simFireCountdown ?? fireProjResult`,
+  // `simFireAgeFractional ?? snapshotFireAge`); dit resultaat is alleen
+  // zichtbaar als de unified-sim niet kan draaien (geen dob, netWorth ≤ 0,
+  // of een sim-error). Niet als primaire KPI-bron gebruiken.
   const fireProjResult = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr, undefined, strategyOpts)
 
   // Horizon extra: scenario range (optimistic / expected / pessimistic)

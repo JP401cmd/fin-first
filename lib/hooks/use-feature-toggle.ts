@@ -54,7 +54,7 @@ export function useFeatureToggle() {
       })
 
       if (res.ok) {
-        // Clear all overrides — features revert to sovereignty defaults
+        // Clear all overrides — features revert to default (aan)
         refreshFeaturePrefs({})
         // Force page reload to recompute from server
         window.location.reload()

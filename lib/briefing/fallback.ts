@@ -30,7 +30,7 @@ export function composeBriefingFallback(
     value: formatCurrency(data.netWorth),
     freedomStr: netWorthFreedom ?? undefined,
     module: 'kern',
-    href: '/core',
+    href: '/overzicht',
   })
 
   // 3. Budget progress ring
@@ -43,7 +43,7 @@ export function composeBriefingFallback(
     percentage: Math.min(budgetPct, 100),
     total: `van ${formatCurrency(bt.limit)}`,
     module: 'kern',
-    href: '/core/budgets',
+    href: '/overzicht/cashflow/budget',
   })
 
   // 4. Budget alert if > 90%
@@ -53,7 +53,7 @@ export function composeBriefingFallback(
       severity: budgetPct > 100 ? 'urgent' : 'warning',
       title: 'Budget druk',
       message: `Je hebt ${budgetPct}% van je maandbudget besteed. ${budgetPct > 100 ? 'Je zit over je limiet.' : 'Let op je uitgaven de komende dagen.'}`,
-      href: '/core/budgets',
+      href: '/overzicht/cashflow/budget',
     })
   }
 
@@ -65,7 +65,7 @@ export function composeBriefingFallback(
       kicker: 'Acties',
       title: `${data.openActions} openstaande ${data.openActions === 1 ? 'actie' : 'acties'}`,
       description: `${Math.round(data.totalFreedomDaysOpen)} vrijheidsdagen te winnen door je acties af te ronden.`,
-      href: '/will',
+      href: '/overzicht/tips',
       module: 'wil',
     })
   }
@@ -90,7 +90,7 @@ export function composeBriefingFallback(
     label: 'Spaarquote',
     value: `${savingsRate}%`,
     module: 'kern',
-    href: '/core',
+    href: '/overzicht/cashflow/forecast',
   })
 
   // 8. Phase-specific cards
@@ -130,7 +130,7 @@ export function composeBriefingFallback(
       rightLabel: 'Breakeven rendement',
       rightValue: `${breakevenPct}%`,
       delta: aanbevelingNl,
-      href: '/core/debts',
+      href: '/overzicht/schulden',
     })
   }
 
@@ -152,7 +152,7 @@ export function composeBriefingFallback(
         text: `Je fondsbeheer van ${annualFee}/jaar (${terPct}% TER) kost je ${timeStr} vrijheid. Lagere kosten maken een dramatisch verschil over 30 jaar.`,
         emphasis: 'tip',
         module: 'kern',
-        href: '/core/assets',
+        href: '/overzicht/bezittingen',
         ctaLabel: 'Bekijk fee-erosie',
       })
     } else {
@@ -161,7 +161,7 @@ export function composeBriefingFallback(
         text: `Je fondskosten bedragen ${annualFee}/jaar (${terPct}% TER). Bekijk hoe zelfs kleine kostenverschillen oplopen over 30 jaar.`,
         emphasis: 'observation',
         module: 'kern',
-        href: '/core/assets',
+        href: '/overzicht/bezittingen',
         ctaLabel: 'Bekijk fee-erosie',
       })
     }
@@ -177,7 +177,7 @@ export function composeBriefingFallback(
       days: Math.max(0, daysLeft),
       sublabel: '1 mei',
       module: 'kern',
-      href: '/core/belasting',
+      href: '/overzicht/belasting',
     })
   } else if (temporal.daysUntilSalary > 0 && temporal.daysUntilSalary <= 10) {
     cards.push({

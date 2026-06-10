@@ -44,6 +44,34 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: 'fin_prod_0.88',
+    date: '2026-06-10',
+    title: 'Beheerscherm heringedeeld: vier groepen, hub-startpagina en opschoning',
+    sections: [
+      {
+        module: 'Platform',
+        color: 'zinc',
+        items: [
+          {
+            title: 'Hub-startpagina voor beheer',
+            description:
+              '/beheer is nu een startpagina met vier secties — Technisch beheer, Functioneel beheer, Test & ontwikkeling en Ter info — met per tool een kaart met omschrijving. De platte tabbalk met 27 tabs is vervangen door een twee-niveau navigatie: groepen boven, tools van de actieve groep eronder.',
+          },
+          {
+            title: 'Eén bron voor de beheer-indeling',
+            description:
+              'Nieuwe lib/beheer-sections.ts voedt de startpagina, de navigatie, het command-palette en de regressietests — geen losse kopieën van de tablijst meer.',
+          },
+          {
+            title: 'Acht verouderde pagina’s verwijderd',
+            description:
+              'De features- en tiers-redirects, het meldingen-plakkaat, test-deferred, de Will Avatar-showcase, de widgets-galerij, propositie en roadmap zijn opgeruimd. De inhoud blijft beschikbaar in de git-historie.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: 'fin_prod_0.87',
     date: '2026-03-27',
     title:

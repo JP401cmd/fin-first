@@ -96,12 +96,12 @@ export function AfbouwOverzichtCard({
         </article>
 
         {/* Bij eindleeftijd */}
-        <article className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 sm:p-5">
+        <article className="rounded-2xl border border-positive/20 bg-positive/5 p-4 sm:p-5">
           <header className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-bold">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-positive/15 text-positive text-xs font-bold">
               {endAge}
             </span>
-            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-emerald-700">
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-positive">
               Bij eindleeftijd
             </div>
           </header>

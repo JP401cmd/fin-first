@@ -1,8 +1,9 @@
-// ── Feature-Phase Matrix ─────────────────────────────────────
-// Defines phases and sovereignty computation.
-// DEFAULT_MATRIX and FEATURES are now generated from the unified feature registry.
+// ── Sovereignty Phases ───────────────────────────────────────
+// Defines phases and sovereignty computation — puur voor motivatie-weergave
+// (Jouw Pad, fase-overgang-viering). Fases sturen geen feature-toegang meer;
+// toegang loopt via abonnement + user-toggles (zie compute-feature-access.ts).
 
-import { UNIFIED_FEATURES, LEGACY_FEATURE_MAP, isPhaseSufficient, type PhaseId } from '@/lib/feature-registry'
+import { UNIFIED_FEATURES, LEGACY_FEATURE_MAP } from '@/lib/feature-registry'
 
 export interface Phase {
   id: string
@@ -17,8 +18,6 @@ export interface FeatureDef {
   label: string
   description: string
 }
-
-export type FeaturePhaseMatrix = Record<string, Record<string, boolean>>
 
 export const PHASES: Phase[] = [
   { id: 'recovery',  label: 'Recovery',  color: 'rose',  cssName: 'phase_recovery',  levels: [-2, -1, 0] },
@@ -50,33 +49,6 @@ function buildFeatures(): FeatureDef[] {
 }
 
 export const FEATURES: FeatureDef[] = buildFeatures()
-
-// ── Generate DEFAULT_MATRIX from unified registry (backward compat) ──────────
-// For each feature (unified + legacy), derive which phases it's enabled in
-// based on the unified feature's defaultPhase.
-
-function buildDefaultMatrix(): FeaturePhaseMatrix {
-  const phaseIds = PHASES.map(p => p.id)
-  const matrix: FeaturePhaseMatrix = {}
-
-  for (const feat of UNIFIED_FEATURES) {
-    // Build phase row for this feature
-    const row: Record<string, boolean> = {}
-    for (const pid of phaseIds) {
-      row[pid] = isPhaseSufficient(pid as PhaseId, feat.defaultPhase)
-    }
-    // Set for unified ID
-    matrix[feat.id] = row
-    // Set for all legacy IDs
-    for (const legacyId of feat.legacyIds) {
-      matrix[legacyId] = row
-    }
-  }
-
-  return matrix
-}
-
-export const DEFAULT_MATRIX: FeaturePhaseMatrix = buildDefaultMatrix()
 
 /**
  * Compute sovereignty level from financial data.

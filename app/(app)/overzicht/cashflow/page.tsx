@@ -14,6 +14,7 @@ import { loadCashflowSettingsData } from '@/lib/cashflow-settings-data'
 import { CashflowInstellingenBlok } from '@/components/overview/cashflow-instellingen-blok'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
+import { Kicker, EditorialDeck } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
@@ -60,29 +61,22 @@ export default async function OverzichtCashflowPage() {
       </div>
 
       <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        <div className="mb-2 flex items-center gap-2.5">
-          <span
-            aria-hidden
-            className="inline-block h-px w-7"
-            style={{ background: 'var(--module-active-500)' }}
-          />
-          <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-[var(--ink-2)]">
-            Je geldstroom
-          </span>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <Kicker>Je geldstroom</Kicker>
           <PerspectiveContextLabel />
         </div>
-        <p
-          className="mb-4 max-w-[60ch] border-l-2 pl-3 font-serif text-sm italic text-[var(--ink-2)]"
-          style={{ borderColor: 'var(--module-active-500)' }}
-        >
+        <EditorialDeck className="mb-4">
           Het deel van je inkomen dat je opzij zet bepaalt hoe snel je vrijheid
           bereikt. Kies een onderdeel om dieper te kijken.
-        </p>
+        </EditorialDeck>
         <CashflowLandingCards cards={cards} />
       </section>
 
       {cashflow.baselineExpenses >= 500 && (
         <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+          <Kicker size="small" className="mb-2">
+            Koopkracht
+          </Kicker>
           <InflationImpactCard monthlyExpenses={cashflow.baselineExpenses} />
         </section>
       )}

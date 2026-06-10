@@ -305,7 +305,7 @@ export default function RevaluePage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 flex items-center gap-2 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 flex items-center gap-2 rounded-[var(--r)] border border-negative/30 bg-negative/10 px-4 py-3 text-sm text-negative">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
@@ -403,7 +403,7 @@ export default function RevaluePage() {
                         <div className="sm:w-28 shrink-0 text-right">
                           {!locked && hasChanged && (
                             <p className={`text-sm font-mono tabular-nums font-medium ${
-                              delta > 0 ? 'text-emerald-600' : 'text-red-600'
+                              delta > 0 ? 'text-positive' : 'text-negative'
                             }`}>
                               {delta > 0 ? '+' : ''}{fc(delta)}
                             </p>
@@ -447,12 +447,12 @@ export default function RevaluePage() {
               <div>
                 <p className="text-xs font-medium text-[var(--ink-3)] uppercase">Verschil</p>
                 <p className={`text-lg font-bold font-mono tabular-nums ${
-                  totalDelta > 0 ? 'text-emerald-600' : 'text-red-600'
+                  totalDelta > 0 ? 'text-positive' : 'text-negative'
                 }`}>
                   {totalDelta > 0 ? '+' : ''}{fc(totalDelta)}
                 </p>
                 {dailyExpenses > 0 && (
-                  <p className={`text-xs ${totalDelta > 0 ? 'text-emerald-500/70' : 'text-red-500/70'}`}>
+                  <p className={`text-xs ${totalDelta > 0 ? 'text-positive/70' : 'text-negative/70'}`}>
                     {(() => {
                       const ft = calculateFreedomTime(Math.abs(totalDelta), dailyExpenses)
                       const str = formatFreedomTimeString(ft, 'short', true)
@@ -470,7 +470,7 @@ export default function RevaluePage() {
             disabled={changedCount === 0 || saving || saved}
             className={`inline-flex items-center gap-2 rounded-[var(--r)] px-6 py-2.5 text-sm font-medium transition-colors ${
               saved
-                ? 'bg-emerald-600 text-white'
+                ? 'bg-positive text-[var(--paper)]'
                 : changedCount === 0
                   ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed'
                   : 'bg-kern-600 text-white hover:bg-kern-700'

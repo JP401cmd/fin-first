@@ -1,6 +1,7 @@
 'use client'
 
 import { AbonnementSection } from './abonnement-section'
+import { AiCreditsSection } from './ai-credits-section'
 import { AccountBasisSection } from './account-basis-section'
 import { DangerZone } from './danger-zone'
 
@@ -19,6 +20,8 @@ export function AccountClient({
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 pb-16 space-y-10">
       <AbonnementSection activeSubscriptions={activeSubscriptions} />
+      <hr className="border-[var(--border-ed)]" />
+      <AiCreditsSection />
       <hr className="border-[var(--border-ed)]" />
       <AccountBasisSection currentEmail={email} />
       <hr className="border-[var(--border-ed)]" />

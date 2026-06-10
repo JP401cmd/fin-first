@@ -21,9 +21,9 @@ export function MetricCard({ spec }: Props) {
       {spec.delta && (
         <div className="mt-2 flex items-center gap-1 text-xs">
           {spec.delta.startsWith('+') ? (
-            <ArrowUp className="h-4 w-4 text-emerald-600" />
+            <ArrowUp className="h-4 w-4 text-positive" />
           ) : spec.delta.startsWith('-') ? (
-            <ArrowDown className="h-4 w-4 text-rose-600" />
+            <ArrowDown className="h-4 w-4 text-negative" />
           ) : null}
           <span className="font-mono tabular-nums text-[var(--ink-2)]">{spec.delta}</span>
           {spec.deltaLabel && (

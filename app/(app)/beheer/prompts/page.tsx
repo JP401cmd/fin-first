@@ -19,6 +19,7 @@ const DOMAIN_BADGE: Record<string, { bg: string; text: string; label: string }> 
   wil: { bg: 'bg-teal-100', text: 'text-teal-700', label: 'Tips & acties' },
   horizon: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Toekomst' },
   nieuws: { bg: 'bg-sky-100', text: 'text-sky-700', label: 'Nieuws' },
+  parsing: { bg: 'bg-slate-100', text: 'text-slate-700', label: 'Verwerking' },
 }
 const SHARED_BADGE = { bg: 'bg-zinc-100', text: 'text-zinc-600', label: 'Gedeeld' }
 
@@ -87,6 +88,11 @@ export default function BeheerPromptsPage() {
         <p className="mt-1 text-sm text-[var(--ink-3)]">
           Overzicht van alle system prompts die Will en andere AI-modules gebruiken.
           Aanpassen doe je in de code ({prompts.length} prompts, {totalChars.toLocaleString('nl-NL')} tekens totaal).
+        </p>
+        <p className="mt-2 text-xs text-[var(--ink-4)]">
+          Apart beheerd: de nieuwsprompt (bewerkbaar op <span className="font-medium">/beheer/nieuws</span>) en
+          briefing-directieven (<span className="font-medium">/beheer/briefing</span>). Die staan hier niet omdat
+          ze een eigen beheerscherm met overrides hebben.
         </p>
 
         {/* Combined preview button */}

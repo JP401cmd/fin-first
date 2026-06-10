@@ -145,7 +145,7 @@ export function HouseholdPrivacySettings() {
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <EyeOff className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
+          <EyeOff className="h-3.5 w-3.5 text-negative" aria-hidden="true" />
           <span className="text-xs text-[var(--ink-2)]">
             <strong>Verborgen</strong> — volledig afgeschermd
           </span>
@@ -180,7 +180,7 @@ export function HouseholdPrivacySettings() {
                   isActive
                     ? opt.val === 'transparent'
                       ? 'bg-wil-50 text-wil-700 border border-wil-300'
-                      : 'bg-red-50 text-red-700 border border-red-300'
+                      : 'bg-negative/10 text-negative border border-negative/40'
                     : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
                 }`}
               >
@@ -229,7 +229,7 @@ export function HouseholdPrivacySettings() {
                             ? 'bg-wil-50 text-wil-700 border border-wil-300'
                             : opt.color === 'amber'
                               ? 'bg-amber-50 text-amber-700 border border-amber-300'
-                              : 'bg-red-50 text-red-700 border border-red-300'
+                              : 'bg-negative/10 text-negative border border-negative/40'
                           : 'border border-[var(--border-ed)] text-[var(--ink-3)] hover:bg-[var(--subtle)]'
                       }`}
                     >
@@ -253,7 +253,7 @@ export function HouseholdPrivacySettings() {
           {saving ? 'Opslaan...' : 'Opslaan'}
         </button>
         {message && (
-          <p className={`text-sm ${message.type === 'success' ? 'text-wil-600' : 'text-red-600'}`}>
+          <p className={`text-sm ${message.type === 'success' ? 'text-wil-600' : 'text-negative'}`}>
             {message.text}
           </p>
         )}

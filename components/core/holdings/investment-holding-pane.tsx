@@ -421,7 +421,7 @@ export function InvestmentHoldingPane({
       <button
         type="button"
         onClick={() => setConfirmDelete(true)}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-red-600 hover:bg-red-50"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-negative hover:bg-negative/10"
         aria-label="Holding verwijderen"
         title="Verwijderen"
       >
@@ -531,7 +531,7 @@ export function InvestmentHoldingPane({
               type="button"
               onClick={handleDeleteConfirm}
               disabled={!deleteCanConfirm || deleting}
-              className="border border-red-600 bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="border border-negative bg-negative px-4 py-3 text-sm font-semibold text-[var(--paper)] hover:bg-negative/90 disabled:cursor-not-allowed disabled:opacity-50"
               style={{ minHeight: 44 }}
             >
               {deleting ? 'Verwijderen…' : 'Definitief verwijderen'}
@@ -884,13 +884,13 @@ interface DetailErrorBannerProps {
 
 function DetailErrorBanner({ message, onRetry }: DetailErrorBannerProps) {
   return (
-    <div className="flex items-start gap-2 border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-800">
+    <div className="flex items-start gap-2 border border-negative/30 bg-negative/10 px-3 py-2 text-[12px] text-negative">
       <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       <span className="flex-1 leading-snug">{message}</span>
       <button
         type="button"
         onClick={onRetry}
-        className="border border-red-300 bg-white px-2 py-0.5 text-[11px] font-medium text-red-800 hover:bg-red-100"
+        className="border border-negative/40 bg-white px-2 py-0.5 text-[11px] font-medium text-negative hover:bg-negative/15"
       >
         Opnieuw proberen
       </button>
@@ -1221,7 +1221,7 @@ function InvestmentHoldingPaneEdit({
 
       {/* Validatie-fout / sync-conflict — inline rood banner. */}
       {validationError && (
-        <div className="flex items-start gap-2 border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-800">
+        <div className="flex items-start gap-2 border border-negative/30 bg-negative/10 px-3 py-2 text-[12px] text-negative">
           <AlertCircle
             className="mt-0.5 h-3.5 w-3.5 shrink-0"
             aria-hidden="true"

@@ -26,8 +26,6 @@ export async function GET() {
   for (const row of data ?? []) {
     if (row.key === 'anthropic_api_key' || row.key === 'openai_api_key' || row.key === 'mistral_api_key' || row.key === 'truelayer_client_id' || row.key === 'truelayer_client_secret') {
       settings[row.key] = row.value ? maskApiKey(row.value) : ''
-    } else if (row.key === 'feature_phase_matrix' || row.key === 'unified_feature_matrix') {
-      try { settings[row.key] = JSON.parse(row.value) } catch { settings[row.key] = row.value }
     } else {
       settings[row.key] = row.value
     }
@@ -47,8 +45,6 @@ const ALLOWED_KEYS = [
   'ollama_base_url',
   'ai_model_ollama',
   'ai_system_prompt_override',
-  'feature_phase_matrix',
-  'unified_feature_matrix',
   'truelayer_enabled',
   'truelayer_client_id',
   'truelayer_client_secret',
@@ -74,7 +70,7 @@ export async function PUT(req: Request) {
       continue
     }
 
-    // Stringify object values (e.g. feature_phase_matrix)
+    // Stringify object values
     if (typeof value === 'object' && value !== null) {
       value = JSON.stringify(value)
     }

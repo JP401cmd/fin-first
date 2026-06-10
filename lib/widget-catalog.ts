@@ -1,7 +1,6 @@
 // ── Widget Catalog ────────────────────────────────────────────
 // Static definition of all dashboard widgets.
 
-import { PHASES, DEFAULT_MATRIX } from '@/lib/feature-phases'
 import { WIDGET_TO_FEATURE } from '@/lib/feature-registry'
 import type { ModuleId } from '@/lib/module-registry'
 import { getWidgetRequiredModule } from '@/lib/module-registry'
@@ -26,9 +25,6 @@ export interface WidgetDef {
   module: WidgetModule
   sizes: WidgetSize[]          // allowed sizes
   defaultSize: WidgetSize
-  minLevel: number             // sovereignty level required (-2..6)
-  /** Phase label shown in locked placeholder */
-  requiredPhase?: string
   /** Module that must be active for this widget to be visible (undefined = always visible) */
   requiredModule?: ModuleId
 }
@@ -44,39 +40,6 @@ export interface WidgetPrefs {
   widgets: WidgetPref[]
 }
 
-// ── Derive minLevel & requiredPhase from feature-phase matrix ─
-// Single source of truth: DEFAULT_MATRIX determines when a widget unlocks.
-
-/**
- * Find the earliest phase where a feature is enabled and return
- * the lowest sovereignty level of that phase.
- * Returns -2 if the feature is not in the matrix (always available).
- */
-export function deriveMinLevel(featureId: string): number {
-  const row = DEFAULT_MATRIX[featureId]
-  if (!row) return -2
-  for (const phase of PHASES) {
-    if (row[phase.id] === true) return Math.min(...phase.levels)
-  }
-  return -2
-}
-
-/**
- * Find the earliest phase where a feature is enabled and return its label.
- * Returns undefined if the feature is always available (recovery or not in matrix).
- */
-export function deriveRequiredPhase(featureId: string): string | undefined {
-  const row = DEFAULT_MATRIX[featureId]
-  if (!row) return undefined
-  for (const phase of PHASES) {
-    if (row[phase.id] === true) {
-      // Recovery = always available, no phase label needed
-      return phase.id === 'recovery' ? undefined : phase.label
-    }
-  }
-  return undefined
-}
-
 export const WIDGET_CATALOG: WidgetDef[] = [
   {
     id: 'netto_vermogen',
@@ -85,7 +48,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'cash_flow',
@@ -94,7 +56,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'budgetten',
@@ -103,7 +64,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'uitgaven_heatmap',
@@ -112,7 +72,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'assets',
@@ -121,8 +80,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'schulden',
@@ -131,7 +88,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'holdings',
@@ -140,8 +96,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 3,
-    requiredPhase: 'Momentum',
   },
   {
     id: 'voorstellen',
@@ -150,8 +104,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'wil',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'acties',
@@ -160,7 +112,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'wil',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'doelen',
@@ -169,8 +120,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'wil',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'fire_prognose',
@@ -179,8 +128,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'full',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'monte_carlo',
@@ -189,8 +136,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'full',
-    minLevel: 3,
-    requiredPhase: 'Momentum',
   },
   {
     id: 'levensgebeurtenissen',
@@ -199,8 +144,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'spaarquote',
@@ -209,7 +152,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'vrijheidsvoortgang',
@@ -218,7 +160,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'cross',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'vaste_lasten',
@@ -227,7 +168,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'jouw_pad',
@@ -236,7 +176,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'cross',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'gezondheids_score',
@@ -245,8 +184,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'belasting_box3',
@@ -255,8 +192,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'nibud_benchmark',
@@ -265,7 +200,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'full',
-    minLevel: -2,
   },
   {
     id: 'vrijheidsscenarios',
@@ -274,8 +208,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'sim_vermogenspad',
@@ -284,8 +216,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'box3_drag',
@@ -294,8 +224,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'vrijheidsmijlpalen',
@@ -304,7 +232,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 0,
   },
   {
     id: 'backtesting_score',
@@ -313,8 +240,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 3,
-    requiredPhase: 'Momentum',
   },
   {
     id: 'surplus_gap',
@@ -323,7 +248,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'inflatie_impact',
@@ -332,7 +256,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'beleggingsrendement',
@@ -341,8 +264,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'swr_monitor',
@@ -351,8 +272,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'pensioen_aow',
@@ -361,7 +280,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'horizon',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'meldingen',
@@ -370,7 +288,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'cross',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'ai_inzicht',
@@ -379,7 +296,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'cross',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 0,
   },
   {
     id: 'volgende_stap',
@@ -388,7 +304,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'cross',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'maandoverzicht',
@@ -397,7 +312,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'cross',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'weekoverzicht',
@@ -406,7 +320,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'agenda',
@@ -415,7 +328,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'cross',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'noodfonds',
@@ -424,7 +336,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'huishouden_vergelijking',
@@ -433,7 +344,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'huishouden_activiteit',
@@ -442,7 +352,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'beslissingspatronen',
@@ -451,8 +360,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'wil',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 1,
-    requiredPhase: 'Stability',
   },
   {
     id: 'vrijheidsdagen_maand',
@@ -461,7 +368,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'wil',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'wilskracht',
@@ -470,7 +376,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'wil',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'berichten',
@@ -479,7 +384,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'cross',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'trend_inkomen',
@@ -488,7 +392,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'trend_uitgaven',
@@ -497,7 +400,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'trend_sparen',
@@ -506,7 +408,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'trend_schulden',
@@ -515,7 +416,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: -2,
   },
   {
     id: 'rebalancing',
@@ -524,8 +424,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 3,
-    requiredPhase: 'Momentum',
   },
   {
     id: 'fee_analyzer',
@@ -534,8 +432,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 3,
-    requiredPhase: 'Momentum',
   },
   {
     id: 'hypotheek_vs_beleggen',
@@ -544,8 +440,6 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
-    minLevel: 3,
-    requiredPhase: 'Momentum',
   },
 ]
 
@@ -563,56 +457,56 @@ export const DEFAULT_WIDGET_PREFS: WidgetPrefs = {
 // Where a modal can be auto-opened via URL param, include ?modal=...
 
 export const WIDGET_HREFS: Record<string, string> = {
-  netto_vermogen:           '/core',
-  cash_flow:                '/core/cash',
-  budgetten:                '/core/budgets',
-  uitgaven_heatmap:         '/core/budgets',
-  assets:                   '/core/assets',
-  schulden:                 '/core/debts',
-  holdings:                 '/core/assets',
+  netto_vermogen:           '/overzicht',
+  cash_flow:                '/overzicht/cashflow',
+  budgetten:                '/overzicht/cashflow/budget',
+  uitgaven_heatmap:         '/overzicht/cashflow/budget',
+  assets:                   '/overzicht/bezittingen',
+  schulden:                 '/overzicht/schulden',
+  holdings:                 '/overzicht/bezittingen/investment?tab=aandelen-holdings',
   voorstellen:              '/overzicht/tips',
   acties:                   '/overzicht/tips#acties',
   doelen:                   '/toekomst#doelen',
-  fire_prognose:            '/horizon',
-  monte_carlo:              '/horizon?modal=simulations',
-  levensgebeurtenissen:     '/horizon?modal=life_events',
-  spaarquote:               '/core',
-  vrijheidsvoortgang:       '/horizon',
+  fire_prognose:            '/toekomst',
+  monte_carlo:              '/toekomst?modal=simulations',
+  levensgebeurtenissen:     '/toekomst/gebeurtenissen',
+  spaarquote:               '/overzicht/cashflow/forecast',
+  vrijheidsvoortgang:       '/toekomst',
   vaste_lasten:             '/overzicht/cashflow?view=vaste-lasten',
-  jouw_pad:                 '/identity',
-  gezondheids_score:        '/horizon',
-  belasting_box3:           '/core/debts',
-  nibud_benchmark:          '/core',
-  vrijheidsscenarios:       '/horizon?modal=scenarios',
-  sim_vermogenspad:         '/horizon?modal=simulations',
-  box3_drag:                '/core/debts',
-  vrijheidsmijlpalen:       '/horizon',
-  backtesting_score:        '/horizon?modal=backtesting',
-  surplus_gap:              '/horizon#vermogensstromen',
-  swr_monitor:              '/identity/instellingen',
-  inflatie_impact:          '/identity/instellingen',
-  beleggingsrendement:      '/core/assets',
-  pensioen_aow:             '/horizon',
+  jouw_pad:                 '/mijn',
+  gezondheids_score:        '/toekomst',
+  belasting_box3:           '/overzicht/belasting/box3',
+  nibud_benchmark:          '/overzicht/cashflow/budget',
+  vrijheidsscenarios:       '/toekomst?modal=scenarios',
+  sim_vermogenspad:         '/toekomst?modal=simulations',
+  box3_drag:                '/overzicht/belasting/box3',
+  vrijheidsmijlpalen:       '/toekomst',
+  backtesting_score:        '/toekomst?modal=backtesting',
+  surplus_gap:              '/toekomst#vermogensstromen',
+  swr_monitor:              '/toekomst/voorkeuren',
+  inflatie_impact:          '/toekomst/voorkeuren',
+  beleggingsrendement:      '/overzicht/bezittingen',
+  pensioen_aow:             '/toekomst/gebeurtenissen',
   meldingen:                '/berichten',
   ai_inzicht:               '/berichten',
-  volgende_stap:            '/will',
-  maandoverzicht:           '/core',
-  weekoverzicht:            '/core/budgets',
-  agenda:                   '/core/cash',
-  noodfonds:                '/core',
-  huishouden_vergelijking:  '/core',
-  huishouden_activiteit:   '/core/cash',
-  beslissingspatronen:     '/will',
-  vrijheidsdagen_maand:    '/will',
-  wilskracht:              '/will',
+  volgende_stap:            '/overzicht/tips',
+  maandoverzicht:           '/overzicht/cashflow',
+  weekoverzicht:            '/overzicht/cashflow',
+  agenda:                   '/overzicht/cashflow',
+  noodfonds:                '/overzicht/cashflow/budget',
+  huishouden_vergelijking:  '/overzicht',
+  huishouden_activiteit:   '/overzicht/cashflow/transacties',
+  beslissingspatronen:     '/overzicht/tips',
+  vrijheidsdagen_maand:    '/overzicht/tips',
+  wilskracht:              '/overzicht/tips',
   berichten:               '/nieuws',
-  trend_inkomen:           '/core/budgets',
-  trend_uitgaven:          '/core/budgets',
-  trend_sparen:            '/core/budgets',
-  trend_schulden:          '/core/budgets',
-  rebalancing:             '/core/assets',
-  fee_analyzer:            '/core/assets',
-  hypotheek_vs_beleggen:   '/core/debts',
+  trend_inkomen:           '/overzicht/cashflow/forecast',
+  trend_uitgaven:          '/overzicht/cashflow/forecast',
+  trend_sparen:            '/overzicht/cashflow/forecast',
+  trend_schulden:          '/overzicht/cashflow/forecast',
+  rebalancing:             '/overzicht/bezittingen',
+  fee_analyzer:            '/overzicht/bezittingen',
+  hypotheek_vs_beleggen:   '/overzicht/schulden/mortgage',
 }
 
 // ── Widget → Feature mapping ─────────────────────────────────
@@ -622,16 +516,10 @@ export const WIDGET_HREFS: Record<string, string> = {
 
 export const WIDGET_FEATURE_MAP: Record<string, string> = WIDGET_TO_FEATURE
 
-// ── Sync minLevel, requiredPhase & requiredModule from matrix/registry ───────
-// Single source of truth: DEFAULT_MATRIX drives minLevel/requiredPhase; WIDGET_MODULE_MAP
-// drives requiredModule. Running this loop prevents drift between widget-catalog,
-// feature-phases, and module-registry.
+// ── Sync requiredModule from module-registry ─────────────────────────────────
+// Single source of truth: WIDGET_MODULE_MAP drives requiredModule. Running this
+// loop prevents drift between widget-catalog and module-registry.
 for (const widget of WIDGET_CATALOG) {
-  const featureId = WIDGET_FEATURE_MAP[widget.id]
-  if (featureId) {
-    widget.minLevel = deriveMinLevel(featureId)
-    widget.requiredPhase = deriveRequiredPhase(featureId)
-  }
   // Populate module gate from WIDGET_MODULE_MAP (undefined when always visible)
   widget.requiredModule = getWidgetRequiredModule(widget.id)
 }

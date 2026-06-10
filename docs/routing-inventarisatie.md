@@ -1,5 +1,7 @@
 # Routing-inventarisatie TriFinity (`fintwo`)
 
+> ⚠️ **VEROUDERD** — dit document beschrijft de oude module-indeling (Kern/Wil/Horizon/Identiteit) van vóór de IA-migratie naar **Overzicht / Toekomst / Mijn** (mei-juni 2026). De canonieke navigatiebron is nu **`lib/nav-config.ts`**; redirects van oude routes staan in `next.config.ts`. Gebruik dit document alleen als historische referentie.
+
 > Stand per **2026-05-04**. Volledige kaart van alle pagina's, modals en sub-routes per module — Kern, Wil, Horizon, Identiteit, plus globale en admin-routes. Gebaseerd op `app/(app)/**` + `app/**`.
 
 Per route: localhost-URL, omschrijving, type, terug-/sluit-navigatie, of het pad zichtbaar is (breadcrumb), en aanvullende relevante info (module-gating, query-params, app-tabs, etc.).
@@ -268,38 +270,37 @@ Eigen layout `app/(app)/horizon/doorrekening-test/layout.tsx` + `layout-client.t
 
 ## F. BEHEER (Admin-paneel, `/beheer/**`)
 
-Eigen layout `app/(app)/beheer/layout.tsx`. Alleen toegankelijk voor `profile.role === 'admin'` (gehandhaafd in pagina's, niet in middleware).
+Eigen layout `app/(app)/beheer/layout.tsx`. Alleen toegankelijk voor `profiles.role === 'superadmin'` (gehandhaafd in de layout, niet in middleware). Indeling per juni 2026 in **vier groepen** uit `lib/beheer-sections.ts` (single source of truth voor hub, groepsnav, command-palette en regressietests): Technisch beheer, Functioneel beheer, Test & ontwikkeling, Ter info.
 
-| URL                                  | Bestand                                                  | Functie                                                  |
+| URL                                  | Bestand                                                  | Groep — functie                                           |
 |--------------------------------------|----------------------------------------------------------|----------------------------------------------------------|
-| `/beheer`                            | `app/(app)/beheer/page.tsx`                              | Server-redirect → `/beheer/ai`.                           |
-| `/beheer/ai`                         | `app/(app)/beheer/ai/page.tsx`                           | AI-beheer (entry).                                        |
-| `/beheer/ai-features`                | `app/(app)/beheer/ai-features/page.tsx`                  | Per-feature AI-instellingen.                              |
-| `/beheer/aow-leeftijd`               | `app/(app)/beheer/aow-leeftijd/page.tsx`                 | AOW-leeftijd tabel.                                       |
-| `/beheer/bank-connect`               | `app/(app)/beheer/bank-connect/page.tsx`                 | Bank-koppeling debug.                                     |
-| `/beheer/blueprints`                 | `app/(app)/beheer/blueprints/page.tsx`                   | UI-blueprint-bibliotheek (10 page-type-archetypes).       |
-| `/beheer/blueprints/[type]`          | `app/(app)/beheer/blueprints/[type]/page.tsx`            | Blueprint-detail per type.                                |
-| `/beheer/briefing`                   | `app/(app)/beheer/briefing/page.tsx`                     | Briefing-engine debug.                                    |
-| `/beheer/extractie-test`             | `app/(app)/beheer/extractie-test/page.tsx`               | PDF-/extractie-test.                                       |
-| `/beheer/features`                   | `app/(app)/beheer/features/page.tsx`                     | Feature-flags.                                            |
-| `/beheer/meldingen`                  | `app/(app)/beheer/meldingen/page.tsx`                    | Meldingen-systeem.                                        |
-| `/beheer/migration`                  | `app/(app)/beheer/migration/page.tsx`                    | Datamigratie-tools.                                       |
-| `/beheer/module-guide`               | `app/(app)/beheer/module-guide/page.tsx`                 | Module-gids editor.                                       |
-| `/beheer/nieuws`                     | `app/(app)/beheer/nieuws/page.tsx`                       | Nieuws-feed beheer.                                       |
-| `/beheer/prompts`                    | `app/(app)/beheer/prompts/page.tsx`                      | AI-prompts beheer.                                        |
-| `/beheer/propositie`                 | `app/(app)/beheer/propositie/page.tsx`                   | Marketing-propositie.                                     |
-| `/beheer/regressietest`              | `app/(app)/beheer/regressietest/page.tsx`                | Regressie-test runner.                                    |
-| `/beheer/releases`                   | `app/(app)/beheer/releases/page.tsx`                     | Release-management.                                       |
-| `/beheer/roadmap`                    | `app/(app)/beheer/roadmap/page.tsx`                      | Roadmap-board.                                            |
-| `/beheer/testdata`                   | `app/(app)/beheer/testdata/page.tsx`                     | Test-data seed.                                           |
-| `/beheer/tiers`                      | `app/(app)/beheer/tiers/page.tsx`                        | Subscription-tiers.                                       |
-| `/beheer/toegang`                    | `app/(app)/beheer/toegang/page.tsx`                      | Toegangsbeheer (rollen, accounts).                        |
-| `/beheer/vragenlijsten`              | `app/(app)/beheer/vragenlijsten/page.tsx`                | Vragenlijsten-editor.                                     |
-| `/beheer/widget-presets`             | `app/(app)/beheer/widget-presets/page.tsx`               | Widget-preset-bibliotheek.                                |
-| `/beheer/widgets-test`               | `app/(app)/beheer/widgets-test/page.tsx`                 | Widget-rendering smoke-test.                              |
-| `/beheer/will-avatar`                | `app/(app)/beheer/will-avatar/page.tsx`                  | "Will"-avatar/persona instellingen.                       |
+| `/beheer`                            | `app/(app)/beheer/page.tsx`                              | Hub-startpagina met kaart-secties per groep.              |
+| `/beheer/ai`                         | `app/(app)/beheer/ai/page.tsx`                           | Technisch — AI-provider, model, API-keys.                 |
+| `/beheer/prompts`                    | `app/(app)/beheer/prompts/page.tsx`                      | Technisch — systeem-prompts (alleen-lezen).               |
+| `/beheer/ai-features`                | `app/(app)/beheer/ai-features/page.tsx`                  | Technisch — limieten voor AI-functies.                    |
+| `/beheer/bank-connect`               | `app/(app)/beheer/bank-connect/page.tsx`                 | Technisch — TrueLayer-koppeling.                          |
+| `/beheer/migration`                  | `app/(app)/beheer/migration/page.tsx`                    | Technisch — schema-status & migraties.                    |
+| `/beheer/welkom`                     | `app/(app)/beheer/welkom/page.tsx`                       | Functioneel — welkomstgids-schermen.                      |
+| `/beheer/coach`                      | `app/(app)/beheer/coach/page.tsx`                        | Functioneel — coach-suggestieregels.                      |
+| `/beheer/briefing`                   | `app/(app)/beheer/briefing/page.tsx`                     | Functioneel — briefing-redactieregels.                    |
+| `/beheer/doelen`                     | `app/(app)/beheer/doelen/page.tsx`                       | Functioneel — doelgids-stappen.                           |
+| `/beheer/nieuws`                     | `app/(app)/beheer/nieuws/page.tsx`                       | Functioneel — nieuwsbronnen & ingest.                     |
+| `/beheer/vragenlijsten`              | `app/(app)/beheer/vragenlijsten/page.tsx`                | Functioneel — vragenlijsten-editor.                       |
+| `/beheer/aow-leeftijd`               | `app/(app)/beheer/aow-leeftijd/page.tsx`                 | Functioneel — AOW-leeftijd opzoektabel.                   |
+| `/beheer/widget-presets`             | `app/(app)/beheer/widget-presets/page.tsx`               | Functioneel — dashboard-voorinstellingen.                 |
+| `/beheer/calculator-reports`         | `app/(app)/beheer/calculator-reports/page.tsx`           | Functioneel — moderatie-inbox rekenhulpen.                |
+| `/beheer/testdata`                   | `app/(app)/beheer/testdata/page.tsx`                     | Test — persona-seeding & mobile preview.                  |
+| `/beheer/regressietest`              | `app/(app)/beheer/regressietest/page.tsx`                | Test — regressie-test runner.                             |
+| `/beheer/extractie-test`             | `app/(app)/beheer/extractie-test/page.tsx`               | Test — AI-extractie testen.                               |
+| `/beheer/architectuur`               | `app/(app)/beheer/architectuur/page.tsx`                 | Ter info — interactieve ArchiMate-plaat.                  |
+| `/beheer/releases`                   | `app/(app)/beheer/releases/page.tsx`                     | Ter info — release notes.                                 |
+| `/beheer/widget-audit`               | `app/(app)/beheer/widget-audit/page.tsx`                 | Ter info — widget-reviewlog.                              |
+| `/beheer/blueprints`                 | `app/(app)/beheer/blueprints/page.tsx`                   | Ter info — UI-blueprint-bibliotheek (10 archetypes).      |
+| `/beheer/blueprints/[type]`          | `app/(app)/beheer/blueprints/[type]/page.tsx`            | Ter info — blueprint-detail per type.                     |
 
-Navigatie binnen Beheer loopt via de Beheer-layout (zijbalk/tabs); alle pagina's zijn `pagina`-type met als terugpad `/beheer` (admin-shell).
+Verwijderd (juni 2026): `/beheer/features` en `/beheer/tiers` (redirect-aliassen), `/beheer/meldingen` (deprecation-plakkaat), `/beheer/test-deferred`, `/beheer/will-avatar`, `/beheer/widgets-test`, `/beheer/propositie`, `/beheer/roadmap` en `/beheer/toegang` (feature-gating opgeruimd).
+
+Navigatie binnen Beheer: twee-niveau groepsnav (groepen boven, tools van de actieve groep eronder) op toolpagina's; `/beheer` zelf is de hub en toont geen nav.
 
 ---
 

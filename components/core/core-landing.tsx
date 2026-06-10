@@ -897,21 +897,21 @@ function KassabonGroup({
 
 /** Kleur-class op basis van pilaar-score (spec: groen >70, amber 40-70, rood <40). */
 function pillarScoreColorClass(score: number): string {
-  if (score > 70) return 'text-emerald-600'
+  if (score > 70) return 'text-positive'
   if (score >= 40) return 'text-amber-600'
-  return 'text-red-600'
+  return 'text-negative'
 }
 
 function pillarBarColorClass(score: number): string {
-  if (score > 70) return 'bg-emerald-500'
+  if (score > 70) return 'bg-positive'
   if (score >= 40) return 'bg-amber-500'
-  return 'bg-red-500'
+  return 'bg-negative'
 }
 
 function pillarScoreBgClass(score: number): string {
-  if (score > 70) return 'bg-emerald-50'
+  if (score > 70) return 'bg-positive/10'
   if (score >= 40) return 'bg-amber-50'
-  return 'bg-red-50'
+  return 'bg-negative/10'
 }
 
 function pillarScoreLabel(score: number): string {
@@ -921,9 +921,9 @@ function pillarScoreLabel(score: number): string {
 }
 
 function pillarScoreFill(score: number): string {
-  if (score > 70) return 'var(--color-positive, #10b981)'
+  if (score > 70) return 'var(--positive)'
   if (score >= 40) return 'var(--color-amber, #f59e0b)'
-  return 'var(--negative, #ef4444)'
+  return 'var(--negative)'
 }
 
 /**
@@ -1117,8 +1117,8 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
         <div className="border-t border-dashed border-[var(--border-md)] mt-2 pt-2">
           <div className="flex items-center gap-3 text-[10px]" aria-label="Pilaaroverzicht">
             {strongCount > 0 && (
-              <span className="inline-flex items-center gap-1 text-emerald-600">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
+              <span className="inline-flex items-center gap-1 text-positive">
+                <span className="w-2 h-2 rounded-full bg-positive" aria-hidden="true" />
                 {strongCount} sterk
               </span>
             )}
@@ -1129,8 +1129,8 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
               </span>
             )}
             {weakCount > 0 && (
-              <span className="inline-flex items-center gap-1 text-red-600">
-                <span className="w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
+              <span className="inline-flex items-center gap-1 text-negative">
+                <span className="w-2 h-2 rounded-full bg-negative" aria-hidden="true" />
                 {weakCount} zwak
               </span>
             )}
@@ -1245,9 +1245,9 @@ function HealthPillarCard({ pillar }: { pillar: HealthPillar }) {
       >
         {/* Achtergrond met zones */}
         <div className="h-2.5 w-full rounded-full bg-[var(--subtle)] overflow-hidden flex">
-          <div className="h-full bg-red-100" style={{ width: '40%' }} />
+          <div className="h-full bg-negative/15" style={{ width: '40%' }} />
           <div className="h-full bg-amber-50" style={{ width: '30%' }} />
-          <div className="h-full bg-emerald-50" style={{ width: '30%' }} />
+          <div className="h-full bg-positive/10" style={{ width: '30%' }} />
         </div>
         {/* Gevulde balk overlay */}
         <div

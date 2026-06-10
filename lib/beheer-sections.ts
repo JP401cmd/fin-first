@@ -1,0 +1,294 @@
+// Single source of truth voor de indeling van het beheerscherm (/beheer).
+// Geconsumeerd door: de hub-startpagina, BeheerNav, het command-palette en
+// de regressietest-suite beheer-layout. Nieuwe beheer-pagina's horen hier
+// in precies één groep te landen.
+
+import {
+  AlertOctagon,
+  BarChart3,
+  Bot,
+  CalendarClock,
+  CalendarDays,
+  ClipboardCheck,
+  ClipboardList,
+  Database,
+  FileSearch,
+  FlaskConical,
+  Goal,
+  History,
+  Inbox,
+  Landmark,
+  LayoutGrid,
+  LayoutTemplate,
+  ListChecks,
+  Mail,
+  MessageSquare,
+  MessageCircle,
+  Milestone,
+  Network,
+  Newspaper,
+  Activity,
+  ScrollText,
+  ShieldAlert,
+  SlidersHorizontal,
+  Sparkles,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
+
+export type BeheerGroupId = 'technisch' | 'functioneel' | 'test' | 'info'
+
+export interface BeheerTool {
+  label: string
+  href: string
+  description: string
+  icon: LucideIcon
+}
+
+export interface BeheerGroup {
+  id: BeheerGroupId
+  label: string
+  description: string
+  /** Actieve-tab kleur (border + tekst) voor de groepsnav. */
+  accentClass: string
+  /** Kicker-streep kleur (achtergrond) voor de hub-secties. */
+  stripeClass: string
+  tools: BeheerTool[]
+}
+
+export const BEHEER_GROUPS: BeheerGroup[] = [
+  {
+    id: 'technisch',
+    label: 'Technisch beheer',
+    description: 'Systeemconfiguratie en koppelingen — voor de technisch beheerder.',
+    accentClass: 'border-[var(--ink)] text-[var(--ink)]',
+    stripeClass: 'bg-[var(--ink)]',
+    tools: [
+      {
+        label: 'AI Instellingen',
+        href: '/beheer/ai',
+        description: 'Provider, model, API-keys en systeemprompt-override.',
+        icon: Bot,
+      },
+      {
+        label: 'Prompts',
+        href: '/beheer/prompts',
+        description: 'Alle systeem-prompts per domein, alleen-lezen.',
+        icon: ScrollText,
+      },
+      {
+        label: 'AI Features',
+        href: '/beheer/ai-features',
+        description: 'Limieten voor AI-functies, zoals nieuws-verversingen.',
+        icon: SlidersHorizontal,
+      },
+      {
+        label: 'Bank Connect',
+        href: '/beheer/bank-connect',
+        description: 'TrueLayer-koppeling: omgeving, credentials en verbindingstest.',
+        icon: Landmark,
+      },
+      {
+        label: 'Database',
+        href: '/beheer/migration',
+        description: 'Schema-status, ontbrekende tabellen en migraties.',
+        icon: Database,
+      },
+      {
+        label: 'Achtergrondtaken',
+        href: '/beheer/jobs',
+        description: 'Laatste uitvoering, status en duur van de geplande crons.',
+        icon: Activity,
+      },
+      {
+        label: 'Platform-status',
+        href: '/beheer/platform',
+        description: 'Onderhoudsmodus, aankondiging en globale kill-switches.',
+        icon: ShieldAlert,
+      },
+      {
+        label: 'Foutmeldingen',
+        href: '/beheer/errors',
+        description: 'Ongevangen client-fouten die gebruikers raakten.',
+        icon: AlertOctagon,
+      },
+      {
+        label: 'E-mail',
+        href: '/beheer/email',
+        description: 'Providerstatus en recente transactionele e-mailpogingen.',
+        icon: Mail,
+      },
+    ],
+  },
+  {
+    id: 'functioneel',
+    label: 'Functioneel beheer',
+    description: 'Inhoud, regels en autorisaties — voor de functioneel beheerder.',
+    accentClass: 'border-amber-500 text-amber-700',
+    stripeClass: 'bg-amber-500',
+    tools: [
+      {
+        label: 'Gebruikers',
+        href: '/beheer/gebruikers',
+        description: 'Zoek een gebruiker en ken AI- of Connected-abonnementen toe.',
+        icon: Users,
+      },
+      {
+        label: 'Welkomstgids',
+        href: '/beheer/welkom',
+        description: 'Schermen en stappen van de welkomstgids op het overzicht.',
+        icon: Sparkles,
+      },
+      {
+        label: 'Coach',
+        href: '/beheer/coach',
+        description: 'Suggestieregels, timing en kopregel van Will.',
+        icon: MessageCircle,
+      },
+      {
+        label: 'Briefing',
+        href: '/beheer/briefing',
+        description: 'Temporele en functionele redactieregels voor de briefing.',
+        icon: CalendarClock,
+      },
+      {
+        label: 'Doelen',
+        href: '/beheer/doelen',
+        description: 'Doelgids-stappen die Will per doel volgt.',
+        icon: Goal,
+      },
+      {
+        label: 'Nieuws',
+        href: '/beheer/nieuws',
+        description: 'Bronnen, RSS-feeds, ingest en artikelendatabase.',
+        icon: Newspaper,
+      },
+      {
+        label: 'Vragenlijsten',
+        href: '/beheer/vragenlijsten',
+        description: 'Vragenlijsten opstellen en respons bekijken.',
+        icon: ClipboardList,
+      },
+      {
+        label: 'AOW-leeftijd',
+        href: '/beheer/aow-leeftijd',
+        description: 'Opzoektabel AOW-leeftijd per geboortecohort.',
+        icon: CalendarDays,
+      },
+      {
+        label: 'Widget Presets',
+        href: '/beheer/widget-presets',
+        description: 'Dashboard-voorinstellingen samenstellen en ordenen.',
+        icon: LayoutGrid,
+      },
+      {
+        label: 'Rekenhulp-meldingen',
+        href: '/beheer/calculator-reports',
+        description: 'Moderatie-inbox voor feedback op rekenhulpen.',
+        icon: Inbox,
+      },
+      {
+        label: 'Feedback',
+        href: '/beheer/feedback',
+        description: 'Wat gebruikers insturen: bugs, ideeën en vragen.',
+        icon: MessageSquare,
+      },
+    ],
+  },
+  {
+    id: 'test',
+    label: 'Test & ontwikkeling',
+    description: 'Hulpmiddelen voor testen en ontwikkelen.',
+    accentClass: 'border-emerald-500 text-emerald-700',
+    stripeClass: 'bg-emerald-500',
+    tools: [
+      {
+        label: 'Testdata',
+        href: '/beheer/testdata',
+        description: "Persona's seeden, onboarding-reset en mobile preview.",
+        icon: FlaskConical,
+      },
+      {
+        label: 'Regressietest',
+        href: '/beheer/regressietest',
+        description: 'Regressiesuite draaien met live resultaten per module.',
+        icon: ListChecks,
+      },
+      {
+        label: 'Extractie Test',
+        href: '/beheer/extractie-test',
+        description: 'AI-extractie van vrije tekst testen zonder op te slaan.',
+        icon: FileSearch,
+      },
+      {
+        label: 'Roadmap functionaliteiten',
+        href: '/beheer/roadmap',
+        description: 'Gap-analyse uit marktonderzoek: gewenste functies per belofte-pijler.',
+        icon: Milestone,
+      },
+    ],
+  },
+  {
+    id: 'info',
+    label: 'Ter info',
+    description: 'Naslag en documentatie — alleen-lezen.',
+    accentClass: 'border-[var(--color-horizon-500)] text-[var(--color-horizon-700)]',
+    stripeClass: 'bg-[var(--color-horizon-500)]',
+    tools: [
+      {
+        label: 'Kerngetallen',
+        href: '/beheer/kpi',
+        description: 'Platform-KPI’s: gebruikers, tiers, verbruik en fouten deze maand.',
+        icon: BarChart3,
+      },
+      {
+        label: 'Architectuur',
+        href: '/beheer/architectuur',
+        description: 'Interactieve ArchiMate-plaat van de applicatie.',
+        icon: Network,
+      },
+      {
+        label: 'Audit-trail',
+        href: '/beheer/audit',
+        description: 'Logboek van beheeracties: abonnement, rol, blokkade, config.',
+        icon: ScrollText,
+      },
+      {
+        label: 'Release Notes',
+        href: '/beheer/releases',
+        description: 'Wat er per versie veranderd is.',
+        icon: History,
+      },
+      {
+        label: 'Widget Audit',
+        href: '/beheer/widget-audit',
+        description: 'Reviewlog en classificatie van alle widgets.',
+        icon: ClipboardCheck,
+      },
+      {
+        label: 'Blueprints',
+        href: '/beheer/blueprints',
+        description: 'Tien pagina-archetypen als ontwerpreferentie.',
+        icon: LayoutTemplate,
+      },
+    ],
+  },
+]
+
+/**
+ * Boundary-veilige match: exact pad of een subpad met '/'-grens.
+ * Voorkomt dat '/beheer/ai' ook '/beheer/ai-features' claimt, terwijl
+ * '/beheer/blueprints/[type]' wél onder Blueprints valt.
+ */
+export function isBeheerToolActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+/** De groep waar het huidige pad onder valt, of null (bv. op /beheer zelf). */
+export function findBeheerGroup(pathname: string): BeheerGroup | null {
+  return (
+    BEHEER_GROUPS.find((group) =>
+      group.tools.some((tool) => isBeheerToolActive(pathname, tool.href)),
+    ) ?? null
+  )
+}

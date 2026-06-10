@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { recordAiUsage } from '@/lib/ai-credits'
 import { streamText } from 'ai'
 import { getModel } from '@/lib/ai/config'
 import { buildBriefingSystemPrompt, briefingTools } from '@/lib/ai/dna/briefing'
@@ -288,6 +289,7 @@ export async function POST(request: Request) {
         state.complete = true
         state.composedAt = new Date().toISOString()
         state.completedAt = Date.now()
+        await recordAiUsage(supabase, user.id, 'briefing')
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'AI compositie mislukt'
         console.error('[briefing/compose] Background composition failed:', err)

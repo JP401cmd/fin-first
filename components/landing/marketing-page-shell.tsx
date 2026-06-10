@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import { Header } from '@/components/landing/header'
 import { Footer } from '@/components/landing/footer'
 
@@ -48,9 +49,96 @@ export function MarketingPageShell({
 }
 
 /**
+ * MarketingWideShell — chrome voor de brede marketing-pagina's (home,
+ * /functies, /prijzen, /veiligheid): skip-link + Header + volle-breedte
+ * <main id="main-content"> + Footer (incl. SlotCta). Secties bepalen
+ * zelf hun max-width, net als op de oorspronkelijke landing.
+ */
+export function MarketingWideShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="bg-[var(--bg)] text-[var(--ink)]">
+      {/* Skip-link — eerste tab-stop voor keyboard- en screen-reader-gebruikers
+          (WCAG 2.1 Bypass Blocks). sr-only verbergt visueel; focus:not-sr-only
+          maakt zichtbaar bij focus. Target = #main-content op <main>. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-[var(--paper)] focus:px-4 focus:py-2 focus:border-2 focus:border-[var(--ink)] focus:text-sm focus:font-medium focus:text-[var(--ink)] focus:no-underline"
+      >
+        Naar inhoud
+      </a>
+      <Header />
+      <main id="main-content">{children}</main>
+      <Footer />
+    </div>
+  )
+}
+
+/**
+ * MarketingPageHero — redactionele pagina-kop voor de sub-pagina's van de
+ * marketing-site (/functies, /prijzen, /veiligheid). Gecentreerd, met
+ * ruime top-padding zodat de vaste Header niet overlapt, en standaard de
+ * primaire "Begin gratis"-conversie onder de intro.
+ */
+export function MarketingPageHero({
+  kicker,
+  title,
+  italics,
+  intro,
+  ctaLabel = 'Begin gratis',
+  ctaHref = '/signup',
+  showCta = true,
+}: {
+  kicker: string
+  title: string
+  italics?: string
+  intro?: string
+  ctaLabel?: string
+  ctaHref?: string
+  /** Uit te zetten op pagina's waar de content zelf de CTA is (bv. /prijzen-tiers). */
+  showCta?: boolean
+}) {
+  return (
+    <section className="px-6 pt-32 pb-4 text-center md:px-12 md:pt-40">
+      <div className="mx-auto max-w-3xl">
+        <p className="mb-4 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
+          {kicker}
+        </p>
+        <h1 className="font-display text-[2.4rem] font-bold leading-[1.08] tracking-[-0.02em] text-[var(--ink)] md:text-[3.2rem]">
+          {title}
+          {italics && (
+            <>
+              {' '}
+              <em className="italic text-kern-600">{italics}</em>
+            </>
+          )}
+        </h1>
+        {intro && (
+          <p className="mx-auto mt-5 max-w-2xl font-serif text-lg leading-relaxed text-[var(--ink-2)]">
+            {intro}
+          </p>
+        )}
+        {showCta && (
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <Link
+              href={ctaHref}
+              className="inline-flex items-center justify-center rounded-[var(--r)] bg-[var(--ink)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--bg)] transition-all hover:bg-[var(--ink-2)] hover:shadow-[var(--s1)]"
+            >
+              {ctaLabel}
+            </Link>
+            <p className="font-sans text-xs text-[var(--ink-3)]">
+              Klaar in ±5 minuten · geen creditcard nodig
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+/**
  * Section — redactionele sectie met optionele h2-kop. De info-pagina's
- * gebruiken deze om de prose-stijl van components/landing/features.tsx te
- * spiegelen (font-display kop, font-serif body in var(--ink-2)).
+ * gebruiken deze om de prose-stijl van de marketing-secties te spiegelen
+ * (font-display kop, font-serif body in var(--ink-2)).
  */
 export function MarketingSection({
   heading,

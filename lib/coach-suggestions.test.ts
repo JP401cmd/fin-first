@@ -61,7 +61,7 @@ describe('coach catalog', () => {
 
 describe('getFirstUndismissedSuggestion priority', () => {
   it('deferred wins over data gap', () => {
-    const s = getFirstUndismissedSuggestion(empty(), '/will', none, ['assets'])
+    const s = getFirstUndismissedSuggestion(empty(), '/overzicht', none, ['assets'])
     expect(s?.key).toBe('deferred_assets')
   })
 
@@ -126,7 +126,7 @@ describe('module-gated data gaps (absorbed nudges)', () => {
 describe('overrides + dismiss', () => {
   it('applies message/cta override', () => {
     const ov: CoachOverrides = { gap_bank: { message: 'X', cta: 'Y' } }
-    const s = getFirstUndismissedSuggestion(empty(), '/will', none, [], ov)
+    const s = getFirstUndismissedSuggestion(empty(), '/overzicht', none, [], ov)
     expect(s?.message).toBe('X')
     expect(s?.cta).toBe('Y')
   })
@@ -136,12 +136,12 @@ describe('overrides + dismiss', () => {
     // Alleen bank + assets open; nieuwe gaps satisfied zodat gap_assets de
     // eerstvolgende open gap blijft.
     const gaps: CoachDataGaps = { ...full(), hasBank: false, hasAssets: false }
-    expect(getFirstUndismissedSuggestion(gaps, '/will', none, [], ov)?.key).toBe('gap_assets')
+    expect(getFirstUndismissedSuggestion(gaps, '/overzicht', none, [], ov)?.key).toBe('gap_assets')
   })
 
   it('skips dismissed rule', () => {
     const gaps: CoachDataGaps = { ...full(), hasBank: false, hasAssets: false }
-    expect(getFirstUndismissedSuggestion(gaps, '/will', new Set(['gap_bank']), [])?.key).toBe('gap_assets')
+    expect(getFirstUndismissedSuggestion(gaps, '/overzicht', new Set(['gap_bank']), [])?.key).toBe('gap_assets')
   })
 
   it('returns null when everything is exhausted', () => {

@@ -49,8 +49,8 @@ export default function TestBriefingHistoryPage() {
           <p className="text-green-600 font-medium">
             {TEST_BRIEFINGS.length} test briefings seeded to localStorage!
           </p>
-          <a href="/will" className="mt-4 inline-block text-blue-600 underline">
-            Ga naar /will om de geschiedenis te bekijken
+          <a href="/overzicht" className="mt-4 inline-block text-blue-600 underline">
+            Ga naar /overzicht om de geschiedenis te bekijken
           </a>
         </div>
       ) : (

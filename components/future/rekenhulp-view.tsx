@@ -711,7 +711,7 @@ function SavedCalculatorCard({
                 type="button"
                 role="menuitem"
                 onClick={onDelete}
-                className="w-full inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 text-left"
+                className="w-full inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-negative hover:bg-negative/10 text-left"
               >
                 <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                 Verwijderen

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 /**
  * Household invite redirect page.
  * This is the landing page for email invitation links.
- * It extracts the token from the URL and redirects to /identity?invite_token=xxx
+ * It extracts the token from the URL and redirects to /mijn/profiel?invite_token=xxx
  * The proxy will handle redirecting to login if not authenticated.
  */
 function HouseholdInviteContent() {
@@ -16,9 +16,9 @@ function HouseholdInviteContent() {
 
   useEffect(() => {
     if (token) {
-      router.replace(`/identity?invite_token=${token}`)
+      router.replace(`/mijn/profiel?invite_token=${token}`)
     } else {
-      router.replace('/identity')
+      router.replace('/mijn/profiel')
     }
   }, [token, router])
 

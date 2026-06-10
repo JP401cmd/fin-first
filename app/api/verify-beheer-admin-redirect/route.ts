@@ -38,20 +38,20 @@ export async function GET() {
       : 'ERROR: isSuperAdmin check not found in beheer layout',
   })
 
-  // Test 3: Non-admin redirect to /will
-  const hasRedirectToWill = beheerLayoutSrc.includes("!isAdmin") && beheerLayoutSrc.includes("redirect('/will')")
+  // Test 3: Non-admin redirect to /overzicht
+  const hasRedirectToOverzicht = beheerLayoutSrc.includes("!isAdmin") && beheerLayoutSrc.includes("redirect('/overzicht')")
   results.push({
-    test: 'Non-admin users are redirected to /will',
-    pass: hasRedirectToWill,
-    detail: hasRedirectToWill
-      ? "Layout checks if (!isAdmin) { redirect('/will') } — server-side redirect"
+    test: 'Non-admin users are redirected to /overzicht',
+    pass: hasRedirectToOverzicht,
+    detail: hasRedirectToOverzicht
+      ? "Layout checks if (!isAdmin) { redirect('/overzicht') } — server-side redirect"
       : 'ERROR: No redirect for non-admin users found',
   })
 
   // Test 4: Redirect happens before any JSX render (server-side, no flash)
   // The redirect() call is inside the async server component, before the return statement
   const redirectBeforeReturn = (() => {
-    const redirectIdx = beheerLayoutSrc.indexOf("redirect('/will')")
+    const redirectIdx = beheerLayoutSrc.indexOf("redirect('/overzicht')")
     const returnIdx = beheerLayoutSrc.indexOf('return (')
     return redirectIdx > -1 && returnIdx > -1 && redirectIdx < returnIdx
   })()
@@ -59,7 +59,7 @@ export async function GET() {
     test: 'Redirect executes before any JSX return (no admin content flash)',
     pass: redirectBeforeReturn,
     detail: redirectBeforeReturn
-      ? "redirect('/will') call appears before return ( JSX — no content briefly visible"
+      ? "redirect('/overzicht') call appears before return ( JSX — no content briefly visible"
       : 'ERROR: Redirect may occur after JSX begins rendering',
   })
 

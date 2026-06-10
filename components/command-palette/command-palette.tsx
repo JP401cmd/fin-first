@@ -130,7 +130,7 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
   const allPages = useMemo(() => {
     const pages = getAllPageItems()
     const filtered = filterPagesByModules(pages, activeModules)
-    if (role === 'admin') {
+    if (role === 'superadmin') {
       return [...filtered, ...getAdminPageItems()]
     }
     return filtered

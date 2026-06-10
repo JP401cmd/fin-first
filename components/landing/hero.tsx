@@ -1,5 +1,100 @@
 import Link from 'next/link'
 
+/**
+ * Hero van de marketing-home. Draagt de merkbelofte als kop — "De
+ * vrijheid om met inzicht en grip keuzes te maken voor nu en de
+ * toekomst" — waarvan de vier kernwoorden de pijler-secties eronder
+ * ankeren. Rechts de VrijheidsPadKaart: een illustratieve projectie
+ * die laat zien dat jouw keuzes het vrijheidsmoment verschuiven.
+ */
+
+// ── Vrijheidspad — illustratieve projectie-grafiek ───────────────────
+
+function VrijheidsPadKaart() {
+  return (
+    <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s1)]">
+      {/* Card header — krantenrubriek */}
+      <div className="flex items-center justify-between border-b-2 border-[var(--ink)] px-5 py-3">
+        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
+          Jouw pad naar vrijheid
+        </p>
+        <span className="font-mono text-[10px] text-[var(--ink-4)]">illustratief</span>
+      </div>
+
+      {/* Projectie-grafiek */}
+      <div className="px-5 pb-1 pt-4">
+        <svg
+          viewBox="0 0 320 200"
+          className="w-full"
+          role="img"
+          aria-label="Voorbeeldprojectie: je vermogen groeit tot het doelvermogen en je bent vrij vanaf je 51e; met vijf procent extra spaarquote verschuift dat moment naar je 48e."
+        >
+          {/* Doelvermogen-lijn: hier ben je vrij */}
+          <line x1="16" y1="48" x2="304" y2="48" stroke="var(--border-md)" strokeDasharray="2 4" />
+          <text x="16" y="38" fontSize="9" fill="var(--ink-4)" className="font-sans uppercase" letterSpacing="0.08em">
+            Doelvermogen — genoeg om vrij te zijn
+          </text>
+
+          {/* Vlak onder het basispad */}
+          <path
+            d="M 20 160 C 110 150, 190 112, 284 48 L 284 168 L 20 168 Z"
+            fill="var(--color-kern-100)"
+            opacity="0.45"
+          />
+
+          {/* Versneld pad — keuzes schuiven het moment naar voren */}
+          <path
+            d="M 20 160 C 96 146, 156 96, 232 48"
+            fill="none"
+            stroke="var(--color-horizon-600)"
+            strokeWidth="2"
+            strokeDasharray="5 4"
+          />
+
+          {/* Basispad */}
+          <path
+            d="M 20 160 C 110 150, 190 112, 284 48"
+            fill="none"
+            stroke="var(--ink)"
+            strokeWidth="2.25"
+          />
+
+          {/* Moment-markers op de tijdas */}
+          <line x1="232" y1="48" x2="232" y2="168" stroke="var(--color-horizon-300)" strokeDasharray="2 3" />
+          <line x1="284" y1="48" x2="284" y2="168" stroke="var(--border-ed)" strokeDasharray="2 3" />
+          <circle cx="232" cy="48" r="4.5" fill="var(--paper)" stroke="var(--color-horizon-600)" strokeWidth="2" />
+          <circle cx="284" cy="48" r="4.5" fill="var(--ink)" />
+
+          {/* Tijdas */}
+          <line x1="16" y1="168" x2="304" y2="168" stroke="var(--border-md)" />
+          <text x="20" y="184" fontSize="9" fill="var(--ink-3)" className="font-mono">nu</text>
+          <text x="232" y="184" fontSize="9" fill="var(--color-horizon-700)" textAnchor="middle" className="font-mono">48e</text>
+          <text x="284" y="184" fontSize="9" fill="var(--ink-2)" textAnchor="middle" className="font-mono">51e</text>
+        </svg>
+      </div>
+
+      {/* Legenda */}
+      <div className="space-y-1.5 px-5 pb-4">
+        <p className="flex items-center gap-2 font-sans text-[11px] text-[var(--ink-2)]">
+          <span aria-hidden="true" className="inline-block h-0.5 w-5 shrink-0 bg-[var(--ink)]" />
+          Jouw pad — vrij vanaf je <strong className="font-semibold">51e</strong>
+        </p>
+        <p className="flex items-center gap-2 font-sans text-[11px] text-[var(--ink-2)]">
+          <span aria-hidden="true" className="inline-block w-5 shrink-0 border-t-2 border-dashed border-horizon-600" />
+          Met 5% extra spaarquote — vrij vanaf je <strong className="font-semibold text-horizon-700">48e</strong>
+        </p>
+      </div>
+
+      {/* Card footer */}
+      <div className="bg-[var(--subtle)] px-5 py-3">
+        <p className="text-center font-sans text-[10px] italic text-[var(--ink-4)]">
+          Voorbeeldprojectie — jouw eigen pad staat er in ±5 minuten
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export function Hero() {
   return (
     <section className="relative min-h-screen bg-[var(--bg)] px-6 pt-32 pb-28 md:px-12 md:pt-40">
@@ -14,30 +109,27 @@ export function Hero() {
         </p>
       </div>
 
-      {/* Hoofdgrid: tekst (3/5) + metrics card (2/5) */}
+      {/* Hoofdgrid: tekst (3/5) + vrijheidspad (2/5) */}
       <div className="mx-auto max-w-6xl grid grid-cols-1 items-start gap-14 md:grid-cols-5 md:gap-10">
 
-        {/* Linkerkolom — redactionele tekst */}
+        {/* Linkerkolom — de belofte */}
         <div className="md:col-span-3">
           <p className="mb-5 font-serif italic text-base text-kern-600 leading-relaxed">
             &ldquo;Geld is opgeslagen tijd&rdquo;
           </p>
 
-          <h1 className="mb-6 font-display text-[2.6rem] font-bold leading-[1.05] tracking-[-0.03em] text-[var(--ink)] sm:text-[3.2rem] md:text-[3.8rem] lg:text-[4.2rem]">
-            Grip op vandaag,
-            <br />
-            <span className="text-kern-600">vrijheid voor morgen.</span>
+          <h1 className="mb-6 font-display text-[2rem] font-bold leading-[1.15] tracking-[-0.02em] text-[var(--ink)] sm:text-[2.4rem] md:text-[2.7rem] lg:text-[3.1rem]">
+            De vrijheid om met{' '}
+            <em className="italic text-kern-600">inzicht</em> en{' '}
+            <em className="italic text-kern-600">grip</em> keuzes te maken
+            voor <em className="italic text-kern-600">nu</em> en{' '}
+            <em className="italic text-kern-600">de toekomst</em>.
           </h1>
 
           <p className="mb-8 max-w-[520px] font-serif text-lg leading-relaxed text-[var(--ink-2)]">
-            De vrijheid om met{' '}
-            <strong className="font-semibold text-[var(--ink)]">inzicht</strong>{' '}
-            en{' '}
-            <strong className="font-semibold text-[var(--ink)]">grip</strong>{' '}
-            keuzes te maken voor{' '}
-            <strong className="font-semibold text-[var(--ink)]">nu</strong>{' '}
-            en{' '}
-            <strong className="font-semibold text-[var(--ink)]">de toekomst</strong>.
+            TriFinity vertaalt je geld naar vrijheid in jaren, maanden en
+            dagen — en laat zien hoe jouw keuzes het moment van financiële
+            vrijheid dichterbij brengen.
           </p>
 
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -47,13 +139,13 @@ export function Hero() {
             >
               Begin gratis
             </Link>
-            <a
-              href="#modules"
+            <Link
+              href="/functies"
               className="inline-flex items-center justify-center gap-2 rounded-[var(--r)] border border-[var(--border-md)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--ink-2)] transition-all hover:border-[var(--ink-3)] hover:shadow-[var(--s0)]"
             >
               Ontdek hoe het werkt
-              <span className="text-[var(--ink-4)]">↓</span>
-            </a>
+              <span className="text-[var(--ink-4)]">→</span>
+            </Link>
           </div>
 
           <p className="mb-12 font-sans text-xs text-[var(--ink-3)]">Klaar in ±5 minuten · geen creditcard nodig</p>
@@ -78,80 +170,9 @@ export function Hero() {
           </div>
         </div>
 
-        {/* Rechterkolom — mock vrijheidsprofiel card */}
+        {/* Rechterkolom — vrijheidspad-projectie */}
         <div className="md:col-span-2">
-          <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s1)]">
-
-            {/* Card header — krantenrubriek */}
-            <div className="flex items-center justify-between border-b-2 border-[var(--ink)] px-5 py-3">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
-                Jouw vrijheidsprofiel
-              </p>
-              <span className="font-mono text-[10px] text-[var(--ink-4)]">vandaag</span>
-            </div>
-
-            {/* Hoofdmetric */}
-            <div className="border-b border-dashed border-[var(--border-ed)] px-5 py-6">
-              <p className="mb-1 font-sans text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
-                Netto vrijheidskapitaal
-              </p>
-              <p className="font-display text-[2.8rem] font-bold leading-none tabular-nums text-[var(--ink)]">
-                14{' '}
-                <span className="text-[1.3rem] font-normal text-[var(--ink-3)]">jr</span>{' '}
-                3{' '}
-                <span className="text-[1.3rem] font-normal text-[var(--ink-3)]">mnd</span>
-              </p>
-              <p className="mt-1 font-serif italic text-sm text-[var(--ink-3)]">
-                als je morgen stopt met werken
-              </p>
-            </div>
-
-            {/* Sub-metrics grid */}
-            <div className="grid grid-cols-2 divide-x divide-[var(--border-ed)]">
-              <div className="border-b border-dashed border-[var(--border-ed)] px-4 py-4">
-                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
-                  Maandelijkse vrijheid
-                </p>
-                <p className="font-mono text-lg font-bold text-kern-600 tabular-nums">
-                  23{' '}
-                  <span className="text-sm font-normal text-[var(--ink-3)]">dgn</span>
-                </p>
-              </div>
-              <div className="border-b border-dashed border-[var(--border-ed)] px-4 py-4">
-                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
-                  FIRE-datum
-                </p>
-                <p className="font-mono text-lg font-bold tabular-nums text-horizon-600">
-                  51e{' '}
-                  <span className="text-sm font-normal text-[var(--ink-3)]">jaar</span>
-                </p>
-              </div>
-              <div className="px-4 py-4">
-                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
-                  Spaarquote
-                </p>
-                <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-                  34<span className="text-sm font-normal text-[var(--ink-3)]">%</span>
-                </p>
-              </div>
-              <div className="px-4 py-4">
-                <p className="mb-1 font-sans text-[9px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
-                  Vrijheidsgroei
-                </p>
-                <p className="font-mono text-lg font-bold tabular-nums text-[var(--ink)]">
-                  +8{' '}
-                  <span className="text-sm font-normal text-[var(--ink-3)]">dgn/mnd</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Card footer */}
-            <div className="bg-[var(--subtle)] px-5 py-3">
-              <p className="text-center font-sans text-[10px] italic text-[var(--ink-4)]">
-                Voorbeeldprofiel — klaar in ±5 minuten na je eerste setup
-              </p>
-            </div>
-          </div>
+          <VrijheidsPadKaart />
         </div>
       </div>
 

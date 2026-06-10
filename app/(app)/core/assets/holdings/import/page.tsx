@@ -86,9 +86,9 @@ function typeLabel(type: ParsedHoldingRow['type']): string {
 function typeColor(type: ParsedHoldingRow['type']): string {
   switch (type) {
     case 'buy':
-      return 'text-emerald-600'
+      return 'text-positive'
     case 'sell':
-      return 'text-red-600'
+      return 'text-negative'
     case 'dividend':
       return 'text-blue-600'
     case 'position':
@@ -491,12 +491,12 @@ export default function HoldingsImportPage() {
 
       {/* Global error banner */}
       {error && (
-        <div className="mb-6 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="mb-6 flex items-start gap-2 rounded-lg border border-negative/30 bg-negative/10 p-3 text-sm text-negative">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
           <button
             onClick={() => setError('')}
-            className="ml-auto shrink-0 text-red-400 hover:text-red-600"
+            className="ml-auto shrink-0 text-negative/70 hover:text-negative"
           >
             <X className="h-4 w-4" />
           </button>
@@ -831,8 +831,8 @@ export default function HoldingsImportPage() {
       {step === 3 && importSummary && (
         <div className="space-y-6">
           {/* Success card */}
-          <div className="flex flex-col items-center rounded-lg border border-emerald-200 bg-emerald-50 p-8 text-center">
-            <CheckCircle className="mb-3 h-12 w-12 text-emerald-600" />
+          <div className="flex flex-col items-center rounded-lg border border-positive/30 bg-positive/10 p-8 text-center">
+            <CheckCircle className="mb-3 h-12 w-12 text-positive" />
             <h2 className="text-xl font-bold text-[var(--ink)]">
               Import geslaagd
             </h2>

@@ -20,18 +20,29 @@ interface GlobalSyncButtonProps {
   onOpenReport: () => void
 }
 
+const NL_MONTH_ABBR = [
+  'jan', 'feb', 'mrt', 'apr', 'mei', 'jun',
+  'jul', 'aug', 'sep', 'okt', 'nov', 'dec',
+]
+
+// Krant-stijl tijdnotatie (zie FreshnessLabel): HH:mm vandaag, d MMM dit
+// jaar, d MMM yyyy ouder — geen relatieve tijden ("2 uur geleden").
 function formatRelative(iso: string | null): string {
   if (!iso) return 'Nog niet gesynchroniseerd'
-  const ts = new Date(iso).getTime()
-  if (!Number.isFinite(ts)) return 'Onbekend'
-  const diffMs = Date.now() - ts
-  if (diffMs < 60_000) return 'zojuist gesynchroniseerd'
-  const minutes = Math.floor(diffMs / 60_000)
-  if (minutes < 60) return `${minutes} min geleden`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} uur geleden`
-  const days = Math.floor(hours / 24)
-  return `${days} dag${days === 1 ? '' : 'en'} geleden`
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return 'Onbekend'
+  const now = new Date()
+  if (now.getTime() - d.getTime() < 60_000) return 'zojuist gesynchroniseerd'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const isSameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  if (isSameDay) return `laatste sync ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  if (d.getFullYear() === now.getFullYear()) {
+    return `laatste sync ${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]}`
+  }
+  return `laatste sync ${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`
 }
 
 export function GlobalSyncButton({ onOpenReport }: GlobalSyncButtonProps) {

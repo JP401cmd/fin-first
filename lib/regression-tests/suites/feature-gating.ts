@@ -1,6 +1,8 @@
-// ── Feature Gating & Sovereignty Levels Regression Tests ────────────────────
-// Tests for the feature-gating system: sovereignty levels, phase requirements,
-// widget min-levels, feature registry, and admin overrides.
+// ── Feature Gating Regression Tests ──────────────────────────────────────────
+// Tests for the feature-gating system: abonnement-gating (harde lock),
+// user-toggles (default aan) en de feature registry. Sovereignty levels zijn
+// puur motivatie-weergave en sturen geen toegang — zie sovereignty-levels.ts
+// voor de level-berekening zelf.
 
 import { registerCategory, registerTests } from '../test-registry'
 import type { TestCase } from '../test-types'
@@ -9,39 +11,26 @@ import {
   assertEqual,
   assertNotNull,
   assertGreaterThanOrEqual,
-  assertLessThanOrEqual,
   assertIncludes,
-  assertDefined,
 } from '../assert'
 import {
   computeFeatureAccess,
   isFeatureAccessible,
   getFeatureAccess,
   type FinancialInput,
-  type FeatureAccessMap,
 } from '@/lib/compute-feature-access'
 import {
   UNIFIED_FEATURES,
   LEGACY_FEATURE_MAP,
   WIDGET_TO_FEATURE,
   hasSubscription,
-  isPhaseSufficient,
-  phaseIndex,
-  type PhaseId,
 } from '@/lib/feature-registry'
 import {
   computeSovereigntyLevel,
   levelToPhaseId,
   PHASES,
   FEATURES,
-  DEFAULT_MATRIX,
 } from '@/lib/feature-phases'
-import {
-  WIDGET_CATALOG,
-  deriveMinLevel,
-  deriveRequiredPhase,
-  WIDGET_FEATURE_MAP,
-} from '@/lib/widget-catalog'
 
 const CAT = 'identiteit.feature-gating'
 
@@ -58,161 +47,43 @@ function makeInput(overrides: Partial<FinancialInput> = {}): FinancialInput {
       { amount: -1000, is_income: false },
     ],
     activeSubscriptions: ['gratis'],
-    matrixJson: null,
     userFeaturePrefs: null,
     ...overrides,
-  }
-}
-
-/** Build input that produces a specific sovereignty level */
-function makeInputForLevel(targetLevel: number): FinancialInput {
-  // monthlyExpenses = 4500/3 = 1500, yearlyExpenses = 18000
-  const base = {
-    transactions: [
-      { amount: -2000, is_income: false },
-      { amount: -1500, is_income: false },
-      { amount: -1000, is_income: false },
-    ],
-    activeSubscriptions: ['gratis'] as string[],
-    matrixJson: null,
-    userFeaturePrefs: null,
-  }
-
-  switch (targetLevel) {
-    case -2: // Time Deficit: negative net worth + consumer debt
-      return { ...base, assets: [{ current_value: 0 }], debts: [{ current_balance: 50000, debt_type: 'credit_card' }] }
-    case -1: // Negative net worth, no consumer debt
-      return { ...base, assets: [{ current_value: 0 }], debts: [{ current_balance: 50000, debt_type: 'mortgage' }] }
-    case 0: // Net worth ~0, less than 1 month covered
-      return { ...base, assets: [{ current_value: 500 }], debts: [] }
-    case 1: // 1-3 months covered
-      return { ...base, assets: [{ current_value: 2000 }], debts: [] }
-    case 2: // 3-6 months covered
-      return { ...base, assets: [{ current_value: 5000 }], debts: [] }
-    case 3: // Freedom 10-25%
-      return { ...base, assets: [{ current_value: 70000 }], debts: [] }
-    case 4: // Freedom 25-75%
-      return { ...base, assets: [{ current_value: 200000 }], debts: [] }
-    case 5: // Freedom 75-100%
-      return { ...base, assets: [{ current_value: 400000 }], debts: [] }
-    case 6: // Full independence (freedom >= 100%)
-      return { ...base, assets: [{ current_value: 600000 }], debts: [] }
-    default:
-      return { ...base, assets: [{ current_value: 0 }], debts: [] }
   }
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 const tests: TestCase[] = [
-  // ── Step 1: computeFeatureAccess per sovereignty level ────────────────────
+  // ── Step 1: Default toegang — alle gratis features staan aan ──────────────
 
   {
-    id: `${CAT}-recovery-gating`,
-    name: 'computeFeatureAccess: Recovery fase (level -2..0) — alleen recovery features beschikbaar',
+    id: `${CAT}-default-access`,
+    name: 'computeFeatureAccess: gratis features standaard toegankelijk, ongeacht fase',
     category: CAT,
-    description: 'In recovery fase zijn alleen features met defaultPhase=recovery ontgrendeld',
+    description: 'Zonder user-toggles zijn alle gratis features aan; sovereignty-fase heeft geen invloed',
     priority: 'critical',
     estimatedDurationMs: 50,
     fn() {
-      const input = makeInputForLevel(-2) // Recovery level -2
-      const result = computeFeatureAccess(input)
-      assertEqual(result.phase, 'recovery', 'phase')
-      assert(result.level <= 0, 'level should be <= 0 for recovery')
+      // Recovery-gebruiker (negatief vermogen + consumptieve schuld)
+      const recoveryResult = computeFeatureAccess(makeInput({
+        assets: [{ current_value: 0 }],
+        debts: [{ current_balance: 50000, debt_type: 'credit_card' }],
+      }))
+      assertEqual(recoveryResult.phase, 'recovery', 'phase')
 
-      // Recovery-phase features should be accessible
-      const recoveryFeatures = UNIFIED_FEATURES.filter(f => f.defaultPhase === 'recovery' && f.requiredTier === 'gratis')
-      for (const feat of recoveryFeatures) {
-        const access = result.features[feat.id]
-        assertNotNull(access, `feature ${feat.id}`)
-        assert(access.accessible, `${feat.id} should be accessible in recovery`)
-      }
+      // Mastery-gebruiker
+      const masteryResult = computeFeatureAccess(makeInput({
+        assets: [{ current_value: 600000 }],
+      }))
+      assertEqual(masteryResult.phase, 'mastery', 'phase')
 
-      // Stability+ features should NOT be accessible (default)
-      const stabilityFeatures = UNIFIED_FEATURES.filter(f => f.defaultPhase === 'stability' && f.requiredTier === 'gratis')
-      for (const feat of stabilityFeatures) {
-        const access = result.features[feat.id]
-        assertNotNull(access, `feature ${feat.id}`)
-        assert(!access.defaultEnabled, `${feat.id} should not be default-enabled in recovery`)
-      }
-    },
-  },
-
-  {
-    id: `${CAT}-stability-gating`,
-    name: 'computeFeatureAccess: Stability fase (level 1-2) — stability features ontgrendeld',
-    category: CAT,
-    description: 'In stability fase worden stability + recovery features ontgrendeld',
-    priority: 'critical',
-    estimatedDurationMs: 50,
-    fn() {
-      const input = makeInputForLevel(2) // Stability level 2
-      const result = computeFeatureAccess(input)
-      assertEqual(result.phase, 'stability', 'phase')
-
-      // Recovery + stability features should be accessible
-      const allowedPhases: PhaseId[] = ['recovery', 'stability']
-      const accessibleFeatures = UNIFIED_FEATURES.filter(
-        f => allowedPhases.includes(f.defaultPhase) && f.requiredTier === 'gratis'
-      )
-      for (const feat of accessibleFeatures) {
-        assert(result.features[feat.id]?.accessible === true, `${feat.id} should be accessible in stability`)
-      }
-
-      // Momentum features should NOT be accessible
-      const momentumFeatures = UNIFIED_FEATURES.filter(f => f.defaultPhase === 'momentum' && f.requiredTier === 'gratis')
-      for (const feat of momentumFeatures) {
-        assert(!result.features[feat.id]?.defaultEnabled, `${feat.id} should not be default-enabled in stability`)
-      }
-    },
-  },
-
-  {
-    id: `${CAT}-momentum-gating`,
-    name: 'computeFeatureAccess: Momentum fase (level 3-4) — momentum features ontgrendeld',
-    category: CAT,
-    description: 'In momentum fase worden recovery + stability + momentum features ontgrendeld',
-    priority: 'critical',
-    estimatedDurationMs: 50,
-    fn() {
-      const input = makeInputForLevel(3) // Momentum level 3
-      const result = computeFeatureAccess(input)
-      assertEqual(result.phase, 'momentum', 'phase')
-
-      // Recovery + stability + momentum features should be accessible
-      const allowedPhases: PhaseId[] = ['recovery', 'stability', 'momentum']
-      const accessibleFeatures = UNIFIED_FEATURES.filter(
-        f => allowedPhases.includes(f.defaultPhase) && f.requiredTier === 'gratis'
-      )
-      for (const feat of accessibleFeatures) {
-        assert(result.features[feat.id]?.accessible === true, `${feat.id} should be accessible in momentum`)
-      }
-
-      // Mastery features should NOT be accessible
-      const masteryFeatures = UNIFIED_FEATURES.filter(f => f.defaultPhase === 'mastery' && f.requiredTier === 'gratis')
-      for (const feat of masteryFeatures) {
-        assert(!result.features[feat.id]?.defaultEnabled, `${feat.id} should not be default-enabled in momentum`)
-      }
-    },
-  },
-
-  {
-    id: `${CAT}-mastery-gating`,
-    name: 'computeFeatureAccess: Mastery fase (level 5-6) — alle features ontgrendeld',
-    category: CAT,
-    description: 'In mastery fase zijn alle gratis features ontgrendeld',
-    priority: 'critical',
-    estimatedDurationMs: 50,
-    fn() {
-      const input = makeInputForLevel(6) // Mastery level 6
-      const result = computeFeatureAccess(input)
-      assertEqual(result.phase, 'mastery', 'phase')
-
-      // ALL gratis features should be accessible
+      // ALLE gratis features toegankelijk voor beide
       const gratisFeatures = UNIFIED_FEATURES.filter(f => f.requiredTier === 'gratis')
       for (const feat of gratisFeatures) {
-        assert(result.features[feat.id]?.accessible === true, `${feat.id} should be accessible in mastery`)
-        assert(result.features[feat.id]?.defaultEnabled === true, `${feat.id} should be default-enabled in mastery`)
+        assert(recoveryResult.features[feat.id]?.accessible === true, `${feat.id} aan in recovery`)
+        assert(masteryResult.features[feat.id]?.accessible === true, `${feat.id} aan in mastery`)
+        assert(recoveryResult.features[feat.id]?.defaultEnabled === true, `${feat.id} defaultEnabled`)
       }
     },
   },
@@ -237,7 +108,6 @@ const tests: TestCase[] = [
         assertNotNull(feat.description, `feature ${feat.id} description`)
         assertNotNull(feat.module, `feature ${feat.id} module`)
         assertNotNull(feat.requiredTier, `feature ${feat.id} requiredTier`)
-        assertNotNull(feat.defaultPhase, `feature ${feat.id} defaultPhase`)
         assert(Array.isArray(feat.widgets), `${feat.id} widgets should be array`)
         assert(Array.isArray(feat.legacyIds), `${feat.id} legacyIds should be array`)
       }
@@ -286,8 +156,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 30,
     fn() {
-      const input = makeInputForLevel(6) // Mastery: all gratis accessible
-      const { features } = computeFeatureAccess(input)
+      const { features } = computeFeatureAccess(makeInput())
 
       // Unified ID
       assert(isFeatureAccessible(features, 'vermogensbeheer'), 'unified ID vermogensbeheer')
@@ -313,39 +182,11 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 3: Widget min-levels ─────────────────────────────────────────────
-
-  {
-    id: `${CAT}-widget-min-levels`,
-    name: 'Widget min-levels: elk van de widgets heeft een correct minimum level',
-    category: CAT,
-    description: 'WIDGET_CATALOG widgets met feature mapping krijgen minLevel van DEFAULT_MATRIX',
-    priority: 'critical',
-    estimatedDurationMs: 50,
-    fn() {
-      // Widget catalog should have the expected number of widgets
-      assertGreaterThanOrEqual(WIDGET_CATALOG.length, 40, 'at least 40 widgets')
-
-      for (const widget of WIDGET_CATALOG) {
-        // minLevel should be a valid sovereignty level (-2..6)
-        assertGreaterThanOrEqual(widget.minLevel, -2, `${widget.id} minLevel >= -2`)
-        assertLessThanOrEqual(widget.minLevel, 6, `${widget.id} minLevel <= 6`)
-      }
-
-      // Widgets with feature mapping should have derived minLevel
-      for (const widget of WIDGET_CATALOG) {
-        const featureId = WIDGET_FEATURE_MAP[widget.id]
-        if (featureId) {
-          const derivedLevel = deriveMinLevel(featureId)
-          assertEqual(widget.minLevel, derivedLevel, `${widget.id} minLevel matches derived`)
-        }
-      }
-    },
-  },
+  // ── Step 3: Widget-feature mapping ────────────────────────────────────────
 
   {
     id: `${CAT}-widget-feature-mapping`,
-    name: 'Widget min-levels: WIDGET_TO_FEATURE compleet voor alle feature-widget links',
+    name: 'Widget mapping: WIDGET_TO_FEATURE compleet voor alle feature-widget links',
     category: CAT,
     description: 'Elke widget in UNIFIED_FEATURES.widgets staat in WIDGET_TO_FEATURE',
     priority: 'high',
@@ -369,96 +210,11 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 4: deriveMinLevel and deriveRequiredPhase ────────────────────────
-
-  {
-    id: `${CAT}-derive-min-level`,
-    name: 'deriveMinLevel: correcte afleiding van sovereignty level per feature',
-    category: CAT,
-    description: 'deriveMinLevel geeft het laagste sovereignty level terug waarop een feature beschikbaar is',
-    priority: 'high',
-    estimatedDurationMs: 30,
-    fn() {
-      // Recovery features: minLevel = -2 (available from lowest level)
-      assertEqual(deriveMinLevel('vermogensbeheer'), -2, 'vermogensbeheer recovery → -2')
-      assertEqual(deriveMinLevel('doelen'), -2, 'doelen recovery → -2')
-
-      // Stability features: minLevel = 1 (first stability level)
-      assertEqual(deriveMinLevel('cashflow'), 1, 'cashflow stability → 1')
-      assertEqual(deriveMinLevel('belasting'), 1, 'belasting stability → 1')
-
-      // Momentum features: minLevel = 3 (first momentum level)
-      assertEqual(deriveMinLevel('simulaties'), 3, 'simulaties momentum → 3')
-      assertEqual(deriveMinLevel('data_export'), 3, 'data_export momentum → 3')
-
-      // Mastery features: minLevel = 5 (first mastery level)
-      assertEqual(deriveMinLevel('fire_planning'), 5, 'fire_planning mastery → 5')
-
-      // Unknown feature: returns -2
-      assertEqual(deriveMinLevel('nonexistent_xyz'), -2, 'unknown feature → -2')
-    },
-  },
-
-  {
-    id: `${CAT}-derive-required-phase`,
-    name: 'deriveRequiredPhase: correcte fase-label per feature',
-    category: CAT,
-    description: 'deriveRequiredPhase geeft het fase-label terug (of undefined voor recovery)',
-    priority: 'high',
-    estimatedDurationMs: 30,
-    fn() {
-      // Recovery features: undefined (always available)
-      assertEqual(deriveRequiredPhase('vermogensbeheer'), undefined, 'recovery → undefined')
-      assertEqual(deriveRequiredPhase('doelen'), undefined, 'doelen recovery → undefined')
-
-      // Stability features: 'Stability'
-      assertEqual(deriveRequiredPhase('cashflow'), 'Stability', 'cashflow → Stability')
-      assertEqual(deriveRequiredPhase('fire_projecties'), 'Stability', 'fire_projecties → Stability')
-
-      // Momentum features: 'Momentum'
-      assertEqual(deriveRequiredPhase('simulaties'), 'Momentum', 'simulaties → Momentum')
-
-      // Mastery features: 'Mastery'
-      assertEqual(deriveRequiredPhase('fire_planning'), 'Mastery', 'fire_planning → Mastery')
-
-      // Unknown feature: undefined
-      assertEqual(deriveRequiredPhase('nonexistent_xyz'), undefined, 'unknown → undefined')
-    },
-  },
-
-  // ── Step 5: Phase transition ──────────────────────────────────────────────
-
-  {
-    id: `${CAT}-phase-transition-unlock`,
-    name: 'Fase transitie: level 1→2 ontgrendelt stability features',
-    category: CAT,
-    description: 'Bij overgang van recovery naar stability worden nieuwe features beschikbaar',
-    priority: 'critical',
-    estimatedDurationMs: 50,
-    fn() {
-      // Level 0 = recovery, cashflow (stability) should not be accessible
-      const recoveryInput = makeInputForLevel(0)
-      const recoveryResult = computeFeatureAccess(recoveryInput)
-      assertEqual(recoveryResult.phase, 'recovery', 'phase at level 0')
-      assert(!recoveryResult.features['cashflow']?.accessible, 'cashflow locked in recovery')
-
-      // Level 1 = stability, cashflow should now be accessible
-      const stabilityInput = makeInputForLevel(1)
-      const stabilityResult = computeFeatureAccess(stabilityInput)
-      assertEqual(stabilityResult.phase, 'stability', 'phase at level 1')
-      assert(stabilityResult.features['cashflow']?.accessible === true, 'cashflow unlocked in stability')
-
-      // Level 2 = still stability, same access
-      const stability2Input = makeInputForLevel(2)
-      const stability2Result = computeFeatureAccess(stability2Input)
-      assertEqual(stability2Result.phase, 'stability', 'phase at level 2')
-      assert(stability2Result.features['cashflow']?.accessible === true, 'cashflow still accessible at level 2')
-    },
-  },
+  // ── Step 4: Sovereignty als motivatie-weergave ────────────────────────────
 
   {
     id: `${CAT}-sovereignty-level-computation`,
-    name: 'Fase transitie: computeSovereigntyLevel correct per financieel scenario',
+    name: 'Motivatie: computeSovereigntyLevel correct per financieel scenario',
     category: CAT,
     description: 'Sovereignty level berekening voor alle 9 levels (-2 tot 6)',
     priority: 'high',
@@ -497,7 +253,7 @@ const tests: TestCase[] = [
 
   {
     id: `${CAT}-level-to-phase-mapping`,
-    name: 'Fase transitie: levelToPhaseId correct voor alle levels',
+    name: 'Motivatie: levelToPhaseId correct voor alle levels',
     category: CAT,
     description: 'Elk sovereignty level mapt naar de correcte fase',
     priority: 'high',
@@ -525,53 +281,7 @@ const tests: TestCase[] = [
     },
   },
 
-  {
-    id: `${CAT}-phase-ordering`,
-    name: 'Fase transitie: isPhaseSufficient volgorde correct',
-    category: CAT,
-    description: 'Phase ordering: recovery < stability < momentum < mastery',
-    priority: 'medium',
-    estimatedDurationMs: 20,
-    fn() {
-      // Same phase = sufficient
-      assert(isPhaseSufficient('recovery', 'recovery'), 'recovery >= recovery')
-      assert(isPhaseSufficient('stability', 'stability'), 'stability >= stability')
-      assert(isPhaseSufficient('mastery', 'mastery'), 'mastery >= mastery')
-
-      // Higher phase = sufficient
-      assert(isPhaseSufficient('stability', 'recovery'), 'stability >= recovery')
-      assert(isPhaseSufficient('momentum', 'stability'), 'momentum >= stability')
-      assert(isPhaseSufficient('mastery', 'recovery'), 'mastery >= recovery')
-
-      // Lower phase = NOT sufficient
-      assert(!isPhaseSufficient('recovery', 'stability'), 'recovery < stability')
-      assert(!isPhaseSufficient('stability', 'momentum'), 'stability < momentum')
-      assert(!isPhaseSufficient('momentum', 'mastery'), 'momentum < mastery')
-    },
-  },
-
-  // ── Step 6: Admin override / subscription gating ──────────────────────────
-
-  {
-    id: `${CAT}-admin-matrix-override`,
-    name: 'Admin override: matrixJson overschrijft defaultPhase',
-    category: CAT,
-    description: 'Admin kan via matrixJson features eerder beschikbaar maken',
-    priority: 'high',
-    estimatedDurationMs: 50,
-    fn() {
-      // Without override: fire_planning (mastery) not accessible in recovery
-      const baseInput = makeInputForLevel(0) // Recovery
-      const baseResult = computeFeatureAccess(baseInput)
-      assert(!baseResult.features['fire_planning']?.accessible, 'fire_planning locked without override')
-
-      // With admin override: unlock fire_planning in recovery
-      const overrideInput = makeInputForLevel(0)
-      overrideInput.matrixJson = JSON.stringify({ fire_planning: { unlockPhase: 'recovery' } })
-      const overrideResult = computeFeatureAccess(overrideInput)
-      assert(overrideResult.features['fire_planning']?.accessible === true, 'fire_planning unlocked with admin override')
-    },
-  },
+  // ── Step 5: Abonnement-gating (de enige harde lock) ───────────────────────
 
   {
     id: `${CAT}-subscription-tier-lock`,
@@ -582,9 +292,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 50,
     fn() {
       // No subscriptions beyond gratis
-      const input = makeInputForLevel(6) // Mastery level
-      input.activeSubscriptions = [] // No subs at all
-      const result = computeFeatureAccess(input)
+      const result = computeFeatureAccess(makeInput({ activeSubscriptions: [] }))
 
       // Gratis features still accessible
       assert(result.features['vermogensbeheer']?.accessible === true, 'gratis feature accessible without sub')
@@ -594,6 +302,7 @@ const tests: TestCase[] = [
       assertNotNull(bankAccess, 'bankintegratie in map')
       assert(!bankAccess.accessible, 'bankintegratie locked without connected sub')
       assertEqual(bankAccess.reason, 'tier_locked', 'bankintegratie reason')
+      assertEqual(bankAccess.defaultEnabled, false, 'tier-locked → defaultEnabled false')
 
       // AI feature locked
       const aiAccess = result.features['ai_assistent']
@@ -612,15 +321,18 @@ const tests: TestCase[] = [
     estimatedDurationMs: 50,
     fn() {
       // With both connected + ai subscriptions
-      const input = makeInputForLevel(6) // Mastery
-      input.activeSubscriptions = ['connected', 'ai']
-      const result = computeFeatureAccess(input)
+      const result = computeFeatureAccess(makeInput({ activeSubscriptions: ['connected', 'ai'] }))
 
       // Connected feature accessible
       assert(result.features['bankintegratie']?.accessible === true, 'bankintegratie accessible with connected sub')
 
-      // AI feature accessible (mastery phase covers all default phases)
+      // AI feature accessible
       assert(result.features['ai_assistent']?.accessible === true, 'ai_assistent accessible with ai sub')
+
+      // ALLE features toegankelijk met beide subs (geen andere gating-as meer)
+      for (const feat of UNIFIED_FEATURES) {
+        assert(result.features[feat.id]?.accessible === true, `${feat.id} accessible met alle subs`)
+      }
     },
   },
 
@@ -632,10 +344,9 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 30,
     fn() {
-      // Vermogensbeheer is always accessible in any phase
-      const input = makeInputForLevel(6) // Mastery
-      input.userFeaturePrefs = { vermogensbeheer: false }
-      const result = computeFeatureAccess(input)
+      const result = computeFeatureAccess(makeInput({
+        userFeaturePrefs: { vermogensbeheer: false },
+      }))
 
       // Feature should show as not accessible due to user override
       const access = result.features['vermogensbeheer']
@@ -643,37 +354,33 @@ const tests: TestCase[] = [
       assert(!access.accessible, 'vermogensbeheer disabled by user pref')
       assertEqual(access.reason, 'user_disabled', 'reason is user_disabled')
       assert(access.defaultEnabled === true, 'defaultEnabled still true')
+
+      // Andere features onaangetast
+      assert(result.features['budgetbeheer']?.accessible === true, 'budgetbeheer onaangetast')
     },
   },
-
-  // ── Step 7: DEFAULT_MATRIX and FEATURES backward compat ───────────────────
 
   {
-    id: `${CAT}-default-matrix-completeness`,
-    name: 'DEFAULT_MATRIX: alle unified + legacy IDs aanwezig',
+    id: `${CAT}-user-pref-no-tier-bypass`,
+    name: 'User prefs: toggle kan abonnement-lock niet omzeilen',
     category: CAT,
-    description: 'DEFAULT_MATRIX bevat entries voor alle unified feature IDs en hun legacy IDs',
-    priority: 'medium',
+    description: 'Een user-pref true op een tier-locked feature maakt deze niet toegankelijk',
+    priority: 'critical',
     estimatedDurationMs: 30,
     fn() {
-      for (const feat of UNIFIED_FEATURES) {
-        // Unified ID in matrix
-        assertDefined(DEFAULT_MATRIX[feat.id], `matrix has ${feat.id}`)
+      const result = computeFeatureAccess(makeInput({
+        activeSubscriptions: [],
+        userFeaturePrefs: { ai_assistent: true, bankintegratie: true },
+      }))
 
-        // Legacy IDs in matrix
-        for (const legacyId of feat.legacyIds) {
-          assertDefined(DEFAULT_MATRIX[legacyId], `matrix has legacy ${legacyId}`)
-        }
-
-        // Phase booleans correct
-        const row = DEFAULT_MATRIX[feat.id]
-        for (const phase of PHASES) {
-          const expected = isPhaseSufficient(phase.id as PhaseId, feat.defaultPhase)
-          assertEqual(row[phase.id], expected, `${feat.id} x ${phase.id}`)
-        }
-      }
+      // Subscription-check komt vóór user-prefs: blijft tier_locked
+      assert(!result.features['ai_assistent']?.accessible, 'ai_assistent blijft locked')
+      assertEqual(result.features['ai_assistent']?.reason, 'tier_locked', 'reason blijft tier_locked')
+      assert(!result.features['bankintegratie']?.accessible, 'bankintegratie blijft locked')
     },
   },
+
+  // ── Step 6: FEATURES / PHASES backward compat ─────────────────────────────
 
   {
     id: `${CAT}-features-backward-compat`,
@@ -787,7 +494,7 @@ export function register(): void {
   registerCategory({
     id: CAT,
     label: 'Identiteit — Feature Gating',
-    description: 'Feature gating systeem: sovereignty levels, fase-vereisten, widget min-levels, feature registry',
+    description: 'Feature gating systeem: abonnement-gating, user-toggles, feature registry',
     icon: 'Lock',
     testCount: 0,
   })

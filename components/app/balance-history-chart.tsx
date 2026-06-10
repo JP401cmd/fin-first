@@ -370,7 +370,7 @@ export const BalanceHistoryChart = memo(function BalanceHistoryChart({
                     />
                     <span className="text-[var(--ink-2)]">{e.entity_name}</span>
                   </span>
-                  <span className="font-mono tabular-nums text-red-600">−{<MaskedAmount value={val} tone="kern" />}</span>
+                  <span className="font-mono tabular-nums text-negative">−{<MaskedAmount value={val} tone="kern" />}</span>
                 </div>
               )
             })}

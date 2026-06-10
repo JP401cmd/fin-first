@@ -36,16 +36,16 @@ function statusFor(progress: GoalDisplay['progress']): {
   bg: string
 } {
   if (progress.pct >= 100) {
-    return { label: 'Behaald', color: 'text-emerald-700', bg: 'bg-emerald-50' }
+    return { label: 'Behaald', color: 'text-positive', bg: 'bg-positive/10' }
   }
   if (progress.onTrack) {
-    return { label: 'Op koers', color: 'text-emerald-700', bg: 'bg-emerald-50' }
+    return { label: 'Op koers', color: 'text-positive', bg: 'bg-positive/10' }
   }
   // at-risk: progress > 50% but not on-track
   if (progress.pct >= 50) {
     return { label: 'Aandacht', color: 'text-amber-700', bg: 'bg-amber-50' }
   }
-  return { label: 'Achter op planning', color: 'text-red-700', bg: 'bg-red-50' }
+  return { label: 'Achter op planning', color: 'text-negative', bg: 'bg-negative/10' }
 }
 
 export function DoelenView({
@@ -154,12 +154,12 @@ export function DoelenView({
                 <div
                   className={`h-full ${
                     pct >= 100
-                      ? 'bg-emerald-500'
+                      ? 'bg-positive'
                       : progress.onTrack
-                        ? 'bg-emerald-500'
+                        ? 'bg-positive'
                         : pct >= 50
                           ? 'bg-amber-500'
-                          : 'bg-red-500'
+                          : 'bg-negative'
                   } transition-all duration-700`}
                   style={{ width: `${pct}%` }}
                 />

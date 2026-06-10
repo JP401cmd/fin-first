@@ -30,27 +30,27 @@ const ACCENT_CLASSES: Record<'kern' | 'wil' | 'horizon' | 'cross', {
   lineOpen: string
 }> = {
   kern: {
-    dotDone: 'bg-emerald-500 border-emerald-500',
+    dotDone: 'bg-positive border-positive',
     dotOpen: 'border-kern-300 bg-[var(--paper)]',
     lineDone: 'bg-kern-400',
     lineOpen: 'bg-[var(--border-ed)]',
   },
   wil: {
-    dotDone: 'bg-emerald-500 border-emerald-500',
+    dotDone: 'bg-positive border-positive',
     dotOpen: 'border-wil-300 bg-[var(--paper)]',
     lineDone: 'bg-wil-400',
     lineOpen: 'bg-[var(--border-ed)]',
   },
   horizon: {
-    dotDone: 'bg-emerald-500 border-emerald-500',
+    dotDone: 'bg-positive border-positive',
     dotOpen: 'border-horizon-300 bg-[var(--paper)]',
     lineDone: 'bg-horizon-400',
     lineOpen: 'bg-[var(--border-ed)]',
   },
   cross: {
-    dotDone: 'bg-emerald-500 border-emerald-500',
+    dotDone: 'bg-positive border-positive',
     dotOpen: 'border-[var(--border-md)] bg-[var(--paper)]',
-    lineDone: 'bg-emerald-400',
+    lineDone: 'bg-positive/70',
     lineOpen: 'bg-[var(--border-ed)]',
   },
 }
@@ -129,8 +129,8 @@ export function GoalGuideCard({ spec }: Props) {
       >
         <BriefingCard module={cardModule}>
           <div className="flex flex-col items-center justify-center py-4 text-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
-              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-positive/15">
+              <CheckCircle2 className="h-6 w-6 text-positive" />
             </div>
             <div>
               <p className="text-sm font-semibold text-[var(--ink)]">Doel volbracht!</p>

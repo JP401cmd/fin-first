@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { loadNewsSources, fetchRssContent, fetchWebContent } from '@/lib/news-sources'
 import { getModel } from '@/lib/ai/config'
 import { extractNewsFromWebPage, categorizeArticles } from '@/lib/news-enrich'
+import { recordJobRun } from '@/lib/job-runs'
 
 /**
  * GET /api/news-ingest/cron
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey)
+  const startedAt = new Date().toISOString()
 
   try {
     // The loadNewsSources function accepts a generic SupabaseClient
@@ -170,20 +172,25 @@ export async function GET(request: Request) {
       .delete()
       .lt('fetched_at', ninetyDaysAgo.toISOString())
 
+    const summary = {
+      sourcesChecked: sources.rssFeeds.length + sources.webSources.length,
+      rssArticlesFound: rssArticles.length,
+      webArticlesExtracted: webArticles.length,
+      inserted,
+      skipped,
+    }
+
+    await recordJobRun(supabase, { job: 'news-ingest', status: 'success', startedAt, summary })
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      summary: {
-        sourcesChecked: sources.rssFeeds.length + sources.webSources.length,
-        rssArticlesFound: rssArticles.length,
-        webArticlesExtracted: webArticles.length,
-        inserted,
-        skipped,
-      },
+      summary,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
     console.error('[news-ingest/cron] Ingestion failed:', message)
+    await recordJobRun(supabase, { job: 'news-ingest', status: 'error', startedAt, error: message })
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -1,5 +1,4 @@
 import { Wallet, RefreshCw, ArrowUpCircle, Compass, Bell, CheckCircle2, Sparkles } from 'lucide-react'
-import { DEFAULT_MATRIX, FEATURES, PHASES, type FeatureDef } from '@/lib/feature-phases'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -150,56 +149,6 @@ export const levelCriteriaMap: Record<number, LevelCriteria> = {
     criteria: ['Vrijheidspercentage \u2265 100% (passief inkomen dekt alle uitgaven)'],
     progress: (d) => Math.min(100, Math.round((Math.max(0, d.freedomPct) / 100) * 100)),
   },
-}
-
-// ── Feature Roadmap helpers ───────────────────────────────────────────
-
-/** Determine the first phase where a feature becomes available */
-export function getFeatureUnlockPhase(featureId: string): string | null {
-  const matrix = DEFAULT_MATRIX[featureId]
-  if (!matrix) return null
-  for (const phase of PHASES) {
-    if (matrix[phase.id]) return phase.id
-  }
-  return null
-}
-
-/** Map of feature icons (emoji) by feature id */
-export const featureIcons: Record<string, string> = {
-  nibud_benchmark: '\uD83D\uDCCA',
-  box3_belasting: '\uD83C\uDFDB\uFE0F',
-  budget_optimalisatie: '\uD83D\uDCA1',
-  schulden_aflosplan: '\uD83D\uDD17',
-  asset_allocatie: '\uD83D\uDCC8',
-  fire_projecties: '\uD83D\uDD25',
-  monte_carlo: '\uD83C\uDFB2',
-  levensgebeurtenissen: '\uD83C\uDFAF',
-  withdrawal_strategie: '\uD83D\uDCB8',
-  gezondheids_score: '\uD83D\uDCAA',
-  vermogensprojectie_chart: '\uD83D\uDCC9',
-  fire_scenario_analyse: '\uD83D\uDD00',
-  fire_geavanceerde_params: '\u2699\uFE0F',
-  vermogensverloop: '\uD83D\uDCC5',
-  snapshot_vergelijking: '\uD83D\uDD0D',
-  cashflow_sankey: '\uD83C\uDF0A',
-  data_export: '\uD83D\uDCE4',
-  doelen_systeem: '\uD83C\uDFAF',
-  beslissingspatronen: '\uD83E\uDDE0',
-}
-
-/** Group features by the phase where they first unlock */
-export function getFeaturesPerPhase(): Record<string, FeatureDef[]> {
-  const result: Record<string, FeatureDef[]> = {}
-  for (const phase of PHASES) {
-    result[phase.id] = []
-  }
-  for (const feature of FEATURES) {
-    const unlockPhase = getFeatureUnlockPhase(feature.id)
-    if (unlockPhase && result[unlockPhase]) {
-      result[unlockPhase].push(feature)
-    }
-  }
-  return result
 }
 
 export const NOTIFICATION_TYPES = [

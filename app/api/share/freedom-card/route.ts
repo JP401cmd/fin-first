@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
+import { localMonthBounds } from '@/lib/month-range'
 
 export async function GET(request: Request) {
   try {
@@ -20,8 +21,7 @@ export async function GET(request: Request) {
     // Fetch all financial data in parallel (same as dashboard)
     // Each query uses individual error handling to gracefully degrade
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+    const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
     const [
       txResult, assetsResult, debtsResult, profileResult,

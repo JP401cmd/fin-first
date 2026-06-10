@@ -39,11 +39,10 @@ export async function POST() {
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
-  const [assetsRes, debtsRes, txRes, matrixRes] = await Promise.all([
+  const [assetsRes, debtsRes, txRes] = await Promise.all([
     supabase.from('assets').select('current_value').eq('user_id', user.id).eq('is_active', true),
     supabase.from('debts').select('current_balance, debt_type').eq('user_id', user.id).eq('is_active', true),
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
-    supabase.from('app_settings').select('value').eq('key', 'feature_phase_matrix').maybeSingle(),
   ])
 
   const { phase } = computeFeatureAccess({
@@ -52,7 +51,6 @@ export async function POST() {
     transactions: txRes.data ?? [],
     activeSubscriptions: [],
     userFeaturePrefs: null,
-    matrixJson: matrixRes.data?.value ?? null,
   })
 
   const { error } = await supabase

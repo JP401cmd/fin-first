@@ -13,6 +13,7 @@
  * Door precies dezelfde keuzeregel te gebruiken kan de prognose nooit
  * divergeren van wat de gebruiker op de cashflow-pagina ziet.
  */
+import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 
 export interface SavingsSourceInput {
   /** profiles.income_source — 'manual' wint over de berekende waarde. */
@@ -36,6 +37,39 @@ export interface SavingsSource {
   effectiveSavingsRatePct: number
   /** Jaarlijks spaarbedrag = effectiveAnnualIncome × effectiveSavingsRatePct%. */
   baseAnnualSavings: number
+}
+
+/**
+ * Maandelijkse schuldaflossing die meetelt als vermogensopbouw ("sparen").
+ * Zelfde regels als de loaders en de check-in-route: alleen actieve schulden
+ * met include_aflossing_in_savings, gewogen met net_worth_inclusion_pct.
+ */
+export function computeDebtAflossingMonthly(debts: Debt[]): number {
+  let monthly = 0
+  for (const d of debts) {
+    if (!d.is_active || !d.include_aflossing_in_savings) continue
+    const aflossing = d.custom_aflossing_amount != null
+      ? Number(d.custom_aflossing_amount)
+      : (computeRenteAflossingsSplit(d)?.currentAflossing ?? 0)
+    monthly += aflossing * ((d.net_worth_inclusion_pct ?? 100) / 100)
+  }
+  return monthly
+}
+
+/**
+ * Kern-formule van de 6-maands spaarquote (%):
+ *   (inkomen − uitgaven + aflossing) / inkomen × 100
+ *
+ * De loaders (dashboard/horizon) voegen hier extrapolatie bij <6 maanden
+ * data en een spaarbudget-term aan toe; dit is de gedeelde basis voor
+ * call-sites die met rauwe 6-maands-aggregaten werken (check-in, what-if).
+ */
+export function savingsRateFromAggregates(
+  income6m: number,
+  expenses6m: number,
+  debtAflossing6m: number,
+): number {
+  return income6m > 0 ? ((income6m - expenses6m + debtAflossing6m) / income6m) * 100 : 0
 }
 
 export function resolveSavingsSource(input: SavingsSourceInput): SavingsSource {

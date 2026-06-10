@@ -21,9 +21,9 @@ const MODULE_COLORS: Record<string, { bg: string; text: string; dot: string }> =
 }
 
 const MODULE_HREFS: Record<string, string> = {
-  kern: '/core',
-  wil: '/will',
-  horizon: '/horizon',
+  kern: '/overzicht',
+  wil: '/overzicht/tips',
+  horizon: '/toekomst',
 }
 
 function formatDate(dateStr: string): string {

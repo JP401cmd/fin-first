@@ -7,6 +7,12 @@ import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
 import { PrintTijdasButton } from '@/components/future/print-tijdas-button'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import {
+  Kicker,
+  EditorialHeadline,
+  EditorialDeck,
+  OrnamentColophon,
+} from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
@@ -105,15 +111,18 @@ export default async function ToekomstPage({
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
         <header className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
-              De Toekomst
-            </div>
-            <h1 className="font-serif text-2xl sm:text-3xl text-[var(--ink)] leading-tight">
+            <Kicker>De Toekomst</Kicker>
+            <EditorialHeadline
+              level="h1"
+              size="sm"
+              emphasis="tijdas"
+              className="mt-1 text-[var(--ink)]"
+            >
               Je tijdas
-            </h1>
-            <p className="mt-1 text-sm text-[var(--ink-3)]">
+            </EditorialHeadline>
+            <EditorialDeck className="mt-2">
               Geld is opgeslagen tijd — kies wat je later met die tijd doet.
-            </p>
+            </EditorialDeck>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <PageInfoButton description={PAGE_INFO['/toekomst'] ?? ''} />
@@ -138,6 +147,12 @@ export default async function ToekomstPage({
       </section>
 
       <HorizonPage initialData={horizonData} />
+
+      {/* Krant-stijl colophon als landing-footer. print:hidden zodat de
+          tijdas-print (PrintTijdasButton) ongewijzigd blijft. */}
+      <div className="print:hidden">
+        <OrnamentColophon text="Geld is opgeslagen tijd" module="De Toekomst" />
+      </div>
     </>
   )
 }

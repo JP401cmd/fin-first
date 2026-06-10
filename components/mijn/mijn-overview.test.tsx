@@ -5,7 +5,10 @@ import { MijnOverview } from './mijn-overview'
 describe('MijnOverview — render', () => {
   it('rendert header met "Profiel & instellingen"', () => {
     render(<MijnOverview />)
-    expect(screen.getByText('Profiel & instellingen')).toBeTruthy()
+    // EditorialHeadline splitst de kop over meerdere spans (italic-em op
+    // "instellingen") — match daarom op de samengestelde heading-tekst.
+    const heading = screen.getByRole('heading', { level: 1 })
+    expect(heading.textContent).toBe('Profiel & instellingen')
   })
 
   it('rendert 8 sub-route cards', () => {

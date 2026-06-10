@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
 /**
  * GET /api/daily-expense-rate
@@ -16,8 +17,8 @@ export async function GET() {
     }
 
     const now = new Date()
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
+    const monthEnd = localMonthBounds(now).end
+    const twelveMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 11, 1))
 
     // Fetch expense transactions from the last 12 months
     const [expenseResult, earliestTxResult] = await Promise.all([

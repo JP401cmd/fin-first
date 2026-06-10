@@ -463,11 +463,11 @@ function EtaPreview({
     return (
       <section
         data-testid="eta-preview"
-        className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3"
+        className="mt-4 rounded-xl border border-positive/20 bg-positive/5 p-3"
       >
         <header className="flex items-center gap-1.5 mb-1">
-          <Calculator className="w-3.5 h-3.5 text-emerald-700" aria-hidden="true" />
-          <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-emerald-700">
+          <Calculator className="w-3.5 h-3.5 text-positive" aria-hidden="true" />
+          <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-positive">
             Wat je nodig hebt
           </span>
         </header>

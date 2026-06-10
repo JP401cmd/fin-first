@@ -350,7 +350,7 @@ export function SyncReportModal({ open, onClose }: SyncReportModalProps) {
               Koppel een exchange of wallet om automatische saldi en transacties te ontvangen.
             </p>
             <Link
-              href="/identity/koppelingen"
+              href="/mijn/koppelingen"
               onClick={onClose}
               className="mt-4 inline-flex items-center gap-1.5 border border-[var(--border-md)] bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] transition-all hover:-translate-y-px"
             >
@@ -432,7 +432,7 @@ export function SyncReportModal({ open, onClose }: SyncReportModalProps) {
         {data && totalConnections > 0 && (
           <div className="mt-4 border-t border-[var(--border-ed)] pt-4 text-center">
             <Link
-              href="/identity/koppelingen"
+              href="/mijn/koppelingen"
               onClick={onClose}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--ink-2)] underline decoration-[var(--border-ed)] underline-offset-4 hover:text-[var(--ink)] hover:decoration-[var(--ink-2)]"
             >

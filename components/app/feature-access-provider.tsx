@@ -2,13 +2,10 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { FeatureAccessData, FeatureAccessMap } from '@/lib/compute-feature-access'
-import { UNIFIED_FEATURES, isPhaseSufficient, type PhaseId } from '@/lib/feature-registry'
 import { PhaseTransitionModal } from '@/components/app/phase-transition-modal'
 import { ALL_MODULES, isModuleActive, type ModuleId } from '@/lib/module-registry'
 
 type FeatureAccessContextValue = FeatureAccessData & {
-  /** Feature IDs newly unlocked by a phase transition (for spotlight animations) */
-  newlyUnlockedFeatures: string[]
   /** Refresh feature prefs after user toggle */
   refreshFeaturePrefs: (prefs: Record<string, boolean>) => void
   /** Active module IDs for the current user */
@@ -30,7 +27,6 @@ export function useFeatureAccess(): FeatureAccessContextValue {
     netWorth: 0,
     monthlyExpenses: 0,
     freedomPct: 0,
-    newlyUnlockedFeatures: [],
     refreshFeaturePrefs: () => {},
     activeModules: [...ALL_MODULES],
     refreshModules: () => {},
@@ -52,22 +48,6 @@ export function FeatureAccessProvider({
 }) {
   const [showTransitionModal, setShowTransitionModal] = useState(!!phaseTransition)
   const [featureOverrides, setFeatureOverrides] = useState<FeatureAccessMap>(data.features)
-
-  // Compute newly unlocked features when there's a phase transition.
-  // Memoized so consumers downstream don't see a fresh array on every parent render.
-  const newlyUnlockedFeatures = useMemo<string[]>(
-    () =>
-      phaseTransition
-        ? UNIFIED_FEATURES
-            .filter(f => {
-              const wasDefault = isPhaseSufficient(phaseTransition.oldPhase as PhaseId, f.defaultPhase)
-              const isDefault = isPhaseSufficient(phaseTransition.newPhase as PhaseId, f.defaultPhase)
-              return isDefault && !wasDefault
-            })
-            .map(f => f.id)
-        : [],
-    [phaseTransition],
-  )
 
   // Allow optimistic refresh after user toggles
   const refreshFeaturePrefs = useCallback((prefs: Record<string, boolean>) => {
@@ -95,12 +75,11 @@ export function FeatureAccessProvider({
     () => ({
       ...data,
       features: featureOverrides,
-      newlyUnlockedFeatures,
       refreshFeaturePrefs,
       activeModules: moduleOverrides,
       refreshModules,
     }),
-    [data, featureOverrides, newlyUnlockedFeatures, refreshFeaturePrefs, moduleOverrides, refreshModules],
+    [data, featureOverrides, refreshFeaturePrefs, moduleOverrides, refreshModules],
   )
 
   return (

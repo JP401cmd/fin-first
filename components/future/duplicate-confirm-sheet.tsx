@@ -159,7 +159,7 @@ export function DuplicateConfirmSheet({
                   <span
                     className={`inline-flex items-center justify-center w-4 h-4 rounded-full shrink-0 mt-0.5 ${
                       req.met
-                        ? 'bg-emerald-100 text-emerald-700'
+                        ? 'bg-positive/15 text-positive'
                         : 'bg-[var(--subtle)] text-[var(--ink-3)]'
                     }`}
                     aria-hidden="true"
@@ -178,7 +178,7 @@ export function DuplicateConfirmSheet({
         {allMet ? (
           <div
             role="status"
-            className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5 text-xs text-emerald-800"
+            className="rounded-xl border border-positive/20 bg-positive/5 px-3 py-2.5 text-xs text-positive"
           >
             <strong className="font-semibold">Klaar om te gebruiken</strong> —
             jouw gegevens worden automatisch ingevuld.
@@ -220,7 +220,7 @@ export function DuplicateConfirmSheet({
             disabled={submitting}
             className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${
               allMet
-                ? 'bg-emerald-600 hover:bg-emerald-700'
+                ? 'bg-positive hover:bg-positive/90'
                 : 'bg-[var(--ink)] hover:bg-[var(--ink-2)]'
             }`}
           >

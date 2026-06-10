@@ -2,7 +2,7 @@
 //
 // JSON-versie van `loadConnectionsData()` voor de globale sync-rapport-modal in
 // de header. De modal kan niet leunen op de bestaande server-pagina
-// (`/identity/koppelingen`) omdat hij client-side gemount wordt en zijn data
+// (`/mijn/koppelingen`) omdat hij client-side gemount wordt en zijn data
 // optimistisch refresht na elke sync-actie.
 //
 // Geen body, geen query-params — de modal wil altijd de volledige actuele state

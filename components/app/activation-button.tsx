@@ -96,7 +96,7 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
                   <p className="text-xs font-medium text-[var(--ink-3)]">Netto vermogen</p>
-                  <p className={`mt-1 text-lg font-bold ${data.netWorth >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                  <p className={`mt-1 text-lg font-bold ${data.netWorth >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {<MaskedAmount value={data.netWorth} tone="kern" />}
                   </p>
                 </div>

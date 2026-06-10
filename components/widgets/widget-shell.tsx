@@ -2,7 +2,7 @@
 
 import { memo, useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Lock, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import type { WidgetModule, WidgetSize } from '@/lib/widget-catalog'
 
 // ── Module accent colors ──────────────────────────────────────
@@ -204,49 +204,3 @@ export const WidgetShell = memo(function WidgetShell({ module, size, kicker, hre
   )
 })
 
-// ── LockedWidgetShell ─────────────────────────────────────────
-
-interface LockedWidgetShellProps {
-  module: WidgetModule
-  size: WidgetSize
-  name: string
-  requiredPhase: string
-}
-
-export const LockedWidgetShell = memo(function LockedWidgetShell({ module, size, name, requiredPhase }: LockedWidgetShellProps) {
-  const accent = MODULE_ACCENT[module]
-  const minH = SIZE_HEIGHT[size]
-  const isMini = size === 'mini'
-  const isQuarter = size === 'quarter'
-
-  if (isMini) {
-    return (
-      <div className={`relative overflow-hidden rounded-[var(--r-lg)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/80 opacity-60 ${minH}`}>
-        <div className={`h-[2px] w-full ${accent} opacity-30`} />
-        <div className="flex h-[62px] items-center gap-2 px-3">
-          <Lock className="h-3 w-3 shrink-0 text-[var(--ink-4)]" />
-          <p className="text-xs font-medium text-[var(--ink-3)] truncate">{name}</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className={`relative overflow-hidden rounded-[var(--r-lg)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/80 opacity-60 ${minH}`}
-    >
-      {/* Faded accent bar */}
-      <div className={`h-[3px] w-full ${accent} opacity-30`} />
-
-      <div className={`flex flex-col items-center justify-center h-[calc(100%-3px)] ${isQuarter ? 'gap-1 p-3' : 'gap-2 p-4'} text-center`}>
-        <div className={`flex ${isQuarter ? 'h-7 w-7' : 'h-9 w-9'} items-center justify-center rounded-full bg-[var(--subtle)] border border-[var(--border-ed)]`}>
-          <Lock className={`${isQuarter ? 'h-3 w-3' : 'h-4 w-4'} text-[var(--ink-4)]`} />
-        </div>
-        <p className={`${isQuarter ? 'text-xs' : 'text-sm'} font-medium text-[var(--ink-3)]`}>{name}</p>
-        <span className="rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">
-          Beschikbaar in {requiredPhase}
-        </span>
-      </div>
-    </div>
-  )
-})

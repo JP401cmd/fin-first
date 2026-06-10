@@ -1,15 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency } from './formatter'
+import { localMonthBounds } from '@/lib/month-range'
 
 /**
  * Kern-specific context: budgets, spending vs limits, recent patterns.
  * Uses real Supabase data.
  */
 export async function buildKernContext(supabase: SupabaseClient): Promise<string> {
-  // Get current month boundaries
+  // Get current month boundaries (tijdzone-veilig). monthEnd is exclusief =
+  // de 1e van de volgende maand; gebruik dus .lt(monthEnd) i.p.v. .lte op de
+  // laatste dag (zelfde venster, geen vorige-maand-lek).
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
   // Fetch budgets (parents and children) + this month's transactions with budget_id
   const [budgetsResult, transactionsResult] = await Promise.all([
@@ -21,7 +23,7 @@ export async function buildKernContext(supabase: SupabaseClient): Promise<string
       .from('transactions')
       .select('budget_id, amount, is_income, transaction_type')
       .gte('date', monthStart)
-      .lte('date', monthEnd)
+      .lt('date', monthEnd)
       .not('budget_id', 'is', null),
   ])
 

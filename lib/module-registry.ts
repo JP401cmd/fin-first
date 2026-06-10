@@ -299,28 +299,10 @@ export function getActiveNavModules(activeModules: ModuleId[]): NavModule[] {
  *
  * Priority:
  * 1. nieuws only → '/nieuws' (dedicated news-only page)
- * 2. inzicht_acties → '/will' (richest overview)
- * 3. fallback       → '/core'
+ * 2. fallback    → '/overzicht'
  */
-/**
- * Get the first-win page path for an onboarding intent.
- * After onboarding, the user is routed to the page most relevant to their chosen intent.
- */
-export function getFirstWinPath(intent: IntentId): string {
-  const map: Record<IntentId, string> = {
-    coaching: '/will',
-    grip_uitgaven: '/core/budgets',
-    overzicht_geld: '/core',
-    toekomst: '/horizon',
-    alles: '/will',
-    nieuws: '/nieuws',
-  }
-  return map[intent]
-}
-
 export function getHomePath(activeModules: ModuleId[]): string {
   const isNewsOnly = activeModules.length === 1 && activeModules[0] === 'nieuws'
   if (isNewsOnly) return '/nieuws'
-  if (activeModules.includes('inzicht_acties')) return '/will'
-  return '/core'
+  return '/overzicht'
 }

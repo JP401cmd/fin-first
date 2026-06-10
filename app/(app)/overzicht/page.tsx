@@ -221,6 +221,14 @@ export default async function OverzichtPage() {
       : null
   const simRows = dashboardData.simRows ?? null
   const simRequiredPortfolio = dashboardData.simRequiredPortfolio ?? null
+  // Geschat maandelijks spaarritme voor de back-cast van ontbrekende
+  // historie-maanden (< 3 echte waarderingen): bewuste maandinleg als die
+  // er is, anders inkomen − uitgaven. Zelfde fallback-volgorde als de
+  // netto-vermogen-widget.
+  const monthlySavings =
+    dashboardData.monthlyContributions > 0
+      ? dashboardData.monthlyContributions
+      : (dashboardData.monthlyIncome ?? 0) - (dashboardData.monthlyExpenses ?? 0)
 
   return (
     <>
@@ -246,6 +254,7 @@ export default async function OverzichtPage() {
         fireAge={fireAge}
         simRows={simRows}
         simRequiredPortfolio={simRequiredPortfolio}
+        monthlySavings={monthlySavings}
         dashboardData={dashboardData}
         activeWidgets={activeWidgets}
         allWidgetPrefs={allWidgetPrefs}

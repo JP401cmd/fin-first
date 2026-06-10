@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 import { createClient } from '@/lib/supabase/client'
 import { Clock } from 'lucide-react'
 import { formatWithFreedom } from '@/lib/format'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 /**
@@ -41,8 +42,8 @@ export function DailyExpenseProvider({ children }: { children: ReactNode }) {
       const supabase = createClient()
 
       const now = new Date()
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-      const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
+      const monthEnd = localMonthBounds(now).end
+      const twelveMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 11, 1))
 
       // Fetch expense transactions from the last 12 months
       const [expenseResult, earliestTxResult] = await Promise.all([

@@ -8,6 +8,7 @@ import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { SWR } from '@/lib/constants'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
 /**
  * GET /api/snapshots/auto
@@ -43,9 +44,9 @@ export async function GET() {
   const today = now.toISOString().split('T')[0]
 
   // Fetch all required data in parallel
-  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
-  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+  const twelveMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 11, 1))
+  const sixMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 5, 1))
+  const monthEnd = localMonthBounds(now).end
 
   const [assetsResult, debtsResult, expensesResult, incomeResult, profileResult, budgetsResult] = await Promise.all([
     supabase

@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
+import { localMonthBounds } from '@/lib/month-range'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 /**
@@ -277,8 +278,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       if (signal?.aborted) return
       if (user) {
         const now = new Date()
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+        const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
         const [mortgageResult, txResult, bankLinksResult, profileBaResult] = await Promise.all([
           supabase
@@ -561,9 +561,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-12">
-        <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-sm font-medium text-red-700">{error}</p>
-          <button onClick={() => { setError(null); setLoading(true); loadAssets() }} className="mt-3 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+        <div className="rounded-[var(--r-lg)] border border-negative/30 bg-negative/10 p-6 text-center">
+          <p className="text-sm font-medium text-negative">{error}</p>
+          <button onClick={() => { setError(null); setLoading(true); loadAssets() }} className="mt-3 rounded-[var(--r)] bg-negative px-4 py-2 text-sm font-medium text-[var(--paper)] hover:bg-negative/90">
             Opnieuw proberen
           </button>
         </div>
@@ -755,9 +755,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
               <ProjectionChart data={projection} currentValue={totalValue} />
               <div className="mt-3 flex items-center gap-4 text-xs">
                 <div className="flex items-center gap-1">
-                  <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                  <TrendingUp className="h-3.5 w-3.5 text-positive" />
                   <span className="text-[var(--ink-3)]">Verwachte groei:</span>
-                  <span className="font-medium text-emerald-600" data-testid="projected-growth">+{fc(projectedGrowth)}</span>
+                  <span className="font-medium text-positive" data-testid="projected-growth">+{fc(projectedGrowth)}</span>
                 </div>
               </div>
               {/* Contextual projection message */}
@@ -767,7 +767,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                     ? `Met je huidige inleg van ${fc(totalMonthlyContrib)}/maand groeit je portfolio naar ${fc(futureValue)} in ${projectionYears} jaar`
                     : `Zonder extra inleg groeit je portfolio naar ${fc(futureValue)} in ${projectionYears} jaar`}
                   {dailyExpenses > 0 && futureValue > 0 && (
-                    <span className="text-emerald-600 font-medium">
+                    <span className="text-positive font-medium">
                       {' — '}dat is {formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid
                     </span>
                   )}
@@ -1176,9 +1176,9 @@ export function AssetDetailModal({
           <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
             {asset.risk_profile && (
               <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                asset.risk_profile === 'laag' ? 'bg-emerald-100 text-emerald-700' :
+                asset.risk_profile === 'laag' ? 'bg-positive/15 text-positive' :
                 asset.risk_profile === 'middel' ? 'bg-kern-100 text-kern-700' :
-                'bg-red-100 text-red-700'
+                'bg-negative/15 text-negative'
               }`}>
                 Risico: {RISK_PROFILE_LABELS[asset.risk_profile]}
               </span>
@@ -1294,7 +1294,7 @@ export function AssetDetailModal({
                         <span className="font-mono tabular-nums text-sm font-medium text-[var(--ink)]">{fc(d.current_balance)}</span>
                         <button
                           onClick={() => unlinkDebt(d.id)}
-                          className="rounded p-0.5 text-[var(--ink-4)] hover:text-red-500 hover:bg-red-50 transition-colors"
+                          className="rounded p-0.5 text-[var(--ink-4)] hover:text-negative hover:bg-negative/10 transition-colors"
                           title="Ontkoppel"
                         >
                           <X className="h-3 w-3" />
@@ -1318,20 +1318,20 @@ export function AssetDetailModal({
                   </div>
 
                   {totalDgaLeningen >= WET_EXCESSIEF_LENEN_DREMPEL && (
-                    <div className="mt-2 flex items-start gap-2 rounded-[var(--r)] bg-red-50 border border-red-200 px-3 py-2">
-                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+                    <div className="mt-2 flex items-start gap-2 rounded-[var(--r)] bg-negative/10 border border-negative/30 px-3 py-2">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-negative" />
                       <div>
-                        <p className="text-xs font-medium text-red-700">
+                        <p className="text-xs font-medium text-negative">
                           Wet excessief lenen: drempel overschreden
                         </p>
-                        <p className="text-[10px] text-red-600 mt-0.5">
+                        <p className="text-[10px] text-negative mt-0.5">
                           Uw totale DGA-leningen ({fc(totalDgaLeningen)}) overschrijden de drempel van {fc(WET_EXCESSIEF_LENEN_DREMPEL)}. Het meerdere wordt belast als fictief regulier voordeel in Box 2.
                         </p>
                         <a
                           href="https://www.belastingdienst.nl/wps/wcm/connect/nl/box-2/content/excessief-lenen"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-1 inline-block text-[10px] font-medium text-red-700 underline hover:text-red-800"
+                          className="mt-1 inline-block text-[10px] font-medium text-negative underline hover:text-negative/80"
                         >
                           Meer informatie over Wet excessief lenen →
                         </a>
@@ -1515,14 +1515,14 @@ export function AssetDetailModal({
             {confirmDelete ? (
               <button
                 onClick={onDelete}
-                className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
+                className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-negative px-3 py-2 text-xs font-medium text-[var(--paper)] hover:bg-negative/90"
               >
                 Bevestigen
               </button>
             ) : (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] border border-negative/30 px-3 py-2 text-xs font-medium text-negative hover:bg-negative/10"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -1711,7 +1711,7 @@ function MiniSparkline({
   })
 
   const trend = values[values.length - 1] >= values[0]
-  const strokeColor = trend ? '#059669' : '#dc2626'
+  const strokeColor = trend ? 'var(--positive)' : 'var(--negative)'
 
   // Create gradient fill
   const fillPoints = [
@@ -1795,8 +1795,8 @@ function ValuationTrendSection({ valuations }: { valuations: Valuation[] }) {
   }
 
   const trend = values.length >= 2 && values[values.length - 1] >= values[0]
-  const strokeColor = trend ? '#059669' : '#dc2626'
-  const fillColor = trend ? '#059669' : '#dc2626'
+  const strokeColor = trend ? 'var(--positive)' : 'var(--negative)'
+  const fillColor = trend ? 'var(--positive)' : 'var(--negative)'
 
   // Chart line path
   const linePath = sorted.length === 1
@@ -2166,7 +2166,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
           )}
 
           {error && (
-            <div className="flex items-center gap-2 rounded-[var(--r)] bg-red-50 px-3 py-2 text-xs text-red-600">
+            <div className="flex items-center gap-2 rounded-[var(--r)] bg-negative/10 px-3 py-2 text-xs text-negative">
               <AlertCircle className="h-3.5 w-3.5" />
               {error}
             </div>
@@ -2246,7 +2246,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                         {deleteConfirm === h.id ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(h.id) }}
-                            className="rounded p-1 text-red-600 hover:bg-red-50"
+                            className="rounded p-1 text-negative hover:bg-negative/10"
                             disabled={deleting === h.id}
                             data-testid={`confirm-delete-holding-${h.id}`}
                           >
@@ -2259,7 +2259,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                         ) : (
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeleteConfirm(h.id) }}
-                            className="rounded p-1 text-[var(--ink-3)] hover:bg-red-50 hover:text-red-600"
+                            className="rounded p-1 text-[var(--ink-3)] hover:bg-negative/10 hover:text-negative"
                             title="Verwijderen"
                             data-testid={`delete-holding-${h.id}`}
                           >
@@ -2388,7 +2388,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
               </div>
 
               {formError && (
-                <div className="flex items-center gap-1 text-[10px] text-red-600">
+                <div className="flex items-center gap-1 text-[10px] text-negative">
                   <AlertCircle className="h-3 w-3" />
                   {formError}
                 </div>
@@ -2551,9 +2551,9 @@ function ProjectionChart({
         stroke="#f59e0b" strokeWidth="0.5" strokeDasharray="3 3"
       />
 
-      <path d={areaPath} fill="#10b981"
+      <path d={areaPath} fill="var(--positive)"
         style={{ opacity: hasEntered ? 0.12 : 0, transition: hasEntered ? 'opacity 250ms ease-out 455ms' : 'none' }} />
-      <path d={linePath} fill="none" stroke="#10b981" strokeWidth="1.5"
+      <path d={linePath} fill="none" stroke="var(--positive)" strokeWidth="1.5"
         pathLength={1} strokeDasharray={1}
         style={{ strokeDashoffset: hasEntered ? undefined : 1, animation: hasEntered ? 'drawPath 600ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
 
@@ -3211,7 +3211,7 @@ export function AssetForm({
           {/* Budget tracking toggle (cash only, hidden when budgetteren module is off) */}
           {assetType === 'cash' && budgetingActive && (
             <>
-              <label className="flex items-start gap-3 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/30 p-3 cursor-pointer">
+              <label className="flex items-start gap-3 rounded-[var(--r)] border border-positive/30 bg-positive/5 p-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={hasBudgetTracking}
@@ -3484,8 +3484,8 @@ export function AssetForm({
                   </div>
                 )}
                 {wozResult && (
-                  <div className="col-span-2 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 p-3">
-                    <p className="mb-2 text-xs font-semibold text-emerald-700">WOZ-waarden gevonden</p>
+                  <div className="col-span-2 rounded-[var(--r)] border border-positive/30 bg-positive/5 p-3">
+                    <p className="mb-2 text-xs font-semibold text-positive">WOZ-waarden gevonden</p>
                     <div className="space-y-1">
                       {wozResult.map((w) => (
                         <div key={w.peildatum} className="flex items-center justify-between text-xs">
@@ -3497,8 +3497,8 @@ export function AssetForm({
                   </div>
                 )}
                 {wozError && (
-                  <div className="col-span-2 rounded-[var(--r)] border border-red-200 bg-red-50/50 p-2">
-                    <p className="text-xs text-red-600">{wozError}</p>
+                  <div className="col-span-2 rounded-[var(--r)] border border-negative/30 bg-negative/5 p-2">
+                    <p className="text-xs text-negative">{wozError}</p>
                   </div>
                 )}
                 {visibleFields.includes('rental_income') && (
@@ -3591,9 +3591,9 @@ export function AssetForm({
                     {(() => {
                       const totalDga = dgaTotal + (Number(currentValue) || 0)
                       if (totalDga > 500000) return (
-                        <div className="rounded-[var(--r)] border border-red-300 bg-red-50 p-3">
-                          <p className="text-xs font-medium text-red-800">Wet excessief lenen: totaal DGA-leningen &euro;{totalDga.toLocaleString('nl-NL')} overschrijdt de grens van &euro;500.000.</p>
-                          <p className="mt-0.5 text-[10px] text-red-600">Het meerdere boven &euro;500.000 wordt belast als box 2-inkomen (aanmerkelijk belang).</p>
+                        <div className="rounded-[var(--r)] border border-negative/40 bg-negative/10 p-3">
+                          <p className="text-xs font-medium text-negative">Wet excessief lenen: totaal DGA-leningen &euro;{totalDga.toLocaleString('nl-NL')} overschrijdt de grens van &euro;500.000.</p>
+                          <p className="mt-0.5 text-[10px] text-negative">Het meerdere boven &euro;500.000 wordt belast als box 2-inkomen (aanmerkelijk belang).</p>
                         </div>
                       )
                       if (totalDga > 400000) return (
@@ -3621,7 +3621,7 @@ export function AssetForm({
         </div>
 
         {validationError && (
-          <div className="mx-6 mt-3 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="asset-validation-error">
+          <div className="mx-6 mt-3 rounded-[var(--r)] border border-negative/30 bg-negative/10 px-4 py-2 text-sm text-negative" data-testid="asset-validation-error">
             {validationError}
           </div>
         )}

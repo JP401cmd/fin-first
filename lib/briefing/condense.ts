@@ -353,7 +353,7 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     if (impactMonths > 0) {
       lines.push(`  FIRE-impact: ${impactMonths} maanden vertraging door fondskosten`)
     }
-    lines.push(`  TIP: Gebruik showInsight met href="/core/assets" en ctaLabel="Bekijk fee-erosie" om gebruiker naar de fee-erosie visualisatie te leiden`)
+    lines.push(`  TIP: Gebruik showInsight met href="/overzicht/bezittingen" en ctaLabel="Bekijk fee-erosie" om gebruiker naar de fee-erosie visualisatie te leiden`)
     lines.push('')
   }
 
@@ -455,7 +455,7 @@ export function condenseDashboardData(data: DashboardData, temporal: TemporalCon
     lines.push(`- Fiscaal aftrekbaar: ${hvb.isTaxDeductible ? 'ja' : 'nee'}`)
     lines.push(`- Breakeven rendement: ${breakevenPct}%`)
     lines.push(`- Aanbeveling (€200/mnd extra): ${hvb.aanbeveling}`)
-    lines.push(`- Vergelijkingsmodal: /core/debts`)
+    lines.push(`- Vergelijkingsmodal: /overzicht/schulden`)
     lines.push('')
   }
 

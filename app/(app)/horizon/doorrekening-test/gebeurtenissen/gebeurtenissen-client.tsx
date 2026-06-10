@@ -1006,8 +1006,8 @@ export function GebeurtenissenClient({
                 variant="first-use"
                 icon={Calendar}
                 title="Levensgebeurtenissen"
-                description="Geen actieve levensgebeurtenissen gevonden. Voeg levensgebeurtenissen toe via De Horizon."
-                action={{ label: 'Levensgebeurtenissen toevoegen', href: '/horizon' }}
+                description="Geen actieve levensgebeurtenissen gevonden. Voeg levensgebeurtenissen toe via Toekomst."
+                action={{ label: 'Levensgebeurtenissen toevoegen', href: '/toekomst/gebeurtenissen' }}
               />
             )}
           </div>

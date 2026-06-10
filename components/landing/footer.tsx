@@ -1,50 +1,25 @@
 import Link from 'next/link'
+import { SlotCta } from './slot-cta'
 
 /**
  * Footer — drie-koloms layout met Producten / Hulp / Bedrijf.
  * Geen GitHub-link (productowner-beslissing 31 mei 2026: geen
  * open-source-positionering).
  *
- * Boven de footer staat de SlotCta-strook met de laatste mid-page
- * conversie. Beide hier samen zodat ze als één unit door page.tsx
- * geconsumeerd worden.
+ * Boven de footer staat de SlotCta-strook (zie slot-cta.tsx) met de
+ * laatste mid-page conversie. Doordat die hier in de Footer zit, eindigt
+ * élke marketing-pagina automatisch met dezelfde CTA.
  */
 
-function SlotCta() {
-  return (
-    <section className="border-t-2 border-[var(--ink)] bg-[var(--ink)] px-6 py-16 md:px-12 md:py-20">
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="mb-4 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--bg)]/60">
-          Klaar om te beginnen?
-        </p>
-        <h2 className="mb-6 font-display text-[2rem] font-bold leading-tight tracking-[-0.02em] text-[var(--bg)] md:text-[2.6rem]">
-          Maak van geld{' '}
-          <em className="italic text-kern-300">opgeslagen tijd</em>
-        </h2>
-        <p className="mx-auto mb-8 max-w-xl font-serif text-base leading-relaxed text-[var(--bg)]/80">
-          Probeer TriFinity gratis. Geen creditcard, geen trial die afloopt
-          &mdash; alleen helderheid in je financiën, vanaf de eerste sessie.
-        </p>
-        <Link
-          href="/signup"
-          className="inline-flex items-center justify-center rounded-[var(--r)] bg-[var(--bg)] px-7 py-3.5 font-sans text-sm font-medium text-[var(--ink)] transition-all hover:bg-[var(--paper)] hover:shadow-[var(--s2)]"
-        >
-          Begin gratis
-        </Link>
-      </div>
-    </section>
-  )
-}
-
 const PRODUCTEN = [
-  { label: 'Het Overzicht', href: '/#modules' },
-  { label: 'De Toekomst', href: '/#modules' },
-  { label: 'Rekenhulp-bibliotheek', href: '/#rekenhulp' },
-  { label: 'Will — AI-coach', href: '/#coach' },
+  { label: 'Functies', href: '/functies' },
+  { label: 'Prijzen', href: '/prijzen' },
+  { label: 'Veiligheid', href: '/veiligheid' },
+  { label: 'Will — AI-coach', href: '/functies#grip' },
 ]
 
 const HULP = [
-  { label: 'Veelgestelde vragen', href: '/#faq' },
+  { label: 'Veelgestelde vragen', href: '/functies#faq' },
   { label: 'Contact', href: '/contact' },
 ]
 

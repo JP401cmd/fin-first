@@ -23,7 +23,7 @@ export type BuildCalculatorResult =
   | { ok: true; definition: CalculatorDefinition }
   | { ok: false; error: string }
 
-function buildSystemPrompt(): string {
+export function buildSystemPrompt(): string {
   const prefillList = PREFILL_KEYS.map(
     (k) => `  - ${k.key} (${k.unit}): ${k.description}`,
   ).join('\n')

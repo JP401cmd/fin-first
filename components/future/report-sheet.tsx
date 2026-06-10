@@ -134,9 +134,9 @@ export function ReportSheet({
           // het signaal krijgt dat zijn input ergens landt.
           <div
             role="status"
-            className="flex flex-col items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 py-6 px-4 text-center"
+            className="flex flex-col items-center gap-2 rounded-xl border border-positive/20 bg-positive/5 py-6 px-4 text-center"
           >
-            <CheckCircle2 className="w-7 h-7 text-emerald-700" aria-hidden="true" />
+            <CheckCircle2 className="w-7 h-7 text-positive" aria-hidden="true" />
             <p className="text-sm font-semibold text-[var(--ink)]">
               Bedankt voor je melding
             </p>

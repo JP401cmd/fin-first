@@ -6,8 +6,6 @@ import {
   chronologyLevels,
   phaseColors,
   levelCriteriaMap,
-  getFeaturesPerPhase,
-  featureIcons,
 } from '@/lib/identity-constants'
 import { NL_SWR } from '@/lib/constants'
 
@@ -298,54 +296,6 @@ describe('Identity — Demo switch flow', () => {
   it('after reset, redirects to /onboarding', () => {
     const redirectTarget = '/onboarding'
     expect(redirectTarget).toBe('/onboarding')
-  })
-})
-
-// ── Step 8: Feature roadmap per fase ────────────────────────────────────
-
-describe('Identity — Feature roadmap per fase', () => {
-  it('getFeaturesPerPhase returns features grouped by phase', () => {
-    const result = getFeaturesPerPhase()
-    // Should have keys for all 4 phases
-    for (const phase of PHASES) {
-      expect(result[phase.id]).toBeDefined()
-      expect(Array.isArray(result[phase.id])).toBe(true)
-    }
-  })
-
-  it('every feature has an icon (or fallback)', () => {
-    const result = getFeaturesPerPhase()
-    for (const phase of PHASES) {
-      for (const feature of result[phase.id]) {
-        // The component uses: featureIcons[feature.id] ?? '⚡'
-        const icon = featureIcons[feature.id] ?? '\u26A1'
-        expect(icon).toBeTruthy()
-      }
-    }
-  })
-
-  it('feature pills have id, label, and description', () => {
-    const result = getFeaturesPerPhase()
-    for (const phase of PHASES) {
-      for (const feature of result[phase.id]) {
-        expect(feature.id).toBeTruthy()
-        expect(feature.label).toBeTruthy()
-        expect(feature.description).toBeTruthy()
-      }
-    }
-  })
-
-  it('phase unlock status depends on sovereignty level vs phase index', () => {
-    // Level 3 → momentum → phases recovery, stability, momentum are unlocked
-    const currentPhaseId = levelToPhaseId(3)
-    expect(currentPhaseId).toBe('momentum')
-    const currentPhaseIdx = PHASES.findIndex(p => p.id === currentPhaseId)
-
-    for (let i = 0; i < PHASES.length; i++) {
-      const isUnlocked = i <= currentPhaseIdx
-      if (i <= 2) expect(isUnlocked).toBe(true)   // recovery, stability, momentum
-      if (i === 3) expect(isUnlocked).toBe(false)  // mastery
-    }
   })
 })
 

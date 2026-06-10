@@ -1,6 +1,7 @@
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
 import { buildRecommendationContext } from '@/lib/ai/context/recommendation-context'
@@ -78,6 +79,7 @@ export async function POST() {
       prompt: `Analyseer het volgende financiële profiel en genereer 3 optimalisatietips:\n\n${context}`,
     })
     object = result.object
+    await recordAiUsage(supabase, user.id, 'recommendations')
   } catch (err) {
     console.error('AI generation failed:', err)
     const message = err instanceof Error ? err.message : 'Onbekende fout'

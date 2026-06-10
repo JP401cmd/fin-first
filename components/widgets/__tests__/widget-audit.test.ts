@@ -81,14 +81,14 @@ describe('Observation widgets retain legitimacy without forced actions (#802)', 
     // The href is optional — widget functions as pure observation without it
     expect(WIDGET_CLASSIFICATION['netto_vermogen']).toBe('observation')
     // It MAY have a navigation href but it's for "see more" not "take action"
-    expect(WIDGET_HREFS['netto_vermogen']).toBe('/core')
+    expect(WIDGET_HREFS['netto_vermogen']).toBe('/overzicht')
   })
 
   it('jouw_pad (fase-bar/sovereignty) has no forced action button', () => {
     // JouwPadWidgetWrapper props: { size, data, href? }
     // Shows sovereignty level + phase progress — purely observational
     expect(WIDGET_CLASSIFICATION['jouw_pad']).toBe('observation')
-    expect(WIDGET_HREFS['jouw_pad']).toBe('/identity')
+    expect(WIDGET_HREFS['jouw_pad']).toBe('/mijn')
   })
 
   it('vermogensgrafiek (trend widgets) accepted as observations', () => {

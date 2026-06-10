@@ -1,8 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
+import { type Debt } from '@/lib/debt-data'
 import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
 import { computeFireAge } from '@/lib/checkin/fire-age'
+import { resolveFireParams } from '@/lib/fire-params'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
+import { computeDebtAflossingMonthly, savingsRateFromAggregates } from '@/lib/savings-source'
 import {
   buildGespreksstarters,
   type GespreksstartersInput,
@@ -16,21 +19,22 @@ export async function GET() {
   const now = new Date()
   const currentMonth = now.getMonth()
   const currentYear = now.getFullYear()
-  const monthStart = new Date(currentYear, currentMonth, 1).toISOString().slice(0, 10)
-  const monthEnd = new Date(currentYear, currentMonth + 1, 1).toISOString().slice(0, 10)
-  const prevMonthStart = new Date(currentYear, currentMonth - 1, 1).toISOString().slice(0, 10)
+  // Tijdzone-veilige maandgrenzen (lib/month-range.ts) — lokale datum +
+  // toISOString() schoof de grens in NL een dag terug.
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
+  const prevMonthStart = localMonthStart(new Date(currentYear, currentMonth - 1, 1))
   const prevMonthEnd = monthStart
-  const sixMonthsAgo = new Date(Date.UTC(currentYear, currentMonth - 6, 1)).toISOString().slice(0, 10)
-  const threeMonthsAgo = new Date(currentYear, currentMonth - 3, 1).toISOString().slice(0, 10)
+  const sixMonthsAgo = localMonthStart(new Date(currentYear, currentMonth - 6, 1))
+  const threeMonthsAgo = localMonthStart(new Date(currentYear, currentMonth - 3, 1))
 
   const [
     assetsRes, debtsRes, curIncomeRes, prevIncomeRes,
     goalsRes, budgetsRes, actionsRes, snapshotsRes,
-    income6mRes, expense6mRes, profileRes,
+    income6mRes, expense6mRes, profileRes, bankRes,
     curCatRes, prevCatRes, recurringRes, perspective,
     prevFireAge,
   ] = await Promise.all([
-    supabase.from('assets').select('name, current_value').eq('user_id', user.id),
+    supabase.from('assets').select('name, current_value, net_worth_inclusion_pct').eq('user_id', user.id).eq('is_active', true),
     supabase.from('debts').select('current_balance, name, debt_type, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('user_id', user.id),
     supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', monthStart).lt('date', monthEnd),
     supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', prevMonthStart).lt('date', prevMonthEnd),
@@ -38,9 +42,10 @@ export async function GET() {
     supabase.from('budgets').select('name, monthly_limit, budget_type').eq('user_id', user.id).eq('budget_type', 'expense'),
     supabase.from('actions').select('id, freedom_days, is_completed, completed_at').eq('user_id', user.id),
     supabase.from('net_worth_snapshots').select('value, snapshot_date').eq('user_id', user.id).order('snapshot_date', { ascending: false }).limit(6),
-    supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
-    supabase.from('transactions').select('amount').eq('user_id', user.id).eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
-    supabase.from('profiles').select('date_of_birth, expected_return').eq('id', user.id).maybeSingle(),
+    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', user.id).eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', user.id).eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
+    supabase.from('profiles').select('date_of_birth, expected_return, inflation_rate').eq('id', user.id).maybeSingle(),
+    supabase.from('bank_accounts').select('balance').eq('user_id', user.id).eq('is_active', true).is('linked_asset_id', null),
     supabase.from('transactions').select('amount, category').eq('user_id', user.id).eq('is_income', false).gte('date', monthStart).lt('date', monthEnd),
     supabase.from('transactions').select('amount, category').eq('user_id', user.id).eq('is_income', false).gte('date', prevMonthStart).lt('date', monthStart),
     supabase.from('transactions').select('amount, counterparty_name, description, date').eq('user_id', user.id).eq('is_income', false).gte('date', threeMonthsAgo).lt('date', monthEnd),
@@ -49,9 +54,17 @@ export async function GET() {
   ])
 
   // ── Kernmetrics ──────────────────────────────────────────────────────
+  // Zelfde inclusieregels als dashboard-data-loader: actieve posten, gewogen
+  // met net_worth_inclusion_pct, plus losse bankrekeningen als cash.
   const assets = assetsRes.data || []
-  const totalAssets = assets.reduce((s, a) => s + (a.current_value || 0), 0)
-  const totalDebts = (debtsRes.data || []).reduce((s, d) => s + (d.current_balance || 0), 0)
+  const unlinkedCash = (bankRes.data || []).reduce((s, b) => s + Number(b.balance || 0), 0)
+  const totalAssets = assets.reduce(
+    (s, a) => s + (a.current_value || 0) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0,
+  ) + unlinkedCash
+  const activeDebts = ((debtsRes.data || []) as Debt[]).filter(d => d.is_active)
+  const totalDebts = activeDebts.reduce(
+    (s, d) => s + (d.current_balance || 0) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0,
+  )
   const netWorth = totalAssets - totalDebts
 
   const monthlyIncome = (curIncomeRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
@@ -60,21 +73,32 @@ export async function GET() {
   const prevMonthExpenses = (prevCatRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
   const monthlySavings = monthlyIncome - monthlyExpenses
   const prevMonthlySavings = prevMonthIncome - prevMonthExpenses
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
 
-  // 6-maands spaarquote (incl. aflossing als vermogensopbouw)
-  const income6m = (income6mRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const expenses6m = (expense6mRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  let debtAflossing6m = 0
-  for (const d of (debtsRes.data || []) as Debt[]) {
-    if (!d.is_active || !d.include_aflossing_in_savings) continue
-    const aflossing = d.custom_aflossing_amount != null
-      ? Number(d.custom_aflossing_amount)
-      : (computeRenteAflossingsSplit(d)?.currentAflossing ?? 0)
-    debtAflossing6m += aflossing * ((d.net_worth_inclusion_pct ?? 100) / 100)
+  // 6-maands gemiddelden (excl. eigen-rekening-transfers, zoals de loaders);
+  // bij minder dan 6 maanden data middelen we over de beschikbare maanden.
+  const isRealTx = (t: { transaction_type?: string | null }) =>
+    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+  const income6mRows = (income6mRes.data || []).filter(isRealTx)
+  const expense6mRows = (expense6mRes.data || []).filter(isRealTx)
+  const income6m = income6mRows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const expenses6m = expense6mRows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  const earliest6m = [...income6mRows, ...expense6mRows]
+    .reduce<string | null>((min, t) => (t.date && (!min || t.date < min) ? t.date : min), null)
+  let dataMonths6 = 6
+  if (earliest6m) {
+    const ed = new Date(earliest6m)
+    dataMonths6 = Math.max(1, Math.min(6,
+      (currentYear - ed.getFullYear()) * 12 + (currentMonth - ed.getMonth()),
+    ))
   }
-  debtAflossing6m *= 6
-  const savingsRate6m = income6m > 0 ? ((income6m - expenses6m + debtAflossing6m) / income6m) * 100 : 0
+  const income6mAvg = income6m / dataMonths6
+  const expenses6mAvg = expenses6m / dataMonths6
+  const debtAflossing6m = computeDebtAflossingMonthly(activeDebts) * 6
+  const savingsRate6m = savingsRateFromAggregates(income6mAvg * 6, expenses6mAvg * 6, debtAflossing6m)
+
+  // Dagtarief op jaarbasis (×12/365) — zelfde denominator als
+  // calculateFreedomTime in lib/format.ts, niet deze-maand/30.
+  const dailyExpenses = expenses6mAvg > 0 ? (expenses6mAvg * 12) / 365 : 0
 
   // Snapshots → trend
   const snapshots = snapshotsRes.data || []
@@ -89,12 +113,19 @@ export async function GET() {
   const completedActionsFreedomDays = completedThisMonth.reduce((s, a) => s + (a.freedom_days || 0), 0)
   const pendingActionsCount = allActions.filter(a => !a.is_completed).length
 
-  // FIRE-leeftijd nu + vorige check-in
+  // FIRE-leeftijd nu + vorige check-in — gepersonaliseerde parameters
+  // (resolveFireParams) + 6-maands gemiddelden i.p.v. deze-maand-cijfers,
+  // zodat de schatting niet halverwege de maand alle kanten op springt.
   const profile = profileRes.data
+  const fireParams = resolveFireParams(profile ?? {})
   const fireAge = computeFireAge({
     dateOfBirth: profile?.date_of_birth ?? null,
-    netWorth, monthlyIncome, monthlyExpenses,
-    expectedReturn: profile?.expected_return ?? null, now,
+    netWorth,
+    monthlyIncome: income6mAvg,
+    monthlyExpenses: expenses6mAvg,
+    expectedReturn: fireParams.grossReturn,
+    swr: fireParams.effectiveSwr,
+    now,
   })
   // Categorie-uitgaven (huidig vs vorige maand) + budgetlimieten
   const budgetLimits: Record<string, number> = {}
@@ -130,7 +161,7 @@ export async function GET() {
       name: g.name, current: g.current_value, target: g.target_value,
       completed: g.is_completed, targetDate: g.target_date ?? null,
     })),
-    totalDebts, debtCount: (debtsRes.data || []).filter(d => (d.current_balance || 0) > 0).length,
+    totalDebts, debtCount: activeDebts.filter(d => (d.current_balance || 0) > 0).length,
     completedActionsThisMonth: completedThisMonth.length,
     completedActionsFreedomDays, pendingActionsCount,
     fireAge, prevFireAge,

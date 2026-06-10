@@ -61,52 +61,52 @@ const REQUIREMENT_META: Record<RequirementKind, Omit<CalculatorRequirement, 'kin
   'debt:mortgage': {
     label: 'Hypotheek',
     detail: 'Een actieve schuld van het type hypotheek',
-    deepLink: '/core/debts',
+    deepLink: '/overzicht/schulden',
   },
   'debt:any': {
     label: 'Schuld',
     detail: 'Minstens één actieve schuld',
-    deepLink: '/core/debts',
+    deepLink: '/overzicht/schulden',
   },
   'asset:home': {
     label: 'Eigen huis',
     detail: 'Een eigen huis als bezit',
-    deepLink: '/core/assets',
+    deepLink: '/overzicht/bezittingen',
   },
   'asset:investment': {
     label: 'Beleggingen',
     detail: 'Een beleggings- of crypto-bezit',
-    deepLink: '/core/assets',
+    deepLink: '/overzicht/bezittingen',
   },
   'asset:cash': {
     label: 'Spaargeld',
     detail: 'Een cash- of spaarrekening',
-    deepLink: '/core/assets',
+    deepLink: '/overzicht/bezittingen',
   },
   'asset:any': {
     label: 'Bezit',
     detail: 'Minstens één bezit',
-    deepLink: '/core/assets',
+    deepLink: '/overzicht/bezittingen',
   },
   'profile:income': {
     label: 'Inkomen',
     detail: 'Netto maandinkomen ingevuld in je profiel',
-    deepLink: '/identity',
+    deepLink: '/mijn/profiel',
   },
   'profile:expenses': {
     label: 'Uitgaven',
     detail: 'Maandelijkse uitgaven ingevuld',
-    deepLink: '/identity',
+    deepLink: '/mijn/profiel',
   },
   'profile:income_and_expenses': {
     label: 'Inkomen + uitgaven',
     detail: 'Zowel inkomen als uitgaven ingevuld',
-    deepLink: '/identity',
+    deepLink: '/mijn/profiel',
   },
   'profile:dob': {
     label: 'Leeftijd',
     detail: 'Geboortedatum ingevuld in je profiel',
-    deepLink: '/identity',
+    deepLink: '/mijn/profiel',
   },
 }
 

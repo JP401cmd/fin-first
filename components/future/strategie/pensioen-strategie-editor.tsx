@@ -432,7 +432,7 @@ export function PensioenStrategieEditor({
                 type="button"
                 onClick={deletePot}
                 disabled={saving}
-                className="inline-flex items-center gap-1 text-xs text-red-700 hover:underline disabled:opacity-50"
+                className="inline-flex items-center gap-1 text-xs text-negative hover:underline disabled:opacity-50"
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden /> Verwijder pot
               </button>
@@ -633,7 +633,7 @@ export function PensioenStrategieEditor({
               {' → '}
               <span className="font-mono tabular-nums font-semibold">{draftRounded}</span> jaar
               {draftRounded !== savedRounded && (
-                <span className={draftRounded < savedRounded ? 'text-emerald-700' : 'text-amber-700'}>
+                <span className={draftRounded < savedRounded ? 'text-positive' : 'text-amber-700'}>
                   {' '}({draftRounded < savedRounded ? 'eerder vrij' : 'later vrij'})
                 </span>
               )}

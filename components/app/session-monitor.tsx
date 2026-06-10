@@ -124,11 +124,6 @@ export function SessionMonitor() {
     }
 
     const wrapped: typeof window.fetch = async (...args) => {
-      // Geen try/catch hier: network-errors moeten transparant doorlopen
-      // zodat ze in de stacktrace bij hun eigen call-site landen, niet bij
-      // de session-monitor. We onderscheppen alleen het 401-pad.
-      const response = await originalFetch(...args)
-
       const url =
         typeof args[0] === 'string'
           ? args[0]
@@ -137,6 +132,22 @@ export function SessionMonitor() {
             : args[0] instanceof URL
               ? args[0].toString()
               : ''
+
+      let response: Response
+      try {
+        response = await originalFetch(...args)
+      } catch (err) {
+        // De native fetch wordt fysiek híer aangeroepen, dus de stacktrace van
+        // elke netwerkfout in de app wijst onvermijdelijk naar deze regel — de
+        // echte call-site is daaruit niet te herleiden. Plak daarom de URL aan
+        // de melding (zelfde error-object: instanceof en startsWith/includes-
+        // matchers op 'Failed to fetch' blijven werken).
+        if (err instanceof Error && url && !err.message.includes(url)) {
+          err.message = `${err.message} — request: ${url}`
+        }
+        throw err
+      }
+
       const isOurApi = url.startsWith('/api/') || url.includes('/api/')
       const isAuthApi = url.includes('/auth/') || url.includes('supabase.co/auth')
 

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { SWR, DEFAULT_RETURN, INFLATION } from '@/lib/constants'
+import { localMonthBounds } from '@/lib/month-range'
 
 /**
  * GET /api/next-steps — Get user's next recommended steps.
@@ -32,8 +33,7 @@ export async function GET() {
   try {
     // Query actual user data state in parallel
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+    const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
     const [
       transactionsResult,

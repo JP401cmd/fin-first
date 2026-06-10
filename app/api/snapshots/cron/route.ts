@@ -6,6 +6,8 @@ import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { SWR } from '@/lib/constants'
+import { recordJobRun } from '@/lib/job-runs'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
 /**
  * GET /api/snapshots/cron
@@ -61,13 +63,13 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey)
+  const startedAt = new Date().toISOString()
 
   const now = new Date()
   const today = now.toISOString().split('T')[0]
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
-  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
+  const twelveMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 11, 1))
+  const sixMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 5, 1))
 
   // Get all users with completed onboarding
   const { data: profiles, error: profilesError } = await supabase
@@ -76,6 +78,7 @@ export async function GET(request: Request) {
     .eq('onboarding_completed', true)
 
   if (profilesError) {
+    await recordJobRun(supabase, { job: 'snapshots', status: 'error', startedAt, error: profilesError.message })
     return NextResponse.json({ error: profilesError.message }, { status: 500 })
   }
 
@@ -244,15 +247,25 @@ export async function GET(request: Request) {
   const skipped = results.filter(r => !r.created && !r.error).length
   const errors = results.filter(r => r.error).length
 
+  const summary = {
+    total_users: results.length,
+    created,
+    skipped_existing: skipped,
+    errors,
+  }
+
+  await recordJobRun(supabase, {
+    job: 'snapshots',
+    status: 'success',
+    startedAt,
+    summary,
+    error: errors > 0 ? `${errors} gebruiker(s) faalden` : null,
+  })
+
   return NextResponse.json({
     success: true,
     date: today,
-    summary: {
-      total_users: results.length,
-      created,
-      skipped_existing: skipped,
-      errors,
-    },
+    summary,
     results,
   })
 }

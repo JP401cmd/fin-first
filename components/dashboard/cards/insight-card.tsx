@@ -12,7 +12,7 @@ interface Props {
 const EMPHASIS_STYLES: Record<string, { border: string; bg: string; label: string }> = {
   greeting: { border: '', bg: '', label: '' },
   observation: { border: 'border-l-2 border-l-wil-300', bg: 'bg-wil-50/30', label: 'Observatie' },
-  celebration: { border: 'border-l-2 border-l-emerald-400', bg: 'bg-emerald-50/30', label: '' },
+  celebration: { border: 'border-l-2 border-l-positive/40', bg: 'bg-positive/5', label: '' },
   tip: { border: 'border-l-2 border-l-amber-400', bg: 'bg-amber-50/30', label: 'Tip' },
 }
 

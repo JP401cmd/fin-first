@@ -41,15 +41,15 @@ export async function GET() {
         : 'Missing onboarding_completed check',
     })
 
-    // Test 3: Page redirects to /will when already onboarded
-    const hasRedirect = pageSource.includes("router.replace('/will')") ||
-      pageSource.includes('router.replace("/will")')
+    // Test 3: Page redirects to /overzicht when already onboarded
+    const hasRedirect = pageSource.includes("router.replace('/overzicht')") ||
+      pageSource.includes('router.replace("/overzicht")')
     results.push({
-      name: 'Page redirects onboarded users to /will',
+      name: 'Page redirects onboarded users to /overzicht',
       pass: hasRedirect,
       detail: hasRedirect
-        ? 'router.replace("/will") found for onboarded users'
-        : 'No redirect to /will found',
+        ? 'router.replace("/overzicht") found for onboarded users'
+        : 'No redirect to /overzicht found',
     })
 
     // Test 4: Redirect is conditional on onboarding_completed being true

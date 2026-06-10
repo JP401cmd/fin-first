@@ -1186,8 +1186,8 @@ function ManualPriceOverrideModal({
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
-            <p className="text-xs text-red-600">{error}</p>
+          <div className="mb-4 rounded-lg border border-negative/30 bg-negative/10 p-3">
+            <p className="text-xs text-negative">{error}</p>
           </div>
         )}
 
@@ -1397,8 +1397,8 @@ function HoldingForm({
     <BottomSheet open={true} onClose={onClose} title="Nieuwe holding" size="md">
       <div className="p-5">
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
-            <p className="text-xs text-red-600">{error}</p>
+          <div className="mb-4 rounded-lg border border-negative/30 bg-negative/10 p-3">
+            <p className="text-xs text-negative">{error}</p>
           </div>
         )}
 
@@ -1560,7 +1560,7 @@ function HoldingForm({
                 className="flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-sm text-[var(--ink-2)]"
                 data-testid="holding-is-active-display"
               >
-                <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                <span className="inline-block h-2 w-2 rounded-full bg-positive" />
                 Actief
               </div>
             </div>
@@ -1593,7 +1593,7 @@ function HoldingForm({
               Vind de TER op de fonds factsheet of Morningstar
             </p>
             {Number(ter) > 10 && (
-              <p className="mt-1 text-[11px] text-red-500">TER mag maximaal 10% zijn</p>
+              <p className="mt-1 text-[11px] text-negative">TER mag maximaal 10% zijn</p>
             )}
           </div>
 
@@ -1749,8 +1749,8 @@ function HoldingTransactionForm({
   }
 
   const typeConfig = {
-    buy: { label: 'Koop', icon: ArrowDownRight, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', ring: 'ring-emerald-500' },
-    sell: { label: 'Verkoop', icon: ArrowUpRight, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', ring: 'ring-red-500' },
+    buy: { label: 'Koop', icon: ArrowDownRight, color: 'text-positive', bg: 'bg-positive/10', border: 'border-positive/30', ring: 'ring-positive' },
+    sell: { label: 'Verkoop', icon: ArrowUpRight, color: 'text-negative', bg: 'bg-negative/10', border: 'border-negative/30', ring: 'ring-negative' },
     dividend: { label: 'Dividend', icon: DollarSign, color: 'text-kern-600', bg: 'bg-kern-50', border: 'border-kern-200', ring: 'ring-kern-500' },
   }
 
@@ -1779,8 +1779,8 @@ function HoldingTransactionForm({
           {tab === 'new' && (
             <>
               {error && (
-                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
-                  <p className="text-xs text-red-600">{error}</p>
+                <div className="mb-4 rounded-lg border border-negative/30 bg-negative/10 p-3">
+                  <p className="text-xs text-negative">{error}</p>
                 </div>
               )}
 
@@ -1821,7 +1821,7 @@ function HoldingTransactionForm({
                         <button
                           type="button"
                           onClick={() => setUnits(String(currentUnits))}
-                          className="text-[10px] font-medium text-red-600 hover:text-red-700"
+                          className="text-[10px] font-medium text-negative hover:text-negative/80"
                           data-testid="sell-all-btn"
                         >
                           Alles verkopen ({currentUnits})
@@ -1835,7 +1835,7 @@ function HoldingTransactionForm({
                       value={units}
                       onChange={(e) => setUnits(e.target.value)}
                       className={`w-full rounded-lg border px-3 py-2 text-sm ${
-                        sellExceedsOwned || sellFromZero ? 'border-red-300 bg-red-50/50' : 'border-[var(--border-ed)]'
+                        sellExceedsOwned || sellFromZero ? 'border-negative/40 bg-negative/5' : 'border-[var(--border-ed)]'
                       }`}
                       placeholder={txType === 'dividend' ? '1' : '10'}
                       autoFocus
@@ -1885,16 +1885,16 @@ function HoldingTransactionForm({
 
               {/* Sell validation warning */}
               {sellFromZero && (
-                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="sell-from-zero-warning">
-                  <p className="text-xs font-medium text-red-700">
+                <div className="mt-4 rounded-lg border border-negative/30 bg-negative/10 p-3" data-testid="sell-from-zero-warning">
+                  <p className="text-xs font-medium text-negative">
                     <AlertTriangle className="inline h-3 w-3 mr-1" />
                     Deze holding heeft 0 eenheden. Je kunt niet verkopen.
                   </p>
                 </div>
               )}
               {sellExceedsOwned && !sellFromZero && (
-                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3" data-testid="sell-exceeds-warning">
-                  <p className="text-xs font-medium text-red-700">
+                <div className="mt-4 rounded-lg border border-negative/30 bg-negative/10 p-3" data-testid="sell-exceeds-warning">
+                  <p className="text-xs font-medium text-negative">
                     <AlertTriangle className="inline h-3 w-3 mr-1" />
                     Je hebt maar {currentUnits} eenheden. Je kunt niet meer verkopen dan je bezit.
                   </p>
@@ -1931,8 +1931,8 @@ function HoldingTransactionForm({
                   onClick={handleSave}
                   disabled={saving || !units || !pricePerUnit || !date || sellExceedsOwned || sellFromZero}
                   className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
-                    txType === 'buy' ? 'bg-emerald-600 hover:bg-emerald-700' :
-                    txType === 'sell' ? 'bg-red-600 hover:bg-red-700' :
+                    txType === 'buy' ? 'bg-positive hover:bg-positive/90' :
+                    txType === 'sell' ? 'bg-negative hover:bg-negative/90' :
                     'bg-kern-600 hover:bg-kern-700'
                   }`}
                 >

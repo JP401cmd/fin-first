@@ -22,6 +22,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, appendFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, relative, sep } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import annotations from './annotations.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -257,6 +258,214 @@ function scanPhases() {
   return { file: rel(file), phases }
 }
 
+// ── datatoegang: welke API-domeinen welke tabellen lezen/schrijven ──────────--
+// Regex op `.from('tabel')` (alleen bekende tabellen) met een schrijf-detectie
+// in een venster erna. Test-/verify-/migratie-routes worden overgeslagen.
+function scanTableAccess(knownTables) {
+  const tableSet = new Set(knownTables)
+  const files = walk(join(ROOT, 'app', 'api'), (f) => /[\\/]route\.(ts|js)$/.test(f))
+  const domainLabels = annotations.apiDomainLabels || {}
+  // domain -> table -> { write }
+  const domainTables = new Map()
+  // table -> domain -> { write, routes:Set }
+  const tableDomains = new Map()
+
+  for (const f of files) {
+    const { url, segs } = routeFromFile(f, /\/route\.(ts|js)$/)
+    const domain = segs[1] || segs[0] || 'root'
+    // sla niet-product-routes over (test, verify, migratie-helpers)
+    if (/^(verify|test)/.test(domain) || /migration|schema-check|run-|apply-/.test(domain) || /\/(verify|test)-/.test(url)) continue
+    const src = read(f)
+    for (const m of src.matchAll(/\.from\(\s*['"`]([a-z_][a-z0-9_]*)['"`]\s*\)/g)) {
+      const table = m[1]
+      if (!tableSet.has(table)) continue
+      const after = src.slice(m.index, m.index + 140)
+      const write = /\.(insert|update|upsert|delete)\s*\(/.test(after)
+      // domain -> table
+      let dt = domainTables.get(domain)
+      if (!dt) domainTables.set(domain, (dt = new Map()))
+      dt.set(table, { write: (dt.get(table)?.write ?? false) || write })
+      // table -> domain
+      let td = tableDomains.get(table)
+      if (!td) tableDomains.set(table, (td = new Map()))
+      let entry = td.get(domain)
+      if (!entry) td.set(domain, (entry = { write: false, routes: new Set() }))
+      entry.write = entry.write || write
+      entry.routes.add(url)
+    }
+  }
+
+  const byDomain = {}
+  for (const [domain, tables] of domainTables) {
+    byDomain[domain] = [...tables.entries()]
+      .map(([name, v]) => ({ name, write: v.write }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+  const byTable = {}
+  for (const [table, domains] of tableDomains) {
+    byTable[table] = [...domains.entries()]
+      .map(([domain, v]) => ({ domain, label: domainLabels[domain] || domain, write: v.write, routes: [...v.routes].sort() }))
+      .sort((a, b) => Number(b.write) - Number(a.write) || a.domain.localeCompare(b.domain))
+  }
+  const multiWriter = Object.entries(byTable)
+    .filter(([, writers]) => writers.filter((w) => w.write).length > 1)
+    .map(([t]) => t)
+    .sort()
+
+  return { byDomain, byTable, multiWriter }
+}
+
+// ── datarelaties: foreign keys + eigenaarschap + RLS ────────────────────────-
+// Line-based state machine over de migraties. Edges = FK's tussen bekende
+// public-tabellen, behálve naar `profiles`/`auth.users` (universele
+// gebruikers-eigenaar) — die worden als eigenaarschap-badge getoond i.p.v. als
+// ruis-edge. household_id → households blijft wél een edge (de huishoudgraaf is
+// juist interessant).
+function scanTableRelations(knownTables) {
+  const tableSet = new Set(knownTables)
+  const files = walk(join(ROOT, 'supabase', 'migrations'), (f) => /\.sql$/.test(f)).sort()
+  const relations = []
+  const relKey = new Set()
+  const meta = {}
+  const ensure = (t) => (meta[t] ??= { user: false, household: false, rls: false })
+  const addRef = (from, column, schema, table) => {
+    ensure(from)
+    if (schema === 'auth' || table === 'users' || table === 'profiles') {
+      meta[from].user = true
+      return
+    }
+    if (column === 'household_id') meta[from].household = true
+    if (column === 'user_id') meta[from].user = true
+    if (!tableSet.has(table) || from === table) return
+    const k = `${from}->${table}:${column}`
+    if (relKey.has(k)) return
+    relKey.add(k)
+    relations.push({ from, to: table, column })
+  }
+
+  const REF = /references\s+(?:"?(public|auth)"?\.)?"?([a-z_][a-z0-9_]*)"?/i
+  for (const f of files) {
+    let current = null
+    for (const line of read(f).split('\n')) {
+      const ct = line.match(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?/i)
+      if (ct) {
+        current = ct[1].toLowerCase()
+        if (tableSet.has(current)) ensure(current)
+        continue
+      }
+      if (current && /^\s*\)\s*;?/.test(line)) current = null
+      // inline kolom-referentie binnen een CREATE TABLE
+      if (current && tableSet.has(current) && REF.test(line)) {
+        const col = line.match(/^\s*"?([a-z_][a-z0-9_]*)"?\s/)
+        const ref = line.match(REF)
+        if (col && ref) addRef(current, col[1].toLowerCase(), (ref[1] || '').toLowerCase(), ref[2].toLowerCase())
+      }
+      // ALTER TABLE ADD COLUMN ... REFERENCES (één regel)
+      const at = line.match(/alter\s+table\s+(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?\s+add\s+column\s+(?:if\s+not\s+exists\s+)?"?([a-z_][a-z0-9_]*)"?/i)
+      if (at && tableSet.has(at[1].toLowerCase()) && REF.test(line)) {
+        const ref = line.match(REF)
+        addRef(at[1].toLowerCase(), at[2].toLowerCase(), (ref[1] || '').toLowerCase(), ref[2].toLowerCase())
+      }
+      // RLS
+      const rls = line.match(/alter\s+table\s+(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?\s+enable\s+row\s+level\s+security/i)
+      if (rls && tableSet.has(rls[1].toLowerCase())) ensure(rls[1].toLowerCase()).rls = true
+      const pol = line.match(/create\s+policy\s+.*\bon\s+(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?/i)
+      if (pol && tableSet.has(pol[1].toLowerCase())) ensure(pol[1].toLowerCase()).rls = true
+    }
+  }
+  relations.sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to))
+  return { relations, meta }
+}
+
+// ── architectuurbesluiten (ADR's) ───────────────────────────────────────────-
+function parseFrontmatter(src) {
+  const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+  if (!m) return { data: {}, body: src }
+  const data = {}
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^([a-zA-Z_]+):\s*(.*)$/)
+    if (!kv) continue
+    let val = kv[2].trim()
+    if (/^\[.*\]$/.test(val)) {
+      val = val.slice(1, -1).split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
+    } else {
+      val = val.replace(/^['"]|['"]$/g, '')
+    }
+    data[kv[1]] = val
+  }
+  return { data, body: src.slice(m[0].length) }
+}
+function scanAdrs() {
+  const dir = join(ROOT, 'docs', 'adr')
+  const files = walk(dir, (f) => /\.md$/.test(f) && !/README/i.test(f)).sort()
+  const adrs = []
+  for (const f of files) {
+    const { data, body } = parseFrontmatter(read(f))
+    const base = f.split(sep).pop().replace(/\.md$/, '')
+    const firstPara = body.split(/\r?\n\r?\n/).map((p) => p.trim()).find((p) => p && !p.startsWith('#')) || ''
+    adrs.push({
+      id: data.id || base,
+      title: data.title || base.replace(/^\d+[-_]?/, '').replace(/[-_]/g, ' '),
+      status: data.status || 'voorgesteld',
+      date: data.date || '',
+      elements: Array.isArray(data.elements) ? data.elements : data.elements ? [data.elements] : [],
+      summary: firstPara.replace(/\s+/g, ' ').slice(0, 280),
+      file: rel(f),
+    })
+  }
+  if (!adrs.length) warn('geen ADR-bestanden gevonden in docs/adr/ (optioneel)')
+  return adrs
+}
+
+// ── churn: wijzigingsdruk per gebied + grootste bestanden ───────────────────-
+const CHURN_AREAS = [
+  'app/api/ai', 'app/api/household', 'app/api/budgets', 'app/api/assets',
+  'app/(app)/toekomst', 'app/(app)/overzicht',
+  'lib/ai', 'lib/fire-simulation.ts', 'lib/horizon-data.ts', 'components/horizon',
+]
+// Geen shell: execFileSync met argument-array. Alle args zijn repo-constanten
+// of paden uit de eigen walk — nooit externe invoer.
+function git(args) {
+  return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+}
+function gitCommitCount(since, path) {
+  try {
+    const out = git(['log', since, '--pretty=format:%h', '--', path]).trim()
+    return out ? out.split(/\r?\n/).length : 0
+  } catch {
+    return 0
+  }
+}
+function countLines(file) {
+  const s = read(file)
+  return s ? s.split('\n').length : 0
+}
+function scanChurn(sinceDays = 90) {
+  try {
+    git(['rev-parse', '--is-inside-work-tree'])
+  } catch {
+    warn('git niet beschikbaar — churn overgeslagen')
+    return null
+  }
+  const since = `--since=${sinceDays} days ago`
+  const areas = CHURN_AREAS.map((path) => ({ path, commits: gitCommitCount(since, path) }))
+  // grootste client-/lib-bestanden op regelaantal, met commit-druk
+  const codeFiles = [
+    ...walk(join(ROOT, 'components'), (f) => /\.(tsx|ts)$/.test(f)),
+    ...walk(join(ROOT, 'app'), (f) => /\.(tsx|ts)$/.test(f)),
+    ...walk(join(ROOT, 'lib'), (f) => /\.(tsx|ts)$/.test(f)),
+  ].filter((f) => !/\.test\.|\.spec\./.test(f))
+  const sized = codeFiles.map((f) => ({ file: rel(f), loc: countLines(f) })).sort((a, b) => b.loc - a.loc).slice(0, 8)
+  const hotFiles = sized.map((s) => ({ file: s.file, loc: s.loc, commits: gitCommitCount(since, s.file) }))
+  return { sinceDays, areas: areas.sort((a, b) => b.commits - a.commits), hotFiles }
+}
+
+// ── trend-historie: rollende dagreeks van de kerngetallen ───────────────────-
+function buildStatsHistory(prev, today) {
+  const prior = Array.isArray(prev?.statsHistory) ? prev.statsHistory.filter((e) => e && e.date !== today.date) : []
+  return [...prior, today].slice(-120)
+}
+
 // ── diff t.o.v. vorige snapshot ──────────────────────────────────────────--
 function diffList(prev, cur, keyFn, labelFn = keyFn) {
   const p = new Map((prev || []).map((x) => [keyFn(x), x]))
@@ -305,6 +514,10 @@ function build() {
   const coach = scanCoach()
   const modules = scanModules()
   const phases = scanPhases()
+  const tableAccess = scanTableAccess(tables.list.map((t) => t.name))
+  const tableRelations = scanTableRelations(tables.list.map((t) => t.name))
+  const adrs = scanAdrs()
+  const churn = scanChurn()
 
   // groeperingen voor de UI
   const routesByGroup = {}
@@ -348,10 +561,21 @@ function build() {
     patterns: { contextBuilder, briefing, coach },
     modules,
     phases,
+    tableAccess,
+    tableRelations,
+    adrs,
+    churn,
   }
 
   const prev = existsSync(DATA_FILE) ? JSON.parse(read(DATA_FILE) || 'null') : null
   data.diff = computeDiff(prev, data)
+  data.statsHistory = buildStatsHistory(prev, {
+    date: data.generatedDate,
+    api: data.stats.api,
+    components: data.stats.components,
+    tables: data.stats.tables,
+    routesProduction: data.stats.routesProduction,
+  })
 
   // schrijven
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
@@ -390,6 +614,9 @@ function printSummary(data) {
   console.log(`\n  Repo ${data.repo.name}@${data.repo.version} — ${data.generatedDate}`)
   console.log(`  Schermen ${s.routes} (prod ${s.routesProduction}) · API ${s.api} · Tabellen ${s.tables} · Integraties ${s.integrations} · Componenten ${s.components}`)
   console.log(`  Context-builders ${s.contextBuilders} · Briefing-kaarten ${s.briefingTools} · Coach-lagen ${s.coachLayers} · Modules ${s.modules} · Niveaus ${s.phases}`)
+  const ta = data.tableAccess
+  console.log(`  Datatoegang: ${Object.keys(ta.byTable).length} tabellen geraakt · ${ta.multiWriter.length} multi-writer · ADR's ${data.adrs.length} · Churn ${data.churn ? data.churn.areas.length + ' gebieden' : 'n.v.t.'}`)
+  console.log(`  Datarelaties: ${data.tableRelations.relations.length} FK-edges · ${Object.values(data.tableRelations.meta).filter((m) => m.rls).length} tabellen met RLS`)
   const d = data.diff
   if (d.baseline) console.log('  Diff: baseline (eerste run).')
   else if (!d.hasChanges) console.log(`  Diff: geen wijzigingen sinds ${d.previousDate}.`)

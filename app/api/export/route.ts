@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { localMonthBounds } from '@/lib/month-range'
 
 type ExportType = 'transactions' | 'budgets' | 'net_worth' | 'assets' | 'debts' | 'goals'
 
@@ -66,8 +67,7 @@ export async function GET(req: Request) {
 
     case 'budgets': {
       const now = new Date()
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+      const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
       const [budgetsRes, txRes] = await Promise.all([
         supabase

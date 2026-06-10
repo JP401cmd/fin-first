@@ -995,10 +995,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const currentAge = effectiveInput?.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
 
   // ── Baseline overrides for inline what-if sliders (feature #795) ───────
+  // savingsRate6m: server-canoniek getal (incl. spaarbudgetten + aflossing)
+  // zodat de slider start op dezelfde spaarquote als de cashflow-pagina.
   const whatIfBaseline = useMemo<WhatIfOverrides | null>(() => {
     if (!effectiveInput) return null
-    return buildBaselineOverrides(effectiveInput, fireParams.grossReturn)
-  }, [effectiveInput, fireParams.grossReturn])
+    return buildBaselineOverrides(effectiveInput, fireParams.grossReturn, initialData.healthScoreInput.savingsRate6m)
+  }, [effectiveInput, fireParams.grossReturn, initialData.healthScoreInput.savingsRate6m])
 
   // Typed event setter that accepts WhatIfEvent updaters (structural superset of LifeEvent)
   const setEventsForSliders = useCallback(
@@ -1620,7 +1622,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       const scenario = savedScenarios.find(s => s.id === scenarioId)
       if (!scenario) continue
 
-      const baselineOvr = buildBaselineOverrides(initialEffectiveInput, initialFireParams.grossReturn)
+      const baselineOvr = buildBaselineOverrides(initialEffectiveInput, initialFireParams.grossReturn, initialData.healthScoreInput.savingsRate6m)
       const { adjustedInput, annualSavings } = applyWhatIfOverrides(initialEffectiveInput, scenario.overrides, baselineOvr)
 
       // Build cashflows from scenario events, normalising numeric fields that may be stored as strings.

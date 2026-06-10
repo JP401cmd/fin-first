@@ -9,9 +9,9 @@ interface Props {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  healthy: 'bg-emerald-500',
+  healthy: 'bg-positive',
   warning: 'bg-amber-500',
-  over: 'bg-rose-500',
+  over: 'bg-negative',
 }
 
 export function BudgetBarCard({ spec }: Props) {

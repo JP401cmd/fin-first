@@ -6,6 +6,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-banner'
 import { TransactiesAnalyse } from '@/components/overview/transacties/transacties-analyse'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { Kicker, EditorialDeck } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
@@ -34,6 +35,17 @@ export default async function OverzichtCashflowTransactiesPage() {
         />
       </div>
       <div className="mx-auto max-w-6xl space-y-6 px-4 pt-4 sm:px-6">
+        {/* Editorial header — zelfde stijl als de andere cashflow-subpages. */}
+        <header>
+          <Kicker>Je geldstroom</Kicker>
+          <h1 className="mt-1 font-serif text-2xl text-[var(--ink)]">
+            Transacties
+          </h1>
+          <EditorialDeck className="mt-2">
+            Elke transactie is gekochte of verkochte tijd — bekijk waar je uren
+            heen gaan.
+          </EditorialDeck>
+        </header>
         <KoppelRekeningBanner accountCount={accountCount} />
         <TransactiesAnalyse />
       </div>

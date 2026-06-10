@@ -2,11 +2,21 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
+const NAV_LINKS = [
+  { label: 'Functies', href: '/functies' },
+  { label: 'Prijzen', href: '/prijzen' },
+  { label: 'Veiligheid', href: '/veiligheid' },
+]
+
 export function Header() {
+  const pathname = usePathname()
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + '/')
   const [user, setUser] = useState<User | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -45,24 +55,23 @@ export function Header() {
       </Link>
 
       <div className="flex items-center gap-6 md:gap-8">
-        <a
-          href="#modules"
-          className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
-        >
-          Modules
-        </a>
-        <a
-          href="#rekenhulp"
-          className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
-        >
-          Rekenhulp
-        </a>
-        <a
-          href="#pricing"
-          className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
-        >
-          Prijzen
-        </a>
+        {NAV_LINKS.map((link) => {
+          const active = isActive(link.href)
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={active ? 'page' : undefined}
+              className={`hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] transition-colors md:block ${
+                active
+                  ? 'border-b-2 border-[var(--ink)] pb-0.5 text-[var(--ink)]'
+                  : 'text-[var(--ink-3)] hover:text-[var(--ink)]'
+              }`}
+            >
+              {link.label}
+            </Link>
+          )
+        })}
 
         {/* Hamburger — alleen mobiel */}
         <button
@@ -79,7 +88,11 @@ export function Header() {
         {user ? (
           <div className="relative">
             <button
+              type="button"
               onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="Accountmenu"
+              aria-expanded={menuOpen}
+              aria-haspopup="true"
               className="flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 transition-all hover:border-[var(--ink-3)] hover:shadow-[var(--s0)]"
             >
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ink)] font-sans text-xs font-medium text-[var(--bg)]">
@@ -109,12 +122,20 @@ export function Header() {
             )}
           </div>
         ) : (
-          <Link
-            href="/signup"
-            className="rounded-[var(--r)] border-2 border-[var(--ink)] bg-[var(--ink)] px-4 py-2 font-sans text-sm font-medium text-[var(--bg)] transition-all hover:bg-[var(--ink-2)] hover:border-[var(--ink-2)]"
-          >
-            Begin gratis
-          </Link>
+          <>
+            <Link
+              href="/login"
+              className="hidden font-sans text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] md:block"
+            >
+              Inloggen
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-[var(--r)] border-2 border-[var(--ink)] bg-[var(--ink)] px-4 py-2 font-sans text-sm font-medium text-[var(--bg)] transition-all hover:bg-[var(--ink-2)] hover:border-[var(--ink-2)]"
+            >
+              Begin gratis
+            </Link>
+          </>
         )}
       </div>
 
@@ -125,27 +146,22 @@ export function Header() {
           className="absolute left-0 right-0 top-full border-b-2 border-t border-[var(--ink)] border-t-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s2)] md:hidden"
         >
           <div className="flex flex-col px-6 py-3">
-            <a
-              href="#modules"
-              onClick={() => setMobileOpen(false)}
-              className="border-b border-[var(--border-ed)] py-3 font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
-            >
-              Modules
-            </a>
-            <a
-              href="#rekenhulp"
-              onClick={() => setMobileOpen(false)}
-              className="border-b border-[var(--border-ed)] py-3 font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
-            >
-              Rekenhulp
-            </a>
-            <a
-              href="#pricing"
-              onClick={() => setMobileOpen(false)}
-              className="border-b border-[var(--border-ed)] py-3 font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
-            >
-              Prijzen
-            </a>
+            {NAV_LINKS.map((link) => {
+              const active = isActive(link.href)
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  aria-current={active ? 'page' : undefined}
+                  className={`border-b border-[var(--border-ed)] py-3 font-sans text-[12px] font-medium uppercase tracking-[0.08em] transition-colors ${
+                    active ? 'text-[var(--ink)]' : 'text-[var(--ink-2)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              )
+            })}
             {user ? (
               <Link
                 href="/overzicht"
@@ -155,13 +171,22 @@ export function Header() {
                 Overzicht
               </Link>
             ) : (
-              <Link
-                href="/signup"
-                onClick={() => setMobileOpen(false)}
-                className="mt-3 rounded-[var(--r)] border-2 border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-center font-sans text-sm font-medium text-[var(--bg)] transition-all hover:border-[var(--ink-2)] hover:bg-[var(--ink-2)]"
-              >
-                Begin gratis
-              </Link>
+              <>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="border-b border-[var(--border-ed)] py-3 font-sans text-[12px] font-medium uppercase tracking-[0.08em] text-[var(--ink-2)] transition-colors hover:text-[var(--ink)]"
+                >
+                  Inloggen
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileOpen(false)}
+                  className="mt-3 rounded-[var(--r)] border-2 border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-center font-sans text-sm font-medium text-[var(--bg)] transition-all hover:border-[var(--ink-2)] hover:bg-[var(--ink-2)]"
+                >
+                  Begin gratis
+                </Link>
+              </>
             )}
           </div>
         </div>

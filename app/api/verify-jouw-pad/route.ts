@@ -98,12 +98,12 @@ export async function GET() {
     detail: `Compact card: ${hasCompactCard}, Hover: ${hasHoverEffect}`,
   })
 
-  // 9. Widget links to /identity for full details
-  const linksToIdentity = widgetCode.includes('href="/identity"')
+  // 9. Widget is clickable via href prop (catalog WIDGET_HREFS → /mijn)
+  const acceptsHrefProp = widgetCode.includes('href?: string') && widgetCode.includes('href={href}')
   results.push({
-    name: 'Widget links to /identity page',
-    pass: linksToIdentity,
-    detail: `Links to /identity: ${linksToIdentity}`,
+    name: 'Widget accepts href prop for click-through (catalog routes to /mijn)',
+    pass: acceptsHrefProp,
+    detail: `Accepts href prop: ${acceptsHrefProp}`,
   })
 
   // 10. Phase progress bar with 4 segments

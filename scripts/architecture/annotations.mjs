@@ -53,7 +53,7 @@ export const annotations = {
       'aangeroepen met RLS.',
     domain:
       'De domein- en AI-logica. Hier wonen de drie generieke mechanismen, de functionele modules ' +
-      'en de soevereiniteitsniveaus die functionaliteit progressief vrijspelen.',
+      '(door de gebruiker activeerbaar) en de soevereiniteitsniveaus als motivatie- en voortgangsmodel.',
     data:
       'Supabase (PostgreSQL 17) met Row Level Security, realtime en RPC-functies. Schema beheerd ' +
       'via migraties.',
@@ -105,7 +105,7 @@ export const annotations = {
     'Elke EUR boven €100 toont ook zijn vrijheidstijd-equivalent.',
     'Time-/vrijheidsframing boven generieke financiële termen.',
     'Eén filosofie over alle schermen, niet "data + AI-coaching" ernaast.',
-    'Progressive disclosure via soevereiniteitsniveaus (Recovery → Mastery).',
+    'Zichtbaarheid via module-activatie; soevereiniteitsniveaus (Recovery → Mastery) motiveren — geen gating.',
     'Nieuwe domeinen pluggen in bestaande patronen — geen nieuwe infrastructuur.',
   ],
 

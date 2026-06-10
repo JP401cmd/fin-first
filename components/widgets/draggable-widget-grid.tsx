@@ -1224,9 +1224,6 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
                                 {!accessible && (
                                   <div className="flex items-center gap-1 shrink-0 text-[var(--ink-4)]">
                                     <Lock className="h-3 w-3" />
-                                    {w.requiredPhase && (
-                                      <span className="text-[10px]">{w.requiredPhase}</span>
-                                    )}
                                   </div>
                                 )}
                               </button>

@@ -15,133 +15,11 @@ function isRedirect(status: number): boolean {
   return status >= 300 && status < 400
 }
 
-// ── Propositie page expected sections ────────────────────────────────────────
-const PROPOSITIE_SECTIONS = [
-  'Filosofie',
-  'Propositie',
-  'Het emotionele verhaal',
-  'Feature Mapping per Module',
-  'Differentiatie',
-  'Het Aha-Moment',
-  'Samenvatting',
-]
-
-// ── Module cards in emotioneel verhaal ────────────────────────────────────────
-const MODULE_CARDS = [
-  { module: 'De Kern', label: '1. Ken je werkelijkheid' },
-  { module: 'De Wil', label: '2. Neem de regie' },
-  { module: 'De Horizon', label: '3. Zie je vrijheid groeien' },
-]
-
 // ── Release notes expected module colors ─────────────────────────────────────
 const MODULE_COLORS = ['amber', 'teal', 'purple', 'blue', 'zinc', 'rose']
 
 const tests: TestCase[] = [
-  // ── Step 1: Propositie pagina secties ────────────────────────────────────
-  {
-    id: 'propositie-sections',
-    name: 'Propositie pagina: alle 7 secties aanwezig',
-    category: CAT,
-    description:
-      'Controleert dat Filosofie, Propositie, Emotioneel Verhaal, Feature Mapping, Differentiatie, Aha-Moment en Samenvatting gerenderd worden',
-    priority: 'critical',
-    estimatedDurationMs: 2000,
-    async fn() {
-      // Propositie page should be reachable (200 or auth redirect)
-      const res = await fetchNoRedirect('/beheer/propositie')
-      assert(
-        res.status === 200 || isRedirect(res.status),
-        `Expected 200 or redirect for /beheer/propositie, got ${res.status}`,
-      )
-
-      // Verify the page component exports correctly by checking route existence
-      // The page is a server component with 7 sections — verify the section count
-      assertEqual(
-        PROPOSITIE_SECTIONS.length,
-        7,
-        'Propositie page should have exactly 7 sections',
-      )
-
-      // Verify section names match specification
-      assert(
-        PROPOSITIE_SECTIONS.includes('Filosofie'),
-        'Missing Filosofie section',
-      )
-      assert(
-        PROPOSITIE_SECTIONS.includes('Propositie'),
-        'Missing Propositie section',
-      )
-      assert(
-        PROPOSITIE_SECTIONS.includes('Het emotionele verhaal'),
-        'Missing Emotioneel Verhaal section',
-      )
-      assert(
-        PROPOSITIE_SECTIONS.includes('Feature Mapping per Module'),
-        'Missing Feature Mapping section',
-      )
-      assert(
-        PROPOSITIE_SECTIONS.includes('Differentiatie'),
-        'Missing Differentiatie section',
-      )
-      assert(
-        PROPOSITIE_SECTIONS.includes('Het Aha-Moment'),
-        'Missing Aha-Moment section',
-      )
-      assert(
-        PROPOSITIE_SECTIONS.includes('Samenvatting'),
-        'Missing Samenvatting section',
-      )
-    },
-  },
-
-  // ── Step 2: Emotioneel verhaal module kaarten ───────────────────────────
-  {
-    id: 'propositie-module-cards',
-    name: 'Emotioneel verhaal: 3 module kaarten correct',
-    category: CAT,
-    description:
-      'De Kern, De Wil en De Horizon kaarten met juiste labels en volgorde',
-    priority: 'critical',
-    estimatedDurationMs: 500,
-    fn() {
-      // Verify 3 module cards
-      assertEqual(
-        MODULE_CARDS.length,
-        3,
-        'Should have exactly 3 module cards',
-      )
-
-      // Verify correct module names
-      const moduleNames = MODULE_CARDS.map((c) => c.module)
-      assert(moduleNames.includes('De Kern'), 'Missing De Kern module card')
-      assert(moduleNames.includes('De Wil'), 'Missing De Wil module card')
-      assert(
-        moduleNames.includes('De Horizon'),
-        'Missing De Horizon module card',
-      )
-
-      // Verify order: Kern → Wil → Horizon (numbered 1, 2, 3)
-      assertEqual(MODULE_CARDS[0].module, 'De Kern', 'First card should be De Kern')
-      assertEqual(MODULE_CARDS[1].module, 'De Wil', 'Second card should be De Wil')
-      assertEqual(MODULE_CARDS[2].module, 'De Horizon', 'Third card should be De Horizon')
-
-      // Verify numbered labels
-      assert(
-        MODULE_CARDS[0].label.startsWith('1.'),
-        'De Kern label should start with 1.',
-      )
-      assert(
-        MODULE_CARDS[1].label.startsWith('2.'),
-        'De Wil label should start with 2.',
-      )
-      assert(
-        MODULE_CARDS[2].label.startsWith('3.'),
-        'De Horizon label should start with 3.',
-      )
-    },
-  },
-
-  // ── Step 3: Release notes data en rendering ─────────────────────────────
+  // ── Step 1: Release notes data en rendering ─────────────────────────────
   {
     id: 'releases-data-structure',
     name: 'Release notes: RELEASE_NOTES data correct gerenderd',
@@ -233,7 +111,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 4: Release module kleuren ──────────────────────────────────────
+  // ── Step 2: Release module kleuren ──────────────────────────────────────
   {
     id: 'releases-module-colors',
     name: 'Release module kleuren: correcte kleuring per module',
@@ -292,125 +170,21 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 5: Roadmap FASE_A features ─────────────────────────────────────
-  {
-    id: 'roadmap-fase-a',
-    name: 'Roadmap: FASE_A_FEATURES correct weergegeven',
-    category: CAT,
-    description:
-      'Controleert dat FASE_A features alle velden bevatten: nr, naam, beschrijving, werking, prioriteit',
-    priority: 'critical',
-    estimatedDurationMs: 1000,
-    async fn() {
-      // Roadmap page should be reachable
-      const res = await fetchNoRedirect('/beheer/roadmap')
-      assert(
-        res.status === 200 || isRedirect(res.status),
-        `Expected 200 or redirect for /beheer/roadmap, got ${res.status}`,
-      )
-
-      // Verify Feature type contract by checking the page module
-      // The roadmap page defines FASE_A_FEATURES as readonly Feature[]
-      // Each Feature must have: nr, name, description, werking, afhankelijkheden, technisch, waardeGebruiker, aandachtspunten, competitors, priority
-      const requiredFields = [
-        'nr',
-        'name',
-        'description',
-        'werking',
-        'afhankelijkheden',
-        'technisch',
-        'waardeGebruiker',
-        'aandachtspunten',
-        'competitors',
-        'priority',
-      ]
-
-      // Verify the Feature type contract is correct
-      assertEqual(
-        requiredFields.length,
-        10,
-        'Feature type should have 10 required fields',
-      )
-
-      // Verify FASE_A has high priority features
-      // FASE_A = "De Brug" — bridge phase with high priority
-      assert(
-        requiredFields.includes('priority'),
-        'Feature type must include priority field',
-      )
-      assert(
-        requiredFields.includes('nr'),
-        'Feature type must include nr field',
-      )
-      assert(
-        requiredFields.includes('name'),
-        'Feature type must include name field',
-      )
-      assert(
-        requiredFields.includes('description'),
-        'Feature type must include description field',
-      )
-      assert(
-        requiredFields.includes('werking'),
-        'Feature type must include werking field',
-      )
-    },
-  },
-
-  // ── Step 6: Roadmap phases chronologisch ────────────────────────────────
-  {
-    id: 'roadmap-phases-order',
-    name: 'Roadmap timeline: chronologische fase-volgorde correct',
-    category: CAT,
-    description:
-      'Controleert dat Fase A → B → C → D in juiste volgorde staan met correcte titels',
-    priority: 'high',
-    estimatedDurationMs: 500,
-    fn() {
-      // Roadmap has 4 phases in order
-      const phases = [
-        { id: 'Fase A', title: 'De Brug', priority: 'Hoog' },
-        { id: 'Fase B', title: 'Nederland-proof', priority: 'Middel' },
-        { id: 'Fase C', title: 'Groei', priority: 'varies' },
-        { id: 'Fase D', title: 'Premium', priority: 'varies' },
-      ]
-
-      assertEqual(phases.length, 4, 'Should have 4 roadmap phases')
-
-      // Verify order
-      assertEqual(phases[0].id, 'Fase A', 'First phase should be Fase A')
-      assertEqual(phases[1].id, 'Fase B', 'Second phase should be Fase B')
-      assertEqual(phases[2].id, 'Fase C', 'Third phase should be Fase C')
-      assertEqual(phases[3].id, 'Fase D', 'Fourth phase should be Fase D')
-
-      // Verify phase titles
-      assertEqual(phases[0].title, 'De Brug', 'Fase A title')
-      assertEqual(phases[1].title, 'Nederland-proof', 'Fase B title')
-      assertEqual(phases[2].title, 'Groei', 'Fase C title')
-      assertEqual(phases[3].title, 'Premium', 'Fase D title')
-
-      // Phases follow a priority gradient: Hoog → Middel → lower
-      assert(
-        phases[0].priority === 'Hoog',
-        'Fase A should be Hoog priority',
-      )
-    },
-  },
-
-  // ── Extra: Route accessibility ──────────────────────────────────────────
+  // ── Step 3: Informatieve routes bereikbaar ──────────────────────────────
   {
     id: 'informatief-routes-accessible',
     name: 'Alle informatieve beheer routes bereikbaar',
     category: CAT,
     description:
-      'Controleert dat /beheer/propositie, /beheer/releases en /beheer/roadmap bereikbaar zijn',
+      'Controleert dat /beheer/releases, /beheer/architectuur, /beheer/blueprints en /beheer/widget-audit bereikbaar zijn',
     priority: 'high',
     estimatedDurationMs: 3000,
     async fn() {
       const routes = [
-        '/beheer/propositie',
         '/beheer/releases',
-        '/beheer/roadmap',
+        '/beheer/architectuur',
+        '/beheer/blueprints',
+        '/beheer/widget-audit',
       ]
       const failures: string[] = []
 
@@ -429,65 +203,18 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Extra: Propositie samenvatting tabel ────────────────────────────────
-  {
-    id: 'propositie-samenvatting',
-    name: 'Propositie samenvatting: 7 rijen met juiste labels',
-    category: CAT,
-    description:
-      'Controleert dat de samenvatting tabel 7 rijen bevat met verwachte labels',
-    priority: 'medium',
-    estimatedDurationMs: 200,
-    fn() {
-      const samenvattingRows = [
-        'Filosofie',
-        'Propositie',
-        'Emotioneel frame',
-        'Drie pijlers',
-        'Gelaagdheid',
-        'Aha-moment',
-        'Differentiatie',
-      ]
-
-      assertEqual(
-        samenvattingRows.length,
-        7,
-        'Samenvatting should have exactly 7 rows',
-      )
-
-      // Verify key content
-      assert(
-        samenvattingRows.includes('Filosofie'),
-        'Missing Filosofie in samenvatting',
-      )
-      assert(
-        samenvattingRows.includes('Drie pijlers'),
-        'Missing Drie pijlers in samenvatting',
-      )
-      assert(
-        samenvattingRows.includes('Aha-moment'),
-        'Missing Aha-moment in samenvatting',
-      )
-      assert(
-        samenvattingRows.includes('Differentiatie'),
-        'Missing Differentiatie in samenvatting',
-      )
-    },
-  },
-
-  // ── Extra: Release notes count ──────────────────────────────────────────
+  // ── Step 4: Release notes count ──────────────────────────────────────────
   {
     id: 'releases-version-count',
     name: 'Release notes: minstens 20 versies aanwezig',
     category: CAT,
     description:
-      'Controleert dat er voldoende release history is (23 versies verwacht)',
+      'Controleert dat er voldoende release history is',
     priority: 'medium',
     estimatedDurationMs: 500,
     async fn() {
       const { RELEASE_NOTES } = await import('@/lib/release-notes')
 
-      // We know there are 23 versions from v0.1 to v0.85
       assertGreaterThan(
         RELEASE_NOTES.length,
         19,
@@ -512,104 +239,14 @@ const tests: TestCase[] = [
       }
     },
   },
-
-  // ── Extra: Feature Mapping modules ──────────────────────────────────────
-  {
-    id: 'propositie-feature-mapping',
-    name: 'Propositie: Feature Mapping per module compleet',
-    category: CAT,
-    description:
-      'Controleert dat alle 3 modules features hebben in Feature Mapping sectie',
-    priority: 'medium',
-    estimatedDurationMs: 200,
-    fn() {
-      // Kern features (from propositie page)
-      const kernFeatures = [
-        'Nettovermogen',
-        'Vermogen',
-        'Schulden',
-        'Transacties',
-        'Budgetteren (optioneel)',
-        'Belastingpositie',
-        'Holdings',
-      ]
-
-      // Wil features
-      const wilFeatures = [
-        'Gepersonaliseerd dashboard',
-        'Acties & aanbevelingen',
-        'Doelen',
-        'Abonnementen-inzicht',
-        'Patroonherkenning',
-        'Nieuws x jouw situatie',
-        'AI-coach Will',
-      ]
-
-      // Horizon features
-      const horizonFeatures = [
-        'Vrijheidsprognose',
-        'Aftellen',
-        'What-if scenario\u2019s',
-        'Levensgebeurtenissen',
-        'Droomscenario',
-        'Sparren',
-      ]
-
-      assertEqual(kernFeatures.length, 7, 'Kern should have 7 features')
-      assertEqual(wilFeatures.length, 7, 'Wil should have 7 features')
-      assertEqual(horizonFeatures.length, 6, 'Horizon should have 6 features')
-
-      // Total features across all modules
-      const totalFeatures =
-        kernFeatures.length + wilFeatures.length + horizonFeatures.length
-      assertEqual(totalFeatures, 20, 'Total feature mapping should be 20 items')
-    },
-  },
-
-  // ── Extra: Differentiatie kaarten ───────────────────────────────────────
-  {
-    id: 'propositie-differentiatie',
-    name: 'Propositie: 3 differentiatie kaarten correct',
-    category: CAT,
-    description:
-      'Controleert de 3 differentiatiepunten: Vrijheidstijd, Data x AI x Wereld, Nederland',
-    priority: 'medium',
-    estimatedDurationMs: 200,
-    fn() {
-      const differentiators = [
-        'Vrijheidstijd als taal',
-        'Data x AI x de wereld',
-        'Gebouwd voor Nederland',
-      ]
-
-      assertEqual(
-        differentiators.length,
-        3,
-        'Should have exactly 3 differentiators',
-      )
-
-      assert(
-        differentiators.some((d) => d.includes('Vrijheidstijd')),
-        'Missing Vrijheidstijd differentiator',
-      )
-      assert(
-        differentiators.some((d) => d.includes('AI')),
-        'Missing Data x AI differentiator',
-      )
-      assert(
-        differentiators.some((d) => d.includes('Nederland')),
-        'Missing Nederland differentiator',
-      )
-    },
-  },
 ]
 
 export function register(): void {
   registerCategory({
     id: CAT,
-    label: 'Beheer \u2014 Informatief',
+    label: 'Beheer — Informatief',
     description:
-      'Propositie, release notes en roadmap: read-only beheer pagina\u2019s',
+      'Release notes en informatieve beheer-pagina’s: architectuur, blueprints, widget-audit',
     icon: 'BookOpen',
     testCount: 0,
     defaultRole: 'superadmin' as const,

@@ -2,31 +2,13 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
 import { authenticatedFetch } from '../server-runner'
+import { BEHEER_GROUPS } from '@/lib/beheer-sections'
 
 const CAT = 'beheer.layout'
 
-// ── Beheer nav tabs (all 18 from beheer-nav.tsx) ──────────────────────────────
+// ── Alle beheer-tools uit de gedeelde sectie-config (lib/beheer-sections.ts) ──
 
-const BEHEER_TABS = [
-  { label: 'AI Instellingen', href: '/beheer/ai' },
-  { label: 'Prompts', href: '/beheer/prompts' },
-  { label: 'Briefing', href: '/beheer/briefing' },
-  { label: 'Testdata', href: '/beheer/testdata' },
-  { label: 'Release Notes', href: '/beheer/releases' },
-  { label: 'Meldingen', href: '/beheer/meldingen' },
-  { label: 'Toegang', href: '/beheer/toegang' },
-  { label: 'Database', href: '/beheer/migration' },
-  { label: 'Mobile Preview', href: '/beheer/testdata#mobile-preview' },
-  { label: 'Bank Connect', href: '/beheer/bank-connect' },
-  { label: 'Nieuws', href: '/beheer/nieuws' },
-  { label: 'AI Features', href: '/beheer/ai-features' },
-  { label: 'Widgets', href: '/beheer/widgets-test' },
-  { label: 'Propositie', href: '/beheer/propositie' },
-  { label: 'AOW-leeftijd', href: '/beheer/aow-leeftijd' },
-  { label: 'Will Avatar', href: '/beheer/will-avatar' },
-  { label: 'Roadmap', href: '/beheer/roadmap' },
-  { label: 'Regressietest', href: '/beheer/regressietest' },
-]
+const BEHEER_TOOLS = BEHEER_GROUPS.flatMap((group) => group.tools)
 
 /** Fetch a URL without following redirects */
 async function fetchNoRedirect(path: string): Promise<Response> {
@@ -75,12 +57,12 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 2: Redirect bij niet-admin → /will ─────────────────────────
+  // ── Step 2: Redirect bij niet-admin ──────────────────────────────────
   {
     id: 'beheer-redirect-non-admin',
-    name: 'Redirect bij niet-admin naar /will',
+    name: 'Redirect bij niet-admin weg van beheer',
     category: CAT,
-    description: 'Niet-admin gebruikers worden doorgestuurd naar /will',
+    description: 'Niet-admin gebruikers worden weggestuurd van beheer-paginas',
     priority: 'critical',
     estimatedDurationMs: 3000,
     requiredRole: 'user',
@@ -93,136 +75,85 @@ const tests: TestCase[] = [
       )
       const location = res.headers.get('location') ?? ''
       assert(
-        location.includes('/will') || location.includes('/login'),
-        `Expected redirect to /will or /login, got ${location}`,
+        location.includes('/overzicht') || location.includes('/will') || location.includes('/login'),
+        `Expected redirect to /overzicht, /will or /login, got ${location}`,
       )
     },
   },
 
-  // ── Step 3: All 18 beheer-nav tabs reachable ────────────────────────
+  // ── Step 3: Alle beheer-tools uit de sectie-config bereikbaar ─────────
   {
     id: 'beheer-nav-tabs-reachable',
-    name: 'Alle 18 beheer-nav tabs zijn bereikbaar',
+    name: 'Alle beheer-tools zijn bereikbaar',
     category: CAT,
-    description: 'Alle tabs uit beheer-nav.tsx geven een redirect (auth) of 200',
+    description: 'Alle tools uit lib/beheer-sections.ts geven een redirect (auth) of 200',
     priority: 'critical',
     estimatedDurationMs: 5000,
     async fn() {
       const failures: string[] = []
-      for (const tab of BEHEER_TABS) {
-        const path = tab.href.split('#')[0] // strip hash fragments
-        const res = await fetchNoRedirect(path)
+      for (const tool of BEHEER_TOOLS) {
+        const res = await fetchNoRedirect(tool.href)
         // Valid: 200 (admin logged in) or redirect (auth/admin check)
         // Invalid: 404, 500
         const valid = res.status === 200 || isRedirect(res.status)
         if (!valid) {
-          failures.push(`${tab.label} (${path}): ${res.status}`)
+          failures.push(`${tool.label} (${tool.href}): ${res.status}`)
         }
       }
       assert(
         failures.length === 0,
-        `Onbereikbare beheer tabs: ${failures.join(', ')}`,
+        `Onbereikbare beheer tools: ${failures.join(', ')}`,
       )
     },
   },
 
-  // ── Step 4: /beheer redirect → /beheer/ai ──────────────────────────
+  // ── Step 4: /beheer is de hub-startpagina ─────────────────────────────
   {
-    id: 'beheer-root-redirect',
-    name: '/beheer redirectt naar /beheer/ai',
+    id: 'beheer-root-hub',
+    name: '/beheer toont de hub-startpagina',
     category: CAT,
-    description: '/beheer zonder subpad redirectt naar AI instellingen',
+    description: '/beheer rendert de startpagina met groepssecties (200), geen redirect meer naar /beheer/ai',
     priority: 'high',
-    estimatedDurationMs: 500,
+    estimatedDurationMs: 1000,
+    requiredRole: 'superadmin',
     async fn() {
       const res = await fetchNoRedirect('/beheer')
       assert(
-        isRedirect(res.status),
-        `Expected redirect for /beheer, got ${res.status}`,
-      )
-      const location = res.headers.get('location') ?? ''
-      // Should redirect to /beheer/ai (page.tsx redirect) or /login (auth)
-      assert(
-        location.includes('/beheer/ai') || location.includes('/login') || location.includes('/will'),
-        `Expected redirect to /beheer/ai, /login or /will, got ${location}`,
+        res.status === 200,
+        `Expected 200 for /beheer hub as superadmin, got ${res.status}`,
       )
     },
   },
 
-  // ── Step 5: /beheer/features redirect → /beheer/toegang ────────────
+  // ── Step 5: Sectie-config structuur ───────────────────────────────────
   {
-    id: 'beheer-features-redirect',
-    name: '/beheer/features redirectt naar /beheer/toegang',
+    id: 'beheer-sections-structure',
+    name: 'Beheer-secties: 4 groepen met unieke routes',
     category: CAT,
-    description: 'Legacy features pagina redirectt naar toegang',
-    priority: 'high',
-    estimatedDurationMs: 500,
-    async fn() {
-      const res = await fetchNoRedirect('/beheer/features')
-      assert(
-        isRedirect(res.status),
-        `Expected redirect for /beheer/features, got ${res.status}`,
-      )
-      const location = res.headers.get('location') ?? ''
-      assert(
-        location.includes('/beheer/toegang') || location.includes('/login') || location.includes('/will'),
-        `Expected redirect to /beheer/toegang, /login or /will, got ${location}`,
-      )
-    },
-  },
-
-  // ── Step 6: /beheer/tiers redirect → /beheer/toegang ───────────────
-  {
-    id: 'beheer-tiers-redirect',
-    name: '/beheer/tiers redirectt naar /beheer/toegang',
-    category: CAT,
-    description: 'Legacy tiers pagina redirectt naar toegang',
-    priority: 'high',
-    estimatedDurationMs: 500,
-    async fn() {
-      const res = await fetchNoRedirect('/beheer/tiers')
-      assert(
-        isRedirect(res.status),
-        `Expected redirect for /beheer/tiers, got ${res.status}`,
-      )
-      const location = res.headers.get('location') ?? ''
-      assert(
-        location.includes('/beheer/toegang') || location.includes('/login') || location.includes('/will'),
-        `Expected redirect to /beheer/toegang, /login or /will, got ${location}`,
-      )
-    },
-  },
-
-  // ── Step 7: Horizontaal scrollende nav ──────────────────────────────
-  {
-    id: 'beheer-nav-scroll',
-    name: 'Horizontaal scrollende nav: alle tabs bereikbaar',
-    category: CAT,
-    description: 'BeheerNav heeft overflow-x-auto voor mobiel scroll en bevat alle 18 tabs',
+    description: 'BEHEER_GROUPS heeft vier groepen in vaste volgorde; elke tool een label en unieke /beheer/-route',
     priority: 'medium',
     estimatedDurationMs: 100,
     fn() {
-      // Static verification: the beheer-nav component uses overflow-x-auto
-      // and renders all tabs with whitespace-nowrap for horizontal scrolling.
-      // We verify the expected tab count matches the component definition.
       assertEqual(
-        BEHEER_TABS.length,
-        18,
-        `Expected 18 beheer tabs, got ${BEHEER_TABS.length}`,
+        BEHEER_GROUPS.map((g) => g.id).join(','),
+        'technisch,functioneel,test,info',
+        'Groepsvolgorde moet technisch, functioneel, test, info zijn',
       )
-      // Verify all tabs have labels and hrefs
-      for (const tab of BEHEER_TABS) {
-        assert(tab.label.length > 0, `Tab missing label`)
-        assert(tab.href.startsWith('/beheer/'), `Tab href must start with /beheer/: ${tab.href}`)
+      for (const group of BEHEER_GROUPS) {
+        assert(group.tools.length > 0, `Groep ${group.id} heeft geen tools`)
       }
-      // Verify no duplicate hrefs (ignoring hash fragments)
-      const paths = BEHEER_TABS.map((t) => t.href.split('#')[0])
-      const unique = new Set(paths)
-      // Mobile Preview shares /beheer/testdata with Testdata tab (hash fragment difference)
-      // So we expect 17 unique base paths for 18 tabs
-      assert(
-        unique.size >= 17,
-        `Expected at least 17 unique base paths, got ${unique.size}`,
+      for (const tool of BEHEER_TOOLS) {
+        assert(tool.label.length > 0, 'Tool zonder label')
+        assert(
+          tool.href.startsWith('/beheer/'),
+          `Tool href moet met /beheer/ beginnen: ${tool.href}`,
+        )
+      }
+      const hrefs = BEHEER_TOOLS.map((t) => t.href)
+      assertEqual(
+        new Set(hrefs).size,
+        hrefs.length,
+        `Dubbele tool-routes in BEHEER_GROUPS: ${hrefs.filter((h, i) => hrefs.indexOf(h) !== i).join(', ')}`,
       )
     },
   },
@@ -231,8 +162,8 @@ const tests: TestCase[] = [
 export function register(): void {
   registerCategory({
     id: CAT,
-    label: 'Beheer \u2014 Layout & Toegang',
-    description: 'Admin guard, navigatie, redirects bij ongeautoriseerde toegang',
+    label: 'Beheer — Layout & Toegang',
+    description: 'Admin guard, hub-startpagina, groepsnavigatie, redirects bij ongeautoriseerde toegang',
     icon: 'ShieldCheck',
     testCount: 0,
   })

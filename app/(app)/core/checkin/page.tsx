@@ -173,7 +173,7 @@ function CheckinPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const readOnlyMonth = searchParams.get('month')
-  const returnTo = searchParams.get('from') || '/will'
+  const returnTo = searchParams.get('from') || '/overzicht'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [readOnlySnapshot, setReadOnlySnapshot] = useState<any>(null)
   const [readOnlyLoading, setReadOnlyLoading] = useState(!!readOnlyMonth)
@@ -394,8 +394,8 @@ function CheckinPageContent() {
       const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
       sessionStorage.setItem('checkin_dismissed', monthKey)
       // Navigate back to the page that started the check-in
-      const allowedPaths = ['/identity', '/will']
-      const dest = allowedPaths.includes(returnTo) ? returnTo : '/will'
+      const allowedPaths = ['/overzicht', '/mijn', '/mijn/checkins']
+      const dest = allowedPaths.includes(returnTo) ? returnTo : '/overzicht'
       window.location.href = dest
     } catch {
       setSaving(false)

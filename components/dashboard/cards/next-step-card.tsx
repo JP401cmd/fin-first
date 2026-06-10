@@ -143,7 +143,7 @@ export function NextStepBriefingCard({ spec }: Props) {
 
         {/* Error toast — shows briefly when dismiss fails */}
         {error && (
-          <p className="mt-2 text-xs text-red-600 animate-fade-up">{error}</p>
+          <p className="mt-2 text-xs text-negative animate-fade-up">{error}</p>
         )}
       </BriefingCard>
     </div>

@@ -39,6 +39,7 @@
 
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { recordAiUsage } from '@/lib/ai-credits'
 import { extractAangifteData } from '@/lib/aangifte/extract-aangifte-data'
 import { extractionSchema } from '@/lib/aangifte/extraction-schema'
 import { stripSensitiveData } from '@/lib/aangifte/strip-bsn'
@@ -131,6 +132,7 @@ export async function POST(req: Request) {
       )
     }
 
+    await recordAiUsage(supabase, user.id, 'extraction')
     return Response.json(reparsed.data)
   } catch (err) {
     // The extraction function is fail-graceful, so we should rarely hit

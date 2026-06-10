@@ -194,8 +194,8 @@ export function EventBewerkenSheet({
         </p>
 
         {confirmDelete ? (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-3">
-            <p className="text-xs text-red-800 mb-2">
+          <div className="mt-4 rounded-xl border border-negative/30 bg-negative/10 px-3 py-3">
+            <p className="text-xs text-negative mb-2">
               Weet je zeker dat je &quot;{event.name}&quot; wilt verwijderen?
               De tijdas-projectie wordt direct bijgewerkt.
             </p>
@@ -204,7 +204,7 @@ export function EventBewerkenSheet({
                 type="button"
                 onClick={handleDelete}
                 disabled={saving}
-                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                className="rounded-lg bg-negative px-3 py-1.5 text-xs font-semibold text-white hover:bg-negative/90 transition-colors disabled:opacity-50"
               >
                 {saving ? 'Verwijderen…' : 'Ja, verwijder'}
               </button>
@@ -224,7 +224,7 @@ export function EventBewerkenSheet({
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center gap-1 text-xs text-red-700 hover:text-red-800 hover:underline"
+              className="inline-flex items-center gap-1 text-xs text-negative hover:underline"
             >
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
               Verwijder

@@ -26,7 +26,7 @@ export function ComparisonCard({ spec }: Props) {
         <div className="flex flex-col items-center">
           <span className="text-[var(--ink-4)]">&rarr;</span>
           <span className={`text-xs font-mono tabular-nums font-semibold ${
-            isPositive ? 'text-emerald-600' : isNegative ? 'text-rose-600' : 'text-[var(--ink-3)]'
+            isPositive ? 'text-positive' : isNegative ? 'text-negative' : 'text-[var(--ink-3)]'
           }`}>
             {spec.delta}
           </span>

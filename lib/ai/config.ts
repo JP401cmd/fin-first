@@ -2,6 +2,7 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createMistral } from '@ai-sdk/mistral'
 import { createOpenAI } from '@ai-sdk/openai'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { parsePlatformStatus } from '@/lib/platform-status'
 
 export class AIConfigError extends Error {
   constructor(
@@ -17,11 +18,17 @@ export async function getModel(supabase: SupabaseClient) {
   const { data } = await supabase
     .from('app_settings')
     .select('key, value')
-    .in('key', ['ai_provider', 'ai_model_anthropic', 'ai_model_openai', 'anthropic_api_key', 'openai_api_key', 'ai_model_mistral', 'mistral_api_key', 'ollama_base_url', 'ai_model_ollama'])
+    .in('key', ['ai_provider', 'ai_model_anthropic', 'ai_model_openai', 'anthropic_api_key', 'openai_api_key', 'ai_model_mistral', 'mistral_api_key', 'ollama_base_url', 'ai_model_ollama', 'platform_status'])
 
   const settings: Record<string, string> = {}
   for (const row of data ?? []) {
     settings[row.key] = row.value
+  }
+
+  // Globale AI-kill-switch (beheerd via /beheer/platform). Staat boven de
+  // provider-keuze: als AI uit staat, geen enkele AI-call mag door.
+  if (!parsePlatformStatus(settings.platform_status).killSwitches.ai) {
+    throw new AIConfigError('AI is tijdelijk uitgeschakeld door beheer.', 'platform')
   }
 
   const provider = settings.ai_provider || process.env.AI_PROVIDER || 'anthropic'

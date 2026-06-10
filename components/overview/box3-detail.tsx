@@ -11,7 +11,7 @@ import {
   type PartnerAllocation,
 } from '@/lib/box3-data'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
-import { Kicker, HighlightMark } from '@/components/editorial'
+import { Kicker, HighlightMark, OrnamentColophon } from '@/components/editorial'
 import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -567,6 +567,9 @@ export function Box3Detail({
           </div>
         )}
       </div>
+
+      {/* Krant-stijl colophon als pagina-afsluiter. */}
+      <OrnamentColophon text="Box 3 · Sparen + beleggen" module="Belasting" />
     </section>
   )
 }

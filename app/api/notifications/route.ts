@@ -659,7 +659,7 @@ export async function GET(request: NextRequest) {
           color: 'amber',
           createdAt: now,
           read: readIds.includes(id),
-          actionUrl: '/identity/profiel',
+          actionUrl: '/mijn/profiel',
           aiContext: 'Ik heb mijn geboortedatum nog niet ingesteld. Waarom is dat belangrijk voor mijn FIRE-berekeningen?',
         })
       }

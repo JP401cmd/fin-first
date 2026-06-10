@@ -7,10 +7,8 @@ import {
   UNIFIED_FEATURES,
   LEGACY_FEATURE_MAP,
   hasSubscription,
-  isPhaseSufficient,
   type CommercialTier,
   type ActiveSubscriptions,
-  type PhaseId,
 } from '@/lib/feature-registry'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -21,7 +19,7 @@ export interface FeatureAccessResult {
   accessible: boolean
   reason: LockReason
   requiredTier?: CommercialTier
-  /** What sovereignty defaults recommend (before user override) */
+  /** Default state before any user override (true unless tier-locked) */
   defaultEnabled: boolean
 }
 
@@ -29,7 +27,9 @@ export type FeatureAccessMap = Record<string, FeatureAccessResult>
 
 export type FeatureAccessData = {
   features: FeatureAccessMap
+  /** Sovereignty phase — motivatie-weergave (Jouw Pad), stuurt géén toegang */
   phase: string
+  /** Sovereignty level — motivatie-weergave, stuurt géén toegang */
   level: number
   /** Active subscriptions (independent add-ons, not hierarchical) */
   subscriptions: ActiveSubscriptions
@@ -46,7 +46,6 @@ export type FinancialInput = {
   transactions: { amount: number | string; is_income: boolean }[]
   /** Active subscription add-ons */
   activeSubscriptions: ActiveSubscriptions
-  matrixJson: string | null          // admin overrides (unified_feature_matrix)
   userFeaturePrefs: Record<string, boolean> | null  // user toggles
   /** @deprecated Use activeSubscriptions instead — kept for backward compat */
   commercialTier?: CommercialTier
@@ -95,24 +94,16 @@ export function computeFeatureAccess(input: FinancialInput): FeatureAccessData {
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
   const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)
 
+  // Sovereignty level/phase worden alleen nog berekend voor motivatie-weergave
+  // (Jouw Pad, fase-overgang-viering) — ze sturen geen feature-toegang meer.
   const level = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPct, hasConsumerDebt)
-  const phase = levelToPhaseId(level) as PhaseId
+  const phase = levelToPhaseId(level)
   const subs = input.activeSubscriptions
-
-  // Parse admin overrides (only phase overrides per feature)
-  let adminOverrides: Record<string, { unlockPhase?: PhaseId }> = {}
-  if (input.matrixJson) {
-    try {
-      const parsed = JSON.parse(input.matrixJson)
-      if (parsed && typeof parsed === 'object') adminOverrides = parsed
-    } catch {
-      // keep empty
-    }
-  }
 
   const userPrefs = input.userFeaturePrefs ?? {}
 
-  // ── Build feature access map (3-layer resolution) ──────────────────────────
+  // ── Build feature access map (2-layer resolution) ──────────────────────────
+  // Laag 1: abonnement (harde lock). Laag 2: user-toggle (default aan).
 
   const features: FeatureAccessMap = {}
 
@@ -128,18 +119,14 @@ export function computeFeatureAccess(input: FinancialInput): FeatureAccessData {
       continue
     }
 
-    // LAYER 2 — Sovereignty default
-    const effectivePhase = adminOverrides[feat.id]?.unlockPhase ?? feat.defaultPhase
-    const defaultEnabled = isPhaseSufficient(phase, effectivePhase)
-
-    // LAYER 3 — User override
+    // LAYER 2 — User override (features staan standaard aan)
     const userOverride = userPrefs[feat.id]
-    const accessible = userOverride !== undefined ? userOverride : defaultEnabled
+    const accessible = userOverride !== undefined ? userOverride : true
 
     features[feat.id] = {
       accessible,
       reason: accessible ? 'accessible' : 'user_disabled',
-      defaultEnabled,
+      defaultEnabled: true,
     }
   }
 

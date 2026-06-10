@@ -4,6 +4,7 @@ import { fetchPriceData } from '@/lib/price-feed'
 import { fetchCoinPricesEurBatch } from '@/lib/integrations/coingecko-client'
 import { syncAllExchangeConnections } from '@/lib/integrations/exchange-cron'
 import { syncAllWalletAddresses } from '@/lib/integrations/wallet-cron'
+import { recordJobRun } from '@/lib/job-runs'
 
 /**
  * GET /api/holdings/refresh-prices/cron
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
   // `.from('investment_holdings')` without the strict default-schema generics
   // collapsing the row shape to `never`.
   const supabase: SupabaseClient = createClient(supabaseUrl, serviceRoleKey) as unknown as SupabaseClient
+  const startedAt = new Date(startTime).toISOString()
 
   try {
     // ── Step 1: Investment holdings refresh ───────────────────────
@@ -95,19 +97,35 @@ export async function GET(request: Request) {
       }
     }
 
+    const summary = {
+      investment: investmentSummary,
+      crypto: cryptoSummary,
+      exchanges: exchangeResult,
+      wallets: walletResult,
+    }
+    const hadErrors =
+      investmentSummary.errors > 0 ||
+      cryptoSummary.errors > 0 ||
+      (exchangeResult?.failed ?? 0) > 0 ||
+      (walletResult?.failed ?? 0) > 0
+
+    await recordJobRun(supabase, {
+      job: 'holdings-prices',
+      status: 'success',
+      startedAt,
+      summary,
+      error: hadErrors ? 'Eén of meer deeltaken faalden — zie samenvatting' : null,
+    })
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      summary: {
-        investment: investmentSummary,
-        crypto: cryptoSummary,
-        exchanges: exchangeResult,
-        wallets: walletResult,
-      },
+      summary,
       duration_ms: Date.now() - startTime,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Onbekende fout'
+    await recordJobRun(supabase, { job: 'holdings-prices', status: 'error', startedAt, error: message })
     return NextResponse.json({
       error: message,
       duration_ms: Date.now() - startTime,

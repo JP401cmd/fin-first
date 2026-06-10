@@ -46,7 +46,7 @@ export const SurplusGapWidget = memo(function SurplusGapWidget({ size, data, hre
           variant="first-use"
           icon={LineChart}
           description="Niet genoeg data — vul je profiel verder aan om je vermogensstromen te zien."
-          action={{ label: 'Profiel aanvullen', href: '/identity/profiel' }}
+          action={{ label: 'Profiel aanvullen', href: '/mijn/profiel' }}
         />
       </WidgetShell>
     )

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { computeConfidenceBand, DEFAULT_VOLATILITY } from './confidence-band'
+import {
+  computeConfidenceBand,
+  DEFAULT_VOLATILITY,
+  Z_SCORE_P40_P60,
+  Z_SCORE_P10_P90,
+} from './confidence-band'
 
 const SIM_ROWS = [
   { age: 35, endPortfolio: 100_000 },
@@ -13,46 +18,46 @@ describe('computeConfidenceBand — basis', () => {
     expect(computeConfidenceBand([])).toEqual([])
   })
 
-  it('eerste jaar heeft spread = 0 (P10 = P50 = P90)', () => {
+  it('eerste jaar heeft spread = 0 (low = mid = high)', () => {
     const result = computeConfidenceBand(SIM_ROWS)
-    expect(result[0]?.p10).toBe(100_000)
-    expect(result[0]?.p50).toBe(100_000)
-    expect(result[0]?.p90).toBe(100_000)
+    expect(result[0]?.low).toBe(100_000)
+    expect(result[0]?.mid).toBe(100_000)
+    expect(result[0]?.high).toBe(100_000)
   })
 
-  it('P50 = endPortfolio uit simRows', () => {
+  it('mid = endPortfolio uit simRows', () => {
     const result = computeConfidenceBand(SIM_ROWS)
-    expect(result[1]?.p50).toBe(110_000)
-    expect(result[3]?.p50).toBe(500_000)
+    expect(result[1]?.mid).toBe(110_000)
+    expect(result[3]?.mid).toBe(500_000)
   })
 
   it('spread groeit met sqrt(jaren_vooruit)', () => {
     const result = computeConfidenceBand(SIM_ROWS)
     // year 1: sigma×√1 = 0.15
     // year 3: sigma×√3 ≈ 0.26
-    // P90 jaar 3 > P90 jaar 1 in relatieve termen
-    const year1Spread = (result[1]!.p90 - result[1]!.p50) / result[1]!.p50
-    const year3Spread = (result[3]!.p90 - result[3]!.p50) / result[3]!.p50
+    // high jaar 3 > high jaar 1 in relatieve termen
+    const year1Spread = (result[1]!.high - result[1]!.mid) / result[1]!.mid
+    const year3Spread = (result[3]!.high - result[3]!.mid) / result[3]!.mid
     expect(year3Spread).toBeGreaterThan(year1Spread)
   })
 
-  it('P10 niet negatief (clamp op 0)', () => {
+  it('low niet negatief (clamp op 0)', () => {
     // Verzin extreem hoog jaar zodat factor > 1 zou worden
     const longHorizon = Array.from({ length: 100 }, (_, i) => ({
       age: 35 + i,
       endPortfolio: 100_000,
     }))
-    const result = computeConfidenceBand(longHorizon, 0.5) // hoge sigma
+    const result = computeConfidenceBand(longHorizon, 0.5, Z_SCORE_P10_P90)
     for (const p of result) {
-      expect(p.p10).toBeGreaterThanOrEqual(0)
+      expect(p.low).toBeGreaterThanOrEqual(0)
     }
   })
 
-  it('P90 > P50 > P10 op alle non-eerste jaren', () => {
+  it('high > mid > low op alle non-eerste jaren', () => {
     const result = computeConfidenceBand(SIM_ROWS)
     for (let i = 1; i < result.length; i++) {
-      expect(result[i]!.p90).toBeGreaterThan(result[i]!.p50)
-      expect(result[i]!.p50).toBeGreaterThan(result[i]!.p10)
+      expect(result[i]!.high).toBeGreaterThan(result[i]!.mid)
+      expect(result[i]!.mid).toBeGreaterThan(result[i]!.low)
     }
   })
 
@@ -63,9 +68,31 @@ describe('computeConfidenceBand — basis', () => {
   it('lagere sigma → smallere band', () => {
     const normal = computeConfidenceBand(SIM_ROWS, 0.15)
     const low = computeConfidenceBand(SIM_ROWS, 0.05)
-    // Lager sigma → kleiner verschil tussen P10 en P90
-    const normalSpread = normal[3]!.p90 - normal[3]!.p10
-    const lowSpread = low[3]!.p90 - low[3]!.p10
+    // Lager sigma → kleiner verschil tussen low en high
+    const normalSpread = normal[3]!.high - normal[3]!.low
+    const lowSpread = low[3]!.high - low[3]!.low
     expect(lowSpread).toBeLessThan(normalSpread)
+  })
+})
+
+describe('computeConfidenceBand — percentiel-keuze (z-score)', () => {
+  it('default = P40–P60 (smalle kern-band)', () => {
+    const defaultBand = computeConfidenceBand(SIM_ROWS)
+    const explicit = computeConfidenceBand(SIM_ROWS, DEFAULT_VOLATILITY, Z_SCORE_P40_P60)
+    expect(defaultBand).toEqual(explicit)
+  })
+
+  it('P40–P60 is smaller dan P10–P90 bij gelijke sigma', () => {
+    const narrow = computeConfidenceBand(SIM_ROWS, 0.15, Z_SCORE_P40_P60)
+    const wide = computeConfidenceBand(SIM_ROWS, 0.15, Z_SCORE_P10_P90)
+    const narrowSpread = narrow[3]!.high - narrow[3]!.low
+    const wideSpread = wide[3]!.high - wide[3]!.low
+    expect(narrowSpread).toBeLessThan(wideSpread)
+  })
+
+  it('z-score-constanten kloppen met de normaalverdeling', () => {
+    // 60e percentiel ≈ 0.2533, 90e percentiel ≈ 1.28
+    expect(Z_SCORE_P40_P60).toBeCloseTo(0.2533, 3)
+    expect(Z_SCORE_P10_P90).toBeCloseTo(1.28, 2)
   })
 })

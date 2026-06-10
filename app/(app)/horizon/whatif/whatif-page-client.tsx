@@ -53,6 +53,7 @@ import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { WhatIfBeslishulp } from '@/components/app/horizon/whatif-beslishulp'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
+import { computeDebtAflossingMonthly, savingsRateFromAggregates } from '@/lib/savings-source'
 import {
   deriveOverridesFromEvents,
   buildSliderEvent,
@@ -110,6 +111,8 @@ export default function WhatIfPage() {
   const [box3Method, setBox3Method] = useState<Box3Method>('forfaitair')
   const [hasPartner, setHasPartner] = useState(false)
   const [bankAccountCash, setBankAccountCash] = useState(0)
+  /** Canonieke 6m-spaarquote (incl. aflossing) — baseline voor de spaarquote-slider. */
+  const [savingsRate6m, setSavingsRate6m] = useState<number | null>(null)
   const [withdrawalStrategyConfig, setWithdrawalStrategyConfig] = useState<WithdrawalStrategyConfig>(WITHDRAWAL_DEFAULTS)
 
   // ── Per-asset-type return-deltas (decimaal, bv. { investment: 0.02 }). ──
@@ -146,8 +149,9 @@ export default function WhatIfPage() {
       const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
       const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
+      const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, income12Result, earliestIncomeResult, fullAssetsResult, fullDebtsResult, bankAccountsResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, income12Result, earliestIncomeResult, fullAssetsResult, fullDebtsResult, bankAccountsResult, income6mResult, expense6mResult] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
@@ -160,6 +164,8 @@ export default function WhatIfPage() {
         supabase.from('assets').select('*').eq('is_active', true).limit(500),
         supabase.from('debts').select('*').eq('is_active', true).limit(200),
         supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
+        supabase.from('transactions').select('amount, transaction_type').eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
+        supabase.from('transactions').select('amount, transaction_type').eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
       ])
 
       let monthlyIncome = 0
@@ -247,6 +253,19 @@ export default function WhatIfPage() {
       setFullDebts((fullDebtsResult.data ?? []) as Debt[])
       const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s: number, a: { balance: number | string }) => s + Number(a.balance), 0)
       setBankAccountCash(unlinkedCash)
+
+      // Canonieke 6m-spaarquote voor de slider-baseline — zelfde semantiek
+      // als savingsRate6m op de cashflow-pagina (transfers uitgesloten,
+      // schuldaflossing telt als vermogensopbouw), i.p.v. de oude
+      // deze-maand-surplus-benadering.
+      const isRealTx = (t: { transaction_type?: string | null }) =>
+        t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+      const income6m = (income6mResult.data ?? []).filter(isRealTx)
+        .reduce((s: number, t: { amount: number | string | null }) => s + Math.abs(Number(t.amount) || 0), 0)
+      const expenses6m = (expense6mResult.data ?? []).filter(isRealTx)
+        .reduce((s: number, t: { amount: number | string | null }) => s + Math.abs(Number(t.amount) || 0), 0)
+      const aflossing6m = computeDebtAflossingMonthly((fullDebtsResult.data ?? []) as Debt[]) * 6
+      setSavingsRate6m(income6m > 0 ? savingsRateFromAggregates(income6m, expenses6m, aflossing6m) : null)
       setBox3Method(fireParams.box3Method)
       const householdType = profileResult.data?.household_type
       setHasPartner(householdType === 'samenwonend' || householdType === 'getrouwd')
@@ -292,10 +311,12 @@ export default function WhatIfPage() {
   }, [])
 
   // ── Derived baseline values (snapshot of real data) ──────
+  // savingsRate6m: canonieke 6m-spaarquote zodat de slider start op hetzelfde
+  // getal als de cashflow-pagina (null → fallback op maand-surplus).
   const baseline = useMemo<WhatIfOverrides | null>(() => {
     if (!input) return null
-    return buildBaselineOverrides(input, userGrossReturn)
-  }, [input, userGrossReturn])
+    return buildBaselineOverrides(input, userGrossReturn, savingsRate6m)
+  }, [input, userGrossReturn, savingsRate6m])
 
   // ── Asset groups for MarketAssumptions preview (gewogen rendement per asset_type) ──
   const assetGroups = useMemo(() => {

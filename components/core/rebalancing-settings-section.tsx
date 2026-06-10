@@ -150,7 +150,7 @@ export function RebalancingSettingsSection() {
               {saving ? 'Opslaan...' : 'Drempel opslaan'}
             </button>
             {message && (
-              <span className={`text-sm ${message.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+              <span className={`text-sm ${message.type === 'success' ? 'text-positive' : 'text-negative'}`}>
                 {message.text}
               </span>
             )}

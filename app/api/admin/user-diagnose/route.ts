@@ -1,0 +1,78 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { isSuperAdmin } from '@/lib/admin'
+import { logAdminAction } from '@/lib/admin-audit'
+
+/**
+ * GET /api/admin/user-diagnose?userId=...&label=... — financiële kerndata van
+ * één gebruiker, voor support-debugging. Superadmin-only; ELKE inzage wordt in
+ * de audit-trail gelogd (support.view). Leest via de superadmin-RLS op de
+ * financiële tabellen.
+ */
+export async function GET(req: Request) {
+  const supabase = await createClient()
+  if (!(await isSuperAdmin(supabase))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  const {
+    data: { user: admin },
+  } = await supabase.auth.getUser()
+  if (!admin) {
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(req.url)
+  const userId = searchParams.get('userId')
+  if (!userId) {
+    return NextResponse.json({ error: 'userId is vereist' }, { status: 400 })
+  }
+  const label = searchParams.get('label') || userId
+
+  const [assetsRes, debtsRes, txCountRes, lastTxRes] = await Promise.all([
+    supabase
+      .from('assets')
+      .select('asset_type, name, current_value, net_worth_inclusion_pct')
+      .eq('user_id', userId)
+      .eq('is_active', true),
+    supabase
+      .from('debts')
+      .select('current_balance, net_worth_inclusion_pct')
+      .eq('user_id', userId)
+      .eq('is_active', true),
+    supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('transactions').select('date').eq('user_id', userId).order('date', { ascending: false }).limit(1),
+  ])
+
+  type AssetRow = { asset_type: string | null; name: string | null; current_value: number | string; net_worth_inclusion_pct: number | null }
+  type DebtRow = { current_balance: number | string; net_worth_inclusion_pct: number | null }
+  const assets = (assetsRes.data ?? []) as AssetRow[]
+  const debts = (debtsRes.data ?? []) as DebtRow[]
+
+  const assetTotal = assets.reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+  const debtTotal = debts.reduce((s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
+  const cashAccounts = assets
+    .filter((a) => a.asset_type === 'cash')
+    .map((a) => ({ name: a.name ?? 'Naamloos', value: Number(a.current_value) }))
+
+  const diagnose = {
+    assetCount: assets.length,
+    assetTotal,
+    debtCount: debts.length,
+    debtTotal,
+    netWorth: assetTotal - debtTotal,
+    cashAccounts,
+    txCount: txCountRes.count ?? 0,
+    lastTxDate: (lastTxRes.data?.[0]?.date as string | undefined) ?? null,
+  }
+
+  // Audit: leg de inzage vast (wie keek wanneer naar wiens data).
+  await logAdminAction(supabase, {
+    actorId: admin.id,
+    actorEmail: admin.email,
+    action: 'support.view',
+    targetUser: userId,
+    targetLabel: label,
+  })
+
+  return NextResponse.json(diagnose)
+}
