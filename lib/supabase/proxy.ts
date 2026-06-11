@@ -402,8 +402,10 @@ export async function updateSession(request: NextRequest) {
     pathname === prefix || pathname.startsWith(prefix.endsWith('/') ? prefix : prefix + '/')
   )
 
-  // Redirect authenticated users away from public auth pages to the app
-  const authPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password']
+  // Redirect authenticated users away from public auth pages to the app.
+  // /reset-password hoort hier NIET bij: de recovery-link logt de gebruiker in
+  // via /auth/callback en moet daarna op /reset-password kunnen landen.
+  const authPages = ['/', '/login', '/signup', '/forgot-password']
   if (user && authPages.includes(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/overzicht'

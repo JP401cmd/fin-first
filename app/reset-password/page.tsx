@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -12,6 +12,14 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [hasSession, setHasSession] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setHasSession(Boolean(session))
+    })
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -42,6 +50,26 @@ export default function ResetPasswordPage() {
       // Redirect to dashboard after short delay so user sees success message
       setTimeout(() => router.push('/overzicht'), 2000)
     }
+  }
+
+  if (hasSession === false) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
+        <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg text-center">
+          <h1 className="mb-4 text-2xl font-bold text-zinc-900">Link verlopen of ongeldig</h1>
+          <p className="text-zinc-600">
+            Deze wachtwoord-resetlink is verlopen of al gebruikt.
+            Vraag een nieuwe link aan om je wachtwoord opnieuw in te stellen.
+          </p>
+          <Link
+            href="/forgot-password"
+            className="mt-6 inline-block rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+          >
+            Nieuwe resetlink aanvragen
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   if (success) {
