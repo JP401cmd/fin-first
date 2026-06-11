@@ -12,6 +12,8 @@ interface MastheadProps {
   articleCount?: number
   /** ISO-tijdstip waarop de editie is samengesteld — getoond als "Bijgewerkt …" */
   updatedAt?: string
+  /** Grondslag-regel, bijv. "Gebaseerd op 38 bronartikelen" — transparantie over grounding */
+  sourceNote?: string
 }
 
 // Kapitaliseer de eerste letter — nl-NL geeft "maandag", krantdatelines zijn "Maandag …"
@@ -31,7 +33,7 @@ function formatUpdated(iso: string): string | null {
   return `Bijgewerkt ${when}`
 }
 
-export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount, updatedAt }: MastheadProps) {
+export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount, updatedAt, sourceNote }: MastheadProps) {
   const now = new Date()
   const rawDateline = dateline ?? now.toLocaleDateString('nl-NL', {
     weekday: 'long',
@@ -55,6 +57,7 @@ export function Masthead({ editionNr, jaargang, dateline, metaLeft, articleCount
       ? `${articleCount} ${articleCount === 1 ? 'artikel' : 'artikelen'}`
       : null,
     updatedAt ? formatUpdated(updatedAt) : null,
+    sourceNote ?? null,
   ].filter(Boolean) as string[]
 
   return (

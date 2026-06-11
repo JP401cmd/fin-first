@@ -6,9 +6,11 @@ import { createClient } from '@/lib/supabase/client'
 import { type RecurringTransaction, FREQUENCY_LABELS } from '@/lib/recurring-data'
 import { type Budget } from '@/lib/budget-data'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { OwnershipToggle, useHouseholdStatus } from '@/components/app/ownership-toggle'
 
 interface RecurringEditSheetProps {
-  recurring: RecurringTransaction
+  /** `ownership` is optioneel: niet alle call-sites typen de huishoud-kolom mee. */
+  recurring: RecurringTransaction & { ownership?: 'personal' | 'shared' }
   budgets: Budget[]
   onClose: () => void
   onSaved: () => void
@@ -17,6 +19,7 @@ interface RecurringEditSheetProps {
 const DAY_NAMES = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
 
 export function RecurringEditSheet({ recurring, budgets, onClose, onSaved }: RecurringEditSheetProps) {
+  const { hasHousehold } = useHouseholdStatus()
   const [form, setForm] = useState({
     name: recurring.name,
     amount: String(Math.abs(Number(recurring.amount))),
@@ -27,6 +30,7 @@ export function RecurringEditSheet({ recurring, budgets, onClose, onSaved }: Rec
     endDate: recurring.end_date ?? '',
     isActive: recurring.is_active,
     budgetId: recurring.budget_id ?? '',
+    ownership: recurring.ownership ?? ('personal' as 'personal' | 'shared'),
   })
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -51,6 +55,8 @@ export function RecurringEditSheet({ recurring, budgets, onClose, onSaved }: Rec
         end_date: form.endDate || null,
         is_active: form.isActive,
         budget_id: form.budgetId || null,
+        // household_id wordt server-side afgeleid door de stamp_household_id-trigger.
+        ownership: form.ownership,
       })
       .eq('id', recurring.id)
     setSaving(false)
@@ -214,6 +220,21 @@ export function RecurringEditSheet({ recurring, budgets, onClose, onSaved }: Rec
             />
             <span className="text-sm text-[var(--ink-2)]">Actief</span>
           </label>
+
+          {/* Eigendom — alleen relevant met een actief huishouden */}
+          {hasHousehold && (
+            <div data-testid="recurring-ownership-toggle">
+              <label className="mb-1 block font-sans text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--ink-3)]">
+                Eigendom
+              </label>
+              <OwnershipToggle
+                value={form.ownership}
+                onChange={(v) => set('ownership', v)}
+                hasHousehold={hasHousehold}
+                compact
+              />
+            </div>
+          )}
         </div>
 
         {/* Acties */}

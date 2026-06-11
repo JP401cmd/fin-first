@@ -124,9 +124,11 @@ export const loadCashflowData = cache(async (
       .select('*')
       .eq('is_active', true),
     // Liquide saldo voor cumulatief-startpunt — RLS levert eigen + gedeeld.
+    // ⚠️ géén partner_split_pct selecteren: die kolom bestaat niet op
+    // bank_accounts en PostgREST laat de hele query dan stil falen (saldo 0).
     supabase
       .from('bank_accounts')
-      .select('id, balance, name, ownership, user_id, partner_split_pct')
+      .select('id, balance, name, ownership, user_id')
       .eq('is_active', true),
     // Join-gedecoreerde rijen (account-naam + categorie) voor de feed-weergave.
     // We filteren ze hieronder op de ID's die de perspectief-loader teruggeeft,
@@ -197,7 +199,6 @@ export const loadCashflowData = cache(async (
     name: string
     ownership?: OwnershipType
     user_id?: string
-    partner_split_pct?: number | null
   }>
   const scopedAccounts = accountsRows.filter((a) => {
     const own = (a.ownership ?? 'personal') as OwnershipType

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getServiceClient } from '@/lib/supabase/service'
 import type {
   TLProvider,
   TLAccount,
@@ -25,14 +26,17 @@ export async function getBaseUrls(supabase: SupabaseClient): Promise<{ authUrl: 
   return { authUrl: SANDBOX_AUTH_URL, dataUrl: SANDBOX_DATA_URL }
 }
 
-async function getCredentials(supabase: SupabaseClient): Promise<{ clientId: string; clientSecret: string }> {
-  const { data: clientIdRow } = await supabase
+async function getCredentials(_supabase: SupabaseClient): Promise<{ clientId: string; clientSecret: string }> {
+  // Credentials zijn secrets: sinds de app_settings-verharding alleen via de
+  // service-role leesbaar (server-only pad), niet via de gebruikerssessie.
+  const service = getServiceClient()
+  const { data: clientIdRow } = await service
     .from('app_settings')
     .select('value')
     .eq('key', 'truelayer_client_id')
     .single()
 
-  const { data: clientSecretRow } = await supabase
+  const { data: clientSecretRow } = await service
     .from('app_settings')
     .select('value')
     .eq('key', 'truelayer_client_secret')

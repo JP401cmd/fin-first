@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Newspaper, Save, RotateCcw, Check, AlertCircle, ChevronDown, ChevronUp, Globe, Rss, Plus, Trash2, Database, Search, RefreshCw, FileText } from 'lucide-react'
+import { Newspaper, Save, RotateCcw, Check, AlertCircle, ChevronDown, ChevronUp, Globe, Rss, Plus, Trash2, Database, Search, RefreshCw, FileText, Activity } from 'lucide-react'
 import {
   DEFAULT_WEB_SOURCES,
   DEFAULT_RSS_FEEDS,
@@ -22,6 +22,35 @@ interface DbArticle {
   fetched_at: string
   potential_impact: string | null
   is_used: boolean
+}
+
+interface JobRun {
+  status: 'success' | 'error'
+  started_at: string
+  finished_at: string | null
+  duration_ms: number | null
+  summary: {
+    sourcesChecked?: number
+    rssArticlesFound?: number
+    webArticlesExtracted?: number
+    duplicatesSkipped?: number
+    inserted?: number
+    skipped?: number
+  } | null
+  error: string | null
+}
+
+interface SourceHealthEntry {
+  label: string
+  url: string
+  type: 'rss' | 'web'
+  items: number
+  error?: string
+}
+
+interface IngestStatus {
+  runs: JobRun[]
+  sourceHealth: { checkedAt: string; sources: SourceHealthEntry[] } | null
 }
 
 // ── Shared input className for consistency ───────────────────────────
@@ -53,6 +82,10 @@ export default function BeheerNieuwsPage() {
   // Active system prompt state
   const [activePrompt, setActivePrompt] = useState('')
   const [showActivePrompt, setShowActivePrompt] = useState(false)
+
+  // Pipeline status state (cron-runs + bron-gezondheid)
+  const [ingestStatus, setIngestStatus] = useState<IngestStatus | null>(null)
+  const [showSourceHealth, setShowSourceHealth] = useState(false)
 
   // Debounce ref for search
   const searchTimeoutRef = useRef<NodeJS.Timeout>(undefined)
@@ -96,6 +129,19 @@ export default function BeheerNieuwsPage() {
     return () => clearTimeout(searchTimeoutRef.current)
   }, [dbSearch, loadArticles])
 
+  // ── Load pipeline status (cron-runs + bron-health) ────────────────
+
+  const loadIngestStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/news-ingest')
+      if (!res.ok) return
+      const data = await res.json()
+      setIngestStatus({ runs: data.runs || [], sourceHealth: data.sourceHealth || null })
+    } catch {
+      // status is informatief — stil falen
+    }
+  }, [])
+
   // Load sources and articles in parallel on mount
   useEffect(() => {
     async function loadSources() {
@@ -132,7 +178,8 @@ export default function BeheerNieuwsPage() {
 
     loadSources()
     loadArticles()
-  }, [loadArticles])
+    loadIngestStatus()
+  }, [loadArticles, loadIngestStatus])
 
   // ── Sources handlers ─────────────────────────────────────────────
 
@@ -226,9 +273,10 @@ export default function BeheerNieuwsPage() {
       const data = await res.json()
       setStatus({
         type: 'success',
-        message: `${data.summary.inserted} nieuwe artikelen (${data.summary.rssArticlesFound ?? '?'} RSS, ${data.summary.webArticlesExtracted ?? '?'} web) uit ${data.summary.sourcesChecked} bronnen`,
+        message: `${data.summary.inserted} nieuwe artikelen (${data.summary.rssArticlesFound ?? '?'} RSS, ${data.summary.webArticlesExtracted ?? '?'} web, ${data.summary.duplicatesSkipped ?? 0} duplicaten overgeslagen) uit ${data.summary.sourcesChecked} bronnen`,
       })
       loadArticles(dbSearch)
+      loadIngestStatus()
     } catch (err) {
       setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Ophalen mislukt' })
     } finally {
@@ -313,6 +361,103 @@ export default function BeheerNieuwsPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Section: Pipeline-status ──────────────────────────────── */}
+      <div className="mb-8">
+        <div className="mb-4 flex items-center gap-2">
+          <Activity className="h-5 w-5 text-[var(--ink-3)]" />
+          <h3 className="text-lg font-bold text-[var(--ink)]">Pipeline-status</h3>
+        </div>
+
+        {/* Laatste automatische/handmatige runs */}
+        {ingestStatus === null ? (
+          <p className="text-sm text-[var(--ink-4)]">Laden...</p>
+        ) : ingestStatus.runs.length === 0 ? (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <span>
+              De dagelijkse cron heeft nog nooit een run gelogd. Controleer de Vercel-cron-configuratie
+              en de <code className="font-mono text-xs">CRON_SECRET</code>-omgevingsvariabele — zonder
+              werkende cron worden bronnen alleen ververst als je hier handmatig op &quot;Bronnen ophalen&quot; klikt.
+            </span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {ingestStatus.runs.map((run, i) => (
+              <div
+                key={i}
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-[var(--border-ed)] px-4 py-2.5 text-sm"
+              >
+                <span
+                  className={`inline-flex items-center gap-1.5 font-medium ${
+                    run.status === 'success' ? 'text-green-700' : 'text-red-700'
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${run.status === 'success' ? 'bg-green-400' : 'bg-red-400'}`} />
+                  {run.status === 'success' ? 'Geslaagd' : 'Mislukt'}
+                </span>
+                <span className="font-mono text-xs text-[var(--ink-4)]">
+                  {new Date(run.started_at).toLocaleString('nl-NL')}
+                </span>
+                {run.status === 'success' && run.summary ? (
+                  <span className="text-[var(--ink-3)]">
+                    {run.summary.inserted ?? 0} nieuw · {run.summary.duplicatesSkipped ?? 0} duplicaten ·{' '}
+                    {run.summary.sourcesChecked ?? 0} bronnen
+                  </span>
+                ) : run.error ? (
+                  <span className="text-red-700">{run.error}</span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Per-bron gezondheid (collapsible) */}
+        {ingestStatus?.sourceHealth && (
+          <div className="mt-3 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)]">
+            <button
+              type="button"
+              onClick={() => setShowSourceHealth(!showSourceHealth)}
+              className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-[var(--ink-3)] hover:text-[var(--ink-2)] transition-colors"
+            >
+              <span>
+                Bron-gezondheid — laatste controle{' '}
+                {new Date(ingestStatus.sourceHealth.checkedAt).toLocaleString('nl-NL')}
+                {' · '}
+                {ingestStatus.sourceHealth.sources.filter((s) => s.items === 0).length} van{' '}
+                {ingestStatus.sourceHealth.sources.length} bronnen leverde niets
+              </span>
+              {showSourceHealth ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            {showSourceHealth && (
+              <div className="max-h-80 overflow-auto border-t border-[var(--border-ed)]">
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-[var(--border-ed)]">
+                    {[...ingestStatus.sourceHealth.sources]
+                      .sort((a, b) => a.items - b.items)
+                      .map((source, i) => (
+                        <tr key={i}>
+                          <td className="px-4 py-2">
+                            <span
+                              className={`mr-2 inline-block h-2 w-2 rounded-full ${
+                                source.error ? 'bg-red-400' : source.items === 0 ? 'bg-amber-400' : 'bg-green-400'
+                              }`}
+                            />
+                            {source.label}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs uppercase text-[var(--ink-4)]">{source.type}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[var(--ink-3)]">
+                            {source.items} items
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Section: Nieuwsbronnen — Websites ─────────────────────── */}
@@ -459,7 +604,8 @@ export default function BeheerNieuwsPage() {
           <span className="ml-auto text-xs text-[var(--ink-4)]">{dbTotal} artikelen</span>
         </div>
         <p className="mb-4 text-sm text-[var(--ink-3)]">
-          Alle opgehaalde nieuwsartikelen uit de bronnen. Maximaal 100 rijen.
+          Alle opgehaalde nieuwsartikelen uit de bronnen. Er worden maximaal 100 artikelen bewaard
+          (nieuwste eerst) — oudere worden bij elke ingest automatisch verwijderd.
         </p>
 
         {/* Search + Ingest controls */}

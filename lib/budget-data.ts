@@ -254,14 +254,29 @@ export function getDefaultBudgets(): SeedBudget[] {
 
 /** Minimale vorm van een budget-groep (hoofdcategorie + subbudgetten) voor de keuzelijst. */
 export type BudgetSelectGroup = {
-  parent: { id: string; name: string; budget_type: Budget['budget_type'] }
-  children: { id: string; name: string }[]
+  parent: { id: string; name: string; budget_type: Budget['budget_type']; ownership?: 'personal' | 'shared' }
+  children: { id: string; name: string; ownership?: 'personal' | 'shared' }[]
 }
 
 /** Eén regel in een budget-keuzelijst: óf een optgroup-kop met opties, óf een losse optie. */
 export type BudgetSelectEntry =
-  | { kind: 'group'; id: string; label: string; options: { id: string; name: string }[] }
-  | { kind: 'option'; id: string; name: string }
+  | {
+      kind: 'group'
+      id: string
+      label: string
+      ownership?: 'personal' | 'shared'
+      options: { id: string; name: string; ownership?: 'personal' | 'shared' }[]
+    }
+  | { kind: 'option'; id: string; name: string; ownership?: 'personal' | 'shared' }
+
+/**
+ * Weergavelabel voor een budget-optie in een keuzelijst: gedeelde budgetten
+ * krijgen het suffix "· Gezamenlijk" zodat in elk categoriseer-scherm zichtbaar
+ * is dat een keuze het huishoudbudget raakt.
+ */
+export function budgetOptionLabel(option: { name: string; ownership?: 'personal' | 'shared' }): string {
+  return option.ownership === 'shared' ? `${option.name} · Gezamenlijk` : option.name
+}
 
 /**
  * Bouw de keuzelijst voor het toewijzen van een transactie aan een budget.
@@ -283,14 +298,15 @@ export function buildBudgetSelectEntries(groups: BudgetSelectGroup[]): BudgetSel
     if (group.parent.budget_type === 'archive') {
       const leaves = group.children.length > 0 ? group.children : [group.parent]
       for (const leaf of leaves) {
-        entries.push({ kind: 'option', id: leaf.id, name: leaf.name })
+        entries.push({ kind: 'option', id: leaf.id, name: leaf.name, ownership: leaf.ownership })
       }
     } else if (group.children.length > 0) {
       entries.push({
         kind: 'group',
         id: group.parent.id,
         label: group.parent.name,
-        options: group.children.map((c) => ({ id: c.id, name: c.name })),
+        ownership: group.parent.ownership,
+        options: group.children.map((c) => ({ id: c.id, name: c.name, ownership: c.ownership })),
       })
     }
   }

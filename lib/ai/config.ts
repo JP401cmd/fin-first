@@ -2,6 +2,7 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createMistral } from '@ai-sdk/mistral'
 import { createOpenAI } from '@ai-sdk/openai'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getServiceClient } from '@/lib/supabase/service'
 import { parsePlatformStatus } from '@/lib/platform-status'
 
 export class AIConfigError extends Error {
@@ -14,8 +15,12 @@ export class AIConfigError extends Error {
   }
 }
 
-export async function getModel(supabase: SupabaseClient) {
-  const { data } = await supabase
+// De _supabase-parameter blijft voor de call-sites bestaan, maar de settings
+// worden via de service-role gelezen: de API-key-sleutels zijn sinds de
+// app_settings-verharding niet meer leesbaar voor gewone sessies, terwijl
+// AI-calls wél voor elke gebruiker moeten werken (server-only pad).
+export async function getModel(_supabase: SupabaseClient) {
+  const { data } = await getServiceClient()
     .from('app_settings')
     .select('key, value')
     .in('key', ['ai_provider', 'ai_model_anthropic', 'ai_model_openai', 'anthropic_api_key', 'openai_api_key', 'ai_model_mistral', 'mistral_api_key', 'ollama_base_url', 'ai_model_ollama', 'platform_status'])

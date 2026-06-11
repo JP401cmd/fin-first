@@ -52,6 +52,11 @@ export interface PerspectiveContext {
   mySharePct: number
   /** Privacy die de PARTNER hanteert t.o.v. de huidige gebruiker. */
   partnerPrivacy: PrivacySettings | null
+  /**
+   * Budgetmodel van het huishouden: 'separate' (ieder eigen boom, default) of
+   * 'household' (één gedeelde boom met persoonlijke potjes — fase 3 consent).
+   */
+  budgetModel: 'separate' | 'household'
 }
 
 export type PerspectiveItem = Record<string, unknown> & {
@@ -81,6 +86,7 @@ const SOLO_CONTEXT = (userId: string): PerspectiveContext => ({
   primaryPayerId: null,
   mySharePct: 100,
   partnerPrivacy: null,
+  budgetModel: 'separate',
 })
 
 // ── Context loader ─────────────────────────────────────────────
@@ -112,13 +118,14 @@ export async function loadPerspectiveContext(
 
   const { data: household } = await supabase
     .from('households')
-    .select('name, split_mode, custom_split_pct, primary_payer_id')
+    .select('name, split_mode, custom_split_pct, primary_payer_id, budget_model')
     .eq('id', householdId)
     .maybeSingle()
 
   const splitMode = (household?.split_mode ?? 'equal') as SplitMode
   const customSplitPct = household?.custom_split_pct ?? null
   const primaryPayerId = household?.primary_payer_id ?? null
+  const budgetModel = (household?.budget_model ?? 'separate') as 'separate' | 'household'
 
   // Profiles RLS is own-only; lees de partnernaam via de huishoud-RPC
   // (anders blijft de naam leeg en valt de badge terug op "Partner").
@@ -165,6 +172,7 @@ export async function loadPerspectiveContext(
     partnerPrivacy: normalisePrivacySettings(
       partner.privacy_settings as Record<string, string> | null,
     ),
+    budgetModel,
   }
 }
 

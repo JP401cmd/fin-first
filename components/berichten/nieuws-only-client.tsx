@@ -23,23 +23,24 @@ interface LocalNewsCache {
   items: NewsItem[]
   fetchedAt: number
   generatedAt?: string
+  sourceCount?: number
 }
 
-function getLocalNewsCache(): { items: NewsItem[]; generatedAt?: string } | null {
+function getLocalNewsCache(): { items: NewsItem[]; generatedAt?: string; sourceCount?: number } | null {
   try {
     const raw = localStorage.getItem(NEWS_LOCAL_CACHE_KEY)
     if (!raw) return null
     const cache: LocalNewsCache = JSON.parse(raw)
     if (Date.now() - cache.fetchedAt > NEWS_CACHE_TTL_MS) return null
-    return { items: cache.items, generatedAt: cache.generatedAt }
+    return { items: cache.items, generatedAt: cache.generatedAt, sourceCount: cache.sourceCount }
   } catch {
     return null
   }
 }
 
-function setLocalNewsCache(items: NewsItem[], generatedAt?: string): void {
+function setLocalNewsCache(items: NewsItem[], generatedAt?: string, sourceCount?: number): void {
   try {
-    const cache: LocalNewsCache = { items, fetchedAt: Date.now(), generatedAt }
+    const cache: LocalNewsCache = { items, fetchedAt: Date.now(), generatedAt, sourceCount }
     localStorage.setItem(NEWS_LOCAL_CACHE_KEY, JSON.stringify(cache))
   } catch {
     // Silent fail — localStorage might be full
@@ -79,6 +80,7 @@ export function NieuwsOnlyClient() {
   const [refreshesRemaining, setRefreshesRemaining] = useState<number | undefined>()
   const [generating, setGenerating] = useState(false)
   const [generatedAt, setGeneratedAt] = useState<string | undefined>()
+  const [sourceCount, setSourceCount] = useState<number | undefined>()
 
   // ── Read article tracking ──
   useEffect(() => {
@@ -111,6 +113,7 @@ export function NieuwsOnlyClient() {
     if (cached) {
       setNewsItems(cached.items)
       if (cached.generatedAt) setGeneratedAt(cached.generatedAt)
+      if (cached.sourceCount !== undefined) setSourceCount(cached.sourceCount)
       setNewsFetched(true)
       return
     }
@@ -134,11 +137,12 @@ export function NieuwsOnlyClient() {
 
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
-      setLocalNewsCache(items, data.generatedAt)
+      setLocalNewsCache(items, data.generatedAt, data.sourceCount)
       setNewsFetched(true)
       if (data.editionNr) setEditionNr(data.editionNr)
       if (data.jaargang) setJaargang(data.jaargang)
       if (data.generatedAt) setGeneratedAt(data.generatedAt)
+      if (data.sourceCount !== undefined) setSourceCount(data.sourceCount)
       if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
     } catch (err) {
       setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
@@ -177,12 +181,13 @@ export function NieuwsOnlyClient() {
 
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
-      setLocalNewsCache(items, data.generatedAt)
+      setLocalNewsCache(items, data.generatedAt, data.sourceCount)
       setNewsFetched(true)
       setRefreshing(false)
       if (data.editionNr) setEditionNr(data.editionNr)
       if (data.jaargang) setJaargang(data.jaargang)
       if (data.generatedAt) setGeneratedAt(data.generatedAt)
+      if (data.sourceCount !== undefined) setSourceCount(data.sourceCount)
       if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
     } catch (err) {
       setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
@@ -221,12 +226,14 @@ export function NieuwsOnlyClient() {
         // Generation complete — final items arrived
         const items: NewsItem[] = data.items ?? data
         setNewsItems(items)
-        setLocalNewsCache(items, data.generatedAt)
+        setLocalNewsCache(items, data.generatedAt, data.sourceCount)
         setNewsFetched(true)
         setGenerating(false)
         setRefreshing(false)
         if (data.editionNr) setEditionNr(data.editionNr)
         if (data.jaargang) setJaargang(data.jaargang)
+        if (data.generatedAt) setGeneratedAt(data.generatedAt)
+        if (data.sourceCount !== undefined) setSourceCount(data.sourceCount)
         if (data.refreshesRemaining !== undefined) setRefreshesRemaining(data.refreshesRemaining)
       } catch (err) {
         setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
@@ -249,6 +256,11 @@ export function NieuwsOnlyClient() {
         jaargang={jaargang}
         articleCount={newsTab === 'current' ? newsItems.length : undefined}
         updatedAt={newsTab === 'current' ? generatedAt : undefined}
+        sourceNote={
+          newsTab === 'current' && sourceCount !== undefined
+            ? `Gebaseerd op ${sourceCount} ${sourceCount === 1 ? 'bronartikel' : 'bronartikelen'}`
+            : undefined
+        }
       />
 
       {/* ── FINANCIEEL NIEUWS ──────────────────────────── */}
@@ -399,8 +411,13 @@ export function NieuwsOnlyClient() {
                 ) : (
                   <div className="flex flex-col items-center gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-8 py-16 text-center shadow-[var(--s0)]">
                     <Newspaper className="h-8 w-8 text-[var(--ink-4)]" />
-                    <p className="font-inter text-sm text-[var(--ink-3)]">
-                      Nog geen nieuws beschikbaar.
+                    <p className="font-inter text-sm font-medium text-[var(--ink-2)]">
+                      Geen nieuws met impact op jouw situatie
+                    </p>
+                    <p className="max-w-sm font-source-serif text-[13px] italic leading-relaxed text-[var(--ink-4)]">
+                      {sourceCount
+                        ? `Will heeft ${sourceCount} bronartikelen getoetst aan je financiële profiel — geen ervan raakt je situatie op dit moment. Dat is goed nieuws: geen actie nodig.`
+                        : 'Er zijn op dit moment geen bronartikelen om te toetsen. Zodra er nieuws is dat jouw situatie raakt, verschijnt het hier.'}
                     </p>
                   </div>
                 )}

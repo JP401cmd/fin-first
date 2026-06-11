@@ -6,6 +6,7 @@ import Link from 'next/link'
 import {
   Upload, FileText, Check, AlertTriangle, X,
   ChevronRight, Loader2, WifiOff, RefreshCw, ArrowLeftRight, Sparkles,
+  Users, User,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { parseMT940 } from '@/lib/parsers/mt940'
@@ -15,7 +16,7 @@ import { detectFormat, CSV_PRESETS, type CSVPreset } from '@/lib/parsers/index'
 import type { ParsedTransaction } from '@/lib/parsers/shared'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { categorizeTransaction, isOwnAccountTransfer, isWalletTransferType, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
-import { type Budget, resolveEigenRekeningBudgetId } from '@/lib/budget-data'
+import { type Budget, resolveEigenRekeningBudgetId, budgetOptionLabel } from '@/lib/budget-data'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { useToast } from '@/components/app/toast-provider'
@@ -27,6 +28,23 @@ type Account = {
   id: string
   name: string
   iban: string | null
+  ownership?: 'personal' | 'shared'
+}
+
+/**
+ * Leidt het eigendom van een te importeren transactie af: een gedeeld budget op
+ * een persoonlijke rekening maakt de transactie gezamenlijk (volgt het budget),
+ * tenzij de gebruiker dat per rij handmatig heeft teruggezet. Anders volgt de
+ * transactie het eigendom van de rekening.
+ */
+function deriveRowOwnership(
+  accountOwnership: 'personal' | 'shared',
+  budgetOwnership: 'personal' | 'shared' | undefined,
+  manualOverride?: 'personal' | 'shared',
+): 'personal' | 'shared' {
+  if (manualOverride) return manualOverride
+  if (budgetOwnership === 'shared' && accountOwnership === 'personal') return 'shared'
+  return accountOwnership
 }
 
 type AISuggestion = {
@@ -47,6 +65,8 @@ type ImportRow = ParsedTransaction & {
   isTransfer: boolean
   aiAccepted?: boolean
   userManuallyChanged?: boolean
+  /** Handmatige eigendoms-override (klik op de gezamenlijk-badge zet 'm terug). */
+  manualOwnership?: 'personal' | 'shared'
 }
 
 /**
@@ -198,7 +218,7 @@ export default function ImportPage() {
       const { data: { user } } = await supabase.auth.getUser()
 
       const [accountsRes, budgetsRes, correctionsRes, ownIbansRes] = await Promise.all([
-        supabase.from('bank_accounts').select('id, name, iban').eq('is_active', true).order('sort_order'),
+        supabase.from('bank_accounts').select('id, name, iban, ownership').eq('is_active', true).order('sort_order'),
         supabase.from('budgets').select('*').order('sort_order'),
         supabase.from('category_corrections').select('match_field, match_value, budget_id'),
         user ? supabase.from('user_own_ibans').select('match_type, match_value, iban').eq('user_id', user.id) : Promise.resolve({ data: [], error: null }),
@@ -1143,9 +1163,19 @@ export default function ImportPage() {
       setRows((prev) => prev.map((row) => existingHashSet.has(rowDedupKey(row)) ? { ...row, skipImport: true } : row))
     }
 
-    const insertRows = finalRows.map((r) => ({
+    const selectedAccount = accounts.find((a) => a.id === selectedAccountId)
+    const accountOwnership: 'personal' | 'shared' = selectedAccount?.ownership ?? 'personal'
+
+    const insertRows = finalRows.map((r) => {
+      // Eigendom: volgt de rekening, maar een (handmatig of automatisch toegekend)
+      // gedeeld budget op een persoonlijke rekening tilt de transactie naar
+      // gezamenlijk — tenzij de gebruiker dat per rij heeft teruggezet.
+      const budgetOwnership = budgets.find((b) => b.id === r.budget_id)?.ownership
+      const ownership = deriveRowOwnership(accountOwnership, budgetOwnership, r.manualOwnership)
+      return {
       user_id: user!.id,
       account_id: selectedAccountId,
+      ownership,
       date: r.date,
       amount: r.amount,
       description: r.description,
@@ -1166,7 +1196,8 @@ export default function ImportPage() {
       fx_amount: r.fx_amount,
       fx_currency: r.fx_currency,
       fx_rate: r.fx_rate,
-    }))
+      }
+    })
 
     const BATCH_SIZE = 100
     const batches: typeof insertRows[] = []
@@ -2192,11 +2223,47 @@ export default function ImportPage() {
                                   .map((group) => (
                                   <optgroup key={group.parent.id} label={group.parent.name}>
                                     {group.children.map((child) => (
-                                      <option key={child.id} value={child.id}>{child.name}</option>
+                                      <option key={child.id} value={child.id}>{budgetOptionLabel(child)}</option>
                                     ))}
                                   </optgroup>
                                 ))}
                               </select>
+                              {(() => {
+                                // Hint: gedeeld budget op een persoonlijke rekening → de
+                                // transactie wordt gezamenlijk geïmporteerd. Klik om dat
+                                // per rij terug te zetten (manualOwnership = 'personal').
+                                const acc = accounts.find((a) => a.id === selectedAccountId)
+                                const accOwn: 'personal' | 'shared' = acc?.ownership ?? 'personal'
+                                const budgetOwn = budgets.find((b) => b.id === row.budget_id)?.ownership
+                                const resolved = deriveRowOwnership(accOwn, budgetOwn, row.manualOwnership)
+                                const wouldBeShared = budgetOwn === 'shared' && accOwn === 'personal'
+                                if (!wouldBeShared) return null
+                                return resolved === 'shared' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRows((prev) => prev.map((r, i) =>
+                                      i === realIdx ? { ...r, manualOwnership: 'personal' } : r
+                                    ))}
+                                    title="Klik om deze transactie toch persoonlijk te importeren"
+                                    className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-kern-50 border border-kern-200 px-1.5 py-0.5 text-[9px] font-medium text-kern-700 hover:bg-kern-100"
+                                  >
+                                    <Users className="h-2.5 w-2.5" />
+                                    Gezamenlijk budget → transactie wordt gezamenlijk geïmporteerd
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setRows((prev) => prev.map((r, i) =>
+                                      i === realIdx ? { ...r, manualOwnership: undefined } : r
+                                    ))}
+                                    title="Toch gezamenlijk importeren"
+                                    className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-[var(--subtle)] border border-[var(--border-ed)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--ink-3)] hover:bg-[var(--border-ed)]"
+                                  >
+                                    <User className="h-2.5 w-2.5" />
+                                    Persoonlijk geïmporteerd
+                                  </button>
+                                )
+                              })()}
                             </div>
                           )}
                         </td>

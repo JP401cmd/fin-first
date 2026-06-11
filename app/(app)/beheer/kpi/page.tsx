@@ -1,5 +1,8 @@
 import { BarChart3 } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
+import { isSuperAdmin } from '@/lib/admin'
 import { hasSubscription } from '@/lib/feature-registry'
 
 export const dynamic = 'force-dynamic'
@@ -33,11 +36,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default async function BeheerKpiPage() {
   const supabase = await createClient()
+  if (!(await isSuperAdmin(supabase))) {
+    redirect('/overzicht')
+  }
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
+  // Profielen van álle gebruikers: via de service-role-client (de brede
+  // superadmin-RLS op profiles is verwijderd — zie lib/supabase/service.ts).
+  const service = getServiceClient()
   const [profilesRes, aiRes, errRes, mailRes] = await Promise.all([
-    supabase.from('profiles').select('created_at, onboarding_completed, active_subscriptions, blocked_at, role'),
+    service.from('profiles').select('created_at, onboarding_completed, active_subscriptions, blocked_at, role'),
     supabase.from('ai_usage').select('credits').gte('created_at', monthStart),
     supabase.from('error_logs').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
     supabase.from('mail_log').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),

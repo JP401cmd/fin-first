@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { logAdminAction } from '@/lib/admin-audit'
 
 /**
  * GET /api/admin/user-diagnose?userId=...&label=... — financiële kerndata van
  * één gebruiker, voor support-debugging. Superadmin-only; ELKE inzage wordt in
- * de audit-trail gelogd (support.view). Leest via de superadmin-RLS op de
- * financiële tabellen.
+ * de audit-trail gelogd (support.view). Leest via de service-role-client —
+ * RLS geeft interactieve sessies bewust geen cross-user leesrecht.
  */
 export async function GET(req: Request) {
   const supabase = await createClient()
@@ -28,19 +29,20 @@ export async function GET(req: Request) {
   }
   const label = searchParams.get('label') || userId
 
+  const service = getServiceClient()
   const [assetsRes, debtsRes, txCountRes, lastTxRes] = await Promise.all([
-    supabase
+    service
       .from('assets')
       .select('asset_type, name, current_value, net_worth_inclusion_pct')
       .eq('user_id', userId)
       .eq('is_active', true),
-    supabase
+    service
       .from('debts')
       .select('current_balance, net_worth_inclusion_pct')
       .eq('user_id', userId)
       .eq('is_active', true),
-    supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-    supabase.from('transactions').select('date').eq('user_id', userId).order('date', { ascending: false }).limit(1),
+    service.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    service.from('transactions').select('date').eq('user_id', userId).order('date', { ascending: false }).limit(1),
   ])
 
   type AssetRow = { asset_type: string | null; name: string | null; current_value: number | string; net_worth_inclusion_pct: number | null }

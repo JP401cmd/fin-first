@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 
 export async function PATCH(
   req: NextRequest,
@@ -105,9 +106,12 @@ export async function PATCH(
         const freedomDays = action.freedom_days_impact ? Math.round(Number(action.freedom_days_impact)) : 0
         const freedomLabel = freedomDays > 0 ? ` — ${freedomDays} ${freedomDays === 1 ? 'vrijheidsdag' : 'vrijheidsdagen'} gewonnen` : ''
 
-        // Store notification for the assigner
+        // Store notification for the assigner. Cross-user sleutel: de
+        // notificatie-historie van de PARTNER — sinds de app_settings-
+        // verharding alleen via de service-role schrijfbaar.
         const notifKey = `notifications_history_${assignedBy}`
-        const { data: existing } = await supabase
+        const service = getServiceClient()
+        const { data: existing } = await service
           .from('app_settings')
           .select('value')
           .eq('key', notifKey)
@@ -131,7 +135,7 @@ export async function PATCH(
         // Keep max 100 entries
         if (history.length > 100) history.length = 100
 
-        await supabase
+        await service
           .from('app_settings')
           .upsert({ key: notifKey, value: JSON.stringify(history) }, { onConflict: 'key' })
       } catch {

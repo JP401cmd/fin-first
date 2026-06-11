@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback } from 'react'
-import { TrendingUp, Lightbulb, MessageSquare, CheckCheck, Loader2, ExternalLink } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { TrendingUp, TrendingDown, Lightbulb, MessageSquare, CheckCheck, Loader2, ExternalLink, CalendarClock, ListPlus, Check, EyeOff } from 'lucide-react'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import type { NewsItem } from '@/app/api/news/route'
 
@@ -46,18 +46,51 @@ export function CategoryBadge({ category }: { category: string }) {
 
 // ── Impact block ─────────────────────────────────────────────────────
 
-export function ImpactBlock({ impact }: { impact: string }) {
+/** Impactscore 1-5 als gevulde/lege bolletjes — compact en taalvrij */
+function ImpactScoreDots({ score }: { score: number }) {
+  const clamped = Math.min(5, Math.max(1, Math.round(score)))
+  return (
+    <span className="ml-auto flex items-center gap-[3px]" title={`Impactscore ${clamped} van 5`} aria-label={`Impactscore ${clamped} van 5`}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <span
+          key={i}
+          className={`h-1.5 w-1.5 rounded-full ${i < clamped ? 'bg-wil-500' : 'bg-wil-200'}`}
+        />
+      ))}
+    </span>
+  )
+}
+
+export function ImpactBlock({ item }: { item: NewsItem }) {
+  const direction = item.impactDirection
   return (
     <div className="mt-3 rounded-[var(--r)] border-l-3 border-wil-400 bg-wil-50/60 px-4 py-3">
       <div className="mb-1 flex items-center gap-1.5">
-        <TrendingUp className="h-3.5 w-3.5 text-wil-600" />
+        {direction === 'negatief' ? (
+          <TrendingDown className="h-3.5 w-3.5 text-negative" />
+        ) : (
+          <TrendingUp className="h-3.5 w-3.5 text-wil-600" />
+        )}
         <span className="font-inter text-[10px] font-bold uppercase tracking-[0.08em] text-wil-700">
           Impact voor jou
         </span>
+        {direction === 'positief' && (
+          <span className="font-inter text-[10px] font-semibold text-positive">▲ positief</span>
+        )}
+        {direction === 'negatief' && (
+          <span className="font-inter text-[10px] font-semibold text-negative">▼ negatief</span>
+        )}
+        {item.impactScore ? <ImpactScoreDots score={item.impactScore} /> : null}
       </div>
       <p className="font-source-serif text-[13px] leading-relaxed text-wil-900">
-        {impact}
+        {item.personalImpact}
       </p>
+      {item.deadline && (
+        <p className="mt-1.5 flex items-center gap-1 font-inter text-[11px] font-medium text-kern-700">
+          <CalendarClock className="h-3 w-3" />
+          Vóór {formatNewsDate(item.deadline)}
+        </p>
+      )}
     </div>
   )
 }
@@ -84,6 +117,46 @@ export function RelevanceBlock({ relevance }: { relevance: string }) {
 
 export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsItem; isRead: boolean; onMarkRead: (id: string) => void }) {
   const { openWithMessage } = useChatContext()
+  const [actionState, setActionState] = useState<'idle' | 'saving' | 'done'>('idle')
+  const [feedbackGiven, setFeedbackGiven] = useState(false)
+
+  const handleCreateAction = useCallback(async () => {
+    if (actionState !== 'idle') return
+    setActionState('saving')
+    try {
+      const res = await fetch('/api/ai/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: item.headline,
+          description: item.personalImpact,
+          freedom_days_impact: 0,
+          due_date: item.deadline || undefined,
+          priority_score: item.impactScore || 3,
+          source: 'manual',
+          metadata: { aandachtspunt_id: `news:${item.id}`, news_category: item.category },
+        }),
+      })
+      setActionState(res.ok ? 'done' : 'idle')
+    } catch {
+      setActionState('idle')
+    }
+  }, [actionState, item])
+
+  const handleLessLikeThis = useCallback(() => {
+    if (feedbackGiven) return
+    setFeedbackGiven(true)
+    fetch('/api/news/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        articleId: item.id,
+        headline: item.headline,
+        category: item.category,
+        verdict: 'less',
+      }),
+    }).catch(() => { /* Silent fail */ })
+  }, [feedbackGiven, item])
 
   const handleDiscuss = useCallback(() => {
     onMarkRead(item.id)
@@ -105,7 +178,7 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
   }, [item.id, onMarkRead])
 
   return (
-    <div className="mt-3 flex items-center gap-2">
+    <div className="mt-3 flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={handleDiscuss}
@@ -114,6 +187,17 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
         <MessageSquare className="h-3 w-3" />
         Bespreek met Will
       </button>
+      {item.impactType === 'direct' && (
+        <button
+          type="button"
+          onClick={handleCreateAction}
+          disabled={actionState !== 'idle'}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--border-ed)] px-3 py-2 font-inter text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] disabled:opacity-70 sm:min-h-0 sm:px-2 sm:py-1"
+        >
+          {actionState === 'done' ? <Check className="h-3 w-3 text-positive" /> : <ListPlus className="h-3 w-3" />}
+          {actionState === 'done' ? 'Actie aangemaakt' : actionState === 'saving' ? 'Bezig…' : 'Maak actie'}
+        </button>
+      )}
       {!isRead && (
         <button
           type="button"
@@ -124,6 +208,16 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
           Gelezen
         </button>
       )}
+      <button
+        type="button"
+        onClick={handleLessLikeThis}
+        disabled={feedbackGiven}
+        title="Toon minder berichten zoals dit"
+        className="ml-auto inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] px-2 py-2 font-inter text-[11px] text-[var(--ink-4)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-3)] disabled:opacity-70 sm:min-h-0 sm:py-1"
+      >
+        <EyeOff className="h-3 w-3" />
+        {feedbackGiven ? 'Genoteerd' : 'Minder hierover'}
+      </button>
     </div>
   )
 }
@@ -184,7 +278,7 @@ export function HeroNewsArticle({ item, isRead, onMarkRead, readOnly }: {
       {item.impactType === 'relevant' ? (
         <RelevanceBlock relevance={item.personalImpact} />
       ) : (
-        <ImpactBlock impact={item.personalImpact} />
+        <ImpactBlock item={item} />
       )}
       {!readOnly && <NewsArticleActions item={item} isRead={isRead} onMarkRead={onMarkRead} />}
       <div className="mt-6 h-px bg-[var(--border-ed)]" />
@@ -245,7 +339,7 @@ export function NewsArticle({ item, isRead, onMarkRead, readOnly }: {
       {item.impactType === 'relevant' ? (
         <RelevanceBlock relevance={item.personalImpact} />
       ) : (
-        <ImpactBlock impact={item.personalImpact} />
+        <ImpactBlock item={item} />
       )}
       {!readOnly && <NewsArticleActions item={item} isRead={isRead} onMarkRead={onMarkRead} />}
     </article>

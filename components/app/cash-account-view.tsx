@@ -30,7 +30,7 @@ import { BillCalendar, type CalendarTransaction } from '@/components/app/bill-ca
 import { RecurringEditSheet } from '@/components/app/recurring-edit-sheet'
 import { CategoryRulesSheet } from '@/components/app/category-rules-sheet'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
-import { useHouseholdStatus } from '@/components/app/ownership-toggle'
+import { OwnershipToggle, useHouseholdStatus } from '@/components/app/ownership-toggle'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { Users, TrendingUp, TrendingDown, Minus, Shield } from 'lucide-react'
@@ -232,14 +232,15 @@ export function CashAccountView({
 
   const loadBudgets = useCallback(async (signal?: AbortSignal) => {
     const supabase = createClient()
-    let budgetsQuery = supabase
+    // GEEN perspectief-filter op de budget-lijst: het categoriseer-doel moet
+    // altijd eigen én gezamenlijke budgetten bevatten (een persoonlijke
+    // transactie kan op een huishoudbudget geboekt worden). RLS scope't dit al
+    // correct. De lijst voedt zowel budgetGroups (categoriseren + Sankey-labels,
+    // die alleen budgetten met spending tonen) als het filter-dropdown.
+    const budgetsQuery = supabase
       .from('budgets')
       .select('*')
       .order('sort_order', { ascending: true })
-
-    if (perspective === 'personal') {
-      budgetsQuery = budgetsQuery.eq('ownership', 'personal')
-    }
 
     const { data } = await budgetsQuery
     if (signal?.aborted) return // Discard stale results
@@ -264,7 +265,8 @@ export function CashAccountView({
 
       setBudgetGroups([...groups, ...archiveGroups])
     }
-  }, [perspective])
+    // De budget-lijst is perspectief-onafhankelijk (eigen + gezamenlijk, RLS-scoped).
+  }, [])
 
   const loadRecurrings = useCallback(async () => {
     const supabase = createClient()
@@ -880,18 +882,37 @@ export function CashAccountView({
 
   useEffect(() => { loadLinkedAsset() }, [loadLinkedAsset])
 
-  async function handleSaveAsset(formData: { name: string; expected_return: number }) {
+  async function handleSaveAsset(formData: { name: string; expected_return: number; ownership: 'personal' | 'shared' }) {
     if (!linkedAsset || !account) return
     setAssetSaving(true)
     const supabase = createClient()
+    const prevOwnership = (account as { ownership?: 'personal' | 'shared' }).ownership ?? 'personal'
     await supabase.from('assets').update({
       name: formData.name,
       expected_return: formData.expected_return,
+      ownership: formData.ownership,
     }).eq('id', linkedAsset.id)
-    // Sync the bank_account display name with the asset name
+    // Sync de bank_account-weergavenaam + eigendom met de asset (de DB-trigger
+    // stempelt household_id uit ownership, dus die hoeft niet mee).
     await supabase.from('bank_accounts').update({
       name: formData.name,
+      ownership: formData.ownership,
     }).eq('id', account.id)
+    // Eigendom gewijzigd? Bied opt-in aan om bestaande transacties mee om te
+    // zetten — default is historie ongemoeid laten.
+    if (formData.ownership !== prevOwnership) {
+      const { count } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', account.id)
+        .eq('ownership', prevOwnership)
+      if ((count ?? 0) > 0) {
+        const label = formData.ownership === 'shared' ? 'gezamenlijk' : 'persoonlijk'
+        if (confirm(`Ook ${count} bestaande transactie${count === 1 ? '' : 's'} van deze rekening op ${label} zetten? Kies Annuleren om de historie ongemoeid te laten.`)) {
+          await supabase.from('transactions').update({ ownership: formData.ownership }).eq('account_id', account.id)
+        }
+      }
+    }
     setAssetSaving(false)
     setShowAssetEdit(false)
     loadAccount()
@@ -2218,6 +2239,10 @@ export function CashAccountView({
         <TransactionForm
           transaction={editTransaction ?? undefined}
           accountId={editTransaction?.account_id ?? accountId ?? allAccounts[0]?.id ?? ''}
+          // Nieuwe transactie erft het eigendom van de gekozen rekening. De
+          // ownership-kolom bestaat op de bank_accounts-rij maar staat (nog) niet
+          // in het Account-type — daarom defensief uitgelezen.
+          accountOwnership={(account as { ownership?: 'personal' | 'shared' } | null)?.ownership}
           budgetGroups={budgetGroups}
           onClose={() => { setShowForm(false); setEditTransaction(null) }}
           onSaved={() => {
@@ -2425,12 +2450,16 @@ function AssetEditForm({
   onDisconnectBank: () => void
   onReauthorize: () => void
   onRevalue: () => void
-  onSave: (data: { name: string; expected_return: number }) => void
+  onSave: (data: { name: string; expected_return: number; ownership: 'personal' | 'shared' }) => void
   onCancel: () => void
   onDisconnect: () => void
 }) {
   const [name, setName] = useState(asset.name)
   const [expectedReturn, setExpectedReturn] = useState(String(asset.expected_return ?? 0))
+  const [ownership, setOwnership] = useState<'personal' | 'shared'>(
+    (account as { ownership?: 'personal' | 'shared' }).ownership ?? 'personal',
+  )
+  const { hasHousehold } = useHouseholdStatus()
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
 
   // Alleen koppelingen die bij déze bankrekening horen tonen.
@@ -2513,6 +2542,17 @@ function AssetEditForm({
         />
       </div>
 
+      {/* 5. Eigendom (alleen met huishouden) */}
+      {hasHousehold && (
+        <div data-testid="account-ownership-toggle">
+          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Eigendom</label>
+          <OwnershipToggle value={ownership} onChange={setOwnership} hasHousehold={hasHousehold} compact />
+          <p className="mt-1.5 text-xs text-[var(--ink-4)]">
+            Nieuwe transacties op deze rekening erven dit eigendom.
+          </p>
+        </div>
+      )}
+
       {/* Budgetteren uitschakelen */}
       <div className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
         {!confirmDisconnect ? (
@@ -2560,6 +2600,7 @@ function AssetEditForm({
           onClick={() => onSave({
             name,
             expected_return: Number(expectedReturn) || 0,
+            ownership,
           })}
           disabled={saving || !name.trim()}
           className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"

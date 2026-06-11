@@ -121,15 +121,23 @@ export async function POST(req: Request) {
     )
   }
 
-  // Build a lookup map from slug → budget_id
+  // Build a lookup map from slug → budget_id.
+  // Met gedeelde budgetten kan dezelfde slug twee keer voorkomen: een eigen
+  // ('personal') rij én de gedeelde huishoud-rij ('shared'). Het gedeelde
+  // huishoudbudget is canoniek, dus dat wint bij een collisie. (Gearchiveerde,
+  // samengevoegde duplicaten krijgen hernoemde slugs en botsen daarom niet.)
   const { data: budgets } = await supabase
     .from('budgets')
-    .select('id, slug')
+    .select('id, slug, ownership')
     .in('slug', [...CHILD_SLUGS])
 
   const slugToId = new Map<BudgetSlug, string>()
   for (const b of budgets ?? []) {
-    if (b.slug) slugToId.set(b.slug as BudgetSlug, b.id)
+    if (!b.slug) continue
+    const slug = b.slug as BudgetSlug
+    // Voorkeur voor 'shared' bij een slug-collisie.
+    if (slugToId.has(slug) && b.ownership !== 'shared') continue
+    slugToId.set(slug, b.id)
   }
 
   // Positional mapping: result[i] corresponds to batch[i]

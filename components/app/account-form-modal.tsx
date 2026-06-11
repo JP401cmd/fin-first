@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Building2, X, Plus, Trash2 } from 'lucide-react'
+import { X, Plus, Trash2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
+import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 
 export type Account = {
   id: string
@@ -15,6 +16,7 @@ export type Account = {
   is_active: boolean
   sort_order: number
   linked_asset_id?: string | null
+  ownership?: OwnershipType
 }
 
 export const ACCOUNT_TYPES = [
@@ -35,7 +37,7 @@ export function AccountFormModal({
 }: {
   account: Account | null
   canDelete: boolean
-  onSave: (data: { name: string; iban: string; bank_name: string; account_type: string; balance: number }) => void
+  onSave: (data: { name: string; iban: string; bank_name: string; account_type: string; balance: number; ownership: OwnershipType }) => void
   onDelete: (id: string) => void
   onClose: () => void
 }) {
@@ -44,7 +46,15 @@ export function AccountFormModal({
   const [bankName, setBankName] = useState(account?.bank_name ?? '')
   const [accountType, setAccountType] = useState(account?.account_type ?? 'checking')
   const [balance, setBalance] = useState(account ? String(account.balance) : '')
+  const [ownership, setOwnership] = useState<OwnershipType>(account?.ownership ?? 'personal')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const { hasHousehold } = useHouseholdStatus()
+
+  // Backfill-bevestiging bij eigendomsflip van een bestaande rekening met historie.
+  const [pendingBackfill, setPendingBackfill] = useState<{ next: OwnershipType; count: number } | null>(null)
+  const [backfillChecked, setBackfillChecked] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<string | null>(null)
   const [showOwnIbans, setShowOwnIbans] = useState(false)
   const [ownIbanRows, setOwnIbanRows] = useState<{ id: string; match_type: string; match_value: string; iban: string | null; label: string | null }[]>([])
   const [newOwnIban, setNewOwnIban] = useState('')
@@ -132,16 +142,61 @@ export function AccountFormModal({
     setReclassifying(false)
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!name.trim()) return
+  function persist() {
     onSave({
       name: name.trim(),
       iban: iban.trim(),
       bank_name: bankName.trim(),
       account_type: accountType,
       balance: Number(balance) || 0,
+      ownership,
     })
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return
+
+    // Bij het bewerken van een bestaande rekening waarvan het eigendom wijzigt:
+    // tel de bestaande transacties met het oude eigendom. Zijn die er, vraag dan
+    // eerst of ze meeverhuizen (standaard niet — historie blijft ongemoeid).
+    const ownershipChanged = !!account && (account.ownership ?? 'personal') !== ownership
+    if (ownershipChanged && account && !pendingBackfill) {
+      const supabase = createClient()
+      const prev: OwnershipType = ownership === 'shared' ? 'personal' : 'shared'
+      const { count } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', account.id)
+        .eq('ownership', prev)
+      if ((count ?? 0) > 0) {
+        setPendingBackfill({ next: ownership, count: count ?? 0 })
+        return
+      }
+    }
+
+    persist()
+  }
+
+  // Voer de optionele backfill uit en sluit daarna af via onSave. RLS beperkt de
+  // UPDATE tot eigen rijen; de DB-trigger herstempelt household_id per rij.
+  async function confirmBackfill() {
+    if (!pendingBackfill || !account) return
+    if (backfillChecked) {
+      setBackfilling(true)
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('transactions')
+        .update({ ownership: pendingBackfill.next })
+        .eq('account_id', account.id)
+      setBackfilling(false)
+      if (error) {
+        setBackfillResult('Bijwerken van transacties mislukt: ' + error.message)
+        return
+      }
+    }
+    setPendingBackfill(null)
+    persist()
   }
 
   return (
@@ -210,6 +265,19 @@ export function AccountFormModal({
               />
             </div>
           </div>
+
+          {/* Eigendom — alleen relevant met een huishouden. */}
+          {hasHousehold && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">Eigendom</label>
+              <OwnershipToggle
+                value={ownership}
+                onChange={(v) => { setOwnership(v); setBackfillResult(null) }}
+                hasHousehold={hasHousehold}
+                compact
+              />
+            </div>
+          )}
 
           {/* Own IBAN registry (hidden for contant geld) */}
           {accountType !== 'contant_geld' && <div className="border-t border-[var(--border-ed)] pt-3">
@@ -305,7 +373,46 @@ export function AccountFormModal({
             )}
           </div>}
 
-          <div className="flex items-center justify-between pt-2">
+          {/* Backfill-bevestiging bij eigendomsflip met bestaande transacties. */}
+          {pendingBackfill && (
+            <div className="space-y-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+              <label className="flex items-start gap-2 text-xs text-[var(--ink-2)]">
+                <input
+                  type="checkbox"
+                  checked={backfillChecked}
+                  onChange={(e) => setBackfillChecked(e.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-kern-600"
+                />
+                <span>
+                  {pendingBackfill.next === 'shared'
+                    ? `Zet ook bestaande transacties van deze rekening op gezamenlijk (${pendingBackfill.count})`
+                    : `Zet ook bestaande transacties van deze rekening op persoonlijk (${pendingBackfill.count})`}
+                </span>
+              </label>
+              {backfillResult && (
+                <p className="text-[11px] text-negative">{backfillResult}</p>
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setPendingBackfill(null); setBackfillChecked(false); setBackfillResult(null) }}
+                  className="rounded-[var(--r)] px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:bg-zinc-100"
+                >
+                  Annuleer
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmBackfill}
+                  disabled={backfilling}
+                  className="rounded-[var(--r)] bg-kern-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+                >
+                  {backfilling ? 'Bezig…' : 'Opslaan'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className={`flex items-center justify-between pt-2${pendingBackfill ? ' hidden' : ''}`}>
             {account && canDelete ? (
               confirmDelete ? (
                 <div className="flex items-center gap-2">

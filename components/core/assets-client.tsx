@@ -2915,6 +2915,10 @@ export function AssetForm({
           bank_name: institution || null,
           account_type: subtype || 'checking',
           balance: Number(currentValue) || 0,
+          // Sync eigendom mee: een eigendomswijziging op het cash-bezit moet
+          // doorwerken naar de gekoppelde bankrekening (DB-trigger herstempelt
+          // household_id). Geen backfill-dialoog hier — alleen de rekeningrij.
+          ownership,
         }).eq('id', existingBA.id)
       }
     }

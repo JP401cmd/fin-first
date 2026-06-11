@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { isSuperAdmin } from '@/lib/admin'
 import { logAdminAction } from '@/lib/admin-audit'
 
@@ -7,7 +8,8 @@ import { logAdminAction } from '@/lib/admin-audit'
  * GET /api/admin/user-export?userId=...&label=... — AVG-export (inzageverzoek):
  * de financiële kerndata van één gebruiker als JSON-download. Superadmin-only;
  * de export wordt gelogd in de audit-trail (data.export). Leest via de
- * superadmin-RLS op de financiële tabellen.
+ * service-role-client — RLS geeft interactieve sessies bewust geen
+ * cross-user leesrecht.
  *
  * NB: dekt profiel + bezittingen + schulden + transacties (de financiële kern).
  * Een volledige export over álle tabellen volgt hetzelfde patroon.
@@ -31,11 +33,12 @@ export async function GET(req: Request) {
   }
   const label = searchParams.get('label') || userId
 
+  const service = getServiceClient()
   const [profileRes, assetsRes, debtsRes, txRes] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-    supabase.from('assets').select('*').eq('user_id', userId),
-    supabase.from('debts').select('*').eq('user_id', userId),
-    supabase.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false }),
+    service.from('profiles').select('*').eq('id', userId).maybeSingle(),
+    service.from('assets').select('*').eq('user_id', userId),
+    service.from('debts').select('*').eq('user_id', userId),
+    service.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false }),
   ])
 
   const payload = {

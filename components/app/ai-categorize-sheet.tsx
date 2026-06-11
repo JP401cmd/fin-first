@@ -6,7 +6,8 @@ import {
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
-import { buildBudgetSelectEntries, resolveEigenRekeningBudgetId, type Budget } from '@/lib/budget-data'
+import { buildBudgetSelectEntries, budgetOptionLabel, resolveEigenRekeningBudgetId, type Budget } from '@/lib/budget-data'
+import { useHouseholdStatus } from '@/components/app/ownership-toggle'
 import { buildFrequencyMap, type CategoryCorrection } from '@/lib/parsers/categorize'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
 import {
@@ -122,6 +123,10 @@ export function AICategorizeSheet({
 }: Props) {
   const [phase, setPhase] = useState<'choice' | 'ai' | 'review' | 'saving' | 'applying' | 'success'>('choice')
   const [rows, setRows] = useState<RowState[]>([])
+  const { hasHousehold } = useHouseholdStatus()
+  // Standaard aan: een keuze voor een gedeeld budget maakt de transactie ook
+  // gezamenlijk. Alleen relevant met een huishouden + minstens één gedeeld budget.
+  const [shareSharedBudgetTx, setShareSharedBudgetTx] = useState(true)
   const [aiError, setAiError] = useState<string | null>(null)
   const [showCount, setShowCount] = useState(SHOW_MORE_STEP)
   const [savedCount, setSavedCount] = useState(0)
@@ -519,10 +524,19 @@ export function AICategorizeSheet({
     let bulk = 0
 
     for (const row of accepted) {
-      // Update transaction
+      // Update transaction. Wanneer het doelbudget gedeeld is en de gebruiker de
+      // optie aan heeft staan, zet de transactie meteen op 'shared' (DB-trigger
+      // herstempelt household_id). Anders blijft het eigendom ongemoeid.
+      const update: { budget_id: string | null; category_source: string; ownership?: 'shared' } = {
+        budget_id: row.acceptedBudgetId,
+        category_source: 'ai',
+      }
+      if (showShareToggle && shareSharedBudgetTx && isSharedBudget(row.acceptedBudgetId)) {
+        update.ownership = 'shared'
+      }
       await supabase
         .from('transactions')
-        .update({ budget_id: row.acceptedBudgetId, category_source: 'ai' })
+        .update(update)
         .eq('id', row.tx.id)
 
       saved++
@@ -597,6 +611,19 @@ export function AICategorizeSheet({
   const acceptedCount = rows.filter((r) => r.accepted).length
   const pendingCount = rows.filter((r) => !r.accepted).length
   const aiSuggestionCount = rows.filter((r) => r.suggestion?.budget_id).length
+
+  // Is een budget-id een gedeeld huishoudbudget?
+  const isSharedBudget = useCallback(
+    (budgetId: string | null | undefined) =>
+      !!budgetId && budgets.find((b) => b.id === budgetId)?.ownership === 'shared',
+    [budgets],
+  )
+  // Checkbox alleen tonen wanneer er een huishouden is én minstens één voorstel/
+  // keuze een gedeeld budget raakt.
+  const anySharedTarget = rows.some(
+    (r) => isSharedBudget(r.acceptedBudgetId) || isSharedBudget(r.suggestion?.budget_id),
+  )
+  const showShareToggle = hasHousehold && anySharedTarget
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -856,6 +883,19 @@ export function AICategorizeSheet({
             </div>
           </div>
 
+          {/* Gedeeld-budget → gezamenlijke transactie (alleen met huishouden + gedeeld budget) */}
+          {showShareToggle && (
+            <label className="mb-4 flex items-start gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5 text-xs text-[var(--ink-2)]">
+              <input
+                type="checkbox"
+                checked={shareSharedBudgetTx}
+                onChange={(e) => setShareSharedBudgetTx(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-kern-600"
+              />
+              <span>Transacties op gezamenlijke budgetten ook gezamenlijk maken</span>
+            </label>
+          )}
+
           {/* Bulk-apply prompt */}
           {bulkApplyPrompt && (
             <div className="mb-4 flex items-center justify-between gap-3 rounded-[var(--r)] border border-dashed border-wil-300 bg-wil-50/50 px-4 py-4 text-sm">
@@ -1097,11 +1137,11 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
               entry.kind === 'group' ? (
                 <optgroup key={entry.id} label={entry.label}>
                   {entry.options.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{budgetOptionLabel(c)}</option>
                   ))}
                 </optgroup>
               ) : (
-                <option key={entry.id} value={entry.id}>{entry.name}</option>
+                <option key={entry.id} value={entry.id}>{budgetOptionLabel(entry)}</option>
               )
             )}
           </select>
@@ -1139,11 +1179,11 @@ function TransactionRow({ row, budgetGroups, onAcceptSuggestion, onManualBudget,
               entry.kind === 'group' ? (
                 <optgroup key={entry.id} label={entry.label}>
                   {entry.options.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{budgetOptionLabel(c)}</option>
                   ))}
                 </optgroup>
               ) : (
-                <option key={entry.id} value={entry.id}>{entry.name}</option>
+                <option key={entry.id} value={entry.id}>{budgetOptionLabel(entry)}</option>
               )
             )}
           </select>

@@ -1,6 +1,7 @@
 import { streamObject } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { buildSharedContext } from '@/lib/ai/context/shared-context'
@@ -9,6 +10,11 @@ import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { NextResponse } from 'next/server'
 import { checkTierGate } from '@/lib/require-tier'
 import { NEWS_SYSTEM_PROMPT } from '@/lib/news-system-prompt'
+import {
+  selectSourceArticles,
+  filterGroundedItems,
+  type SelectableArticle,
+} from '@/lib/news-selection'
 
 // ── Cache TTL ────────────────────────────────────────────────────────
 
@@ -33,10 +39,13 @@ const newsItemSchema = z.object({
   summary: z.string().describe('Samenvatting van het nieuws in 2-3 zinnen'),
   impactType: z.enum(['direct', 'relevant']).describe('"direct" = concrete, berekenbare impact op de financiele situatie van de gebruiker. "relevant" = financieel relevant nieuws zonder concrete berekenbare impact, maar wel waardevol om te weten.'),
   personalImpact: z.string().describe('Bij impactType "direct": concrete impact met specifieke euro-bedragen of vrijheidstijd gebaseerd op het profiel. Bij impactType "relevant": korte uitleg waarom dit nieuwsitem relevant is voor de financiele situatie van de gebruiker, zonder concrete bedragen.'),
+  impactScore: z.number().int().min(1).max(5).describe('Impactscore 1-5: hoe groot is de impact/relevantie voor deze gebruiker? 5 = grote concrete impact, 1 = achtergrond.'),
+  impactDirection: z.enum(['positief', 'negatief', 'neutraal']).describe('Richting van de impact voor de gebruiker: "positief" (bespaart geld of versnelt vrijheid), "negatief" (kost geld of vertraagt vrijheid) of "neutraal".'),
+  deadline: z.string().optional().describe('Alleen invullen als er een concrete datum (YYYY-MM-DD) is waarvoor de gebruiker iets kan of moet doen.'),
   category: z.enum(NEWS_CATEGORIES).describe('Nieuwscategorie'),
   date: z.string().describe('Datum van het nieuws in YYYY-MM-DD formaat'),
   sourceContext: z.string().optional().describe('Broncontext of toelichting (bijv. "Belastingplan 2026", "ECB persconferentie")'),
-  sourceUrl: z.string().optional().describe('Directe URL naar het bronartikelen waarop dit nieuwsitem gebaseerd is'),
+  sourceUrl: z.string().optional().describe('Directe URL naar het bronartikel waarop dit nieuwsitem gebaseerd is — LETTERLIJK overgenomen uit de aangeleverde bronnen'),
   sourceName: z.string().optional().describe('Naam van de bron (bijv. "Belastingdienst", "Rijksoverheid", "ECB")'),
 })
 
@@ -53,12 +62,14 @@ function cacheKey(userId: string) {
 interface CachedNews {
   items: NewsItem[]
   generatedAt: string
+  sourceCount?: number
+  sourceNewestAt?: string
 }
 
 async function getCachedNews(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-): Promise<{ items: NewsItem[]; generatedAt: string } | null> {
+): Promise<CachedNews | null> {
   const { data } = await supabase
     .from('app_settings')
     .select('value')
@@ -78,7 +89,7 @@ async function getCachedNews(
 
     if (ageHours > CACHE_TTL_HOURS) return null
 
-    return { items: cached.items, generatedAt: cached.generatedAt }
+    return cached
   } catch {
     return null
   }
@@ -88,10 +99,13 @@ async function setCachedNews(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   items: NewsItem[],
+  meta: { sourceCount: number; sourceNewestAt?: string },
 ): Promise<void> {
   const value: CachedNews = {
     items,
     generatedAt: new Date().toISOString(),
+    sourceCount: meta.sourceCount,
+    sourceNewestAt: meta.sourceNewestAt,
   }
 
   await supabase
@@ -192,6 +206,32 @@ async function getRecentHeadlines(supabase: SupabaseClient, userId: string): Pro
   })
 }
 
+// ── Feedback helper — categorieën die de gebruiker minder wil zien ──
+
+async function getDemotedCategories(supabase: SupabaseClient, userId: string): Promise<string[]> {
+  try {
+    const ninetyDaysAgo = new Date()
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
+    const { data } = await supabase
+      .from('news_feedback')
+      .select('category')
+      .eq('user_id', userId)
+      .eq('verdict', 'less')
+      .gte('created_at', ninetyDaysAgo.toISOString())
+
+    if (!data) return []
+    const counts = new Map<string, number>()
+    for (const row of data) {
+      if (!row.category) continue
+      counts.set(row.category, (counts.get(row.category) ?? 0) + 1)
+    }
+    return [...counts.entries()].filter(([, n]) => n >= 2).map(([cat]) => cat)
+  } catch {
+    return []
+  }
+}
+
 // ── Refresh rate limiter ─────────────────────────────────────────────
 
 async function checkRefreshLimit(
@@ -217,24 +257,117 @@ async function checkRefreshLimit(
   return { allowed: used < limit, remaining: Math.max(0, limit - used), limit }
 }
 
-// ── Background generation tracker ────────────────────────────────────
+// ── Background generation state (persisted in app_settings) ─────────
+//
+// Eerder leefde deze state in in-memory Maps. Op serverless kan een poll op
+// een andere instance landen, waardoor de state onvindbaar was en er een
+// tweede (dure) generatie startte. De state staat daarom in app_settings
+// onder een uid-gebonden sleutel (valt onder de "own keys" RLS-policy).
+
+const GENERATION_TIMEOUT_MS = 120_000 // 2 min — daarna geldt een run als gestrand
+
+function generationKey(userId: string) {
+  return `news_generation:${userId}`
+}
 
 interface GenerationState {
   items: NewsItem[]
   complete: boolean
-  startedAt: number
+  error?: string
+  startedAt: string
+  sourceCount?: number
+  sourceNewestAt?: string
 }
 
-const activeGenerations = new Map<string, GenerationState>()
-const generationErrors = new Map<string, string>()    // userId → error message
-const GENERATION_TIMEOUT_MS = 120_000                 // 2 min — auto-cleanup
+async function readGenerationState(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<GenerationState | null> {
+  const { data } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', generationKey(userId))
+    .maybeSingle()
 
-function cleanupStaleGenerations() {
-  const now = Date.now()
-  for (const [userId, state] of activeGenerations) {
-    if (now - state.startedAt > GENERATION_TIMEOUT_MS) {
-      activeGenerations.delete(userId)
-    }
+  if (!data?.value) return null
+  try {
+    return typeof data.value === 'string' ? JSON.parse(data.value) : data.value
+  } catch {
+    return null
+  }
+}
+
+async function writeGenerationState(
+  supabase: SupabaseClient,
+  userId: string,
+  state: GenerationState,
+): Promise<void> {
+  await supabase
+    .from('app_settings')
+    .upsert(
+      {
+        key: generationKey(userId),
+        value: JSON.stringify(state),
+        updated_at: new Date().toISOString(),
+        updated_by: userId,
+      },
+      { onConflict: 'key' },
+    )
+}
+
+async function clearGenerationState(supabase: SupabaseClient, userId: string): Promise<void> {
+  await supabase.from('app_settings').delete().eq('key', generationKey(userId))
+}
+
+// ── Source articles ──────────────────────────────────────────────────
+
+const SOURCE_CANDIDATE_LIMIT = 120
+const SOURCE_PROMPT_LIMIT = 40
+
+/**
+ * Laad bronartikelen via de service-role-client: news_articles is een
+ * systeemtabel (RLS: superadmin + service_role) en moet voor ÁLLE gebruikers
+ * de generatie voeden. Er gaat geen gebruikersinput in deze query en het
+ * resultaat blijft server-side — alleen de AI-prompt ziet de artikelen.
+ */
+async function loadSourceArticles(): Promise<SelectableArticle[]> {
+  let client: ReturnType<typeof getServiceClient>
+  try {
+    client = getServiceClient()
+  } catch (err) {
+    console.error('[/api/news] Service client unavailable — no source articles:', err)
+    return []
+  }
+
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  const { data, error } = await client
+    .from('news_articles')
+    .select('id, title, summary, source_url, source_name, category, published_at, potential_impact, is_used')
+    .gte('fetched_at', thirtyDaysAgo.toISOString())
+    .order('published_at', { ascending: false })
+    .limit(SOURCE_CANDIDATE_LIMIT)
+
+  if (error) {
+    console.error('[/api/news] Failed to load source articles:', error.message)
+    return []
+  }
+
+  return selectSourceArticles(data || [], { limit: SOURCE_PROMPT_LIMIT })
+}
+
+/** Markeer alleen de artikelen die daadwerkelijk in de editie zijn gebruikt. */
+async function markUsedArticles(articles: SelectableArticle[], items: NewsItem[]): Promise<void> {
+  const usedUrls = new Set(items.map((i) => i.sourceUrl).filter(Boolean))
+  const usedIds = articles.filter((a) => usedUrls.has(a.source_url)).map((a) => a.id)
+  if (usedIds.length === 0) return
+
+  try {
+    const client = getServiceClient()
+    await client.from('news_articles').update({ is_used: true }).in('id', usedIds)
+  } catch (err) {
+    console.error('[/api/news] Failed to mark used articles:', err)
   }
 }
 
@@ -259,35 +392,44 @@ export async function GET(request: Request) {
   const editionNr = await getNextEditionNr(supabase, user.id)
   const jaargang = new Date().getFullYear() - 2025
 
-  // Cleanup stale background generations
-  cleanupStaleGenerations()
+  // ── Lopende of afgeronde achtergrond-generatie (state in DB) ───
+  const existingState = await readGenerationState(supabase, user.id)
+  if (existingState) {
+    if (existingState.error) {
+      await clearGenerationState(supabase, user.id)
+      return NextResponse.json(
+        { error: `Nieuws kon niet worden gegenereerd: ${existingState.error}` },
+        { status: 500 },
+      )
+    }
 
-  // Return error from a previously failed background generation
-  if (generationErrors.has(user.id)) {
-    const error = generationErrors.get(user.id)!
-    generationErrors.delete(user.id)
-    return NextResponse.json(
-      { error: `Nieuws kon niet worden gegenereerd: ${error}` },
-      { status: 500 },
-    )
-  }
-
-  // If generation is already running, return partial items
-  if (activeGenerations.has(user.id)) {
-    const state = activeGenerations.get(user.id)!
-    if (state.complete) {
-      activeGenerations.delete(user.id)
+    if (existingState.complete) {
+      await clearGenerationState(supabase, user.id)
       const refreshStatus = await checkRefreshLimit(supabase, user.id)
       return NextResponse.json({
-        items: state.items,
+        items: existingState.items,
         cached: false,
         editionNr,
         jaargang,
         generatedAt: new Date().toISOString(),
         refreshesRemaining: refreshStatus.remaining,
+        sourceCount: existingState.sourceCount,
+        sourceNewestAt: existingState.sourceNewestAt,
       })
     }
-    return NextResponse.json({ status: 'generating', items: state.items, editionNr, jaargang })
+
+    const ageMs = Date.now() - new Date(existingState.startedAt).getTime()
+    if (ageMs < GENERATION_TIMEOUT_MS) {
+      return NextResponse.json({
+        status: 'generating',
+        items: existingState.items,
+        editionNr,
+        jaargang,
+      })
+    }
+
+    // Gestrande generatie — opruimen en opnieuw starten
+    await clearGenerationState(supabase, user.id)
   }
 
   // Check cache first (unless refresh is forced)
@@ -302,6 +444,8 @@ export async function GET(request: Request) {
         jaargang,
         generatedAt: cached.generatedAt,
         refreshesRemaining: refreshStatus.remaining,
+        sourceCount: cached.sourceCount,
+        sourceNewestAt: cached.sourceNewestAt,
       })
     }
   }
@@ -362,41 +506,28 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
   }
 
-  const recentHeadlines = await getRecentHeadlines(supabase, user.id)
+  const [recentHeadlines, demotedCategories, sourceArticles] = await Promise.all([
+    getRecentHeadlines(supabase, user.id),
+    getDemotedCategories(supabase, user.id),
+    loadSourceArticles(),
+  ])
 
-  // ── Load source articles from news_articles DB ─────────────────
-
-  interface DbArticle {
-    id: string
-    title: string
-    summary: string | null
-    source_url: string
-    source_name: string
-    category: string | null
-    published_at: string | null
-  }
-
-  let sourceArticles: DbArticle[] = []
-  try {
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-    const { data } = await supabase
-      .from('news_articles')
-      .select('id, title, summary, source_url, source_name, category, published_at')
-      .gte('fetched_at', thirtyDaysAgo.toISOString())
-      .order('published_at', { ascending: false })
-      .limit(50)
-
-    sourceArticles = data || []
-  } catch (err) {
-    console.error('[/api/news] Failed to load source articles from DB:', err)
-  }
+  const sourceNewestAt = sourceArticles
+    .map((a) => a.published_at)
+    .filter((d): d is string => Boolean(d))
+    .sort()
+    .at(-1)
 
   // ── Fire-and-forget background generation ──────────────────────
 
-  const state: GenerationState = { items: [], complete: false, startedAt: Date.now() }
-  activeGenerations.set(user.id, state)
+  const startedAt = new Date().toISOString()
+  await writeGenerationState(supabase, user.id, {
+    items: [],
+    complete: false,
+    startedAt,
+    sourceCount: sourceArticles.length,
+    sourceNewestAt,
+  })
 
   const generation = (async () => {
     try {
@@ -405,12 +536,24 @@ export async function GET(request: Request) {
         ? `\n\nEERDER GEGENEREERDE KOPPEN (afgelopen 2 maanden — vermijd herhaling van dezelfde onderwerpen):\n${recentHeadlines.map(h => `- "${h}"`).join('\n')}\n\nGenereer nieuws over ANDERE onderwerpen. Varieer in invalshoek, subcategorie en focus.`
         : ''
 
-      // Build source context from database articles
-      const sourcesContext = sourceArticles.length > 0
-        ? `\n\nACTUELE NIEUWSBRONNEN (baseer je artikelen hierop — gebruik sourceUrl en sourceName):\n${sourceArticles.map(a =>
-          `- [${a.source_name}] "${a.title}" (${a.published_at ? a.published_at.split('T')[0] : 'onbekend'})\n  Link: ${a.source_url}\n  ${a.summary || ''}`
-        ).join('\n\n')}`
+      const feedbackContext = demotedCategories.length > 0
+        ? `\n\nFEEDBACK VAN DE GEBRUIKER: geef berichten in deze categorieën alleen een plek bij hoge impact (impactScore 4-5): ${demotedCategories.join(', ')}.`
         : ''
+
+      // Build source context from database articles, incl. de ingest-impactanalyse
+      const sourcesContext = sourceArticles.length > 0
+        ? `\n\nACTUELE NIEUWSBRONNEN (toets ze op relevantie en impact; gebruik sourceUrl en sourceName letterlijk):\n${sourceArticles.map(a =>
+          `- [${a.source_name}] "${a.title}" (${a.published_at ? a.published_at.split('T')[0] : 'onbekend'})\n  Link: ${a.source_url}\n  Samenvatting: ${a.summary || '(geen)'}${a.potential_impact ? `\n  Potentiele impact: ${a.potential_impact}` : ''}`
+        ).join('\n\n')}`
+        : '\n\nER ZIJN GEEN BRONARTIKELEN BESCHIKBAAR. Genereer daarom GEEN berichten — een lege editie is het juiste antwoord.'
+
+      const state: GenerationState = {
+        items: [],
+        complete: false,
+        startedAt,
+        sourceCount: sourceArticles.length,
+        sourceNewestAt,
+      }
 
       const result = streamObject({
         model,
@@ -422,41 +565,52 @@ export async function GET(request: Request) {
 FINANCIEEL PROFIEL VAN DE GEBRUIKER:
 ${financialContext}
 
-Genereer 5-8 Nederlandse financiele nieuwsitems. Begin met minimaal 4 "direct" impact berichten (het eerste bericht moet de grootste impact hebben). Vul aan met maximaal 4 "relevant" berichten. Sorteer: direct-impact eerst, dan relevant.${headlinesContext}${sourcesContext}`,
+Toets de aangeleverde bronartikelen op relevantie en impact voor dit profiel en schrijf ALLEEN over artikelen met duidelijke nieuwswaarde (0-8 berichten; minder is beter dan geforceerd). Sorteer: direct-impact eerst (hoogste impactScore bovenaan), dan relevant.${headlinesContext}${feedbackContext}${sourcesContext}`,
       })
 
       for await (const item of result.elementStream) {
         state.items.push(maskPIIInObject(item))
+        await writeGenerationState(supabase, user.id, state)
       }
 
-      // Enforce sort: direct-impact items first, then relevant items
-      // The AI is instructed to sort this way, but we guarantee it server-side
-      state.items.sort((a, b) => {
+      // Grounding: zonder geldige bron-URL uit de aangeleverde set vervalt
+      // een bericht (alleen afdwingbaar als er bronnen wáren)
+      const { kept, dropped } = filterGroundedItems(
+        state.items,
+        sourceArticles.map((a) => a.source_url),
+      )
+      if (dropped.length > 0) {
+        console.warn(`[/api/news] Dropped ${dropped.length} ungrounded item(s):`, dropped.map(d => d.headline))
+      }
+
+      // Sortering garanderen: direct eerst, daarbinnen hoogste impactScore
+      kept.sort((a, b) => {
         if (a.impactType === 'direct' && b.impactType !== 'direct') return -1
         if (a.impactType !== 'direct' && b.impactType === 'direct') return 1
-        return 0
+        return (b.impactScore ?? 0) - (a.impactScore ?? 0)
       })
 
-      state.complete = true
-      await setCachedNews(supabase, user.id, state.items)
+      await setCachedNews(supabase, user.id, kept, {
+        sourceCount: sourceArticles.length,
+        sourceNewestAt,
+      })
       await recordAiUsage(supabase, user.id, 'news')
+      await markUsedArticles(sourceArticles, kept)
 
-      // Mark source articles as used so admins can track what's been consumed
-      if (sourceArticles.length > 0) {
-        await supabase
-          .from('news_articles')
-          .update({ is_used: true })
-          .in('id', sourceArticles.map(a => a.id))
-      }
+      await writeGenerationState(supabase, user.id, { ...state, items: kept, complete: true })
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       console.error('[/api/news] Background generation failed:', errMsg)
-      generationErrors.set(user.id, errMsg)
-      activeGenerations.delete(user.id)
+      await writeGenerationState(supabase, user.id, {
+        items: [],
+        complete: false,
+        error: errMsg,
+        startedAt,
+      })
     }
   })()
 
-  // Prevent unhandled rejection warning (errors captured in generationErrors)
+  // Prevent unhandled rejection warning (errors persisted in generation state)
   generation.catch(() => {})
 
   return NextResponse.json({ status: 'generating', items: [], editionNr, jaargang })

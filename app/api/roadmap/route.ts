@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { isSuperAdmin } from '@/lib/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -75,6 +76,11 @@ export async function PUT(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  }
+
+  // Roadmap-status bijwerken is een beheerhandeling (/beheer/roadmap).
+  if (!(await isSuperAdmin(supabase))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   let body: {

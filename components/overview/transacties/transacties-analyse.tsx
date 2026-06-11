@@ -64,6 +64,7 @@ type FullTransaction = {
   notes: string | null
   category_source: string
   is_split?: boolean
+  ownership?: 'personal' | 'shared'
 }
 
 type BudgetGroup = { parent: Budget; children: Budget[] }
@@ -395,7 +396,7 @@ export function TransactiesAnalyse() {
     const { data } = await supabase
       .from('transactions')
       .select(
-        'id, account_id, budget_id, date, amount, description, counterparty_name, counterparty_iban, is_income, notes, category_source, is_split',
+        'id, account_id, budget_id, date, amount, description, counterparty_name, counterparty_iban, is_income, notes, category_source, is_split, ownership',
       )
       .eq('id', tx.id)
       .single()

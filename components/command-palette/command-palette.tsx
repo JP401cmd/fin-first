@@ -88,6 +88,16 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
   const [entityLoading, setEntityLoading] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
 
+  // Op touch-apparaten geen autofocus op de input: dat klapt direct het
+  // on-screen toetsenbord open terwijl de gebruiker vaak alleen wil tikken
+  // op een recent item of actie. Het paneel zelf krijgt dan de focus
+  // (tabIndex={-1}) zodat de focus-trap en Esc blijven werken.
+  const [isCoarsePointer] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia('(hover: none) and (pointer: coarse)').matches,
+  )
+
   const { activeModules } = useModuleAccess()
   const { open: openChat } = useChatContext()
   const { masked, toggle: togglePrivacy } = useMaskedAmounts()
@@ -327,7 +337,11 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
 
   // ── Body scroll-lock + focus-trap ──────────────────────────────────────────
   useScrollLock(open)
-  useFocusTrap({ active: open, containerRef, initialFocusRef: inputRef })
+  useFocusTrap({
+    active: open,
+    containerRef,
+    initialFocusRef: isCoarsePointer ? containerRef : inputRef,
+  })
 
   // ── Backdrop click ─────────────────────────────────────────────────────────
   const onBackdrop = useCallback(
@@ -353,7 +367,8 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
         role="dialog"
         aria-label="Zoeken in TriFinity"
         aria-modal="true"
-        className="w-full md:max-w-2xl bg-[var(--paper)] border border-[var(--border-ed)] shadow-[var(--s2)] flex flex-col max-h-[88vh] md:max-h-[70vh]"
+        tabIndex={-1}
+        className="w-full md:max-w-2xl bg-[var(--paper)] border border-[var(--border-ed)] shadow-[var(--s2)] flex flex-col max-h-[88vh] md:max-h-[70vh] outline-none"
         style={{
           animation: 'cmdk-pop-in 180ms cubic-bezier(0.32, 0.72, 0, 1)',
         }}

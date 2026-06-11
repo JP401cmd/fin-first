@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, BarChart3, Sparkles } from 'lucide-react'
+import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, BarChart3, Sparkles, Users } from 'lucide-react'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { OwnershipToggle, useHouseholdStatus } from '@/components/app/ownership-toggle'
 import { createClient } from '@/lib/supabase/client'
-import { buildBudgetSelectEntries, type Budget } from '@/lib/budget-data'
+import { buildBudgetSelectEntries, budgetOptionLabel, type Budget } from '@/lib/budget-data'
 import { FREQUENCY_LABELS } from '@/lib/recurring-data'
 
 type Transaction = {
@@ -21,6 +22,7 @@ type Transaction = {
   notes: string | null
   category_source: string
   is_split?: boolean
+  ownership?: 'personal' | 'shared'
 }
 
 type BudgetGroup = {
@@ -42,6 +44,7 @@ type PendingRow = {
   is_split: boolean
   category_source: string
   notes: string | null
+  ownership: 'personal' | 'shared'
 }
 
 function formatDateNL(dateStr: string): string {
@@ -52,6 +55,7 @@ function formatDateNL(dateStr: string): string {
 export function TransactionForm({
   transaction,
   accountId,
+  accountOwnership,
   budgetGroups,
   onClose,
   onSaved,
@@ -59,12 +63,15 @@ export function TransactionForm({
 }: {
   transaction?: Transaction
   accountId: string
+  /** Eigendom van de gekozen rekening — bepaalt het standaard-eigendom van een NIEUWE transactie. */
+  accountOwnership?: 'personal' | 'shared'
   budgetGroups: BudgetGroup[]
   onClose: () => void
   onSaved: () => void
   disableAnalysis?: boolean
 }) {
   const isEdit = !!transaction
+  const { hasHousehold } = useHouseholdStatus()
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
@@ -112,6 +119,11 @@ export function TransactionForm({
     counterparty_name: transaction?.counterparty_name ?? '',
     budget_id: transaction?.budget_id ?? '',
     notes: transaction?.notes ?? '',
+    // Nieuwe transactie erft het eigendom van de rekening; bij bewerken telt
+    // het eigen eigendom van de transactie. Geen huishouden → altijd persoonlijk.
+    ownership: transaction
+      ? (transaction.ownership ?? 'personal')
+      : (accountOwnership ?? 'personal'),
     is_recurring: false,
     frequency: 'monthly' as string,
     day_of_month: String(new Date().getDate()),
@@ -122,6 +134,32 @@ export function TransactionForm({
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  // Eenmaal weggeklikte share-suggestie blijft weg tot de gekozen budget(ten) wijzigen.
+  const [shareSuggestionDismissed, setShareSuggestionDismissed] = useState(false)
+
+  // Snelle lookup: budget-id → eigendom, voor de "dit budget is gezamenlijk"-hint.
+  const budgetOwnershipById = new Map<string, 'personal' | 'shared'>()
+  for (const entry of buildBudgetSelectEntries(budgetGroups)) {
+    if (entry.kind === 'group') {
+      for (const opt of entry.options) {
+        if (opt.ownership) budgetOwnershipById.set(opt.id, opt.ownership)
+      }
+    } else if (entry.ownership) {
+      budgetOwnershipById.set(entry.id, entry.ownership)
+    }
+  }
+
+  // Toon de suggestie als de transactie persoonlijk staat terwijl een gekozen
+  // budget gezamenlijk is — voor de losse budget-keuze óf voor een split-regel.
+  const selectedBudgetIsShared = !isSplit && budgetOwnershipById.get(form.budget_id) === 'shared'
+  const anySplitBudgetIsShared =
+    isSplit && splitRows.some((r) => budgetOwnershipById.get(r.budget_id) === 'shared')
+  const showShareSuggestion =
+    hasHousehold &&
+    form.ownership === 'personal' &&
+    !shareSuggestionDismissed &&
+    (selectedBudgetIsShared || anySplitBudgetIsShared)
 
   const matchName = form.counterparty_name.trim() || form.description.trim()
   const matchField = form.counterparty_name.trim() ? 'counterparty_name' : 'description'
@@ -252,6 +290,8 @@ export function TransactionForm({
       is_split: isSplit && validSplitRows.length >= 2,
       category_source: 'manual' as const,
       notes: form.notes.trim() || null,
+      // household_id wordt server-side afgeleid door de stamp_household_id-trigger.
+      ownership: form.ownership,
     }
 
     if (isEdit && transaction) {
@@ -334,6 +374,7 @@ export function TransactionForm({
           start_date: form.date,
           end_date: form.end_date || null,
           is_active: true,
+          ownership: form.ownership,
         }
 
         await supabase.from('recurring_transactions').insert(recurringRow)
@@ -557,17 +598,23 @@ export function TransactionForm({
                       <optgroup key={entry.id} label={entry.label}>
                         {entry.options.map((child) => (
                           <option key={child.id} value={child.id}>
-                            {child.name}
+                            {budgetOptionLabel(child)}
                           </option>
                         ))}
                       </optgroup>
                     ) : (
                       <option key={entry.id} value={entry.id}>
-                        {entry.name}
+                        {budgetOptionLabel(entry)}
                       </option>
                     )
                   )}
                 </select>
+                {showShareSuggestion && selectedBudgetIsShared && (
+                  <ShareSuggestionChip
+                    onAccept={() => { update('ownership', 'shared'); setShareSuggestionDismissed(true) }}
+                    onDismiss={() => setShareSuggestionDismissed(true)}
+                  />
+                )}
                 {isEdit && transaction && (transaction.category_source === 'ai' || transaction.category_source === 'rule') && transaction.budget_id && (
                   <p className="mt-1.5 flex items-center gap-1.5 text-xs text-wil-700" data-testid="suggested-category-notice">
                     <Sparkles className="h-3 w-3 text-wil-500" />
@@ -577,6 +624,19 @@ export function TransactionForm({
                     </span>
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Eigendom — alleen relevant met een actief huishouden */}
+            {hasHousehold && (
+              <div data-testid="tx-ownership-toggle">
+                <label className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">Eigendom</label>
+                <OwnershipToggle
+                  value={form.ownership}
+                  onChange={(v) => update('ownership', v)}
+                  hasHousehold={hasHousehold}
+                  compact
+                />
               </div>
             )}
 
@@ -632,11 +692,11 @@ export function TransactionForm({
                                 entry.kind === 'group' ? (
                                   <optgroup key={entry.id} label={entry.label}>
                                     {entry.options.map(child => (
-                                      <option key={child.id} value={child.id}>{child.name}</option>
+                                      <option key={child.id} value={child.id}>{budgetOptionLabel(child)}</option>
                                     ))}
                                   </optgroup>
                                 ) : (
-                                  <option key={entry.id} value={entry.id}>{entry.name}</option>
+                                  <option key={entry.id} value={entry.id}>{budgetOptionLabel(entry)}</option>
                                 )
                               )}
                             </select>
@@ -701,6 +761,12 @@ export function TransactionForm({
                         <Plus className="h-3.5 w-3.5" />
                         Regel toevoegen
                       </button>
+                      {showShareSuggestion && anySplitBudgetIsShared && (
+                        <ShareSuggestionChip
+                          onAccept={() => { update('ownership', 'shared'); setShareSuggestionDismissed(true) }}
+                          onDismiss={() => setShareSuggestionDismissed(true)}
+                        />
+                      )}
                     </>
                   )}
                 </div>
@@ -859,5 +925,37 @@ export function TransactionForm({
         </form>
       )}
     </BottomSheet>
+  )
+}
+
+/**
+ * Inline suggestie onder de budget-keuze: nodigt uit de transactie op
+ * "gezamenlijk" te zetten wanneer een gekozen budget gezamenlijk is terwijl de
+ * transactie nog persoonlijk staat. Weg te klikken met de X.
+ */
+function ShareSuggestionChip({ onAccept, onDismiss }: { onAccept: () => void; onDismiss: () => void }) {
+  return (
+    <div
+      className="mt-2 flex items-center gap-2 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 text-xs text-[var(--ink-2)]"
+      data-testid="tx-share-suggestion"
+    >
+      <Users className="h-3.5 w-3.5 shrink-0 text-kern-600" />
+      <span className="flex-1">Dit budget is gezamenlijk — transactie ook op gezamenlijk zetten?</span>
+      <button
+        type="button"
+        onClick={onAccept}
+        className="shrink-0 font-medium text-kern-600 hover:text-kern-700"
+      >
+        Zet op gezamenlijk
+      </button>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Sluiten"
+        className="shrink-0 text-[var(--ink-4)] hover:text-[var(--ink-2)]"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
   )
 }
