@@ -427,8 +427,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'do-huishouden', x: 935, y: 1186, w: 138, h: 56, kind: 'data',
       title: 'Huishouden',
-      lead: 'Huishoudens, leden en uitnodigingen voor de partner-koppeling.',
-      items: ['households', 'household_members', 'household_invitations'],
+      lead: 'Huishoudens, leden, uitnodigingen en budgetmodel-voorstellen (wederzijdse instemming).',
+      items: ['households', 'household_members', 'household_invitations', 'household_budget_model_proposals'],
     },
     {
       id: 'do-meta', x: 1081, y: 1186, w: 138, h: 56, kind: 'data',

@@ -60,6 +60,13 @@ import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { SPLIT_MODE_LABELS, type SplitMode, type PrivacySettings } from '@/lib/household-data'
 import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
+import {
+  stampBudgetShares,
+  combineSpending,
+  buildSpendingSums,
+  formatShareCaption,
+  type SpendingSums,
+} from '@/lib/budget-perspective'
 import { Users } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -69,6 +76,28 @@ import { PAGE_INFO } from '@/lib/page-info-content'
 
 
 type Goal = BudgetGoal
+
+// Fase 2 (huishouden-budgetteren): elk budget krijgt een `_shareFraction` —
+// het aandeel (0-1) waarmee limit/spent/carried in het huidige perspectief
+// worden weergegeven. Eigen-persoonlijk = 1; gedeeld = mySharePct/100 (eigen
+// blik) of het complement (partner-blik); in household-blik altijd 1. Editing
+// gebruikt áltijd de volledige bedragen — `_shareFraction` is puur presentatie.
+type ShareStamp = { _shareFraction?: number }
+type StampedBudgetWithChildren = BudgetWithChildren & ShareStamp & {
+  children: (Budget & ShareStamp)[]
+}
+
+// Eén partner-persoonlijk budget uit de privacy-gated RPC. Bij privacy='totals'
+// is dit één aggregaatrij (`_aggregated:true`, `name`='Partner budget (totaal)',
+// `default_limit`=som, `_aggregatedCount`=aantal).
+type PartnerBudgetRow = {
+  id: string
+  name: string
+  default_limit: number
+  budget_type?: string
+  _aggregated?: boolean
+  _aggregatedCount?: number
+}
 
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -310,9 +339,12 @@ function BudgetKpiCell({
 
 type HubAlert = { id: string; name: string; spent: number; limit: number; pct: number; severity: 'over' | 'bijna' }
 
-function BudgetHub({
-  hubAlertsVisible,
-  hubAlertsExtra,
+// Aantal alerts dat ingeklapt zichtbaar is; de rest zit achter "toon meer".
+const HUB_ALERTS_COLLAPSED_MAX = 5
+
+// Exported voor unit-tests (budget-hub.test.tsx); binnen de app alleen hier gebruikt.
+export function BudgetHub({
+  hubAlerts,
   dekkingsgraad,
   opSchemaCount,
   parentBudgetsCount,
@@ -330,8 +362,7 @@ function BudgetHub({
   totalIncomeActual,
   budgetingActive,
 }: {
-  hubAlertsVisible: HubAlert[]
-  hubAlertsExtra: number
+  hubAlerts: HubAlert[]
   dekkingsgraad: number
   opSchemaCount: number
   parentBudgetsCount: number
@@ -350,11 +381,15 @@ function BudgetHub({
   budgetingActive: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [alertsExpanded, setAlertsExpanded] = useState(false)
   const { dailyExpenseRate, loading: rateLoading, source } = useDailyExpenseRate()
   const hasFreedomData = !rateLoading && source === 'transactions' && dailyExpenseRate > 0
 
-  const overCount = hubAlertsVisible.filter(a => a.severity === 'over').length
-  const bijnaCount = hubAlertsVisible.filter(a => a.severity === 'bijna').length + hubAlertsExtra
+  const hubAlertsVisible = alertsExpanded ? hubAlerts : hubAlerts.slice(0, HUB_ALERTS_COLLAPSED_MAX)
+  const hubAlertsExtra = hubAlerts.length - hubAlertsVisible.length
+
+  const overCount = hubAlerts.filter(a => a.severity === 'over').length
+  const bijnaCount = hubAlerts.filter(a => a.severity === 'bijna').length
 
   // KPI visibility — KPI-grid bevat Te Verdelen, Dekking, Schema
   const showTeVerdelen = periodMode === 'maand' && totalIncome > 0
@@ -373,7 +408,7 @@ function BudgetHub({
     showOverAllocated ||
     showTeVerdelenAttention ||
     showCoverage ||
-    hubAlertsVisible.length > 0 ||
+    hubAlerts.length > 0 ||
     showUncategorized
   // "Alles op schema" alleen als niks anders aandacht vraagt
   const showAllOnSchedule =
@@ -621,11 +656,18 @@ function BudgetHub({
                   </div>
                 )}
 
-                {/* "…en N meer" — als hubAlertsVisible is ingekort */}
-                {hubAlertsExtra > 0 && (
-                  <p className="text-[11px] italic text-[var(--ink-3)] pl-3.5 py-2">
-                    en {hubAlertsExtra} meer…
-                  </p>
+                {/* Toon meer/minder — als de alert-lijst langer is dan de ingeklapte limiet */}
+                {hubAlerts.length > HUB_ALERTS_COLLAPSED_MAX && (
+                  <button
+                    type="button"
+                    onClick={() => setAlertsExpanded(v => !v)}
+                    aria-expanded={alertsExpanded}
+                    className="w-full min-h-[44px] py-2 pl-3.5 text-left font-serif text-[12px] italic text-[var(--ink-3)] hover:text-[var(--ink)] hover:underline"
+                  >
+                    {alertsExpanded
+                      ? 'Toon minder'
+                      : `Toon ${hubAlertsExtra} meer ${hubAlertsExtra === 1 ? 'melding' : 'meldingen'}…`}
+                  </button>
                 )}
               </div>
             </div>
@@ -648,6 +690,37 @@ function BudgetHub({
   )
 }
 
+/**
+ * Read-only weergave van de PERSOONLIJKE budgetten van de partner in de
+ * household-boom-modus. Itemized rijen tonen naam + (volledig) budget; de
+ * privacy-'totalen'-aggregaatrij toont één samenvattende kaart met het totaal
+ * en het aantal onderliggende potjes. Geen edit/delete/reorder-affordances.
+ */
+function PartnerBudgetSection({ rows }: { rows: PartnerBudgetRow[] }) {
+  return (
+    <div className="mt-3 space-y-2">
+      {rows.map((row) => (
+        <div
+          key={row.id}
+          className="flex items-center justify-between gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-4 py-3"
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-[var(--ink-2)]">{row.name}</p>
+            {row._aggregated && row._aggregatedCount != null && (
+              <p className="font-serif text-[11px] italic text-[var(--ink-4)]">
+                {row._aggregatedCount} {row._aggregatedCount === 1 ? 'potje' : 'potjes'} — privacy: alleen totaal
+              </p>
+            )}
+          </div>
+          <span className="shrink-0 font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
+            {formatCurrency(Number(row.default_limit) || 0)}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function BudgetsPage({ initialBudgetId, initialData }: { initialBudgetId?: string; initialData?: BudgetsPageData } = {}) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -663,7 +736,12 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     mySharePct: number
     splitMode: SplitMode
     partnerName: string | null
+    budgetModel: 'separate' | 'household'
   } | null>(null)
+  // Afgeleide gemaks-waarden — gebruikt door de stempeling + display-scaling.
+  const mySharePct = householdShare?.mySharePct ?? 100
+  const partnerName = householdShare?.partnerName ?? null
+  const budgetModel = householdShare?.budgetModel ?? 'separate'
   const hiddenCategories = useMemo(
     () =>
       partnerPrivacy
@@ -685,13 +763,21 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           mySharePct: ctx.mySharePct,
           splitMode: ctx.splitMode,
           partnerName: ctx.partnerName,
+          budgetModel: ctx.budgetModel,
         })
       })
       .catch(() => { /* non-critical: solo-user fallback */ })
     return () => { cancelled = true }
   }, [perspectiveSignal])
   const { openWithMessage } = useChatContext()
-  const [budgets, setBudgets] = useState<BudgetWithChildren[]>(initialData?.budgets ?? [])
+  const [budgets, setBudgets] = useState<StampedBudgetWithChildren[]>(
+    (initialData?.budgets ?? []) as StampedBudgetWithChildren[],
+  )
+  // Partner-PERSOONLIJKE budgetten (read-only) — alleen geladen in de
+  // household-boom-modus (budgetModel='household'). Komen privacy-gated uit de
+  // RPC `household_partner_items('budgets')`: itemized rijen of één
+  // `_aggregated`-totaalrij. Worden NIET gestempeld (altijd vol getoond).
+  const [partnerBudgets, setPartnerBudgets] = useState<PartnerBudgetRow[]>([])
   const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
 
@@ -704,13 +790,15 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const selectedBudgetId = searchParams.get(OVERLAY_QUERY_KEYS.budget)
   const modalStep: 'detail' | 'edit' =
     searchParams.get(OVERLAY_QUERY_KEYS.edit) === 'true' ? 'edit' : 'detail'
-  const [viewMode, setViewMode] = useState<'tree' | 'donut' | 'heatmap'>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('budgets-view-mode')
-      if (stored === 'tree' || stored === 'donut' || stored === 'heatmap') return stored
-    }
-    return 'tree'
-  })
+  // SSR rendert altijd 'tree'; de opgeslagen voorkeur wordt pas ná mount
+  // toegepast. localStorage in de useState-initializer gaf een hydration-
+  // mismatch: de server kent de voorkeur niet en rendert een andere view
+  // (en andere toggle-classNames) dan de client.
+  const [viewMode, setViewMode] = useState<'tree' | 'donut' | 'heatmap'>('tree')
+  useEffect(() => {
+    const stored = localStorage.getItem('budgets-view-mode')
+    if (stored === 'donut' || stored === 'heatmap') setViewMode(stored)
+  }, [])
   const [periodMode, setPeriodMode] = useState<'maand' | 'ytd' | '12m'>('maand')
   const [monthDate, setMonthDate] = useState(() => {
     // Deeplink vanaf de geldstroom-banner (/overzicht/cashflow) opent deze
@@ -724,7 +812,13 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
+  // `spending` is de PERSPECTIEF-GESCHAALDE uitgaven per budget (eigen geld ×1 +
+  // gedeeld geld × aandeel) — de bestaande `Record<string, number>`-shape blijft
+  // zo intact voor alle consumers (boom/donut/heatmap/KPI's). De ruwe
+  // twee-sommen-map (`spendingSums`) houden we apart voor de partner-breakdown
+  // die het VOLLEDIGE huishoud-bedrag nodig heeft (anders dubbel-schalen).
   const [spending, setSpending] = useState<Record<string, number>>(initialData?.spending ?? {})
+  const [spendingSums, setSpendingSums] = useState<Map<string, SpendingSums>>(new Map())
   const [transactions, setTransactions] = useState<{ id?: string; account_id?: string; budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]>(initialData?.transactions ?? [])
   const [rollovers, setRollovers] = useState<BudgetRollover[]>(initialData?.rollovers ?? [])
   const [budgetAmounts, setBudgetAmounts] = useState<{ id: string; budget_id: string; effective_from: string; amount: number }[]>(initialData?.budgetAmounts ?? [])
@@ -822,30 +916,37 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     // de AICategorizeSheet die op deze pagina via de "ongecategoriseerd"-
     // aandacht-item geopend kan worden. Ze zijn goedkoop en voorkomen een
     // tweede roundtrip puur om dezelfde rijen met meer kolommen op te halen.
-    let spendQuery = supabase
+    // Geen perspectief-filter meer op ownership: RLS levert eigen-persoonlijk +
+    // alle gedeelde transacties van het huishouden. We schalen het GEDEELDE
+    // deel hieronder per perspectief (buildSpendingSums + combineSpending) i.p.v.
+    // gedeelde rijen weg te filteren — zo telt eigen geld op een gedeeld budget
+    // altijd ×1 mee, ook in eigen-blik. `ownership` is nodig voor die splitsing.
+    const spendQuery = supabase
       .from('transactions')
-      .select('id, account_id, is_split, budget_id, amount, date, description, counterparty_name, transaction_type, counterparty_iban, import_hash, reference')
+      .select('id, account_id, is_split, budget_id, amount, date, description, counterparty_name, transaction_type, counterparty_iban, import_hash, reference, ownership, user_id')
       .gte('date', monthStart)
       .lt('date', monthEnd)
       .order('date', { ascending: false })
-
-    if (perspective === 'personal') {
-      spendQuery = spendQuery.eq('ownership', 'personal')
-    }
 
     const { data } = await spendQuery
     if (signal?.aborted) return // Discard stale results
 
     if (data && data.length > 0) {
-      const map: Record<string, number> = {}
+      // Rijen voor de twee-sommen-map: transacties + split-regels (een split
+      // erft de ownership van de oudertransactie). De map houdt personalSum
+      // (eigen geld, ×1) en sharedSum (gedeeld, ×aandeel) per budget gescheiden.
+      const sumRows: Array<{ budget_id: string | null; amount: number; ownership?: string }> = []
       for (const t of data) {
         if (t.budget_id) {
-          map[t.budget_id] = (map[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
+          sumRows.push({ budget_id: t.budget_id, amount: Number(t.amount), ownership: t.ownership as string | undefined })
         }
       }
 
       // Add spending from split transactions
       const splitTxIds = data.filter(t => t.is_split).map(t => t.id)
+      // Ownership per oudertransactie zodat split-regels dezelfde herkomst krijgen.
+      const ownershipByTxId = new Map<string, string | undefined>()
+      for (const t of data) ownershipByTxId.set(t.id as string, t.ownership as string | undefined)
       let splitRows: typeof transactions = []
       if (splitTxIds.length > 0) {
         const { data: splits } = await supabase
@@ -855,7 +956,11 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         if (splits) {
           for (const s of splits) {
             if (s.budget_id) {
-              map[s.budget_id] = (map[s.budget_id] ?? 0) + Math.abs(Number(s.amount))
+              sumRows.push({
+                budget_id: s.budget_id,
+                amount: Number(s.amount),
+                ownership: ownershipByTxId.get(s.transaction_id),
+              })
             }
           }
           splitRows = (splits as unknown as Array<{
@@ -880,20 +985,37 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
 
       if (signal?.aborted) return // Discard stale results after split query
 
-      setSpending(map)
+      // Twee-sommen-map (ruw) + perspectief-geschaalde display-Record.
+      const sums = buildSpendingSums(sumRows)
+      const scaled: Record<string, number> = {}
+      for (const [budgetId, { personalSum, sharedSum }] of sums) {
+        scaled[budgetId] = combineSpending(personalSum, sharedSum, perspective, mySharePct)
+      }
+      setSpendingSums(sums)
+      setSpending(scaled)
       setTransactions([
         ...data.filter(t => t.budget_id) as typeof transactions,
         ...splitRows,
       ])
 
-      // Compute uncategorized expenses (no budget_id, not a transfer, not income)
+      // Compute uncategorized expenses (no budget_id, not a transfer, not income).
+      // In eigen-blik tellen we partner-persoonlijke ongecategoriseerde rijen
+      // (user_id !== currentUserId, ownership='personal') NIET mee — dat is geld
+      // van de partner; eigen + gedeelde ongecategoriseerde rijen blijven staan.
       const uncategorized = data.filter(
         (t) =>
           !t.budget_id &&
           !t.is_split &&
           t.transaction_type !== 'transfer' &&
           t.transaction_type !== 'income' &&
-          Number(t.amount) < 0,
+          Number(t.amount) < 0 &&
+          !(
+            perspective === 'personal' &&
+            (t.ownership as string | undefined) !== 'shared' &&
+            currentUserId != null &&
+            (t.user_id as string | undefined) != null &&
+            (t.user_id as string) !== currentUserId
+          ),
       )
       setUncategorizedCount(uncategorized.length)
       setUncategorizedTotal(
@@ -917,6 +1039,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     } else {
       if (signal?.aborted) return
       setSpending({})
+      setSpendingSums(new Map())
       setTransactions([])
       setUncategorizedCount(0)
       setUncategorizedTotal(0)
@@ -949,8 +1072,14 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       const [prevRolloversRes, prevTxRes, budgetsForRolloverRes] = await Promise.all([
         supabase.from('budget_rollovers').select('*').eq('period', prevPeriod),
         supabase.from('transactions').select('id, is_split, budget_id, amount').gte('date', prevStart).lt('date', prevEnd),
-        supabase.from('budgets').select('id, default_limit, rollover_type, parent_id').not('parent_id', 'is', null),
+        supabase.from('budgets').select('id, default_limit, rollover_type, parent_id, user_id, ownership').not('parent_id', 'is', null),
       ])
+      // Alleen de aanmaker van een (gedeeld) budget schrijft rollover-rijen weg —
+      // anders zouden beide partners dubbele budget_rollovers inserten voor
+      // hetzelfde gedeelde budget (de RLS staat schrijven door beiden toe, maar
+      // de UNIQUE(budget_id, period) zou botsen / de cijfers dubbel laden).
+      const { data: { user: rolloverUser } } = await supabase.auth.getUser()
+      if (signal?.aborted) return
 
       const prevRollovers = (prevRolloversRes.data ?? []) as BudgetRollover[]
       const prevTx = prevTxRes.data ?? []
@@ -986,6 +1115,9 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
 
         for (const budget of childBudgets) {
           if (budget.rollover_type === 'reset') continue
+          // Creator-gate: schrijf alleen rollover-rijen voor budgetten die de
+          // huidige gebruiker bezit (eigen of door mij aangemaakt gedeeld).
+          if (rolloverUser && budget.user_id && budget.user_id !== rolloverUser.id) continue
           const prevCarry = getCarriedAmount(prevRollovers, prevPeriod)
           const { carry } = computeRollover(
             Number(budget.default_limit),
@@ -1016,27 +1148,29 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     }
 
     setRollovers((rolloverData ?? []) as BudgetRollover[])
-  }, [monthStart, monthEnd, monthDate, perspective])
+  }, [monthStart, monthEnd, monthDate, perspective, mySharePct, currentUserId])
 
   const loadBudgets = useCallback(async (signal?: AbortSignal) => {
     try {
       const supabase = createClient()
-      let query = supabase
+      // GEEN ownership-filter meer in eigen-blik: RLS levert eigen-persoonlijk +
+      // alle gedeelde budgetten van het huishouden. Gedeelde budgetten worden
+      // pro-rata WEERGEGEVEN (via `_shareFraction`), niet weggefilterd — zo zie
+      // je in eigen-blik ook de gezamenlijke potjes op jouw aandeel.
+      const query = supabase
         .from('budgets')
         .select('*')
         .eq('is_archived', false)
         .order('sort_order', { ascending: true })
-
-      // Filter by perspective: personal shows only own budgets, household shows all
-      if (perspective === 'personal') {
-        query = query.eq('ownership', 'personal')
-      }
 
       const { data, error: fetchError } = await query
 
       if (signal?.aborted) return // Discard stale results
       if (fetchError) throw fetchError
 
+      // SEED-GUARD: seeden mag NOOIT triggeren wanneer er alleen gedeelde
+      // budgetten zijn (de query is nu ongefilterd, dus `data` bevat eigen +
+      // gedeeld; een lege set betekent écht "nog geen budgetten" → seed defaults).
       if (!data || data.length === 0) {
         await seedBudgets(supabase)
         return
@@ -1058,10 +1192,14 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         }
       }
 
-      const parents = filteredBudgetData.filter((b) => !b.parent_id)
-      const children = filteredBudgetData.filter((b) => !!b.parent_id)
+      // Stempel elk budget met zijn `_shareFraction` voor het huidige
+      // perspectief. Ouders en kinderen worden los gestempeld zodat een gedeeld
+      // kind onder een persoonlijke ouder (of andersom) correct schaalt.
+      const stamped = stampBudgetShares(filteredBudgetData, perspective, mySharePct)
+      const parents = stamped.filter((b) => !b.parent_id)
+      const children = stamped.filter((b) => !!b.parent_id)
 
-      const tree: BudgetWithChildren[] = parents.map((parent) => ({
+      const tree: StampedBudgetWithChildren[] = parents.map((parent) => ({
         ...parent,
         children: children
           .filter((c) => c.parent_id === parent.id)
@@ -1069,13 +1207,26 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       }))
 
       setBudgets(tree)
+
+      // Household-boom-modus (budgetModel='household'): laad de partner-
+      // PERSOONLIJKE budgetten read-only via de privacy-gated RPC. Buiten deze
+      // modus (separate) tonen we geen aparte partner-sectie — leegmaken.
+      if (perspective === 'household' && budgetModel === 'household') {
+        const { data: partnerData } = await supabase.rpc('household_partner_items', {
+          p_category: 'budgets',
+        })
+        if (signal?.aborted) return
+        setPartnerBudgets((partnerData ?? []) as PartnerBudgetRow[])
+      } else {
+        setPartnerBudgets([])
+      }
     } catch (err) {
       console.error('Error loading budgets:', err)
       if (!signal?.aborted) setError('Kon budgetten niet laden. Probeer het opnieuw.')
     } finally {
       if (!signal?.aborted) setLoading(false)
     }
-  }, [perspective, partnerPrivacy])
+  }, [perspective, partnerPrivacy, mySharePct, budgetModel])
 
   const loadGoals = useCallback(async () => {
     const supabase = createClient()
@@ -1368,6 +1519,13 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const currentPeriodLabel = useMemo(() => formatPeriod(monthDate), [monthDate])
   const displayDate = useMemo(() => localDateStr(monthDate), [monthDate])
 
+  // Het pro-rata aandeel waarmee een budget WORDT WEERGEGEVEN (1 buiten een
+  // gedeeld budget of in household-blik). De budgetten in state zijn gestempeld
+  // door `stampBudgetShares`; deze helper leest dat veld defensief uit.
+  function shareOf(budget: Budget): number {
+    return (budget as ShareStamp)._shareFraction ?? 1
+  }
+
   function getEffectiveLimit(budget: Budget): number {
     const budgetRollovers = rolloversIndex[budget.id] ?? []
     const carry = getCarriedAmount(budgetRollovers, currentPeriodLabel)
@@ -1381,13 +1539,17 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       ? Number(applicable[0].amount)
       : Number(budget.default_limit)
 
+    // Pro-rata weergave: in eigen/partner-blik tonen we het aandeel van een
+    // gedeeld budget. Editing leest altijd de volledige bedragen (apart pad).
+    const fraction = shareOf(budget)
+
     // For multi-month modes, scale the base limit by the number of months.
     // Rollovers only apply to single-month view — they don't make sense across periods.
     if (periodMonthCount > 1) {
-      return baseLimit * periodMonthCount
+      return baseLimit * periodMonthCount * fraction
     }
 
-    return baseLimit + carry
+    return (baseLimit + carry) * fraction
   }
 
   function getParentEffectiveLimit(parent: BudgetWithChildren): number {
@@ -1397,7 +1559,8 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
 
   function getBudgetCarry(budget: Budget): number {
     const budgetRollovers = rolloversIndex[budget.id] ?? []
-    return getCarriedAmount(budgetRollovers, currentPeriodLabel)
+    // Carried-over saldo wordt ook pro-rata getoond (consistent met de limiet).
+    return getCarriedAmount(budgetRollovers, currentPeriodLabel) * shareOf(budget)
   }
 
   async function copyFromLastMonth() {
@@ -1479,6 +1642,16 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const teVerdelen = totalIncome - totalAllocated
   const dekkingsgraad = totalIncome > 0 ? (totalAllocated / totalIncome) * 100 : 0
 
+  // Pro-rata onderschrift: tonen zodra één weergegeven budget op een aandeel
+  // < 100% staat (gedeeld budget in eigen/partner-blik). Dan zijn álle KPI-
+  // totalen geschaald en verdient dat een korte verklaring onder de strip.
+  const hasProRataBudget = budgets.some(
+    (b) =>
+      (b._shareFraction ?? 1) < 1 ||
+      b.children.some((c) => ((c as ShareStamp)._shareFraction ?? 1) < 1),
+  )
+  const shareCaption = hasProRataBudget ? formatShareCaption(mySharePct) : null
+
   // G3: Budget insights voor AI-kaart (overschreden + bijna vol)
   const childBudgetsFlat = budgets.flatMap(g =>
     g.children.length > 0 ? g.children : (g.budget_type !== 'income' ? [g as Budget] : [])
@@ -1527,13 +1700,12 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     return actual >= lim
   }).length
 
-  // G3-hub: combined alert list (overschreden first, then bijna vol), max 5
+  // G3-hub: combined alert list (overschreden first, then bijna vol);
+  // de hub kapt zelf af op HUB_ALERTS_COLLAPSED_MAX met een toon-meer-knop
   const hubAlerts = [
     ...overschredenInzichten.map(i => ({ ...i, severity: 'over' as const })),
     ...bijnaVolInzichten.map(i => ({ ...i, severity: 'bijna' as const })),
   ]
-  const hubAlertsVisible = hubAlerts.slice(0, 5)
-  const hubAlertsExtra = hubAlerts.length - hubAlertsVisible.length
 
   // F2-09: beschikbaar per sub-budget (effectieve limiet incl. rollover − uitgegeven)
   const beschikbaarMap: Record<string, number> = {}
@@ -1548,6 +1720,57 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const coverageRatio = totalIncome > 0 ? Math.min(1, totalIncomeActual / totalIncome) : 1
 
   const monthLabel = monthDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
+
+  // Household-boom-modus: in huishoud-blik mét budgetModel='household' splitsen we
+  // de boom in drie secties (Gezamenlijk / Mijn potjes / Potjes van partner).
+  // In 'separate'-modus blijft de bestaande enkele type-gegroepeerde boom staan.
+  const householdSectioned = perspective === 'household' && budgetModel === 'household'
+
+  // De vier type-trees voor een willekeurige subset budgetten. `withAnchors`
+  // rendert de scroll-anchor-id's (#inkomen etc.) — alleen in de enkele-boom-
+  // modus relevant; in de gesectioneerde modus zou dat dubbele id's geven.
+  const renderTypeTrees = (subset: StampedBudgetWithChildren[], withAnchors: boolean) => {
+    const inc = subset.filter((b) => b.budget_type === 'income')
+    const exp = subset.filter((b) => b.budget_type === 'expense')
+    const sav = subset.filter((b) => b.budget_type === 'savings')
+    const deb = subset.filter((b) => b.budget_type === 'debt')
+    return (
+      <>
+        {inc.length > 0 && (
+          <div id={withAnchors ? 'inkomen' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
+            <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
+            <BudgetTree groups={inc} spending={spending} budgetType="income" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+          </div>
+        )}
+        {exp.length > 0 && (
+          <div id={withAnchors ? 'uitgaven' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
+            <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Uitgaven</h3>
+            <BudgetTree groups={exp} spending={spending} budgetType="expense" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+          </div>
+        )}
+        {sav.length > 0 && (
+          <div id={withAnchors ? 'sparen' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
+            <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-wil-400/70">— vrijheid opbouwen</span></h3>
+            <BudgetTree groups={sav} spending={spending} budgetType="savings" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+          </div>
+        )}
+        {deb.length > 0 && (
+          <div id={withAnchors ? 'schulden' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
+            <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
+            <BudgetTree groups={deb} spending={spending} budgetType="debt" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+          </div>
+        )}
+      </>
+    )
+  }
+
+  // Sectie-header in editorial-stijl (kleine uppercase tracking + dunne bovenrand)
+  // — consistent met de bestaande sectie-patronen verderop in dit bestand.
+  const sectionHeader = (label: string) => (
+    <h3 className="mt-8 mb-2 border-t border-[var(--border-ed)] pt-4 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+      {label}
+    </h3>
+  )
 
   if (loading) {
     return (
@@ -1780,13 +2003,20 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           />
         </div>
 
+        {/* Pro-rata onderschrift — alle bedragen hierboven tonen jouw aandeel
+            van gedeelde budgetten (gedeeld geld × aandeel; eigen geld telt vol). */}
+        {shareCaption && (
+          <p className="border-t border-[var(--rule-soft)] px-3 py-1.5 text-center font-serif text-[11px] italic text-[var(--ink-3)] sm:px-4">
+            {shareCaption} — gedeelde budgetten tellen mee op jouw deel
+          </p>
+        )}
+
       </section>
 
       {/* G3: Budget Hub — geconsolideerde dropdown (Allocatie + Aandacht + Alerts + Inzichten) */}
       {budgetingActive && (
         <BudgetHub
-          hubAlertsVisible={hubAlertsVisible}
-          hubAlertsExtra={hubAlertsExtra}
+          hubAlerts={hubAlerts}
           dekkingsgraad={dekkingsgraad}
           opSchemaCount={opSchemaCount}
           parentBudgetsCount={parentBudgetsCount}
@@ -1865,6 +2095,31 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       {/* Budget groups */}
       {viewMode === 'tree' ? (
         <>
+          {householdSectioned ? (
+            // Drie secties op herkomst: Gezamenlijk (gedeeld, vol) / Mijn potjes
+            // (eigen persoonlijk) / Potjes van partner (read-only via RPC).
+            <>
+              {budgets.some((b) => b.ownership === 'shared') && (
+                <div>
+                  {sectionHeader('Gezamenlijk')}
+                  {renderTypeTrees(budgets.filter((b) => b.ownership === 'shared'), true)}
+                </div>
+              )}
+              {budgets.some((b) => b.ownership !== 'shared') && (
+                <div>
+                  {sectionHeader('Mijn potjes')}
+                  {renderTypeTrees(budgets.filter((b) => b.ownership !== 'shared'), false)}
+                </div>
+              )}
+              {partnerBudgets.length > 0 && (
+                <div>
+                  {sectionHeader(`Potjes van ${partnerName ?? 'partner'}`)}
+                  <PartnerBudgetSection rows={partnerBudgets} />
+                </div>
+              )}
+            </>
+          ) : (
+          <>
           {incomeBudgets.length > 0 && (
             <div id="inkomen" className="mt-4 sm:mt-8 scroll-mt-20">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
@@ -1959,6 +2214,8 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 </>
               )}
             </div>
+          )}
+          </>
           )}
         </>
       ) : viewMode === 'heatmap' ? (
@@ -2070,6 +2327,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           parent={selectedParent}
           siblings={selectedSiblings}
           spending={spending}
+          spendingSums={spendingSums}
           transactions={transactions}
           allBudgets={budgets}
           rollovers={rollovers}
@@ -2234,6 +2492,7 @@ function BudgetDetailModal({
   parent,
   siblings,
   spending,
+  spendingSums,
   transactions,
   allBudgets,
   rollovers,
@@ -2254,6 +2513,9 @@ function BudgetDetailModal({
   parent: BudgetWithChildren | null
   siblings: Budget[]
   spending: Record<string, number>
+  /** Ruwe twee-sommen-map (personal/shared) per budget — voor het VOLLEDIGE
+   *  huishoud-bedrag in de "Impact per partner"-uitsplitsing (geen dubbel-schalen). */
+  spendingSums: Map<string, SpendingSums>
   transactions: { id?: string; account_id?: string; budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]
   allBudgets: BudgetWithChildren[]
   rollovers: BudgetRollover[]
@@ -2455,6 +2717,23 @@ function BudgetDetailModal({
     : getBudgetCarry(budget)
   const cumulativeCarry = rolloverHistory.reduce((sum, r) => sum + Number(r.carried_amount), 0)
 
+  // VOLLEDIGE huishoud-uitgave (personal + shared, ongeschaald) voor de
+  // "Impact per partner"-uitsplitsing. `spent` hierboven is al perspectief-
+  // geschaald; de partner-split rekent zelf met mySharePct, dus die heeft het
+  // ongeschaalde totaal nodig om niet dubbel te schalen.
+  const fullSpentFor = (b: Budget): number => {
+    const sums = spendingSums.get(b.id)
+    return sums ? sums.personalSum + sums.sharedSum : 0
+  }
+  const fullSpent = isParent
+    ? children.reduce((sum, c) => sum + fullSpentFor(c), 0)
+    : fullSpentFor(budget)
+
+  // Pro-rata onderschrift in de detail-pane: alleen tonen wanneer dit budget
+  // daadwerkelijk geschaald wordt weergegeven (gedeeld in eigen/partner-blik).
+  const detailShareFraction = (budget as ShareStamp)._shareFraction ?? 1
+  const showProRataLine = detailShareFraction < 1 && fullSpent > 0
+
   // Filter transactions for this budget (or children if parent)
   const budgetIds = isParent ? children.map(c => c.id) : [budget.id]
   const budgetTx = transactions.filter(t => budgetIds.includes(t.budget_id))
@@ -2587,6 +2866,12 @@ function BudgetDetailModal({
                   perspective={perspective}
                 />
               )}
+              {/* Aandeel-subtekst op een gedeeld budget in niet-household-blik. */}
+              {perspective !== 'household' && budget.ownership === 'shared' && detailShareFraction < 1 && (
+                <span className="text-[10px] text-[var(--ink-4)]">
+                  · jouw deel {Math.round(detailShareFraction * 100)}%
+                </span>
+              )}
             </div>
             {budget.description && <p className="truncate text-xs text-[var(--ink-3)]">{budget.description}</p>}
           </div>
@@ -2605,8 +2890,10 @@ function BudgetDetailModal({
         />
 
         <div className="px-6 pb-4">
-          {/* Per-partner breakdown for shared budgets */}
-          {budgetPartnerSplit && hasFreedomData && spent >= 100 && (
+          {/* Per-partner breakdown for shared budgets — rekent met fullSpent
+              (volledig huishoud-bedrag) zodat de × aandeel-split niet dubbel
+              schaalt op een al perspectief-geschaalde `spent`. */}
+          {budgetPartnerSplit && hasFreedomData && fullSpent >= 100 && (
             <div className="mt-3 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3" data-testid="budget-partner-breakdown">
               <div className="flex items-center gap-1.5 mb-2">
                 <Users className="h-3.5 w-3.5 text-kern-500" />
@@ -2617,23 +2904,38 @@ function BudgetDetailModal({
                 <div>
                   <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{budgetPartnerSplit.myName}</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                    {<MaskedAmount value={spent * budgetPartnerSplit.mySharePct / 100} tone="wil" />}
+                    {<MaskedAmount value={fullSpent * budgetPartnerSplit.mySharePct / 100} tone="wil" />}
                   </p>
                   <p className="text-xs italic text-[var(--ink-3)]">
-                    ≈ {eurToFreedomTime(spent * budgetPartnerSplit.mySharePct / 100, dailyExpenseRate).formattedDagen}
+                    ≈ {eurToFreedomTime(fullSpent * budgetPartnerSplit.mySharePct / 100, dailyExpenseRate).formattedDagen}
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase truncate">{budgetPartnerSplit.partnerName}</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-[var(--ink)]">
-                    {<MaskedAmount value={spent * (100 - budgetPartnerSplit.mySharePct) / 100} tone="wil" />}
+                    {<MaskedAmount value={fullSpent * (100 - budgetPartnerSplit.mySharePct) / 100} tone="wil" />}
                   </p>
                   <p className="text-xs italic text-[var(--ink-3)]">
-                    ≈ {eurToFreedomTime(spent * (100 - budgetPartnerSplit.mySharePct) / 100, dailyExpenseRate).formattedDagen}
+                    ≈ {eurToFreedomTime(fullSpent * (100 - budgetPartnerSplit.mySharePct) / 100, dailyExpenseRate).formattedDagen}
                   </p>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Pro-rata uitleg in eigen/partner-blik op een gedeeld budget:
+              toon het volledige budget, het aandeel-% en het toegerekende deel. */}
+          {showProRataLine && (
+            <p className="mt-2 font-serif text-[12px] italic text-[var(--ink-3)]">
+              Volledig budget{' '}
+              <span className="font-mono tabular-nums not-italic text-[var(--ink-2)]">
+                {formatCurrency(getEffectiveLimit(budget) / detailShareFraction)}
+              </span>{' '}
+              · jouw aandeel {Math.round(detailShareFraction * 100)}% ={' '}
+              <span className="font-mono tabular-nums not-italic text-[var(--ink-2)]">
+                {formatCurrency(getEffectiveLimit(budget))}
+              </span>
+            </p>
           )}
 
           {carry > 0 && (

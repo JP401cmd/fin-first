@@ -1,15 +1,15 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import {
-  Loader2, CheckCircle, HelpCircle, Check, ChevronDown, GitFork, Sparkles, Wand2, ArrowLeftRight,
+  Loader2, CheckCircle, HelpCircle, Check, ChevronDown, GitFork, Sparkles, Wand2, ArrowLeftRight, Hand,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
-import { buildBudgetSelectEntries, budgetOptionLabel, resolveEigenRekeningBudgetId, type Budget } from '@/lib/budget-data'
+import { buildBudgetSelectEntries, budgetOptionLabel, type Budget } from '@/lib/budget-data'
 import { useHouseholdStatus } from '@/components/app/ownership-toggle'
-import { buildFrequencyMap, type CategoryCorrection } from '@/lib/parsers/categorize'
-import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
+import { loadAutoCatContext as loadSharedAutoCatContext } from '@/lib/auto-categorize-context'
 import {
   computeAutoCategorization,
   computeOwnAccountDetection,
@@ -17,6 +17,13 @@ import {
   type AutoCatTx,
   type AutoAssignment,
 } from '@/lib/auto-categorize'
+
+// De Sleepmodus (drag-&-drop) sleept dnd-kit mee — eigen chunk, laadt pas
+// wanneer de gebruiker de modus opent.
+const SleepmodusOverlay = dynamic(
+  () => import('@/components/app/sleepmodus/sleepmodus-overlay').then((m) => ({ default: m.SleepmodusOverlay })),
+  { ssr: false },
+)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,7 +128,7 @@ export function AICategorizeSheet({
   monthLabel,
   currentUserId,
 }: Props) {
-  const [phase, setPhase] = useState<'choice' | 'ai' | 'review' | 'saving' | 'applying' | 'success'>('choice')
+  const [phase, setPhase] = useState<'choice' | 'ai' | 'review' | 'saving' | 'applying' | 'success' | 'sleep'>('choice')
   const [rows, setRows] = useState<RowState[]>([])
   const { hasHousehold } = useHouseholdStatus()
   // Standaard aan: een keuze voor een gedeeld budget maakt de transactie ook
@@ -320,33 +327,13 @@ export function AICategorizeSheet({
 
   // ── Automatisch indelen (optie 3 & 4) ─────────────────────────────────────
 
-  /** Laadt regels, geschiedenis en eigen-rekening-identifiers voor de auto-flows. */
-  const loadAutoCatContext = useCallback(async (): Promise<AutoCatContext> => {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Je bent niet (meer) ingelogd.')
-
-    const [corrRes, ownRes, bankRes, freqMap] = await Promise.all([
-      supabase.from('category_corrections').select('match_field, match_value, budget_id'),
-      supabase.from('user_own_ibans').select('match_type, match_value, iban').eq('user_id', user.id),
-      supabase.from('bank_accounts').select('iban').eq('is_active', true),
-      buildFrequencyMap(user.id, supabase),
-    ])
-
-    const ids = buildOwnAccountIdentifiers(
-      (ownRes.data ?? []) as { match_type?: string | null; match_value?: string | null; iban?: string | null }[],
-      ((bankRes.data ?? []) as { iban: string | null }[]).map((b) => b.iban),
-    )
-
-    return {
-      budgets,
-      corrections: (corrRes.data ?? []) as CategoryCorrection[],
-      freqMap,
-      ownIbans: ids.ibans,
-      ownNamePatterns: ids.namePatterns,
-      eigenRekeningBudgetId: resolveEigenRekeningBudgetId(budgets),
-    }
-  }, [budgets])
+  /** Laadt regels, geschiedenis en eigen-rekening-identifiers voor de auto-flows.
+   *  Gedeelde implementatie in lib/auto-categorize-context.ts (ook gebruikt door
+   *  de Sleepmodus-overlay). */
+  const loadAutoCatContext = useCallback(
+    async (): Promise<AutoCatContext> => loadSharedAutoCatContext(createClient(), budgets),
+    [budgets],
+  )
 
   /** Schrijft de toewijzingen gebatcht weg: één update per budget/bron/transfer. */
   async function applyAssignments(assignments: AutoAssignment[]): Promise<void> {
@@ -628,7 +615,11 @@ export function AICategorizeSheet({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <BottomSheet open onClose={onClose} title="Transacties categoriseren">
+    <>
+    {/* De sheet sluit visueel tijdens de Sleepmodus (open=false) — daarmee
+        deactiveren ook zijn document-level Escape-listener en focus-trap,
+        zodat die niet vechten met de fullscreen overlay. State blijft staan. */}
+    <BottomSheet open={phase !== 'sleep'} onClose={onClose} title="Transacties categoriseren">
 
       {/* ── Choice ── */}
       {phase === 'choice' && (
@@ -766,6 +757,24 @@ export function AICategorizeSheet({
             <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">of zelf</span>
             <div className="h-px flex-1 bg-[var(--border-ed)]" />
           </div>
+
+          {/* Sleepmodus (drag & drop) */}
+          <button
+            type="button"
+            onClick={() => setPhase('sleep')}
+            disabled={loadingAll || activeTransactions.length === 0}
+            className="flex items-start gap-3 rounded-[var(--r-lg)] border border-dashed border-kern-300 bg-kern-50/50 px-4 py-4 text-left transition-all hover:border-kern-400 hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-kern-300"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-kern-100">
+              <Hand className="h-4 w-4 text-kern-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[var(--ink)]">Sleepmodus</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                Sleep elke transactie naar het juiste budget. Eén voor één, met je budgetten als doelen om de transactie heen — vergelijkbare transacties vliegen mee.
+              </p>
+            </div>
+          </button>
 
           {/* Handmatig */}
           <button
@@ -1022,6 +1031,20 @@ export function AICategorizeSheet({
         </div>
       )}
     </BottomSheet>
+
+    {/* ── Sleepmodus — fullscreen drag-&-drop boven de (gesloten) sheet ── */}
+    {phase === 'sleep' && (
+      <SleepmodusOverlay
+        transactions={activeTransactions}
+        budgets={budgets}
+        budgetGroups={budgetGroups}
+        hasHousehold={hasHousehold}
+        monthLabel={scope === 'month' ? monthLabel : undefined}
+        onExit={() => setPhase('choice')}
+        onDone={onSaved}
+      />
+    )}
+    </>
   )
 }
 

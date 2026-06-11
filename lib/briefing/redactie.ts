@@ -200,7 +200,7 @@ export async function redactBriefing(
 ): Promise<RedactieResult> {
   if (entries.length === 0) return { headline: null, texts: new Map() }
   try {
-    const model = await getModel(supabase)
+    const model = await getModel(supabase, 'briefing')
     const system = opts.directivesBlock
       ? `${REDACTIE_SYSTEM}\n\n${opts.directivesBlock}`
       : REDACTIE_SYSTEM

@@ -1,0 +1,12 @@
+-- Fix: bij unmerge hingen persoonlijke potjes van de partner nog onder de
+-- (weer persoonlijke) canonical-ouder van het andere lid — onzichtbaar voor de
+-- eigenaar. Re-parent ze terug naar de herstelde duplicaat-ouder.
+-- Toegepast op remote via mcp apply_migration (household_budget_unmerge_reparent_fix).
+-- Wijziging t.o.v. 20260611000002: in de duplicaten-loop van
+-- _unmerge_household_budgets, vóór de de-archivering:
+--
+--   UPDATE budgets SET parent_id = d.id
+--     WHERE parent_id = d.merged_into AND user_id = d.user_id
+--       AND ownership = 'personal' AND is_archived = false;
+--
+-- Volledige definitie: zie remote functie public._unmerge_household_budgets.

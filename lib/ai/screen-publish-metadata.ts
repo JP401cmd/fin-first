@@ -102,7 +102,7 @@ export async function screenPublishMetadata(
   const userPrompt = blocks.join('\n\n')
 
   try {
-    const model = await getModel(supabase)
+    const model = await getModel(supabase, 'scherm_publicatie')
     const { object } = await generateObject({
       model,
       schema: ScreenResultSchema,

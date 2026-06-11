@@ -657,6 +657,61 @@ body {
   to   { opacity: 1; }
 }
 
+/* ── Sleepmodus (drag-&-drop toewijzen) ─────────────────── */
+/* Volgende transactie draait het midden binnen. */
+@keyframes sleep-bol-enter {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.55) rotate(-14deg); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+}
+.animate-sleep-bol-enter {
+  animation: sleep-bol-enter 320ms cubic-bezier(.22,1,.36,1) both;
+}
+/* Zwerm-bolletje vliegt het doelbudget in; doel via CSS-vars per bolletje. */
+@keyframes sleep-fly {
+  to {
+    transform: translate(var(--sleep-fly-x, 0px), var(--sleep-fly-y, -200px)) scale(0.25);
+    opacity: 0;
+  }
+}
+.animate-sleep-fly {
+  animation: sleep-fly 420ms cubic-bezier(.5,.05,.45,1) both;
+  animation-delay: var(--stagger, 0ms);
+}
+/* ✓-puls op de doelbol na een geslaagde landing. */
+@keyframes sleep-check-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--sleep-pulse-color, var(--color-kern-500)) 45%, transparent); }
+  70%  { box-shadow: 0 0 0 14px color-mix(in oklch, var(--sleep-pulse-color, var(--color-kern-500)) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.animate-sleep-check-pulse {
+  animation: sleep-check-pulse 600ms ease-out both;
+}
+/* Deelbudgetten nemen de ring over (of herstel van de ring). */
+@keyframes sleep-ring-fade {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.animate-sleep-ring-fade {
+  animation: sleep-ring-fade 200ms ease-out both;
+  animation-delay: var(--stagger, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-sleep-bol-enter,
+  .animate-sleep-fly,
+  .animate-sleep-check-pulse,
+  .animate-sleep-ring-fade {
+    animation: none !important;
+  }
+  /* Zwerm-bolletjes verdwijnen direct in plaats van te vliegen. */
+  .animate-sleep-fly { opacity: 0; }
+}
+/* Grijpend handje tijdens de hele drag — de sleep-kloon heeft pointer-events
+   none, dus de elementen erónder bepalen anders de cursor. */
+body.sleepmodus-dragging,
+body.sleepmodus-dragging * {
+  cursor: grabbing !important;
+}
+
 /* Budget blob animations moved to components/app/budget-blob.css */
 
 /* Onboarding animations moved to app/(onboarding)/onboarding/onboarding.css */

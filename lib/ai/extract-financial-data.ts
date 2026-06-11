@@ -142,7 +142,7 @@ export async function extractFinancialData(
 
   try {
     // Resolve the AI model from project settings
-    const model = await getModel(supabase)
+    const model = await getModel(supabase, 'document_extractie')
 
     // Check for admin-configured prompt override, fall back to hardcoded default
     const { data: overrideRow } = await supabase

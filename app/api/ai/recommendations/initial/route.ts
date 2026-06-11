@@ -72,7 +72,7 @@ export async function POST() {
 
   let model
   try {
-    model = await getModel(supabase)
+    model = await getModel(supabase, 'aanbevelingen_initieel')
   } catch (err) {
     if (err instanceof AIConfigError) {
       return Response.json({ error: err.message }, { status: 422 })

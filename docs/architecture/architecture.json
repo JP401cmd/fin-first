@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-11T08:14:39.414Z",
+  "generatedAt": "2026-06-11T15:08:45.461Z",
   "generatedDate": "2026-06-11",
   "repo": {
     "name": "fin",
@@ -182,13 +182,13 @@
     }
   },
   "stats": {
-    "routes": 319,
+    "routes": 320,
     "routesProduction": 94,
-    "api": 373,
-    "tables": 49,
-    "migrations": 95,
+    "api": 374,
+    "tables": 51,
+    "migrations": 100,
     "integrations": 24,
-    "components": 682,
+    "components": 685,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -212,6 +212,12 @@
     {
       "url": "/beheer/ai-features",
       "file": "app/(app)/beheer/ai-features/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/ai-verbruik",
+      "file": "app/(app)/beheer/ai-verbruik/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -2129,6 +2135,12 @@
       {
         "url": "/beheer/ai-features",
         "file": "app/(app)/beheer/ai-features/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/ai-verbruik",
+        "file": "app/(app)/beheer/ai-verbruik/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -5080,6 +5092,16 @@
       ]
     },
     {
+      "url": "/api/household/budget-model",
+      "file": "app/api/household/budget-model/route.ts",
+      "domain": "household",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH"
+      ]
+    },
+    {
       "url": "/api/household/data",
       "file": "app/api/household/data/route.ts",
       "domain": "household",
@@ -7606,7 +7628,7 @@
     {
       "domain": "household",
       "label": "Huishouden",
-      "count": 12,
+      "count": 13,
       "routes": [
         {
           "url": "/api/household/accept",
@@ -7631,6 +7653,16 @@
           "domain": "household",
           "methods": [
             "GET"
+          ]
+        },
+        {
+          "url": "/api/household/budget-model",
+          "file": "app/api/household/budget-model/route.ts",
+          "domain": "household",
+          "methods": [
+            "GET",
+            "POST",
+            "PATCH"
           ]
         },
         {
@@ -11951,6 +11983,10 @@
         "migration": "supabase/migrations/20260529100000_create_calculator_library.sql"
       },
       {
+        "name": "ai_token_usage",
+        "migration": "supabase/migrations/20260611140000_create_ai_token_usage.sql"
+      },
+      {
         "name": "aow_leeftijd",
         "migration": "supabase/migrations/20260315000001_create_aow_leeftijd.sql"
       },
@@ -12037,6 +12073,10 @@
       {
         "name": "holdings",
         "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
+      },
+      {
+        "name": "household_budget_model_proposals",
+        "migration": "supabase/migrations/20260611000002_household_budget_model_consent.sql"
       },
       {
         "name": "household_invitations",
@@ -12143,7 +12183,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 95
+    "migrationCount": 100
   },
   "tablesByDomain": [
     {
@@ -12258,6 +12298,31 @@
       ]
     },
     {
+      "domain": "Overig",
+      "tables": [
+        {
+          "name": "ai_token_usage",
+          "migration": "supabase/migrations/20260611140000_create_ai_token_usage.sql"
+        },
+        {
+          "name": "badges",
+          "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
+        },
+        {
+          "name": "external_data_sources",
+          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
+        },
+        {
+          "name": "household_budget_model_proposals",
+          "migration": "supabase/migrations/20260611000002_household_budget_model_consent.sql"
+        },
+        {
+          "name": "job_runs",
+          "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
+        }
+      ]
+    },
+    {
       "domain": "AI & calculators",
       "tables": [
         {
@@ -12313,23 +12378,6 @@
         {
           "name": "life_events",
           "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
-        }
-      ]
-    },
-    {
-      "domain": "Overig",
-      "tables": [
-        {
-          "name": "badges",
-          "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
-        },
-        {
-          "name": "external_data_sources",
-          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
-        },
-        {
-          "name": "job_runs",
-          "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
         }
       ]
     },
@@ -12445,11 +12493,11 @@
     }
   ],
   "components": {
-    "total": 682,
+    "total": 685,
     "groups": [
       {
         "group": "app",
-        "count": 292,
+        "count": 293,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12493,6 +12541,7 @@
           "budget-donut",
           "budget-form",
           "budget-heatmap",
+          "budget-merge-wizard",
           "budget-plan-editor-sheet",
           "budget-sankey",
           "budget-shared",
@@ -13057,7 +13106,7 @@
       },
       {
         "group": "mijn",
-        "count": 26,
+        "count": 28,
         "items": [
           "abonnement-section",
           "account-basis-section",
@@ -13073,6 +13122,8 @@
           "font-picker",
           "font-picker.test",
           "geavanceerd-settings",
+          "household-budget-model-section",
+          "household-budget-model-section.test",
           "household-privacy-settings",
           "household-privacy-settings.test",
           "mijn-overview",
@@ -14070,6 +14121,10 @@
           "write": false
         },
         {
+          "name": "household_budget_model_proposals",
+          "write": false
+        },
+        {
           "name": "household_invitations",
           "write": true
         },
@@ -14235,6 +14290,10 @@
         },
         {
           "name": "holding_alerts",
+          "write": false
+        },
+        {
+          "name": "household_budget_model_proposals",
           "write": false
         },
         {
@@ -15533,6 +15592,7 @@
           "label": "Huishouden",
           "write": false,
           "routes": [
+            "/api/household/budget-model",
             "/api/household/fire-projections"
           ]
         },
@@ -16081,6 +16141,7 @@
           "routes": [
             "/api/household/box2",
             "/api/household/box3",
+            "/api/household/budget-model",
             "/api/household/data",
             "/api/household/fire-projections"
           ]
@@ -16709,6 +16770,24 @@
           ]
         }
       ],
+      "household_budget_model_proposals": [
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": false,
+          "routes": [
+            "/api/household/budget-model"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        }
+      ],
       "households": [
         {
           "domain": "household",
@@ -16966,6 +17045,11 @@
         "from": "holdings",
         "to": "assets",
         "column": "asset_id"
+      },
+      {
+        "from": "household_budget_model_proposals",
+        "to": "households",
+        "column": "household_id"
       },
       {
         "from": "household_invitations",
@@ -17309,6 +17393,16 @@
         "household": false,
         "rls": true
       },
+      "household_budget_model_proposals": {
+        "user": false,
+        "household": true,
+        "rls": true
+      },
+      "ai_token_usage": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
       "news_feedback": {
         "user": true,
         "household": false,
@@ -17409,11 +17503,11 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 75
+        "commits": 76
       },
       {
         "path": "lib/ai",
-        "commits": 33
+        "commits": 35
       },
       {
         "path": "app/(app)/toekomst",
@@ -17425,7 +17519,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 12
+        "commits": 13
       },
       {
         "path": "lib/horizon-data.ts",
@@ -17456,13 +17550,13 @@
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 4463,
+        "loc": 4762,
         "commits": 24
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 3822,
-        "commits": 39
+        "loc": 3826,
+        "commits": 40
       },
       {
         "file": "lib/release-notes.ts",
@@ -17471,13 +17565,13 @@
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 2574,
-        "commits": 15
+        "loc": 2615,
+        "commits": 16
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2405,
-        "commits": 19
+        "loc": 2472,
+        "commits": 20
       },
       {
         "file": "lib/unified-projection.ts",
@@ -17497,11 +17591,18 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "API-routes",
-        "added": [],
-        "removed": [
-          "/api/dashboard-type"
-        ]
+        "label": "Schermen",
+        "added": [
+          "/beheer/ai-verbruik"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Tabellen",
+        "added": [
+          "ai_token_usage"
+        ],
+        "removed": []
       }
     ]
   },
@@ -17515,9 +17616,9 @@
     },
     {
       "date": "2026-06-11",
-      "api": 373,
-      "components": 682,
-      "tables": 49,
+      "api": 374,
+      "components": 685,
+      "tables": 51,
       "routesProduction": 94
     }
   ]

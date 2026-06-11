@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
   let model
   try {
-    model = await getModel(supabase)
+    model = await getModel(supabase, 'budget_suggesties')
   } catch (err) {
     if (err instanceof AIConfigError) {
       return Response.json({ error: `AI niet geconfigureerd: ${err.message}` }, { status: 503 })

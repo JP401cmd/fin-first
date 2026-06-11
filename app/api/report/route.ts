@@ -594,7 +594,7 @@ export async function GET(request: Request) {
     let aiIntroduction: string | null = null
     if (useAi) {
       try {
-        const model = await getModel(supabase)
+        const model = await getModel(supabase, 'rapport')
         const periodLabel = formatPeriodName(periodType, dateFrom, dateTo)
         const prompt = `Je bent Will, de financieel adviseur van TriFinity. Schrijf een bondige redactionele inleiding (3-4 zinnen, max 200 tokens) voor het financieel rapport "${periodLabel}".
 

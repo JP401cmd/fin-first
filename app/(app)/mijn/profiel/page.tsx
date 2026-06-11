@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { HouseholdSection } from '@/components/app/household-section'
 import { HouseholdPrivacySettings } from '@/components/mijn/household-privacy-settings'
+import { HouseholdBudgetModelSection } from '@/components/mijn/household-budget-model-section'
 import { useModuleColors, useBudgetColors, usePhaseColors } from '@/components/app/module-color-provider'
 import { DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS } from '@/lib/color-palette'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
@@ -496,6 +497,7 @@ export default function ProfielPage() {
 
       {/* ── Huishouden Management ────────────────────────────────── */}
       <HouseholdSection />
+      <HouseholdBudgetModelSection />
       <HouseholdPrivacySettings />
     </div>
   )

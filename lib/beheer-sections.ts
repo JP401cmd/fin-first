@@ -14,6 +14,7 @@ import {
   Database,
   FileSearch,
   FlaskConical,
+  Gauge,
   Goal,
   History,
   Inbox,
@@ -240,6 +241,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/kpi',
         description: 'Platform-KPI’s: gebruikers, tiers, verbruik en fouten deze maand.',
         icon: BarChart3,
+      },
+      {
+        label: 'AI-verbruik',
+        href: '/beheer/ai-verbruik',
+        description: 'Werkelijk tokenverbruik per functie en per account.',
+        icon: Gauge,
       },
       {
         label: 'Architectuur',

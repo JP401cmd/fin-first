@@ -93,7 +93,7 @@ export async function GET(request: Request) {
     let model: any = null
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      model = await getModel(service as any)
+      model = await getModel(service as any, 'nieuws_ingest')
     } catch {
       // AI model not configured — proceed without enrichment
     }

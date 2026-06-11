@@ -57,3 +57,14 @@
 ## 2026-06-11
 
 - **API-routes** verwijderd: /api/dashboard-type
+
+## 2026-06-11
+
+- **API-routes** toegevoegd: /api/household/budget-model
+- **Tabellen** toegevoegd: household_budget_model_proposals
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-06-11
+
+- **Schermen** toegevoegd: /beheer/ai-verbruik
+- **Tabellen** toegevoegd: ai_token_usage

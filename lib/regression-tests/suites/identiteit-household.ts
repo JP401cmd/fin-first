@@ -783,6 +783,63 @@ const tests: TestCase[] = [
       assertEqual(sharedRlsTables.length, 10, '10 tabellen met huishoud-bewuste shared-SELECT RLS')
     },
   },
+
+  // ── Step 11: Fase 1 — gedeelde budgetten samen bewerken ───────────────────
+  {
+    id: 'household-shared-budget-write-semantics',
+    name: 'Gedeeld budget: partner bewerkt wel, eigendom-flip niet',
+    category: CAT,
+    description: 'Fase-1 RLS (migratie 20260611000000): partner mag naam/limiet/goal van een gedeeld budget wijzigen, maar de WITH CHECK eist ownership=shared (geen terug-flip naar personal) en de zz_guard_budget_owner-trigger houdt user_id onveranderlijk. Live geverifieerd via simulated-JWT RLS-matrix (build-plan §1a).',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      // Spiegel van de UPDATE-policy "Household members can update shared budgets":
+      //   USING      (ownership = 'shared' AND household_id = user_household_id())
+      //   WITH CHECK (ownership = 'shared' AND household_id = user_household_id())
+      // plus trigger guard: NEW.user_id moet gelijk blijven aan OLD.user_id.
+      function partnerUpdateAllowed(
+        before: { ownership: 'personal' | 'shared'; household_id: string | null; owner_id: string },
+        after: { ownership: 'personal' | 'shared'; owner_id: string },
+        partnerHouseholdId: string | null,
+      ): boolean {
+        const usingOk = before.ownership === 'shared'
+          && before.household_id !== null
+          && before.household_id === partnerHouseholdId
+        const withCheckOk = after.ownership === 'shared'
+          && before.household_id === partnerHouseholdId
+        const ownerImmutable = after.owner_id === before.owner_id // zz_guard_budget_owner
+        return usingOk && withCheckOk && ownerImmutable
+      }
+
+      const sharedBudget = { ownership: 'shared' as const, household_id: 'hh-1', owner_id: 'user1' }
+
+      // Naam-update door partner op gedeeld budget (ownership blijft shared, owner gelijk) → toegestaan
+      assert(
+        partnerUpdateAllowed(sharedBudget, { ownership: 'shared', owner_id: 'user1' }, 'hh-1'),
+        'partner mag naam/limiet van gedeeld budget bewerken',
+      )
+      // Eigendom-flip naar personal door partner → WITH CHECK faalt
+      assert(
+        !partnerUpdateAllowed(sharedBudget, { ownership: 'personal', owner_id: 'user1' }, 'hh-1'),
+        'partner kan ownership NIET terugzetten naar personal',
+      )
+      // Eigenaar herschrijven door partner → trigger guard faalt
+      assert(
+        !partnerUpdateAllowed(sharedBudget, { ownership: 'shared', owner_id: 'user2' }, 'hh-1'),
+        'budget-eigenaar is onveranderlijk (zz_guard_budget_owner)',
+      )
+      // Partner buiten het huishouden → USING faalt
+      assert(
+        !partnerUpdateAllowed(sharedBudget, { ownership: 'shared', owner_id: 'user1' }, 'andere-hh'),
+        'ander huishouden → geen toegang',
+      )
+      // Persoonlijk budget valt niet onder deze policy (alleen eigen ALL-policy)
+      assert(
+        !partnerUpdateAllowed({ ownership: 'personal', household_id: 'hh-1', owner_id: 'user1' }, { ownership: 'personal', owner_id: 'user1' }, 'hh-1'),
+        'persoonlijk budget niet via shared-policy bewerkbaar',
+      )
+    },
+  },
 ]
 
 export function register(): void {

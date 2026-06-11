@@ -129,6 +129,7 @@ export function buildHldModel(): HldModel {
         items: [
           { title: 'Je financiën delen in één huishouden', desc: 'Veilig gekoppeld met je partner.' },
           { title: 'Drie perspectieven', desc: 'Kijk vanuit jezelf, vanuit het huishouden, of vanuit je partner.' },
+          { title: 'Samen budgetteren in één huishoudbudget', desc: 'Dubbele categorieën samenvoegen tot gezamenlijke potten — alleen als jullie het allebei willen.' },
         ],
       },
     ],

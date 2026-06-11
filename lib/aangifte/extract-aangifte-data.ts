@@ -121,7 +121,7 @@ export async function extractAangifteData(
     // 1) Resolve the configured AI model. This may throw `AIConfigError`
     // if no provider is set up — we let it bubble into our catch so the
     // UI gets the same empty-result fallback regardless of cause.
-    const model = await getModel(supabase)
+    const model = await getModel(supabase, 'aangifte_extractie')
 
     // 2) Optional admin override of the system prompt. Stored in the
     // shared `app_settings` table under the stable key from

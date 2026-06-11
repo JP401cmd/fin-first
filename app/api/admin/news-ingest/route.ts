@@ -21,7 +21,7 @@ export async function POST() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let model: any = null
     try {
-      model = await getModel(supabase)
+      model = await getModel(supabase, 'nieuws_ingest')
     } catch {
       // AI model not configured — proceed without enrichment
     }

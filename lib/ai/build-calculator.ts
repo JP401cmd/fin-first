@@ -248,7 +248,7 @@ export async function buildCalculator(
   if (!userPrompt) return { ok: false, error: 'Lege vraag.' }
 
   try {
-    const model = await getModel(supabase)
+    const model = await getModel(supabase, 'rekenhulp_bouwen')
     const refineBlock = refineFrom
       ? `\n\nBestaande definitie om aan te passen (pas alleen aan wat de gebruiker vraagt):\n${JSON.stringify(refineFrom)}`
       : ''

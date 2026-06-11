@@ -121,7 +121,7 @@ export async function POST() {
     // Prepare AI model
     let model
     try {
-      model = await getModel(supabase)
+      model = await getModel(supabase, 'abonnementen_analyse')
     } catch (err) {
       if (err instanceof AIConfigError) {
         return NextResponse.json({ error: err.message }, { status: 422 })

@@ -20,8 +20,8 @@ import {
   assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
-import type { Budget } from '@/lib/budget-data'
-import { BUDGET_SLUGS } from '@/lib/budget-data'
+import type { Budget, BudgetSelectGroup } from '@/lib/budget-data'
+import { BUDGET_SLUGS, budgetOptionLabel, buildBudgetSelectEntries } from '@/lib/budget-data'
 import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'kern.budget-crud'
@@ -299,6 +299,13 @@ const tests: TestCase[] = [
       assertEqual(initForm.is_essential, true, 'is_essential loaded')
       assertEqual(initForm.priority_score, 5, 'priority_score loaded')
       assertEqual(initForm.ownership, 'shared', 'ownership loaded')
+
+      // Fase 1: een gedeeld budget toont in keuzelijsten het "· Gezamenlijk"-label
+      assertEqual(
+        budgetOptionLabel({ name: existingBudget.name!, ownership: initForm.ownership }),
+        'Boodschappen · Gezamenlijk',
+        'shared ownership → "· Gezamenlijk" suffix',
+      )
     },
   },
   {
@@ -706,6 +713,159 @@ const tests: TestCase[] = [
     async fn() {
       const res = await unauthenticatedFetch('/api/budgets/550e8400-e29b-41d4-a716-446655440000')
       assertEqual(res.status, 401, 'unauthenticated GET returns 401')
+    },
+  },
+
+  // ── I: Fase 1 — huishoud-bewuste budgetten (ownership in keuzelijsten) ─────
+  {
+    id: 'budget-crud-option-label-ownership',
+    name: 'Budget keuzelijst: "· Gezamenlijk"-label per eigendom',
+    description: 'budgetOptionLabel voegt suffix toe voor shared, laat personal/undefined ongemoeid',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 20,
+    fn() {
+      // personal → naam ongewijzigd
+      assertEqual(
+        budgetOptionLabel({ name: 'Boodschappen', ownership: 'personal' }),
+        'Boodschappen',
+        'personal → naam ongewijzigd',
+      )
+      // shared → "naam · Gezamenlijk"
+      assertEqual(
+        budgetOptionLabel({ name: 'Boodschappen', ownership: 'shared' }),
+        'Boodschappen · Gezamenlijk',
+        'shared → suffix toegevoegd',
+      )
+      // undefined ownership → naam ongewijzigd (geen suffix)
+      assertEqual(
+        budgetOptionLabel({ name: 'Boodschappen' }),
+        'Boodschappen',
+        'undefined ownership → naam ongewijzigd',
+      )
+    },
+  },
+  {
+    id: 'budget-crud-select-entries-carry-ownership',
+    name: 'Budget keuzelijst: eigendom blijft behouden op group-opties',
+    description: 'buildBudgetSelectEntries draagt ownership door op group + children, archive-opties + parent',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 30,
+    fn() {
+      const groups: BudgetSelectGroup[] = [
+        {
+          parent: { id: 'p-1', name: 'Dagelijkse uitgaven', budget_type: 'expense', ownership: 'shared' },
+          children: [
+            { id: 'c-1', name: 'Boodschappen', ownership: 'shared' },
+            { id: 'c-2', name: 'Eigen lunch', ownership: 'personal' },
+          ],
+        },
+        {
+          parent: { id: 'a-1', name: 'Eigen rekening', budget_type: 'archive', ownership: 'personal' },
+          children: [{ id: 'a-1-sub', name: 'Eigen rekening', ownership: 'personal' }],
+        },
+      ]
+
+      const entries = buildBudgetSelectEntries(groups)
+
+      // Eerste entry is de optgroup; eigendom van de parent én van elke optie blijft behouden
+      const group = entries.find(e => e.kind === 'group')
+      assertNotNull(group, 'group entry aanwezig')
+      if (group && group.kind === 'group') {
+        assertEqual(group.ownership, 'shared', 'group-kop draagt parent-ownership')
+        const sharedChild = group.options.find(o => o.id === 'c-1')
+        assertNotNull(sharedChild, 'gedeeld kind aanwezig in opties')
+        assertEqual(sharedChild!.ownership, 'shared', 'gedeeld kind behoudt ownership in entry-opties')
+        const personalChild = group.options.find(o => o.id === 'c-2')
+        assertEqual(personalChild!.ownership, 'personal', 'persoonlijk kind behoudt ownership')
+      }
+
+      // Archive-emmer levert losse opties op die hun ownership behouden
+      const archiveOption = entries.find(e => e.kind === 'option')
+      assertNotNull(archiveOption, 'archive-optie aanwezig')
+      if (archiveOption && archiveOption.kind === 'option') {
+        assertEqual(archiveOption.ownership, 'personal', 'archive-optie behoudt ownership')
+      }
+    },
+  },
+  {
+    id: 'budget-crud-tx-ownership-default-from-account',
+    name: 'Transactie eigendom: standaard afgeleid van rekening',
+    description: 'Nieuwe transactie erft accountOwnership; bewerken behoudt eigen ownership; geen → personal',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 20,
+    fn() {
+      // Spiegel van TransactionForm: nieuw → accountOwnership ?? 'personal',
+      // bewerken → transaction.ownership ?? 'personal'.
+      function defaultOwnership(
+        accountOwnership: 'personal' | 'shared' | undefined,
+        existing: { ownership?: 'personal' | 'shared' } | undefined,
+      ): 'personal' | 'shared' {
+        return existing ? (existing.ownership ?? 'personal') : (accountOwnership ?? 'personal')
+      }
+
+      // Nieuwe transactie op een persoonlijke rekening → personal
+      assertEqual(defaultOwnership('personal', undefined), 'personal', 'persoonlijke rekening → personal')
+      // Nieuwe transactie op een gedeelde rekening → shared
+      assertEqual(defaultOwnership('shared', undefined), 'shared', 'gedeelde rekening → shared')
+      // Geen rekening-eigendom bekend → veilige default personal
+      assertEqual(defaultOwnership(undefined, undefined), 'personal', 'onbekend rekening-eigendom → personal')
+      // Bewerken: bestaand shared blijft shared (ongeacht rekening)
+      assertEqual(defaultOwnership('personal', { ownership: 'shared' }), 'shared', 'bewerken behoudt shared')
+      // Bewerken zonder ownership-veld → personal
+      assertEqual(defaultOwnership('shared', {}), 'personal', 'bewerken zonder ownership → personal')
+    },
+  },
+  {
+    id: 'budget-crud-share-suggestion-trigger',
+    name: 'Transactie deel-suggestie: triggervoorwaarde',
+    description: 'Suggestie verschijnt als gekozen budget gedeeld is, tx persoonlijk en er een huishouden is',
+    category: CAT,
+    priority: 'high',
+    estimatedDurationMs: 20,
+    fn() {
+      // Spiegel van showShareSuggestion in TransactionForm.
+      function showShareSuggestion(opts: {
+        hasHousehold: boolean
+        txOwnership: 'personal' | 'shared'
+        dismissed: boolean
+        selectedBudgetIsShared: boolean
+      }): boolean {
+        return (
+          opts.hasHousehold &&
+          opts.txOwnership === 'personal' &&
+          !opts.dismissed &&
+          opts.selectedBudgetIsShared
+        )
+      }
+
+      // Volledige triggervoorwaarde → suggestie tonen
+      assert(
+        showShareSuggestion({ hasHousehold: true, txOwnership: 'personal', dismissed: false, selectedBudgetIsShared: true }),
+        'huishouden + persoonlijke tx + gedeeld budget → suggestie',
+      )
+      // Geen huishouden → nooit
+      assert(
+        !showShareSuggestion({ hasHousehold: false, txOwnership: 'personal', dismissed: false, selectedBudgetIsShared: true }),
+        'geen huishouden → geen suggestie',
+      )
+      // Transactie al gedeeld → geen suggestie nodig
+      assert(
+        !showShareSuggestion({ hasHousehold: true, txOwnership: 'shared', dismissed: false, selectedBudgetIsShared: true }),
+        'tx al gedeeld → geen suggestie',
+      )
+      // Budget persoonlijk → geen mismatch, geen suggestie
+      assert(
+        !showShareSuggestion({ hasHousehold: true, txOwnership: 'personal', dismissed: false, selectedBudgetIsShared: false }),
+        'persoonlijk budget → geen suggestie',
+      )
+      // Eenmaal weggeklikt → blijft weg
+      assert(
+        !showShareSuggestion({ hasHousehold: true, txOwnership: 'personal', dismissed: true, selectedBudgetIsShared: true }),
+        'weggeklikt → geen suggestie',
+      )
     },
   },
 ]

@@ -16,6 +16,7 @@ export type NotificationType =
   | 'horizon'
   | 'holding_alert'
   | 'briefing'
+  | 'budget_model_proposal'
 
 export type Notification = {
   id: string
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest) {
       recommendation: true, levelup: true,
       partner_transaction: true, horizon: true,
       holding_alert: true, briefing: true,
+      budget_model_proposal: true,
     }
     const prefs: Record<string, boolean> = prefsRes.data?.value
       ? { ...defaultPrefs, ...JSON.parse(prefsRes.data.value) }
@@ -619,6 +621,71 @@ export async function GET(request: NextRequest) {
       // Non-critical — continue without partner notifications
     }
 
+    // ── 6b. Budgetmodel-voorstellen (gezamenlijk ⇄ gescheiden budget) ─
+    // Toon een melding aan de PARTNER (niet de aanvrager) wanneer er een
+    // openstaand voorstel is om over te stappen op één gezamenlijk
+    // huishoudbudget — of juist terug naar gescheiden budgetten. RLS scoopt de
+    // query al tot het eigen huishouden; we filteren op `proposed_by != user.id`
+    // zodat de aanvrager zelf geen "actie vereist"-melding krijgt.
+
+    try {
+      const { data: budgetProposals } = await supabase
+        .from('household_budget_model_proposals')
+        .select('id, target_model, proposed_by, created_at')
+        .eq('status', 'pending')
+        .neq('proposed_by', user.id)
+        .order('created_at', { ascending: false })
+
+      if (budgetProposals && budgetProposals.length > 0) {
+        // Partnernaam goedkoop ophalen via de huishoud-RPC (profiles-RLS is
+        // own-only). Faalt dit, dan valt de tekst terug op "je partner".
+        let proposerNameById: Record<string, string> = {}
+        try {
+          const { data: memberProfiles } = await supabase.rpc('household_member_profiles')
+          for (const m of (memberProfiles ?? []) as Array<{ id: string; full_name: string | null }>) {
+            if (m.full_name) proposerNameById[m.id] = m.full_name
+          }
+        } catch {
+          proposerNameById = {}
+        }
+
+        for (const proposal of budgetProposals) {
+          const toHousehold = proposal.target_model === 'household'
+          const proposerName = proposerNameById[proposal.proposed_by] ?? 'je partner'
+          const id = `budget_model_proposal_${proposal.id}`
+
+          const title = toHousehold
+            ? 'Voorstel: gezamenlijk huishoudbudget'
+            : 'Voorstel: terug naar gescheiden budgetten'
+          const description = toHousehold
+            ? `${proposerName} stelt voor om jullie budgetten samen te voegen tot één gezamenlijk huishoudbudget.`
+            : `${proposerName} stelt voor om terug te gaan naar gescheiden budgetten.`
+
+          notifications.push({
+            id,
+            type: 'budget_model_proposal',
+            priority: 2,
+            title,
+            description,
+            icon: 'Users',
+            color: 'teal',
+            createdAt: proposal.created_at
+              ? new Date(proposal.created_at).toISOString()
+              : now,
+            read: readIds.includes(id),
+            actionUrl: '/mijn/profiel#huishoudbudget',
+            aiContext: toHousehold
+              ? `${proposerName} stelt voor om over te stappen op één gezamenlijk huishoudbudget. Wat betekent dat voor mijn budgetten en privacy, en waar moet ik op letten?`
+              : `${proposerName} stelt voor om terug te gaan naar gescheiden budgetten. Wat zijn de gevolgen van het terugdraaien van het gezamenlijke huishoudbudget?`,
+            metadata: { proposalId: proposal.id, targetModel: proposal.target_model },
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Budget model proposal notification error:', err)
+      // Non-critical — continue without budget model proposal notifications
+    }
+
     // ── 7. Horizon alerts (FIRE aandachtspunten) ─────────────────────
 
     // Profile is hoisted here so the horizon alerts below can read it
@@ -998,7 +1065,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const validTypes = ['budget', 'sync', 'recommendation', 'levelup', 'partner_transaction', 'horizon', 'holding_alert', 'briefing']
+    const validTypes = ['budget', 'sync', 'recommendation', 'levelup', 'partner_transaction', 'horizon', 'holding_alert', 'briefing', 'budget_model_proposal']
     const sanitized: Record<string, boolean> = {}
     for (const key of validTypes) {
       sanitized[key] = preferences[key] !== false

@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import {
   Upload, FileText, Check, AlertTriangle, X,
   ChevronRight, Loader2, WifiOff, RefreshCw, ArrowLeftRight, Sparkles,
-  Users, User,
+  Users, User, Hand,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { parseMT940 } from '@/lib/parsers/mt940'
@@ -23,6 +24,16 @@ import { useToast } from '@/components/app/toast-provider'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
+import { importRowKey, applyAssignmentToImportRows } from '@/lib/sleepmodus/import-assign'
+import type { QueueTx } from '@/lib/sleepmodus/queue'
+import type { SleepmodusApplyRequest, SleepmodusApplyResult } from '@/components/app/sleepmodus/sleepmodus-overlay'
+
+// Sleepmodus (drag-&-drop) in een eigen chunk — laadt pas wanneer de gebruiker
+// de modus opent vanaf de categoriseer-stap.
+const SleepmodusOverlay = dynamic(
+  () => import('@/components/app/sleepmodus/sleepmodus-overlay').then((m) => ({ default: m.SleepmodusOverlay })),
+  { ssr: false },
+)
 
 type Account = {
   id: string
@@ -201,6 +212,7 @@ export default function ImportPage() {
   const [aiFailedBatches, setAiFailedBatches] = useState<Array<{ index: number; payload: Array<{ import_hash: string; description: string; counterparty_name: string | null; amount: number; reference: string | null }> }>>([])
   const [aiRetrying, setAiRetrying] = useState(false)
   const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
+  const [showSleepmodus, setShowSleepmodus] = useState(false)
   const [checkingDups, setCheckingDups] = useState(false)
   const [pendingSession, setPendingSession] = useState<ImportSession | null>(null)
   const PAGE_SIZE = 50
@@ -989,6 +1001,12 @@ export default function ImportPage() {
     }
 
     // Onthoud de regel voor toekomstige imports: op IBAN indien aanwezig, anders op naam.
+    rememberOwnAccountRule(iban, nameKey, triggerRow.counterparty_name)
+  }
+
+  /** Sla een eigen-rekening-herkenning op (user_own_ibans) — IBAN indien aanwezig,
+   *  anders tegenpartij-naam. Gedeeld door markRowsAsTransfer en de Sleepmodus. */
+  function rememberOwnAccountRule(iban: string, nameKey: string, label: string | null) {
     void (async () => {
       try {
         const supabase = createClient()
@@ -1010,7 +1028,7 @@ export default function ImportPage() {
             iban: iban || null,
             match_type: matchType,
             match_value: matchValue,
-            label: triggerRow.counterparty_name || null,
+            label: label || null,
           })
           // Lokale set/patterns direct bijwerken voor hergebruik binnen dezelfde sessie.
           if (matchType === 'iban') {
@@ -1096,6 +1114,64 @@ export default function ImportPage() {
       i === index ? { ...r, skipImport: !r.skipImport } : r
     ))
   }
+
+  // ── Sleepmodus (drag-&-drop) over de nog ongecategoriseerde import-rijen ────
+  // De rijen staan nog niet in de DB: een drop werkt de lokale lijst bij via
+  // applyAssignmentToImportRows; alleen regels (category_corrections /
+  // user_own_ibans) worden direct opgeslagen, net als bij de dropdown-flow.
+  const sleepQueue = useMemo<QueueTx[]>(
+    () => rows
+      .filter((r) => !r.skipImport && !r.isTransfer && !r.budget_id)
+      .map((r) => ({
+        id: importRowKey(r),
+        date: r.date,
+        description: r.description ?? '',
+        counterparty_name: r.counterparty_name ?? null,
+        counterparty_iban: r.counterparty_iban ?? null,
+        amount: r.amount,
+        import_hash: r.import_hash,
+        budget_id: null,
+        reference: r.reference ?? null,
+      })),
+    [rows],
+  )
+
+  const handleSleepmodusAssign = useCallback(async (req: SleepmodusApplyRequest): Promise<SleepmodusApplyResult> => {
+    const keys = req.scope === 'one' ? [req.tx.id] : [req.tx.id, ...req.siblingIds]
+    const budgetName = req.isTransfer
+      ? 'Eigen rekening'
+      : budgets.find((b) => b.id === req.budgetId)?.name ?? null
+    setRows((prev) => applyAssignmentToImportRows(prev, {
+      keys,
+      budgetId: req.budgetId,
+      budgetName,
+      isTransfer: req.isTransfer,
+    }))
+
+    let ruleCreated = false
+    if (req.scope === 'rule') {
+      if (req.isTransfer) {
+        const iban = req.tx.counterparty_iban?.replace(/\s/g, '').toUpperCase() || ''
+        const nameKey = (req.tx.counterparty_name ?? '').trim().toLowerCase()
+        if (iban || nameKey) {
+          rememberOwnAccountRule(iban, nameKey, req.tx.counterparty_name)
+          ruleCreated = true
+        }
+      } else {
+        const matchField = req.tx.counterparty_name ? ('counterparty_name' as const) : ('description' as const)
+        const matchValue = req.tx.counterparty_name || req.tx.description
+        if (matchValue) {
+          saveCorrectionRule(matchField, matchValue, req.budgetId)
+          ruleCreated = true
+        }
+        if (req.tx.counterparty_iban) {
+          saveCorrectionRule('counterparty_iban', req.tx.counterparty_iban.replace(/\s/g, '').toUpperCase(), req.budgetId)
+        }
+      }
+    }
+    return { ruleCreated, bulkUpdated: 0 }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgets])
 
   async function handleImport(retryFromBatch?: number) {
     setImporting(true)
@@ -1919,6 +1995,18 @@ export default function ImportPage() {
               <strong>{toImportCount}</strong> transacties om te importeren uit <strong>{fileName}</strong>
             </p>
             <div className="flex items-center gap-2">
+              {/* Sleepmodus — drag-&-drop over de nog ongecategoriseerde rijen */}
+              {sleepQueue.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowSleepmodus(true)}
+                  className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-kern-300 px-3 py-1.5 text-xs font-medium text-kern-700 hover:bg-kern-50"
+                >
+                  <Hand className="h-3.5 w-3.5" />
+                  Sleepmodus
+                  <span className="font-mono tabular-nums text-kern-600">({sleepQueue.length})</span>
+                </button>
+              )}
               {/* Ask Will button — only show when AI hasn't been triggered yet */}
               {!aiLoading && !aiReady && !aiError && (
                 <button
@@ -2465,6 +2553,22 @@ export default function ImportPage() {
             </div>
           </div>
         </BottomSheet>
+      )}
+
+      {/* Sleepmodus — drag-&-drop toewijzen over de lokale import-rijen */}
+      {showSleepmodus && (
+        <SleepmodusOverlay
+          transactions={sleepQueue}
+          budgets={budgets}
+          budgetGroups={budgetGroups}
+          /* Eigendom wordt bij het importeren afgeleid van het budget
+             (deriveRowOwnership) — geen aparte toggle in de overlay nodig. */
+          hasHousehold={false}
+          onExit={() => setShowSleepmodus(false)}
+          onDone={() => setShowSleepmodus(false)}
+          applyAssignment={handleSleepmodusAssign}
+          doneLabel="Terug naar import"
+        />
       )}
     </div>
   )

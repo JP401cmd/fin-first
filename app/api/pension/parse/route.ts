@@ -88,7 +88,7 @@ export async function POST(req: Request) {
     const base64 = Buffer.from(arrayBuffer).toString('base64')
 
     // Get AI model
-    const model = await getModel(supabase)
+    const model = await getModel(supabase, 'pensioen_extractie')
 
     // Parse pension PDF with AI
     const { object: result } = await generateObject({

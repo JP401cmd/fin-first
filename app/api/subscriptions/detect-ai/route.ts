@@ -129,7 +129,7 @@ export async function POST() {
     // Ask Claude which of these patterns are subscriptions
     let model
     try {
-      model = await getModel(supabase)
+      model = await getModel(supabase, 'abonnementen_detectie')
     } catch (err) {
       if (err instanceof AIConfigError) {
         return NextResponse.json({ error: err.message }, { status: 422 })

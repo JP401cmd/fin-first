@@ -127,18 +127,20 @@ export function WhatIfPresets({
   /** Optional callback notified when active preset changes (id or null). */
   onActiveChange?: (id: string | null) => void
 }) {
-  const [category, setCategory] = useState<PresetCategory>(() => {
-    if (typeof window === 'undefined') return 'werk'
+  // SSR rendert altijd 'werk'; de opgeslagen voorkeur wordt pas ná mount
+  // toegepast. localStorage in de useState-initializer geeft een hydration-
+  // mismatch (server kent de voorkeur niet → andere tab-markup dan de client).
+  const [category, setCategory] = useState<PresetCategory>('werk')
+  useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY) as PresetCategory | null
-    if (stored && PRESET_CATEGORIES.some(c => c.id === stored)) return stored
-    return 'werk'
-  })
+    if (stored && stored !== 'werk' && PRESET_CATEGORIES.some(c => c.id === stored)) {
+      setCategory(stored)
+    }
+  }, [])
 
   const updateCategory = (c: PresetCategory) => {
     setCategory(c)
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(STORAGE_KEY, c)
-    }
+    window.localStorage.setItem(STORAGE_KEY, c)
   }
 
   const visiblePresets = useMemo(

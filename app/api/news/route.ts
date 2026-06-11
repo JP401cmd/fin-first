@@ -39,7 +39,11 @@ const newsItemSchema = z.object({
   summary: z.string().describe('Samenvatting van het nieuws in 2-3 zinnen'),
   impactType: z.enum(['direct', 'relevant']).describe('"direct" = concrete, berekenbare impact op de financiele situatie van de gebruiker. "relevant" = financieel relevant nieuws zonder concrete berekenbare impact, maar wel waardevol om te weten.'),
   personalImpact: z.string().describe('Bij impactType "direct": concrete impact met specifieke euro-bedragen of vrijheidstijd gebaseerd op het profiel. Bij impactType "relevant": korte uitleg waarom dit nieuwsitem relevant is voor de financiele situatie van de gebruiker, zonder concrete bedragen.'),
-  impactScore: z.number().int().min(1).max(5).describe('Impactscore 1-5: hoe groot is de impact/relevantie voor deze gebruiker? 5 = grote concrete impact, 1 = achtergrond.'),
+  // NB: geen .int()/.min()/.max() — Anthropic structured output ondersteunt
+  // geen minimum/maximum in het JSON-schema, en Zod v4 voegt die bij .int()
+  // zelf toe (safe-integer-grenzen) → 400 invalid_request_error. Range en
+  // afronding worden afgedwongen via de prompt + server-side clamp.
+  impactScore: z.number().describe('Impactscore: geheel getal van 1 t/m 5 — hoe groot is de impact/relevantie voor deze gebruiker? 5 = grote concrete impact, 1 = achtergrond.'),
   impactDirection: z.enum(['positief', 'negatief', 'neutraal']).describe('Richting van de impact voor de gebruiker: "positief" (bespaart geld of versnelt vrijheid), "negatief" (kost geld of vertraagt vrijheid) of "neutraal".'),
   deadline: z.string().optional().describe('Alleen invullen als er een concrete datum (YYYY-MM-DD) is waarvoor de gebruiker iets kan of moet doen.'),
   category: z.enum(NEWS_CATEGORIES).describe('Nieuwscategorie'),
@@ -87,7 +91,11 @@ async function getCachedNews(
     const now = new Date()
     const ageHours = (now.getTime() - generatedAt.getTime()) / (1000 * 60 * 60)
 
-    if (ageHours > CACHE_TTL_HOURS) return null
+    // Een lege editie ("geen nieuws met impact") cachen we kort: morgen kan er
+    // wél relevant nieuws zijn, en een fout-veroorzaakte lege editie mag de
+    // gebruiker geen week achtervolgen.
+    const ttlHours = cached.items.length === 0 ? 6 : CACHE_TTL_HOURS
+    if (ageHours > ttlHours) return null
 
     return cached
   } catch {
@@ -498,7 +506,7 @@ export async function GET(request: Request) {
 
   let model
   try {
-    model = await getModel(supabase)
+    model = await getModel(supabase, 'nieuws')
   } catch (err) {
     if (err instanceof AIConfigError) {
       return NextResponse.json({ error: err.message }, { status: 422 })
@@ -569,7 +577,9 @@ Toets de aangeleverde bronartikelen op relevantie en impact voor dit profiel en 
       })
 
       for await (const item of result.elementStream) {
-        state.items.push(maskPIIInObject(item))
+        const masked = maskPIIInObject(item)
+        masked.impactScore = Math.min(5, Math.max(1, Math.round(masked.impactScore ?? 3)))
+        state.items.push(masked)
         await writeGenerationState(supabase, user.id, state)
       }
 
