@@ -23,6 +23,8 @@ import {
 } from '@/lib/format'
 import { buildBriefingEntries, type BriefingEngineInput } from './engine'
 import { loadTopMarketBriefing } from './news-market'
+import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
+import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import type { BriefingEntry } from '@/components/overview/briefing-panel'
 import type { SparklineDataPoint } from '@/components/app/budget-sparkline'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
@@ -32,6 +34,43 @@ type HorizonData = Awaited<ReturnType<typeof loadHorizonData>> | null
 
 /** Maximum aantal briefjes dat /overzicht toont (3-koloms × 2 rijen). */
 export const OVERVIEW_BRIEFING_MAX = 6
+
+/** Check-in-reflectie ouder dan dit aantal dagen komt niet meer in de briefing. */
+const CHECKIN_RECENCY_DAYS = 60
+
+/**
+ * Meest recente maand-check-in met niet-lege reflectie, voor het check-in-
+ * briefje. Leest de `checkin_snapshot_{userId}_{YYYY-MM}`-keys (app_settings);
+ * de hoogste key = de laatste maand. Faalt zacht → undefined.
+ */
+export async function loadLatestCheckinForBriefing(
+  supabase: SupabaseClient,
+  userId: string,
+  now: Date = new Date(),
+): Promise<{ monthKey: string; reflection: string } | undefined> {
+  try {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('key, value')
+      .like('key', `checkin_snapshot_${userId}_%`)
+      .order('key', { ascending: false })
+      .limit(1)
+    const row = data?.[0]
+    if (!row?.value) return undefined
+    const snap = JSON.parse(row.value) as { monthKey?: string; reflection?: string; savedAt?: string }
+    const reflection = snap.reflection?.trim()
+    const monthKey = snap.monthKey ?? row.key.slice(-7)
+    if (!reflection || !monthKey) return undefined
+    const savedAt = snap.savedAt ? Date.parse(snap.savedAt) : NaN
+    if (Number.isFinite(savedAt)) {
+      const ageDays = (now.getTime() - savedAt) / (24 * 3600 * 1000)
+      if (ageDays > CHECKIN_RECENCY_DAYS) return undefined
+    }
+    return { monthKey, reflection }
+  } catch {
+    return undefined
+  }
+}
 
 /** Liquide cash = niet-gekoppelde cash + cash/savings/checking-assets.
  *  Zelfde definitie als in de overzicht-page (CompoundInsightCard). */
@@ -55,6 +94,8 @@ export function buildOverviewBriefingInput(
   horizonData: HorizonData,
   now: Date = new Date(),
   marketEntry?: BriefingEntry,
+  aandachtspunten?: Aandachtspunt[],
+  checkin?: { monthKey: string; reflection: string },
 ): BriefingEngineInput {
   const dob = horizonData?.effectiveInput?.dateOfBirth ?? null
   const currentAge = dob ? Math.round(ageAtDate(dob)) : null
@@ -84,8 +125,34 @@ export function buildOverviewBriefingInput(
       totalFreedomDaysOpen: dashboardData.totalFreedomDaysOpen,
       backtestSuccessRate: dashboardData.backtestSuccessRate,
       backtestNamedPaths: dashboardData.backtestNamedPaths,
+      recurring: (dashboardData.topRecurringTransactions ?? [])
+        .slice(0, 3)
+        .map((r) => ({ name: r.name, amount: r.amount })),
+      totalRecurringAmount: dashboardData.totalRecurringAmount,
+      box3Tax: dashboardData.box3Tax,
+      feeAnalysis: dashboardData.feeAnalysis
+        ? {
+            totalAnnualFee: dashboardData.feeAnalysis.totalAnnualFee,
+            weightedTER: dashboardData.feeAnalysis.weightedTER,
+          }
+        : null,
+      emergencyFund: dashboardData.emergencyFund
+        ? {
+            monthsCovered: dashboardData.emergencyFund.monthsCovered,
+            targetMonths: dashboardData.emergencyFund.targetMonths,
+            isComplete: dashboardData.emergencyFund.isComplete,
+          }
+        : null,
+      hvbSummary: dashboardData.hvbSummary
+        ? {
+            rente: dashboardData.hvbSummary.rente,
+            aanbeveling: dashboardData.hvbSummary.aanbeveling,
+          }
+        : null,
     },
     marketEntry,
+    aandachtspunten,
+    checkin,
     now,
   }
 }
@@ -97,9 +164,11 @@ export function composeOverviewBriefing(
   horizonData: HorizonData,
   now: Date = new Date(),
   marketEntry?: BriefingEntry,
+  aandachtspunten?: Aandachtspunt[],
+  checkin?: { monthKey: string; reflection: string },
 ): BriefingEntry[] {
   const entries = buildBriefingEntries(
-    buildOverviewBriefingInput(dashboardData, willData, horizonData, now, marketEntry),
+    buildOverviewBriefingInput(dashboardData, willData, horizonData, now, marketEntry, aandachtspunten, checkin),
   )
   return entries.slice(0, OVERVIEW_BRIEFING_MAX)
 }
@@ -115,23 +184,36 @@ export async function loadAndComposeOverviewBriefing(
 ): Promise<{
   entries: BriefingEntry[]
   freedom: { totalFreedomDays: number; netWorth: number; monthlyExpenses: number }
+  /** De volledige engine-input — voor de redactie-laag (metrics t.b.v.
+   *  functionele directives), zodat de refresh-route niets dubbel laadt. */
+  input: BriefingEngineInput
 }> {
-  const [dashboardResult, willData, horizonData] = await Promise.all([
+  const [dashboardResult, willData, horizonData, aandachtspunten] = await Promise.all([
     loadDashboardData(supabase),
     loadWillData(supabase),
     loadHorizonData(supabase),
+    // Faalt intern zacht per producent (collectAandachtspunten vangt zelf af).
+    collectAandachtspunten(supabase).catch(() => [] as Aandachtspunt[]),
   ])
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const marketEntry = user ? await loadTopMarketBriefing(supabase, user.id, now) : null
-  const entries = composeOverviewBriefing(
+  const [marketEntry, checkin] = user
+    ? await Promise.all([
+        loadTopMarketBriefing(supabase, user.id, now),
+        loadLatestCheckinForBriefing(supabase, user.id, now),
+      ])
+    : [null, undefined]
+  const input = buildOverviewBriefingInput(
     dashboardResult.dashboardData,
     willData,
     horizonData,
     now,
     marketEntry ?? undefined,
+    aandachtspunten,
+    checkin,
   )
+  const entries = buildBriefingEntries(input).slice(0, OVERVIEW_BRIEFING_MAX)
   const currentNetWorth =
     (horizonData?.healthScoreInput?.totalAssets ?? 0) -
     (horizonData?.healthScoreInput?.totalDebts ?? 0)
@@ -146,6 +228,7 @@ export async function loadAndComposeOverviewBriefing(
       netWorth: total.netWorth,
       monthlyExpenses: total.monthlyExpenses,
     },
+    input,
   }
 }
 

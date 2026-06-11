@@ -38,3 +38,22 @@
 - **API-routes** toegevoegd: /api/admin/users/block, /api/admin/users/role
 - **Tabellen** toegevoegd: job_runs
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-06-11
+
+- **Schermen** toegevoegd: /beheer/audit, /beheer/email, /beheer/errors, /beheer/feedback, /beheer/kpi, /beheer/platform, /mijn/feedback
+- **API-routes** toegevoegd: /api/admin/feedback, /api/admin/platform, /api/admin/user-delete, /api/admin/user-diagnose, /api/admin/user-export, /api/ai-credits, /api/feedback, /api/log-error
+- **Componenten (aantal)** toegevoegd: +5
+
+## 2026-06-11
+
+- **Schermen** verwijderd: /test-briefing-history, /test-briefing-toggles, /test-discover-card-mobile, /test-insight-cta, /test-next-step-card
+- **API-routes** toegevoegd: /api/news/feedback
+- **API-routes** verwijderd: /api/briefing/compose, /api/briefing/history, /api/briefing/history/[id]
+- **Tabellen** toegevoegd: news_feedback
+- **Briefing-kaarten** verwijderd: showAction, showAlert, showBudgetBar, showChecklist, showComparison, showCountdown, showDecisionPatterns, showDiscover, showFreedomDaysTrend, showGoalProgress, showInsight, showLifeEvent, showMetric, showMilestone, showNextStep, showProgressRing, showQuote, showRecurring, showSparkline
+- **Componenten (aantal)** verwijderd: -29
+
+## 2026-06-11
+
+- **API-routes** verwijderd: /api/dashboard-type

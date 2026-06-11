@@ -166,8 +166,8 @@ const MODULES: NaslagwerkModule[] = [
       },
       {
         icon: Newspaper,
-        title: 'Briefing (DAIshboard)',
-        summary: 'AI-samengestelde dagelijkse briefing met persoonlijke financiële inzichten.',
+        title: 'Wekelijkse briefing',
+        summary: 'Wekelijkse briefing op je overzicht met persoonlijke financiële inzichten.',
         anchor: 'guide-reis-3',
       },
       {
@@ -276,8 +276,8 @@ const MODULES: NaslagwerkModule[] = [
       },
       {
         icon: Newspaper,
-        title: 'DAIshboard / Briefing',
-        summary: 'AI-briefing met tot 23 kaarttypes, tijdsbewust en progressief geladen.',
+        title: 'Wekelijkse briefing',
+        summary: 'Wekelijkse briefing met max 6 briefjes, door Will geredigeerd en 1×/dag te verversen.',
       },
       {
         icon: Settings,

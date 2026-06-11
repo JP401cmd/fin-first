@@ -407,10 +407,22 @@ export function formatFunctionalDirectivesForPrompt(
   directives: FunctionalDirective[],
   dataSummary?: string,
 ): string {
+  const metrics = dataSummary ? extractMetricsFromSummary(dataSummary) : null
+  return formatFunctionalDirectivesWithMetrics(directives, metrics)
+}
+
+/**
+ * Zelfde prompt-blok, maar met een al-berekende metrics-record i.p.v. een
+ * te regex-parsen tekst-summary. Dit is het pad voor de levende briefing
+ * (redactie-laag): de metrics komen daar rechtstreeks uit de engine-input
+ * (`buildEngineMetrics` in redactie.ts), zonder fragiele tekst-extractie.
+ */
+export function formatFunctionalDirectivesWithMetrics(
+  directives: FunctionalDirective[],
+  metrics: Record<string, string | number | boolean | null> | null,
+): string {
   const enabled = directives.filter((d) => d.enabled)
   if (enabled.length === 0) return ''
-
-  const metrics = dataSummary ? extractMetricsFromSummary(dataSummary) : null
 
   const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 }
   const sorted = [...enabled].sort(
@@ -450,7 +462,7 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'Vermogen groeit',
       metric: 'net_worth',
       condition: 'rising',
-      instruction: 'Vier de vooruitgang. Toon groeitrend met sparkline. Frame als "vrijheid opbouwen".',
+      instruction: 'Vier de vooruitgang en benoem de groeitrend. Frame als "vrijheid opbouwen".',
       priority: 'normal',
       enabled: true,
     },
@@ -468,7 +480,7 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'Budget overschreden',
       metric: 'budget',
       condition: 'over',
-      instruction: 'Budget alert prominent tonen met showBudgetBar. Concrete bespaartips, niet veroordelend.',
+      instruction: 'Benoem de budgetoverschrijding prominent. Concrete bespaartips, niet veroordelend.',
       priority: 'high',
       enabled: true,
     },
@@ -477,7 +489,7 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'Lage spaarquote',
       metric: 'savings_rate',
       condition: 'low',
-      instruction: 'Benadruk kleine verbeteringen. Elke extra euro gespaard = meer vrijheidstijd. Toon progressRing.',
+      instruction: 'Benadruk kleine verbeteringen. Elke extra euro gespaard = meer vrijheidstijd.',
       priority: 'normal',
       enabled: true,
     },
@@ -486,7 +498,7 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'Schulden nemen af',
       metric: 'debt',
       condition: 'decreasing',
-      instruction: 'Vier de schuldenreductie. Frame als "vrijheid teruggewonnen". Toon voortgang met milestone.',
+      instruction: 'Vier de schuldenreductie. Frame als "vrijheid teruggewonnen" en benoem de voortgang.',
       priority: 'normal',
       enabled: true,
     },
@@ -495,7 +507,7 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'FIRE mijlpaal nabij',
       metric: 'fire',
       condition: 'milestone_near',
-      instruction: 'Mijlpaal prominent tonen met showMilestone. Motivatieboost, concreet hoeveel er nog nodig is.',
+      instruction: 'Benoem de mijlpaal prominent. Motivatieboost, concreet hoeveel er nog nodig is.',
       priority: 'high',
       enabled: true,
     },
@@ -522,7 +534,7 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'Volgende stappen beschikbaar',
       metric: 'next_steps',
       condition: 'available',
-      instruction: 'Toon de meest relevante volgende stap via showNextStep. Kies de stap die het beste past bij de huidige financiële situatie. Max 2 per briefing.',
+      instruction: 'Wijs op de meest relevante volgende stap, passend bij de huidige financiële situatie.',
       priority: 'normal',
       enabled: true,
     },
@@ -531,7 +543,7 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'Alle stappen afgerond',
       metric: 'next_steps',
       condition: 'all_done',
-      instruction: 'Feliciteer de gebruiker — alle volgende stappen zijn afgerond. Geen showNextStep nodig.',
+      instruction: 'Feliciteer de gebruiker — alle volgende stappen zijn afgerond.',
       priority: 'low',
       enabled: true,
     },
@@ -540,7 +552,7 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'Onontdekte features',
       metric: 'discover',
       condition: 'unvisited_features',
-      instruction: 'Toon max 1 ontdek-suggestie via showDiscover. Kies een feature die past bij de gebruikersfase en huidige behoeften.',
+      instruction: 'Wijs maximaal op één onontdekte functie die past bij de gebruikersfase en huidige behoeften.',
       priority: 'low',
       enabled: true,
     },
@@ -615,7 +627,7 @@ export function getDefaultDirectives(): BriefingDirective[] {
     {
       id: crypto.randomUUID(),
       title: 'Begin van de maand',
-      instruction: 'Begin van de maand: start met comparison-card (vorige vs huidige maand). Maand-terugblik, nieuw budget-overzicht.',
+      instruction: 'Begin van de maand: open met de maand-terugblik (vorige vs huidige maand) en het nieuwe budget-overzicht.',
       priority: 'normal',
       months: [],
       dayFrom: 1,
@@ -625,7 +637,7 @@ export function getDefaultDirectives(): BriefingDirective[] {
     {
       id: crypto.randomUUID(),
       title: 'Einde van de maand',
-      instruction: 'Einde van de maand: budget-druk prominent, salaris countdown. Gebruik showBudgetBar en showCountdown.',
+      instruction: 'Einde van de maand: budget-druk prominent benoemen, salaris in zicht.',
       priority: 'normal',
       months: [],
       dayFrom: 23,

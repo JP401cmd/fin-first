@@ -17,7 +17,7 @@
 // (geen freeze, knop blijft beschikbaar maar persisteert niets).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
+import type { BriefingEntry, BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
 
 /** Vrijheidstijd-meetpunt van deze week — basis voor de week-over-week delta. */
 export interface FreedomSnapshotData {
@@ -48,7 +48,13 @@ export interface BriefingSnapshot {
   previousFreedomSnapshot?: FreedomBaseline
   /** Eén-zin kop boven de briefjes (deterministisch, of AI bij handmatige ververs). */
   headline?: string
+  /** Afgesloten weken (nieuwste laatst), gecapt op MAX_WEEK_HISTORY. Bij elke
+   *  week-overgang schuift de aflopende week hierin. */
+  history?: BriefingWeekHistoryItem[]
 }
+
+/** Max. aantal bewaarde voorbije weken in de snapshot-historie (~2 maanden). */
+export const MAX_WEEK_HISTORY = 8
 
 /** Opties voor snapshot-schrijfpaden: extra context + injecteerbare `now`. */
 export interface SnapshotWriteOptions {
@@ -153,11 +159,30 @@ function parseFreedomBaseline(raw: unknown): FreedomBaseline | undefined {
   }
 }
 
+/** Valideer één historie-item (zelfde defensieve aanpak als de snapshot zelf). */
+function parseHistoryItem(raw: unknown): BriefingWeekHistoryItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const h = raw as Record<string, unknown>
+  if (typeof h.week !== 'string' || !Array.isArray(h.entries)) return null
+  return {
+    week: h.week,
+    headline: typeof h.headline === 'string' ? h.headline : undefined,
+    entries: sanitizeEntries(h.entries),
+    freedomDays: isFiniteNum(h.freedomDays) ? h.freedomDays : undefined,
+  }
+}
+
 /** Valideer een ruw jsonb-object naar een BriefingSnapshot (of null). */
 function parseSnapshot(raw: unknown): BriefingSnapshot | null {
   if (!raw || typeof raw !== 'object') return null
   const s = raw as Record<string, unknown>
   if (typeof s.week !== 'string' || !Array.isArray(s.entries)) return null
+  const history = Array.isArray(s.history)
+    ? s.history
+        .map(parseHistoryItem)
+        .filter((h): h is BriefingWeekHistoryItem => h !== null)
+        .slice(-MAX_WEEK_HISTORY)
+    : undefined
   return {
     week: s.week,
     lastManualRefresh:
@@ -168,6 +193,7 @@ function parseSnapshot(raw: unknown): BriefingSnapshot | null {
     freedomSnapshot: parseFreedomSnapshot(s.freedomSnapshot),
     previousFreedomSnapshot: parseFreedomBaseline(s.previousFreedomSnapshot),
     headline: typeof s.headline === 'string' ? s.headline : undefined,
+    history,
   }
 }
 
@@ -237,6 +263,27 @@ function derivePreviousBaseline(
 }
 
 /**
+ * Historie voor de nieuwe snapshot: bij een week-overgang schuift de
+ * aflopende week erin (nieuwste laatst, gecapt). Binnen dezelfde week blijft
+ * de bestaande historie ongewijzigd.
+ */
+function deriveWeekHistory(
+  existing: BriefingSnapshot | null,
+  week: string,
+): BriefingWeekHistoryItem[] | undefined {
+  if (!existing) return undefined
+  const base = existing.history ?? []
+  if (existing.week === week) return base.length > 0 ? base : undefined
+  const closed: BriefingWeekHistoryItem = {
+    week: existing.week,
+    headline: existing.headline,
+    entries: existing.entries,
+    freedomDays: existing.freedomSnapshot?.totalFreedomDays,
+  }
+  return [...base.filter((h) => h.week !== existing.week), closed].slice(-MAX_WEEK_HISTORY)
+}
+
+/**
  * Haal de snapshot van deze ISO-week op, of maak hem aan uit de vers-
  * gecomposeerde briefjes. Geeft naast de snapshot de `priorFreedom`-basis
  * terug zodat de page de week-over-week vrijheidstijd-delta kan berekenen.
@@ -264,6 +311,7 @@ export async function getOrCreateWeeklySnapshot(
     freedomSnapshot: opts.freedom,
     previousFreedomSnapshot: priorFreedom ?? undefined,
     headline: opts.headline,
+    history: deriveWeekHistory(existing, week),
   }
   await writeBriefingSnapshot(supabase, userId, fresh)
   return { snapshot: fresh, priorFreedom }
@@ -297,6 +345,7 @@ export async function applyManualRefresh(
     freedomSnapshot: opts.freedom,
     previousFreedomSnapshot: derivePreviousBaseline(existing, week) ?? undefined,
     headline: opts.headline,
+    history: deriveWeekHistory(existing, week),
   }
   await writeBriefingSnapshot(supabase, userId, refreshed)
   return { allowed: true, snapshot: refreshed }

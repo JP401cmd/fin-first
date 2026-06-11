@@ -9,21 +9,26 @@
 // extractie hierheen geeft:
 //  1. testbaarheid (pure functie, geen Next-deps)
 //  2. herbruikbaarheid (andere routes kunnen de zelfde briefing tonen)
-//  3. fundament voor toekomstige uitbreiding — natural-language layer
-//     (Cleo-stijl) of LLM-templating kan hier inhaken zonder page-rewrite
+//  3. fundament voor de AI-redactielaag (lib/briefing/redactie.ts): die
+//     herschrijft alleen de teksten — alle cijfers komen uit deze engine
 //
 // Categorieën (matchend met BriefingPanel):
-//  - observation  Will-recommendations[0]              (analyse-output)
-//  - tip          Will-recommendations[1]              (actie-suggestie)
-//  - upcoming     eerstvolgend life-event ≤90 dagen
-//  - heads_up     laagst-scorende health-pillar < 50
+//  - observation  Will-recommendations[0] + finance-observaties
+//  - tip          Will-recommendations[1] + finance-tips
+//  - upcoming     eerstvolgend life-event ≤90 dagen, salaris, seizoen
+//  - heads_up     laagst-scorende health-pillar < 50, budgetdruk, daling
 //  - milestone    behaald doel OF +5 punten health-score t.o.v. vorige maand
-//  - market       (toekomst) externe feed — voorlopig niet gepowered
+//  - market       top-'direct'-item uit de nieuws-cache (news-market.ts)
+//
+// Entries worden op prioriteit geweven via `briefingRank` (zie aldaar);
+// de doc-volgorde hieronder per generator is dus de bron-volgorde, niet
+// per se de getoonde volgorde.
 
 import { formatCurrency } from '@/lib/format'
 import type { HealthScore } from '@/lib/financial-health'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { Recommendation } from '@/lib/recommendation-data'
+import type { Aandachtspunt, AandachtspuntDomain } from '@/lib/aandachtspunten'
 import type { BriefingEntry, HefboomTag } from '@/components/overview/briefing-panel'
 
 /**
@@ -138,6 +143,18 @@ export interface BriefingFinanceInput {
   backtestSuccessRate?: number | null
   /** Per benoemde historische crash of het plan die doorstaat (pass/fail). */
   backtestNamedPaths?: { label: string; success: boolean }[] | null
+  /** Top terugkerende lasten (gesorteerd op bedrag) — voor het vaste-lasten-briefje. */
+  recurring?: { name: string; amount: number }[]
+  /** Som van alle terugkerende lasten per maand. */
+  totalRecurringAmount?: number
+  /** Geschatte Box 3-heffing dit jaar (EUR) — voor het belasting-briefje. */
+  box3Tax?: number | null
+  /** Fondskosten-analyse: jaarlijkse fee + gewogen TER (decimaal). */
+  feeAnalysis?: { totalAnnualFee: number; weightedTER: number } | null
+  /** Noodfonds-dekking in maanden t.o.v. het doel. */
+  emergencyFund?: { monthsCovered: number; targetMonths: number; isComplete: boolean } | null
+  /** Hypotheek-vs-beleggen-uitkomst (null zonder hypotheek). */
+  hvbSummary?: { rente: number; aanbeveling: 'aflossen' | 'beleggen' | 'gelijk' } | null
 }
 
 export interface BriefingEngineInput {
@@ -153,6 +170,12 @@ export interface BriefingEngineInput {
   /** Optionele financiële context — voedt de verrijkte briefing-bronnen.
    *  Wanneer afwezig blijft de engine-output identiek aan voorheen. */
   finance?: BriefingFinanceInput
+  /** App-brede aandachtspunten-bus (lib/aandachtspunten), gesorteerd op
+   *  besparing. De engine pakt het zwaarste punt als briefje. */
+  aandachtspunten?: Aandachtspunt[]
+  /** Meest recente maand-check-in met reflectie (loader bewaakt recency).
+   *  Maakt de briefing persoonlijk: jouw eigen woorden komen terug. */
+  checkin?: { monthKey: string; reflection: string }
   /** Optioneel vooraf-gebouwd 'market'-briefje (uit de nieuws-cache). Wordt
    *  op prioriteit tussen de overige entries geweven. */
   marketEntry?: BriefingEntry
@@ -166,17 +189,18 @@ export interface BriefingEngineInput {
  * we leveren alle gevonden entries in prioriteit-volgorde; de panel
  * cap't zelf.
  *
- * Volgorde van entries:
+ * Bron-volgorde van de kern-entries:
  *  1. observation (uit recommendations)
  *  2. tip         (uit recommendations)
- *  3. heads_up    (uit health-pillars)
+ *  3. heads_up    (uit health-pillars + goals)
  *  4. milestone   (uit goals + score-trend)
  *  5. upcoming    (uit life-events)
+ *  6. seasonal    (NL-fiscale kalender)
  *
- * Deze volgorde reflecteert urgentie: feiten over je situatie eerst,
- * dan acties, dan zorgwekkende items, dan positieve hoogtepunten, dan
- * vooruitblik. Markt-content (categorie 'market') volgt zodra dat
- * gepowered wordt.
+ * Zodra er finance- of market-entries zijn, bepaalt `mergeRankedEntries`
+ * (stabiele sort op `briefingRank`) de getoonde volgorde: urgentie eerst,
+ * vooruitblik en acties later. Zonder finance/market blijft de output
+ * byte-identiek aan de bron-volgorde hierboven.
  */
 export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[] {
   const now = input.now ?? new Date()
@@ -240,8 +264,8 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
       entries.push({
         id: `heads_up:goal:${worstGoalIdx}`,
         category: 'heads_up',
-        text: `${goalName} ligt achter op planning (${Math.round(progress.pct)}%) — extra inleg deze maand?`,
-        href: '/toekomst?tab=doelen',
+        text: `${goalName} ligt achter op planning: ${formatCurrency(progress.current)} van ${formatCurrency(progress.target)} (${Math.round(progress.pct)}%) — extra inleg deze maand?`,
+        href: '/toekomst/doelen',
       })
     }
   }
@@ -260,7 +284,7 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
         id: 'milestone:goal:' + completedGoalIdx,
         category: 'milestone',
         text: `Mijlpaal: doel "${goalName}" behaald.`,
-        href: '/toekomst?tab=doelen',
+        href: '/toekomst/doelen',
       })
     }
   } else if (input.health && input.health.trend >= 5) {
@@ -305,12 +329,84 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
   // tests (die geen van beide meegeven) zijn dus ongewijzigd.
   const extra: BriefingEntry[] = []
   if (input.finance) extra.push(...buildFinanceEntries(input.finance, now))
+  if (input.aandachtspunten && input.aandachtspunten.length > 0) {
+    const punt = buildAandachtspuntEntry(input.aandachtspunten)
+    if (punt) extra.push(punt)
+  }
+  if (input.checkin) {
+    const reflectie = buildCheckinEntry(input.checkin)
+    if (reflectie) extra.push(reflectie)
+  }
   if (input.marketEntry) extra.push(input.marketEntry)
   if (extra.length > 0) {
     return mergeRankedEntries(entries, extra)
   }
 
   return entries
+}
+
+// ── Aandachtspunten-bus ─────────────────────────────────────────────
+//
+// De app-brede aandachtspunten (belasting-kansen, budgetoverschrijdingen,
+// dure schulden, stilstaand vermogen) voeden ook de Will-chat-context. Hier
+// pakt de briefing het zwaarste punt (hoogste besparing) als briefje, zodat
+// de belangrijkste kans van het moment niet alleen in de chat leeft.
+
+const AANDACHTSPUNT_HEFBOOM: Record<AandachtspuntDomain, HefboomTag> = {
+  tax: 'belasting',
+  budget: 'cashflow',
+  debt: 'schulden',
+  asset: 'bezittingen',
+}
+
+const NL_MONTHS = [
+  'januari', 'februari', 'maart', 'april', 'mei', 'juni',
+  'juli', 'augustus', 'september', 'oktober', 'november', 'december',
+]
+
+/** Max. lengte van de geciteerde reflectie in het check-in-briefje. */
+const CHECKIN_QUOTE_MAX = 110
+
+/**
+ * Check-in-reflectie als briefje: de eigen woorden van de gebruiker komen
+ * terug in de weekbriefing ("bij je check-in van juni schreef je …").
+ * Recency bewaakt de loader; hier alleen de tekstvorm.
+ */
+function buildCheckinEntry(checkin: { monthKey: string; reflection: string }): BriefingEntry | null {
+  const reflection = checkin.reflection.replace(/\s+/g, ' ').trim()
+  if (!reflection) return null
+  const quote =
+    reflection.length > CHECKIN_QUOTE_MAX
+      ? `${reflection.slice(0, CHECKIN_QUOTE_MAX).trimEnd()}…`
+      : reflection
+  const monthIdx = Number(checkin.monthKey.slice(5, 7)) - 1
+  const monthLabel = monthIdx >= 0 && monthIdx < 12 ? NL_MONTHS[monthIdx] : checkin.monthKey
+  return {
+    id: `checkin:${checkin.monthKey}`,
+    category: 'observation',
+    text: `Bij je check-in van ${monthLabel} schreef je: "${quote}"`,
+    href: '/mijn/checkins',
+  }
+}
+
+function buildAandachtspuntEntry(punten: Aandachtspunt[]): BriefingEntry | null {
+  const top = punten[0]
+  if (!top) return null
+  const parts: string[] = []
+  if (top.savings > 0) parts.push(`${formatCurrency(top.savings)} per jaar`)
+  if (top.freedomDays > 0) {
+    parts.push(`${Math.round(top.freedomDays)} ${Math.round(top.freedomDays) === 1 ? 'dag' : 'dagen'} vrijheid`)
+  }
+  const impact = parts.length > 0 ? ` — ${parts.join(', ')}` : ''
+  const deadline = top.deadline ? ` (vóór ${top.deadline})` : ''
+  return {
+    id: `aandachtspunt:${top.id}`,
+    // Met deadline is het urgent (heads_up); anders een kans (tip).
+    category: top.deadline ? 'heads_up' : 'tip',
+    text: `${top.title}${impact}${deadline}.`,
+    href: top.href,
+    hefboom: AANDACHTSPUNT_HEFBOOM[top.domain],
+  }
 }
 
 // ── Verrijkte financiële briefjes ───────────────────────────────────
@@ -531,7 +627,89 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
   const resilience = buildResilienceEntry(finance)
   if (resilience) out.push(resilience)
 
+  // 9. Noodfonds — onvolledig noodfonds gaat vóór beleggen/optimaliseren.
+  const ef = finance.emergencyFund
+  if (ef && !ef.isComplete && ef.targetMonths > 0 && ef.monthsCovered < ef.targetMonths) {
+    const covered = nlDecimal(ef.monthsCovered, 1)
+    out.push({
+      id: 'finance:emergency',
+      category: 'heads_up',
+      text: `Je noodfonds dekt ${covered} van de ${ef.targetMonths} maanden — buffer eerst, die koopt rust én vrijheid.`,
+      href: '/overzicht/cashflow',
+      hefboom: 'cashflow',
+    })
+  }
+
+  // 10. Vaste lasten — som van terugkerende lasten, met de grootste benoemd.
+  //     Alleen met bekend inkomen zodat het percentage betekenis heeft.
+  if (
+    finance.totalRecurringAmount != null &&
+    finance.totalRecurringAmount > 0 &&
+    finance.monthlyIncome &&
+    finance.monthlyIncome > 0
+  ) {
+    const pct = Math.round((finance.totalRecurringAmount / finance.monthlyIncome) * 100)
+    const top = finance.recurring?.[0]
+    const topLabel = top ? ` — grootste: ${top.name} (${formatCurrency(top.amount)})` : ''
+    out.push({
+      id: 'finance:recurring',
+      category: 'observation',
+      text: `Je vaste lasten zijn ${formatCurrency(finance.totalRecurringAmount)} per maand, ${pct}% van je inkomen${topLabel}.`,
+      href: '/overzicht/cashflow',
+      hefboom: 'cashflow',
+    })
+  }
+
+  // 11. Box 3-druk — concreet jaarbedrag i.p.v. alleen de kalenderzin, met
+  //     vrijheidsdagen-equivalent en de tegenbewijs-route als handeling.
+  if (finance.box3Tax != null && finance.box3Tax > 0) {
+    const days = freedomDaysLabel(finance.box3Tax, dailyExp)
+    out.push({
+      id: 'finance:box3',
+      category: 'tip',
+      text: `Je geschatte Box 3-heffing is ${formatCurrency(finance.box3Tax)} dit jaar${days ? ` — ${days}` : ''}. Check of tegenbewijs (werkelijk rendement) voordeliger is.`,
+      href: '/overzicht/belasting/box3',
+      hefboom: 'belasting',
+    })
+  }
+
+  // 12. Fee-erosie — jaarlijkse fondskosten boven de drempel. Kosten zijn
+  //     "stille" vrijheidsdagen die elk jaar terugkomen.
+  const fees = finance.feeAnalysis
+  if (fees && fees.totalAnnualFee >= FEE_EROSION_MIN) {
+    const days = freedomDaysLabel(fees.totalAnnualFee, dailyExp)
+    const ter = nlDecimal(fees.weightedTER * 100, 2)
+    out.push({
+      id: 'finance:fees',
+      category: 'tip',
+      text: `Je fondskosten zijn ${formatCurrency(fees.totalAnnualFee)} per jaar (${ter}% TER)${days ? ` — ${days}, elk jaar opnieuw` : ''}.`,
+      href: '/overzicht/bezittingen',
+      hefboom: 'bezittingen',
+    })
+  }
+
+  // 13. Hypotheek vs beleggen — alleen bij een duidelijke winnaar.
+  const hvb = finance.hvbSummary
+  if (hvb && hvb.aanbeveling !== 'gelijk') {
+    const actie = hvb.aanbeveling === 'aflossen' ? 'extra aflossen' : 'beleggen'
+    out.push({
+      id: 'finance:hvb',
+      category: 'tip',
+      text: `Met ${nlDecimal(hvb.rente, 1)}% hypotheekrente is ${actie} nu rekenkundig voordeliger.`,
+      href: '/overzicht/schulden',
+      hefboom: 'schulden',
+    })
+  }
+
   return out
+}
+
+/** Drempel (EUR/jaar) waarboven fondskosten een eigen briefje krijgen. */
+const FEE_EROSION_MIN = 100
+
+/** NL-decimaalnotatie (komma) met vast aantal decimalen. */
+function nlDecimal(value: number, decimals: number): string {
+  return value.toFixed(decimals).replace('.', ',')
 }
 
 /**
@@ -578,6 +756,8 @@ function briefingRank(entry: BriefingEntry): number {
   if (id.startsWith('finance:networth')) return 95
   if (id.startsWith('tip:')) return 90
   if (id.startsWith('finance:budget')) return 88
+  if (id.startsWith('aandachtspunt:')) return 87
+  if (id.startsWith('finance:emergency')) return 84
   if (id.startsWith('heads_up:goal')) return 83
   if (id.startsWith('heads_up:')) return 85
   if (id.startsWith('finance:savings')) return 80
@@ -587,22 +767,41 @@ function briefingRank(entry: BriefingEntry): number {
   if (id.startsWith('upcoming:')) return 70
   if (id.startsWith('finance:salary')) return 68
   if (id.startsWith('market:')) return 65
+  if (id.startsWith('finance:recurring')) return 62
   if (id.startsWith('finance:cashdrag')) return 60
+  if (id.startsWith('finance:box3')) return 58
+  if (id.startsWith('finance:fees')) return 57
+  if (id.startsWith('finance:hvb')) return 56
   if (id.startsWith('seasonal:')) return 55
+  if (id.startsWith('checkin:')) return 52
   if (id.startsWith('finance:actions')) return 40
   return 50
 }
 
+/** Max. aantal briefjes per hefboom-domein — dwingt spreiding af zodat de
+ *  zichtbare 6 niet door één domein (bv. drie cashflow-kaartjes) worden
+ *  gedomineerd. Entries zonder hefboom-tag (cross-domein) tellen niet mee. */
+const MAX_PER_HEFBOOM = 2
+
 /**
  * Weef kern- en finance-entries samen op prioriteit (stabiele sort op rank,
- * aflopend). Toegepast op alleen de kern-entries reproduceert dit exact de
- * bestaande volgorde, dus deze merge is veilig voor de niet-finance-tests.
+ * aflopend), met domein-spreiding: max MAX_PER_HEFBOOM per hefboom-tag.
+ * Toegepast op alleen de kern-entries reproduceert dit exact de bestaande
+ * volgorde, dus deze merge is veilig voor de niet-finance-tests.
  */
 function mergeRankedEntries(
   core: BriefingEntry[],
   finance: BriefingEntry[],
 ): BriefingEntry[] {
-  return [...core, ...finance].sort((a, b) => briefingRank(b) - briefingRank(a))
+  const ranked = [...core, ...finance].sort((a, b) => briefingRank(b) - briefingRank(a))
+  const perHefboom = new Map<HefboomTag, number>()
+  return ranked.filter((entry) => {
+    if (!entry.hefboom) return true
+    const seen = perHefboom.get(entry.hefboom) ?? 0
+    if (seen >= MAX_PER_HEFBOOM) return false
+    perHefboom.set(entry.hefboom, seen + 1)
+    return true
+  })
 }
 
 // ── Seizoens-entries ────────────────────────────────────────────────
@@ -726,76 +925,7 @@ export function buildSeasonalEntry(now: Date): BriefingEntry | null {
   return null
 }
 
-// ── Natural-language narrative ─────────────────────────────────────
-//
-// Plan-context: T-1 (Tier-3 #16) "Wekelijkse briefing in natuurlijke taal,
-// gerendered server-side, gecached per gebruiker. 4-zinnen samenvatting
-// + 1 concrete actie."
-//
-// Voorlopig template-based (geen LLM-call). Eén zin per actieve categorie,
-// verbonden met natuurlijke connectoren. Tone: rustig en informatief,
-// niet casual — past bij TriFinity editorial-stijl. Bij weinig data
-// blijft de output beknopt (1-2 zinnen) i.p.v. holle vulling.
-
-interface NarrativeFragment {
-  /** Inleidende connector — undefined voor eerste fragment. */
-  connector?: string
-  /** Body-tekst zonder eindpunt; engine voegt punctuatie toe. */
-  body: string
-}
-
-const CATEGORY_CONNECTORS: Record<string, string[]> = {
-  observation: [], // eerste fragment, geen connector
-  tip:         ['Tegelijkertijd', 'Daarnaast', 'Verder'],
-  heads_up:    ['Let op', 'Aandacht', 'Wel'],
-  milestone:   ['Mooi nieuws', 'Plus', 'En'],
-  upcoming:    ['Op de horizon', 'Komende periode', 'Vooruitkijkend'],
-  market:      ['Markt', 'Buitenwereld'],
-}
-
-function fragmentForEntry(
-  entry: BriefingEntry,
-  index: number,
-): NarrativeFragment {
-  // Eerste entry: geen connector (begin van alinea).
-  // Daarna: roteer door beschikbare connectoren zodat herhaling
-  // beperkt blijft over meerdere weken.
-  const options = CATEGORY_CONNECTORS[entry.category] ?? []
-  const connector =
-    index === 0 || options.length === 0
-      ? undefined
-      : options[index % options.length]
-  // Cap-titel-eerst-woord op één char lowercased zodat de zin
-  // grammaticaal vloeit ná een connector ("Tegelijkertijd verschuif...")
-  let body = entry.text
-  if (connector && body.length > 0) {
-    body = body.charAt(0).toLowerCase() + body.slice(1)
-  }
-  return { connector, body }
-}
-
-/**
- * Bouw een natuurlijke-taal samenvatting uit BriefingEntry[]. Returnt
- * `null` wanneer er onvoldoende inhoud is om een zinvolle alinea te
- * vormen (< 1 entry). Anders: 1-5 zinnen aan elkaar geregen.
- *
- * Will-persona: de output is "stem van Will" (plan §6.5). Het is aan
- * de display-component of er een "Will:" prefix wordt getoond.
- *
- * Cap op MAX_NARRATIVE_FRAGMENTS (= 4) zodat de alinea kort en scanbaar
- * blijft — de visuele cards in BriefingPanel kunnen tot 6 entries
- * tonen voor wie meer detail wil.
- */
-export const MAX_NARRATIVE_FRAGMENTS = 4
-
-export function buildBriefingNarrative(entries: BriefingEntry[]): string | null {
-  if (entries.length === 0) return null
-  const capped = entries.slice(0, MAX_NARRATIVE_FRAGMENTS)
-  const fragments = capped.map((entry, i) => fragmentForEntry(entry, i))
-  const sentences = fragments.map((f) => {
-    const text = f.connector ? `${f.connector} ${f.body}` : f.body
-    // Eind-punt veiligstellen.
-    return text.replace(/[.!?]\s*$/, '') + '.'
-  })
-  return sentences.join(' ')
-}
+// De vroegere template-based natural-language-laag (`buildBriefingNarrative`)
+// is verwijderd: die werd nergens live aangeroepen en is vervangen door de
+// AI-redactielaag in lib/briefing/redactie.ts (kop-zin + tekst-redactie met
+// nummer-guard, deterministische terugval).

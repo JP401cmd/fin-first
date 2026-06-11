@@ -1,72 +1,16 @@
 import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertGreaterThan, assertGreaterThanOrEqual } from '../assert'
 import type { TestCase } from '../test-types'
-import type { BriefingCardSpec } from '@/lib/briefing/types'
-import { CARD_SPAN } from '@/lib/briefing/types'
-import { validateBriefingLayout, optimizeRowFill } from '@/lib/briefing/validate-layout'
 import { validateHref, validateCardHrefs } from '@/lib/briefing/validate-hrefs'
 import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'berichten.ai-content'
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function makeCard(type: BriefingCardSpec['type'], extra?: Record<string, unknown>): BriefingCardSpec {
-  const base: Record<string, unknown> = { type }
-
-  switch (type) {
-    case 'metric':
-      return { type: 'metric', label: 'Test', value: '€100', module: 'kern', ...extra } as BriefingCardSpec
-    case 'action':
-      return { type: 'action', icon: 'Zap', kicker: 'Test', title: 'Actie', description: 'Doe iets', href: '/core', module: 'kern', ...extra } as BriefingCardSpec
-    case 'alert':
-      return { type: 'alert', severity: 'warning', title: 'Alert', message: 'Let op', ...extra } as BriefingCardSpec
-    case 'progressRing':
-      return { type: 'progressRing', label: 'Ring', value: '50%', percentage: 50, module: 'kern', ...extra } as BriefingCardSpec
-    case 'sparkline':
-      return { type: 'sparkline', label: 'Spark', value: '€100', dataKey: 'netWorthHistory', module: 'kern', ...extra } as BriefingCardSpec
-    case 'milestone':
-      return { type: 'milestone', target: '€100K', current: '€50K', percentage: 50, label: 'Mijlpaal', ...extra } as BriefingCardSpec
-    case 'insight':
-      return { type: 'insight', text: 'Inzicht tekst', emphasis: 'observation', ...extra } as BriefingCardSpec
-    case 'checklist':
-      return { type: 'checklist', title: 'Lijst', items: [{ label: 'Item 1', done: false }], ...extra } as BriefingCardSpec
-    case 'comparison':
-      return { type: 'comparison', label: 'Vergelijking', leftLabel: 'A', leftValue: '€10', rightLabel: 'B', rightValue: '€20', delta: '+€10', ...extra } as BriefingCardSpec
-    case 'countdown':
-      return { type: 'countdown', label: 'Aftellen', days: 30, module: 'horizon', ...extra } as BriefingCardSpec
-    case 'goalProgress':
-      return { type: 'goalProgress', name: 'Doel', percentage: 75, current: '€7.5K', target: '€10K', onTrack: true, module: 'wil', ...extra } as BriefingCardSpec
-    case 'budgetBar':
-      return { type: 'budgetBar', name: 'Budget', spent: '€500', limit: '€1000', percentage: 50, status: 'healthy', ...extra } as BriefingCardSpec
-    case 'quote':
-      return { type: 'quote', text: 'Wijsheid', module: 'wil', ...extra } as BriefingCardSpec
-    case 'recurring':
-      return { type: 'recurring', title: 'Terugkerend', items: [{ name: 'Netflix', amount: '€12' }], totalAmount: '€12', ...extra } as BriefingCardSpec
-    case 'lifeEvent':
-      return { type: 'lifeEvent', name: 'Event', daysUntil: 60, amount: '€5K', amountType: 'eenmalig', module: 'horizon', ...extra } as BriefingCardSpec
-    case 'nextStep':
-      return { type: 'nextStep', title: 'Volgende stap', description: 'Doe dit', href: '/core', module: 'kern', icon: 'ArrowRight', ...extra } as BriefingCardSpec
-    case 'discover':
-      return { type: 'discover', label: 'Ontdek', teaser: 'Nieuw!', description: 'Probeer dit', href: '/horizon', module: 'horizon', featureId: 'test', ...extra } as BriefingCardSpec
-    default:
-      return { ...base, ...extra } as unknown as BriefingCardSpec
-  }
-}
-
-async function fetchJson(
-  path: string,
-  init?: RequestInit,
-): Promise<{ status: number; body: Record<string, unknown> }> {
-  const res = await authenticatedFetch(path, init)
-  let body: Record<string, unknown> = {}
-  try {
-    body = await res.json()
-  } catch {
-    // Non-JSON response
-  }
-  return { status: res.status, body }
-}
+// NB: het AI-DAIshboard-briefingsysteem ("Systeem B": /api/briefing/compose +
+// history + de kaart-type-bibliotheek) is verwijderd — zie
+// docs/briefing-analyse.md. De tests die op die routes, op CARD_SPAN of op
+// validateBriefingLayout leunden zijn samen met de code verwijderd. Wat
+// resteert: nieuws-generatie (levend) + de href-validatie (herbruikbaar nut).
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -211,176 +155,6 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 2: Briefing generatie — streamText met tool-call card push ──
-  {
-    id: 'briefing-tool-to-card-mapping',
-    name: 'Briefing tool calls correct gemapped naar card types',
-    category: CAT,
-    description: 'Alle 19 showXxx tool names worden correct omgezet naar card type strings',
-    priority: 'critical',
-    estimatedDurationMs: 500,
-    fn() {
-      // Map of tool names → expected card types (from briefing/compose/route.ts)
-      const toolToCard: Record<string, string> = {
-        showMetric: 'metric',
-        showAction: 'action',
-        showAlert: 'alert',
-        showProgressRing: 'progressRing',
-        showSparkline: 'sparkline',
-        showMilestone: 'milestone',
-        showInsight: 'insight',
-        showChecklist: 'checklist',
-        showComparison: 'comparison',
-        showCountdown: 'countdown',
-        showGoalProgress: 'goalProgress',
-        showBudgetBar: 'budgetBar',
-        showQuote: 'quote',
-        showRecurring: 'recurring',
-        showLifeEvent: 'lifeEvent',
-        showNextStep: 'nextStep',
-        showDiscover: 'discover',
-        showDecisionPatterns: 'decisionPatterns',
-        showFreedomDaysTrend: 'freedomDaysTrend',
-      }
-
-      assertEqual(Object.keys(toolToCard).length, 19, 'Should map 19 tool names')
-
-      // Verify each mapping
-      for (const [tool, cardType] of Object.entries(toolToCard)) {
-        // Tool name should start with 'show'
-        assert(tool.startsWith('show'), `Tool name ${tool} should start with "show"`)
-        // Card type should be lowercase first letter of the remainder
-        const expectedType = tool.replace('show', '')
-        const lowered = expectedType.charAt(0).toLowerCase() + expectedType.slice(1)
-        assertEqual(cardType, lowered, `Tool ${tool} should map to ${lowered}`)
-      }
-    },
-  },
-
-  {
-    id: 'briefing-card-span-completeness',
-    name: 'CARD_SPAN bevat alle card types',
-    category: CAT,
-    description: 'Elk card type in BriefingCardSpec heeft een span-waarde in CARD_SPAN',
-    priority: 'critical',
-    estimatedDurationMs: 500,
-    fn() {
-      const allTypes = [
-        'metric', 'action', 'alert', 'progressRing', 'sparkline', 'milestone',
-        'insight', 'checklist', 'comparison', 'countdown', 'goalProgress',
-        'budgetBar', 'quote', 'recurring', 'lifeEvent', 'nextStep', 'discover',
-        'decisionPatterns', 'freedomDaysTrend',
-      ] as const
-
-      assertEqual(Object.keys(CARD_SPAN).length, allTypes.length, `CARD_SPAN should have ${allTypes.length} entries`)
-
-      for (const type of allTypes) {
-        const span = CARD_SPAN[type]
-        assertNotNull(span, `CARD_SPAN should define span for type "${type}"`)
-        assert(
-          span === 1 || span === 2 || span === 4,
-          `Span for ${type} should be 1, 2, or 4 — got ${span}`,
-        )
-      }
-
-      // Verify specific span values
-      // 1-col cards
-      const oneColTypes = ['metric', 'progressRing', 'countdown', 'sparkline', 'goalProgress', 'budgetBar']
-      for (const t of oneColTypes) {
-        assertEqual(CARD_SPAN[t as BriefingCardSpec['type']], 1, `${t} should span 1 col`)
-      }
-
-      // 2-col cards
-      const twoColTypes = ['action', 'alert', 'checklist', 'comparison', 'insight', 'quote', 'recurring', 'lifeEvent', 'nextStep', 'discover', 'decisionPatterns', 'freedomDaysTrend']
-      for (const t of twoColTypes) {
-        assertEqual(CARD_SPAN[t as BriefingCardSpec['type']], 2, `${t} should span 2 cols`)
-      }
-
-      // 4-col cards
-      assertEqual(CARD_SPAN.milestone, 4, 'milestone should span 4 cols (full width)')
-    },
-  },
-
-  {
-    id: 'briefing-compose-auth-guard',
-    name: 'POST /api/briefing/compose vereist authenticatie',
-    category: CAT,
-    description: 'Niet-ingelogde gebruikers krijgen 401',
-    priority: 'critical',
-    estimatedDurationMs: 1500,
-    async fn() {
-      const res = await authenticatedFetch('/api/briefing/compose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataSummary: 'test', temporal: { date: '2026-03-18', dayOfMonth: 18 } }),
-      })
-      const body = await res.json()
-
-      assert(
-        res.status === 401 || res.status === 403 || res.status === 200,
-        `Expected 401, 403 or 200, got ${res.status}`,
-      )
-
-      if (res.status === 401) {
-        assertNotNull(body.error, 'Auth error should have message')
-      }
-    },
-  },
-
-  {
-    id: 'briefing-compose-missing-fields',
-    name: 'POST /api/briefing/compose wijst ontbrekende velden af',
-    category: CAT,
-    description: 'Verzoeken zonder dataSummary of temporal krijgen 400',
-    priority: 'high',
-    estimatedDurationMs: 1500,
-    async fn() {
-      const res = await authenticatedFetch('/api/briefing/compose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-
-      // 400 (validation) or 401/403 (auth)
-      assert(
-        res.status === 400 || res.status === 401 || res.status === 403,
-        `Expected 400, 401 or 403 for missing fields, got ${res.status}`,
-      )
-
-      if (res.status === 400) {
-        const body = await res.json()
-        assertNotNull(body.error, 'Should return error message for missing fields')
-      }
-    },
-  },
-
-  {
-    id: 'briefing-poll-idle-state',
-    name: 'GET /api/briefing/compose retourneert idle status zonder actieve compositie',
-    category: CAT,
-    description: 'Polling endpoint retourneert { status: "idle" } wanneer geen compositie actief is',
-    priority: 'high',
-    estimatedDurationMs: 1500,
-    async fn() {
-      const res = await authenticatedFetch('/api/briefing/compose')
-      const body = await res.json()
-
-      // 200 with idle, or 401/403 for auth
-      assert(
-        res.status === 200 || res.status === 401 || res.status === 403,
-        `Expected 200, 401 or 403, got ${res.status}`,
-      )
-
-      if (res.status === 200 && body.status) {
-        // Could be idle or composing if another session is running
-        assert(
-          body.status === 'idle' || body.status === 'composing',
-          `Expected status idle or composing, got ${body.status}`,
-        )
-      }
-    },
-  },
-
   // ── Step 3: Progressive loading patroon — server map state management ──
   {
     id: 'news-generation-state-structure',
@@ -400,30 +174,6 @@ const tests: TestCase[] = [
       assert(Array.isArray(state.items), 'items should be an array')
       assertEqual(state.complete, false, 'complete should start as false')
       assertGreaterThan(state.startedAt, 0, 'startedAt should be a timestamp')
-    },
-  },
-
-  {
-    id: 'briefing-composition-state-structure',
-    name: 'Briefing CompositionState bevat cards[], complete, composedAt, startedAt, completedAt',
-    category: CAT,
-    description: 'Server state object voor briefing bevat uitgebreide state fields',
-    priority: 'critical',
-    estimatedDurationMs: 200,
-    fn() {
-      const state = {
-        cards: [] as unknown[],
-        complete: false,
-        composedAt: '',
-        startedAt: Date.now(),
-        completedAt: 0,
-      }
-
-      assert(Array.isArray(state.cards), 'cards should be an array')
-      assertEqual(state.complete, false, 'complete should start as false')
-      assertEqual(state.composedAt, '', 'composedAt should start empty')
-      assertGreaterThan(state.startedAt, 0, 'startedAt should be a timestamp')
-      assertEqual(state.completedAt, 0, 'completedAt should start at 0')
     },
   },
 
@@ -448,46 +198,6 @@ const tests: TestCase[] = [
 
       assert(isStale, 'State older than 2 minutes should be stale')
       assert(!isFresh, 'State younger than 2 minutes should not be stale')
-    },
-  },
-
-  {
-    id: 'briefing-composition-timeout-and-ttl',
-    name: 'Briefing composition timeout 2min en result TTL 5min',
-    category: CAT,
-    description: 'COMPOSITION_TIMEOUT_MS = 120_000, RESULT_TTL_MS = 300_000',
-    priority: 'high',
-    estimatedDurationMs: 200,
-    fn() {
-      const COMPOSITION_TIMEOUT_MS = 120_000
-      const RESULT_TTL_MS = 5 * 60 * 1000
-
-      assertEqual(COMPOSITION_TIMEOUT_MS, 120_000, 'Composition timeout should be 2 minutes')
-      assertEqual(RESULT_TTL_MS, 300_000, 'Result TTL should be 5 minutes')
-
-      // Verify cleanup logic: incomplete > timeout → cleaned, complete > TTL → cleaned
-      const now = Date.now()
-
-      // Incomplete + stale → cleanup
-      const incompleteStale = { complete: false, startedAt: now - 150_000, completedAt: 0 }
-      assert(
-        !incompleteStale.complete && now - incompleteStale.startedAt > COMPOSITION_TIMEOUT_MS,
-        'Incomplete stale should be cleaned up',
-      )
-
-      // Complete + expired → cleanup
-      const completeExpired = { complete: true, startedAt: now - 400_000, completedAt: now - 350_000 }
-      assert(
-        completeExpired.complete && now - completeExpired.completedAt > RESULT_TTL_MS,
-        'Complete expired should be cleaned up',
-      )
-
-      // Complete + fresh → keep
-      const completeFresh = { complete: true, startedAt: now - 60_000, completedAt: now - 30_000 }
-      assert(
-        !(completeFresh.complete && now - completeFresh.completedAt > RESULT_TTL_MS),
-        'Complete fresh should be kept',
-      )
     },
   },
 
@@ -538,45 +248,6 @@ const tests: TestCase[] = [
   },
 
   {
-    id: 'briefing-polling-response-shapes',
-    name: 'Briefing compose retourneert correcte response shapes per status',
-    category: CAT,
-    description: 'Idle: { status: "idle" }, Composing: { status, cards }, Done: { type: "done", cards, composedAt }, Error: { type: "error", message }',
-    priority: 'critical',
-    estimatedDurationMs: 500,
-    fn() {
-      // Idle response
-      const idleResponse = { status: 'idle' }
-      assertEqual(idleResponse.status, 'idle', 'Idle status')
-
-      // Composing response (with partial cards)
-      const composingResponse = {
-        status: 'composing',
-        cards: [{ type: 'metric', label: 'Test', value: '€100', module: 'kern' }],
-      }
-      assertEqual(composingResponse.status, 'composing', 'Composing status')
-      assert(Array.isArray(composingResponse.cards), 'Partial cards should be array')
-
-      // Done response
-      const doneResponse = {
-        type: 'done' as const,
-        cards: [{ type: 'metric', label: 'Test', value: '€100', module: 'kern' }],
-        composedAt: '2026-03-18T12:00:00.000Z',
-      }
-      assertEqual(doneResponse.type, 'done', 'Done type')
-      assertNotNull(doneResponse.composedAt, 'Done should include composedAt')
-
-      // Error response
-      const errorResponse = {
-        type: 'error' as const,
-        message: 'AI compositie mislukt',
-      }
-      assertEqual(errorResponse.type, 'error', 'Error type')
-      assertNotNull(errorResponse.message, 'Error should include message')
-    },
-  },
-
-  {
     id: 'news-rate-limit-response',
     name: 'News API retourneert 429 bij rate limit overschrijding',
     category: CAT,
@@ -602,200 +273,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 5: validateBriefingLayout — layout validatie na generatie ──
-  {
-    id: 'layout-empty-and-single',
-    name: 'validateBriefingLayout: lege en single-card arrays ongewijzigd',
-    category: CAT,
-    description: 'Lege array en array met 1 card worden ongewijzigd geretourneerd',
-    priority: 'high',
-    estimatedDurationMs: 200,
-    fn() {
-      const empty = validateBriefingLayout([])
-      assertEqual(empty.length, 0, 'Empty array should stay empty')
-
-      const single = validateBriefingLayout([makeCard('metric')])
-      assertEqual(single.length, 1, 'Single card should stay single')
-      assertEqual(single[0].type, 'metric', 'Single card type preserved')
-    },
-  },
-
-  {
-    id: 'layout-milestone-not-first-or-last',
-    name: 'validateBriefingLayout: milestone niet als eerste of laatste',
-    category: CAT,
-    description: 'Milestone cards worden naar het midden verplaatst als ze eerste of laatste zijn',
-    priority: 'critical',
-    estimatedDurationMs: 300,
-    fn() {
-      // Milestone first → moved to middle
-      const cards: BriefingCardSpec[] = [
-        makeCard('milestone'),
-        makeCard('metric'),
-        makeCard('metric'),
-        makeCard('metric'),
-        makeCard('metric'),
-        makeCard('insight'),
-      ]
-      const result = validateBriefingLayout(cards)
-
-      assert(result[0].type !== 'milestone', 'Milestone should not be first after validation')
-      assert(result[result.length - 1].type !== 'milestone', 'Milestone should not be last after validation')
-
-      // Verify milestone exists somewhere in the middle
-      const milestoneIdx = result.findIndex((c) => c.type === 'milestone')
-      assert(milestoneIdx > 0, 'Milestone should be at index > 0')
-      assert(milestoneIdx < result.length - 1, 'Milestone should not be at last index')
-    },
-  },
-
-  {
-    id: 'layout-last-card-valid-ending',
-    name: 'validateBriefingLayout: laatste card is action, insight of quote',
-    category: CAT,
-    description: 'Als de laatste card geen geldig eind-type is, wordt een geldige card naar het einde verplaatst',
-    priority: 'critical',
-    estimatedDurationMs: 300,
-    fn() {
-      const validEndTypes = new Set(['action', 'insight', 'quote'])
-
-      // Last card is metric (invalid) but has an insight in the middle
-      const cards: BriefingCardSpec[] = [
-        makeCard('metric'),
-        makeCard('insight'),
-        makeCard('metric'),
-        makeCard('metric'),
-      ]
-      const result = validateBriefingLayout(cards)
-      assert(
-        validEndTypes.has(result[result.length - 1].type),
-        `Last card should be action/insight/quote, got ${result[result.length - 1].type}`,
-      )
-    },
-  },
-
-  {
-    id: 'layout-no-adjacent-same-1col',
-    name: 'validateBriefingLayout: geen twee zelfde 1-col types naast elkaar',
-    category: CAT,
-    description: 'Twee opeenvolgende 1-col cards van hetzelfde type worden uit elkaar geplaatst',
-    priority: 'high',
-    estimatedDurationMs: 300,
-    fn() {
-      const cards: BriefingCardSpec[] = [
-        makeCard('metric'),
-        makeCard('metric'),
-        makeCard('progressRing'),
-        makeCard('insight'), // 2-col, valid ending
-      ]
-      const result = validateBriefingLayout(cards)
-
-      // Check that no two adjacent 1-col cards have the same type
-      for (let i = 0; i < result.length - 1; i++) {
-        const curr = result[i]
-        const next = result[i + 1]
-        if (CARD_SPAN[curr.type] === 1 && CARD_SPAN[next.type] === 1) {
-          // Only assert if there was a swap candidate available
-          if (curr.type === next.type) {
-            // Check if there was a different type available for swap
-            const otherTypes = result.filter((c) => CARD_SPAN[c.type] === 1 && c.type !== curr.type)
-            if (otherTypes.length > 0) {
-              assert(false, `Adjacent 1-col cards should have different types: ${curr.type} at ${i}, ${next.type} at ${i + 1}`)
-            }
-          }
-        }
-      }
-    },
-  },
-
-  {
-    id: 'layout-row-fill-optimization',
-    name: 'optimizeRowFill: rijen vullen tot precies 4 kolommen',
-    category: CAT,
-    description: 'Greedy algoritme vult rijen met exacte 4-kolom breedte, milestone krijgt eigen rij',
-    priority: 'critical',
-    estimatedDurationMs: 500,
-    fn() {
-      // Test 1: 4 x 1-col → perfect single row
-      const fourMetrics = [
-        makeCard('metric'),
-        makeCard('progressRing'),
-        makeCard('countdown'),
-        makeCard('sparkline'),
-      ]
-      const result1 = optimizeRowFill(fourMetrics)
-      assertEqual(result1.length, 4, 'All 4 cards preserved')
-      const totalSpan1 = result1.reduce((sum, c) => sum + CARD_SPAN[c.type], 0)
-      assertEqual(totalSpan1, 4, 'Total span should be 4')
-
-      // Test 2: milestone (4) + 2-col + 2-col → 2 rows
-      const withMilestone = [
-        makeCard('milestone'),
-        makeCard('action'),
-        makeCard('insight'),
-      ]
-      const result2 = optimizeRowFill(withMilestone)
-      assertEqual(result2.length, 3, 'All 3 cards preserved')
-
-      // First card should be milestone (span=4, own row)
-      assertEqual(result2[0].type, 'milestone', 'Milestone should stay first')
-
-      // Remaining should fit in row of 4 (2+2)
-      const remainingSpan = CARD_SPAN[result2[1].type] + CARD_SPAN[result2[2].type]
-      assertEqual(remainingSpan, 4, 'Remaining cards should fill a row of 4')
-
-      // Test 3: Reorder needed — 2-col, 1-col, 1-col, 2-col, 1-col, 1-col
-      const needsReorder = [
-        makeCard('action'),    // 2
-        makeCard('metric'),    // 1
-        makeCard('countdown'), // 1
-        makeCard('insight'),   // 2
-        makeCard('sparkline'), // 1
-        makeCard('budgetBar'), // 1
-      ]
-      const result3 = optimizeRowFill(needsReorder)
-      assertEqual(result3.length, 6, 'All 6 cards preserved')
-      const totalSpan3 = result3.reduce((sum, c) => sum + CARD_SPAN[c.type], 0)
-      assertEqual(totalSpan3, 8, 'Total span should be 8 (2 full rows)')
-    },
-  },
-
-  {
-    id: 'layout-preserves-card-count',
-    name: 'validateBriefingLayout verliest geen cards',
-    category: CAT,
-    description: 'Input en output arrays hebben dezelfde lengte — geen cards worden verwijderd',
-    priority: 'critical',
-    estimatedDurationMs: 300,
-    fn() {
-      const cards: BriefingCardSpec[] = [
-        makeCard('metric'),
-        makeCard('action'),
-        makeCard('milestone'),
-        makeCard('progressRing'),
-        makeCard('sparkline'),
-        makeCard('countdown'),
-        makeCard('budgetBar'),
-        makeCard('insight'),
-        makeCard('comparison'),
-        makeCard('quote'),
-      ]
-
-      const result = validateBriefingLayout(cards)
-      assertEqual(result.length, cards.length, 'Output should have same number of cards as input')
-
-      // Verify all types are preserved (just reordered)
-      const inputTypes = cards.map((c) => c.type).sort()
-      const outputTypes = result.map((c) => c.type).sort()
-      assertEqual(
-        JSON.stringify(inputTypes),
-        JSON.stringify(outputTypes),
-        'All card types should be preserved after layout validation',
-      )
-    },
-  },
-
-  // ── Href validation ──
+  // ── Href validation (herbruikbaar nut, los van het verwijderde DAIshboard) ──
   {
     id: 'briefing-href-validation',
     name: 'validateCardHrefs corrigeert ongeldige en gehallucinereerde routes',
@@ -804,20 +282,20 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 300,
     fn() {
-      // Valid route stays
-      const valid = validateHref('/core')
-      assertEqual(valid, '/core', 'Valid route should stay unchanged')
+      // Valid route stays (nieuwe IA)
+      const valid = validateHref('/overzicht')
+      assertEqual(valid, '/overzicht', 'Valid route should stay unchanged')
 
-      // Alias corrected
+      // Legacy alias corrected → nieuwe IA
       const alias = validateHref('/core/transactions')
-      assertEqual(alias, '/core/cash', 'Alias /core/transactions should map to /core/cash')
+      assertEqual(alias, '/overzicht/cashflow/transacties', 'Alias /core/transactions should map to /overzicht/cashflow/transacties')
 
       const alias2 = validateHref('/core/schulden')
-      assertEqual(alias2, '/core/debts', 'Alias /core/schulden should map to /core/debts')
+      assertEqual(alias2, '/overzicht/schulden', 'Alias /core/schulden should map to /overzicht/schulden')
 
       // Prefix match
-      const prefix = validateHref('/core/budgets/123')
-      assertEqual(prefix, '/core/budgets', 'Prefix match should strip dynamic segment')
+      const prefix = validateHref('/overzicht/cashflow/budget/123')
+      assertEqual(prefix, '/overzicht/cashflow/budget', 'Prefix match should strip dynamic segment')
 
       // Invalid route removed
       const invalid = validateHref('/nonexistent/page')
@@ -828,17 +306,17 @@ const tests: TestCase[] = [
       assertEqual(empty, undefined, 'Empty href should return undefined')
 
       // Card-level validation
-      const cards: BriefingCardSpec[] = [
-        makeCard('action', { href: '/core/transacties' }),
-        makeCard('metric', { href: '/will' }),
+      const cards = [
+        { type: 'action', href: '/core/transacties' },
+        { type: 'metric', href: '/overzicht' },
       ]
       const validated = validateCardHrefs(cards)
       assert(
-        'href' in validated[0] && validated[0].href === '/core/cash',
+        validated[0].href === '/overzicht/cashflow/transacties',
         'Hallucinated href should be corrected',
       )
       assert(
-        'href' in validated[1] && validated[1].href === '/will',
+        validated[1].href === '/overzicht',
         'Valid href should remain unchanged',
       )
     },
@@ -852,13 +330,13 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 200,
     fn() {
-      const cards: BriefingCardSpec[] = [
+      const cards = [
         {
           type: 'checklist',
           title: 'To-do',
           items: [
-            { label: 'Budgetten bekijken', href: '/core/budgets', done: false },
-            { label: 'Goals bekijken', href: '/core/goals', done: false },
+            { label: 'Budgetten bekijken', href: '/overzicht/cashflow/budget', done: false },
+            { label: 'Doelen bekijken', href: '/core/goals', done: false },
             { label: 'Geen link', done: true },
           ],
         },
@@ -867,8 +345,8 @@ const tests: TestCase[] = [
       const validated = validateCardHrefs(cards)
       const checklist = validated[0] as { type: 'checklist'; items: { label: string; href?: string; done: boolean }[] }
 
-      assertEqual(checklist.items[0].href, '/core/budgets', 'Valid checklist href preserved')
-      assertEqual(checklist.items[1].href, '/will', 'Hallucinated /core/goals should map to /will')
+      assertEqual(checklist.items[0].href, '/overzicht/cashflow/budget', 'Valid checklist href preserved')
+      assertEqual(checklist.items[1].href, '/toekomst/doelen', 'Hallucinated /core/goals should map to /toekomst/doelen')
       assertEqual(checklist.items[2].href, undefined, 'Item without href stays undefined')
     },
   },
@@ -898,59 +376,13 @@ const tests: TestCase[] = [
       assertGreaterThanOrEqual(jaargang, 1, 'Jaargang should be >= 1 (app launched 2025)')
     },
   },
-
-  {
-    id: 'briefing-temporal-context-structure',
-    name: 'TemporalContext bevat alle verplichte velden',
-    category: CAT,
-    description: 'TemporalContext interface heeft 12 velden voor datum, tijd, seizoen en salaris-countdown',
-    priority: 'high',
-    estimatedDurationMs: 200,
-    fn() {
-      // Verify TemporalContext structure
-      const temporal = {
-        date: '2026-03-18',
-        dayOfMonth: 18,
-        dayOfWeek: 'woensdag',
-        dayOfWeekEn: 'Wednesday',
-        month: 3,
-        monthName: 'maart',
-        year: 2026,
-        timeOfDay: 'ochtend' as const,
-        greeting: 'Goedemorgen',
-        seasonalNotes: ['Belastingaangifte periode'],
-        daysUntilMonthEnd: 13,
-        daysUntilSalary: 7,
-      }
-
-      const requiredKeys = [
-        'date', 'dayOfMonth', 'dayOfWeek', 'dayOfWeekEn',
-        'month', 'monthName', 'year', 'timeOfDay',
-        'greeting', 'seasonalNotes', 'daysUntilMonthEnd', 'daysUntilSalary',
-      ]
-
-      for (const key of requiredKeys) {
-        assertNotNull(
-          (temporal as Record<string, unknown>)[key],
-          `TemporalContext should have field: ${key}`,
-        )
-      }
-
-      // Verify timeOfDay valid values
-      const validTimes = ['ochtend', 'middag', 'avond']
-      assert(
-        validTimes.includes(temporal.timeOfDay),
-        `timeOfDay should be ochtend/middag/avond, got ${temporal.timeOfDay}`,
-      )
-    },
-  },
 ]
 
 export function register(): void {
   registerCategory({
     id: CAT,
-    label: 'Berichten \u2014 AI Content',
-    description: 'Nieuws generatie, briefing compositie, progressive loading, layout validatie',
+    label: 'Berichten — AI Content',
+    description: 'Nieuws generatie, progressive loading, href-validatie',
     icon: 'Newspaper',
     testCount: 0,
   })

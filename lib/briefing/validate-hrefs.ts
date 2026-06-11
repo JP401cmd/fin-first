@@ -1,8 +1,25 @@
 // ── Href Validation ─────────────────────────────────────────
 // Validates and corrects hrefs in briefing cards to prevent
 // hallucinated routes from the AI.
+//
+// NB: het AI-DAIshboard-briefingsysteem ("Systeem B") en zijn type-bibliotheek
+// (`./types`) zijn verwijderd (zie docs/briefing-analyse.md). Deze href-
+// validatie blijft een herbruikbaar nut voor de levende redactie-/briefing-
+// laag, dus het minimale card-shape leeft nu lokaal i.p.v. via `./types`.
 
-import type { BriefingCardSpec } from './types'
+/** Minimale card-vorm die href-validatie nodig heeft. Bewust losgekoppeld
+ *  van het verwijderde BriefingCardSpec-union zodat dit nut zelfstandig blijft. */
+interface ChecklistHrefItem {
+  label: string
+  href?: string
+  done: boolean
+}
+
+interface HrefValidatableCard {
+  type: string
+  href?: string
+  items?: ChecklistHrefItem[]
+}
 
 /** All valid app routes that cards may link to (nieuwe IA: Overzicht/Toekomst/Mijn) */
 const VALID_ROUTES = new Set([
@@ -100,16 +117,18 @@ export function validateHref(href: string): string | undefined {
 }
 
 /**
- * Validate all hrefs in an array of briefing cards.
- * Invalid hrefs are corrected or removed.
+ * Validate all hrefs in an array of cards.
+ * Invalid hrefs are corrected or removed. Generic over the concrete card type
+ * zodat callers hun eigen card-vorm kunnen aanleveren zolang die `type`/`href`/
+ * `items` exposeert.
  */
-export function validateCardHrefs(cards: BriefingCardSpec[]): BriefingCardSpec[] {
+export function validateCardHrefs<T extends HrefValidatableCard>(cards: T[]): T[] {
   return cards.map((card) => {
     // Cards that may have href
     if ('href' in card && typeof card.href === 'string') {
       const validated = validateHref(card.href)
       if (validated !== card.href) {
-        return { ...card, href: validated } as BriefingCardSpec
+        return { ...card, href: validated }
       }
     }
 
@@ -124,7 +143,7 @@ export function validateCardHrefs(cards: BriefingCardSpec[]): BriefingCardSpec[]
         }
         return item
       })
-      return { ...card, items: updatedItems } as BriefingCardSpec
+      return { ...card, items: updatedItems }
     }
 
     return card

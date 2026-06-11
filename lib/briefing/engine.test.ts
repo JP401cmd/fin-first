@@ -1,14 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildBriefingEntries,
-  buildBriefingNarrative,
-  MAX_NARRATIVE_FRAGMENTS,
   type BriefingEngineInput,
 } from './engine'
 import type { HealthScore } from '@/lib/financial-health'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { Recommendation } from '@/lib/recommendation-data'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
 
 /**
  * Tests voor briefing-engine — pure functie die ruwe data omzet in
@@ -157,7 +154,7 @@ describe('buildBriefingEntries — milestone', () => {
     const milestone = result.find((e) => e.category === 'milestone')
     expect(milestone?.text).toContain('Spaargeld')
     expect(milestone?.text).toContain('behaald')
-    expect(milestone?.href).toBe('/toekomst?tab=doelen')
+    expect(milestone?.href).toBe('/toekomst/doelen')
   })
 
   it('valt terug op score-trend >= 5 wanneer geen behaald doel', () => {
@@ -308,89 +305,6 @@ describe('buildBriefingEntries — hefboom-tagging (plan T-3)', () => {
     const event = { ...makeEvent('e1', 'Huis kopen', 30), event_type: 'housing_purchase' }
     const result = buildBriefingEntries(emptyInput({ events: [event] }))
     expect(result.find((e) => e.category === 'upcoming')?.hefboom).toBe('schulden')
-  })
-})
-
-function makeEntry(
-  category: BriefingEntry['category'],
-  text: string,
-): BriefingEntry {
-  return { id: category + ':' + text.slice(0, 5), category, text }
-}
-
-describe('buildBriefingNarrative — natural-language samenvatting (plan T-1)', () => {
-  it('returnt null bij lege entries', () => {
-    expect(buildBriefingNarrative([])).toBeNull()
-  })
-
-  it('rendert één-zin samenvatting bij één entry', () => {
-    const result = buildBriefingNarrative([
-      makeEntry('observation', 'Je vermogen groeide 1.2% sneller dan gemiddeld'),
-    ])
-    expect(result).toBe('Je vermogen groeide 1.2% sneller dan gemiddeld.')
-  })
-
-  it('voegt connectoren toe na het eerste fragment', () => {
-    const result = buildBriefingNarrative([
-      makeEntry('observation', 'Je vermogen groeit gestaag'),
-      makeEntry('tip', 'Verschuif €3k naar beleggen'),
-    ])
-    // Eerste zonder connector, tweede met "Tegelijkertijd" of vergelijkbaar
-    expect(result?.startsWith('Je vermogen groeit gestaag.')).toBe(true)
-    expect(result?.toLowerCase()).toMatch(
-      /tegelijkertijd|daarnaast|verder/i,
-    )
-  })
-
-  it('lowercase de eerste letter van entry na connector voor grammaticale vlotheid', () => {
-    const result = buildBriefingNarrative([
-      makeEntry('observation', 'Eerste zin'),
-      makeEntry('tip', 'Verschuif vermogen'),
-    ])
-    // Connector + lowercased body: bv. "Daarnaast verschuif vermogen"
-    expect(result).toMatch(/(Tegelijkertijd|Daarnaast|Verder) verschuif/)
-  })
-
-  it('cap op MAX_NARRATIVE_FRAGMENTS (= 4)', () => {
-    const entries: BriefingEntry[] = [
-      makeEntry('observation', 'A'),
-      makeEntry('tip', 'B'),
-      makeEntry('heads_up', 'C'),
-      makeEntry('milestone', 'D'),
-      makeEntry('upcoming', 'E'),
-    ]
-    const result = buildBriefingNarrative(entries)
-    expect(MAX_NARRATIVE_FRAGMENTS).toBe(4)
-    // 5e entry "E" mag niet voorkomen in de samenvatting. A..D zijn aanwezig
-    // (D wordt lowercased na connector → "d.").
-    expect(result).not.toContain(' E.')
-    expect(result).toContain('A.')
-    expect(result).toMatch(/[Dd]\.$/)
-  })
-
-  it('elk fragment eindigt met een eindpunt', () => {
-    const result = buildBriefingNarrative([
-      makeEntry('observation', 'Eerste'),
-      makeEntry('tip', 'Tweede'),
-    ])
-    // Twee zinnen → twee punten
-    expect(result?.match(/\./g)?.length).toBe(2)
-  })
-
-  it('strip bestaand eindpunt voordat punt wordt toegevoegd (geen ".." artifact)', () => {
-    const result = buildBriefingNarrative([
-      makeEntry('observation', 'Zin met eindpunt.'),
-    ])
-    expect(result).toBe('Zin met eindpunt.')
-    expect(result).not.toContain('..')
-  })
-
-  it('heads_up krijgt eigen connector-pool ("Let op" / "Aandacht")', () => {
-    const result = buildBriefingNarrative([
-      makeEntry('observation', 'Iets goeds'),
-      makeEntry('heads_up', 'Spaarquote te laag'),
-    ])
-    expect(result?.toLowerCase()).toMatch(/let op|aandacht|wel/i)
   })
 })
 
@@ -803,5 +717,238 @@ describe('buildBriefingEntries — finance-verrijking', () => {
     expect(ids.indexOf('observation:r1')).toBeLessThan(ids.indexOf('finance:networth'))
     expect(ids.indexOf('finance:networth')).toBeLessThan(ids.indexOf('tip:r2'))
     expect(ids.indexOf('tip:r2')).toBeLessThan(ids.indexOf('finance:savings'))
+  })
+})
+
+describe('buildBriefingEntries — verbrede vulling (jun 2026)', () => {
+  const financeNow = new Date('2026-10-01T12:00:00Z')
+
+  it('onvolledig noodfonds → heads_up met maanden-dekking', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { emergencyFund: { monthsCovered: 1.5, targetMonths: 3, isComplete: false } },
+      }),
+    )
+    const ef = result.find((e) => e.id === 'finance:emergency')
+    expect(ef?.category).toBe('heads_up')
+    expect(ef?.hefboom).toBe('cashflow')
+    expect(ef?.text).toContain('1,5 van de 3 maanden')
+  })
+
+  it('volledig noodfonds → geen briefje', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { emergencyFund: { monthsCovered: 4, targetMonths: 3, isComplete: true } },
+      }),
+    )
+    expect(result.find((e) => e.id === 'finance:emergency')).toBeUndefined()
+  })
+
+  it('vaste lasten → observation met percentage en grootste post', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          monthlyIncome: 4000,
+          totalRecurringAmount: 1200, // 30%
+          recurring: [{ name: 'Huur', amount: 900 }],
+        },
+      }),
+    )
+    const rec = result.find((e) => e.id === 'finance:recurring')
+    expect(rec?.category).toBe('observation')
+    expect(rec?.text).toContain('30%')
+    expect(rec?.text).toContain('Huur')
+  })
+
+  it('vaste lasten zonder inkomen → geen briefje (percentage betekenisloos)', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { totalRecurringAmount: 1200, recurring: [{ name: 'Huur', amount: 900 }] },
+      }),
+    )
+    expect(result.find((e) => e.id === 'finance:recurring')).toBeUndefined()
+  })
+
+  it('Box 3-heffing → tip met vrijheidsdagen en tegenbewijs-route', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { box3Tax: 1500, monthlyExpenses: 3000 }, // dagbasis €100 → 15 dagen
+      }),
+    )
+    const box3 = result.find((e) => e.id === 'finance:box3')
+    expect(box3?.category).toBe('tip')
+    expect(box3?.hefboom).toBe('belasting')
+    expect(box3?.href).toBe('/overzicht/belasting/box3')
+    expect(box3?.text).toMatch(/15 dagen vrijheid/)
+    expect(box3?.text).toMatch(/tegenbewijs/i)
+  })
+
+  it('fondskosten ≥ drempel → tip met TER in NL-notatie', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { feeAnalysis: { totalAnnualFee: 450, weightedTER: 0.0035 } },
+      }),
+    )
+    const fees = result.find((e) => e.id === 'finance:fees')
+    expect(fees?.category).toBe('tip')
+    expect(fees?.text).toContain('0,35% TER')
+  })
+
+  it('fondskosten onder drempel → geen briefje', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { feeAnalysis: { totalAnnualFee: 60, weightedTER: 0.001 } },
+      }),
+    )
+    expect(result.find((e) => e.id === 'finance:fees')).toBeUndefined()
+  })
+
+  it('hypotheek-vs-beleggen met duidelijke winnaar → tip; "gelijk" → niets', () => {
+    const winnaar = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { hvbSummary: { rente: 4.2, aanbeveling: 'aflossen' } },
+      }),
+    )
+    const hvb = winnaar.find((e) => e.id === 'finance:hvb')
+    expect(hvb?.text).toContain('4,2%')
+    expect(hvb?.text).toContain('extra aflossen')
+    expect(hvb?.hefboom).toBe('schulden')
+
+    const gelijk = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { hvbSummary: { rente: 3.5, aanbeveling: 'gelijk' } },
+      }),
+    )
+    expect(gelijk.find((e) => e.id === 'finance:hvb')).toBeUndefined()
+  })
+
+  it('goal heads_up bevat de concrete bedragen', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        goalNames: ['Bufferdoel'],
+        goalProgresses: [{ current: 3000, target: 10000, pct: 30, onTrack: false, eta: null }],
+      }),
+    )
+    const goal = result.find((e) => e.id.startsWith('heads_up:goal'))
+    expect(goal?.text).toContain('Bufferdoel')
+    expect(goal?.text).toMatch(/3\.000/)
+    expect(goal?.text).toMatch(/10\.000/)
+  })
+})
+
+describe('buildBriefingEntries — aandachtspunten-bus', () => {
+  const financeNow = new Date('2026-10-01T12:00:00Z')
+
+  it('zwaarste punt → tip met besparing, vrijheidsdagen en domein-hefboom', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        aandachtspunten: [
+          { id: 'tax:jaarruimte', domain: 'tax', title: 'Benut je jaarruimte', savings: 1200, freedomDays: 12, href: '/overzicht/belasting/box1' },
+          { id: 'debt:duur', domain: 'debt', title: 'Dure lening', savings: 300, freedomDays: 3, href: '/overzicht/schulden' },
+        ],
+      }),
+    )
+    const punt = result.find((e) => e.id === 'aandachtspunt:tax:jaarruimte')
+    expect(punt?.category).toBe('tip')
+    expect(punt?.hefboom).toBe('belasting')
+    expect(punt?.href).toBe('/overzicht/belasting/box1')
+    expect(punt?.text).toContain('Benut je jaarruimte')
+    expect(punt?.text).toMatch(/1\.200/)
+    expect(punt?.text).toContain('12 dagen vrijheid')
+    // Alleen het zwaarste punt wordt een briefje.
+    expect(result.find((e) => e.id === 'aandachtspunt:debt:duur')).toBeUndefined()
+  })
+
+  it('punt met deadline → heads_up met deadline in de tekst', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        aandachtspunten: [
+          { id: 'tax:aangifte', domain: 'tax', title: 'Aangifte indienen', savings: 0, freedomDays: 0, deadline: '1 mei', href: '/overzicht/belasting' },
+        ],
+      }),
+    )
+    const punt = result.find((e) => e.id === 'aandachtspunt:tax:aangifte')
+    expect(punt?.category).toBe('heads_up')
+    expect(punt?.text).toContain('vóór 1 mei')
+  })
+})
+
+describe('buildBriefingEntries — domein-spreiding', () => {
+  it('max 2 briefjes per hefboom: derde cashflow-kaart valt af', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: new Date('2026-10-01T12:00:00Z'),
+        finance: {
+          // Drie cashflow-kandidaten: budgetdruk (88), noodfonds (84),
+          // vaste lasten (62) → de laagst gerangschikte valt af.
+          monthlyIncome: 4000,
+          budgetExpense: { spent: 1900, limit: 2000 },
+          emergencyFund: { monthsCovered: 1, targetMonths: 3, isComplete: false },
+          totalRecurringAmount: 1200,
+          recurring: [{ name: 'Huur', amount: 900 }],
+        },
+      }),
+    )
+    const cashflow = result.filter((e) => e.hefboom === 'cashflow')
+    expect(cashflow.map((e) => e.id)).toEqual(['finance:budget', 'finance:emergency'])
+    expect(result.find((e) => e.id === 'finance:recurring')).toBeUndefined()
+  })
+
+  it('entries zonder hefboom-tag worden niet gecapt', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: new Date('2026-10-01T12:00:00Z'),
+        recommendations: [makeRec('r1', 'A'), makeRec('r2', 'B')],
+        finance: { freedomPct: 40, openActions: 2, totalFreedomDaysOpen: 10 },
+      }),
+    )
+    // fire + actions + beide recommendations zijn allemaal zonder hefboom → alle 4 aanwezig.
+    expect(result.find((e) => e.id === 'finance:fire')).toBeDefined()
+    expect(result.find((e) => e.id === 'finance:actions')).toBeDefined()
+    expect(result.find((e) => e.id === 'observation:r1')).toBeDefined()
+    expect(result.find((e) => e.id === 'tip:r2')).toBeDefined()
+  })
+})
+
+describe('buildBriefingEntries — check-in-reflectie', () => {
+  it('recente check-in met reflectie → observation met citaat en maand', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        checkin: { monthKey: '2026-06', reflection: 'Deze maand bewust minder uit eten gegaan.' },
+      }),
+    )
+    const c = result.find((e) => e.id === 'checkin:2026-06')
+    expect(c?.category).toBe('observation')
+    expect(c?.href).toBe('/mijn/checkins')
+    expect(c?.text).toContain('check-in van juni')
+    expect(c?.text).toContain('minder uit eten')
+  })
+
+  it('lange reflectie wordt afgekapt met ellipsis', () => {
+    const long = 'a'.repeat(200)
+    const result = buildBriefingEntries(
+      emptyInput({ checkin: { monthKey: '2026-06', reflection: long } }),
+    )
+    const c = result.find((e) => e.id === 'checkin:2026-06')
+    expect(c?.text).toContain('…')
+    expect((c?.text ?? '').length).toBeLessThan(170)
+  })
+
+  it('lege reflectie → geen briefje', () => {
+    const result = buildBriefingEntries(
+      emptyInput({ checkin: { monthKey: '2026-06', reflection: '   ' } }),
+    )
+    expect(result.find((e) => e.id.startsWith('checkin:'))).toBeUndefined()
   })
 })

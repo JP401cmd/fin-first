@@ -352,3 +352,109 @@ describe('applyManualRefresh — 1× per dag-poort', () => {
     expect(writes).toHaveLength(1)
   })
 })
+
+describe('week-historie — afgesloten weken in de snapshot', () => {
+  // Dinsdag 9 juni 2026 = week 2026-W24.
+  const now = new Date('2026-06-09T10:00:00.000Z')
+
+  it('week-overgang schuift de aflopende week in history', async () => {
+    const existing: BriefingSnapshot = {
+      week: '2026-W23',
+      lastManualRefresh: '',
+      refreshedAt: '2026-06-01T08:00:00.000Z',
+      entries: [entry('observation:vorige-week')],
+      headline: 'Vorige-week-kop',
+      freedomSnapshot: {
+        totalFreedomDays: 120,
+        netWorth: 50000,
+        monthlyExpenses: 2500,
+        capturedAt: '2026-06-01T08:00:00.000Z',
+      },
+    }
+    const { supabase } = makeSupabase({ snapshot: existing })
+    const { snapshot } = await getOrCreateWeeklySnapshot(
+      supabase, 'u', [entry('observation:nieuw')], { now },
+    )
+    expect(snapshot.week).toBe('2026-W24')
+    expect(snapshot.history).toHaveLength(1)
+    expect(snapshot.history?.[0]).toMatchObject({
+      week: '2026-W23',
+      headline: 'Vorige-week-kop',
+      freedomDays: 120,
+    })
+    expect(snapshot.history?.[0].entries[0].id).toBe('observation:vorige-week')
+  })
+
+  it('binnen dezelfde week blijft de historie ongewijzigd', async () => {
+    const existing: BriefingSnapshot = {
+      week: amsterdamWeekKey(now),
+      lastManualRefresh: '',
+      refreshedAt: now.toISOString(),
+      entries: [entry('observation:huidig')],
+      history: [{ week: '2026-W23', entries: [entry('observation:oud')] }],
+    }
+    const { supabase, writes } = makeSupabase({ snapshot: existing })
+    const { snapshot } = await getOrCreateWeeklySnapshot(supabase, 'u', [], { now })
+    expect(writes).toHaveLength(0)
+    expect(snapshot.history).toHaveLength(1)
+    expect(snapshot.history?.[0].week).toBe('2026-W23')
+  })
+
+  it('historie wordt gecapt op MAX_WEEK_HISTORY (oudste valt af)', async () => {
+    const fullHistory = Array.from({ length: 8 }, (_, i) => ({
+      week: `2026-W${String(15 + i).padStart(2, '0')}`,
+      entries: [entry(`observation:w${15 + i}`)],
+    }))
+    const existing: BriefingSnapshot = {
+      week: '2026-W23',
+      lastManualRefresh: '',
+      refreshedAt: '2026-06-01T08:00:00.000Z',
+      entries: [entry('observation:af')],
+      history: fullHistory,
+    }
+    const { supabase } = makeSupabase({ snapshot: existing })
+    const { snapshot } = await getOrCreateWeeklySnapshot(supabase, 'u', [], { now })
+    expect(snapshot.history).toHaveLength(8)
+    expect(snapshot.history?.[0].week).toBe('2026-W16') // W15 is afgevallen
+    expect(snapshot.history?.[7].week).toBe('2026-W23') // aflopende week achteraan
+  })
+
+  it('handmatige ververs behoudt de bestaande historie', async () => {
+    const existing: BriefingSnapshot = {
+      week: amsterdamWeekKey(now),
+      lastManualRefresh: '2026-06-08',
+      refreshedAt: '2026-06-08T08:00:00.000Z',
+      entries: [entry('observation:oud')],
+      history: [{ week: '2026-W23', entries: [entry('observation:hist')] }],
+    }
+    const { supabase } = makeSupabase({ snapshot: existing })
+    const res = await applyManualRefresh(supabase, 'u', [entry('observation:vers')], { now })
+    expect(res.allowed).toBe(true)
+    expect(res.snapshot.history).toHaveLength(1)
+    expect(res.snapshot.history?.[0].week).toBe('2026-W23')
+  })
+
+  it('parser saneert history-items defensief (onbekende categorie vervalt)', async () => {
+    const raw = {
+      week: amsterdamWeekKey(now),
+      lastManualRefresh: '',
+      refreshedAt: now.toISOString(),
+      entries: [],
+      history: [
+        {
+          week: '2026-W23',
+          entries: [
+            { id: 'ok', category: 'tip', text: 'goed' },
+            { id: 'kapot', category: 'streak', text: 'onbekend type' },
+          ],
+        },
+        { geen: 'week' },
+      ],
+    }
+    const { supabase } = makeSupabase({ snapshot: raw })
+    const snap = await readBriefingSnapshot(supabase, 'u')
+    expect(snap?.history).toHaveLength(1)
+    expect(snap?.history?.[0].entries).toHaveLength(1)
+    expect(snap?.history?.[0].entries[0].id).toBe('ok')
+  })
+})

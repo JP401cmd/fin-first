@@ -13,7 +13,7 @@ import type { GoalWithBudget } from '@/lib/will-data-loader'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import { HefbomenNav } from './overzicht-hero/hefbomen-nav'
-import { BriefingPanel, type BriefingEntry } from './briefing-panel'
+import { BriefingPanel, type BriefingEntry, type BriefingWeekHistoryItem } from './briefing-panel'
 import type { FreedomHeroProps } from '@/lib/briefing/overview-briefing'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { HealthScoreCard } from './overzicht-hero/health-score-card'
@@ -58,12 +58,16 @@ type OverzichtHeroProps = {
   briefingEntries?: BriefingEntry[]
   /** ISO-tijdstip waarop de briefing voor vandaag is vastgezet ("Bijgewerkt …"). */
   briefingRefreshedAt?: string | null
+  /** Live cijfers wijken af van het bevroren weekbeeld → freshness-hint. */
+  briefingDataChanged?: boolean
   /** Of de handmatige ververs vandaag nog beschikbaar is (max 1×/dag). */
   briefingCanRefresh?: boolean
   /** Vrijheidstijd-hero bovenaan de briefing (week-over-week delta). */
   freedomHero?: FreedomHeroProps | null
   /** Eén-zin kop boven de briefjes. */
   briefingHeadline?: string | null
+  /** Afgesloten weken uit de snapshot-historie (terugblik-disclosure). */
+  briefingWeekHistory?: BriefingWeekHistoryItem[]
   /** Inputs voor mini-vermogen-grafiek naast Health Score. Wanneer leeg
    *  blijft chart-slot leeg (geen rendering). */
   netWorthHistory?: { month: string; value: number }[]
@@ -144,9 +148,11 @@ export function OverzichtHero({
   totals,
   briefingEntries,
   briefingRefreshedAt,
+  briefingDataChanged,
   briefingCanRefresh,
   freedomHero,
   briefingHeadline,
+  briefingWeekHistory,
   netWorthHistory,
   currentNetWorth,
   fireAge,
@@ -381,6 +387,7 @@ export function OverzichtHero({
         canRefresh={briefingCanRefresh ?? false}
         freedomHero={freedomHero ?? null}
         headline={briefingHeadline ?? null}
+        weekHistory={briefingWeekHistory}
       />
 
       {/* Drie "alles bekijken"-ingangen onder de briefing: de tips & acties-

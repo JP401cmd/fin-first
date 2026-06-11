@@ -213,10 +213,10 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 10,
     fn() {
-      assertEqual(DIRECTIVE_METRICS.length, 10, '10 metrics')
+      assertEqual(DIRECTIVE_METRICS.length, 11, '11 metrics')
       const expectedIds = [
         'net_worth', 'savings_rate', 'budget', 'debt', 'fire',
-        'spending', 'emergency_fund', 'income', 'next_steps', 'discover',
+        'spending', 'emergency_fund', 'income', 'hypotheek', 'next_steps', 'discover',
       ]
       for (const id of expectedIds) {
         const metric = DIRECTIVE_METRICS.find((m) => m.id === id)

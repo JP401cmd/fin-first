@@ -42,7 +42,7 @@ export const ARCHI_FLOWS: ArchiFlow[] = [
     steps: [
       { elementId: 'data-cont', label: 'Bronnen uit Postgres', artifact: 'Promise.all([...buildXContext])', detail: '9 builders, RLS-gefilterd.' },
       { elementId: 'as-coach', label: 'buildContext() stelt samen', artifact: 'lib/ai/context/builder.ts', detail: 'Een nieuw domein plugt in met één extra buildXContext.' },
-      { elementId: 't-aigateway', label: 'Will / briefing genereren', artifact: 'Vercel AI SDK', detail: 'streamText + per-tool-call kaart-push.' },
+      { elementId: 't-aigateway', label: 'Will / briefing redigeren', artifact: 'Vercel AI SDK', detail: 'streamText (chat) + generateObject (briefing-redactie met nummer-guard).' },
       { elementId: 'sp-inzicht', label: 'Aanbevelingen & acties', artifact: '/api/ai/actions', detail: 'Aandachtspunten-bus voegt punten als actie toe.' },
     ],
   },

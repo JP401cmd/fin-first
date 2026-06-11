@@ -88,15 +88,15 @@ export const annotations = {
         'De predicaten blijven in code; tekst, CTA en aan/uit zijn override-baar in app_settings.',
     },
     {
-      id: 'briefing-tools',
-      title: 'Briefing-kaart-tools',
-      file: 'lib/ai/dna/briefing.ts',
+      id: 'briefing-engine',
+      title: 'Briefing-engine + redactie',
+      file: 'lib/briefing/engine.ts',
       summary:
-        'Een generieke catalogus van kaart-tools die elk data-gebied kan aanroepen om de ' +
-        'dagelijkse briefing van Will samen te stellen.',
+        'Deterministische generatoren zetten de financiële cijfers om in wekelijkse briefjes; ' +
+        'Will redigeert alleen de teksten (lib/briefing/redactie.ts, nummer-guard — ADR 0007).',
       extend:
-        'Definieer een nieuwe showX: tool({...}) met een Zod-schema; Will kan de kaart dan ' +
-        'meteen plaatsen op de juiste plek in de briefing.',
+        'Voeg een generator toe in buildFinanceEntries (drempel + test) en een rank in ' +
+        'briefingRank; de redactie en de directives pakken het nieuwe briefje automatisch mee.',
     },
   ],
 

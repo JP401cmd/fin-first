@@ -5,6 +5,7 @@ import { loadWillData } from '@/lib/will-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { OverzichtHero } from '@/components/overview/overzicht-hero'
+import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
 import { WelcomeGuideBanner } from '@/components/overview/welcome-guide-banner'
 import {
@@ -12,10 +13,13 @@ import {
   computeFreedomTotal,
   buildFreedomHeroProps,
   buildBriefingHeadline,
+  loadLatestCheckinForBriefing,
   type FreedomHeroProps,
 } from '@/lib/briefing/overview-briefing'
 import { getOrCreateWeeklySnapshot, canRefreshToday } from '@/lib/briefing/snapshot'
 import { loadTopMarketBriefing } from '@/lib/briefing/news-market'
+import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
+import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { ageAtDate } from '@/lib/horizon-data'
 
 export const metadata: Metadata = {
@@ -50,10 +54,13 @@ export default async function OverzichtPage() {
   // router.refresh() (PerspectiveProvider) met de nieuwe cookie.
   const perspective = await getServerPerspective()
 
-  const [dashboardResult, willData, horizonData] = await Promise.all([
+  const [dashboardResult, willData, horizonData, aandachtspunten] = await Promise.all([
     loadDashboardData(supabase),
     loadWillData(supabase),
     loadHorizonData(supabase, perspective),
+    // Aandachtspunten-bus voedt de briefing (zwaarste punt als briefje).
+    // Parallel met de loaders → nauwelijks extra wall-clock; faalt zacht.
+    collectAandachtspunten(supabase).catch(() => [] as Aandachtspunt[]),
   ])
 
   const {
@@ -144,15 +151,31 @@ export default async function OverzichtPage() {
   // Valt terug op vers-gecomposeerde briefjes wanneer de gebruiker (nog) niet
   // bekend is of de snapshot-kolom ontbreekt (graceful degradation).
   // Markt-briefje (read-only uit de nieuws-cache; triggert geen generatie).
-  const marketEntry = authUser.user?.id
-    ? await loadTopMarketBriefing(supabase, authUser.user.id)
-    : null
+  const [marketEntry, checkinForBriefing] = authUser.user?.id
+    ? await Promise.all([
+        loadTopMarketBriefing(supabase, authUser.user.id),
+        loadLatestCheckinForBriefing(supabase, authUser.user.id),
+      ])
+    : [null, undefined]
+  // In huishoud-/partnerweergave compose't de briefing met de perspectief-
+  // inkomsten/-uitgaven, zodat spaarquote- en vrijheidsdagen-briefjes dezelfde
+  // basis gebruiken als de hero-tegels. Vermogensverloop/recommendations
+  // blijven (nog) persoonlijk — zie household-integration-build-plan.
+  const briefingDashboardData = perspectiveOverride
+    ? {
+        ...dashboardData,
+        monthlyIncome: perspectiveOverride.monthlyIncome,
+        monthlyExpenses: perspectiveOverride.monthlyExpenses,
+      }
+    : dashboardData
   const composedBriefing = composeOverviewBriefing(
-    dashboardData,
+    briefingDashboardData,
     willData,
     horizonData,
     new Date(),
     marketEntry ?? undefined,
+    aandachtspunten,
+    checkinForBriefing,
   )
   // Freedom-time: netto vermogen (perspectief-correct) ÷ dagelijkse uitgaven.
   // In huishoud-/partnerweergave de bijbehorende maanduitgaven gebruiken.
@@ -161,6 +184,8 @@ export default async function OverzichtPage() {
   let briefingEntries = composedBriefing
   let briefingRefreshedAt: string | null = null
   let briefingCanRefresh = false
+  let briefingDataChanged = false
+  let briefingWeekHistory: BriefingWeekHistoryItem[] | undefined
   // Hero uit live data; in de eerste week (geen basis) toont hij het totaal.
   let freedomHero: FreedomHeroProps = buildFreedomHeroProps(
     freedomTotal,
@@ -196,6 +221,7 @@ export default async function OverzichtPage() {
     briefingEntries = snapshot.entries
     briefingRefreshedAt = snapshot.refreshedAt
     briefingCanRefresh = canRefreshToday(snapshot)
+    briefingWeekHistory = snapshot.history
     // Hero uit de bevroren snapshot → stabiel de hele week.
     if (snapshot.freedomSnapshot) {
       freedomHero = buildFreedomHeroProps(
@@ -203,6 +229,13 @@ export default async function OverzichtPage() {
         snapshot.previousFreedomSnapshot ?? null,
         netWorthHistory,
       )
+      // Freshness-signaal: wijken de live vrijheidsdagen ≥ 2 dagen af van het
+      // bevroren weekbeeld, dan toont de panel-header een kalme hint. De delta
+      // is server-side al beschikbaar — geen extra query.
+      briefingDataChanged =
+        Math.abs(
+          freedomTotal.totalFreedomDays - snapshot.freedomSnapshot.totalFreedomDays,
+        ) >= 2
     }
     briefingHeadline = snapshot.headline ?? buildBriefingHeadline(freedomHero)
   } else {
@@ -246,6 +279,8 @@ export default async function OverzichtPage() {
         totals={totals}
         briefingEntries={briefingEntries}
         briefingRefreshedAt={briefingRefreshedAt}
+        briefingDataChanged={briefingDataChanged}
+        briefingWeekHistory={briefingWeekHistory}
         briefingCanRefresh={briefingCanRefresh}
         freedomHero={freedomHero}
         briefingHeadline={briefingHeadline}

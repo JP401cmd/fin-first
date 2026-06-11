@@ -1,63 +1,28 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generateText } from 'ai'
-import { getModel } from '@/lib/ai/config'
-import {
-  loadAndComposeOverviewBriefing,
-  sanitizeAiHeadline,
-} from '@/lib/briefing/overview-briefing'
+import { loadAndComposeOverviewBriefing } from '@/lib/briefing/overview-briefing'
 import {
   readBriefingSnapshot,
   canRefreshToday,
   applyManualRefresh,
 } from '@/lib/briefing/snapshot'
-import type { BriefingEntry } from '@/components/overview/briefing-panel'
-import type { SupabaseClient } from '@supabase/supabase-js'
-
-/**
- * Genereer één Will-kop-zin uit de gecomposeerde briefjes. Alléén bij een
- * handmatige ververs (buiten de render-hot-path, 1×/dag-gepoort). Faalt de
- * AI-call of is AI niet geconfigureerd → null, en valt /overzicht terug op de
- * deterministische kop (`snapshot.headline ?? buildBriefingHeadline(...)`).
- */
-async function generateBriefingHeadline(
-  supabase: SupabaseClient,
-  entries: BriefingEntry[],
-): Promise<string | null> {
-  if (entries.length === 0) return null
-  try {
-    const model = await getModel(supabase)
-    const bullets = entries
-      .slice(0, 6)
-      .map((e) => `- ${e.text}`)
-      .join('\n')
-    const { text } = await generateText({
-      model,
-      system:
-        'Je bent Will, een rustige, wijze financiële gids van TriFinity. ' +
-        'Kernfilosofie: "Geld is opgeslagen tijd" — elke euro is vrijheidstijd. ' +
-        'Schrijf in het Nederlands, warm maar feitelijk, nooit klef.',
-      prompt:
-        'Vat deze wekelijkse briefing samen in ÉÉN korte, krachtige kop-zin ' +
-        '(max ~90 tekens), in de stem van Will, met de vrijheidstijd-framing. ' +
-        'Geen aanhalingstekens, geen emoji, geen opsomming — alleen die ene zin.\n\n' +
-        `Briefing:\n${bullets}`,
-      maxOutputTokens: 60,
-      temperature: 0.7,
-    })
-    return sanitizeAiHeadline(text)
-  } catch (err) {
-    console.warn('[briefing/refresh] AI-kop mislukt, val terug op deterministisch:', err)
-    return null
-  }
-}
+import {
+  loadBriefingDirectives,
+  buildEngineMetrics,
+  buildDirectivesBlock,
+  redactBriefing,
+  applyRedactie,
+} from '@/lib/briefing/redactie'
 
 /**
  * POST /api/briefing/refresh
  *
  * Handmatige dagelijkse ververs van de /overzicht-briefing. Mag maximaal
- * 1× per kalenderdag (Amsterdam). Recomposeert de briefjes uit verse data,
- * genereert een AI-kop en zet alles als snapshot vast.
+ * 1× per kalenderdag (Amsterdam). Recomposeert de briefjes deterministisch
+ * uit verse data en laat Will ze daarna redigeren (kop-zin + teksten) in
+ * één AI-call, gestuurd door de beheer-directives. Elke AI-fout of
+ * afgekeurde tekst (nummer-guard) valt stil terug op de deterministische
+ * variant — zie lib/briefing/redactie.ts.
  *
  * Response:
  *  - { allowed: true, entries, refreshedAt, headline } — ververst en opgeslagen
@@ -84,10 +49,17 @@ export async function POST() {
       })
     }
 
-    const { entries, freedom } = await loadAndComposeOverviewBriefing(supabase)
-    const headline = await generateBriefingHeadline(supabase, entries)
+    const now = new Date()
+    const { entries, freedom, input } = await loadAndComposeOverviewBriefing(supabase, now)
 
-    const { allowed, snapshot } = await applyManualRefresh(supabase, user.id, entries, {
+    // AI-redactie: directives uit beheer + metrics uit de engine-input sturen
+    // de herschrijving. Faalt dit (AI uit, fout, guard) → deterministisch.
+    const directives = await loadBriefingDirectives(supabase)
+    const directivesBlock = buildDirectivesBlock(directives, now, buildEngineMetrics(input))
+    const { headline, texts } = await redactBriefing(supabase, entries, { directivesBlock })
+    const redactedEntries = applyRedactie(entries, texts)
+
+    const { allowed, snapshot } = await applyManualRefresh(supabase, user.id, redactedEntries, {
       freedom: { ...freedom, capturedAt: new Date().toISOString() },
       headline: headline ?? undefined,
     })

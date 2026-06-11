@@ -6,7 +6,7 @@ import { WIL_PROMPT, WHATIF_PROMPT, VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai
 import { KERN_PROMPT } from '@/lib/ai/dna/kern'
 import { HORIZON_PROMPT } from '@/lib/ai/dna/horizon'
 import { RECOMMENDATIONS_SYSTEM_PROMPT } from '@/lib/ai/dna/recommendations'
-import { buildBriefingSystemPrompt } from '@/lib/ai/dna/briefing'
+import { buildRedactiePromptPreview } from '@/lib/briefing/redactie'
 import { getDefaultFullPrompt } from '@/lib/ai/dna'
 import { DEFAULT_EXTRACTION_PROMPT } from '@/lib/ai/extraction-system-prompt'
 import { CATEGORIZE_SYSTEM_PROMPT } from '@/lib/ai/categorize-system-prompt'
@@ -24,28 +24,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Build briefing prompt with representative defaults
-  const now = new Date()
-  const dayOfMonth = now.getDate()
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-  const briefingContent = buildBriefingSystemPrompt(
-    {
-      date: now.toISOString().slice(0, 10),
-      dayOfMonth,
-      dayOfWeek: 'maandag',
-      dayOfWeekEn: 'Monday',
-      month: now.getMonth() + 1,
-      monthName: 'maart',
-      year: now.getFullYear(),
-      timeOfDay: 'ochtend',
-      greeting: 'Goedemorgen',
-      seasonalNotes: [],
-      daysUntilMonthEnd: lastDay - dayOfMonth,
-      daysUntilSalary: ((25 - dayOfMonth + lastDay) % lastDay) || lastDay,
-    },
-    'stability',
-    2,
-  )
+  // Briefing-redactieprompt met representatieve default-directives
+  const briefingContent = buildRedactiePromptPreview()
 
   // Combined preview: base + wil (what the chat API actually sends)
   const combinedWil = getDefaultFullPrompt('wil')
@@ -127,10 +107,10 @@ export async function GET() {
     },
     {
       id: 'briefing',
-      label: 'Briefing',
-      description: 'Dynamisch prompt voor de DAIshboard briefing-compositie. Bevat temporele context en fase-instructies.',
+      label: 'Briefing (redactie)',
+      description: 'Redactieprompt voor de wekelijkse /overzicht-briefing: Will herschrijft de deterministische briefjes (kop-zin + teksten) met een harde nummer-guard. Gestuurd door de beheer-directives.',
       content: briefingContent,
-      source: 'lib/ai/dna/briefing.ts',
+      source: 'lib/briefing/redactie.ts',
       domain: null,
       dynamic: true,
       charCount: briefingContent.length,

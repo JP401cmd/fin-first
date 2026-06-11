@@ -80,6 +80,17 @@ export interface BriefingEntry {
   }
 }
 
+/** Eén afgesloten week uit de briefing-historie (bewaard in de snapshot,
+ *  gecapt — zie lib/briefing/snapshot.ts). */
+export interface BriefingWeekHistoryItem {
+  /** ISO-week-sleutel 'YYYY-Www'. */
+  week: string
+  headline?: string
+  entries: BriefingEntry[]
+  /** Vrijheidsdagen-stand van die week (voor de mini-samenvatting). */
+  freedomDays?: number
+}
+
 const CATEGORY_CONFIG: Record<
   BriefingCategory,
   { label: string; dotColor: string; bar: string; Icon: LucideIcon }
@@ -122,19 +133,26 @@ function buildShareContent(data: FreedomCardData): ShareContent {
 export function BriefingPanel({
   entries,
   refreshedAt,
+  dataChanged = false,
   canRefresh = false,
   freedomHero,
   headline,
+  weekHistory,
 }: {
   entries: BriefingEntry[]
   /** ISO-tijdstip waarop de briefing voor vandaag is vastgezet ("Bijgewerkt …"). */
   refreshedAt?: string | null
+  /** Live cijfers wijken af van het bevroren weekbeeld (server berekent de
+   *  delta) → toon een kalme freshness-hint onder de stempel. */
+  dataChanged?: boolean
   /** Of de handmatige ververs vandaag nog beschikbaar is (max 1×/dag). */
   canRefresh?: boolean
   /** Vrijheidstijd-hero bovenaan (week-over-week delta). Optioneel. */
   freedomHero?: FreedomHeroProps | null
   /** Eén-zin kop onder de titel (deterministisch of AI bij ververs). */
   headline?: string | null
+  /** Afgesloten weken uit de snapshot-historie (nieuwste laatst). */
+  weekHistory?: BriefingWeekHistoryItem[]
 }) {
   // Override-state: alleen gezet ná een succesvolle handmatige ververs. Zonder
   // override blijven de server-props de bron van waarheid — remount-veilig.
@@ -146,6 +164,7 @@ export function BriefingPanel({
   const [refreshing, setRefreshing] = useState(false)
   const [usedToday, setUsedToday] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   // Deel-state: de canvas-renderer wordt dynamisch geïmporteerd bij de eerste
   // klik zodat de tekencode buiten de initiële /overzicht-bundle blijft.
@@ -196,6 +215,10 @@ export function BriefingPanel({
           refreshedAt: data.refreshedAt,
           headline: data.headline ?? null,
         })
+      } else if (data.allowed === false) {
+        // Stille no-op zichtbaar maken: zonder dit lijkt de spinner "niets te
+        // doen" wanneer de dag-poort de ververs al had verbruikt.
+        setNotice('Je hebt vandaag al ververst — morgen weer beschikbaar.')
       }
       // Of de ververs nu nieuwe content opleverde of al gebruikt was: vandaag
       // is de knop hierna uitgeput.
@@ -213,6 +236,8 @@ export function BriefingPanel({
       <BriefingHeader
         refreshedAt={shownRefreshedAt}
         headline={shownHeadline}
+        // Na een geslaagde ververs (override) is het weekbeeld weer actueel.
+        dataChanged={dataChanged && !override}
         refreshable={refreshable}
         refreshing={refreshing}
         showRefresh={canRefresh || usedToday}
@@ -224,6 +249,11 @@ export function BriefingPanel({
       {error && (
         <p className="mb-3 text-[11px] text-rose-600" role="status">
           {error}
+        </p>
+      )}
+      {!error && notice && (
+        <p className="mb-3 text-[11px] text-[var(--ink-3)]" role="status">
+          {notice}
         </p>
       )}
 
@@ -250,6 +280,10 @@ export function BriefingPanel({
         </div>
       )}
 
+      {weekHistory && weekHistory.length > 0 && (
+        <BriefingWeekHistory items={weekHistory} />
+      )}
+
       {shareOpen && shareData && shareRenderer && (
         <ShareDialog
           open={shareOpen}
@@ -262,6 +296,58 @@ export function BriefingPanel({
   )
 }
 
+/** 'YYYY-Www' → 'Week ww'. */
+function formatWeekLabel(week: string): string {
+  const n = Number(week.split('-W')[1])
+  return Number.isFinite(n) ? `Week ${n}` : week
+}
+
+/**
+ * Bescheiden terugblik op voorbije weken (uit de snapshot-historie, max 8).
+ * Een native <details>-disclosure: standaard dicht, geen JS-state nodig.
+ */
+function BriefingWeekHistory({ items }: { items: BriefingWeekHistoryItem[] }) {
+  // Nieuwste eerst tonen.
+  const reversed = [...items].reverse()
+  return (
+    <details className="mt-4 group print:hidden">
+      <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]">
+        <span className="inline-block transition-transform group-open:rotate-90">›</span>{' '}
+        Vorige weken ({reversed.length})
+      </summary>
+      <div className="mt-3 space-y-3">
+        {reversed.map((item) => (
+          <article
+            key={item.week}
+            className="rounded-2xl border border-[var(--border-md)] bg-[var(--subtle)] p-3 sm:p-4"
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                {formatWeekLabel(item.week)}
+              </h3>
+              {item.freedomDays != null && (
+                <span className="text-[11px] text-[var(--ink-3)] tabular-nums">
+                  {Math.round(item.freedomDays)} vrijheidsdagen
+                </span>
+              )}
+            </div>
+            {item.headline && (
+              <p className="mt-1 text-[13px] text-[var(--ink-2)] leading-snug">{item.headline}</p>
+            )}
+            <ul className="mt-2 space-y-1">
+              {item.entries.map((e) => (
+                <li key={e.id} className="text-[12px] leading-snug text-[var(--ink-3)]">
+                  <span className="text-[var(--ink-4)]">·</span> {e.text}
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </details>
+  )
+}
+
 /**
  * Sectiekop boven het briefing-grid: titel + "Bijgewerkt …"-stempel links,
  * Ververs-knop rechts. Vervangt het oude Will-narratief-blok als visuele
@@ -270,6 +356,7 @@ export function BriefingPanel({
 function BriefingHeader({
   refreshedAt,
   headline,
+  dataChanged,
   refreshable,
   refreshing,
   showRefresh,
@@ -279,6 +366,7 @@ function BriefingHeader({
 }: {
   refreshedAt: string | null
   headline: string | null
+  dataChanged: boolean
   refreshable: boolean
   refreshing: boolean
   showRefresh: boolean
@@ -300,6 +388,12 @@ function BriefingHeader({
         {refreshedAt && (
           <p className="mt-0.5 text-[11px] text-[var(--ink-3)] tabular-nums">
             Bijgewerkt {formatTimestamp(refreshedAt)}
+            {dataChanged && (
+              <span className="ml-1.5 text-amber-700">
+                · je cijfers zijn sindsdien veranderd
+                {refreshable ? ' — ververs voor de actuele stand' : ''}
+              </span>
+            )}
           </p>
         )}
       </div>

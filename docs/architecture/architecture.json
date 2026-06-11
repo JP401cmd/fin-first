@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-10T14:26:17.058Z",
-  "generatedDate": "2026-06-10",
+  "generatedAt": "2026-06-11T08:14:39.414Z",
+  "generatedDate": "2026-06-11",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -59,11 +59,11 @@
         "extend": "Voeg een regel toe aan de juiste prioriteitslaag (deferred / data_gap / path / default). De predicaten blijven in code; tekst, CTA en aan/uit zijn override-baar in app_settings."
       },
       {
-        "id": "briefing-tools",
-        "title": "Briefing-kaart-tools",
-        "file": "lib/ai/dna/briefing.ts",
-        "summary": "Een generieke catalogus van kaart-tools die elk data-gebied kan aanroepen om de dagelijkse briefing van Will samen te stellen.",
-        "extend": "Definieer een nieuwe showX: tool({...}) met een Zod-schema; Will kan de kaart dan meteen plaatsen op de juiste plek in de briefing."
+        "id": "briefing-engine",
+        "title": "Briefing-engine + redactie",
+        "file": "lib/briefing/engine.ts",
+        "summary": "Deterministische generatoren zetten de financiële cijfers om in wekelijkse briefjes; Will redigeert alleen de teksten (lib/briefing/redactie.ts, nummer-guard — ADR 0007).",
+        "extend": "Voeg een generator toe in buildFinanceEntries (drempel + test) en een rank in briefingRank; de redactie en de directives pakken het nieuwe briefje automatisch mee."
       }
     ],
     "principles": [
@@ -182,16 +182,16 @@
     }
   },
   "stats": {
-    "routes": 317,
-    "routesProduction": 93,
-    "api": 368,
-    "tables": 48,
-    "migrations": 90,
+    "routes": 319,
+    "routesProduction": 94,
+    "api": 373,
+    "tables": 49,
+    "migrations": 95,
     "integrations": 24,
-    "components": 706,
+    "components": 682,
     "providers": 11,
     "contextBuilders": 9,
-    "briefingTools": 19,
+    "briefingTools": 0,
     "coachLayers": 4,
     "modules": 6,
     "phases": 4
@@ -224,6 +224,12 @@
     {
       "url": "/beheer/architectuur",
       "file": "app/(app)/beheer/architectuur/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/audit",
+      "file": "app/(app)/beheer/audit/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -270,10 +276,28 @@
       "isTest": false
     },
     {
+      "url": "/beheer/email",
+      "file": "app/(app)/beheer/email/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/errors",
+      "file": "app/(app)/beheer/errors/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
       "url": "/beheer/extractie-test",
       "file": "app/(app)/beheer/extractie-test/page.tsx",
       "group": "beheer",
       "isTest": true
+    },
+    {
+      "url": "/beheer/feedback",
+      "file": "app/(app)/beheer/feedback/page.tsx",
+      "group": "beheer",
+      "isTest": false
     },
     {
       "url": "/beheer/gebruikers",
@@ -288,6 +312,12 @@
       "isTest": false
     },
     {
+      "url": "/beheer/kpi",
+      "file": "app/(app)/beheer/kpi/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
       "url": "/beheer/migration",
       "file": "app/(app)/beheer/migration/page.tsx",
       "group": "beheer",
@@ -296,6 +326,12 @@
     {
       "url": "/beheer/nieuws",
       "file": "app/(app)/beheer/nieuws/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/platform",
+      "file": "app/(app)/beheer/platform/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -642,6 +678,12 @@
       "isTest": false
     },
     {
+      "url": "/mijn/feedback",
+      "file": "app/(app)/mijn/feedback/page.tsx",
+      "group": "persoonlijk",
+      "isTest": false
+    },
+    {
       "url": "/mijn/geavanceerd",
       "file": "app/(app)/mijn/geavanceerd/page.tsx",
       "group": "persoonlijk",
@@ -978,18 +1020,6 @@
       "isTest": true
     },
     {
-      "url": "/test-briefing-history",
-      "file": "app/test-briefing-history/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-briefing-toggles",
-      "file": "app/test-briefing-toggles/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
       "url": "/test-budget-alerts",
       "file": "app/test-budget-alerts/page.tsx",
       "group": "overig",
@@ -1232,12 +1262,6 @@
     {
       "url": "/test-direct-identity",
       "file": "app/test-direct-identity/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-discover-card-mobile",
-      "file": "app/test-discover-card-mobile/page.tsx",
       "group": "overig",
       "isTest": true
     },
@@ -1602,12 +1626,6 @@
       "isTest": true
     },
     {
-      "url": "/test-insight-cta",
-      "file": "app/test-insight-cta/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
       "url": "/test-jouw-pad",
       "file": "app/test-jouw-pad/page.tsx",
       "group": "overig",
@@ -1706,12 +1724,6 @@
     {
       "url": "/test-news-hero",
       "file": "app/test-news-hero/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-next-step-card",
-      "file": "app/test-next-step-card/page.tsx",
       "group": "overig",
       "isTest": true
     },
@@ -2133,6 +2145,12 @@
         "isTest": false
       },
       {
+        "url": "/beheer/audit",
+        "file": "app/(app)/beheer/audit/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
         "url": "/beheer/bank-connect",
         "file": "app/(app)/beheer/bank-connect/page.tsx",
         "group": "beheer",
@@ -2175,10 +2193,28 @@
         "isTest": false
       },
       {
+        "url": "/beheer/email",
+        "file": "app/(app)/beheer/email/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/errors",
+        "file": "app/(app)/beheer/errors/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
         "url": "/beheer/extractie-test",
         "file": "app/(app)/beheer/extractie-test/page.tsx",
         "group": "beheer",
         "isTest": true
+      },
+      {
+        "url": "/beheer/feedback",
+        "file": "app/(app)/beheer/feedback/page.tsx",
+        "group": "beheer",
+        "isTest": false
       },
       {
         "url": "/beheer/gebruikers",
@@ -2193,6 +2229,12 @@
         "isTest": false
       },
       {
+        "url": "/beheer/kpi",
+        "file": "app/(app)/beheer/kpi/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
         "url": "/beheer/migration",
         "file": "app/(app)/beheer/migration/page.tsx",
         "group": "beheer",
@@ -2201,6 +2243,12 @@
       {
         "url": "/beheer/nieuws",
         "file": "app/(app)/beheer/nieuws/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/platform",
+        "file": "app/(app)/beheer/platform/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -2287,6 +2335,12 @@
       {
         "url": "/mijn/checkins",
         "file": "app/(app)/mijn/checkins/page.tsx",
+        "group": "persoonlijk",
+        "isTest": false
+      },
+      {
+        "url": "/mijn/feedback",
+        "file": "app/(app)/mijn/feedback/page.tsx",
         "group": "persoonlijk",
         "isTest": false
       },
@@ -2741,18 +2795,6 @@
         "isTest": true
       },
       {
-        "url": "/test-briefing-history",
-        "file": "app/test-briefing-history/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-briefing-toggles",
-        "file": "app/test-briefing-toggles/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
         "url": "/test-budget-alerts",
         "file": "app/test-budget-alerts/page.tsx",
         "group": "overig",
@@ -2995,12 +3037,6 @@
       {
         "url": "/test-direct-identity",
         "file": "app/test-direct-identity/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-discover-card-mobile",
-        "file": "app/test-discover-card-mobile/page.tsx",
         "group": "overig",
         "isTest": true
       },
@@ -3365,12 +3401,6 @@
         "isTest": true
       },
       {
-        "url": "/test-insight-cta",
-        "file": "app/test-insight-cta/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
         "url": "/test-jouw-pad",
         "file": "app/test-jouw-pad/page.tsx",
         "group": "overig",
@@ -3469,12 +3499,6 @@
       {
         "url": "/test-news-hero",
         "file": "app/test-news-hero/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
-        "url": "/test-next-step-card",
-        "file": "app/test-next-step-card/page.tsx",
         "group": "overig",
         "isTest": true
       },
@@ -4135,6 +4159,15 @@
       ]
     },
     {
+      "url": "/api/admin/feedback",
+      "file": "app/api/admin/feedback/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "PATCH"
+      ]
+    },
+    {
       "url": "/api/admin/news-active-prompt",
       "file": "app/api/admin/news-active-prompt/route.ts",
       "domain": "admin",
@@ -4156,6 +4189,7 @@
       "file": "app/api/admin/news-ingest/route.ts",
       "domain": "admin",
       "methods": [
+        "GET",
         "POST"
       ]
     },
@@ -4177,6 +4211,15 @@
         "GET",
         "PUT",
         "DELETE"
+      ]
+    },
+    {
+      "url": "/api/admin/platform",
+      "file": "app/api/admin/platform/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "PUT"
       ]
     },
     {
@@ -4267,6 +4310,30 @@
       ]
     },
     {
+      "url": "/api/admin/user-delete",
+      "file": "app/api/admin/user-delete/route.ts",
+      "domain": "admin",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/admin/user-diagnose",
+      "file": "app/api/admin/user-diagnose/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/admin/user-export",
+      "file": "app/api/admin/user-export/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/admin/users/block",
       "file": "app/api/admin/users/block/route.ts",
       "domain": "admin",
@@ -4290,6 +4357,14 @@
         "GET",
         "PUT",
         "DELETE"
+      ]
+    },
+    {
+      "url": "/api/ai-credits",
+      "file": "app/api/ai-credits/route.ts",
+      "domain": "ai-credits",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -4530,32 +4605,6 @@
       ]
     },
     {
-      "url": "/api/briefing/compose",
-      "file": "app/api/briefing/compose/route.ts",
-      "domain": "briefing",
-      "methods": [
-        "GET",
-        "POST"
-      ]
-    },
-    {
-      "url": "/api/briefing/history",
-      "file": "app/api/briefing/history/route.ts",
-      "domain": "briefing",
-      "methods": [
-        "GET",
-        "POST"
-      ]
-    },
-    {
-      "url": "/api/briefing/history/[id]",
-      "file": "app/api/briefing/history/[id]/route.ts",
-      "domain": "briefing",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
       "url": "/api/briefing/refresh",
       "file": "app/api/briefing/refresh/route.ts",
       "domain": "briefing",
@@ -4767,15 +4816,6 @@
       ]
     },
     {
-      "url": "/api/dashboard-type",
-      "file": "app/api/dashboard-type/route.ts",
-      "domain": "dashboard-type",
-      "methods": [
-        "GET",
-        "PUT"
-      ]
-    },
-    {
       "url": "/api/debts/toggle-hypotheekplanner",
       "file": "app/api/debts/toggle-hypotheekplanner/route.ts",
       "domain": "debts",
@@ -4831,6 +4871,14 @@
       "domain": "feature-visits",
       "methods": [
         "GET",
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/feedback",
+      "file": "app/api/feedback/route.ts",
+      "domain": "feedback",
+      "methods": [
         "POST"
       ]
     },
@@ -5280,6 +5328,14 @@
       ]
     },
     {
+      "url": "/api/log-error",
+      "file": "app/api/log-error/route.ts",
+      "domain": "log-error",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/module-guide/progress",
       "file": "app/api/module-guide/progress/route.ts",
       "domain": "module-guide",
@@ -5339,6 +5395,15 @@
       "domain": "news",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/news/feedback",
+      "file": "app/api/news/feedback/route.ts",
+      "domain": "news",
+      "methods": [
+        "GET",
+        "POST"
       ]
     },
     {
@@ -7093,7 +7158,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 28,
+      "count": 33,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -7185,6 +7250,15 @@
           ]
         },
         {
+          "url": "/api/admin/feedback",
+          "file": "app/api/admin/feedback/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "PATCH"
+          ]
+        },
+        {
           "url": "/api/admin/news-active-prompt",
           "file": "app/api/admin/news-active-prompt/route.ts",
           "domain": "admin",
@@ -7206,6 +7280,7 @@
           "file": "app/api/admin/news-ingest/route.ts",
           "domain": "admin",
           "methods": [
+            "GET",
             "POST"
           ]
         },
@@ -7227,6 +7302,15 @@
             "GET",
             "PUT",
             "DELETE"
+          ]
+        },
+        {
+          "url": "/api/admin/platform",
+          "file": "app/api/admin/platform/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "PUT"
           ]
         },
         {
@@ -7314,6 +7398,30 @@
           "methods": [
             "GET",
             "PUT"
+          ]
+        },
+        {
+          "url": "/api/admin/user-delete",
+          "file": "app/api/admin/user-delete/route.ts",
+          "domain": "admin",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/admin/user-diagnose",
+          "file": "app/api/admin/user-diagnose/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/admin/user-export",
+          "file": "app/api/admin/user-export/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET"
           ]
         },
         {
@@ -8154,47 +8262,6 @@
       ]
     },
     {
-      "domain": "briefing",
-      "label": "briefing",
-      "count": 4,
-      "routes": [
-        {
-          "url": "/api/briefing/compose",
-          "file": "app/api/briefing/compose/route.ts",
-          "domain": "briefing",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/briefing/history",
-          "file": "app/api/briefing/history/route.ts",
-          "domain": "briefing",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/briefing/history/[id]",
-          "file": "app/api/briefing/history/[id]/route.ts",
-          "domain": "briefing",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/briefing/refresh",
-          "file": "app/api/briefing/refresh/route.ts",
-          "domain": "briefing",
-          "methods": [
-            "POST"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "guide-help",
       "label": "guide-help",
       "count": 4,
@@ -8231,6 +8298,47 @@
           "methods": [
             "PATCH",
             "DELETE"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "news",
+      "label": "news",
+      "count": 4,
+      "routes": [
+        {
+          "url": "/api/news",
+          "file": "app/api/news/route.ts",
+          "domain": "news",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/news/archive",
+          "file": "app/api/news/archive/route.ts",
+          "domain": "news",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/news/feedback",
+          "file": "app/api/news/feedback/route.ts",
+          "domain": "news",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/news/read",
+          "file": "app/api/news/read/route.ts",
+          "domain": "news",
+          "methods": [
+            "GET",
+            "POST"
           ]
         }
       ]
@@ -8338,38 +8446,6 @@
             "GET",
             "PUT",
             "DELETE"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "news",
-      "label": "news",
-      "count": 3,
-      "routes": [
-        {
-          "url": "/api/news",
-          "file": "app/api/news/route.ts",
-          "domain": "news",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/news/archive",
-          "file": "app/api/news/archive/route.ts",
-          "domain": "news",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/news/read",
-          "file": "app/api/news/read/route.ts",
-          "domain": "news",
-          "methods": [
-            "GET",
-            "POST"
           ]
         }
       ]
@@ -8632,6 +8708,21 @@
       ]
     },
     {
+      "domain": "ai-credits",
+      "label": "ai-credits",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/ai-credits",
+          "file": "app/api/ai-credits/route.ts",
+          "domain": "ai-credits",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "apply-household-migration",
       "label": "apply-household-migration",
       "count": 1,
@@ -8721,6 +8812,21 @@
           "domain": "benchmark-comparison",
           "methods": [
             "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "briefing",
+      "label": "briefing",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/briefing/refresh",
+          "file": "app/api/briefing/refresh/route.ts",
+          "domain": "briefing",
+          "methods": [
+            "POST"
           ]
         }
       ]
@@ -8877,22 +8983,6 @@
       ]
     },
     {
-      "domain": "dashboard-type",
-      "label": "dashboard-type",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/dashboard-type",
-          "file": "app/api/dashboard-type/route.ts",
-          "domain": "dashboard-type",
-          "methods": [
-            "GET",
-            "PUT"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "debts",
       "label": "Schulden",
       "count": 1,
@@ -8995,6 +9085,21 @@
           "domain": "feature-visits",
           "methods": [
             "GET",
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "feedback",
+      "label": "feedback",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/feedback",
+          "file": "app/api/feedback/route.ts",
+          "domain": "feedback",
+          "methods": [
             "POST"
           ]
         }
@@ -9106,6 +9211,21 @@
           "domain": "investment",
           "methods": [
             "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "log-error",
+      "label": "log-error",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/log-error",
+          "file": "app/api/log-error/route.ts",
+          "domain": "log-error",
+          "methods": [
+            "POST"
           ]
         }
       ]
@@ -11959,6 +12079,10 @@
         "migration": "supabase/migrations/20260324000001_create_news_articles.sql"
       },
       {
+        "name": "news_feedback",
+        "migration": "supabase/migrations/20260611140000_create_news_feedback.sql"
+      },
+      {
         "name": "next_step_completions",
         "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
       },
@@ -12019,7 +12143,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 90
+    "migrationCount": 95
   },
   "tablesByDomain": [
     {
@@ -12227,6 +12351,23 @@
       ]
     },
     {
+      "domain": "Nieuws & briefing",
+      "tables": [
+        {
+          "name": "briefing_history",
+          "migration": "supabase/migrations/20260518000001_create_briefing_history.sql"
+        },
+        {
+          "name": "news_articles",
+          "migration": "supabase/migrations/20260324000001_create_news_articles.sql"
+        },
+        {
+          "name": "news_feedback",
+          "migration": "supabase/migrations/20260611140000_create_news_feedback.sql"
+        }
+      ]
+    },
+    {
       "domain": "Huishouden",
       "tables": [
         {
@@ -12240,19 +12381,6 @@
         {
           "name": "households",
           "migration": "supabase/migrations/20260218000001_add_household_support.sql"
-        }
-      ]
-    },
-    {
-      "domain": "Nieuws & briefing",
-      "tables": [
-        {
-          "name": "briefing_history",
-          "migration": "supabase/migrations/20260518000001_create_briefing_history.sql"
-        },
-        {
-          "name": "news_articles",
-          "migration": "supabase/migrations/20260324000001_create_news_articles.sql"
         }
       ]
     },
@@ -12317,11 +12445,11 @@
     }
   ],
   "components": {
-    "total": 706,
+    "total": 682,
     "groups": [
       {
         "group": "app",
-        "count": 289,
+        "count": 292,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12419,6 +12547,7 @@
           "empty-state",
           "end-of-life",
           "envelope-transfer-sheet",
+          "error-reporter",
           "event-chat-pane",
           "event-cluster-sheet",
           "event-impact-preview",
@@ -12537,6 +12666,7 @@
           "phase-modal-opbouw",
           "phase-modal-overgang",
           "phase-transition-modal",
+          "platform-banner",
           "portfolio-allocation-chart",
           "postpone-form",
           "privacy-hidden-notice",
@@ -12558,6 +12688,7 @@
           "schulden-samenvatting",
           "section-divider",
           "session-monitor",
+          "session-monitor.test",
           "settlement-overview",
           "share-dialog",
           "shell-overlay",
@@ -12616,7 +12747,7 @@
       },
       {
         "group": "overview",
-        "count": 116,
+        "count": 117,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -12696,6 +12827,7 @@
           "mini-networth-chart.test",
           "mini-timeline-strip",
           "mini-timeline-strip.test",
+          "networth-history-sheet",
           "nieuwe-tegenpartijen",
           "off-track-doelen-lijst",
           "off-track-doelen-lijst.test",
@@ -12924,47 +13056,13 @@
         ]
       },
       {
-        "group": "dashboard",
-        "count": 29,
-        "items": [
-          "action-card",
-          "alert-card",
-          "briefing-card",
-          "briefing-card-grid",
-          "briefing-footer",
-          "briefing-header",
-          "briefing-history",
-          "briefing-skeleton",
-          "briefing-stale-banner",
-          "budget-bar-card",
-          "card-feedback-context",
-          "checklist-card",
-          "comparison-card",
-          "countdown-card",
-          "daishboard",
-          "discover-card",
-          "goal-guide-card",
-          "goal-progress-card",
-          "insight-card",
-          "life-event-card",
-          "metric-card",
-          "milestone-card",
-          "module-guide-card",
-          "monthly-checkin-card",
-          "next-step-card",
-          "progress-ring-card",
-          "quote-card",
-          "recurring-card",
-          "sparkline-card"
-        ]
-      },
-      {
         "group": "mijn",
-        "count": 25,
+        "count": 26,
         "items": [
           "abonnement-section",
           "account-basis-section",
           "account-client",
+          "ai-credits-section",
           "ai-privacy-settings",
           "ai-privacy-settings.test",
           "budget-tint-picker",
@@ -13115,15 +13213,6 @@
         ]
       },
       {
-        "group": "will",
-        "count": 3,
-        "items": [
-          "cashflow-section",
-          "vaste-kosten-analyse",
-          "will-landing"
-        ]
-      },
-      {
         "group": "command-palette",
         "count": 2,
         "items": [
@@ -13132,10 +13221,25 @@
         ]
       },
       {
+        "group": "will",
+        "count": 2,
+        "items": [
+          "cashflow-section",
+          "vaste-kosten-analyse"
+        ]
+      },
+      {
         "group": "beheer",
         "count": 1,
         "items": [
           "help-content-pane"
+        ]
+      },
+      {
+        "group": "dashboard",
+        "count": 1,
+        "items": [
+          "monthly-checkin-card"
         ]
       },
       {
@@ -13290,27 +13394,7 @@
     },
     "briefing": {
       "file": "lib/ai/dna/briefing.ts",
-      "tools": [
-        "showAction",
-        "showAlert",
-        "showBudgetBar",
-        "showChecklist",
-        "showComparison",
-        "showCountdown",
-        "showDecisionPatterns",
-        "showDiscover",
-        "showFreedomDaysTrend",
-        "showGoalProgress",
-        "showInsight",
-        "showLifeEvent",
-        "showMetric",
-        "showMilestone",
-        "showNextStep",
-        "showProgressRing",
-        "showQuote",
-        "showRecurring",
-        "showSparkline"
-      ]
+      "tools": []
     },
     "coach": {
       "file": "lib/coach-suggestions.ts",
@@ -13480,7 +13564,19 @@
           "write": true
         },
         {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
           "name": "household_members",
+          "write": false
+        },
+        {
+          "name": "job_runs",
           "write": false
         },
         {
@@ -13502,6 +13598,10 @@
         {
           "name": "questionnaires",
           "write": true
+        },
+        {
+          "name": "transactions",
+          "write": false
         }
       ],
       "ai": [
@@ -13515,6 +13615,16 @@
         },
         {
           "name": "household_members",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": false
+        }
+      ],
+      "ai-credits": [
+        {
+          "name": "app_settings",
           "write": false
         },
         {
@@ -13571,20 +13681,6 @@
         },
         {
           "name": "valuations",
-          "write": false
-        }
-      ],
-      "briefing": [
-        {
-          "name": "app_settings",
-          "write": false
-        },
-        {
-          "name": "briefing_history",
-          "write": true
-        },
-        {
-          "name": "profiles",
           "write": false
         }
       ],
@@ -13684,6 +13780,10 @@
           "write": false
         },
         {
+          "name": "bank_accounts",
+          "write": false
+        },
+        {
           "name": "budgets",
           "write": false
         },
@@ -13770,12 +13870,6 @@
         {
           "name": "transactions",
           "write": false
-        }
-      ],
-      "dashboard-type": [
-        {
-          "name": "profiles",
-          "write": true
         }
       ],
       "debts": [
@@ -14070,14 +14164,12 @@
           "write": true
         },
         {
+          "name": "news_feedback",
+          "write": true
+        },
+        {
           "name": "profiles",
           "write": false
-        }
-      ],
-      "news-ingest": [
-        {
-          "name": "news_articles",
-          "write": true
         }
       ],
       "next-steps": [
@@ -14590,10 +14682,13 @@
           "label": "Beheer",
           "write": true,
           "routes": [
+            "/api/admin/ai-features",
             "/api/admin/questionnaires/[id]/responses",
             "/api/admin/seed",
             "/api/admin/tier-assign",
             "/api/admin/tier-config",
+            "/api/admin/user-delete",
+            "/api/admin/user-export",
             "/api/admin/users/block",
             "/api/admin/users/role"
           ]
@@ -14620,14 +14715,6 @@
           "write": true,
           "routes": [
             "/api/crypto-holdings/setup"
-          ]
-        },
-        {
-          "domain": "dashboard-type",
-          "label": "dashboard-type",
-          "write": true,
-          "routes": [
-            "/api/dashboard-type"
           ]
         },
         {
@@ -14789,19 +14876,19 @@
           ]
         },
         {
+          "domain": "ai-credits",
+          "label": "ai-credits",
+          "write": false,
+          "routes": [
+            "/api/ai-credits"
+          ]
+        },
+        {
           "domain": "bank-connect",
           "label": "Bank-connect",
           "write": false,
           "routes": [
             "/api/bank-connect/callback"
-          ]
-        },
-        {
-          "domain": "briefing",
-          "label": "briefing",
-          "write": false,
-          "routes": [
-            "/api/briefing/compose"
           ]
         },
         {
@@ -15004,6 +15091,15 @@
           ]
         },
         {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": false,
+          "routes": [
+            "/api/admin/user-diagnose",
+            "/api/admin/user-export"
+          ]
+        },
+        {
           "domain": "checkin",
           "label": "checkin",
           "write": false,
@@ -15201,6 +15297,15 @@
           ]
         },
         {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": false,
+          "routes": [
+            "/api/admin/user-diagnose",
+            "/api/admin/user-export"
+          ]
+        },
+        {
           "domain": "checkin",
           "label": "checkin",
           "write": false,
@@ -15336,6 +15441,15 @@
           "write": false,
           "routes": [
             "/api/activate"
+          ]
+        },
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": false,
+          "routes": [
+            "/api/admin/user-diagnose",
+            "/api/admin/user-export"
           ]
         },
         {
@@ -15513,8 +15627,10 @@
             "/api/admin/checkins",
             "/api/admin/coach",
             "/api/admin/extraction-prompt",
+            "/api/admin/news-ingest",
             "/api/admin/news-prompt",
             "/api/admin/news-sources",
+            "/api/admin/platform",
             "/api/admin/settings",
             "/api/admin/tier-config",
             "/api/admin/welcome-guide"
@@ -15649,19 +15765,19 @@
           ]
         },
         {
+          "domain": "ai-credits",
+          "label": "ai-credits",
+          "write": false,
+          "routes": [
+            "/api/ai-credits"
+          ]
+        },
+        {
           "domain": "bank-connect",
           "label": "Bank-connect",
           "write": false,
           "routes": [
             "/api/bank-connect/providers"
-          ]
-        },
-        {
-          "domain": "briefing",
-          "label": "briefing",
-          "write": false,
-          "routes": [
-            "/api/briefing/compose"
           ]
         },
         {
@@ -15773,8 +15889,7 @@
           "label": "Beheer",
           "write": true,
           "routes": [
-            "/api/admin/news-articles",
-            "/api/admin/news-ingest"
+            "/api/admin/news-articles"
           ]
         },
         {
@@ -15784,13 +15899,15 @@
           "routes": [
             "/api/news"
           ]
-        },
+        }
+      ],
+      "job_runs": [
         {
-          "domain": "news-ingest",
-          "label": "news-ingest",
-          "write": true,
+          "domain": "admin",
+          "label": "Beheer",
+          "write": false,
           "routes": [
-            "/api/news-ingest/cron"
+            "/api/admin/news-ingest"
           ]
         }
       ],
@@ -16090,6 +16207,15 @@
           ]
         },
         {
+          "domain": "checkin",
+          "label": "checkin",
+          "write": false,
+          "routes": [
+            "/api/checkin/gespreksstarters",
+            "/api/checkin/overview"
+          ]
+        },
+        {
           "domain": "own-accounts",
           "label": "own-accounts",
           "write": false,
@@ -16257,17 +16383,6 @@
           "write": false,
           "routes": [
             "/api/investment/holdings/[id]/detail"
-          ]
-        }
-      ],
-      "briefing_history": [
-        {
-          "domain": "briefing",
-          "label": "briefing",
-          "write": true,
-          "routes": [
-            "/api/briefing/history",
-            "/api/briefing/history/[id]"
           ]
         }
       ],
@@ -16648,6 +16763,17 @@
             "/api/integrations/wallets/[id]",
             "/api/integrations/wallets/[id]/sync",
             "/api/integrations/wallets/[id]/test"
+          ]
+        }
+      ],
+      "news_feedback": [
+        {
+          "domain": "news",
+          "label": "news",
+          "write": true,
+          "routes": [
+            "/api/news",
+            "/api/news/feedback"
           ]
         }
       ],
@@ -17182,6 +17308,11 @@
         "user": false,
         "household": false,
         "rls": true
+      },
+      "news_feedback": {
+        "user": true,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -17246,6 +17377,31 @@
       ],
       "summary": "De Android-app is een Trusted Web Activity (TWA) rond de PWA, gegenereerd met Bubblewrap — niet Capacitor of een full-native build.",
       "file": "docs/adr/0005-android-via-twa.md"
+    },
+    {
+      "id": "0006-superadmin-inzage-via-service-role",
+      "title": "Superadmin-inzage via service-role, nooit via RLS",
+      "status": "aanvaard",
+      "date": "2026-06-11",
+      "elements": [
+        "t-supabase",
+        "do-huishouden"
+      ],
+      "summary": "Cross-user leesrecht voor beheer (supportview, AVG-export, platform-KPI's) loopt uitsluitend via de service-role-client in `/api/admin/*`-routes met een expliciete superadmin-check en audit-log — nooit via RLS-policies op persoonlijke tabellen.",
+      "file": "docs/adr/0006-superadmin-inzage-via-service-role.md"
+    },
+    {
+      "id": "0007-briefing-een-engine",
+      "title": "Eén briefing-engine — deterministische feiten, AI als redacteur",
+      "status": "aanvaard",
+      "date": "2026-06-11",
+      "elements": [
+        "as-coach",
+        "t-aigateway",
+        "sp-inzicht"
+      ],
+      "summary": "De wekelijkse briefing op /overzicht heeft één engine: de deterministische `buildBriefingEntries` (lib/briefing/engine.ts) levert alle cijfers en briefjes; de LLM mag uitsluitend **redigeren** (kop-zin + tekst-herschrijving) via `lib/briefing/redactie.ts`, met een harde nummer-gu",
+      "file": "docs/adr/0007-briefing-een-engine.md"
     }
   ],
   "churn": {
@@ -17253,7 +17409,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 74
+        "commits": 75
       },
       {
         "path": "lib/ai",
@@ -17261,7 +17417,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 19
+        "commits": 20
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -17269,7 +17425,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 11
+        "commits": 12
       },
       {
         "path": "lib/horizon-data.ts",
@@ -17277,7 +17433,7 @@
       },
       {
         "path": "app/api/household",
-        "commits": 5
+        "commits": 6
       },
       {
         "path": "components/horizon",
@@ -17295,8 +17451,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6802,
-        "commits": 100
+        "loc": 6804,
+        "commits": 101
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17306,7 +17462,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 3822,
-        "commits": 38
+        "commits": 39
       },
       {
         "file": "lib/release-notes.ts",
@@ -17316,12 +17472,12 @@
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 2574,
-        "commits": 16
+        "commits": 15
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2405,
-        "commits": 20
+        "commits": 19
       },
       {
         "file": "lib/unified-projection.ts",
@@ -17337,37 +17493,15 @@
   },
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-10",
+    "previousDate": "2026-06-11",
     "hasChanges": true,
     "sections": [
       {
-        "label": "Schermen",
-        "added": [
-          "/beheer/jobs"
-        ],
-        "removed": []
-      },
-      {
         "label": "API-routes",
-        "added": [
-          "/api/admin/users/block",
-          "/api/admin/users/role"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Tabellen",
-        "added": [
-          "job_runs"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
+        "added": [],
+        "removed": [
+          "/api/dashboard-type"
+        ]
       }
     ]
   },
@@ -17378,6 +17512,13 @@
       "components": 706,
       "tables": 48,
       "routesProduction": 93
+    },
+    {
+      "date": "2026-06-11",
+      "api": 373,
+      "components": 682,
+      "tables": 49,
+      "routesProduction": 94
     }
   ]
 }

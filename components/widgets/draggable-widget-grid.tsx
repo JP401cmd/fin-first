@@ -46,8 +46,6 @@ import { WIDGET_PRESETS, type WidgetPreset } from '@/lib/widget-presets'
 import { isFeatureAccessible, type FeatureAccessMap } from '@/lib/compute-feature-access'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useDashboardType } from '@/components/app/dashboard-type-provider'
-import { readBriefingContentPrefs, saveBriefingContentPrefs, type BriefingContentPrefs } from '@/lib/briefing/user-preferences'
-import { createClient } from '@/lib/supabase/client'
 
 /** Human-readable size label */
 function sizeLabel(size: WidgetSize): string {
@@ -203,7 +201,6 @@ interface DraggableWidgetGridProps {
   initialPrefs: WidgetPref[]
   allPrefs: WidgetPref[]
   data: DashboardData
-  showDashboardTypeToggle?: boolean
   /**
    * Klikbare deeplinks naar de app-tabs binnen actieve categorieën — bron
    * voor de balk bovenaan het dashboard. Lege array of undefined → de balk
@@ -273,7 +270,7 @@ function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: Das
   return true
 }
 
-export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboardTypeToggle, categoryAppLinks, suppressIntroSheet, hideHeader, hideRemoveButton, editMode: controlledEditMode, onEditModeChange }: DraggableWidgetGridProps) {
+export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppLinks, suppressIntroSheet, hideHeader, hideRemoveButton, editMode: controlledEditMode, onEditModeChange }: DraggableWidgetGridProps) {
   const router = useRouter()
   const { features } = useFeatureAccess()
 
@@ -304,8 +301,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
   const [selectedPreset, setSelectedPreset] = useState<WidgetPreset | null>(null)
   // Bulk-actie wacht op bevestiging — `null` = geen dialoog open.
   const [bulkAction, setBulkAction] = useState<{ type: 'fill'; size: WidgetSize } | { type: 'clear' } | null>(null)
-  // Dashboard state from shared context (type + collapsed)
-  const { dashboardType, setDashboardType, isCollapsed, setIsCollapsed: setCollapsedCtx } = useDashboardType()
+  // Dashboard collapsed state from shared context
+  const { isCollapsed, setIsCollapsed: setCollapsedCtx } = useDashboardType()
 
   // ── API-loaded presets (fallback to hardcoded) ──────────────
   const [apiPresets, setApiPresets] = useState<WidgetPreset[]>(WIDGET_PRESETS)
@@ -321,13 +318,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       .catch(() => { /* fallback to hardcoded WIDGET_PRESETS */ })
     return () => { cancelled = true }
   }, [])
-
-  // Briefing content preferences
-  const [briefingPrefs, setBriefingPrefs] = useState<BriefingContentPrefs>({ showNextSteps: true, showDiscover: true })
-
-  useEffect(() => {
-    if (showDashboardTypeToggle) setBriefingPrefs(readBriefingContentPrefs())
-  }, [showDashboardTypeToggle])
 
   // Categorie-balk toggle — pure UI-pref (localStorage). Default `true`,
   // maar pas zichtbaar zodra de hydratatie heeft uitgelezen zodat we geen
@@ -599,22 +589,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
     }
   }, [isEditMode, handleGereed])
 
-  const toggleBriefingPref = useCallback((key: keyof BriefingContentPrefs) => {
-    setBriefingPrefs(prev => {
-      const updated = { ...prev, [key]: !prev[key] }
-      saveBriefingContentPrefs(updated)
-      const sb = createClient()
-      sb.auth.getUser().then(({ data: { user: u } }) => {
-        if (!u) return
-        sb.from('app_settings').upsert(
-          { key: `briefing_preferences_${u.id}`, value: JSON.stringify(updated) },
-          { onConflict: 'key' },
-        )
-      })
-      return updated
-    })
-  }, [])
-
   const toggleCollapsed = useCallback(() => {
     setCollapsedCtx(!isCollapsed)
   }, [isCollapsed, setCollapsedCtx])
@@ -624,17 +598,13 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
 
   // De balk verschijnt onder de "Mijn Dashboard"-titel zodra:
   //   • er data is (`categoryAppLinks` met >0 entries),
-  //   • de gebruiker hem aan heeft staan,
-  //   • het Will-dashboard de Widgets-modus toont (op andere hosts zonder
-  //     de dashboard-type-toggle valt deze conditie weg en wordt de balk
-  //     direct gerendeerd zodra de data beschikbaar is).
-  // De `!isCollapsed`-check zit in de wrapper (regel ~613), waardoor de
-  // balk vanzelf weg valt wanneer de gebruiker het dashboard inklapt.
+  //   • de gebruiker hem aan heeft staan.
+  // De `!isCollapsed`-check zit in de wrapper, waardoor de balk vanzelf
+  // weg valt wanneer de gebruiker het dashboard inklapt.
   const showCategoryNavBar =
     !!categoryAppLinks &&
     categoryAppLinks.length > 0 &&
-    categoryNavVisible &&
-    (!showDashboardTypeToggle || dashboardType === 'widgets')
+    categoryNavVisible
 
   const gridContent = (
     <div>
@@ -648,33 +618,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
             <h2 className="label-editorial text-[var(--ink-2)]">Mijn Dashboard</h2>
           </button>
           {!isCollapsed && <div className="flex items-center gap-2">
-            {/* Dashboard type pill toggle */}
-            {showDashboardTypeToggle && (
-              <div className="flex rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setDashboardType('widgets')}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                    dashboardType === 'widgets'
-                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
-                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                  }`}
-                >
-                  Widgets
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDashboardType('briefing')}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                    dashboardType === 'briefing'
-                      ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm'
-                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                  }`}
-                >
-                  Briefing
-                </button>
-              </div>
-            )}
             <button
               type="button"
               onClick={toggleEditMode}
@@ -707,51 +650,10 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
       {/* Categorie-app-balk — direct onder de titel zodat de Kern-apps van
           de gebruiker (Bezittingen + Schulden) als snelkoppelingen zichtbaar
           zijn vóór de widget-grid. Conditioneel via `categoryNavVisible`
-          (modify-toggle) en `dashboardType === 'widgets'`. */}
+          (modify-toggle). */}
       {showCategoryNavBar && (
         <CategoryAppNavBar links={categoryAppLinks!} />
       )}
-
-      {/* Briefing content toggles — only visible when dashboard type is briefing */}
-      {showDashboardTypeToggle && dashboardType === 'briefing' && (
-        <div className="mb-3 flex items-center gap-4 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-2">
-          <label className="flex items-center gap-2 text-xs cursor-pointer">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={briefingPrefs.showNextSteps}
-              onClick={() => toggleBriefingPref('showNextSteps')}
-              className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
-                briefingPrefs.showNextSteps ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
-              }`}
-            >
-              <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
-                briefingPrefs.showNextSteps ? 'translate-x-3.5' : 'translate-x-0.5'
-              }`} />
-            </button>
-            <span className="text-[var(--ink-2)]">Volgende stappen</span>
-          </label>
-          <label className="flex items-center gap-2 text-xs cursor-pointer">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={briefingPrefs.showDiscover}
-              onClick={() => toggleBriefingPref('showDiscover')}
-              className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
-                briefingPrefs.showDiscover ? 'bg-[var(--ink)]' : 'bg-[var(--border-md)]'
-              }`}
-            >
-              <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
-                briefingPrefs.showDiscover ? 'translate-x-3.5' : 'translate-x-0.5'
-              }`} />
-            </button>
-            <span className="text-[var(--ink-2)]">Ontdek-suggesties</span>
-          </label>
-        </div>
-      )}
-
-      {/* Widget content — hidden when briefing mode is active */}
-      {!(showDashboardTypeToggle && dashboardType === 'briefing') && (<>
 
       {activeWidgets.length === 0 && !isEditMode && suppressIntroSheet ? (
         // Host-suppressed intro: compacte CTA i.p.v. "Handmatig / Automatisch /
@@ -993,7 +895,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, showDashboar
         </div>
       )}
 
-      </>)}
       </>)}
       </>)}
 

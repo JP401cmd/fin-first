@@ -229,71 +229,8 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 5: GET/PUT /api/dashboard-type ────────────────────────────────────
-  {
-    id: 'profiel-dashboard-type-get',
-    name: 'GET /api/dashboard-type retourneert voorkeur',
-    category: CAT,
-    description: 'Dashboard type voorkeur ophalen',
-    priority: 'high',
-    estimatedDurationMs: 500,
-    async fn() {
-      const { status, body } = await fetchJson('/api/dashboard-type')
-      assertEqual(status, 200, 'status 200')
-      assert(
-        body.dashboard_type === 'widgets' || body.dashboard_type === 'briefing',
-        `dashboard_type is widgets of briefing, got ${body.dashboard_type}`,
-      )
-    },
-  },
-  {
-    id: 'profiel-dashboard-type-put',
-    name: 'PUT /api/dashboard-type toggle werkt',
-    category: CAT,
-    description: 'Dashboard type voorkeur opslaan',
-    priority: 'high',
-    estimatedDurationMs: 1000,
-    async fn() {
-      // Read original
-      const { body: original } = await fetchJson('/api/dashboard-type')
-      const originalType = original.dashboard_type
-
-      // Switch type
-      const newType = originalType === 'widgets' ? 'briefing' : 'widgets'
-      const { status: putStatus, body: putBody } = await fetchJson('/api/dashboard-type', {
-        method: 'PUT',
-        body: JSON.stringify({ dashboard_type: newType }),
-      })
-      assertEqual(putStatus, 200, 'PUT status 200')
-      assert(putBody.success === true, 'success: true')
-      assertEqual(putBody.dashboard_type, newType, 'returned type matches')
-
-      // Verify persisted
-      const { body: verify } = await fetchJson('/api/dashboard-type')
-      assertEqual(verify.dashboard_type, newType, 'type gepersisteerd')
-
-      // Restore
-      await fetchJson('/api/dashboard-type', {
-        method: 'PUT',
-        body: JSON.stringify({ dashboard_type: originalType }),
-      })
-    },
-  },
-  {
-    id: 'profiel-dashboard-type-validation',
-    name: 'PUT /api/dashboard-type valideert input',
-    category: CAT,
-    description: 'Ongeldige dashboard_type geeft 400',
-    priority: 'medium',
-    estimatedDurationMs: 500,
-    async fn() {
-      const { status } = await fetchJson('/api/dashboard-type', {
-        method: 'PUT',
-        body: JSON.stringify({ dashboard_type: 'invalid_type' }),
-      })
-      assertEqual(status, 400, 'ongeldige type → 400')
-    },
-  },
+  // (Step 5 — /api/dashboard-type — verwijderd jun 2026 samen met de
+  //  DAIshboard-keten; de widgets/briefing-toggle bestaat niet meer.)
 
   // ── Step 6: GET /api/guide-progress — tellingen ────────────────────────────
   {

@@ -2,20 +2,19 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 
-type DashboardType = 'widgets' | 'briefing'
+// NB: dit was ooit een dual-purpose provider (dashboard-type widgets/briefing
+// + ingeklapte-staat). Het AI-briefing-DAIshboard-systeem ("Systeem B") is
+// verwijderd — zie docs/briefing-analyse.md. Wat resteert is uitsluitend de
+// ingeklapte-staat van het widget-dashboard (localStorage-gedreven UI-pref).
+// De naam blijft `DashboardType*` voor compat met de bestaande mount in
+// app/(app)/layout.tsx.
 
 interface DashboardTypeContextValue {
-  dashboardType: DashboardType
-  setDashboardType: (type: DashboardType) => Promise<void>
-  loading: boolean
   isCollapsed: boolean
   setIsCollapsed: (collapsed: boolean) => void
 }
 
 const DashboardTypeContext = createContext<DashboardTypeContextValue>({
-  dashboardType: 'widgets',
-  setDashboardType: async () => {},
-  loading: true,
   isCollapsed: false,
   setIsCollapsed: () => {},
 })
@@ -25,8 +24,6 @@ export function useDashboardType() {
 }
 
 export function DashboardTypeProvider({ children }: { children: ReactNode }) {
-  const [dashboardType, setType] = useState<DashboardType>('widgets')
-  const [loading, setLoading] = useState(true)
   const [isCollapsed, setIsCollapsedState] = useState(false)
 
   useEffect(() => {
@@ -35,27 +32,6 @@ export function DashboardTypeProvider({ children }: { children: ReactNode }) {
         setIsCollapsedState(true)
       }
     } catch { /* noop */ }
-  }, [])
-
-  useEffect(() => {
-    fetch('/api/dashboard-type')
-      .then(r => r.json())
-      .then(d => {
-        if (d.dashboard_type === 'widgets' || d.dashboard_type === 'briefing') {
-          setType(d.dashboard_type)
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
-
-  const setDashboardType = useCallback(async (type: DashboardType) => {
-    setType(type)
-    await fetch('/api/dashboard-type', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dashboard_type: type }),
-    })
   }, [])
 
   const setIsCollapsed = useCallback((collapsed: boolean) => {
@@ -67,8 +43,8 @@ export function DashboardTypeProvider({ children }: { children: ReactNode }) {
   // re-renders in every consumer on every parent re-render even when nothing
   // actually changed.
   const value = useMemo(
-    () => ({ dashboardType, setDashboardType, loading, isCollapsed, setIsCollapsed }),
-    [dashboardType, setDashboardType, loading, isCollapsed, setIsCollapsed],
+    () => ({ isCollapsed, setIsCollapsed }),
+    [isCollapsed, setIsCollapsed],
   )
 
   return (
