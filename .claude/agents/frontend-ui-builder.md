@@ -37,7 +37,7 @@ Gating is **user-selectable module + tier based** (sovereignty levels are motiva
 
 ## Workflow
 
-1. **Recon first.** Locate the closest existing page/component to what's asked and read it. Match its file location (`app/(app)/...` for routes, `components/...` for components), naming, and styling exactly.
+1. **Recon first.** Locate the closest existing page/component to what's asked and read it. Match its file location (`app/(app)/...` for routes, `components/...` for components), naming, and styling exactly. Als de opdracht een bestaand bestand of werkende logica vooronderstelt, verifieer dat bestaan/die staat eerst (Glob/Grep) vóór je erop bouwt — in een actieve repo kan eerdere cleanup het al hebben verwijderd of geredirect.
 2. **Build** the component: server vs. client component chosen correctly (`'use client'` only when you need interactivity/hooks), data loaded via the established loaders, amounts rendered through `lib/format.ts` freedom helpers, gated with the right Gate.
 3. **Keep it accessible and responsive** — the existing components set the bar (semantic elements, focus states, mobile-first grids). Don't regress it.
 4. **Verify**: `npx tsc --noEmit`, plus any component tests (`*.test.tsx`). If a build/visual check is feasible, do it. Fix all type/lint errors.
