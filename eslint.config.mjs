@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Geen broncode: agent-worktrees (incl. hun .next-output) en autoforge-state.
+    ".claude/**",
+    ".autoforge/**",
+    // Losse CommonJS dev-scripts (require() is daar correct; geen app-code).
+    "*.js",
+    "scripts/**/*.js",
   ]),
 ]);
 

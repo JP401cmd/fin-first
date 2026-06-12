@@ -56,7 +56,7 @@ export async function GET() {
     ]
 
     const dangerousPatterns = ['globalThis.', 'window.__appState', 'global.sharedData', 'let sharedState']
-    let found: string[] = []
+    const found: string[] = []
 
     for (const file of checkFiles) {
       const filePath = path.join(process.cwd(), file)

@@ -123,7 +123,7 @@ export default function TestBudgetModesPage() {
       })
 
       // Test 5: Color coding logic
-      let colorLogicCorrect = true
+      const colorLogicCorrect = true
       let colorDetail = ''
       for (const group of tree) {
         for (const child of group.children) {

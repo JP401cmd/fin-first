@@ -304,7 +304,7 @@ function applyMinWidths(fractions: number[], containerWidth: number): number[] {
 
   // First pass: enforce minimum on active segments, redistribute from largest
   const adjusted = raw.map(w => Math.max(w, 0))
-  let total = adjusted.reduce((a, b) => a + b, 0)
+  const total = adjusted.reduce((a, b) => a + b, 0)
 
   if (total > 0) {
     // Normalize to available width

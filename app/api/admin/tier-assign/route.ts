@@ -206,7 +206,7 @@ export async function GET(req: Request) {
 
   // Get profile names for target users
   const userIds = [...new Set((log ?? []).map((l) => l.target_user))]
-  let profileMap: Record<string, string> = {}
+  const profileMap: Record<string, string> = {}
 
   if (userIds.length > 0) {
     const { data: profiles } = await service

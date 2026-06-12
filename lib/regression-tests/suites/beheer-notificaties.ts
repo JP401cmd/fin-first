@@ -389,7 +389,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 10,
     fn() {
       // Validate the logic from the PATCH handler
-      let readIds: string[] = ['existing-1', 'existing-2']
+      const readIds: string[] = ['existing-1', 'existing-2']
       const markRead = 'new-id-3'
 
       if (!readIds.includes(markRead)) {
@@ -413,7 +413,7 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
-      let readIds: string[] = ['existing-1']
+      const readIds: string[] = ['existing-1']
       const markAllRead = ['new-2', 'new-3', 'existing-1']
 
       for (const id of markAllRead) {

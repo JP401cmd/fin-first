@@ -54,7 +54,7 @@ export async function GET() {
 
   const topEntries = [...userMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
   const topIds = topEntries.map((e) => e[0])
-  let names: Record<string, string> = {}
+  const names: Record<string, string> = {}
   if (topIds.length > 0) {
     const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', topIds)
     for (const p of profs ?? []) names[p.id] = (p.full_name as string | null) ?? p.id

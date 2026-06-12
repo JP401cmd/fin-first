@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
   let visiblePartnerAssets = partnerPersonalAssets
   let visiblePartnerDebts = partnerPersonalDebts
   let visiblePartnerBudgets = partnerPersonalBudgets
-  let privacyApplied: Record<string, { level: string; aggregated: boolean }> = {}
+  const privacyApplied: Record<string, { level: string; aggregated: boolean }> = {}
 
   if (perspective === 'household' && partnerPrivacy) {
     // Assets privacy

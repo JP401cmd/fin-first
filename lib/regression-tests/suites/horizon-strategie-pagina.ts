@@ -9,6 +9,7 @@ import {
   type WithdrawalStrategyType,
   type WithdrawalStrategyConfig,
   WITHDRAWAL_DEFAULTS,
+  initBucketState,
   resolveWithdrawalStrategy,
   applyWithdrawalStrategy,
   type WithdrawalContext,
@@ -491,7 +492,6 @@ const tests: TestCase[] = [
     estimatedDurationMs: 30,
     fn() {
       const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' }
-      const { initBucketState } = require('@/lib/withdrawal-strategy')
       // Small portfolio → small cash bucket
       const smallBucket = initBucketState(50_000, 40_000)
       // Cash = min(80_000, 50_000) = 50_000

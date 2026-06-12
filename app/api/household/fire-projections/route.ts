@@ -207,7 +207,7 @@ export async function GET() {
 
     // Transactions for this member
     const memberTx = allTransactions.filter(t => t.user_id === memberId)
-    let monthlyIncome = myIncome
+    const monthlyIncome = myIncome
     let monthlyExpenses = 0
     for (const tx of memberTx) {
       const amt = Number(tx.amount)

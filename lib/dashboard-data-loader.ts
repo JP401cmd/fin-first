@@ -513,7 +513,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     : 0
 
   // Fallback savings rate from profile estimates for users without transactions
-  let savingsRateIsEstimate = savingsRate6m === 0
+  const savingsRateIsEstimate = savingsRate6m === 0
   if (savingsRate6m === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
     savingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
   }
@@ -1274,7 +1274,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // ── Household & partner perspective overrides ──────────────────────────
   let householdOverrides: DashboardData['householdOverrides'] = null
   let partnerOverrides: DashboardData['partnerOverrides'] = null
-  let partnerHiddenCategories: string[] = []
+  const partnerHiddenCategories: string[] = []
   // Household membership (reused in activity feed below)
   let cachedHouseholdId: string | null = null
   let cachedHouseholdMemberIds: string[] = []

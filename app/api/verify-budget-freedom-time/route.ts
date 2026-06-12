@@ -226,7 +226,7 @@ export async function GET() {
     ]
 
     const mockPatterns = ['globalThis', 'devStore', 'mockData', 'fakeData', 'sampleData', 'dummyData', 'MOCK', 'STUB']
-    let foundMocks: string[] = []
+    const foundMocks: string[] = []
 
     for (const filePath of files) {
       const source = fs.readFileSync(filePath, 'utf-8')
