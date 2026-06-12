@@ -6,6 +6,7 @@ import {
   type TaxYear,
 } from '@/lib/box2-data'
 import type { Asset } from '@/lib/asset-data'
+import { normalisePrivacySettings } from '@/lib/household-data'
 
 /**
  * GET /api/household/box2?year=2025|2026
@@ -28,14 +29,24 @@ export async function GET(request: NextRequest) {
   const yearParam = request.nextUrl.searchParams.get('year')
   const year: TaxYear = yearParam === '2025' ? 2025 : 2026
 
-  // Fetch household membership
+  // Fetch household membership (incl. partner privacy settings)
   const { data: members } = await supabase
     .from('household_members')
-    .select('user_id, role')
+    .select('user_id, role, privacy_settings')
 
   const hasHousehold = members && members.length > 1
   const partnerMember = members?.find(m => m.user_id !== user.id)
   const partnerId = partnerMember?.user_id
+
+  // What the partner allows the household to see of their vermogen (Box 2
+  // deelnemingen = wealth). Mirrors the foundation loader: 'full' shows the
+  // partner's individual deelnemingen; 'totals' keeps only aggregate results
+  // (no per-deelneming itemisation); 'hidden' removes the partner's personal
+  // holdings from every calculation. Default is 'totals'. (Security review S5.)
+  const partnerVermogenLevel = normalisePrivacySettings(
+    (partnerMember?.privacy_settings as Record<string, string> | null) ?? null,
+  ).assets
+  const partnerHidesVermogen = partnerVermogenLevel === 'hidden'
 
   // Fetch all deelneming assets, DGA-vorderingen, and DGA-schulden (RLS scoped)
   const [{ data: assetsRaw }, { data: vorderingenRaw }, { data: dgaSchuldenRaw }] = await Promise.all([
@@ -82,10 +93,18 @@ export async function GET(request: NextRequest) {
 
   const myDgaTotal = calcDgaForUser(user.id)
 
-  const partnerDgaTotal = partnerId ? calcDgaForUser(partnerId) : 0
+  const partnerDgaTotal = partnerId && !partnerHidesVermogen ? calcDgaForUser(partnerId) : 0
 
-  const totalVorderingen = dgaVorderingen.reduce((s, v) => s + Number(v.current_value), 0)
-  const totalSchulden = dgaSchulden.reduce((s, d) => s + Number(d.current_balance), 0)
+  // Combined DGA over the VISIBLE set — exclude the partner's personal
+  // vorderingen/schulden when they hide their vermogen (shared stays).
+  const visibleVorderingen = partnerHidesVermogen
+    ? dgaVorderingen.filter(v => v.user_id === user.id || v.ownership === 'shared')
+    : dgaVorderingen
+  const visibleSchulden = partnerHidesVermogen
+    ? dgaSchulden.filter(d => d.user_id === user.id || d.ownership === 'shared')
+    : dgaSchulden
+  const totalVorderingen = visibleVorderingen.reduce((s, v) => s + Number(v.current_value), 0)
+  const totalSchulden = visibleSchulden.reduce((s, d) => s + Number(d.current_balance), 0)
   const combinedDgaTotal = Math.max(0, totalVorderingen - totalSchulden)
 
   // Get monthly expenses for freedom days calculation
@@ -115,6 +134,8 @@ export async function GET(request: NextRequest) {
   const partnerAssets = partnerId
     ? allAssets.filter(a => a.user_id === partnerId && (a as any).ownership !== 'shared')
     : []
+  // Drop the partner's personal deelnemingen from every calculation when hidden.
+  const visiblePartnerAssets = partnerHidesVermogen ? [] : partnerAssets
 
   // Personal calculation
   const myDeelnemingen = [...myAssets, ...sharedAssets].map(assetToDeelneming)
@@ -174,7 +195,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Partner calculation
-  const partnerDeelnemingen = [...partnerAssets, ...sharedAssets].map(assetToDeelneming)
+  const partnerDeelnemingen = [...visiblePartnerAssets, ...sharedAssets].map(assetToDeelneming)
   const partnerResult = calculateBox2({
     deelnemingen: partnerDeelnemingen,
     year,
@@ -183,10 +204,10 @@ export async function GET(request: NextRequest) {
     dgaLeningenTotal: partnerDgaTotal,
   })
 
-  // Combined calculation
+  // Combined calculation (partner personal dropped when hidden)
   const allDeelnemingen = [
     ...myAssets,
-    ...partnerAssets,
+    ...visiblePartnerAssets,
     ...sharedAssets,
   ].map(assetToDeelneming)
 
@@ -198,8 +219,8 @@ export async function GET(request: NextRequest) {
     dgaLeningenTotal: combinedDgaTotal,
   })
 
-  // Build enriched deelneming details
-  const allAssetsForDetails = [...myAssets, ...partnerAssets, ...sharedAssets]
+  // Build enriched deelneming details (same visible set as the combined calc).
+  const allAssetsForDetails = [...myAssets, ...visiblePartnerAssets, ...sharedAssets]
   const deelnemingDetails = allDeelnemingen.map((d, i) => ({
     ...d,
     assetId: allAssetsForDetails[i]?.id,
@@ -208,6 +229,14 @@ export async function GET(request: NextRequest) {
     ownerId: allAssetsForDetails[i]?.user_id,
     isShared: (allAssetsForDetails[i] as any)?.ownership === 'shared',
   }))
+
+  // Itemised partner holdings are only exposed at privacy level 'full'. At
+  // 'totals' (and 'hidden') the partner's contribution stays in the aggregate
+  // results above, but per-deelneming detail (assetId, value, owner) is removed.
+  const visibleDeelnemingDetails =
+    partnerVermogenLevel === 'full'
+      ? deelnemingDetails
+      : deelnemingDetails.filter(d => d.ownerId !== partnerId)
 
   return NextResponse.json({
     hasHousehold: true,
@@ -230,6 +259,7 @@ export async function GET(request: NextRequest) {
       },
     ],
     combined: combinedResult,
-    deelnemingen: deelnemingDetails,
+    deelnemingen: visibleDeelnemingDetails,
+    partnerVermogenPrivacy: partnerVermogenLevel,
   })
 }

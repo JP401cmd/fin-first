@@ -76,3 +76,7 @@ signin2.yaml
 
 # superpowers brainstorm visual-companion working dir (generated)
 .superpowers/
+
+# ad-hoc root debug/probe scripts (login/signup probes, port killers, one-off
+# migration runners) — never commit; these have leaked service-role keys before.
+/.*.mjs

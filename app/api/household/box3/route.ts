@@ -8,6 +8,7 @@ import {
 } from '@/lib/box3-data'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
+import { normalisePrivacySettings } from '@/lib/household-data'
 
 /**
  * GET /api/household/box3?year=2025|2026
@@ -32,14 +33,24 @@ export async function GET(request: NextRequest) {
   const yearParam = request.nextUrl.searchParams.get('year')
   const year: TaxYear = yearParam === '2025' ? 2025 : 2026
 
-  // Fetch household membership
+  // Fetch household membership (incl. partner privacy settings)
   const { data: members } = await supabase
     .from('household_members')
-    .select('user_id, role')
+    .select('user_id, role, privacy_settings')
 
   const hasHousehold = members && members.length > 1
   const partnerMember = members?.find(m => m.user_id !== user.id)
   const partnerId = partnerMember?.user_id
+
+  // What the partner allows the household to see of their vermogen (Box 3 = wealth).
+  // Mirrors the foundation loader (loadPerspectiveData): 'hidden' means the
+  // partner's personal wealth must not be exposed here at all. Default is
+  // 'totals' (DEFAULT_PRIVACY_SETTINGS) — Box 3 returns only aggregated tax
+  // results per partner, so 'totals'/'full' are equivalent here; only 'hidden'
+  // changes behaviour. (Security review S5.)
+  const partnerVermogenLevel = normalisePrivacySettings(
+    (partnerMember?.privacy_settings as Record<string, string> | null) ?? null,
+  ).assets
 
   // Fetch all assets and debts (RLS scoped)
   const [assetsRes, debtsRes, profileRes] = await Promise.all([
@@ -83,6 +94,13 @@ export async function GET(request: NextRequest) {
   const partnerPersonalDebts = partnerId
     ? allDebts.filter(d => d.user_id === partnerId && (d as any).ownership !== 'shared')
     : []
+
+  // Privacy gate: when the partner hides their vermogen, drop their personal
+  // assets/debts before any per-partner or combined Box 3 calculation so their
+  // taxable wealth never leaks. Shared items remain (both partners own them).
+  const partnerHidesVermogen = partnerVermogenLevel === 'hidden'
+  const visiblePartnerAssets = partnerHidesVermogen ? [] : partnerPersonalAssets
+  const visiblePartnerDebts = partnerHidesVermogen ? [] : partnerPersonalDebts
 
   // Personal calculation (user's own assets + their share of shared)
   const personalResult = calculateBox3({
@@ -131,16 +149,16 @@ export async function GET(request: NextRequest) {
 
   // Partner's individual calculation
   const partnerResult = calculateBox3({
-    assets: [...partnerPersonalAssets, ...sharedAssets],
-    debts: [...partnerPersonalDebts, ...sharedDebts],
+    assets: [...visiblePartnerAssets, ...sharedAssets],
+    debts: [...visiblePartnerDebts, ...sharedDebts],
     hasPartner: true,
     dailyExpenses,
     year,
   })
 
   // Combined calculation: all assets + debts, fiscal partners
-  const combinedAssets = [...myPersonalAssets, ...partnerPersonalAssets, ...sharedAssets]
-  const combinedDebts = [...myPersonalDebts, ...partnerPersonalDebts, ...sharedDebts]
+  const combinedAssets = [...myPersonalAssets, ...visiblePartnerAssets, ...sharedAssets]
+  const combinedDebts = [...myPersonalDebts, ...visiblePartnerDebts, ...sharedDebts]
 
   const combinedResult = calculateBox3({
     assets: combinedAssets,
@@ -181,5 +199,6 @@ export async function GET(request: NextRequest) {
     ],
     combined: combinedResult,
     optimalAllocation,
+    partnerVermogenPrivacy: partnerVermogenLevel,
   })
 }

@@ -11,7 +11,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
-  Database,
   FileSearch,
   FlaskConical,
   Gauge,
@@ -88,12 +87,6 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/bank-connect',
         description: 'TrueLayer-koppeling: omgeving, credentials en verbindingstest.',
         icon: Landmark,
-      },
-      {
-        label: 'Database',
-        href: '/beheer/migration',
-        description: 'Schema-status, ontbrekende tabellen en migraties.',
-        icon: Database,
       },
       {
         label: 'Achtergrondtaken',

@@ -122,7 +122,6 @@ export async function loadAllTests(): Promise<void> {
     import('@/lib/regression-tests/suites/beheer-nieuws-ai').then(m => m.register()).catch(e => { console.warn('[test-registry] beheer-nieuws-ai failed:', e) }),
     import('@/lib/regression-tests/suites/beheer-testdata').then(m => m.register()).catch(e => { console.warn('[test-registry] beheer-testdata failed:', e) }),
     import('@/lib/regression-tests/suites/widgets-avatar').then(m => m.register()).catch(e => { console.warn('[test-registry] widgets-avatar failed:', e) }),
-    import('@/lib/regression-tests/suites/beheer-migratie').then(m => m.register()).catch(e => { console.warn('[test-registry] beheer-migratie failed:', e) }),
     import('@/lib/regression-tests/suites/beheer-informatief').then(m => m.register()).catch(e => { console.warn('[test-registry] beheer-informatief failed:', e) }),
     import('@/lib/regression-tests/suites/onboarding-flow').then(m => m.register()).catch(e => { console.warn('[test-registry] onboarding-flow failed:', e) }),
     import('@/lib/regression-tests/suites/onboarding-identity').then(m => m.register()).catch(e => { console.warn('[test-registry] onboarding-identity failed:', e) }),

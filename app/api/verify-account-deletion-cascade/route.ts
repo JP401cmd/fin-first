@@ -24,6 +24,13 @@ interface TestResult {
  * 7. No orphaned records for non-existent user
  */
 export async function GET() {
+  // Defense-in-depth: this unauthenticated verification harness runs DELETE
+  // operations and must never be reachable in production, even if the proxy
+  // gate is bypassed. (Security review S4.)
+  if (process.env.NODE_ENV === 'production') {
+    return new Response(null, { status: 404 })
+  }
+
   const results: TestResult[] = []
 
   try {

@@ -73,7 +73,6 @@ export async function updateSession(request: NextRequest) {
     '/api/test-schema-validation',
     '/test-user-isolation',
     '/test-budget-workflow',
-    '/api/apply-migration',
     '/api/verify-schema',
     '/test-migration',
     '/api/verify-onboarding',
@@ -330,10 +329,8 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-share-targets',
     '/test-household-schema',
     '/api/verify-household-schema',
-    '/api/apply-household-migration',
     '/test-perspective-switcher',
     '/api/verify-perspective-switcher',
-    '/api/apply-perspective-migration',
     '/test-household-invite',
     '/api/verify-household-invite',
     '/test-shared-data',
@@ -346,7 +343,6 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-kpi-deduplication',
     '/test-household-db',
     '/api/verify-household-db',
-    '/api/run-household-migration',
     '/test-next-step-completion-tracking',
     '/api/verify-next-step-completion-tracking',
     '/test-enhanced-snapshots',
@@ -394,6 +390,20 @@ export async function updateSession(request: NextRequest) {
   ]
 
   const { pathname } = request.nextUrl
+
+  // Dev-only feature-verification harness. These routes are unauthenticated by
+  // design (the harness drives them without a session) and several perform
+  // destructive DELETE/reset operations, so they must NOT exist in production.
+  // Returning 404 removes the entire `/test-*`, `/api/verify-*` and `/api/test-*`
+  // surface from the deployed app in one place. (See security review S4.)
+  if (
+    process.env.NODE_ENV === 'production' &&
+    (pathname.startsWith('/test-') ||
+      pathname.startsWith('/api/verify-') ||
+      pathname.startsWith('/api/test-'))
+  ) {
+    return new NextResponse(null, { status: 404 })
+  }
 
   const isPublicPath =
     publicPaths.includes(pathname) || pathname.startsWith('/auth/')

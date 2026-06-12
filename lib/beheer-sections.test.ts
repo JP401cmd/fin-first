@@ -8,8 +8,8 @@ describe('BEHEER_GROUPS', () => {
     expect(BEHEER_GROUPS.map((g) => g.id)).toEqual(['technisch', 'functioneel', 'test', 'info'])
   })
 
-  it('bevat 31 tools met unieke routes onder /beheer/', () => {
-    expect(allTools).toHaveLength(31)
+  it('bevat 30 tools met unieke routes onder /beheer/', () => {
+    expect(allTools).toHaveLength(30)
     const hrefs = allTools.map((t) => t.href)
     expect(new Set(hrefs).size).toBe(hrefs.length)
     for (const href of hrefs) {
@@ -65,7 +65,7 @@ describe('isBeheerToolActive', () => {
 describe('findBeheerGroup', () => {
   it('vindt de juiste groep per tool', () => {
     expect(findBeheerGroup('/beheer/coach')?.id).toBe('functioneel')
-    expect(findBeheerGroup('/beheer/migration')?.id).toBe('technisch')
+    expect(findBeheerGroup('/beheer/bank-connect')?.id).toBe('technisch')
     expect(findBeheerGroup('/beheer/testdata')?.id).toBe('test')
     expect(findBeheerGroup('/beheer/architectuur')?.id).toBe('info')
   })
