@@ -33,7 +33,8 @@ const RESET_PROFILE = {
 } as const
 
 /**
- * 26 child budget slugs used by the default seed and AI suggest endpoint.
+ * De 26 child-budget-slugs binnen de AI-suggest-scope (= alle leaves van de
+ * default seed mínus de technische `eigen-rekening-sub`; de seed zelf telt 27).
  * Fase C: 2 nieuwe slugs toegevoegd onder vaste-lasten-wonen:
  *   - telefoon-internet-tv (€45/mnd)
  *   - abonnementen-contributies (€25/mnd)

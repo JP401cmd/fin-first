@@ -91,7 +91,7 @@ Alle drie de templates gebruiken **dezelfde 8 hoofdbudgetten** (= canonieke taxo
 
 Voordelen: het Vervoer-probleem is per definitie opgelost (altijd één hoofdbudget); opschalen van Minimalistisch → Uitgebreid is een natuurlijk "splits dit potje"-pad; rapportages/heatmap/donut blijven op hoofdniveau vergelijkbaar ongeacht template; en de preview kan eindelijk kloppen met het resultaat.
 
-> Minimalistisch boekt transacties direct op het hoofdbudget — een hoofdbudget zónder children is al een geldig toewijsdoel (`budgetOptions` in `budget-data.ts:298` valt terug op de parent; sleepmodus sluit alleen parents *mét* children uit).
+> Minimalistisch boekt transacties direct op het hoofdbudget. AI-categorisatie en sleepmodus ondersteunden childless parents al als toewijsdoel; de handmatige toewijs-dropdowns (`buildBudgetSelectEntries` in `budget-data.ts`) lieten ze vóór deze herziening echter stilletjes weg — dat is in de implementatie meegefixt (code-review-bevinding) en vastgepind met regressiecase `budget-crud-select-entries-childless-parent`.
 
 ### 3.2 Nieuwe deelbudget-slugs (6)
 

@@ -47,11 +47,13 @@ describe('buildBudgetSelectEntries', () => {
     expect(entries).toEqual([{ kind: 'option', id: 'er', name: 'Eigen rekening' }])
   })
 
-  it('laat lege niet-archive hoofdcategorieën weg', () => {
+  it('toont een childless niet-archive hoofdbudget als direct-selecteerbare optie (Minimalistisch: boeken op het hoofdbudget)', () => {
     const entries = buildBudgetSelectEntries([
-      group({ id: 'p', name: 'Leeg', budget_type: 'expense' }, []),
+      group({ id: 'p', name: 'Vaste lasten wonen & energie', budget_type: 'expense' }, []),
     ])
-    expect(entries).toEqual([])
+    expect(entries).toEqual([
+      { kind: 'option', id: 'p', name: 'Vaste lasten wonen & energie' },
+    ])
   })
 
   it('behoudt volgorde: optgroups en losse archive-opties in invoervolgorde', () => {

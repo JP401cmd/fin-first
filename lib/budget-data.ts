@@ -426,16 +426,21 @@ export function budgetOptionLabel(option: { name: string; ownership?: 'personal'
  * gelijknamig subitem eronder — waardoor het lijkt alsof de eigen rekening "niet
  * te kiezen" is. Heeft de emmer (nog) geen subpost, dan valt de optie terug op de
  * hoofdpost zelf (zelfde fallback als `resolveEigenRekeningBudgetId`).
+ *
+ * Hoofdbudgetten zónder subbudgetten (bv. het Minimalistisch-template: je boekt
+ * direct op het hoofdbudget) zijn zelf een direct-selecteerbare optie — anders
+ * zou een minimalistisch plan onbruikbaar zijn in de handmatige toewijs-UI's
+ * terwijl de AI-categorisatie ze wél kan kiezen.
  */
 export function buildBudgetSelectEntries(groups: BudgetSelectGroup[]): BudgetSelectEntry[] {
   const entries: BudgetSelectEntry[] = []
   for (const group of groups) {
-    if (group.parent.budget_type === 'archive') {
+    if (group.parent.budget_type === 'archive' || group.children.length === 0) {
       const leaves = group.children.length > 0 ? group.children : [group.parent]
       for (const leaf of leaves) {
         entries.push({ kind: 'option', id: leaf.id, name: leaf.name, ownership: leaf.ownership })
       }
-    } else if (group.children.length > 0) {
+    } else {
       entries.push({
         kind: 'group',
         id: group.parent.id,

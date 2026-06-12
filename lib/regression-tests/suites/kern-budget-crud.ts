@@ -790,6 +790,41 @@ const tests: TestCase[] = [
     },
   },
   {
+    id: 'budget-crud-select-entries-childless-parent',
+    name: 'Budget keuzelijst: childless hoofdbudget is direct selecteerbaar',
+    description:
+      'Een hoofdbudget zonder subbudgetten (Minimalistisch-template: boeken direct op het hoofdbudget) verschijnt als losse optie in buildBudgetSelectEntries — anders is een minimalistisch plan onbruikbaar in de handmatige toewijs-UI\'s terwijl AI-categorisatie het wél kan kiezen.',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 30,
+    fn() {
+      const groups: BudgetSelectGroup[] = [
+        {
+          parent: { id: 'p-wonen', name: 'Vaste lasten wonen & energie', budget_type: 'expense', ownership: 'personal' },
+          children: [],
+        },
+        {
+          parent: { id: 'p-dagelijks', name: 'Dagelijkse uitgaven', budget_type: 'expense', ownership: 'shared' },
+          children: [{ id: 'c-bood', name: 'Boodschappen', ownership: 'shared' }],
+        },
+      ]
+
+      const entries = buildBudgetSelectEntries(groups)
+
+      // Childless expense-parent → directe optie op de parent zelf
+      const childlessOption = entries.find(e => e.kind === 'option' && e.id === 'p-wonen')
+      assertNotNull(childlessOption, 'childless hoofdbudget aanwezig als directe optie')
+      if (childlessOption && childlessOption.kind === 'option') {
+        assertEqual(childlessOption.name, 'Vaste lasten wonen & energie', 'optie draagt parent-naam')
+        assertEqual(childlessOption.ownership, 'personal', 'optie behoudt parent-ownership')
+      }
+
+      // Parent mét children blijft een optgroup (geen gedragsverandering)
+      const group = entries.find(e => e.kind === 'group' && e.id === 'p-dagelijks')
+      assertNotNull(group, 'parent met children blijft optgroup')
+    },
+  },
+  {
     id: 'budget-crud-tx-ownership-default-from-account',
     name: 'Transactie eigendom: standaard afgeleid van rekening',
     description: 'Nieuwe transactie erft accountOwnership; bewerken behoudt eigen ownership; geen → personal',
