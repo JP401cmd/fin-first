@@ -1083,7 +1083,7 @@ function TemplatePreview({
                   // Hoofdbudget zonder deelbudgetten (minimalistisch): je boekt
                   // er direct op, dus het bedrag is hier bewerkbaar in plaats
                   // van een afgeleide som.
-                  const childless = kids.length > 0 ? false : parent.budgetType !== 'income' && parent.budgetType !== 'archive'
+                  const childless = kids.length === 0 && parent.budgetType !== 'income' && parent.budgetType !== 'archive'
                   return (
                     <div key={parent.id} className="mb-2 rounded-[var(--r)] border border-[var(--border-ed)]">
                       <div className="flex items-center justify-between gap-2 px-3 py-2">
@@ -1109,8 +1109,8 @@ function TemplatePreview({
                         )}
                       </div>
                       {childless && (
-                        <p className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-1.5 text-[11px] italic text-[var(--ink-4)]">
-                          Je boekt transacties direct op dit hoofdbudget.
+                        <p className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-1.5 text-[11px] text-[var(--ink-3)]">
+                          Je boekt transacties direct op dit potje.
                         </p>
                       )}
                       {kids.map((child) => (

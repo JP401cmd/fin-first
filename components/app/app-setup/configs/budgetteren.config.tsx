@@ -208,12 +208,16 @@ function BudgetTemplatePicker({
                           <span className="text-[12px] font-medium text-[var(--ink)]">{cat.label}</span>
                         </div>
                         {cat.slugs.length === 0 ? (
-                          <p className="pl-[1.375rem] text-[11px] italic text-[var(--ink-4)]">
+                          <p className="pl-[1.375rem] text-[11px] text-[var(--ink-3)]">
                             boek direct op dit potje
                           </p>
                         ) : (
                           <p className="pl-[1.375rem] text-[11px] leading-snug text-[var(--ink-3)]">
-                            {cat.slugs.map((slug) => BUDGET_LEAF_META[slug]?.name ?? slug).join(' · ')}
+                            {cat.slugs
+                              .slice(0, 3)
+                              .map((slug) => BUDGET_LEAF_META[slug]?.name ?? slug)
+                              .join(' · ')}
+                            {cat.slugs.length > 3 && ` · +${cat.slugs.length - 3} meer`}
                           </p>
                         )}
                       </li>
