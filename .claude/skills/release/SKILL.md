@@ -9,6 +9,12 @@ Brengt afgerond werk gecontroleerd naar master/productie. Kern: "het werkt bij m
 
 Geef mee wat er geshipt wordt; onduidelijke scope ⇒ eerst de diff inventariseren.
 
+## Rol van de hoofdchat — orchestrator
+
+De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn.
+
+**Voortgangsrapportage (verplicht):** houd de gebruiker doorlopend op de hoogte van waar de pijplijn mee bezig is. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten, draai de agent(s) dan met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
+
 ## Proces
 
 ### 1. Scope & hygiëne
@@ -37,8 +43,11 @@ Per CLAUDE.md verplicht: rekenmotor geraakt ⇒ `lib/architecture/calculations.t
 ### 7. Build & echte verificatie
 `npm run build` — Next 16 production-build vangt wat tsc mist. Nieuwe/gewijzigde UI **daadwerkelijk bekijken** (dev-server of playwright/chrome-devtools): rendert het, juiste gating, vrijheidstijd-framing, design tokens, mobiel. Nieuwe API-route end-to-end aanroepen: 401 zonder sessie, validatie werkt, RLS houdt vreemde data tegen. Een component dat alleen tsc passeert is niet geverifieerd.
 
-### 8. Review — `code-review`
-Over de volledige diff: correctheid, single-source-of-truth (lezen álle surfaces het nieuwe getal uit dezelfde bron?), kwaliteit. Bij UI ook `ux-review-expert`.
+### 8. Review — gericht via domein-specialisten (licht houden)
+Geen brede review-pass over alles: stappen 2–7 hebben statics, tests, security en build al bewezen. Deze stap is uitsluitend een **diff-review op correctheid en single-source-of-truth** (lezen álle surfaces het nieuwe getal uit dezelfde bron?) — herhaal geen tsc/lint/tests en geen security (stap 5).
+- **Routeer naar de specialist van het geraakte domein** in plaats van één generieke zware review: rekenmotor → `calc-engine-specialist`, DB/RLS → `supabase-db-specialist` (niet herhalen als stap 4 al draaide), AI-plumbing → `ai-specialist-general`, prompts → `ai-specialist-prompt-dna`, UI → `ux-review-expert`. Raakt de diff meerdere domeinen wezenlijk: maximaal twee parallelle specialist-reviews; anders volstaat één.
+- **Scope strak**: geef de reviewer alleen de diff (`git diff master...HEAD`) en de direct geraakte bestanden mee — geen vrije veldtocht door de codebase. Vraag een compact rapport (alleen bevindingen, gesorteerd op ernst).
+- Alleen bij een **architectuur-brede of risicovolle wijziging** (nieuwe datastroom, cross-domein refactor, rekenmotor-aanname) zet je de volledige `code-review`-agent of `senior-developer` op de complete diff — dat is de uitzondering, niet de standaard.
 
 ### 9. Ship
 Expliciete `git add` van de bedoelde bestanden (geen `add -A`), commit met heldere message, hooks laten draaien (geen `--no-verify`). Push + PR naar master met: wat het is, de migratie-status (al remote toegepast), en de bijgewerkte architectuurdocs. **Post-deploy**: de nieuwe flow één keer op productie doorlopen en `mcp__supabase__get_logs` checken op errors.
@@ -50,7 +59,7 @@ Rapporteer per poort het bewijs (commando + uitkomst), de security-bevindingen e
 
 Sluit elke run af met een korte retrospectief:
 
-1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus je eigen observaties over deze pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot.
+1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus je eigen observaties over deze pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot. Kijk daarbij ook expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten — en welke instructie-aanpassing zou dat de volgende keer afdwingen?
 2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*/SKILL.md` of `.claude/agents/*.md` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen).
 3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan de eigen definities sleutelen.
 
