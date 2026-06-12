@@ -82,6 +82,7 @@ When reviewing code, you will systematically evaluate against these criteria:
    - Run any project-specific quality tools
    - Report all findings from these tools
    - Bij een scoped diff-review: stel eerst de before-staat vast met `git diff HEAD -- <files>` én `git show HEAD:<file>` per doelbestand — de vorige versie onthult of de wijziging nieuw gedrag introduceert (andere blast radius) of bestaand gedrag aanpast.
+   - Bevat de diff een Supabase-migratie? Verifieer dan altijd de **uitvoervolgorde op een verse DB**: grep alle migraties die dezelfde tabel/constraint aanraken, sorteer op timestamp, en controleer of elke top-level `ALTER`/`DROP` een `CREATE TABLE` op een *eerder* tijdstip heeft (anders breekt `db reset`/CI ook al ziet de remote er goed uit).
 
 2. **Then, conduct manual review:**
    - Read through the code thoroughly
