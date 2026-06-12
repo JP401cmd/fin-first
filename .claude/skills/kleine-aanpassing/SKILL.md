@@ -1,5 +1,6 @@
 ---
 name: kleine-aanpassing
+effort: medium
 description: Lichte pijplijn voor een KLEINE AANPASSING op verzoek in TriFinity — een wens, geen defect; bijschaven, geen nieuw gedrag van betekenis. Gebruik deze skill vrijwel altijd wanneer de vraag klinkt als "wil je…", "kun je…", "pas … aan", "verander…", "maak … (kleiner/anders/mooier)" — bv. een tekstje, label, marge, kleur, beeld (zoals onboarding-beeld) of kleine gedragstweak op iets dat al werkt. Weinig stappen, één specialist waar het kan, mét vangrails (routering, verificatie, UX-/security-gate, "is dit wel klein?"-poort). NIET voor een defect (→ bug-fix), een functionele delta van betekenis (→ extend-feature), iets nieuws (→ new-feature), pure herstructurering (→ refactor) of AI-gedrag (→ ai-gedrag).
 ---
 
@@ -11,7 +12,7 @@ Geef de gewenste aanpassing mee als argument; ontbreekt die, vraag er eerst naar
 
 ## Rol van de hoofdchat — orchestrator
 
-De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn. Uitzondering in déze lichte pijplijn: de poort (stap 1) en een evidente één-regel-tweak mag de hoofdchat zelf afhandelen — delegeren zodra het meer is dan dat.
+De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn. Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport, inventariseer dan eerst diens deelstaat (git status/diff op de opdracht-scope) en maak het werk in de hoofdthread af of dispatch gericht het restant — nooit blind opnieuw dispatchen of het rapport als compleet behandelen. Uitzondering in déze lichte pijplijn: de poort (stap 1) en een evidente één-regel-tweak mag de hoofdchat zelf afhandelen — delegeren zodra het meer is dan dat.
 
 **Voortgangsrapportage (verplicht):** houd de gebruiker doorlopend op de hoogte van waar de pijplijn mee bezig is. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten, draai de agent(s) dan met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
 

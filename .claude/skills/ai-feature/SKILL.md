@@ -1,5 +1,6 @@
 ---
 name: ai-feature
+effort: high
 description: Pijplijn voor het bouwen of wijzigen van AI-FUNCTIONALITEIT in TriFinity — nieuwe AI-routes, tools, structured outputs, context-builders of provider/config-wijzigingen. Zet de AI-specialisten en het team in de juiste volgorde in, met de guardrails (sanitize, PII-mask, kill-switch, tier-gate, token-logging) als harde eis. Gebruik deze skill voor "de app moet iets nieuws met AI kunnen"; voor hoe de AI zich gedraagt of antwoordt, gebruik /ai-gedrag.
 ---
 
@@ -11,7 +12,7 @@ Geef de gewenste AI-functionaliteit mee als argument.
 
 ## Rol van de hoofdchat — orchestrator
 
-De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn.
+De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn. Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport, inventariseer dan eerst diens deelstaat (git status/diff op de opdracht-scope) en maak het werk in de hoofdthread af of dispatch gericht het restant — nooit blind opnieuw dispatchen of het rapport als compleet behandelen.
 
 **Voortgangsrapportage (verplicht):** houd de gebruiker doorlopend op de hoogte van waar de pijplijn mee bezig is. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten, draai de agent(s) dan met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
 
