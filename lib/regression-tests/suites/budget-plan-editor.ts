@@ -29,7 +29,9 @@ import {
 import {
   BUDGET_TEMPLATES,
   buildTemplateAmounts,
+  buildTemplateSeed,
 } from '@/lib/budget-templates/onboarding-presets'
+import { BUDGET_SLUGS } from '@/lib/budget-data'
 
 const CAT = 'kern.budget-plan-editor'
 
@@ -335,6 +337,48 @@ const tests: TestCase[] = [
       assertEqual(diff.amounts.length, 1, '1 upsert')
       assertEqual(diff.amounts[0].effective_from, '2026-04-01', 'always current month')
       assertGreaterThanOrEqual(diff.amounts[0].effective_from.localeCompare('2026-04-01'), 0, 'never historical')
+    },
+  },
+  {
+    id: 'budget-plan-seed-minimalistisch-childless-limits',
+    name: 'buildTemplateSeed minimalistisch: childless bestedings-parents met default_limit > 0',
+    description:
+      'Fase C invariant: minimalistisch boekt direct op het hoofdbudget. ' +
+      'buildTemplateSeed levert wonen/dagelijks/vervoer/leuke-dingen zonder children maar met een positieve limiet.',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const seed = buildTemplateSeed('minimalistisch', 3000)
+
+      // These parents have empty slugs[] → childless, but limit = parent allocation
+      const childlessExpected = [
+        BUDGET_SLUGS.VASTE_LASTEN_WONEN,
+        BUDGET_SLUGS.DAGELIJKSE_UITGAVEN,
+        BUDGET_SLUGS.VERVOER,
+        BUDGET_SLUGS.LEUKE_DINGEN,
+      ]
+
+      for (const slug of childlessExpected) {
+        const parent = seed.find((p) => p.slug === slug)
+        assert(parent !== undefined, `${slug} aanwezig in minimalistisch seed`)
+        assertEqual(
+          (parent?.children ?? []).length,
+          0,
+          `${slug}: geen children (transacties direct op hoofdbudget)`,
+        )
+        assert(
+          (parent?.default_limit ?? 0) > 0,
+          `${slug}: default_limit > 0 (niet €0 — template alloceert bedrag op parent)`,
+        )
+      }
+
+      // Sanity: sum of these childless parents (+ sparen children + schulden 0) == netIncome
+      const incomeSlugs = [BUDGET_SLUGS.INKOMEN, BUDGET_SLUGS.EIGEN_REKENING]
+      const expenseSum = seed
+        .filter((p) => !incomeSlugs.includes(p.slug as (typeof incomeSlugs)[number]))
+        .reduce((n, p) => n + p.default_limit, 0)
+      assertEqual(expenseSum, 3000, 'minimalistisch seed: bestedings-parents sommeren naar 3000')
     },
   },
 ]

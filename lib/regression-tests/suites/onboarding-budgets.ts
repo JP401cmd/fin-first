@@ -2,247 +2,284 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import type { TestCase } from '../test-types'
 import { authenticatedFetch } from '../server-runner'
+import {
+  BUDGET_TEMPLATES,
+  buildTemplateAmounts,
+  buildTemplateSeed,
+  type BudgetTemplateId,
+} from '@/lib/budget-templates/onboarding-presets'
+import { BUDGET_SLUGS, BUDGET_LEAF_META, BUDGET_PARENT_META } from '@/lib/budget-data'
 
 const CAT = 'onboarding.budgets'
 
-// ── New template system (minimalistisch/nibud/uitgebreid) ───────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-type BudgetTemplateId = 'minimalistisch' | 'nibud' | 'uitgebreid'
+const INCOME_SLUGS = [
+  BUDGET_SLUGS.SALARIS_UITKERING,
+  BUDGET_SLUGS.TOESLAGEN_KINDERBIJSLAG,
+  BUDGET_SLUGS.TERUGGAVE_BELASTING,
+  BUDGET_SLUGS.OVERIGE_INKOMSTEN,
+] as const
 
-interface TemplateCategory {
-  label: string
-  icon: string
-  slugs: string[]
+/** Sum of allocated (bestedings-)amounts: everything except income keys. */
+function allocatedSum(amounts: Record<string, number>): number {
+  return Object.entries(amounts)
+    .filter(([slug]) => !(INCOME_SLUGS as readonly string[]).includes(slug))
+    .reduce((n, [, v]) => n + v, 0)
 }
 
-interface BudgetTemplate {
-  id: BudgetTemplateId
-  name: string
-  description: string
-  allocations: Record<string, number>
-  categories: TemplateCategory[]
-}
-
-// ── Per-template allocation maps ────────────────────────────────────────────
-
-const MINIMALISTISCH_ALLOC: Record<string, number> = {
-  'huur-hypotheek': 0.28, 'gas-water-licht': 0.06, 'verzekeringen-wonen': 0.03,
-  'gemeentelijke-lasten': 0.01, 'boodschappen': 0.15, 'brandstof-ov': 0.07,
-  'kleding-overige': 0.15, 'sparen-noodbuffer': 0.10, 'investeren-fire': 0.15,
-}
-
-const NIBUD_ALLOC: Record<string, number> = {
-  'huur-hypotheek': 0.24, 'gas-water-licht': 0.05, 'gemeentelijke-lasten': 0.02,
-  'verzekeringen-wonen': 0.05, 'boodschappen': 0.12, 'huishouden-verzorging': 0.02,
-  'kinderen-school': 0.02, 'medische-kosten': 0.02, 'brandstof-ov': 0.04,
-  'auto-vaste-lasten': 0.04, 'fiets-deelvervoer': 0.02, 'kleding-overige': 0.04,
-  'uit-eten-horeca': 0.03, 'vrije-tijd-sport': 0.03, 'vakantie': 0.04,
-  'sparen-noodbuffer': 0.07, 'investeren-fire': 0.10, 'schulden-aflossingen': 0.03,
-  'extra-aflossing-hypotheek': 0.02,
-}
-
-const UITGEBREID_ALLOC: Record<string, number> = {
-  'huur-hypotheek': 0.24, 'gas-water-licht': 0.05, 'verzekeringen-wonen': 0.04,
-  'gemeentelijke-lasten': 0.02, 'boodschappen': 0.12, 'huishouden-verzorging': 0.02,
-  'kinderen-school': 0.02, 'medische-kosten': 0.02, 'brandstof-ov': 0.03,
-  'auto-vaste-lasten': 0.03, 'auto-onderhoud': 0.02, 'fiets-deelvervoer': 0.01,
-  'uit-eten-horeca': 0.04, 'vrije-tijd-sport': 0.03, 'vakantie': 0.04,
-  'kleding-overige': 0.03, 'sparen-noodbuffer': 0.06, 'investeren-fire': 0.12,
-  'schulden-aflossingen': 0.03, 'extra-aflossing-hypotheek': 0.03,
-}
-
-// ── Template definitions with category groupings ────────────────────────────
-
-const BUDGET_TEMPLATES: BudgetTemplate[] = [
-  {
-    id: 'minimalistisch',
-    name: 'Minimalistisch',
-    description: 'Eenvoudig budget met 5 categorieën',
-    allocations: MINIMALISTISCH_ALLOC,
-    categories: [
-      { label: 'Wonen', icon: 'Home', slugs: ['huur-hypotheek', 'gas-water-licht', 'verzekeringen-wonen', 'gemeentelijke-lasten'] },
-      { label: 'Levensonderhoud', icon: 'ShoppingCart', slugs: ['boodschappen'] },
-      { label: 'Vervoer', icon: 'Car', slugs: ['brandstof-ov'] },
-      { label: 'Overig', icon: 'MoreHorizontal', slugs: ['kleding-overige'] },
-      { label: 'Sparen & Investeren', icon: 'PiggyBank', slugs: ['sparen-noodbuffer', 'investeren-fire'] },
-    ],
-  },
-  {
-    id: 'nibud',
-    name: 'Nibud',
-    description: 'Gebalanceerd budget op basis van Nibud-richtlijnen met 9 categorieën',
-    allocations: NIBUD_ALLOC,
-    categories: [
-      { label: 'Wonen', icon: 'Home', slugs: ['huur-hypotheek', 'gas-water-licht', 'gemeentelijke-lasten', 'verzekeringen-wonen'] },
-      { label: 'Levensonderhoud', icon: 'ShoppingCart', slugs: ['boodschappen', 'huishouden-verzorging'] },
-      { label: 'Kinderen & Zorg', icon: 'Heart', slugs: ['kinderen-school', 'medische-kosten'] },
-      { label: 'Vervoer', icon: 'Car', slugs: ['brandstof-ov', 'auto-vaste-lasten', 'fiets-deelvervoer'] },
-      { label: 'Kleding', icon: 'Shirt', slugs: ['kleding-overige'] },
-      { label: 'Vrije tijd', icon: 'Coffee', slugs: ['uit-eten-horeca', 'vrije-tijd-sport', 'vakantie'] },
-      { label: 'Sparen', icon: 'PiggyBank', slugs: ['sparen-noodbuffer'] },
-      { label: 'Investeren', icon: 'TrendingUp', slugs: ['investeren-fire'] },
-      { label: 'Aflossingen', icon: 'CreditCard', slugs: ['schulden-aflossingen', 'extra-aflossing-hypotheek'] },
-    ],
-  },
-  {
-    id: 'uitgebreid',
-    name: 'Uitgebreid',
-    description: 'Gedetailleerd budget met 16 categorieën',
-    allocations: UITGEBREID_ALLOC,
-    categories: Array.from({ length: 16 }, (_, i) => ({
-      label: `Categorie ${i + 1}`,
-      icon: 'Circle',
-      slugs: [],
-    })),
-  },
-]
-
-// ── Expected budget slugs (all 24: 4 income + 20 expense/savings) ───────────
-
-const INCOME_SLUGS = ['salaris-uitkering', 'toeslagen-kinderbijslag', 'teruggave-belasting', 'overige-inkomsten']
-
-const EXPECTED_BUDGET_SLUGS = [
-  ...INCOME_SLUGS,
-  'huur-hypotheek', 'gas-water-licht', 'verzekeringen-wonen', 'gemeentelijke-lasten',
-  'brandstof-ov', 'auto-vaste-lasten', 'auto-onderhoud', 'fiets-deelvervoer',
-  'boodschappen', 'huishouden-verzorging', 'kinderen-school', 'medische-kosten',
-  'uit-eten-horeca', 'vrije-tijd-sport', 'vakantie', 'kleding-overige',
-  'sparen-noodbuffer', 'investeren-fire',
-  'schulden-aflossingen', 'extra-aflossing-hypotheek',
-]
-
-// ── Helper: replicate distributeIncome + buildTemplateAmounts logic ──────────
-
-function distributeIncome(netIncome: number, allocations: Record<string, number>): Record<string, number> {
-  const result: Record<string, number> = {}
-
-  // 1. Set all income slugs
-  result['salaris-uitkering'] = netIncome
-  for (const slug of INCOME_SLUGS) {
-    if (slug !== 'salaris-uitkering') result[slug] = 0
-  }
-
-  // 2. Set all expense/savings slugs to 0 initially
-  for (const slug of EXPECTED_BUDGET_SLUGS) {
-    if (!INCOME_SLUGS.includes(slug) && !(slug in result)) {
-      result[slug] = 0
-    }
-  }
-
-  // 3. Apply allocations: Math.round(netIncome * pct)
-  for (const [slug, pct] of Object.entries(allocations)) {
-    result[slug] = Math.round(netIncome * pct)
-  }
-
-  // 4. Fix rounding: adjust the largest allocated slug so the sum equals netIncome
-  const allocatedSlugs = Object.keys(allocations)
-  if (allocatedSlugs.length > 0 && netIncome > 0) {
-    const allocatedSum = allocatedSlugs.reduce((sum, s) => sum + result[s], 0)
-    const diff = netIncome - allocatedSum
-    if (diff !== 0) {
-      // Find the largest slug
-      let maxSlug = allocatedSlugs[0]
-      for (const s of allocatedSlugs) {
-        if (result[s] > result[maxSlug]) maxSlug = s
-      }
-      result[maxSlug] += diff
-    }
-  }
-
-  return result
-}
-
-function buildTemplateAmounts(netIncome: number, templateId: BudgetTemplateId): Record<string, number> {
-  const template = BUDGET_TEMPLATES.find((t) => t.id === templateId)
-  if (!template) throw new Error(`Unknown template: ${templateId}`)
-  return distributeIncome(netIncome, template.allocations)
-}
-
-// ── Tests ───────────────────────────────────────────────────────────────────
+// ── Tests ────────────────────────────────────────────────────────────────────
 
 const tests: TestCase[] = [
   // ── Step 1: Budget templates ──────────────────────────────────
   {
     id: 'ob-budget-templates',
-    name: 'Budget templates: minimalistisch/nibud/uitgebreid selectie met correcte preset bedragen',
+    name: 'Budget templates: 3 templates met stabiele IDs',
     category: CAT,
-    description: 'Drie budget templates zijn beschikbaar met per-slug allocatiepercentages',
+    description: 'Drie budget templates beschikbaar met vaste IDs: minimalistisch, nibud, uitgebreid',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // 3 templates available
+      // (a) Exact 3 templates with the canonical IDs
       assertEqual(BUDGET_TEMPLATES.length, 3, 'Exact 3 budget templates beschikbaar')
-
-      // Verify template IDs
       assertEqual(BUDGET_TEMPLATES[0].id, 'minimalistisch', 'Eerste template is minimalistisch')
       assertEqual(BUDGET_TEMPLATES[1].id, 'nibud', 'Tweede template is nibud')
       assertEqual(BUDGET_TEMPLATES[2].id, 'uitgebreid', 'Derde template is uitgebreid')
 
-      // All allocation percentages should sum to ~1.0 for each template
-      for (const t of BUDGET_TEMPLATES) {
-        const sum = Object.values(t.allocations).reduce((s, v) => s + v, 0)
-        assert(
-          Math.abs(sum - 1.0) < 0.005,
-          `Template ${t.id}: allocatie percentages sommeren tot ~100% (was ${(sum * 100).toFixed(1)}%)`,
-        )
-      }
-
-      // Verify concrete amounts for EUR 3000 income
+      // buildTemplateAmounts works for each template
       const income = 3000
       const amounts = buildTemplateAmounts(income, 'nibud')
-      assertEqual(amounts['salaris-uitkering'], income, 'Inkomen = netIncome')
-      assert(amounts['huur-hypotheek'] > 0, 'Huur/hypotheek bedrag is positief')
-      assert(amounts['boodschappen'] > 0, 'Boodschappen bedrag is positief')
-      assert(amounts['investeren-fire'] > 0, 'Investeren bedrag is positief')
+      assertEqual(amounts[BUDGET_SLUGS.SALARIS_UITKERING], income, 'Inkomen = netIncome')
+      assert((amounts[BUDGET_SLUGS.HUUR_HYPOTHEEK] ?? 0) > 0, 'Huur/hypotheek bedrag is positief')
+      assert((amounts[BUDGET_SLUGS.BOODSCHAPPEN] ?? 0) > 0, 'Boodschappen bedrag is positief')
+      assert((amounts[BUDGET_SLUGS.INVESTEREN_FIRE] ?? 0) > 0, 'Investeren bedrag is positief')
     },
   },
 
-  // ── Step 2: Template switch ───────────────────────────────────
+  // ── Step 2: Categorie-aantallen per template ──────────────────
   {
-    id: 'ob-budget-template-switch',
-    name: 'Template switch: wijzigen van template update alle bedragen',
+    id: 'ob-budget-category-counts',
+    name: 'Categorie-aantallen: minimalistisch 5 / nibud 6 / uitgebreid 6',
     category: CAT,
-    description: 'Selectie van een ander template herberekent alle budget bedragen op basis van netIncome',
+    description: 'Nieuwe hiërarchische templates: minimalistisch 5 potjes, nibud 6 hoofdbudgetten, uitgebreid 6 hoofdbudgetten',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      const income = 3500
+      const mini = BUDGET_TEMPLATES.find((t) => t.id === 'minimalistisch')!
+      const nibud = BUDGET_TEMPLATES.find((t) => t.id === 'nibud')!
+      const uitg = BUDGET_TEMPLATES.find((t) => t.id === 'uitgebreid')!
 
-      const mini = buildTemplateAmounts(income, 'minimalistisch')
-      const uitg = buildTemplateAmounts(income, 'uitgebreid')
+      // (b) Category counts match the new template structure
+      assertEqual(mini.categories.length, 5, 'Minimalistisch: 5 categorieën')
+      assertEqual(nibud.categories.length, 6, 'Nibud: 6 categorieën')
+      assertEqual(uitg.categories.length, 6, 'Uitgebreid: 6 categorieën')
 
-      // Minimalistisch allocates more to huur-hypotheek (28% vs 24%)
-      assert(
-        mini['huur-hypotheek'] > uitg['huur-hypotheek'],
-        'Minimalistisch heeft hogere huur dan uitgebreid (28% vs 24%)',
-      )
-
-      // Uitgebreid allocates more to investeren-fire (12% vs 15%)
-      // Actually minimalistisch has 15%, uitgebreid has 12%
-      assert(
-        mini['investeren-fire'] > uitg['investeren-fire'],
-        'Minimalistisch heeft hoger investeringsbedrag dan uitgebreid',
-      )
-
-      // Both have same income
-      assertEqual(mini['salaris-uitkering'], income, 'Minimalistisch: inkomen = netIncome')
-      assertEqual(uitg['salaris-uitkering'], income, 'Uitgebreid: inkomen = netIncome')
-
-      // All 24 slugs present in both
-      assertEqual(
-        Object.keys(mini).sort().join(','),
-        Object.keys(uitg).sort().join(','),
-        'Beide templates produceren dezelfde budget slugs',
-      )
-
-      // Uitgebreid has more non-zero expense slugs (more granular)
-      const miniNonZero = Object.entries(mini).filter(([s, v]) => v > 0 && !INCOME_SLUGS.includes(s)).length
-      const uitgNonZero = Object.entries(uitg).filter(([s, v]) => v > 0 && !INCOME_SLUGS.includes(s)).length
-      assert(uitgNonZero > miniNonZero, 'Uitgebreid heeft meer niet-nul posten dan minimalistisch')
+      // Each category has the new shape: parentSlug + label + icon + slugs
+      for (const tpl of BUDGET_TEMPLATES) {
+        for (const cat of tpl.categories) {
+          assert(typeof cat.parentSlug === 'string' && cat.parentSlug.length > 0,
+            `${tpl.id}/${cat.label}: parentSlug aanwezig`)
+          assert(typeof cat.label === 'string' && cat.label.length > 0,
+            `${tpl.id}: categorie heeft label`)
+          assert(typeof cat.icon === 'string' && cat.icon.length > 0,
+            `${tpl.id}/${cat.label}: icon aanwezig`)
+          assert(Array.isArray(cat.slugs),
+            `${tpl.id}/${cat.label}: slugs is array`)
+        }
+      }
     },
   },
 
-  // ── Step 3: AI budget suggesties ──────────────────────────────
+  // ── Step 3: Slug-aanwezigheid in catalogus + geen duplicaten ──
+  {
+    id: 'ob-budget-slug-catalogue-and-uniqueness',
+    name: 'Template-slugs in BUDGET_SLUGS + BUDGET_LEAF_META, geen duplicaten per template',
+    category: CAT,
+    description:
+      'Elke template-slug bestaat in BUDGET_SLUGS én BUDGET_LEAF_META en hoort bij de parentSlug van zijn categorie. ' +
+      'Geen slug dubbel binnen een template (vastpint bugfix D1 — oude huishouden-verzorging-dubbeling).',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      const knownSlugs = new Set<string>(Object.values(BUDGET_SLUGS))
+
+      for (const tpl of BUDGET_TEMPLATES) {
+        const seenInTemplate = new Set<string>()
+
+        for (const cat of tpl.categories) {
+          // parentSlug must be a known parent
+          assert(knownSlugs.has(cat.parentSlug),
+            `${tpl.id}: parentSlug '${cat.parentSlug}' bestaat in BUDGET_SLUGS`)
+          assert(BUDGET_PARENT_META[cat.parentSlug] !== undefined,
+            `${tpl.id}: parentSlug '${cat.parentSlug}' bestaat in BUDGET_PARENT_META`)
+
+          // (c) Each leaf slug must be in BUDGET_SLUGS and BUDGET_LEAF_META under the correct parent
+          for (const slug of cat.slugs) {
+            assert(knownSlugs.has(slug),
+              `${tpl.id}: slug '${slug}' bestaat in BUDGET_SLUGS`)
+            assert(BUDGET_LEAF_META[slug] !== undefined,
+              `${tpl.id}: slug '${slug}' bestaat in BUDGET_LEAF_META`)
+            assertEqual(
+              BUDGET_LEAF_META[slug].parentSlug,
+              cat.parentSlug,
+              `${tpl.id}: '${slug}' hangt onder de juiste parent '${cat.parentSlug}'`,
+            )
+
+            // (d) No slug appears twice within the same template
+            assert(!seenInTemplate.has(slug),
+              `${tpl.id}: slug '${slug}' komt NIET dubbel voor (bugfix D1)`)
+            seenInTemplate.add(slug)
+          }
+        }
+      }
+    },
+  },
+
+  // ── Step 4: Allocatie sommeert naar netIncome ─────────────────
+  {
+    id: 'ob-budget-allocation-sum',
+    name: 'Allocaties sommeren exact naar netIncome via buildTemplateAmounts',
+    category: CAT,
+    description: 'Per template: som van bestedings-amounts = netIncome (rounding-safe)',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      const testIncomes = [3000, 2347, 3333]
+
+      for (const income of testIncomes) {
+        for (const tpl of BUDGET_TEMPLATES) {
+          const amounts = buildTemplateAmounts(income, tpl.id)
+          // (e) Allocation sums exactly to netIncome
+          const sum = allocatedSum(amounts)
+          assertEqual(
+            sum,
+            income,
+            `${tpl.id} @ EUR${income}: bestedingen sommeren exact naar netIncome`,
+          )
+          // Income key equals netIncome
+          assertEqual(amounts[BUDGET_SLUGS.SALARIS_UITKERING], income,
+            `${tpl.id} @ EUR${income}: salaris-uitkering = netIncome`)
+        }
+      }
+    },
+  },
+
+  // ── Step 5: buildTemplateSeed — canonieke structuur ────────────
+  {
+    id: 'ob-budget-template-seed-structure',
+    name: 'buildTemplateSeed: 8 canonieke parents, vervoer-slugs onder één Vervoer-parent',
+    category: CAT,
+    description:
+      'buildTemplateSeed levert exact de 8 canonieke parents in sort_order. ' +
+      'Nibud/uitgebreid: vervoer-slugs hangen als children onder één Vervoer-parent.',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      // (f) buildTemplateSeed levert exact de 8 canonieke parents in volgorde
+      const expectedOrder = Object.keys(BUDGET_PARENT_META).sort(
+        (a, b) => BUDGET_PARENT_META[a].sort_order - BUDGET_PARENT_META[b].sort_order,
+      )
+
+      for (const tpl of BUDGET_TEMPLATES) {
+        const seed = buildTemplateSeed(tpl.id, 3000)
+        const actualSlugs = seed.map((p) => p.slug)
+        assertEqual(
+          actualSlugs.join(','),
+          expectedOrder.join(','),
+          `${tpl.id}: 8 canonieke parents in sort_order`,
+        )
+      }
+
+      // (f) Vervoer-slugs als children onder één Vervoer-parent (nibud/uitgebreid)
+      const vervoerLeaves = [
+        BUDGET_SLUGS.BRANDSTOF_OV,
+        BUDGET_SLUGS.AUTO_VASTE_LASTEN,
+        BUDGET_SLUGS.AUTO_ONDERHOUD,
+        BUDGET_SLUGS.FIETS_DEELVERVOER,
+      ]
+      for (const id of ['nibud', 'uitgebreid'] as BudgetTemplateId[]) {
+        const seed = buildTemplateSeed(id, 3000)
+        const vervoer = seed.find((p) => p.slug === BUDGET_SLUGS.VERVOER)!
+        const childSlugs = (vervoer.children ?? []).map((c) => c.slug).sort()
+        assertEqual(
+          childSlugs.join(','),
+          [...vervoerLeaves].sort().join(','),
+          `${id}: 4 vervoer-leaves als children onder Vervoer-parent`,
+        )
+      }
+    },
+  },
+
+  // ── Step 6: Minimalistisch — childless bestedings-parents ─────
+  {
+    id: 'ob-budget-minimalistisch-childless-parents',
+    name: 'Minimalistisch: bestedings-parents zonder leaf-slugs zijn childless met limit > 0',
+    category: CAT,
+    description:
+      'Minimalistisch heeft lege slugs-arrays voor wonen/dagelijks/vervoer/leuke-dingen. ' +
+      'buildTemplateSeed levert die als hoofdbudgetten zonder children maar met default_limit > 0 (direct boeken).',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      const seed = buildTemplateSeed('minimalistisch', 3000)
+
+      // Childless bestedings-parents that book directly on the parent budget
+      const childlessParents = [
+        BUDGET_SLUGS.VASTE_LASTEN_WONEN,
+        BUDGET_SLUGS.DAGELIJKSE_UITGAVEN,
+        BUDGET_SLUGS.VERVOER,
+        BUDGET_SLUGS.LEUKE_DINGEN,
+      ]
+
+      for (const slug of childlessParents) {
+        const parent = seed.find((p) => p.slug === slug)
+        assert(parent !== undefined, `minimalistisch: '${slug}' aanwezig in seed`)
+        const children = (parent?.children ?? [])
+        assertEqual(children.length, 0,
+          `minimalistisch: '${slug}' heeft geen children (direct boeken)`)
+        assert((parent?.default_limit ?? 0) > 0,
+          `minimalistisch: '${slug}' heeft default_limit > 0 (niet €0)`)
+      }
+
+      // Schulden-parent exists at €0 (no category for it in minimalistisch)
+      const schulden = seed.find((p) => p.slug === BUDGET_SLUGS.SCHULDEN_AFLOSSINGEN_PARENT)
+      assert(schulden !== undefined, 'minimalistisch: schulden-parent aanwezig')
+      assertEqual(schulden?.default_limit ?? -1, 0, 'minimalistisch: schulden-parent op €0')
+      assertEqual((schulden?.children ?? []).length, 0, 'minimalistisch: schulden-parent geen children')
+    },
+  },
+
+  // ── Step 7: Template switch ───────────────────────────────────
+  {
+    id: 'ob-budget-template-switch',
+    name: 'Template switch: nibud/uitgebreid bevatten de 2 nieuwe vaste-lasten-slugs',
+    category: CAT,
+    description: 'telefoon-internet-tv en abonnementen-contributies zitten in nibud/uitgebreid prompt-context',
+    priority: 'high',
+    estimatedDurationMs: 100,
+    fn() {
+      // Both nibud and uitgebreid include the two new slugs under vaste-lasten-wonen
+      for (const id of ['nibud', 'uitgebreid'] as BudgetTemplateId[]) {
+        const tpl = BUDGET_TEMPLATES.find((t) => t.id === id)!
+        const wonenCat = tpl.categories.find((c) => c.parentSlug === BUDGET_SLUGS.VASTE_LASTEN_WONEN)!
+
+        assert(wonenCat.slugs.includes(BUDGET_SLUGS.TELEFOON_INTERNET_TV),
+          `${id}: telefoon-internet-tv in vaste-lasten categorie`)
+        assert(wonenCat.slugs.includes(BUDGET_SLUGS.ABONNEMENTEN_CONTRIBUTIES),
+          `${id}: abonnementen-contributies in vaste-lasten categorie`)
+      }
+
+      // minimalistisch does NOT have leaf slugs for these (books on parent)
+      const mini = BUDGET_TEMPLATES.find((t) => t.id === 'minimalistisch')!
+      const allMiniSlugs = mini.categories.flatMap((c) => c.slugs)
+      assert(!allMiniSlugs.includes(BUDGET_SLUGS.TELEFOON_INTERNET_TV),
+        'minimalistisch: telefoon-internet-tv niet als leaf (direct op parent)')
+      assert(!allMiniSlugs.includes(BUDGET_SLUGS.ABONNEMENTEN_CONTRIBUTIES),
+        'minimalistisch: abonnementen-contributies niet als leaf (direct op parent)')
+    },
+  },
+
+  // ── Step 8: AI budget suggesties ──────────────────────────────
   {
     id: 'ob-budget-ai-suggest-api',
     name: 'AI budget suggesties: POST /api/onboarding/suggest-budgets endpoint',
@@ -267,7 +304,6 @@ const tests: TestCase[] = [
       assert(res.status !== 404, `Endpoint /api/onboarding/suggest-budgets bestaat (status: ${res.status})`)
 
       // Should require auth or return valid response
-      // 401 (auth required) or 200 (success) or 500 (AI unavailable) are all acceptable
       assert(
         [200, 401, 403, 500].includes(res.status),
         `Endpoint retourneert verwachte status: ${res.status} (200=ok, 401=auth, 500=AI unavailable)`,
@@ -275,7 +311,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 4: AI suggesties foutafhandeling ─────────────────────
+  // ── Step 9: AI suggesties foutafhandeling ─────────────────────
   {
     id: 'ob-budget-ai-fallback',
     name: 'AI suggesties foutafhandeling: graceful fallback zonder AI tier',
@@ -287,10 +323,9 @@ const tests: TestCase[] = [
       // Verify that templates work standalone without AI
       const income = 2500
       const amounts = buildTemplateAmounts(income, 'nibud')
-      const keys = Object.keys(amounts)
 
-      assert(keys.length >= 20, `Template produceert voldoende budget slugs: ${keys.length}`)
-      assert(amounts['salaris-uitkering'] === income, 'Fallback: inkomen correct zonder AI')
+      assert(allocatedSum(amounts) === income, 'Fallback: allocaties = inkomen')
+      assert(amounts[BUDGET_SLUGS.SALARIS_UITKERING] === income, 'Fallback: inkomen correct zonder AI')
 
       // All amounts should be non-negative (valid fallback)
       for (const [slug, amount] of Object.entries(amounts)) {
@@ -299,83 +334,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 5: BudgetAmountEditor ────────────────────────────────
-  {
-    id: 'ob-budget-amount-editor',
-    name: 'BudgetAmountEditor: individuele budgets handmatig aanpassen na template',
-    category: CAT,
-    description: 'Na template selectie kan de gebruiker individuele bedragen aanpassen in de manual editor',
-    priority: 'high',
-    estimatedDurationMs: 100,
-    fn() {
-      const income = 3000
-      const templateAmounts = buildTemplateAmounts(income, 'minimalistisch')
-
-      // Simulate manual adjustment: user changes boodschappen
-      const adjusted = { ...templateAmounts }
-      adjusted['boodschappen'] = 500
-
-      // Adjusted amount should differ from template
-      assert(
-        adjusted['boodschappen'] !== templateAmounts['boodschappen'],
-        'Handmatig aangepast bedrag verschilt van template',
-      )
-
-      // Other amounts remain unchanged
-      assertEqual(
-        adjusted['huur-hypotheek'],
-        templateAmounts['huur-hypotheek'],
-        'Niet-aangepaste bedragen blijven gelijk',
-      )
-
-      // The editor receives amounts + onChange + netIncome props
-      assert(typeof adjusted === 'object', 'Budget amounts is een object')
-      assert(Object.keys(adjusted).length > 0, 'Budget amounts bevat entries')
-    },
-  },
-
-  // ── Step 6: Budget slugs ──────────────────────────────────────
-  {
-    id: 'ob-budget-slugs-completeness',
-    name: 'Budget slugs: alle 24 slugs aanwezig in template output',
-    category: CAT,
-    description: 'buildTemplateAmounts produceert bedragen voor alle 24 verwachte budget slugs',
-    priority: 'critical',
-    estimatedDurationMs: 100,
-    fn() {
-      const income = 3000
-
-      for (const templateId of ['minimalistisch', 'nibud', 'uitgebreid'] as BudgetTemplateId[]) {
-        const amounts = buildTemplateAmounts(income, templateId)
-        const keys = Object.keys(amounts)
-
-        // All expected slugs must be present
-        for (const slug of EXPECTED_BUDGET_SLUGS) {
-          assert(keys.includes(slug), `Template ${templateId}: budget slug '${slug}' aanwezig`)
-        }
-
-        // Total count matches
-        assertEqual(
-          keys.length,
-          EXPECTED_BUDGET_SLUGS.length,
-          `Template ${templateId}: produceert exact ${EXPECTED_BUDGET_SLUGS.length} budget slugs`,
-        )
-      }
-
-      // Verify slug categories:
-      // Inkomen slugs (4)
-      for (const s of INCOME_SLUGS) {
-        assert(EXPECTED_BUDGET_SLUGS.includes(s), `Inkomen slug '${s}' aanwezig`)
-      }
-      assertEqual(INCOME_SLUGS.length, 4, '4 inkomen slugs')
-
-      // Sparen slugs (2)
-      assert(EXPECTED_BUDGET_SLUGS.includes('sparen-noodbuffer'), 'Sparen slug aanwezig')
-      assert(EXPECTED_BUDGET_SLUGS.includes('investeren-fire'), 'Investeren slug aanwezig')
-    },
-  },
-
-  // ── Step 7: Numerieke invoer validatie ────────────────────────
+  // ── Step 10: Numerieke invoer validatie ───────────────────────
   {
     id: 'ob-budget-numeric-validation',
     name: 'Numerieke invoer: alleen positieve bedragen, correct afgerond',
@@ -384,26 +343,20 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      // Test with various incomes
       const testIncomes = [1500, 2500, 3000, 5000, 10000]
 
       for (const income of testIncomes) {
-        for (const templateId of ['minimalistisch', 'nibud', 'uitgebreid'] as BudgetTemplateId[]) {
-          const amounts = buildTemplateAmounts(income, templateId)
+        for (const tpl of BUDGET_TEMPLATES) {
+          const amounts = buildTemplateAmounts(income, tpl.id)
 
           for (const [slug, amount] of Object.entries(amounts)) {
-            // All amounts must be non-negative
-            assert(amount >= 0, `${templateId} @ EUR${income}: ${slug} is niet negatief (${amount})`)
-
-            // All amounts must be integers (Math.round)
+            assert(amount >= 0, `${tpl.id} @ EUR${income}: ${slug} is niet negatief (${amount})`)
             assertEqual(
               amount,
               Math.round(amount),
-              `${templateId} @ EUR${income}: ${slug} is afgerond (${amount})`,
+              `${tpl.id} @ EUR${income}: ${slug} is afgerond (${amount})`,
             )
-
-            // No NaN or Infinity
-            assert(Number.isFinite(amount), `${templateId} @ EUR${income}: ${slug} is eindig getal`)
+            assert(Number.isFinite(amount), `${tpl.id} @ EUR${income}: ${slug} is eindig getal`)
           }
         }
       }
@@ -416,7 +369,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 8: distributeIncome rounding fix ──────────────────────
+  // ── Step 11: distributeIncome rounding fix ──────────────────────
   {
     id: 'ob-budget-rounding-fix',
     name: 'distributeIncome: rounding fix zorgt dat allocated sum == netIncome',
@@ -425,66 +378,23 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      // Test with incomes that cause rounding issues
       const testIncomes = [3333, 2777, 4999, 7777]
 
       for (const income of testIncomes) {
-        for (const templateId of ['minimalistisch', 'nibud', 'uitgebreid'] as BudgetTemplateId[]) {
-          const amounts = buildTemplateAmounts(income, templateId)
-          const template = BUDGET_TEMPLATES.find((t) => t.id === templateId)!
-          const allocatedSlugs = Object.keys(template.allocations)
-          const allocatedSum = allocatedSlugs.reduce((sum, s) => sum + amounts[s], 0)
-
+        for (const tpl of BUDGET_TEMPLATES) {
+          const amounts = buildTemplateAmounts(income, tpl.id)
+          const sum = allocatedSum(amounts)
           assertEqual(
-            allocatedSum,
+            sum,
             income,
-            `${templateId} @ EUR${income}: allocated sum (${allocatedSum}) == netIncome (${income})`,
+            `${tpl.id} @ EUR${income}: allocated sum (${sum}) == netIncome (${income})`,
           )
         }
       }
     },
   },
 
-  // ── Step 9: Category-based display ────────────────────────────
-  {
-    id: 'ob-budget-category-display',
-    name: 'Category-based display: templates groeperen slugs in categorieën',
-    category: CAT,
-    description: 'Minimalistisch heeft 5 categorieën, Nibud heeft 9, Uitgebreid heeft 16',
-    priority: 'high',
-    estimatedDurationMs: 100,
-    fn() {
-      const mini = BUDGET_TEMPLATES.find((t) => t.id === 'minimalistisch')!
-      const nibud = BUDGET_TEMPLATES.find((t) => t.id === 'nibud')!
-      const uitg = BUDGET_TEMPLATES.find((t) => t.id === 'uitgebreid')!
-
-      // Verify category counts
-      assertEqual(mini.categories.length, 5, 'Minimalistisch: 5 categorieën')
-      assertEqual(nibud.categories.length, 9, 'Nibud: 9 categorieën')
-      assertEqual(uitg.categories.length, 16, 'Uitgebreid: 16 categorieën')
-
-      // Each category has a label and icon
-      for (const cat of mini.categories) {
-        assert(cat.label.length > 0, `Minimalistisch categorie heeft label: ${cat.label}`)
-        assert(cat.icon.length > 0, `Minimalistisch categorie ${cat.label} heeft icon`)
-        assert(Array.isArray(cat.slugs), `Minimalistisch categorie ${cat.label} heeft slugs array`)
-      }
-
-      // Minimalistisch categories cover all allocated slugs
-      const miniCoverSlugs = mini.categories.flatMap((c) => c.slugs)
-      for (const slug of Object.keys(mini.allocations)) {
-        assert(miniCoverSlugs.includes(slug), `Minimalistisch categorie dekt slug: ${slug}`)
-      }
-
-      // Nibud categories cover all allocated slugs
-      const nibudCoverSlugs = nibud.categories.flatMap((c) => c.slugs)
-      for (const slug of Object.keys(nibud.allocations)) {
-        assert(nibudCoverSlugs.includes(slug), `Nibud categorie dekt slug: ${slug}`)
-      }
-    },
-  },
-
-  // ── Step 10: Route accessibility ───────────────────────────────
+  // ── Step 12: Route accessibility ───────────────────────────────
   {
     id: 'ob-budget-route-accessible',
     name: '/onboarding route bereikbaar (budget stap is onderdeel van onboarding)',

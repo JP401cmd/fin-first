@@ -32,10 +32,16 @@ const RESET_PROFILE = {
   children_ages: [] as number[],
 } as const
 
-/** 24 child budget slugs used by AI suggest endpoint */
+/**
+ * 26 child budget slugs used by the default seed and AI suggest endpoint.
+ * Fase C: 2 nieuwe slugs toegevoegd onder vaste-lasten-wonen:
+ *   - telefoon-internet-tv (€45/mnd)
+ *   - abonnementen-contributies (€25/mnd)
+ */
 const AI_BUDGET_CHILD_SLUGS = [
   'salaris-uitkering', 'toeslagen-kinderbijslag', 'teruggave-belasting', 'overige-inkomsten',
   'huur-hypotheek', 'gas-water-licht', 'verzekeringen-wonen', 'gemeentelijke-lasten',
+  'telefoon-internet-tv', 'abonnementen-contributies',
   'boodschappen', 'huishouden-verzorging', 'kinderen-school', 'medische-kosten',
   'brandstof-ov', 'auto-vaste-lasten', 'auto-onderhoud', 'fiets-deelvervoer',
   'uit-eten-horeca', 'vrije-tijd-sport', 'vakantie', 'kleding-overige',
@@ -428,12 +434,14 @@ const tests: TestCase[] = [
       assert(typeof responseShape.usage === 'object', 'usage bevat token counts')
       assert(typeof responseShape.usage.totalTokens === 'number', 'totalTokens is number')
 
-      // Test 4: AI uses 24 child budget slugs
-      assertEqual(AI_BUDGET_CHILD_SLUGS.length, 24, '24 child budget slugs')
+      // Test 4: AI uses 26 child budget slugs (fase C: +telefoon-internet-tv, +abonnementen-contributies)
+      assertEqual(AI_BUDGET_CHILD_SLUGS.length, 26, '26 child budget slugs')
       assertIncludes(AI_BUDGET_CHILD_SLUGS, 'huur-hypotheek', 'Bevat huur-hypotheek')
       assertIncludes(AI_BUDGET_CHILD_SLUGS, 'boodschappen', 'Bevat boodschappen')
       assertIncludes(AI_BUDGET_CHILD_SLUGS, 'sparen-noodbuffer', 'Bevat sparen-noodbuffer')
       assertIncludes(AI_BUDGET_CHILD_SLUGS, 'investeren-fire', 'Bevat investeren-fire')
+      assertIncludes(AI_BUDGET_CHILD_SLUGS, 'telefoon-internet-tv', 'Bevat telefoon-internet-tv')
+      assertIncludes(AI_BUDGET_CHILD_SLUGS, 'abonnementen-contributies', 'Bevat abonnementen-contributies')
 
       // Test 5: Prompt includes household context
       const prompt = `Netto maandinkomen: ${requestBody.netMonthlyIncome}`
