@@ -29,7 +29,7 @@ Eerst gericht (de geraakte paden), dan volledig `npm run test:run`. Gedragswijzi
 
 ### 4. Migratie naar remote — `supabase-db-specialist` (indien migratie)
 **De lokale `supabase/migrations/`-map is níet de remote waarheid** (bekende drift). Daarom altijd:
-1. `mcp__supabase__list_migrations` + `list_tables` — bestaat de tabel/kolom al, conflicteert er iets?
+1. `mcp__supabase__list_migrations` + `list_tables` — bestaat de tabel/kolom al, conflicteert er iets? Vergelijk daarbij op **schema-effect** (tabel/kolom/index/policy via `execute_sql` op `information_schema`/`pg_catalog`), niet op bestandsnaam/timestamp — door de drift staan migraties remote vaak onder een ándere versie-string, en een naam-diff markeert al-toegepaste migraties dan onterecht als "ontbrekend".
 2. Toepassen via `mcp__supabase__apply_migration` (idempotent: `if not exists` / `create or replace`) — nooit blind een push-commando.
 3. Verifiëren met `execute_sql` (kolommen/policies bestaan echt) en `mcp__supabase__get_advisors` (security) — vangt ontbrekende RLS direct.
 
