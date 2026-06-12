@@ -48,6 +48,8 @@ Routeer naar het domein van de wijziging en zet **één** specialist in; alleen 
 
 Schaaf bij de **bron**, hergebruik bestaande tokens/componenten/helpers; introduceer geen tweede manier van iets doen. Respecteer "Geld is opgeslagen tijd"-framing en de bestaande conventies (design tokens, `font-mono tabular-nums` voor bedragen, vrijheidstijd-framing).
 
+Geef elke bouw-agent expliciet mee dat hij **géén werkboom-muterende git-commando's** draait (stash/checkout/restore/reset) — pre-existing fouten read-only beoordelen (bv. via `git diff`); er kan een parallelle sessie in dezelfde werkboom actief zijn. Git-experimenten alleen in een geïsoleerde worktree.
+
 ### 4. Verifiëren — verplicht, geen groen-theater
 Altijd: `npx tsc --noEmit` + het **gerichte** `npm run test:run`-pad rond het geraakte bestand (niet de hele suite tenzij nodig). Bij een UI-wijziging ook een **visuele check** van het geraakte scherm in de betrokken toestanden. Echte output rapporteren. Brak een bestaande test door de tweak → fix of pas de test bewust aan met uitleg; nooit wegmoffelen. Een nieuwe (regressie)test is bij een echt kleine aanpassing meestal niet nodig — voeg er één toe als de tweak gedrag raakt dat makkelijk terug kan vallen.
 
