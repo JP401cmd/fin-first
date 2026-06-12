@@ -24,7 +24,7 @@ import type {
 import type { WidgetPref, WidgetPrefs } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import {
   computeFireProjection,
   computeFireRange,
@@ -572,7 +572,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     fireSwr,
     { strategy: fireStrategy.strategy, yearsInRetirement, realReturn },
   )
-  const freedomPct = computeFreedomPercentage(netWorth, fireTarget)
 
   // FIRE projection — housing strategy bepaalt of eigen woning meedoet in
   // de FIRE-pot. Voor display-doel houdt totalAssets/totalDebts (en netWorth)
@@ -715,6 +714,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       simFireAgeFractional = null
     }
   }
+
+  // Vrijheidsvoortgang — canonieke grondslag: FIRE-eligible vermogen (huis
+  // gefilterd via housing-strategie) ÷ benodigde portfolio uit de unified
+  // projection. Dezelfde teller/noemer als de "nog X jaar"-aftelling, dus 100%
+  // verschijnt nooit meer naast "nog jaren". Fallback wanneer de sim niet kon
+  // draaien (geen dob / netWorth ≤ 0 / sim-error): het strategie-bewuste
+  // fireTarget op dezelfde FIRE-eligible grondslag — geen nieuwe parallelle som.
+  const requiredPortfolioForProgress = simRequiredPortfolio ?? (fireTarget > 0 ? fireTarget : null)
+  const freedomPct = computeFreedomProgress({
+    fireEligibleNetWorth,
+    requiredPortfolio: requiredPortfolioForProgress,
+  })
 
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
   const simCurrentAge = dob ? ageAtDate(dob) : null

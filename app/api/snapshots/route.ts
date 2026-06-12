@@ -49,7 +49,14 @@ export async function GET() {
   }, 0)
   const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / NL_SWR : 0
 
-  // Enrich snapshots with computed freedom_percentage
+  // Enrich snapshots with computed freedom_percentage.
+  // NB: bewuste afwijking van de canonieke vrijheidsvoortgang
+  // (computeFreedomProgress in lib/core-metrics.ts). Hier: VOLLEDIG netWorth ÷
+  // (essentiële jaarlasten / NL_SWR), huis meegerekend, géén unified-projection
+  // en géén housing-strategie-filter. De live-loaders (dashboard/horizon)
+  // gebruiken sinds de "100% naast nog X jaar"-fix WEL de FIRE-eligible
+  // grondslag. Snapshot-historie houdt bewust een eigen, per-rij intern
+  // consistente definitie (de freedom_percentage hier ↔ de opgeslagen kolom).
   const enriched = (snapshots ?? []).map(s => {
     const netWorth = Number(s.net_worth)
     const totalAssets = Number(s.total_assets)
@@ -170,6 +177,17 @@ export async function POST() {
   const fireParams = resolveFireParams(profileResult.data ?? {})
   const fireSwr = fireParams.effectiveSwr
   const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
+  // Bewuste afwijking van de canonieke vrijheidsvoortgang (computeFreedomProgress
+  // in lib/core-metrics.ts): freedomPercentage is hier VOLLEDIG netWorth ÷
+  // fireTarget (essentiële lasten / SWR), huis meegerekend en ZONDER
+  // unified-projection / housing-strategie-filter. De live-voortgangsbalk
+  // (dashboard/horizon) gebruikt sinds de "100% naast nog X jaar"-fix WEL de
+  // FIRE-eligible grondslag ÷ benodigde portfolio uit runUnifiedProjection.
+  // Unificeren zou hier de volledige housing-/fire-strategy-machinerie per
+  // snapshot vereisen (grote ombouw) en de per-rij kolom-consistentie breken
+  // (deze waarde landt 1-op-1 in de freedom_percentage-kolom van diezelfde rij).
+  // Daarom: snapshot-historie = eigen, gedocumenteerde definitie. Bewust twee
+  // grondslagen.
   const freedomPercentage = fireTarget > 0
     ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
     : 0

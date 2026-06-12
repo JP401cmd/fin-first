@@ -1,6 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
+import { computeCoreData, computeFreedomProgress, type FinancialInput } from '@/lib/core-metrics'
 import { loadCoreData } from '@/lib/core-data-loader'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
+import {
+  deriveHousingContext,
+  getFireEligibleNetWorth,
+  parseHousingStrategy,
+} from '@/lib/housing-strategy'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 
 const TEMPORAL_LABELS: Record<number, string> = {
@@ -30,7 +37,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     loadCoreData(supabase),
     supabase
       .from('profiles')
-      .select('temporal_balance, household_type, financial_context')
+      .select('temporal_balance, household_type, financial_context, housing_strategy_config')
       .maybeSingle(),
   ])
 
@@ -73,11 +80,36 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   }
   const core = computeCoreData(coreInput, coreData.fireParams.effectiveSwr)
 
+  // Vrijheids-% op de canonieke grondslag (ADR 0009): FIRE-eligible vermogen
+  // (eigen woning gefilterd via de housing-strategie) ÷ benodigde portfolio uit
+  // de unified projection. Dit is exact dezelfde teller/noemer als de "nog X
+  // jaar"-aftelling op /overzicht en /toekomst, zodat Will nooit "100% op weg"
+  // beweert terwijl de UI <100% en "nog jaren" toont. `computeCoreData`'s eigen
+  // `freedomPercentage` (vol netto vermogen incl. huis ÷ simpel fireTarget) is
+  // bewust NIET de bron — alleen een laatste fallback voor het FIRE-doelbedrag.
+  const housingStrategy = parseHousingStrategy(profile?.housing_strategy_config)
+  const housingContext = deriveHousingContext(
+    (coreData.fullAssets ?? []) as Asset[],
+    (coreData.fullDebts ?? []) as Debt[],
+  )
+  const fireEligibleNetWorth = getFireEligibleNetWorth(core.netWorth, housingContext, housingStrategy)
+  // Noemer: benodigde portfolio uit de unified projection (zelfde getal als de
+  // loaders gebruiken). Valt terug op het strategie-loze fireTarget wanneer de
+  // projectie niet kon draaien (geen geboortedatum / geen jaaruitgaven).
+  const requiredPortfolio = coreData.fireTargetFromHorizon ?? (core.fireTarget > 0 ? core.fireTarget : null)
+  const freedomPercentage = computeFreedomProgress({
+    fireEligibleNetWorth,
+    requiredPortfolio,
+  })
+
   const lines = [
     `Netto vermogen: ${formatCurrency(core.netWorth)}`,
     `Vrijgekochte tijd: ${formatFreedomTime(core.freedomYears, core.freedomMonths)}`,
-    `Vrijheids-%: ${formatPercentage(core.freedomPercentage)}`,
-    `FIRE-doel: ${formatCurrency(core.fireTarget)}`,
+    `Vrijheids-%: ${formatPercentage(freedomPercentage)}`,
+    // Toon het FIRE-doel op dezelfde grondslag als het Vrijheids-% (de
+    // unified-projection-portfolio uit de loaders), met fallback op het simpele
+    // fireTarget — zo zijn teller, noemer en doelbedrag onderling consistent.
+    `FIRE-doel: ${formatCurrency(requiredPortfolio ?? core.fireTarget)}`,
     `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
     `Maandinkomen: ${formatCurrency(rawFinancials.monthlyIncome)} | Maanduitgaven: ${formatCurrency(rawFinancials.monthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,

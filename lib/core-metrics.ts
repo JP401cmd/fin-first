@@ -86,6 +86,46 @@ export function computeFreedomPercentage(
     : 0
 }
 
+/**
+ * Canonieke vrijheidsvoortgang (0–100): FIRE-eligible netto vermogen afgezet
+ * tegen de benodigde portfolio uit de unified projection.
+ *
+ * Dit is de ENIGE grondslag voor de voortgangsbalk: dezelfde noemer en teller
+ * als de "nog X jaar"-aftelling (FIRE-eligible vermogen, huis gefilterd via de
+ * housing-strategie; benodigde portfolio uit runUnifiedProjection). Daardoor
+ * kan 100% nooit naast "nog jaren" verschijnen.
+ *
+ * Contrast met computeFreedomPercentage (primitief op vrije netWorth ÷ doel):
+ * dat blijft bestaan voor losse percentage-berekeningen, maar de voortgang-
+ * call-sites gebruiken deze helper.
+ *
+ * Semantiek (vastgepind in core-metrics.test.ts):
+ *  - requiredPortfolio ≤ 0 / null / niet-finite          ⇒ 0
+ *  - fireEligibleNetWorth niet-finite of negatief         ⇒ 0
+ *  - eligible ≥ required                                  ⇒ exact 100
+ *  - anders                                               ⇒ (eligible / required) × 100, [0,100]
+ */
+export function computeFreedomProgress({
+  fireEligibleNetWorth,
+  requiredPortfolio,
+}: {
+  fireEligibleNetWorth: number
+  requiredPortfolio: number | null
+}): number {
+  if (
+    requiredPortfolio == null ||
+    !Number.isFinite(requiredPortfolio) ||
+    requiredPortfolio <= 0
+  ) {
+    return 0
+  }
+  if (!Number.isFinite(fireEligibleNetWorth) || fireEligibleNetWorth < 0) {
+    return 0
+  }
+  if (fireEligibleNetWorth >= requiredPortfolio) return 100
+  return Math.max(0, Math.min((fireEligibleNetWorth / requiredPortfolio) * 100, 100))
+}
+
 /** Freedom time: how many years + months net worth covers expenses. */
 export function computeFreedomTime(
   netWorth: number,

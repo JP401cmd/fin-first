@@ -11,7 +11,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   ageAtDate,
-  computeFireProjection,
   computeLifeEventImpact,
   type FinancialInput,
   type LifeEvent,
@@ -26,7 +25,7 @@ import { resolveFireStrategyWithOverride, type FireStrategyConfig } from '@/lib/
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress } from '@/lib/core-metrics'
 import {
   parseHousingStrategy,
   deriveHousingContext,
@@ -569,7 +568,31 @@ export async function loadHorizonData(
     fireSwr,
     { strategy: fireStrategy.strategy, yearsInRetirement, realReturn },
   )
-  const freedomPct = computeFreedomPercentage(netWorth, fireTarget)
+
+  // ── Housing strategy ──────────────────────────────────────────
+  // Parse strategy uit profile (default include_full bij missing/legacy users).
+  // Context aggregeert eigen_huis + linked mortgage. fireEligibleNetWorth =
+  // netWorth minus equity bij strategieën waar het huis niet meedoet.
+  // Vroeg berekend zodat de canonieke freedomPct dezelfde FIRE-eligible
+  // grondslag gebruikt als de "nog X jaar"-aftelling.
+  const housingStrategy = parseHousingStrategy(
+    (profile as Record<string, unknown>).housing_strategy_config,
+  )
+  const housingContext = deriveHousingContext(
+    (fullAssetsResult.data ?? []) as Asset[],
+    (fullDebtsResult.data ?? []) as Debt[],
+  )
+  const fireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategy)
+
+  // ── freedomPct: canonieke vrijheidsvoortgang (zelfde grondslag als dashboard) ──
+  // Deze loader draait zelf géén unified projection (de client doet dat); de
+  // benodigde portfolio is hier het strategie-bewuste fireTarget op de
+  // FIRE-eligible grondslag — geen nieuwe parallelle som, identieke noemer als
+  // de "nog X jaar"-aftelling. Voorkomt 100% naast "nog jaren".
+  const freedomPct = computeFreedomProgress({
+    fireEligibleNetWorth,
+    requiredPortfolio: fireTarget > 0 ? fireTarget : null,
+  })
 
   // ── assetTypeCount: distinct asset_type values ──
   const assetTypes = new Set((assetsResult.data ?? []).map(a => a.asset_type).filter(Boolean))
@@ -626,15 +649,8 @@ export async function loadHorizonData(
   const debts = (fullDebtsResult.data ?? []) as Debt[]
   const assets = (fullAssetsResult.data ?? []) as Asset[]
 
-  // ── Housing strategy ──────────────────────────────────────────
-  // Parse strategy uit profile (default include_full bij missing/legacy users).
-  // Context aggregeert eigen_huis + linked mortgage. fireEligibleNetWorth =
-  // netWorth minus equity bij strategieën waar het huis niet meedoet.
-  const housingStrategy = parseHousingStrategy(
-    (profile as Record<string, unknown>).housing_strategy_config,
-  )
-  const housingContext = deriveHousingContext(assets, debts)
-  const fireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategy)
+  // housingStrategy/housingContext/fireEligibleNetWorth zijn hierboven al
+  // berekend (vóór freedomPct, zelfde grondslag als de "nog X jaar"-aftelling).
   const housingStrategyDismissedAt =
     ((profile as Record<string, unknown>).housing_strategy_dismissed_at as string | null) ?? null
 
