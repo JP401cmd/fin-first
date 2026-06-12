@@ -1,5 +1,6 @@
 ---
 name: ai-gedrag
+effort: high
 description: Pijplijn voor het bijsturen van AI-GEDRAG in TriFinity — hoe De Wil (en Kern/Horizon) praat, redeneert, categoriseert en antwoordt. Voor verkeerde categorisaties, toon/lengte-problemen, filosofie-drift, compliance-zorgen of het verfijnen van een bestaande prompt. Werkt als een evaluatie-loop: concrete voorbeelden → diagnose → chirurgische prompt-aanpassing → regressiebewijs. Gebruik /ai-feature wanneer de app iets nieuws met AI moet kunnen; deze skill gaat over hoe de bestaande AI zich gedraagt.
 ---
 
@@ -29,6 +30,7 @@ De `ai-specialist-prompt-dna`:
 - Past **minimaal** aan: een concreet voorbeeld of een expliciete tie-break-regel verslaat een vaag bijvoeglijk naamwoord.
 - Bewaakt de invarianten: cijfers komen uit het FINANCIEEL OVERZICHT, vrijheidstijd-framing, toon (je/jij, geen emoji, compact), Wft-grenzen. **Versoepelt nooit stilzwijgend een guardrail** — dat is een expliciete keuze van de `business-owner`.
 - Checkt neveneffecten: lost de edit de voorbeelden op zónder andere gevallen te breken?
+- Controleert voor elk **nieuw veld dat naar het model gaat** het feitelijke effect van `sanitizeForAI`: IBAN/BSN/e-mail/telefoon worden tot vaste tokens gereduceerd — een veld dat na sanitisatie voor elke rij identiek is, is verspilde context, geen signaal. Test de sanitizer-output, lees niet alleen de diff.
 
 **Escalatie naar `ai-specialist-general`**: blijkt de oorzaak niet de prompt maar de *voeding* — een context-builder die verkeerde/verouderde cijfers levert, een tool die niet gevonden wordt, sanitize die te veel wegstript — dan is het een plumbing-fix; de prompt-specialist draagt over met het bewijs.
 

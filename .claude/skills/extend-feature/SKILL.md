@@ -1,5 +1,6 @@
 ---
 name: extend-feature
+effort: high
 description: Pijplijn voor het UITBOUWEN van een BESTAANDE functionaliteit in TriFinity — een delta op iets dat al werkt. Zet de juiste subagents in met nadruk op de huidige werking begrijpen, hergebruik, minimale blast radius en het beschermen van bestaand gedrag (regressie). Gebruik deze skill wanneer een bestaande functie uitgebreid, verdiept of aangepast moet worden (niet nieuw, niet een bug).
 ---
 
@@ -40,7 +41,7 @@ Zelfde routering als bij een nieuwe functie, maar met de opdracht **hergebruik b
 - UI → `frontend-ui-builder` · lijm/overig → `coder`
 
 ### 7. Testen — bestaand beschermen + nieuw dekken — `tester`
-De `tester` voegt tests toe voor het nieuwe gedrag **en** draait de bestaande suites om regressie uit te sluiten; voegt waar nodig een regressiecase toe die het oude gedrag vastpint. `tsc`/lint/tests groen, echte output.
+De `tester` voegt tests toe voor het nieuwe gedrag **en** draait de bestaande suites om regressie uit te sluiten; voegt waar nodig een regressiecase toe die het oude gedrag vastpint. `tsc`/lint/tests groen, echte output. Gebruik NOOIT `git stash` om een "schone baseline" te meten wanneer er omvangrijke niet-gecommitte WIP in de working tree staat — dat bundelt vreemde wijzigingen met de jouwe en een mislukte `pop` kan werk in gevaar brengen; bepaal of een fout pre-existing is door het pad/bestand te inspecteren (is het een bestand dat jij aanraakte?).
 
 ### 8. Review — `code-review` (+ `ux-review-expert` bij UI, + `security-specialist` bij data/auth/routes)
 Beoordeling op correctheid, neveneffecten op bestaand gedrag, en UI-consistentie. Raakt de uitbreiding data-toegang, auth, routes, AI-context of partner-/huishouddata (bij twijfel: ja), dan draait de `security-specialist` zijn ship-gate-checklist — let extra op een tweede datapad dat een privacy-bewuste loader omzeilt; een 🔴-bevinding blokkeert tot opgelost.
