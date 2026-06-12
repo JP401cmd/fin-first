@@ -9,6 +9,7 @@ import {
   BUDGET_TEMPLATES,
   type BudgetTemplateId,
 } from '@/lib/budget-templates/onboarding-presets'
+import { BUDGET_LEAF_META } from '@/lib/budget-data'
 
 // ── State ────────────────────────────────────────────────────
 
@@ -199,17 +200,25 @@ function BudgetTemplatePicker({
                   {choice.description}
                 </p>
                 {template && (
-                  <div className="mt-2 flex flex-wrap gap-1">
+                  <ul className="mt-2 space-y-1.5">
                     {template.categories.map((cat) => (
-                      <span
-                        key={cat.label}
-                        className="inline-flex items-center gap-1 border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-1.5 py-0.5 text-[10px] text-[var(--ink-2)]"
-                      >
-                        <span aria-hidden="true">{cat.icon}</span>
-                        {cat.label}
-                      </span>
+                      <li key={cat.parentSlug}>
+                        <div className="flex items-baseline gap-1.5">
+                          <span aria-hidden="true" className="text-[12px]">{cat.icon}</span>
+                          <span className="text-[12px] font-medium text-[var(--ink)]">{cat.label}</span>
+                        </div>
+                        {cat.slugs.length === 0 ? (
+                          <p className="pl-[1.375rem] text-[11px] italic text-[var(--ink-4)]">
+                            boek direct op dit potje
+                          </p>
+                        ) : (
+                          <p className="pl-[1.375rem] text-[11px] leading-snug text-[var(--ink-3)]">
+                            {cat.slugs.map((slug) => BUDGET_LEAF_META[slug]?.name ?? slug).join(' · ')}
+                          </p>
+                        )}
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
               </div>
               <span

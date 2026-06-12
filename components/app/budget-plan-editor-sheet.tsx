@@ -9,14 +9,13 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useToast } from '@/components/app/toast-provider'
 import { BudgetIcon } from '@/components/app/budget-shared'
 import {
-  BUDGET_SLUGS,
   type Budget,
   type BudgetWithChildren,
 } from '@/lib/budget-data'
 import { getCarriedAmount, formatPeriod, type BudgetRollover } from '@/lib/budget-rollover'
 import {
   BUDGET_TEMPLATES,
-  buildTemplateAmounts,
+  buildTemplateSeed,
   type BudgetTemplateId,
 } from '@/lib/budget-templates/onboarding-presets'
 import {
@@ -320,60 +319,64 @@ export function BudgetPlanEditorSheet({
   }
 
   function selectTemplate(id: BudgetTemplateId) {
-    const tpl = BUDGET_TEMPLATES.find((t) => t.id === id)
-    if (!tpl) return
     const income = templateIncome || 2500
-    const amounts = buildTemplateAmounts(income, id)
-    const next = buildTemplateDraft(tpl, amounts)
     setSelectedTemplate(id)
-    setTemplateDraft(next)
+    setTemplateDraft(buildTemplateDraft(id, income))
     setView('template-preview')
   }
 
+  /**
+   * Bouw de template-draft uit de gedeelde, canonieke seed-builder
+   * (`buildTemplateSeed`). De seed levert de volledige hiërarchie met de
+   * canonieke slug, naam, icoon en `budget_type` per budget — de editor
+   * verzint hier dus niets meer zelf (geen `${slug}-parent`, geen 'Circle',
+   * geen type-gok). Childless hoofdbudgetten (minimalistisch) komen als parent
+   * zónder children, met hun eigen `default_limit` als bedrag; de tree- en
+   * preview-views rekenen daar correct mee (parent zonder kinderen = leaf).
+   */
   function buildTemplateDraft(
-    tpl: (typeof BUDGET_TEMPLATES)[number],
-    amounts: Record<string, number>,
+    templateId: BudgetTemplateId,
+    income: number,
   ): DraftBudget[] {
+    const seed = buildTemplateSeed(templateId, income)
     const next: DraftBudget[] = []
 
-    // 1. Income parent + salaris child
-    const inkomenId = makeTmpId()
-    next.push({
-      id: inkomenId, parentId: null, name: 'Inkomen',
-      slug: BUDGET_SLUGS.INKOMEN, icon: 'Wallet', description: null,
-      budgetType: 'income', defaultLimit: amounts[BUDGET_SLUGS.SALARIS_UITKERING] ?? templateIncome,
-      isEssential: true, sortOrder: 0, interval: 'monthly', rolloverType: 'reset', amount: null,
-    })
-    next.push({
-      id: makeTmpId(), parentId: inkomenId, name: 'Salaris & uitkering',
-      slug: BUDGET_SLUGS.SALARIS_UITKERING, icon: 'Wallet', description: null,
-      budgetType: 'income', defaultLimit: amounts[BUDGET_SLUGS.SALARIS_UITKERING] ?? templateIncome,
-      isEssential: true, sortOrder: 0, interval: 'monthly', rolloverType: 'reset',
-      amount: amounts[BUDGET_SLUGS.SALARIS_UITKERING] ?? templateIncome,
-    })
-
-    // 2. For each category in the template, create a parent and its child slugs
-    tpl.categories.forEach((cat, catIdx) => {
+    seed.forEach((parent, parentIdx) => {
       const parentId = makeTmpId()
-      const parentType = inferCategoryType(cat.slugs)
-      const parentTotal = cat.slugs.reduce((sum, s) => sum + (amounts[s] || 0), 0)
+      const children = parent.children ?? []
       next.push({
-        id: parentId, parentId: null, name: cat.label,
-        slug: cat.slugs[0] ? `${cat.slugs[0]}-parent` : null,
-        icon: 'Circle', description: null,
-        budgetType: parentType, defaultLimit: parentTotal,
-        isEssential: parentType !== 'expense' || catIdx < 3,
-        sortOrder: catIdx + 1,
-        interval: 'monthly', rolloverType: 'reset', amount: null,
+        id: parentId,
+        parentId: null,
+        name: parent.name,
+        slug: parent.slug,
+        icon: parent.icon,
+        description: parent.description ?? null,
+        budgetType: parent.budget_type,
+        defaultLimit: parent.default_limit,
+        isEssential: parent.is_essential,
+        sortOrder: parent.sort_order ?? parentIdx,
+        interval: 'monthly',
+        rolloverType: 'reset',
+        // Een hoofdbudget mét children leidt zijn bedrag af van de kinderen
+        // (amount = null → de view toont de som). Een childless hoofdbudget
+        // (minimalistisch) draagt zelf het bedrag.
+        amount: children.length > 0 ? null : parent.default_limit,
       })
-      cat.slugs.forEach((slug, idx) => {
-        const amt = amounts[slug] ?? 0
+      children.forEach((child, idx) => {
         next.push({
-          id: makeTmpId(), parentId, name: nameForSlug(slug),
-          slug, icon: 'Circle', description: null,
-          budgetType: parentType, defaultLimit: amt, isEssential: false,
-          sortOrder: idx, interval: 'monthly', rolloverType: 'reset',
-          amount: amt,
+          id: makeTmpId(),
+          parentId,
+          name: child.name,
+          slug: child.slug,
+          icon: child.icon,
+          description: child.description ?? null,
+          budgetType: parent.budget_type,
+          defaultLimit: child.default_limit,
+          isEssential: false,
+          sortOrder: idx,
+          interval: 'monthly',
+          rolloverType: 'reset',
+          amount: child.default_limit,
         })
       })
     })
@@ -388,10 +391,7 @@ export function BudgetPlanEditorSheet({
   function onTemplateIncomeChange(income: number) {
     setTemplateIncome(income)
     if (!selectedTemplate) return
-    const tpl = BUDGET_TEMPLATES.find((t) => t.id === selectedTemplate)
-    if (!tpl) return
-    const amounts = buildTemplateAmounts(income || 2500, selectedTemplate)
-    setTemplateDraft(buildTemplateDraft(tpl, amounts))
+    setTemplateDraft(buildTemplateDraft(selectedTemplate, income || 2500))
   }
 
   function applyTemplateToDraft() {
@@ -1080,14 +1080,39 @@ function TemplatePreview({
                 </h4>
                 {parents.map((parent) => {
                   const kids = childrenBy[parent.id] ?? []
+                  // Hoofdbudget zonder deelbudgetten (minimalistisch): je boekt
+                  // er direct op, dus het bedrag is hier bewerkbaar in plaats
+                  // van een afgeleide som.
+                  const childless = kids.length > 0 ? false : parent.budgetType !== 'income' && parent.budgetType !== 'archive'
                   return (
                     <div key={parent.id} className="mb-2 rounded-[var(--r)] border border-[var(--border-ed)]">
-                      <div className="flex items-center justify-between px-3 py-2">
-                        <span className="text-sm font-medium text-[var(--ink)]">{parent.name}</span>
-                        <span className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
-                          {<MaskedAmount value={kids.reduce((s, k) => s + (k.amount ?? 0), 0)} tone="wil" />}
-                        </span>
+                      <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <span className="min-w-0 flex-1 text-sm font-medium text-[var(--ink)]">{parent.name}</span>
+                        {childless ? (
+                          <div className="relative w-24 shrink-0">
+                            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-3)]">€</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="10"
+                              value={parent.amount ?? parent.defaultLimit ?? 0}
+                              onChange={(e) => onUpdateAmount(parent.id, Number(e.target.value) || 0)}
+                              className="w-full rounded-[var(--r)] border border-[var(--border-md)] py-1 pl-5 pr-2 text-right font-mono text-xs tabular-nums text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+                              aria-label={`${parent.name} bedrag`}
+                            />
+                          </div>
+                        ) : (
+                          <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
+                            {<MaskedAmount value={kids.reduce((s, k) => s + (k.amount ?? 0), 0)} tone="wil" />}
+                          </span>
+                        )}
                       </div>
+                      {childless && (
+                        <p className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-1.5 text-[11px] italic text-[var(--ink-4)]">
+                          Je boekt transacties direct op dit hoofdbudget.
+                        </p>
+                      )}
                       {kids.map((child) => (
                         <div key={child.id} className="flex items-center gap-2 border-t border-[var(--border-ed)] bg-[var(--subtle)]/30 px-3 py-1.5 pl-6 sm:pl-10">
                           <span className="flex-1 text-xs text-[var(--ink-2)]">{child.name}</span>
@@ -1231,38 +1256,6 @@ function TemplateConfirm({
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
-
-function inferCategoryType(slugs: string[]): BudgetType {
-  if (slugs.some((s) => s.includes('sparen') || s.includes('investeren'))) return 'savings'
-  if (slugs.some((s) => s.includes('aflossing') || s.includes('schulden'))) return 'debt'
-  return 'expense'
-}
-
-function nameForSlug(slug: string): string {
-  const map: Record<string, string> = {
-    [BUDGET_SLUGS.HUUR_HYPOTHEEK]: 'Huur/hypotheek',
-    [BUDGET_SLUGS.GAS_WATER_LICHT]: 'Gas, water, licht',
-    [BUDGET_SLUGS.VERZEKERINGEN_WONEN]: 'Verzekeringen',
-    [BUDGET_SLUGS.GEMEENTELIJKE_LASTEN]: 'Gemeentelijke lasten',
-    [BUDGET_SLUGS.BOODSCHAPPEN]: 'Boodschappen',
-    [BUDGET_SLUGS.HUISHOUDEN_VERZORGING]: 'Huishouden & verzorging',
-    [BUDGET_SLUGS.KINDEREN_SCHOOL]: 'Kinderen & school',
-    [BUDGET_SLUGS.MEDISCHE_KOSTEN]: 'Medische kosten',
-    [BUDGET_SLUGS.BRANDSTOF_OV]: 'Brandstof & OV',
-    [BUDGET_SLUGS.AUTO_VASTE_LASTEN]: 'Auto vaste lasten',
-    [BUDGET_SLUGS.AUTO_ONDERHOUD]: 'Auto onderhoud',
-    [BUDGET_SLUGS.FIETS_DEELVERVOER]: 'Fiets & deelvervoer',
-    [BUDGET_SLUGS.UIT_ETEN_HORECA]: 'Uit eten & horeca',
-    [BUDGET_SLUGS.VRIJE_TIJD_SPORT]: 'Vrije tijd & sport',
-    [BUDGET_SLUGS.VAKANTIE]: 'Vakantie',
-    [BUDGET_SLUGS.KLEDING_OVERIGE]: 'Kleding & overige',
-    [BUDGET_SLUGS.SPAREN_NOODBUFFER]: 'Noodbuffer',
-    [BUDGET_SLUGS.INVESTEREN_FIRE]: 'Investeren / FIRE',
-    [BUDGET_SLUGS.SCHULDEN_AFLOSSINGEN]: 'Aflossingen',
-    [BUDGET_SLUGS.EXTRA_AFLOSSING_HYPOTHEEK]: 'Extra aflossing hypotheek',
-  }
-  return map[slug] ?? slug.replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
-}
 
 function summarizeCounts(counts: Record<string, number>): string {
   const bits: string[] = []
