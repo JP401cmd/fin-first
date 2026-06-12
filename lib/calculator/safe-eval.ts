@@ -94,7 +94,6 @@ const GAMMA_P = [
 ]
 
 function gamma(n: number): number {
-  let t: number
   let x: number
 
   if (isInteger(n)) {
@@ -129,7 +128,7 @@ function gamma(n: number): number {
   for (let i = 1; i < GAMMA_P.length; ++i) {
     x += GAMMA_P[i] / (n + i)
   }
-  t = n + GAMMA_G + 0.5
+  const t = n + GAMMA_G + 0.5
   return Math.sqrt(2 * Math.PI) * Math.pow(t, n + 0.5) * Math.exp(-t) * x
 }
 
