@@ -54,6 +54,25 @@
 
 ---
 
+### RF-008: Supabase-egress laag C — lokale dev-DB + getClaims
+- **Status:** `[ ]` — lagen A+B zijn afgerond (commits `d0ee5a3c7` + `f9dc19287`, jun 2026); dit is het open restant
+- **Ernst:** Hoog (kosten/egress; vrijwel ál het Supabase-verkeer is dev-verkeer tegen remote)
+- **Betrokken bestanden:** `supabase/config.toml`, `supabase/migrations/*`, `.env.local`, `lib/supabase/server.ts`, `app/(app)/layout.tsx`, ~40 API-routes met `auth.getUser()`
+- **Beschrijving:** Onderzoek (jun 2026) wees uit: 6,16 mln PostgREST-calls in 4 mnd bij 24 users — polling (gefixt in laag A/B) + dev-verkeer. De structurele oplossing is development tegen een lokale Supabase-stack draaien en server-side auth via lokale JWT-verificatie. Volledig plan: `~/.claude/plans/wil-je-onderzoeken-doen-expressive-globe.md` (+ memory `project_supabase_egress.md`).
+- **Stappen (C1 — lokale Supabase voor dev):**
+  1. [ ] **Docker Desktop installeren** (blokkerend; CLI 2.102.0 staat er al)
+  2. [ ] Migratie-drift-baseline: `supabase link` + `supabase db pull` → remote schema als baseline-migratie (lokale migrations-map mist o.a. de `budget_amounts`-DDL); lokaal `supabase db reset` en verifiëren
+  3. [ ] Env-switch: `.env.local` → `http://127.0.0.1:54321` + lokale keys; remote keys alleen in productie-env
+  4. [ ] Seed: testuser via lokale auth + `lib/seed-persona.ts`
+  5. [ ] Discipline-afspraak: schema-wijzigingen voortaan ALLEEN via migrations
+- **Stappen (C2 — `getUser()` → `getClaims()` waar veilig):**
+  1. [ ] Helper `getAuthUser()` in `lib/supabase/server.ts` (JWKS-verificatie, patroon uit `lib/supabase/proxy.ts:32`); eerst op één route verifiëren
+  2. [ ] Migreer `app/(app)/layout.tsx` (hoogste frequentie), daarna routes die alleen `user.id`/`email` gebruiken
+  3. [ ] `getUser()` behouden voor admin/account-mutaties (revocatie-gevoelig)
+- **Meetprotocol:** nulmeting pg_stat_statements gereset 2026-06-12 12:58 UTC → na 24-48 u top-20 op `calls` vergelijken (clusters ±430k en app_settings 664k moeten een orde van grootte dalen); Supabase Usage → Egress week-op-week; na C1: API-requests/dag van ~50k → < 5k verwacht.
+
+---
+
 ## Prioriteit: MEDIUM
 
 ### RF-004: DB→Frontend type mapper
