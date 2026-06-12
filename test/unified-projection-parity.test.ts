@@ -403,10 +403,10 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     it('computeFireProjection en computeFireRange worden niet geïmporteerd of gewijzigd in unified-projection', async () => {
       // Verify unified-projection.ts does not import from horizon-data
       // This is a structural test — those functions use their own simple projection
-      const module = await import('@/lib/unified-projection')
+      const mod = await import('@/lib/unified-projection')
       // Should not have these functions
-      expect(module).not.toHaveProperty('computeFireProjection')
-      expect(module).not.toHaveProperty('computeFireRange')
+      expect(mod).not.toHaveProperty('computeFireProjection')
+      expect(mod).not.toHaveProperty('computeFireRange')
     })
   })
 

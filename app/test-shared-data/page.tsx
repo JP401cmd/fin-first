@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 
 type TestResult = { step: string; pass: boolean; details: string }
 
@@ -72,15 +73,15 @@ export default function TestSharedData() {
           <div className="mt-8 space-y-4">
             <h2 className="text-lg font-semibold text-zinc-900">Quick Links</h2>
             <div className="grid grid-cols-2 gap-3">
-              <a href="/core/assets" className="rounded-lg border border-zinc-200 p-3 text-sm hover:bg-zinc-50">
+              <Link href="/core/assets" className="rounded-lg border border-zinc-200 p-3 text-sm hover:bg-zinc-50">
                 Assets Page (ownership toggle)
-              </a>
-              <a href="/core/debts" className="rounded-lg border border-zinc-200 p-3 text-sm hover:bg-zinc-50">
+              </Link>
+              <Link href="/core/debts" className="rounded-lg border border-zinc-200 p-3 text-sm hover:bg-zinc-50">
                 Debts Page (ownership toggle)
-              </a>
-              <a href="/core/budgets" className="rounded-lg border border-zinc-200 p-3 text-sm hover:bg-zinc-50">
+              </Link>
+              <Link href="/core/budgets" className="rounded-lg border border-zinc-200 p-3 text-sm hover:bg-zinc-50">
                 Budgets Page (ownership toggle)
-              </a>
+              </Link>
               <a href="/identity" className="rounded-lg border border-zinc-200 p-3 text-sm hover:bg-zinc-50">
                 Identity (household section)
               </a>

@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
+import Link from 'next/link'
 import { Landmark, CheckCircle2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
@@ -535,12 +536,12 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
         )}
 
         {/* ── Link to full analysis ──────────────────────────── */}
-        <a
+        <Link
           href="/core/debts"
           className="inline-flex min-h-[44px] items-center text-xs font-semibold text-[var(--color-horizon-600)] transition-colors hover:text-[var(--color-horizon-700)]"
         >
           Bekijk volledige schuldenanalyse →
-        </a>
+        </Link>
       </div>
     </AnalysisSection>
   )

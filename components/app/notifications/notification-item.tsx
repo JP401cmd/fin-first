@@ -50,7 +50,7 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
   const router = useRouter()
   const { openWithMessage } = useChatContext()
   const [showLevelUp, setShowLevelUp] = useState(false)
-  const module = MODULE_MAP[notification.type]
+  const moduleInfo = MODULE_MAP[notification.type]
 
   const handleClick = useCallback(() => {
     onRead(notification.id)
@@ -94,22 +94,22 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
           onClick={handleClick}
           className="w-full text-left transition-all hover:shadow-[var(--s1)]"
           style={{
-            borderLeft: `3px solid ${module.colorVar}`,
-            background: `linear-gradient(135deg, ${module.lightVar}, transparent)`,
+            borderLeft: `3px solid ${moduleInfo.colorVar}`,
+            background: `linear-gradient(135deg, ${moduleInfo.lightVar}, transparent)`,
           }}
         >
           <div className="px-5 py-3">
             <div className="flex items-center gap-2">
               <span
                 className="font-[family-name:var(--font-inter)] text-[9px] font-bold uppercase tracking-[.1em]"
-                style={{ color: module.textVar }}
+                style={{ color: moduleInfo.textVar }}
               >
-                {module.label}
+                {moduleInfo.label}
               </span>
               {!notification.read && (
                 <span
                   className="h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: module.colorVar }}
+                  style={{ backgroundColor: moduleInfo.colorVar }}
                 />
               )}
               <span className="ml-auto font-[family-name:var(--font-inter)] text-[11px] text-[var(--ink-4)]">
@@ -144,7 +144,7 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }}
       className="w-full cursor-pointer text-left transition-all hover:bg-[var(--subtle)]"
       style={{
-        borderLeft: `3px solid ${module.colorVar}`,
+        borderLeft: `3px solid ${moduleInfo.colorVar}`,
       }}
     >
       <div className="border-b border-dashed border-[var(--border-ed)] px-5 py-3">
@@ -152,14 +152,14 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
         <div className="flex items-center gap-2">
           <span
             className="font-[family-name:var(--font-inter)] text-[9px] font-bold uppercase tracking-[.1em]"
-            style={{ color: module.textVar }}
+            style={{ color: moduleInfo.textVar }}
           >
-            {module.label}
+            {moduleInfo.label}
           </span>
           {!notification.read && (
             <span
               className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: module.colorVar }}
+              style={{ backgroundColor: moduleInfo.colorVar }}
             />
           )}
           <span className="ml-auto font-[family-name:var(--font-inter)] text-[11px] text-[var(--ink-4)]">
@@ -203,9 +203,9 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
             onClick={handleAskAI}
             className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-[var(--r-sm)] px-3 py-2 font-[family-name:var(--font-inter)] text-[11px] font-medium transition-colors sm:min-h-0 sm:px-2 sm:py-1"
             style={{
-              backgroundColor: module.lightVar,
-              color: module.textVar,
-              border: `1px solid ${module.mediumVar}`,
+              backgroundColor: moduleInfo.lightVar,
+              color: moduleInfo.textVar,
+              border: `1px solid ${moduleInfo.mediumVar}`,
             }}
           >
             <Lightbulb className="h-3 w-3" />

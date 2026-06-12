@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Building2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { APP_SETUP_SLUGS } from '@/lib/app-setup-status'
@@ -71,12 +72,12 @@ function ObjectSelector({
       <div className="border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-4 py-5">
         <p className="font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
           Je hebt nog geen verhuurd vastgoed geregistreerd. Voeg een real-estate-object toe via{' '}
-          <a
+          <Link
             href="/core/assets/real_estate"
             className="underline decoration-[var(--ink-3)] underline-offset-2 hover:decoration-[var(--ink)]"
           >
             Bezittingen
-          </a>{' '}
+          </Link>{' '}
           voordat je de app instelt.
         </p>
       </div>

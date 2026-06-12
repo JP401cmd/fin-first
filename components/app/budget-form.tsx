@@ -501,14 +501,14 @@ export function BudgetForm({
         <>
           {/* Back */}
           <div className="mb-6">
-            <a
+            <Link
               href="/core/budgets"
               onClick={(e) => handleNavClick(e, '/core/budgets')}
               className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] hover:text-[var(--ink)]"
             >
               <ArrowLeft className="h-3 w-3" aria-hidden />
               Terug naar budgetten
-            </a>
+            </Link>
           </div>
 
           <header className="mb-8 space-y-2">
@@ -1099,13 +1099,13 @@ export function BudgetForm({
       {/* Submit — alleen in standalone-mode; pane-wrapper levert de footer-CTA */}
       {!embedded && (
         <div className="flex items-center justify-end gap-3 border-t border-[var(--border-ed)] pt-6">
-          <a
+          <Link
             href="/core/budgets"
             onClick={(e) => handleNavClick(e, '/core/budgets')}
             className="rounded-lg border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
           >
             Annuleren
-          </a>
+          </Link>
           <button
             type="submit"
             disabled={saving}

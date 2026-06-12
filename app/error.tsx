@@ -48,6 +48,10 @@ export default function GlobalError({
           >
             Opnieuw proberen
           </button>
+          {/* In een error-boundary is een harde reload (geen client-side
+              navigatie) de echte reset: de kapotte React-tree wordt volledig
+              herbouwd. Daarom bewust een plain <a> i.p.v. next/link. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-6 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors"

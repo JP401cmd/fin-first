@@ -1,6 +1,7 @@
 'use client'
 
 import { memo } from 'react'
+import Link from 'next/link'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -243,12 +244,12 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
           <p className="text-[11px] leading-snug text-[var(--ink-3)]">
             Je hebt budgetten klaarstaan. Activeer ze om inzicht te krijgen in je bestedingen en vrijheid op te bouwen.
           </p>
-          <a
+          <Link
             href="/core/budgets"
             className="mt-1 inline-flex items-center gap-1 rounded-lg bg-[var(--subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
           >
             Bekijk budgetten
-          </a>
+          </Link>
         </div>
       </WidgetShell>
     )

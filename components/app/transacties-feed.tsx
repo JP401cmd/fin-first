@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Search, ArrowDown, ArrowUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { AnalysisTransaction } from '@/lib/transaction-insights'
@@ -152,12 +153,12 @@ export function TransactiesFeed({
         {transactions.length > 0 && (
           <p className="text-xs text-[var(--ink-3)] leading-relaxed">
             Gecombineerd overzicht van alle gekoppelde rekeningen.{' '}
-            <a
+            <Link
               href="/overzicht/bezittingen/cash"
               className="text-violet-700 font-medium hover:underline"
             >
               Beheer koppelingen →
-            </a>
+            </Link>
           </p>
         )}
 

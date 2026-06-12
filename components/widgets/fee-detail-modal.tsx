@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { findAlternatives, FUND_ALTERNATIVES_DISCLAIMER, berekenJaarlijkseBesparing, type FindAlternativesResult } from '@/lib/fund-alternatives'
@@ -172,12 +173,12 @@ export function FeeDetailModal({ open, onClose, feeAnalysis, feeImpactMonths, gr
                     {h.name}
                     {h.ticker && <span className="text-[var(--ink-4)] text-xs ml-1">({h.ticker})</span>}
                   </span>
-                  <a
+                  <Link
                     href="/core/assets"
                     className="inline-flex items-center gap-1 text-xs font-medium text-[var(--ink-2)] hover:underline"
                   >
                     Vul TER in <ArrowRight className="h-3 w-3" />
-                  </a>
+                  </Link>
                 </div>
               ))}
             </div>

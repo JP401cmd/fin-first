@@ -125,7 +125,7 @@ export default function TestChatPage() {
             <tbody>
               {DOMAIN_CONFIGS.map(c => (
                 <tr key={c.domain} className="border-b border-zinc-100">
-                  <td className="py-2 font-mono text-xs">{c.route}/*</td>
+                  <td className="py-2 font-mono text-xs">{c.route}{'/*'}</td>
                   <td className="py-2 font-mono text-xs">{c.domain}</td>
                   <td className="py-2 font-semibold">{c.name}</td>
                   <td className="py-2">{c.fabAvatar(24)}</td>

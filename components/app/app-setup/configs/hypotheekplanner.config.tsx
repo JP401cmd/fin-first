@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Home } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { APP_SETUP_SLUGS } from '@/lib/app-setup-status'
@@ -76,12 +77,12 @@ function MortgageSelector({
       <div className="border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-4 py-5">
         <p className="font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
           Je hebt nog geen hypotheek geregistreerd. Voeg er één toe via{' '}
-          <a
+          <Link
             href="/core/debts"
             className="underline decoration-[var(--ink-3)] underline-offset-2 hover:decoration-[var(--ink)]"
           >
             Schulden
-          </a>{' '}
+          </Link>{' '}
           voordat je de planner instelt.
         </p>
       </div>
