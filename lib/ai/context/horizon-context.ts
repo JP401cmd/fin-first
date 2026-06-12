@@ -9,15 +9,20 @@ import { section, formatCurrency } from './formatter'
  * Uses real Supabase data.
  */
 export async function buildHorizonContext(supabase: SupabaseClient): Promise<string> {
+  // Egress-trim: alleen de velden die deze context daadwerkelijk gebruikt —
+  // breakdown-regels + projectPortfolio (current_value/expected_return/
+  // monthly_contribution/depreciation_rate/purchase_value/is_active/asset_type)
+  // en debtProjection (current_balance/interest_rate/monthly_payment/
+  // repayment_type/end_date).
   const [assetsResult, debtsResult] = await Promise.all([
     supabase
       .from('assets')
-      .select('*')
+      .select('name, asset_type, current_value, expected_return, monthly_contribution, depreciation_rate, purchase_value, is_active')
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
     supabase
       .from('debts')
-      .select('*')
+      .select('name, debt_type, current_balance, interest_rate, monthly_payment, repayment_type, end_date')
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
   ])

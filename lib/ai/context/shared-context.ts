@@ -1,9 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
 import { loadCoreData } from '@/lib/core-data-loader'
-import { resolveFireParams } from '@/lib/fire-params'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
-import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 
 const TEMPORAL_LABELS: Record<number, string> = {
   1: 'De Levensgenieter (level 1) — Comfort > Snelheid',
@@ -16,117 +14,64 @@ const TEMPORAL_LABELS: Record<number, string> = {
 /**
  * Shared context available to all domains:
  * profile overview, net worth, freedom calculation.
- * Uses real Supabase data.
+ *
+ * Egress-reductie (jun 2026): alle financiële kerngetallen komen uit
+ * `loadCoreData` (React-cached, dezelfde bron als de app-pagina's) in
+ * plaats van zes eigen queries die functioneel overlapten. Dat scheelt
+ * per chatbericht ~6 PostgREST-calls én garandeert dat Will exact
+ * dezelfde getallen ziet als de gebruiker op /core en /overzicht
+ * (single-source-of-truth). Alleen de drie profielvelden die niet in
+ * `CorePageData` zitten (temporal_balance, household_type,
+ * financial_context) worden nog los opgehaald — RLS scopet naar de
+ * eigen rij.
  */
 export async function buildSharedContext(supabase: SupabaseClient): Promise<string> {
-  // Fetch assets, debts, transactions, user profile, and essential budgets
-  const [assetsResult, debtsResult, transactionsResult, profileResult, essentialBudgetsResult, allChildrenResult, coreData] = await Promise.all([
-    supabase
-      .from('assets')
-      .select('current_value')
-      .eq('is_active', true),
-    supabase
-      .from('debts')
-      .select('current_balance')
-      .eq('is_active', true),
-    supabase
-      .from('transactions')
-      .select('amount, is_income, date, transaction_type')
-      .gte('date', getMonthsAgoDate(12))
-      .order('date', { ascending: false }),
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return { data: null }
-      return supabase
-        .from('profiles')
-        .select('full_name, temporal_balance, household_type, date_of_birth, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, financial_context')
-        .eq('id', user.id)
-        .single()
-    }),
-    supabase.from('budgets').select('*').eq('is_essential', true),
-    supabase.from('budgets').select('*').not('parent_id', 'is', null),
-    // Canonieke 6-maands spaarquote — exact dezelfde bron als de cashflow-pagina
-    // (savingsRate6m, incl. sparen in budgetten + schuldaflossing). React-cached,
-    // dus geen dubbele round-trips binnen één request.
+  const [coreData, profileResult] = await Promise.all([
     loadCoreData(supabase),
+    supabase
+      .from('profiles')
+      .select('temporal_balance, household_type, financial_context')
+      .maybeSingle(),
   ])
 
-  const assets = assetsResult.data ?? []
-  const debts = debtsResult.data ?? []
-  const transactions = transactionsResult.data ?? []
   const profile = profileResult.data
+  const { rawFinancials } = coreData
+  const totalAssets = rawFinancials.totalAssets
+  const totalDebts = rawFinancials.totalDebts
 
-  const totalAssets = assets.reduce((s, a) => s + Number(a.current_value), 0)
-  const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance), 0)
+  const monthlyMustExpenses = rawFinancials.yearlyMustExpenses > 0
+    ? Math.round(rawFinancials.yearlyMustExpenses / 12)
+    : 0
+  const yearlyRetirementExpenses = rawFinancials.yearlyRetirementExpenses ?? 0
+  const monthlyRetirementExpenses = yearlyRetirementExpenses > 0
+    ? Math.round(yearlyRetirementExpenses / 12)
+    : 0
 
-  // Calculate average monthly income and expenses from recent transactions
-  // Filter out own-account transfers — they inflate income/expense totals
-  const realTransactions = transactions.filter(
-    (t) => (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
-           (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer'
-  )
-  const monthsOfData = Math.max(1, getDistinctMonths(realTransactions))
-  const totalIncome = realTransactions
-    .filter((t) => t.is_income)
-    .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-  const totalExpenses = realTransactions
-    .filter((t) => !t.is_income)
-    .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-
-  const monthlyIncome = Math.round(totalIncome / monthsOfData)
-  const monthlyExpenses = Math.round(totalExpenses / monthsOfData)
-
-  // Fallback to profile estimates for users without transactions
-  const profileMonthlyIncome = Number(profile?.net_monthly_income ?? 0)
-  const profileMonthlyExpenses = Number(profile?.estimated_monthly_expenses ?? 0)
-  const effectiveMonthlyIncome = monthlyIncome > 0 ? monthlyIncome : profileMonthlyIncome
-  const effectiveMonthlyExpenses = monthlyExpenses > 0 ? monthlyExpenses : profileMonthlyExpenses
-
-  const last12Income = totalIncome  // already summed over the now-12-month window
-  const extrapolatedYearlyIncome = monthsOfData > 0 ? (last12Income / monthsOfData) * 12 : 0
-
-  // Compute must-expenses from essential budgets
-  const { yearlyMustExpenses } = computeYearlyMustExpenses(
-    essentialBudgetsResult.data ?? [],
-    allChildrenResult.data ?? [],
-  )
-  const monthlyMustExpenses = yearlyMustExpenses > 0 ? Math.round(yearlyMustExpenses / 12) : 0
-
-  const yearlyRetirementExpenses = computeRetirementExpenses(
-    profile?.retirement_expense_method as RetirementExpenseMethod,
-    yearlyMustExpenses,
-    extrapolatedYearlyIncome,
-    profile?.retirement_expense_custom_amount,
-    profileMonthlyExpenses * 12,
-  )
-  const monthlyRetirementExpenses = yearlyRetirementExpenses > 0 ? Math.round(yearlyRetirementExpenses / 12) : 0
-
-  // If no transaction data, return minimal context
-  if (totalAssets === 0 && totalDebts === 0 && transactions.length === 0) {
+  // If no financial data at all, return minimal context
+  if (totalAssets === 0 && totalDebts === 0 && !coreData.hasTransactions) {
     return section('FINANCIEEL OVERZICHT', 'Nog geen financiële data beschikbaar. Vraag de gebruiker om assets, schulden of transacties toe te voegen.')
   }
 
-  // Build identity section from profile
-  let identitySection = ''
-  if (profile) {
-    const temporal = TEMPORAL_LABELS[profile.temporal_balance ?? 3] ?? TEMPORAL_LABELS[3]
-    const age = profile.date_of_birth
-      ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-      : null
-    const identityLines = [
-      profile.full_name ? `Naam: ${profile.full_name}` : null,
-      age ? `Leeftijd: ${age} jaar` : null,
-      `Huishoudtype: ${profile.household_type ?? 'solo'}`,
-      `Temporal Balance: ${temporal}`,
-    ].filter(Boolean) as string[]
-    identitySection = section('GEBRUIKERSPROFIEL', identityLines.join('\n')) + '\n'
-  }
+  // Build identity section from profile + core data
+  const temporal = TEMPORAL_LABELS[profile?.temporal_balance ?? 3] ?? TEMPORAL_LABELS[3]
+  const identityLines = [
+    coreData.userName ? `Naam: ${coreData.userName}` : null,
+    coreData.currentAge ? `Leeftijd: ${coreData.currentAge} jaar` : null,
+    `Huishoudtype: ${profile?.household_type ?? 'solo'}`,
+    `Temporal Balance: ${temporal}`,
+  ].filter(Boolean) as string[]
+  const identitySection = section('GEBRUIKERSPROFIEL', identityLines.join('\n')) + '\n'
 
-  const fireParams = resolveFireParams(profile ?? {})
   const coreInput: FinancialInput = {
-    totalAssets, totalDebts, monthlyIncome: effectiveMonthlyIncome, monthlyExpenses: effectiveMonthlyExpenses,
-    yearlyMustExpenses: yearlyRetirementExpenses, monthlyContributions: 0, dateOfBirth: null,
+    totalAssets,
+    totalDebts,
+    monthlyIncome: rawFinancials.monthlyIncome,
+    monthlyExpenses: rawFinancials.monthlyExpenses,
+    yearlyMustExpenses: yearlyRetirementExpenses,
+    monthlyContributions: 0,
+    dateOfBirth: null,
   }
-  const core = computeCoreData(coreInput, fireParams.effectiveSwr)
+  const core = computeCoreData(coreInput, coreData.fireParams.effectiveSwr)
 
   const lines = [
     `Netto vermogen: ${formatCurrency(core.netWorth)}`,
@@ -134,15 +79,15 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Vrijheids-%: ${formatPercentage(core.freedomPercentage)}`,
     `FIRE-doel: ${formatCurrency(core.fireTarget)}`,
     `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
-    `Maandinkomen: ${formatCurrency(effectiveMonthlyIncome)} | Maanduitgaven: ${formatCurrency(effectiveMonthlyExpenses)}`,
+    `Maandinkomen: ${formatCurrency(rawFinancials.monthlyIncome)} | Maanduitgaven: ${formatCurrency(rawFinancials.monthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
-    monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${profile?.retirement_expense_method ?? 'essential_budgets'}) — basis voor FIRE & vrijheidsdagen` : null,
+    monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${coreData.retirementMethodUsed}) — basis voor FIRE & vrijheidsdagen` : null,
     `Spaarquote: ${formatPercentage(coreData.savingsRate6m)} — canonieke 6-maands spaarquote incl. sparen in budgetten + schuldaflossing (exact hetzelfde getal als onderaan de cashflow-pagina). Gebruik dit getal letterlijk; herbereken het NIET uit inkomen/uitgaven.`,
     `Dagen vrijheid verdiend per maand: ${core.daysWonPerMonth}`,
     `Vrije dagen per jaar (passief inkomen): ${core.freeDaysPerYear}`,
     `Autonomiescore: ${core.autonomyScore}`,
     `Dagelijkse uitgaven: ${formatCurrency(Math.round(core.yearlyExpenses / 365))}`,
-    `Budgettering: ${profile?.budgeting_active !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
+    `Budgettering: ${coreData.budgetingActive !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
   ]
 
   // Add supplementary context from free-text financial description (news-only onboarding)
@@ -151,18 +96,4 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     : ''
 
   return identitySection + section('FINANCIEEL OVERZICHT', (lines.filter(Boolean) as string[]).join('\n')) + contextSection
-}
-
-/** Get a date string N months ago in YYYY-MM-DD format (UTC, no timezone shift) */
-function getMonthsAgoDate(months: number): string {
-  const now = new Date()
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth() - months, 1)).toISOString().split('T')[0]
-}
-
-/** Count distinct year-month combinations in transactions */
-function getDistinctMonths(transactions: { date: string }[]): number {
-  const months = new Set(
-    transactions.map((t) => t.date.substring(0, 7))
-  )
-  return months.size
 }

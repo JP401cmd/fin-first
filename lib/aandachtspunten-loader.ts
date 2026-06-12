@@ -179,7 +179,13 @@ async function collectDebtAandachtspunten(supabase: SupabaseClient): Promise<Aan
   const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
   const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 100
 
-  const { data } = await supabase.from('debts').select('*').eq('is_active', true).limit(200)
+  // Egress-trim: de adapter gebruikt alleen id/name/current_balance/
+  // interest_rate/is_active.
+  const { data } = await supabase
+    .from('debts')
+    .select('id, name, current_balance, interest_rate, is_active')
+    .eq('is_active', true)
+    .limit(200)
   const debts = (data ?? []) as Debt[]
   return debtsToAandachtspunten(debts, dailyExpenses)
 }
@@ -198,7 +204,12 @@ async function collectAssetAandachtspunten(supabase: SupabaseClient): Promise<Aa
   const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
   const inflationRate = horizonData.fireParams?.inflationRate ?? 0
 
-  const { data } = await supabase.from('assets').select('*').eq('is_active', true).limit(500)
+  // Egress-trim: de adapter gebruikt alleen asset_type/current_value/is_active.
+  const { data } = await supabase
+    .from('assets')
+    .select('asset_type, current_value, is_active')
+    .eq('is_active', true)
+    .limit(500)
   const assets = (data ?? []) as Asset[]
   return assetsToAandachtspunten(assets, dailyExpenses, inflationRate)
 }

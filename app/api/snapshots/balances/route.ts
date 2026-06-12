@@ -24,10 +24,18 @@ export async function GET(request: Request) {
   const typeFilter = url.searchParams.get('type') ?? 'all'
   const limit = Math.min(Number(url.searchParams.get('limit') ?? 24), 120)
 
+  // Egress-trim: snapshots zijn ~maandelijks, dus `limit` punten per entiteit
+  // past binnen een venster van `limit + 1` maanden. Voorheen werd de hele
+  // historie met alle kolommen opgehaald en pas in JS geknipt.
+  const windowStart = new Date()
+  windowStart.setUTCMonth(windowStart.getUTCMonth() - (limit + 1), 1)
+  const windowStartStr = windowStart.toISOString().split('T')[0]
+
   let query = supabase
     .from('balance_snapshots')
-    .select('*')
+    .select('entity_id, entity_name, entity_type, entity_subtype, snapshot_date, balance')
     .eq('user_id', user.id)
+    .gte('snapshot_date', windowStartStr)
     .order('snapshot_date', { ascending: true })
 
   if (typeFilter === 'asset' || typeFilter === 'debt') {
@@ -44,7 +52,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const rows = (data ?? []) as BalanceSnapshot[]
+  const rows = (data ?? []) as Pick<
+    BalanceSnapshot,
+    'entity_id' | 'entity_name' | 'entity_type' | 'entity_subtype' | 'snapshot_date' | 'balance'
+  >[]
 
   // Group by entity_id
   const grouped = new Map<string, EntityBalanceHistory>()
