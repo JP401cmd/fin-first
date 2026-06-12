@@ -684,6 +684,14 @@ export default function ImportPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Zonder geselecteerde rekening geen upload: elke insert zou anders falen
+    // op een ongeldige account_id (productie-incident met 8000 transacties).
+    if (!selectedAccountId) {
+      setError('Selecteer eerst een bankrekening voordat je een bestand uploadt.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
     setFileName(file.name)
     setError('')
 
@@ -872,6 +880,10 @@ export default function ImportPage() {
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
+    if (!selectedAccountId) {
+      setError('Selecteer eerst een bankrekening voordat je een bestand uploadt.')
+      return
+    }
     const file = e.dataTransfer.files[0]
     if (file) {
       const dt = new DataTransfer()
@@ -1170,7 +1182,7 @@ export default function ImportPage() {
       }
     }
     return { ruleCreated, bulkUpdated: 0 }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [budgets])
 
   async function handleImport(retryFromBatch?: number) {
@@ -1198,6 +1210,14 @@ export default function ImportPage() {
 
     if (!user) {
       setError('Niet ingelogd')
+      setImporting(false)
+      return
+    }
+
+    // Vangnet: importeren zonder geldige rekening laat elke insert-batch falen
+    // op account_id. Blokkeer hier hard in plaats van 8000 mislukte inserts.
+    if (!selectedAccountId || !accounts.some((a) => a.id === selectedAccountId)) {
+      setError('Geen bankrekening geselecteerd. Ga terug en selecteer eerst een rekening.')
       setImporting(false)
       return
     }
@@ -1655,11 +1675,32 @@ export default function ImportPage() {
             </select>
           </div>
 
-          {/* File upload */}
+          {/* Geen rekeningen: upload geblokkeerd tot er een rekening is */}
+          {!loading && accounts.length === 0 && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div className="text-sm">
+                <p className="font-medium text-amber-800">Eerst een bankrekening toevoegen</p>
+                <p className="mt-1 text-xs text-amber-700">
+                  Transacties worden altijd aan een rekening gekoppeld. Voeg eerst een
+                  bankrekening toe, daarna kun je hier een bestand importeren.
+                </p>
+                <Link
+                  href="/core/cash"
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-amber-800 underline hover:text-amber-900"
+                >
+                  Rekening toevoegen
+                  <ChevronRight className="h-3 w-3" />
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* File upload — pas actief wanneer een rekening is geselecteerd */}
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
-            className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-12 hover:border-kern-400 hover:bg-kern-50/30"
+            className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--border-md)] bg-[var(--subtle)] p-12 ${selectedAccountId ? 'hover:border-kern-400 hover:bg-kern-50/30' : 'opacity-60'}`}
           >
             {parsing ? (
               <Loader2 className="h-8 w-8 animate-spin text-kern-500" />
@@ -1670,7 +1711,7 @@ export default function ImportPage() {
                   Sleep een MT940-bestand hierheen
                 </p>
                 <p className="mt-1 text-xs text-[var(--ink-3)]">of</p>
-                <label className="mt-3 cursor-pointer rounded-lg bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700">
+                <label className={`mt-3 rounded-lg px-4 py-2 text-sm font-medium text-white ${selectedAccountId ? 'cursor-pointer bg-kern-600 hover:bg-kern-700' : 'cursor-not-allowed bg-[var(--ink-4)]'}`}>
                   <Upload className="mr-2 inline h-4 w-4" />
                   Bestand kiezen
                   <input
@@ -1678,9 +1719,15 @@ export default function ImportPage() {
                     type="file"
                     accept=".sta,.txt,.mt940,.940,.csv,.ofx,.qfx"
                     onChange={handleFileSelect}
+                    disabled={!selectedAccountId}
                     className="hidden"
                   />
                 </label>
+                {!selectedAccountId && !loading && (
+                  <p className="mt-3 text-xs font-medium text-amber-700">
+                    Selecteer eerst een bankrekening voordat je een bestand uploadt.
+                  </p>
+                )}
                 <p className="mt-3 text-xs text-[var(--ink-3)]">Ondersteunde formaten: MT940 (.sta, .mt940), CSV (.csv), OFX (.ofx, .qfx)</p>
                 <p className="mt-1 text-xs text-[var(--ink-3)]">Maximale bestandsgrootte: {MAX_FILE_SIZE_LABEL}</p>
               </>

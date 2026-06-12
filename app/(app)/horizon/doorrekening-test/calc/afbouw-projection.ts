@@ -62,7 +62,7 @@ export function computeRequiredPortfolio(
   grossReturn: number,
   inflationRate: number,
   strategy: FireEndStrategy,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   withdrawalStrategy: WithdrawalStrategy,
   hasPartner: boolean,
   legacyAmount: number,

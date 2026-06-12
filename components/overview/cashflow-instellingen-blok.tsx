@@ -67,7 +67,7 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
     else { setExpensesManual(true); void persist({ estimated_monthly_expenses: Math.round(next.monthlyExpenses), expenses_source: 'manual' }) }
   }
 
-  const useComputed = (field: 'income' | 'expenses') => {
+  const applyComputed = (field: 'income' | 'expenses') => {
     if (field === 'income') {
       const { next } = recomputeTriple({ ...triple, monthlyIncome: computedIncome }, 'income', lastEdited)
       setTriple(next); setIncomeManual(false); void persist({ income_source: 'auto' })
@@ -113,7 +113,7 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
             </div>
           </KassabonShell>
           <ChoiceRow computedLabel={`Gebruik berekend (€${computedIncome.toLocaleString('nl-NL')}/mnd)`}
-            isManual={incomeManual} onUseComputed={() => useComputed('income')}
+            isManual={incomeManual} onUseComputed={() => applyComputed('income')}
             manualValue={Math.round(triple.monthlyIncome)} onManual={(v) => editField('income', v)} unit="€/mnd" />
         </div>
       </BottomSheet>
@@ -139,7 +139,7 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
             </div>
           </KassabonShell>
           <ChoiceRow computedLabel={`Gebruik berekend (€${Math.round(computedExpenses).toLocaleString('nl-NL')}/mnd)`}
-            isManual={expensesManual} onUseComputed={() => useComputed('expenses')}
+            isManual={expensesManual} onUseComputed={() => applyComputed('expenses')}
             manualValue={Math.round(triple.monthlyExpenses)} onManual={(v) => editField('expenses', v)} unit="€/mnd" />
         </div>
       </BottomSheet>
@@ -176,7 +176,7 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
             </div>
           </KassabonShell>
           <ChoiceRow computedLabel={`Gebruik berekend (${Math.round(data.savingsRate6m)}%)`}
-            isManual={expensesManual} onUseComputed={() => useComputed('expenses')}
+            isManual={expensesManual} onUseComputed={() => applyComputed('expenses')}
             manualValue={Math.round(triple.savingsRate)} onManual={(v) => editField('savingsRate', v)} unit="%" />
           <p className="text-[11px] text-[var(--ink-4)]">Een handmatige spaarquote past je geschatte uitgaven aan (inkomen blijft gelijk).</p>
         </div>

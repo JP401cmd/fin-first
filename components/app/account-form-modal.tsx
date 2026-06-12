@@ -77,7 +77,7 @@ export function AccountFormModal({
 
   useEffect(() => {
     if (showOwnIbans) { void loadOwnIbans() }
-  }, [showOwnIbans, loadOwnIbans]) // eslint-disable-line react-hooks/set-state-in-effect
+  }, [showOwnIbans, loadOwnIbans])  
 
   async function addOwnIban() {
     const normalized = newOwnIban.replace(/\s/g, '').toUpperCase()

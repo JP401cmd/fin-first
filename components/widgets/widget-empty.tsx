@@ -149,7 +149,7 @@ export function WidgetEmpty({
     variant === 'first-use' &&
     !action
   ) {
-    // eslint-disable-next-line no-console
+     
     console.warn(
       '[WidgetEmpty] first-use variant rendered without an `action` prop. ' +
         'The design bible mandates a CTA for first-use empty states ' +

@@ -433,7 +433,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
 
     if (shouldReplace) router.replace('/horizon', { scroll: false })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [searchParams, router, triggerDream])
 
   // Event form state

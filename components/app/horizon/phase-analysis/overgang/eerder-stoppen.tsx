@@ -80,7 +80,7 @@ export const EerderStoppen = memo(function EerderStoppen({
     }, 50)
 
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [
     currentAge,
     currentFireAge,

@@ -45,12 +45,12 @@ export async function GET() {
       // Force an error by calling with a type that would cause regex to fail
       // We monkey-patch temporarily to simulate
       const originalReplace = String.prototype.replace
-      // eslint-disable-next-line no-extend-native
+       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(String.prototype as any).replace = function (this: string, ...args: any[]) {
         // Only throw on the first IBAN regex replacement to simulate failure
         if (args[0] instanceof RegExp && args[0].source.includes('NL')) {
-          // eslint-disable-next-line no-extend-native
+           
           String.prototype.replace = originalReplace // restore immediately
           throw new Error('Simulated sanitize failure')
         }
@@ -66,7 +66,7 @@ export async function GET() {
         errorLogged = err instanceof Error && err.message === 'Simulated sanitize failure'
       } finally {
         // Ensure restore even if test logic fails
-        // eslint-disable-next-line no-extend-native
+         
         String.prototype.replace = originalReplace
       }
     } catch {

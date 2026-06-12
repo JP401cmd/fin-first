@@ -62,7 +62,7 @@ export function useCoachSuggestion({
     if (!next) return
     const timer = setTimeout(() => setSuggestion(next), delayMs)
     return () => clearTimeout(timer)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [pathname, dataGaps, deferredFields, overrides, activeModules, delayMs])
 
   const dismiss = useCallback(() => {

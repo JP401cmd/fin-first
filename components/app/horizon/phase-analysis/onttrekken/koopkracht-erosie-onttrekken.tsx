@@ -149,7 +149,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
     }, 50)
 
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [yearlyWithdrawal, inflationRate, startAge, endAge, yearlyAowIncome])
 
   const loading = state === null

@@ -454,11 +454,8 @@ function EventFormSheet({
   isDbEvent?: boolean
 }) {
   const catalog = LIFE_EVENT_CATALOG[form.eventType]
-  if (!catalog) return null
 
-  const fields = catalog.fields ?? []
-
-  // Compute summary values
+  // Compute summary values (hooks vóór de early-return — rules-of-hooks)
   const totalImpact = useMemo(() => {
     const oneTime = Math.abs(form.oneTimeCost)
     const monthlyNet = form.monthlyCostChange + Math.abs(form.monthlyIncomeChange < 0 ? form.monthlyIncomeChange : 0)
@@ -471,6 +468,10 @@ function EventFormSheet({
     const breakdown = calculateFreedomTime(totalImpact, dailyExpenses)
     return formatFreedomTimeString(breakdown, 'long', true)
   }, [totalImpact, dailyExpenses])
+
+  if (!catalog) return null
+
+  const fields = catalog.fields ?? []
 
   function updateField<K extends keyof EventFormState>(key: K, value: EventFormState[K]) {
     onChange({ ...form, [key]: value })

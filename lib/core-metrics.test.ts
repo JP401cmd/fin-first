@@ -6,6 +6,9 @@ import {
   computeFreedomPercentage,
   computeFreedomTime,
   computeSavingsRate,
+  // NB: bestaat nog niet — canonieke helper uit het fix-ontwerp.
+  // Tests hieronder pinnen de gewenste semantiek; ze zijn ROOD tot de helper bestaat.
+  computeFreedomProgress,
 } from './core-metrics'
 
 // ── computeEffectiveExpenses ────────────────────────────────
@@ -181,5 +184,128 @@ describe('computeSavingsRate', () => {
 
   it('defaults savingsBudgetSpent to 0 (backward compatible)', () => {
     expect(computeSavingsRate(5000, 3000)).toBe(40)
+  })
+})
+
+// ── computeFreedomProgress (canonieke vrijheidsvoortgang) ───────
+//
+// BUG: /overzicht toont 100% vrijheidsvoortgang naast "nog 6 jaar".
+// Root cause: freedomPct = volledig netto vermogen (incl. eigen huis)
+// ÷ simpel FIRE-doel (computeFireTarget ≈ uitgaven/SWR), geclampt op 100.
+// De "nog X jaar" komt uit runUnifiedProjection op de FIRE-eligible
+// grondslag (huis gefilterd via housing-strategie). Die twee gebruiken
+// verschillende grondslagen → percentage en jaren spreken elkaar tegen.
+//
+// Fix-ontwerp: één canonieke helper computeFreedomProgress dat de
+// FIRE-eligible netto-waarde afzet tegen de benodigde portfolio uit de
+// unified projection (requiredPortfolio), geclampt op [0,100].
+//
+// Deze tests pinnen de gewenste invarianten en zijn ROOD tot de helper
+// bestaat. De aparte "huidig foute pad"-test verderop faalt op het
+// HUIDIGE gedrag (niet alleen op "functie ontbreekt").
+
+describe('computeFreedomProgress', () => {
+  it('invariant 1: nog jaren te gaan (eligible < required) ⇒ strikt < 100% — ook als totaal vermogen incl. huis boven het simpele doel ligt', () => {
+    // Minimale repro: belegbaar (FIRE-eligible) €600k, benodigde
+    // portfolio uit de sim ±€1M ⇒ ~60%, NIET 100% — ook al ligt het
+    // totale vermogen (incl. €500k huis = €1,1M) boven het simpele doel.
+    const pct = computeFreedomProgress({
+      fireEligibleNetWorth: 600_000,
+      requiredPortfolio: 1_000_000,
+    })
+    expect(pct).toBeLessThan(100)
+    expect(pct).toBeCloseTo(60, 5)
+  })
+
+  it('invariant 2: doel bereikt (eligible ≥ required) ⇒ exact 100%', () => {
+    expect(
+      computeFreedomProgress({ fireEligibleNetWorth: 1_000_000, requiredPortfolio: 1_000_000 }),
+    ).toBe(100)
+    expect(
+      computeFreedomProgress({ fireEligibleNetWorth: 1_200_000, requiredPortfolio: 1_000_000 }),
+    ).toBe(100)
+  })
+
+  it('invariant 3a: requiredPortfolio = 0 ⇒ 0% (geen deling door nul / Infinity)', () => {
+    const pct = computeFreedomProgress({ fireEligibleNetWorth: 600_000, requiredPortfolio: 0 })
+    expect(pct).toBe(0)
+    expect(Number.isFinite(pct)).toBe(true)
+  })
+
+  it('invariant 3b: requiredPortfolio < 0 of niet berekenbaar (null) ⇒ 0%', () => {
+    expect(
+      computeFreedomProgress({ fireEligibleNetWorth: 600_000, requiredPortfolio: -50_000 }),
+    ).toBe(0)
+    expect(
+      computeFreedomProgress({ fireEligibleNetWorth: 600_000, requiredPortfolio: null }),
+    ).toBe(0)
+  })
+
+  it('invariant 3c: geen NaN/Infinity bij rare invoer', () => {
+    const a = computeFreedomProgress({ fireEligibleNetWorth: 600_000, requiredPortfolio: 0 })
+    const b = computeFreedomProgress({ fireEligibleNetWorth: NaN, requiredPortfolio: 1_000_000 })
+    expect(Number.isNaN(a)).toBe(false)
+    expect(Number.isFinite(a)).toBe(true)
+    expect(Number.isNaN(b)).toBe(false)
+    expect(Number.isFinite(b)).toBe(true)
+  })
+
+  it('invariant 4: negatief eligible vermogen ⇒ 0%', () => {
+    expect(
+      computeFreedomProgress({ fireEligibleNetWorth: -100_000, requiredPortfolio: 1_000_000 }),
+    ).toBe(0)
+  })
+
+  it('lineair tussen 0 en 100 bij gewone invoer', () => {
+    expect(
+      computeFreedomProgress({ fireEligibleNetWorth: 250_000, requiredPortfolio: 1_000_000 }),
+    ).toBe(25)
+  })
+})
+
+// ── Bug-demonstratie: HUIDIG foute pad vs. gewenste uitkomst ────
+//
+// Deze test gebruikt UITSLUITEND bestaande functies en demonstreert dat
+// het huidige loader-recept (computeFreedomPercentage(totaalNetWorth,
+// computeFireTarget(...))) in de minimale repro 100% oplevert, terwijl de
+// canonieke uitkomst < 100% hoort te zijn. Faalt dus op HUIDIG GEDRAG,
+// niet op een ontbrekende functie.
+
+describe('vrijheidsvoortgang bug — huidig pad geeft 100% in minimale repro', () => {
+  // Minimale repro (uit requirements):
+  //   - totaal netto vermogen €1,1M, waarvan €500k eigen huis
+  //   - FIRE-eligible (belegbaar) vermogen €600k
+  //   - jaarlijkse uitgaven €40k, SWR 4% ⇒ simpel FIRE-doel = €1,0M
+  //   - benodigde portfolio uit de sim ±€1,0M
+  const totaalNetWorth = 1_100_000
+  const fireEligibleNetWorth = 600_000
+  const yearlyExpenses = 40_000
+  const swr = 0.04
+  const simpelFireDoel = computeFireTarget(yearlyExpenses, swr) // 1_000_000
+  const requiredPortfolio = 1_000_000 // ±gelijk aan simpel doel in deze repro
+
+  it('het simpele FIRE-doel is €1,0M (sanity)', () => {
+    expect(simpelFireDoel).toBe(1_000_000)
+  })
+
+  it('HUIDIG (fout): totaal vermogen incl. huis ÷ simpel doel, geclampt ⇒ 100%', () => {
+    // Dit is exact wat de loaders nu doen (dashboard-data-loader.ts:575
+    // en horizon-data-loader.ts:572): netWorth = volledig totaal incl. huis.
+    const huidigPct = computeFreedomPercentage(totaalNetWorth, simpelFireDoel)
+    expect(huidigPct).toBe(100)
+  })
+
+  it('GEWENST (canoniek): FIRE-eligible vermogen ÷ required portfolio ⇒ ~60%, NIET 100%', () => {
+    // Wat de loaders zouden moeten voeden: de FIRE-eligible grondslag
+    // (huis gefilterd) afgezet tegen de required portfolio uit de sim.
+    const gewenstPct = computeFreedomProgress({ fireEligibleNetWorth, requiredPortfolio })
+    expect(gewenstPct).toBeLessThan(100)
+    expect(gewenstPct).toBeCloseTo(60, 5)
+  })
+
+  it('de twee paden verschillen ⇒ bewijst de tegenstrijdigheid (100% naast "nog jaren")', () => {
+    const huidigPct = computeFreedomPercentage(totaalNetWorth, simpelFireDoel)
+    const gewenstPct = computeFreedomProgress({ fireEligibleNetWorth, requiredPortfolio })
+    expect(huidigPct).not.toBeCloseTo(gewenstPct, 0)
   })
 })

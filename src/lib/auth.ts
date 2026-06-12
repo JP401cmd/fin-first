@@ -10,7 +10,7 @@ export const auth = betterAuth({
     enabled: true,
     sendResetPassword: async ({ user, url }) => {
       // Log password reset URL to terminal (no email integration yet)
-      // eslint-disable-next-line no-console
+       
       console.log(`\n${"=".repeat(60)}\nPASSWORD RESET REQUEST\nUser: ${user.email}\nReset URL: ${url}\n${"=".repeat(60)}\n`)
     },
   },
@@ -18,7 +18,7 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     sendVerificationEmail: async ({ user, url }) => {
       // Log verification URL to terminal (no email integration yet)
-      // eslint-disable-next-line no-console
+       
       console.log(`\n${"=".repeat(60)}\nEMAIL VERIFICATION\nUser: ${user.email}\nVerification URL: ${url}\n${"=".repeat(60)}\n`)
     },
   },

@@ -550,13 +550,13 @@ export function OverzichtClient({
   useEffect(() => {
     if (!showDiffPanel) return
     if (aggFireAge != null && simFireAge != null && Math.abs(aggFireAge - simFireAge) > 0.5) {
-      // eslint-disable-next-line no-console
+       
       console.warn(
         `[doorrekening-test] fireAge divergentie: aggregatie=${aggFireAge.toFixed(2)} vs sim=${simFireAge.toFixed(2)}`,
       )
     }
     if (simEnd > 0 && Math.abs(aggEnd - simEnd) / simEnd > 0.05) {
-      // eslint-disable-next-line no-console
+       
       console.warn(
         `[doorrekening-test] endPortfolio delta: aggregatie=${aggEnd} vs sim=${simEnd}`,
       )

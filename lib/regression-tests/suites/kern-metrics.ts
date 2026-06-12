@@ -278,6 +278,57 @@ const tests: TestCase[] = [
       assertEqual(computeSavingsRate(4_000, 4_000), 0, 'break-even')
     },
   },
+
+  // ── computeFreedomProgress (vrijheidsvoortgang, FIRE-eligible) ─────────
+  // VOORBEREID — bewaakt de fix voor de "100% naast nog X jaar"-bug.
+  // De canonieke helper computeFreedomProgress bestaat nog niet; deze cases
+  // laden 'm dynamisch zodat de suite blijft compileren tot de fix landt.
+  // Vóór de fix falen ze (helper ontbreekt); ná de fix borgen ze de
+  // invarianten. Zie lib/core-metrics.test.ts voor de volledige unit-set.
+  {
+    id: 'kern-fprog-eligible-lt-required', name: 'Vrijheidsvoortgang: eligible < required → < 100%', category: CAT,
+    description: 'FIRE-eligible vermogen onder benodigde portfolio → strikt < 100% (bug-regressie: huis-vermogen mag het percentage niet naar 100% duwen)',
+    priority: 'critical', estimatedDurationMs: 5,
+    async fn() {
+      const mod = await import('@/lib/core-metrics') as Record<string, unknown>
+      const fn = mod.computeFreedomProgress as
+        | ((a: { fireEligibleNetWorth: number; requiredPortfolio: number | null }) => number)
+        | undefined
+      assert(typeof fn === 'function', 'computeFreedomProgress helper bestaat (fix gelandt)')
+      const pct = fn!({ fireEligibleNetWorth: 600_000, requiredPortfolio: 1_000_000 })
+      assertLessThanOrEqual(pct, 99.999, 'eligible < required → < 100%')
+      assertGreaterThanOrEqual(pct, 59.9, '~60%')
+    },
+  },
+  {
+    id: 'kern-fprog-reached', name: 'Vrijheidsvoortgang: doel bereikt → 100%', category: CAT,
+    description: 'FIRE-eligible ≥ required → exact 100%',
+    priority: 'high', estimatedDurationMs: 5,
+    async fn() {
+      const mod = await import('@/lib/core-metrics') as Record<string, unknown>
+      const fn = mod.computeFreedomProgress as
+        | ((a: { fireEligibleNetWorth: number; requiredPortfolio: number | null }) => number)
+        | undefined
+      assert(typeof fn === 'function', 'computeFreedomProgress helper bestaat (fix gelandt)')
+      assertEqual(fn!({ fireEligibleNetWorth: 1_200_000, requiredPortfolio: 1_000_000 }), 100, 'bereikt → 100%')
+    },
+  },
+  {
+    id: 'kern-fprog-guards', name: 'Vrijheidsvoortgang: guards (0/negatief/null)', category: CAT,
+    description: 'required ≤ 0 of null → 0%; negatief eligible → 0%; geen NaN/Infinity',
+    priority: 'high', estimatedDurationMs: 5,
+    async fn() {
+      const mod = await import('@/lib/core-metrics') as Record<string, unknown>
+      const fn = mod.computeFreedomProgress as
+        | ((a: { fireEligibleNetWorth: number; requiredPortfolio: number | null }) => number)
+        | undefined
+      assert(typeof fn === 'function', 'computeFreedomProgress helper bestaat (fix gelandt)')
+      assertEqual(fn!({ fireEligibleNetWorth: 600_000, requiredPortfolio: 0 }), 0, 'required=0 → 0%')
+      assertEqual(fn!({ fireEligibleNetWorth: 600_000, requiredPortfolio: null }), 0, 'required=null → 0%')
+      assertEqual(fn!({ fireEligibleNetWorth: -100_000, requiredPortfolio: 1_000_000 }), 0, 'negatief eligible → 0%')
+      assertFinite(fn!({ fireEligibleNetWorth: 600_000, requiredPortfolio: 0 }), 'finite')
+    },
+  },
 ]
 
 export function register(): void {

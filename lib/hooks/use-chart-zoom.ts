@@ -333,7 +333,7 @@ export function useChartZoom({
     }
     el.addEventListener('wheel', handler, { passive: false })
     return () => el.removeEventListener('wheel', handler)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])  
 
   // --- Keyboard ---
   const onKeyDown = useCallback(
