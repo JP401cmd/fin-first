@@ -1,16 +1,11 @@
 import { WillDots } from '@/components/app/will-dots'
-import { Wallet, Compass, Newspaper, type LucideIcon } from 'lucide-react'
-import { type ModuleId } from '@/lib/module-registry'
+import { Wallet, Compass, type LucideIcon } from 'lucide-react'
 
 export function OnboardingSuccess({
   onDashboard,
-  activeModules,
 }: {
   onDashboard: () => void
-  activeModules?: ModuleId[]
 }) {
-  const isNewsOnly = activeModules?.length === 1 && activeModules[0] === 'nieuws'
-
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center py-8 text-center sm:py-12">
       {/* Will's avatar — celebration emphasis with subtle pulse */}
@@ -31,64 +26,48 @@ export function OnboardingSuccess({
       {/* Editorial divider */}
       <div className="mx-auto mt-8 mb-8 h-px w-16 bg-[var(--border-md)]" />
 
-      {isNewsOnly ? (
-        <>
-          {/* News-only intro + card */}
-          <div className="mx-auto max-w-md font-serif text-sm leading-relaxed text-[var(--ink-3)]">
-            <p>
-              Ik ben Will, je persoonlijke financiële coach. Je vindt me elke dag in de Trifinity Post met nieuws en inzichten die relevant zijn voor jouw financiële situatie.
-            </p>
-          </div>
-          <div className="mt-10 w-full">
-            <NewsCard />
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Twee modules — overzicht van vandaag + de toekomst */}
-          <h2 className="font-display text-xl font-semibold tracking-tight text-[var(--ink)] sm:text-2xl">
-            Vandaag op orde, <em className="italic text-kern-600">morgen in beeld</em>
-          </h2>
-          <p className="mx-auto mt-3 max-w-md font-serif text-sm leading-relaxed text-[var(--ink-2)] sm:text-base">
-            TriFinity bestaat uit twee modules die naadloos op elkaar aansluiten. Samen geven ze inzicht in waar je nu staat én waar je naartoe gaat.
-          </p>
+      {/* Twee modules — overzicht van vandaag + de toekomst */}
+      <h2 className="font-display text-xl font-semibold tracking-tight text-[var(--ink)] sm:text-2xl">
+        Vandaag op orde, <em className="italic text-kern-600">morgen in beeld</em>
+      </h2>
+      <p className="mx-auto mt-3 max-w-md font-serif text-sm leading-relaxed text-[var(--ink-2)] sm:text-base">
+        TriFinity bestaat uit twee modules die naadloos op elkaar aansluiten. Samen geven ze inzicht in waar je nu staat én waar je naartoe gaat.
+      </p>
 
-          <div className="mt-8 grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
-            <ModuleKaart
-              kleur="var(--color-kern-600)"
-              rubriek="Het Overzicht · Vandaag"
-              titel="Wat heb ik, wat geef ik uit?"
-              ondertitel="Alles wat je hebt en uitgeeft, in één rustig beeld."
-              features={[
-                'Bezittingen, schulden, cashflow en belasting',
-                'Dagelijkse briefing met zes inzichten',
-                'Doelen gekoppeld aan échte rekeningen',
-                'Samen-modus voor wie financiën deelt',
-              ]}
-              bgClass="bg-kern-50"
-              borderClass="border-kern-200"
-              iconColor="text-kern-600"
-              Icon={Wallet}
-            />
-            <ModuleKaart
-              kleur="var(--color-horizon-600)"
-              rubriek="De Toekomst · Morgen + later"
-              titel="Wat brengt mijn vrijheid dichterbij?"
-              ondertitel="Levensgebeurtenissen, scenario's en de Rekenhulp van Will."
-              features={[
-                'Tijdas met levensgebeurtenissen (kinderen, verhuizing, pensioen)',
-                'FIRE-prognose met scenario-vergelijking',
-                'Rekenhulp-bibliotheek met 12 kant-en-klare rekenhulpen',
-                'Vraag Will een eigen rekenhulp op maat',
-              ]}
-              bgClass="bg-horizon-50"
-              borderClass="border-horizon-200"
-              iconColor="text-horizon-600"
-              Icon={Compass}
-            />
-          </div>
-        </>
-      )}
+      <div className="mt-8 grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
+        <ModuleKaart
+          kleur="var(--color-kern-600)"
+          rubriek="Het Overzicht · Vandaag"
+          titel="Wat heb ik, wat geef ik uit?"
+          ondertitel="Alles wat je hebt en uitgeeft, in één rustig beeld."
+          features={[
+            'Bezittingen, schulden, cashflow en belasting',
+            'Dagelijkse briefing met zes inzichten',
+            'Doelen gekoppeld aan échte rekeningen',
+            'Samen-modus voor wie financiën deelt',
+          ]}
+          bgClass="bg-kern-50"
+          borderClass="border-kern-200"
+          iconColor="text-kern-600"
+          Icon={Wallet}
+        />
+        <ModuleKaart
+          kleur="var(--color-horizon-600)"
+          rubriek="De Toekomst · Morgen + later"
+          titel="Wat brengt mijn vrijheid dichterbij?"
+          ondertitel="Levensgebeurtenissen, scenario's en de Rekenhulp van Will."
+          features={[
+            'Tijdas met levensgebeurtenissen (kinderen, verhuizing, pensioen)',
+            'FIRE-prognose met scenario-vergelijking',
+            'Rekenhulp-bibliotheek met 12 kant-en-klare rekenhulpen',
+            'Vraag Will een eigen rekenhulp op maat',
+          ]}
+          bgClass="bg-horizon-50"
+          borderClass="border-horizon-200"
+          iconColor="text-horizon-600"
+          Icon={Compass}
+        />
+      </div>
 
       {/* Will's closing — font-serif italic */}
       <div className="mx-auto mt-10 max-w-md border-y border-[var(--border-ed)] px-4 py-4">
@@ -99,41 +78,17 @@ export function OnboardingSuccess({
 
       {/* Decorative color bar — twee modules (Overzicht + Toekomst) */}
       <div className="mt-8 flex w-full max-w-xs items-center gap-0">
-        {isNewsOnly ? (
-          <div className="h-0.5 flex-1 bg-wil-300" />
-        ) : (
-          <>
-            <div className="h-0.5 flex-1 bg-kern-300" />
-            <div className="h-0.5 flex-1 bg-horizon-300" />
-          </>
-        )}
+        <div className="h-0.5 flex-1 bg-kern-300" />
+        <div className="h-0.5 flex-1 bg-horizon-300" />
       </div>
 
-      {/* CTA — opent het Overzicht (news-only gaat naar de krant) */}
+      {/* CTA — opent het Overzicht */}
       <button
         onClick={onDashboard}
         className="mt-6 min-h-[48px] w-full max-w-xs rounded-xl bg-kern-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-kern-700 hover:shadow-md active:bg-kern-800 active:shadow-none sm:w-auto sm:min-w-[200px]"
       >
-        {isNewsOnly ? 'Naar de Trifinity Post' : 'Ga naar overzicht'}
+        Ga naar overzicht
       </button>
-    </div>
-  )
-}
-
-/* ── News-only card ───────────────────────────────────────── */
-
-function NewsCard() {
-  return (
-    <div className="card-editorial flex items-start gap-3 border-l-3 border-wil-400 p-4 text-left">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-wil-100">
-        <Newspaper className="h-5 w-5 text-wil-700" />
-      </div>
-      <div>
-        <p className="font-display text-sm font-semibold text-wil-700">De Trifinity Post</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-3)]">
-          Dagelijks financieel nieuws en inzichten, gepersonaliseerd voor jouw situatie.
-        </p>
-      </div>
     </div>
   )
 }

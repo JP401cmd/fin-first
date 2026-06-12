@@ -72,3 +72,32 @@
 ## 2026-06-12
 
 - **Componenten (aantal)** toegevoegd: +4
+
+## 2026-06-12
+
+- **Schermen** verwijderd: /beheer/migration
+- **API-routes** verwijderd: /api/apply-household-migration, /api/apply-migration, /api/apply-perspective-migration, /api/run-household-migration
+
+## 2026-06-12
+
+- Geen wijzigingen.
+
+## 2026-06-12
+
+- **Schermen** toegevoegd: /beheer/development
+
+## 2026-06-12
+
+- Geen wijzigingen.
+
+## 2026-06-12
+
+- Geen wijzigingen.
+
+## 2026-06-12
+
+- **Componenten (aantal)** verwijderd: -2
+
+## 2026-06-12
+
+- **Componenten (aantal)** toegevoegd: +1

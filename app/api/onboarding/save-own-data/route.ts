@@ -644,6 +644,14 @@ export async function POST(req: Request) {
           primary_goal_slug: primaryGoalSlug ?? null,
           selected_goal_slugs: selectedGoalSlugs.length > 0 ? selectedGoalSlugs : null,
         }
+        // Onboarding-schattingen = handmatige bron ("eigen bedrag") voor het
+        // blok "Instellingen & toekomst" op /overzicht/cashflow. Zo drijven
+        // jaarinkomen, spaarquote en geschatte uitgaven direct de FIRE-
+        // prognose via resolveSavingsSource — ook zonder transacties.
+        if (identity.net_monthly_income > 0) profileUpdates.income_source = 'manual'
+        if (identity.estimated_monthly_expenses != null && identity.estimated_monthly_expenses > 0) {
+          profileUpdates.expenses_source = 'manual'
+        }
         // Feature #830: persist deferred onboarding fields for post-onboarding suggestions.
         // Stored in feature_preferences.deferred_onboarding_fields (JSONB sub-key)
         // so no DDL migration is needed — the column already exists.
@@ -819,6 +827,12 @@ export async function POST(req: Request) {
     }
     // Add estimated monthly expenses if provided
     if (identity.estimated_monthly_expenses != null) profileData.estimated_monthly_expenses = identity.estimated_monthly_expenses
+    // Onboarding-schattingen = handmatige bron ("eigen bedrag") — zie het
+    // gelijknamige blok in het RPC-pad hierboven.
+    if (identity.net_monthly_income > 0) profileData.income_source = 'manual'
+    if (identity.estimated_monthly_expenses != null && identity.estimated_monthly_expenses > 0) {
+      profileData.expenses_source = 'manual'
+    }
     // Add FIRE parameters — horizonData takes priority, then identity (backwards compat)
     if (identity.expected_return != null) profileData.expected_return = identity.expected_return
     if (identity.inflation_rate != null) profileData.inflation_rate = identity.inflation_rate
@@ -885,6 +899,8 @@ export async function POST(req: Request) {
       'temporal_balance',
       'widget_prefs',
       'financial_context',
+      'income_source',
+      'expenses_source',
     ] as const
     let profileErr: { message?: string; code?: string } | null = null
     for (let attempt = 0; attempt < OPTIONAL_PROFILE_COLUMNS.length + 1; attempt++) {

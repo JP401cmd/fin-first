@@ -72,8 +72,8 @@ export function OnboardingKlaar({
   onAddMore,
   onFinish,
   onBack,
-  currentStep = 6,
-  totalSteps = 6,
+  currentStep = 5,
+  totalSteps = 5,
 }: OnboardingKlaarProps) {
   // Doel-labels — bij meerdere doelen voegen we ze samen met komma.
   // De gebruiker ziet de eerste twee in volle; bij ≥3 tonen we "+N" als

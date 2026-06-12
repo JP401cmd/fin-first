@@ -34,10 +34,16 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
     return { months: last6, income, expenses, saved, rate }
   }, [data.monthlyBreakdown])
 
+  // Initial triple respecteert de bron-keuze (handmatig vs berekend). De
+  // savingsRate moet uit DEZELFDE effectieve waarden volgen — een verse
+  // gebruiker met alleen onboarding-schattingen (geen transacties) heeft
+  // anders 0% staan terwijl inkomen/uitgaven wél gevuld zijn.
+  const initIncome = data.incomeSource === 'manual' && data.netMonthlyIncome > 0 ? data.netMonthlyIncome : computedIncome
+  const initExpenses = data.expensesSource === 'manual' ? data.estimatedMonthlyExpenses : computedExpenses
   const [triple, setTriple] = useState({
-    monthlyIncome: data.incomeSource === 'manual' && data.netMonthlyIncome > 0 ? data.netMonthlyIncome : computedIncome,
-    monthlyExpenses: data.expensesSource === 'manual' ? data.estimatedMonthlyExpenses : computedExpenses,
-    savingsRate: rawSavingsRate,
+    monthlyIncome: initIncome,
+    monthlyExpenses: initExpenses,
+    savingsRate: initIncome > 0 ? ((initIncome - initExpenses) / initIncome) * 100 : 0,
   })
   const [lastEdited, setLastEdited] = useState<LastEdited>('expenses')
   const [incomeManual, setIncomeManual] = useState(data.incomeSource === 'manual')

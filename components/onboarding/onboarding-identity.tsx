@@ -17,9 +17,21 @@ type HouseholdType = 'solo' | 'samen' | 'gezin'
 export interface IdentityData {
   full_name: string
   date_of_birth: string
+  /**
+   * Niet meer uitgevraagd in onboarding (jun 2026) — huishouden loopt via
+   * de partner-koppeling op /mijn/profiel. Blijft in de shape (default
+   * 'solo') zodat de server-zod en oude drafts blijven werken.
+   */
   household_type: HouseholdType
   number_of_children: number
+  /**
+   * Niet meer direct uitgevraagd — wordt bij save afgeleid uit
+   * `estimated_yearly_income` / 12. Blijft in de shape voor oude drafts.
+   */
   net_monthly_income: string
+  /** Geschat netto-jaarinkomen (raw invoerstring) — stap 3. */
+  estimated_yearly_income: string
+  /** Geschatte maandelijkse uitgaven (raw invoerstring) — stap 3. */
   estimated_monthly_expenses: string
 }
 
@@ -88,8 +100,9 @@ export interface OnboardingIdentityProps {
   data: IdentityData
   onChange: (data: IdentityData) => void
   onNext: () => void
-  onBack: () => void
-  /** 1-indexed stap-nummer voor de voortgangsbalk (default 2). */
+  /** Optioneel sinds jun 2026 — identity is de eerste stap (geen terug). */
+  onBack?: () => void
+  /** 1-indexed stap-nummer voor de voortgangsbalk (default 1). */
   currentStep?: number
   totalSteps?: number
 }
@@ -99,8 +112,8 @@ export function OnboardingIdentity({
   onChange,
   onNext,
   onBack,
-  currentStep = 2,
-  totalSteps = 6,
+  currentStep = 1,
+  totalSteps = 5,
 }: OnboardingIdentityProps) {
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [submitted, setSubmitted] = useState(false)
@@ -167,7 +180,7 @@ export function OnboardingIdentity({
   return (
     <OnboardingShell
       kicker="Profiel"
-      romanNum="ii."
+      romanNum="i."
       title={headline}
       deck="Zo vertaal ik je bedragen naar jouw vrijheid in tijd — op maat van je situatie."
       factsPanel={

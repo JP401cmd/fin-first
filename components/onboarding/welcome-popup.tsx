@@ -135,8 +135,8 @@ export function WelcomePopup({ onDismiss }: WelcomePopupProps) {
             dashboard, geen bankportaal.
           </p>
           <p>
-            We beginnen met een paar korte vragen &mdash; ongeveer vier minuten.
-            Alles wat je hier invult, pas je later aan.
+            We beginnen met een paar korte vragen &mdash; in een paar minuten
+            klaar. Alles wat je hier invult, pas je later aan.
           </p>
         </div>
 

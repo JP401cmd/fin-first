@@ -377,6 +377,91 @@ function scanTableRelations(knownTables) {
   return { relations, meta }
 }
 
+// ── Claude-team: subagents + skill-pijplijnen (.claude/) ────────────────────-
+// Feiten gescand uit de teamopstelling op schijf; de betekenis (rol/inzet,
+// groepen, taglines) wordt gecureerd in lib/architecture/development-model.ts.
+// Defensief: ontbreekt .claude/ of een bestand, dan degraderen we naar leeg.
+function scanAgentFrontmatter(src, fallbackName) {
+  const { data } = parseFrontmatter(src)
+  // description afknippen vóór het (lange) voorbeeldenblok
+  let desc = typeof data.description === 'string' ? data.description : ''
+  // YAML-escapes uit een quoted scalar terug naar leesbare tekst
+  desc = desc.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\t/g, '\t')
+  const cut = desc.search(/Examples?:|<example>/i)
+  if (cut !== -1) desc = desc.slice(0, cut)
+  desc = desc.replace(/\s+/g, ' ').trim()
+  const agent = { name: typeof data.name === 'string' && data.name ? data.name : fallbackName, description: desc }
+  if (typeof data.model === 'string' && data.model) agent.model = data.model
+  if (typeof data.color === 'string' && data.color) agent.color = data.color
+  return agent
+}
+function scanSkillSteps(body, agentIds) {
+  // pijplijn-stappen: koppen `### N. Titel` (eventueel met `— ` + agent-naam)
+  const steps = []
+  const headRe = /^###\s+(\d+)\.\s+(.+?)\s*$/gm
+  const heads = [...body.matchAll(headRe)]
+  for (let i = 0; i < heads.length; i++) {
+    const h = heads[i]
+    const index = Number(h[1])
+    // titel: alles vóór een eventueel "— `agent`"-achtervoegsel
+    const title = h[2].split('—')[0].replace(/\s+/g, ' ').trim()
+    const start = h.index + h[0].length
+    // sectietekst loopt tot de volgende ### of de volgende ## (wat het eerst komt)
+    const rest = body.slice(start)
+    const nextH = rest.search(/\n###\s/)
+    const nextHH = rest.search(/\n##\s/)
+    const stop = [nextH, nextHH].filter((n) => n >= 0).sort((a, b) => a - b)[0]
+    const section = stop >= 0 ? rest.slice(0, stop) : rest
+    // verzamel backtick-tokens die exact een agent-id zijn, in volgorde, gededup.
+    // De kop telt mee: agents staan vaak als "— `agent`"-achtervoegsel.
+    const agents = []
+    for (const m of (h[0] + '\n' + section).matchAll(/`([a-z0-9-]+)`/g)) {
+      const tok = m[1]
+      if (agentIds.has(tok) && !agents.includes(tok)) agents.push(tok)
+    }
+    steps.push({ index, title, agents })
+  }
+  return steps
+}
+function scanClaudeTeam() {
+  const empty = { agents: [], skills: [] }
+  const claudeDir = join(ROOT, '.claude')
+  if (!existsSync(claudeDir)) return empty
+
+  // ── agents ──
+  const agents = []
+  const agentIds = new Set()
+  const agentsDir = join(claudeDir, 'agents')
+  let agentFiles = []
+  try { agentFiles = readdirSync(agentsDir).filter((f) => /\.md$/.test(f)).sort() } catch { agentFiles = [] }
+  for (const f of agentFiles) {
+    const id = f.replace(/\.md$/, '')
+    const src = read(join(agentsDir, f))
+    if (!src) continue
+    agents.push({ id, ...scanAgentFrontmatter(src, id) })
+    agentIds.add(id)
+  }
+
+  // ── skills ──
+  const skills = []
+  const skillsDir = join(claudeDir, 'skills')
+  let skillDirs = []
+  try {
+    skillDirs = readdirSync(skillsDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort()
+  } catch { skillDirs = [] }
+  for (const id of skillDirs) {
+    const src = read(join(skillsDir, id, 'SKILL.md'))
+    if (!src) continue
+    const { data, body } = parseFrontmatter(src)
+    const name = typeof data.name === 'string' && data.name ? data.name : id
+    const description = typeof data.description === 'string' ? data.description.replace(/\s+/g, ' ').trim() : ''
+    const steps = scanSkillSteps(body, agentIds)
+    skills.push({ id, name, description, steps })
+  }
+
+  return { agents, skills }
+}
+
 // ── architectuurbesluiten (ADR's) ───────────────────────────────────────────-
 function parseFrontmatter(src) {
   const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---/)
@@ -518,6 +603,7 @@ function build() {
   const tableRelations = scanTableRelations(tables.list.map((t) => t.name))
   const adrs = scanAdrs()
   const churn = scanChurn()
+  const claudeTeam = scanClaudeTeam()
 
   // groeperingen voor de UI
   const routesByGroup = {}
@@ -565,6 +651,7 @@ function build() {
     tableRelations,
     adrs,
     churn,
+    claudeTeam,
   }
 
   const prev = existsSync(DATA_FILE) ? JSON.parse(read(DATA_FILE) || 'null') : null
@@ -617,6 +704,7 @@ function printSummary(data) {
   const ta = data.tableAccess
   console.log(`  Datatoegang: ${Object.keys(ta.byTable).length} tabellen geraakt · ${ta.multiWriter.length} multi-writer · ADR's ${data.adrs.length} · Churn ${data.churn ? data.churn.areas.length + ' gebieden' : 'n.v.t.'}`)
   console.log(`  Datarelaties: ${data.tableRelations.relations.length} FK-edges · ${Object.values(data.tableRelations.meta).filter((m) => m.rls).length} tabellen met RLS`)
+  console.log(`  Claude-team: ${data.claudeTeam.agents.length} agents · ${data.claudeTeam.skills.length} skills`)
   const d = data.diff
   if (d.baseline) console.log('  Diff: baseline (eerste run).')
   else if (!d.hasChanges) console.log(`  Diff: geen wijzigingen sinds ${d.previousDate}.`)

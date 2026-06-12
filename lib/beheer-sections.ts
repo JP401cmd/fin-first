@@ -33,6 +33,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Users,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -246,6 +247,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/architectuur',
         description: 'Interactieve ArchiMate-plaat van de applicatie.',
         icon: Network,
+      },
+      {
+        label: 'Development',
+        href: '/beheer/development',
+        description: 'Het agent-team en de skill-pijplijnen waarmee TriFinity gebouwd wordt.',
+        icon: Workflow,
       },
       {
         label: 'Audit-trail',

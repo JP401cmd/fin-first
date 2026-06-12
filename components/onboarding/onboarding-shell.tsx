@@ -39,7 +39,7 @@ export interface OnboardingShellProps {
   /** Kicker-tekst zonder streep — bv. "DOEL", "PROFIEL", "INKOMEN". */
   kicker: string
   /** Romeinse num — bv. "i.", "ii.", "iii.", "iv.", "v.". Optioneel: zonder
-   *  rendert de kicker zonder romeins cijfer (compact bij intro/news-only). */
+   *  rendert de kicker zonder romeins cijfer (compact, voor stappen zonder nummering). */
   romanNum?: string
   /** Headline — kan plain string of JSX bevatten (bv. `<>Waar help ik je <em>mee</em>?</>`).
    *  Aanbevolen: ReactNode met inline italic-em in `--module-active-700`,

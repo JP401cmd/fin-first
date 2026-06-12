@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-12T06:15:27.420Z",
+  "generatedAt": "2026-06-12T11:31:03.622Z",
   "generatedDate": "2026-06-12",
   "repo": {
     "name": "fin",
@@ -184,11 +184,11 @@
   "stats": {
     "routes": 320,
     "routesProduction": 94,
-    "api": 374,
+    "api": 370,
     "tables": 51,
     "migrations": 101,
     "integrations": 24,
-    "components": 689,
+    "components": 688,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -276,6 +276,12 @@
       "isTest": false
     },
     {
+      "url": "/beheer/development",
+      "file": "app/(app)/beheer/development/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
       "url": "/beheer/doelen",
       "file": "app/(app)/beheer/doelen/page.tsx",
       "group": "beheer",
@@ -320,12 +326,6 @@
     {
       "url": "/beheer/kpi",
       "file": "app/(app)/beheer/kpi/page.tsx",
-      "group": "beheer",
-      "isTest": false
-    },
-    {
-      "url": "/beheer/migration",
-      "file": "app/(app)/beheer/migration/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -2199,6 +2199,12 @@
         "isTest": false
       },
       {
+        "url": "/beheer/development",
+        "file": "app/(app)/beheer/development/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
         "url": "/beheer/doelen",
         "file": "app/(app)/beheer/doelen/page.tsx",
         "group": "beheer",
@@ -2243,12 +2249,6 @@
       {
         "url": "/beheer/kpi",
         "file": "app/(app)/beheer/kpi/page.tsx",
-        "group": "beheer",
-        "isTest": false
-      },
-      {
-        "url": "/beheer/migration",
-        "file": "app/(app)/beheer/migration/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -4469,33 +4469,6 @@
       ]
     },
     {
-      "url": "/api/apply-household-migration",
-      "file": "app/api/apply-household-migration/route.ts",
-      "domain": "apply-household-migration",
-      "methods": [
-        "GET",
-        "POST"
-      ]
-    },
-    {
-      "url": "/api/apply-migration",
-      "file": "app/api/apply-migration/route.ts",
-      "domain": "apply-migration",
-      "methods": [
-        "GET",
-        "POST"
-      ]
-    },
-    {
-      "url": "/api/apply-perspective-migration",
-      "file": "app/api/apply-perspective-migration/route.ts",
-      "domain": "apply-perspective-migration",
-      "methods": [
-        "GET",
-        "POST"
-      ]
-    },
-    {
       "url": "/api/apply-roadmap-migration",
       "file": "app/api/apply-roadmap-migration/route.ts",
       "domain": "apply-roadmap-migration",
@@ -5749,15 +5722,6 @@
       "methods": [
         "GET",
         "PUT"
-      ]
-    },
-    {
-      "url": "/api/run-household-migration",
-      "file": "app/api/run-household-migration/route.ts",
-      "domain": "run-household-migration",
-      "methods": [
-        "GET",
-        "POST"
       ]
     },
     {
@@ -8755,54 +8719,6 @@
       ]
     },
     {
-      "domain": "apply-household-migration",
-      "label": "apply-household-migration",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/apply-household-migration",
-          "file": "app/api/apply-household-migration/route.ts",
-          "domain": "apply-household-migration",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "apply-migration",
-      "label": "apply-migration",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/apply-migration",
-          "file": "app/api/apply-migration/route.ts",
-          "domain": "apply-migration",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "apply-perspective-migration",
-      "label": "apply-perspective-migration",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/apply-perspective-migration",
-          "file": "app/api/apply-perspective-migration/route.ts",
-          "domain": "apply-perspective-migration",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "apply-roadmap-migration",
       "label": "apply-roadmap-migration",
       "count": 1,
@@ -9496,22 +9412,6 @@
           "methods": [
             "GET",
             "PUT"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "run-household-migration",
-      "label": "run-household-migration",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/run-household-migration",
-          "file": "app/api/run-household-migration/route.ts",
-          "domain": "run-household-migration",
-          "methods": [
-            "GET",
-            "POST"
           ]
         }
       ]
@@ -12493,7 +12393,7 @@
     }
   ],
   "components": {
-    "total": 689,
+    "total": 688,
     "groups": [
       {
         "group": "app",
@@ -13144,18 +13044,17 @@
       },
       {
         "group": "onboarding",
-        "count": 18,
+        "count": 17,
         "items": [
           "aangifte-import-pane",
           "budget-amount-editor",
           "facts-panel",
           "onboarding-bezittingen",
-          "onboarding-doel",
+          "onboarding-bezittingen.test",
           "onboarding-horizon",
           "onboarding-identity",
           "onboarding-inkomen",
           "onboarding-klaar",
-          "onboarding-nieuws-only",
           "onboarding-shell",
           "onboarding-spaardoel",
           "onboarding-success",
@@ -15975,6 +15874,37 @@
           ]
         }
       ],
+      "questionnaires": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires",
+            "/api/admin/questionnaires/[id]"
+          ]
+        },
+        {
+          "domain": "questionnaires",
+          "label": "Vragenlijsten",
+          "write": false,
+          "routes": [
+            "/api/questionnaires"
+          ]
+        }
+      ],
+      "questionnaire_questions": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires",
+            "/api/admin/questionnaires/[id]",
+            "/api/admin/questionnaires/[id]/responses"
+          ]
+        }
+      ],
       "questionnaire_sessions": [
         {
           "domain": "admin",
@@ -15992,37 +15922,6 @@
             "/api/questionnaires",
             "/api/questionnaires/[id]/respond",
             "/api/questionnaires/[id]/session"
-          ]
-        }
-      ],
-      "questionnaire_questions": [
-        {
-          "domain": "admin",
-          "label": "Beheer",
-          "write": true,
-          "routes": [
-            "/api/admin/questionnaires",
-            "/api/admin/questionnaires/[id]",
-            "/api/admin/questionnaires/[id]/responses"
-          ]
-        }
-      ],
-      "questionnaires": [
-        {
-          "domain": "admin",
-          "label": "Beheer",
-          "write": true,
-          "routes": [
-            "/api/admin/questionnaires",
-            "/api/admin/questionnaires/[id]"
-          ]
-        },
-        {
-          "domain": "questionnaires",
-          "label": "Vragenlijsten",
-          "write": false,
-          "routes": [
-            "/api/questionnaires"
           ]
         }
       ],
@@ -16807,20 +16706,6 @@
           ]
         }
       ],
-      "external_data_sources": [
-        {
-          "domain": "integrations",
-          "label": "Externe koppelingen",
-          "write": true,
-          "routes": [
-            "/api/integrations/exchanges/[id]",
-            "/api/integrations/exchanges/[id]/sync",
-            "/api/integrations/wallets",
-            "/api/integrations/wallets/[id]",
-            "/api/integrations/wallets/[id]/sync"
-          ]
-        }
-      ],
       "exchange_connections": [
         {
           "domain": "integrations",
@@ -16833,6 +16718,20 @@
             "/api/integrations/exchanges/bitvavo/connect",
             "/api/integrations/exchanges/coinbase/connect",
             "/api/integrations/exchanges/kraken/connect"
+          ]
+        }
+      ],
+      "external_data_sources": [
+        {
+          "domain": "integrations",
+          "label": "Externe koppelingen",
+          "write": true,
+          "routes": [
+            "/api/integrations/exchanges/[id]",
+            "/api/integrations/exchanges/[id]/sync",
+            "/api/integrations/wallets",
+            "/api/integrations/wallets/[id]",
+            "/api/integrations/wallets/[id]/sync"
           ]
         }
       ],
@@ -17531,7 +17430,7 @@
       },
       {
         "path": "app/api/household",
-        "commits": 7
+        "commits": 8
       },
       {
         "path": "components/horizon",
@@ -17589,15 +17488,670 @@
       }
     ]
   },
+  "claudeTeam": {
+    "agents": [
+      {
+        "id": "ai-specialist-general",
+        "name": "ai-specialist-general",
+        "description": "Use this agent for any general AI/LLM integration work in TriFinity: wiring up or reviewing AI features that use the Vercel AI SDK (the `ai` package), the multi-provider model config in `lib/ai/config.ts` (Anthropic default, plus OpenAI/Mistral/Ollama), streaming chat, tool calling (`lib/ai/tools/`), structured outputs with zod schemas (`lib/ai/schemas/`), context building (`lib/ai/context/`), token/usage logging (`lib/ai/token-usage.ts`), guardrails (`lib/ai/sanitize.ts`, `lib/ai/pii-output-filter.ts`), the kill-switch/tier gating, and the AI API routes under `app/api/ai/*`. Prompt wording and the per-domain personality DNA itself belong to the `ai-specialist-prompt-dna` agent — this agent owns the plumbing AROUND the prompts.",
+        "model": "opus",
+        "color": "cyan"
+      },
+      {
+        "id": "ai-specialist-prompt-dna",
+        "name": "ai-specialist-prompt-dna",
+        "description": "Use this agent for anything about the WORDING and BEHAVIOUR of the prompts TriFinity sends to the LLM — the app's prompt 'DNA'. This is the agent that owns how De Wil (and Kern/Horizon) talks and reasons: the system prompts in `lib/ai/dna/` (base + per-domain personalities), the task prompts like transaction categorization (`lib/ai/categorize-system-prompt.ts`), extraction (`lib/ai/extraction-system-prompt.ts`), subscription detection, pension parsing, what-if suggestions, and the budget-categorization quality (does a transaction land on the RIGHT budget?). Use it to write, tune, debug, or review any prompt; the surrounding plumbing (SDK, providers, tools, routes) belongs to the `ai-specialist-general` agent.",
+        "model": "opus",
+        "color": "teal"
+      },
+      {
+        "id": "architect",
+        "name": "architect",
+        "description": "Use this agent as the Enterprise & Solution Architect for TriFinity: the owner of the structural blueprint and architectural decisions, and the person accountable that the in-app architecture plates (`/beheer/architectuur` — Praatplaat/HLD, ArchiMate, Database/ERD, Berekeningen) stay truthful. He works at TWO moments: (1) at the START of a new feature — solution design, how it fits the enterprise architecture, the principles/trade-offs and the ADR; and (2) as a REVIEWER — does this change respect the architecture, the domains, the single-source-of-truth and the documented decisions? He owns architectural CONTENT and DECISIONS; the mechanical doc-sync is delegated to `architecture-docs-keeper`, and code-level direction to `senior-developer`.",
+        "model": "opus",
+        "color": "pink"
+      },
+      {
+        "id": "architecture-docs-keeper",
+        "name": "architecture-docs-keeper",
+        "description": "Use this agent to keep TriFinity's self-documenting architecture page (`/beheer/architectuur`) in sync with code changes. It owns the curation behind the four views — Praatplaat (HLD), Plaat (ArchiMate), Database (ERD) and Berekeningen — and the rule from CLAUDE.md: 'laat de documentatie beter achter dan je 'm vond'. Use it whenever a domain, module, table, calculation, integration or capability is added/removed/renamed, when ADRs or concerns need recording, or to review whether an architecture change kept the docs consistent.",
+        "model": "opus",
+        "color": "blue"
+      },
+      {
+        "id": "bug-reporter",
+        "name": "bug-reporter",
+        "description": "Use this agent to turn a vague problem report into a complete, reproducible bug report for TriFinity. It does NOT fix the bug — it investigates and documents: a clear title, environment/context, exact steps to reproduce, expected vs. actual behaviour, the affected use cases/user journeys, severity & impact, suspected area in the codebase, and the evidence behind it. Use it whenever a bug is observed or reported and you want a crisp, actionable write-up before anyone starts fixing.",
+        "model": "opus",
+        "color": "red"
+      },
+      {
+        "id": "business-owner",
+        "name": "business-owner",
+        "description": "Use this agent for product/business-owner thinking on TriFinity: deciding what to build and why, shaping and prioritizing the backlog, writing clear feature definitions, and judging whether a proposed change serves the product's mission and philosophy ('Geld is opgeslagen tijd'). It owns the feature-management MCP tools (feature_create, feature_create_bulk, feature_skip, feature_get_stats, feature_get_ready, feature_get_blocked, feature_get_by_id). Use it to turn a vague idea into well-scoped features, to challenge scope/priority, to assess value and risk (incl. Wft-compliance and trust), and for the user-facing 'is this worth doing?' call.",
+        "model": "opus",
+        "color": "amber"
+      },
+      {
+        "id": "calc-engine-specialist",
+        "name": "calc-engine-specialist",
+        "description": "Use this agent for TriFinity's financial calculation engines (rekenmotoren): the code that turns raw DB data into the derived numbers users see — spaarquote, netto vermogen, belastingdruk (box 1/box 3), FIRE-doel, vrijheids-% and vrijheidstijd. It owns `lib/constants.ts`, `lib/fire-params.ts`, `lib/unified-projection.ts`, `lib/budget-utils.ts`, `lib/effective-financials.ts`, `lib/savings-source.ts`, `lib/housing-strategy.ts`, `lib/box1-tax.ts`, `lib/box3-data.ts`, `lib/dashboard-data-loader.ts` and `lib/format.ts`. Use it whenever a calculation, constant or assumption changes, or to verify a number is correct and single-sourced. It also keeps the curated *Berekeningen* view (`lib/architecture/calculations.ts`) in sync.",
+        "model": "opus",
+        "color": "amber"
+      },
+      {
+        "id": "code-review",
+        "name": "code-review",
+        "description": "Use this agent when you need a thorough code review of recently written code, when you want to ensure code quality meets the highest standards, when checking for technical debt, security vulnerabilities, or performance issues, or when you need to run quality checks like linting and type checking.",
+        "model": "opus",
+        "color": "red"
+      },
+      {
+        "id": "coder",
+        "name": "coder",
+        "description": "Use this agent when you need to implement new features, write new code, refactor existing code, or make any code changes to the codebase. This agent should be invoked for tasks requiring high-quality, production-ready code implementation.\\ \\",
+        "model": "opus",
+        "color": "orange"
+      },
+      {
+        "id": "deep-dive",
+        "name": "deep-dive",
+        "description": "Use this agent when you need comprehensive analysis, investigation, or exploration of code, architecture, or technical solutions. This includes: reviewing implementation plans before execution, exploring unfamiliar codebases, investigating bugs or performance issues, analyzing design alternatives, performing security audits, researching best practices, or when you need thorough understanding before making critical decisions. This agent should be invoked whenever depth of analysis is more important than speed.\\ \\",
+        "model": "opus",
+        "color": "purple"
+      },
+      {
+        "id": "frontend-ui-builder",
+        "name": "frontend-ui-builder",
+        "description": "Use this agent to BUILD new TriFinity UI: pages and React components in the established Next.js 16 / React 19 / Tailwind v4 style — module heroes, KPI stat cards, BottomSheet deep-dives, charts — always with the 'Geld is opgeslagen tijd' framing and correct feature/module gating. It writes components; the separate `ux-review-expert` agent reviews them. Use it when a new screen, widget, modal or component is needed, or when restyling existing UI to match the design system.",
+        "model": "opus",
+        "color": "purple"
+      },
+      {
+        "id": "polar-payments-expert",
+        "name": "polar-payments-expert",
+        "description": "Use this agent when implementing, reviewing, or troubleshooting Polar payment integration in the Next.js application. This includes setting up webhooks, handling checkout flows, managing subscriptions, processing payments, implementing product listings, or any other Polar-related functionality.",
+        "model": "sonnet",
+        "color": "green"
+      },
+      {
+        "id": "requirement-specialist",
+        "name": "requirement-specialist",
+        "description": "Use this agent to turn a business-owner intent into precise, unambiguous requirements and acceptance criteria for TriFinity — the bridge between 'what we want and why' (business-owner) and 'how we build it' (engineers). It works on behalf of the business-owner to set the right expectations: it elaborates a feature into clear functional & non-functional requirements, explicit acceptance criteria (Given/When/Then), scope boundaries (in/out), edge cases, dependencies, and the definition of done — without deciding priority (that's the business-owner) or implementation (that's the engineers). Use it after an idea is greenlit and before building, or when a feature's expectations are fuzzy and need pinning down.",
+        "model": "opus",
+        "color": "amber"
+      },
+      {
+        "id": "security-specialist",
+        "name": "security-specialist",
+        "description": "Use this agent for application-security and privacy review in TriFinity: auditing new/changed API routes, service-role usage, secrets/keys, dev/test endpoints, partner/household privacy, AI data-exposure and Wft/AVG-sensitive surfaces. Use it as the security gate in the feature/bug pipelines, before shipping any change that touches data access, auth, external calls or admin paths — and for periodic security sweeps of the whole app. RLS/schema mechanics belong to `supabase-db-specialist`; this agent owns the security view ACROSS layers (route → proxy → client → AI → DB).",
+        "model": "opus",
+        "color": "red"
+      },
+      {
+        "id": "senior-developer",
+        "name": "senior-developer",
+        "description": "Use this agent as the senior/principal engineer for TriFinity: high-level technical direction, architecture and design decisions, tricky cross-cutting refactors, hard debugging, and final technical judgement that spans multiple domains (Next.js 16, React 19, Supabase/RLS, AI, the calc engines, the self-documenting architecture). It coordinates the specialist agents, weighs trade-offs, and owns codebase-wide quality and consistency. Use it when a change is architecturally significant, touches several subsystems, needs a build/refactor plan, or when you want a seasoned 'is this the right approach?' call before committing.",
+        "model": "opus",
+        "color": "red"
+      },
+      {
+        "id": "supabase-db-specialist",
+        "name": "supabase-db-specialist",
+        "description": "Use this agent for any Supabase / PostgreSQL database work in TriFinity: writing or reviewing SQL migrations in `supabase/migrations/*`, designing tables, foreign keys, indexes, RPCs/functions, and — above all — Row Level Security (RLS) policies and ownership (gebruiker vs. huishouden). Use it whenever a schema change, a new table, an RLS policy, a service-role write path, or a data-access question comes up. It guards that every new table is RLS-correct, scoped to the right owner, and that the ERD/architecture stays in sync.",
+        "model": "opus",
+        "color": "green"
+      },
+      {
+        "id": "tester",
+        "name": "tester",
+        "description": "Use this agent to write, run, debug and review tests for TriFinity, and to verify that a change actually works before it's called done. It owns the two test layers: unit/component tests with Vitest (`*.test.ts` / `*.test.tsx`, run via `npm run test:run`) and the in-app regression framework (`lib/regression-tests/suites/*` — 83 suites, registered via `registerTest`/`registerCategory`). Use it after any non-trivial change, when coverage is missing, when a bug needs a reproducing test, or when tests are failing and need diagnosis.",
+        "model": "opus",
+        "color": "green"
+      },
+      {
+        "id": "ux-review-expert",
+        "name": "ux-review-expert",
+        "description": "Use this agent when the user wants a UI/UX review of recently written or modified code, when consistency issues need to be identified across components, when new UI components are being designed or implemented, or when the user asks for feedback on user experience, visual design, interaction patterns, or accessibility. This agent should be proactively invoked after any significant UI change is made.\\ \\",
+        "model": "sonnet",
+        "color": "purple"
+      }
+    ],
+    "skills": [
+      {
+        "id": "ai-feature",
+        "name": "ai-feature",
+        "description": "Pijplijn voor het bouwen of wijzigen van AI-FUNCTIONALITEIT in TriFinity — nieuwe AI-routes, tools, structured outputs, context-builders of provider/config-wijzigingen. Zet de AI-specialisten en het team in de juiste volgorde in, met de guardrails (sanitize, PII-mask, kill-switch, tier-gate, token-logging) als harde eis. Gebruik deze skill voor \"de app moet iets nieuws met AI kunnen\"; voor hoe de AI zich gedraagt of antwoordt, gebruik /ai-gedrag.",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Waarde & compliance",
+            "agents": [
+              "business-owner"
+            ]
+          },
+          {
+            "index": 2,
+            "title": "Verwachtingen",
+            "agents": [
+              "requirement-specialist"
+            ]
+          },
+          {
+            "index": 3,
+            "title": "Architectuur-fit",
+            "agents": [
+              "architect"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Bouwen",
+            "agents": [
+              "ai-specialist-general",
+              "supabase-db-specialist",
+              "calc-engine-specialist",
+              "frontend-ui-builder"
+            ]
+          },
+          {
+            "index": 5,
+            "title": "Prompt erbij",
+            "agents": [
+              "ai-specialist-prompt-dna"
+            ]
+          },
+          {
+            "index": 6,
+            "title": "Testen",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 7,
+            "title": "Review",
+            "agents": [
+              "code-review",
+              "security-specialist"
+            ]
+          },
+          {
+            "index": 8,
+            "title": "Platen",
+            "agents": [
+              "architecture-docs-keeper",
+              "architect"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ai-gedrag",
+        "name": "ai-gedrag",
+        "description": "Pijplijn voor het bijsturen van AI-GEDRAG in TriFinity — hoe De Wil (en Kern/Horizon) praat, redeneert, categoriseert en antwoordt. Voor verkeerde categorisaties, toon/lengte-problemen, filosofie-drift, compliance-zorgen of het verfijnen van een bestaande prompt. Werkt als een evaluatie-loop: concrete voorbeelden → diagnose → chirurgische prompt-aanpassing → regressiebewijs. Gebruik /ai-feature wanneer de app iets nieuws met AI moet kunnen; deze skill gaat over hoe de bestaande AI zich gedraagt.",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Gedrag vastleggen met voorbeelden",
+            "agents": [
+              "bug-reporter"
+            ]
+          },
+          {
+            "index": 2,
+            "title": "Gewenst gedrag definiëren",
+            "agents": [
+              "requirement-specialist",
+              "business-owner"
+            ]
+          },
+          {
+            "index": 3,
+            "title": "Diagnose & aanpassing",
+            "agents": [
+              "ai-specialist-prompt-dna",
+              "business-owner",
+              "ai-specialist-general"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Regressiebewijs",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 5,
+            "title": "Gedragsreview",
+            "agents": [
+              "code-review"
+            ]
+          },
+          {
+            "index": 6,
+            "title": "Borging",
+            "agents": [
+              "architect"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bug-fix",
+        "name": "bug-fix",
+        "description": "End-to-end bug-fix pijplijn voor TriFinity die de juiste subagents in volgorde inzet — van reproduceerbaar bugrapport naar gefixte, geverifieerde en (indien nodig) architectuur-gereviewde oplossing. Gebruik deze skill wanneer een bug gemeld of waargenomen is en je 'm gestructureerd wilt oplossen in plaats van ad-hoc te patchen.",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Rapporteren & reproduceren",
+            "agents": [
+              "bug-reporter"
+            ]
+          },
+          {
+            "index": 2,
+            "title": "Verwachting vastleggen",
+            "agents": [
+              "requirement-specialist"
+            ]
+          },
+          {
+            "index": 3,
+            "title": "Architectuur-impact triage",
+            "agents": [
+              "architect"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Falende test vastleggen",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 5,
+            "title": "Fixen via de juiste specialist",
+            "agents": [
+              "senior-developer",
+              "calc-engine-specialist",
+              "supabase-db-specialist",
+              "ai-specialist-general",
+              "ai-specialist-prompt-dna",
+              "frontend-ui-builder",
+              "coder"
+            ]
+          },
+          {
+            "index": 6,
+            "title": "Verifiëren",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 7,
+            "title": "Review",
+            "agents": [
+              "code-review",
+              "ux-review-expert",
+              "security-specialist"
+            ]
+          },
+          {
+            "index": 8,
+            "title": "Architectuur-fit & platen",
+            "agents": [
+              "architect",
+              "architecture-docs-keeper"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "extend-feature",
+        "name": "extend-feature",
+        "description": "Pijplijn voor het UITBOUWEN van een BESTAANDE functionaliteit in TriFinity — een delta op iets dat al werkt. Zet de juiste subagents in met nadruk op de huidige werking begrijpen, hergebruik, minimale blast radius en het beschermen van bestaand gedrag (regressie). Gebruik deze skill wanneer een bestaande functie uitgebreid, verdiept of aangepast moet worden (niet nieuw, niet een bug).",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Huidige werking in kaart",
+            "agents": [
+              "deep-dive"
+            ]
+          },
+          {
+            "index": 2,
+            "title": "Waarde van de uitbreiding",
+            "agents": [
+              "business-owner"
+            ]
+          },
+          {
+            "index": 3,
+            "title": "Delta-requirements",
+            "agents": [
+              "requirement-specialist"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Impact- & fit-review",
+            "agents": [
+              "architect"
+            ]
+          },
+          {
+            "index": 5,
+            "title": "Plan met minimale blast radius",
+            "agents": [
+              "senior-developer"
+            ]
+          },
+          {
+            "index": 6,
+            "title": "Bouwen",
+            "agents": [
+              "supabase-db-specialist",
+              "calc-engine-specialist",
+              "ai-specialist-general",
+              "ai-specialist-prompt-dna",
+              "frontend-ui-builder",
+              "coder"
+            ]
+          },
+          {
+            "index": 7,
+            "title": "Testen",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 8,
+            "title": "Review",
+            "agents": [
+              "code-review",
+              "ux-review-expert",
+              "security-specialist"
+            ]
+          },
+          {
+            "index": 9,
+            "title": "Platen synchroniseren",
+            "agents": [
+              "architecture-docs-keeper",
+              "architect"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "frontend-design",
+        "name": "frontend-design",
+        "description": "Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics.",
+        "steps": []
+      },
+      {
+        "id": "kleine-aanpassing",
+        "name": "kleine-aanpassing",
+        "description": "Lichte pijplijn voor een KLEINE AANPASSING op verzoek in TriFinity — een wens, geen defect; bijschaven, geen nieuw gedrag van betekenis. Gebruik deze skill vrijwel altijd wanneer de vraag klinkt als \"wil je…\", \"kun je…\", \"pas … aan\", \"verander…\", \"maak … (kleiner/anders/mooier)\" — bv. een tekstje, label, marge, kleur, beeld (zoals onboarding-beeld) of kleine gedragstweak op iets dat al werkt. Weinig stappen, één specialist waar het kan, mét vangrails (routering, verificatie, UX-/security-gate, \"is dit wel klein?\"-poort). NIET voor een defect (→ bug-fix), een functionele delta van betekenis (→ extend-feature), iets nieuws (→ new-feature), pure herstructurering (→ refactor) of AI-gedrag (→ ai-gedrag).",
+        "steps": [
+          {
+            "index": 1,
+            "title": "\"Is dit wel klein?\"",
+            "agents": []
+          },
+          {
+            "index": 2,
+            "title": "Plek & impact lokaliseren",
+            "agents": []
+          },
+          {
+            "index": 3,
+            "title": "Aanpassen via de juiste specialist",
+            "agents": [
+              "senior-developer",
+              "ai-specialist-general",
+              "ai-specialist-prompt-dna",
+              "frontend-ui-builder",
+              "coder"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Verifiëren",
+            "agents": []
+          },
+          {
+            "index": 5,
+            "title": "Conditionele review",
+            "agents": [
+              "ux-review-expert",
+              "security-specialist",
+              "code-review"
+            ]
+          },
+          {
+            "index": 6,
+            "title": "Platen-check",
+            "agents": [
+              "architecture-docs-keeper"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "new-feature",
+        "name": "new-feature",
+        "description": "End-to-end pijplijn voor een NIEUWE functionaliteit in TriFinity die de juiste subagents in volgorde inzet — van waarde & scope, via requirements en solution-architectuur, naar parallelle bouw, test, review en het bijwerken van de architectuurplaten. Gebruik deze skill wanneer iets nieuws gebouwd moet worden dat nog niet bestaat.",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Waarde, scope & prioriteit",
+            "agents": [
+              "business-owner"
+            ]
+          },
+          {
+            "index": 2,
+            "title": "Verwachtingen vastleggen",
+            "agents": [
+              "requirement-specialist",
+              "business-owner"
+            ]
+          },
+          {
+            "index": 3,
+            "title": "Solution-architectuur",
+            "agents": [
+              "architect"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Technisch plan & dispatch",
+            "agents": [
+              "senior-developer"
+            ]
+          },
+          {
+            "index": 5,
+            "title": "Bouwen",
+            "agents": [
+              "supabase-db-specialist",
+              "calc-engine-specialist",
+              "ai-specialist-general",
+              "ai-specialist-prompt-dna",
+              "frontend-ui-builder",
+              "coder"
+            ]
+          },
+          {
+            "index": 6,
+            "title": "Testen",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 7,
+            "title": "Review",
+            "agents": [
+              "code-review",
+              "ux-review-expert",
+              "security-specialist"
+            ]
+          },
+          {
+            "index": 8,
+            "title": "Architectuurplaten bijwerken",
+            "agents": [
+              "architecture-docs-keeper",
+              "architect"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "playwright-cli",
+        "name": "playwright-cli",
+        "description": "Automates browser interactions for web testing, form filling, screenshots, and data extraction. Use when the user needs to navigate websites, interact with web pages, fill forms, take screenshots, test web applications, or extract information from web pages.",
+        "steps": []
+      },
+      {
+        "id": "refactor",
+        "name": "refactor",
+        "description": "Pijplijn voor VERBOUWEN ZONDER GEDRAGSWIJZIGING in TriFinity — god-components opknippen, code verplaatsen/ontvlechten, hernoemen, lagen herindelen. Gebruik deze skill wanneer de structuur moet veranderen maar de app zich identiek moet blijven gedragen. Niet voor nieuw gedrag (new-feature / extend-feature) en niet voor defecten (bug-fix).",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Verkennen",
+            "agents": [
+              "deep-dive"
+            ]
+          },
+          {
+            "index": 2,
+            "title": "Vangnet",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 3,
+            "title": "Plan",
+            "agents": [
+              "senior-developer"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "De pure-move loop",
+            "agents": [
+              "coder",
+              "frontend-ui-builder"
+            ]
+          },
+          {
+            "index": 5,
+            "title": "Eindverificatie",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 6,
+            "title": "Review",
+            "agents": [
+              "code-review"
+            ]
+          },
+          {
+            "index": 7,
+            "title": "Opruimen & docs",
+            "agents": [
+              "architecture-docs-keeper"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "release",
+        "name": "release",
+        "description": "Ship-gate pijplijn voor TriFinity. Gebruik deze skill wanneer werk als \"klaar\" wordt beschouwd en gecommit, gepusht, gemerged of gedeployed gaat worden — \"ship het\", \"maak het af\", \"kan dit live?\" — zeker wanneer de wijziging een Supabase-migratie, nieuwe API-route, rekenmotor-wijziging of nieuw UI-oppervlak bevat. Ook te gebruiken als losse eindcheck op een branch die al \"af\" heet te zijn.",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Scope & hygiëne",
+            "agents": []
+          },
+          {
+            "index": 2,
+            "title": "Statische checks",
+            "agents": []
+          },
+          {
+            "index": 3,
+            "title": "Tests",
+            "agents": [
+              "tester"
+            ]
+          },
+          {
+            "index": 4,
+            "title": "Migratie naar remote",
+            "agents": [
+              "supabase-db-specialist"
+            ]
+          },
+          {
+            "index": 5,
+            "title": "Security-gate",
+            "agents": [
+              "security-specialist"
+            ]
+          },
+          {
+            "index": 6,
+            "title": "Architectuurdocumentatie",
+            "agents": [
+              "architecture-docs-keeper"
+            ]
+          },
+          {
+            "index": 7,
+            "title": "Build & echte verificatie",
+            "agents": []
+          },
+          {
+            "index": 8,
+            "title": "Review",
+            "agents": [
+              "code-review",
+              "ux-review-expert"
+            ]
+          },
+          {
+            "index": 9,
+            "title": "Ship",
+            "agents": []
+          }
+        ]
+      }
+    ]
+  },
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-11",
+    "previousDate": "2026-06-12",
     "hasChanges": true,
     "sections": [
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+4"
+          "+1"
         ],
         "removed": []
       }
@@ -17620,8 +18174,8 @@
     },
     {
       "date": "2026-06-12",
-      "api": 374,
-      "components": 689,
+      "api": 370,
+      "components": 688,
       "tables": 51,
       "routesProduction": 94
     }

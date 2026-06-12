@@ -59,6 +59,9 @@ Volledig **gescand** — niets handmatig. `scanTableRelations` in `generate.mjs`
 ### View 4 — Praatplaat (HLD, gebruikersperspectief)
 **Gecureerd** in `lib/architecture/hld-model.ts`: het verhaal van de app in gewone taal, zodat een **leek het begrijpt als functionaliteiten** ("dit kan de app voor je doen"). Geen techniek/lagen — wel `capabilityGroups` (functionaliteiten per gebruikersdoel, in "ik wil…"-taal), de reis, Will, de soevereiniteitsfasen (als motivatie, niet gating — ADR 0001) en de uitkomst (vrijheid). Werk dit bij wanneer **functionaliteit verschijnt/verdwijnt/van naam verandert**. De `modules` komen uit `MODULE_CATALOG` (gesynct); `validateHldModel` (getest) bewaakt die sync + coherentie. Bewust een HTML-praatplaat (geen SVG/export) — bedoeld om mee te presenteren.
 
+### Beheer › Development (Claude-team)
+`/beheer/development` (tabs Skills/Ons team) toont de teamopstelling: subagents (`.claude/agents/*`) en skill-pijplijnen (`.claude/skills/*`). Zelfde principe: feiten gescand door `scanClaudeTeam()` in `generate.mjs` → `architecture.json.claudeTeam` (regenereer met `npm run arch:diagram`); betekenis gecureerd in `lib/architecture/development-model.ts` (`TEAM_GROUPS`/`AGENT_CURATION`/`SKILL_CURATION`). **Voeg je een agent of skill toe (of hernoem/verwijder je er één), deel 'm daar in** — `development-model.test.ts` wordt anders rood. Deze pagina is interne meta/naslag en hoort bewust NIET in de ArchiMate-topologie, HLD of Berekeningen.
+
 ## Project Specification
 
 <project_specification>

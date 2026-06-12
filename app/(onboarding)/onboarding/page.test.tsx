@@ -5,29 +5,24 @@ import {
   _resolveRestoredStep,
   _firstNavigationRecoveryStep,
 } from './page'
+import { ALL_MODULES } from '@/lib/module-registry'
 
 // The component module imports a CSS file and a chain of client components
-// (onboarding-doel, onboarding-identity, etc.) plus `@/lib/supabase/client`.
+// (onboarding-identity, onboarding-inkomen, etc.) plus `@/lib/supabase/client`.
 // Vitest/Vite handle the CSS import natively. The component imports live at
 // the top of the module but they don't execute at import time — their
 // side-effect surface is limited to `createClient` being called inside the
 // component body, which we never invoke here. So importing `_reducer` and the
 // helpers should be safe in a jsdom environment.
 
+// Actieve volgorde sinds jun 2026: doel-stap ("Waar help ik je mee?") en het
+// news-only-pad zijn verwijderd — identity is de eerste content-stap.
 const NEW_ACTIVE_ORDER = [
-  'doel',
   'identity',
   'inkomen',
   'bezittingen',
   'spaardoel',
   'klaar',
-  'saving',
-  'success',
-] as const
-
-const NEWS_ONLY_ACTIVE_ORDER = [
-  'doel',
-  'nieuws_only',
   'saving',
   'success',
 ] as const
@@ -51,14 +46,27 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     expect(result).toEqual({ step: 'klaar', healed: true })
   })
 
-  it('heals a legacy "intro" lastStep to "doel"', () => {
+  it('heals a legacy "intro" lastStep to "identity"', () => {
     const result = _resolveRestoredStep('intro', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'doel', healed: true })
+    expect(result).toEqual({ step: 'identity', healed: true })
   })
 
-  it('heals a legacy "goal" lastStep to "doel"', () => {
+  it('heals a legacy "goal" lastStep to "identity"', () => {
     const result = _resolveRestoredStep('goal', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'doel', healed: true })
+    expect(result).toEqual({ step: 'identity', healed: true })
+  })
+
+  it('heals the removed "doel" step to "identity"', () => {
+    // De doel-stap is in jun 2026 verwijderd — drafts die daar gepauzeerd
+    // waren landen op de nieuwe eerste stap.
+    const result = _resolveRestoredStep('doel', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'identity', healed: true })
+  })
+
+  it('heals the removed "nieuws_only" step to "identity"', () => {
+    // Het news-only-pad is samen met de doel-stap verwijderd.
+    const result = _resolveRestoredStep('nieuws_only', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'identity', healed: true })
   })
 
   it('heals legacy "extras" step name directly to "bezittingen"', () => {
@@ -66,98 +74,40 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     expect(result).toEqual({ step: 'bezittingen', healed: true })
   })
 
-  it('falls back from budgets to klaar in news-only mode (closest valid step)', () => {
-    // News-only active order bevat alleen `doel` + `nieuws_only`. `budgets`
-    // mapt naar `klaar` (LEGACY_STEP_MAP), maar `klaar` zit niet in de
-    // news-only order — dus walk-forward landt op de eerste actieve stap
-    // met canonical-idx ≥ klaar's idx. `nieuws_only` voldoet aan die
-    // voorwaarde in CANONICAL_STEP_ORDER.
-    const result = _resolveRestoredStep('budgets', [...NEWS_ONLY_ACTIVE_ORDER])
-    expect(result.healed).toBe(true)
-    expect(result.step).toBe('nieuws_only')
-  })
-
   it('falls back to identity when the saved step is not in the canonical union', () => {
     const result = _resolveRestoredStep('verzonnen_stap', [...NEW_ACTIVE_ORDER])
     expect(result).toEqual({ step: 'identity', healed: true })
   })
 
-  it('never falls back to doel — identity is the minimum', () => {
-    // Missing lastStep should also land on identity, not doel, because
-    // the restore was triggered by the presence of saved data.
+  it('lands on identity when there is no saved step', () => {
     const result = _resolveRestoredStep(undefined, [...NEW_ACTIVE_ORDER])
     expect(result.step).toBe('identity')
   })
 
-  it('heals legacy "intent" step name directly to "doel"', () => {
-    // The migration map renames the legacy 'intent' step to 'doel' via
-    // LEGACY_STEP_MAP. Active order bevat `doel`, dus dat is de uitkomst.
+  it('heals legacy "intent" step name directly to "identity"', () => {
     const result = _resolveRestoredStep('intent', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'doel', healed: true })
+    expect(result).toEqual({ step: 'identity', healed: true })
   })
 
-  it('heals legacy "modules" step name directly to "doel"', () => {
+  it('heals legacy "modules" step name directly to "identity"', () => {
     const result = _resolveRestoredStep('modules', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'doel', healed: true })
+    expect(result).toEqual({ step: 'identity', healed: true })
   })
 
-  it('heals legacy "persona" step name directly to "doel"', () => {
+  it('heals legacy "persona" step name directly to "identity"', () => {
     const result = _resolveRestoredStep('persona', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'doel', healed: true })
+    expect(result).toEqual({ step: 'identity', healed: true })
   })
 })
 
-describe('onboarding _reducer — SET_GOAL multi-select', () => {
-  it('merges modules from multiple goals into a deduped union', () => {
-    // 'grip-uitgaven' → ['budgetteren']
-    // 'eerder-stoppen' → ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties']
-    // Verwachte unie (in volgorde van eerste voorkomen):
-    const result = _reducer(_initialState, {
-      type: 'SET_GOAL',
-      goals: ['grip-uitgaven', 'eerder-stoppen'],
-    })
-    expect(result.selectedGoals).toEqual(['grip-uitgaven', 'eerder-stoppen'])
-    expect(result.activeModules).toEqual([
-      'budgetteren',
-      'vermogensregistratie',
-      'toekomstplannen',
-      'inzicht_acties',
-    ])
-  })
-
-  it('dedupes overlapping modules across goals', () => {
-    // 'grip-uitgaven' → ['budgetteren']
-    // 'noodfonds' → ['budgetteren', 'inzicht_acties']
-    // budgetteren mag maar éénmaal in de unie staan.
-    const result = _reducer(_initialState, {
-      type: 'SET_GOAL',
-      goals: ['grip-uitgaven', 'noodfonds'],
-    })
-    expect(result.activeModules).toEqual(['budgetteren', 'inzicht_acties'])
-  })
-
-  it('clears modules when goals array is empty', () => {
-    // Start vanuit een state met actieve modules en zet vervolgens een
-    // lege goal-array — modules moeten teruggaan naar []
-    const withGoal = _reducer(_initialState, {
-      type: 'SET_GOAL',
-      goals: ['grip-uitgaven'],
-    })
-    const cleared = _reducer(withGoal, { type: 'SET_GOAL', goals: [] })
-    expect(cleared.selectedGoals).toEqual([])
-    expect(cleared.activeModules).toEqual([])
-  })
-})
-
-describe('onboarding _reducer — SET_NEWS_ONLY', () => {
-  it('clears selectedGoals and sets activeModules to [nieuws]', () => {
-    const withGoals = _reducer(_initialState, {
-      type: 'SET_GOAL',
-      goals: ['grip-uitgaven', 'eerder-stoppen'],
-    })
-    const result = _reducer(withGoals, { type: 'SET_NEWS_ONLY' })
-    expect(result.selectedGoals).toEqual([])
-    expect(result.activeModules).toEqual(['nieuws'])
+describe('onboarding _initialState — modules default aan', () => {
+  it('starts on identity with all modules active', () => {
+    // Sinds jun 2026 is er geen doel-/module-keuze meer in onboarding:
+    // alle modules staan default aan, gating gebeurt via abonnement +
+    // user-toggles buiten de onboarding.
+    expect(_initialState.step).toBe('identity')
+    expect(_initialState.activeModules).toEqual([...ALL_MODULES])
+    expect(_initialState.selectedGoals).toEqual([])
   })
 })
 
@@ -168,6 +118,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     household_type: 'solo',
     number_of_children: 0,
     net_monthly_income: '3500',
+    estimated_yearly_income: '42000',
     estimated_monthly_expenses: '2200',
   }
 
@@ -184,7 +135,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     warnSpy.mockRestore()
   })
 
-  it('restores a valid lastStep without warning', () => {
+  it('restores a valid lastStep without warning and forces all modules on', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
@@ -192,8 +143,6 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         selectedGoals: ['grip-uitgaven'],
         activeModules: ['budgetteren'],
         horizon: baseHorizon,
-        newsDescription: '',
-        extraction: null,
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
@@ -201,15 +150,15 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       },
     })
     expect(result.step).toBe('bezittingen')
-    expect(result.activeModules).toEqual(['budgetteren'])
+    // Module-keuze uit oude drafts wordt genegeerd — alles aan.
+    expect(result.activeModules).toEqual([...ALL_MODULES])
     expect(result.selectedGoals).toEqual(['grip-uitgaven'])
     expect(warnSpy).not.toHaveBeenCalled()
   })
 
   it('migrates a legacy single-goal draft to a selectedGoals array', () => {
     // Een draft van vóór fase 3 had `goal: GoalSlug | null`. RESTORE_STATE
-    // wrapt single → array en zet activeModules op de daarbij horende
-    // preset.
+    // wrapt single → array.
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
@@ -218,8 +167,6 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         goal: 'grip-uitgaven',
         activeModules: ['budgetteren'],
         horizon: baseHorizon,
-        newsDescription: '',
-        extraction: null,
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
@@ -227,7 +174,6 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       },
     })
     expect(result.selectedGoals).toEqual(['grip-uitgaven'])
-    expect(result.activeModules).toEqual(['budgetteren'])
   })
 
   it('migrates a legacy "budgets" lastStep to "klaar"', () => {
@@ -241,8 +187,6 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         selectedGoals: ['grip-uitgaven'],
         activeModules: ['budgetteren'],
         horizon: baseHorizon,
-        newsDescription: '',
-        extraction: null,
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
@@ -257,10 +201,9 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     expect(warnSpy.mock.calls[0][0]).toContain('klaar')
   })
 
-  it('heals a lastStep that no longer belongs in the news-only active order', () => {
-    // News-only flow heeft alleen doel + nieuws_only — een legacy
-    // bezittingen-lastStep moet healen naar nieuws_only (eerste actieve stap
-    // ≥ bezittingen in canonical).
+  it('heals a news-only draft (lastStep nieuws_only) back to identity', () => {
+    // News-only-pad is verwijderd: een draft die daar gepauzeerd was gaat
+    // de normale flow in, met alle modules aan.
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
@@ -268,15 +211,14 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         selectedGoals: [],
         activeModules: ['nieuws'],
         horizon: baseHorizon,
-        newsDescription: '',
-        extraction: null,
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
-        lastStep: 'bezittingen' as (typeof _initialState)['step'],
+        lastStep: 'nieuws_only' as unknown as (typeof _initialState)['step'],
       },
     })
-    expect(result.step).toBe('nieuws_only')
+    expect(result.step).toBe('identity')
+    expect(result.activeModules).toEqual([...ALL_MODULES])
     expect(warnSpy).toHaveBeenCalledOnce()
   })
 
@@ -288,8 +230,6 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         selectedGoals: [],
         activeModules: ['budgetteren'],
         horizon: baseHorizon,
-        newsDescription: '',
-        extraction: null,
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
@@ -341,13 +281,7 @@ describe('onboarding _reducer — SET_SPAARDOEL', () => {
   })
 
   it('does not affect other state fields', () => {
-    // Start vanuit een state met goals + identity, dispatch spaardoel, check
-    // dat selectedGoals / identity / quickAssets ongemoeid blijven.
-    const withGoal = _reducer(_initialState, {
-      type: 'SET_GOAL',
-      goals: ['noodfonds'],
-    })
-    const result = _reducer(withGoal, {
+    const result = _reducer(_initialState, {
       type: 'SET_SPAARDOEL',
       data: {
         presetKey: 'vakantie',
@@ -357,8 +291,9 @@ describe('onboarding _reducer — SET_SPAARDOEL', () => {
         skipped: false,
       },
     })
-    expect(result.selectedGoals).toEqual(['noodfonds'])
-    expect(result.activeModules).toEqual(withGoal.activeModules)
+    expect(result.selectedGoals).toEqual(_initialState.selectedGoals)
+    expect(result.activeModules).toEqual(_initialState.activeModules)
+    expect(result.identity).toEqual(_initialState.identity)
   })
 })
 
@@ -385,6 +320,7 @@ describe('onboarding _reducer — RESTORE_STATE met spaardoel', () => {
     household_type: 'solo',
     number_of_children: 0,
     net_monthly_income: '3500',
+    estimated_yearly_income: '42000',
     estimated_monthly_expenses: '2200',
   }
   const baseHorizon = _initialState.horizon
@@ -405,8 +341,6 @@ describe('onboarding _reducer — RESTORE_STATE met spaardoel', () => {
         selectedGoals: ['noodfonds'],
         activeModules: ['budgetteren', 'inzicht_acties'],
         horizon: baseHorizon,
-        newsDescription: '',
-        extraction: null,
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
@@ -435,8 +369,6 @@ describe('onboarding _reducer — RESTORE_STATE met spaardoel', () => {
         selectedGoals: ['grip-uitgaven'],
         activeModules: ['budgetteren'],
         horizon: baseHorizon,
-        newsDescription: '',
-        extraction: null,
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
@@ -452,14 +384,9 @@ describe('onboarding _reducer — RESTORE_STATE met spaardoel', () => {
 describe('onboarding _firstNavigationRecoveryStep', () => {
   it('returns the first content step for the new active order', () => {
     const result = _firstNavigationRecoveryStep([...NEW_ACTIVE_ORDER])
-    // Eerste niet-terminal step is `doel` — saving/success worden
-    // overgeslagen, intro bestaat niet meer.
-    expect(result).toBe('doel')
-  })
-
-  it('returns the first selectable step when news-only mode is active', () => {
-    const result = _firstNavigationRecoveryStep([...NEWS_ONLY_ACTIVE_ORDER])
-    expect(result).toBe('doel')
+    // Eerste niet-terminal step is `identity` — saving/success worden
+    // overgeslagen, doel bestaat niet meer.
+    expect(result).toBe('identity')
   })
 
   it('falls back to identity when the active order is empty', () => {
@@ -472,6 +399,6 @@ describe('onboarding _firstNavigationRecoveryStep', () => {
     // in activeStepOrder (idx === -1), the recovery helper produces the
     // first valid non-terminal step for SET_STEP to dispatch to.
     const fallback = _firstNavigationRecoveryStep([...NEW_ACTIVE_ORDER])
-    expect(fallback).toBe('doel')
+    expect(fallback).toBe('identity')
   })
 })

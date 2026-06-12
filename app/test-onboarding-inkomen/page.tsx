@@ -3,23 +3,19 @@
 import { useState } from 'react'
 import { OnboardingInkomen } from '@/components/onboarding/onboarding-inkomen'
 import type { IdentityData } from '@/components/onboarding/onboarding-identity'
-import type { PensionParseData } from '@/components/onboarding/onboarding-upo-section'
 
 /**
  * Test page for OnboardingInkomen — verifies:
- * 1. Income field is optional (marked "(optioneel)")
- * 2. Household has no asterisk (has a default)
- * 3. User can proceed without income
- * 4. Only 1-2 real required interactions (household + optionally income)
- * 5. UPO upload section visible and functional (feature #773)
+ * 1. Both fields are optional (marked "(optioneel)")
+ * 2. User can proceed without filling anything ("Later invullen")
+ * 3. Geschat jaarinkomen (netto) + geschatte maandelijkse uitgaven are asked
+ * 4. Spaarquote-preview appears when both fields are valid
  */
 export default function TestOnboardingInkomen() {
-  const [data, setData] = useState<Pick<IdentityData, 'household_type' | 'number_of_children' | 'net_monthly_income'>>({
-    household_type: 'solo',
-    number_of_children: 0,
-    net_monthly_income: '',
+  const [data, setData] = useState<Pick<IdentityData, 'estimated_yearly_income' | 'estimated_monthly_expenses'>>({
+    estimated_yearly_income: '',
+    estimated_monthly_expenses: '',
   })
-  const [pensionData, setPensionData] = useState<PensionParseData | null>(null)
   const [proceeded, setProceeded] = useState(false)
 
   if (proceeded) {
@@ -30,10 +26,10 @@ export default function TestOnboardingInkomen() {
           De gebruiker kon doorgaan met de volgende waarden:
         </p>
         <pre className="text-sm bg-[var(--subtle)] p-4 border border-[var(--border-ed)]">
-          {JSON.stringify({ ...data, pensionData }, null, 2)}
+          {JSON.stringify(data, null, 2)}
         </pre>
         <button
-          onClick={() => { setProceeded(false); setData({ household_type: 'solo', number_of_children: 0, net_monthly_income: '' }) }}
+          onClick={() => { setProceeded(false); setData({ estimated_yearly_income: '', estimated_monthly_expenses: '' }) }}
           className="mt-4 bg-[var(--ink)] text-[var(--paper)] px-4 py-2 text-sm"
         >
           Opnieuw testen
@@ -58,7 +54,7 @@ export default function TestOnboardingInkomen() {
     } as React.CSSProperties}>
       <div className="mx-auto max-w-2xl px-4 pt-4">
         <p className="text-xs font-mono uppercase tracking-widest text-[var(--ink-3)] mb-2">
-          Test: Onboarding Inkomen (feature #828 + #829)
+          Test: Onboarding Inkomen (jaarinkomen + maanduitgaven → spaarquote)
         </p>
       </div>
       <OnboardingInkomen
@@ -67,12 +63,9 @@ export default function TestOnboardingInkomen() {
         onNext={() => setProceeded(true)}
         onBack={() => alert('Terug geklikt')}
         onSkipIncome={() => {
-          setData(prev => ({ ...prev, net_monthly_income: '' }))
+          setData({ estimated_yearly_income: '', estimated_monthly_expenses: '' })
           setProceeded(true)
         }}
-        pensionData={pensionData}
-        onPensionParsed={setPensionData}
-        onPensionRemoved={() => setPensionData(null)}
       />
     </div>
   )

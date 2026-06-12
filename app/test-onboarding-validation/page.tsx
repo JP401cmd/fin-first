@@ -10,6 +10,7 @@ export default function TestOnboardingValidation() {
     household_type: 'solo',
     number_of_children: 0,
     net_monthly_income: '',
+    estimated_yearly_income: '',
     estimated_monthly_expenses: '',
   })
   const [step, setStep] = useState<'form' | 'success'>('form')
@@ -77,6 +78,7 @@ export default function TestOnboardingValidation() {
               household_type: 'solo',
               number_of_children: 0,
               net_monthly_income: '',
+              estimated_yearly_income: '',
               estimated_monthly_expenses: '',
             })
           }}

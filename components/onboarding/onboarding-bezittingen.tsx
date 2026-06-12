@@ -1,11 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { FileText, Minus, Plus, Trash2, Link2, Shield, Zap, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Hammer, Minus, Plus, Trash2, Link2, Shield, Zap, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
-import { AangifteImportPane } from '@/components/onboarding/aangifte-import-pane'
 import {
   ASSET_QUICK_ADD_LABELS,
   ASSET_TYPE_ICONS,
@@ -27,40 +26,31 @@ import { formatCurrency } from '@/lib/format'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
 
 /**
- * Stap 4 — Wat heb je al? (/core-style: 3 entry-knoppen + lijst).
+ * Stap — Registreer je bezittingen en schulden (/core-style: 2 entry-knoppen
+ * + lijst).
  *
  * Vervangt het oude ja/nee-tile + inline-mini-form-patroon. De gebruiker
- * krijgt nu drie gelijkwaardige toevoeg-paden, identiek aan de bezittings-
+ * krijgt twee gelijkwaardige toevoeg-paden, identiek aan de bezittings-
  * en schulden-cards op `/core`:
  *
  *  1. **Bezitting toevoegen** — `QuickAddWizard` in `mode='collect'` met
  *     `initialIntent='asset'`. Wizard rendert als BottomSheet (eigen portal)
  *     en geeft het verzamelde item via `onCollect` terug. Geen DB-write.
  *  2. **Schuld toevoegen** — idem voor `initialIntent='debt'`.
- *  3. **Aangifte uploaden** — `AangifteImportPane` in
- *     `mode='onboarding-collect'`. Pane geeft `assets[]` + `debts[]` terug
- *     via `onCollect`-payload; we mergen die in de parent-state, profile-
- *     updates en life-events negeren we in deze run (kan later).
+ *
+ * De aangifte-upload is in jun 2026 uit deze stap verwijderd (te zwaar voor
+ * onboarding); importeren via aangifte kan nog steeds op /mijn/koppelingen
+ * en de bezittingen-pagina. De PSD2-bankkoppeling staat er nog wel, maar
+ * achter een "in ontwikkeling"-overlay tot de flow productieklaar is.
  *
  * Toegevoegde items verschijnen in twee secties onder de actie-strip:
  * Bezittingen + Schulden, met type-icoon, naam, bedrag en delete-knop.
  * Lege secties zijn verborgen om visuele ruis te vermijden.
  *
- * De ja/nee-keuze is verdwenen: het kost net zoveel klikken om te skippen
- * (één tekstlink onderaan), en de gebruiker hoeft niet eerst een vraag te
- * beantwoorden voordat hij iets kan toevoegen. Boldin-tactiek "vraag eerst,
- * detail later" is vervangen door /core-tactiek "actie eerst, vraag overslaan
- * via skip-link".
- *
  * **Wizard binnen onboarding**: de wizard wordt gerenderd als BottomSheet
  * (via `BottomSheet` → `createPortal` → document.body). Geen z-index issues
  * met de onboarding-shell. De wizard zelf detecteert via `useOptionalToast`
  * dat er geen ToastProvider is en skipt de toasts in collect-mode.
- *
- * **Backward-compat**: de deprecated props (`activeModules`,
- * `onActivateBudgetteren`, `subStep`) zijn verwijderd. De orchestrator-page
- * geeft ze sinds fase 3 niet meer door — als ze toch worden meegegeven door
- * een oudere caller, faalt de TypeScript-compile bewust.
  */
 
 // ── Props ──────────────────────────────────────────────────────────────
@@ -72,17 +62,9 @@ export interface OnboardingBezittingenProps {
   onDebtsChange: (items: DebtQuickInput[]) => void
   onNext: () => void
   onBack: () => void
-  /** 1-indexed stap-nummer voor de voortgangsbalk (default 4). */
+  /** 1-indexed stap-nummer voor de voortgangsbalk (default 3). */
   currentStep?: number
   totalSteps?: number
-  /**
-   * Forceer ≥1 cash-asset voordat doorgaan toegestaan is. Aan-gezet wanneer
-   * de gebruiker in de doel-stap een doel koos waar Budgetteren bij hoort —
-   * een cash-rekening is dan structureel nodig om transacties tegen
-   * budgetten af te zetten. Conform CLAUDE.md fallback-regel: een module
-   * mag niet stilzwijgend leeg starten.
-   */
-  requireCashAccount?: boolean
   /** True wanneer de gebruiker net terug is van een succesvolle PSD2 bank
    *  koppeling (callback redirect met ?bank_connected=1). Toont een
    *  succesmelding boven de actie-strip. */
@@ -100,29 +82,20 @@ export function OnboardingBezittingen({
   onDebtsChange,
   onNext,
   onBack,
-  currentStep = 4,
-  totalSteps = 6,
-  requireCashAccount = false,
+  currentStep = 3,
+  totalSteps = 5,
   bankConnected = false,
   bankError = false,
 }: OnboardingBezittingenProps) {
-  // Bij budgetteren-doel moet er minstens één cash-asset zijn. Zonder
-  // cash-rekening valt de Budgetteren-app om — daarom dwingen we het hier af.
-  const hasCashAccount = quickAssets.some((a) => a.asset_type === 'cash')
-  const cashRequirementMet = !requireCashAccount || hasCashAccount
-  // PSD2 bank connect state
+  // PSD2 bank connect state — de koppel-flow zelf staat achter een
+  // "in ontwikkeling"-overlay, maar de callback-states blijven afgehandeld
+  // voor gebruikers die al een koppeling gestart hadden.
   const [bankConnecting, setBankConnecting] = useState(false)
   const [bankConnectError, setBankConnectError] = useState<string | null>(
     bankError ? 'Bankverbinding mislukt. Probeer het opnieuw.' : null
   )
 
-  // Drie modale-states. Ze sluiten elkaar uit (je opent er maar één tegelijk
-  // omdat de tiles disabled worden zodra er één open is — onnodig in praktijk,
-  // de wizard/pane zelf dimt de achtergrond). We houden ze separaat zodat de
-  // sluit-handlers atomair zijn en de wizard niet "per ongeluk" een aangifte-
-  // pane sluit.
   const [wizardIntent, setWizardIntent] = useState<QuickAddIntent | null>(null)
-  const [aangifteOpen, setAangifteOpen] = useState(false)
 
   const totalAssets = useMemo(
     () => quickAssets.reduce((s, a) => s + (Number(a.current_value) || 0), 0),
@@ -161,26 +134,6 @@ export function OnboardingBezittingen({
     }
   }
 
-  // ── Aangifte-collect handler ──────────────────────────────────────
-  // De pane retourneert assets + debts in `AangifteAssetReviewItem` /
-  // `AangifteDebtReviewItem`-shape — beide extenden `AssetQuickInput` /
-  // `DebtQuickInput`, dus de `current_value_actual` / `current_balance_actual`
-  // extra-velden glijden er gewoon doorheen (server-validator negeert ze in
-  // de quickAssets/quickDebts arrays). Profile-updates en peildatum/tax-year
-  // worden in deze flow genegeerd — life-events en bruto inkomen kunnen later
-  // toegevoegd worden via een aparte uitbreiding.
-  function handleAangifteCollect(payload: {
-    assets: AssetQuickInput[]
-    debts: DebtQuickInput[]
-  }) {
-    if (payload.assets.length > 0) {
-      onAssetsChange([...quickAssets, ...payload.assets])
-    }
-    if (payload.debts.length > 0) {
-      onDebtsChange([...quickDebts, ...payload.debts])
-    }
-  }
-
   // Item-removal handlers — gewone splice-by-index, geen confirm-modal:
   // onboarding-input is transient en kan trivially opnieuw worden ingevoerd.
   function removeAsset(idx: number) {
@@ -193,21 +146,20 @@ export function OnboardingBezittingen({
   // ── Headline ──────────────────────────────────────────────────────
   const headline = (
     <>
-      Heb je al{' '}
+      Registreer je{' '}
       <em
         className="font-normal italic"
         style={{ color: 'var(--module-active-700)' }}
       >
         bezittingen
       </em>{' '}
-      of{' '}
+      en{' '}
       <em
         className="font-normal italic"
         style={{ color: 'var(--module-active-700)' }}
       >
         schulden
       </em>
-      ?
     </>
   )
 
@@ -230,9 +182,9 @@ export function OnboardingBezittingen({
     <>
       <OnboardingShell
         kicker="Bezit"
-        romanNum="iv."
+        romanNum="iii."
         title={headline}
-        deck="Samen tonen ze hoeveel vrijheid je al hebt opgebouwd. Skip kan altijd."
+        deck="Denk aan je betaal- en spaarrekening, woning of beleggingen — en je hypotheek, studieschuld of lening. Samen tonen ze hoeveel vrijheid je al hebt opgebouwd; alles vul je later aan."
         factsPanel={
           <FactsPanel
             {...factsProps}
@@ -261,27 +213,20 @@ export function OnboardingBezittingen({
         totalSteps={totalSteps}
         onBack={onBack}
         footer={
-          <div className="space-y-2">
-            {requireCashAccount && !hasCashAccount && (
-              <p className="border-l-2 border-[var(--ink-3)] bg-[var(--subtle)]/60 px-3 py-2 text-[12px] leading-snug text-[var(--ink-2)]">
-                Voor Budgetteren is een cash-rekening nodig zodat we
-                transacties tegen je budgetten kunnen afzetten. Voeg een
-                bankrekening of spaarrekening toe om verder te gaan.
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={onNext}
-              disabled={!cashRequirementMet}
-              className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {hasAnyItem ? 'Verder' : 'Later invullen'}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onNext}
+            className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
+          >
+            {hasAnyItem ? 'Verder' : 'Later invullen'}
+          </button>
         }
       >
         <div className="space-y-7">
-          {/* ── PSD2 Bank Connect — prominent aanbevolen optie ──────── */}
+          {/* ── PSD2 Bank Connect — achter "in ontwikkeling"-overlay ──
+              De kaart blijft zichtbaar als preview van wat eraan komt,
+              maar de semi-transparante overlay vangt alle interactie af
+              tot de koppel-flow productieklaar is. */}
           {bankConnected ? (
             <div className="flex items-center gap-3 border-2 border-green-200 bg-green-50 p-4">
               <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
@@ -298,64 +243,79 @@ export function OnboardingBezittingen({
               </div>
             </div>
           ) : (
-            <PSD2ConnectCard
-              connecting={bankConnecting}
-              error={bankConnectError}
-              onConnect={async (provider) => {
-                setBankConnecting(true)
-                setBankConnectError(null)
-                try {
-                  const res = await fetch('/api/bank-connect/auth-link', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      provider_id: provider.id,
-                      provider_name: provider.name,
-                      provider_logo: provider.logo,
-                    }),
-                  })
-                  const data = await res.json()
-                  if (!res.ok) {
-                    throw new Error(data.error || 'Verbinding maken mislukt')
-                  }
-                  // Redirect to bank authorization — user returns via callback → /onboarding?bank_connected=1
-                  window.location.href = data.auth_url
-                } catch (err) {
-                  setBankConnectError(
-                    err instanceof Error ? err.message : 'Verbinding maken mislukt'
-                  )
-                  setBankConnecting(false)
-                }
-              }}
-            />
+            <div className="relative" aria-disabled="true">
+              <div aria-hidden className="select-none">
+                <PSD2ConnectCard
+                  connecting={bankConnecting}
+                  error={bankConnectError}
+                  onConnect={async (provider) => {
+                    setBankConnecting(true)
+                    setBankConnectError(null)
+                    try {
+                      const res = await fetch('/api/bank-connect/auth-link', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          provider_id: provider.id,
+                          provider_name: provider.name,
+                          provider_logo: provider.logo,
+                        }),
+                      })
+                      const data = await res.json()
+                      if (!res.ok) {
+                        throw new Error(data.error || 'Verbinding maken mislukt')
+                      }
+                      // Redirect to bank authorization — user returns via callback → /onboarding?bank_connected=1
+                      window.location.href = data.auth_url
+                    } catch (err) {
+                      setBankConnectError(
+                        err instanceof Error ? err.message : 'Verbinding maken mislukt'
+                      )
+                      setBankConnecting(false)
+                    }
+                  }}
+                />
+              </div>
+              {/* Semi-transparante overlay — vangt klikken af (geen
+                  pointer-events-none) en kondigt de optie aan. */}
+              <div
+                role="note"
+                aria-label="Bank koppelen is in ontwikkeling en nog niet beschikbaar"
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 bg-[var(--paper)]/75 backdrop-blur-[1px]"
+              >
+                <span className="flex items-center gap-2 border border-[var(--border-md)] bg-[var(--paper)] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-2)]">
+                  <Hammer className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                  In ontwikkeling
+                </span>
+                <p
+                  className="text-xs italic text-[var(--ink-3)]"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  Bank koppelen komt binnenkort — voeg nu handmatig toe.
+                </p>
+              </div>
+            </div>
           )}
 
-          {/* ── Actie-strip: drie tiles ──────────────────────────────── */}
+          {/* ── Actie-strip: twee tiles ──────────────────────────────── */}
           <div
             role="group"
-            aria-label="Voeg bezittingen, schulden of een aangifte toe"
-            className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+            aria-label="Voeg bezittingen of schulden toe"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-3"
           >
             <ActionTile
               icon={<Plus className="h-4 w-4" strokeWidth={2} />}
               label="Bezitting toevoegen"
-              sublabel="Bankrekening, woning, beleggingen…"
+              sublabel="Betaal- of spaarrekening, woning, beleggingen, auto…"
               onClick={() => setWizardIntent('asset')}
               variant="asset"
             />
             <ActionTile
               icon={<Minus className="h-4 w-4" strokeWidth={2} />}
               label="Schuld toevoegen"
-              sublabel="Hypotheek, lening, krediet…"
+              sublabel="Hypotheek, studieschuld, lening, creditcard…"
               onClick={() => setWizardIntent('debt')}
               variant="debt"
-            />
-            <ActionTile
-              icon={<FileText className="h-4 w-4" strokeWidth={1.75} />}
-              label="Aangifte uploaden"
-              sublabel="Snel je gegevens importeren via PDF"
-              onClick={() => setAangifteOpen(true)}
-              variant="aangifte"
             />
           </div>
 
@@ -409,14 +369,6 @@ export function OnboardingBezittingen({
         mode="collect"
         onCollect={handleWizardCollect}
       />
-
-      {/* ── AangifteImportPane — ShellOverlay (pane → BottomSheet) ──── */}
-      <AangifteImportPane
-        open={aangifteOpen}
-        onClose={() => setAangifteOpen(false)}
-        mode="onboarding-collect"
-        onCollect={handleAangifteCollect}
-      />
     </>
   )
 }
@@ -435,11 +387,11 @@ function ActionTile({
   label: string
   sublabel: string
   onClick: () => void
-  variant: 'asset' | 'debt' | 'aangifte'
+  variant: 'asset' | 'debt'
 }) {
-  // Asset + Aangifte krijgen de module-tint (kern-warm). Schuld blijft
-  // neutraal-ink — bewuste visuele afsplitsing zodat "schuld" zich niet
-  // als een primair pad presenteert.
+  // Asset krijgt de module-tint (kern-warm). Schuld blijft neutraal-ink —
+  // bewuste visuele afsplitsing zodat "schuld" zich niet als een primair
+  // pad presenteert.
   const accentBorder =
     variant === 'debt'
       ? 'hover:border-[var(--ink-2)]'

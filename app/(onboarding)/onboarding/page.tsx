@@ -9,25 +9,18 @@ import type { IdentityData } from '@/components/onboarding/onboarding-identity'
 import type { HorizonData } from '@/components/onboarding/onboarding-horizon'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 
-import { OnboardingDoel } from '@/components/onboarding/onboarding-doel'
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
-import { OnboardingInkomen } from '@/components/onboarding/onboarding-inkomen'
+import { OnboardingInkomen, parseBedragInput } from '@/components/onboarding/onboarding-inkomen'
 import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
 import { OnboardingSpaardoel } from '@/components/onboarding/onboarding-spaardoel'
 import { OnboardingKlaar } from '@/components/onboarding/onboarding-klaar'
-import type { PensionParseData } from '@/components/onboarding/onboarding-upo-section'
 import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
-import { OnboardingNieuwsOnly, type ExtractionResult } from '@/components/onboarding/onboarding-nieuws-only'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
 import { WelcomePopup } from '@/components/onboarding/welcome-popup'
-import { type PersonaId, type IntentId, type ModuleId, getHomePath } from '@/lib/module-registry'
+import { type PersonaId, type IntentId, type ModuleId, ALL_MODULES } from '@/lib/module-registry'
 import type { GoalSlug } from '@/lib/goals/types'
-import {
-  GOAL_MODULE_PRESETS,
-  INTENT_TO_GOAL_FALLBACK,
-  isGoalSlug,
-} from '@/lib/goals/catalog'
+import { INTENT_TO_GOAL_FALLBACK, isGoalSlug } from '@/lib/goals/catalog'
 
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
@@ -51,27 +44,24 @@ const SAVING_MESSAGES = [
 // ── Types ────────────────────────────────────────────────────
 
 /**
- * Active step union sinds de onboarding-redesign (mei 2026, fase 3):
- * 6 content-stappen (doel → identity → inkomen → bezittingen → spaardoel
- * → klaar) plus de twee terminal-stappen `saving`/`success`, en het
- * news-only-pad.
+ * Active step union sinds de onboarding-redesign (mei 2026, fase 3),
+ * versimpeld in jun 2026: de doel-stap ("Waar help ik je mee?") en het
+ * daaraan hangende news-only-pad zijn verwijderd. 5 content-stappen
+ * (identity → inkomen → bezittingen → spaardoel → klaar) plus de twee
+ * terminal-stappen `saving`/`success`. Alle modules staan default aan —
+ * gating gebeurt buiten onboarding (abonnement + user-toggles).
  *
- * Stap `spaardoel` is in mei 2026 toegevoegd tussen `bezittingen` en
- * `klaar`: laagdrempelig één spaardoel laten kiezen vlak voor de afronding
- * (zie `components/onboarding/onboarding-spaardoel.tsx`).
- *
- * Legacy step-namen (`intro`, `goal`, `budgets`, `horizon`) zijn uit de
- * actieve flow verwijderd — ze leven nog in `CANONICAL_STEP_ORDER` zodat
- * self-healing restore werkt op oude localStorage-drafts.
+ * Legacy step-namen (`intro`, `goal`, `doel`, `nieuws_only`, `budgets`,
+ * `horizon`) zijn uit de actieve flow verwijderd — ze leven nog in
+ * `CANONICAL_STEP_ORDER` zodat self-healing restore werkt op oude
+ * localStorage-drafts.
  */
 type Step =
-  | 'doel'
   | 'identity'
   | 'inkomen'
   | 'bezittingen'
   | 'spaardoel'
   | 'klaar'
-  | 'nieuws_only'
   | 'saving'
   | 'success'
 
@@ -85,17 +75,17 @@ type Direction = 'forward' | 'back'
  */
 const CANONICAL_STEP_ORDER: readonly string[] = [
   // legacy → nieuw vervangers
-  'intro',       // → doel
-  'doel',
+  'intro',       // → identity (legacy)
+  'doel',        // → identity (verwijderd jun 2026)
   'identity',
-  'goal',        // → doel (legacy)
+  'goal',        // → identity (legacy)
   'inkomen',
   'bezittingen',
   'spaardoel',   // toegevoegd mei 2026 — laagdrempelige spaardoel-keuze
   'budgets',     // → klaar (legacy)
   'horizon',     // → klaar (legacy)
   'klaar',
-  'nieuws_only',
+  'nieuws_only', // → identity (verwijderd jun 2026, samen met de doel-stap)
   'saving',
   'success',
 ] as const
@@ -108,16 +98,19 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
  */
 const LEGACY_STEP_MAP: Record<string, Step> = {
   // pre-mei 2026 step-namen
-  modules: 'doel',
-  persona: 'doel',
-  intent: 'doel',
+  modules: 'identity',
+  persona: 'identity',
+  intent: 'identity',
   extras: 'bezittingen',
   preferences: 'klaar',
   // fase 3 (mei 2026): intro/goal/budgets/horizon zijn niet meer actief
-  intro: 'doel',
-  goal: 'doel',
+  intro: 'identity',
+  goal: 'identity',
   budgets: 'klaar',
   horizon: 'klaar',
+  // jun 2026: doel-stap ("Waar help ik je mee?") + news-only-pad verwijderd
+  doel: 'identity',
+  nieuws_only: 'identity',
 }
 
 /**
@@ -138,8 +131,7 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
   const terminalSteps: Step[] = ['saving', 'success']
   const isSelectable = (s: Step): boolean => !terminalSteps.includes(s)
 
-  // No saved step at all → start at identity (user already past doel if
-  // we're restoring data with at least the user's name in it).
+  // No saved step at all → start at identity (de eerste content-stap).
   if (!lastStep) {
     return { step: 'identity', healed: false }
   }
@@ -178,9 +170,7 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
   }
 
   // Last resort: identity if it's in the active order, otherwise the first
-  // selectable step. We intentionally skip 'doel' (the first content-stap)
-  // because the user already had persisted data — sending them back to the
-  // goal-keuze would feel like a full reset.
+  // selectable step.
   const identityFallback = activeStepOrder.find((s) => s === 'identity')
   if (identityFallback) {
     return { step: 'identity', healed: true }
@@ -203,26 +193,13 @@ export function _firstNavigationRecoveryStep(activeStepOrder: Step[]): Step {
 }
 
 /**
- * Compute the dynamic step order. Sinds de redesign (mei 2026):
- *
- * - Happy-path: alle 5 content-stappen zijn altijd actief, ongeacht
- *   module-keuze. Module-gating gebeurt buiten onboarding (eerste-win-pad +
- *   module-tabs op de detailpagina's).
- * - News-only: `doel → nieuws_only` (de doel-stap toont een opt-out-link
- *   die `SET_NEWS_ONLY` dispatcht en direct naar `nieuws_only` springt).
- *
- * We blijven `activeModules` als signaal gebruiken om news-only te
- * detecteren — niet omdat onboarding modules gate't, maar omdat de
- * downstream save-flow weet hoe news-only verschilt van een gewone flow.
+ * Compute the step order. Sinds jun 2026 statisch: de doel-stap en het
+ * news-only-pad zijn verwijderd, alle 5 content-stappen zijn altijd actief.
+ * Module-gating gebeurt buiten onboarding (abonnement + user-toggles op
+ * /mijn) — alle modules staan na onboarding default aan.
  */
-function computeStepOrder(selectedModules: ModuleId[]): Step[] {
-  const isNewsOnly = selectedModules.length === 1 && selectedModules[0] === 'nieuws'
-
-  if (isNewsOnly) {
-    return ['doel', 'nieuws_only', 'saving', 'success']
-  }
-
-  return ['doel', 'identity', 'inkomen', 'bezittingen', 'spaardoel', 'klaar', 'saving', 'success']
+function computeStepOrder(): Step[] {
+  return ['identity', 'inkomen', 'bezittingen', 'spaardoel', 'klaar', 'saving', 'success']
 }
 
 /**
@@ -252,22 +229,19 @@ interface State {
   direction: Direction
   identity: IdentityData
   /**
-   * Sinds mei 2026 (fase 3): multi-select. De gebruiker mag 1+ goals kiezen
-   * op stap 1 — `activeModules` is de unie van alle gekozen `GOAL_MODULE_PRESETS`.
-   * De primaire goal (eerste in array) bepaalt `getGoalFirstWinPath`.
+   * Restant van de verwijderde doel-stap (jun 2026). Nieuwe gebruikers
+   * kiezen geen doelen meer; het veld blijft bestaan zodat restored drafts
+   * hun eerdere keuze behouden (server slaat 'm op als `selected_goal_slugs`).
    */
   selectedGoals: GoalSlug[]
+  /** Sinds jun 2026 altijd `ALL_MODULES` — modules staan default aan. */
   activeModules: ModuleId[]
   horizon: HorizonData
-  newsDescription: string
-  extraction: ExtractionResult | null
   budgetAmounts: Record<string, number>
   quickAssets: AssetQuickInput[]
   quickDebts: DebtQuickInput[]
   /** Stap v. — spaardoel-keuze. Skipped + presetKey=null = niet weggeschreven. */
   spaardoel: SpaardoelState
-  /** Parsed UPO pension data — null when nothing uploaded. Optional enrichment. */
-  pensionData: PensionParseData | null
   /**
    * Velden die de gebruiker expliciet heeft overgeslagen via "Later invullen"
    * (feature #830). Na onboarding worden ze als suggesties aangeboden via de
@@ -291,15 +265,11 @@ interface PersistedData {
   /** @deprecated Use activeModules — kept for migration from old localStorage drafts */
   selectedModules?: ModuleId[]
   horizon?: HorizonData
-  newsDescription?: string
-  extraction?: ExtractionResult | null
   budgetAmounts: Record<string, number>
   quickAssets: AssetQuickInput[]
   quickDebts: DebtQuickInput[]
   /** Spaardoel-keuze van stap v. — optioneel zodat oude drafts blijven werken. */
   spaardoel?: SpaardoelState
-  /** Parsed UPO pension data — optioneel, oude drafts kennen dit veld niet. */
-  pensionData?: PensionParseData | null
   /** Last step the user was on (to restore position) */
   lastStep?: Step
   /** Fields deferred via "Later invullen" — optioneel, oude drafts kennen dit veld niet. */
@@ -309,17 +279,7 @@ interface PersistedData {
 type Action =
   | { type: 'SET_STEP'; step: Step }
   | { type: 'SET_IDENTITY'; data: IdentityData }
-  /**
-   * Vervangt de oude single-goal action. `goals` is een array — caller mag
-   * 0+ goals doorgeven; lege array zet `activeModules` op `[]` zodat de
-   * volgende-knop disabled wordt door de `OnboardingDoel`-component.
-   */
-  | { type: 'SET_GOAL'; goals: GoalSlug[] }
-  /** Opt-out vanaf de doel-stap: zet activeModules op ['nieuws'] en clear goals. */
-  | { type: 'SET_NEWS_ONLY' }
   | { type: 'SET_HORIZON'; data: HorizonData }
-  | { type: 'SET_NEWS_DESCRIPTION'; value: string }
-  | { type: 'SET_EXTRACTION'; data: ExtractionResult | null }
   | { type: 'SET_BUDGET_AMOUNTS'; amounts: Record<string, number> }
   | { type: 'SET_QUICK_ASSETS'; items: AssetQuickInput[] }
   | { type: 'SET_QUICK_DEBTS'; items: DebtQuickInput[] }
@@ -328,8 +288,6 @@ type Action =
    * partial-update-acties want de child levert telkens de volledige shape.
    */
   | { type: 'SET_SPAARDOEL'; data: SpaardoelState }
-  /** UPO pension parse result — set on successful parse, null on remove. */
-  | { type: 'SET_PENSION_DATA'; data: PensionParseData | null }
   /**
    * Track een overgeslagen veld via "Later invullen" (feature #830).
    * Idempotent: voegt de key alleen toe als hij er nog niet in zit.
@@ -338,21 +296,20 @@ type Action =
   | { type: 'RESTORE_STATE'; data: PersistedData }
 
 export const _initialState: State = {
-  step: 'doel',
+  step: 'identity',
   direction: 'forward',
   selectedGoals: [],
-  activeModules: [],
+  activeModules: [...ALL_MODULES],
   identity: {
     full_name: '',
     date_of_birth: '',
     household_type: 'solo',
     number_of_children: 0,
     net_monthly_income: '',
+    estimated_yearly_income: '',
     estimated_monthly_expenses: '',
   },
   horizon: INITIAL_HORIZON_DATA,
-  newsDescription: '',
-  extraction: null,
   budgetAmounts: {},
   quickAssets: [],
   quickDebts: [],
@@ -363,7 +320,6 @@ export const _initialState: State = {
     target_date: '',
     skipped: false,
   },
-  pensionData: null,
   deferredFields: [],
 }
 
@@ -391,51 +347,19 @@ function migrateIntentToGoal(
   return null
 }
 
-/**
- * Bereken `activeModules` als unie van alle goals' `GOAL_MODULE_PRESETS`.
- * Volgorde-stabiel: behoudt de eerste-occurrence-volgorde over de
- * geselecteerde goals, zodat `getHomePath` (die de eerste module pakt)
- * een voorspelbaar resultaat geeft bij multi-select.
- */
-function resolveModulesForGoals(goals: GoalSlug[]): ModuleId[] {
-  const seen = new Set<ModuleId>()
-  const merged: ModuleId[] = []
-  for (const goal of goals) {
-    for (const m of GOAL_MODULE_PRESETS[goal]) {
-      if (!seen.has(m)) {
-        seen.add(m)
-        merged.push(m)
-      }
-    }
-  }
-  return merged
-}
-
 export function _reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_STEP': {
-      const stepOrder = computeStepOrder(state.activeModules)
+      const stepOrder = computeStepOrder()
       const oldIdx = stepOrder.indexOf(state.step)
       const newIdx = stepOrder.indexOf(action.step)
       const direction: Direction = newIdx >= oldIdx ? 'forward' : 'back'
       return { ...state, step: action.step, direction }
     }
-    case 'SET_GOAL': {
-      // Multi-select: bouw activeModules als unie van alle gekozen goals.
-      const modules = resolveModulesForGoals(action.goals)
-      return { ...state, selectedGoals: action.goals, activeModules: modules }
-    }
-    case 'SET_NEWS_ONLY': {
-      return { ...state, selectedGoals: [], activeModules: ['nieuws'] }
-    }
     case 'SET_IDENTITY':
       return { ...state, identity: action.data }
     case 'SET_HORIZON':
       return { ...state, horizon: action.data }
-    case 'SET_NEWS_DESCRIPTION':
-      return { ...state, newsDescription: action.value }
-    case 'SET_EXTRACTION':
-      return { ...state, extraction: action.data }
     case 'SET_BUDGET_AMOUNTS':
       return { ...state, budgetAmounts: action.amounts }
     case 'SET_QUICK_ASSETS':
@@ -444,23 +368,15 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, quickDebts: action.items }
     case 'SET_SPAARDOEL':
       return { ...state, spaardoel: action.data }
-    case 'SET_PENSION_DATA':
-      return { ...state, pensionData: action.data }
     case 'DEFER_FIELD': {
       // Idempotent: voeg alleen toe als de key er nog niet in zit.
       if (state.deferredFields.includes(action.key)) return state
       return { ...state, deferredFields: [...state.deferredFields, action.key] }
     }
     case 'RESTORE_STATE': {
-      const restoredModules = action.data.activeModules ?? action.data.selectedModules ?? []
-      // Recompute the active step order for the restored module selection so
-      // we can validate `lastStep` against the flow the user will actually
-      // see. The user's saved module choice — not the in-memory state —
-      // defines which steps are reachable.
-      const restoredStepOrder = computeStepOrder(restoredModules)
       const { step: restoredStep, healed } = _resolveRestoredStep(
         action.data.lastStep,
-        restoredStepOrder
+        computeStepOrder()
       )
       if (healed) {
         // Surface self-healing restores in logs so we can monitor how often
@@ -484,12 +400,15 @@ export function _reducer(state: State, action: Action): State {
         ...state,
         step: restoredStep,
         direction: 'forward',
-        identity: action.data.identity,
+        // Merge over de initial-shape zodat velden die een oude draft nog
+        // niet kent (estimated_yearly_income) altijd een string zijn —
+        // anders worden de controlled inputs uncontrolled.
+        identity: { ..._initialState.identity, ...action.data.identity },
         selectedGoals: restoredGoals,
-        activeModules: restoredModules,
+        // Sinds jun 2026 kiest de gebruiker geen modules meer in onboarding —
+        // negeer wat een oude draft had (incl. news-only) en zet alles aan.
+        activeModules: [...ALL_MODULES],
         horizon: action.data.horizon ?? INITIAL_HORIZON_DATA,
-        newsDescription: action.data.newsDescription ?? '',
-        extraction: action.data.extraction ?? null,
         budgetAmounts: action.data.budgetAmounts,
         quickAssets: action.data.quickAssets,
         quickDebts: action.data.quickDebts,
@@ -497,8 +416,6 @@ export function _reducer(state: State, action: Action): State {
         // _initialState-shape. Geen migratie nodig — het is een nieuw veld
         // dat oude drafts gewoon niet kennen.
         spaardoel: action.data.spaardoel ?? _initialState.spaardoel,
-        // UPO pension data — optioneel, oude drafts kennen dit veld niet.
-        pensionData: action.data.pensionData ?? null,
         // Deferred fields — optioneel, oude drafts kennen dit veld niet.
         deferredFields: Array.isArray(action.data.deferredFields)
           ? action.data.deferredFields
@@ -532,13 +449,10 @@ function saveToLocalStorage(state: State) {
       selectedGoals: state.selectedGoals,
       activeModules: state.activeModules,
       horizon: state.horizon,
-      newsDescription: state.newsDescription,
-      extraction: state.extraction,
       budgetAmounts: state.budgetAmounts,
       quickAssets: state.quickAssets,
       quickDebts: state.quickDebts,
       spaardoel: state.spaardoel,
-      pensionData: state.pensionData,
       deferredFields: state.deferredFields,
       lastStep: state.step,
     }
@@ -580,10 +494,24 @@ function loadFromLocalStorage(): PersistedData | null {
         household_type: (old.household_type as string) ?? 'solo',
         number_of_children: (old.number_of_children as number) ?? 0,
         net_monthly_income: (old.net_monthly_income as string) ?? '',
+        estimated_yearly_income: '',
         estimated_monthly_expenses: (old.estimated_monthly_expenses as string) ?? '',
       } as IdentityData
     } else {
       identity = parsed.identity as IdentityData
+    }
+
+    // Migratie: drafts van vóór de jaarinkomen-vraag (jun 2026) hebben alleen
+    // `net_monthly_income`. Leid het jaarinkomen daaruit af (×12) zodat de
+    // gebruiker zijn eerdere invoer terugziet in het nieuwe veld.
+    if (typeof identity.estimated_yearly_income !== 'string' || identity.estimated_yearly_income === '') {
+      const monthly = identity.net_monthly_income
+        ? Number(String(identity.net_monthly_income).replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.'))
+        : NaN
+      identity = {
+        ...identity,
+        estimated_yearly_income: isFinite(monthly) && monthly > 0 ? String(Math.round(monthly * 12)) : '',
+      }
     }
 
     // Migratie selectedGoals: nieuwe shape > legacy single `goal` > leeg array.
@@ -633,13 +561,10 @@ function loadFromLocalStorage(): PersistedData | null {
       activeModules: Array.isArray(parsed.activeModules) ? parsed.activeModules : (Array.isArray(parsed.selectedModules) ? parsed.selectedModules : []),
       selectedModules: Array.isArray(parsed.selectedModules) ? parsed.selectedModules : [],
       horizon,
-      newsDescription: parsed.newsDescription,
-      extraction: parsed.extraction ?? null,
       budgetAmounts: parsed.budgetAmounts && typeof parsed.budgetAmounts === 'object' ? parsed.budgetAmounts : {},
       quickAssets: Array.isArray(parsed.quickAssets) ? parsed.quickAssets : [],
       quickDebts: Array.isArray(parsed.quickDebts) ? parsed.quickDebts : [],
       spaardoel,
-      pensionData: parsed.pensionData ?? null,
       deferredFields: Array.isArray(parsed.deferredFields) ? parsed.deferredFields : [],
       lastStep: parsed.lastStep,
     }
@@ -721,7 +646,7 @@ export default function OnboardingPage() {
   // — initial false zodat SSR en eerste paint geen popup tonen.
   const [showWelcomePopup, setShowWelcomePopup] = useState(false)
 
-  const activeStepOrder = useMemo(() => computeStepOrder(state.activeModules), [state.activeModules])
+  const activeStepOrder = useMemo(() => computeStepOrder(), [])
 
   // Content-stappen voor de voortgangsbalk (excl. saving/success).
   // We typen het als `Step[]` zodat `indexOf` `state.step` (incl. terminal
@@ -833,8 +758,6 @@ export default function OnboardingPage() {
   }, [])
 
   // Persist state to localStorage on every step change (except saving/success).
-  // We slaan ook op stap 1 (`doel`) op, anders zou een gebruiker die alleen
-  // doelen kiest en daarna afhaakt z'n keuze verliezen.
   useEffect(() => {
     if (['saving', 'success'].includes(state.step)) return
     saveToLocalStorage(state)
@@ -883,14 +806,29 @@ export default function OnboardingPage() {
       }
       const idempotencyKey = idempotencyKeyRef.current
 
+      // Jaarinkomen (stap 3) → maandinkomen voor profiles.net_monthly_income.
+      // De server zet dit (mits > 0) als handmatige bron ('eigen bedrag') in
+      // het blok "Instellingen & toekomst" op /overzicht/cashflow.
+      const yearlyIncome = identity.estimated_yearly_income
+        ? parseBedragInput(identity.estimated_yearly_income)
+        : NaN
+      const monthlyIncome = isFinite(yearlyIncome) && yearlyIncome > 0
+        ? Math.round(yearlyIncome / 12)
+        : 0
+      const monthlyExpenses = identity.estimated_monthly_expenses
+        ? parseBedragInput(identity.estimated_monthly_expenses)
+        : NaN
+
       const body: Record<string, unknown> = {
         identity: {
           full_name: identity.full_name,
           date_of_birth: identity.date_of_birth,
           household_type: identity.household_type,
           number_of_children: identity.number_of_children,
-          net_monthly_income: identity.net_monthly_income ? Number(identity.net_monthly_income) : 0,
-          estimated_monthly_expenses: identity.estimated_monthly_expenses ? Number(identity.estimated_monthly_expenses) : undefined,
+          net_monthly_income: monthlyIncome,
+          estimated_monthly_expenses: isFinite(monthlyExpenses) && monthlyExpenses > 0
+            ? Math.round(monthlyExpenses)
+            : undefined,
         },
         budgetAmounts,
         idempotencyKey,
@@ -949,22 +887,6 @@ export default function OnboardingPage() {
       // Add deferred fields for post-onboarding suggestions (feature #830)
       if (state.deferredFields.length > 0) {
         body.deferredFields = state.deferredFields
-      }
-
-      // Add news description if present
-      if (state.newsDescription) {
-        body.newsDescription = state.newsDescription
-      }
-
-      // Add user-reviewed extraction data if present (avoids re-running extraction server-side)
-      if (state.extraction) {
-        body.extractionData = state.extraction
-      }
-
-      // Add parsed UPO pension data if present — server uses this to
-      // create pension life events and override AOW monthly amount.
-      if (state.pensionData) {
-        body.pensionData = state.pensionData
       }
 
       // Derive budgettering mode from modules
@@ -1094,13 +1016,27 @@ export default function OnboardingPage() {
     return totalAssets - totalDebts
   }, [state.quickAssets, state.quickDebts])
 
+  // Maandinkomen voor recap + spaardoel-suggesties: afgeleid uit het
+  // jaarinkomen van stap 3 (÷12); valt terug op het legacy maandveld voor
+  // herstelde oude drafts waarin alleen dat gevuld was.
   const netMonthlyIncomeForKlaar = useMemo(() => {
-    const raw = state.identity.net_monthly_income
-    if (!raw) return 0
-    const cleaned = raw.replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.')
-    const n = Number(cleaned)
-    return isFinite(n) && n > 0 ? n : 0
-  }, [state.identity.net_monthly_income])
+    const yearly = state.identity.estimated_yearly_income
+      ? parseBedragInput(state.identity.estimated_yearly_income)
+      : NaN
+    if (isFinite(yearly) && yearly > 0) return Math.round(yearly / 12)
+    const legacy = state.identity.net_monthly_income
+      ? parseBedragInput(state.identity.net_monthly_income)
+      : NaN
+    return isFinite(legacy) && legacy > 0 ? legacy : 0
+  }, [state.identity.estimated_yearly_income, state.identity.net_monthly_income])
+
+  // Maanduitgaven (stap 3) — zelfde NL-parse als de save-payload.
+  const monthlyExpensesParsed = useMemo(() => {
+    const n = state.identity.estimated_monthly_expenses
+      ? parseBedragInput(state.identity.estimated_monthly_expenses)
+      : NaN
+    return isFinite(n) && n > 0 ? Math.round(n) : 0
+  }, [state.identity.estimated_monthly_expenses])
 
   // ── Render ───────────────────────────────────────────────────
 
@@ -1209,28 +1145,11 @@ export default function OnboardingPage() {
         )}
 
         <StepTransition key={state.step} direction={state.direction}>
-          {state.step === 'doel' && (
-            <OnboardingDoel
-              selectedGoals={state.selectedGoals}
-              onChange={(goals) => dispatch({ type: 'SET_GOAL', goals })}
-              onNext={goToNext}
-              onNewsOnly={() => {
-                // Skip naar nieuws-only flow: zet modules op ['nieuws'] +
-                // spring naar 'nieuws_only'-stap.
-                dispatch({ type: 'SET_NEWS_ONLY' })
-                dispatch({ type: 'SET_STEP', step: 'nieuws_only' })
-              }}
-              currentStep={currentContentStep}
-              totalSteps={totalContentSteps}
-            />
-          )}
-
           {state.step === 'identity' && (
             <OnboardingIdentity
               data={state.identity}
               onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
               onNext={goToNext}
-              onBack={goToBack}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />
@@ -1239,9 +1158,8 @@ export default function OnboardingPage() {
           {state.step === 'inkomen' && (
             <OnboardingInkomen
               data={{
-                household_type: state.identity.household_type,
-                number_of_children: state.identity.number_of_children,
-                net_monthly_income: state.identity.net_monthly_income,
+                estimated_yearly_income: state.identity.estimated_yearly_income,
+                estimated_monthly_expenses: state.identity.estimated_monthly_expenses,
               }}
               onChange={(income) =>
                 dispatch({
@@ -1252,20 +1170,21 @@ export default function OnboardingPage() {
               onNext={goToNext}
               onBack={goToBack}
               onSkipIncome={() => {
-                // "Later invullen" defer-pad (feature #829): wis het
-                // inkomensveld en ga door naar de volgende stap. De
-                // gebruiker vult dit later aan via Instellingen.
+                // "Later invullen" defer-pad (feature #829): wis beide
+                // velden en ga door naar de volgende stap. De gebruiker
+                // vult dit later aan via /overzicht/cashflow.
                 dispatch({
                   type: 'SET_IDENTITY',
-                  data: { ...state.identity, net_monthly_income: '' },
+                  data: {
+                    ...state.identity,
+                    estimated_yearly_income: '',
+                    estimated_monthly_expenses: '',
+                  },
                 })
                 // Track deferral for post-onboarding suggestions (feature #830)
                 dispatch({ type: 'DEFER_FIELD', key: 'income' })
                 goToNext()
               }}
-              pensionData={state.pensionData}
-              onPensionParsed={(data) => dispatch({ type: 'SET_PENSION_DATA', data })}
-              onPensionRemoved={() => dispatch({ type: 'SET_PENSION_DATA', data: null })}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />
@@ -1289,7 +1208,6 @@ export default function OnboardingPage() {
               onBack={goToBack}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
-              requireCashAccount={state.activeModules.includes('budgetteren')}
               bankConnected={bankConnected}
               bankError={bankError}
             />
@@ -1321,9 +1239,7 @@ export default function OnboardingPage() {
                 goToNext()
               }}
               monthlyIncome={netMonthlyIncomeForKlaar}
-              monthlyExpenses={
-                Number(state.identity.estimated_monthly_expenses) || 0
-              }
+              monthlyExpenses={monthlyExpensesParsed}
               selectedGoals={state.selectedGoals}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
@@ -1354,25 +1270,6 @@ export default function OnboardingPage() {
             />
           )}
 
-          {state.step === 'nieuws_only' && (
-            <OnboardingNieuwsOnly
-              description={state.newsDescription}
-              onChange={(value) => dispatch({ type: 'SET_NEWS_DESCRIPTION', value })}
-              onNext={handleSaveOwnData}
-              onBack={goToBack}
-              extraction={state.extraction}
-              onExtractionChange={(data) => dispatch({ type: 'SET_EXTRACTION', data })}
-              profileContext={{
-                age: state.identity.date_of_birth
-                  ? Math.floor((Date.now() - new Date(state.identity.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-                  : undefined,
-                householdType: state.identity.household_type,
-                monthlyIncome: state.identity.net_monthly_income ? Number(state.identity.net_monthly_income) : undefined,
-                monthlyExpenses: state.identity.estimated_monthly_expenses ? Number(state.identity.estimated_monthly_expenses) : undefined,
-              }}
-            />
-          )}
-
           {state.step === 'saving' && (
             <div className="flex min-h-[60vh] flex-col items-center justify-center sm:min-h-0">
               <div className="w-full max-w-sm rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] shadow-sm p-8 text-center">
@@ -1400,21 +1297,13 @@ export default function OnboardingPage() {
             <OnboardingSuccess
               onDashboard={() => {
                 clearLocalStorage()
-                // News-only gebruikers landen op hun krant; iedereen anders gaat
-                // standaard naar het Overzicht (de knop heet ook "Ga naar overzicht").
-                const isNewsOnly =
-                  state.activeModules.length === 1 && state.activeModules[0] === 'nieuws'
-                const destination = isNewsOnly
-                  ? getHomePath(state.activeModules)
-                  : '/overzicht'
                 // Hard navigation: voorkomt stale-read redirect-loop in (app)/layout.tsx
                 // direct na het wegschrijven van `onboarding_completed = true`. Bij een
                 // soft-navigation kan de server-layout de nét-geschreven row missen en
                 // redirecten naar /onboarding, wat de Suspense-fallback laat knipperen
                 // tot een browser-refresh de sessie opnieuw aligneert.
-                window.location.assign(destination)
+                window.location.assign('/overzicht')
               }}
-              activeModules={state.activeModules}
             />
           )}
         </StepTransition>

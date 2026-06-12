@@ -29,7 +29,7 @@ import type { GoalSlug } from '@/lib/goals/types'
  * `goals`-tabel weggeschreven.
  *
  * Visuele blueprint:
- *   - Identiek tile-grid-patroon als `OnboardingDoel`: scherpe hoeken,
+ *   - Tile-grid-patroon (krant-DNA): scherpe hoeken,
  *     2px border, 3px module-streep boven bij selected, lucide-icoon links,
  *     italic Source-Serif-tagline onder de label.
  *   - Inline form direct onder de tile-grid, alleen zichtbaar wanneer een
@@ -126,8 +126,8 @@ export function OnboardingSpaardoel({
   monthlyIncome,
   monthlyExpenses,
   selectedGoals,
-  currentStep = 5,
-  totalSteps = 6,
+  currentStep = 4,
+  totalSteps = 5,
 }: OnboardingSpaardoelProps) {
   // Mount-only guard voor de pre-select. We mogen de pre-select alleen op de
   // eerste render uitvoeren — anders zou een gebruiker die bewust een ander
@@ -317,7 +317,7 @@ export function OnboardingSpaardoel({
   return (
     <OnboardingShell
       kicker="Spaardoel"
-      romanNum="v."
+      romanNum="iv."
       title={headline}
       deck="Met een spaardoel bepaal je zelf hoeveel vrijheid je opzijzet. Sla over kan altijd — je past het later aan in De Toekomst."
       factsPanel={
