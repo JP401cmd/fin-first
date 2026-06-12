@@ -35,8 +35,8 @@ Hergebruik bestaande componenten en bronnen; **geen parallelle berekening of twe
 ### 6. Testen — `tester`
 De `tester` schrijft unit-/component-tests en (waar end-to-end) een regression-suite-case, **getoetst aan de acceptatiecriteria** uit stap 2. Dekt randgevallen (nul/negatief inkomen, tekort, oneindige vrijheid, lege/laad-states, rolgrenzen). Draait `tsc`, lint en relevante tests groen — echte output.
 
-### 7. Review — `code-review` + `ux-review-expert`
-`code-review` voor correctheid/kwaliteit; `ux-review-expert` voor UI-consistentie en gebruikerservaring tegen het designsysteem.
+### 7. Review — `code-review` + `ux-review-expert` + `security-specialist`
+`code-review` voor correctheid/kwaliteit; `ux-review-expert` voor UI-consistentie en gebruikerservaring tegen het designsysteem. Raakt de feature data-toegang, auth, routes, AI-context, secrets of admin-paden (bij twijfel: ja), dan draait de `security-specialist` zijn ship-gate-checklist — een 🔴-bevinding blokkeert tot opgelost.
 
 ### 8. Architectuurplaten bijwerken — `architecture-docs-keeper` + fit-review `architect`
 `architecture-docs-keeper` werkt de vier views van `/beheer/architectuur` bij (ArchiMate-topologie/relaties/flows, HLD-capability, ERD via migraties, Berekeningen) en regenereert facts (`npm run arch:diagram`); suites groen. De `architect` doet de eind-fit-review: past het, klopt de ADR, is een concern nodig of opgelost.

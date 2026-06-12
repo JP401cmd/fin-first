@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-11T15:08:45.461Z",
-  "generatedDate": "2026-06-11",
+  "generatedAt": "2026-06-12T06:15:27.420Z",
+  "generatedDate": "2026-06-12",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -186,9 +186,9 @@
     "routesProduction": 94,
     "api": 374,
     "tables": 51,
-    "migrations": 100,
+    "migrations": 101,
     "integrations": 24,
-    "components": 685,
+    "components": 689,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -12183,7 +12183,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 100
+    "migrationCount": 101
   },
   "tablesByDomain": [
     {
@@ -12493,11 +12493,11 @@
     }
   ],
   "components": {
-    "total": 685,
+    "total": 689,
     "groups": [
       {
         "group": "app",
-        "count": 293,
+        "count": 297,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12541,6 +12541,7 @@
           "budget-donut",
           "budget-form",
           "budget-heatmap",
+          "budget-hub.test",
           "budget-merge-wizard",
           "budget-plan-editor-sheet",
           "budget-sankey",
@@ -12745,6 +12746,9 @@
           "sim-chart",
           "sim-chart-widget",
           "simulations-modal",
+          "sleepmodus-bollen",
+          "sleepmodus-overlay",
+          "sleepmodus-overlay.test",
           "slide-in-pane",
           "snapshot-comparison-view",
           "sorr-analyse",
@@ -15971,37 +15975,6 @@
           ]
         }
       ],
-      "questionnaires": [
-        {
-          "domain": "admin",
-          "label": "Beheer",
-          "write": true,
-          "routes": [
-            "/api/admin/questionnaires",
-            "/api/admin/questionnaires/[id]"
-          ]
-        },
-        {
-          "domain": "questionnaires",
-          "label": "Vragenlijsten",
-          "write": false,
-          "routes": [
-            "/api/questionnaires"
-          ]
-        }
-      ],
-      "questionnaire_questions": [
-        {
-          "domain": "admin",
-          "label": "Beheer",
-          "write": true,
-          "routes": [
-            "/api/admin/questionnaires",
-            "/api/admin/questionnaires/[id]",
-            "/api/admin/questionnaires/[id]/responses"
-          ]
-        }
-      ],
       "questionnaire_sessions": [
         {
           "domain": "admin",
@@ -16019,6 +15992,37 @@
             "/api/questionnaires",
             "/api/questionnaires/[id]/respond",
             "/api/questionnaires/[id]/session"
+          ]
+        }
+      ],
+      "questionnaire_questions": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires",
+            "/api/admin/questionnaires/[id]",
+            "/api/admin/questionnaires/[id]/responses"
+          ]
+        }
+      ],
+      "questionnaires": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/questionnaires",
+            "/api/admin/questionnaires/[id]"
+          ]
+        },
+        {
+          "domain": "questionnaires",
+          "label": "Vragenlijsten",
+          "write": false,
+          "routes": [
+            "/api/questionnaires"
           ]
         }
       ],
@@ -16803,6 +16807,20 @@
           ]
         }
       ],
+      "external_data_sources": [
+        {
+          "domain": "integrations",
+          "label": "Externe koppelingen",
+          "write": true,
+          "routes": [
+            "/api/integrations/exchanges/[id]",
+            "/api/integrations/exchanges/[id]/sync",
+            "/api/integrations/wallets",
+            "/api/integrations/wallets/[id]",
+            "/api/integrations/wallets/[id]/sync"
+          ]
+        }
+      ],
       "exchange_connections": [
         {
           "domain": "integrations",
@@ -16815,20 +16833,6 @@
             "/api/integrations/exchanges/bitvavo/connect",
             "/api/integrations/exchanges/coinbase/connect",
             "/api/integrations/exchanges/kraken/connect"
-          ]
-        }
-      ],
-      "external_data_sources": [
-        {
-          "domain": "integrations",
-          "label": "Externe koppelingen",
-          "write": true,
-          "routes": [
-            "/api/integrations/exchanges/[id]",
-            "/api/integrations/exchanges/[id]/sync",
-            "/api/integrations/wallets",
-            "/api/integrations/wallets/[id]",
-            "/api/integrations/wallets/[id]/sync"
           ]
         }
       ],
@@ -17527,7 +17531,7 @@
       },
       {
         "path": "app/api/household",
-        "commits": 6
+        "commits": 7
       },
       {
         "path": "components/horizon",
@@ -17550,8 +17554,8 @@
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 4762,
-        "commits": 24
+        "loc": 4765,
+        "commits": 25
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -17561,17 +17565,17 @@
       {
         "file": "lib/release-notes.ts",
         "loc": 2763,
-        "commits": 5
+        "commits": 4
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 2615,
-        "commits": 16
+        "commits": 15
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2472,
-        "commits": 20
+        "loc": 2576,
+        "commits": 21
       },
       {
         "file": "lib/unified-projection.ts",
@@ -17591,16 +17595,9 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "Schermen",
+        "label": "Componenten (aantal)",
         "added": [
-          "/beheer/ai-verbruik"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Tabellen",
-        "added": [
-          "ai_token_usage"
+          "+4"
         ],
         "removed": []
       }
@@ -17618,6 +17615,13 @@
       "date": "2026-06-11",
       "api": 374,
       "components": 685,
+      "tables": 51,
+      "routesProduction": 94
+    },
+    {
+      "date": "2026-06-12",
+      "api": 374,
+      "components": 689,
       "tables": 51,
       "routesProduction": 94
     }

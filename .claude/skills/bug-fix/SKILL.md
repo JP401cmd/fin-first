@@ -37,8 +37,8 @@ Fix bij de **bron** (geen symptoombestrijding, geen duplicatie van een berekenin
 ### 6. Verifiëren — `tester`
 De `tester` draait de test uit stap 4 (nu **groen**) plus de bredere relevante suites, en voegt een **regressiecase** toe zodat de bug niet terugkomt. Draai `npx tsc --noEmit` en relevante `npm run test:run`-paden. Geen groen-theater: rapporteer echte output.
 
-### 7. Review — `code-review` (+ conditioneel `ux-review-expert`)
-`code-review` beoordeelt de fix op correctheid, neveneffecten en kwaliteit. Bij een UI-bug ook `ux-review-expert` voor consistentie/UX.
+### 7. Review — `code-review` (+ conditioneel `ux-review-expert` / `security-specialist`)
+`code-review` beoordeelt de fix op correctheid, neveneffecten en kwaliteit. Bij een UI-bug ook `ux-review-expert` voor consistentie/UX. Raakt de fix data-toegang, auth, routes of partner-privacy — of wás de bug zelf een lek — dan draait de `security-specialist` zijn ship-gate-checklist vóór afronding.
 
 ### 8. Architectuur-fit & platen — `architect` (+ `architecture-docs-keeper` indien structureel)
 Was stap 3 "structureel"? Dan reviewt de `architect` of de fit klopt en zorgt hij dat de vier views van `/beheer/architectuur` meebewegen — gedelegeerd aan `architecture-docs-keeper` (`npm run arch:diagram`, suites groen), inclusief een ADR/concern-update (concern verwíjderen als het risico is opgelost). Lokale bug zonder impact? Sla over.

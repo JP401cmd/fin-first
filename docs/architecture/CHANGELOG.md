@@ -68,3 +68,7 @@
 
 - **Schermen** toegevoegd: /beheer/ai-verbruik
 - **Tabellen** toegevoegd: ai_token_usage
+
+## 2026-06-12
+
+- **Componenten (aantal)** toegevoegd: +4

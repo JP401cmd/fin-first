@@ -36,8 +36,8 @@ Zelfde routering als bij een nieuwe functie, maar met de opdracht **hergebruik b
 ### 7. Testen — bestaand beschermen + nieuw dekken — `tester`
 De `tester` voegt tests toe voor het nieuwe gedrag **en** draait de bestaande suites om regressie uit te sluiten; voegt waar nodig een regressiecase toe die het oude gedrag vastpint. `tsc`/lint/tests groen, echte output.
 
-### 8. Review — `code-review` (+ `ux-review-expert` bij UI)
-Beoordeling op correctheid, neveneffecten op bestaand gedrag, en UI-consistentie.
+### 8. Review — `code-review` (+ `ux-review-expert` bij UI, + `security-specialist` bij data/auth/routes)
+Beoordeling op correctheid, neveneffecten op bestaand gedrag, en UI-consistentie. Raakt de uitbreiding data-toegang, auth, routes, AI-context of partner-/huishouddata (bij twijfel: ja), dan draait de `security-specialist` zijn ship-gate-checklist — let extra op een tweede datapad dat een privacy-bewuste loader omzeilt; een 🔴-bevinding blokkeert tot opgelost.
 
 ### 9. Platen synchroniseren — `architecture-docs-keeper` (indien structureel)
 Veranderde de uitbreiding een domein/tabel/rekenmotor/capability? Dan werkt `architecture-docs-keeper` de relevante view(s) bij en regenereert facts; de `architect` bevestigt de fit. Puur additief binnen bestaande grenzen? Sla over.

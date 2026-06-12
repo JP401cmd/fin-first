@@ -113,19 +113,21 @@ const collisionDetection: CollisionDetection = (args) => {
 }
 
 /**
- * Centreer de sleep-kloon op de cursor: het handje "grijpt" de bol in het
- * midden (direct onder de transactienaam), waar je hem ook oppakt. Zonder
- * deze modifier hangt de bol op de grijp-offset en trekt de cursor linksboven
- * de bol uit het centrum.
+ * Het handje "grijpt" de bol horizontaal in het midden en verticaal vlak
+ * onder de transactienaam, waar je hem ook oppakt. Zonder deze modifier hangt
+ * de bol op de grijp-offset en staat de cursor naast de bol bij het droppen.
  */
-const snapCenterToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+// Cursor dít aantal px boven het bol-centrum = direct onder de titelregel.
+const GRIP_BOVEN_CENTRUM_PX = 10
+
+const snapGripToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
   if (!draggingNodeRect || !activatorEvent) return transform
   const coords = getEventCoordinates(activatorEvent)
   if (!coords) return transform
   return {
     ...transform,
     x: transform.x + coords.x - draggingNodeRect.left - draggingNodeRect.width / 2,
-    y: transform.y + coords.y - draggingNodeRect.top - draggingNodeRect.height / 2,
+    y: transform.y + coords.y - draggingNodeRect.top - draggingNodeRect.height / 2 + GRIP_BOVEN_CENTRUM_PX,
   }
 }
 
@@ -811,7 +813,7 @@ export function SleepmodusOverlay({
           {/* Sleep-kloon */}
           {/* Sleep-kloon — gecentreerd onder de cursor; de zwerm volgt apart
               als vertraagde staart (ZwermTrail) */}
-          <DragOverlay dropAnimation={null} modifiers={[snapCenterToCursor]}>
+          <DragOverlay dropAnimation={null} modifiers={[snapGripToCursor]}>
             {state.phase === 'dragging' && tx ? (
               <div data-sleep-clone className="scale-[0.94] cursor-grabbing opacity-95">
                 <CentraleBolVisual tx={tx} siblingCount={siblingTxs.length} />
