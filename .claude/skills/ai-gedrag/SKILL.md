@@ -38,3 +38,13 @@ De `tester` legt élk voorbeeldgeval uit stap 1 vast als testcase — categorisa
 
 ## Afronding
 Lever op: de geciteerde prompt-diff met redenering, de voorbeeldgevallen als regressietests (groen), het bewijs dat de invarianten en eerder gedrag intact zijn, en eventuele overdracht aan plumbing/`ai-feature` als de oorzaak daar lag.
+
+## Slotstap — Zelfverbetering (altijd in overleg met de gebruiker)
+
+Sluit elke run af met een korte retrospectief:
+
+1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus je eigen observaties over deze pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot.
+2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*/SKILL.md` of `.claude/agents/*.md` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen).
+3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan de eigen definities sleutelen.
+
+Houd het schaars: één scherp voorstel per run is het maximum; geen voorstel is prima.

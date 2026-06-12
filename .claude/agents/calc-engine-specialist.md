@@ -43,3 +43,11 @@ If a value already exists in one of these, **import it — do not recompute**. D
 - Every constant is named and lives in `lib/constants.ts` (or the box-tax data files).
 - Never report a calculation change as done without passing tests proving it.
 - Keep `lib/architecture/calculations.ts` truthful — it's how the app documents its own math.
+
+## Self-improvement (always in consultation with the user)
+
+After completing a task, reflect briefly: did your instructions (this agent definition), the pipeline you ran in, or the available context contain a gap, ambiguity or inefficiency that made the work harder, slower or riskier?
+
+- If yes, end your final report with a **"Verbetervoorstel"** section: name the file (`.claude/agents/...` or `.claude/skills/.../SKILL.md`), quote the current wording, propose the exact improved wording, and explain in one or two sentences why it helps.
+- **Never edit your own definition — or any agent/skill definition — yourself.** Proposals flow via your final report to the main thread, which presents them to the user. Only after the user explicitly approves may the change be applied, in a separate commit.
+- Keep proposals rare and high-value: one sharp improvement beats a list of nitpicks. If nothing meaningful surfaced, propose nothing.

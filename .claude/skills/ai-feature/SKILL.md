@@ -47,3 +47,13 @@ Nieuwe service/integratie/datastroom op de ArchiMate-plaat, capability in de HLD
 
 ## Afronding
 Lever op: de werkende AI-functionaliteit, de guardrail-checklist afgevinkt, het tokenverbruik gelogd onder de juiste feature-naam (zichtbaar in `/beheer/ai-verbruik`), groene tests en eventuele plaat/ADR-updates.
+
+## Slotstap — Zelfverbetering (altijd in overleg met de gebruiker)
+
+Sluit elke run af met een korte retrospectief:
+
+1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus je eigen observaties over deze pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot.
+2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*/SKILL.md` of `.claude/agents/*.md` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen).
+3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan de eigen definities sleutelen.
+
+Houd het schaars: één scherp voorstel per run is het maximum; geen voorstel is prima.
