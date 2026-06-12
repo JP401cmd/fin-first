@@ -2,6 +2,7 @@
 name: code-review
 description: "Use this agent when you need a thorough code review of recently written code, when you want to ensure code quality meets the highest standards, when checking for technical debt, security vulnerabilities, or performance issues, or when you need to run quality checks like linting and type checking. Examples:\\n\\n<example>\\nContext: The user has just finished implementing a new feature.\\nuser: \"I just finished implementing the user authentication feature\"\\nassistant: \"Let me use the code-review agent to thoroughly review your authentication implementation for security, maintainability, and best practices.\"\\n<Task tool call to launch code-review agent>\\n</example>\\n\\n<example>\\nContext: A significant piece of code was written and needs quality verification.\\nuser: \"Here's the new API endpoint I created for handling payments\"\\nassistant: \"Payment handling is critical. I'll use the code-review agent to ensure this code is secure, well-documented, and follows all best practices.\"\\n<Task tool call to launch code-review agent>\\n</example>\\n\\n<example>\\nContext: User wants to check overall code quality before a release.\\nuser: \"Can you check if this module is production-ready?\"\\nassistant: \"I'll launch the code-review agent to perform a comprehensive review including lint checks, type checks, and a thorough analysis of code quality, security, and maintainability.\"\\n<Task tool call to launch code-review agent>\\n</example>\\n\\n<example>\\nContext: After refactoring code, verification is needed.\\nuser: \"I refactored the database layer to use the repository pattern\"\\nassistant: \"Refactoring requires careful review. Let me use the code-review agent to verify the implementation follows best practices and maintains code quality.\"\\n<Task tool call to launch code-review agent>\\n</example>"
 model: opus
+effort: xhigh
 color: red
 ---
 
@@ -80,6 +81,7 @@ When reviewing code, you will systematically evaluate against these criteria:
    - Execute type checks (e.g., `npm run type-check`, `mypy`, `tsc --noEmit`, etc.)
    - Run any project-specific quality tools
    - Report all findings from these tools
+   - Bij een scoped diff-review: stel eerst de before-staat vast met `git diff HEAD -- <files>` én `git show HEAD:<file>` per doelbestand — de vorige versie onthult of de wijziging nieuw gedrag introduceert (andere blast radius) of bestaand gedrag aanpast.
 
 2. **Then, conduct manual review:**
    - Read through the code thoroughly
