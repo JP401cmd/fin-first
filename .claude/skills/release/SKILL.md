@@ -21,7 +21,7 @@ De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: 
 `git status` + `git diff master...HEAD --stat`: gaan alleen bedoelde bestanden mee? Geen debug-rommel, geen vergeten bestanden. Nieuwe env-variabelen ⇒ placeholder in `env.example` én de echte waarde in de productie-omgeving gezet vóór deploy.
 
 ### 2. Statische checks
-`npx tsc --noEmit` en `npm run lint` — beide schoon. Geen uitzonderingen "voor later".
+`npx tsc --noEmit` schoon. Lint gericht op de gewijzigde bestanden (`npx eslint <geraakte paden>`): geen nieuwe errors t.o.v. master (baseline-errors blokkeren niet, vergelijk bij twijfel via stash). Geen repo-brede lint-run.
 
 ### 3. Tests — `tester`
 Eerst gericht (de geraakte paden), dan volledig `npm run test:run`. Gedragswijziging in een rekenmotor of flow zonder test die het nieuwe gedrag vastlegt? Dan eerst die test (laten) toevoegen — anders niet klaar. Relevante in-app regressiesuites (`lib/regression-tests/suites/*`) meenemen.
