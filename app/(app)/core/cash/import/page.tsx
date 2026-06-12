@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import {
   Upload, FileText, Check, AlertTriangle, X,
   ChevronRight, Loader2, WifiOff, RefreshCw, ArrowLeftRight, Sparkles,
-  Users, User, Hand,
+  Users, User, Hand, Lightbulb,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { parseMT940 } from '@/lib/parsers/mt940'
@@ -1733,6 +1733,22 @@ export default function ImportPage() {
               </>
             )}
           </div>
+
+          {/* Tip: begin klein — één maand importeren */}
+          {!showColumnMapping && (
+            <div className="flex items-start gap-3 rounded-lg border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
+              <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" />
+              <div className="text-sm">
+                <p className="font-medium text-[var(--ink-2)]">Tip: begin met één maand</p>
+                <p className="mt-1 text-xs text-[var(--ink-3)]">
+                  Importeer eerst een bestand van één maand. Zo zie je snel waar je budgetten nog
+                  hiaten hebben en kun je die bijstellen. Elke correctie die je tijdens het
+                  toewijzen maakt wordt onthouden, zodat de automatische toekenning bij je
+                  volgende import al een stuk slimmer is.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* CSV Column Mapping */}
           {showColumnMapping && (

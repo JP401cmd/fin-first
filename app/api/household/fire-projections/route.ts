@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, computeFireRange, type FinancialInput, type FireProjection, type FireRange } from '@/lib/horizon-data'
 import { computeSharePct, type SplitMode } from '@/lib/household-data'
+import { localMonthBounds } from '@/lib/month-range'
 
 /**
  * GET /api/household/fire-projections
@@ -118,8 +119,7 @@ export async function GET() {
 
   const memberIds = members.map(m => m.user_id)
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
   // Fetch all financial data for all household members in parallel
   const [

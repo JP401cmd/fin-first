@@ -12,6 +12,7 @@ import {
   debtProjection,
 } from '@/lib/debt-data'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { NL_SWR } from '@/lib/constants'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -218,10 +219,11 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
   )
 
   // Freedom yardstick: the FIRE target portfolio. Prefer the app-resolved target,
-  // fall back to the 4%-rule on expenses. NEVER use savings as the yardstick.
+  // fall back to the canonical NL SWR on expenses (geen vaste 4%; deze component
+  // krijgt geen per-gebruiker SWR mee). NEVER use savings as the yardstick.
   const resolvedFireTarget = useMemo(() => {
     if (fireTarget != null && fireTarget > 0) return fireTarget
-    if (yearlyExpenses != null && yearlyExpenses > 0) return yearlyExpenses / 0.04
+    if (yearlyExpenses != null && yearlyExpenses > 0) return yearlyExpenses / NL_SWR
     return 0
   }, [fireTarget, yearlyExpenses])
 

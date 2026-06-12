@@ -21,7 +21,6 @@ async function main() {
   await testEndpoint('GET', 'http://localhost:3000/api/health');
   // Then test admin endpoints
   await testEndpoint('GET', 'http://localhost:3000/api/admin/settings');
-  await testEndpoint('POST', 'http://localhost:3000/api/admin/test-phase-transition', { oldPhase: 'recovery' });
 }
 
 main();

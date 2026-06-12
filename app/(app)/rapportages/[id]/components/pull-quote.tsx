@@ -8,9 +8,9 @@ const MODULE_NAMES: Record<ReportAiInsight['module'], string> = {
 }
 
 const AVATAR_NAMES: Record<string, string> = {
-  fhin: 'Fhin',
+  fhin: 'Will',
   finn: 'Will',
-  ffin: 'Ffin',
+  ffin: 'Will',
   will: 'Will',
 }
 

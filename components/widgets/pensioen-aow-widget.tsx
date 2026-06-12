@@ -3,7 +3,8 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
+import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, NL_SWR } from '@/lib/constants'
+import { computeEffectiveSwr } from '@/lib/fire-params'
 
 interface Props {
   size: WidgetSize
@@ -24,9 +25,16 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
       ? Math.min(100, (aowMonthly / data.monthlyExpenses) * 100)
       : 0
 
-  // Capital equivalent of AOW income stream (how much less FIRE capital needed)
-  const effectiveReturn = data.grossReturn || 0.07
-  const aowFireReduction = aowYearly / effectiveReturn
+  // Capital equivalent of AOW income stream (how much less FIRE capital needed).
+  // Een duurzame inkomensstroom kapitaliseer je op de ONTTREKKINGSVOET (SWR),
+  // niet op het bruto rendement: kapitaal × SWR = duurzaam jaarinkomen, dus
+  // kapitaal = jaarinkomen / SWR. Kapitaliseren op grossReturn (~7%) onderschat
+  // het vermogensequivalent met een factor ~2,4. Per-gebruiker SWR via de
+  // gedeelde helper, met NL_SWR als fallback.
+  const swr = (data.grossReturn != null && data.inflationRate != null)
+    ? computeEffectiveSwr(data.grossReturn, data.inflationRate)
+    : NL_SWR
+  const aowFireReduction = aowYearly / swr
 
   // ── Mini: years to AOW ────────────────────────────────────────
   if (size === 'mini') {
@@ -70,7 +78,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
     const selfSupplementMonthly = Math.max(0, data.monthlyExpenses - aowMonthly)
     const postAowTarget =
       data.monthlyExpenses > aowMonthly
-        ? (data.monthlyExpenses - aowMonthly) * 12 / effectiveReturn
+        ? (data.monthlyExpenses - aowMonthly) * 12 / swr
         : 0
 
     return (

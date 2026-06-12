@@ -4,36 +4,12 @@ import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { getModel, AIConfigError } from '@/lib/ai/config'
 import { checkTierGate } from '@/lib/require-tier'
-import { CATEGORIZE_SYSTEM_PROMPT } from '@/lib/ai/categorize-system-prompt'
-
-const CHILD_SLUGS = [
-  'salaris-uitkering',
-  'toeslagen-kinderbijslag',
-  'teruggave-belasting',
-  'overige-inkomsten',
-  'huur-hypotheek',
-  'gas-water-licht',
-  'verzekeringen-wonen',
-  'gemeentelijke-lasten',
-  'boodschappen',
-  'huishouden-verzorging',
-  'kinderen-school',
-  'medische-kosten',
-  'brandstof-ov',
-  'auto-vaste-lasten',
-  'auto-onderhoud',
-  'fiets-deelvervoer',
-  'uit-eten-horeca',
-  'vrije-tijd-sport',
-  'vakantie',
-  'kleding-overige',
-  'sparen-noodbuffer',
-  'investeren-fire',
-  'schulden-aflossingen',
-  'extra-aflossing-hypotheek',
-] as const
-
-type BudgetSlug = typeof CHILD_SLUGS[number]
+import { sanitizeForAI } from '@/lib/ai/sanitize'
+import {
+  buildCategorizeSystemPrompt,
+  type CategorizeBudgetOption,
+} from '@/lib/ai/categorize-system-prompt'
+import { buildBudgetOptions, resolveSlug, type BudgetRow } from './budget-options'
 
 const categorizationSchema = z.object({
   categorizations: z.array(z.object({
@@ -43,15 +19,17 @@ const categorizationSchema = z.object({
   })),
 })
 
-const VALID_SLUGS = new Set<string>(CHILD_SLUGS)
-
 type RequestTransaction = {
   import_hash: string
   description: string
   counterparty_name?: string | null
   amount: number
   reference?: string | null
+  date?: string | null
 }
+
+// BudgetRow en de pure helpers (buildBudgetOptions, resolveSlug, isAssignableType)
+// leven nu in ./budget-options.ts zodat ze getest kunnen worden zonder Supabase.
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -81,6 +59,29 @@ export async function POST(req: Request) {
   // Max 20 per batch to avoid model timeouts and hash mangling
   const batch = transactions.slice(0, 20)
 
+  // ── Toewijsbare budgetten ophalen (RLS-respecterend) ──────────────────────
+  // Geen user_id-filter en geen service-role: RLS surfacet zowel de eigen
+  // budgetten (auth.uid() = user_id) als de via het huishouden gedeelde
+  // budgetten (ownership='shared' AND household_id = user_household_id()).
+  // We nemen alleen LEAF-budgetten als toewijsdoel — een parent mét children is
+  // geen toewijsdoel (bestaande app-conventie, zie Sleepmodus/budget-keuzelijst).
+  const { data: budgetRows, error: budgetError } = await supabase
+    .from('budgets')
+    .select('id, parent_id, name, slug, budget_type, description, ownership')
+    .eq('is_archived', false)
+
+  if (budgetError) {
+    return Response.json({ error: 'Budgetten konden niet worden geladen.' }, { status: 500 })
+  }
+
+  const rows = (budgetRows ?? []) as BudgetRow[]
+
+  const { options, slugToId, validSlugs } = buildBudgetOptions(rows)
+
+  if (options.length === 0) {
+    return Response.json({ error: 'Geen budgetten gevonden om transacties aan toe te wijzen.' }, { status: 422 })
+  }
+
   let model
   try {
     model = await getModel(supabase, 'categorisatie')
@@ -91,12 +92,24 @@ export async function POST(req: Request) {
     return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
   }
 
+  // Systeemprompt opbouwen uit de echte budgetten van de gebruiker. Budgetnamen
+  // zijn noodzakelijke feature-context maar zijn user-content → sanitizen vóór
+  // ze naar het model gaan (zelfde discipline als bij de transactieregels).
+  const sanitizedOptions: CategorizeBudgetOption[] = options.map((o) => ({
+    ...o,
+    name: sanitizeForAI(o.name),
+    parentName: o.parentName ? sanitizeForAI(o.parentName) : o.parentName,
+    description: o.description ? sanitizeForAI(o.description) : o.description,
+  }))
+  const system = buildCategorizeSystemPrompt(sanitizedOptions)
+
   const prompt = `Categoriseer de volgende ${batch.length} transacties.\nRetourneer een array van exact ${batch.length} items in dezelfde volgorde.\n\n${batch.map((tx, i) => {
     const parts = [
-      `beschrijving: ${tx.description}`,
-      tx.counterparty_name ? `tegenpartij: ${tx.counterparty_name}` : null,
+      `beschrijving: ${sanitizeForAI(tx.description ?? '')}`,
+      tx.counterparty_name ? `tegenpartij: ${sanitizeForAI(tx.counterparty_name)}` : null,
       `bedrag: ${tx.amount > 0 ? '+' : ''}${tx.amount}`,
-      tx.reference ? `referentie: ${tx.reference}` : null,
+      tx.date ? `datum: ${tx.date}` : null,
+      tx.reference ? `referentie: ${sanitizeForAI(tx.reference)}` : null,
     ].filter(Boolean)
     return `${i + 1}. ${parts.join('\n   ')}`
   }).join('\n\n')}`
@@ -106,46 +119,29 @@ export async function POST(req: Request) {
     const result = await generateObject({
       model,
       schema: categorizationSchema,
-      system: CATEGORIZE_SYSTEM_PROMPT,
+      system,
       prompt,
       maxRetries: 0,
     })
     object = result.object
     await recordAiUsage(supabase, user.id, 'categorize')
   } catch (err) {
+    // Details alleen server-side loggen — provider-foutmeldingen kunnen
+    // modelnamen/interne details bevatten en horen niet bij de client.
     console.error('AI categorization failed:', err)
-    const message = err instanceof Error ? err.message : 'Onbekende fout'
     return Response.json(
-      { error: `AI-categorisatie mislukt: ${message}` },
+      { error: 'AI-categorisatie is tijdelijk niet beschikbaar. Probeer het later opnieuw.' },
       { status: 500 },
     )
   }
 
-  // Build a lookup map from slug → budget_id.
-  // Met gedeelde budgetten kan dezelfde slug twee keer voorkomen: een eigen
-  // ('personal') rij én de gedeelde huishoud-rij ('shared'). Het gedeelde
-  // huishoudbudget is canoniek, dus dat wint bij een collisie. (Gearchiveerde,
-  // samengevoegde duplicaten krijgen hernoemde slugs en botsen daarom niet.)
-  const { data: budgets } = await supabase
-    .from('budgets')
-    .select('id, slug, ownership')
-    .in('slug', [...CHILD_SLUGS])
-
-  const slugToId = new Map<BudgetSlug, string>()
-  for (const b of budgets ?? []) {
-    if (!b.slug) continue
-    const slug = b.slug as BudgetSlug
-    // Voorkeur voor 'shared' bij een slug-collisie.
-    if (slugToId.has(slug) && b.ownership !== 'shared') continue
-    slugToId.set(slug, b.id)
-  }
-
-  // Positional mapping: result[i] corresponds to batch[i]
+  // Positional mapping: result[i] corresponds to batch[i]. Een door het model
+  // geretourneerde slug valideren we tegen de set daadwerkelijk aangeboden slugs;
+  // onbekend → nette degradatie naar budget_id null (output-shape ongewijzigd).
   const results = batch.map((tx, i) => {
     const cat = object.categorizations[i]
     if (!cat) return { import_hash: tx.import_hash, budget_slug: null, budget_id: null, confidence: 0, reasoning: '' }
-    const slug = cat.budget_slug?.toLowerCase().trim() ?? null
-    const validSlug = slug && VALID_SLUGS.has(slug) ? (slug as BudgetSlug) : null
+    const validSlug = resolveSlug(cat.budget_slug, validSlugs)
     return {
       import_hash: tx.import_hash,
       budget_slug: validSlug,

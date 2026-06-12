@@ -482,13 +482,13 @@ function DrawdownChart({ schedule }: { schedule: WithdrawalYear[] }) {
 
       <defs>
         <linearGradient id="drawdownGradModal" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#8B5CB8" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#8B5CB8" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--color-horizon-500, #c4a06b)" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="var(--color-horizon-500, #c4a06b)" stopOpacity="0" />
         </linearGradient>
       </defs>
       <path d={areaPath} fill="url(#drawdownGradModal)" style={{ animation: animated ? 'fadeInFill 250ms ease-out 455ms both' : 'none' }} />
 
-      <path d={linePath} fill="none" stroke="#8B5CB8" strokeWidth="2"
+      <path d={linePath} fill="none" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2"
         pathLength={1} strokeDasharray={1}
         style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
 

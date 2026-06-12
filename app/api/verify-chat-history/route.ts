@@ -25,19 +25,24 @@ export async function GET() {
   const chatPanelSrc = readSrc('components/app/chat/chat-panel.tsx')
   const chatProviderSrc = readSrc('components/app/chat/chat-provider.tsx')
 
-  // Test 1: ChatProvider and ChatPanel are in the app layout
+  // Test 1: ChatProvider and the ChatPanel mount are in the app layout
   {
     const hasChatProvider = layoutSrc.includes('<ChatProvider>')
-    const hasChatPanel = layoutSrc.includes('<ChatPanel')
+    // ChatPanel wordt lazy gemount via de ChatPanelLazy-wrapper (next/dynamic,
+    // ssr:false) zodat de zware `ai`/@ai-sdk/react-chunk uit de First-Load JS
+    // blijft tot de chat voor het eerst opent. De wrapper houdt ChatPanel daarna
+    // permanent gemount, zodat de berichten-historie net als voorheen behouden
+    // blijft over open/dicht- en navigatie-cycli heen.
+    const hasChatPanel = layoutSrc.includes('<ChatPanelLazy')
     const importsChatProvider = layoutSrc.includes("import { ChatProvider }")
-    const importsChatPanel = layoutSrc.includes("import { ChatPanel }")
+    const importsChatPanel = layoutSrc.includes("import { ChatPanelLazy }")
     const pass = hasChatProvider && hasChatPanel && importsChatProvider && importsChatPanel
     results.push({
-      name: 'ChatProvider and ChatPanel rendered in app layout',
+      name: 'ChatProvider and ChatPanel mount rendered in app layout',
       pass,
       detail: pass
-        ? 'Both ChatProvider and ChatPanel are imported and rendered in app/(app)/layout.tsx. This layout wraps ALL protected pages.'
-        : `ChatProvider: ${hasChatProvider}, ChatPanel: ${hasChatPanel}`,
+        ? 'ChatProvider and the ChatPanelLazy mount are imported and rendered in app/(app)/layout.tsx. This layout wraps ALL protected pages; ChatPanelLazy lazy-loads ChatPanel on first open and keeps it mounted thereafter.'
+        : `ChatProvider: ${hasChatProvider}, ChatPanelLazy: ${hasChatPanel}`,
     })
   }
 

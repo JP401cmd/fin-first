@@ -12,6 +12,7 @@ import {
   type TaxYear,
 } from '@/lib/box3-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { localMonthBounds } from '@/lib/month-range'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { Box3Classification } from '@/components/app/core/box3-classification'
@@ -65,8 +66,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
     try {
       const supabase = createClient()
       const now = new Date()
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+      const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
       const [assetsResult, debtsResult, txResult, essentialBudgetsResult, allChildrenResult, profileResult] = await Promise.all([
         supabase.from('assets').select('*').eq('is_active', true),

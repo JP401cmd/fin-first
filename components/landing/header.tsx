@@ -39,10 +39,10 @@ export function Header() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 transition-all duration-300 md:px-12 ${
+      className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b-2 px-6 py-4 transition-all duration-300 md:px-12 ${
         scrolled
-          ? 'bg-[var(--bg)]/95 backdrop-blur-xl border-b-2 border-[var(--ink)] shadow-[var(--s0)]'
-          : ''
+          ? 'bg-[var(--bg)]/95 backdrop-blur-xl border-[var(--ink)] shadow-[var(--s0)]'
+          : 'border-transparent'
       }`}
     >
       {/* Wordmark: tf. */}

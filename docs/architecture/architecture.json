@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-12T11:31:03.622Z",
+  "generatedAt": "2026-06-12T21:36:48.397Z",
   "generatedDate": "2026-06-12",
   "repo": {
     "name": "fin",
@@ -182,13 +182,13 @@
     }
   },
   "stats": {
-    "routes": 320,
+    "routes": 319,
     "routesProduction": 94,
-    "api": 370,
-    "tables": 51,
-    "migrations": 101,
+    "api": 369,
+    "tables": 52,
+    "migrations": 105,
     "integrations": 24,
-    "components": 688,
+    "components": 690,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -1658,12 +1658,6 @@
     {
       "url": "/test-kpi-deduplication",
       "file": "app/test-kpi-deduplication/page.tsx",
-      "group": "overig",
-      "isTest": true
-    },
-    {
-      "url": "/test-level-up-celebration",
-      "file": "app/test-level-up-celebration/page.tsx",
       "group": "overig",
       "isTest": true
     },
@@ -3443,12 +3437,6 @@
         "isTest": true
       },
       {
-        "url": "/test-level-up-celebration",
-        "file": "app/test-level-up-celebration/page.tsx",
-        "group": "overig",
-        "isTest": true
-      },
-      {
         "url": "/test-loading-states",
         "file": "app/test-loading-states/page.tsx",
         "group": "overig",
@@ -4279,14 +4267,6 @@
       ]
     },
     {
-      "url": "/api/admin/test-phase-transition",
-      "file": "app/api/admin/test-phase-transition/route.ts",
-      "domain": "admin",
-      "methods": [
-        "POST"
-      ]
-    },
-    {
       "url": "/api/admin/test-users",
       "file": "app/api/admin/test-users/route.ts",
       "domain": "admin",
@@ -4466,6 +4446,14 @@
       "domain": "ai",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/appearance",
+      "file": "app/api/appearance/route.ts",
+      "domain": "appearance",
+      "methods": [
+        "PUT"
       ]
     },
     {
@@ -6726,14 +6714,6 @@
       ]
     },
     {
-      "url": "/api/verify-level-up-celebration",
-      "file": "app/api/verify-level-up-celebration/route.ts",
-      "domain": "verify-level-up-celebration",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
       "url": "/api/verify-locked-footer",
       "file": "app/api/verify-locked-footer/route.ts",
       "domain": "verify-locked-footer",
@@ -7144,7 +7124,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 33,
+      "count": 32,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -7341,14 +7321,6 @@
           "methods": [
             "GET",
             "PUT"
-          ]
-        },
-        {
-          "url": "/api/admin/test-phase-transition",
-          "file": "app/api/admin/test-phase-transition/route.ts",
-          "domain": "admin",
-          "methods": [
-            "POST"
           ]
         },
         {
@@ -8714,6 +8686,21 @@
           "domain": "ai-credits",
           "methods": [
             "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "appearance",
+      "label": "appearance",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/appearance",
+          "file": "app/api/appearance/route.ts",
+          "domain": "appearance",
+          "methods": [
+            "PUT"
           ]
         }
       ]
@@ -11105,21 +11092,6 @@
       ]
     },
     {
-      "domain": "verify-level-up-celebration",
-      "label": "verify-level-up-celebration",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/verify-level-up-celebration",
-          "file": "app/api/verify-level-up-celebration/route.ts",
-          "domain": "verify-level-up-celebration",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "verify-locked-footer",
       "label": "verify-locked-footer",
       "count": 1,
@@ -11927,6 +11899,10 @@
         "migration": "supabase/migrations/20260529100000_create_calculator_library.sql"
       },
       {
+        "name": "category_corrections",
+        "migration": "supabase/migrations/20260213122235_add_category_corrections.sql"
+      },
+      {
         "name": "crypto_holding_prices",
         "migration": "supabase/migrations/20260502000003_split_holdings_tables.sql"
       },
@@ -12083,7 +12059,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 101
+    "migrationCount": 105
   },
   "tablesByDomain": [
     {
@@ -12169,6 +12145,35 @@
       ]
     },
     {
+      "domain": "Overig",
+      "tables": [
+        {
+          "name": "ai_token_usage",
+          "migration": "supabase/migrations/20260611140000_create_ai_token_usage.sql"
+        },
+        {
+          "name": "badges",
+          "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
+        },
+        {
+          "name": "category_corrections",
+          "migration": "supabase/migrations/20260213122235_add_category_corrections.sql"
+        },
+        {
+          "name": "external_data_sources",
+          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
+        },
+        {
+          "name": "household_budget_model_proposals",
+          "migration": "supabase/migrations/20260611000002_household_budget_model_consent.sql"
+        },
+        {
+          "name": "job_runs",
+          "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
+        }
+      ]
+    },
+    {
       "domain": "Engagement & features",
       "tables": [
         {
@@ -12194,31 +12199,6 @@
         {
           "name": "user_streaks",
           "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
-        }
-      ]
-    },
-    {
-      "domain": "Overig",
-      "tables": [
-        {
-          "name": "ai_token_usage",
-          "migration": "supabase/migrations/20260611140000_create_ai_token_usage.sql"
-        },
-        {
-          "name": "badges",
-          "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
-        },
-        {
-          "name": "external_data_sources",
-          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
-        },
-        {
-          "name": "household_budget_model_proposals",
-          "migration": "supabase/migrations/20260611000002_household_budget_model_consent.sql"
-        },
-        {
-          "name": "job_runs",
-          "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
         }
       ]
     },
@@ -12393,11 +12373,11 @@
     }
   ],
   "components": {
-    "total": 688,
+    "total": 690,
     "groups": [
       {
         "group": "app",
-        "count": 297,
+        "count": 299,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12459,6 +12439,7 @@
           "chart-overlay-explainer",
           "chat-layout-wrapper",
           "chat-panel",
+          "chat-panel-lazy",
           "chat-prompt-deeplink",
           "chat-prompt-deeplink.test",
           "chat-provider",
@@ -12535,6 +12516,7 @@
           "guide-topic-card",
           "head-scripts",
           "health-score-receipt",
+          "health-score-receipt.test",
           "holding-alerts",
           "holding-transaction-log",
           "holdings-heatmap",
@@ -12563,7 +12545,6 @@
           "kassabon-shell",
           "koopkracht-erosie",
           "koopkracht-erosie-onttrekken",
-          "level-up-celebration",
           "lever-compass",
           "life-events-in-phase",
           "log-timeline",
@@ -12580,6 +12561,7 @@
           "mobile-stack-shell",
           "module-activation-modal",
           "module-color-provider",
+          "module-color-provider.persist.test",
           "module-nav",
           "module-onboarding-modal",
           "monte-carlo-onttrekken",
@@ -12593,6 +12575,7 @@
           "next-step-card",
           "nibud-benchmark",
           "notification-item",
+          "notification-item.test",
           "notification-panel",
           "notification-provider",
           "opzeg-modal",
@@ -12615,7 +12598,6 @@
           "phase-modal-onttrekking",
           "phase-modal-opbouw",
           "phase-modal-overgang",
-          "phase-transition-modal",
           "platform-banner",
           "portfolio-allocation-chart",
           "postpone-form",
@@ -12890,7 +12872,7 @@
       },
       {
         "group": "widgets",
-        "count": 59,
+        "count": 61,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -12943,8 +12925,10 @@
           "voorstellen-widget",
           "vrijheidsdagen-maand-widget",
           "vrijheidsmijlpalen-widget",
+          "vrijheidsmijlpalen-widget.test",
           "vrijheidsscenario-widget",
           "vrijheidsvoortgang-widget",
+          "vrijheidsvoortgang-widget.test",
           "weekoverzicht-widget",
           "widget-empty",
           "widget-empty.test",
@@ -13010,7 +12994,7 @@
       },
       {
         "group": "mijn",
-        "count": 28,
+        "count": 26,
         "items": [
           "abonnement-section",
           "account-basis-section",
@@ -13036,8 +13020,6 @@
           "module-accent-picker.test",
           "palette-picker",
           "palette-picker.test",
-          "phase-color-picker",
-          "phase-color-picker.test",
           "privacy-overview",
           "privacy-overview.test"
         ]
@@ -13586,6 +13568,12 @@
           "write": false
         }
       ],
+      "appearance": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "assets": [
         {
           "name": "assets",
@@ -13607,6 +13595,10 @@
         },
         {
           "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "category_corrections",
           "write": false
         },
         {
@@ -14438,6 +14430,10 @@
           "write": false
         },
         {
+          "name": "bank_accounts",
+          "write": false
+        },
+        {
           "name": "budgets",
           "write": false
         },
@@ -14461,6 +14457,10 @@
         },
         {
           "name": "balance_snapshots",
+          "write": false
+        },
+        {
+          "name": "bank_accounts",
           "write": false
         },
         {
@@ -14653,6 +14653,14 @@
             "/api/admin/user-export",
             "/api/admin/users/block",
             "/api/admin/users/role"
+          ]
+        },
+        {
+          "domain": "appearance",
+          "label": "appearance",
+          "write": true,
+          "routes": [
+            "/api/appearance"
           ]
         },
         {
@@ -16202,6 +16210,34 @@
           "routes": [
             "/api/report/balans"
           ]
+        },
+        {
+          "domain": "share",
+          "label": "share",
+          "write": false,
+          "routes": [
+            "/api/share/freedom-card"
+          ]
+        },
+        {
+          "domain": "snapshots",
+          "label": "Snapshots",
+          "write": false,
+          "routes": [
+            "/api/snapshots",
+            "/api/snapshots/auto",
+            "/api/snapshots/cron"
+          ]
+        }
+      ],
+      "category_corrections": [
+        {
+          "domain": "bank-connect",
+          "label": "Bank-connect",
+          "write": false,
+          "routes": [
+            "/api/bank-connect/sync"
+          ]
         }
       ],
       "investment_holdings": [
@@ -16885,6 +16921,11 @@
         "column": "calculator_id"
       },
       {
+        "from": "category_corrections",
+        "to": "budgets",
+        "column": "budget_id"
+      },
+      {
         "from": "crypto_holding_prices",
         "to": "crypto_holdings",
         "column": "holding_id"
@@ -17056,6 +17097,11 @@
       }
     ],
     "meta": {
+      "category_corrections": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
       "profiles": {
         "user": true,
         "household": true,
@@ -17399,6 +17445,56 @@
       ],
       "summary": "De wekelijkse briefing op /overzicht heeft één engine: de deterministische `buildBriefingEntries` (lib/briefing/engine.ts) levert alle cijfers en briefjes; de LLM mag uitsluitend **redigeren** (kop-zin + tekst-herschrijving) via `lib/briefing/redactie.ts`, met een harde nummer-gu",
       "file": "docs/adr/0007-briefing-een-engine.md"
+    },
+    {
+      "id": "0008-gezondheidsgetal-een-bron",
+      "title": "Het gezondheidsgetal kent één canonieke berekening",
+      "status": "aanvaard",
+      "date": "2026-06-12",
+      "elements": [
+        "as-planning"
+      ],
+      "summary": "De financiële gezondheidsscore (0–100, 7-pijler) heeft één canonieke berekening: `computeHealthScoreFromInputs` (lib/financial-health.ts) op een input die door één gedeeld pad wordt gebouwd (`buildHealthScoreInput` in lib/health-score-input.ts). Het \"huidige\" getal is overal live",
+      "file": "docs/adr/0008-gezondheidsgetal-een-bron.md"
+    },
+    {
+      "id": "0009-vrijheidsvoortgang-unified-grondslag",
+      "title": "Vrijheidsvoortgang single-sourced op de unified-projection-grondslag",
+      "status": "aanvaard",
+      "date": "2026-06-12",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "Vrijheidsvoortgang (freedomPct) heeft één canonieke grondslag: FIRE-eligible netto vermogen ÷ benodigde portfolio uit de unified projection. 100% betekent per definitie dat het FIRE-doel is bereikt; het eigen huis telt alleen mee voor zover de housing-strategie het vrijspeelt. Eé",
+      "file": "docs/adr/0009-vrijheidsvoortgang-unified-grondslag.md"
+    },
+    {
+      "id": "0010-gezondheidsgetal-v2",
+      "title": "Gezondheidsgetal v2 — vier gedragspijlers",
+      "status": "aanvaard",
+      "date": "2026-06-12",
+      "elements": [
+        "as-budget",
+        "as-vermogen",
+        "as-planning",
+        "as-belasting"
+      ],
+      "summary": "Het gezondheidsgetal (0–100) wordt geherstructureerd van 7 vlakke pijlers met handmatige gewichten naar **vier gedragspijlers** (Rondkomen 35% · Buffer 20% · Schuld 20% · Vrijheid 25%) met 7 actieve indicatoren, in lijn met de internationale frameworks (FHN FinHealth Score, CFPB,",
+      "file": "docs/adr/0010-gezondheidsgetal-v2.md"
+    },
+    {
+      "id": "0011-budget-referenties-on-delete-set-null",
+      "title": "Budget-FK's — ON DELETE SET NULL voor referentie-data, CASCADE voor levenscyclus-data",
+      "status": "aanvaard",
+      "date": "2026-06-12",
+      "elements": [
+        "as-budget",
+        "data-cont"
+      ],
+      "summary": "FK's naar `budgets(id)` krijgen ON DELETE SET NULL (referentie-data: transacties, doelen, leer-regels) of CASCADE (levenscyclus-data: bedragen, rollovers, ouder-kind-relaties) — nooit de default NO ACTION. Alle tabelstructuur gaat via migraties in de repo; anders is ze onzichtbaa",
+      "file": "docs/adr/0011-budget-referenties-on-delete-set-null.md"
     }
   ],
   "churn": {
@@ -17410,7 +17506,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 35
+        "commits": 37
       },
       {
         "path": "app/(app)/toekomst",
@@ -17422,15 +17518,15 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 13
+        "commits": 12
+      },
+      {
+        "path": "app/api/household",
+        "commits": 9
       },
       {
         "path": "lib/horizon-data.ts",
         "commits": 9
-      },
-      {
-        "path": "app/api/household",
-        "commits": 8
       },
       {
         "path": "components/horizon",
@@ -17448,17 +17544,17 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6804,
-        "commits": 101
+        "loc": 6831,
+        "commits": 102
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 4765,
+        "loc": 4847,
         "commits": 25
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 3826,
+        "loc": 3813,
         "commits": 40
       },
       {
@@ -17467,14 +17563,14 @@
         "commits": 4
       },
       {
-        "file": "components/app/cash-account-view.tsx",
-        "loc": 2615,
-        "commits": 15
+        "file": "app/(app)/core/cash/import/page.tsx",
+        "loc": 2639,
+        "commits": 22
       },
       {
-        "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2576,
-        "commits": 21
+        "file": "components/app/cash-account-view.tsx",
+        "loc": 2608,
+        "commits": 14
       },
       {
         "file": "lib/unified-projection.ts",
@@ -17515,21 +17611,21 @@
         "id": "architecture-docs-keeper",
         "name": "architecture-docs-keeper",
         "description": "Use this agent to keep TriFinity's self-documenting architecture page (`/beheer/architectuur`) in sync with code changes. It owns the curation behind the four views — Praatplaat (HLD), Plaat (ArchiMate), Database (ERD) and Berekeningen — and the rule from CLAUDE.md: 'laat de documentatie beter achter dan je 'm vond'. Use it whenever a domain, module, table, calculation, integration or capability is added/removed/renamed, when ADRs or concerns need recording, or to review whether an architecture change kept the docs consistent.",
-        "model": "opus",
+        "model": "sonnet",
         "color": "blue"
       },
       {
         "id": "bug-reporter",
         "name": "bug-reporter",
         "description": "Use this agent to turn a vague problem report into a complete, reproducible bug report for TriFinity. It does NOT fix the bug — it investigates and documents: a clear title, environment/context, exact steps to reproduce, expected vs. actual behaviour, the affected use cases/user journeys, severity & impact, suspected area in the codebase, and the evidence behind it. Use it whenever a bug is observed or reported and you want a crisp, actionable write-up before anyone starts fixing.",
-        "model": "opus",
+        "model": "sonnet",
         "color": "red"
       },
       {
         "id": "business-owner",
         "name": "business-owner",
         "description": "Use this agent for product/business-owner thinking on TriFinity: deciding what to build and why, shaping and prioritizing the backlog, writing clear feature definitions, and judging whether a proposed change serves the product's mission and philosophy ('Geld is opgeslagen tijd'). It owns the feature-management MCP tools (feature_create, feature_create_bulk, feature_skip, feature_get_stats, feature_get_ready, feature_get_blocked, feature_get_by_id). Use it to turn a vague idea into well-scoped features, to challenge scope/priority, to assess value and risk (incl. Wft-compliance and trust), and for the user-facing 'is this worth doing?' call.",
-        "model": "opus",
+        "model": "sonnet",
         "color": "amber"
       },
       {
@@ -17571,14 +17667,14 @@
         "id": "polar-payments-expert",
         "name": "polar-payments-expert",
         "description": "Use this agent when implementing, reviewing, or troubleshooting Polar payment integration in the Next.js application. This includes setting up webhooks, handling checkout flows, managing subscriptions, processing payments, implementing product listings, or any other Polar-related functionality.",
-        "model": "sonnet",
+        "model": "opus",
         "color": "green"
       },
       {
         "id": "requirement-specialist",
         "name": "requirement-specialist",
         "description": "Use this agent to turn a business-owner intent into precise, unambiguous requirements and acceptance criteria for TriFinity — the bridge between 'what we want and why' (business-owner) and 'how we build it' (engineers). It works on behalf of the business-owner to set the right expectations: it elaborates a feature into clear functional & non-functional requirements, explicit acceptance criteria (Given/When/Then), scope boundaries (in/out), edge cases, dependencies, and the definition of done — without deciding priority (that's the business-owner) or implementation (that's the engineers). Use it after an idea is greenlit and before building, or when a feature's expectations are fuzzy and need pinning down.",
-        "model": "opus",
+        "model": "sonnet",
         "color": "amber"
       },
       {
@@ -17592,7 +17688,7 @@
         "id": "senior-developer",
         "name": "senior-developer",
         "description": "Use this agent as the senior/principal engineer for TriFinity: high-level technical direction, architecture and design decisions, tricky cross-cutting refactors, hard debugging, and final technical judgement that spans multiple domains (Next.js 16, React 19, Supabase/RLS, AI, the calc engines, the self-documenting architecture). It coordinates the specialist agents, weighs trade-offs, and owns codebase-wide quality and consistency. Use it when a change is architecturally significant, touches several subsystems, needs a build/refactor plan, or when you want a seasoned 'is this the right approach?' call before committing.",
-        "model": "opus",
+        "model": "fable",
         "color": "red"
       },
       {
@@ -17606,7 +17702,7 @@
         "id": "tester",
         "name": "tester",
         "description": "Use this agent to write, run, debug and review tests for TriFinity, and to verify that a change actually works before it's called done. It owns the two test layers: unit/component tests with Vitest (`*.test.ts` / `*.test.tsx`, run via `npm run test:run`) and the in-app regression framework (`lib/regression-tests/suites/*` — 83 suites, registered via `registerTest`/`registerCategory`). Use it after any non-trivial change, when coverage is missing, when a bug needs a reproducing test, or when tests are failing and need diagnosis.",
-        "model": "opus",
+        "model": "sonnet",
         "color": "green"
       },
       {
@@ -18130,8 +18226,13 @@
             "index": 8,
             "title": "Review",
             "agents": [
+              "calc-engine-specialist",
+              "supabase-db-specialist",
+              "ai-specialist-general",
+              "ai-specialist-prompt-dna",
+              "ux-review-expert",
               "code-review",
-              "ux-review-expert"
+              "senior-developer"
             ]
           },
           {
@@ -18146,16 +18247,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-06-12",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+1"
-        ],
-        "removed": []
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -18174,9 +18267,9 @@
     },
     {
       "date": "2026-06-12",
-      "api": 370,
-      "components": 688,
-      "tables": 51,
+      "api": 369,
+      "components": 690,
+      "tables": 52,
       "routesProduction": 94
     }
   ]

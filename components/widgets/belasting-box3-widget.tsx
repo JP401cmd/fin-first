@@ -5,6 +5,7 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import { Receipt } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 import { NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF } from '@/lib/constants'
+import { BOX3_PARAMS } from '@/lib/box3-data'
 
 interface Props {
   size: WidgetSize
@@ -12,20 +13,29 @@ interface Props {
   href?: string
 }
 
-/** Heffingsvrij vermogen 2025 (single, without partner). */
-const VRIJSTELLING = 57_684
+// Heffingsvrij vermogen — single, zonder fiscaal partner. Single-sourced uit de
+// canonieke BOX3_PARAMS, op hetzelfde belastingjaar (2025) als waarmee de bundel
+// `box3Tax` wordt berekend (dashboard-data-loader gebruikt year: 2025).
+const BOX3_YEAR = 2025 as const
+const VRIJSTELLING = BOX3_PARAMS[BOX3_YEAR].heffingsvrijSingle
 
 export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, data, href }: Props) {
   const { totalAssets, monthlyExpenses, box3Tax } = data
 
   // ── Box 3 breakdown calculation ──────────────────────────
+  // De HEADLINE (`estimatedTax`) komt uit de bundel-`box3Tax` (dual-forfait
+  // calculateBox3) wanneer beschikbaar — dat is het canonieke getal. De kassabon
+  // hieronder is een INDICATIEVE enkel-forfait-benadering (alles als beleggingen,
+  // geen spaargeld/schulden-splitsing); de Box 3-pagina toont de volledige
+  // dual-forfait-berekening. Het fallback-getal gebruikt dezelfde benadering.
   const belastbaarVermogen = Math.max(totalAssets - VRIJSTELLING, 0)
   const fictiefRendement = belastbaarVermogen * NL_FICTIEF_BELEGGINGEN
   const estimatedTax = box3Tax ?? fictiefRendement * BOX3_TARIEF
   const effectiefTarief = totalAssets > 0
     ? (estimatedTax / totalAssets) * 100
     : 0
-  const dailyExp = monthlyExpenses / 30
+  // Dagtarief op de canonieke jaar/365-basis (niet maand/30 = jaar/360).
+  const dailyExp = (monthlyExpenses * 12) / 365
   const vrijheidsdagen = dailyExp > 0
     ? Math.round(estimatedTax / dailyExp)
     : 0
@@ -147,7 +157,10 @@ export const BelastingBox3Widget = memo(function BelastingBox3Widget({ size, dat
         )}
       </div>
 
-      <p className="mt-2 font-serif italic text-[12px] text-[var(--ink-3)]">
+      <p className="mt-2 text-[10px] text-[var(--ink-4)]">
+        Indicatieve benadering (enkel forfait). Bekijk de volledige Box 3-berekening voor de exacte heffing.
+      </p>
+      <p className="mt-1 font-serif italic text-[12px] text-[var(--ink-3)]">
         Bekijk volledige Box 3 berekening &rarr;
       </p>
     </WidgetShell>

@@ -73,4 +73,14 @@ describe('BudgetTintPicker — switching', () => {
       screen.getByLabelText('Schulden: Bordeaux (default)').getAttribute('aria-pressed'),
     ).toBe('true')
   })
+
+  it('eigen hex via de native color-input wordt toegepast (geen preset meer actief)', () => {
+    renderPicker()
+    const colorInput = screen.getByLabelText('Inkomen: eigen kleur kiezen') as HTMLInputElement
+    fireEvent.input(colorInput, { target: { value: '#abcdef' } })
+    expect(screen.getByText('#abcdef')).toBeTruthy()
+    expect(
+      screen.getByLabelText('Inkomen: Donkergroen (default)').getAttribute('aria-pressed'),
+    ).toBe('false')
+  })
 })

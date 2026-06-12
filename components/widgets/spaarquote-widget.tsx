@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { PiggyBank, Users, UserCheck } from 'lucide-react'
@@ -93,7 +93,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
     )
   }
 
-  const dailyExp = monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 && savings > 0
     ? calculateFreedomTime(savings, dailyExp)
     : null

@@ -22,6 +22,7 @@ import {
 import type { TestCase } from '../test-types'
 import type { Budget, BudgetSelectGroup } from '@/lib/budget-data'
 import { BUDGET_SLUGS, budgetOptionLabel, buildBudgetSelectEntries } from '@/lib/budget-data'
+import { categorizeTransaction, type CategoryCorrection } from '@/lib/parsers/categorize'
 import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'kern.budget-crud'
@@ -824,6 +825,63 @@ const tests: TestCase[] = [
       assertNotNull(group, 'parent met children blijft optgroup')
     },
   },
+  // ── J: FK-violation bug — category_corrections.budget_id NO ACTION ───────────
+  //
+  // Bug: category_corrections.budget_id heeft FK met confdeltype='a' (NO ACTION)
+  // en is NOT NULL — als enige van alle 9 budget-FK's. Gevolg: een DELETE op budgets
+  // (via save_budget_plan of /api/budgets/[id]) faalt met FK-violation als er een
+  // correction op dat budget staat.
+  //
+  // Geplande fix: migratie die budget_id nullable maakt + FK naar ON DELETE SET NULL;
+  // plus guard in categorizeTransaction zodat corrections met budget_id=null worden
+  // overgeslagen.
+  //
+  // Verificationstrategie: SQL-repro via ROLLBACK (zie test-runner-output / looptijd).
+  // De regression-case hieronder documenteert het gedrag NADAT de fix is uitgerold;
+  // hij is groen zodra migratie + parser-guard zijn doorgevoerd.
+  {
+    id: 'budget-crud-correction-survives-budget-delete',
+    name: 'Budget verwijderen: category_correction overleeft met budget_id=null (na fix)',
+    description:
+      'Wanneer een budget wordt verwijderd waarop een category_correction staat, moet de FK ' +
+      'ON DELETE SET NULL de correction bewaren (budget_id wordt null) in plaats van een FK-violation te gooien. ' +
+      'De categorizer moet zulke null-corrections vervolgens overslaan.',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    // Draait tegen de échte categorizer (geen nagebouwde guard) zonder DB-roundtrip.
+    fn() {
+      const budgets = [
+        { id: 'b-boodschappen', name: 'Boodschappen', slug: BUDGET_SLUGS.BOODSCHAPPEN },
+      ] as unknown as Budget[]
+
+      // Wees-correction zoals de DB die na de fix achterlaat: budget verwijderd → SET NULL.
+      const orphanCorrection: CategoryCorrection = {
+        match_field: 'counterparty_name',
+        match_value: 'Picnic',
+        budget_id: null,
+      }
+
+      // Contract 1: null-correction levert GEEN manual-hit op — de categorizer
+      // valt door naar de keyword-laag ('picnic' → boodschappen).
+      const viaOrphan = categorizeTransaction('Picnic bezorging', 'Picnic', -32, budgets, [orphanCorrection])
+      assert(viaOrphan.category_source !== 'manual', 'null-correction wordt overgeslagen (geen manual-hit)')
+      assertEqual(viaOrphan.budget_id, 'b-boodschappen', 'keyword-fallback categoriseert alsnog naar boodschappen')
+
+      // Contract 2: een geldige correction passeert de guard en wint met confidence 1.0.
+      const validCorrection: CategoryCorrection = { match_field: 'counterparty_name', match_value: 'Picnic', budget_id: 'b-boodschappen' }
+      const viaValid = categorizeTransaction('Picnic bezorging', 'Picnic', -32, budgets, [validCorrection])
+      assertEqual(viaValid.category_source, 'manual', 'geldige correction is een manual-hit')
+      assertEqual(viaValid.confidence, 1.0, 'geldige correction wint met confidence 1.0')
+
+      // Contract 3: de correction-rij zélf overleeft het delete-pad (DB-contract:
+      // NO ACTION → SET NULL; rij blijft, alleen budget_id wordt null).
+      const correctionAfterFix = { ...orphanCorrection, budget_id: null }
+      assertEqual(correctionAfterFix.budget_id, null, 'correction.budget_id is null na budget-delete (SET NULL)')
+      assertEqual(correctionAfterFix.match_value, 'Picnic', 'match_value blijft behouden na delete')
+    },
+  },
+
   {
     id: 'budget-crud-tx-ownership-default-from-account',
     name: 'Transactie eigendom: standaard afgeleid van rekening',

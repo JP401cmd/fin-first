@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/format'
 import { AnalysisSection } from '../analysis-section'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { computeEffectiveSwr } from '@/lib/fire-params'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,11 +58,12 @@ function computeFireAgeForSavings(
   if (yearlyExpenses <= 0) return { fireAge: null, portfolioAtFire: currentPortfolio }
 
   // FIRE target: prefer the app-resolved target (from effectiveSwr), fall back to
-  // the 4%-rule (NL standard). A non-4% SWR shifts the target and thus the FIRE age.
+  // the per-user effective SWR derived from expectedReturn/inflationRate (NOT a
+  // fixed 4%-rule). A non-default SWR shifts the target and thus the FIRE age.
   const fireTarget =
     fireTargetOverride != null && fireTargetOverride > 0
       ? fireTargetOverride
-      : yearlyExpenses / 0.04
+      : yearlyExpenses / computeEffectiveSwr(expectedReturn, inflationRate)
 
   let portfolio = currentPortfolio
   const realReturn = expectedReturn - inflationRate
@@ -121,16 +123,18 @@ export const SpaarquoteGevoeligheid = memo(function SpaarquoteGevoeligheid({
 }: SpaarquoteGevoeligheidProps) {
   const [scenarios, setScenarios] = useState<ScenarioRow[] | null>(null)
 
-  // Resolve the FIRE target: prefer the app-resolved value, fall back to 4%-rule.
+  // Resolve the FIRE target: prefer the app-resolved value, fall back to the
+  // per-user effective SWR (derived from expectedReturn/inflationRate), niet 4%.
+  const fallbackSwr = computeEffectiveSwr(expectedReturn, inflationRate)
   const resolvedFireTarget = fireTarget != null && fireTarget > 0
     ? fireTarget
     : yearlyExpenses > 0
-      ? yearlyExpenses / 0.04
+      ? yearlyExpenses / fallbackSwr
       : 0
   // Effective SWR implied by the resolved target (for the Will-context).
   const resolvedSwr = yearlyExpenses > 0 && resolvedFireTarget > 0
     ? yearlyExpenses / resolvedFireTarget
-    : 0.04
+    : fallbackSwr
 
   // Derive actual savings rate: prefer explicit prop, fall back to income-based computation
   const effectiveSavingsRate = savingsRate != null && savingsRate > 0

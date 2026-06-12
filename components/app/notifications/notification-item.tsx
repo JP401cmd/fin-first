@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useCallback, memo } from 'react'
+import { useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lightbulb, Clock } from 'lucide-react'
 import { useChatContext } from '@/components/app/chat/chat-provider'
-import { LevelUpCelebration } from '@/components/app/level-up-celebration'
 import type { Notification, NotificationType } from '@/app/api/notifications/route'
 
 // ── Module mapping ──────────────────────────────────────────────────
@@ -25,12 +24,25 @@ const MODULE_MAP: Record<NotificationType, ModuleInfo> = {
   budget:         { label: 'Budget',       colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
   sync:           { label: 'Bank',         colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
   recommendation: { label: 'Partner-actie',colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
-  levelup:             { label: 'Niveau',      colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
   partner_transaction: { label: 'Partner',     colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
   horizon:             { label: 'Toekomst',    colorVar: 'var(--hor)',    textVar: 'var(--hor-t)',    lightVar: 'var(--hor-l)',  mediumVar: 'var(--hor-m)' },
   holding_alert:       { label: 'Belegging',   colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
   briefing:            { label: 'Briefing',    colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
   budget_model_proposal: { label: 'Huishouden', colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
+}
+
+/**
+ * Vangnet voor bericht-types die niet (meer) in MODULE_MAP staan. De DB kan
+ * nog rijen bevatten met gesaneerde legacy-types (bv. insight/streak/badge,
+ * jun 2026) — runtime-data houdt zich niet aan de NotificationType-union.
+ * Zonder dit vangnet crasht de hele berichtenlijst op één oud bericht.
+ */
+const FALLBACK_MODULE_INFO: ModuleInfo = {
+  label: 'Bericht',
+  colorVar: 'var(--will)',
+  textVar: 'var(--will-t)',
+  lightVar: 'var(--will-l)',
+  mediumVar: 'var(--will-m)',
 }
 
 function formatTime(dateStr: string): string {
@@ -49,31 +61,16 @@ type Props = {
 export const NotificationItem = memo(function NotificationItem({ notification, onRead, onClose }: Props) {
   const router = useRouter()
   const { openWithMessage } = useChatContext()
-  const [showLevelUp, setShowLevelUp] = useState(false)
-  const moduleInfo = MODULE_MAP[notification.type]
+  const moduleInfo = MODULE_MAP[notification.type] ?? FALLBACK_MODULE_INFO
 
   const handleClick = useCallback(() => {
     onRead(notification.id)
-
-    // Level-up: show celebration overlay first
-    if (notification.type === 'levelup' && notification.metadata) {
-      setShowLevelUp(true)
-      return
-    }
 
     if (notification.actionUrl) {
       onClose()
       router.push(notification.actionUrl)
     }
   }, [notification, onRead, onClose, router])
-
-  const handleLevelUpClose = useCallback(() => {
-    setShowLevelUp(false)
-    onClose()
-    if (notification.actionUrl) {
-      router.push(notification.actionUrl)
-    }
-  }, [notification.actionUrl, onClose, router])
 
   const handleAskAI = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -83,57 +80,6 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
       openWithMessage(notification.aiContext)
     }
   }, [notification, onRead, onClose, openWithMessage])
-
-  // ── Level-up: special full-width card ──────────────────────────────
-  if (notification.type === 'levelup') {
-    const meta = notification.metadata as { oldLevel?: number; newLevel?: number } | undefined
-    return (
-      <>
-        <button
-          type="button"
-          onClick={handleClick}
-          className="w-full text-left transition-all hover:shadow-[var(--s1)]"
-          style={{
-            borderLeft: `3px solid ${moduleInfo.colorVar}`,
-            background: `linear-gradient(135deg, ${moduleInfo.lightVar}, transparent)`,
-          }}
-        >
-          <div className="px-5 py-3">
-            <div className="flex items-center gap-2">
-              <span
-                className="font-[family-name:var(--font-inter)] text-[9px] font-bold uppercase tracking-[.1em]"
-                style={{ color: moduleInfo.textVar }}
-              >
-                {moduleInfo.label}
-              </span>
-              {!notification.read && (
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: moduleInfo.colorVar }}
-                />
-              )}
-              <span className="ml-auto font-[family-name:var(--font-inter)] text-[11px] text-[var(--ink-4)]">
-                {formatTime(notification.createdAt)}
-              </span>
-            </div>
-            <p className="mt-1 font-[family-name:var(--font-playfair)] text-[20px] text-[var(--ink)]">
-              {notification.title}
-            </p>
-            <p className="mt-0.5 font-[family-name:var(--font-source-serif)] text-[13px] leading-snug text-[var(--ink-2)]">
-              {notification.description}
-            </p>
-          </div>
-        </button>
-        {showLevelUp && meta?.oldLevel !== undefined && meta?.newLevel !== undefined && (
-          <LevelUpCelebration
-            oldLevel={meta.oldLevel}
-            newLevel={meta.newLevel}
-            onClose={handleLevelUpClose}
-          />
-        )}
-      </>
-    )
-  }
 
   // ── Standard notification item ─────────────────────────────────────
   return (

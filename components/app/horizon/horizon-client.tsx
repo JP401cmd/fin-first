@@ -10,7 +10,7 @@ import { previewEventCashflows, lifeEventsToCashflows, type SimCashflow, type Si
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
-import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   computeFireProjection, computeFireRange,
@@ -24,8 +24,9 @@ import {
   type MonteCarloResult, type CatalogField,
   type UserDefinedCashflow,
 } from '@/lib/horizon-data'
-import { computeHealthScoreFromInputs, getHealthLabel, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomPercentage } from '@/lib/core-metrics'
+import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress } from '@/lib/core-metrics'
+import { computeEmergencyFundMonths } from '@/lib/health-score-input'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
@@ -60,6 +61,7 @@ import {
   projectEigenHuisValuesAt,
   estimateReverseMortgagePayout,
   resolveTriggerAge,
+  getFireEligibleNetWorth,
 } from '@/lib/housing-strategy'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
@@ -252,7 +254,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   }
   const [avgIncome6m, setAvgIncome6m] = useState<number | null>(initialData.avgIncome6m)
   const [avgExpenses6m, setAvgExpenses6m] = useState<number | null>(initialData.avgExpenses6m)
-  const [snapshotResilience, setSnapshotResilience] = useState<number | null>(initialData.snapshotResilience)
   const [resilienceSnapshots, setResilienceSnapshots] = useState<SnapshotForTrend[]>(initialData.resilienceSnapshots)
   const [healthChartOpen, setHealthChartOpen] = useState(false)
   const [fireAgeChartOpen, setFireAgeChartOpen] = useState(false)
@@ -556,7 +557,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         supabase.from('debts').select('*').eq('is_active', true).limit(200),
         supabase
           .from('net_worth_snapshots')
-          .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age')
+          .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version')
           .order('snapshot_date', { ascending: true })
           .limit(60),
         supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
@@ -716,18 +717,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         monthlyContributions, yearlyMustExpenses: yearlyRetirementExpenses, dateOfBirth: dob,
       }
 
-      // Process snapshot data for resilience score
+      // Snapshots voeden uitsluitend de historische trendlijn; het huidige
+      // gezondheidsgetal komt van de live score (SSoT, Defect A).
       const allSnapshots = (snapshotsResult.data ?? []) as SnapshotForTrend[]
       setResilienceSnapshots(allSnapshots)
-
-      // Use latest snapshot's resilience_score if available
-      const snapshotsWithResilience = allSnapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)
-      if (snapshotsWithResilience.length > 0) {
-        const latestScore = snapshotsWithResilience[snapshotsWithResilience.length - 1].resilience_score
-        setSnapshotResilience(latestScore)
-      } else {
-        setSnapshotResilience(null)
-      }
 
       setInput(horizonInput)
 
@@ -935,19 +928,37 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     const stratOpts = fireStrategy ? { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge } : undefined
     setFire(computeFireProjection(effectiveInput, fireParams.grossReturn, fireSwr, undefined, stratOpts))
     setRange(computeFireRange(effectiveInput, fireSwr, undefined, fireParams.grossReturn, stratOpts))
-    // Health score: recompute with updated inputs (same formulas as dashboard)
-    // savingsRate6m + budgetCategories: keep server-computed values (transaction data doesn't change client-side)
-    // Emergency fund: actual liquid assets (same as dashboard-data-loader)
+    // Health score: recompute with updated inputs — DEZELFDE semantiek als de
+    // loader (horizon-data-loader.ts), zodat /toekomst niet van /overzicht
+    // afwijkt en de badge niet flikkert van SSR-score naar een client-score.
+    // savingsRate6m + budgetCategories: server-canoniek (transactiedata wijzigt
+    // niet client-side).
     const expensesForHealth = avgExpenses6m ?? effectiveInput.monthlyExpenses
-    const liquidAssets = (initialData.assets ?? [])
-      .filter(a => {
-        const t = a.asset_type as string
-        return t === 'savings' || t === 'checking' || t === 'cash'
-      })
-      .reduce((s, a) => s + Number(a.current_value), 0) + (initialData.unlinkedCash ?? 0)
-    const emergencyMonths = expensesForHealth > 0 ? liquidAssets / expensesForHealth : 0
-    // Freedom pct: strategy-adjusted FIRE target (same as dashboard-data-loader)
+    // Noodfonds: gedeelde helper (liquide bezit / gem. maanduitgaven). Identiek
+    // aan de loader; vervangt de eerdere inline liquidAssets-som.
+    const emergencyMonths = computeEmergencyFundMonths(
+      initialData.assets ?? [],
+      initialData.unlinkedCash ?? 0,
+      expensesForHealth,
+    )
+    // Vrijheidsvoortgang: zelfde TELLER-grondslag als de loader en de hero —
+    // FIRE-eligible netto vermogen (huis gefilterd via de housing-strategie)
+    // via computeFreedomProgress (NIET de oude computeFreedomPercentage op het
+    // volle nettovermogen). De NOEMER is hier een lokaal herbouwd strategie-
+    // bewust fireTarget (geen sim-required portfolio zoals de hero): deze
+    // recompute moet ook onder what-if-sliders draaien zonder her-sim.
+    //
+    // What-if: effectiveInput.totalAssets/totalDebts kunnen scenario-aangepast
+    // zijn. De eigen-woning-overwaarde (eigenHuisValue − mortgageBalance) is een
+    // vaste offset uit de werkelijke eigen_huis-data en wordt door de cashflow-
+    // sliders niet verstoord; getFireEligibleNetWorth past die offset toe op het
+    // (eventueel aangepaste) nettovermogen — dus what-if blijft correct.
     const nw = effectiveInput.totalAssets - effectiveInput.totalDebts
+    const hsFireEligibleNetWorth = getFireEligibleNetWorth(
+      nw,
+      initialData.housingContext,
+      initialData.housingStrategy,
+    )
     const hsCurrentAge = effectiveInput.dateOfBirth ? ageAtDate(effectiveInput.dateOfBirth) : null
     const hsYearsInRetirement = (fireStrategy?.strategy === 'deplete' && hsCurrentAge != null)
       ? Math.max(1, (fireStrategy.endAge ?? 90) - Math.round(hsCurrentAge))
@@ -958,7 +969,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       fireSwr,
       { strategy: fireStrategy?.strategy ?? 'deplete', yearsInRetirement: hsYearsInRetirement, realReturn: hsRealReturn },
     )
-    const fPct = computeFreedomPercentage(nw, hsFireTarget)
+    const fPct = computeFreedomProgress({
+      fireEligibleNetWorth: hsFireEligibleNetWorth,
+      requiredPortfolio: hsFireTarget > 0 ? hsFireTarget : null,
+    })
     const newInput: HealthScoreInput = {
       ...healthScoreInput,
       totalAssets: effectiveInput.totalAssets,
@@ -1269,8 +1283,24 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // Gebruik simulatie-FIRE-bedrag als authoritative vrijheidspercentage wanneer beschikbaar
   const effectiveFireTarget = simResult?.requiredFirePortfolio ?? fire?.fireTarget ?? 0
   const effectiveNetWorth = (effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)
+  // Canonieke grondslag (ADR 0009): FIRE-eligible vermogen (huis gefilterd via
+  // de housing-strategie) ÷ benodigde portfolio via computeFreedomProgress —
+  // dezelfde teller/noemer als de "nog X jaar"-aftelling. NIET meer het volle
+  // nettovermogen als teller (toonde 100% terwijl de aftelling nog jaren
+  // beweerde). NB: de health-score-recompute (zie hsFireTarget hierboven)
+  // deelt deze TELLER maar herbouwt zijn NOEMER als strategie-bewust
+  // fireTarget i.p.v. de sim-required portfolio — bewust, zodat hij ook onder
+  // what-if-sliders werkt zonder her-sim; klein noemer-verschil mogelijk.
+  const effectiveFireEligibleNetWorth = getFireEligibleNetWorth(
+    effectiveNetWorth,
+    initialData.housingContext,
+    initialData.housingStrategy,
+  )
   const effectiveFreedomPct = effectiveFireTarget > 0
-    ? Math.max(Math.min((effectiveNetWorth / effectiveFireTarget) * 100, 100), 0)
+    ? computeFreedomProgress({
+        fireEligibleNetWorth: effectiveFireEligibleNetWorth,
+        requiredPortfolio: effectiveFireTarget,
+      })
     : (fire?.freedomPercentage ?? 0)
 
   // ── UPO nudge: check of gebruiker pensioenevent heeft (excl. AOW) ──────
@@ -3766,7 +3796,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       {/* === 5b. Verloop-grid: Gezondheid + FIRE-leeftijd (Deep Dive) === */}
       <HorizonTrendGrid
         resilienceSnapshots={resilienceSnapshots}
-        snapshotResilience={snapshotResilience}
         healthScoreTotal={healthScore.total}
         healthChartOpen={healthChartOpen}
         onToggleHealth={() => setHealthChartOpen(v => !v)}
@@ -3810,7 +3839,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           : isPeriod && dur > 0
             ? amt * dur * sign
             : amt * 12 * 10 * sign // continuous: show 10-year estimate
-        const dailyExp = effectiveInput ? effectiveInput.monthlyExpenses / 30 : 0
+        const dailyExp = effectiveInput ? dailyExpenseRate(effectiveInput.monthlyExpenses) : 0
         const freedomBreakdown = dailyExp > 0 ? calculateFreedomTime(Math.abs(totalImpact), dailyExp) : null
         const freedomStr = freedomBreakdown ? formatFreedomTimeString(freedomBreakdown, 'short') : null
         const hasCatalogFields = LIFE_EVENT_CATALOG[formType]?.fields && LIFE_EVENT_CATALOG[formType].fields!.length > 0
@@ -5899,7 +5928,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 const netOneTime = formCashflows
                   .filter(cf => cf.type === 'one_time')
                   .reduce((s, cf) => s + (cf.direction === 'income' ? cf.amount : -cf.amount), 0)
-                const dailyExpCf = effectiveInput ? effectiveInput.monthlyExpenses / 30 : 0
+                const dailyExpCf = effectiveInput ? dailyExpenseRate(effectiveInput.monthlyExpenses) : 0
                 const totalNetImpact = Math.abs(netRecurring * 12 * 10 + netOneTime) // 10yr estimate
                 const freedomBdCf = dailyExpCf > 0 && totalNetImpact >= 100
                   ? calculateFreedomTime(totalNetImpact, dailyExpCf)
@@ -6608,8 +6637,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           {healthScore && (
             <HealthScoreReceipt
               health={healthScore}
-              overrideTotal={snapshotResilience}
-              overrideLabel={snapshotResilience !== null ? getHealthLabel(snapshotResilience) : null}
               footer={
                 <>
                   {/* Backtesting samenvatting */}
@@ -6627,7 +6654,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     </button>
                   </div>
                   <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
-                    {snapshotResilience !== null ? 'Op basis van meest recente snapshot' : 'Live berekend uit huidige financiële gegevens'}
+                    Live berekend uit huidige financiële gegevens
                   </p>
                 </>
               }
@@ -6639,7 +6666,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       {/* === Deep-dive Modals === */}
       {effectiveInput && (
         <>
-          <ScenariosModal input={effectiveInput} debts={debts} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} />
+          <ScenariosModal input={effectiveInput} debts={debts} baseHealthInput={healthScoreInput} open={activeModal === 'scenarios'} onClose={() => setActiveModal(null)} />
           <SimulationsModal
             input={effectiveInput}
             open={activeModal === 'simulations'}

@@ -372,7 +372,7 @@ function VoorkeurCard({
           <span />
         )}
         {onEdit ? (
-          <span className="text-[11px] font-semibold text-violet-700 inline-flex items-center gap-1">
+          <span className="text-[11px] font-semibold text-horizon-700 inline-flex items-center gap-1">
             Bijwerken
             <ArrowRight className="w-3 h-3" aria-hidden="true" />
           </span>

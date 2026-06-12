@@ -1,12 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { recordAiUsage } from '@/lib/ai-credits'
-import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
+import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { computeNetWorthProjection } from '@/lib/net-worth-projection'
 import { buildCategorySpending, patternsToInsights, detectSeasonalPatterns, detectTrends, detectAnomalies } from '@/lib/spending-patterns'
 import { generateText } from 'ai'
 import { getModel } from '@/lib/ai/config'
 import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/report-data'
 import { checkTierGate } from '@/lib/require-tier'
+import { resolveFireParams } from '@/lib/fire-params'
+import { computeFreedomProgress } from '@/lib/core-metrics'
+import { resolveSavingsSource } from '@/lib/savings-source'
+import {
+  deriveHousingContext,
+  getFireEligibleNetWorth,
+  parseHousingStrategy,
+} from '@/lib/housing-strategy'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
 
 const MONTH_LABELS_NL: Record<number, string> = {
   0: 'jan', 1: 'feb', 2: 'mrt', 3: 'apr', 4: 'mei', 5: 'jun',
@@ -155,11 +165,11 @@ export async function GET(request: Request) {
         .select('id, name, slug, icon, budget_type, default_limit, interval, is_essential, parent_id'),
       supabase
         .from('assets')
-        .select('id, name, asset_type, current_value, monthly_contribution, expected_return, is_active, net_worth_inclusion_pct')
+        .select('id, name, asset_type, current_value, woz_value, monthly_contribution, expected_return, is_active, net_worth_inclusion_pct')
         .eq('is_active', true),
       supabase
         .from('debts')
-        .select('id, name, debt_type, original_amount, current_balance, interest_rate, monthly_payment, is_active, net_worth_inclusion_pct')
+        .select('id, name, debt_type, original_amount, current_balance, interest_rate, monthly_payment, is_active, linked_asset_id, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, repayment_type, end_date, start_date')
         .eq('is_active', true),
       supabase
         .from('actions')
@@ -172,7 +182,7 @@ export async function GET(request: Request) {
         .select('id, name, goal_type, target_value, current_value, is_completed'),
       supabase
         .from('profiles')
-        .select('full_name, date_of_birth')
+        .select('full_name, date_of_birth, expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, housing_strategy_config')
         .single(),
     ])
 
@@ -180,8 +190,8 @@ export async function GET(request: Request) {
     type SnapshotRow = { snapshot_date: string; net_worth: number; total_assets: number; total_debts: number; freedom_percentage?: number }
     type TxRow = { id: string; amount: number; date: string; is_income: boolean; budget_id: string | null; description: string | null; counterparty_name: string | null }
     type BudgetRow = { id: string; name: string; slug: string; icon: string; budget_type: string; default_limit: number | null; interval: string | null; is_essential: boolean; parent_id: string | null }
-    type AssetRow = { id: string; name: string; asset_type: string; current_value: number; monthly_contribution: number; expected_return: number | null; is_active: boolean; net_worth_inclusion_pct: number }
-    type DebtRow = { id: string; name: string; debt_type: string; original_amount: number; current_balance: number; interest_rate: number; monthly_payment: number; is_active: boolean; net_worth_inclusion_pct: number }
+    type AssetRow = { id: string; name: string; asset_type: string; current_value: number; woz_value: number | null; monthly_contribution: number; expected_return: number | null; is_active: boolean; net_worth_inclusion_pct: number }
+    type DebtRow = { id: string; name: string; debt_type: string; original_amount: number; current_balance: number; interest_rate: number; monthly_payment: number; is_active: boolean; linked_asset_id: string | null; net_worth_inclusion_pct: number; include_aflossing_in_savings: boolean | null; custom_aflossing_amount: number | null; repayment_type: string | null; end_date: string | null; start_date: string | null }
     type ActionRow = { id: string; title: string; status: string; freedom_days_impact: number | null; completed_at: string }
     type GoalRow = { id: string; name: string; goal_type: string; target_value: number; current_value: number; is_completed: boolean }
 
@@ -292,20 +302,39 @@ export async function GET(request: Request) {
     const totalDays = Math.max(1, Math.round((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)))
     const dailyExpenseRate = totalExpenses / totalDays
 
-    // FIRE target — based on essential (must) expenses from budget settings
+    // Gepersonaliseerde FIRE-parameters (effectiveSwr/return/inflatie) i.p.v.
+    // de vaste NL_SWR — exact dezelfde bron als /toekomst, dashboard en de
+    // AI shared-context (resolveFireParams).
+    const fireParams = resolveFireParams(profile ?? {})
+
+    // FIRE target — based on essential (must) expenses from budget settings,
+    // gedeeld door de gebruikers-effectiveSwr (was: vaste NL_SWR).
     const yearlyMustExpenses = allBudgets
       .filter(b => b.is_essential && b.budget_type === 'expense' && !b.parent_id)
       .reduce((s, b) => {
         const limit = Number(b.default_limit) || 0
         return s + (b.interval === 'yearly' ? limit : limit * 12)
       }, 0)
-    const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / NL_SWR : 0
+    const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireParams.effectiveSwr : 0
 
     // Total assets & debts (weighted by net_worth_inclusion_pct)
     const totalAssets = assets.reduce((sum, a) => sum + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
     const totalDebts = debts.reduce((sum, d) => sum + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
     const currentNetWorth = totalAssets - totalDebts
-    const firePercentage = fireTarget > 0 ? Math.round(Math.min((currentNetWorth / fireTarget) * 100, 100) * 10) / 10 : null
+
+    // Vrijheids-% op de canonieke grondslag (ADR 0009): FIRE-eligible vermogen
+    // (eigen woning gefilterd via de housing-strategie) ÷ benodigde portfolio.
+    // Spiegelt lib/ai/context/shared-context.ts:83-103 — zo noemt het rapport
+    // exact hetzelfde percentage als /toekomst en de chat. De benodigde
+    // portfolio is hier het strategie-loze fireTarget op effectiveSwr (het
+    // rapport laadt geen unified projection; dit is dezelfde fallback die
+    // shared-context gebruikt voor het FIRE-doelbedrag).
+    const housingStrategy = parseHousingStrategy(profile?.housing_strategy_config)
+    const housingContext = deriveHousingContext(assets as unknown as Asset[], debts as unknown as Debt[])
+    const fireEligibleNetWorth = getFireEligibleNetWorth(currentNetWorth, housingContext, housingStrategy)
+    const firePercentage = fireTarget > 0
+      ? Math.round(computeFreedomProgress({ fireEligibleNetWorth, requiredPortfolio: fireTarget }) * 10) / 10
+      : null
 
     // Budget breakdown
     const expenseBudgets = allBudgets.filter(b => b.budget_type === 'expense' && !b.parent_id)
@@ -492,7 +521,6 @@ export async function GET(request: Request) {
     let fireAge: number | null = null
     let monthlyPassiveIncome: number | null = null
 
-    const monthlyContributions = assets.reduce((sum, a) => sum + Number(a.monthly_contribution || 0), 0)
     const yearlyMustExpensesHorizon = allBudgets
       .filter(b => b.is_essential && b.budget_type === 'expense' && !b.parent_id)
       .reduce((sum, b) => {
@@ -501,19 +529,53 @@ export async function GET(request: Request) {
         if (b.interval === 'quarterly') return sum + limit * 4
         return sum + limit * 12
       }, 0)
+    const avgMonthlyIncome = monthsWithData.length > 0 ? totalIncome / monthsWithData.length : 0
     const avgMonthlyExpenses = monthsWithData.length > 0 ? totalExpenses / monthsWithData.length : 0
 
+    // Spaarbron via resolveSavingsSource (zelfde keuzeregel als de cashflow-
+    // pagina en /toekomst): handmatig inkomen/uitgaven winnen, anders het
+    // periode-gemiddelde × de canonieke spaarquote. Vervangt de oude
+    // asset.monthly_contribution-som, die computeFireProjection bovendien niet
+    // eens als spaarbron gebruikte (de motor rekent op inkomen − uitgaven).
+    const reportSavingsRatePct = avgMonthlyIncome > 0
+      ? Math.max(0, ((avgMonthlyIncome - avgMonthlyExpenses) / avgMonthlyIncome) * 100)
+      : 0
+    const { baseAnnualSavings } = resolveSavingsSource({
+      incomeSource: profile?.income_source,
+      expensesSource: profile?.expenses_source,
+      netMonthlyIncome: Number(profile?.net_monthly_income ?? 0),
+      estimatedAnnualIncome: avgMonthlyIncome * 12,
+      estimatedMonthlyExpenses: Number(profile?.estimated_monthly_expenses ?? 0),
+      savingsRate6m: reportSavingsRatePct,
+    })
+    const monthlySavingsForFire = baseAnnualSavings / 12
+
     try {
+      // computeFireProjection leidt het maandsurplus af uit monthlyIncome −
+      // monthlyExpenses. Met yearlyMustExpenses > 0 hangt de interne fireTarget
+      // alleen aan yearlyMustExpenses × swr (computeEffectiveExpenses negeert
+      // monthlyExpenses), dus we mogen income/expenses uitdrukken als het
+      // resolveSavingsSource-surplus zonder het FIRE-doel te verstoren. Zo
+      // draait de FIRE-leeftijd op exact dezelfde spaarbron als /toekomst.
+      // Bij ontbrekende must-budgetten (yearlyMustExpensesHorizon === 0) valt
+      // de motor terug op het periode-gemiddelde — daar is geen canonieke
+      // must-grondslag beschikbaar.
+      const useSavingsSource = yearlyMustExpensesHorizon > 0
       const horizonInput: FinancialInput = {
         totalAssets,
         totalDebts,
-        monthlyIncome: monthsWithData.length > 0 ? totalIncome / monthsWithData.length : 0,
-        monthlyExpenses: avgMonthlyExpenses,
-        monthlyContributions,
+        monthlyIncome: useSavingsSource ? monthlySavingsForFire : avgMonthlyIncome,
+        monthlyExpenses: useSavingsSource ? 0 : avgMonthlyExpenses,
+        monthlyContributions: 0,
         yearlyMustExpenses: yearlyMustExpensesHorizon,
         dateOfBirth: profile?.date_of_birth || null,
       }
-      const fp = computeFireProjection(horizonInput)
+      const fp = computeFireProjection(
+        horizonInput,
+        fireParams.grossReturn,
+        fireParams.effectiveSwr,
+        fireParams.inflationRate,
+      )
       fireDate = fp.fireDate
       fireAge = fp.fireAge
       monthlyPassiveIncome = Math.round(fp.monthlyPassiveIncome)

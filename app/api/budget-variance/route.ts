@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
  * GET /api/budget-variance — Calculate spending variance per budget category.
@@ -35,17 +36,14 @@ export async function GET() {
 
     // Calculate date range: last 12 months
     const now = new Date()
-    const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-    const startStr = startDate.toISOString().split('T')[0]
-    const endStr = endDate.toISOString().split('T')[0]
+    const startStr = localMonthStartMonthsAgo(now, 11)
+    const endStr = localMonthBounds(now).end
 
     // Build months array
     const months: { start: string; end: string; key: string }[] = []
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const start = d.toISOString().split('T')[0]
-      const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().split('T')[0]
+      const { start, end } = localMonthBounds(d)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       months.push({ start, end, key })
     }

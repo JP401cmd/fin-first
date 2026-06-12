@@ -19,6 +19,7 @@ import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/c
 import { BenchmarkComparisonChart } from '@/components/app/benchmark-comparison-chart'
 import { TIME_PERIODS, type TimePeriod, type ComparisonResult } from '@/lib/benchmark-comparison'
 import DividendTracker from '@/components/app/dividend-tracker'
+import { RebalancingSettingsSection } from './rebalancing-settings-section'
 import dynamic from 'next/dynamic'
 
 const HoldingsHeatmap = dynamic(() => import('@/components/app/holdings-heatmap'), { ssr: false })
@@ -772,6 +773,11 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
           />
         </section>
       )}
+
+      {/* Rebalancing drempel-instellingen — horen bij de portfolio-verdeling
+          hierboven. Alleen zichtbaar wanneer er target-allocaties zijn
+          (de component gate zichzelf). */}
+      {showAllocation && <RebalancingSettingsSection />}
 
       {/* Benchmark — alleen vanaf 3 holdings */}
       {showBenchmark && (

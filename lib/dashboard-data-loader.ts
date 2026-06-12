@@ -31,7 +31,6 @@ import {
   runBacktest,
   ageAtDate,
   deriveCountdown,
-  NL_SWR,
   computeLifeEventNetImpact,
   type FinancialInput,
   type LifeEvent,
@@ -48,7 +47,7 @@ import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { resolveDepreciation, type Asset } from '@/lib/asset-data'
-import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
+import { type Debt } from '@/lib/debt-data'
 import {
   parseHousingStrategy,
   deriveHousingContext,
@@ -57,7 +56,7 @@ import {
   getHousingLifeEvents,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
 import { computePortfolioFees, computeFeeImpactOnFire } from '@/lib/fee-analysis'
@@ -74,7 +73,9 @@ import {
   type CategoryAppLink,
 } from '@/lib/category-app-nav'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
-import { resolveSavingsSource } from './savings-source'
+import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from './savings-source'
+import { buildHealthScoreInput } from '@/lib/health-score-input'
+import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -496,21 +497,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const extExpenses6 = dataMonths6 < 6 ? (expenses6m / dataMonths6) * 6 : expenses6m
   const extSavingsBudget6 = dataMonths6 < 6 ? (savingsBudgetSpent6m / dataMonths6) * 6 : savingsBudgetSpent6m
 
-  // Compute debt aflossing total (only debts with include_aflossing_in_savings, weighted by net_worth_inclusion_pct)
-  let debtAflossingMonthly = 0
-  for (const d of debtsResult.data ?? []) {
-    if (!(d as any).include_aflossing_in_savings) continue
-    const customAfl = (d as any).custom_aflossing_amount
-    const aflossing = customAfl != null
-      ? Number(customAfl)
-      : (computeRenteAflossingsSplit(d as unknown as Debt)?.currentAflossing ?? 0)
-    debtAflossingMonthly += aflossing * ((d as any).net_worth_inclusion_pct ?? 100) / 100
-  }
+  // Compute debt aflossing total (only active debts with include_aflossing_in_savings,
+  // weighted by net_worth_inclusion_pct) — gedeelde canonieke helper.
+  const debtAflossingMonthly = computeDebtAflossingMonthly((debtsResult.data ?? []) as unknown as Debt[])
   const debtAflossing6m = debtAflossingMonthly * 6
 
-  let savingsRate6m = extIncome6 > 0
-    ? ((extIncome6 - extExpenses6 + extSavingsBudget6 + debtAflossing6m) / extIncome6) * 100
-    : 0
+  // Spaarbudgetten tellen als sparen (niet als uitgave) → uit de uitgaven-term
+  // halen zodat de gedeelde formule (income − expenses + aflossing) byte-gelijk
+  // blijft aan de oude inline-versie (income − expenses + savingsBudget + aflossing).
+  let savingsRate6m = savingsRateFromAggregates(extIncome6, extExpenses6 - extSavingsBudget6, debtAflossing6m)
 
   // Fallback savings rate from profile estimates for users without transactions
   const savingsRateIsEstimate = savingsRate6m === 0
@@ -753,7 +748,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const rawDebts = debtsResult.data ?? []
   if (rawAssets.length > 0) {
     try {
-      const dailyExp = yearlyMustExpenses > 0 ? yearlyMustExpenses / 365 : (effectiveMonthlyExpenses > 0 ? effectiveMonthlyExpenses / 30 : 0)
+      const dailyExp = yearlyMustExpenses > 0 ? yearlyMustExpenses / 365 : dailyExpenseRate(effectiveMonthlyExpenses)
       const box3Result = calculateBox3({
         assets: rawAssets as unknown as Asset[],
         debts: rawDebts as unknown as Debt[],
@@ -797,8 +792,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       }
     })
 
-  // Daily expenses for freedom-time calculations
-  const dailyExpenses = effectiveMonthlyExpenses > 0 ? effectiveMonthlyExpenses / 30 : 0
+  // Daily expenses for freedom-time calculations (canonieke jaar/365-dagbasis
+  // via dailyExpenseRate). Widgets rekenen ditzelfde tarief af met de gedeelde
+  // helper op hun in-scope maanduitgaven (personal of perspectief-override).
+  const dailyExpenses = dailyExpenseRate(effectiveMonthlyExpenses)
 
   // Vermogensgroei deze maand (net cash flow this month: income - expenses)
   const monthlyGrowth = effectiveMonthlyIncome - effectiveMonthlyExpenses
@@ -812,17 +809,20 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const activated = profileResult.data?.last_known_phase !== null
 
   // Sovereignty level calculation for Jouw Pad widget
-  // Uses stable 3-month average expenses (excl. current month) + NL_SWR, matching identity page
+  // Uses stable 3-month average expenses (excl. current month) for the
+  // months-covered tiers. Het vrijheids-% is bewust de canonieke `freedomPct`
+  // (computeFreedomProgress op FIRE-eligible vermogen ÷ benodigde portfolio,
+  // r725) — dezelfde grondslag als de voortgangsbalk en de aftelling (ADR 0009).
+  // Voorheen rekende dit pad een eigen sovFreedomPct op vol vermogen ÷ doel op
+  // NL_SWR, waardoor een huiseigenaar een te hoog niveau kreeg naast een lagere
+  // voortgangsbalk. Sovereignty is puur motivatie (ADR 0001), geen gating.
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
   const hasConsumerDebt = (debtsResult.data ?? []).some(d => {
     const dt = (d as { debt_type?: string }).debt_type
     return dt != null && consumerDebtTypes.includes(dt) && Number(d.current_balance) > 0
   })
   const sovMonthlyExp = (sovereigntyTxResult.data ?? []).filter(isRealTx).reduce((s, t) => s + Math.abs(Number(t.amount)), 0) / 3
-  const sovYearlyExp = sovMonthlyExp * 12
-  const sovFireTarget = sovYearlyExp > 0 ? sovYearlyExp / NL_SWR : 0
-  const sovFreedomPct = sovFireTarget > 0 ? (netWorth / sovFireTarget) * 100 : 0
-  const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, sovFreedomPct, hasConsumerDebt)
+  const sovereigntyLevel = computeSovereigntyLevel(netWorth, sovMonthlyExp, freedomPct, hasConsumerDebt)
   const currentPhaseId = levelToPhaseId(sovereigntyLevel)
 
   // Widget prefs
@@ -879,6 +879,52 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       month: s.snapshot_date as string,
       value: Number((s as { savings_rate?: number | null }).savings_rate),
     }))
+
+  // ── Canonieke gezondheidsscore (ADR 0008) ──────────────────────
+  // Eén bron: dezelfde `buildHealthScoreInput` + `computeHealthScoreFromInputs`
+  // als /toekomst (horizon-data-loader ±r634) en de snapshot-routes — inclusief
+  // de echte tax_optimization-pijler uit buildTaxData. Vroeger rekende de
+  // gezondheids-widget zelf via computeHealthScore(DashboardData), waar de
+  // tax-pijler hardcoded 50 was, zodat het dashboard-getal kon afwijken van
+  // /toekomst. De trend komt uit de snapshot-historie (computeHealthScoreWith-
+  // Trend), op de canonieke freedomPct-noemer (requiredPortfolioForProgress).
+  const healthHouseholdType = (profileResult.data as Record<string, unknown> | null)?.household_type as string | null
+  // DSTI-noemer: DEZELFDE canonieke inkomensbron die savingsRate6m voedt
+  // (extIncome6/6 = het 6-maands-gemiddelde inkomen; profiel-fallback wanneer er
+  // geen transactie-inkomen is) — geen nieuwe/afwijkende bron (ADR 0010 / FR-2).
+  const healthNetMonthlyIncome = income6m > 0 ? extIncome6 / 6 : effectiveMonthlyIncome
+  // DSTI-teller: Σ maandlasten over de al geladen actieve schulden.
+  const healthDebtMonthlyPayments = (debtsResult.data ?? []).reduce(
+    (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),
+    0,
+  )
+  const healthScoreInput = buildHealthScoreInput(
+    {
+      savingsRate6m,
+      totalAssets,
+      totalDebts,
+      freedomPct,
+      avgMonthlyExpenses: effectiveMonthlyExpenses,
+      netMonthlyIncome: healthNetMonthlyIncome,
+    },
+    {
+      assets: (assetsResult.data ?? []) as { asset_type?: string | null; current_value?: number | string | null }[],
+      unlinkedCash,
+      budgets: allBudgetsRaw,
+      transactions: (txResult.data ?? []) as { amount?: number | string | null; budget_id?: string | null }[],
+      householdType: healthHouseholdType,
+      debtMonthlyPayments: healthDebtMonthlyPayments,
+    },
+  )
+  const healthScore: HealthScore = computeHealthScoreWithTrend(
+    healthScoreInput,
+    budgetingActive,
+    {
+      prevNetWorth: netWorthHistory.length >= 2 ? netWorthHistory[netWorthHistory.length - 2].value : null,
+      prevSavingsRate: savingsHistory.length >= 2 ? savingsHistory[savingsHistory.length - 2].value : null,
+      requiredPortfolio: requiredPortfolioForProgress,
+    },
+  )
 
   // Expense history: aggregate negative transactions per month (absolute values)
   const expenseByMonth = new Map<string, number>()
@@ -1290,6 +1336,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   let cachedHouseholdId: string | null = null
   let cachedHouseholdMemberIds: string[] = []
   let cachedPartnerId: string | null = null
+  // Full household_members rows (user_id, privacy_settings) fetched once in the
+  // overrides block and reused by the activity-feed block to avoid a duplicate query.
+  let cachedAllMembers: Array<{ user_id: string; privacy_settings: unknown }> | null = null
   try {
     // Check if user has a household (reuse authUser from above)
     if (authUser) {
@@ -1301,23 +1350,32 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
       if (membership?.household_id) {
         cachedHouseholdId = membership.household_id
-        // Get partner's personal asset/debt totals via RPC + partner's privacy settings
-        const [partnerTotalsRes, partnerMemberRes, combinedRes, memberProfilesRes] = await Promise.all([
+        // Get partner's personal asset/debt totals via RPC + ALL household members.
+        // We fetch the full member list here (instead of a partner-only row) so the
+        // same result can be reused by the activity-feed block below, avoiding a
+        // duplicate household_members round-trip. The partner row is derived locally
+        // with the exact same semantics as the previous `.neq(self).maybeSingle()`
+        // query (one non-self member → that row, otherwise null).
+        const [partnerTotalsRes, allMembersRes, combinedRes, memberProfilesRes] = await Promise.all([
           supabase.rpc('household_partner_totals'),
           supabase
             .from('household_members')
             .select('user_id, privacy_settings')
-            .eq('household_id', membership.household_id)
-            .neq('user_id', authUser!.id)
-            .maybeSingle(),
+            .eq('household_id', membership.household_id),
           // FIRE-cijfers die /toekomst exact matchen: gecombineerd uit households,
           // partner uit diens fire_summary (gated via de RPC).
           supabase.from('households').select('combined_fire_summary').eq('id', membership.household_id).maybeSingle(),
           supabase.rpc('household_member_profiles'),
         ])
+        // Reused by the activity-feed block below (replaces a second fetch).
+        cachedAllMembers = allMembersRes.data ?? null
         const pt = partnerTotalsRes.data?.[0] ?? null
+        // Replicate `.neq(self).maybeSingle()`: exactly one non-self member → that
+        // row; zero or multiple (which would have errored) → null.
+        const nonSelfMembers = (allMembersRes.data ?? []).filter((m) => m.user_id !== authUser!.id)
+        const partnerMemberData = nonSelfMembers.length === 1 ? nonSelfMembers[0] : null
         // Parse partner's privacy settings (Feature #537)
-        const ppRaw = partnerMemberRes.data?.privacy_settings as Record<string, string> | null
+        const ppRaw = partnerMemberData?.privacy_settings as Record<string, string> | null
         const ppAssets = ppRaw?.assets ?? 'totals'
         const ppDebts = ppRaw?.debts ?? 'totals'
         // Build list of hidden categories
@@ -1393,11 +1451,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   let householdActivity: HouseholdActivityItem[] = []
   try {
     if (authUser && householdOverrides && cachedHouseholdId) {
-      // Get all household members (reuse cached household_id)
-      const { data: allMembers } = await supabase
-        .from('household_members')
-        .select('user_id, privacy_settings')
-        .eq('household_id', cachedHouseholdId)
+      // Reuse the household_members rows already fetched in the overrides block
+      // above (identical query: select user_id, privacy_settings for this household).
+      const allMembers = cachedAllMembers
 
       const memberIds = (allMembers ?? []).map(m => m.user_id)
       cachedHouseholdMemberIds = memberIds
@@ -1756,8 +1812,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     yearlyMustExpenses,
     budgetTotals,
     freedomPct,
+    // FIRE-eligible vermogen (huis gefilterd via housing-strategie) — canonieke
+    // teller van de vrijheidsvoortgang, voor widgets die de mijlpaal-datums op
+    // dezelfde grondslag als data.freedomPct moeten leggen (ADR 0009).
+    fireEligibleNetWorth,
     fireTarget,
     fireProjResult,
+    // Canonieke gezondheidsscore mét trend (ADR 0008) — gebruikt door de
+    // gezondheids-widget i.p.v. de DashboardData-variant met tax-pijler=50.
+    healthScore,
     fireAgeFractional,
     openActions: openActions.length,
     totalFreedomDaysOpen,

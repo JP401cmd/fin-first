@@ -86,10 +86,27 @@ describe('HefbomenNav', () => {
     })
   })
 
-  it('status-substext "Diversificatie ok" bij bezittingen good', () => {
-    render(<HefbomenNav health={mockHealth()} />)
-    // diversification = 80 → 'good' → "Diversificatie ok"
-    expect(screen.getByText('Diversificatie ok')).toBeTruthy()
+  it('status-substext "Goed gespreid" bij bezittingen good (v2: asset_concentration)', () => {
+    // v2 (ADR 0010): bezittingen-tegel gebruikt pillarKey 'asset_concentration'.
+    // asset_concentration score 80 → 'good' → "Goed gespreid".
+    const healthV2 = mockHealth({
+      pillars: [
+        ...mockHealth().pillars.filter(p => p.id !== 'diversification'),
+        {
+          id: 'asset_concentration',
+          name: 'Vermogensspreiding',
+          score: 80,
+          weight: 0.08,
+          explanation: '',
+          improvementTip: '',
+          actionHref: '/overzicht/bezittingen',
+          actionLabel: 'Spreid je vermogen',
+          rawValue: '45% in 1 type',
+        },
+      ],
+    })
+    render(<HefbomenNav health={healthV2} />)
+    expect(screen.getByText('Goed gespreid')).toBeTruthy()
   })
 
   it('status-substext "Schuldratio" tekst bij schulden warn', () => {
@@ -104,26 +121,13 @@ describe('HefbomenNav', () => {
     expect(screen.getByText('Tekort op rekening')).toBeTruthy()
   })
 
-  it('belasting-tegel toont status uit tax_optimization pillar wanneer aanwezig', () => {
-    const healthWithTax = mockHealth({
-      pillars: [
-        ...mockHealth().pillars,
-        {
-          id: 'tax_optimization',
-          name: 'Belasting',
-          score: 85,
-          weight: 0.1,
-          explanation: '',
-          improvementTip: '',
-          actionHref: '/overzicht/belasting',
-          actionLabel: 'X',
-          rawValue: '€100/jaar',
-        },
-      ],
-    })
-    render(<HefbomenNav health={healthWithTax} />)
-    // tax pillar score = 85 → 'good' → "Geen actie nodig"
-    expect(screen.getByText('Geen actie nodig')).toBeTruthy()
+  it('belasting-tegel toont altijd "Verken je Box 3-positie" (v2: proxy op health.total)', () => {
+    // v2 (ADR 0010): belasting heeft pillarKey=null → valt terug op health.total als proxy.
+    // tax_optimization bestaat niet meer als pijler. De belasting-tegel toont altijd
+    // de vaste educatieve tekst "Verken je Box 3-positie" (Wft-richtingaanwijzer).
+    const health = mockHealth({ total: 85 })
+    render(<HefbomenNav health={health} />)
+    expect(screen.getByText('Verken je Box 3-positie')).toBeTruthy()
   })
 
   it('rendert geen status-substext bij ontbrekende health (neutral)', () => {

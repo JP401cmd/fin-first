@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { TrendingUp, ShoppingCart, PiggyBank, CreditCard } from 'lucide-react'
@@ -227,7 +227,7 @@ export const BudgetTrendWidget = memo(function BudgetTrendWidget({ budgetType, s
   const avg6m = avg(history.slice(-6))
 
   // Freedom time for full size
-  const dailyExp = data.monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(data.monthlyExpenses)
   const monthAvg = avg(history)
   const freedomTime = dailyExp > 0 && monthAvg > 0
     ? calculateFreedomTime(monthAvg, dailyExp)

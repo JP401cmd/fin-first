@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 
 /* ── Types ──────────────────────────────────────────────────────────── */
 export interface Aandachtspunt {
@@ -32,9 +33,13 @@ export async function GET() {
   const now = new Date()
   const currentMonth = now.getMonth()
   const currentYear = now.getFullYear()
-  const monthStart = new Date(currentYear, currentMonth, 1).toISOString().slice(0, 10)
-  const monthEnd = new Date(currentYear, currentMonth + 1, 1).toISOString().slice(0, 10)
-  const prevMonthStart = new Date(currentYear, currentMonth - 1, 1).toISOString().slice(0, 10)
+  // Tijdzone-veilige maandgrenzen (lib/month-range.ts) — lokale datum +
+  // toISOString() schoof de grens in NL een dag terug; zelfde patroon als de
+  // zuster-routes checkin/budgets en checkin/gespreksstarters. Exclusieve
+  // `lt`-grenzen: [monthStart, monthEnd) = huidige maand, [prevMonthStart,
+  // monthStart) = vorige maand.
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
+  const prevMonthStart = localMonthStart(new Date(currentYear, currentMonth - 1, 1))
 
   // Fetch data in parallel
   const [budgetsRes, curExpenseRes, prevExpenseRes, goalsRes, transactionsRes] = await Promise.all([
@@ -82,9 +87,11 @@ export async function GET() {
   const prevExpenses = prevExpenseRes.data || []
   const goals = goalsRes.data || []
 
-  // Daily expenses for freedom days calculation
+  // Daily expenses for freedom days calculation.
+  // Canonieke dagbasis = jaaruitgaven / 365 (zie lib/format.ts calculateFreedomTime),
+  // niet maand/30 (=jaar/360). De maandcijfers extrapoleren we naar een jaar (×12).
   const totalMonthlyExpenses = (transactionsRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const dailyExpenses = totalMonthlyExpenses > 0 ? totalMonthlyExpenses / 30 : 0
+  const dailyExpenses = totalMonthlyExpenses > 0 ? (totalMonthlyExpenses * 12) / 365 : 0
 
   const aandachtspunten: Aandachtspunt[] = []
 

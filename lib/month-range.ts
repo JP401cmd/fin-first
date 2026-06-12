@@ -26,3 +26,28 @@ export function localMonthBounds(monthDate: Date): { start: string; end: string 
   const next = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1)
   return { start, end: localMonthStart(next) }
 }
+
+/**
+ * Eerste dag (`YYYY-MM-01`) van de maand die `monthsBack` maanden vóór
+ * `refDate` ligt — tijdzone-veilig. Bedoeld als ondergrens voor rolling-window-
+ * queries (bv. een 12-maands-venster = `localMonthStartMonthsAgo(now, 11)`).
+ * Vervangt het onveilige `new Date(jaar, maand - n, 1).toISOString()`-patroon
+ * dat de grens in NL een dag terugschuift (zie de module-toelichting).
+ */
+export function localMonthStartMonthsAgo(refDate: Date, monthsBack: number): string {
+  return localMonthStart(new Date(refDate.getFullYear(), refDate.getMonth() - monthsBack, 1))
+}
+
+/**
+ * Laatste kalenderdag van de maand van `monthDate` als `YYYY-MM-DD` —
+ * tijdzone-veilig. Bedoeld als *inclusieve* bovengrens (bv. snapshot-datum of
+ * `<= monthEnd`-vergelijking), in tegenstelling tot de exclusieve `end` van
+ * `localMonthBounds` (de 1e van de volgende maand). Vervangt het onveilige
+ * `new Date(jaar, maand + 1, 0).toISOString()`-patroon dat de dag in NL (UTC+)
+ * een dag terugschuift (zie de module-toelichting).
+ */
+export function localMonthEnd(monthDate: Date): string {
+  // Dag 0 van de volgende maand = de laatste dag van deze maand.
+  const last = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0)
+  return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
+}

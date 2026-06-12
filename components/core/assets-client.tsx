@@ -12,9 +12,10 @@ import { PAGE_INFO } from '@/lib/page-info-content'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { createClient } from '@/lib/supabase/client'
+import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
-import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency, dailyExpenseRate } from '@/lib/format'
 import { localMonthBounds } from '@/lib/month-range'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
@@ -80,7 +81,6 @@ import {
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
 import { AangifteImportPane } from '@/components/onboarding/aangifte-import-pane'
-import { RebalancingSettingsSection } from './rebalancing-settings-section'
 import { AssetEditConnectionSection } from './asset-edit-connection-section'
 import { CryptoHoldingCard } from '@/components/holdings/crypto-holding-card'
 import { InvestmentHoldingCard } from '@/components/holdings/investment-holding-card'
@@ -332,7 +332,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           const amt = Number(t.amount)
           return amt < 0 ? sum + Math.abs(amt) : sum
         }, 0)
-        setDailyExpenses(monthlyExpenses > 0 ? monthlyExpenses / 30 : 0)
+        setDailyExpenses(dailyExpenseRate(monthlyExpenses))
       }
     } catch (err) {
       console.error('Error loading assets:', err)
@@ -777,10 +777,6 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           </div>
         )}
       </div>
-
-      {/* Rebalancing settings — contextually placed near portfolio allocation.
-          Only visible when user has target allocations. */}
-      <RebalancingSettingsSection />
 
       {/* Grouped asset cards — grid per categorie, conform /core/assets/[type].
           Elke categorie krijgt een klikbare header die doorlinkt naar de
@@ -2945,20 +2941,11 @@ export function AssetForm({
       }
     }
 
-    // After save: sync budgeting_active with has_budget_tracking status
+    // After save: sync budgeting_active with has_budget_tracking status.
+    // Best-effort (zoals de oude inline sync): een gefaalde gate-write mag de
+    // save-flow niet breken; een volgende save herstelt de gate.
     if (isCashType) {
-      const { data: trackingAssets } = await supabase
-        .from('assets')
-        .select('id')
-        .eq('asset_type', 'cash')
-        .eq('has_budget_tracking', true)
-        .eq('is_active', true)
-
-      const hasAnyBudgetTracking = (trackingAssets?.length ?? 0) > 0
-      await supabase
-        .from('profiles')
-        .update({ budgeting_active: hasAnyBudgetTracking })
-        .eq('id', user.id)
+      await syncBudgetingActive(supabase, user.id).catch(() => undefined)
     }
 
     setSaving(false)

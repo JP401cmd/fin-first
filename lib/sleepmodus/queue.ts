@@ -10,6 +10,9 @@
  *   applying ─APPLY_SUCCESS→ celebrating ─ANIMATION_DONE→ idle | done
  *            └─APPLY_ERROR→ idle (wachtrij ongewijzigd)
  *   idle ─SKIP→ idle | done (huidige transactie uit de wachtrij, geen write)
+ *   idle/dragging ─FINISH_EARLY→ done (tussentijds stoppen; tellers + resterende
+ *                                       items behouden, geen write — alles is al
+ *                                       per drop gepersisteerd)
  */
 
 export type QueueTx = {
@@ -67,6 +70,7 @@ export type SleepmodusAction =
   | { type: 'APPLY_ERROR' }
   | { type: 'ANIMATION_DONE' }
   | { type: 'SKIP' }
+  | { type: 'FINISH_EARLY' }
 
 export function initQueue(transactions: QueueTx[]): SleepmodusState {
   // Defensief: transfers en al-toegewezen rijen horen niet in de wachtrij,
@@ -177,6 +181,13 @@ export function sleepmodusReducer(state: SleepmodusState, action: SleepmodusActi
         skippedCount: state.skippedCount + 1,
       }
     }
+
+    case 'FINISH_EARLY':
+      // Tussentijds stoppen mét behoud van tellers én de resterende wachtrij,
+      // zodat de samenvatting kan tonen hoeveel er nog open stond. Alleen
+      // toegestaan uit een rustige fase — niet midden in een write/animatie/vraag.
+      if (state.phase !== 'idle' && state.phase !== 'dragging') return state
+      return { ...state, phase: 'done', pendingDrop: null }
 
     default:
       return state

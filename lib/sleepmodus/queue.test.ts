@@ -152,6 +152,39 @@ describe('sleepmodusReducer', () => {
     expect(next.skippedCount).toBe(1)
   })
 
+  it('FINISH_EARLY → done met behoud van tellers en resterende wachtrij', () => {
+    // Eén toewijzing afronden, dan tussentijds stoppen met nog items open.
+    const applying = sleepmodusReducer(dropped(base), {
+      type: 'APPLY_SUCCESS', assignedIds: ['a'], ruleCreated: false, bulkUpdated: 0,
+    })
+    const idle = sleepmodusReducer(applying, { type: 'ANIMATION_DONE' })
+    expect(idle.phase).toBe('idle')
+    expect(idle.assignedCount).toBe(1)
+    expect(idle.items).toHaveLength(2)
+
+    const finished = sleepmodusReducer(idle, { type: 'FINISH_EARLY' })
+    expect(finished.phase).toBe('done')
+    expect(finished.assignedCount).toBe(1)
+    expect(finished.items.map((t) => t.id)).toEqual(['b', 'c'])
+    expect(finished.processedCount).toBe(1)
+    expect(finished.pendingDrop).toBeNull()
+  })
+
+  it('FINISH_EARLY werkt ook vanuit dragging', () => {
+    const dragging = sleepmodusReducer(base, { type: 'DRAG_START' })
+    expect(sleepmodusReducer(dragging, { type: 'FINISH_EARLY' }).phase).toBe('done')
+  })
+
+  it('FINISH_EARLY wordt genegeerd midden in een write of vraagkaart', () => {
+    const applying = dropped(base)
+    expect(applying.phase).toBe('applying')
+    expect(sleepmodusReducer(applying, { type: 'FINISH_EARLY' })).toBe(applying)
+
+    const confirm = dropped(base, ['b'])
+    expect(confirm.phase).toBe('confirm')
+    expect(sleepmodusReducer(confirm, { type: 'FINISH_EARLY' })).toBe(confirm)
+  })
+
   it('currentTx geeft de voorste transactie of null', () => {
     expect(currentTx(base)?.id).toBe('a')
     expect(currentTx(initQueue([]))).toBeNull()

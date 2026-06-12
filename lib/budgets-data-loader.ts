@@ -146,15 +146,39 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
     }
   }
 
-  // ── Fetch splits for split transactions ─────────────────────
+  // ── Fetch splits for split transactions (current month + history in parallel) ──
+  // Both splits queries depend only on their own preceding transaction batch
+  // (txData resp. historyTx), not on each other — so we start them together and
+  // await them as a pair to avoid a sequential round-trip.
   const splitTxIds = txData.filter(t => t.is_split).map(t => t.id)
 
-  if (splitTxIds.length > 0) {
-    const { data: splits } = await supabase
-      .from('transaction_splits')
-      .select('transaction_id, budget_id, amount, transactions(id, account_id, date, description, counterparty_name)')
-      .in('transaction_id', splitTxIds)
+  const historyTx = (historyTxRes.data ?? []) as Array<{
+    id: string
+    budget_id: string | null
+    amount: number
+    date: string
+    transaction_type: string | null
+    is_split: boolean | null
+  }>
+  const historySplitTxIds = historyTx.filter(t => t.is_split).map(t => t.id)
 
+  const splitsPromise = splitTxIds.length > 0
+    ? supabase
+        .from('transaction_splits')
+        .select('transaction_id, budget_id, amount, transactions(id, account_id, date, description, counterparty_name)')
+        .in('transaction_id', splitTxIds)
+    : null
+  const historySplitsPromise = historySplitTxIds.length > 0
+    ? supabase
+        .from('transaction_splits')
+        .select('transaction_id, budget_id, amount, transactions!inner(transaction_type, date)')
+        .in('transaction_id', historySplitTxIds)
+    : null
+
+  const [splitsRes, historySplitsRes] = await Promise.all([splitsPromise, historySplitsPromise])
+
+  if (splitsRes) {
+    const { data: splits } = splitsRes
     if (splits) {
       for (const s of splits as unknown as Array<{
         transaction_id: string
@@ -201,22 +225,9 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
   // computed over the number of distinct months in which the budget had
   // any activity, not over a fixed 12-month denominator — this avoids
   // pulling seasonal budgets (e.g. vakantie) down to near-zero.
-  const historyTx = (historyTxRes.data ?? []) as Array<{
-    id: string
-    budget_id: string | null
-    amount: number
-    date: string
-    transaction_type: string | null
-    is_split: boolean | null
-  }>
-
-  const historySplitTxIds = historyTx.filter(t => t.is_split).map(t => t.id)
   let historySplits: Array<{ transaction_id: string; budget_id: string | null; amount: number; transaction_type: string | null; date: string }> = []
-  if (historySplitTxIds.length > 0) {
-    const { data: splits } = await supabase
-      .from('transaction_splits')
-      .select('transaction_id, budget_id, amount, transactions!inner(transaction_type, date)')
-      .in('transaction_id', historySplitTxIds)
+  if (historySplitsRes) {
+    const { data: splits } = historySplitsRes
     if (splits) {
       historySplits = (splits as unknown as Array<{
         transaction_id: string

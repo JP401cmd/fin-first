@@ -16,6 +16,7 @@
 
 import type { Budget } from '@/lib/budget-data'
 import { BUDGET_SLUGS } from '@/lib/budget-data'
+import { normalizeCounterparty } from '@/lib/parsers/counterparty-normalize'
 
 type CategoryRule = {
   keywords: string[]
@@ -76,7 +77,8 @@ const RULES: CategoryRule[] = [
 export type CategoryCorrection = {
   match_field: 'counterparty_name' | 'description' | 'counterparty_iban'
   match_value: string
-  budget_id: string
+  /** Null wanneer het doelbudget is verwijderd (FK ON DELETE SET NULL) — de regel is dan inert. */
+  budget_id: string | null
 }
 
 /**
@@ -125,8 +127,10 @@ export async function buildFrequencyMap(
 
   for (const row of data as { counterparty_name: string | null; counterparty_iban: string | null; budget_id: string }[]) {
     if (row.counterparty_name) {
-      const key = row.counterparty_name.toLowerCase()
-      if (!byName.has(key)) byName.set(key, new Map())
+      // Genormaliseerd (PSP-/terminal-ruis gestript) zodat varianten van dezelfde
+      // tegenpartij ("CCV*BAKKER 12", "Bakker") op één frequentie-key landen.
+      const key = normalizeCounterparty(row.counterparty_name)
+      if (key && !byName.has(key)) byName.set(key, new Map())
       const counts = byName.get(key)!
       counts.set(row.budget_id, (counts.get(row.budget_id) ?? 0) + 1)
     }
@@ -167,20 +171,27 @@ export async function buildFrequencyMap(
 
 /**
  * Look up a single transaction in the pre-built frequency map.
- * Checks counterparty_name first, then counterparty_iban.
+ *
+ * IBAN-eerst: een IBAN is een sterker, eenduidiger signaal dan een (mogelijk
+ * door ruis vervuilde) naam — net als de correctie-laag (priority 1) die ook
+ * IBAN vóór naam probeert. De naam-key wordt op dezelfde manier genormaliseerd
+ * als bij het bouwen van de map (PSP-/terminal-ruis gestript).
  */
 export function frequencyMatch(
   counterpartyName: string | null,
   counterpartyIban: string | null,
   frequencyMap: Map<string, FrequencyMatch>,
 ): FrequencyMatch | null {
-  if (counterpartyName) {
-    const match = frequencyMap.get('name:' + counterpartyName.toLowerCase())
-    if (match) return match
-  }
   if (counterpartyIban) {
     const match = frequencyMap.get('iban:' + counterpartyIban.replace(/\s/g, '').toUpperCase())
     if (match) return match
+  }
+  if (counterpartyName) {
+    const key = normalizeCounterparty(counterpartyName)
+    if (key) {
+      const match = frequencyMap.get('name:' + key)
+      if (match) return match
+    }
   }
   return null
 }
@@ -258,7 +269,10 @@ export function categorizeTransaction(
     return { budget_id: null, confidence: 1.0, budgetName: null, isTransfer: true, category_source: 'transfer' }
   }
 
-  const searchText = `${description} ${counterparty ?? ''}`.toLowerCase()
+  // Tegenpartij genormaliseerd (PSP-/terminal-ruis weg) zodat keyword-regels op
+  // de schone merchantnaam matchen; de beschrijving blijft ruw (bevat juist de
+  // trefwoord-rijke vrije tekst). Beide lowercase voor de substring-vergelijking.
+  const searchText = `${description.toLowerCase()} ${normalizeCounterparty(counterparty)}`
   const isIncome = amount > 0
 
   // Build a slug-to-budget map and id-to-budget map
@@ -271,11 +285,16 @@ export function categorizeTransaction(
 
   // Priority 1: Check user corrections
   // Sub-priority: IBAN (most reliable) → counterparty_name → description
-  if (corrections && corrections.length > 0) {
+  // Regels zonder doelbudget (budget_id null na budget-verwijdering) zijn inert:
+  // overslaan zodat de categorisatie doorvalt naar frequentie/keywords.
+  const activeCorrections = (corrections ?? []).filter(
+    (c): c is CategoryCorrection & { budget_id: string } => c.budget_id !== null,
+  )
+  if (activeCorrections.length > 0) {
     // 1a: IBAN corrections first (highest reliability)
     if (counterpartyIban) {
       const normalizedIban = counterpartyIban.replace(/\s/g, '').toUpperCase()
-      for (const c of corrections) {
+      for (const c of activeCorrections) {
         if (c.match_field === 'counterparty_iban' && c.match_value.replace(/\s/g, '').toUpperCase() === normalizedIban) {
           const budget = idMap.get(c.budget_id)
           return { budget_id: c.budget_id, confidence: 1.0, budgetName: budget?.name ?? null, category_source: 'manual' }
@@ -283,7 +302,7 @@ export function categorizeTransaction(
       }
     }
     // 1b: counterparty_name and description corrections
-    for (const c of corrections) {
+    for (const c of activeCorrections) {
       const needle = c.match_value.toLowerCase()
       if (c.match_field === 'counterparty_name' && counterparty && counterparty.toLowerCase() === needle) {
         const budget = idMap.get(c.budget_id)
@@ -309,6 +328,14 @@ export function categorizeTransaction(
           category_source: 'rule',
         }
       }
+      // Stille fallthrough zichtbaar maken: een frequentie-hit waarvan het
+      // budget niet in de aangeleverde set zit wijst vrijwel altijd op een
+      // caller die een boom i.p.v. een platte lijst doorgaf (deelbudgetten
+      // ontbreken dan) — zie de salaris-bug van jun 2026.
+      console.warn(
+        '[categorize] frequentie-match genegeerd: budget_id niet in aangeleverde budgets-set',
+        freqResult.budget_id,
+      )
     }
   }
 
@@ -336,6 +363,15 @@ export function categorizeTransaction(
   }
 
   const budget = slugMap.get(bestMatch.budgetSlug)
+  if (!budget) {
+    // Zelfde klasse als hierboven: keyword-hit maar de slug ontbreekt in de
+    // aangeleverde budgets-set (boom-i.p.v.-flat, of custom slug zonder
+    // template-equivalent). Loggen i.p.v. stil degraderen.
+    console.warn(
+      '[categorize] keyword-match genegeerd: slug niet in aangeleverde budgets-set',
+      bestMatch.budgetSlug,
+    )
+  }
 
   return {
     budget_id: budget?.id ?? null,

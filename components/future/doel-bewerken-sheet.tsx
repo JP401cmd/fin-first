@@ -277,11 +277,11 @@ export function DoelBewerkenSheet({
           <section
             data-testid="will-suggesties"
             aria-label="Will-suggesties"
-            className="mb-4 rounded-xl border border-violet-100 bg-violet-50/40 p-3"
+            className="mb-4 rounded-xl border border-horizon-100 bg-horizon-50/40 p-3"
           >
             <header className="flex items-center gap-1.5 mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-violet-700" aria-hidden="true" />
-              <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-violet-700">
+              <Sparkles className="w-3.5 h-3.5 text-horizon-700" aria-hidden="true" />
+              <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-horizon-700">
                 Will-suggesties
               </span>
             </header>
@@ -298,7 +298,7 @@ export function DoelBewerkenSheet({
                     {s.href && s.ctaLabel && (
                       <Link
                         href={s.href}
-                        className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-700 hover:underline"
+                        className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-horizon-700 hover:underline"
                       >
                         {s.ctaLabel}
                         <ArrowRight className="w-3 h-3" aria-hidden="true" />
@@ -343,7 +343,7 @@ export function DoelBewerkenSheet({
         <button
           type="button"
           onClick={() => setFullEditOpen(true)}
-          className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-700 hover:text-violet-800 hover:underline"
+          className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-horizon-700 hover:text-horizon-800 hover:underline"
         >
           <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
           Volledig bewerken (naam, bedrag, datum, koppeling…)

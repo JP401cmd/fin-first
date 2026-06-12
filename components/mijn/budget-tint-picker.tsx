@@ -1,16 +1,18 @@
 'use client'
 
-import { Check } from 'lucide-react'
+import { ColorPickerCard, type ColorPreset } from '@/components/app/color-picker-card'
 import { useBudgetColors } from '@/components/app/module-color-provider'
-import type { BudgetColorConfig } from '@/lib/color-palette'
+import { DEFAULT_BUDGET_COLORS, type BudgetColorConfig } from '@/lib/color-palette'
 
 /**
  * BudgetTintPicker — kleurkeuze per budget-categorie (income/expense/
- * savings/debt/other). Plan A-2 stap 4 — uitkamerd uit legacy
+ * savings/debt/other). Plan A-2 stap 4 — uitgekamerd uit legacy
  * /identity/instellingen?tab=weergave naar /mijn/uiterlijk.
  *
- * Per categorie 6 voorkeuze-tints. Active = scale-110 + Check-icoon.
- * Klik = setBudgetConfig — CSS-vars updates instant + API-persist.
+ * Per categorie één ColorPickerCard: ronde swatch met native color-input
+ * (volledig eigen tint kiesbaar), live palettestrip, de 6 voorkeuze-tints
+ * als presets, hex-weergave en een per-kaart reset naar de default.
+ * Klik = setBudgetConfig — CSS-vars updaten instant + API-persist.
  *
  * Categorie-betekenis (uit DEFAULT_BUDGET_COLORS):
  *  - income   donkergroen — groei
@@ -21,62 +23,61 @@ import type { BudgetColorConfig } from '@/lib/color-palette'
  */
 
 type BudgetKey = keyof BudgetColorConfig
-type Swatch = { label: string; hex: string }
 
-const BUDGET_SWATCHES: Record<BudgetKey, { label: string; swatches: Swatch[] }> = {
+const BUDGET_SWATCHES: Record<BudgetKey, { label: string; presets: ColorPreset[] }> = {
   income: {
     label: 'Inkomen',
-    swatches: [
-      { label: 'Donkergroen (default)', hex: '#2d6a4f' },
-      { label: 'Emerald', hex: '#059669' },
-      { label: 'Forest', hex: '#15803d' },
-      { label: 'Mint', hex: '#10b981' },
-      { label: 'Olijfgroen', hex: '#65a30d' },
-      { label: 'Teal', hex: '#0d9488' },
+    presets: [
+      { name: 'Donkergroen (default)', hex: '#2d6a4f' },
+      { name: 'Emerald', hex: '#059669' },
+      { name: 'Forest', hex: '#15803d' },
+      { name: 'Mint', hex: '#10b981' },
+      { name: 'Olijfgroen', hex: '#65a30d' },
+      { name: 'Teal', hex: '#0d9488' },
     ],
   },
   expense: {
     label: 'Uitgaven',
-    swatches: [
-      { label: 'Terracotta (default)', hex: '#6b3a2d' },
-      { label: 'Roest', hex: '#9a3412' },
-      { label: 'Amber', hex: '#d97706' },
-      { label: 'Bordeaux', hex: '#9f1239' },
-      { label: 'Bruin', hex: '#7c2d12' },
-      { label: 'Slate', hex: '#475569' },
+    presets: [
+      { name: 'Terracotta (default)', hex: '#6b3a2d' },
+      { name: 'Roest', hex: '#9a3412' },
+      { name: 'Amber', hex: '#d97706' },
+      { name: 'Bordeaux', hex: '#9f1239' },
+      { name: 'Bruin', hex: '#7c2d12' },
+      { name: 'Slate', hex: '#475569' },
     ],
   },
   savings: {
     label: 'Sparen',
-    swatches: [
-      { label: 'Staalsblauw (default)', hex: '#1d4e6b' },
-      { label: 'Sky', hex: '#0284c7' },
-      { label: 'Indigo', hex: '#4338ca' },
-      { label: 'Cyaan', hex: '#0891b2' },
-      { label: 'Royal', hex: '#1e40af' },
-      { label: 'Violet', hex: '#7c3aed' },
+    presets: [
+      { name: 'Staalsblauw (default)', hex: '#1d4e6b' },
+      { name: 'Sky', hex: '#0284c7' },
+      { name: 'Indigo', hex: '#4338ca' },
+      { name: 'Cyaan', hex: '#0891b2' },
+      { name: 'Royal', hex: '#1e40af' },
+      { name: 'Violet', hex: '#7c3aed' },
     ],
   },
   debt: {
     label: 'Schulden',
-    swatches: [
-      { label: 'Bordeaux (default)', hex: '#7a2d3a' },
-      { label: 'Rood', hex: '#b91c1c' },
-      { label: 'Rose', hex: '#be123c' },
-      { label: 'Roest', hex: '#9a3412' },
-      { label: 'Magenta', hex: '#a21caf' },
-      { label: 'Donkerbruin', hex: '#451a03' },
+    presets: [
+      { name: 'Bordeaux (default)', hex: '#7a2d3a' },
+      { name: 'Rood', hex: '#b91c1c' },
+      { name: 'Rose', hex: '#be123c' },
+      { name: 'Roest', hex: '#9a3412' },
+      { name: 'Magenta', hex: '#a21caf' },
+      { name: 'Donkerbruin', hex: '#451a03' },
     ],
   },
   other: {
     label: 'Overig',
-    swatches: [
-      { label: 'Ink (default)', hex: '#4a4840' },
-      { label: 'Slate', hex: '#475569' },
-      { label: 'Stone', hex: '#57534e' },
-      { label: 'Gray', hex: '#52525b' },
-      { label: 'Neutral', hex: '#525252' },
-      { label: 'Warm', hex: '#78716c' },
+    presets: [
+      { name: 'Ink (default)', hex: '#4a4840' },
+      { name: 'Slate', hex: '#475569' },
+      { name: 'Stone', hex: '#57534e' },
+      { name: 'Gray', hex: '#52525b' },
+      { name: 'Neutral', hex: '#525252' },
+      { name: 'Warm', hex: '#78716c' },
     ],
   },
 }
@@ -89,46 +90,22 @@ export function BudgetTintPicker() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
         Budget-categorie-tints
       </div>
       {(Object.keys(BUDGET_SWATCHES) as BudgetKey[]).map((type) => {
-        const { label, swatches } = BUDGET_SWATCHES[type]
-        const currentHex = budgetConfig[type]
+        const { label, presets } = BUDGET_SWATCHES[type]
         return (
-          <div key={type}>
-            <div className="text-xs font-semibold text-[var(--ink-2)] mb-1.5">
-              {label}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {swatches.map((s) => {
-                const active = currentHex.toLowerCase() === s.hex.toLowerCase()
-                return (
-                  <button
-                    key={s.hex}
-                    type="button"
-                    onClick={() => handlePick(type, s.hex)}
-                    aria-label={`${label}: ${s.label}`}
-                    aria-pressed={active}
-                    title={s.label}
-                    className={`relative w-8 h-8 rounded-lg border-2 transition-all ${
-                      active
-                        ? 'border-[var(--ink-2)] scale-110 shadow-sm'
-                        : 'border-[var(--border-ed)] hover:scale-105'
-                    }`}
-                    style={{ background: s.hex }}
-                  >
-                    {active && (
-                      <span className="absolute inset-0 flex items-center justify-center">
-                        <Check className="w-4 h-4 text-white drop-shadow" aria-hidden="true" />
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <ColorPickerCard
+            key={type}
+            label={label}
+            value={budgetConfig[type]}
+            defaultValue={DEFAULT_BUDGET_COLORS[type]}
+            presets={presets}
+            onChange={(hex) => handlePick(type, hex)}
+            contrastHint
+          />
         )
       })}
     </div>

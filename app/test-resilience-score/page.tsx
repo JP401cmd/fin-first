@@ -223,7 +223,7 @@ export default function TestResilienceScorePage() {
               {demoLabel}
             </p>
             <p className="mt-0.5 text-[10px] text-purple-400" data-testid="demo-snapshot-source">
-              uit snapshot data
+              Live berekend
             </p>
           </div>
 
@@ -284,8 +284,8 @@ export default function TestResilienceScorePage() {
               <div className="flex items-start gap-2">
                 <span className="mt-0.5 text-emerald-500">{'\u2705'}</span>
                 <div>
-                  <p className="font-medium text-zinc-700">3. KPI Display</p>
-                  <p className="text-xs text-zinc-500">Prefers snapshotResilience (latest snapshot) over computed resilience.total. Shows &quot;uit snapshot data&quot; label when from snapshot.</p>
+                  <p className="font-medium text-zinc-700">3. Badge Display</p>
+                  <p className="text-xs text-zinc-500">Toont ALTIJD de live healthScoreTotal (Defect A/B-fix). De opgeslagen resilience_score voedt enkel nog de trendlijn; het label is altijd &quot;Live berekend&quot;.</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">

@@ -39,7 +39,6 @@ function makeSnapshots(n: number): SnapshotForTrend[] {
 function baseProps() {
   return {
     resilienceSnapshots: makeSnapshots(3),
-    snapshotResilience: 72,
     healthScoreTotal: 80,
     healthChartOpen: false,
     onToggleHealth: vi.fn(),
@@ -56,14 +55,42 @@ describe('HorizonTrendGrid', () => {
     expect(screen.getByTestId('fire-age-trend-section')).toBeTruthy()
   })
 
-  it('toont de snapshot-resilience-score (override op healthScoreTotal)', () => {
+  it('toont altijd de live healthScoreTotal in de badge (SSoT, AC-1)', () => {
+    // Voorheen overschreef een snapshot-resilience dit getal (de bug). De badge
+    // toont nu uitsluitend de live score; de snapshot voedt enkel de trendlijn.
+    // makeSnapshots(3) levert resilience_score 60/61/62 — een AFWIJKENDE snapshot —
+    // maar de badge volgt de live healthScoreTotal (80), niet die snapshot.
     render(<HorizonTrendGrid {...baseProps()} />)
-    expect(screen.getByText('72/100')).toBeTruthy()
+    expect(screen.getByText('80/100')).toBeTruthy()
+    // De afwijkende snapshot-score verschijnt NIET als huidig getal in de badge.
+    expect(screen.queryByText('62/100')).toBeNull()
   })
 
-  it('valt terug op healthScoreTotal wanneer geen snapshot-resilience', () => {
-    render(<HorizonTrendGrid {...baseProps()} snapshotResilience={null} />)
-    expect(screen.getByText('80/100')).toBeTruthy()
+  it('toont de live healthScoreTotal in de badge ÓÓK zonder snapshots (AC-2)', () => {
+    // Geen historie: het huidige getal moet nog steeds de live score zijn.
+    render(<HorizonTrendGrid {...baseProps()} resilienceSnapshots={[]} healthScoreTotal={47} />)
+    expect(screen.getByText('47/100')).toBeTruthy()
+  })
+
+  it('badge-title volgt het getoonde live getal (AC-4)', () => {
+    // De aria/title-context noemt exact het getoonde getal — geen snapshot-getal.
+    render(<HorizonTrendGrid {...baseProps()} healthScoreTotal={47} resilienceSnapshots={[]} />)
+    expect(screen.getByTitle('Financiële Gezondheid: 47 / 100')).toBeTruthy()
+  })
+
+  it('toont de "gebruik de app langer"-fallback bij <2 gezondheids-snapshots (trendhistorie ≥2-drempel)', () => {
+    // Eén snapshot < drempel → géén trendchart, wél de uitleg-fallback.
+    render(
+      <HorizonTrendGrid
+        {...baseProps()}
+        resilienceSnapshots={makeSnapshots(1)}
+        healthChartOpen
+      />,
+    )
+    expect(screen.queryByTestId('resilience-chart')).toBeNull()
+    expect(
+      screen.getByText(/Gebruik de app langer om het verloop in je financiële gezondheid/i),
+    ).toBeTruthy()
   })
 
   it('toont de laatste FIRE-leeftijd wanneer ≥2 snapshots fire_age hebben', () => {

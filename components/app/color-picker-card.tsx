@@ -1,8 +1,8 @@
 'use client'
 
 import { useRef } from 'react'
-import { RotateCcw } from 'lucide-react'
-import { generatePalette, SHADES } from '@/lib/color-palette'
+import { RotateCcw, AlertTriangle } from 'lucide-react'
+import { generatePalette, SHADES, contrastRatio } from '@/lib/color-palette'
 
 export interface ColorPreset {
   hex: string
@@ -19,6 +19,12 @@ interface ColorPickerCardProps {
   size?: 'large' | 'compact'
   /** Optional badge shown on the card (e.g. "Jij zit hier →") */
   activeBadge?: string
+  /**
+   * When true, warns (does not block) if white text on the 700-shade of the
+   * chosen color drops below WCAG AA (4.5:1) — useful for accent colors that
+   * carry white button-text / kickers.
+   */
+  contrastHint?: boolean
 }
 
 /**
@@ -37,10 +43,13 @@ export function ColorPickerCard({
   presets = [],
   onChange,
   activeBadge,
+  contrastHint = false,
 }: ColorPickerCardProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const palette = generatePalette(value)
   const isDefault = value.toLowerCase() === defaultValue.toLowerCase()
+  const lowContrast =
+    contrastHint && contrastRatio('#ffffff', palette[700].hex) < 4.5
 
   return (
     <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-all hover:border-[var(--border-md)]">
@@ -57,6 +66,7 @@ export function ColorPickerCard({
             type="color"
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            aria-label={`${label}: eigen kleur kiezen`}
             className="absolute inset-0 cursor-pointer opacity-0"
           />
         </label>
@@ -97,23 +107,36 @@ export function ColorPickerCard({
         ))}
       </div>
 
+      {/* Contrast-waarschuwing — alleen waarschuwen, nooit blokkeren */}
+      {lowContrast && (
+        <p className="mb-2 flex items-start gap-1 text-[10px] italic text-[var(--ink-3)]">
+          <AlertTriangle className="mt-0.5 h-2.5 w-2.5 shrink-0" aria-hidden="true" />
+          <span>Lichte kleur — tekst op deze tint kan slecht leesbaar worden.</span>
+        </p>
+      )}
+
       {/* Preset swatches */}
       {presets.length > 0 && (
         <div className="mb-1.5 flex flex-wrap gap-1">
-          {presets.map((preset) => (
-            <button
-              key={preset.hex}
-              type="button"
-              onClick={() => onChange(preset.hex)}
-              className={`h-5 w-5 rounded-full border-2 transition-all hover:scale-110 ${
-                value.toLowerCase() === preset.hex.toLowerCase()
-                  ? 'border-[var(--ink)] scale-110'
-                  : 'border-[var(--border-ed)]'
-              }`}
-              style={{ backgroundColor: preset.hex }}
-              title={preset.name}
-            />
-          ))}
+          {presets.map((preset) => {
+            const active = value.toLowerCase() === preset.hex.toLowerCase()
+            return (
+              <button
+                key={preset.hex}
+                type="button"
+                onClick={() => onChange(preset.hex)}
+                aria-label={`${label}: ${preset.name}`}
+                aria-pressed={active}
+                className={`h-5 w-5 rounded-full border-2 transition-all hover:scale-110 ${
+                  active
+                    ? 'border-[var(--ink)] scale-110'
+                    : 'border-[var(--border-ed)]'
+                }`}
+                style={{ backgroundColor: preset.hex }}
+                title={preset.name}
+              />
+            )
+          })}
         </div>
       )}
 

@@ -422,10 +422,10 @@ export function ScenarioBibliotheek({ currentAge }: { currentAge: number | null 
             <Link
               href="/toekomst/whatif"
               onClick={() => setOpen(false)}
-              className="mb-4 flex items-center gap-3 rounded-xl border border-violet-300 bg-violet-50/60 px-4 py-3 hover:border-violet-500 hover:bg-violet-50 transition-colors"
+              className="mb-4 flex items-center gap-3 rounded-xl border border-horizon-300 bg-horizon-50/60 px-4 py-3 hover:border-horizon-500 hover:bg-horizon-50 transition-colors"
             >
-              <span className="inline-flex w-9 h-9 shrink-0 rounded-lg bg-violet-100 items-center justify-center">
-                <Sparkles className="w-4 h-4 text-violet-700" aria-hidden="true" />
+              <span className="inline-flex w-9 h-9 shrink-0 rounded-lg bg-horizon-100 items-center justify-center">
+                <Sparkles className="w-4 h-4 text-horizon-700" aria-hidden="true" />
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-[var(--ink)]">

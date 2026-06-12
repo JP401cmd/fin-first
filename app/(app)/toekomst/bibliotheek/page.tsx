@@ -182,7 +182,7 @@ export default async function BibliotheekPage({
       {/* Editorial header met Wil-kicker */}
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-horizon-700">
             Toekomst — bibliotheek
           </div>
           <h1 className="font-serif text-2xl sm:text-3xl text-[var(--ink)] mt-1">
@@ -242,9 +242,9 @@ function EmptyState({ showOnlyUsable }: { showOnlyUsable: boolean }) {
   if (showOnlyUsable) {
     return (
       <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-8 text-center">
-        <span className="inline-flex w-10 h-10 rounded-xl bg-violet-50 items-center justify-center mb-3">
+        <span className="inline-flex w-10 h-10 rounded-xl bg-horizon-50 items-center justify-center mb-3">
           <Sparkles
-            className="w-5 h-5 text-violet-700"
+            className="w-5 h-5 text-horizon-700"
             aria-hidden="true"
           />
         </span>
@@ -267,9 +267,9 @@ function EmptyState({ showOnlyUsable }: { showOnlyUsable: boolean }) {
 
   return (
     <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-8 text-center">
-      <span className="inline-flex w-10 h-10 rounded-xl bg-violet-50 items-center justify-center mb-3">
+      <span className="inline-flex w-10 h-10 rounded-xl bg-horizon-50 items-center justify-center mb-3">
         <BookOpen
-          className="w-5 h-5 text-violet-700"
+          className="w-5 h-5 text-horizon-700"
           aria-hidden="true"
         />
       </span>

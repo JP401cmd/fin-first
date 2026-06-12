@@ -144,12 +144,9 @@ const tests: TestCase[] = [
     async fn() {
       const prefs = {
         budget: true,
-        streak: false,
         sync: true,
         recommendation: true,
-        insight: false,
-        badge: true,
-        levelup: true,
+        horizon: false,
         partner_transaction: false,
       }
       const { status, body } = await fetchJson('/api/notifications', {
@@ -161,7 +158,7 @@ const tests: TestCase[] = [
       // Verify returned preferences match
       const returned = body.preferences as Record<string, boolean>
       assertNotNull(returned, 'preferences teruggegeven')
-      assertEqual(returned.streak, false, 'streak uitgeschakeld')
+      assertEqual(returned.horizon, false, 'horizon uitgeschakeld')
       assertEqual(returned.budget, true, 'budget ingeschakeld')
 
       // Restore defaults
@@ -169,9 +166,10 @@ const tests: TestCase[] = [
         method: 'PUT',
         body: JSON.stringify({
           preferences: {
-            budget: true, streak: true, sync: true,
-            recommendation: true, insight: true, badge: true,
-            levelup: true, partner_transaction: true,
+            budget: true, sync: true,
+            recommendation: true, horizon: true,
+            holding_alert: true, briefing: true,
+            partner_transaction: true, budget_model_proposal: true,
           },
         }),
       })

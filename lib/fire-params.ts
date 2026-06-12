@@ -42,6 +42,19 @@ function deriveMarginaalTarief(netMonthlyIncome?: number | null): number {
 }
 
 /**
+ * Effectieve Nederlandse SWR uit bruto rendement en inflatie.
+ *
+ * Eén formule, één home: `grossReturn − BOX3_DRAG − inflationRate`, met een
+ * vloer van 0.001 zodat een (zeldzaam) hoog-inflatie/laag-rendement-scenario
+ * nooit een negatieve onttrekkingsvoet oplevert. Zowel `resolveFireParams` als
+ * UI-oppervlakken (bv. de SWR-monitor-widget) MOETEN deze helper gebruiken i.p.v.
+ * de formule te dupliceren.
+ */
+export function computeEffectiveSwr(grossReturn: number, inflationRate: number): number {
+  return Math.max(0.001, grossReturn - BOX3_DRAG - inflationRate)
+}
+
+/**
  * Resolve FIRE parameters from user profile.
  * Returns effectiveSwr (NL Box 3-corrected) based on user settings,
  * falling back to defaults (≈NL_SWR) when no profile data is available.
@@ -60,7 +73,7 @@ export function resolveFireParams(profile: {
 }): FireParams {
   const grossReturn = profile.expected_return ?? DEFAULT_RETURN
   const inflationRate = profile.inflation_rate ?? INFLATION
-  const effectiveSwr = Math.max(0.001, grossReturn - BOX3_DRAG - inflationRate)
+  const effectiveSwr = computeEffectiveSwr(grossReturn, inflationRate)
   const box3Method: Box3Method = (profile.box3_method === 'werkelijk') ? 'werkelijk' : 'forfaitair'
   const marginaalTarief = profile.marginaal_tarief ?? deriveMarginaalTarief(profile.net_monthly_income)
   return { grossReturn, inflationRate, effectiveSwr, box3Method, marginaalTarief }

@@ -2,43 +2,151 @@
 
 import { useMemo, useId, useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Lightbulb, ArrowRight, MessageSquare, ListPlus, Check, Loader2 } from 'lucide-react'
+import { Lightbulb, ArrowRight, MessageSquare, ListPlus, Check, Loader2, Receipt } from 'lucide-react'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useChatContext } from '@/components/app/chat/chat-provider'
-import type { HealthScore, HealthPillar } from '@/lib/financial-health'
+import type { HealthScore, HealthPillar, PillarGroup } from '@/lib/financial-health'
 
-// ── Color helpers (spec: groen >70, amber 40-70, rood <40) ──
+// ── Pillar-group presentatie-metadata ────────────────────────
+// Vaste volgorde + leesbaar label voor de vier gedragspijlers (ADR 0010).
+// De receipt groepeert de indicatoren hieronder met een subtotaal per groep.
+
+const PILLAR_GROUP_ORDER: PillarGroup[] = ['rondkomen', 'buffer', 'schuld', 'vrijheid']
+
+const PILLAR_GROUP_LABELS: Record<PillarGroup, string> = {
+  rondkomen: 'Rondkomen',
+  buffer: 'Buffer',
+  schuld: 'Schuld',
+  vrijheid: 'Vrijheid',
+}
+
+/**
+ * Eén-regel duiding per groep: waarom deze pijler er toe doet in
+ * vrijheidstijd-termen — kort, niet-oordelend.
+ */
+const PILLAR_GROUP_BLURBS: Record<PillarGroup, string> = {
+  rondkomen: 'Wat je elke maand overhoudt — de motor van je vrijheid.',
+  buffer: 'Je stootkussen — hoelang je het volhoudt zonder inkomen.',
+  schuld: 'Vrijheid die je terugkoopt — hoe zwaar je lasten wegen.',
+  vrijheid: 'Je weg naar volledige vrijheid — voortgang en spreiding.',
+}
+
+type PillarGroupBucket = {
+  group: PillarGroup
+  label: string
+  blurb: string
+  /** Gewogen subtotaal (Σ score×weight ÷ Σ weight) van actieve indicatoren. */
+  subtotal: number
+  pillars: HealthPillar[]
+}
+
+/**
+ * Groepeer de pijlers onder de vier gedragsgroepen en bereken een gewogen
+ * subtotaal per groep (presentatie-berekening — geen engine-veld). Pijlers
+ * zonder `pillarGroup` (oudere/overige indicatoren of test-fixtures) vallen in
+ * een "overig"-bucket dat alleen verschijnt als er zulke pijlers zijn.
+ */
+function groupPillars(pillars: HealthPillar[]): {
+  groups: PillarGroupBucket[]
+  ungrouped: HealthPillar[]
+} {
+  const byGroup = new Map<PillarGroup, HealthPillar[]>()
+  const ungrouped: HealthPillar[] = []
+
+  for (const p of pillars) {
+    if (p.pillarGroup) {
+      const list = byGroup.get(p.pillarGroup) ?? []
+      list.push(p)
+      byGroup.set(p.pillarGroup, list)
+    } else {
+      ungrouped.push(p)
+    }
+  }
+
+  const groups: PillarGroupBucket[] = []
+  for (const group of PILLAR_GROUP_ORDER) {
+    const list = byGroup.get(group)
+    if (!list || list.length === 0) continue
+    const weightSum = list.reduce((acc, p) => acc + p.weight, 0)
+    const subtotal = weightSum > 0
+      ? Math.round(list.reduce((acc, p) => acc + p.score * p.weight, 0) / weightSum)
+      : Math.round(list.reduce((acc, p) => acc + p.score, 0) / list.length)
+    groups.push({
+      group,
+      label: PILLAR_GROUP_LABELS[group],
+      blurb: PILLAR_GROUP_BLURBS[group],
+      subtotal,
+      pillars: [...list].sort((a, b) => a.score - b.score),
+    })
+  }
+
+  return { groups, ungrouped }
+}
+
+/**
+ * Rond een set gewichten (0-1, samen ~1) om naar hele procenten die optisch op
+ * 100 sluiten — grootste-rest-methode (largest remainder). Voorkomt dat de
+ * weging-sectie 99/101 toont door losstaande afrondingen.
+ */
+function roundWeightsToPercent<T>(
+  items: T[],
+  weightOf: (item: T) => number,
+): Map<T, number> {
+  const total = items.reduce((acc, it) => acc + weightOf(it), 0)
+  const result = new Map<T, number>()
+  if (total <= 0) {
+    for (const it of items) result.set(it, 0)
+    return result
+  }
+  const raw = items.map((it) => ({ item: it, exact: (weightOf(it) / total) * 100 }))
+  const floored = raw.map((r) => ({ ...r, base: Math.floor(r.exact), rem: r.exact - Math.floor(r.exact) }))
+  let remainder = 100 - floored.reduce((acc, r) => acc + r.base, 0)
+  // Deel de resterende procenten uit aan de grootste resten.
+  const order = [...floored].sort((a, b) => b.rem - a.rem)
+  for (const r of order) {
+    if (remainder <= 0) break
+    r.base += 1
+    remainder -= 1
+  }
+  for (const r of floored) result.set(r.item, r.base)
+  return result
+}
+
+// ── Color helpers (canonieke 4-traps score-tokens, drempels >=80/>=60/>=40) ──
+// Spiegelt BAND_STYLES in components/overview/overzicht-hero/health-score-card.tsx
+// en de score-tier tokens (text-score-good/-ok/-warn/-bad, bg-score-*) uit
+// app/globals.css — één score-kleurconventie door de hele app.
 
 function scoreColor(score: number): string {
-  if (score > 70) return 'var(--color-positive, #10b981)'
-  if (score >= 40) return 'var(--color-amber, #f59e0b)'
-  return 'var(--negative, #ef4444)'
+  if (score >= 80) return 'var(--score-good)'
+  if (score >= 60) return 'var(--score-ok)'
+  if (score >= 40) return 'var(--score-warn)'
+  return 'var(--score-bad)'
 }
 
 function scoreColorClass(score: number): string {
-  if (score > 70) return 'text-emerald-600'
-  if (score >= 40) return 'text-amber-600'
-  return 'text-red-600'
+  if (score >= 80) return 'text-score-good'
+  if (score >= 60) return 'text-score-ok'
+  if (score >= 40) return 'text-score-warn'
+  return 'text-score-bad'
 }
 
 function barColorClass(score: number): string {
-  if (score > 70) return 'bg-emerald-500'
-  if (score >= 40) return 'bg-amber-500'
-  return 'bg-red-500'
+  if (score >= 80) return 'bg-score-good'
+  if (score >= 60) return 'bg-score-ok'
+  if (score >= 40) return 'bg-score-warn'
+  return 'bg-score-bad'
 }
 
-function scoreBgClass(score: number): string {
-  if (score > 70) return 'bg-emerald-50'
-  if (score >= 40) return 'bg-amber-50'
-  return 'bg-red-50'
-}
-
+// 5-traps label conform getLabel in lib/financial-health.ts en BAND_STYLES.
 function scoreLabelNl(score: number): string {
-  if (score > 70) return 'Sterk'
-  if (score >= 40) return 'Gemiddeld'
-  return 'Zwak'
+  if (score >= 80) return 'Uitstekend'
+  if (score >= 60) return 'Sterk'
+  if (score >= 40) return 'Redelijk'
+  if (score >= 20) return 'Kwetsbaar'
+  return 'Kritiek'
 }
 
 /**
@@ -262,7 +370,7 @@ function PillarBar({
         <span className="text-xs font-medium text-[var(--ink)]">{pillar.name}</span>
         <div className="flex items-center gap-1.5">
           <span
-            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${scoreBgClass(pillar.score)} ${scoreColorClass(pillar.score)}`}
+            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold bg-white/80 ${scoreColorClass(pillar.score)}`}
           >
             {label}
           </span>
@@ -370,10 +478,6 @@ function PillarBar({
 
 interface HealthScoreReceiptProps {
   health: HealthScore
-  /** Optional: override the displayed total score (e.g. from snapshot) */
-  overrideTotal?: number | null
-  /** Optional: override the displayed label */
-  overrideLabel?: string | null
   /** Optional: footer content (e.g. backtesting link) */
   footer?: React.ReactNode
 }
@@ -382,22 +486,20 @@ interface HealthScoreReceiptProps {
 
 export function HealthScoreReceipt({
   health,
-  overrideTotal,
-  overrideLabel,
   footer,
 }: HealthScoreReceiptProps) {
   // Always use the live computed total from the weighted average of pillars.
   const displayTotal = health.total
   const displayLabel = health.label
 
-  // Sort pillars: weakest first for improvement focus
-  const sorted = useMemo(
-    () => [...health.pillars].sort((a, b) => a.score - b.score),
-    [health.pillars],
-  )
-
   // Welke pijler staat open in de "maak er een actie van"-popup.
   const [actionPillar, setActionPillar] = useState<HealthPillar | null>(null)
+
+  // Indicatoren gegroepeerd onder de vier gedragspijlers, met subtotaal.
+  const { groups, ungrouped } = useMemo(
+    () => groupPillars(health.pillars),
+    [health.pillars],
+  )
 
   // Count pillars by category
   const strongCount = health.pillars.filter(p => p.score > 70).length
@@ -491,26 +593,39 @@ export function HealthScoreReceipt({
         </div>
       </div>
 
-      {/* Per-pillar breakdown (enhanced with visual indicators) */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-[var(--ink-2)]">Pilaren (zwakste eerst)</h3>
-        {sorted.map(pillar => (
-          <PillarBar key={pillar.id} pillar={pillar} onCreateAction={setActionPillar} />
+      {/* Per-groep breakdown: vier gedragspijlers, elk met subtotaal + indicatoren */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-semibold text-[var(--ink-2)]">Pijlers (subtotaal per groep)</h3>
+        {groups.map(bucket => (
+          <PillarGroupSection
+            key={bucket.group}
+            bucket={bucket}
+            onCreateAction={setActionPillar}
+          />
         ))}
+
+        {/* Overige indicatoren zonder gedragsgroep (backward-compat / fixtures) */}
+        {ungrouped.length > 0 && (
+          <section aria-label="Overige indicatoren" className="space-y-2">
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Overig
+              </span>
+            </div>
+            {[...ungrouped]
+              .sort((a, b) => a.score - b.score)
+              .map(pillar => (
+                <PillarBar key={pillar.id} pillar={pillar} onCreateAction={setActionPillar} />
+              ))}
+          </section>
+        )}
       </div>
 
-      {/* Weighting explanation */}
-      <div className="rounded-[var(--r-sm)] bg-[var(--subtle)] p-3">
-        <h4 className="text-[10px] font-semibold text-[var(--ink-2)] mb-1.5">Weging</h4>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-          {health.pillars.map(p => (
-            <div key={p.id} className="flex items-center justify-between text-[10px]">
-              <span className="text-[var(--ink-3)]">{p.name}</span>
-              <span className="font-mono tabular-nums text-[var(--ink-2)]">{Math.round(p.weight * 100)}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Educatieve belasting-"kans" — buiten de score (ADR 0010, Wft: richting­aanwijzer) */}
+      <TaxOpportunitySection />
+
+      {/* Weighting explanation — per gedragsgroep (zelfde vier pijlers als boven) */}
+      <WeightingSection groups={groups} ungrouped={ungrouped} />
 
       {/* Optional footer (e.g. backtesting link) */}
       {footer}
@@ -518,6 +633,170 @@ export function HealthScoreReceipt({
       {/* Popup: maak een actie van de pijler-suggestie */}
       <PillarActionPopup pillar={actionPillar} onClose={() => setActionPillar(null)} />
     </div>
+  )
+}
+
+// ── Pillar group section (kassabon-stijl: groepskop + subtotaal) ──
+// Eén gedragspijler-groep: een groepskop met subtotaal (gewogen gemiddelde
+// van de actieve indicatoren in de groep) en de indicatoren als subregels.
+
+function PillarGroupSection({
+  bucket,
+  onCreateAction,
+}: {
+  bucket: PillarGroupBucket
+  onCreateAction: (pillar: HealthPillar) => void
+}) {
+  const label = scoreLabelNl(bucket.subtotal)
+  return (
+    <section
+      aria-label={`Pijler ${bucket.label}: subtotaal ${bucket.subtotal} van 100, ${label}`}
+      className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden"
+    >
+      {/* Groepskop met subtotaal — rustige lichte tint van de bandkleur met een
+          accent-randstreep links; tekst blijft neutraal (ink) voor leesbaarheid
+          (Editorial Finance: beperkt kleur). */}
+      <div
+        className="flex items-start justify-between gap-3 border-l-[3px] px-3 py-2.5"
+        style={{
+          backgroundColor: `color-mix(in oklch, ${scoreColor(bucket.subtotal)} 10%, transparent)`,
+          borderLeftColor: scoreColor(bucket.subtotal),
+        }}
+      >
+        <div className="min-w-0">
+          <h4 className="text-xs font-semibold text-[var(--ink)]">{bucket.label}</h4>
+          <p className="mt-0.5 text-[10px] text-[var(--ink-3)] leading-snug">{bucket.blurb}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span
+            className={`inline-flex items-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-1.5 py-0.5 text-[9px] font-semibold ${scoreColorClass(bucket.subtotal)}`}
+          >
+            {label}
+          </span>
+          <span
+            className={`font-mono text-base font-bold tabular-nums ${scoreColorClass(bucket.subtotal)}`}
+            aria-hidden="true"
+          >
+            {bucket.subtotal}
+          </span>
+        </div>
+      </div>
+
+      {/* Indicatoren als subregels onder de groepskop */}
+      <div className="space-y-2 border-t border-dashed border-[var(--border-md)] p-2.5">
+        {bucket.pillars.map(pillar => (
+          <PillarBar key={pillar.id} pillar={pillar} onCreateAction={onCreateAction} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// ── Weging per gedragsgroep (kassabon-stijl) ─────────────────
+// Spiegelt de groepering hierboven: per groep het GROEPSGEWICHT (Σ herverdeelde
+// gewichten van de actieve indicatoren) als heel procent — grootste-rest zodat
+// de som optisch op 100% sluit — met daaronder de indicatoren en hun eigen
+// gewicht. Inactieve indicatoren (niet in een groep) verschijnen niet.
+
+function WeightingSection({
+  groups,
+  ungrouped,
+}: {
+  groups: PillarGroupBucket[]
+  ungrouped: HealthPillar[]
+}) {
+  // Groepsgewicht = som van de pijlergewichten in de groep; afgerond met
+  // grootste-rest over álle actieve groepen samen zodat het op 100% sluit.
+  const groupPct = roundWeightsToPercent(
+    groups,
+    (b) => b.pillars.reduce((acc, p) => acc + p.weight, 0),
+  )
+
+  if (groups.length === 0 && ungrouped.length === 0) return null
+
+  return (
+    <div className="rounded-[var(--r-sm)] bg-[var(--subtle)] p-3">
+      <h4 className="text-[10px] font-semibold text-[var(--ink-2)] mb-2">Weging per pijler</h4>
+      <div className="space-y-2">
+        {groups.map((bucket) => (
+          <div
+            key={bucket.group}
+            className="border-l-[3px] pl-2.5"
+            style={{ borderLeftColor: scoreColor(bucket.subtotal) }}
+          >
+            {/* Groepskop: label + groepsgewicht */}
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[11px] font-semibold text-[var(--ink)]">{bucket.label}</span>
+              <span className="font-mono text-[11px] font-semibold tabular-nums text-[var(--ink)]">
+                {groupPct.get(bucket) ?? 0}%
+              </span>
+            </div>
+            {/* Indicatoren van de groep met hun eigen gewicht */}
+            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+              {bucket.pillars.map((p) => (
+                <span key={p.id} className="text-[10px] text-[var(--ink-3)]">
+                  {p.name}{' '}
+                  <span className="font-mono tabular-nums text-[var(--ink-2)]">
+                    {Math.round(p.weight * 100)}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Overige indicatoren zonder gedragsgroep (backward-compat) */}
+        {ungrouped.length > 0 && (
+          <div className="border-l-[3px] border-[var(--border-md)] pl-2.5">
+            <span className="text-[11px] font-semibold text-[var(--ink)]">Overig</span>
+            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+              {ungrouped.map((p) => (
+                <span key={p.id} className="text-[10px] text-[var(--ink-3)]">
+                  {p.name}{' '}
+                  <span className="font-mono tabular-nums text-[var(--ink-2)]">
+                    {Math.round(p.weight * 100)}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Educatieve belasting-"kans" (buiten de score) ────────────
+// ADR 0010: belasting voedt sinds v2 GEEN pijler meer, maar verschijnt als
+// educatieve richtingaanwijzer. Wft-eis: educatie/oriëntatie, GEEN handelings-
+// of fiscaal advies, geen euro-besparing beloven.
+
+function TaxOpportunitySection() {
+  return (
+    <section
+      aria-label="Belasting: educatief inzicht"
+      className="rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)] p-3"
+    >
+      <div className="flex items-start gap-2">
+        <Receipt className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden="true" />
+        <div className="min-w-0">
+          <h4 className="text-xs font-semibold text-[var(--ink)]">Belasting · ter oriëntatie</h4>
+          <p className="mt-1 text-[11px] leading-snug text-[var(--ink-2)]">
+            Verken je Box 3-positie. Je heffingsvrije vermogen en hoe je het saldo over
+            partners verdeelt bepalen mee hoeveel belasting je over je vermogen betaalt.
+            Dit telt bewust niet mee in je gezondheidsscore — het is geen oordeel, maar
+            iets om te begrijpen.
+          </p>
+          <Link
+            href="/overzicht/belasting"
+            className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-horizon-600 transition-colors hover:text-horizon-800"
+          >
+            <span className="underline underline-offset-2">Verken je belastingpositie</span>
+            <ArrowRight className="h-2.5 w-2.5" aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+    </section>
   )
 }
 

@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { Users, User } from 'lucide-react'
@@ -19,7 +19,7 @@ interface Props {
 export const HuishoudenVergelijkingWidget = memo(function HuishoudenVergelijkingWidget({ size, data, href }: Props) {
   const { perspective, isHousehold, partnerName } = usePerspective()
 
-  const dailyExp = data.monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(data.monthlyExpenses)
   const ho = data.householdOverrides
 
   // Solo users: hide widget completely (no empty state)

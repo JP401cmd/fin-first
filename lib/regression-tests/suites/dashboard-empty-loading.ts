@@ -29,7 +29,9 @@ function makeEmptyDashboardData(): DashboardData {
     },
     // Freedom
     freedomPct: 0,
+    fireEligibleNetWorth: 0,
     fireTarget: 0,
+    healthScore: { total: 0, label: '', pillars: [], previousMonth: null, trend: 0, activePillarCount: 6, budgetingActive: true },
     fireProjResult: {
       fireTarget: 0,
       netWorth: 0,

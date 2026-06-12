@@ -179,7 +179,7 @@ const MODULES: NaslagwerkModule[] = [
       {
         icon: MessageSquare,
         title: 'Will AI-chat',
-        summary: 'Je persoonlijke financiële gesprekspartner met drie persoonlijkheden.',
+        summary: 'Je persoonlijke financiële gesprekspartner die meedenkt over vandaag, je tips en je toekomst.',
         anchor: 'guide-reis-5',
       },
     ],
@@ -257,7 +257,7 @@ const MODULES: NaslagwerkModule[] = [
       {
         icon: Sparkles,
         title: 'Will — je AI-assistent',
-        summary: 'Drie persoonlijkheden (FHIN, FINN, FFIN) voor context-aware financieel advies.',
+        summary: 'Eén assistent, Will, die meedenkt over je overzicht van vandaag, concrete tips en je toekomst — context-aware financieel inzicht.',
       },
       {
         icon: Bell,

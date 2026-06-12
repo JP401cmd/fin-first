@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
+import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
  * GET /api/verify-freedom-time-labels
@@ -41,9 +42,8 @@ export async function GET() {
 
     // Test 3: Calculate daily expense rate from real transactions
     const now = new Date()
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
-    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+    const { start: monthStart, end: monthEnd } = localMonthBounds(now)
+    const twelveMonthsAgo = localMonthStartMonthsAgo(now, 11)
 
     const [expenseResult, earliestTxResult, currentMonthTx] = await Promise.all([
       supabase

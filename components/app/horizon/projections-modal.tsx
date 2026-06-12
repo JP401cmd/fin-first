@@ -502,18 +502,18 @@ function ThreeLineChart({
       {/* FIRE target */}
       {fireInRange && (
         <>
-          <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="6 3" />
+          <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="1.5" strokeDasharray="6 3" />
           <text x={W - PAD + 4} y={fireY + 3} className="fill-horizon-500" style={{ fontSize: 9, fontWeight: 600 }}>FIRE</text>
         </>
       )}
 
       {/* Cone fill */}
-      <path d={areaPath} fill="#8B5CB8" style={{ opacity: animated ? 0.08 : 0, transition: animated ? 'opacity 250ms ease-out 455ms' : 'none' }} />
+      <path d={areaPath} fill="var(--color-horizon-500, #c4a06b)" style={{ opacity: animated ? 0.08 : 0, transition: animated ? 'opacity 250ms ease-out 455ms' : 'none' }} />
 
       {/* Lines */}
       <path d={linePath(pesS)} fill="none" stroke="#d4a843" strokeWidth="1.5" strokeDasharray="4"
         style={{ animation: animated ? 'fadeInFill 400ms ease-out 200ms both' : 'none', opacity: animated ? undefined : 0 }} />
-      <path d={linePath(expS)} fill="none" stroke="#8B5CB8" strokeWidth="2.5"
+      <path d={linePath(expS)} fill="none" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2.5"
         pathLength={1} strokeDasharray={1}
         style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
       <path d={linePath(optS)} fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4"
@@ -532,7 +532,7 @@ function ThreeLineChart({
       {/* Legend */}
       <line x1={PAD} y1={12} x2={PAD + 16} y2={12} stroke="#10b981" strokeWidth="1.5" strokeDasharray="4" />
       <text x={PAD + 20} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Optimistisch</text>
-      <line x1={PAD + 100} y1={12} x2={PAD + 116} y2={12} stroke="#8B5CB8" strokeWidth="2" />
+      <line x1={PAD + 100} y1={12} x2={PAD + 116} y2={12} stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2" />
       <text x={PAD + 120} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Verwacht</text>
       <line x1={PAD + 190} y1={12} x2={PAD + 206} y2={12} stroke="#d4a843" strokeWidth="1.5" strokeDasharray="4" />
       <text x={PAD + 210} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Pessimistisch</text>

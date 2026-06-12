@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { localMonthBounds } from '@/lib/month-range'
 import { getDefaultBudgets, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { shouldAlert } from '@/lib/budget-alerts'
@@ -48,8 +49,7 @@ export default function TestBudgetWorkflowPage() {
   const loadSpending = useCallback(async () => {
     const supabase = createClient()
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+    const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
     const { data } = await supabase
       .from('transactions')

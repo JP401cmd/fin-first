@@ -156,7 +156,7 @@ export function CashflowSankey({
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Inkomen
             </div>
-            <div className="font-serif font-semibold text-emerald-700 tabular-nums">
+            <div className="font-serif font-semibold text-positive tabular-nums">
               {formatCurrency(totalIncome)}
             </div>
           </div>
@@ -164,7 +164,7 @@ export function CashflowSankey({
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
               Uitgaven
             </div>
-            <div className="font-serif font-semibold text-red-700 tabular-nums">
+            <div className="font-serif font-semibold text-negative tabular-nums">
               {formatCurrency(totalExpense)}
             </div>
           </div>
@@ -174,7 +174,7 @@ export function CashflowSankey({
             </div>
             <div
               className={`font-serif font-semibold tabular-nums ${
-                surplus >= 0 ? 'text-emerald-700' : 'text-red-700'
+                surplus >= 0 ? 'text-positive' : 'text-negative'
               }`}
             >
               {formatCurrency(Math.abs(surplus))}
@@ -190,7 +190,7 @@ export function CashflowSankey({
           Inkomen
         </div>
         <div
-          className="h-10 rounded-xl bg-emerald-600 flex items-center px-3"
+          className="h-10 rounded-xl bg-positive flex items-center px-3"
           role="img"
           aria-label={`Inkomen totaal ${formatCurrency(totalIncome)}`}
         >
@@ -218,7 +218,9 @@ export function CashflowSankey({
           {expenseBuckets.map((b) => {
             const isSurplus = b.category === '__surplus'
             const width = renorm(b.amount)
-            const color = isSurplus ? '#10b981' : colorForCategory(b.category)
+            // Overschot = positief (sparen) → semantische positief-token, één bron.
+            // Categorie-hexen blijven (categorie-herkenbaarheid, bewust buiten scope).
+            const color = isSurplus ? 'var(--positive)' : colorForCategory(b.category)
             const label = isSurplus
               ? `Overschot ${formatCurrency(b.amount)}`
               : `${readableLabel(b.category)} ${formatCurrency(b.amount)}`
@@ -245,7 +247,7 @@ export function CashflowSankey({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 text-xs">
         {expenseBuckets.map((b) => {
           const isSurplus = b.category === '__surplus'
-          const color = isSurplus ? '#10b981' : colorForCategory(b.category)
+          const color = isSurplus ? 'var(--positive)' : colorForCategory(b.category)
           const label = isSurplus ? 'Overschot' : readableLabel(b.category)
           return (
             <div

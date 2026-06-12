@@ -1,7 +1,8 @@
 ---
 name: polar-payments-expert
 description: Use this agent when implementing, reviewing, or troubleshooting Polar payment integration in the Next.js application. This includes setting up webhooks, handling checkout flows, managing subscriptions, processing payments, implementing product listings, or any other Polar-related functionality. Examples:\n\n<example>\nContext: User is implementing a new checkout flow using Polar\nuser: "I need to add a checkout button for our premium plan subscription"\nassistant: "Let me use the Task tool to launch the polar-payments-expert agent to ensure we implement the checkout flow following current Polar best practices."\n<commentary>Since this involves Polar payment implementation, use the polar-payments-expert agent to guide the implementation with up-to-date documentation.</commentary>\n</example>\n\n<example>\nContext: User has written code for Polar webhook handling\nuser: "I've implemented the webhook handler in src/app/api/webhooks/polar/route.ts. Can you review it?"\nassistant: "I'll use the Task tool to launch the polar-payments-expert agent to review the webhook implementation against current Polar best practices."\n<commentary>Since this is Polar-specific code that needs expert review for security and correctness, use the polar-payments-expert agent.</commentary>\n</example>\n\n<example>\nContext: Proactive review after payment-related code changes\nuser: "I've just finished adding the pricing page with Polar product integration"\nassistant: "Let me use the Task tool to launch the polar-payments-expert agent to review the implementation for best practices and security concerns."\n<commentary>Payment integration code should always be reviewed by the polar-payments-expert agent proactively.</commentary>\n</example>
-model: sonnet
+model: opus
+effort: high
 color: green
 ---
 

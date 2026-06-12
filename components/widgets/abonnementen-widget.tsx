@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { RefreshCw } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
@@ -15,7 +15,7 @@ interface Props {
 export const AbonnementenWidget = memo(function AbonnementenWidget({ size, data, href }: Props) {
   const { recurringTransactions, totalRecurringAmount, topRecurringTransactions, monthlyExpenses, monthlyIncome } = data
 
-  const dailyExp = monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 && totalRecurringAmount > 0
     ? calculateFreedomTime(totalRecurringAmount, dailyExp)
     : null

@@ -3,6 +3,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { NL_FICTIEF_BELEGGINGEN, BOX3_DRAG } from '@/lib/constants'
 
 interface Props {
   size: WidgetSize
@@ -63,8 +64,9 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
       }
     }
 
-    // Box 3 effective rate (annualDrag / totalAssets)
-    const effectiveRate = totalAssets > 0 ? annualDrag / totalAssets : 0.0212
+    // Box 3 effective rate (annualDrag / totalAssets). Fallback bij ontbrekend
+    // vermogen: de canonieke Box 3-drag (forfait × tarief ≈ 2,12%) uit constants.
+    const effectiveRate = totalAssets > 0 ? annualDrag / totalAssets : BOX3_DRAG
 
     // 5-year projection
     const projections: { year: number; wealth: number; tax: number; days: number | null }[] = []
@@ -142,7 +144,7 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
           <div className="flex justify-between text-[11px]">
             <span className="text-[var(--ink-3)]">Fictief rendement (Box 3)</span>
             <span className="text-[var(--ink-2)]">
-              <MaskedAmount value={totalAssets * 0.0643} tone="horizon" />
+              <MaskedAmount value={totalAssets * NL_FICTIEF_BELEGGINGEN} tone="horizon" />
             </span>
           </div>
           <div className="flex justify-between text-[11px]">
@@ -154,7 +156,7 @@ export const Box3DragWidget = memo(function Box3DragWidget({ size, data, href }:
         </div>
 
         {/* Optimalisatie hint */}
-        {annualGrowthRate < 0.0643 && totalAssets > 50000 && (
+        {annualGrowthRate < NL_FICTIEF_BELEGGINGEN && totalAssets > 50000 && (
           <p className="mt-1.5 text-[11px] text-[var(--ink-2)] font-medium">
             💡 Werkelijk rendement lager dan fictief — overweeg asset-mix optimalisatie
           </p>

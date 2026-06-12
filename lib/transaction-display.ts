@@ -5,6 +5,7 @@
 
 import { calculateFreedomTime } from '@/lib/format'
 import { counterpartyKey } from '@/lib/transaction-insights'
+import { PSP_PREFIX_RE, stripPspPrefix } from '@/lib/parsers/counterparty-normalize'
 
 // ─── Task 5: cleanMerchantName ────────────────────────────────────────────────
 
@@ -23,13 +24,14 @@ export function cleanMerchantName(raw: string | null): string {
   let s = (raw ?? '').trim()
   if (!s) return 'Onbekend'
   // Strip PSP prefix before KNOWN lookup so "BCK*SHELL T KEMPKE" → "SHELL T KEMPKE"
-  // Only check KNOWN AFTER prefix stripping to avoid over-matching location suffixes
-  const hasPsp = /^[A-Za-z.]{2,8}\*/.test(s)
+  // Only check KNOWN AFTER prefix stripping to avoid over-matching location suffixes.
+  // Patroonbron gedeeld met de match-normalisatie (counterparty-normalize.ts).
+  const hasPsp = PSP_PREFIX_RE.test(s)
   if (!hasPsp) {
     // For non-PSP inputs, check KNOWN first (catches "Esso Arnhem IJsseloo" → "Esso")
     for (const k of KNOWN) if (k.test.test(s)) return k.name
   }
-  s = s.replace(/^[A-Za-z.]{2,8}\*/, '').replace(/^iZ\s+/i, '').trim()
+  s = stripPspPrefix(s).replace(/^iZ\s+/i, '').trim()
   s = s.replace(/\s+(b\.?v\.?|n\.?v\.?)$/i, '').trim()
   s = s.replace(/\s+\d{2,5}(\s+[A-Za-zÀ-ÿ]+)?$/, '').trim()
   if (!s) return 'Onbekend'

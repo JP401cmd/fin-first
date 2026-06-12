@@ -243,12 +243,12 @@ describe('buildBriefingEntries — hefboom-tagging (plan T-3)', () => {
     expect(headsUp?.hefboom).toBe('cashflow')
   })
 
-  it('mapt diversification → bezittingen', () => {
+  it('mapt asset_concentration → bezittingen', () => {
     const result = buildBriefingEntries(
       emptyInput({
         health: makeHealth({
           pillars: [
-            { id: 'diversification', name: 'Diversificatie', score: 30, weight: 0.1, explanation: '', improvementTip: 't', actionHref: '', actionLabel: '', rawValue: '' },
+            { id: 'asset_concentration', name: 'Vermogensspreiding', score: 30, weight: 0.1, explanation: '', improvementTip: 't', actionHref: '', actionLabel: '', rawValue: '' },
           ],
         }),
       }),
@@ -269,17 +269,17 @@ describe('buildBriefingEntries — hefboom-tagging (plan T-3)', () => {
     expect(result.find((e) => e.category === 'heads_up')?.hefboom).toBe('schulden')
   })
 
-  it('mapt tax_optimization → belasting', () => {
+  it('mapt debt_service_ratio → schulden', () => {
     const result = buildBriefingEntries(
       emptyInput({
         health: makeHealth({
           pillars: [
-            { id: 'tax_optimization', name: 'Belasting', score: 30, weight: 0.1, explanation: '', improvementTip: 't', actionHref: '', actionLabel: '', rawValue: '' },
+            { id: 'debt_service_ratio', name: 'Schuldenlast', score: 30, weight: 0.12, explanation: '', improvementTip: 't', actionHref: '', actionLabel: '', rawValue: '' },
           ],
         }),
       }),
     )
-    expect(result.find((e) => e.category === 'heads_up')?.hefboom).toBe('belasting')
+    expect(result.find((e) => e.category === 'heads_up')?.hefboom).toBe('schulden')
   })
 
   it('fire_progress blijft ongetagd (cross-hefboom)', () => {
@@ -566,6 +566,55 @@ describe('buildBriefingEntries — finance-verrijking', () => {
     const sav = result.find((e) => e.id === 'finance:savings')
     expect(sav?.category).toBe('heads_up')
     expect(sav?.text).toMatch(/meer uit/)
+  })
+
+  it('spaarquote gebruikt savingsRate6m wanneer aanwezig (≠ maandcijfer)', () => {
+    // 1-maands cijfer zou 25% zijn; de canonieke 6m-spaarquote is 32%.
+    // Het briefje MOET het 6m-getal noemen, niet het maandsurplus.
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { monthlyIncome: 4000, monthlyExpenses: 3000, savingsRate6m: 32 },
+      }),
+    )
+    const sav = result.find((e) => e.id === 'finance:savings')
+    expect(sav?.category).toBe('observation')
+    expect(sav?.text).toMatch(/32%/)
+    expect(sav?.text).not.toMatch(/25%/)
+  })
+
+  it('lage savingsRate6m → spaarquote-framing met het 6m-getal', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { monthlyIncome: 4000, monthlyExpenses: 3000, savingsRate6m: 4 },
+      }),
+    )
+    const sav = result.find((e) => e.id === 'finance:savings')
+    expect(sav?.category).toBe('observation')
+    expect(sav?.text).toMatch(/spaarquote is 4%/)
+  })
+
+  it('dagbasis = jaar/365 (×12/365), niet maand/30', () => {
+    // monthlyExpenses 3000: oude maand/30-basis = €100/dag, canonieke
+    // ×12/365-basis = €98,63/dag. Groei €1449 kantelt de afronding:
+    //   /30:      1449/100   = 14,49 → 14 dagen
+    //   ×12/365:  1449/98,63 = 14,69 → 15 dagen
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          netWorthHistory: [
+            { month: '2026-08', value: 100000 },
+            { month: '2026-09', value: 101449 },
+          ],
+          monthlyExpenses: 3000,
+        },
+      }),
+    )
+    const nw = result.find((e) => e.id === 'finance:networth')
+    // Canonieke dagbasis (98,63) → 15 dagen; de oude /30-basis gaf 14.
+    expect(nw?.text).toMatch(/15 dagen/)
   })
 
   it('FIRE-voortgang → observation met percentage en leeftijd', () => {

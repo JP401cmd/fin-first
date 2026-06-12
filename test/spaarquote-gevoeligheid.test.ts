@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
+import { computeEffectiveSwr } from '@/lib/fire-params'
 
 // ── Inline copy of computeFireAgeForSavings (pure function from component) ──
 // We test the core logic directly to avoid React component dependencies.
+// Mirrors components/.../spaarquote-gevoeligheid.tsx: de fallback-SWR komt nu
+// uit computeEffectiveSwr(expectedReturn, inflationRate), niet een vaste 4%.
 
 interface SimCashflow {
   type: 'one_time' | 'recurring'
@@ -24,11 +27,12 @@ function computeFireAgeForSavings(
 ): { fireAge: number | null; portfolioAtFire: number } {
   if (yearlyExpenses <= 0) return { fireAge: null, portfolioAtFire: currentPortfolio }
 
-  // Prefer the app-resolved FIRE target (from effectiveSwr); fall back to 4% rule.
+  // Prefer the app-resolved FIRE target (from effectiveSwr); fall back to the
+  // per-user effective SWR derived from expectedReturn/inflationRate.
   const fireTarget =
     fireTargetOverride != null && fireTargetOverride > 0
       ? fireTargetOverride
-      : yearlyExpenses / 0.04
+      : yearlyExpenses / computeEffectiveSwr(expectedReturn, inflationRate)
 
   let portfolio = currentPortfolio
   const realReturn = expectedReturn - inflationRate
@@ -67,7 +71,7 @@ function computeFireAgeForSavings(
 const BASE_PARAMS = {
   currentPortfolio: 200_000,
   annualSavings: 24_000,    // €2.000/maand
-  yearlyExpenses: 36_000,   // €3.000/maand → FIRE target = 900.000
+  yearlyExpenses: 36_000,   // €3.000/maand → FIRE-doel ≈ €1,25M bij default SWR (≈2,88%)
   expectedReturn: 0.07,
   inflationRate: 0.02,
   currentAge: 35,
@@ -145,9 +149,9 @@ describe('Spaarquote gevoeligheidsanalyse – regressietest', () => {
     )
 
     // With €200K portfolio at 5% real return and 0 savings, it might still reach
-    // FIRE target (900K) eventually via compound interest: 200K * 1.05^N >= 900K
-    // N = ln(900/200) / ln(1.05) ≈ 30.7 years → FIRE at ~66
-    // Should still be reachable, just much later than with savings
+    // the FIRE target eventually via compound interest. Met de effectieve-SWR-
+    // default (≈2,88%) ligt het doel rond €1,25M → bereikbaar via rente alleen,
+    // maar veel later dan mét sparen. (Relatieve assertie, geen vast doelbedrag.)
     if (result.fireAge !== null) {
       const baseFire = fireAge(BASE_PARAMS.annualSavings)!
       expect(result.fireAge).toBeGreaterThan(baseFire)
@@ -157,10 +161,12 @@ describe('Spaarquote gevoeligheidsanalyse – regressietest', () => {
     expect(result.portfolioAtFire).toBeGreaterThan(0)
   })
 
-  it('Stap 4b: een niet-4%-SWR verschuift de FIRE-leeftijd', () => {
-    // Met de 4%-regel is het FIRE-doel yearlyExpenses/0.04 = 900.000.
-    // Een lagere SWR (bijv. 3,5%) verhoogt het doel (≈ 1.028.571) → later FIRE.
-    // Een hogere SWR (bijv. 5%) verlaagt het doel (720.000) → eerder FIRE.
+  it('Stap 4b: een afwijkende SWR verschuift de FIRE-leeftijd', () => {
+    // De default-fallback gebruikt nu de per-gebruiker effectieve SWR
+    // (computeEffectiveSwr(0.07, 0.02) ≈ 2,88%), niet een vaste 4%.
+    // Relatief daaraan: een LAGERE SWR verhoogt het doel → later FIRE;
+    // een HOGERE SWR verlaagt het doel → eerder FIRE.
+    const defaultSwr = computeEffectiveSwr(BASE_PARAMS.expectedReturn, BASE_PARAMS.inflationRate)
     const args = [
       BASE_PARAMS.currentPortfolio,
       BASE_PARAMS.annualSavings,
@@ -172,25 +178,25 @@ describe('Spaarquote gevoeligheidsanalyse – regressietest', () => {
       90,
     ] as const
 
-    const baseline4pct = computeFireAgeForSavings(...args).fireAge // default 4%
+    const baselineDefault = computeFireAgeForSavings(...args).fireAge // default effectieve SWR
     const lowerSwr = computeFireAgeForSavings(
       ...args,
-      BASE_PARAMS.yearlyExpenses / 0.035, // 3,5% SWR → hoger doel
+      BASE_PARAMS.yearlyExpenses / (defaultSwr - 0.005), // lagere SWR → hoger doel
     ).fireAge
     const higherSwr = computeFireAgeForSavings(
       ...args,
-      BASE_PARAMS.yearlyExpenses / 0.05, // 5% SWR → lager doel
+      BASE_PARAMS.yearlyExpenses / (defaultSwr + 0.01), // hogere SWR → lager doel
     ).fireAge
 
-    expect(baseline4pct).not.toBeNull()
+    expect(baselineDefault).not.toBeNull()
     expect(lowerSwr).not.toBeNull()
     expect(higherSwr).not.toBeNull()
 
-    // Lagere SWR (hoger doel) → niet eerder dan 4%; hogere SWR (lager doel) → niet later.
-    expect(lowerSwr!).toBeGreaterThanOrEqual(baseline4pct!)
-    expect(higherSwr!).toBeLessThanOrEqual(baseline4pct!)
+    // Lagere SWR (hoger doel) → niet eerder; hogere SWR (lager doel) → niet later.
+    expect(lowerSwr!).toBeGreaterThanOrEqual(baselineDefault!)
+    expect(higherSwr!).toBeLessThanOrEqual(baselineDefault!)
     // En de SWR maakt daadwerkelijk verschil (niet alle drie identiek).
-    expect(lowerSwr! > baseline4pct! || higherSwr! < baseline4pct!).toBe(true)
+    expect(lowerSwr! > baselineDefault! || higherSwr! < baselineDefault!).toBe(true)
   })
 
   it('Stap 5: Eindvermogen op vaste leeftijd stijgt met spaarquote', () => {

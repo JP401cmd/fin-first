@@ -19,6 +19,12 @@ export type SnapshotForTrend = {
   net_worth: number
   freedom_percentage: number | null
   fire_age: number | null
+  /**
+   * Scoreversie van de gezondheids-snapshot (ADR 0010). 1 = oude 7-pijler-
+   * methode, 2 = nieuwe 4-pijler-methode. Optioneel: oudere selects leveren 'm
+   * niet — dan blijft de "methode aangepast"-markering achterwege.
+   */
+  score_version?: number | null
 }
 
 export type PensionParseSummaryResult = {
@@ -404,6 +410,14 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTren
   const linePath = withScore.map((s, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(s.resilience_score as number).toFixed(1)}`).join(' ')
   const areaPath = linePath + ` L${x(withScore.length - 1).toFixed(1)},${(H - PAD).toFixed(1)} L${PAD},${(H - PAD).toFixed(1)} Z`
 
+  // Methode-wissel-markering: alleen tonen wanneer de reeks zowel v1- als v2-
+  // punten bevat (ADR 0010). We markeren het eerste v2-punt subtiel met een
+  // gestreepte verticale scheiding + klein label "methode aangepast".
+  const firstV2Index = withScore.findIndex(s => s.score_version === 2)
+  const hasV1 = withScore.some(s => s.score_version != null && s.score_version < 2)
+  const showMethodMarker = firstV2Index > 0 && hasV1
+  const markerX = showMethodMarker ? x(firstV2Index) : 0
+
   // Color zones: Kritiek (0-20), Kwetsbaar (20-40), Redelijk (40-60), Sterk (60-80), Uitstekend (80-100)
   const zones = [
     { min: 0, max: 20, color: '#fecaca', label: 'Kritiek' },
@@ -452,14 +466,39 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTren
       {/* Area fill */}
       <defs>
         <linearGradient id="resilienceGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#8B5CB8" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="#8B5CB8" stopOpacity="0.05" />
+          <stop offset="0%" stopColor="var(--color-horizon-500, #c4a06b)" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="var(--color-horizon-500, #c4a06b)" stopOpacity="0.05" />
         </linearGradient>
       </defs>
       <path d={areaPath} fill="url(#resilienceGrad)" />
 
-      {/* Line */}
-      <path d={linePath} fill="none" stroke="#8B5CB8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Line — horizon module-identiteit (volgt instelbare accent) */}
+      <path d={linePath} fill="none" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Methode-wissel-markering (alleen bij mix v1+v2) */}
+      {showMethodMarker && (
+        <g data-testid="method-change-marker" aria-hidden="true">
+          <line
+            x1={markerX}
+            y1={PAD - 18}
+            x2={markerX}
+            y2={H - PAD}
+            stroke="#a1a1aa"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+          <text
+            x={markerX}
+            y={PAD - 20}
+            textAnchor="middle"
+            aria-hidden="true"
+            className="fill-zinc-500"
+            style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.04em' }}
+          >
+            methode aangepast
+          </text>
+        </g>
+      )}
 
       {/* Data points */}
       {withScore.map((s, i) => (
@@ -468,7 +507,7 @@ export function ResilienceTrendChart({ snapshots }: { snapshots: SnapshotForTren
           cx={x(i)}
           cy={y(s.resilience_score as number)}
           r="4"
-          fill="#8B5CB8"
+          fill="var(--color-horizon-500, #c4a06b)"
           stroke="white"
           strokeWidth="2"
         />

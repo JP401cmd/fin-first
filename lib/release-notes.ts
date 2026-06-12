@@ -2352,8 +2352,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
             description: 'De next-steps API bevraagt nu 7 database-tabellen parallel (transacties, budgetten, assets, schulden, snapshots, profielen, doelen) en sluit reeds voltooide stappen automatisch uit.',
           },
           {
-            title: 'Dynamische AI-persoonlijkheid per module',
-            description: 'ChatPanel detecteert de huidige module via het pad en past avatar, kleuren, begroeting en placeholder aan: FHIN (kern/amber), Will (wil/teal), FFIN (horizon/paars). Elk module heeft een apart chatgesprek.',
+            title: 'Dynamische AI-context per module',
+            description: 'ChatPanel detecteert de huidige module via het pad en past de context, kleuren, begroeting en placeholder aan. Will denkt mee vanuit het juiste perspectief (overzicht/teal, toekomst/paars) en elke module heeft een apart chatgesprek.',
           },
         ],
       },

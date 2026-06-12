@@ -267,6 +267,7 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
+import type { HealthScore } from '@/lib/financial-health'
 
 // ── DashboardData bundle ──────────────────────────────────────
 // All data the dashboard page fetches and passes down to widgets.
@@ -420,8 +421,16 @@ export interface DashboardData {
   }
   // Freedom
   freedomPct: number
+  // FIRE-eligible vermogen (huis gefilterd via housing-strategie) — canonieke
+  // teller van data.freedomPct; mijlpaal-widgets leggen hun datumlogica hierop
+  // zodat "bereikt" en de voortgang dezelfde grondslag delen (ADR 0009).
+  fireEligibleNetWorth: number
   fireTarget: number
   fireProjResult: FireProjection
+  // Canonieke gezondheidsscore mét trend (ADR 0008). Bevat de echte
+  // tax_optimization-pijler; de gezondheids-widget consumeert dit i.p.v. zelf
+  // computeHealthScore(DashboardData) te draaien (waar tax hardcoded 50 is).
+  healthScore: HealthScore
   // Actions
   openActions: number
   totalFreedomDaysOpen: number

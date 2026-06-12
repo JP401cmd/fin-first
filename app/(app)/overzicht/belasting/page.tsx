@@ -8,6 +8,7 @@ import {
   type BelastingBoxStatus,
 } from '@/components/overview/belasting-box-cards'
 import { computeJaarruimte } from '@/lib/jaarruimte'
+import { dailyExpenseRate } from '@/lib/format'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 import { pillarStatus } from '@/lib/leverage-status'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
@@ -106,10 +107,11 @@ export default async function OverzichtBelastingPage() {
   } = await supabase.auth.getUser()
   const hasAanmerkelijkBelang = user ? await hasBox2Relevance(supabase, user.id) : false
 
-  // Dag-uitgaven voor de vrijheidstijd-omrekening (maandbudget / 30). Fallback
-  // op €100/dag zodat de vrijheidstijd nooit door nul deelt.
+  // Dag-uitgaven voor de vrijheidstijd-omrekening (canonieke jaar/365-dagbasis
+  // via dailyExpenseRate). Fallback op €100/dag zodat de vrijheidstijd nooit
+  // door nul deelt.
   const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 100
+  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
 
   // Box 1-schatting: netto-maandinkomen ≈ bruto × (1 − marginaal_tarief),
   // dus bruto ≈ netto / (1 − marginaal). We leiden zo het bruto-jaarinkomen af

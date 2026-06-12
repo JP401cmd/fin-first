@@ -1,9 +1,10 @@
 import { registerTests } from '../test-registry'
-import { assertEqual, assert, assertGreaterThan, assertGreaterThanOrEqual, assertLessThanOrEqual } from '../assert'
+import { assertEqual, assert, assertGreaterThan, assertGreaterThanOrEqual, assertLessThanOrEqual, assertLessThan } from '../assert'
 import type { TestCase } from '../test-types'
 import { computeSovereigntyLevel, levelToPhaseId, PHASES } from '@/lib/feature-phases'
 import { computeFeatureAccess, isFeatureAccessible } from '@/lib/compute-feature-access'
 import type { FinancialInput } from '@/lib/compute-feature-access'
+import { NL_SWR } from '@/lib/horizon-data'
 
 const CAT = 'identiteit.sovereignty'
 
@@ -291,6 +292,50 @@ const tests: TestCase[] = [
       // Gratis features staan voor beide standaard aan
       assert(recoveryMap['vermogensbeheer']?.accessible === true, 'vermogensbeheer aan in recovery')
       assert(masteryMap['vermogensbeheer']?.accessible === true, 'vermogensbeheer aan in mastery')
+    },
+  },
+
+  // ── Canonieke grondslag (ADR 0009 / audit §R2): freedomPct, niet vol-vermogen ─
+  // Regressie voor de WP-B-fix in dashboard-data-loader: het sovereignty-niveau
+  // ("Jouw Pad") krijgt nu de canonieke `freedomPct` (FIRE-eligible vermogen ÷
+  // benodigde portfolio, huis-uitgesloten) i.p.v. een lokaal hertelde
+  // `netWorth / (jaaruitgaven / NL_SWR)`. Voor een huiseigenaar dúwde die oude
+  // som het percentage — en daarmee het niveau — kunstmatig omhoog, terwijl het
+  // dashboard tegelijk een lager (correcter) getal toonde. Deze case pint vast
+  // dat de canonieke freedomPct een STRIKT lager (en juister) niveau oplevert.
+  {
+    id: 'sov-freedompct-canoniek-niet-volvermogen',
+    name: 'Sovereignty-niveau volgt canonieke freedomPct, niet netWorth/NL_SWR (huiseigenaar)',
+    category: CAT,
+    description:
+      'Huiseigenaar: vol netWorth ÷ (jaaruitgaven/NL_SWR) zou ~92% (level 5) geven; de canonieke huis-uitgesloten freedomPct is 50% (level 4). Het niveau MOET het canonieke, lagere getal volgen.',
+    priority: 'critical',
+    estimatedDurationMs: 5,
+    fn() {
+      // Huiseigenaar met veel vastgeklonken woningwaarde.
+      const netWorth = 1_150_000        // incl. woning
+      const monthlyExpenses = 3_000
+      const yearlyExpenses = monthlyExpenses * 12 // 36.000
+
+      // OUD (buggy): vol vermogen ÷ benodigde portfolio op NL_SWR-grondslag.
+      // NL_SWR ≈ 0,02883 → benodigd ≈ 1.248.613.
+      const oldRequired = yearlyExpenses / NL_SWR          // ≈ 1.248.613
+      const oldFreedomPct = (netWorth / oldRequired) * 100 // 1.150k/1.249M ≈ 92,1%
+      // CANONIEK: FIRE-eligible (huis uitgesloten) ÷ dezelfde noemer.
+      const fireEligibleNetWorth = 624_000                 // belegd + cash, huis eruit
+      const canonicalFreedomPct = (fireEligibleNetWorth / oldRequired) * 100 // ≈ 50,0%
+
+      // Sanity: de twee grondslagen verschillen substantieel (anders zegt de case niets).
+      assertGreaterThanOrEqual(oldFreedomPct, 75, `oude grondslag duwt naar ≥75% (was ${oldFreedomPct.toFixed(1)}%)`)
+      assertLessThan(canonicalFreedomPct, 75, `canonieke grondslag blijft <75% (${canonicalFreedomPct.toFixed(1)}%)`)
+
+      const oldLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, oldFreedomPct, false)
+      const canonicalLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, canonicalFreedomPct, false)
+
+      // De fix: het niveau dat de loader vaststelt = het canonieke, lagere.
+      assertEqual(oldLevel, 5, 'oude grondslag → level 5 (75–100% freedom)')
+      assertEqual(canonicalLevel, 4, 'canonieke grondslag → level 4 (25–75% freedom)')
+      assertLessThan(canonicalLevel, oldLevel, 'canoniek niveau is strikt lager dan de oude vol-vermogen-som')
     },
   },
 

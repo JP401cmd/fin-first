@@ -75,6 +75,19 @@ type ModuleColorContextType = {
   setPhaseConfig: (config: PhaseColorConfig) => void
   getPhaseHex: (phase: PhaseColorName, shade?: Shade) => string
 
+  /**
+   * Niet-persisterende hydratatie vanuit een DB-leesroute. Zet refs + state +
+   * CSS-vars, maar triggert NOOIT schedulePersist(). Gebruik dit overal waar
+   * kleuren ingeladen worden (i.p.v. setConfig/setBudgetConfig): die setters
+   * zijn uitsluitend voor echte gebruikersinteractie en zouden anders een
+   * verse keuze overschrijven met stale DB-waarden (clobber-bug).
+   */
+  hydrateColors: (next: {
+    modules?: ModuleColorConfig
+    budget?: BudgetColorConfig
+    phase?: PhaseColorConfig
+  }) => void
+
   // Font theme
   fontTheme: FontTheme
   setFontTheme: (theme: FontTheme) => void
@@ -121,6 +134,57 @@ export function ModuleColorProvider({
   const budgetRef = useRef(budgetConfig)
   const phaseRef = useRef(phaseConfig)
 
+  // Debounce-timer voor het persisteren van kleur-keuzes naar profiles.
+  // Eén gedeelde timer: snel achter elkaar klikken levert één PUT op.
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Snapshot van wat er bij de eerstvolgende persist verstuurd moet worden.
+  // BEWUST losgekoppeld van moduleRef/budgetRef: die refs volgen óók
+  // niet-persisterende hydratatie (applyVars heeft de actueel getoonde kleuren
+  // nodig). De persist mag echter UITSLUITEND de gebruikerskeuze versturen, ook
+  // als er binnen het debounce-window stale DB-waarden gehydrateerd worden —
+  // anders clobbert die hydratatie de keuze alsnog via de pending timer.
+  const pendingPersistRef = useRef<{
+    module_colors: ModuleColorConfig
+    budget_colors: BudgetColorConfig
+  } | null>(null)
+
+  /**
+   * Verstuurt de gesnapshotte kleur-keuze direct naar profiles via
+   * /api/appearance. `keepalive: true` zorgt dat de request óók afrondt als de
+   * pagina sluit/navigeert (browser houdt 'm in leven). Fire-and-forget: een
+   * mislukte save mag de UI nooit blokkeren.
+   */
+  const sendPersist = useCallback(() => {
+    const payload = pendingPersistRef.current
+    if (!payload) return
+    pendingPersistRef.current = null
+    void fetch('/api/appearance', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => { /* offline / transient — CSS-vars blijven staan */ })
+  }, [])
+
+  /**
+   * Snapshot de huidige keuze en persisteer 'm debounced (400ms) naar profiles.
+   * CSS-vars zijn al direct toegepast; deze call zorgt dat de keuze een refresh
+   * overleeft (layout laadt ze weer in). Een lopende timer wordt door de
+   * pagehide/visibilitychange-flush hieronder direct verzilverd.
+   */
+  const schedulePersist = useCallback(() => {
+    pendingPersistRef.current = {
+      module_colors: moduleRef.current,
+      budget_colors: budgetRef.current,
+    }
+    if (persistTimer.current) clearTimeout(persistTimer.current)
+    persistTimer.current = setTimeout(() => {
+      persistTimer.current = null
+      sendPersist()
+    }, 400)
+  }, [sendPersist])
+
   const applyVars = useCallback(() => {
     const vars = generateAllColorVars({
       modules: moduleRef.current,
@@ -137,17 +201,44 @@ export function ModuleColorProvider({
     moduleRef.current = newConfig
     setConfigState(newConfig)
     applyVars()
-  }, [applyVars])
+    schedulePersist()
+  }, [applyVars, schedulePersist])
 
   const setBudgetConfig = useCallback((newConfig: BudgetColorConfig) => {
     budgetRef.current = newConfig
     setBudgetConfigState(newConfig)
     applyVars()
-  }, [applyVars])
+    schedulePersist()
+  }, [applyVars, schedulePersist])
 
   const setPhaseConfig = useCallback((newConfig: PhaseColorConfig) => {
     phaseRef.current = newConfig
     setPhaseConfigState(newConfig)
+    applyVars()
+  }, [applyVars])
+
+  /**
+   * Niet-persisterende hydratatie: zet refs + state + CSS-vars zonder
+   * schedulePersist(). Bewust GEEN persist — DB-leesroutes (bv. de
+   * profielpagina) mogen nooit een PUT triggeren, anders overschrijven ze een
+   * verse keuze met stale DB-waarden (clobber-bug). Alleen de losse setters
+   * (setConfig/setBudgetConfig) — gebonden aan echte gebruikersinteractie —
+   * persisteren.
+   *
+   * Heeft momenteel géén productie-afnemers: de layout hydrateert al
+   * server-side via de initialConfig-props, dus client-side DB-loads zijn
+   * overbodig geworden. Gereserveerd (en door de persist-regressietests
+   * gecontracteerd) voor toekomstige DB-leesroutes — gebruik bij inladen
+   * ALTIJD dit pad, nooit de setters.
+   */
+  const hydrateColors = useCallback((next: {
+    modules?: ModuleColorConfig
+    budget?: BudgetColorConfig
+    phase?: PhaseColorConfig
+  }) => {
+    if (next.modules) { moduleRef.current = next.modules; setConfigState(next.modules) }
+    if (next.budget)  { budgetRef.current = next.budget; setBudgetConfigState(next.budget) }
+    if (next.phase)   { phaseRef.current = next.phase; setPhaseConfigState(next.phase) }
     applyVars()
   }, [applyVars])
 
@@ -206,6 +297,29 @@ export function ModuleColorProvider({
     } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Flush-hardening: een full reload / tab-sluit / app-switch binnen het 400ms
+  // debounce-window zou een net-gemaakte kleurkeuze verliezen. We flushen een
+  // lopende debounce-timer direct met dezelfde PUT (keepalive overleeft de
+  // navigatie). `pagehide` dekt reload/sluit/back-forward-cache; de hidden-
+  // overgang van `visibilitychange` dekt mobiel app-switchen (waar pagehide
+  // niet altijd vuurt).
+  useEffect(() => {
+    const flush = () => {
+      if (persistTimer.current) {
+        clearTimeout(persistTimer.current)
+        persistTimer.current = null
+        sendPersist()
+      }
+    }
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [sendPersist])
+
   const getHex = useCallback((module: ModuleName, shade: Shade = 500): string => {
     const hex = config[module] || DEFAULT_MODULE_COLORS[module]
     const palette = generatePalette(hex)
@@ -229,6 +343,7 @@ export function ModuleColorProvider({
       config, setConfig, getHex,
       budgetConfig, setBudgetConfig, getBudgetHex,
       phaseConfig, setPhaseConfig, getPhaseHex,
+      hydrateColors,
       fontTheme, setFontTheme,
       paletteTheme, setPaletteTheme,
     }}>
@@ -253,6 +368,17 @@ export function usePhaseColors() {
   const ctx = useContext(ModuleColorContext)
   if (!ctx) throw new Error('usePhaseColors must be used within ModuleColorProvider')
   return { phaseConfig: ctx.phaseConfig, setPhaseConfig: ctx.setPhaseConfig, getPhaseHex: ctx.getPhaseHex }
+}
+
+/**
+ * Geeft uitsluitend de niet-persisterende hydratatie-API terug. Bedoeld voor
+ * DB-leesroutes (bv. de profielpagina) die ingeladen kleuren in de provider
+ * willen zetten zónder een PUT /api/appearance te triggeren.
+ */
+export function useColorHydration() {
+  const ctx = useContext(ModuleColorContext)
+  if (!ctx) throw new Error('useColorHydration must be used within ModuleColorProvider')
+  return ctx.hydrateColors
 }
 
 export function useFontTheme() {

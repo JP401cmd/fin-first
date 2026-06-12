@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { localMonthBounds } from '@/lib/month-range'
 
 type VerificationResult = {
   budget_id: string
@@ -39,8 +40,7 @@ export default function TestBudgetVerifyPage() {
         }
         setAuthenticated(true)
 
-        const monthStart = monthDate.toISOString().split('T')[0]
-        const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1).toISOString().split('T')[0]
+        const { start: monthStart, end: monthEnd } = localMonthBounds(monthDate)
 
         // Fetch budgets (same as budgets page)
         const { data: budgets, error: budgetErr } = await supabase

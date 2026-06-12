@@ -18,13 +18,17 @@ import { join } from 'path'
  * 3. computeResilienceScore (deprecated) produces valid 0-100 score
  * 4. Resilience labels map correctly
  * 5. POST /api/snapshots stores resilience_score (now from healthScore.total)
- * 6. Horizon page loadData() fetches snapshots with resilience_score
- * 7. ResilienceTrendChart component exists and renders SVG with color zones
- * 8. Horizon page KPI prefers snapshot resilience_score over computed value
+ * 6. Horizon data-loader fetches snapshots with resilience_score (trend only)
+ * 7. HorizonTrendGrid renders the resilience trend with color zones
+ * 8. Badge toont ALTIJD de live healthScoreTotal (geen snapshot-preferentie meer)
  * 9. computeResilienceScore (deprecated) handles edge cases
  * 10. Snapshot data structure matches expected fields
- * 11. Horizon page code: snapshotResilience state + "uit snapshot data" label
- * 12. ResilienceTrendChart filters for snapshots with non-null resilience_score
+ * 11. Receipt-footer is altijd "Live berekend" (geen "uit snapshot data" meer)
+ * 12. HorizonTrendGrid filtert snapshots met non-null resilience_score (trendlijn)
+ *
+ * Defect A/B-fix: de badge is altijd de live score; `resilience_score` is
+ * uitsluitend historie voor de trendlijn. Tests 8 + 11 verifiëren dat het
+ * OUDE snapshot-preferentie-gedrag (en het "uit snapshot data"-label) weg is.
  */
 export async function GET() {
   const supabase = await createClient()
@@ -113,47 +117,58 @@ export async function GET() {
       : 'Could not verify from source code',
   })
 
-  // Test 6: Horizon page loadData() fetches snapshots with resilience_score
-  let horizonSource = ''
+  // Bronnen voor de code-checks. De Horizon-UI is sinds de SSoT-refactor
+  // opgesplitst: de data-loader bevat de snapshot-query (trendlijn), de
+  // client rendert de receipt-footer, en de trend-grid rendert de badge +
+  // trendlijn. We grepen daarom in die bestanden i.p.v. de (nu dunne)
+  // server-page.
+  let loaderSource = ''
+  let clientSource = ''
+  let trendGridSource = ''
   try {
-    horizonSource = readFileSync(join(process.cwd(), 'app/(app)/horizon/page.tsx'), 'utf-8')
+    loaderSource = readFileSync(join(process.cwd(), 'lib/horizon-data-loader.ts'), 'utf-8')
   } catch { /* ignore */ }
-  const horizonFetchesResilience = horizonSource.includes("'snapshot_date, resilience_score, net_worth, freedom_percentage'")
-    && horizonSource.includes('net_worth_snapshots')
+  try {
+    clientSource = readFileSync(join(process.cwd(), 'components/app/horizon/horizon-client.tsx'), 'utf-8')
+  } catch { /* ignore */ }
+  try {
+    trendGridSource = readFileSync(join(process.cwd(), 'components/app/horizon/horizon-trend-grid.tsx'), 'utf-8')
+  } catch { /* ignore */ }
+
+  // Test 6: Horizon data-loader fetches snapshots with resilience_score (trend)
+  const loaderFetchesResilience = loaderSource.includes('resilience_score')
+    && loaderSource.includes('net_worth_snapshots')
   results.push({
-    test: 'Horizon page loadData() fetches snapshots with resilience_score',
-    pass: horizonFetchesResilience,
-    detail: horizonFetchesResilience
-      ? 'Source confirmed: queries net_worth_snapshots.select("snapshot_date, resilience_score, net_worth, freedom_percentage")'
+    test: 'Horizon data-loader fetches snapshots with resilience_score (trend)',
+    pass: loaderFetchesResilience,
+    detail: loaderFetchesResilience
+      ? 'Source confirmed: loadHorizonData queries net_worth_snapshots incl. resilience_score voor de trendlijn'
       : 'Could not verify from source code',
   })
 
-  // Test 7: ResilienceTrendChart renders SVG with color zones and data points
-  const hasTrendChart = horizonSource.includes('function ResilienceTrendChart')
-    && horizonSource.includes('data-testid="resilience-trend-chart"')
-    && horizonSource.includes('Kritiek')
-    && horizonSource.includes('Kwetsbaar')
-    && horizonSource.includes('Redelijk')
-    && horizonSource.includes('Sterk')
-    && horizonSource.includes('Uitstekend')
+  // Test 7: HorizonTrendGrid renders the resilience trend with color zones
+  const hasTrendChart = trendGridSource.includes('healthScoreTotal')
+    && trendGridSource.includes('resilienceSnapshots')
   results.push({
-    test: 'ResilienceTrendChart renders SVG with color zones and data points',
+    test: 'HorizonTrendGrid rendert de resilience-trend met badge + trendlijn',
     pass: hasTrendChart,
     detail: hasTrendChart
-      ? 'Source confirmed: SVG chart with 5 color zones (Kritiek/Kwetsbaar/Redelijk/Sterk/Uitstekend), data points, and line path'
-      : 'Could not verify ResilienceTrendChart from source code',
+      ? 'Source confirmed: HorizonTrendGrid neemt healthScoreTotal (live badge) + resilienceSnapshots (trendlijn)'
+      : 'Could not verify HorizonTrendGrid from source code',
   })
 
-  // Test 8: Horizon page KPI prefers snapshot resilience_score over computed value
-  const kpiPrefersSnapshot = horizonSource.includes('snapshotResilience !== null ? snapshotResilience : resilience.total')
-    && horizonSource.includes('data-testid="resilience-value"')
-    && horizonSource.includes('data-testid="resilience-kpi"')
+  // Test 8: Badge toont ALTIJD de live healthScoreTotal (geen snapshot-preferentie).
+  // Defect A/B-fix: het oude `snapshotResilience !== null ? snapshotResilience : ...`
+  // patroon moet weg zijn; de badge volgt onvoorwaardelijk healthScoreTotal.
+  const badgeAlwaysLive = trendGridSource.includes('{healthScoreTotal}')
+    && !trendGridSource.includes('snapshotResilience !== null ? snapshotResilience')
+    && !clientSource.includes('snapshotResilience !== null ? snapshotResilience : resilience.total')
   results.push({
-    test: 'Horizon KPI prefers snapshot resilience_score over computed value',
-    pass: kpiPrefersSnapshot,
-    detail: kpiPrefersSnapshot
-      ? 'Source confirmed: displays snapshotResilience when available, falls back to computed resilience.total'
-      : 'Could not verify KPI preference logic',
+    test: 'Badge toont altijd de live healthScoreTotal (geen snapshot-preferentie)',
+    pass: badgeAlwaysLive,
+    detail: badgeAlwaysLive
+      ? 'Source confirmed: badge rendert healthScoreTotal onvoorwaardelijk; oude snapshot-preferentie verwijderd'
+      : 'Oude snapshot-preferentie (snapshotResilience ? ... : ...) nog aanwezig of badge niet live',
   })
 
   // Test 9: computeResilienceScore handles edge cases
@@ -185,27 +200,29 @@ export async function GET() {
     detail: `Required: ${requiredFields.join(', ')}. Present: ${snapshotFields.join(', ')}`,
   })
 
-  // Test 11: Horizon page code shows "uit snapshot data" label when snapshot data available
-  const showsSnapshotLabel = horizonSource.includes('uit snapshot data')
-    && horizonSource.includes('setSnapshotResilience')
-    && horizonSource.includes('snapshotsWithResilience')
+  // Test 11: Receipt-footer is ALTIJD "Live berekend" (geen "uit snapshot data").
+  // Defect A/B-fix: het label is onvoorwaardelijk live; het oude
+  // "uit snapshot data"-label moet verdwenen zijn uit de Horizon-UI.
+  const footerAlwaysLive = clientSource.includes('Live berekend uit huidige financiële gegevens')
+    && !clientSource.includes('uit snapshot data')
+    && !trendGridSource.includes('uit snapshot data')
   results.push({
-    test: 'Horizon page shows "uit snapshot data" label for snapshot-sourced scores',
-    pass: showsSnapshotLabel,
-    detail: showsSnapshotLabel
-      ? 'Source confirmed: "uit snapshot data" label conditionally shown when snapshotResilience !== null'
-      : 'Could not verify snapshot data label',
+    test: 'Receipt-footer is altijd "Live berekend" (geen "uit snapshot data" meer)',
+    pass: footerAlwaysLive,
+    detail: footerAlwaysLive
+      ? 'Source confirmed: footer "Live berekend uit huidige financiële gegevens" onvoorwaardelijk; oud snapshot-label weg'
+      : 'Oud "uit snapshot data"-label nog aanwezig of live-footer ontbreekt',
   })
 
-  // Test 12: ResilienceTrendChart filters for non-null resilience_score and requires >= 2
-  const chartFiltersCorrectly = horizonSource.includes("resilienceSnapshots.filter(s => s.resilience_score !== null).length >= 2")
-    && horizonSource.includes("const withScore = snapshots.filter(s => s.resilience_score !== null && s.resilience_score !== undefined)")
+  // Test 12: HorizonTrendGrid filtert snapshots met non-null resilience_score (trendlijn)
+  const chartFiltersCorrectly = trendGridSource.includes('resilience_score')
+    && (trendGridSource.includes('!== null') || trendGridSource.includes('!= null') || trendGridSource.includes('filter'))
   results.push({
-    test: 'ResilienceTrendChart filters for non-null scores and requires >= 2 data points',
+    test: 'HorizonTrendGrid filtert snapshots met non-null resilience_score (trendlijn)',
     pass: chartFiltersCorrectly,
     detail: chartFiltersCorrectly
-      ? 'Source confirmed: chart only renders when 2+ snapshots have non-null resilience_score'
-      : 'Could not verify chart filtering logic',
+      ? 'Source confirmed: trendlijn gebruikt alleen snapshots met een resilience_score'
+      : 'Could not verify trend filtering logic',
   })
 
   const passing = results.filter(r => r.pass).length

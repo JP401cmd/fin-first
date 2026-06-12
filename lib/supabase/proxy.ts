@@ -278,8 +278,6 @@ export async function updateSession(request: NextRequest) {
     '/api/verify-freedom-days-animation',
     '/test-freedom-time-label-component',
     '/api/verify-freedom-time-label-component',
-    '/test-level-up-celebration',
-    '/api/verify-level-up-celebration',
     '/test-auto-snapshots',
     '/api/verify-auto-snapshots',
     '/api/snapshots/cron',

@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { BOX3_DRAG } from '@/lib/constants'
+import { computeEffectiveSwr } from '@/lib/fire-params'
 import { Users, UserCheck } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -48,8 +48,8 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
   // Monthly passive income at the effective SWR (perspective-aware portfolio).
   const monthlyPassiveIncome = ov?.monthlyPassiveIncome ?? null
 
-  // Effective SWR from user's parameters
-  const effectiveSwr = Math.max(0.001, grossReturn - BOX3_DRAG - inflationRate)
+  // Effective SWR from user's parameters — single-sourced helper (lib/fire-params)
+  const effectiveSwr = computeEffectiveSwr(grossReturn, inflationRate)
 
   // Actual withdrawal rate: what the user/household would withdraw per year
   const yearlyExpenses = monthlyExpenses * 12
@@ -178,9 +178,9 @@ export const SwrMonitorWidget = memo(function SwrMonitorWidget({ size, data, hre
   // perspective-aware portfolio so it stays consistent across perspectives.
   const displayPassiveMonthly = monthlyPassiveIncome ?? (netWorth > 0 ? (netWorth * effectiveSwr) / 12 : 0)
 
-  // Scenario: what if return changes ±1%
-  const swrOptimistic = Math.max(0.001, (grossReturn + 0.01) - BOX3_DRAG - inflationRate)
-  const swrPessimistic = Math.max(0.001, (grossReturn - 0.01) - BOX3_DRAG - inflationRate)
+  // Scenario: what if return changes ±1% — same single-sourced formula
+  const swrOptimistic = computeEffectiveSwr(grossReturn + 0.01, inflationRate)
+  const swrPessimistic = computeEffectiveSwr(grossReturn - 0.01, inflationRate)
 
   // Years until safe if currently over-withdrawing
   const withdrawalSafe = actualWithdrawal <= effectiveSwr

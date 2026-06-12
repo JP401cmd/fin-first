@@ -28,7 +28,7 @@ import {
   Lock,
   Link2,
 } from 'lucide-react'
-import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -868,7 +868,7 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
   // Compute deltas from previous check-in
   const prevMetrics = previous?.metrics
   const netWorthDelta = prevMetrics ? overview.netWorth - prevMetrics.netWorth : null
-  const dailyExpenses = overview.monthlyExpenses > 0 ? overview.monthlyExpenses / 30 : 0
+  const dailyExpenses = dailyExpenseRate(overview.monthlyExpenses)
 
   // Freedom time for net worth growth
   const freedomGrowth = netWorthDelta && dailyExpenses > 0
@@ -1877,7 +1877,7 @@ function StepReflectie({
   const overBudgetCount = budgets.filter(b => b.budget_type === 'expense' && b.limit > 0 && b.spent > b.limit).length
   const activeGoalCount = goals.filter(g => !g.is_completed).length
   const prevMetrics = previous?.metrics
-  const dailyExpenses = overview && overview.monthlyExpenses > 0 ? overview.monthlyExpenses / 30 : 0
+  const dailyExpenses = overview ? dailyExpenseRate(overview.monthlyExpenses) : 0
 
   // Compute freedom time for savings
   const savingsFreedom = overview && dailyExpenses > 0

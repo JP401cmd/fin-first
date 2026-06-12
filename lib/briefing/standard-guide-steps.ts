@@ -57,8 +57,8 @@ export const DEFAULT_STANDARD_GUIDE_STEPS: readonly StandardGuideStep[] = [
   },
   {
     key: 'sg_horizon',
-    label: 'Bekijk je horizon-instellingen',
-    href: '/identity/instellingen',
+    label: 'Bekijk je toekomst-voorkeuren',
+    href: '/toekomst/voorkeuren',
     // Geen autoComplete — bewuste actie van de gebruiker.
   },
 ] as const

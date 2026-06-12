@@ -14,7 +14,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { useCallback } from 'react'
-import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 /**
@@ -185,7 +185,7 @@ function CheckinHistoryCard({
 }) {
   const fc = useFc()
   const { metrics } = checkin
-  const dailyExpenses = metrics.monthlyExpenses > 0 ? metrics.monthlyExpenses / 30 : 0
+  const dailyExpenses = dailyExpenseRate(metrics.monthlyExpenses)
 
   // Delta from previous
   const prevMetrics = previousCheckin?.metrics

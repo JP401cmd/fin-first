@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { tool } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { localMonthBounds } from '@/lib/month-range'
+import { buildBudgetSpendingMap, spentForBudget } from '@/lib/budget-spending'
 
 /**
  * Creates a lookup tool that queries real financial data from Supabase.
@@ -52,15 +53,18 @@ export function createLookupTool(supabase: SupabaseClient) {
           const now = new Date()
           const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
+          // Trek gelijk met de budgets-pagina: ALLE budgetten (parent + child),
+          // besteding per budget via de gedeelde aggregatie (inkomsten/transfers
+          // uitgesloten, split-bedragen op hun eigen budget), en parent-rollup.
           const [budgetsRes, txRes] = await Promise.all([
             supabase
               .from('budgets')
-              .select('id, name, slug, default_limit, budget_type, parent_id')
-              .not('parent_id', 'is', null)
+              .select('id, name, slug, default_limit, budget_type, parent_id, is_archived')
+              .eq('is_archived', false)
               .order('sort_order', { ascending: true }),
             supabase
               .from('transactions')
-              .select('budget_id, amount')
+              .select('id, budget_id, amount, is_income, transaction_type, is_split')
               .gte('date', monthStart)
               .lt('date', monthEnd),
           ])
@@ -68,21 +72,37 @@ export function createLookupTool(supabase: SupabaseClient) {
           const budgets = budgetsRes.data ?? []
           const txData = txRes.data ?? []
 
-          const spendingMap: Record<string, number> = {}
-          for (const t of txData) {
-            if (t.budget_id) {
-              spendingMap[t.budget_id] = (spendingMap[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
+          // Splits ophalen voor split-transacties zodat per-budget bedragen kloppen.
+          const splitTxIds = txData.filter((t) => t.is_split).map((t) => t.id)
+          let splits: Array<{ budget_id: string | null; amount: number }> = []
+          if (splitTxIds.length > 0) {
+            const { data: splitData } = await supabase
+              .from('transaction_splits')
+              .select('budget_id, amount')
+              .in('transaction_id', splitTxIds)
+            splits = (splitData ?? []) as Array<{ budget_id: string | null; amount: number }>
+          }
+
+          const spendingMap = buildBudgetSpendingMap(txData, splits)
+
+          // Child-ids per parent voor de rollup.
+          const childIdsByParent: Record<string, string[]> = {}
+          for (const b of budgets) {
+            if (b.parent_id) {
+              ;(childIdsByParent[b.parent_id] ??= []).push(b.id)
             }
           }
 
-          let results = budgets.map((b) => ({
-            name: b.name,
-            limit: Number(b.default_limit),
-            spent: spendingMap[b.id] ?? 0,
-            pct: Number(b.default_limit) > 0
-              ? Math.round(((spendingMap[b.id] ?? 0) / Number(b.default_limit)) * 100)
-              : 0,
-          }))
+          let results = budgets.map((b) => {
+            const spent = spentForBudget(b.id, childIdsByParent[b.id] ?? [], spendingMap)
+            const limit = Number(b.default_limit)
+            return {
+              name: b.name,
+              limit,
+              spent,
+              pct: limit > 0 ? Math.round((spent / limit) * 100) : 0,
+            }
+          })
 
           if (q) {
             results = results.filter(

@@ -288,10 +288,10 @@ function BacktestChart({
         )
       })}
 
-      {/* Min-max band (all paths) */}
+      {/* Min-max band (all paths) — horizon module-identiteit (volgt accent) */}
       <path
         d={areaPath(result.bandMax, result.bandMin)}
-        fill="#c4a06b"
+        fill="var(--color-horizon-500, #c4a06b)"
         style={{
           opacity: animated ? 0.10 : 0,
           transition: animated ? 'opacity 400ms ease-out 200ms' : 'none',
@@ -301,7 +301,7 @@ function BacktestChart({
       {/* P25-P75 band */}
       <path
         d={areaPath(result.bandP75, result.bandP25)}
-        fill="#c4a06b"
+        fill="var(--color-horizon-500, #c4a06b)"
         style={{
           opacity: animated ? 0.18 : 0,
           transition: animated ? 'opacity 400ms ease-out 300ms' : 'none',
@@ -371,8 +371,8 @@ function BacktestChart({
 
       {/* Legend */}
       <text x={PAD_L} y={12} fill="#888070" fontSize={9} fontWeight={600}>Alle periodes</text>
-      <rect x={PAD_L + 72} y={5} width={14} height={7} fill="#c4a06b" opacity={0.2} rx={1} />
-      <rect x={PAD_L + 90} y={5} width={14} height={7} fill="#c4a06b" opacity={0.35} rx={1} />
+      <rect x={PAD_L + 72} y={5} width={14} height={7} fill="var(--color-horizon-500, #c4a06b)" opacity={0.2} rx={1} />
+      <rect x={PAD_L + 90} y={5} width={14} height={7} fill="var(--color-horizon-500, #c4a06b)" opacity={0.35} rx={1} />
       <text x={PAD_L + 108} y={12} fill="#888070" fontSize={9}>IQR-band</text>
     </svg>
   )

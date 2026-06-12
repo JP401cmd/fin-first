@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { ShieldCheck, Lightbulb } from 'lucide-react'
@@ -27,7 +27,7 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
   const monthlyExpenses = targetMonths > 0 ? targetAmount / targetMonths : 0
 
   // Freedom time framing
-  const dailyExp = data.monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(data.monthlyExpenses)
   const freedomTime = dailyExp > 0 && currentAmount > 0
     ? calculateFreedomTime(currentAmount, dailyExp)
     : null

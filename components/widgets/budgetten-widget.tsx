@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { isOverPositive, computeBarSegments } from '@/components/app/budget-shared'
 import type { DashboardData } from './widget-renderer'
@@ -308,7 +308,7 @@ export const BudgettenWidget = memo(function BudgettenWidget({ size, data, href 
 
   const isNettoPositief = nettoBalans >= 0
 
-  const dailyExp = monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 && Math.abs(nettoBalans) > 0
     ? calculateFreedomTime(Math.abs(nettoBalans), dailyExp)
     : null

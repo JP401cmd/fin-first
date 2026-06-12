@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { RefreshCcw, Home, ShoppingCart, Car, Zap, Heart, Smartphone, CreditCard, HelpCircle } from 'lucide-react'
 import type { DashboardData, TopRecurringTransaction } from './widget-renderer'
@@ -69,7 +69,7 @@ function ItemRow({ t }: { t: TopRecurringTransaction }) {
 export const VasteLastenWidget = memo(function VasteLastenWidget({ size, data, href }: Props) {
   const { recurringTransactions, totalRecurringAmount, topRecurringTransactions, monthlyExpenses, monthlyIncome } = data
 
-  const dailyExp = monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 && totalRecurringAmount > 0
     ? calculateFreedomTime(totalRecurringAmount, dailyExp)
     : null

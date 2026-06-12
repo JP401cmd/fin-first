@@ -34,7 +34,7 @@ export function CoachMelding({
     >
       {/* platen-kop: label links, rechts ruimte voor de avatar */}
       <div className="flex min-h-[2.75rem] items-center border-b border-[var(--border-ed)] pl-3.5 pr-12">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--ink-3)]">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-wil-700">
           {headerLabel}
         </span>
       </div>

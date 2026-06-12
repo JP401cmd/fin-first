@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   frequencyMatch,
   categorizeTransaction,
@@ -46,9 +46,13 @@ describe('frequencyMatch', () => {
     expect(result!.budget_id).toBe('b2')
   })
 
-  it('prefers name match over IBAN match', () => {
+  it('prefers IBAN match over name match (IBAN is het eenduidiger signaal)', () => {
+    // Bewust bijgewerkt: frequencyMatch probeert nu IBAN VÓÓR naam, gelijk aan de
+    // correctie-laag (priority 1). De oude test pinde de omgekeerde volgorde
+    // (naam-eerst) vast; dat was de zwakkere keuze. Beide keys bestaan in freqMap
+    // maar wijzen naar verschillende budgetten, dus de volgorde is observeerbaar.
     const result = frequencyMatch('Albert Heijn', 'NL02INGB0001234567', freqMap)
-    expect(result!.budget_id).toBe('b1')
+    expect(result!.budget_id).toBe('b2')
   })
 
   it('returns null when no match found', () => {
@@ -59,6 +63,14 @@ describe('frequencyMatch', () => {
   it('returns null for empty counterparty', () => {
     const result = frequencyMatch(null, null, freqMap)
     expect(result).toBeNull()
+  })
+
+  it('matcht een PSP-/ruis-variant op dezelfde genormaliseerde naam-key', () => {
+    // De map-key is "name:albert heijn"; een binnenkomende "CCV*Albert Heijn 1032"
+    // moet via normalizeCounterparty op diezelfde key landen.
+    const result = frequencyMatch('CCV*Albert Heijn 1032', null, freqMap)
+    expect(result).not.toBeNull()
+    expect(result!.budget_id).toBe('b1')
   })
 })
 
@@ -169,6 +181,58 @@ describe('categorizeTransaction with freqMap', () => {
   })
 })
 
+// ── Salaris-scenario: deelbudget moet in de (platte) budgets-set zitten ──
+// Regressie voor de jun-2026 bug: vanaf de budgetpagina kreeg de sheet de
+// budget-BOOM (alleen parents top-level), waardoor het deelbudget
+// "Salaris & uitkering" onzichtbaar was voor frequentie- én keyword-laag.
+// De sheet flattent nu zelf; deze tests pinnen het pure-functie-contract
+// (set mét child → match; set zónder child → null + warn-log).
+
+describe('categorizeTransaction — salaris-scenario (boom-vs-flat regressie)', () => {
+  const salarisBudget = mockBudget('b-salaris', 'Salaris & uitkering', 'salaris-uitkering')
+  // 15 historische ProjectHuis BV-boekingen — ruim boven de ≥3-drempel.
+  // Key is genormaliseerd: normalizeCounterparty('ProjectHuis BV') → 'projecthuis'.
+  const freqMap = new Map<string, FrequencyMatch>([
+    ['name:projecthuis', { budget_id: 'b-salaris', count: 15, total: 15, confidence: 0.95 }],
+  ])
+
+  it('matcht op het deelbudget wanneer de budgets-set plat is (child aanwezig)', () => {
+    const result = categorizeTransaction(
+      'Salaris december 2025',
+      'ProjectHuis BV',
+      4200,
+      [salarisBudget],
+      undefined,
+      undefined,
+      null,
+      freqMap,
+    )
+    expect(result.budget_id).toBe('b-salaris')
+    expect(result.category_source).toBe('rule')
+  })
+
+  it('degradeert naar null MET warn-log wanneer het deelbudget ontbreekt (boom-doorgave)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // Alleen de parent in de set — exact de situatie vóór de fix.
+    const parentOnly = [mockBudget('b-inkomen', 'Inkomen', 'inkomen')]
+    const result = categorizeTransaction(
+      'Salaris december 2025',
+      'ProjectHuis BV',
+      4200,
+      parentOnly,
+      undefined,
+      undefined,
+      null,
+      freqMap,
+    )
+    expect(result.budget_id).toBeNull()
+    // Zowel de frequentie-miss als de keyword-miss horen gelogd te worden —
+    // stil degraderen was precies wat de bug onvindbaar maakte.
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+})
+
 // ── isOwnAccountTransfer ──────────────────────────────────────────────
 
 describe('isOwnAccountTransfer', () => {
@@ -196,6 +260,80 @@ describe('isOwnAccountTransfer', () => {
 
   it('returns false for null IBAN with no name patterns', () => {
     expect(isOwnAccountTransfer(null, ownIbans)).toBe(false)
+  })
+})
+
+// ── category_corrections met budget_id null (FK-violation bug, rood vóór fix) ──
+//
+// Bug: category_corrections.budget_id FK = NO ACTION / NOT NULL.
+// Als een budget wordt verwijderd (save_budget_plan of direct DELETE) terwijl er
+// corrections op staan, knalt de DB met FK-violation. Geplande fix: budget_id
+// nullable + ON DELETE SET NULL + guard in categorizeTransaction zodat null-corrections
+// worden overgeslagen.
+//
+// VERWACHTE STATUS: de eerste twee tests zijn ROD zolang de fix er niet is, omdat
+// het huidige code-pad `idMap.get(c.budget_id)` aanroept met null (JS: geeft
+// undefined) en vervolgens `return { budget_id: null, confidence: 1.0, ... }` —
+// category_source='manual' terwijl het een wees-rij is. De derde test (regressie
+// voor geldige correcties) zou groen moeten zijn.
+
+describe('categorizeTransaction — correction met budget_id null (na fix)', () => {
+  const budgets: Budget[] = [
+    mockBudget('b-food', 'Boodschappen', 'boodschappen'),
+    mockBudget('b-energy', 'Gas Water Licht', 'gas_water_licht'),
+  ]
+
+  it('correction met budget_id null wordt overgeslagen, valt door naar keyword-regel', () => {
+    // Na de fix: null-corrections zijn wees-rijen (budget verwijderd) → overslaan.
+    // "Albert Heijn" → via keyword-regel naar boodschappen.
+    const correctionsWithNullBudget = [
+      { match_field: 'counterparty_name' as const, match_value: 'Albert Heijn', budget_id: null },
+    ]
+    const result = categorizeTransaction(
+      'Albert Heijn betaling',
+      'Albert Heijn',
+      -45,
+      budgets,
+      correctionsWithNullBudget,
+    )
+    // Moet NIET een null budget_id teruggeven als correction-hit
+    expect(result.budget_id).not.toBeNull()            // keyword-fallback geeft een resultaat
+    expect(result.category_source).not.toBe('manual')  // het is GEEN manual-correctie-hit
+    expect(result.budget_id).toBe('b-food')             // keyword-regel wint: boodschappen
+  })
+
+  it('correction met budget_id null via IBAN wordt overgeslagen', () => {
+    const correctionsWithNullBudget = [
+      { match_field: 'counterparty_iban' as const, match_value: 'NL02INGB0001234567', budget_id: null },
+    ]
+    const result = categorizeTransaction(
+      'Onbekende beschrijving',
+      'Onbekende winkel',
+      -10,
+      budgets,
+      correctionsWithNullBudget,
+      undefined,
+      'NL02INGB0001234567',
+    )
+    // Null-IBAN-correction mag niet een manual-hit retourneren
+    expect(result.category_source).not.toBe('manual')
+  })
+
+  it('geldige correction (budget_id ingevuld) wint met confidence 1.0 — regressie', () => {
+    // Basisgedrag mag niet worden aangetast door de null-guard
+    const validCorrections = [
+      { match_field: 'counterparty_name' as const, match_value: 'Albert Heijn', budget_id: 'b-energy' },
+    ]
+    const result = categorizeTransaction(
+      'Albert Heijn betaling',
+      'Albert Heijn',
+      -45,
+      budgets,
+      validCorrections,
+    )
+    expect(result.budget_id).toBe('b-energy')
+    expect(result.confidence).toBe(1.0)
+    expect(result.category_source).toBe('manual')
   })
 })
 

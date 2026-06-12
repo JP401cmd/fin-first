@@ -13,9 +13,12 @@ import {
 type HorizonTrendGridProps = {
   /** Alle snapshots (oudste → nieuwste) voor de verloop-charts. */
   resilienceSnapshots: SnapshotForTrend[]
-  /** Snapshot-resilience; overschrijft de live healthScore wanneer aanwezig. */
-  snapshotResilience: number | null
-  /** Live gezondheidsscore-totaal (fallback wanneer geen snapshot). */
+  /**
+   * Live gezondheidsscore-totaal. Dit is overal het "huidige" getal — de badge
+   * + title tonen ALTIJD deze live score (SSoT, Defect A). De opgeslagen
+   * snapshot-resilience voedt nog wél de historische trendgrafiek hieronder via
+   * `resilienceSnapshots`, maar niet langer het huidige getal.
+   */
   healthScoreTotal: number
   healthChartOpen: boolean
   onToggleHealth: () => void
@@ -35,7 +38,6 @@ type HorizonTrendGridProps = {
  */
 export function HorizonTrendGrid({
   resilienceSnapshots,
-  snapshotResilience,
   healthScoreTotal,
   healthChartOpen,
   onToggleHealth,
@@ -79,11 +81,11 @@ export function HorizonTrendGrid({
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onOpenResilienceReceipt() } }}
                   className="flex items-center gap-1.5 rounded-full bg-horizon-50 px-2.5 py-1 transition-colors hover:bg-horizon-100"
                   data-testid="health-score-card"
-                  title={`Financiële Gezondheid: ${snapshotResilience !== null ? snapshotResilience : healthScoreTotal} / 100`}
+                  title={`Financiële Gezondheid: ${healthScoreTotal} / 100`}
                 >
                   <Heart className="h-3.5 w-3.5 fill-horizon-500 text-horizon-500" />
                   <span className="font-mono text-sm font-semibold tabular-nums text-horizon-700">
-                    {snapshotResilience !== null ? snapshotResilience : healthScoreTotal}/100
+                    {healthScoreTotal}/100
                   </span>
                 </div>
               </div>

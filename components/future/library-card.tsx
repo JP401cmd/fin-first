@@ -59,7 +59,7 @@ export function LibraryCard({
       {/* Header */}
       <header className="flex items-start gap-3">
         <span
-          className="inline-flex w-9 h-9 rounded-xl bg-violet-50 text-violet-700 items-center justify-center shrink-0"
+          className="inline-flex w-9 h-9 rounded-xl bg-horizon-50 text-horizon-700 items-center justify-center shrink-0"
           aria-hidden="true"
         >
           <Calculator className="w-4.5 h-4.5" />
@@ -127,7 +127,7 @@ export function LibraryCard({
             <span className="sr-only">duplicaten</span>
           </span>
         </div>
-        <span className="text-[11px] font-semibold text-violet-700 group-hover:underline">
+        <span className="text-[11px] font-semibold text-horizon-700 group-hover:underline">
           Bekijken →
         </span>
       </footer>

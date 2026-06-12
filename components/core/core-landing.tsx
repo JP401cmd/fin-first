@@ -297,88 +297,48 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
 
   const fireSnapshot = useMemo(() => computeFireSnapshot(initialData), [initialData])
 
-  // ── Gezondheidsscore: zelfde 6-pilaren berekening als de dashboard-widget ──
-  // Gebruikt `computeHealthScoreFromInputs` (lichtgewicht variant) met inputs
-  // afgeleid uit CorePageData zodat de hero-score overeenkomt met de widget.
+  // ── Gezondheidsscore: het ÉNE canonieke pad (ADR 0008/0010, FR-8.7) ──
+  // De score draait op `initialData.healthScoreInput` — server-side gebouwd via
+  // `buildHealthScoreInput`, dezelfde bron als de dashboard-loader en de
+  // snapshot-routes. Verving het oude tweede berekenpad hier (eigen noodfonds-/
+  // diversificatie-/budget-reconstructie + pre-ADR-0009 freedomPct =
+  // netWorth/fireTarget), zodat de /core-score binnen afronding gelijk is aan
+  // /overzicht. De trend blijft een snapshot-afgeleide bovenop diezelfde input.
   const healthScore = useMemo((): HealthScore => {
-    const { rawFinancials, fullAssets, savingsRate6m, fireTargetFromHorizon } = initialData
-    const netWorth = rawFinancials.totalAssets - rawFinancials.totalDebts
-
-    // Noodfonds-dekking: liquid assets (cash + savings) / maanduitgaven
-    // Zelfde definitie als dashboard-data-loader: cash- en savings-type assets
-    // plus ontkoppelde bankrekeningen.
-    const liquidAssets = fullAssets
-      .filter(a => a.is_active && (a.asset_type === 'cash' || a.asset_type === 'savings'))
-      .reduce((s, a) => s + Number(a.current_value), 0)
-      + initialData.cashAccounts.filter(c => c.source === 'bank').reduce((s, c) => s + c.balance, 0)
-    const monthlyExp = rawFinancials.monthlyExpenses
-    const emergencyFundMonths = monthlyExp > 0 ? liquidAssets / monthlyExp : 0
-
-    // FIRE-voortgang percentage
-    const fireTarget = fireTargetFromHorizon ?? 0
-    const freedomPct = fireTarget > 0 ? (netWorth / fireTarget) * 100 : 0
-
-    // Unieke asset-types voor diversificatie
-    const assetTypeCount = new Set(
-      fullAssets.filter(a => a.is_active && Number(a.current_value) > 0).map(a => a.asset_type),
-    ).size
-
-    // Budget-categorieën voor discipline
-    // `overviewBudgetGroups` bevat alleen parents (BudgetWithChildren) —
-    // children zitten in `b.children`, niet als losse entries.
-    const budgetCategories = initialData.overviewBudgetGroups
-      .filter(b => b.budget_type === 'expense')
-      .map(b => {
-        const kids = b.children ?? []
-        const limit = kids.length > 0
-          ? kids.reduce((s, c) => s + Number(c.default_limit), 0)
-          : Number(b.default_limit)
-        const spent = kids.length > 0
-          ? kids.reduce((s, c) => s + (initialData.overviewSpending[c.id] ?? 0), 0)
-          : (initialData.overviewSpending[b.id] ?? 0)
-        return { limit, spent }
-      })
-
+    const baseInput = initialData.healthScoreInput
     const score = computeHealthScoreFromInputs(
-      {
-        savingsRate6m,
-        totalAssets: rawFinancials.totalAssets,
-        totalDebts: rawFinancials.totalDebts,
-        emergencyFundMonths: Math.round(emergencyFundMonths * 10) / 10,
-        freedomPct,
-        assetTypeCount,
-        budgetCategories,
-      },
+      baseInput,
       initialData.budgetingActive,
       activeModules,
     )
 
     // ── Trend berekenen uit snapshots ──────────────────────────
     // De lightweight `computeHealthScoreFromInputs` retourneert altijd
-    // previousMonth=null. Hier schatten we de vorige-maand-score in op
-    // basis van `net_worth_snapshots`, dezelfde aanpak als
-    // `computeHealthScore` in de dashboard-path.
+    // previousMonth=null. Hier schatten we de vorige-maand-score in op basis van
+    // `net_worth_snapshots`: spread de canonieke input en overschrijf alleen de
+    // vorige-maand-velden (vermogen/schuld/spaarquote + freedomPct-proxy). De
+    // overige v2-indicatoren (noodfonds, DSTI, concentratie, budget) zijn niet in
+    // de snapshot beschikbaar → huidige waarde als best estimate, identiek aan de
+    // dashboard-trendaanpak.
     const snaps = initialData.snapshots
+    const fireTarget = initialData.fireTargetFromHorizon ?? 0
     if (snaps.length >= 2) {
       const prevSnap = snaps[snaps.length - 2]
       const prevAssets = Number(prevSnap.total_assets)
       const prevDebts = Number(prevSnap.total_debts)
       const prevNetWorth = prevAssets - prevDebts
-      const prevSavingsRate = prevSnap.savings_rate ?? savingsRate6m
-      const prevFreedomPct = fireTarget > 0 ? (prevNetWorth / fireTarget) * 100 : 0
+      const prevSavingsRate = prevSnap.savings_rate ?? baseInput.savingsRate6m
+      const prevFreedomPct = fireTarget > 0
+        ? Math.max(0, Math.min((prevNetWorth / fireTarget) * 100, 100))
+        : 0
 
       const prevScore = computeHealthScoreFromInputs(
         {
+          ...baseInput,
           savingsRate6m: prevSavingsRate,
           totalAssets: prevAssets,
           totalDebts: prevDebts,
-          // Noodfonds + diversificatie + budget niet beschikbaar in snapshot;
-          // hergebruik huidige waarden (best estimate — zelfde aanpak als
-          // computeHealthScore in de dashboard-path).
-          emergencyFundMonths: Math.round(emergencyFundMonths * 10) / 10,
           freedomPct: prevFreedomPct,
-          assetTypeCount,
-          budgetCategories,
         },
         initialData.budgetingActive,
         activeModules,
@@ -1182,10 +1142,11 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
       <p className="text-center font-sans text-[10px] text-[var(--ink-4)] leading-relaxed">
         Score gebaseerd op{' '}
         <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm>,{' '}
+        {healthScore.budgetingActive ? <>budgetdiscipline,{' '}</> : null}
+        noodfonds, schuldenlast,{' '}
         <GlossaryTerm term="schuldgraad">schuldratio</GlossaryTerm>,{' '}
-        noodfonds,{' '}
-        <GlossaryTerm term="FIRE">FIRE</GlossaryTerm>-voortgang,{' '}
-        <GlossaryTerm term="diversificatie">diversificatie</GlossaryTerm>{healthScore.budgetingActive ? ' en budgetdiscipline' : ''}.
+        <GlossaryTerm term="FIRE">FIRE</GlossaryTerm>-voortgang en{' '}
+        <GlossaryTerm term="diversificatie">vermogensspreiding</GlossaryTerm>.
         Herberekend bij elke paginaweergave.
       </p>
     </div>

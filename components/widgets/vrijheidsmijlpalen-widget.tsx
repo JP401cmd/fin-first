@@ -37,12 +37,18 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
   const ov = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
   const isShared = isHouseholdView || isPartnerView
 
-  const { freedomPct, fireTarget, fireProjResult, simRequiredPortfolio, simFireCountdown } = data
+  const { freedomPct, fireTarget, fireEligibleNetWorth, fireProjResult, simRequiredPortfolio, simFireCountdown } = data
   const netWorth = ov?.netWorth ?? data.netWorth
   const effectiveFire = ov?.fireTarget ?? simRequiredPortfolio ?? fireTarget
-  const effectivePct = effectiveFire > 0
-    ? Math.min((netWorth / effectiveFire) * 100, 100)
-    : (ov?.freedomPct ?? freedomPct)
+  // Vrijheids-% = canonieke grondslag (ADR 0009). Eigen perspectief:
+  // data.freedomPct (FIRE-eligible vermogen ÷ benodigde portfolio, huis
+  // gefilterd). Huishouden/partner: ov.freedomPct (eigen household-grondslag).
+  // GEEN eigen som op vol netWorth meer.
+  const effectivePct = ov?.freedomPct ?? freedomPct
+  // FIRE-eligible vermogen is de canonieke teller; mijlpaal-datums (target/
+  // "bereikt") leggen hierop zodat ze met effectivePct overeenstemmen. Shared
+  // views gebruiken het ov-vermogen (consistent paar uit de household-engine).
+  const freedomEligibleNetWorth = ov?.netWorth ?? fireEligibleNetWorth
 
   // Monthly savings approximation using the personal countdown — used purely
   // to estimate milestone dates, which are per-user and therefore suppressed
@@ -50,15 +56,15 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
   const cd = simFireCountdown ?? fireProjResult
   const countdownYears = cd.countdownYears + cd.countdownMonths / 12
   const monthlySavingsApprox = !isShared && countdownYears > 0 && effectiveFire > 0
-    ? (effectiveFire - netWorth) / (countdownYears * 12)
+    ? (effectiveFire - freedomEligibleNetWorth) / (countdownYears * 12)
     : 0
 
   const getMilestoneDate = (targetPct: number): string | null => {
     if (isShared) return null // date projection is per-user only
     const targetAmount = effectiveFire * (targetPct / 100)
-    if (netWorth >= targetAmount) return null // Already reached
+    if (freedomEligibleNetWorth >= targetAmount) return null // Already reached
     if (monthlySavingsApprox <= 0) return null
-    const monthsNeeded = (targetAmount - netWorth) / monthlySavingsApprox
+    const monthsNeeded = (targetAmount - freedomEligibleNetWorth) / monthlySavingsApprox
     return yearsToDate(monthsNeeded / 12)
   }
 

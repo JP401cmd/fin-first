@@ -53,7 +53,8 @@ import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { WhatIfBeslishulp } from '@/components/app/horizon/whatif-beslishulp'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
-import { computeDebtAflossingMonthly, savingsRateFromAggregates } from '@/lib/savings-source'
+import { computeDebtAflossingMonthly, savingsRateFromAggregates, resolveSavingsSource } from '@/lib/savings-source'
+import { filterAssetsForFire, parseHousingStrategy, type HousingStrategyConfig } from '@/lib/housing-strategy'
 import {
   deriveOverridesFromEvents,
   buildSliderEvent,
@@ -113,6 +114,13 @@ export default function WhatIfPage() {
   const [bankAccountCash, setBankAccountCash] = useState(0)
   /** Canonieke 6m-spaarquote (incl. aflossing) — baseline voor de spaarquote-slider. */
   const [savingsRate6m, setSavingsRate6m] = useState<number | null>(null)
+  /** Handmatige spaar-override uit profiles.monthly_savings_override (null = geen). */
+  const [monthlySavingsOverride, setMonthlySavingsOverride] = useState<number | null>(null)
+  /** Jaarlijks spaarbedrag uit de cashflow (inkomen × spaarquote) — zelfde
+   *  bron als /toekomst, via resolveSavingsSource. */
+  const [baseAnnualSavingsFromCashflow, setBaseAnnualSavingsFromCashflow] = useState(0)
+  /** Eigen-woning-strategie — bepaalt of het huis uit de FIRE-pot wordt gefilterd. */
+  const [housingStrategy, setHousingStrategy] = useState<HousingStrategyConfig>({ mode: 'include_full' })
   const [withdrawalStrategyConfig, setWithdrawalStrategyConfig] = useState<WithdrawalStrategyConfig>(WITHDRAWAL_DEFAULTS)
 
   // ── Per-asset-type return-deltas (decimaal, bv. { investment: 0.02 }). ──
@@ -141,7 +149,12 @@ export default function WhatIfPage() {
   // ── Set Will's auto-open message for the global chat FAB ──
   const { setAutoOpenMessage } = useChatContext()
 
-  // ── Load data (same as horizon/page.tsx — single source of truth) ──
+  // ── Load data ──
+  // Spiegelt de FIRE-grondslag van /toekomst (horizon-data-loader): assets via
+  // filterAssetsForFire op de housing-strategie, en annualSavings via dezelfde
+  // resolveSavingsSource-prioriteit (override → cashflow-spaarquote →
+  // asset-contributies). Zo is de baseline-FIRE-leeftijd in what-if identiek
+  // aan /toekomst bij gelijke data; de "+X maanden"-delta's kloppen daarmee.
   const loadData = useCallback(async () => {
     try {
       const supabase = createClient()
@@ -155,7 +168,7 @@ export default function WhatIfPage() {
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, net_monthly_income, income_source, expenses_source, monthly_savings_override, housing_strategy_config').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
@@ -265,7 +278,27 @@ export default function WhatIfPage() {
       const expenses6m = (expense6mResult.data ?? []).filter(isRealTx)
         .reduce((s: number, t: { amount: number | string | null }) => s + Math.abs(Number(t.amount) || 0), 0)
       const aflossing6m = computeDebtAflossingMonthly((fullDebtsResult.data ?? []) as Debt[]) * 6
-      setSavingsRate6m(income6m > 0 ? savingsRateFromAggregates(income6m, expenses6m, aflossing6m) : null)
+      const cashflowSavingsRate6m = income6m > 0 ? savingsRateFromAggregates(income6m, expenses6m, aflossing6m) : null
+      setSavingsRate6m(cashflowSavingsRate6m)
+
+      // Jaarlijks spaarbedrag uit de cashflow (inkomen × spaarquote) via dezelfde
+      // resolveSavingsSource-keuzeregel als de horizon-loader — primaire
+      // FIRE-spaarbron wanneer er geen handmatige override is.
+      const { baseAnnualSavings } = resolveSavingsSource({
+        incomeSource: profileResult.data?.income_source,
+        expensesSource: profileResult.data?.expenses_source,
+        netMonthlyIncome: Number(profileResult.data?.net_monthly_income ?? 0),
+        estimatedAnnualIncome: extrapolatedIncome,
+        estimatedMonthlyExpenses: profileMonthlyExpenses,
+        savingsRate6m: cashflowSavingsRate6m ?? 0,
+      })
+      setBaseAnnualSavingsFromCashflow(baseAnnualSavings)
+
+      // Handmatige spaar-override + housing-strategie (zelfde bronnen als /toekomst).
+      const overrideRaw = profileResult.data?.monthly_savings_override
+      setMonthlySavingsOverride(overrideRaw == null ? null : Number(overrideRaw))
+      setHousingStrategy(parseHousingStrategy(profileResult.data?.housing_strategy_config))
+
       setBox3Method(fireParams.box3Method)
       const householdType = profileResult.data?.household_type
       setHasPartner(householdType === 'samenwonend' || householdType === 'getrouwd')
@@ -437,14 +470,32 @@ export default function WhatIfPage() {
     const yearlyExpenses = input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses : 0
     if (yearlyExpenses <= 0) return null
     const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
+
+    // Eigen-woning uit de FIRE-pot filteren bij exclude/downsize — zelfde
+    // bewerking als use-horizon-fire-sim.ts (/toekomst), zodat het huis alleen
+    // meetelt voor zover de strategie het vrijspeelt.
+    const { assets: fireAssets, debts: fireDebts } = filterAssetsForFire(
+      housingStrategy, fullAssets, fullDebts,
+    )
+
+    // annualSavings — zelfde prioriteit als use-horizon-fire-sim.ts:116-120:
+    //   1. handmatige override (monthlySavingsOverride × 12)
+    //   2. cashflow-spaarquote × inkomen (baseAnnualSavingsFromCashflow)
+    //   3. asset-contributie-aggregaat (legacy fallback voor lege data)
+    const annualSavings = monthlySavingsOverride != null && monthlySavingsOverride >= 0
+      ? monthlySavingsOverride * 12
+      : (baseAnnualSavingsFromCashflow > 0
+          ? baseAnnualSavingsFromCashflow
+          : (input.monthlyContributions ?? 0) * 12)
+
     return {
-      assets: fullAssets,
-      debts: fullDebts,
+      assets: fireAssets,
+      debts: fireDebts,
       currentAge,
       endAge: strategyForSim.endAge,
       yearlyExpenses,
-      annualSavings: (input.monthlyContributions ?? 0) * 12,
-      monthlySurplus: input.monthlyContributions ?? 0,
+      annualSavings,
+      monthlySurplus: annualSavings / 12,
       monthlyIncome: input.monthlyIncome ?? 0,
       incomeGrowthRate: 0,
       grossReturn: userGrossReturn,
@@ -457,7 +508,7 @@ export default function WhatIfPage() {
       hasPartner,
       bankAccountCash,
     }
-  }, [input, fullAssets, fullDebts, fireStrategy, userGrossReturn, userInflation, box3Method, hasPartner, bankAccountCash, withdrawalStrategyConfig, userAowAge])
+  }, [input, fullAssets, fullDebts, fireStrategy, userGrossReturn, userInflation, box3Method, hasPartner, bankAccountCash, withdrawalStrategyConfig, userAowAge, housingStrategy, monthlySavingsOverride, baseAnnualSavingsFromCashflow])
 
   // ── What-if UnifiedProjectionInput — per-asset-type return-deltas toegepast in engine ──
   const whatIfUnifiedInput = useMemo<UnifiedProjectionInput | null>(() => {

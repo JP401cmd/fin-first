@@ -26,7 +26,6 @@ export default function MijnNotificatiesPage() {
     budget: true,
     sync: true,
     recommendation: true,
-    levelup: true,
     horizon: true,
     holding_alert: true,
     briefing: true,

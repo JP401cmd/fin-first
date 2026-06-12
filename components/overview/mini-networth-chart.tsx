@@ -113,7 +113,7 @@ export function MiniNetWorthChart({
     return (
       <Link
         href="/toekomst"
-        className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-4 sm:p-6 text-center hover:border-violet-300 transition-colors min-h-[140px] h-full"
+        className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-4 sm:p-6 text-center hover:border-horizon-300 transition-colors min-h-[140px] h-full"
       >
         <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
           Vermogen door de tijd
@@ -122,7 +122,7 @@ export function MiniNetWorthChart({
           Vul je profiel aan om je vermogensgroei tot{' '}
           {isPensioenMode ? 'pensioen' : 'vrijheid'} te zien.
         </p>
-        <span className="mt-3 text-xs font-semibold text-violet-700">
+        <span className="mt-3 text-xs font-semibold text-horizon-700">
           Bekijk projectie →
         </span>
       </Link>
@@ -388,8 +388,8 @@ export function MiniNetWorthChart({
             {/* Schaduw-gradients: van lijn-kleur naar transparant richting
                 de vloer. Historie iets lichter dan de projectie. */}
             <linearGradient id={`${gradientId}-proj`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--module-active-500, #10b981)" stopOpacity="0.16" />
-              <stop offset="100%" stopColor="var(--module-active-500, #10b981)" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--module-active-500)" stopOpacity="0.16" />
+              <stop offset="100%" stopColor="var(--module-active-500)" stopOpacity="0" />
             </linearGradient>
             <linearGradient id={`${gradientId}-hist`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="var(--ink-3, #6b7280)" stopOpacity="0.10" />
@@ -422,7 +422,7 @@ export function MiniNetWorthChart({
             <path
               d={realHistPath}
               fill="none"
-              stroke="var(--module-active-700, #047857)"
+              stroke="var(--module-active-700)"
               strokeWidth="2"
               strokeDasharray="3 3"
               strokeLinecap="round"
@@ -434,7 +434,7 @@ export function MiniNetWorthChart({
           {bandPath && (
             <path
               d={bandPath}
-              fill="var(--module-active-500, #10b981)"
+              fill="var(--module-active-500)"
               opacity="0.14"
               stroke="none"
             />
@@ -443,7 +443,7 @@ export function MiniNetWorthChart({
           <path
             d={projPath}
             fill="none"
-            stroke="var(--module-active-700, #047857)"
+            stroke="var(--module-active-700)"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -452,7 +452,7 @@ export function MiniNetWorthChart({
             cx={todayX}
             cy={valueToYClamped(currentNetWorth)}
             r="4"
-            fill="var(--module-active-700, #047857)"
+            fill="var(--module-active-700)"
           />
           {/* Vandaag verticaal richtlijntje */}
           <line
@@ -517,17 +517,17 @@ export function MiniNetWorthChart({
             y1={PAD_TOP}
             x2={ageToX(finalAge)}
             y2={valueToY(endValue)}
-            stroke="var(--horizon-500, #8b5cf6)"
+            stroke="var(--color-horizon-500)"
             strokeWidth="1"
             strokeDasharray="2 3"
             opacity="0.6"
           />
-          <circle cx={ageToX(finalAge)} cy={valueToY(endValue)} r="4" fill="var(--horizon-500, #8b5cf6)" />
+          <circle cx={ageToX(finalAge)} cy={valueToY(endValue)} r="4" fill="var(--color-horizon-500)" />
           <text
             x={ageToX(finalAge)}
             y={PAD_TOP - 4}
             textAnchor="end"
-            className="fill-[var(--horizon-700,#6d28d9)] font-mono"
+            className="fill-[var(--color-horizon-700)] font-mono"
             fontSize="9"
           >
             {endMarkerText}
@@ -580,7 +580,7 @@ export function MiniNetWorthChart({
                 y1="1"
                 x2="16"
                 y2="1"
-                stroke="var(--module-active-700, #10b981)"
+                stroke="var(--module-active-700)"
                 strokeWidth="1.5"
                 strokeDasharray="3 2"
               />
@@ -602,7 +602,7 @@ export function MiniNetWorthChart({
                 y1="1"
                 x2="16"
                 y2="1"
-                stroke="var(--module-active-500, #10b981)"
+                stroke="var(--module-active-500)"
                 strokeWidth="2"
               />
             </svg>
@@ -616,7 +616,7 @@ export function MiniNetWorthChart({
             <span
               className="inline-block w-3 h-2 rounded-sm"
               style={{
-                background: 'var(--module-active-500, #10b981)',
+                background: 'var(--module-active-500)',
                 opacity: 0.25,
               }}
               aria-hidden="true"
@@ -626,7 +626,7 @@ export function MiniNetWorthChart({
         </div>
         <Link
           href="/toekomst"
-          className="text-[11px] font-semibold text-violet-700 hover:underline shrink-0"
+          className="text-[11px] font-semibold text-horizon-700 hover:underline shrink-0"
         >
           Bekijk afbouw →
         </Link>

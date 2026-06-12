@@ -425,7 +425,7 @@ export function GebeurtenissenView({
                 <p className="text-xs text-[var(--ink-2)] leading-snug flex-1">
                   {strat.description}
                 </p>
-                <span className="mt-3 text-[11px] font-semibold text-violet-700 inline-flex items-center gap-1">
+                <span className="mt-3 text-[11px] font-semibold text-horizon-700 inline-flex items-center gap-1">
                   Configureren
                   <ArrowRight className="w-3 h-3" aria-hidden="true" />
                 </span>

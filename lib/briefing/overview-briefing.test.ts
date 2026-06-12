@@ -141,9 +141,12 @@ describe('buildOverviewBriefingInput — finance-mapping', () => {
 })
 
 describe('vrijheidstijd-hero helpers', () => {
-  it('computeFreedomTotal: €100k bij €3000/mnd = 1000 vrijheidsdagen', () => {
-    const t = computeFreedomTotal(100000, 3000) // dagbasis €100 → 1000 dagen
-    expect(t.totalFreedomDays).toBe(1000)
+  it('computeFreedomTotal: €100k bij €3000/mnd ≈ 1014 vrijheidsdagen', () => {
+    // Canonieke dagbasis = €3000×12/365 = €98,63/dag → €100k ≈ 1013,9 dagen
+    // (de oude maand/30-basis gaf exact 1000; ~1,4% hoger nu — gelijkgetrokken
+    // met calculateFreedomTime/core-metrics).
+    const t = computeFreedomTotal(100000, 3000)
+    expect(t.totalFreedomDays).toBeCloseTo(1013.9, 1)
     expect(t.breakdown.isInfinite).toBe(false)
   })
 
@@ -154,9 +157,10 @@ describe('vrijheidstijd-hero helpers', () => {
   })
 
   it('computeFreedomTotal: tekort levert een NEGATIEF totaal (getekend)', () => {
-    const t = computeFreedomTotal(-30000, 3000) // dagbasis €100 → 300 dagen schuld
+    // Canonieke dagbasis €98,63/dag → €30k schuld ≈ 304,2 dagen.
+    const t = computeFreedomTotal(-30000, 3000)
     expect(t.breakdown.isDeficit).toBe(true)
-    expect(t.totalFreedomDays).toBe(-300)
+    expect(t.totalFreedomDays).toBeCloseTo(-304.2, 1)
   })
 
   it('computeFreedomDelta: null-basis = eerste week', () => {
@@ -175,14 +179,15 @@ describe('vrijheidstijd-hero helpers', () => {
   it('buildFreedomSparkline: vermogen → vrijheidsdagen per maand', () => {
     const series = buildFreedomSparkline(
       [
-        { month: '2026-04', value: 36500 }, // /100 = 365 dagen
-        { month: '2026-05', value: 73000 }, // /100 = 730 dagen
+        { month: '2026-04', value: 36500 }, // €98,63/dag → 370 dagen
+        { month: '2026-05', value: 73000 }, // €98,63/dag → 740 dagen
       ],
       3000,
     )
     expect(series).toHaveLength(2)
-    expect(series[0].spent).toBe(365)
-    expect(series[1].spent).toBe(730)
+    // Canonieke dagbasis €3000×12/365 = €98,63/dag (was €100/dag bij /30).
+    expect(series[0].spent).toBe(370)
+    expect(series[1].spent).toBe(740)
     expect(series[0].label).toBe('apr')
   })
 
@@ -194,12 +199,12 @@ describe('vrijheidstijd-hero helpers', () => {
     const series = buildFreedomSparkline(
       [
         { month: '2026-04', value: -20000 }, // schuld → 0 dagen
-        { month: '2026-05', value: 50000 }, // /100 = 500 dagen
+        { month: '2026-05', value: 50000 }, // €98,63/dag → 507 dagen
       ],
       3000,
     )
     expect(series[0].spent).toBe(0)
-    expect(series[1].spent).toBe(500)
+    expect(series[1].spent).toBe(507)
   })
 
   it('buildFreedomHeroProps: delta + totaal-label uit meetpunt + basis', () => {

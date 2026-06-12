@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, formatFreedomTime } from './formatter'
+import { calculateFreedomTime } from '@/lib/format'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { AandachtspuntDomain } from '@/lib/aandachtspunten'
 
@@ -13,15 +14,17 @@ const DOMAIN_LABEL: Record<AandachtspuntDomain, string> = {
 
 /**
  * Zet een aantal vrijheidsdagen om naar een jaar/maanden-string via de gedeelde
- * formatter. 30 dagen = 1 maand, 12 maanden = 1 jaar. Onder een halve maand → null.
+ * formatter. Gebruikt de canonieke `calculateFreedomTime` breakdown (jaar/365 +
+ * maand/30) i.p.v. een eigen 30/360-terugconversie: dagen-in → euro-onafhankelijk
+ * door een dagtarief van €1 te gebruiken (amount = aantal dagen). Onder een halve
+ * maand restdagen → afronden, anders null bij 0.
  */
 function freedomDaysToString(freedomDays: number): string | null {
   if (!Number.isFinite(freedomDays) || freedomDays <= 0) return null
-  const totalMonths = Math.round(freedomDays / 30)
-  if (totalMonths <= 0) return null
-  const years = Math.floor(totalMonths / 12)
-  const months = totalMonths % 12
-  return formatFreedomTime(years, months)
+  const bd = calculateFreedomTime(freedomDays, 1)
+  const months = bd.months + (bd.days >= 15 ? 1 : 0)
+  if (bd.years === 0 && months === 0) return null
+  return formatFreedomTime(bd.years, months)
 }
 
 /**

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
-import { ChatPanel } from '@/components/app/chat/chat-panel'
+import { ChatPanelLazy } from '@/components/app/chat/chat-panel-lazy'
 import { ChatPromptDeeplink } from '@/components/app/chat/chat-prompt-deeplink'
 import { FeatureAccessProvider } from '@/components/app/feature-access-provider'
 import { MobilePreviewProvider } from '@/components/app/beheer/mobile-preview-provider'
@@ -21,7 +21,6 @@ import { PlatformBanner } from '@/components/app/platform-banner'
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { CommandPaletteProvider } from '@/components/command-palette/command-palette-provider'
 import { computeFeatureAccess } from '@/lib/compute-feature-access'
-import { PHASES } from '@/lib/feature-phases'
 import { ALL_MODULES } from '@/lib/module-registry'
 import type { ModuleId } from '@/lib/module-registry'
 import { getActiveAppKeys } from '@/components/core/category-deepening-registry'
@@ -79,7 +78,6 @@ export default async function AppLayout({
     assetsRes,
     debtsRes,
     txRes,
-    lastLevelRes,
     actionsCountRes,
     budgetCountRes,
     budgetHealthRes,
@@ -105,8 +103,6 @@ export default async function AppLayout({
     // transactions: 3-maand-window voor `computeFeatureAccess` (income/expense
     // signalen voor phase-detectie).
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
-    // Sovereignty level change detection (was sequential — moved into batch)
-    supabase.from('app_settings').select('value').eq('key', `last_sovereignty_level_${user.id}`).maybeSingle(),
     // Sidebar-metric: openstaande acties (Wil-module). Status-filter spiegelt
     // `openActions` uit will-data-loader.ts (open + postponed). Head-only +
     // count: 'exact' = geen rows-payload, alleen totaal.
@@ -154,47 +150,6 @@ export default async function AppLayout({
     activeSubscriptions: (profile?.active_subscriptions as string[]) ?? [],
     userFeaturePrefs: (profile?.feature_preferences as Record<string, boolean>) ?? null,
   })
-
-  // ── Phase transition detection ──────────────────────────
-  const lastKnownPhase = profile?.last_known_phase as string | null
-  let phaseTransition: { oldPhase: string; newPhase: string } | null = null
-
-  if (lastKnownPhase !== featureAccess.phase) {
-    if (lastKnownPhase !== null) {
-      // Genuine phase change (not first load) — check direction
-      const phaseIds = PHASES.map(p => p.id)
-      const oldIndex = phaseIds.indexOf(lastKnownPhase)
-      const newIndex = phaseIds.indexOf(featureAccess.phase)
-
-      if (newIndex > oldIndex) {
-        // Upward transition — show celebration modal
-        phaseTransition = { oldPhase: lastKnownPhase, newPhase: featureAccess.phase }
-      }
-    }
-    // Update DB regardless (first store, upward, or downward)
-    supabase.from('profiles').update({ last_known_phase: featureAccess.phase }).eq('id', user.id).then(() => {})
-  }
-
-  // ── Sovereignty level change detection ────────────────
-  const lastLevel = lastLevelRes.data?.value ? Number(JSON.parse(lastLevelRes.data.value)) : null
-
-  if (lastLevel !== null && featureAccess.level > lastLevel) {
-    // Level went up — store the change for notification display
-    supabase.from('app_settings').upsert({
-      key: `sovereignty_level_change_${user.id}`,
-      value: JSON.stringify({
-        oldLevel: lastLevel,
-        newLevel: featureAccess.level,
-        timestamp: new Date().toISOString(),
-      }),
-    }, { onConflict: 'key' }).then(() => {})
-  }
-
-  // Always store current level
-  supabase.from('app_settings').upsert({
-    key: `last_sovereignty_level_${user.id}`,
-    value: JSON.stringify(featureAccess.level),
-  }, { onConflict: 'key' }).then(() => {})
 
   // ── Active modules ────────────────────────────────────
   // Module-toggle is verwijderd uit Trifinity (zie /mijn/geavanceerd).
@@ -448,7 +403,7 @@ export default async function AppLayout({
                       >
                         Naar hoofdinhoud
                       </a>
-                      <FeatureAccessProvider data={featureAccess} phaseTransition={phaseTransition} activeModules={activeModules}>
+                      <FeatureAccessProvider data={featureAccess} activeModules={activeModules}>
                         <CommandPaletteProvider role={profile?.role ?? 'user'}>
                           <ResponsiveShell
                             email={user.email ?? ''}
@@ -466,7 +421,7 @@ export default async function AppLayout({
                           </ResponsiveShell>
                         </CommandPaletteProvider>
                       </FeatureAccessProvider>
-                      <ChatPanel />
+                      <ChatPanelLazy />
                       <Suspense fallback={null}>
                         <ChatPromptDeeplink />
                       </Suspense>

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
+import { calculateFreedomTime } from '@/lib/format'
 import { computeBox1Tax, marginalRateAt } from '@/lib/box1-tax'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { computeJaarruimte } from '@/lib/jaarruimte'
@@ -8,22 +9,22 @@ import { hasBox2Relevance } from '@/lib/box2-relevance'
 
 const TAX_YEAR = 2026 as const
 
-/** Aantal seconden in een werkdag-equivalent — gebruikt voor vrijheidstijd-conversie. */
-const FREEDOM_DAYS_PER_MONTH = 30
-const FREEDOM_MONTHS_PER_YEAR = 12
-
 /**
  * Zet een belastingbedrag om naar vrijheidstijd (jaar/maanden) op basis van de
  * dagelijkse uitgaven. Eén "vrijheidsdag" = de uitgaven die één dag dekken.
  * Bij ontbrekende dag-uitgaven → null (we tonen dan geen tijd-equivalent).
+ *
+ * Gebruikt de canonieke `calculateFreedomTime` uit lib/format.ts (jaar/365 +
+ * maand/30 breakdown) i.p.v. een eigen 30/360-terugconversie, zodat de AI
+ * exact dezelfde vrijheidstijd noemt als de schermen.
  */
 function amountAsFreedomTime(amount: number, dailyExpenses: number): { years: number; months: number } | null {
   if (dailyExpenses <= 0 || amount <= 0) return null
-  const totalDays = amount / dailyExpenses
-  const totalMonths = Math.round(totalDays / FREEDOM_DAYS_PER_MONTH)
-  const years = Math.floor(totalMonths / FREEDOM_MONTHS_PER_YEAR)
-  const months = totalMonths % FREEDOM_MONTHS_PER_YEAR
-  return { years, months }
+  const bd = calculateFreedomTime(amount, dailyExpenses)
+  // Restdagen (< 1 maand) ronden we naar de dichtstbijzijnde maand zodat een
+  // klein bedrag niet als "0 maanden vrijheid" verdwijnt.
+  const months = bd.months + (bd.days >= 15 ? 1 : 0)
+  return { years: bd.years, months }
 }
 
 /** Formatteer een bedrag inclusief vrijheidstijd-equivalent (indien berekenbaar). */

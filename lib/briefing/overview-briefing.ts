@@ -116,6 +116,11 @@ export function buildOverviewBriefingInput(
       netWorthHistory: dashboardData.netWorthHistory,
       monthlyExpenses: dashboardData.monthlyExpenses,
       monthlyIncome: dashboardData.monthlyIncome,
+      // Canonieke 6m-spaarquote (incl. spaarbudgetten + aflossing) — zit al in
+      // DashboardData. De engine gebruikt dít voor elke spaarquote-presentatie
+      // i.p.v. een 1-maands surplus, zodat de briefing nooit een ander
+      // spaarpercentage noemt dan de cashflow-pagina.
+      savingsRate6m: dashboardData.savingsRate6m,
       budgetExpense: dashboardData.budgetTotals?.expense,
       liquidCash: computeLiquidCash(horizonData),
       freedomPct,
@@ -270,7 +275,9 @@ export interface FreedomHeroProps {
  *  zodat de week-over-week delta klopt wanneer iemand de nul-lijn kruist
  *  (calculateFreedomTime rekent zelf op de absolute waarde). */
 export function computeFreedomTotal(netWorth: number, monthlyExpenses: number): FreedomTotal {
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+  // Canonieke dagbasis: jaaruitgaven/365 (= maanduitgaven×12/365), gelijk aan
+  // calculateFreedomTime/core-metrics — niet maand/30 (=jaar/360).
+  const dailyExpenses = monthlyExpenses > 0 ? (monthlyExpenses * 12) / 365 : 0
   const breakdown = calculateFreedomTime(netWorth, dailyExpenses)
   const totalFreedomDays = breakdown.isDeficit ? -breakdown.totalDays : breakdown.totalDays
   return { totalFreedomDays, netWorth, monthlyExpenses, breakdown }
@@ -293,7 +300,8 @@ export function buildFreedomSparkline(
   netWorthHistory: { month: string; value: number }[],
   monthlyExpenses: number,
 ): SparklineDataPoint[] {
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+  // Canonieke dagbasis: jaaruitgaven/365 (zie computeFreedomTotal).
+  const dailyExpenses = monthlyExpenses > 0 ? (monthlyExpenses * 12) / 365 : 0
   if (dailyExpenses <= 0) return []
   return netWorthHistory.map((h) => {
     // Tekort-maanden klemmen op 0 dagen: calculateFreedomTime rekent op de

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import type {
   BudgetReportData,
   BudgetReportCategory,
@@ -147,8 +148,8 @@ export async function GET(request: Request) {
       supabase.from('transactions').select('id, budget_id, amount, date, is_split').gte('date', trendMonths[0].start).lt('date', monthEnd),
       supabase.from('budget_rollovers').select('budget_id, period, carried_amount, rollover_type').eq('period', currentPeriod),
       supabase.from('budget_amounts').select('budget_id, effective_from, amount'),
-      // Daily expense rate — last 12 months
-      supabase.from('transactions').select('amount, date').lt('amount', 0).gte('date', new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0]).lte('date', now.toISOString().split('T')[0]),
+      // Daily expense rate — last 12 months (tijdzone-veilige ondergrens, lib/month-range)
+      supabase.from('transactions').select('amount, date').lt('amount', 0).gte('date', localMonthStartMonthsAgo(now, 11)).lte('date', now.toISOString().split('T')[0]),
     ])
 
     const profile = profileResult.data

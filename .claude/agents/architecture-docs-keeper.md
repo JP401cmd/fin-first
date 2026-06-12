@@ -1,7 +1,8 @@
 ---
 name: architecture-docs-keeper
 description: "Use this agent to keep TriFinity's self-documenting architecture page (`/beheer/architectuur`) in sync with code changes. It owns the curation behind the four views — Praatplaat (HLD), Plaat (ArchiMate), Database (ERD) and Berekeningen — and the rule from CLAUDE.md: 'laat de documentatie beter achter dan je 'm vond'. Use it whenever a domain, module, table, calculation, integration or capability is added/removed/renamed, when ADRs or concerns need recording, or to review whether an architecture change kept the docs consistent.\n\nExamples:\n\n<example>\nContext: New functional module added\nuser: \"I added a 'subscriptions' module to lib/module-registry.ts\"\nassistant: \"I'll use the architecture-docs-keeper agent to wire it into FUNCTION_SERVICE_MAP in archimate-model.ts and the HLD capability groups so the plaat compiles and the views stay coherent.\"\n<Task tool call to architecture-docs-keeper>\n</example>\n\n<example>\nContext: A structural risk was resolved\nuser: \"We finally fixed the duplicated FIRE calculation\"\nassistant: \"Let me launch the architecture-docs-keeper agent to remove the now-stale concern from archimate-concerns.ts and add an ADR recording the decision.\"\n<Task tool call to architecture-docs-keeper>\n</example>\n\n<example>\nContext: After a feature PR\nuser: \"Does my new integration need any architecture updates?\"\nassistant: \"I'll use the architecture-docs-keeper agent to check the ArchiMate topology, relations/flows enrichment and the regenerated facts.\"\n<Task tool call to architecture-docs-keeper>\n</example>"
-model: opus
+model: sonnet
+effort: medium
 color: blue
 ---
 

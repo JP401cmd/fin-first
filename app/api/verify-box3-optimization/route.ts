@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { localMonthBounds } from '@/lib/month-range'
 import {
   calculateBox3,
   generateBox3Optimizations,
@@ -79,8 +80,8 @@ export async function GET(request: Request) {
       supabase
         .from('transactions')
         .select('amount')
-        .gte('date', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
-        .lt('date', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0]),
+        .gte('date', localMonthBounds(new Date()).start)
+        .lt('date', localMonthBounds(new Date()).end),
     ])
 
     const assets = (assetsResult.data ?? []) as Asset[]

@@ -4,7 +4,7 @@ import { useMemo, memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { formatMaskedCurrency, formatFreedomTimeString, calculateFreedomTime } from '@/lib/format'
+import { formatMaskedCurrency, formatFreedomTimeString, calculateFreedomTime, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
@@ -38,7 +38,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
   // Empty state: no assets or income data at all
   const isEmpty = netWorth === 0 && monthlyIncome === 0 && netWorthHistory.length === 0
 
-  const dailyExp = monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 ? calculateFreedomTime(Math.abs(netWorth), dailyExp) : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 

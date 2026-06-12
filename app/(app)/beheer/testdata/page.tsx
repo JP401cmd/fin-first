@@ -16,8 +16,6 @@ import {
 } from 'lucide-react'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey } from '@/lib/test-personas'
 import { PersonaCard } from '@/components/app/persona-card'
-import { useFeatureAccess } from '@/components/app/feature-access-provider'
-import { PHASES } from '@/lib/feature-phases'
 import { useMobilePreview, DEVICE_PRESETS } from '@/components/app/beheer/mobile-preview-provider'
 import { BUDGET_TEMPLATES, type BudgetTemplate } from '@/lib/budget-templates'
 import { createClient } from '@/lib/supabase/client'
@@ -56,12 +54,8 @@ type SeedEvent = SeedStep | SeedSummary | { error: string }
 
 export default function BeheerTestdataPage() {
   const router = useRouter()
-  const featureAccess = useFeatureAccess()
   const mobilePreview = useMobilePreview()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // Phase transition test state
-  const [simulatingPhase, setSimulatingPhase] = useState(false)
 
   // Seed state
   const [seeding, setSeeding] = useState(false)
@@ -632,101 +626,6 @@ export default function BeheerTestdataPage() {
 
       {/* Check-in beheer */}
       <CheckinManager />
-
-      {/* Fase-overgang testen */}
-      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">
-        <h3 className="text-lg font-semibold text-[var(--ink)]">Fase-overgang testen</h3>
-        <p className="mt-1 text-sm text-[var(--ink-3)]">
-          Simuleer een fase-overgang om de celebratie-modal te testen.
-        </p>
-
-        <div className="mt-4">
-          <p className="text-sm text-[var(--ink-2)]">
-            Huidige fase:{' '}
-            <span className="font-semibold capitalize">{featureAccess.phase}</span>
-            <span className="text-[var(--ink-3)] ml-1">(berekend)</span>
-          </p>
-        </div>
-
-        <div className="mt-4">
-          <p className="text-sm font-medium text-[var(--ink-2)] mb-2">Simuleer overgang vanaf:</p>
-          <div className="flex flex-wrap gap-2">
-            {PHASES.map(phase => {
-              const currentIndex = PHASES.findIndex(p => p.id === featureAccess.phase)
-              const phaseIndex = PHASES.findIndex(p => p.id === phase.id)
-              const isLower = phaseIndex < currentIndex
-              const colorMap: Record<string, string> = {
-                rose: 'bg-rose-100 text-rose-700 border-rose-200 hover:bg-rose-200',
-                blue: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
-                teal: 'bg-teal-100 text-teal-700 border-teal-200 hover:bg-teal-200',
-                amber: 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200',
-              }
-
-              return (
-                <button
-                  key={phase.id}
-                  disabled={!isLower || simulatingPhase || seeding}
-                  onClick={async () => {
-                    setSimulatingPhase(true)
-                    try {
-                      const res = await fetch('/api/admin/test-phase-transition', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ oldPhase: phase.id }),
-                      })
-                      if (!res.ok) throw new Error('Fase-overgang test mislukt')
-                      router.push('/')
-                    } catch {
-                      setSimulatingPhase(false)
-                      setMessage({ type: 'error', text: 'Fase-overgang simulatie mislukt.' })
-                    }
-                  }}
-                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    isLower ? colorMap[phase.color] ?? '' : 'bg-zinc-100 text-[var(--ink-3)] border-[var(--border-ed)]'
-                  }`}
-                >
-                  {phase.label}
-                </button>
-              )
-            })}
-          </div>
-          <p className="mt-2 text-xs text-[var(--ink-3)]">
-            Alleen fasen lager dan je huidige fase zijn klikbaar.
-          </p>
-        </div>
-
-        {simulatingPhase && (
-          <p className="mt-3 text-sm text-teal-600 animate-pulse">Bezig met simuleren...</p>
-        )}
-
-        <div className="mt-6 border-t border-[var(--border-ed)] pt-4">
-          <p className="text-sm font-medium text-[var(--ink-2)] mb-2">Activatie testen</p>
-          <button
-            disabled={simulatingPhase || seeding}
-            onClick={async () => {
-              setSimulatingPhase(true)
-              try {
-                const res = await fetch('/api/admin/test-phase-transition', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ oldPhase: null }),
-                })
-                if (!res.ok) throw new Error('Reset activatie mislukt')
-                router.push('/')
-              } catch {
-                setSimulatingPhase(false)
-                setMessage({ type: 'error', text: 'Reset activatie mislukt.' })
-              }
-            }}
-            className="rounded-lg border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Reset activatie
-          </button>
-          <p className="mt-2 text-xs text-[var(--ink-3)]">
-            Zet last_known_phase op NULL zodat de activatieknop weer verschijnt.
-          </p>
-        </div>
-      </div>
 
       {/* Mobile Preview */}
       <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-6">

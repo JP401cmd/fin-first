@@ -37,7 +37,7 @@ import {
   type Modifier,
 } from '@dnd-kit/core'
 import { getEventCoordinates } from '@dnd-kit/utilities'
-import { Loader2, X } from 'lucide-react'
+import { Loader2, Save, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { loadAutoCatContext } from '@/lib/auto-categorize-context'
 import { buildAssignmentPlan, applyAssignmentPlan } from '@/lib/category-rules'
@@ -273,7 +273,7 @@ export function SleepmodusOverlay({
       const parentId = toParent.get(budgetId)
       if (parentId) map.set(parentId, (map.get(parentId) ?? 0) + weight)
     }
-    for (const corr of ctx.corrections) bump(corr.budget_id, 1)
+    for (const corr of ctx.corrections) if (corr.budget_id) bump(corr.budget_id, 1)
     for (const freq of ctx.freqMap.values()) bump(freq.budget_id, freq.count)
     return map
   }, [ctx, budgetGroups])
@@ -515,12 +515,22 @@ export function SleepmodusOverlay({
   useEffect(() => { setShowDetails(false) }, [tx?.id])
 
   // ── Sluiten / Escape ────────────────────────────────────────────────────────
+  // Tussentijds stoppen mét toewijzingen én nog openstaande items: toon de
+  // samenvatting (FINISH_EARLY) i.p.v. direct sluiten, zodat de ✕ niet als
+  // "annuleren" voelt en dezelfde geruststellende afsluiting geeft als de
+  // expliciete "Opslaan en stoppen"-knop. Op het done-scherm (geen items
+  // meer) sluit de ✕ gewoon af. Zonder toewijzingen: terug naar het keuzescherm.
+  const exitSavesProgress = state.assignedCount > 0
+    && (state.phase === 'idle' || state.phase === 'dragging')
+    && state.items.length > 0
   const handleExit = useCallback(() => {
-    // Tussentijds stoppen mét toewijzingen: caller moet data herladen, dus
-    // dezelfde route als "klaar". Zonder toewijzingen: terug naar het keuzescherm.
-    if (state.assignedCount > 0) onDone()
-    else onExit()
-  }, [state.assignedCount, onDone, onExit])
+    if (state.assignedCount > 0) {
+      if (exitSavesProgress) dispatch({ type: 'FINISH_EARLY' })
+      else onDone()
+    } else {
+      onExit()
+    }
+  }, [state.assignedCount, exitSavesProgress, onDone, onExit])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -575,7 +585,7 @@ export function SleepmodusOverlay({
           ref={closeRef}
           type="button"
           onClick={handleExit}
-          aria-label="Sleepmodus sluiten"
+          aria-label={exitSavesProgress ? 'Voortgang opslaan en sluiten' : 'Sleepmodus sluiten'}
           className="flex h-11 w-11 items-center justify-center text-[var(--ink-3)] hover:text-[var(--ink)]"
         >
           <X className="h-4 w-4" />
@@ -603,6 +613,7 @@ export function SleepmodusOverlay({
           rules={state.ruleCount}
           bulkUpdated={state.bulkUpdated}
           skipped={state.skippedCount}
+          remaining={state.items.length}
           onClose={onDone}
           closeLabel={doneLabel}
         />
@@ -805,9 +816,21 @@ export function SleepmodusOverlay({
                 <span>Transacties op gezamenlijke budgetten ook gezamenlijk maken</span>
               </label>
             )}
-            <p className="mt-2 text-center font-[var(--font-dm-mono)] text-[9px] uppercase tracking-[0.1em] text-[var(--ink-4)]">
-              Nog <span className="tabular-nums">{state.items.length}</span> van <span className="tabular-nums">{state.totalCount}</span>
-            </p>
+            <div className="mt-2 flex items-center justify-center gap-3">
+              <p className="font-[var(--font-dm-mono)] text-[9px] uppercase tracking-[0.1em] text-[var(--ink-4)]">
+                Nog <span className="tabular-nums">{state.items.length}</span> van <span className="tabular-nums">{state.totalCount}</span>
+              </p>
+              {state.phase === 'idle' && state.assignedCount > 0 && state.items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: 'FINISH_EARLY' })}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 border border-[var(--border-ed)] px-3 py-2 font-[var(--font-dm-mono)] text-[9px] uppercase tracking-[0.1em] text-[var(--ink-2)] transition-colors duration-150 hover:border-kern-600 hover:text-kern-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kern-600 focus-visible:ring-offset-1"
+                >
+                  <Save className="h-3 w-3" aria-hidden="true" />
+                  Opslaan en stoppen
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Sleep-kloon */}

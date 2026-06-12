@@ -7,6 +7,7 @@ import {
 } from '@/lib/box2-data'
 import type { Asset } from '@/lib/asset-data'
 import { normalisePrivacySettings } from '@/lib/household-data'
+import { dailyExpenseRate } from '@/lib/format'
 
 /**
  * GET /api/household/box2?year=2025|2026
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
     (sum, b) => sum + (Number(b.default_limit) || 0),
     0,
   )
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 100
+  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
 
   // Helper: convert Asset to Box2Deelneming
   function assetToDeelneming(a: Asset): Box2Deelneming {

@@ -10,7 +10,7 @@ type CategoryRule = {
   id: string
   match_field: 'counterparty_name' | 'description' | 'counterparty_iban'
   match_value: string
-  budget_id: string
+  budget_id: string | null
   auto_apply: boolean
   created_at: string
 }
@@ -78,7 +78,7 @@ export function CategoryRulesSheet({ budgets, onClose }: CategoryRulesSheetProps
     loadRules()
   }
 
-  const getBudgetName = (id: string) => budgets.find((b) => b.id === id)?.name ?? '—'
+  const getBudgetName = (id: string | null) => budgets.find((b) => b.id === id)?.name ?? '—'
 
   return (
     <BottomSheet open={true} onClose={onClose} title="Categorisatieregels" size="lg">

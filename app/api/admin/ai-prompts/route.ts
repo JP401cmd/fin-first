@@ -138,7 +138,7 @@ export async function GET() {
     {
       id: 'categorize',
       label: 'Transactie-categorisatie',
-      description: 'Systeem prompt dat banktransacties toewijst aan budgetcategorieën (cashflow-import).',
+      description: 'Systeem prompt dat banktransacties toewijst aan budgetcategorieën (cashflow-import). Toont de statische variant zónder de per-gebruiker geïnjecteerde budgetlijst; in productie bouwt buildCategorizeSystemPrompt() de prompt per aanroep mét de echte budgetten van de gebruiker.',
       content: CATEGORIZE_SYSTEM_PROMPT,
       source: 'lib/ai/categorize-system-prompt.ts',
       domain: 'parsing',

@@ -2,7 +2,6 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import type { FeatureAccessData, FeatureAccessMap } from '@/lib/compute-feature-access'
-import { PhaseTransitionModal } from '@/components/app/phase-transition-modal'
 import { ALL_MODULES, isModuleActive, type ModuleId } from '@/lib/module-registry'
 
 type FeatureAccessContextValue = FeatureAccessData & {
@@ -36,17 +35,14 @@ export function useFeatureAccess(): FeatureAccessContextValue {
 
 export function FeatureAccessProvider({
   data,
-  phaseTransition,
   activeModules = [...ALL_MODULES],
   children,
 }: {
   data: FeatureAccessData
-  phaseTransition?: { oldPhase: string; newPhase: string } | null
   /** Active modules for the current user. Defaults to all modules (backward compat). */
   activeModules?: ModuleId[]
   children: ReactNode
 }) {
-  const [showTransitionModal, setShowTransitionModal] = useState(!!phaseTransition)
   const [featureOverrides, setFeatureOverrides] = useState<FeatureAccessMap>(data.features)
 
   // Allow optimistic refresh after user toggles
@@ -85,13 +81,6 @@ export function FeatureAccessProvider({
   return (
     <FeatureAccessContext.Provider value={contextValue}>
       {children}
-      {showTransitionModal && phaseTransition && (
-        <PhaseTransitionModal
-          oldPhase={phaseTransition.oldPhase}
-          newPhase={phaseTransition.newPhase}
-          onClose={() => setShowTransitionModal(false)}
-        />
-      )}
     </FeatureAccessContext.Provider>
   )
 }

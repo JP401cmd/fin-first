@@ -8,6 +8,7 @@ import type { ModuleId } from './module-registry'
 import { isModuleActive, getWidgetRequiredModule } from './module-registry'
 import type { ActiveSubscriptions } from './feature-registry'
 import { hasSubscription, UNIFIED_FEATURES, WIDGET_TO_FEATURE } from './feature-registry'
+import { NL_SWR } from './constants'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,8 +149,16 @@ export function isRouteAccessible(pathname: string, activeModules: ModuleId[]): 
  * kept for backward compatibility and consumed by other parts of the app
  * (e.g. dashboard indicators, freedom percentage display).
  *
- * Freedom % formula: (netWorth / FIRE target) × 100
- * where FIRE target = (monthlyExpenses × 12) / 0.04
+ * Freedom % grondslag (ADR 0009): (FIRE-eligible vermogen / FIRE target) × 100,
+ * waarbij FIRE target = (monthlyExpenses × 12) / effectiveSwr. Caller geeft
+ * `fireBasis` door wanneer hij de canonieke waarden heeft (huis-gefilterd
+ * vermogen + per-gebruiker effectiveSwr uit resolveFireParams); ontbreekt dit,
+ * dan vol netWorth ÷ doel op NL_SWR (≈2,88%, de no-profile-fallback van
+ * resolveFireParams) — niet meer de stale 4%-hardcode die de vorige versie
+ * gebruikte. NB: er is momenteel geen productiecaller die fireBasis levert
+ * (zie de toelichting bij fireBasis in compute-feature-access.ts); zonder
+ * fireBasis is dit bewust de lichte, niet-volledig-canonieke variant — het
+ * gebruikerszichtbare "Jouw Pad"-niveau komt uit lib/dashboard-data-loader.ts.
  * Returns 0 when monthlyExpenses is zero to avoid division by zero.
  */
 export function computeModuleAccess(input: {
@@ -158,6 +167,8 @@ export function computeModuleAccess(input: {
   assets: { current_value: number | string }[]
   debts: { current_balance: number | string; debt_type: string }[]
   transactions: { amount: number | string; is_income: boolean }[]
+  /** Canonieke vrijheidsgrondslag (ADR 0009) — optioneel, zie boven. */
+  fireBasis?: { fireEligibleNetWorth: number; effectiveSwr: number }
 }): ModuleAccessData {
   const totalAssets = input.assets.reduce((sum, a) => sum + Number(a.current_value), 0)
   const totalDebts = input.debts.reduce((sum, d) => sum + Number(d.current_balance), 0)
@@ -169,9 +180,10 @@ export function computeModuleAccess(input: {
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
   const monthlyExpenses = totalExpenses / 3
 
-  // FIRE target uses the 4% safe withdrawal rate (SWR = 0.04)
-  const fireTarget = monthlyExpenses > 0 ? (monthlyExpenses * 12) / 0.04 : 0
-  const freedomPct = fireTarget > 0 ? (netWorth / fireTarget) * 100 : 0
+  const swr = input.fireBasis?.effectiveSwr ?? NL_SWR
+  const freedomNumerator = input.fireBasis?.fireEligibleNetWorth ?? netWorth
+  const fireTarget = monthlyExpenses > 0 ? (monthlyExpenses * 12) / swr : 0
+  const freedomPct = fireTarget > 0 ? (freedomNumerator / fireTarget) * 100 : 0
 
   return {
     activeModules: input.activeModules,

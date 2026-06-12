@@ -72,6 +72,52 @@
   --color-horizon-900: oklch(0.414 0.0537 76.6);
   --color-horizon-950: oklch(0.292 0.0364 76.6);
 
+  /* ── Legacy module-alias-tokens ──
+     Historische shorthands die in ~25 componenten/charts worden gebruikt maar
+     nooit gedefinieerd waren — die plekken draaiden stilletjes op hun
+     hex-fallbacks of renderden zonder kleur. Hier gekoppeld aan de
+     instelbare module-kleuren zodat ze de accentkeuze van /mijn/uiterlijk
+     volgen. Mapping: kaal = accent (500), -t = tekst (700), -l = licht
+     vlak (50), -m = medium border (200); genummerd = 1-op-1.
+     Let op: --will-* (Engels, met dubbele l) is de historische schrijfwijze
+     van de afnemers en verwijst bewust naar --color-wil-* — geen typo.
+     NIEUWE code gebruikt var(--color-<module>-NNN) — zie CLAUDE.md
+     "Kleurconventie". */
+  --kern:   var(--color-kern-500);
+  --kern-t: var(--color-kern-700);
+  --kern-l: var(--color-kern-50);
+  --kern-m: var(--color-kern-200);
+  --kern-50: var(--color-kern-50);
+  --kern-100: var(--color-kern-100);
+  --kern-200: var(--color-kern-200);
+  --kern-300: var(--color-kern-300);
+  --kern-400: var(--color-kern-400);
+  --kern-500: var(--color-kern-500);
+  --kern-600: var(--color-kern-600);
+  --kern-700: var(--color-kern-700);
+  --kern-800: var(--color-kern-800);
+  --kern-900: var(--color-kern-900);
+  --kern-950: var(--color-kern-950);
+  --will:   var(--color-wil-500);
+  --will-t: var(--color-wil-700);
+  --will-l: var(--color-wil-50);
+  --will-m: var(--color-wil-200);
+  --hor:    var(--color-horizon-500);
+  --hor-t:  var(--color-horizon-700);
+  --hor-l:  var(--color-horizon-50);
+  --hor-m:  var(--color-horizon-200);
+  --horizon-50: var(--color-horizon-50);
+  --horizon-100: var(--color-horizon-100);
+  --horizon-200: var(--color-horizon-200);
+  --horizon-300: var(--color-horizon-300);
+  --horizon-400: var(--color-horizon-400);
+  --horizon-500: var(--color-horizon-500);
+  --horizon-600: var(--color-horizon-600);
+  --horizon-700: var(--color-horizon-700);
+  --horizon-800: var(--color-horizon-800);
+  --horizon-900: var(--color-horizon-900);
+  --horizon-950: var(--color-horizon-950);
+
   /* ── Belasting box-triade (functionele box-codering) ──
      Box 1 = amber (#b45309 = -700), Box 2 = violet (#7c3aed = -600),
      Box 3 = teal (#0d9488 = -600). Tailwind-scales, expliciet als hex zodat ze
@@ -115,9 +161,12 @@
   --color-box3-950: #042f2e;
 
   /* ── Module-active CSS-variabelen (default = ink-shades, override per route layout) ──
-     Module-routes (/core, /will, /horizon) overschrijven deze met hun eigen module-shades.
-     Cross-module-routes (/dashboard, /identity, /rapportages, /berichten, /nieuws, /beheer)
-     vallen terug op deze defaults.
+     Route-layouts overschrijven deze met hun module-shades volgens de huidige IA:
+       /overzicht                → kern   (amber)
+       /toekomst                 → horizon (paars)
+       /berichten /nieuws /mijn   → wil    (teal) — Will & acties-domein
+     Legacy backing-routes (/core, /will, /horizon) houden hun eigen module-accent.
+     Overige cross-module-routes (/rapportages, /beheer, …) vallen terug op deze defaults.
      Uitzondering: --module-active-200 wordt gebruikt voor highlight-marker.
      Default = Horizon-200 zodat cross-module-pagina's een zichtbare uitkomst-marker behouden. */
   --module-active-50:  var(--ink-4);
@@ -256,11 +305,14 @@
   --negative: oklch(0.50 0.09 25);
   --neutral-change: oklch(0.67 0.005 88);
 
-  /* ── Score-tier tokens (gezondheidsscore, performance, ...) ── */
-  --score-good: oklch(0.50 0.13 162);
-  --score-ok:   oklch(0.55 0.10 200);
-  --score-warn: oklch(0.65 0.13 70);
-  --score-bad:  oklch(0.55 0.18 25);
+  /* ── Score-tier tokens (gezondheidsscore, performance, ...) ──
+     Feller dan de editorial value-change-tokens: hogere chroma voor
+     duidelijke band-kleuren in ring/balken, lichtheid beheerst zodat
+     ze als tekstkleur leesbaar blijven. */
+  --score-good: oklch(0.55 0.17 160);
+  --score-ok:   oklch(0.58 0.13 200);
+  --score-warn: oklch(0.67 0.17 66);
+  --score-bad:  oklch(0.57 0.22 27);
 
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
@@ -508,10 +560,9 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Avatar + WillDots + Level-up animations moved to component CSS files:
+/* Avatar + WillDots animations moved to component CSS files:
    - components/app/avatars.css
-   - components/app/will-dots.css
-   - components/app/level-up-celebration.css */
+   - components/app/will-dots.css */
 
 /* Hide scrollbar for module nav */
 .scrollbar-none::-webkit-scrollbar { display: none; }

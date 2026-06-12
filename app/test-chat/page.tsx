@@ -33,10 +33,10 @@ type DomainConfig = {
 const DOMAIN_CONFIGS: DomainConfig[] = [
   {
     domain: 'kern',
-    name: 'FHIN',
-    subtitle: 'Financieel bewaker',
-    placeholder: 'Vraag FHIN iets over je financien...',
-    greeting: 'Hoi, ik ben FHIN',
+    name: 'Will',
+    subtitle: 'Overzicht van vandaag',
+    placeholder: 'Vraag Will iets over je financien...',
+    greeting: 'Hoi, ik ben Will',
     greetingDescription: 'Ik bewaar je financiele waarheid — vermogen, budgetten, transacties en vrijheidstijd.',
     fabBg: 'bg-amber-600',
     fabAvatar: (size: number) => <FhinAvatar size={size} />,
@@ -45,7 +45,7 @@ const DOMAIN_CONFIGS: DomainConfig[] = [
     accentColor: 'text-amber-600',
     sendBg: 'bg-amber-600',
     route: '/core',
-    moduleLabel: 'De Kern',
+    moduleLabel: 'Overzicht',
     moduleColor: 'amber',
   },
   {
@@ -62,15 +62,15 @@ const DOMAIN_CONFIGS: DomainConfig[] = [
     accentColor: 'text-teal-600',
     sendBg: 'bg-teal-600',
     route: '/will',
-    moduleLabel: 'De Wil',
+    moduleLabel: 'Tips & acties',
     moduleColor: 'teal',
   },
   {
     domain: 'horizon',
-    name: 'FFIN',
-    subtitle: 'Strateeg van De Horizon',
-    placeholder: 'Vraag FFIN iets over je toekomst...',
-    greeting: 'Hoi, ik ben FFIN',
+    name: 'Will',
+    subtitle: 'Strateeg van je toekomst',
+    placeholder: 'Vraag Will iets over je toekomst...',
+    greeting: 'Hoi, ik ben Will',
     greetingDescription: 'Ik analyseer je pad naar financiele vrijheid — projecties, scenario\'s en simulaties.',
     fabBg: 'bg-purple-600',
     fabAvatar: (size: number) => <FfinAvatar size={size} />,
@@ -79,7 +79,7 @@ const DOMAIN_CONFIGS: DomainConfig[] = [
     accentColor: 'text-purple-600',
     sendBg: 'bg-purple-600',
     route: '/horizon',
-    moduleLabel: 'De Horizon',
+    moduleLabel: 'Toekomst',
     moduleColor: 'purple',
   },
 ]
@@ -101,9 +101,9 @@ export default function TestChatPage() {
   return (
     <div className="min-h-screen bg-zinc-100 p-8">
       <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl font-bold text-zinc-900 mb-2">AI Chat Personality Test</h1>
+        <h1 className="text-2xl font-bold text-zinc-900 mb-2">AI Chat Context Test</h1>
         <p className="text-sm text-zinc-500 mb-2">
-          Verifies that the AI chat shows the correct personality per module.
+          Verifies that the AI chat (Will) shows the correct per-module context.
         </p>
         <p className="text-xs text-zinc-400 mb-6">
           Current path: <code className="bg-zinc-200 px-1 rounded">{pathname}</code> → domain: <code className="bg-zinc-200 px-1 rounded">{currentDomainFromRoute}</code>

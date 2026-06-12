@@ -3,12 +3,25 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
+import {
+  buildHealthScoreInput,
+  type HealthScoreAsset,
+  type HealthScoreBudget,
+  type HealthScoreTransaction,
+} from '@/lib/health-score-input'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
-import { SWR } from '@/lib/constants'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
+import {
+  weightedAssetTotal,
+  weightedDebtTotal,
+  computeSnapshotNetWorth,
+  computeSnapshotFreedomPct,
+  type SnapshotAsset,
+  type SnapshotDebt,
+} from '../snapshot-math'
 
 /**
  * GET /api/snapshots/auto
@@ -46,9 +59,18 @@ export async function GET() {
   // Fetch all required data in parallel
   const twelveMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 11, 1))
   const sixMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 5, 1))
-  const monthEnd = localMonthBounds(now).end
+  const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
-  const [assetsResult, debtsResult, expensesResult, incomeResult, profileResult, budgetsResult] = await Promise.all([
+  const [
+    assetsResult,
+    debtsResult,
+    expensesResult,
+    incomeResult,
+    profileResult,
+    budgetsResult,
+    monthTxResult,
+    bankAccountsResult,
+  ] = await Promise.all([
     supabase
       .from('assets')
       .select('id, name, asset_type, current_value, monthly_contribution, net_worth_inclusion_pct')
@@ -75,16 +97,28 @@ export async function GET() {
       .lt('date', monthEnd),
     supabase
       .from('profiles')
-      .select('date_of_birth, expected_return, inflation_rate')
+      .select('date_of_birth, expected_return, inflation_rate, household_type')
       .eq('id', user.id)
       .single(),
+    // Alle budgetten (alle types, parents + children) — must-expenses + health.
     supabase
       .from('budgets')
-      .select('default_limit, interval')
+      .select('id, parent_id, budget_type, default_limit, interval, is_essential')
+      .eq('user_id', user.id),
+    // Huidige-maand-transacties met budget_id voor budget-discipline.
+    supabase
+      .from('transactions')
+      .select('amount, budget_id')
       .eq('user_id', user.id)
-      .eq('is_essential', true)
-      .in('budget_type', ['expense'])
-      .is('parent_id', null),
+      .gte('date', monthStart)
+      .lt('date', monthEnd),
+    // Niet-gekoppelde bankrekeningen voor unlinkedCash.
+    supabase
+      .from('bank_accounts')
+      .select('balance')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .is('linked_asset_id', null),
   ])
 
   if (assetsResult.error || debtsResult.error) {
@@ -98,26 +132,32 @@ export async function GET() {
   const expenses = expensesResult.data ?? []
   const income = incomeResult.data ?? []
 
-  const totalAssets = assets.reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
-  const totalDebts = debts.reduce((s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
-  const netWorth = totalAssets - totalDebts
+  const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+
+  // Canoniek opgeslagen net_worth: inclusion-gewogen assets + losse cash
+  // − inclusion-gewogen debts (spiegelt dashboard-loader; gedeeld met POST/cron).
+  const weightedAssets = weightedAssetTotal(assets as SnapshotAsset[])
+  const totalDebts = weightedDebtTotal(debts as SnapshotDebt[])
+  const totalAssets = weightedAssets + unlinkedCash
+  const netWorth = computeSnapshotNetWorth(weightedAssets, unlinkedCash, totalDebts)
 
   const yearlyExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount), 0))
   const monthlyExpenses = yearlyExpenses / 12
   const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0) / 6
   const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution || 0), 0)
 
-  const yearlyMustExpenses = (budgetsResult.data ?? []).reduce((s, b) => {
-    const limit = Number(b.default_limit) || 0
-    return s + (b.interval === 'yearly' ? limit : limit * 12)
-  }, 0)
+  const allBudgets = budgetsResult.data ?? []
+  const yearlyMustExpenses = allBudgets
+    .filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
+    .reduce((s, b) => {
+      const limit = Number(b.default_limit) || 0
+      return s + (b.interval === 'yearly' ? limit : limit * 12)
+    }, 0)
 
   const fireParams = resolveFireParams(profileResult.data ?? {})
   const fireSwr = fireParams.effectiveSwr
   const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
-  const freedomPercentage = fireTarget > 0
-    ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
-    : 0
+  const freedomPercentage = computeSnapshotFreedomPct(netWorth, fireTarget)
 
   // Compute FIRE projection
   const dateOfBirth = profileResult.data?.date_of_birth ?? null
@@ -147,21 +187,38 @@ export async function GET() {
     debtAflossing6m += aflossing * ((d.net_worth_inclusion_pct ?? 100) / 100)
   }
 
-  // Compute 6-pillar health score (replaces old 4-pillar resilience)
+  // Compute 6/7-pillar health score via het CANONIEKE gedeelde input-bouwpad
+  // (lib/health-score-input.ts) — exact dezelfde functie als de live loader.
+  // Echte noodfonds-maanden, budgetCategories en Box 3-taxData i.p.v. proxies,
+  // zodat de opgeslagen resilience_score ≈ de live score (ADR 0008).
+  // freedomPct = snapshot-eigen freedomPercentage (zie /api/snapshots/route.ts
+  // voor de motivatie van deze bewuste afwijking).
   const savingsRate6m = monthlyIncome > 0
     ? ((monthlyIncome - monthlyExpenses + debtAflossing6m) / monthlyIncome) * 100
     : 0
-  const emergencyFundMonths = monthlyExpenses > 0 ? totalAssets * 0.3 / monthlyExpenses : 0
-  const assetTypes = new Set(assets.map((a: { asset_type?: string }) => a.asset_type).filter(Boolean))
-  const healthScore = computeHealthScoreFromInputs({
-    savingsRate6m,
-    totalAssets,
-    totalDebts,
-    emergencyFundMonths,
-    freedomPct: freedomPercentage,
-    assetTypeCount: assetTypes.size,
-    budgetCategories: [],
-  })
+  // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
+  const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
+  const healthScore = computeHealthScoreFromInputs(
+    buildHealthScoreInput(
+      {
+        savingsRate6m,
+        totalAssets: weightedAssets + unlinkedCash,
+        totalDebts,
+        freedomPct: freedomPercentage,
+        avgMonthlyExpenses: monthlyExpenses,
+        // Zelfde inkomensbron als savingsRate6m (income/6) — DSTI-noemer.
+        netMonthlyIncome: monthlyIncome,
+      },
+      {
+        assets: assets as HealthScoreAsset[],
+        unlinkedCash,
+        budgets: allBudgets as HealthScoreBudget[],
+        transactions: (monthTxResult.data ?? []) as HealthScoreTransaction[],
+        householdType: profileResult.data?.household_type ?? null,
+        debtMonthlyPayments,
+      },
+    ),
+  )
 
   // Build snapshot row
   const snapshotRow: Record<string, unknown> = {
@@ -178,6 +235,9 @@ export async function GET() {
     sovereignty_level: sovereigntyLevel,
     savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
     resilience_score: healthScore.total,
+    // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op de
+    // kolom; v2-snapshots schrijven expliciet 2 voor de trend-methodemarkering.
+    score_version: 2,
   }
 
   // Try upsert with extended fields; fall back to basic if columns don't exist

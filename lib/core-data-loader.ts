@@ -15,7 +15,20 @@ import type { FireParams } from '@/lib/fire-params'
 import {
   type SavingsRateMethod,
   computeSavingsRateFromNetWorthDelta,
+  computeFreedomProgress,
 } from '@/lib/core-metrics'
+import type { HealthScoreInput } from '@/lib/financial-health'
+import {
+  buildHealthScoreInput,
+  type HealthScoreAsset,
+  type HealthScoreBudget,
+  type HealthScoreTransaction,
+} from '@/lib/health-score-input'
+import {
+  parseHousingStrategy,
+  deriveHousingContext,
+  getFireEligibleNetWorth,
+} from '@/lib/housing-strategy'
 import { computeHorizonFireTarget } from '@/lib/fire-target-shared'
 import { computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
 import { resolveFireParams } from '@/lib/fire-params'
@@ -25,9 +38,10 @@ import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
 import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
-import { loadPerspectiveData } from '@/lib/household/perspective-loader'
+import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
+import { savingsRateFromAggregates } from './savings-source'
 
 /** Filter out own-account transfers from income/expense calculations */
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -120,6 +134,16 @@ export interface CorePageData {
   }
   fullAssets: Asset[]
   fullDebts: Debt[]
+
+  /**
+   * Canonieke gezondheidsscore-input (ADR 0008/0010), server-side gebouwd via
+   * `buildHealthScoreInput` — DEZELFDE bron als de dashboard-loader en de
+   * snapshot-routes. De /core-hero scoort hierop, zodat hij binnen afronding
+   * gelijk is aan /overzicht (FR-8.7). `freedomPct` gebruikt de canonieke
+   * `computeFreedomProgress` op de FIRE-eligible grondslag (ADR 0009), niet de
+   * oude netWorth/fireTarget-formule.
+   */
+  healthScoreInput: HealthScoreInput
 
   // Feature state
   hasTransactions: boolean
@@ -412,7 +436,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .limit(1),
     supabase
       .from('profiles')
-      .select('full_name, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, fire_end_strategy, fire_end_age, fire_legacy_amount, date_of_birth, income_source, expenses_source')
+      .select('full_name, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, fire_end_strategy, fire_end_age, fire_legacy_amount, date_of_birth, income_source, expenses_source, household_type, housing_strategy_config')
       .single(),
     supabase
       .from('bank_accounts')
@@ -634,7 +658,7 @@ export const loadCoreData = cache(async function loadCoreData(
   // laden (geen huishouden / RLS) → val terug op de eigen totalen.
   if (perspective !== 'personal' && hasVermogen) {
     try {
-      const pd = await loadPerspectiveData(supabase, perspective)
+      const pd = await loadPerspectiveDataServer(supabase, perspective)
       const share = (
         item: { ownership?: string; _myShareFraction?: number },
         raw: number,
@@ -861,8 +885,9 @@ export const loadCoreData = cache(async function loadCoreData(
         ? (sbTotal6m / savingsRateDataMonths) * 6
         : sbTotal6m
       const extAfl6m = debtAflossingTotal6m
-      const correctedHalfYearSavings = extHalfYearIncome - extHalfYearExpenses + extSb6m + extAfl6m
-      const rate = extHalfYearIncome > 0 ? (correctedHalfYearSavings / extHalfYearIncome) * 100 : 0
+      // Gedeelde formule (income − expenses + aflossing); spaarbudgetten tellen als
+      // sparen → uit de uitgaven-term gehaald zodat de uitkomst byte-gelijk blijft.
+      const rate = savingsRateFromAggregates(extHalfYearIncome, extHalfYearExpenses - extSb6m, extAfl6m)
       if (rate === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
         computedSavingsRate6m = Math.round(((effectiveMonthlyIncome - effectiveMonthlyExpenses) / effectiveMonthlyIncome) * 100)
         savingsRateMethod = 'estimate'
@@ -922,6 +947,55 @@ export const loadCoreData = cache(async function loadCoreData(
   // Promise is vroeg gestart (zie boven), nu pas resolven zodat hij parallel
   // met de Kern-batches heeft kunnen draaien. Identieke output als Horizon.
   const fireTargetFromHorizon = await fireTargetPromise
+
+  // ── Canonieke gezondheidsscore-input (ADR 0008/0010, FR-8.7) ──────────
+  // Trekt de /core-score op het ÉNE canonieke pad (`buildHealthScoreInput`),
+  // i.p.v. het oude tweede berekenpad in core-landing (eigen noodfonds-/
+  // diversificatie-/budget-reconstructie + pre-ADR-0009 freedomPct = netWorth/
+  // fireTarget). Inputs:
+  //   • netMonthlyIncome = het 6-maands-gemiddelde inkomen (extHalfYearIncome/6 =
+  //     dezelfde canonieke bron die savingsRate6m voedt; profiel-fallback wanneer
+  //     er geen transactie-inkomen is) — DSTI-noemer (ADR 0010 / FR-2).
+  //   • debtMonthlyPayments = Σ monthly_payment over de actieve schulden.
+  //   • budgetten/transacties: alle budgetten + huidige-maand-tx-met-budget_id
+  //     uit batch 2 (budgetResult/spendingResult) → identieke budget-discipline.
+  //   • freedomPct = canonieke `computeFreedomProgress` op de FIRE-eligible
+  //     grondslag ÷ `fireTargetFromHorizon` (= het `simRequiredPortfolio` dat de
+  //     dashboard-loader ook gebruikt) zodat /core binnen afronding = /overzicht.
+  const housingStrategyCfg = parseHousingStrategy(
+    (profileResult.data as Record<string, unknown> | null)?.housing_strategy_config,
+  )
+  const housingContext = deriveHousingContext(
+    assetsResult.data as unknown as Asset[],
+    debtsResult.data as unknown as Debt[],
+  )
+  const coreFireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, housingStrategyCfg)
+  const coreFreedomPct = computeFreedomProgress({
+    fireEligibleNetWorth: coreFireEligibleNetWorth,
+    requiredPortfolio: fireTargetFromHorizon != null && fireTargetFromHorizon > 0 ? fireTargetFromHorizon : null,
+  })
+  const coreDebtMonthlyPayments = (debtsResult.data ?? []).reduce(
+    (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),
+    0,
+  )
+  const healthScoreInput: HealthScoreInput = buildHealthScoreInput(
+    {
+      savingsRate6m: Math.round(computedSavingsRate6m * 10) / 10,
+      totalAssets: effectiveTotalAssets,
+      totalDebts: effectiveTotalDebts,
+      freedomPct: coreFreedomPct,
+      avgMonthlyExpenses: effectiveMonthlyExpenses,
+      netMonthlyIncome: extHalfYearIncome > 0 ? extHalfYearIncome / 6 : effectiveMonthlyIncome,
+    },
+    {
+      assets: (assetsResult.data ?? []) as HealthScoreAsset[],
+      unlinkedCash,
+      budgets: (budgetResult.data ?? []) as HealthScoreBudget[],
+      transactions: (spendingResult.data ?? []) as HealthScoreTransaction[],
+      householdType: (profileResult.data as Record<string, unknown> | null)?.household_type as string | null,
+      debtMonthlyPayments: coreDebtMonthlyPayments,
+    },
+  )
 
   // ── Load 12-month budget spending sparklines per parent category ──
   // Aggregeert in één pass over de transacties ipv O(parents × months × txs).
@@ -1131,6 +1205,7 @@ export const loadCoreData = cache(async function loadCoreData(
     rawFinancials,
     fullAssets: assetsResult.data as unknown as Asset[],
     fullDebts: debtsResult.data as unknown as Debt[],
+    healthScoreInput,
 
     hasTransactions,
     hasGoals,

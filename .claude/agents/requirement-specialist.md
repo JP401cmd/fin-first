@@ -1,7 +1,8 @@
 ---
 name: requirement-specialist
 description: "Use this agent to turn a business-owner intent into precise, unambiguous requirements and acceptance criteria for TriFinity — the bridge between 'what we want and why' (business-owner) and 'how we build it' (engineers). It works on behalf of the business-owner to set the right expectations: it elaborates a feature into clear functional & non-functional requirements, explicit acceptance criteria (Given/When/Then), scope boundaries (in/out), edge cases, dependencies, and the definition of done — without deciding priority (that's the business-owner) or implementation (that's the engineers). Use it after an idea is greenlit and before building, or when a feature's expectations are fuzzy and need pinning down.\n\nExamples:\n\n<example>\nContext: A greenlit but fuzzy feature\nuser: \"The business owner wants a subscriptions overview — make the requirements concrete\"\nassistant: \"I'll use the requirement-specialist agent to write the functional/non-functional requirements, acceptance criteria, scope boundaries and definition of done.\"\n<Task tool call to requirement-specialist>\n</example>\n\n<example>\nContext: Ambiguity before build\nuser: \"Engineers and I disagree on what 'freedom-day cost' should include\"\nassistant: \"Let me launch the requirement-specialist agent to nail the exact expected behaviour, edge cases and acceptance criteria so everyone aligns.\"\n<Task tool call to requirement-specialist>\n</example>\n\n<example>\nContext: Refining backlog items\nuser: \"These features are too vague to start\"\nassistant: \"I'll use the requirement-specialist agent to sharpen each into testable requirements with a clear definition of done.\"\n<Task tool call to requirement-specialist>\n</example>"
-model: opus
+model: sonnet
+effort: high
 color: amber
 ---
 

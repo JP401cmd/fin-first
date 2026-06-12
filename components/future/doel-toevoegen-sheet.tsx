@@ -389,7 +389,7 @@ export function DoelToevoegenSheet() {
                 e.stopPropagation()
                 setAdvancedOpen(true)
               }}
-              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-700 hover:text-violet-800 hover:underline"
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-horizon-700 hover:text-horizon-800 hover:underline"
             >
               <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
               Geavanceerd (meer doel-types + koppelingen)
@@ -500,11 +500,11 @@ function EtaPreview({
   return (
     <section
       data-testid="eta-preview"
-      className="mt-4 rounded-xl border border-violet-100 bg-violet-50/40 p-3"
+      className="mt-4 rounded-xl border border-horizon-100 bg-horizon-50/40 p-3"
     >
       <header className="flex items-center gap-1.5 mb-1">
-        <Calculator className="w-3.5 h-3.5 text-violet-700" aria-hidden="true" />
-        <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-violet-700">
+        <Calculator className="w-3.5 h-3.5 text-horizon-700" aria-hidden="true" />
+        <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-horizon-700">
           Indicatie
         </span>
       </header>

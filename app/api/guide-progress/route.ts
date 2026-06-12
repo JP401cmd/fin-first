@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { ageAtDate, NL_SWR } from '@/lib/horizon-data'
 import { calculateFreedomTime } from '@/lib/format'
+import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /**
  * GET /api/guide-progress
@@ -88,12 +89,8 @@ export async function GET() {
 
     // Daily expense rate (from transactions, last 12 months)
     const now = new Date()
-    const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-      .toISOString()
-      .split('T')[0]
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      .toISOString()
-      .split('T')[0]
+    const twelveMonthsAgo = localMonthStartMonthsAgo(now, 11)
+    const monthEnd = localMonthBounds(now).end
 
     const expenseResult = await supabase
       .from('transactions')

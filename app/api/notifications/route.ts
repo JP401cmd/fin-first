@@ -4,6 +4,9 @@ import { shouldAlert } from '@/lib/budget-alerts'
 import { shouldSendWozReminder, WOZ_REMINDER_TEMPLATE } from '@/lib/notifications/woz-reminder'
 import { shouldSendPensionReminder, PENSION_REMINDER_TEMPLATE } from '@/lib/notifications/pension-reminder'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
+import { localMonthBounds } from '@/lib/month-range'
+import { resolveFireParams } from '@/lib/fire-params'
+import { calculateFreedomTime } from '@/lib/format'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -11,7 +14,6 @@ export type NotificationType =
   | 'budget'
   | 'sync'
   | 'recommendation'
-  | 'levelup'
   | 'partner_transaction'
   | 'horizon'
   | 'holding_alert'
@@ -37,7 +39,7 @@ export type Notification = {
 // Egress-reductie (jun 2026): de poll draait per gebruiker elke 10 min en
 // deed ~22 queries per request. De checks die hooguit dagelijks/wekelijks
 // iets nieuws opleveren (sync-warnings, WOZ/pensioen-jaarreminders,
-// weekbriefing, level-up, budgetmodel-voorstellen, horizon- en
+// weekbriefing, budgetmodel-voorstellen, horizon- en
 // holding-alerts) worden hier per gebruiker 15 min gecached. Vers per poll
 // blijven alleen: read-state/prefs, budgetstatus en partner-transacties.
 //
@@ -82,7 +84,7 @@ export async function GET(request: NextRequest) {
 
     const defaultPrefs: Record<string, boolean> = {
       budget: true, sync: true,
-      recommendation: true, levelup: true,
+      recommendation: true,
       partner_transaction: true, horizon: true,
       holding_alert: true, briefing: true,
       budget_model_proposal: true,
@@ -102,7 +104,7 @@ export async function GET(request: NextRequest) {
     const notifications: Notification[] = []
     const now = new Date().toISOString()
 
-    // Langzame checks: cache-hit → secties 4/4b/4c/5/6b/7/8 overslaan en de
+    // Langzame checks: cache-hit → secties 4/4b/4c/6b/7/8 overslaan en de
     // gecachte items hergebruiken (read-state wordt bij de merge vers
     // afgeleid). `slow` vangt de pushes van die secties op een cache-miss.
     const cachedSlow = slowChecksCache.get(user.id)
@@ -116,23 +118,18 @@ export async function GET(request: NextRequest) {
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - days)
 
-    // Keep sevenDaysAgo for backward-compat references (e.g. level-up check)
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
     // ── 1. Budget alerts ─────────────────────────────────────────────
 
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
-    const monthEnd = new Date(
-      monthStart.getFullYear(),
-      monthStart.getMonth() + 1,
-      1
-    )
+    // Tijdzone-veilige maandgrenzen (lib/month-range.ts) — lokale datum +
+    // toISOString() schoof de grens in NL een dag terug, waardoor een
+    // laatste-dag-van-vorige-maand-transactie in deze maand lekte.
+    const monthBounds = localMonthBounds(new Date())
+    const monthStart = monthBounds.start // YYYY-MM-DD, inclusief
+    const monthEnd = monthBounds.end     // YYYY-MM-DD, exclusief (1e volgende maand)
 
-    // Build current period string for rollovers (YYYY-MM)
-    const currentPeriod = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`
+    // Build current period string for rollovers (YYYY-MM) — uit de
+    // tijdzone-veilige maandstart (eerste 7 tekens van YYYY-MM-DD).
+    const currentPeriod = monthStart.slice(0, 7)
 
     const [budgetsRes, txRes, amountsRes, rolloversRes] = await Promise.all([
       supabase
@@ -143,8 +140,8 @@ export async function GET(request: NextRequest) {
         .from('transactions')
         .select('budget_id, amount, transaction_type')
         .eq('user_id', user.id)
-        .gte('date', monthStart.toISOString().split('T')[0])
-        .lt('date', monthEnd.toISOString().split('T')[0])
+        .gte('date', monthStart)
+        .lt('date', monthEnd)
         .not('budget_id', 'is', null),
       // NB: budget_amounts heeft géén user_id-kolom — RLS scopet via de
       // budgets-join (zelfde patroon als lib/budgets-data-loader.ts). Het
@@ -443,46 +440,6 @@ export async function GET(request: NextRequest) {
       console.error('Weekly briefing notification error:', err)
     }
 
-    // ── 5. Level-up notifications ───────────────────────────────────
-
-    const { data: levelChangeData } = computeSlow
-      ? await supabase
-          .from('app_settings')
-          .select('value')
-          .eq('key', `sovereignty_level_change_${user.id}`)
-          .maybeSingle()
-      : { data: null }
-
-    if (levelChangeData?.value) {
-      try {
-        const change = JSON.parse(levelChangeData.value) as {
-          oldLevel: number
-          newLevel: number
-          timestamp: string
-        }
-        // Only show if within the last 7 days
-        if (change.timestamp >= sevenDaysAgo.toISOString()) {
-          const id = `levelup_${change.newLevel}_${change.timestamp.split('T')[0]}`
-          slow.push({
-            id,
-            type: 'levelup',
-            priority: 1,
-            title: `Niveau omhoog: Level ${change.newLevel}`,
-            description: `Je soevereiniteitsniveau is gestegen van level ${change.oldLevel} naar ${change.newLevel}. Bekijk welke features er zijn ontgrendeld!`,
-            icon: 'ArrowUp',
-            color: 'purple',
-            createdAt: change.timestamp,
-            read: readIds.includes(id),
-            actionUrl: '/identity',
-            aiContext: `Ik ben van soevereiniteitsniveau ${change.oldLevel} naar ${change.newLevel} gegaan. Wat is er nu anders?`,
-            metadata: { oldLevel: change.oldLevel, newLevel: change.newLevel },
-          })
-        }
-      } catch {
-        // Invalid JSON — skip
-      }
-    }
-
     // ── 6. Partner transaction notifications ─────────────────────────
     // Check if user is in a household and has partner transaction notification prefs
 
@@ -559,18 +516,16 @@ export async function GET(request: NextRequest) {
               }
             }
 
-            // Compute daily expenses for freedom time calculation (exclude transfers)
-            const dailyExpenses = monthEnd && monthStart
-              ? (() => {
-                  const totalExpenses = (txRes.data ?? [])
-                    .filter(t =>
-                      (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
-                      (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer')
-                    .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
-                  const daysInMonth = Math.ceil((monthEnd.getTime() - monthStart.getTime()) / 86_400_000)
-                  return totalExpenses / Math.max(daysInMonth, 1)
-                })()
-              : 0
+            // Compute daily expenses for freedom time calculation (exclude transfers).
+            // Canonieke dagbasis = jaaruitgaven / 365 (zie lib/format.ts
+            // calculateFreedomTime), niet maand/dagenInMaand. De maanduitgaven
+            // extrapoleren we naar een jaar (×12).
+            const totalMonthExpenses = (txRes.data ?? [])
+              .filter(t =>
+                (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
+                (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer')
+              .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
+            const dailyExpenses = totalMonthExpenses > 0 ? (totalMonthExpenses * 12) / 365 : 0
 
             for (const tx of uniquePartnerTxs) {
               const amount = Math.abs(Number(tx.amount))
@@ -590,29 +545,28 @@ export async function GET(request: NextRequest) {
 
               if (!shouldNotify) continue
 
-              // Calculate freedom days impact
-              const freedomDays = dailyExpenses > 0
-                ? Math.round((amount / dailyExpenses) * 10) / 10
-                : 0
+              // Vrijheidstijd-impact via de canonieke helper (lib/format.ts):
+              // dezelfde €→tijd-conversie als de rest van de app. De zichtbare
+              // tekstvorm ("Xj Ym", "Ym Zd", "N dagen") houden we bewust gelijk
+              // aan de oude melding — alleen de dagbasis is nu canoniek.
+              const freedomBreakdown = calculateFreedomTime(amount, dailyExpenses)
+              const freedomDaysRounded = freedomBreakdown.totalDays
 
               const id = `partner_tx_${tx.id}`
               const isIncome = tx.is_income === true
               const categoryLabel = budgetName ? ` · ${budgetName}` : ''
 
-              // Freedom-time formatting
-              const freedomDaysRounded = Math.round(freedomDays * 10) / 10
+              // Freedom-time formatting — tekstvorm gelijk aan de oude melding,
+              // gevoed door de canonieke breakdown.
               let freedomLabel = ''
               if (freedomDaysRounded > 0) {
-                if (freedomDaysRounded >= 365) {
-                  const years = Math.floor(freedomDaysRounded / 365)
-                  const months = Math.round((freedomDaysRounded % 365) / 30)
+                const { years, months, days } = freedomBreakdown
+                if (years > 0) {
                   freedomLabel = months > 0 ? `${years}j ${months}m` : `${years}j`
-                } else if (freedomDaysRounded >= 30) {
-                  const months = Math.floor(freedomDaysRounded / 30)
-                  const days = Math.round(freedomDaysRounded % 30)
+                } else if (months > 0) {
                   freedomLabel = days > 0 ? `${months}m ${days}d` : `${months}m`
                 } else {
-                  freedomLabel = `${freedomDaysRounded} ${freedomDaysRounded === 1 ? 'dag' : 'dagen'}`
+                  freedomLabel = `${days} ${days === 1 ? 'dag' : 'dagen'}`
                 }
               }
 
@@ -729,18 +683,27 @@ export async function GET(request: NextRequest) {
           .maybeSingle(),
         supabase
           .from('debts')
-          .select('current_balance')
+          .select('current_balance, net_worth_inclusion_pct')
           .eq('is_active', true),
         supabase
           .from('assets')
-          .select('current_value')
-          .eq('user_id', user.id),
+          .select('current_value, net_worth_inclusion_pct')
+          .eq('user_id', user.id)
+          .eq('is_active', true),
       ])
 
       profile = profileRes.data
       const dateOfBirth = profile?.date_of_birth
-      const totalDebts = (debtsRes.data ?? []).reduce((sum, d) => sum + Math.abs(Number(d.current_balance ?? 0)), 0)
-      const totalAssets = (assetsRes.data ?? []).reduce((sum, a) => sum + Number(a.current_value ?? 0), 0)
+      // Netto vermogen op dezelfde grondslag als dashboard-data-loader:
+      // actieve posten, gewogen met net_worth_inclusion_pct.
+      const totalDebts = (debtsRes.data ?? []).reduce(
+        (sum, d) => sum + Math.abs(Number(d.current_balance ?? 0)) * (Number((d as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100),
+        0,
+      )
+      const totalAssets = (assetsRes.data ?? []).reduce(
+        (sum, a) => sum + Number(a.current_value ?? 0) * (Number((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100),
+        0,
+      )
 
       // Alert: no date of birth set
       if (!dateOfBirth) {
@@ -791,7 +754,17 @@ export async function GET(request: NextRequest) {
         const monthlySavings = monthlyIncome - monthlyExpenses
         const netWorth = totalAssets - totalDebts
 
-        if (monthlySavings <= 0 && netWorth < monthlyExpenses * 12 * 25) {
+        // FIRE-doel op de canonieke grondslag: jaaruitgaven / effectiveSwr
+        // (gepersonaliseerde SWR uit resolveFireParams), niet de impliciete
+        // 25× (= 4%-regel). Zo oordeelt deze trigger op hetzelfde doel als
+        // /toekomst.
+        const { effectiveSwr } = resolveFireParams({
+          expected_return: profile?.expected_return ?? null,
+          inflation_rate: profile?.inflation_rate ?? null,
+        })
+        const fireTarget = effectiveSwr > 0 ? (monthlyExpenses * 12) / effectiveSwr : Infinity
+
+        if (monthlySavings <= 0 && netWorth < fireTarget) {
           const id = 'horizon_fire_unreachable'
           slow.push({
             id,
@@ -1120,7 +1093,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const validTypes = ['budget', 'sync', 'recommendation', 'levelup', 'partner_transaction', 'horizon', 'holding_alert', 'briefing', 'budget_model_proposal']
+    const validTypes = ['budget', 'sync', 'recommendation', 'partner_transaction', 'horizon', 'holding_alert', 'briefing', 'budget_model_proposal']
     const sanitized: Record<string, boolean> = {}
     for (const key of validTypes) {
       sanitized[key] = preferences[key] !== false

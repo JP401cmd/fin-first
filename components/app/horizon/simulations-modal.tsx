@@ -401,14 +401,14 @@ function ConeChart({
 
       {fireInRange && (
         <>
-          <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="6 3" />
+          <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="1.5" strokeDasharray="6 3" />
           <text x={W - PAD + 4} y={fireY + 3} className="fill-horizon-500" style={{ fontSize: 9, fontWeight: 600 }}>FIRE</text>
         </>
       )}
 
-      <path d={bandPath} fill="#8B5CB8" style={{ opacity: animated ? 0.08 : 0, transition: animated ? 'opacity 250ms ease-out 455ms' : 'none' }} />
-      <path d={innerBandPath} fill="#8B5CB8" style={{ opacity: animated ? 0.12 : 0, transition: animated ? 'opacity 250ms ease-out 455ms' : 'none' }} />
-      <path d={linePath(percentiles.p50)} fill="none" stroke="#8B5CB8" strokeWidth="2.5"
+      <path d={bandPath} fill="var(--color-horizon-500, #c4a06b)" style={{ opacity: animated ? 0.08 : 0, transition: animated ? 'opacity 250ms ease-out 455ms' : 'none' }} />
+      <path d={innerBandPath} fill="var(--color-horizon-500, #c4a06b)" style={{ opacity: animated ? 0.12 : 0, transition: animated ? 'opacity 250ms ease-out 455ms' : 'none' }} />
+      <path d={linePath(percentiles.p50)} fill="none" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2.5"
         pathLength={1} strokeDasharray={1}
         style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
 
@@ -426,7 +426,7 @@ function ConeChart({
       ))}
 
       {hoveredYear !== null && (
-        <line x1={x(hoveredYear)} y1={PAD} x2={x(hoveredYear)} y2={H - PAD} stroke="#8B5CB8" strokeWidth="1" strokeDasharray="3" opacity="0.5" />
+        <line x1={x(hoveredYear)} y1={PAD} x2={x(hoveredYear)} y2={H - PAD} stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="1" strokeDasharray="3" opacity="0.5" />
       )}
 
       {Array.from({ length: 9 }, (_, i) => {
@@ -438,11 +438,11 @@ function ConeChart({
         )
       })}
 
-      <rect x={PAD} y={6} width={12} height={8} rx={2} fill="#8B5CB8" opacity="0.08" stroke="#8B5CB8" strokeWidth="0.5" />
+      <rect x={PAD} y={6} width={12} height={8} rx={2} fill="var(--color-horizon-500, #c4a06b)" opacity="0.08" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="0.5" />
       <text x={PAD + 16} y={14} className="fill-zinc-500" style={{ fontSize: 10 }}>P10-P90</text>
-      <rect x={PAD + 80} y={6} width={12} height={8} rx={2} fill="#8B5CB8" opacity="0.15" stroke="#8B5CB8" strokeWidth="0.5" />
+      <rect x={PAD + 80} y={6} width={12} height={8} rx={2} fill="var(--color-horizon-500, #c4a06b)" opacity="0.15" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="0.5" />
       <text x={PAD + 96} y={14} className="fill-zinc-500" style={{ fontSize: 10 }}>P25-P75</text>
-      <line x1={PAD + 160} y1={10} x2={PAD + 176} y2={10} stroke="#8B5CB8" strokeWidth="2" />
+      <line x1={PAD + 160} y1={10} x2={PAD + 176} y2={10} stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2" />
       <text x={PAD + 180} y={14} className="fill-zinc-500" style={{ fontSize: 10 }}>Mediaan (P50)</text>
     </svg>
   )
@@ -472,7 +472,7 @@ function HistogramChart({ buckets, max }: { buckets: { label: string; count: num
               width={barW}
               height={animated ? barH : 0}
               rx={3}
-              fill="#8B5CB8"
+              fill="var(--color-horizon-500, #c4a06b)"
               opacity="0.7"
               style={{ transition: animated ? `y 400ms cubic-bezier(.22,1,.36,1) ${staggerDelay}ms, height 400ms cubic-bezier(.22,1,.36,1) ${staggerDelay}ms` : 'none' }}
             />

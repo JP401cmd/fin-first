@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import type { DashboardData } from './widget-renderer'
@@ -32,7 +32,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
   const investmentProportion = totalAllAssets > 0 ? totalInvestments / totalAllAssets : 0
   const investmentContributions = Math.round(monthlyContributions * investmentProportion)
 
-  const dailyExp = monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(monthlyExpenses)
   const ft = dailyExp > 0 && totalInvestments > 0 ? calculateFreedomTime(totalInvestments, dailyExp) : null
   const ftStr = ft ? formatFreedomTimeString(ft, 'short') : null
 

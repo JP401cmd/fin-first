@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -142,7 +143,8 @@ export async function GET(request: Request) {
         .from('transactions')
         .select('amount, date')
         .lt('amount', 0)
-        .gte('date', new Date(new Date(date).getFullYear(), new Date(date).getMonth() - 11, 1).toISOString().split('T')[0])
+        // 12-maands rolling window, tijdzone-veilige ondergrens (lib/month-range).
+        .gte('date', localMonthStartMonthsAgo(new Date(date), 11))
         .lte('date', date),
     ])
 

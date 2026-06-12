@@ -124,6 +124,30 @@ export function oklchToHex(L: number, C: number, h: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }
 
+// ── WCAG contrast ───────────────────────────────────────────────────────
+
+/**
+ * Relative luminance of an sRGB hex color per WCAG 2.x.
+ * https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
+ */
+export function relativeLuminance(hex: string): number {
+  const [sr, sg, sb] = hexToSrgb(hex)
+  const [r, g, b] = [srgbToLinear(sr), srgbToLinear(sg), srgbToLinear(sb)]
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/**
+ * WCAG 2.x contrast ratio between two hex colors (1:1 .. 21:1).
+ * Order-independent. Pure & testable: contrastRatio('#000000', '#ffffff') === 21.
+ */
+export function contrastRatio(hexA: string, hexB: string): number {
+  const lA = relativeLuminance(hexA)
+  const lB = relativeLuminance(hexB)
+  const lighter = Math.max(lA, lB)
+  const darker = Math.min(lA, lB)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
 // ── Palette generation ──────────────────────────────────────────────────
 
 export type Palette = Record<Shade, { oklch: string; hex: string }>

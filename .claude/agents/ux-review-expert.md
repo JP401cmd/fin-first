@@ -2,6 +2,7 @@
 name: ux-review-expert
 description: "Use this agent when the user wants a UI/UX review of recently written or modified code, when consistency issues need to be identified across components, when new UI components are being designed or implemented, or when the user asks for feedback on user experience, visual design, interaction patterns, or accessibility. This agent should be proactively invoked after any significant UI change is made.\\n\\nExamples:\\n\\n- User: \"Ik heb een nieuwe pagina gemaakt voor de debt overview, kun je even kijken?\"\\n  Assistant: \"Laat me de UX review agent inschakelen om je nieuwe pagina te beoordelen op consistentie en gebruikerservaring.\"\\n  [Uses Task tool to launch ux-review-expert agent]\\n\\n- User: \"Hier is mijn nieuwe KPI card component\"\\n  Assistant: \"Ik ga de UX review expert agent gebruiken om je component te reviewen tegen de design patterns en het referentie-template.\"\\n  [Uses Task tool to launch ux-review-expert agent]\\n\\n- Context: The coding agent just finished implementing a new bottom sheet modal.\\n  Assistant: \"Nu de modal is geïmplementeerd, laat me de UX review expert inschakelen om te controleren of deze consistent is met de bestaande patronen.\"\\n  [Uses Task tool to launch ux-review-expert agent]\\n\\n- User: \"Kun je checken of mijn formulier goed werkt qua UX?\"\\n  Assistant: \"Ik schakel de UX review expert in om je formulier grondig te evalueren.\"\\n  [Uses Task tool to launch ux-review-expert agent]"
 model: sonnet
+effort: high
 color: purple
 ---
 

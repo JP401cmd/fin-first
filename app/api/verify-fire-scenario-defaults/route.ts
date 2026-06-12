@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { NextResponse } from 'next/server'
+import { localMonthBounds } from '@/lib/month-range'
 
 /**
  * Verification endpoint for Feature #177:
@@ -19,8 +20,7 @@ export async function GET() {
   try {
     const supabase = await createClient()
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+    const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
     // Run same queries the horizon page runs
     const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, childBudgetsResult] = await Promise.all([

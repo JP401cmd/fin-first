@@ -51,8 +51,18 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
 
   // Freedom
   freedomPct: 30,
+  fireEligibleNetWorth: 187500,
   fireTarget: 625000,
   fireProjResult: fireProjBase,
+  healthScore: {
+    total: 68,
+    label: 'Redelijk',
+    pillars: [],
+    previousMonth: 65,
+    trend: 3,
+    activePillarCount: 7,
+    budgetingActive: true,
+  },
 
   // Actions
   openActions: 8,

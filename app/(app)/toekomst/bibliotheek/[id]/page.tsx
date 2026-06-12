@@ -172,7 +172,7 @@ export default async function BibliotheekDetailPage({
 
       {/* Header */}
       <header className="mb-6">
-        <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+        <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-horizon-700">
           Toekomst — bibliotheek
         </div>
         <h1 className="font-serif text-2xl sm:text-3xl text-[var(--ink)] mt-1">

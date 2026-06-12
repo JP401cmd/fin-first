@@ -1422,7 +1422,7 @@ export function buildScenarioPathsFromSim(
   const baseline: ScenarioPath = {
     name: 'current',
     label: 'Huidige Koers',
-    color: '#8B5CB8',
+    color: 'var(--color-horizon-500, #c4a06b)',
     months: rowsToMonths(baselinePts),
     fireAge: baselineFireAge,
     fireMonth: baselineFireMonth,

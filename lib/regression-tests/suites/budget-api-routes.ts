@@ -22,6 +22,7 @@ import {
   assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
+import { localMonthBounds } from '@/lib/month-range'
 
 const CAT = 'kern.budgets-api'
 
@@ -274,8 +275,7 @@ const tests: TestCase[] = [
       const months: { start: string; end: string; label: string; month: string }[] = []
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const start = d.toISOString().split('T')[0]
-        const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().split('T')[0]
+        const { start, end } = localMonthBounds(d)
         const label = d.toLocaleDateString('nl-NL', { month: 'short' })
         months.push({ start, end, label, month: start })
       }
@@ -587,7 +587,7 @@ const tests: TestCase[] = [
       }[] = []
 
       // Current month
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      const currentMonthStart = localMonthBounds(now).start
       const currentMonthLabel = now.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
       forecast.push({
         month: currentMonthStart,

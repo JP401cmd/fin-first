@@ -20,7 +20,9 @@ const MOCK_DATA: DashboardData = {
     debt: { limit: 500, spent: 450 },
   },
   freedomPct: 35,
+  fireEligibleNetWorth: 125000,
   fireTarget: 750000,
+  healthScore: { total: 70, label: 'Sterk', pillars: [], previousMonth: 68, trend: 2, activePillarCount: 7, budgetingActive: true },
   fireProjResult: {
     fireTarget: 750000, netWorth: 125000, freedomPercentage: 35, fireAge: 55, currentAge: 40,
     fireDate: 'jan 2041', countdownDays: 5475, countdownYears: 15, countdownMonths: 0,

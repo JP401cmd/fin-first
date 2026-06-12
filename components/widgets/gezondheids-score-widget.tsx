@@ -6,7 +6,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Activity, TrendingUp, TrendingDown, Minus, ChevronRight, Lightbulb, ExternalLink } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
-import { computeHealthScore, type HealthPillar } from '@/lib/financial-health'
+import type { HealthPillar, HealthScore } from '@/lib/financial-health'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 
@@ -130,9 +130,19 @@ function RadarChart({ pillars, sz }: { pillars: HealthPillar[]; sz: number }) {
   })
   const dataPath = dataPoints.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`).join(' ') + ' Z'
 
-  // Short labels — 7 pillars (incl. tax_optimization), volgorde matcht
-  // health.pillars uit financial-health.ts.
-  const shortLabels = ['Spaar', 'Schuld', 'Nood', 'Vrij', 'Divers.', 'Budget', 'Bel.']
+  // Korte labels per indicator-id (ADR 0010 / v2). Id-based i.p.v. positioneel,
+  // zodat volgorde of aantal actieve indicatoren de labels niet kan ontkoppelen.
+  const SHORT_LABELS: Record<string, string> = {
+    savings_rate: 'Spaar',
+    budget_discipline: 'Budget',
+    emergency_fund: 'Nood',
+    debt_service_ratio: 'Lasten',
+    debt_ratio: 'Schuld',
+    fire_progress: 'Vrij',
+    asset_concentration: 'Spreid',
+  }
+  const shortLabelFor = (p: HealthPillar): string =>
+    SHORT_LABELS[p.id] ?? (p.name.length > 6 ? p.name.slice(0, 5) + '…' : p.name)
 
   return (
     <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`}>
@@ -195,21 +205,21 @@ function RadarChart({ pillars, sz }: { pillars: HealthPillar[]; sz: number }) {
       ))}
 
       {/* Labels */}
-      {pillars.map((_, i) => {
+      {pillars.map((p, i) => {
         const angle = startOffset + i * angleStep
         const labelR = maxR + 10
         const pos = polarToCart(angle, labelR)
         const anchor = pos.x < cx - 2 ? 'end' : pos.x > cx + 2 ? 'start' : 'middle'
         return (
           <text
-            key={i}
+            key={p.id}
             x={pos.x}
             y={pos.y}
             textAnchor={anchor}
             dominantBaseline="central"
             className="text-[8px] fill-[var(--ink-3)]"
           >
-            {shortLabels[i]}
+            {shortLabelFor(p)}
           </text>
         )
       })}
@@ -262,9 +272,11 @@ function TrendBadge({ trend }: { trend: number }) {
 /**
  * Widget kassabon shows a summary of the health score with pillar overview bars
  * and links to the Horizon page for the full detail view.
- * Both widget and Horizon use the same computeHealthScore function (single source of truth).
+ * Het getal komt uit de canonieke `data.healthScore` (loader → buildHealthScore-
+ * Input + computeHealthScoreFromInputs), per definitie hetzelfde getal als
+ * /toekomst (ADR 0008).
  */
-function HealthKassabonSummary({ health }: { health: ReturnType<typeof computeHealthScore> }) {
+function HealthKassabonSummary({ health }: { health: HealthScore }) {
   return (
     <div className="space-y-4">
       {/* Total score header */}
@@ -326,7 +338,10 @@ function HealthKassabonSummary({ health }: { health: ReturnType<typeof computeHe
 
 export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size, data, href }: Props) {
   const [showKassabon, setShowKassabon] = useState(false)
-  const health = computeHealthScore(data, data.budgetingActive)
+  // Canonieke score uit de bundel (ADR 0008) — per definitie gelijk aan
+  // /toekomst, inclusief de echte tax_optimization-pijler. Geen widget-eigen
+  // herberekening meer (die zette de tax-pijler hardcoded op 50).
+  const health = data.healthScore
   const color = scoreColorClass(health.total)
 
   // ── Mini ─────────────────────────────────────────────────

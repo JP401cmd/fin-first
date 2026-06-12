@@ -77,8 +77,8 @@ export function DoelenView({
     return (
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
         <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 sm:p-8 text-center">
-          <span className="inline-flex w-10 h-10 rounded-xl bg-violet-50 items-center justify-center mb-3">
-            <Target className="w-5 h-5 text-violet-700" aria-hidden="true" />
+          <span className="inline-flex w-10 h-10 rounded-xl bg-horizon-50 items-center justify-center mb-3">
+            <Target className="w-5 h-5 text-horizon-700" aria-hidden="true" />
           </span>
           <h2 className="font-serif text-xl text-[var(--ink)] mb-2">
             Nog geen doelen

@@ -10,6 +10,7 @@ import {
   MoreVertical, Unlink, Save, Check,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { syncBudgetingActive } from '@/lib/budgeting-active'
 import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
 import { TransferConfirmSheet } from '@/components/app/transfer-confirm-sheet'
@@ -22,7 +23,7 @@ import { ConnectedAccountCard } from '@/components/app/bank-connect/connected-ac
 import { type Budget } from '@/lib/budget-data'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency } from '@/components/app/budget-shared'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { localMonthBounds } from '@/lib/month-range'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
 import { type RecurringTransaction, getExpectedMonthlyTotal, getNextOccurrence, formatSchedule } from '@/lib/recurring-data'
@@ -596,7 +597,7 @@ export function CashAccountView({
   const netAmount = totalIncome - totalExpenses
   const transferTotal = transferTx.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
 
-  const dailyExpenses = totalExpenses > 0 ? totalExpenses / 30 : 0
+  const dailyExpenses = dailyExpenseRate(totalExpenses)
 
   const incomeFreedomDays = dailyExpenses > 0
     ? calculateFreedomTime(totalIncome, dailyExpenses)
@@ -937,22 +938,14 @@ export function CashAccountView({
     }
     // 3. Sync budgeting_active
     const { data: { user } } = await supabase.auth.getUser()
-    let trackingAssets: { id: string }[] | null = null
+    let budgetingActive = false
     if (user) {
-      const { data } = await supabase
-        .from('assets')
-        .select('id')
-        .eq('asset_type', 'cash')
-        .eq('has_budget_tracking', true)
-        .eq('is_active', true)
-      trackingAssets = data
-      await supabase
-        .from('profiles')
-        .update({ budgeting_active: (trackingAssets?.length ?? 0) > 0 })
-        .eq('id', user.id)
+      // Best-effort: bij een gefaalde gate-write navigeren we alsof budgetteren
+      // uit staat; de estimates-prompt is dan de veilige kant.
+      budgetingActive = await syncBudgetingActive(supabase, user.id).catch(() => false)
     }
     // 4. Navigate — if budgeting is now off and estimates are missing, prompt user
-    if (user && (trackingAssets?.length ?? 0) === 0) {
+    if (user && !budgetingActive) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('net_monthly_income, estimated_monthly_expenses')

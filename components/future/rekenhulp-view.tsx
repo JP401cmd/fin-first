@@ -190,7 +190,7 @@ export function RekenhulpView({
 
         <header className="mb-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-horizon-700">
               Rekenhulp bouwen met Will
             </div>
             {/* Verbruik-badge — geeft de gebruiker zicht op zijn weekquotum
@@ -262,7 +262,7 @@ export function RekenhulpView({
                 type="button"
                 onClick={saveDraft}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 text-white px-3 py-2 text-sm font-semibold hover:bg-violet-700 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-horizon-700 text-white px-3 py-2 text-sm font-semibold hover:bg-horizon-800 transition-colors disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Opslaan
@@ -353,7 +353,7 @@ export function RekenhulpView({
               blijft. */}
           <Link
             href="/toekomst/bibliotheek"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-700 hover:text-violet-800 transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-horizon-700 hover:text-horizon-800 transition-colors"
           >
             <Library className="w-4 h-4" aria-hidden="true" />
             Open bibliotheek →
@@ -375,8 +375,8 @@ export function RekenhulpView({
 
       {saved.length === 0 ? (
         <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 sm:p-8 text-center">
-          <span className="inline-flex w-10 h-10 rounded-xl bg-violet-50 items-center justify-center mb-3">
-            <Calculator className="w-5 h-5 text-violet-700" aria-hidden="true" />
+          <span className="inline-flex w-10 h-10 rounded-xl bg-horizon-50 items-center justify-center mb-3">
+            <Calculator className="w-5 h-5 text-horizon-700" aria-hidden="true" />
           </span>
           <h3 className="font-serif text-lg text-[var(--ink)] mb-2">
             Nog geen rekenhulpen
@@ -634,7 +634,7 @@ function SavedCalculatorCard({
         </span>
       )}
       <div className="flex items-start gap-2 mb-2">
-        <span className="inline-flex w-8 h-8 rounded-lg bg-violet-50 text-violet-700 items-center justify-center shrink-0">
+        <span className="inline-flex w-8 h-8 rounded-lg bg-horizon-50 text-horizon-700 items-center justify-center shrink-0">
           <Calculator className="w-4 h-4" aria-hidden="true" />
         </span>
         <h3 className="text-sm font-semibold text-[var(--ink)] leading-tight flex-1 min-w-0">
@@ -702,7 +702,7 @@ function SavedCalculatorCard({
                   onClick={onPublish}
                   className="w-full inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] text-left"
                 >
-                  <Globe2 className="w-3.5 h-3.5 text-violet-700" aria-hidden="true" />
+                  <Globe2 className="w-3.5 h-3.5 text-horizon-700" aria-hidden="true" />
                   Publiceren in bibliotheek
                 </button>
               )}

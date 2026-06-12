@@ -180,4 +180,29 @@ describe('SleepmodusOverlay', () => {
     fireEvent.click(screen.getByLabelText('Sla deze transactie over'))
     await waitFor(() => expect(counterIs('Nog 2 van 3')).toBeInTheDocument())
   })
+
+  it('toont geen "Opslaan en stoppen"-knop zolang er niets is toegewezen', async () => {
+    renderOverlay()
+    await waitFor(() => expect(counterIs('Nog 3 van 3')).toBeInTheDocument())
+    expect(screen.queryByText('Opslaan en stoppen')).not.toBeInTheDocument()
+  })
+
+  it('toont de knop na een toewijzing en gaat bij klik naar het samenvattingsscherm', async () => {
+    const applyAssignment = vi.fn(async (_req: SleepmodusApplyRequest) => ({ ruleCreated: false, bulkUpdated: 0 }))
+    renderOverlay({ applyAssignment })
+    await waitFor(() => expect(counterIs('Nog 3 van 3')).toBeInTheDocument())
+
+    // Albert Heijn (scope 'one' via "Alleen deze ene") → 1 toegewezen, 2 over.
+    fireEvent.click(screen.getByLabelText('Wijs toe aan Inkomen'))
+    await screen.findByRole('dialog', { name: 'Nog 1 vergelijkbare transacties' })
+    fireEvent.click(screen.getByText('Alleen deze ene'))
+    await waitFor(() => expect(counterIs('Nog 2 van 3')).toBeInTheDocument(), { timeout: 3000 })
+
+    const stopKnop = await screen.findByText('Opslaan en stoppen')
+    fireEvent.click(stopKnop)
+
+    // Samenvatting verschijnt met de geruststellende resterende-regel.
+    expect(await screen.findByText('Terug naar budgetten')).toBeInTheDocument()
+    expect(screen.getByText(/niet toegewezen/)).toBeInTheDocument()
+  })
 })

@@ -1,7 +1,8 @@
 ---
 name: tester
 description: "Use this agent to write, run, debug and review tests for TriFinity, and to verify that a change actually works before it's called done. It owns the two test layers: unit/component tests with Vitest (`*.test.ts` / `*.test.tsx`, run via `npm run test:run`) and the in-app regression framework (`lib/regression-tests/suites/*` — 83 suites, registered via `registerTest`/`registerCategory`). Use it after any non-trivial change, when coverage is missing, when a bug needs a reproducing test, or when tests are failing and need diagnosis.\n\nExamples:\n\n<example>\nContext: A bug was fixed\nuser: \"I fixed the Picnic categorization bug\"\nassistant: \"I'll use the tester agent to add a regression case in the categorisatie suite that locks the fix, and run the related vitest.\"\n<Task tool call to tester>\n</example>\n\n<example>\nContext: New engine needs coverage\nuser: \"Added a runway calculation\"\nassistant: \"Let me launch the tester agent to write unit tests covering the edge cases (zero income, deficit, infinite) and verify they pass.\"\n<Task tool call to tester>\n</example>\n\n<example>\nContext: CI is red\nuser: \"Some tests are failing after my refactor\"\nassistant: \"I'll use the tester agent to run the suite, isolate the failures, and determine whether the code or the test is wrong.\"\n<Task tool call to tester>\n</example>"
-model: opus
+model: sonnet
+effort: high
 color: green
 ---
 

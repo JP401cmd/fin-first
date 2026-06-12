@@ -20,7 +20,7 @@ import type { Action } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
-import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
+import { type Debt } from '@/lib/debt-data'
 import { resolveFireStrategyWithOverride, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
@@ -34,10 +34,16 @@ import {
   type HousingStrategyConfig,
   type HousingContext,
 } from '@/lib/housing-strategy'
-import { loadPerspectiveData } from '@/lib/household/perspective-loader'
+import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
-import { resolveSavingsSource } from './savings-source'
+import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from './savings-source'
+import {
+  buildHealthScoreInput,
+  type HealthScoreAsset,
+  type HealthScoreBudget,
+  type HealthScoreTransaction,
+} from '@/lib/health-score-input'
 
 // Snapshot type for resilience trend data
 export type SnapshotForTrend = {
@@ -46,6 +52,7 @@ export type SnapshotForTrend = {
   net_worth: number
   freedom_percentage: number | null
   fire_age: number | null
+  score_version: number | null
 }
 
 export interface HorizonPageData {
@@ -166,35 +173,6 @@ const PROFILE_DEFAULTS = {
   monthly_savings_override: null as number | null,
 }
 
-/**
- * Lichtgewicht Box 3-data voor tax_optimization-pillar. Geen volledige
- * calculateBox3-aanroep (vereist veel context) — een proxy-berekening:
- *  - Box 3-bezit = sum van cash + investment + savings + checking + crypto-assets
- *  - Heffingsvrij = €57.000 (single) of €114.000 (partner) per 2026
- *  - Tax = grondslag × 5,88% × 36% (forfaitair, vereenvoudigd)
- *
- * Niet 100% accuraat maar voldoende voor scoreTaxOptimization() in de
- * health-pillar. Voor exacte aangifte gebruikt /overzicht/belasting
- * de volledige calculateBox3.
- */
-function buildTaxData(
-  assets: ReadonlyArray<{ asset_type?: string; current_value?: number | string }>,
-  unlinkedCash: number,
-  profile: Record<string, unknown>,
-): { box3Bezittingen: number; box3Tax: number; heffingsvrijVermogen: number; rendementsgrondslag: number } | null {
-  const box3Types = new Set(['cash', 'savings', 'checking', 'investment', 'crypto'])
-  const box3Bezittingen = assets
-    .filter((a) => a.asset_type && box3Types.has(a.asset_type))
-    .reduce((s, a) => s + Number(a.current_value ?? 0), 0) + unlinkedCash
-  if (box3Bezittingen < 1_000) return null
-  const householdType = String(profile.household_type ?? 'solo')
-  const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
-  const heffingsvrijVermogen = hasPartner ? 114_000 : 57_000
-  const rendementsgrondslag = Math.max(0, box3Bezittingen - heffingsvrijVermogen)
-  const box3Tax = Math.round(rendementsgrondslag * 0.0588 * 0.36)
-  return { box3Bezittingen, box3Tax, heffingsvrijVermogen, rendementsgrondslag }
-}
-
 export async function loadHorizonData(
   supabase: SupabaseClient,
   /**
@@ -255,7 +233,7 @@ export async function loadHorizonData(
     supabase.from('debts').select('*').eq('is_active', true).limit(200),
     supabase
       .from('net_worth_snapshots')
-      .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age')
+      .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version')
       .order('snapshot_date', { ascending: true })
       .limit(60),
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
@@ -426,7 +404,7 @@ export async function loadHorizonData(
   let fireMonthlyContributions = monthlyContributions
   if (perspective !== 'personal') {
     try {
-      const pd = await loadPerspectiveData(supabase, perspective)
+      const pd = await loadPerspectiveDataServer(supabase, perspective)
       const share = (item: { ownership?: string; _myShareFraction?: number }, raw: number): number =>
         item.ownership === 'shared' && perspective !== 'household'
           ? raw * (item._myShareFraction ?? 1)
@@ -492,16 +470,8 @@ export async function loadHorizonData(
     }
   }
 
-  // Debt aflossing add-back (principal repayments count as saving)
-  let debtAflossingMonthly = 0
-  for (const d of fullDebtsResult.data ?? []) {
-    if (!(d as any).include_aflossing_in_savings) continue
-    const customAfl = (d as any).custom_aflossing_amount
-    const aflossing = customAfl != null
-      ? Number(customAfl)
-      : (computeRenteAflossingsSplit(d as unknown as Debt)?.currentAflossing ?? 0)
-    debtAflossingMonthly += aflossing * ((d as any).net_worth_inclusion_pct ?? 100) / 100
-  }
+  // Debt aflossing add-back (principal repayments count as saving) — gedeelde helper.
+  const debtAflossingMonthly = computeDebtAflossingMonthly((fullDebtsResult.data ?? []) as unknown as Debt[])
   const debtAflossing6m = debtAflossingMonthly * 6
 
   // Extrapolate when < 6 months of data
@@ -518,9 +488,10 @@ export async function loadHorizonData(
   const extExpenses6 = dataMonths6 < 6 ? (expenses6m / dataMonths6) * 6 : expenses6m
   const extSavingsBudget6 = dataMonths6 < 6 ? (savingsBudgetSpent6m / dataMonths6) * 6 : savingsBudgetSpent6m
 
-  let savingsRate6m = extIncome6 > 0
-    ? ((extIncome6 - extExpenses6 + extSavingsBudget6 + debtAflossing6m) / extIncome6) * 100
-    : 0
+  // Spaarbudgetten tellen als sparen → uit de uitgaven-term halen zodat de
+  // gedeelde formule (income − expenses + aflossing) byte-gelijk blijft aan de
+  // oude inline-versie (income − expenses + savingsBudget + aflossing).
+  let savingsRate6m = savingsRateFromAggregates(extIncome6, extExpenses6 - extSavingsBudget6, debtAflossing6m)
 
   // Fallback savings rate from profile estimates for users without transactions
   if (savingsRate6m === 0 && effectiveMonthlyIncome > 0 && effectiveMonthlyExpenses > 0) {
@@ -540,14 +511,6 @@ export async function loadHorizonData(
     savingsRate6m,
   })
 
-  // ── emergencyFundMonths: actual liquid assets (same as dashboard) ──
-  const liquidAssets = (fullAssetsResult.data ?? [])
-    .filter(a => {
-      const type = (a as { asset_type?: string }).asset_type
-      return type === 'savings' || type === 'checking' || type === 'cash'
-    })
-    .reduce((s, a) => s + Number(a.current_value), 0) + unlinkedCash
-  const emergencyFundMonths = avgExpenses6m > 0 ? liquidAssets / avgExpenses6m : 0
 
   // ── freedomPct: strategy-adjusted FIRE target (same as dashboard) ──
   // Bij huishoud-/partnerweergave rekenen we met de perspectief-totalen
@@ -594,53 +557,41 @@ export async function loadHorizonData(
     requiredPortfolio: fireTarget > 0 ? fireTarget : null,
   })
 
-  // ── assetTypeCount: distinct asset_type values ──
-  const assetTypes = new Set((assetsResult.data ?? []).map(a => a.asset_type).filter(Boolean))
-  if (unlinkedCash > 0) assetTypes.add('cash')
-  const assetTypeCount = assetTypes.size
-
-  // ── Budget discipline: actual budget limits vs spent (same as dashboard) ──
-  const BUDGET_TYPES = ['income', 'expense', 'savings', 'debt'] as const
-  const budgetLimits: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
-  for (const b of allParentBudgets) {
-    const type = b.budget_type as string
-    if (!BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
-    const children = allChildren.filter(c => c.parent_id === b.id)
-    const limit = children.length > 0
-      ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
-      : Number(b.default_limit)
-    const monthlyLimit = b.interval === 'monthly' ? limit
-      : b.interval === 'quarterly' ? limit / 3
-      : limit / 12
-    budgetLimits[type] = (budgetLimits[type] ?? 0) + monthlyLimit
-  }
-
-  const budgetSpent: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
-  for (const tx of txResult.data ?? []) {
-    const amt = Number(tx.amount)
-    const budgetId = (tx as { budget_id?: string | null }).budget_id
-    if (!budgetId) continue
-    const type = budgetTypeMap.get(budgetId)
-    if (!type || !BUDGET_TYPES.includes(type as typeof BUDGET_TYPES[number])) continue
-    budgetSpent[type] = (budgetSpent[type] ?? 0) + Math.abs(amt)
-  }
-
-  const budgetCategories = [
-    { limit: budgetLimits.expense, spent: budgetSpent.expense },
-    { limit: budgetLimits.savings, spent: budgetSpent.savings },
-    { limit: budgetLimits.debt, spent: budgetSpent.debt },
-  ]
-
-  const healthScoreInput: HealthScoreInput = {
-    savingsRate6m,
-    totalAssets: perspectiveTotalAssets,
-    totalDebts: perspectiveTotalDebts,
-    emergencyFundMonths,
-    freedomPct,
-    assetTypeCount,
-    budgetCategories,
-    taxData: buildTaxData(fullAssetsResult.data ?? [], unlinkedCash, profile),
-  }
+  // ── Canonieke gezondheidsscore-input (ADR 0008/0010) ──────────
+  // Eén bron: dezelfde `buildHealthScoreInput` als de dashboard-loader en de
+  // snapshot-routes. Verving het lokale tweede berekenpad (eigen assetTypeCount/
+  // budgetCategories + buildTaxData-duplicaat) zodat /toekomst, /overzicht en de
+  // opgeslagen resilience_score byte-identiek scoren bij gelijke data.
+  //   • netMonthlyIncome = avgIncome6m (= totaalIncome6m/6, profiel-fallback) —
+  //     DEZELFDE inkomensbron die savingsRate6m voedt (ADR 0010 / FR-2).
+  //   • debtMonthlyPayments = Σ monthly_payment over de actieve schulden uit
+  //     fullDebtsResult (de trimmed debts-query mist deze kolom).
+  //   • avgMonthlyExpenses = avgExpenses6m → identieke noodfonds-dekking als het
+  //     vroegere inline-pad (zelfde liquide-types: savings/checking/cash + cash).
+  // emergencyFundMonths, assetTypeCount én taxData worden nu canoniek door de
+  // helper afgeleid; de losse inline-varianten zijn verwijderd.
+  const healthDebtMonthlyPayments = (fullDebtsResult.data ?? []).reduce(
+    (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),
+    0,
+  )
+  const healthScoreInput: HealthScoreInput = buildHealthScoreInput(
+    {
+      savingsRate6m,
+      totalAssets: perspectiveTotalAssets,
+      totalDebts: perspectiveTotalDebts,
+      freedomPct,
+      avgMonthlyExpenses: avgExpenses6m,
+      netMonthlyIncome: avgIncome6m,
+    },
+    {
+      assets: (fullAssetsResult.data ?? []) as HealthScoreAsset[],
+      unlinkedCash,
+      budgets: allBudgetsRaw as HealthScoreBudget[],
+      transactions: (txResult.data ?? []) as HealthScoreTransaction[],
+      householdType: (profile as Record<string, unknown>).household_type as string | null,
+      debtMonthlyPayments: healthDebtMonthlyPayments,
+    },
+  )
   const healthScore = computeHealthScoreFromInputs(healthScoreInput, budgetingActive)
 
   // Events, actions, debts, assets

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, projectForward, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { NextResponse } from 'next/server'
+import { localMonthBounds } from '@/lib/month-range'
 
 /**
  * Verification endpoint: proves FIRE projection uses real financial inputs.
@@ -32,8 +33,7 @@ export async function GET() {
 
     // ── Test 2: All FIRE-related queries execute against real tables ──
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+    const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
     const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, childBudgetsResult] = await Promise.all([
       supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),

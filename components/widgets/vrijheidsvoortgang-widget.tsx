@@ -25,16 +25,24 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
   const isPartnerView = perspective === 'partner' && data.partnerOverrides?.fireTarget != null
   const ov = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
 
-  const { fireTarget, freedomPct, fireProjResult, simRequiredPortfolio } = data
+  const { fireTarget, freedomPct, fireEligibleNetWorth, fireProjResult, simRequiredPortfolio } = data
   // Headline figures honour the active perspective; everything per-user
   // (growth/forecast/milestone dates) stays guarded below.
   const netWorth = ov?.netWorth ?? data.netWorth
   // Personal still prefers the sim-required portfolio; household/partner FIRE
   // targets come straight from the persisted summary so they match /toekomst.
   const effectiveFire = ov?.fireTarget ?? simRequiredPortfolio ?? fireTarget
-  const effectivePct = effectiveFire > 0
-    ? Math.min((netWorth / effectiveFire) * 100, 100)
-    : (ov?.freedomPct ?? freedomPct)
+  // Vrijheids-% = canonieke grondslag (ADR 0009). Eigen perspectief: data.freedomPct
+  // (FIRE-eligible vermogen ÷ benodigde portfolio — huis gefilterd). Huishouden/
+  // partner: ov.freedomPct (household-engine heeft bewust een eigen grondslag).
+  // GEEN eigen som op vol netWorth meer; die toonde 100% terwijl de aftelling
+  // nog jaren beweerde.
+  const effectivePct = ov?.freedomPct ?? freedomPct
+  // FIRE-eligible vermogen is de canonieke teller (zelfde grondslag als
+  // effectivePct); milestone-datums leggen hun "bereikt"/restbedrag hierop zodat
+  // ze niet tegenspreken met het percentage. Voor shared views gebruiken we het
+  // ov-vermogen (de household-engine levert daar het eigen, consistente paar).
+  const freedomEligibleNetWorth = ov?.netWorth ?? fireEligibleNetWorth
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 700 })
 
   const baseKicker = 'Vrijheidsvoortgang'
@@ -46,11 +54,15 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
 
   // Compute delta: change in freedom percentage vs previous month.
   // netWorthHistory is per-user only — never shown in household/partner view.
+  // De historie is ruw (vol) netto vermogen; we schalen het met de huidige
+  // housing-filter-ratio (FIRE-eligible / vol) zodat de delta op dezelfde
+  // canonieke grondslag ligt als effectivePct en niet tegenspreekt.
+  const housingFilterRatio = netWorth > 0 ? freedomEligibleNetWorth / netWorth : 1
   const prevMonthPct = (() => {
     if (isHouseholdView || isPartnerView) return null
     const hist = data.netWorthHistory
     if (!hist || hist.length < 2) return null
-    const prevNw = hist[hist.length - 2].value
+    const prevNw = hist[hist.length - 2].value * housingFilterRatio
     return effectiveFire > 0 ? Math.min((prevNw / effectiveFire) * 100, 100) : null
   })()
   const pctDelta = prevMonthPct !== null ? effectivePct - prevMonthPct : null
@@ -167,6 +179,8 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
 
   // Monthly growth rate from netWorthHistory — per-user only, so it (and the
   // milestone date estimates that depend on it) is suppressed in shared views.
+  // Geschaald met de housing-filter-ratio zodat groei én restbedrag op de
+  // FIRE-eligible grondslag liggen (consistent met effectivePct).
   const monthlyGrowthRate = (() => {
     if (isHouseholdView || isPartnerView) return null
     const hist = data.netWorthHistory
@@ -175,15 +189,17 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
     const newest = hist[hist.length - 1].value
     const months = hist.length - 1
     if (oldest <= 0 || months <= 0) return null
-    return (newest - oldest) / months
+    return ((newest - oldest) / months) * housingFilterRatio
   })()
 
-  // Estimate date to reach a milestone percentage
+  // Estimate date to reach a milestone percentage. "Bereikt" en het restbedrag
+  // delen de canonieke grondslag: effectivePct (= FIRE-eligible ÷ doel) en het
+  // FIRE-eligible vermogen als teller.
   const estimateDateForMilestone = (targetPct: number): string | null => {
     if (effectivePct >= targetPct) return 'Bereikt'
     if (!monthlyGrowthRate || monthlyGrowthRate <= 0) return null
     const targetValue = (targetPct / 100) * effectiveFire
-    const remaining = targetValue - netWorth
+    const remaining = targetValue - freedomEligibleNetWorth
     const monthsNeeded = Math.ceil(remaining / monthlyGrowthRate)
     if (monthsNeeded > 600) return null // > 50 years, not realistic
     const date = new Date()

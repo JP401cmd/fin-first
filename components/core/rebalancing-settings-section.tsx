@@ -6,7 +6,7 @@ import { Settings2, ChevronDown } from 'lucide-react'
 import { Kicker } from '@/components/editorial'
 
 /**
- * Rebalancing drempel-instellingen — contextually placed on /core/assets.
+ * Rebalancing drempel-instellingen — contextually placed on /core/assets/holdings.
  * Shows a slider to adjust the drift threshold percentage.
  * Only visible when user has target allocations.
  */
@@ -80,7 +80,7 @@ export function RebalancingSettingsSection() {
   if (!loaded || !hasTargetAllocations) return null
 
   return (
-    <div className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
+    <div className="mt-6 border border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden">
       {/* Accent bar */}
       <div className="h-[3px] w-full bg-kern-500" />
 

@@ -4,7 +4,6 @@ import { PalettePicker } from '@/components/mijn/palette-picker'
 import { FontPicker } from '@/components/mijn/font-picker'
 import { ModuleAccentPicker } from '@/components/mijn/module-accent-picker'
 import { BudgetTintPicker } from '@/components/mijn/budget-tint-picker'
-import { PhaseColorPicker } from '@/components/mijn/phase-color-picker'
 import { CategoryTintPicker } from '@/components/mijn/category-tint-picker'
 
 export const metadata: Metadata = {
@@ -66,8 +65,8 @@ export default function MijnUiterlijkPage() {
                 Geavanceerd
               </span>
               <span className="mt-0.5 block text-sm text-[var(--ink-2)]">
-                Module-accenten, budget-tints, fase-kleuren en
-                categoriekaart-tinten fijnregelen
+                Accentkleuren, budget-tints en categoriekaart-tinten
+                fijnregelen
               </span>
             </span>
             <span
@@ -89,15 +88,11 @@ export default function MijnUiterlijkPage() {
           </div>
 
           <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-            <PhaseColorPicker />
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
             <CategoryTintPicker />
           </div>
         </details>
 
-        <p className="mt-6 text-[11px] italic text-[var(--ink-3)]">
+        <p className="mt-6 text-xs leading-relaxed text-[var(--ink-2)]">
           Wijzigingen worden direct toegepast en gesynct met je account. Elke sectie heeft een eigen
           standaard-knop om naar de fabrieksinstelling terug te zetten.
         </p>

@@ -7,8 +7,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadEntitySparklines } from './load-entity-sparklines'
 import { loadKpiContextRefs, type KpiContextRefs } from './kpi-context'
 import { loadConnectionsByAssetIds, type AssetConnectionSummary } from './connections-data'
-import { loadPerspectiveData } from './household/perspective-loader'
+import { loadPerspectiveDataServer } from './household/perspective-loader-server'
 import { localMonthBounds } from './month-range'
+import { dailyExpenseRate } from './format'
 import type { Perspective } from './household-data'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -58,7 +59,7 @@ export const loadAssetsData = cache(async (
   // ownership-/privacy-filtering). De rest (hypotheken, transacties,
   // bankkoppelingen, profiel, waarderingen) blijft een directe query.
   const [perspectiveData, mortgageRes, txRes, bankLinksRes, profileRes, valuationsRes] = await Promise.all([
-    loadPerspectiveData(supabase, perspective),
+    loadPerspectiveDataServer(supabase, perspective),
     supabase
       .from('debts')
       .select('id, name, current_balance, linked_asset_id')
@@ -99,7 +100,7 @@ export const loadAssetsData = cache(async (
     const amt = Number(t.amount)
     return amt < 0 ? sum + Math.abs(amt) : sum
   }, 0)
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+  const dailyExpenses = dailyExpenseRate(monthlyExpenses)
 
   // Bank account links
   const linkedBankAccounts = (bankLinksRes.data ?? []) as AssetsPageData['linkedBankAccounts']

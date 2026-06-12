@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { SWR, DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 import { localMonthBounds } from '@/lib/month-range'
+import { resolveFireParams } from '@/lib/fire-params'
 
 /**
  * GET /api/next-steps — Get user's next recommended steps.
@@ -62,12 +62,12 @@ export async function GET() {
         .is('parent_id', null),
       supabase
         .from('assets')
-        .select('id, current_value')
+        .select('id, current_value, net_worth_inclusion_pct')
         .eq('user_id', user.id)
         .eq('is_active', true),
       supabase
         .from('debts')
-        .select('id, current_balance')
+        .select('id, current_balance, net_worth_inclusion_pct')
         .eq('user_id', user.id)
         .eq('is_active', true),
       supabase
@@ -77,7 +77,7 @@ export async function GET() {
         .limit(1),
       supabase
         .from('profiles')
-        .select('full_name, date_of_birth, household_type')
+        .select('full_name, date_of_birth, household_type, expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income')
         .eq('id', user.id)
         .maybeSingle(),
       supabase
@@ -149,15 +149,22 @@ export async function GET() {
     // Calculate FIRE reachability
     let fireUnreachable = false
     if (hasTransactions && hasAssets) {
-      const totalAssets = (assetsResult.data ?? []).reduce((sum, a) => sum + (a.current_value ?? 0), 0)
-      const totalDebts = (debtsResult.data ?? []).reduce((sum, d) => sum + (d.current_balance ?? 0), 0)
+      // Vermogen gewogen met net_worth_inclusion_pct (dashboard-bron) i.p.v.
+      // ongewogen som.
+      const totalAssets = (assetsResult.data ?? []).reduce(
+        (sum, a) => sum + Number(a.current_value ?? 0) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
+      const totalDebts = (debtsResult.data ?? []).reduce(
+        (sum, d) => sum + Number(d.current_balance ?? 0) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
       const netWorth = totalAssets - totalDebts
       const monthlyTxs = monthlyTxResult.data ?? []
       const monthlyIncome = monthlyTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
       const monthlyExpenses = Math.abs(monthlyTxs.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0))
       const monthlySavings = monthlyIncome - monthlyExpenses
       const yearlyExpenses = monthlyExpenses * 12
-      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / SWR : 0
+      // Gepersonaliseerde effectiveSwr i.p.v. de klassieke 0.04 — zelfde
+      // FIRE-doel als /toekomst (was ~28% te laag bij 4%).
+      const fireParams = resolveFireParams(profileResult.data ?? {})
+      const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / fireParams.effectiveSwr : 0
 
       // FIRE is unreachable if: target exists but savings <= 0 and haven't reached target
       // OR if it would take > 50 years (600 months) to reach
@@ -165,8 +172,9 @@ export async function GET() {
         if (monthlySavings <= 0) {
           fireUnreachable = true
         } else {
-          // Simulate to check if reachable within 50 years
-          const realReturn = (1 + DEFAULT_RETURN) / (1 + INFLATION) - 1
+          // Simulate to check if reachable within 50 years — gebruikersrendement
+          // en -inflatie (resolveFireParams).
+          const realReturn = (1 + fireParams.grossReturn) / (1 + fireParams.inflationRate) - 1
           const monthlyReturn = realReturn / 12
           let projected = netWorth
           let months = 0

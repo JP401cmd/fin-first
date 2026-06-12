@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
 import { NextResponse } from 'next/server'
+import { localMonthBounds } from '@/lib/month-range'
 
 /**
  * Verification endpoint: proves dashboard KPI cards use real Supabase data.
@@ -38,8 +39,7 @@ export async function GET() {
 
     // ── Test 2: All 10 dashboard queries execute against real Supabase tables ──
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+    const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
     // Same queries as dashboard page.tsx lines 29-40
     // Note: .single() on profiles replaced with .limit(1) since this endpoint

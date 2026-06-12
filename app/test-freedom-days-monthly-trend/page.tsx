@@ -3,7 +3,14 @@
 import { useState, useEffect } from 'react'
 import { FreedomDaysMonthlyTrend } from '@/components/app/will/freedom-days-monthly-trend'
 
-// Generate demo actions for testing
+// Generate demo actions for testing.
+// Bewust GEEN month-range-helpers: dit zijn synthetische `completed_at`-event-
+// timestamps op een specifieke dag-in-de-maand (de 3e, 10e, 15e, …) om acties
+// binnen elke maand te spreiden — geen maandgrens-query. De trend-component
+// bucket't op maand, dus de tijdzone-dagverschuiving is hier gedragsneutraal:
+// een niet-grensdag schuift nooit over een maandrand. month-range geeft enkel
+// dag-loze `YYYY-MM-DD`-strings en kan deze fixture niet uitdrukken.
+/* eslint-disable no-restricted-syntax -- gedragsneutrale fixture, zie boven */
 function generateDemoActions() {
   const actions = []
   const now = new Date()
@@ -44,6 +51,7 @@ function generateDemoActions() {
 
   return actions
 }
+/* eslint-enable no-restricted-syntax */
 
 export default function TestFreedomDaysMonthlyTrend() {
   const [apiResult, setApiResult] = useState<{ summary: string; passing: number; total: number; results: { name: string; pass: boolean; detail: string }[] } | null>(null)

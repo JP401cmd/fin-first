@@ -50,7 +50,17 @@ const mockData: DashboardData = {
     debt:    { limit: 0,    spent: 0 },
   },
   freedomPct: 10,
+  fireEligibleNetWorth: 50000,
   fireTarget: 500000,
+  healthScore: {
+    total: 62,
+    label: 'Redelijk',
+    pillars: [],
+    previousMonth: 60,
+    trend: 2,
+    activePillarCount: 6,
+    budgetingActive: true,
+  },
   fireProjResult: {
     fireTarget: 500000,
     netWorth: 50000,

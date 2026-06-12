@@ -5,17 +5,17 @@ import { createClient } from '@/lib/supabase/client'
 import { HouseholdSection } from '@/components/app/household-section'
 import { HouseholdPrivacySettings } from '@/components/mijn/household-privacy-settings'
 import { HouseholdBudgetModelSection } from '@/components/mijn/household-budget-model-section'
-import { useModuleColors, useBudgetColors, usePhaseColors } from '@/components/app/module-color-provider'
-import { DEFAULT_MODULE_COLORS, DEFAULT_BUDGET_COLORS, DEFAULT_PHASE_COLORS } from '@/lib/color-palette'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
 export default function ProfielPage() {
   const supabase = createClient()
-  const { setConfig } = useModuleColors()
-  const { setBudgetConfig } = useBudgetColors()
-  const { setPhaseConfig } = usePhaseColors()
+  // NB: kleuren (module/budget/phase) worden al server-side door de
+  // app-layout in de ModuleColorProvider gezet (zie app/(app)/layout.tsx).
+  // Deze pagina laadt ze daarom NIET opnieuw via de provider-setters — dat zou
+  // bovendien een PUT /api/appearance triggeren en een verse keuze op
+  // /mijn/uiterlijk overschrijven met stale DB-waarden (clobber-bug).
 
   // Profile state
   const [fullName, setFullName] = useState('')
@@ -61,36 +61,9 @@ export default function ProfielPage() {
         setEnergyLabel(data.energy_label ?? null)
         setHasCar(data.has_car ?? false)
         setNetMonthlyIncome(data.net_monthly_income ? String(data.net_monthly_income) : '')
-        // Load module colors into the provider
-        if (data.module_colors) {
-          const mc = data.module_colors as Record<string, string>
-          setConfig({
-            kern: mc.kern || DEFAULT_MODULE_COLORS.kern,
-            wil: mc.wil || DEFAULT_MODULE_COLORS.wil,
-            horizon: mc.horizon || DEFAULT_MODULE_COLORS.horizon,
-          })
-        }
-        // Load budget colors into the provider
-        if (data.budget_colors) {
-          const bc = data.budget_colors as Record<string, string>
-          setBudgetConfig({
-            income:  bc.income  || DEFAULT_BUDGET_COLORS.income,
-            expense: bc.expense || DEFAULT_BUDGET_COLORS.expense,
-            savings: bc.savings || DEFAULT_BUDGET_COLORS.savings,
-            debt:    bc.debt    || DEFAULT_BUDGET_COLORS.debt,
-            other:   bc.other   || DEFAULT_BUDGET_COLORS.other,
-          })
-        }
-        // Load phase colors into the provider
-        if (data.phase_colors) {
-          const pc = data.phase_colors as Record<string, string>
-          setPhaseConfig({
-            phase_recovery:  pc.phase_recovery  || DEFAULT_PHASE_COLORS.phase_recovery,
-            phase_stability: pc.phase_stability || DEFAULT_PHASE_COLORS.phase_stability,
-            phase_momentum:  pc.phase_momentum  || DEFAULT_PHASE_COLORS.phase_momentum,
-            phase_mastery:   pc.phase_mastery   || DEFAULT_PHASE_COLORS.phase_mastery,
-          })
-        }
+        // Kleuren (module/budget/phase) NIET hier laden — de layout zet ze al
+        // server-side in de provider. Opnieuw zetten via de persisterende
+        // setters zou een PUT triggeren en een verse keuze overschrijven.
       }
 
       setLoading(false)

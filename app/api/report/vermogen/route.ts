@@ -13,6 +13,7 @@
  * Spec: docs/superpowers/specs/2026-05-11-kern-rapport-en-instellingen-rapport-design.md
  */
 import { createClient } from '@/lib/supabase/server'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import {
   ASSET_GROUP_FOR_TYPE,
   ASSET_TYPE_LABELS,
@@ -621,9 +622,8 @@ async function computeDailyExpenseRate(
   supabase: Awaited<ReturnType<typeof createClient>>,
   referenceDate: Date,
 ): Promise<number> {
-  const startWindow = new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 11, 1)
-    .toISOString()
-    .split('T')[0]
+  // 12-maands rolling window, tijdzone-veilige ondergrens (lib/month-range).
+  const startWindow = localMonthStartMonthsAgo(referenceDate, 11)
   const refIso = referenceDate.toISOString().split('T')[0]
   const { data } = await supabase
     .from('transactions')

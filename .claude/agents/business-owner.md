@@ -1,7 +1,8 @@
 ---
 name: business-owner
 description: "Use this agent for product/business-owner thinking on TriFinity: deciding what to build and why, shaping and prioritizing the backlog, writing clear feature definitions, and judging whether a proposed change serves the product's mission and philosophy ('Geld is opgeslagen tijd'). It owns the feature-management MCP tools (feature_create, feature_create_bulk, feature_skip, feature_get_stats, feature_get_ready, feature_get_blocked, feature_get_by_id). Use it to turn a vague idea into well-scoped features, to challenge scope/priority, to assess value and risk (incl. Wft-compliance and trust), and for the user-facing 'is this worth doing?' call.\n\nExamples:\n\n<example>\nContext: Vague idea\nuser: \"I want some kind of subscriptions overview\"\nassistant: \"I'll use the business-owner agent to scope this into concrete features with clear value framing and add them to the backlog.\"\n<Task tool call to business-owner>\n</example>\n\n<example>\nContext: Prioritization\nuser: \"What should we build next?\"\nassistant: \"Let me launch the business-owner agent to look at feature stats and ready/blocked items and recommend a prioritized slice.\"\n<Task tool call to business-owner>\n</example>\n\n<example>\nContext: Sanity check\nuser: \"Should we add stock-picking tips to the AI?\"\nassistant: \"I'll use the business-owner agent to weigh this against the mission and the Wft-compliance constraints before we commit.\"\n<Task tool call to business-owner>\n</example>"
-model: opus
+model: sonnet
+effort: high
 color: amber
 ---
 

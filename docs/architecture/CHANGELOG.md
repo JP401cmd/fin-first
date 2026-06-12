@@ -101,3 +101,35 @@
 ## 2026-06-12
 
 - **Componenten (aantal)** toegevoegd: +1
+
+## 2026-06-12
+
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-06-12
+
+- Geen wijzigingen.
+
+## 2026-06-12
+
+- **Schermen** verwijderd: /test-level-up-celebration
+- **API-routes** toegevoegd: /api/appearance
+- **API-routes** verwijderd: /api/admin/test-phase-transition, /api/verify-level-up-celebration
+- **Componenten (aantal)** verwijderd: -2
+
+## 2026-06-12
+
+- Geen wijzigingen.
+
+## 2026-06-12
+
+- **Tabellen** toegevoegd: category_corrections, if
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-06-12
+
+- **Tabellen** verwijderd: if
+
+## 2026-06-12
+
+- Geen wijzigingen.

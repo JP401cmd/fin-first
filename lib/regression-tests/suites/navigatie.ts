@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { label: 'Overzicht (Horizon)', href: '/horizon' },
   { label: 'Overzicht (Identiteit)', href: '/identity' },
   { label: 'Profiel', href: '/identity/profiel' },
-  { label: 'Instellingen', href: '/identity/instellingen' },
+  { label: 'Uiterlijk', href: '/mijn/uiterlijk' },
   { label: 'Koppelingen', href: '/identity/koppelingen' },
 ]
 
@@ -106,8 +106,8 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'nav-redirect-parameters', name: 'Redirect /identity/parameters → /identity/instellingen', category: CAT,
-    description: 'Parameters pagina redirectt naar instellingen',
+    id: 'nav-redirect-parameters', name: 'Redirect /identity/parameters → /toekomst/voorkeuren', category: CAT,
+    description: 'Parameters pagina redirectt naar de Voorkeuren-tab (de FIRE-editors)',
     priority: 'high', estimatedDurationMs: 500,
     async fn() {
       const res = await fetchNoRedirect('/identity/parameters')
@@ -118,8 +118,8 @@ const tests: TestCase[] = [
       if (isRedirect(res.status)) {
         const location = res.headers.get('location') ?? ''
         assert(
-          location.includes('/identity/instellingen') || location.includes('/login'),
-          `Expected redirect to /identity/instellingen or /login, got ${location}`,
+          location.includes('/toekomst/voorkeuren') || location.includes('/login'),
+          `Expected redirect to /toekomst/voorkeuren or /login, got ${location}`,
         )
       }
     },

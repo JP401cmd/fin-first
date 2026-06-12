@@ -245,8 +245,16 @@ function stampPartner(rows: Record<string, unknown>[] | null): PerspectiveItem[]
 export async function loadPerspectiveData(
   supabase: SupabaseClient,
   perspective: Perspective,
+  /**
+   * Optioneel vooraf opgeloste context. Server-loaders kunnen hier een
+   * request-gecachte context injecteren (zie perspective-loader-server.ts) om
+   * dubbele `household_members`-queries binnen één render te voorkomen. Wordt
+   * dit weggelaten (client / in-sessie wissel) dan laadt de functie de context
+   * zelf — byte-identiek aan voorheen.
+   */
+  preloadedContext?: PerspectiveContext,
 ): Promise<PerspectiveData> {
-  const context = await loadPerspectiveContext(supabase)
+  const context = preloadedContext ?? (await loadPerspectiveContext(supabase))
 
   // Basisquery: RLS levert eigen-persoonlijk + ALLE gedeelde items van het
   // huishouden (dankzij de huishoud-bewuste SELECT-policy).
@@ -335,8 +343,14 @@ export async function loadPerspectiveTransactions(
   supabase: SupabaseClient,
   perspective: Perspective,
   opts?: { since?: string; until?: string },
+  /**
+   * Optioneel vooraf opgeloste context — zie loadPerspectiveData. Server-loaders
+   * injecteren een request-gecachte context; weggelaten = byte-identiek aan
+   * voorheen (functie laadt de context zelf).
+   */
+  preloadedContext?: PerspectiveContext,
 ): Promise<PerspectiveTransactions> {
-  const context = await loadPerspectiveContext(supabase)
+  const context = preloadedContext ?? (await loadPerspectiveContext(supabase))
 
   // Pagineer: PostgREST kapt standaard af op 1000 rijen. Power-users met >1000
   // transacties in het venster (jaaroverzicht, 12-maands-heatmap) kregen anders een

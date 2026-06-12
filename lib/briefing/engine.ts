@@ -38,15 +38,14 @@ import type { BriefingEntry, HefboomTag } from '@/components/overview/briefing-p
  */
 function pillarToHefboom(pillarId: string): HefboomTag | undefined {
   switch (pillarId) {
-    case 'diversification':
+    case 'asset_concentration':
       return 'bezittingen'
     case 'debt_ratio':
+    case 'debt_service_ratio':
       return 'schulden'
     case 'savings_rate':
     case 'emergency_fund':
       return 'cashflow'
-    case 'tax_optimization':
-      return 'belasting'
     case 'fire_progress':
     default:
       return undefined
@@ -122,8 +121,14 @@ export interface BriefingFinanceInput {
   netWorthHistory?: { month: string; value: number }[]
   /** Maanduitgaven — basis voor vrijheidsdagen-omrekening (/30 = dagbasis). */
   monthlyExpenses?: number
-  /** Maandinkomen — basis voor de spaarquote. */
+  /** Maandinkomen — basis voor de maand-observatie (déze-maand-surplus). */
   monthlyIncome?: number
+  /** Canonieke 6-maands spaarquote (%) incl. spaarbudgetten + schuldaflossing —
+   *  exact het getal onderaan /overzicht/cashflow. Wanneer aanwezig is dít de
+   *  bron voor elke spaarquote-presentatie; het 1-maands (inkomen−uitgaven)/
+   *  inkomen-cijfer blijft alleen voor de "deze maand meer uitgegeven dan
+   *  binnenkwam"-observatie. Zie lib/savings-source.ts / dashboard-data-loader. */
+  savingsRate6m?: number | null
   /** Uitgaven-budget deze maand — voor de budgetdruk-heads-up. */
   budgetExpense?: { spent: number; limit: number }
   /** Liquide cash die stilstaat — voor de cash-drag-tip. */
@@ -459,9 +464,12 @@ function freedomDaysLabel(amount: number, dailyExpense: number): string {
  */
 function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): BriefingEntry[] {
   const out: BriefingEntry[] = []
+  // Canonieke dagbasis: jaaruitgaven/365 (= maanduitgaven×12/365), exact zoals
+  // calculateFreedomTime in lib/format.ts en core-metrics. Niet maand/30
+  // (= jaar/360), wat ~1,4% afweek van de rest van de app.
   const dailyExp =
     finance.monthlyExpenses && finance.monthlyExpenses > 0
-      ? finance.monthlyExpenses / 30
+      ? (finance.monthlyExpenses * 12) / 365
       : 0
 
   // 1. Vermogensgroei/-daling deze maand (uit de laatste twee snapshots).
@@ -527,10 +535,19 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
     finance.monthlyExpenses > 0
   ) {
     const income = finance.monthlyIncome
-    const savings = income - finance.monthlyExpenses
-    const ratePct = Math.round((savings / income) * 100)
-    const days = freedomDaysLabel(savings, dailyExp)
-    if (savings < 0) {
+    // Deze-maand-surplus blijft de bron voor de "meer uitgegeven dan
+    // binnenkwam"-observatie (expliciet een déze-maand-signaal).
+    const monthSavings = income - finance.monthlyExpenses
+    const days = freedomDaysLabel(monthSavings, dailyExp)
+    // Spaarquote-PRESENTATIE op het canonieke 6-maands getal (incl.
+    // spaarbudgetten + schuldaflossing) — exact wat de cashflow-pagina toont.
+    // Valt terug op het 1-maands-percentage wanneer savingsRate6m ontbreekt
+    // (no-finance-pad blijft byte-identiek; geen verzonnen getallen).
+    const ratePct =
+      finance.savingsRate6m != null
+        ? Math.round(finance.savingsRate6m)
+        : Math.round((monthSavings / income) * 100)
+    if (monthSavings < 0) {
       out.push({
         id: 'finance:savings',
         category: 'heads_up',

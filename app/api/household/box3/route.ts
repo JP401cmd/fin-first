@@ -9,6 +9,7 @@ import {
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { normalisePrivacySettings } from '@/lib/household-data'
+import { dailyExpenseRate } from '@/lib/format'
 
 /**
  * GET /api/household/box3?year=2025|2026
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
     (sum, b) => sum + (Number(b.default_limit) || 0),
     0,
   )
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 100
+  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
 
   // Separate assets/debts by user
   const myAssets = allAssets.filter(a => a.user_id === user.id || (a as any).ownership === 'shared')

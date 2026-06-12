@@ -251,8 +251,11 @@ function LinesView({
 
   const hoveredRow = hoveredAge !== null ? visibleRows.find(r => r.age === hoveredAge) : null
 
-  const COLOR_INCOME = 'var(--horizon-500, #8b5cf6)'
-  const COLOR_EXPENSE = 'var(--kern-500, #f59e0b)'
+  // Module-identiteit: inkomenslijn = horizon-accent, uitgavenlijn = kern-accent.
+  // Volgt de instelbare kleur via de juiste --color-<module>-* tokens
+  // (de oude --horizon-500/--kern-500 namen bestonden niet → viel altijd op de hex terug).
+  const COLOR_INCOME = 'var(--color-horizon-500, #c4a06b)'
+  const COLOR_EXPENSE = 'var(--color-kern-500, #6b4339)'
 
   const xFireLine = !isPensioenMode && fireAge != null && fireAge >= minAge && fireAge <= maxAge
     ? PAD.left + xScale(fireAge) : null

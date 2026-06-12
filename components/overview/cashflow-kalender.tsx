@@ -132,7 +132,7 @@ export function CashflowKalender({
               <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
                 Verwacht uit
               </div>
-              <div className="font-serif font-semibold text-red-700 tabular-nums">
+              <div className="font-serif font-semibold text-negative tabular-nums">
                 {formatCurrency(totalExpenses)}
               </div>
             </div>
@@ -140,7 +140,7 @@ export function CashflowKalender({
               <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
                 Verwacht in
               </div>
-              <div className="font-serif font-semibold text-emerald-700 tabular-nums">
+              <div className="font-serif font-semibold text-positive tabular-nums">
                 {formatCurrency(totalIncomes)}
               </div>
             </div>
@@ -221,7 +221,7 @@ export function CashflowKalender({
                       {bucket.expenses.slice(0, 2).map((e, i) => (
                         <div
                           key={`exp-${i}`}
-                          className="text-[8px] sm:text-[9px] text-red-700 font-mono tabular-nums truncate"
+                          className="text-[8px] sm:text-[9px] text-negative font-mono tabular-nums truncate"
                           title={`${e.name}: ${formatCurrency(Math.abs(e.amount))}`}
                         >
                           −{formatCurrency(Math.abs(e.amount)).replace(/\s/g, '')}
@@ -230,7 +230,7 @@ export function CashflowKalender({
                       {bucket.incomes.slice(0, 2).map((i, idx) => (
                         <div
                           key={`inc-${idx}`}
-                          className="text-[8px] sm:text-[9px] text-emerald-700 font-mono tabular-nums truncate"
+                          className="text-[8px] sm:text-[9px] text-positive font-mono tabular-nums truncate"
                           title={`${i.name}: ${formatCurrency(i.amount)}`}
                         >
                           +{formatCurrency(i.amount).replace(/\s/g, '')}

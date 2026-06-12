@@ -155,8 +155,8 @@ export function PublishCurationSheet({
       >
         <header className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-              <Globe2 className="w-4 h-4 text-violet-700" aria-hidden="true" />
+            <span className="w-9 h-9 rounded-lg bg-horizon-50 flex items-center justify-center shrink-0">
+              <Globe2 className="w-4 h-4 text-horizon-700" aria-hidden="true" />
             </span>
             <div className="min-w-0">
               <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
@@ -225,7 +225,7 @@ export function PublishCurationSheet({
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-horizon-700 px-4 py-2 text-sm font-semibold text-white hover:bg-horizon-800 transition-colors disabled:opacity-50"
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -306,7 +306,7 @@ function InputRow({
             type="checkbox"
             checked={prefillEnabled}
             onChange={onTogglePrefill}
-            className="mt-0.5 h-4 w-4 rounded border-[var(--border-ed)] accent-violet-600"
+            className="mt-0.5 h-4 w-4 rounded border-[var(--border-ed)] accent-horizon-600"
           />
           <span className="text-[11px] text-[var(--ink-2)] leading-snug">
             Anderen mogen hier hun eigen waarde uit hun profiel laten invullen

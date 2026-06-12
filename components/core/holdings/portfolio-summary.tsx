@@ -27,6 +27,7 @@ import {
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatMaskedCurrency } from '@/lib/format'
 import { type calculatePortfolioBox3 } from '@/lib/box3-holdings'
+import { NL_SWR } from '@/lib/constants'
 
 type Box3Summary = ReturnType<typeof calculatePortfolioBox3>
 
@@ -63,7 +64,11 @@ export type PortfolioSummaryProps = {
 }
 
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
-const NL_SWR = 0.04
+// SWR voor de FIRE-deck-regel. Canoniek: de Nederlandse SWR (≈2,88%, na Box 3
+// + inflatie) uit lib/constants. Eerder stond hier een lokale `const NL_SWR =
+// 0.04` die de échte constante schaduwde → te lage dekking-jaren. De per-
+// gebruiker effectiveSwr is hier (nog) niet beschikbaar; de loader levert geen
+// FIRE-params aan deze hero. NL_SWR is de juiste no-profiel-fallback.
 
 export function PortfolioSummary({
   totalValue,
@@ -252,6 +257,7 @@ export function PortfolioSummary({
         <FireDeckLine
           yearsCovered={yearsCovered}
           swrYears={swrYears}
+          swr={NL_SWR}
           fontFamily={SOURCE_SERIF}
         />
       )}
@@ -378,20 +384,25 @@ function ChevronRight() {
 function FireDeckLine({
   yearsCovered,
   swrYears,
+  swr,
   fontFamily,
 }: {
   yearsCovered: number
   swrYears: number
+  /** Onttrekkingsvoet die de SWR-framing aanstuurt (canoniek NL_SWR). */
+  swr: number
   fontFamily: string
 }) {
   // Twee framings: brutto (jaren waar je portfolio op kunt teren tot €0) en
-  // SWR (jaren bij 4%-onttrekking — duurzaam). Toon SWR primair als die ≥1,
-  // anders brutto met label "uitgaven".
+  // SWR (jaren bij duurzame onttrekking). Toon SWR primair als die ≥1, anders
+  // brutto met label "uitgaven". Het percentage komt uit de doorgegeven `swr`
+  // zodat de tekst nooit een ander tarief noemt dan waarmee gerekend is.
   const useSwr = swrYears >= 1
   const display = useSwr ? swrYears : yearsCovered
   const yearsLabel = display.toFixed(1).replace('.', ',')
+  const swrLabel = `${(swr * 100).toFixed(1).replace('.', ',')}%`
   const framing = useSwr
-    ? `Bij 4% onttrekking financiert deze portefeuille ${yearsLabel} jaar van je essentiële uitgaven.`
+    ? `Bij ${swrLabel} onttrekking financiert deze portefeuille ${yearsLabel} jaar van je essentiële uitgaven.`
     : `Deze portefeuille dekt ${yearsLabel} jaar essentiële uitgaven (zonder rendement-aanname).`
   return (
     <p

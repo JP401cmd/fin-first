@@ -27,17 +27,17 @@ const tests: TestCase[] = [
   // ──────────────── Step 2: notificatie voorkeuren pagina laadt ────────────────
   {
     id: 'notif-prefs-page-loads',
-    name: 'Instellingen pagina met notificatie sectie laadt',
+    name: 'Notificaties-voorkeurenpagina laadt',
     category: CAT,
-    description: 'GET /identity/instellingen retourneert 200 of auth redirect — bevat Notificaties sectie',
+    description: 'GET /mijn/notificaties retourneert 200 of auth redirect — de notificatie-voorkeuren',
     priority: 'critical',
     estimatedDurationMs: 2000,
     async fn() {
-      const res = await authenticatedFetch('/identity/instellingen', { redirect: 'manual' })
+      const res = await authenticatedFetch('/mijn/notificaties', { redirect: 'manual' })
       // 200 (logged in) or 307 redirect (not logged in)
       assert(
         res.status === 200 || res.status === 307,
-        `Expected 200 or 307 from /identity/instellingen, got ${res.status}`,
+        `Expected 200 or 307 from /mijn/notificaties, got ${res.status}`,
       )
     },
   },
@@ -83,17 +83,16 @@ const tests: TestCase[] = [
     id: 'notif-prefs-valid-types',
     name: 'Notification preferences bevat alle geldige typen',
     category: CAT,
-    description: 'PUT /api/notifications sanitiseert naar 8 bekende notification types',
+    description: 'PUT /api/notifications sanitiseert naar de 8 bekende notification types',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
-      // The API route validates against these types
+      // The API route validates against these types (lib/api/notifications)
       const validTypes = [
-        'budget', 'streak', 'sync', 'recommendation',
-        'insight', 'badge', 'levelup', 'partner_transaction',
-        'horizon', 'holding_alert',
+        'budget', 'sync', 'recommendation', 'partner_transaction',
+        'horizon', 'holding_alert', 'briefing', 'budget_model_proposal',
       ]
-      assertEqual(validTypes.length, 10, '10 valid notification preference types')
+      assertEqual(validTypes.length, 8, '8 valid notification preference types')
       // Each must be a non-empty string
       for (const t of validTypes) {
         assert(t.length > 0, `Type "${t}" is non-empty`)
@@ -110,12 +109,14 @@ const tests: TestCase[] = [
     fn() {
       // Default preferences from the GET handler
       const defaultPrefs: Record<string, boolean> = {
-        budget: true, streak: true, sync: true,
-        recommendation: true, insight: true, badge: true, levelup: true,
+        budget: true, sync: true,
+        recommendation: true,
         partner_transaction: true, horizon: true,
+        holding_alert: true, briefing: true,
+        budget_model_proposal: true,
       }
       const keys = Object.keys(defaultPrefs)
-      assertGreaterThanOrEqual(keys.length, 9, 'At least 9 default pref keys')
+      assertGreaterThanOrEqual(keys.length, 8, 'At least 8 default pref keys')
       for (const [key, val] of Object.entries(defaultPrefs)) {
         assertEqual(val, true, `Default pref for "${key}" is true`)
       }
@@ -162,20 +163,20 @@ const tests: TestCase[] = [
   },
   {
     id: 'notif-notification-type-enum',
-    name: 'NotificationType bevat alle 10 typen',
+    name: 'NotificationType bevat alle 8 typen',
     category: CAT,
-    description: 'NotificationType union omvat budget, streak, sync, recommendation, insight, badge, levelup, partner_transaction, horizon, holding_alert',
+    description: 'NotificationType union omvat budget, sync, recommendation, partner_transaction, horizon, holding_alert, briefing, budget_model_proposal',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
       const allTypes = [
-        'budget', 'streak', 'sync', 'recommendation', 'insight',
-        'badge', 'levelup', 'partner_transaction', 'horizon', 'holding_alert',
+        'budget', 'sync', 'recommendation', 'partner_transaction',
+        'horizon', 'holding_alert', 'briefing', 'budget_model_proposal',
       ]
-      assertEqual(allTypes.length, 10, '10 notification types')
+      assertEqual(allTypes.length, 8, '8 notification types')
       // Verify uniqueness
       const unique = new Set(allTypes)
-      assertEqual(unique.size, 10, 'All types are unique')
+      assertEqual(unique.size, 8, 'All types are unique')
     },
   },
   {
@@ -247,31 +248,28 @@ const tests: TestCase[] = [
   // ──────────────── Step 5: notificatie weergave in de UI ──────────────────────
   {
     id: 'notif-module-map-completeness',
-    name: 'MODULE_MAP bevat mapping voor alle 10 NotificationTypes',
+    name: 'MODULE_MAP bevat mapping voor alle 8 NotificationTypes',
     category: CAT,
-    description: 'NotificationItem component mapt elk type naar module label en CSS variabelen',
+    description: 'NotificationItem component mapt elk type naar een concept-label en CSS variabelen',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
-      // From notification-item.tsx MODULE_MAP
+      // From notification-item.tsx MODULE_MAP — concept-labels per bericht-type
       const moduleMap: Record<string, { label: string }> = {
-        budget:              { label: 'DE KERN' },
-        streak:              { label: 'DE KERN' },
-        sync:                { label: 'DE KERN' },
-        recommendation:      { label: 'DE WIL' },
-        insight:             { label: 'DE WIL' },
-        badge:               { label: 'DE HORIZON' },
-        levelup:             { label: 'DE HORIZON' },
-        partner_transaction: { label: 'DE KERN' },
-        horizon:             { label: 'DE HORIZON' },
-        holding_alert:       { label: 'DE KERN' },
+        budget:                { label: 'Budget' },
+        sync:                  { label: 'Bank' },
+        recommendation:        { label: 'Partner-actie' },
+        partner_transaction:   { label: 'Partner' },
+        horizon:               { label: 'Toekomst' },
+        holding_alert:         { label: 'Belegging' },
+        briefing:              { label: 'Briefing' },
+        budget_model_proposal: { label: 'Huishouden' },
       }
       const keys = Object.keys(moduleMap)
-      assertEqual(keys.length, 10, '10 types in MODULE_MAP')
-      // Verify each has a valid module label
-      const validLabels = ['DE KERN', 'DE WIL', 'DE HORIZON']
+      assertEqual(keys.length, 8, '8 types in MODULE_MAP')
+      // Verify each has a non-empty label
       for (const [type, info] of Object.entries(moduleMap)) {
-        assert(validLabels.includes(info.label), `${type} maps to valid label: ${info.label}`)
+        assert(info.label.length > 0, `${type} maps to a non-empty label: ${info.label}`)
       }
     },
   },

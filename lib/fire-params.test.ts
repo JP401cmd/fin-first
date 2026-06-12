@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { resolveFireParams } from '@/lib/fire-params'
-import { DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
+import { resolveFireParams, computeEffectiveSwr } from '@/lib/fire-params'
+import { DEFAULT_RETURN, INFLATION, BOX3_DRAG, NL_SWR } from '@/lib/horizon-data'
 
 /**
  * Tests voor resolveFireParams() — single source of truth voor FIRE-
@@ -79,5 +79,27 @@ describe('resolveFireParams — defaults + overrides', () => {
     // BOX3_DRAG ≈ 0.02117 → effectiveSwr ≈ 0.02883
     expect(params.effectiveSwr).toBeGreaterThan(0.025)
     expect(params.effectiveSwr).toBeLessThan(0.035)
+  })
+})
+
+describe('computeEffectiveSwr — gedeelde pure helper', () => {
+  it('matcht de formule grossReturn − BOX3_DRAG − inflationRate', () => {
+    expect(computeEffectiveSwr(0.07, 0.02)).toBeCloseTo(0.07 - BOX3_DRAG - 0.02, 10)
+  })
+
+  it('default-input (0.07 / 0.02) is exact gelijk aan NL_SWR', () => {
+    // NL_SWR = DEFAULT_RETURN − BOX3_DRAG − NL_INFLATIE = 0.07 − BOX3_DRAG − 0.02
+    expect(computeEffectiveSwr(DEFAULT_RETURN, INFLATION)).toBeCloseTo(NL_SWR, 12)
+  })
+
+  it('vloer op 0.001 bij hoge inflatie / laag rendement', () => {
+    expect(computeEffectiveSwr(0.02, 0.05)).toBe(0.001)
+  })
+
+  it('is de bron-van-waarheid die resolveFireParams gebruikt', () => {
+    const gr = 0.065
+    const inf = 0.025
+    expect(resolveFireParams({ expected_return: gr, inflation_rate: inf }).effectiveSwr)
+      .toBe(computeEffectiveSwr(gr, inf))
   })
 })

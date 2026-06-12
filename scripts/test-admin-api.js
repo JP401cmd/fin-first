@@ -20,7 +20,6 @@ async function main() {
   await testEndpoint('GET', 'http://localhost:3000/api/admin/settings');
   await testEndpoint('PUT', 'http://localhost:3000/api/admin/settings', { ai_provider: 'anthropic' });
   await testEndpoint('POST', 'http://localhost:3000/api/admin/seed', { persona: 'starter' });
-  await testEndpoint('POST', 'http://localhost:3000/api/admin/test-phase-transition', { oldPhase: 'recovery' });
 }
 
 main();

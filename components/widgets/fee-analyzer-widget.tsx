@@ -5,6 +5,7 @@ import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
+import { dailyExpenseRate } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { TrendingDown, AlertTriangle, ArrowRight } from 'lucide-react'
@@ -74,7 +75,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             </span>
           </div>
         </WidgetShell>
-        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? data.monthlyExpenses / 30 : undefined} />
+        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : undefined} />
       </>
     )
   }
@@ -103,7 +104,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             </p>
           )}
         </WidgetShell>
-        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? data.monthlyExpenses / 30 : undefined} />
+        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : undefined} />
       </>
     )
   }
@@ -180,7 +181,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
             )}
           </div>
         </WidgetShell>
-        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? data.monthlyExpenses / 30 : undefined} />
+        <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : undefined} />
       </>
     )
   }
@@ -266,7 +267,7 @@ export const FeeAnalyzerWidget = memo(function FeeAnalyzerWidget({ size, data, h
           </div>
         </div>
       </WidgetShell>
-      <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? data.monthlyExpenses / 30 : undefined} />
+      <FeeDetailModal open={showDetail} onClose={() => setShowDetail(false)} feeAnalysis={feeAnalysis} feeImpactMonths={feeImpactMonths} grossReturn={data.grossReturn} dailyExpenses={data.monthlyExpenses > 0 ? dailyExpenseRate(data.monthlyExpenses) : undefined} />
     </>
   )
 })

@@ -60,12 +60,12 @@ export function AfbouwOverzichtCard({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {/* Bij vrijheid */}
-        <article className="rounded-2xl border border-violet-100 bg-violet-50/40 p-4 sm:p-5">
+        <article className="rounded-2xl border border-horizon-100 bg-horizon-50/40 p-4 sm:p-5">
           <header className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-violet-100 text-violet-700">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-horizon-100 text-horizon-700">
               <Compass className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
-            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-violet-700">
+            <div className="text-[10px] uppercase tracking-[0.08em] font-semibold text-horizon-700">
               Bij vrijheid · {fireAge}
             </div>
           </header>
@@ -120,7 +120,7 @@ export function AfbouwOverzichtCard({
 
       <Link
         href="/toekomst"
-        className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:underline"
+        className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-horizon-700 hover:underline"
       >
         Volledige tijdas met afbouw-curve
         <ArrowRight className="w-3 h-3" aria-hidden="true" />

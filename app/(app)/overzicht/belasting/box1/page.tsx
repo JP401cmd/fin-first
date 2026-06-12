@@ -5,7 +5,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { Clock, Users, EyeOff } from 'lucide-react'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
 import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page-header'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { computeBox1Tax, grossFromNet, type Box1Result } from '@/lib/box1-tax'
 import { resolveBox1GrossIncome, type Box1IncomeResolution } from '@/lib/box1-income'
 import { Box1GrossIncomeEditor } from '@/components/overview/belasting/box1-gross-income-editor'
@@ -73,7 +73,7 @@ export default async function BelastingBox1Page() {
   // Vrijheidstijd-equivalent ("Geld is opgeslagen tijd"). Dagelijkse uitgaven
   // uit dezelfde bron als de rest van de app; 0 → geen vertaling.
   const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+  const dailyExpenses = dailyExpenseRate(monthlyExpenses)
 
   // ── Eigen woning + gekoppelde hypotheek (1.6) ──────────────────────────
   // RLS scoopt de queries al naar de ingelogde gebruiker. We pakken de eerste

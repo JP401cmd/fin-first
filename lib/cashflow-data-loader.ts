@@ -19,10 +19,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { TransactionRow } from '@/components/app/transacties-feed'
 import type { RecurringTransaction } from '@/lib/recurring-data'
-import {
-  loadPerspectiveTransactions,
-  type PerspectiveItem,
-} from '@/lib/household/perspective-loader'
+import { loadPerspectiveTransactionsServer } from '@/lib/household/perspective-loader-server'
+import { type PerspectiveItem } from '@/lib/household/perspective-loader'
 import type { OwnershipType, Perspective } from '@/lib/household-data'
 
 // ── Result type ───────────────────────────────────────────────
@@ -116,7 +114,7 @@ export const loadCashflowData = cache(async (
     accountsResult,
     displayTxResult,
   ] = await Promise.all([
-    loadPerspectiveTransactions(supabase, perspective, { since: sixMonthsAgoIso }),
+    loadPerspectiveTransactionsServer(supabase, perspective, { since: sixMonthsAgoIso }),
     supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
     // RLS levert eigen-persoonlijk + ALLE gedeelde recurrings van het huishouden.
     supabase

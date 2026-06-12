@@ -20,7 +20,8 @@ import {
   MARKET_WEATHER, type MarketWeather, type FinancialInput,
   type ScenarioPath,
 } from '@/lib/horizon-data'
-import { computeHealthScoreFromInputs, type HealthScore } from '@/lib/financial-health'
+import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
+import { NL_SWR } from '@/lib/constants'
 import {
   simulatePayoff, payoffSummary,
   type Debt, type PayoffStrategy, type StrategyMonth,
@@ -40,9 +41,18 @@ type Props = {
   simFireTarget?: number
   /** Gross annual return from fire params */
   grossReturn?: number
+  /**
+   * Canonieke health-score-input van de geladen pagina (HorizonPageData). Wanneer
+   * meegegeven hergebruikt de modal die als basis en overschrijft alleen de
+   * scenario-afhankelijke velden (freedomPct + spaarquote) — zo blijven de
+   * v2-indicatoren (DSTI, vermogensconcentratie, noodfonds, budget) één bron en
+   * driften ze niet weg van /toekomst. Zonder deze prop (bv. de test-pagina)
+   * valt de modal terug op een lichtgewicht reconstructie uit `input`/`debts`.
+   */
+  baseHealthInput?: HealthScoreInput
 }
 
-export function ScenariosModal({ input, debts = [], open, onClose, simRows, simFireTarget, grossReturn }: Props) {
+export function ScenariosModal({ input, debts = [], open, onClose, simRows, simFireTarget, grossReturn, baseHealthInput }: Props) {
   const [scenarios, setScenarios] = useState<ScenarioPath[]>([])
   const [healthScore, setHealthScore] = useState<HealthScore | null>(null)
   const [weather, setWeather] = useState<MarketWeather>('normal')
@@ -58,24 +68,38 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
       const effectiveReturn = weather === 'normal' ? grossReturn : MARKET_WEATHER[weather].return
       setScenarios(buildScenarioPathsFromSim(simRows, effectiveReturn, simFireTarget))
     }
-    // Compute 6-pillar health score
+    // Compute health score (v2-indicatoren)
     const savingsRate = input.monthlyIncome > 0
       ? ((input.monthlyIncome - input.monthlyExpenses) / input.monthlyIncome) * 100
       : 0
-    const emergencyMonths = input.monthlyExpenses > 0 ? input.totalAssets * 0.3 / input.monthlyExpenses : 0
     const nw = input.totalAssets - input.totalDebts
-    const target = input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses / 0.04 : 0
+    // FIRE-doel: gebruik het canonieke sim-doel als dat is doorgegeven, anders
+    // de canonieke NL SWR op de must-uitgaven (geen vaste 4%).
+    const target = simFireTarget != null && simFireTarget > 0
+      ? simFireTarget
+      : input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses / NL_SWR : 0
     const fPct = target > 0 ? Math.max(0, Math.min((nw / target) * 100, 100)) : 0
-    setHealthScore(computeHealthScoreFromInputs({
-      savingsRate6m: savingsRate,
-      totalAssets: input.totalAssets,
-      totalDebts: input.totalDebts,
-      emergencyFundMonths: emergencyMonths,
-      freedomPct: fPct,
-      assetTypeCount: 3, // approximate since we don't have asset details here
-      budgetCategories: [],
-    }))
-  }, [input, weather, open, simRows, simFireTarget, grossReturn])
+
+    // Voorkeur: hergebruik de canonieke geladen input en overschrijf alleen de
+    // scenario-afhankelijke velden — minder drift t.o.v. /toekomst. Geen prop →
+    // lichtgewicht reconstructie uit `input`/`debts` (de 3 v2-velden canoniek
+    // gevuld: DSTI-noemer uit het maandinkomen, schuldlast uit de debts-prop;
+    // vermogensconcentratie blijft inactief zonder asset-detail).
+    const healthInput: HealthScoreInput = baseHealthInput
+      ? { ...baseHealthInput, savingsRate6m: savingsRate, freedomPct: fPct }
+      : {
+          savingsRate6m: savingsRate,
+          totalAssets: input.totalAssets,
+          totalDebts: input.totalDebts,
+          emergencyFundMonths: input.monthlyExpenses > 0 ? (input.totalAssets * 0.3) / input.monthlyExpenses : 0,
+          freedomPct: fPct,
+          netMonthlyIncome: input.monthlyIncome,
+          debtMonthlyPayments: debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0),
+          largestAssetTypeShare: null,
+          budgetCategories: [],
+        }
+    setHealthScore(computeHealthScoreFromInputs(healthInput))
+  }, [input, weather, open, simRows, simFireTarget, grossReturn, debts, baseHealthInput])
 
   if (!open) return null
 
@@ -184,7 +208,7 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
                       <circle cx="50" cy="50" r="42" fill="none" stroke="#e4e4e7" strokeWidth="8" />
                       <circle
                         cx="50" cy="50" r="42" fill="none"
-                        stroke="#8B5CB8" strokeWidth="8" strokeLinecap="round"
+                        stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="8" strokeLinecap="round"
                         strokeDasharray={`${(healthScore.total / 100) * 264} 264`}
                         transform="rotate(-90 50 50)"
                       />
@@ -300,7 +324,7 @@ function ScenarioDetailModal({
                       className="h-full rounded-full"
                       style={{
                         width: yearBarsEntered ? `${Math.min(pctOfFire, 100)}%` : '0%',
-                        backgroundColor: scenario.name === 'pessimist' ? '#9e6b50' : scenario.name === 'optimist' ? '#5b8c5a' : '#8B5CB8',
+                        backgroundColor: scenario.name === 'pessimist' ? '#9e6b50' : scenario.name === 'optimist' ? '#5b8c5a' : 'var(--color-horizon-500, #c4a06b)',
                         transition: yearBarsEntered
                           ? `width 500ms cubic-bezier(.22,1,.36,1) ${i * 60}ms`
                           : 'none',
@@ -388,7 +412,7 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
   const fireY = y(fireTarget)
   const fireInRange = fireY > PAD && fireY < H - PAD
 
-  const colors: Record<string, string> = { pessimist: '#9e6b50', current: '#8B5CB8', optimist: '#5b8c5a' }
+  const colors: Record<string, string> = { pessimist: '#9e6b50', current: 'var(--color-horizon-500, #c4a06b)', optimist: '#5b8c5a' }
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 280 }}>
@@ -407,7 +431,7 @@ function DivergingPathsChart({ scenarios, fireTarget }: { scenarios: ScenarioPat
 
       {fireInRange && (
         <>
-          <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="#8B5CB8" strokeWidth="1" strokeDasharray="6 3" opacity="0.5" />
+          <line x1={PAD} y1={fireY} x2={W - PAD} y2={fireY} stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="1" strokeDasharray="6 3" opacity="0.5" />
           <text x={W - PAD + 4} y={fireY + 3} className="fill-horizon-400" style={{ fontSize: 9 }}>FIRE</text>
         </>
       )}

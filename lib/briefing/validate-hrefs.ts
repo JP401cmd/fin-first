@@ -59,7 +59,7 @@ const ROUTE_ALIASES: Record<string, string> = {
   '/will': '/overzicht/tips',
   '/identity': '/mijn',
   '/identity/profiel': '/mijn/profiel',
-  '/identity/instellingen': '/toekomst/voorkeuren',
+  '/identity/instellingen': '/mijn',
   '/dashboard': '/overzicht',
   // Hallucinaties
   '/core/goals': '/toekomst/doelen',

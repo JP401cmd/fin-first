@@ -52,7 +52,7 @@ const HEFBOMEN: ReadonlyArray<{
   {
     key: 'bezittingen',
     href: '/overzicht/bezittingen',
-    pillarKey: 'diversification',
+    pillarKey: 'asset_concentration',
     tooltip: 'Cash, beleggingen, eigen huis en pensioen — wat groeit voor je.',
   },
   {
@@ -70,15 +70,15 @@ const HEFBOMEN: ReadonlyArray<{
   {
     key: 'belasting',
     href: '/overzicht/belasting',
-    pillarKey: 'tax_optimization',
-    tooltip: 'Box 1, Box 2 en Box 3 — slim verdelen scheelt geld per jaar.',
+    pillarKey: null,
+    tooltip: 'Box 1, Box 2 en Box 3 — verken je positie en hoe je het verdeelt.',
   },
 ] as const
 
 function statusSubText(key: HefboomKey, status: StatusCode, pillar?: HealthPillar): string | null {
   if (status === 'neutral') return null
   if (key === 'bezittingen') {
-    return status === 'good' ? 'Diversificatie ok' : status === 'warn' ? 'Beperkt gespreid' : 'Slecht gespreid'
+    return status === 'good' ? 'Goed gespreid' : status === 'warn' ? 'Beperkt gespreid' : 'Sterk geconcentreerd'
   }
   if (key === 'schulden') {
     const ratio = pillar?.rawValue ?? ''
@@ -88,7 +88,9 @@ function statusSubText(key: HefboomKey, status: StatusCode, pillar?: HealthPilla
     return status === 'good' ? 'Op koers met sparen' : status === 'warn' ? 'Lager dan doel' : 'Tekort op rekening'
   }
   if (key === 'belasting') {
-    return status === 'good' ? 'Geen actie nodig' : status === 'warn' ? 'Optimaliseer Box 3' : 'Box 3-actie nodig'
+    // Geen pijler meer (ADR 0010): valt terug op de totaal-score-proxy en is
+    // bewust een richtingaanwijzer — geen handelingsadvies of besparingsbelofte.
+    return 'Verken je Box 3-positie'
   }
   return null
 }

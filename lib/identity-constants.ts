@@ -1,4 +1,4 @@
-import { Wallet, RefreshCw, ArrowUpCircle, Compass, Bell, CheckCircle2, Sparkles } from 'lucide-react'
+import { Wallet, RefreshCw, Compass, Bell, CheckCircle2, Sparkles } from 'lucide-react'
 
 // ── Temporal Balance levels ──────────────────────────────────────────
 
@@ -155,7 +155,6 @@ export const NOTIFICATION_TYPES = [
   { type: 'budget', label: 'Budget alerts', description: 'Meldingen over budgetoverschrijdingen', icon: Wallet },
   { type: 'sync', label: 'Synchronisatie', description: 'Bankconnecties en jaarlijkse WOZ-/pensioen-reminders', icon: RefreshCw },
   { type: 'recommendation', label: 'Partner-acties', description: 'Wanneer je partner een toegewezen actie afrondt', icon: CheckCircle2 },
-  { type: 'levelup', label: 'Level-ups', description: 'Soevereiniteitsniveau wijzigingen', icon: ArrowUpCircle },
   { type: 'horizon', label: 'Toekomst', description: 'FIRE-aandachtspunten en vrijheidswaarschuwingen', icon: Compass },
   { type: 'holding_alert', label: 'Prijs-alerts', description: 'Holdings prijs- en allocatie-alerts', icon: Bell },
   { type: 'briefing', label: 'Briefing', description: 'Je wekelijkse briefing met je vrijheidswinst', icon: Sparkles },

@@ -35,7 +35,7 @@ import {
   INFLATION,
   type LifeEvent,
 } from '@/lib/horizon-data'
-import { NL_AOW_AGE } from '@/lib/constants'
+import { NL_AOW_AGE, NL_SWR } from '@/lib/constants'
 import { localMonthStart } from '@/lib/month-range'
 import {
   lifeEventsToCashflows,
@@ -227,8 +227,20 @@ export interface HouseholdProjectionResult {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-/** SWR voor passief inkomen / freedom-time (consistent met horizon-data NL_SWR). */
-const HOUSEHOLD_SWR = 0.035
+/**
+ * SWR voor de fallback-paden van de huishoud-projectie (passief inkomen /
+ * freedom-time / FIRE-doel) wanneer er GEEN profiel of sim-uitkomst is.
+ *
+ * Was eerder een losse `0.035` met de onjuiste claim "consistent met NL_SWR" —
+ * NL_SWR is feitelijk ≈0,02883 (DEFAULT_RETURN − BOX3_DRAG − NL_INFLATIE). Geen
+ * gemotiveerde reden voor 0,035 gevonden, dus nu single-sourced op de canonieke
+ * NL_SWR uit lib/constants. Gedragswijziging zit ALLEEN in de no-profiel/no-sim-
+ * fallback (sim-uitkomst en resolveFireParams blijven leidend waar beschikbaar);
+ * de huishoud-FIRE-doel-fallback wordt daardoor iets hoger (lagere SWR = grotere
+ * benodigde pot), in lijn met de rest van de app. ADR 0009 dekt de eigen motor,
+ * niet deze comment-/constant-correctie.
+ */
+const HOUSEHOLD_SWR = NL_SWR
 
 /** Maandelijkse begroting → SimResult → projection-uitkomst. */
 function simResultToProjection(

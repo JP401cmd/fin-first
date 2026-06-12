@@ -108,8 +108,8 @@ export function DuplicateConfirmSheet({
       >
         <header className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-              <Plus className="w-4 h-4 text-violet-700" aria-hidden="true" />
+            <span className="w-9 h-9 rounded-lg bg-horizon-50 flex items-center justify-center shrink-0">
+              <Plus className="w-4 h-4 text-horizon-700" aria-hidden="true" />
             </span>
             <div className="min-w-0">
               <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">

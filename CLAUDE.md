@@ -64,6 +64,17 @@ Volledig **gescand** — niets handmatig. `scanTableRelations` in `generate.mjs`
 ### Beheer › Development (Claude-team)
 `/beheer/development` (tabs Skills/Ons team) toont de teamopstelling: subagents (`.claude/agents/*`) en skill-pijplijnen (`.claude/skills/*`). Zelfde principe: feiten gescand door `scanClaudeTeam()` in `generate.mjs` → `architecture.json.claudeTeam` (regenereer met `npm run arch:diagram`); betekenis gecureerd in `lib/architecture/development-model.ts` (`TEAM_GROUPS`/`AGENT_CURATION`/`SKILL_CURATION`). **Voeg je een agent of skill toe (of hernoem/verwijder je er één), deel 'm daar in** — `development-model.test.ts` wordt anders rood. Deze pagina is interne meta/naslag en hoort bewust NIET in de ArchiMate-topologie, HLD of Berekeningen.
 
+## Kleurconventie — module-accenten (verplicht bij UI-werk)
+
+De gebruiker kiest op `/mijn/uiterlijk` drie accentkleuren: **kern** (=Overzicht), **wil** (=Will & acties), **horizon** (=Toekomst). Die werken door via CSS-vars (`--color-kern-50..950` etc., gezet door `ModuleColorProvider` + server-side in `app/(app)/layout.tsx`) en Tailwind v4 `@theme`-tokens. Regels:
+
+- **Module-identiteit** (een element "hoort bij" Overzicht/Will/Toekomst) altijd via `kern-*`/`wil-*`/`horizon-*`-classes, `var(--color-<module>-*)` of route-breed via `--module-active-*` (override per route-layout: `/overzicht`=kern, `/toekomst`=horizon, `/berichten`+`/nieuws`+`/mijn`=wil). **Nooit** Tailwind-standaardkleuren (`emerald-*`, `violet-*`, `sky-*`, …) of losse hexen voor module-identiteit.
+- **Charts/canvas** die een echte hex nodig hebben: `useModuleHex()` uit `components/app/module-color-provider.tsx` — niet hardcoden.
+- **Semantiek blijft semantisch**: positief/negatief (`text-positive`/`text-negative`), stoplicht-status (op koers/aandacht/actie) en risico-rood volgen de accentkeuze NIET. Belasting-boxkleuren (`--color-box1/2/3-*`) en categorie-herkenningskleuren zijn eigen systemen.
+- Fase-kleuren (`--color-phase-*`) zijn bewust **niet** gebruikersinstelbaar (sovereignty = motivatie) maar wel als vars beschikbaar.
+
+Achtergrond + actieplan: `docs/accentkleuren-actieplan.md`.
+
 ## Project Specification
 
 <project_specification>

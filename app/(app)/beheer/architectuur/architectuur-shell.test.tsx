@@ -60,8 +60,8 @@ describe('ArchitectuurShell — view-switcher', () => {
   it('"→ plaat" vanuit een berekening schakelt naar de plaat en selecteert het element', () => {
     renderShell()
     fireEvent.click(screen.getByRole('tab', { name: /Berekeningen/ }))
-    // open de spaarquote-kaart
-    fireEvent.click(screen.getByRole('button', { name: /Spaarquote/i }))
+    // open de spaarquote-kaart (geankerd: 'gezondheidsscore' noemt spaarquote ook in haar samenvatting)
+    fireEvent.click(screen.getByRole('button', { name: /^Spaarquote/i }))
     // klik de plaat-koppeling naar de budgetteringsdienst
     fireEvent.click(screen.getByRole('button', { name: /Budgetteringsdienst/i }))
     expect(screen.getByRole('tab', { name: /Plaat/ })).toHaveAttribute('aria-selected', 'true')

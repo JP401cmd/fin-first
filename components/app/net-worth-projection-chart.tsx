@@ -84,9 +84,10 @@ export const NetWorthProjectionChart = memo(function NetWorthProjectionChart({
     val: minVal + pct * valRange,
   }))
 
-  // Color based on growth direction
-  const lineColor = isGrowing ? '#f59e0b' : '#ef4444'
-  const fillColor = isGrowing ? '#f59e0b' : '#ef4444'
+  // Color based on growth direction: groei = module-accent (volgt de
+  // gebruikerskeuze, op /overzicht = kern), daling = semantisch negatief.
+  const lineColor = isGrowing ? 'var(--module-active-600)' : 'var(--negative)'
+  const fillColor = isGrowing ? 'var(--module-active-600)' : 'var(--negative)'
 
   // Animation timings
   const lineAnim = hasEntered ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none'
@@ -170,7 +171,7 @@ export const NetWorthProjectionChart = memo(function NetWorthProjectionChart({
               y1={fireY!}
               x2={W - PAD_RIGHT}
               y2={fireY!}
-              stroke="#8B5CB8"
+              stroke="var(--color-horizon-500, #c4a06b)"
               strokeWidth="1.5"
               strokeDasharray="6 3"
               data-testid="fire-target-line"
@@ -266,7 +267,7 @@ export const NetWorthProjectionChart = memo(function NetWorthProjectionChart({
             <g data-testid="fire-reached-marker">
               <line
                 x1={fx} y1={PAD_TOP} x2={fx} y2={PAD_TOP + chartH}
-                stroke="#8B5CB8" strokeWidth="1" strokeDasharray="3 3" opacity="0.5"
+                stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="1" strokeDasharray="3 3" opacity="0.5"
               />
               <text x={fx} y={fy - 10} textAnchor="middle" style={{ fontSize: 12 }}>🎯</text>
             </g>
@@ -340,7 +341,7 @@ export const NetWorthProjectionChart = memo(function NetWorthProjectionChart({
             <line
               x1={PAD_LEFT + 70} y1={H - 6}
               x2={PAD_LEFT + 82} y2={H - 6}
-              stroke="#8B5CB8" strokeWidth="1.5" strokeDasharray="4 2"
+              stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="1.5" strokeDasharray="4 2"
             />
             <text x={PAD_LEFT + 86} y={H - 3} className="fill-zinc-500" style={{ fontSize: 9 }}>
               FIRE-doel

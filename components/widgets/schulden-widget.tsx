@@ -3,7 +3,7 @@
 import { memo } from 'react'
 import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
-import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { Users, UserCheck } from 'lucide-react'
@@ -43,7 +43,7 @@ export const SchuldenWidget = memo(function SchuldenWidget({ size, data, href }:
     )
   }
 
-  const dailyExp = monthlyExpenses / 30
+  const dailyExp = dailyExpenseRate(monthlyExpenses)
   const freedomTime = dailyExp > 0 && totalDebts > 0
     ? calculateFreedomTime(totalDebts, dailyExp)
     : null

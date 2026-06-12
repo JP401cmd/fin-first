@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { localMonthBounds } from '@/lib/month-range'
 
 /**
  * GET /api/budget-trends
@@ -39,8 +40,7 @@ export async function GET() {
     const months: { start: string; end: string; label: string; month: string }[] = []
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const start = d.toISOString().split('T')[0]
-      const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().split('T')[0]
+      const { start, end } = localMonthBounds(d)
       const label = d.toLocaleDateString('nl-NL', { month: 'short' })
       months.push({ start, end, label, month: start })
     }

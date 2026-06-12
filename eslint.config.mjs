@@ -22,6 +22,13 @@ const eslintConfig = defineConfig([
     "public/**",
   ]),
   {
+    // Beperk dit regel-object tot exact dezelfde bestanden als de Next-config
+    // die de `react-hooks`-plugin registreert (files: **/*.{js,jsx,mjs,ts,tsx,
+    // mts,cts}). Zonder deze `files` zou dit object óók toegepast worden op
+    // bestanden die Next NIET matcht (bv. een los `*.cjs`-scriptje), waar de
+    // `react-hooks`-plugin dan niet geregistreerd is → "could not find plugin
+    // react-hooks"-crash tijdens een volledige `eslint .`-run.
+    files: ["**/*.{js,jsx,mjs,ts,tsx,mts,cts}"],
     rules: {
       // React-compiler-prep-regels: advisory (warn) tot de overtredingen
       // gericht zijn weggewerkt — errors blijven gereserveerd voor echte bugs.
@@ -37,6 +44,27 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-explicit-any": "warn",
       // Cosmetisch en hinderlijk in Nederlandse UI-teksten (apostrofs/quotes).
       "react/no-unescaped-entities": "off",
+      // Tijdzone-vangrail (eenduidige-gegevens-audit S9): markeer
+      // `new Date(jaar, maand, …).toISOString()` als maandgrens. Een Date uit
+      // lokale componenten via toISOString() schuift de grens in NL (UTC+) een
+      // dag terug — vorige-maand-data lekt in het venster. `new Date()` zonder
+      // argumenten (≤1 arg) blijft toegestaan: dat is een echte timestamp.
+      //
+      // Severity = "error": alle bestaande sites zijn gemigreerd naar
+      // lib/month-range.ts (localMonthBounds / localMonthStart /
+      // localMonthStartMonthsAgo / localMonthEnd). De enige bewuste
+      // uitzondering is een gedragsneutrale demo-fixture met een gerichte
+      // eslint-disable (app/test-freedom-days-monthly-trend/page.tsx). Een
+      // error blokkeert nu elke NIEUWE occurrence van de tijdzone-trap.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            'CallExpression[callee.type="MemberExpression"][callee.property.name="toISOString"][callee.object.type="NewExpression"][callee.object.callee.name="Date"][callee.object.arguments.length>=2]',
+          message:
+            "Gebruik lib/month-range.ts (localMonthBounds / localMonthStart / localMonthStartMonthsAgo) i.p.v. new Date(jaar, maand, …).toISOString() — die schuift de maandgrens in NL een dag terug.",
+        },
+      ],
     },
   },
 ]);

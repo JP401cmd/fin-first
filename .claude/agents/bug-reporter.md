@@ -1,7 +1,8 @@
 ---
 name: bug-reporter
 description: "Use this agent to turn a vague problem report into a complete, reproducible bug report for TriFinity. It does NOT fix the bug — it investigates and documents: a clear title, environment/context, exact steps to reproduce, expected vs. actual behaviour, the affected use cases/user journeys, severity & impact, suspected area in the codebase, and the evidence behind it. Use it whenever a bug is observed or reported and you want a crisp, actionable write-up before anyone starts fixing.\n\nExamples:\n\n<example>\nContext: Vague complaint\nuser: \"The FIRE date on the dashboard looks wrong\"\nassistant: \"I'll use the bug-reporter agent to investigate and produce a full report — repro steps, expected vs actual, affected use cases, and the likely source files — before we touch code.\"\n<Task tool call to bug-reporter>\n</example>\n\n<example>\nContext: Intermittent issue\nuser: \"Sometimes a transaction lands in the wrong budget\"\nassistant: \"Let me launch the bug-reporter agent to characterize when it happens, capture concrete examples, and document the use cases it breaks.\"\n<Task tool call to bug-reporter>\n</example>\n\n<example>\nContext: Pre-fix triage\nuser: \"Users say the budget page is blank on mobile\"\nassistant: \"I'll use the bug-reporter agent to nail down the repro, scope, and severity so the fix is well-targeted.\"\n<Task tool call to bug-reporter>\n</example>"
-model: opus
+model: sonnet
+effort: high
 color: red
 ---
 

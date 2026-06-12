@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { localMonthBounds } from '@/lib/month-range'
 
 /**
  * GET /api/verify-budget-spending
@@ -23,8 +24,7 @@ export async function GET(request: Request) {
   const year = monthParam ? parseInt(monthParam.split('-')[0]) : now.getFullYear()
   const month = monthParam ? parseInt(monthParam.split('-')[1]) - 1 : now.getMonth()
 
-  const monthStart = new Date(year, month, 1).toISOString().split('T')[0]
-  const monthEnd = new Date(year, month + 1, 1).toISOString().split('T')[0]
+  const { start: monthStart, end: monthEnd } = localMonthBounds(new Date(year, month, 1))
 
   const supabase = await createClient()
 

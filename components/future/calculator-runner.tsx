@@ -187,7 +187,7 @@ function InputField({
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
           aria-label={input.label}
-          className="w-full accent-violet-600"
+          className="w-full accent-horizon-600"
         />
       ) : (
         <input
@@ -398,7 +398,7 @@ export function CalculatorRunner({
                   onClick={() => setActiveScenario(s.key)}
                   className={`relative px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
                     isActive
-                      ? 'border-violet-600 text-[var(--ink)]'
+                      ? 'border-horizon-600 text-[var(--ink)]'
                       : 'border-transparent text-[var(--ink-3)] hover:text-[var(--ink-2)]'
                   }`}
                 >
@@ -578,7 +578,7 @@ function SectionRows({
           <tr
             key={output.key}
             className={`border-b border-[var(--border-ed)] last:border-0 ${
-              isCompareRow ? 'bg-violet-50/40' : ''
+              isCompareRow ? 'bg-horizon-50/40' : ''
             } ${styleClass}`}
           >
             <td className="px-4 py-3 text-[var(--ink-2)]">
@@ -589,7 +589,7 @@ function SectionRows({
                 </div>
               )}
               {isCompareRow && (
-                <span className="text-[10px] uppercase tracking-[0.06em] text-violet-700 font-semibold">
+                <span className="text-[10px] uppercase tracking-[0.06em] text-horizon-700 font-semibold">
                   keuze
                 </span>
               )}

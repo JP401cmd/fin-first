@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import {
-  Loader2, CheckCircle, HelpCircle, Check, ChevronDown, GitFork, Sparkles, Wand2, ArrowLeftRight, Hand,
+  Loader2, CheckCircle, HelpCircle, Check, ChevronDown, GitFork, Sparkles, Wand2, Hand,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
@@ -12,11 +12,12 @@ import { useHouseholdStatus } from '@/components/app/ownership-toggle'
 import { loadAutoCatContext as loadSharedAutoCatContext } from '@/lib/auto-categorize-context'
 import {
   computeAutoCategorization,
-  computeOwnAccountDetection,
+  detectTransferPairs,
   type AutoCatContext,
   type AutoCatTx,
   type AutoAssignment,
 } from '@/lib/auto-categorize'
+import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
 
 // De Sleepmodus (drag-&-drop) sleept dnd-kit mee — eigen chunk, laadt pas
 // wanneer de gebruiker de modus opent.
@@ -37,6 +38,8 @@ type Transaction = {
   import_hash: string | null
   budget_id: string | null
   reference?: string | null
+  /** Nodig voor spiegelpaar-detectie (overboekingen tussen eigen rekeningen). */
+  account_id?: string | null
 }
 
 type AISuggestion = {
@@ -82,7 +85,9 @@ type Props = {
   currentUserId?: string | null
 }
 
-const ALL_TIME_LIMIT = 500
+const ALL_TIME_LIMIT = 10000
+/** PostgREST capt één query op 1000 rijen; daarom pagineren we per 1000. */
+const ALL_TIME_PAGE_SIZE = 1000
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -113,6 +118,8 @@ function toAutoCatTx(tx: Transaction): AutoCatTx {
     counterparty_name: tx.counterparty_name,
     counterparty_iban: tx.counterparty_iban,
     amount: tx.amount,
+    date: tx.date,
+    account_id: tx.account_id ?? null,
   }
 }
 
@@ -141,12 +148,27 @@ export function AICategorizeSheet({
   const [bulkUpdated, setBulkUpdated] = useState(0)
   const [bulkApplyPrompt, setBulkApplyPrompt] = useState<BulkApplyPrompt | null>(null)
   const [aiBatchProgress, setAiBatchProgress] = useState({ current: 0, total: 0 })
+  // Aantal overboekingen tussen eigen rekeningen dat de AI-flow vóór de payload
+  // automatisch heeft gemarkeerd (info-regel boven de review-rijen). Alléén
+  // STERKE signalen (IBAN/naam) worden zo stil toegepast; spiegelparen (fuzzy)
+  // komen als review-voorstel terug.
+  const [preMarkedTransfers, setPreMarkedTransfers] = useState(0)
+  // Budget-id van de "Eigen rekening"-post, geresolved bij de auto-context-laad.
+  // Nodig zodat handleSave bij een geaccepteerd eigen-rekening-budget óók
+  // transaction_type='transfer' meeschrijft (de cijfer-filtering hangt aan die
+  // vlag, niet aan het budget). Geldt voor een geaccepteerd spiegelpaar-voorstel
+  // én voor het handmatig kiezen van dit budget via "Kies handmatig".
+  const [eigenRekeningBudgetId, setEigenRekeningBudgetId] = useState<string | null>(null)
   // Auto-flows (optie 3 & 4): foutmelding op de choice-fase + resultaat-samenvatting.
   const [actionError, setActionError] = useState<string | null>(null)
+  // Samenvatting van de slimme-regels-flow (optie 3). Eigen-rekening-herkenning
+  // is geen losse optie meer — die zit nu in de slimme regels én de AI-flow.
+  // `mirrorCandidateCount`: spiegelpaar-kandidaten die NIET zijn toegepast (fuzzy
+  // signaal) — de samenvatting meldt ze als "mogelijke overboekingen".
   const [autoSummary, setAutoSummary] = useState<{
-    mode: 'rules' | 'own'
     ruleCount: number
     transferCount: number
+    mirrorCandidateCount: number
     unmatchedCount: number
   } | null>(null)
 
@@ -162,37 +184,77 @@ export function AICategorizeSheet({
   /** Resolved working set used by both AI and manual flow. */
   const activeTransactions = scope === 'all' && allTransactions ? allTransactions : transactions
 
+  // ⚠️ Sommige callers (budgets-client) geven de budget-BOOM door (parents met
+  // geneste children); cash-account-view geeft een platte lijst. Alle interne
+  // lookups (slugMap/idMap in de auto-cat-context, eigen-rekening-resolve,
+  // naam/ownership per suggestie) hebben de PLATTE lijst nodig — zonder
+  // flatten zijn deelbudgetten onzichtbaar voor Slimme regels en lookups
+  // (salaris-bug jun 2026). Structureel flattenen + dedupe op id, zodat élke
+  // caller-vorm veilig is.
+  const flatBudgets = useMemo(() => {
+    const seen = new Set<string>()
+    const flat: Budget[] = []
+    for (const b of budgets) {
+      const children = (b as { children?: Budget[] }).children ?? []
+      for (const item of [b, ...children]) {
+        if (!seen.has(item.id)) {
+          seen.add(item.id)
+          flat.push(item)
+        }
+      }
+    }
+    return flat
+  }, [budgets])
+
   // Fetch all uncategorized transactions for the current account/user.
-  // Lazy: only triggered when the user picks the 'all' tab. Capped at 500
-  // to keep AI batch budget and UX manageable; the cap is surfaced via
-  // `allCapped` so the choice-fase can show a footnote.
+  // Lazy: only triggered when the user picks the 'all' tab. Capped at
+  // ALL_TIME_LIMIT (10.000) om AI-batchbudget en UX beheersbaar te houden;
+  // de cap wordt via `allCapped` aan de choice-fase als voetnoot getoond.
+  // We pagineren per ALL_TIME_PAGE_SIZE (1000) omdat PostgREST één query
+  // hard op 1000 rijen capt — alleen `.limit(10000)` zetten levert dus
+  // nooit meer dan 1000 rijen op.
   const loadAllUncategorized = useCallback(async () => {
     if (allTransactions) return // already cached
     setLoadingAll(true)
     setAllError(null)
     try {
       const supabase = createClient()
-      let query = supabase
-        .from('transactions')
-        .select('*')
-        .is('budget_id', null)
 
-      if (accountId) {
-        query = query.eq('account_id', accountId)
-      } else if (currentUserId) {
-        query = query.eq('user_id', currentUserId)
+      // Doorlussend ophalen in chunks tot een chunk korter is dan een volle
+      // pagina (= laatste pagina) óf tot we de harde cap raken.
+      const raw: Transaction[] = []
+      for (let offset = 0; offset < ALL_TIME_LIMIT; offset += ALL_TIME_PAGE_SIZE) {
+        let query = supabase
+          .from('transactions')
+          // Expliciete kolomlijst i.p.v. `*`: bij 10k rijen scheelt dat fors
+          // aan egress (raw import-velden, household_id e.d. zijn hier niet
+          // nodig). `transaction_type` moet mee voor het JS-transferfilter;
+          // `account_id` voor de spiegelpaar-detectie (overboekingen tussen
+          // eigen rekeningen).
+          .select('id, date, description, counterparty_name, counterparty_iban, amount, import_hash, budget_id, reference, transaction_type, account_id')
+          .is('budget_id', null)
+
+        if (accountId) {
+          query = query.eq('account_id', accountId)
+        } else if (currentUserId) {
+          query = query.eq('user_id', currentUserId)
+        }
+
+        const { data, error } = await query
+          .order('date', { ascending: false })
+          .range(offset, offset + ALL_TIME_PAGE_SIZE - 1)
+
+        if (error) throw new Error(error.message)
+        const chunk = (data ?? []) as Transaction[]
+        raw.push(...chunk)
+        // Minder dan een volle pagina → dit was de laatste pagina.
+        if (chunk.length < ALL_TIME_PAGE_SIZE) break
       }
 
-      const { data, error } = await query
-        .order('date', { ascending: false })
-        .limit(ALL_TIME_LIMIT)
-
-      if (error) throw new Error(error.message)
       // Filter transfers in JS rather than SQL: PostgreSQL evaluates
       // `NULL != 'transfer'` as UNKNOWN which strips manually-unlinked rows
       // (where `transaction_type` is NULL). JS `!==` returns true for null,
       // matching the existing behaviour in cash-account-view.tsx (regel 531).
-      const raw = (data ?? []) as Transaction[]
       const list = raw.filter(
         (t) => (t as { transaction_type?: string | null }).transaction_type !== 'transfer'
       )
@@ -215,25 +277,154 @@ export function AICategorizeSheet({
     if (next === 'all') void loadAllUncategorized()
   }
 
+  // ── Auto-flow helpers (gedeeld door slimme regels én de AI-pre-detectie) ───
+
+  /** Laadt regels, geschiedenis en eigen-rekening-identifiers voor de auto-flows.
+   *  Gedeelde implementatie in lib/auto-categorize-context.ts (ook gebruikt door
+   *  de Sleepmodus-overlay). */
+  const loadAutoCatContext = useCallback(
+    async (): Promise<AutoCatContext> => loadSharedAutoCatContext(createClient(), flatBudgets),
+    [flatBudgets],
+  )
+
+  /** Schrijft de toewijzingen gebatcht weg: één update per budget/bron/transfer. */
+  const applyAssignments = useCallback(async (assignments: AutoAssignment[]): Promise<void> => {
+    if (assignments.length === 0) return
+    const supabase = createClient()
+    const groups = new Map<string, { ids: string[]; budget_id: string; category_source: string; isTransfer: boolean }>()
+    for (const a of assignments) {
+      const key = `${a.budget_id}|${a.category_source}|${a.isTransfer ? 'T' : 'F'}`
+      const g = groups.get(key) ?? { ids: [], budget_id: a.budget_id, category_source: a.category_source, isTransfer: a.isTransfer }
+      g.ids.push(a.id)
+      groups.set(key, g)
+    }
+    for (const g of groups.values()) {
+      const update: Record<string, unknown> = { budget_id: g.budget_id, category_source: g.category_source }
+      if (g.isTransfer) update.transaction_type = 'transfer'
+      // Chunk om de PostgREST URL-lengte te respecteren bij grote selecties.
+      for (let i = 0; i < g.ids.length; i += 200) {
+        const { error } = await supabase.from('transactions').update(update).in('id', g.ids.slice(i, i + 200))
+        if (error) throw new Error(error.message)
+      }
+    }
+  }, [])
+
   // ── Fetch AI suggestions (parallel batches, max 3 concurrent) ─────────────
 
   const fetchSuggestions = useCallback(async () => {
     setPhase('ai')
     setAiError(null)
     setAiBatchProgress({ current: 0, total: 0 })
+    setPreMarkedTransfers(0)
 
     // Snapshot the resolved set so async work below can't race with a scope
     // change. Manual / AI flow always operates on the same list.
     const sourceTx = activeTransactions
 
+    // ── Pre-detectie: overboekingen tussen eigen rekeningen NOOIT naar de AI ──
+    // Dit gebeurt volledig client-side; counterparty_iban (privacygrens) bereikt
+    // de provider sowieso niet, maar zo houden we transfers ook uit de batch.
+    //
+    // STERK vs. FUZZY signaal (besluit code-review H1):
+    //  - IBAN/naam-detectie (sterk) → direct toepassen (transaction_type='transfer'
+    //    + eigen-rekening-budget), exact zoals de slimme-regels-flow. Deze rijen
+    //    verschijnen NIET als review-rij; alleen geteld in `preMarkedTransfers`.
+    //  - Spiegelpaar (fuzzy: gelijk bedrag, tegengesteld teken, ≤2 dagen, andere
+    //    rekening) → NIET stil toepassen. Wel uit de AI-batch houden en als review-
+    //    rij met een voorgevuld "Eigen rekening (overboeking)"-voorstel tonen, zodat
+    //    een vals-positief (échte uitgave + toevallig gelijke ontvangst) zichtbaar
+    //    blijft. Een tx die ÉN spiegelpaar ÉN IBAN/naam matcht is een sterk signaal
+    //    en valt in het eerste pad.
+    //
+    // Degradeert: lukt het laden niet of is er geen eigen-rekening-budget, dan
+    // blijven alle transacties gewoon in de AI-batch.
+    let aiTx = sourceTx
+    // Spiegelpaar-leden (fuzzy) → review-rij met voorgevuld eigen-rekening-voorstel.
+    const mirrorSuggestions = new Map<string, AISuggestion>()
     try {
-      const payload = sourceTx.map((tx) => ({
-        import_hash: tx.import_hash ?? `${tx.date}-${tx.amount}-${tx.description}`,
-        description: tx.description,
-        counterparty_name: tx.counterparty_name,
-        amount: tx.amount,
-        reference: tx.reference,
-      }))
+      const ctx = await loadAutoCatContext()
+      setEigenRekeningBudgetId(ctx.eigenRekeningBudgetId)
+      if (ctx.eigenRekeningBudgetId) {
+        const autoTxs = sourceTx.map(toAutoCatTx)
+        const pairIds = detectTransferPairs(autoTxs)
+        // Sterk signaal: direct toepassen.
+        const strongTransferIds = new Set<string>()
+        // Fuzzy signaal (spiegelpaar zónder sterk signaal): review-voorstel.
+        const mirrorOnlyTxs: typeof sourceTx = []
+        for (const tx of sourceTx) {
+          const strong = isOwnAccountTransfer(tx.counterparty_iban, ctx.ownIbans, tx.counterparty_name, ctx.ownNamePatterns)
+          if (strong) {
+            strongTransferIds.add(tx.id)
+          } else if (pairIds.has(tx.id)) {
+            mirrorOnlyTxs.push(tx)
+          }
+        }
+        if (strongTransferIds.size > 0) {
+          await applyAssignments(
+            Array.from(strongTransferIds).map((id) => ({
+              id,
+              budget_id: ctx.eigenRekeningBudgetId!,
+              category_source: 'transfer',
+              isTransfer: true,
+            })),
+          )
+          setPreMarkedTransfers(strongTransferIds.size)
+        }
+        // Bouw een review-voorstel per spiegelpaar-only-lid: zelfde vorm als een
+        // AI-voorstel (import_hash-key) maar lokaal gegenereerd. Accepteren schrijft
+        // bij opslaan transaction_type='transfer' (handleSave herkent het budget).
+        // Leesbare naam van de eigen-rekening-post (voor de voorstel-weergave als
+        // het budget niet in budgetGroups.children zit — archive-bucket).
+        const eigenRekeningName =
+          flatBudgets.find((b) => b.id === ctx.eigenRekeningBudgetId)?.name ?? 'Eigen rekening (overboeking)'
+        for (const tx of mirrorOnlyTxs) {
+          const hash = tx.import_hash ?? `${tx.date}-${tx.amount}-${tx.description}`
+          mirrorSuggestions.set(hash, {
+            import_hash: hash,
+            budget_slug: eigenRekeningName,
+            budget_id: ctx.eigenRekeningBudgetId,
+            confidence: 0.85,
+            reasoning: `Spiegelboeking: zelfde bedrag tegengesteld op een andere rekening, ${formatDate(tx.date)}`,
+          })
+        }
+        // Alleen de sterke transfers verlaten de AI-batch; spiegelpaar-leden gaan er
+        // wél doorheen (als review-rij), maar krijgen geen AI-call: ze hebben al een
+        // lokaal voorstel.
+        aiTx = sourceTx.filter((tx) => !strongTransferIds.has(tx.id))
+      }
+    } catch {
+      // Context laden mislukte → degradeer stilletjes: stuur de volledige set
+      // naar de AI (zelfde gedrag als wanneer er geen eigen-rekening-budget is).
+      aiTx = sourceTx
+    }
+
+    // Edge: alles was een overboeking → geen lege batch naar de API, direct naar
+    // review met enkel de info-regel.
+    if (aiTx.length === 0) {
+      setRows([])
+      setPhase('review')
+      return
+    }
+
+    try {
+      // Spiegelpaar-leden krijgen geen AI-call: ze hebben al een lokaal voorstel.
+      // Ze blijven wel review-rij (zie initialRows), maar gaan niet naar de provider.
+      const payload = aiTx
+        .filter((tx) => {
+          const hash = tx.import_hash ?? `${tx.date}-${tx.amount}-${tx.description}`
+          return !mirrorSuggestions.has(hash)
+        })
+        .map((tx) => ({
+          import_hash: tx.import_hash ?? `${tx.date}-${tx.amount}-${tx.description}`,
+          description: tx.description,
+          counterparty_name: tx.counterparty_name,
+          // Bewust GEEN counterparty_iban: sanitizeForAI maskeert elk IBAN naar de
+          // constante "[IBAN]" vóór het de provider bereikt — privacy-correct maar
+          // nul signaal voor het model. IBAN-matching gebeurt lokaal (slimme regels).
+          amount: tx.amount,
+          reference: tx.reference,
+          date: tx.date,
+        }))
 
       // Split into batches of 20
       const batches: typeof payload[] = []
@@ -279,12 +470,14 @@ export function AICategorizeSheet({
         suggestionMap.set(s.import_hash, s)
       }
 
-      // Build rows
-      const initialRows: RowState[] = sourceTx.map((tx) => {
+      // Build rows — de review-set: AI-voorgelegde transacties (sterke transfers zijn
+      // er vooraf uitgehaald en al toegepast) PLUS spiegelpaar-leden, die een lokaal
+      // voorgevuld eigen-rekening-voorstel meekrijgen i.p.v. een AI-voorstel.
+      const initialRows: RowState[] = aiTx.map((tx) => {
         const hash = tx.import_hash ?? `${tx.date}-${tx.amount}-${tx.description}`
-        const suggestion = suggestionMap.get(hash) ?? null
+        const suggestion = mirrorSuggestions.get(hash) ?? suggestionMap.get(hash) ?? null
 
-        // Pre-fill accepted state if AI has a high-confidence suggestion
+        // Suggesties worden NIET vooraf geaccepteerd; de gebruiker beslist per rij.
         return {
           tx,
           suggestion,
@@ -300,18 +493,22 @@ export function AICategorizeSheet({
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'AI-analyse niet beschikbaar'
       setAiError(msg)
-      // Fall back to review mode without suggestions
-      setRows(sourceTx.map((tx) => ({
-        tx,
-        suggestion: null,
-        accepted: false,
-        acceptedBudgetId: null,
-        acceptedBudgetName: null,
-        makeRule: false,
-      })))
+      // Fall back to review mode without AI-suggestions. De lokaal bepaalde
+      // spiegelpaar-voorstellen blijven wél staan (die hangen niet aan de AI-call).
+      setRows(aiTx.map((tx) => {
+        const hash = tx.import_hash ?? `${tx.date}-${tx.amount}-${tx.description}`
+        return {
+          tx,
+          suggestion: mirrorSuggestions.get(hash) ?? null,
+          accepted: false,
+          acceptedBudgetId: null,
+          acceptedBudgetName: null,
+          makeRule: false,
+        }
+      }))
       setPhase('review')
     }
-  }, [activeTransactions])
+  }, [activeTransactions, loadAutoCatContext, applyAssignments, budgets])
 
   function startManual() {
     setRows(activeTransactions.map((tx) => ({
@@ -325,38 +522,6 @@ export function AICategorizeSheet({
     setPhase('review')
   }
 
-  // ── Automatisch indelen (optie 3 & 4) ─────────────────────────────────────
-
-  /** Laadt regels, geschiedenis en eigen-rekening-identifiers voor de auto-flows.
-   *  Gedeelde implementatie in lib/auto-categorize-context.ts (ook gebruikt door
-   *  de Sleepmodus-overlay). */
-  const loadAutoCatContext = useCallback(
-    async (): Promise<AutoCatContext> => loadSharedAutoCatContext(createClient(), budgets),
-    [budgets],
-  )
-
-  /** Schrijft de toewijzingen gebatcht weg: één update per budget/bron/transfer. */
-  async function applyAssignments(assignments: AutoAssignment[]): Promise<void> {
-    if (assignments.length === 0) return
-    const supabase = createClient()
-    const groups = new Map<string, { ids: string[]; budget_id: string; category_source: string; isTransfer: boolean }>()
-    for (const a of assignments) {
-      const key = `${a.budget_id}|${a.category_source}|${a.isTransfer ? 'T' : 'F'}`
-      const g = groups.get(key) ?? { ids: [], budget_id: a.budget_id, category_source: a.category_source, isTransfer: a.isTransfer }
-      g.ids.push(a.id)
-      groups.set(key, g)
-    }
-    for (const g of groups.values()) {
-      const update: Record<string, unknown> = { budget_id: g.budget_id, category_source: g.category_source }
-      if (g.isTransfer) update.transaction_type = 'transfer'
-      // Chunk om de PostgREST URL-lengte te respecteren bij grote selecties.
-      for (let i = 0; i < g.ids.length; i += 200) {
-        const { error } = await supabase.from('transactions').update(update).in('id', g.ids.slice(i, i + 200))
-        if (error) throw new Error(error.message)
-      }
-    }
-  }
-
   /** Optie 3 — slimme regels: volledige keten, direct toepassen. */
   async function runSmartRules() {
     setActionError(null)
@@ -365,28 +530,16 @@ export function AICategorizeSheet({
       const ctx = await loadAutoCatContext()
       const result = computeAutoCategorization(activeTransactions.map(toAutoCatTx), ctx)
       await applyAssignments(result.assignments)
-      setAutoSummary({ mode: 'rules', ruleCount: result.ruleCount, transferCount: result.transferCount, unmatchedCount: result.unmatchedCount })
+      setAutoSummary({
+        ruleCount: result.ruleCount,
+        transferCount: result.transferCount,
+        mirrorCandidateCount: result.mirrorCandidateCount,
+        unmatchedCount: result.unmatchedCount,
+      })
       setSavedCount(result.ruleCount + result.transferCount)
       setPhase('success')
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Automatisch indelen lukte niet. Probeer het opnieuw.')
-      setPhase('choice')
-    }
-  }
-
-  /** Optie 4 — eigen rekening herkennen: alleen overboekingen, direct toepassen. */
-  async function runOwnAccountDetection() {
-    setActionError(null)
-    setPhase('applying')
-    try {
-      const ctx = await loadAutoCatContext()
-      const result = computeOwnAccountDetection(activeTransactions.map(toAutoCatTx), ctx)
-      await applyAssignments(result.assignments)
-      setAutoSummary({ mode: 'own', ruleCount: 0, transferCount: result.transferCount, unmatchedCount: result.unmatchedCount })
-      setSavedCount(result.transferCount)
-      setPhase('success')
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Eigen rekening herkennen lukte niet. Probeer het opnieuw.')
       setPhase('choice')
     }
   }
@@ -397,7 +550,10 @@ export function AICategorizeSheet({
     setBulkApplyPrompt(null)
     const row = rows[idx]
     if (!row?.suggestion?.budget_id) return
-    const budget = budgets.find((b) => b.id === row.suggestion!.budget_id)
+    const budget = flatBudgets.find((b) => b.id === row.suggestion!.budget_id)
+    // Een eigen-rekening-voorstel (spiegelpaar) is een eenmalige overboeking, geen
+    // terugkerende categorie: geen regel aanmaken en geen sibling-detectie.
+    const isEigenRekening = !!eigenRekeningBudgetId && row.suggestion.budget_id === eigenRekeningBudgetId
     const updatedRows = rows.map((r, i) => {
       if (i !== idx || !r.suggestion?.budget_id) return r
       return {
@@ -405,10 +561,11 @@ export function AICategorizeSheet({
         accepted: true,
         acceptedBudgetId: r.suggestion.budget_id,
         acceptedBudgetName: budget?.name ?? r.suggestion.budget_slug,
-        makeRule: true,
+        makeRule: !isEigenRekening,
       }
     })
     setRows(updatedRows)
+    if (isEigenRekening) return
     const matchField = row.tx.counterparty_name ? 'counterparty_name' as const : 'description' as const
     const matchValue = row.tx.counterparty_name || row.tx.description
     const budgetId = row.suggestion.budget_id
@@ -419,7 +576,7 @@ export function AICategorizeSheet({
   function setManualBudget(idx: number, budgetId: string) {
     setBulkApplyPrompt(null)
     const row = rows[idx]
-    const budget = budgets.find((b) => b.id === budgetId)
+    const budget = flatBudgets.find((b) => b.id === budgetId)
     const updatedRows = rows.map((r, i) => {
       if (i !== idx) return r
       return {
@@ -482,7 +639,7 @@ export function AICategorizeSheet({
   function acceptAll() {
     setRows((prev) => prev.map((r) => {
       if (!r.suggestion?.budget_id) return r
-      const budget = budgets.find((b) => b.id === r.suggestion!.budget_id)
+      const budget = flatBudgets.find((b) => b.id === r.suggestion!.budget_id)
       return {
         ...r,
         accepted: true,
@@ -514,9 +671,21 @@ export function AICategorizeSheet({
       // Update transaction. Wanneer het doelbudget gedeeld is en de gebruiker de
       // optie aan heeft staan, zet de transactie meteen op 'shared' (DB-trigger
       // herstempelt household_id). Anders blijft het eigendom ongemoeid.
-      const update: { budget_id: string | null; category_source: string; ownership?: 'shared' } = {
+      const update: {
+        budget_id: string | null
+        category_source: string
+        ownership?: 'shared'
+        transaction_type?: 'transfer'
+      } = {
         budget_id: row.acceptedBudgetId,
         category_source: 'ai',
+      }
+      // Eigen-rekening-budget gekozen (via een spiegelpaar-voorstel óf handmatig via
+      // "Kies handmatig") → markeer als overboeking. De cijfer-filtering hangt aan
+      // deze vlag, niet aan het budget — zelfde discipline als applyAssignments.
+      const isEigenRekening = !!eigenRekeningBudgetId && row.acceptedBudgetId === eigenRekeningBudgetId
+      if (isEigenRekening) {
+        update.transaction_type = 'transfer'
       }
       if (showShareToggle && shareSharedBudgetTx && isSharedBudget(row.acceptedBudgetId)) {
         update.ownership = 'shared'
@@ -602,8 +771,8 @@ export function AICategorizeSheet({
   // Is een budget-id een gedeeld huishoudbudget?
   const isSharedBudget = useCallback(
     (budgetId: string | null | undefined) =>
-      !!budgetId && budgets.find((b) => b.id === budgetId)?.ownership === 'shared',
-    [budgets],
+      !!budgetId && flatBudgets.find((b) => b.id === budgetId)?.ownership === 'shared',
+    [flatBudgets],
   )
   // Checkbox alleen tonen wanneer er een huishouden is én minstens één voorstel/
   // keuze een gedeeld budget raakt.
@@ -622,8 +791,11 @@ export function AICategorizeSheet({
     <BottomSheet open={phase !== 'sleep'} onClose={onClose} title="Transacties categoriseren">
 
       {/* ── Choice ── */}
+      {/* BottomSheet's content-area heeft zelf geen horizontale padding —
+          consumers leveren die zelf (conventie: px-5 sm:px-6, zie o.a.
+          sync-report-modal en strategie-modal-shell). */}
       {phase === 'choice' && (
-        <div className="flex flex-col gap-5 py-5">
+        <div className="flex flex-col gap-5 px-5 py-5 sm:px-6">
           {actionError && (
             <div role="alert" className="rounded-[var(--r)] border border-orange-200 bg-orange-50 px-3 py-2.5 text-[11px] text-orange-700">
               {actionError}
@@ -688,7 +860,7 @@ export function AICategorizeSheet({
               )}
               {scope === 'all' && allCapped && (
                 <p className="mt-2 text-[11px] italic text-[var(--ink-4)]">
-                  Maximaal {ALL_TIME_LIMIT} oudste ongekoppelde meegenomen — herhaal voor de rest.
+                  Maximaal {ALL_TIME_LIMIT} nieuwste ongekoppelde transacties meegenomen.
                 </p>
               )}
             </div>
@@ -729,24 +901,6 @@ export function AICategorizeSheet({
               <p className="text-sm font-semibold text-[var(--ink)]">Slimme regels</p>
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
                 Deel direct in op basis van je regels, je eerdere keuzes en herkende tegenpartijen — zonder AI. Eigen-rekening-overboekingen worden meteen herkend.
-              </p>
-            </div>
-          </button>
-
-          {/* Eigen rekening herkennen (optie 4) */}
-          <button
-            type="button"
-            onClick={() => void runOwnAccountDetection()}
-            disabled={loadingAll || activeTransactions.length === 0}
-            className="flex items-start gap-3 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-4 text-left transition-all hover:border-[var(--border-md)] hover:shadow-[var(--s1)] disabled:opacity-50 disabled:hover:shadow-none disabled:hover:border-[var(--border-ed)]"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--subtle)]">
-              <ArrowLeftRight className="h-4 w-4 text-[var(--ink-2)]" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[var(--ink)]">Eigen rekening herkennen</p>
-              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
-                Markeer overboekingen tussen je eigen rekeningen (spaarpot, PayPal, broker) zodat ze niet als uitgave of inkomen meetellen.
               </p>
             </div>
           </button>
@@ -798,7 +952,7 @@ export function AICategorizeSheet({
 
       {/* ── AI processing ── */}
       {phase === 'ai' && (
-        <div className="space-y-5 py-6">
+        <div className="space-y-5 px-5 py-6 sm:px-6">
           <div className="flex flex-col items-center gap-3 pb-3">
             <Loader2 className="h-7 w-7 animate-spin text-wil-500" />
             <p className="text-sm font-medium text-[var(--ink-2)]">
@@ -822,10 +976,13 @@ export function AICategorizeSheet({
             </div>
           )}
 
-          {/* Fhin editorial quote card */}
+          {/* Will editorial quote card — toon het WERKELIJKE aantal dat naar de AI
+              gaat (aiBatchProgress.total = de payload ná pre-detectie: sterke
+              transfers en spiegelpaar-leden zitten daar niet in). Vóór de teller
+              gezet is, val terug op de actieve set. */}
           <div className="rounded-[var(--r-lg)] border border-dashed border-wil-200 bg-wil-50/50 px-4 py-4">
             <p className="font-[var(--font-source-serif)] text-[13px] italic leading-relaxed text-[var(--ink-2)] border-l-[3px] border-wil-500 pl-3">
-              &ldquo;{transactions.length} transacties worden vergeleken met jouw eerdere gewoonten…&rdquo;
+              &ldquo;{aiBatchProgress.total > 0 ? aiBatchProgress.total : activeTransactions.length} transacties worden vergeleken met jouw eerdere gewoonten…&rdquo;
             </p>
             <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-wil-600">— Will</p>
           </div>
@@ -848,11 +1005,19 @@ export function AICategorizeSheet({
 
       {/* ── Review ── */}
       {phase === 'review' && (
-        <div className="flex flex-col gap-0">
+        <div className="flex flex-col gap-0 px-5 pb-5 sm:px-6">
           {/* AI error fallback */}
           {aiError && (
             <div className="mb-4 rounded-[var(--r)] border border-orange-200 bg-orange-50 px-3 py-3 text-[11px] text-orange-700">
               {aiError}
+            </div>
+          )}
+
+          {/* Vooraf gemarkeerde eigen-rekening-overboekingen — neutraal/informatief.
+              Deze rijen verschijnen bewust NIET als review-rij; ze zijn al toegepast. */}
+          {preMarkedTransfers > 0 && (
+            <div className="mb-4 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5 text-[11px] text-[var(--ink-2)]">
+              {preMarkedTransfers} {preMarkedTransfers === 1 ? 'overboeking' : 'overboekingen'} tussen eigen rekeningen automatisch gemarkeerd.
             </div>
           )}
 
@@ -962,7 +1127,7 @@ export function AICategorizeSheet({
 
       {/* ── Saving ── */}
       {phase === 'saving' && (
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="flex flex-col items-center justify-center px-5 py-16 gap-4 sm:px-6">
           <Loader2 className="h-7 w-7 animate-spin text-kern-500" />
           <p className="text-sm text-[var(--ink-3)]">Opslaan…</p>
         </div>
@@ -970,7 +1135,7 @@ export function AICategorizeSheet({
 
       {/* ── Applying (auto-flows: optie 3 & 4) ── */}
       {phase === 'applying' && (
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="flex flex-col items-center justify-center px-5 py-16 gap-4 sm:px-6">
           <Loader2 className="h-7 w-7 animate-spin text-kern-500" />
           <p className="text-sm text-[var(--ink-3)]">Bezig met indelen…</p>
         </div>
@@ -978,33 +1143,30 @@ export function AICategorizeSheet({
 
       {/* ── Success ── */}
       {phase === 'success' && (
-        <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+        <div className="flex flex-col items-center justify-center px-5 py-16 gap-4 text-center sm:px-6">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-kern-100">
             <CheckCircle className="h-7 w-7 text-kern-600" />
           </div>
           <div>
             <p className="text-lg font-bold font-[var(--font-playfair)] text-[var(--ink)]">Klaar</p>
             {autoSummary ? (
-              autoSummary.mode === 'rules' ? (
-                <>
-                  <p className="mt-2 text-sm text-[var(--ink-2)]">
-                    {savedCount === 0
-                      ? 'Niets kon automatisch ingedeeld worden'
-                      : <>{savedCount} {savedCount === 1 ? 'transactie' : 'transacties'} ingedeeld</>}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--ink-3)]">
-                    {autoSummary.ruleCount} op regels
-                    {autoSummary.transferCount > 0 && <> · {autoSummary.transferCount} als eigen rekening</>}
-                    {autoSummary.unmatchedCount > 0 && <> · {autoSummary.unmatchedCount} nog open voor Will of handmatig</>}
-                  </p>
-                </>
-              ) : (
+              <>
                 <p className="mt-2 text-sm text-[var(--ink-2)]">
-                  {autoSummary.transferCount === 0
-                    ? 'Geen eigen-rekening-overboekingen gevonden'
-                    : <>{autoSummary.transferCount} {autoSummary.transferCount === 1 ? 'transactie' : 'transacties'} herkend als eigen rekening</>}
+                  {savedCount === 0
+                    ? 'Niets kon automatisch ingedeeld worden'
+                    : <>{savedCount} {savedCount === 1 ? 'transactie' : 'transacties'} ingedeeld</>}
                 </p>
-              )
+                <p className="mt-1 text-xs text-[var(--ink-3)]">
+                  {autoSummary.ruleCount} op regels
+                  {autoSummary.transferCount > 0 && <> · {autoSummary.transferCount} als eigen rekening</>}
+                  {autoSummary.unmatchedCount > 0 && <> · {autoSummary.unmatchedCount} nog open voor Will of handmatig</>}
+                </p>
+                {autoSummary.mirrorCandidateCount > 0 && (
+                  <p className="mt-1 text-xs text-[var(--ink-3)]">
+                    {autoSummary.mirrorCandidateCount} {autoSummary.mirrorCandidateCount === 1 ? 'mogelijke overboeking' : 'mogelijke overboekingen'} gevonden — bekijk ze via Vraag Will of handmatig.
+                  </p>
+                )}
+              </>
             ) : (
               <>
                 <p className="mt-2 text-sm text-[var(--ink-2)]">

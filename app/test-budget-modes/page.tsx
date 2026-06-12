@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { localMonthBounds } from '@/lib/month-range'
 import { type BudgetWithChildren, type Budget } from '@/lib/budget-data'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetBlob } from '@/components/app/budget-blob'
@@ -51,8 +52,7 @@ export default function TestBudgetModesPage() {
 
       // Fetch current month transactions
       const now = new Date()
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+      const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
       const { data: txData } = await supabase
         .from('transactions')

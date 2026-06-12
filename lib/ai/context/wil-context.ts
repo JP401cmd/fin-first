@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, bulletList } from './formatter'
 import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
-import { localMonthBounds } from '@/lib/month-range'
+import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import type { ModuleId } from '@/lib/module-registry'
 
 /**
@@ -14,7 +14,10 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
   const now = new Date()
   const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
-  const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString()
+  // Relevantie-ondergrens "ongeveer een jaar terug" voor recent bijgewerkte
+  // goals/acties/aanbevelingen. Tijdzone-veilig via month-range i.p.v.
+  // new Date(jaar, maand, dag).toISOString() (dat schuift de grens in NL terug).
+  const oneYearAgo = localMonthStartMonthsAgo(now, 12)
 
   const inzichtActiesActive = activeModules.includes('inzicht_acties')
   const noData = Promise.resolve({ data: null })

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { localMonthBounds } from '@/lib/month-range'
 import {
   calculateBox3,
   BOX3_PARAMS,
@@ -40,8 +41,7 @@ export default function TestBox3Verification() {
       setLoading(true)
       const supabase = createClient()
       const now = new Date()
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0]
+      const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
       const [assetsResult, debtsResult, txResult] = await Promise.all([
         supabase.from('assets').select('*').eq('is_active', true),

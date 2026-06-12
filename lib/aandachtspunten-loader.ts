@@ -26,6 +26,7 @@ import {
   debtsToAandachtspunten,
   assetsToAandachtspunten,
 } from './aandachtspunten'
+import { dailyExpenseRate } from './format'
 import { buildTaxOverview } from './tax-overview'
 import { computeBox1Tax } from './box1-tax'
 import { loadPerspectiveBox3 } from './household-tax'
@@ -52,7 +53,7 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
   const horizonData = await loadHorizonData(supabase)
 
   const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 100
+  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
 
   // Box 1-schatting: bruto ≈ netto / (1 − marginaal).
   let box1Tax: number | null = null
@@ -177,7 +178,7 @@ async function collectBudgetAandachtspunten(supabase: SupabaseClient): Promise<A
 async function collectDebtAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
   const horizonData = await loadHorizonData(supabase)
   const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 100
+  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
 
   // Egress-trim: de adapter gebruikt alleen id/name/current_balance/
   // interest_rate/is_active.
@@ -201,7 +202,7 @@ async function collectDebtAandachtspunten(supabase: SupabaseClient): Promise<Aan
 async function collectAssetAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
   const horizonData = await loadHorizonData(supabase)
   const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = monthlyExpenses > 0 ? monthlyExpenses / 30 : 0
+  const dailyExpenses = dailyExpenseRate(monthlyExpenses)
   const inflationRate = horizonData.fireParams?.inflationRate ?? 0
 
   // Egress-trim: de adapter gebruikt alleen asset_type/current_value/is_active.

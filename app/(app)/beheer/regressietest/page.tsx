@@ -21,9 +21,9 @@ const ICON_MAP: Record<string, React.ElementType> = {
 
 /** Dutch display labels for module groups (first segment of dot-notation category IDs) */
 const MODULE_LABELS: Record<string, string> = {
-  'kern': 'De Kern',
-  'horizon': 'De Horizon',
-  'wil': 'De Wil',
+  'kern': 'Overzicht (kern)',
+  'horizon': 'Toekomst (horizon)',
+  'wil': 'Tips & acties (wil)',
   'widgets': 'Widgets',
   'identiteit': 'Identiteit',
   'onboarding': 'Onboarding',

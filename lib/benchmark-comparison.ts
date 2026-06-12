@@ -5,6 +5,8 @@
  * Uses time-weighted return (TWR) calculation for accurate comparison.
  */
 
+import { localMonthEnd, localMonthStart } from './month-range'
+
 // ── Types ────────────────────────────────────────────────────
 
 export type BenchmarkId = 'aex' | 'msci_world' | 'sp500'
@@ -324,8 +326,8 @@ export function buildPortfolioHistory(
   }
 
   while (current <= now) {
-    const monthKey = current.toISOString().substring(0, 7) // YYYY-MM
-    const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0).toISOString().split('T')[0]
+    const monthKey = localMonthStart(current).substring(0, 7) // YYYY-MM (tijdzone-veilig)
+    const monthEnd = localMonthEnd(current) // inclusieve laatste dag van de maand
 
     let totalValue = 0
     let totalCost = 0

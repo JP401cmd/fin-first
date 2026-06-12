@@ -545,11 +545,13 @@ export function ConfirmCard({ matchLabel, siblingCount, targetName, onScope, onC
 
 // ── Samenvatting wanneer de wachtrij leeg is ─────────────────────────────────
 
-export function SamenvattingScherm({ assigned, rules, bulkUpdated, skipped, onClose, closeLabel }: {
+export function SamenvattingScherm({ assigned, rules, bulkUpdated, skipped, remaining = 0, onClose, closeLabel }: {
   assigned: number
   rules: number
   bulkUpdated: number
   skipped: number
+  /** Aantal transacties dat nog open stond bij tussentijds stoppen. */
+  remaining?: number
   onClose: () => void
   closeLabel?: string
 }) {
@@ -560,7 +562,9 @@ export function SamenvattingScherm({ assigned, rules, bulkUpdated, skipped, onCl
       </div>
       <div>
         <p className="font-[var(--font-playfair)] text-lg font-bold text-[var(--ink)]">
-          De stapel is <em className="italic text-kern-700">leeg</em>
+          {remaining > 0
+            ? <>Voortgang <em className="italic text-kern-700">opgeslagen</em></>
+            : <>De stapel is <em className="italic text-kern-700">leeg</em></>}
         </p>
         <p className="mt-2 text-sm text-[var(--ink-2)]">
           {assigned === 0
@@ -572,6 +576,11 @@ export function SamenvattingScherm({ assigned, rules, bulkUpdated, skipped, onCl
           <p className="mt-1 text-xs text-[var(--ink-3)]">
             {rules} {rules === 1 ? 'regel' : 'regels'} aangemaakt
             {bulkUpdated > 0 && <> — {bulkUpdated} eerdere {bulkUpdated === 1 ? 'transactie' : 'transacties'} automatisch bijgewerkt</>}
+          </p>
+        )}
+        {remaining > 0 && (
+          <p className="mt-1 text-xs text-[var(--ink-3)]">
+            Nog <strong className="font-[var(--font-dm-mono)] tabular-nums">{remaining}</strong> {remaining === 1 ? 'transactie' : 'transacties'} niet toegewezen — die staan er de volgende keer weer.
           </p>
         )}
       </div>

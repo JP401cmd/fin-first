@@ -1,17 +1,25 @@
 /**
- * Financial Health Score — 6-pillar weighted score (0–100)
+ * Financial Health Score — v2: vier gedragspijlers, 7 actieve indicatoren (0–100)
  *
- * Replaces the old veerkracht_score (4-pillar resilience score).
- * Broader coverage: savings behaviour, debt management, emergency buffer,
- * FIRE progress, portfolio diversification, and budget discipline.
+ * Herstructurering van de v1 7-vlakke-pijler-score (ADR 0010). De score is nu
+ * gegroepeerd in vier gedragspijlers met basisgewichten (som 0.95 → herverdeeld
+ * naar 1.0 via getRedistributedWeightForSet):
  *
- * Pillar weights:
- *   1. Spaarquote        25%
- *   2. Schuldratio        20%
- *   3. Noodfonds-dekking  15%
- *   4. FIRE-voortgang     20%
- *   5. Portefeuille-diversificatie 10%
- *   6. Budget-discipline  10%
+ *   Rondkomen (35%) — Spaarquote 0.20 · Budgetdiscipline 0.10
+ *   Buffer    (20%) — Noodfonds 0.20
+ *   Schuld    (20%) — DSTI (schuldenlast/inkomen) 0.12 · Schuldratio 0.08
+ *   Vrijheid  (25%) — FIRE-voortgang 0.18 · Vermogensconcentratie 0.07
+ *
+ * `tax_optimization` en `diversification` zijn uit de score verwijderd (ADR 0010):
+ * geen toonaangevend framework gebruikt ze als gezondheidsindicator, en ze
+ * draaiden vaak op een neutrale dummy. De helpers (scoreTaxOptimization,
+ * buildTaxData, computeAssetTypeCount) blijven bestaan voor educatieve
+ * "kans"-inzichten buiten de score; ze voeden geen pijler meer.
+ *
+ * No-data-beleid (ADR 0010, FR-5/6): een indicator zonder betekenisvolle data is
+ * inactief — het gewicht wordt proportioneel herverdeeld via
+ * getRedistributedWeightForSet. Geen neutrale dummies (50/70) meer. Alle 7
+ * inactief → total 0, label 'Kritiek', zonder divide-by-zero.
  */
 
 import type { DashboardData } from '@/components/widgets/widget-renderer'
@@ -26,10 +34,32 @@ export interface HealthScoreInput {
   totalDebts: number
   emergencyFundMonths: number
   freedomPct: number
-  assetTypeCount: number
+  /**
+   * Netto maandinkomen — dezelfde canonieke inkomensbron die `savingsRate6m`
+   * voedt (income6m/6 resp. effectiveMonthlyIncome). Noemer van de DSTI-pijler.
+   */
+  netMonthlyIncome: number
+  /** Σ maandlasten (monthly_payment) van actieve schulden. Teller DSTI. */
+  debtMonthlyPayments: number
+  /**
+   * Grootste asset_type als fractie (0–1) van het totaal excl. eigen woning, of
+   * `null` wanneer de concentratie-pijler inactief is (starter: grootste type
+   * < €10.000, of geen vermogen). Vooraf berekend via
+   * `computeLargestAssetTypeShare`.
+   */
+  largestAssetTypeShare: number | null
   /** Budget categories with limit/spent; empty array if no budgets */
   budgetCategories: { limit: number; spent: number }[]
-  /** Box 3 tax-context voor tax_optimization-pillar. Optioneel; null → neutral score 50. */
+  /**
+   * @deprecated Voedt sinds v2 geen pijler meer (ADR 0010). Blijft als optioneel
+   * backward-compat-veld voor het educatieve Box 3-"kans"-inzicht.
+   */
+  assetTypeCount?: number
+  /**
+   * @deprecated Voedt sinds v2 geen pijler meer (ADR 0010). Blijft als optioneel
+   * backward-compat-veld; gebruikt door het educatieve Box 3-"kans"-inzicht in
+   * de kassabon-receipt, buiten de score.
+   */
   taxData?: {
     box3Bezittingen: number       // spaargeld + beleggingen
     box3Tax: number               // jaarlijkse Box 3-heffing
@@ -40,11 +70,14 @@ export interface HealthScoreInput {
 
 // ── Types ────────────────────────────────────────────────────
 
+/** De vier gedragspijler-groepen waarin de 7 indicatoren vallen (ADR 0010). */
+export type PillarGroup = 'rondkomen' | 'buffer' | 'schuld' | 'vrijheid'
+
 export interface HealthPillar {
   id: string
   name: string
   score: number        // 0–100
-  weight: number       // 0–1 (e.g. 0.25)
+  weight: number       // 0–1 (herverdeeld binnen de actieve set)
   explanation: string  // what this pillar measures
   improvementTip: string
   /** Link to the page where the user can act on this tip */
@@ -52,6 +85,10 @@ export interface HealthPillar {
   /** Short CTA label for the action link (e.g. "Budget instellen") */
   actionLabel: string
   rawValue: string     // human-readable current value
+  /** Gedragspijler-groep waartoe deze indicator behoort (ADR 0010, additief). */
+  pillarGroup?: PillarGroup
+  /** Leesbare groepslabel ("Rondkomen", "Buffer", "Schuld", "Vrijheid"). */
+  groupLabel?: string
 }
 
 export interface HealthScore {
@@ -60,10 +97,30 @@ export interface HealthScore {
   pillars: HealthPillar[]
   previousMonth: number | null  // total score for previous month (null if insufficient data)
   trend: number        // delta vs previous month (positive = improving)
-  /** Number of active pillars (5 when budget excluded, 6 when included) */
+  /** Number of active pillars/indicators included in the score */
   activePillarCount: number
   /** Whether budget discipline is included in the score */
   budgetingActive: boolean
+}
+
+// ── Pillar group metadata ────────────────────────────────────
+
+const PILLAR_GROUP_LABELS: Record<PillarGroup, string> = {
+  rondkomen: 'Rondkomen',
+  buffer: 'Buffer',
+  schuld: 'Schuld',
+  vrijheid: 'Vrijheid',
+}
+
+/** Gedragspijler-groep per indicator-id (ADR 0010 / FR-1). */
+const PILLAR_GROUP: Record<string, PillarGroup> = {
+  savings_rate: 'rondkomen',
+  budget_discipline: 'rondkomen',
+  emergency_fund: 'buffer',
+  debt_service_ratio: 'schuld',
+  debt_ratio: 'schuld',
+  fire_progress: 'vrijheid',
+  asset_concentration: 'vrijheid',
 }
 
 // ── Pillar action mapping ────────────────────────────────────
@@ -72,13 +129,13 @@ export interface HealthScore {
 // daad plaatsvindt. Sluit aan op de vrijheids-loop (zie tips-lijst).
 
 const PILLAR_ACTION: Record<string, { href: string; label: string }> = {
-  savings_rate:      { href: '/overzicht/cashflow',    label: 'Verhoog je spaarquote' },
-  debt_ratio:        { href: '/overzicht/schulden',    label: 'Versnel je aflossing' },
-  emergency_fund:    { href: '/overzicht/bezittingen', label: 'Bouw je noodfonds' },
-  fire_progress:     { href: '/toekomst',              label: 'Versnel je vrijheid' },
-  diversification:   { href: '/overzicht/bezittingen', label: 'Spreid je vermogen' },
-  budget_discipline: { href: '/overzicht/cashflow',    label: 'Stel je budget bij' },
-  tax_optimization:  { href: '/overzicht/belasting',   label: 'Optimaliseer je belasting' },
+  savings_rate:       { href: '/overzicht/cashflow',    label: 'Verhoog je spaarquote' },
+  budget_discipline:  { href: '/overzicht/cashflow',    label: 'Stel je budget bij' },
+  emergency_fund:     { href: '/overzicht/bezittingen', label: 'Bouw je noodfonds' },
+  debt_service_ratio: { href: '/overzicht/schulden',    label: 'Verlaag je maandlasten' },
+  debt_ratio:         { href: '/overzicht/schulden',    label: 'Versnel je aflossing' },
+  fire_progress:      { href: '/toekomst',              label: 'Versnel je vrijheid' },
+  asset_concentration:{ href: '/overzicht/bezittingen', label: 'Spreid je vermogen' },
 }
 
 // ── Score curves ─────────────────────────────────────────────
@@ -102,6 +159,27 @@ function scoreDebtRatio(totalAssets: number, totalDebts: number): number {
   return Math.round((1 - ratio) * 100)
 }
 
+/**
+ * DSTI — Debt-Service-To-Income (FR-2.2). Maandlasten op schulden als % van het
+ * netto maandinkomen. FHN/Nibud-drempels:
+ *   ≤20%  → 100
+ *   20–36% lineair 100 → 70
+ *   36–43% lineair  70 → 40
+ *   43–60% lineair  40 →  0
+ *   ≥60%  → 0
+ *
+ * Pure curve op het reeds berekende DSTI-percentage. De activatie-logica (geen
+ * schulden → actief 100; schulden zonder inkomen → inactief) zit in de
+ * pijler-assemblage, niet hier.
+ */
+export function scoreDSTI(dstiPercent: number): number {
+  if (dstiPercent <= 20) return 100
+  if (dstiPercent >= 60) return 0
+  if (dstiPercent <= 36) return Math.round(100 - ((dstiPercent - 20) / 16) * 30) // 100 → 70
+  if (dstiPercent <= 43) return Math.round(70 - ((dstiPercent - 36) / 7) * 30)   // 70 → 40
+  return Math.round(40 - ((dstiPercent - 43) / 17) * 40)                          // 40 → 0
+}
+
 /** Noodfonds-dekking: months of expenses covered. 6+ = 100 */
 function scoreEmergencyFund(monthsCovered: number): number {
   if (monthsCovered <= 0) return 0
@@ -116,42 +194,45 @@ function scoreFireProgress(freedomPct: number): number {
   return Math.max(0, Math.min(Math.round(freedomPct), 100))
 }
 
-/** Portefeuille-diversificatie: number of distinct asset types.
- *  1 type = 20, 2 = 40, 3 = 60, 4 = 80, 5+ = 100 */
-function scoreDiversification(assetTypeCount: number): number {
+/**
+ * Vermogensconcentratie (FR-3.2). Grootste asset_type als % van het totaal
+ * vermogen excl. eigen woning. Lager (beter gespreid) = hogere score.
+ *   ≤40%  → 100
+ *   40–70% lineair 100 → 40
+ *   70–90% lineair  40 →  0
+ *   ≥90%  → 0
+ *
+ * @param sharePercent grootste-type-aandeel in procenten (0–100).
+ */
+export function scoreAssetConcentration(sharePercent: number): number {
+  if (sharePercent <= 40) return 100
+  if (sharePercent >= 90) return 0
+  if (sharePercent <= 70) return Math.round(100 - ((sharePercent - 40) / 30) * 60) // 100 → 40
+  return Math.round(40 - ((sharePercent - 70) / 20) * 40)                          // 40 → 0
+}
+
+/**
+ * @deprecated Voedt sinds v2 geen pijler meer (ADR 0010). Blijft als helper voor
+ * het educatieve "diversificatie"-inzicht, buiten de score.
+ * Portefeuille-diversificatie: number of distinct asset types.
+ *  1 type = 20, 2 = 40, 3 = 60, 4 = 80, 5+ = 100
+ */
+export function scoreDiversification(assetTypeCount: number): number {
   if (assetTypeCount <= 0) return 0
   if (assetTypeCount >= 5) return 100
   return Math.round((assetTypeCount / 5) * 100)
 }
 
-/** Budget-discipline: % of budget categories within their limit.
- *  100% within = 100, 50% = 50, etc. */
-function scoreBudgetDiscipline(budgetTotals: DashboardData['budgetTotals']): number {
-  // Count categories that have a budget limit set
-  const categories = [
-    budgetTotals.expense,
-    budgetTotals.savings,
-    budgetTotals.debt,
-  ].filter(c => c.limit > 0)
-
-  if (categories.length === 0) return 70 // no budgets set = neutral-ish
-
-  const withinBudget = categories.filter(c => c.spent <= c.limit).length
-  return Math.round((withinBudget / categories.length) * 100)
-}
-
 /**
- * Tax-optimalisatie-score (Box 3-context).
- * Hybride benadering (zie deep-dive agent-plan):
- *  - Geen Box 3-bezit (<€1.000) → neutraal 50 (geen optimalisatie nodig)
- *  - Anders: blend van vrijstellingsbenutting (40%) + tax-drag (40%) +
- *    allocatie-hygiene (20%, voor nu = 100 want geen partner-optimalisatie-
- *    data in de input)
+ * @deprecated Voedt sinds v2 geen pijler meer (ADR 0010). Blijft als helper voor
+ * het educatieve Box 3-"kans"-inzicht in de kassabon-receipt, buiten de score.
  *
- * Vrijstellingsbenutting: hoe goed wordt heffingsvrij vermogen benut?
- * Tax-drag: belasting als % van bezittingen (lager = beter).
+ * Tax-optimalisatie-score (Box 3-context). Hybride benadering:
+ *  - Geen Box 3-bezit (<€1.000) → neutraal 50
+ *  - Anders: blend van vrijstellingsbenutting (40%) + tax-drag (40%) +
+ *    allocatie-hygiene (20%).
  */
-function scoreTaxOptimization(
+export function scoreTaxOptimization(
   taxData?: HealthScoreInput['taxData'],
 ): number {
   if (!taxData || taxData.box3Bezittingen < 1_000) return 50
@@ -177,6 +258,14 @@ function scoreTaxOptimization(
   return Math.round(vrijstellingScore * 0.4 + dragScore * 0.4 + allocScore * 0.2)
 }
 
+/** Budget-discipline: % of budget categories within their limit. */
+function scoreBudgetDiscipline(budgetCategories: { limit: number; spent: number }[]): number {
+  const categories = budgetCategories.filter(c => c.limit > 0)
+  if (categories.length === 0) return 0 // caller treats no-budget as inactive (FR-5)
+  const withinBudget = categories.filter(c => c.spent <= c.limit).length
+  return Math.round((withinBudget / categories.length) * 100)
+}
+
 // ── Label ────────────────────────────────────────────────────
 
 function getLabel(score: number): string {
@@ -190,18 +279,23 @@ function getLabel(score: number): string {
 // ── Weight redistribution ────────────────────────────────────
 
 /**
- * Base weights voor 7 pillars. Sum > 1.0 wordt automatisch herverdeeld
- * door getRedistributedWeightForSet() — active pillars worden propor-
- * tioneel geschaald. Voor alle 7 actief: tax krijgt ~9.1%, savings ~22.7%, etc.
+ * Basisgewichten voor de 7 v2-indicatoren (som 0.95, ADR 0010 / FR-1). De som
+ * < 1.0 wordt door getRedistributedWeightForSet() automatisch geschaald naar
+ * 1.0 over de ACTIEVE set; inactieve indicatoren (no-data) vallen weg en hun
+ * gewicht wordt proportioneel herverdeeld.
  */
 const BASE_WEIGHTS: Record<string, number> = {
-  savings_rate: 0.25,
-  debt_ratio: 0.20,
-  emergency_fund: 0.15,
-  fire_progress: 0.20,
-  diversification: 0.10,
+  // Rondkomen (0.30)
+  savings_rate: 0.20,
   budget_discipline: 0.10,
-  tax_optimization: 0.10,
+  // Buffer (0.20)
+  emergency_fund: 0.20,
+  // Schuld (0.20)
+  debt_service_ratio: 0.12,
+  debt_ratio: 0.08,
+  // Vrijheid (0.25)
+  fire_progress: 0.18,
+  asset_concentration: 0.07,
 }
 
 /**
@@ -210,12 +304,12 @@ const BASE_WEIGHTS: Record<string, number> = {
  */
 const PILLAR_MODULE_REQUIREMENTS: Record<string, ModuleId | null> = {
   savings_rate: 'budgetteren',
-  debt_ratio: 'vermogensregistratie',
-  emergency_fund: null,          // Always available — core financial health indicator
-  fire_progress: 'toekomstplannen',
-  diversification: 'vermogensregistratie',
   budget_discipline: 'budgetteren',
-  tax_optimization: 'vermogensregistratie',
+  emergency_fund: null,          // Always available — core financial health indicator
+  debt_service_ratio: 'vermogensregistratie',
+  debt_ratio: 'vermogensregistratie',
+  fire_progress: 'toekomstplannen',
+  asset_concentration: 'vermogensregistratie',
 }
 
 /**
@@ -240,7 +334,7 @@ function getActivePillarIds(activeModules?: ModuleId[]): Set<string> {
 /**
  * Compute redistributed weight for a pillar given the set of active pillar IDs.
  * Active pillar weights are scaled proportionally so they sum to 1.0.
- * Returns 0 for pillars not in the active set.
+ * Returns 0 for pillars not in the active set (or when the active set is empty).
  */
 function getRedistributedWeightForSet(pillarId: string, activePillarIds: Set<string>): number {
   if (!activePillarIds.has(pillarId)) return 0
@@ -252,17 +346,57 @@ function getRedistributedWeightForSet(pillarId: string, activePillarIds: Set<str
   return (BASE_WEIGHTS[pillarId] ?? 0) / totalActiveWeight
 }
 
+// ── Pillar builders (shared between input- and DashboardData-paths) ──
+
 /**
- * @deprecated Use `getRedistributedWeightForSet` with an explicit active-pillar set.
- * Kept only to support the legacy `budgetingActive` boolean path when `activeModules`
- * is not provided. Replicates the old 5-vs-6 pillar behaviour exactly.
+ * Construeert een enkele indicator-pijler met de juiste groep-metadata. De
+ * `weight` wordt later toegekend op basis van de actieve set, dus deze builder
+ * laat 'm op 0 staan tot de caller hem invult.
  */
-function getRedistributedWeight(pillarId: string, includeBudget: boolean): number {
-  // The legacy 5-pillar set excludes only budget_discipline; all other pillars stay.
-  const legacyActiveSet = includeBudget
-    ? new Set(Object.keys(BASE_WEIGHTS))
-    : new Set(Object.keys(BASE_WEIGHTS).filter(id => id !== 'budget_discipline'))
-  return getRedistributedWeightForSet(pillarId, legacyActiveSet)
+function makePillar(
+  id: string,
+  name: string,
+  score: number,
+  explanation: string,
+  improvementTip: string,
+  rawValue: string,
+): HealthPillar {
+  const group = PILLAR_GROUP[id]
+  return {
+    id,
+    name,
+    score,
+    weight: 0,
+    explanation,
+    improvementTip,
+    actionHref: PILLAR_ACTION[id].href,
+    actionLabel: PILLAR_ACTION[id].label,
+    rawValue,
+    pillarGroup: group,
+    groupLabel: group ? PILLAR_GROUP_LABELS[group] : undefined,
+  }
+}
+
+/**
+ * Bepaalt de actieve indicator-set: module-gating (activeModules) ∩
+ * data-beschikbaarheid (inactiveByData). Indicatoren zonder betekenisvolle data
+ * worden hier uit de set gehaald zodat hun gewicht wordt herverdeeld (FR-6).
+ */
+function resolveActiveSet(
+  activeModules: ModuleId[] | undefined,
+  budgetingActive: boolean,
+  inactiveByData: Set<string>,
+): Set<string> {
+  const moduleSet: Set<string> = activeModules !== undefined
+    ? getActivePillarIds(activeModules)
+    : new Set(budgetingActive
+        ? Object.keys(BASE_WEIGHTS)
+        : Object.keys(BASE_WEIGHTS).filter(id => id !== 'budget_discipline'))
+  const active = new Set<string>()
+  for (const id of moduleSet) {
+    if (!inactiveByData.has(id)) active.add(id)
+  }
+  return active
 }
 
 // ── Main computation ─────────────────────────────────────────
@@ -270,240 +404,81 @@ function getRedistributedWeight(pillarId: string, includeBudget: boolean): numbe
 /**
  * Compute health score from DashboardData.
  *
+ * ⚠️ NIET CANONIEK. DashboardData draagt geen netto maandinkomen, schuld-
+ * maandlasten of largestAssetTypeShare, dus de v2-indicatoren `debt_service_ratio`
+ * en `asset_concentration` zijn hier per definitie INACTIEF (no-data → gewicht
+ * herverdeeld). Gebruik deze variant NIET voor een gebruiker-zichtbaar totaal —
+ * het canonieke pad is computeHealthScoreFromInputs / computeHealthScoreWithTrend
+ * via buildHealthScoreInput (ADR 0008/0010). Blijft bestaan voor de regressie-
+ * suite `wil-gezondheid` (pijler-scoring per as) en de core-landing-proxy.
+ *
  * @param data - Full dashboard data bundle
  * @param budgetingActive - Whether the user has active budgeting. Kept for
  *   backward compatibility; ignored when `activeModules` is provided.
  * @param activeModules - Optional list of active module IDs. When provided,
  *   only pillars whose required module is in this list (or always-on pillars)
  *   are included, and weights are redistributed proportionally to sum to 1.0.
- *   When omitted, all pillars are included (full backward compat).
  */
 export function computeHealthScore(
   data: DashboardData,
   budgetingActive = true,
   activeModules?: ModuleId[],
 ): HealthScore {
-  const savingsRateScore = scoreSavingsRate(data.savingsRate6m)
-  const debtRatioScore = scoreDebtRatio(data.totalAssets, data.totalDebts)
-  const emergencyScore = scoreEmergencyFund(data.emergencyFund.monthsCovered)
-  const fireScore = scoreFireProgress(data.freedomPct)
-  const diversificationScore = scoreDiversification(data.assetsByType.length)
-  const budgetScore = scoreBudgetDiscipline(data.budgetTotals)
+  // DashboardData lacks the inputs for the two new v2 indicators: concentratie
+  // wordt inactief (null); DSTI volgt het geen-schulden-pad (actief, score 100).
+  const input: HealthScoreInput = {
+    savingsRate6m: data.savingsRate6m,
+    totalAssets: data.totalAssets,
+    totalDebts: data.totalDebts,
+    emergencyFundMonths: data.emergencyFund.monthsCovered,
+    freedomPct: data.freedomPct,
+    netMonthlyIncome: 0,            // not available on DashboardData
+    debtMonthlyPayments: 0,         // 0 = geen-schulden-pad → DSTI actief op 100
+    largestAssetTypeShare: null,    // not available → concentration inactive
+    budgetCategories: [
+      data.budgetTotals.expense,
+      data.budgetTotals.savings,
+      data.budgetTotals.debt,
+    ],
+  }
 
-  // Debt ratio raw value
-  const debtRatio = data.totalAssets > 0
-    ? Math.round((data.totalDebts / data.totalAssets) * 100)
-    : (data.totalDebts > 0 ? 100 : 0)
+  const current = computeHealthScoreFromInputs(input, budgetingActive, activeModules)
 
-  // Budget discipline raw
-  const budgetCategories = [
-    data.budgetTotals.expense,
-    data.budgetTotals.savings,
-    data.budgetTotals.debt,
-  ].filter(c => c.limit > 0)
-  const budgetWithin = budgetCategories.filter(c => c.spent <= c.limit).length
-  const budgetTotal = budgetCategories.length
+  // Previous-month trend from history, on the SAME active set as `current`.
+  if (data.netWorthHistory.length < 2) return current
 
-  // Determine which pillars to include.
-  // When activeModules is provided: use module-aware filtering.
-  // When not provided: fall back to the legacy budgetingActive boolean path
-  // (all 6 pillars vs. 5 pillars with budget_discipline excluded) so existing
-  // callers that pass only budgetingActive continue to work identically.
-  const activePillarSet: Set<string> = activeModules !== undefined
-    ? getActivePillarIds(activeModules)
-    : new Set(budgetingActive
-        ? Object.keys(BASE_WEIGHTS)
-        : Object.keys(BASE_WEIGHTS).filter(id => id !== 'budget_discipline'))
-  // budgetingActive derived from the resolved pillar set (for HealthScore.budgetingActive field)
-  const resolvedBudgetingActive = activePillarSet.has('budget_discipline')
+  const activeIds = new Set(current.pillars.map(p => p.id))
+  const prevNetWorth = data.netWorthHistory[data.netWorthHistory.length - 2]?.value ?? data.netWorth
+  const prevSavingsRate = data.savingsHistory.length >= 2
+    ? data.savingsHistory[data.savingsHistory.length - 2]?.value ?? data.savingsRate6m
+    : data.savingsRate6m
 
-  const allPillars: HealthPillar[] = [
-    {
-      id: 'savings_rate',
-      name: 'Spaarquote',
-      score: savingsRateScore,
-      weight: getRedistributedWeightForSet('savings_rate', activePillarSet),
-      explanation: 'Hoeveel procent van je inkomen spaar je? (6-maands gemiddelde)',
-      improvementTip: data.savingsRate6m < 10
-        ? 'Begin met 10% van je inkomen automatisch opzij te zetten.'
-        : data.savingsRate6m < 20
-        ? 'Bekijk je abonnementen en vaste lasten — kleine besparingen tellen snel op.'
-        : data.savingsRate6m < 30
-        ? 'Je bent op de goede weg! Verhoog bij elke loonsverhoging je spaarpercentage.'
-        : 'Uitstekende spaarquote — blijf dit volhouden.',
-      actionHref: PILLAR_ACTION.savings_rate.href,
-      actionLabel: PILLAR_ACTION.savings_rate.label,
-      rawValue: `${Math.round(data.savingsRate6m)}%`,
-    },
-    {
-      id: 'debt_ratio',
-      name: 'Schuldratio',
-      score: debtRatioScore,
-      weight: getRedistributedWeightForSet('debt_ratio', activePillarSet),
-      explanation: 'Verhouding tussen je schulden en je totale vermogen.',
-      improvementTip: debtRatio > 50
-        ? 'Focus op de duurste schuld eerst (avalanche-methode) om sneller schuldenvrij te worden.'
-        : debtRatio > 20
-        ? 'Overweeg extra aflossingen op je duurste lening.'
-        : debtRatio > 0
-        ? 'Je schuldenlast is beheersbaar. Overweeg herfinanciering voor betere rente.'
-        : 'Schuldenvrij — uitstekend!',
-      actionHref: PILLAR_ACTION.debt_ratio.href,
-      actionLabel: PILLAR_ACTION.debt_ratio.label,
-      rawValue: `${debtRatio}%`,
-    },
-    {
-      id: 'emergency_fund',
-      name: 'Noodfonds',
-      score: emergencyScore,
-      weight: getRedistributedWeightForSet('emergency_fund', activePillarSet),
-      explanation: 'Hoeveel maanden kun je rondkomen van je noodfonds?',
-      improvementTip: data.emergencyFund.monthsCovered < 1
-        ? 'Start met een doel van 1 maand buffer — automatiseer een vaste storting.'
-        : data.emergencyFund.monthsCovered < 3
-        ? 'Bouw naar 3 maanden — zet onverwachte meevallers direct opzij.'
-        : data.emergencyFund.monthsCovered < 6
-        ? 'Bijna op het ideaal van 6 maanden. Elke extra maand geeft meer rust.'
-        : 'Noodfonds compleet — financiële rust als vangnet.',
-      actionHref: PILLAR_ACTION.emergency_fund.href,
-      actionLabel: PILLAR_ACTION.emergency_fund.label,
-      rawValue: `${data.emergencyFund.monthsCovered.toFixed(1)} mnd`,
-    },
-    {
-      id: 'fire_progress',
-      name: 'FIRE-voortgang',
-      score: fireScore,
-      weight: getRedistributedWeightForSet('fire_progress', activePillarSet),
-      explanation: 'Hoever ben je op weg naar financiële vrijheid?',
-      improvementTip: data.freedomPct < 10
-        ? 'Begin klein — elke euro opgebouwd vermogen brengt je dichter bij vrijheid.'
-        : data.freedomPct < 25
-        ? 'Verhoog je maandelijkse inleg in beleggingen voor versneld vermogensopbouw.'
-        : data.freedomPct < 50
-        ? 'Je bent halverwege! Overweeg je spaarquote te optimaliseren.'
-        : data.freedomPct < 75
-        ? 'Sterk op weg — de compound interest werkt steeds harder voor je.'
-        : data.freedomPct < 100
-        ? 'Bijna vrij! Focus op het volhouden van je strategie.'
-        : 'FIRE bereikt — geniet van je financiële vrijheid!',
-      actionHref: PILLAR_ACTION.fire_progress.href,
-      actionLabel: PILLAR_ACTION.fire_progress.label,
-      rawValue: `${Math.round(data.freedomPct)}%`,
-    },
-    {
-      id: 'diversification',
-      name: 'Diversificatie',
-      score: diversificationScore,
-      weight: getRedistributedWeightForSet('diversification', activePillarSet),
-      explanation: 'Spreiding over verschillende vermogenstypes (cash, aandelen, vastgoed, etc.).',
-      improvementTip: data.assetsByType.length <= 1
-        ? 'Spreid je vermogen — overweeg naast cash ook een indexfonds.'
-        : data.assetsByType.length <= 2
-        ? 'Voeg een derde vermogenstype toe, bijvoorbeeld vastgoed of obligaties.'
-        : data.assetsByType.length <= 3
-        ? 'Goede basis — overweeg crypto of fysiek bezit als extra spreiding.'
-        : 'Goed gespreid — monitor je allocatie periodiek.',
-      actionHref: PILLAR_ACTION.diversification.href,
-      actionLabel: PILLAR_ACTION.diversification.label,
-      rawValue: `${data.assetsByType.length} types`,
-    },
-    {
-      id: 'budget_discipline',
-      name: 'Budgetdiscipline',
-      score: budgetScore,
-      weight: getRedistributedWeightForSet('budget_discipline', activePillarSet),
-      explanation: 'Hoeveel van je budgetcategorieën blijven binnen de limiet?',
-      improvementTip: budgetTotal === 0
-        ? 'Stel budgetten in voor je belangrijkste uitgavencategorieën.'
-        : budgetWithin < budgetTotal
-        ? 'Er zijn budgetten overschreden — bekijk de kassabon voor details.'
-        : 'Alle budgetten binnen de limiet — goed gedisciplineerd!',
-      actionHref: PILLAR_ACTION.budget_discipline.href,
-      actionLabel: PILLAR_ACTION.budget_discipline.label,
-      rawValue: budgetTotal > 0 ? `${budgetWithin}/${budgetTotal}` : 'Geen budget',
-    },
-    {
-      id: 'tax_optimization',
-      name: 'Belasting-optimalisatie',
-      // DashboardData heeft geen taxData; pillar krijgt neutrale 50.
-      // computeHealthScoreFromInputs() levert wel taxData wanneer beschikbaar.
-      score: 50,
-      weight: getRedistributedWeightForSet('tax_optimization', activePillarSet),
-      explanation: 'Hoe slim is je vermogen verdeeld over Box 1, 2 en 3?',
-      improvementTip: 'Bekijk je Box 3-positie — vrijstelling, partner-allocatie en heffingsmethode bepalen je jaarlijkse belasting.',
-      actionHref: PILLAR_ACTION.tax_optimization.href,
-      actionLabel: PILLAR_ACTION.tax_optimization.label,
-      rawValue: 'Geen Box 3-data',
-    },
-  ]
-
-  // Retain only active pillars (weight === 0 means the pillar was excluded)
-  const pillars = allPillars.filter(p => activePillarSet.has(p.id))
-
-  // Weighted total
-  const total = Math.round(
-    pillars.reduce((sum, p) => sum + p.score * p.weight, 0)
+  const prevScores: Record<string, number> = {
+    savings_rate: scoreSavingsRate(prevSavingsRate),
+    budget_discipline: scoreBudgetDiscipline(input.budgetCategories),
+    emergency_fund: scoreEmergencyFund(data.emergencyFund.monthsCovered),
+    debt_ratio: scoreDebtRatio(prevNetWorth + data.totalDebts, data.totalDebts),
+    fire_progress: scoreFireProgress(
+      data.fireTarget > 0 ? (prevNetWorth / data.fireTarget) * 100 : data.freedomPct,
+    ),
+    // debt_service_ratio / asset_concentration are inactive on this path.
+  }
+  const previousMonth = Math.round(
+    Array.from(activeIds).reduce(
+      (sum, id) => sum + (prevScores[id] ?? 0) * getRedistributedWeightForSet(id, activeIds),
+      0,
+    ),
   )
-
-  // Previous month estimate from history
-  let previousMonth: number | null = null
-  let trend = 0
-  if (data.netWorthHistory.length >= 2) {
-    const prevNetWorth = data.netWorthHistory[data.netWorthHistory.length - 2]?.value ?? data.netWorth
-    const prevSavingsRate = data.savingsHistory.length >= 2
-      ? data.savingsHistory[data.savingsHistory.length - 2]?.value ?? data.savingsRate6m
-      : data.savingsRate6m
-
-    const prevSavingsScore = scoreSavingsRate(prevSavingsRate)
-    const prevDebtScore = scoreDebtRatio(
-      prevNetWorth + data.totalDebts,
-      data.totalDebts
-    )
-    const prevEmergency = emergencyScore
-    const prevFire = scoreFireProgress(
-      data.fireTarget > 0 ? (prevNetWorth / data.fireTarget) * 100 : data.freedomPct
-    )
-    const prevDiv = diversificationScore
-    const prevBudget = budgetScore
-
-    // Compute previous month score using the same active-pillar set and redistributed weights
-    const prevScores: Record<string, number> = {
-      savings_rate: prevSavingsScore,
-      debt_ratio: prevDebtScore,
-      emergency_fund: prevEmergency,
-      fire_progress: prevFire,
-      diversification: prevDiv,
-      budget_discipline: prevBudget,
-      // tax_optimization: geen historie beschikbaar in DashboardData → proxy
-      // op huidige score (50 want geen taxData hier). Voorkomt trend-discontinuïteit.
-      tax_optimization: 50,
-    }
-    previousMonth = Math.round(
-      Array.from(activePillarSet).reduce(
-        (sum, id) => sum + (prevScores[id] ?? 0) * getRedistributedWeightForSet(id, activePillarSet),
-        0,
-      )
-    )
-    trend = total - previousMonth
-  }
-
-  return {
-    total,
-    label: getLabel(total),
-    pillars,
-    previousMonth,
-    trend,
-    activePillarCount: pillars.length,
-    budgetingActive: resolvedBudgetingActive,
-  }
+  return { ...current, previousMonth, trend: current.total - previousMonth }
 }
 
 // ── Server-side / snapshot-compatible computation ────────────
 // Uses lightweight HealthScoreInput instead of full DashboardData.
-// Returns only { total, label, pillars } — no trend (no history available).
 
 /**
  * Compute health score from lightweight inputs (server-side / snapshot context).
+ * Dé canonieke berekening (ADR 0008/0010). No-data indicatoren worden inactief
+ * en hun gewicht herverdeeld; alle 7 inactief → total 0, label 'Kritiek'.
  *
  * @param input - Lightweight health score inputs
  * @param budgetingActive - Whether the user has active budgeting. Kept for
@@ -511,101 +486,146 @@ export function computeHealthScore(
  * @param activeModules - Optional list of active module IDs. When provided,
  *   only pillars whose required module is active (or always-on pillars) are
  *   included, and weights are redistributed proportionally to sum to 1.0.
- *   When omitted, all pillars are included (full backward compat).
  */
 export function computeHealthScoreFromInputs(
   input: HealthScoreInput,
   budgetingActive = true,
   activeModules?: ModuleId[],
 ): HealthScore {
-  const savingsRateScore = scoreSavingsRate(input.savingsRate6m)
-  const debtRatioScore = scoreDebtRatio(input.totalAssets, input.totalDebts)
-  const emergencyScore = scoreEmergencyFund(input.emergencyFundMonths)
-  const fireScore = scoreFireProgress(input.freedomPct)
-  const diversificationScore = scoreDiversification(input.assetTypeCount)
-  const taxScore = scoreTaxOptimization(input.taxData)
+  // ── Indicator scores + data-availability (inactivation) ──
+  const inactiveByData = new Set<string>()
 
-  // Budget discipline from raw categories
+  // Spaarquote — always has a value (0 is a real score).
+  const savingsRateScore = scoreSavingsRate(input.savingsRate6m)
+
+  // Budgetdiscipline — inactief zonder budgetten (FR-5; geen 70-dummy meer).
   const budgetCats = input.budgetCategories.filter(c => c.limit > 0)
   const budgetWithin = budgetCats.filter(c => c.spent <= c.limit).length
   const budgetTotal = budgetCats.length
-  const budgetScore = budgetTotal === 0 ? 70 : Math.round((budgetWithin / budgetTotal) * 100)
+  const budgetScore = scoreBudgetDiscipline(input.budgetCategories)
+  if (budgetTotal === 0) inactiveByData.add('budget_discipline')
 
+  // Noodfonds — always has a value.
+  const emergencyScore = scoreEmergencyFund(input.emergencyFundMonths)
+
+  // DSTI — geen schulden → actief 100; schulden zonder inkomen → inactief.
+  const dstiPercent = input.netMonthlyIncome > 0
+    ? (input.debtMonthlyPayments / input.netMonthlyIncome) * 100
+    : 0
+  let dstiScore: number
+  if (input.debtMonthlyPayments <= 0) {
+    dstiScore = 100 // geen schuldlast = volledige score
+  } else if (input.netMonthlyIncome > 0) {
+    dstiScore = scoreDSTI(dstiPercent)
+  } else {
+    dstiScore = 0
+    inactiveByData.add('debt_service_ratio') // schulden zonder inkomen → inactief
+  }
+
+  // Schuldratio — always has a value.
+  const debtRatioScore = scoreDebtRatio(input.totalAssets, input.totalDebts)
   const debtRatio = input.totalAssets > 0
     ? Math.round((input.totalDebts / input.totalAssets) * 100)
     : (input.totalDebts > 0 ? 100 : 0)
 
-  // Determine which pillars to include.
-  // When activeModules is provided: use module-aware filtering.
-  // When not provided: fall back to the legacy budgetingActive boolean path
-  // (all 6 pillars vs. 5 pillars with budget_discipline excluded) so existing
-  // callers that pass only budgetingActive continue to work identically.
-  const activePillarSet: Set<string> = activeModules !== undefined
-    ? getActivePillarIds(activeModules)
-    : new Set(budgetingActive
-        ? Object.keys(BASE_WEIGHTS)
-        : Object.keys(BASE_WEIGHTS).filter(id => id !== 'budget_discipline'))
+  // FIRE-voortgang — always has a value.
+  const fireScore = scoreFireProgress(input.freedomPct)
+
+  // Vermogensconcentratie — inactief wanneer largestAssetTypeShare === null.
+  const concentrationPct = input.largestAssetTypeShare != null
+    ? input.largestAssetTypeShare * 100
+    : 0
+  const concentrationScore = input.largestAssetTypeShare != null
+    ? scoreAssetConcentration(concentrationPct)
+    : 0
+  if (input.largestAssetTypeShare == null) inactiveByData.add('asset_concentration')
+
+  // ── Active set (module-gating ∩ data-availability) ──
+  const activePillarSet = resolveActiveSet(activeModules, budgetingActive, inactiveByData)
   const resolvedBudgetingActive = activePillarSet.has('budget_discipline')
 
+  // ── Build pillars ──
   const allPillars: HealthPillar[] = [
-    {
-      id: 'savings_rate',
-      name: 'Spaarquote',
-      score: savingsRateScore,
-      weight: getRedistributedWeightForSet('savings_rate', activePillarSet),
-      explanation: 'Hoeveel procent van je inkomen spaar je? (6-maands gemiddelde)',
-      improvementTip: input.savingsRate6m < 10
+    makePillar(
+      'savings_rate',
+      'Spaarquote',
+      savingsRateScore,
+      'Hoeveel procent van je inkomen spaar je? (6-maands gemiddelde)',
+      input.savingsRate6m < 10
         ? 'Begin met 10% van je inkomen automatisch opzij te zetten.'
         : input.savingsRate6m < 20
         ? 'Bekijk je abonnementen en vaste lasten — kleine besparingen tellen snel op.'
         : input.savingsRate6m < 30
         ? 'Je bent op de goede weg! Verhoog bij elke loonsverhoging je spaarpercentage.'
         : 'Uitstekende spaarquote — blijf dit volhouden.',
-      actionHref: PILLAR_ACTION.savings_rate.href,
-      actionLabel: PILLAR_ACTION.savings_rate.label,
-      rawValue: `${Math.round(input.savingsRate6m)}%`,
-    },
-    {
-      id: 'debt_ratio',
-      name: 'Schuldratio',
-      score: debtRatioScore,
-      weight: getRedistributedWeightForSet('debt_ratio', activePillarSet),
-      explanation: 'Verhouding tussen je schulden en je totale vermogen.',
-      improvementTip: debtRatio > 50
-        ? 'Focus op de duurste schuld eerst (avalanche-methode) om sneller schuldenvrij te worden.'
-        : debtRatio > 20
-        ? 'Overweeg extra aflossingen op je duurste lening.'
-        : debtRatio > 0
-        ? 'Je schuldenlast is beheersbaar. Overweeg herfinanciering voor betere rente.'
-        : 'Schuldenvrij — uitstekend!',
-      actionHref: PILLAR_ACTION.debt_ratio.href,
-      actionLabel: PILLAR_ACTION.debt_ratio.label,
-      rawValue: `${debtRatio}%`,
-    },
-    {
-      id: 'emergency_fund',
-      name: 'Noodfonds',
-      score: emergencyScore,
-      weight: getRedistributedWeightForSet('emergency_fund', activePillarSet),
-      explanation: 'Hoeveel maanden kun je rondkomen van je noodfonds?',
-      improvementTip: input.emergencyFundMonths < 1
+      `${Math.round(input.savingsRate6m)}%`,
+    ),
+    makePillar(
+      'budget_discipline',
+      'Budgetdiscipline',
+      budgetScore,
+      'Hoeveel van je budgetcategorieën blijven binnen de limiet?',
+      budgetTotal === 0
+        ? 'Stel budgetten in voor je belangrijkste uitgavencategorieën.'
+        : budgetWithin < budgetTotal
+        ? 'Er zijn budgetten overschreden — bekijk de kassabon voor details.'
+        : 'Alle budgetten binnen de limiet — goed gedisciplineerd!',
+      budgetTotal > 0 ? `${budgetWithin}/${budgetTotal}` : 'Geen budget',
+    ),
+    makePillar(
+      'emergency_fund',
+      'Noodfonds',
+      emergencyScore,
+      'Hoeveel maanden kun je rondkomen van je noodfonds?',
+      input.emergencyFundMonths < 1
         ? 'Start met een doel van 1 maand buffer — automatiseer een vaste storting.'
         : input.emergencyFundMonths < 3
         ? 'Bouw naar 3 maanden — zet onverwachte meevallers direct opzij.'
         : input.emergencyFundMonths < 6
         ? 'Bijna op het ideaal van 6 maanden. Elke extra maand geeft meer rust.'
         : 'Noodfonds compleet — financiële rust als vangnet.',
-      actionHref: PILLAR_ACTION.emergency_fund.href,
-      actionLabel: PILLAR_ACTION.emergency_fund.label,
-      rawValue: `${input.emergencyFundMonths.toFixed(1)} mnd`,
-    },
-    {
-      id: 'fire_progress',
-      name: 'FIRE-voortgang',
-      score: fireScore,
-      weight: getRedistributedWeightForSet('fire_progress', activePillarSet),
-      explanation: 'Hoever ben je op weg naar financiële vrijheid?',
-      improvementTip: input.freedomPct < 10
+      `${input.emergencyFundMonths.toFixed(1)} mnd`,
+    ),
+    makePillar(
+      'debt_service_ratio',
+      'Schuldenlast',
+      dstiScore,
+      'Welk deel van je netto maandinkomen gaat naar schuldaflossing?',
+      input.debtMonthlyPayments <= 0
+        ? 'Geen schuldlast — al je inkomen blijft beschikbaar.'
+        : dstiPercent > 43
+        ? 'Je maandlasten zijn hoog t.o.v. je inkomen — verlaag de duurste schuld eerst.'
+        : dstiPercent > 36
+        ? 'Je zit boven de comfortabele grens (36%) — bekijk herfinanciering of extra aflossing.'
+        : dstiPercent > 20
+        ? 'Beheersbaar, maar elke euro minder maandlast geeft meer ruimte.'
+        : 'Lage maandlasten — gezonde verhouding tot je inkomen.',
+      input.debtMonthlyPayments <= 0
+        ? 'Geen schulden'
+        : input.netMonthlyIncome > 0
+        ? `${Math.round(dstiPercent)}%`
+        : 'Geen inkomen',
+    ),
+    makePillar(
+      'debt_ratio',
+      'Schuldratio',
+      debtRatioScore,
+      'Verhouding tussen je schulden en je totale vermogen.',
+      debtRatio > 50
+        ? 'Focus op de duurste schuld eerst (avalanche-methode) om sneller schuldenvrij te worden.'
+        : debtRatio > 20
+        ? 'Overweeg extra aflossingen op je duurste lening.'
+        : debtRatio > 0
+        ? 'Je schuldenlast is beheersbaar. Overweeg herfinanciering voor betere rente.'
+        : 'Schuldenvrij — uitstekend!',
+      `${debtRatio}%`,
+    ),
+    makePillar(
+      'fire_progress',
+      'FIRE-voortgang',
+      fireScore,
+      'Hoever ben je op weg naar financiële vrijheid?',
+      input.freedomPct < 10
         ? 'Begin klein — elke euro opgebouwd vermogen brengt je dichter bij vrijheid.'
         : input.freedomPct < 25
         ? 'Verhoog je maandelijkse inleg in beleggingen voor versneld vermogensopbouw.'
@@ -616,69 +636,35 @@ export function computeHealthScoreFromInputs(
         : input.freedomPct < 100
         ? 'Bijna vrij! Focus op het volhouden van je strategie.'
         : 'FIRE bereikt — geniet van je financiële vrijheid!',
-      actionHref: PILLAR_ACTION.fire_progress.href,
-      actionLabel: PILLAR_ACTION.fire_progress.label,
-      rawValue: `${Math.round(input.freedomPct)}%`,
-    },
-    {
-      id: 'diversification',
-      name: 'Diversificatie',
-      score: diversificationScore,
-      weight: getRedistributedWeightForSet('diversification', activePillarSet),
-      explanation: 'Spreiding over verschillende vermogenstypes (cash, aandelen, vastgoed, etc.).',
-      improvementTip: input.assetTypeCount <= 1
-        ? 'Spreid je vermogen — overweeg naast cash ook een indexfonds.'
-        : input.assetTypeCount <= 2
-        ? 'Voeg een derde vermogenstype toe, bijvoorbeeld vastgoed of obligaties.'
-        : input.assetTypeCount <= 3
-        ? 'Goede basis — overweeg crypto of fysiek bezit als extra spreiding.'
+      `${Math.round(input.freedomPct)}%`,
+    ),
+    makePillar(
+      'asset_concentration',
+      'Vermogensspreiding',
+      concentrationScore,
+      'Hoe sterk leunt je vermogen op één type bezit? (excl. eigen woning)',
+      input.largestAssetTypeShare == null
+        ? 'Bouw eerst vermogen op — spreiding wordt relevant vanaf ±€10.000.'
+        : concentrationPct > 70
+        ? 'Je vermogen is sterk geconcentreerd — overweeg te spreiden over meer typen.'
+        : concentrationPct > 40
+        ? 'Redelijk gespreid — een extra vermogenstype verlaagt je risico verder.'
         : 'Goed gespreid — monitor je allocatie periodiek.',
-      actionHref: PILLAR_ACTION.diversification.href,
-      actionLabel: PILLAR_ACTION.diversification.label,
-      rawValue: `${input.assetTypeCount} types`,
-    },
-    {
-      id: 'budget_discipline',
-      name: 'Budgetdiscipline',
-      score: budgetScore,
-      weight: getRedistributedWeightForSet('budget_discipline', activePillarSet),
-      explanation: 'Hoeveel van je budgetcategorieën blijven binnen de limiet?',
-      improvementTip: budgetTotal === 0
-        ? 'Stel budgetten in voor je belangrijkste uitgavencategorieën.'
-        : budgetWithin < budgetTotal
-        ? 'Er zijn budgetten overschreden — bekijk de kassabon voor details.'
-        : 'Alle budgetten binnen de limiet — goed gedisciplineerd!',
-      actionHref: PILLAR_ACTION.budget_discipline.href,
-      actionLabel: PILLAR_ACTION.budget_discipline.label,
-      rawValue: budgetTotal > 0 ? `${budgetWithin}/${budgetTotal}` : 'Geen budget',
-    },
-    {
-      id: 'tax_optimization',
-      name: 'Belasting-optimalisatie',
-      score: taxScore,
-      weight: getRedistributedWeightForSet('tax_optimization', activePillarSet),
-      explanation: 'Hoe slim is je vermogen verdeeld over Box 1, 2 en 3?',
-      improvementTip: !input.taxData || input.taxData.box3Bezittingen < 1_000
-        ? 'Voeg Box 3-data toe om je belasting-optimalisatie te zien.'
-        : taxScore >= 80
-        ? 'Sterk benut — heffingsvrij en allocatie staan goed.'
-        : taxScore >= 50
-        ? 'Bekijk partner-allocatie of switch tussen forfaitair/werkelijk.'
-        : 'Hoge tax-drag — kijk naar groene beleggingen of partner-verdeling.',
-      actionHref: PILLAR_ACTION.tax_optimization.href,
-      actionLabel: PILLAR_ACTION.tax_optimization.label,
-      rawValue: !input.taxData || input.taxData.box3Bezittingen < 1_000
-        ? 'Geen Box 3'
-        : `€${Math.round(input.taxData.box3Tax)}/jaar`,
-    },
+      input.largestAssetTypeShare == null
+        ? 'Te weinig vermogen'
+        : `${Math.round(concentrationPct)}% in 1 type`,
+    ),
   ]
 
-  // Retain only active pillars
-  const pillars = allPillars.filter(p => activePillarSet.has(p.id))
+  // Assign redistributed weights and retain only the active indicators.
+  const pillars = allPillars
+    .filter(p => activePillarSet.has(p.id))
+    .map(p => ({ ...p, weight: getRedistributedWeightForSet(p.id, activePillarSet) }))
 
-  const total = Math.round(
-    pillars.reduce((sum, p) => sum + p.score * p.weight, 0)
-  )
+  // Weighted total (0 when no active pillars — no divide-by-zero).
+  const total = pillars.length === 0
+    ? 0
+    : Math.round(pillars.reduce((sum, p) => sum + p.score * p.weight, 0))
 
   return {
     total,
@@ -689,6 +675,56 @@ export function computeHealthScoreFromInputs(
     activePillarCount: pillars.length,
     budgetingActive: resolvedBudgetingActive,
   }
+}
+
+/**
+ * Canonieke gezondheidsscore MÉT maand-op-maand-trend.
+ *
+ * Het "huidige" getal is exact `computeHealthScoreFromInputs(input, …)` — de
+ * ÉNE canonieke berekening (ADR 0008/0010). De trend wordt afgeleid door dezelfde
+ * canonieke functie nogmaals te draaien op een "vorige maand"-input (prev-month
+ * vermogen → freedomPct/schuldratio, prev-month spaarquote), op DEZELFDE actieve
+ * set. Zo blijft er één bron voor de pijler-scores; de trend is een afgeleide,
+ * geen tweede berekenpad.
+ *
+ * Bedoeld voor surfaces die wél historie hebben (dashboard-widget). Surfaces
+ * zonder historie (snapshot-routes, /toekomst) gebruiken computeHealthScore-
+ * FromInputs rechtstreeks (trend = 0).
+ */
+export function computeHealthScoreWithTrend(
+  input: HealthScoreInput,
+  budgetingActive: boolean,
+  history: {
+    /** Vorige-maand netto vermogen (voor freedomPct + schuldratio-proxy). */
+    prevNetWorth: number | null
+    /** Vorige-maand spaarquote-%; valt terug op huidige savingsRate6m. */
+    prevSavingsRate: number | null
+    /** Canonieke benodigde portfolio (noemer freedomPct); valt terug op fireTarget. */
+    requiredPortfolio: number | null
+  },
+  activeModules?: ModuleId[],
+): HealthScore {
+  const current = computeHealthScoreFromInputs(input, budgetingActive, activeModules)
+
+  if (history.prevNetWorth == null || history.requiredPortfolio == null || history.requiredPortfolio <= 0) {
+    return current
+  }
+
+  // Vorige-maand freedomPct op DEZELFDE noemer als de canonieke voortgang.
+  const prevFreedomPct = Math.max(
+    0,
+    Math.min((history.prevNetWorth / history.requiredPortfolio) * 100, 100),
+  )
+  const prevInput: HealthScoreInput = {
+    ...input,
+    freedomPct: prevFreedomPct,
+    savingsRate6m: history.prevSavingsRate ?? input.savingsRate6m,
+    // Schuldratio-proxy: prev-month vermogen met huidige schuld.
+    totalAssets: history.prevNetWorth + input.totalDebts,
+  }
+  const prev = computeHealthScoreFromInputs(prevInput, budgetingActive, activeModules).total
+
+  return { ...current, previousMonth: prev, trend: current.total - prev }
 }
 
 /** Get health label from a numeric score (for use with snapshot data) */

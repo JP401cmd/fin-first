@@ -1,14 +1,26 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
+import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
+import {
+  buildHealthScoreInput,
+  type HealthScoreAsset,
+  type HealthScoreBudget,
+  type HealthScoreTransaction,
+} from '@/lib/health-score-input'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
-import { mapDbRows } from '@/lib/db-mapper'
+import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
-
-const SWR = 0.04
+import {
+  weightedAssetTotal,
+  weightedDebtTotal,
+  computeSnapshotNetWorth,
+  computeSnapshotFreedomPct,
+  type SnapshotAsset,
+  type SnapshotDebt,
+} from './snapshot-math'
 
 /**
  * GET /api/snapshots
@@ -34,20 +46,30 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Fetch essential budgets to compute freedom_percentage for each snapshot
-  const { data: essentialBudgets } = await supabase
-    .from('budgets')
-    .select('default_limit, interval')
-    .eq('user_id', user.id)
-    .eq('is_essential', true)
-    .in('budget_type', ['expense'])
-    .is('parent_id', null)
+  // Fetch essential budgets + profile to compute freedom_percentage for each
+  // snapshot. SWR komt uit resolveFireParams (gepersonaliseerd) — identiek aan
+  // het POST-schrijfpad, zodat GET-enrichment en POST hetzelfde fire_target geven.
+  const [budgetsRes, profileRes] = await Promise.all([
+    supabase
+      .from('budgets')
+      .select('default_limit, interval')
+      .eq('user_id', user.id)
+      .eq('is_essential', true)
+      .in('budget_type', ['expense'])
+      .is('parent_id', null),
+    supabase
+      .from('profiles')
+      .select('expected_return, inflation_rate')
+      .eq('id', user.id)
+      .single(),
+  ])
 
-  const yearlyMustExpenses = (essentialBudgets ?? []).reduce((s, b) => {
+  const yearlyMustExpenses = (budgetsRes.data ?? []).reduce((s, b) => {
     const limit = Number(b.default_limit) || 0
     return s + (b.interval === 'yearly' ? limit : limit * 12)
   }, 0)
-  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / NL_SWR : 0
+  const fireSwr = resolveFireParams(profileRes.data ?? {}).effectiveSwr
+  const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
 
   // Enrich snapshots with computed freedom_percentage.
   // NB: bewuste afwijking van de canonieke vrijheidsvoortgang
@@ -62,9 +84,7 @@ export async function GET() {
     const totalAssets = Number(s.total_assets)
     const totalDebts = Number(s.total_debts)
     const computedNetWorth = totalAssets - totalDebts
-    const freedom_percentage = fireTarget > 0
-      ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
-      : 0
+    const freedom_percentage = computeSnapshotFreedomPct(netWorth, fireTarget)
 
     return {
       ...s,
@@ -103,7 +123,19 @@ export async function POST() {
   const sixMonthsAgo = localMonthStart(new Date(now.getFullYear(), now.getMonth() - 5, 1))
   const { start: monthStart, end: monthEnd } = localMonthBounds(now)
 
-  const [assetsResult, debtsResult, expensesResult, incomeResult, profileResult, budgetsResult] = await Promise.all([
+  // Brondata identiek aan /api/snapshots/auto (zelfde queries/kolommen), zodat
+  // de handmatige POST exact dezelfde, canonieke health-score- en net_worth-
+  // berekening draait als de auto/cron-schrijfpaden.
+  const [
+    assetsResult,
+    debtsResult,
+    expensesResult,
+    incomeResult,
+    profileResult,
+    budgetsResult,
+    monthTxResult,
+    bankAccountsResult,
+  ] = await Promise.all([
     supabase
       .from('assets')
       .select('id, name, asset_type, current_value, monthly_contribution, net_worth_inclusion_pct')
@@ -111,7 +143,7 @@ export async function POST() {
       .eq('is_active', true),
     supabase
       .from('debts')
-      .select('id, name, debt_type, current_balance, net_worth_inclusion_pct')
+      .select('id, name, debt_type, current_balance, net_worth_inclusion_pct, interest_rate, monthly_payment, repayment_type, end_date, start_date, include_aflossing_in_savings, custom_aflossing_amount')
       .eq('user_id', user.id)
       .eq('is_active', true),
     supabase
@@ -130,16 +162,28 @@ export async function POST() {
       .lt('date', monthEnd),
     supabase
       .from('profiles')
-      .select('date_of_birth, expected_return, inflation_rate')
+      .select('date_of_birth, expected_return, inflation_rate, household_type')
       .eq('id', user.id)
       .single(),
+    // Alle budgetten (alle types, parents + children) — must-expenses + health.
     supabase
       .from('budgets')
-      .select('default_limit, interval')
+      .select('id, parent_id, budget_type, default_limit, interval, is_essential')
+      .eq('user_id', user.id),
+    // Huidige-maand-transacties met budget_id voor budget-discipline.
+    supabase
+      .from('transactions')
+      .select('amount, budget_id')
       .eq('user_id', user.id)
-      .eq('is_essential', true)
-      .in('budget_type', ['expense'])
-      .is('parent_id', null),
+      .gte('date', monthStart)
+      .lt('date', monthEnd),
+    // Niet-gekoppelde bankrekeningen voor unlinkedCash.
+    supabase
+      .from('bank_accounts')
+      .select('balance')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .is('linked_asset_id', null),
   ])
 
   if (assetsResult.error) {
@@ -149,30 +193,32 @@ export async function POST() {
     return NextResponse.json({ error: debtsResult.error.message }, { status: 500 })
   }
 
-  // Keep raw rows for captureBalanceSnapshots (expects snake_case)
-  const rawAssets = assetsResult.data ?? []
-  const rawDebts = debtsResult.data ?? []
-
-  // Map DB rows to camelCase for local processing
-  const assets = mapDbRows(rawAssets)
-  const debts = mapDbRows(rawDebts)
+  const assets = assetsResult.data ?? []
+  const debts = debtsResult.data ?? []
   const expenses = expensesResult.data ?? []
   const income = incomeResult.data ?? []
 
-  const totalAssets = assets.reduce((s, a) => s + Number(a.currentValue), 0)
-  const totalDebts = debts.reduce((s, d) => s + Number(d.currentBalance), 0)
-  const netWorth = totalAssets - totalDebts
+  // Canoniek opgeslagen net_worth: inclusion-gewogen assets + losse cash
+  // − inclusion-gewogen debts (spiegelt dashboard-loader; gedeeld met auto/cron).
+  const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+  const weightedAssets = weightedAssetTotal(assets as SnapshotAsset[])
+  const totalDebts = weightedDebtTotal(debts as SnapshotDebt[])
+  const totalAssets = weightedAssets + unlinkedCash
+  const netWorth = computeSnapshotNetWorth(weightedAssets, unlinkedCash, totalDebts)
 
   const yearlyExpenses = Math.abs(expenses.reduce((s, t) => s + Number(t.amount), 0))
   const monthlyExpenses = yearlyExpenses / 12
   const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0) / 6
-  const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthlyContribution || 0), 0)
+  const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution || 0), 0)
 
-  // Essential budgets for yearly "must" expenses
-  const yearlyMustExpenses = (budgetsResult.data ?? []).reduce((s, b) => {
-    const limit = Number(b.default_limit) || 0
-    return s + (b.interval === 'yearly' ? limit : limit * 12)
-  }, 0)
+  // Essential budgets for yearly "must" expenses (parents-only, expense, essentieel).
+  const allBudgets = budgetsResult.data ?? []
+  const yearlyMustExpenses = allBudgets
+    .filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
+    .reduce((s, b) => {
+      const limit = Number(b.default_limit) || 0
+      return s + (b.interval === 'yearly' ? limit : limit * 12)
+    }, 0)
 
   const fireParams = resolveFireParams(profileResult.data ?? {})
   const fireSwr = fireParams.effectiveSwr
@@ -187,10 +233,8 @@ export async function POST() {
   // snapshot vereisen (grote ombouw) en de per-rij kolom-consistentie breken
   // (deze waarde landt 1-op-1 in de freedom_percentage-kolom van diezelfde rij).
   // Daarom: snapshot-historie = eigen, gedocumenteerde definitie. Bewust twee
-  // grondslagen.
-  const freedomPercentage = fireTarget > 0
-    ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
-    : 0
+  // grondslagen — identiek aan auto/cron (ADR 0009-uitzondering).
+  const freedomPercentage = computeSnapshotFreedomPct(netWorth, fireTarget)
 
   // Compute FIRE projection (includes fire_age, savings_rate)
   const dateOfBirth = profileResult.data?.date_of_birth ?? null
@@ -207,24 +251,50 @@ export async function POST() {
 
   // Compute sovereignty level
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
-  const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debtType) && Number(d.currentBalance) > 0)
+  const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)
   const sovereigntyLevel = computeSovereigntyLevel(netWorth, monthlyExpenses, freedomPercentage, hasConsumerDebt)
 
-  // Compute 6-pillar health score (replaces old 4-pillar resilience)
+  // Schuldaflossing voor de spaarquote-correctie (zelfde logica als auto).
+  let debtAflossing6m = 0
+  for (const d of debts as Debt[]) {
+    if (!d.include_aflossing_in_savings) continue
+    const aflossing = d.custom_aflossing_amount != null
+      ? Number(d.custom_aflossing_amount)
+      : (computeRenteAflossingsSplit(d)?.currentAflossing ?? 0)
+    debtAflossing6m += aflossing * ((d.net_worth_inclusion_pct ?? 100) / 100)
+  }
+
+  // Compute 6/7-pillar health score via het CANONIEKE gedeelde input-bouwpad
+  // (lib/health-score-input.ts) — exact dezelfde functie als de live loader en
+  // de auto/cron-routes. Echte noodfonds-maanden, budgetCategories en Box 3-
+  // taxData i.p.v. proxies (was: assets×0.3, lege budgetCategories, geen taxData),
+  // zodat de opgeslagen resilience_score ≈ de live score (SSoT, ADR 0008).
   const savingsRate6m = monthlyIncome > 0
-    ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100
+    ? ((monthlyIncome - monthlyExpenses + debtAflossing6m) / monthlyIncome) * 100
     : 0
-  const emergencyFundMonths = monthlyExpenses > 0 ? totalAssets * 0.3 / monthlyExpenses : 0
-  const assetTypes = new Set((assets as { assetType?: string }[]).map(a => a.assetType).filter(Boolean))
-  const healthScore = computeHealthScoreFromInputs({
-    savingsRate6m,
-    totalAssets,
-    totalDebts,
-    emergencyFundMonths,
-    freedomPct: freedomPercentage,
-    assetTypeCount: assetTypes.size,
-    budgetCategories: [], // budget spending not available in snapshot context
-  })
+  // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
+  const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
+  const healthScore = computeHealthScoreFromInputs(
+    buildHealthScoreInput(
+      {
+        savingsRate6m,
+        totalAssets: weightedAssets + unlinkedCash,
+        totalDebts,
+        freedomPct: freedomPercentage,
+        avgMonthlyExpenses: monthlyExpenses,
+        // Zelfde inkomensbron als savingsRate6m (income/6) — DSTI-noemer.
+        netMonthlyIncome: monthlyIncome,
+      },
+      {
+        assets: assets as HealthScoreAsset[],
+        unlinkedCash,
+        budgets: allBudgets as HealthScoreBudget[],
+        transactions: (monthTxResult.data ?? []) as HealthScoreTransaction[],
+        householdType: profileResult.data?.household_type ?? null,
+        debtMonthlyPayments,
+      },
+    ),
+  )
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -245,9 +315,12 @@ export async function POST() {
     sovereignty_level: sovereigntyLevel,
     savings_rate: Math.round(fireProjection.savingsRate * 10) / 10,
     // Note: resilience_score column is retained for historical data continuity.
-    // It now stores the 6-pillar health score (from computeHealthScore) instead of
-    // the old 4-pillar resilience score (from the deprecated computeResilienceScore).
+    // It now stores the v2 4-pijler/7-indicator gezondheidsscore (ADR 0010).
     resilience_score: healthScore.total,
+    // Methode-versie van de opgeslagen score (ADR 0010 / FR-7). DEFAULT 1 op de
+    // kolom; v2-snapshots schrijven expliciet 2 zodat de trendlijn de
+    // methodewissel kan markeren bij een mix v1/v2.
+    score_version: 2,
   }
 
   // Try upsert with extended fields first
@@ -278,7 +351,7 @@ export async function POST() {
   }
 
   // Capture per-entity balance snapshots (fire-and-forget, non-critical)
-  captureBalanceSnapshots(supabase, user.id, today, rawAssets, rawDebts).catch(() => {})
+  captureBalanceSnapshots(supabase, user.id, today, assets, debts).catch(() => {})
 
   return NextResponse.json({
     snapshot: {

@@ -53,7 +53,7 @@ type NavCard = {
   label: string
   href: string
   Icon: LucideIcon
-  /** Tailwind text+bg-tint voor de icon-chip, bv. 'text-violet-700 bg-violet-50'. */
+  /** Tailwind text+bg-tint voor de icon-chip, bv. 'text-horizon-700 bg-horizon-50'. */
   tint: string
   kpi: string
   status: LeverageStatus
@@ -203,7 +203,7 @@ export function buildNavCards({
       label: 'Doelen',
       href: '/toekomst/doelen',
       Icon: Target,
-      tint: 'text-violet-700 bg-violet-50',
+      tint: 'text-horizon-700 bg-horizon-50',
       kpi: countKpi(doelen.activeCount, 'doel', 'doelen'),
       status: doelen.status,
       subText: doelenSubText,
@@ -213,7 +213,7 @@ export function buildNavCards({
       label: 'Gebeurtenissen',
       href: '/toekomst/gebeurtenissen',
       Icon: CalendarClock,
-      tint: 'text-amber-700 bg-amber-50',
+      tint: 'text-horizon-700 bg-horizon-50',
       kpi: countKpi(eventCount, 'gebeurtenis', 'gebeurtenissen'),
       status: 'neutral',
       subText: next ?? 'Nog niets gepland',
@@ -223,7 +223,7 @@ export function buildNavCards({
       label: 'Voorkeuren',
       href: '/toekomst/voorkeuren',
       Icon: SlidersHorizontal,
-      tint: 'text-sky-700 bg-sky-50',
+      tint: 'text-horizon-700 bg-horizon-50',
       kpi: strategy.name,
       status: 'neutral',
       subText: `${withdrawalName} · SWR ${formatPct(fireParams.effectiveSwr)}`,
@@ -233,7 +233,7 @@ export function buildNavCards({
       label: 'Rekenhulp',
       href: '/toekomst/rekenhulp',
       Icon: Calculator,
-      tint: 'text-emerald-700 bg-emerald-50',
+      tint: 'text-horizon-700 bg-horizon-50',
       kpi: countKpi(calcCount, 'rekenhulp', 'rekenhulpen'),
       status: 'neutral',
       subText: calcCount > 0 ? 'Nieuwe met Will' : 'Nog geen rekenhulpen',

@@ -1,11 +1,110 @@
 # Audit: eenduidige gegevens in TriFinity
 
-**Datum:** 2026-06-10 (gereviewd tegen de werkboom van vandaag, incl. opschoonronde en UI/UX-ronde)
+**Ronde 1:** 2026-06-10 (loaders/engines; fixronde diezelfde dag afgerond — zie §4)
+**Ronde 2:** 2026-06-12 (volledig: app-pagina's, widgets, AI/briefing, periferie/snapshots — zie hieronder)
 **Vraag:** Welke kerngetallen worden op meerdere plekken berekend/getoond, is er per getal een canonieke bron, en zijn afwijkende getallen gerechtvaardigd?
 
-Alle regelnummers zijn handmatig geverifieerd in de huidige werkboom. Elke claim heeft een bronlink zodat je hem zelf kunt controleren.
+Alle regelnummers zijn handmatig geverifieerd in de werkboom van de betreffende ronde. Elke claim heeft een bronlink zodat je hem zelf kunt controleren.
 
 ---
+
+# RONDE 2 — 2026-06-12: app, widgets en AI
+
+**Scope:** vier parallelle deelaudits (AI/briefing, widgets, rekenmotoren/loaders, periferie/snapshots) tegen de canonieke bronnen en de verse ADR's 0008 (gezondheidsgetal) en 0009 (vrijheidsvoortgang). Alle 🔴-bevindingen zijn daarna handmatig in de bron geverifieerd.
+
+> **STATUS FIXRONDE — golf 1 uitgevoerd 2026-06-12 (zelfde dag):** alle dertien 🔴-bevindingen uit §R2.1 zijn gefixt via vier werkpakketten (snapshots-familie incl. nieuwe gedeelde `app/api/snapshots/snapshot-math.ts`; sovereignty/widgets/hero + `DashboardData.healthScore`+`fireEligibleNetWorth` via `computeHealthScoreWithTrend`; AI-randen report/whatif/briefing/freedom-card/next-steps; maandgrenzen + ESLint-vangrail). Bewijs: tsc schoon, **3352 vitest groen**, lint 0 errors, **security-gate PASS**, **code-review SHIP** (review-opvolging M1/m1/m2/n2 doorgevoerd: JSDoc-eerlijkheid compute-*-access, noemer-comments horizon-client, freedom-card-teller óók op FIRE-eligible + over-fetch getrimd; m3/n1 geaccepteerd als bewuste benadering/cosmetisch). Uit §R2.2 zijn meegenomen: **S4 ✅** (snapshot-net_worth identiek over 3 routes), **S6 ✅** (report-vensters), **S9 ✅** (vangrail, als `warn` — legde 45 bestaande TZ-sites buiten scope bloot; promotie naar `error` na migratie) en de briefing-/checkin-/notifications-dagbasis uit S1.
+> **STATUS GOLF 2 — uitgevoerd 2026-06-12 (zelfde dag, 3 werkpakketten):**
+> - **S1 ✅** — één gedeelde `dailyExpenseRate` in `lib/format.ts` (×12/365, test-first); ~25 sites gemigreerd (loader-velden, 14 widgets, check-in-pagina's, household box2/box3-routes, horizon-client); AI 30/360-terugconversies (`tax-context`, `aandachtspunten-context`, `freedom-calc`-tool) op `calculateFreedomTime`. Bewust overgeslagen: `/30.44`-kalenderwiskunde (inflatie-koopkracht), `freedom-time-label.tsx` (al /365, eigen output-formaat — consolidatie-kandidaat).
+> - **S2 ✅** — schaduw-`NL_SWR=0.04` in `portfolio-summary` weg (passief inkomen was ~39% te hoog; "4%"-displaytekst nu dynamisch); `computeEffectiveSwr` als enige formule-home in `lib/fire-params.ts` (swr-monitor-widget hergebruikt 'm); `HOUSEHOLD_SWR` 0.035→`NL_SWR` (comment was feitelijk onjuist); 0.04-hardcodes in phase-analysis/scenarios-modal → effectiveSwr/NL_SWR; `pensioen-aow-widget` kapitaliseert op SWR i.p.v. grossReturn (was ~2,4× te laag); catalogus-label gecorrigeerd.
+> - **S3 ✅** — drie inline spaarquote-kopieën → `savingsRateFromAggregates` + `computeDebtAflossingMonthly`, equivalentie bewezen in `lib/savings-source.test.ts`.
+> - **S5 ✅** — `freedom-calc` op `calculateFreedomTime` (+ must-vs-totaal in tool-description); `lookup` budget-aggregatie via nieuwe gedeelde `lib/budget-spending.ts` (is_income/transfers uit, parent-rollup — spiegelt budgets-loader).
+> - **S7-deels ✅** — pensioen-aow/swr-monitor/box3-drag (magic 0.0643/0.0212 → constants) /belasting-box3 (vrijstelling uit `BOX3_PARAMS`, kassabon eerlijk gelabeld "enkel forfait") /nibud (geen nep-per-categorie-signaal meer, eerlijk totaal-signaal). Rest van S7 (horizon-context `projectPortfolio`, shared-context `expectedFireDate`-loop, subscriptions 3m-proxy) bewust open — illustratief gelabelde tweede paden.
+> - **S9 ✅ afgerond** — alle 45 vangrail-sites gemigreerd (echte query-bounds naar `localMonthBounds`/`localMonthStartMonthsAgo`/nieuwe `localMonthEnd`; één gedocumenteerde disable voor een gedragsneutrale demo-fixture); regel gepromoveerd naar **`error`** (+ `files`-scoping die een latente flat-config-crash op niet-Next-extensies dicht). `eslint .` = 0 errors.
+> - Bijvangst: `snapshots/balances` gecheckt — ongewogen is daar semantisch juist (per-entiteit saldolijn, geen aggregaat); `next-steps`-select bleek al minimaal.
+> - **Nog open (bewust):** S7-rest en S8 (briefing-guard-verstrakking, dode FIRE-directive, box3 `year:2025`-hardcode), S10 (module-gating-tak horizon-loader, budgeting-active-defaults-doc, `freedom-milestones` dode code), `eurToFreedomTime`-consolidatie, what-if `downsize`/`reverse_mortgage` virtuele housing-events (groter ontwerpwerk), `fireBasis`-bedrading in layout (productbesluit: hot-path-query vs motivatie-only getal).
+> - ⚠️ Verificatie-context: tijdens golf 2 draaide een **parallelle sessie** (gezondheidsscore v2-herontwerp) die `lib/financial-health.ts`/`lib/health-score-input.ts` ombouwt; de workspace-brede tsc was daardoor tijdelijk rood op vijf v2-callers. Alle golf 2-bestanden zijn per pakket tsc-schoon geverifieerd; de v2-sessie trekt haar eigen callers bij.
+
+## R2.0 Kernbeeld
+
+De **engine-laag en de hoofd-loaders zijn gezond**: `freedomPct` loopt op dashboard, horizon én AI shared-context via `computeFreedomProgress` op de FIRE-eligible grondslag; het gezondheidsgetal loopt in loader, client-recompute en de auto/cron-snapshots via `buildHealthScoreInput`; de check-in is en blijft geünificeerd. De drift zit in de **randen**: widgets die bundel-waarden negeren en zelf herrekenen, AI-/rapport-/share-routes met eigen FIRE-formules, één snapshot-route die ADR 0008 heeft gemist, en een systemische tweedeling in de €→tijd-dagbasis (/30 vs /365).
+
+Belangrijke correctie op de eigen documentatie: **ADR 0009 regel 23 is verouderd** — `lib/ai/context/shared-context.ts` gebruikt `computeFreedomProgress` al (commit `b088ebb2b`, 2026-06-12, geverifieerd op regel 83-103). En **ADR 0008 overclaimt**: niet "alle drie" snapshot-schrijfpaden zijn gemigreerd — de handmatige POST niet (R2.1).
+
+## R2.1 🔴 Geverifieerde drift (gebruiker ziet/krijgt een ander getal dan canoniek)
+
+### Gezondheidsgetal (ADR 0008-gaten)
+
+1. **`app/api/snapshots/route.ts` (POST) is NIET gemigreerd naar `buildHealthScoreInput`** — [`route.ts:214-227`](../app/api/snapshots/route.ts#L214): noodfonds-proxy `totalAssets × 0.3` (`:217`), `budgetCategories: []` (`:226`), geen `taxData`, spaarquote = periode-cijfer zonder 6m/spaarbudget/aflossing (`:214-216`). Import op `:4` haalt alleen `computeHealthScoreFromInputs`, niet `buildHealthScoreInput`. De route schrijft `resilience_score` via upsert op `user_id,snapshot_date` (`:250`, `:259`) — draait hij ná auto/cron op dezelfde dag, dan **overschrijft een proxy-score de canonieke score**. Exact het gat dat ADR 0008 claimde te dichten ("alle drie snapshot-schrijfpaden" — feitelijk twee van de drie). Ook het opgeslagen `net_worth` is hier ongewogen (`:162-164`, geen `inclusion_pct`, geen losse cash).
+2. **`gezondheids-score-widget` toont een andere score dan /toekomst** — [`gezondheids-score-widget.tsx:329`](../components/widgets/gezondheids-score-widget.tsx#L329) gebruikt de `DashboardData`-variant `computeHealthScore`, waarvan de `tax_optimization`-pijler **hardcoded 50** is ([`financial-health.ts:428-430`](../lib/financial-health.ts#L428)), terwijl de doelpagina `/toekomst` `computeHealthScoreFromInputs` mét echte `taxData` draait ([`horizon-data-loader.ts` ±r644]). De widget-CTA linkt naar precies de pagina waarvan het getal kan afwijken.
+
+### Vrijheidsvoortgang (ADR 0009-gaten)
+
+3. **Sovereignty-niveau ("Jouw Pad") rekent op de oude grondslag** — [`dashboard-data-loader.ts:821-825`](../lib/dashboard-data-loader.ts#L821): `sovFreedomPct = vol netWorth ÷ (3m-uitgaven×12 / NL_SWR)` — vol vermogen incl. huis, vaste `NL_SWR` i.p.v. `effectiveSwr`, geen `computeFreedomProgress`. Voedt `computeSovereigntyLevel` → niveau/fase-weergave. Zelfde familie: [`compute-feature-access.ts:92`](../lib/compute-feature-access.ts#L92) en [`compute-module-access.ts:174`](../lib/compute-module-access.ts#L174) (eigen freedomPct op `NL_SWR` resp. `0.04`). Motivatie-weergave (geen gating), maar een huiseigenaar krijgt een te hoog niveau terwijl de voortgangsbalk ernaast de correcte (lagere) waarde toont. Staat niet in ADR 0009's uitzonderingenlijst.
+4. **`vrijheidsvoortgang-widget` + `vrijheidsmijlpalen-widget` herberekenen het percentage zelf** — [`vrijheidsvoortgang-widget.tsx:34-37`](../components/widgets/vrijheidsvoortgang-widget.tsx#L34) en [`vrijheidsmijlpalen-widget.tsx:42-45`](../components/widgets/vrijheidsmijlpalen-widget.tsx#L42): `min(netWorth / effectiveFire × 100, 100)` met **vol `netWorth`** als teller; de canonieke `data.freedomPct` is slechts fallback. Bij housing-strategie exclude/downsize wijkt de widget af van /toekomst én van de aftelling. Zelfde patroon in de horizon-hero: [`horizon-client.tsx` ±r1284]. De fallback-volgorde is omgekeerd: canoniek hoort primair.
+
+### AI & rapport (Will noemt een ander getal dan het scherm)
+
+5. **AI-rapport rekent FIRE zelf** — [`report/route.ts:302-308`](../app/api/report/route.ts#L302): `fireTarget = yearlyMustExpenses / NL_SWR` (negeert gebruikers-`effectiveSwr` uit `resolveFireParams`), `firePercentage` op vol vermogen zonder housing-filter (oude grondslag), `fireAge` via fallback-engine met `monthly_contribution`-som i.p.v. `resolveSavingsSource`. Het naastgelegen `report/persoonlijk-plan` is wél volledig canoniek — dé referentie voor de fix.
+6. **What-if-baseline ≠ /toekomst-baseline** — [`whatif-page-client.tsx:441-447`](../app/(app)/horizon/whatif/whatif-page-client.tsx#L441): `assets: fullAssets` (geen `filterAssetsForFire`) en `annualSavings = monthlyContributions × 12` (geen `resolveSavingsSource`-prioriteit zoals `use-horizon-fire-sim.ts:116-120`). De baseline-FIRE-leeftijd (en dus elke "+X maanden"-delta) wijkt af van /toekomst, en landt via `scenarioContext` ook in de AI-chat ([`app/api/ai/chat/route.ts` ±r96]). Bekend open punt ("whatif nog niet geünificeerd") — hiermee herbevestigd en geconcretiseerd.
+7. **Briefing-spaarquote ≠ cashflow-pagina** — [`briefing/engine.ts:529-556`](../lib/briefing/engine.ts#L529): 1-maands `(inkomen − uitgaven) / inkomen`, gepresenteerd als "Je spaart X% van je inkomen" / "Je spaarquote is X%" (`:545`, `:553`) — zonder spaarbudgetten, zonder aflossing, zonder 6m-venster. De cashflow-pagina toont `savingsRate6m`. Zelfde maand-quote in de redactie-metrics ([`redactie.ts` ±r91]). `savingsRate6m` zit al in `DashboardData` maar wordt niet aan de briefing-input doorgegeven.
+8. **Share/freedom-card** — [`freedom-card/route.ts:63-65`](../app/api/share/freedom-card/route.ts#L63): ongewogen `netWorth` (selecteert `net_worth_inclusion_pct` niet eens, geen losse cash), [`:79-81`](../app/api/share/freedom-card/route.ts#L79): `fireTarget = 1-maands-uitgaven × 12 / NL_SWR` → gedeelde kaart toont ander vermogen en vrijheids-% dan de app.
+9. **Next-steps "FIRE-doel niet haalbaar"** — [`next-steps/route.ts:152-160`](../app/api/next-steps/route.ts#L152): klassieke `SWR = 0.04` (uit `constants.ts:26`, niet `NL_SWR` en niet `effectiveSwr`), ongewogen vermogen, 1-maands inkomen/uitgaven → de haalbaarheidstegel oordeelt op een ~28% lager FIRE-doel dan /toekomst.
+
+### Maandgrenzen (regressies/gemiste sites t.o.v. fixronde 2026-06-10)
+
+10. **`notifications/route.ts:146-147`** — `monthStart.toISOString().split('T')[0]` op lokale datum (TZ-trap) in de budget-alert-queries. Daarnaast in dezelfde route: horizon-trigger op impliciete 25× jaaruitgaven + ongewogen vermogen (±r782-810) en partner-vrijheidstijd op `/daysInMonth` met handgerolde formatter (±r563-617).
+11. **`checkin/aandachtspunten/route.ts:35-37`** — `new Date(jaar, maand, 1).toISOString().slice(0,10)` (TZ-trap; de zuster-routes gebruiken wél `localMonthBounds`) + dagtarief `totalMonthlyExpenses / 30` (`:87`).
+
+### Widgets met verzonnen constanten/data
+
+12. **`box3-drag-widget`** — [`box3-drag-widget.tsx:145`](../components/widgets/box3-drag-widget.tsx#L145), `:157`, `:67`: magic constanten `0.0643` en `0.0212` die nergens in `lib/` bestaan; canoniek is `NL_FICTIEF_BELEGGINGEN = 0.0588` en `BOX3_DRAG ≈ 0.0212` (`lib/constants.ts:53/59`). Het "Fictief rendement"-bedrag (×0.0643, zonder vrijstelling/splitsing) is overschat en inconsistent met de headline die wél uit de bundel komt. De 5-jaars-projectie is een widget-eigen Box 3-model.
+13. **`nibud-benchmark-widget`** — [`nibud-benchmark-widget.tsx:25-36`](../components/widgets/nibud-benchmark-widget.tsx#L25): per-categorie "actual" = `norm × (totalSpent / 2000)` → elke categorie staat op exact hetzelfde %-van-norm; de balkjes suggereren echte vergelijking maar reflecteren geen categorie-data (terwijl de heatmap-data al in de bundel zit).
+
+## R2.2 🟡 Systemische patronen en risico's
+
+| # | Patroon | Plekken (file:line) | Canoniek | Opmerking |
+|---|---|---|---|---|
+| S1 | **€→tijd-dagbasis tweedeling: `/30` (=jaar/360) naast `/365`** | briefing [`engine.ts:462-465`](../lib/briefing/engine.ts#L462); ~10 kern-widgets (`netto-vermogen:41`, `cash-flow:225`, `spaarquote:96`, `assets:49`, `schulden:46`, `vaste-lasten:72`, `noodfonds:30`, `budgetten:311`, e.a.); [`assets-data-loader.ts:102`](../lib/assets-data-loader.ts#L102); AI [`tax-context.ts:22-25`](../lib/ai/context/tax-context.ts#L22) + `aandachtspunten-context.ts:18-25` (30/360-terugconversie); `notifications` partner-pad | `calculateFreedomTime` met dagtarief `jaar/365` ([`format.ts:109`](../lib/format.ts#L109), [`core-metrics.ts:273`](../lib/core-metrics.ts#L273)) | ~1,4% afwijking + must-vs-totaal-verschil; klein per plek maar overal nét anders. Remedie: één gedeelde dagtarief-helper en alle sites daarop. |
+| S2 | **SWR-wildgroei** | [`portfolio-summary.tsx:66`](../components/core/holdings/portfolio-summary.tsx#L66) — **lokale `const NL_SWR = 0.04`** die de echte NL_SWR (≈0.02883) schaduwt → passief inkomen ~39% te hoog; [`household-projection.ts:230-231`](../lib/household-projection.ts#L230) `HOUSEHOLD_SWR = 0.035` met **onjuiste comment** ("consistent met NL_SWR"); `0.04`-hardcodes in `phase-analysis/*` en `scenarios-modal.tsx:67`; [`calculations.ts:186`](../lib/architecture/calculations.ts#L186) documenteert NL_SWR als "4%" (stale) | `resolveFireParams().effectiveSwr` / `NL_SWR` uit `lib/constants.ts` | Vier verschillende SWR-waarden in omloop (0.04 / 0.035 / 0.02883 / per-user). |
+| S3 | **Spaarquote-formule als inline-kopie ×3** | `dashboard-data-loader.ts:511-513`, `horizon-data-loader.ts:521-523`, `core-data-loader.ts:865` | `savingsRateFromAggregates` ([`savings-source.ts:67`](../lib/savings-source.ts#L67)) — check-in doet het al goed | Formule-equivalent vandaag, drift-gevoelig morgen. |
+| S4 | **Snapshot-`net_worth` onderling verschillend** | POST `:162-164` en cron ±r175-177 ongewogen; auto ±r128-130 gewogen; losse cash ontbreekt overal in het opgeslagen `net_worth` | inclusion-gewogen + losse cash (`dashboard-data-loader.ts:243-255`) | Plus: opgeslagen `resilience_score` erft de snapshot-freedomPct (oude grondslag) terwijl live de nieuwe gebruikt — bewust (trend-historie), maar verdient één expliciete zin in ADR 0008. |
+| S5 | **AI-tools rekenen lokaal** | [`freedom-calc.ts:20-26`](../lib/ai/tools/freedom-calc.ts#L20) eigen jaar/maand/dag-breakdown (`%30`) i.p.v. `calculateFreedomTime` + must-vs-totaal noemerkeuze; [`lookup.ts:71-85`](../lib/ai/tools/lookup.ts#L71) eigen budget-spent-aggregatie zonder `is_income`/parent-rollup | `lib/format.ts` / budgets-loader-aggregatie | Maandgrenzen in beide tools wél correct (`localMonthBounds`). |
+| S6 | **Report-windows** | `report/balans:145`, `report/vermogen:624-625`, `report/budget:151` — 12m-ondergrens via lokale `toISOString()` | `localMonthBounds` | Impact begrensd (gemiddelde-venster), wel de verboden bug-klasse. |
+| S7 | **Tweede projectie-paden (informatief)** | `horizon-context.ts:80-86` (`projectPortfolio`, 5-jaars, geen Box3/strategie); `shared-context.ts:113` `expectedFireDate` uit `computeCoreData`-loop; `subscriptions/advice:103` 3-maands dagtarief-proxy; `pensioen-aow-widget:28-29,73` kapitaliseert AOW op `grossReturn` i.p.v. SWR (~2,4× te laag equivalent); `swr-monitor-widget:52` dupliceert de `effectiveSwr`-formule (nu identiek); `belasting-box3-widget:16,96-104` vrijstelling hardcoded + enkel-forfait-kassabon vs dual-forfait-pagina; `inflatie-impact`/`beleggingsrendement`/`holdings` widget-eigen illustratieve berekeningen | `runUnifiedProjection` / `resolveFireParams` / `calculateBox3` | Per stuk verdedigbaar als illustratie, maar nergens als zodanig gelabeld. |
+| S8 | **Briefing-details** | nummer-guard substring-soepel (`redactie.ts:131-154`); dode FIRE-directive (`directives.ts:245` parst een string die geen builder emit); Box 3 in bundel hardcoded `year:2025`/`hasPartner:false` (`dashboard-data-loader.ts:751-768`) | — | Guard is fail-closed (goed), maar eenheid-blind. |
+| S9 | **Vangrail ontbreekt** | geen lint-regel/test tegen nieuwe `new Date(y,m,…).toISOString()`-maandgrenzen | `localMonthBounds` | Open uit ronde 1; bevindingen 10-11 bewijzen dat regressie zonder vangrail terugkomt. |
+| S10 | **Klein** | `horizon-data-loader.ts:356-361` mist de module-gating-tak (vandaag gedragsneutraal — `activeModules` is altijd alles); `budgeting-active` lees-default true vs schrijf-default false (documenteren); `freedom-milestones.ts` dode code | — | — |
+
+## R2.3 🟢 Geverifieerd consistent (en opgelost sinds ronde 1)
+
+- **AI shared-context is canoniek** — [`shared-context.ts:83-103`](../lib/ai/context/shared-context.ts#L83): `getFireEligibleNetWorth` + `computeFreedomProgress`, FIRE-doel op dezelfde noemer, met ADR 0009-comment. De "open follow-up" in ADR 0009 r23 en de MEMORY-index was stale — gefixt in commit `b088ebb2b` (2026-06-12).
+- **Loaders-freedomPct** — dashboard (`:718-728`) en horizon (±r585-592) beide via `computeFreedomProgress` op `fireEligibleNetWorth`; milestone-notificaties (`milestone-fire-near/reached`) vuren op de nieuwe grondslag.
+- **Gezondheidsgetal-hoofdpad** — loader, client-recompute en snapshots **auto + cron** via `buildHealthScoreInput`; `resilience_score` wordt nergens als huidig getal gelezen (alleen trend).
+- **Check-in** — gespreksstarters/overview blijven volledig geünificeerd (6m + transfers-uit + inclusion-weging + jaar/365 + `localMonthBounds` + `effectiveSwr`); `fire-age.ts` is bewust een simpelere schatter, gedocumenteerd in de file-header.
+- **AI-context maandgrenzen** — `lookup`, `kern-context`, `wil-context`, `budget-insights-context`: de fix van 2026-06-10 staat er nog (geen regressie).
+- **Meerderheid van de widgets** consumeert netjes bundel-velden (o.a. vrijheidsscenario's, sim-vermogenspad, backtesting, surplus-gap, maand/weekoverzicht, heatmap, trends) — de volledige 26-widget-tabel staat in het ronde 2-deelrapport (widgets-audit).
+- **`report/persoonlijk-plan`**, `daily-expense-rate`, `export`, `command-palette` (toont bewust geen bedragen) — canoniek/schoon.
+- **`perspective-loader-server.ts`** is een pure cache-wrapper (geen eigen formule); **`budgeting-active.ts`** centraliseert het schrijfpad i.p.v. een tweede waarheid te maken; **`household-projection`** maandgrens-bug uit ronde 1 is opgelost (lokale componenten, gedocumenteerd), eigen motor blijft bewust (ADR 0009).
+- **Berekeningen-view** dekt `computeFreedomProgress` én `buildHealthScoreInput` (alleen het NL_SWR-label is stale, zie S2).
+
+## R2.4 Aanbevolen aanpak (prioriteit)
+
+1. **ADR 0008 afmaken** — `snapshots/route.ts` POST naar `buildHealthScoreInput` (of de health-score-tak van deze route schrappen); meteen het opgeslagen `net_worth` over de drie routes gelijktrekken (inclusion-gewogen + losse cash) en de ADR-zin over de fire-pijler-input toevoegen (S4).
+2. **ADR 0009 afmaken** — (a) sovereignty-pad (`dashboard-data-loader.ts:821-825`, `compute-feature-access`, `compute-module-access`) op `computeFreedomProgress`; (b) `vrijheidsvoortgang`/`vrijheidsmijlpalen`-widgets + horizon-hero: canonieke `freedomPct` primair, eigen som weg.
+3. **Gezondheids-widget** op de canonieke score (bundel-veld via `buildHealthScoreInput`, of `taxData` in de DashboardData-variant).
+4. **AI-randen** — `report/route.ts` op de canonieke engines (kopieer het `persoonlijk-plan`-patroon); what-if-baseline op `resolveSavingsSource` + `filterAssetsForFire`; briefing `savingsRate6m` doorgeven; `freedom-card` en `next-steps` op `resolveFireParams` + gewogen vermogen.
+5. **Eén dagtarief-helper** (jaar/365) en alle `/30`-sites + 30/360-terugconversies daarop (S1) — dit raakt óók de AI-contexten en de briefing.
+6. **SWR-sanering** (S2): `portfolio-summary` schaduw-constante weg, `HOUSEHOLD_SWR`-comment corrigeren, 0.04-hardcodes naar `resolveFireParams`, `calculations.ts`-label.
+7. **Maandgrenzen** — `checkin/aandachtspunten`, `notifications`, report-windows naar `localMonthBounds` + de lint-vangrail (S9) zodat dit de laatste keer is.
+8. **Klein** — box3-drag-constanten naar `lib/constants.ts`, nibud-widget echte data of expliciet "schatting"-label, spaarquote-inline-kopieën naar `savingsRateFromAggregates`, freedom-calc/lookup-tools naar gedeelde helpers.
+
+## R2.5 Methodologie ronde 2
+
+Vier parallelle read-only deelaudits (AI-oppervlakken, widgets, rekenmotoren/loaders, periferie/snapshots) met de canonieke bronnen als meegegeven "wet". Alle dertien 🔴-bevindingen zijn daarna handmatig in de bron geverifieerd (file:line opnieuw opgezocht in de werkboom van 2026-06-12, incl. uncommitted wijzigingen); de 🟡-tabel steunt deels op de deelaudit-verificaties. Twee agent-claims zijn daarbij gecorrigeerd of genuanceerd: de "shared-context oude grondslag"-aanname uit ADR 0009/MEMORY bleek achterhaald (commit `b088ebb2b`), en de module-gating-omissie in horizon-data-loader is vandaag gedragsneutraal (geen 🔴).
+
+---
+
+# RONDE 1 — 2026-06-10 (historie)
 
 ## 1. Overzicht per gegeven (met bron)
 

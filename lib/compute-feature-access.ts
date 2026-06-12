@@ -47,6 +47,26 @@ export type FinancialInput = {
   /** Active subscription add-ons */
   activeSubscriptions: ActiveSubscriptions
   userFeaturePrefs: Record<string, boolean> | null  // user toggles
+  /**
+   * Canonieke vrijheidsgrondslag (ADR 0009) — optioneel.
+   * Wanneer een caller de canonieke waarden al heeft (FIRE-eligible vermogen
+   * met huis-filter, en de per-gebruiker effectiveSwr uit resolveFireParams),
+   * geeft hij die hier door zodat het sovereignty-niveau exact dezelfde
+   * grondslag deelt als de voortgangsbalk en de aftelling. Ontbreekt dit blok,
+   * dan valt de berekening terug op vol netWorth ÷ doel op NL_SWR — dezelfde
+   * fallback-SWR die resolveFireParams zonder profiel teruggeeft (≈2,88%),
+   * niet de stale 4%. Sovereignty is puur motivatie (ADR 0001), geen gating.
+   *
+   * NB: de productiecaller (app/(app)/layout.tsx) geeft fireBasis bewust NIET
+   * door — dat zou woz/linked-asset-kolommen aan een hot-path-query toevoegen
+   * voor een motivatie-only getal. Het gebruikerszichtbare "Jouw Pad"-niveau
+   * komt uit lib/dashboard-data-loader.ts, dat WÉL de canonieke freedomPct
+   * gebruikt. Dit pad is dus alleen volledig canoniek mét fireBasis.
+   */
+  fireBasis?: {
+    fireEligibleNetWorth: number
+    effectiveSwr: number
+  }
   /** @deprecated Use activeSubscriptions instead — kept for backward compat */
   commercialTier?: CommercialTier
 }
@@ -87,9 +107,16 @@ export function computeFeatureAccess(input: FinancialInput): FeatureAccessData {
     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
   const monthlyExpenses = expenses / 3
 
+  // Vrijheidsgrondslag op de canonieke formule-basis (ADR 0009): FIRE-eligible
+  // vermogen (huis gefilterd via housing-strategie) ÷ doel op de per-gebruiker
+  // effectiveSwr. Caller geeft `fireBasis` door wanneer hij die heeft; anders
+  // vol netWorth ÷ doel op NL_SWR (de no-profile-fallback van resolveFireParams,
+  // ≈2,88% — niet de stale 4%).
   const yearlyExpenses = monthlyExpenses * 12
-  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / NL_SWR : 0
-  const freedomPct = fireTarget > 0 ? (netWorth / fireTarget) * 100 : 0
+  const swr = input.fireBasis?.effectiveSwr ?? NL_SWR
+  const freedomNumerator = input.fireBasis?.fireEligibleNetWorth ?? netWorth
+  const fireTarget = yearlyExpenses > 0 ? yearlyExpenses / swr : 0
+  const freedomPct = fireTarget > 0 ? (freedomNumerator / fireTarget) * 100 : 0
 
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
   const hasConsumerDebt = debts.some(d => consumerDebtTypes.includes(d.debt_type) && Number(d.current_balance) > 0)

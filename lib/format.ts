@@ -68,6 +68,36 @@ export function formatMaskedCurrency(
 }
 
 /**
+ * Canonieke dagtarief-conversie: maanduitgaven → dagelijkse uitgaven (€/dag).
+ *
+ * Dé enige toegestane €→vrijheidstijd-dagbasis in de app. Deelt jaaruitgaven
+ * door 365 — niet maanduitgaven door 30. Het verschil is subtiel maar reëel:
+ *
+ *   - Canoniek  (×12/365): maandbedrag × 12 maanden / 365 dagen
+ *   - Fout (/30):          maandbedrag / 30  ⇒ impliciet jaar = 12 × 30 = 360 dagen
+ *
+ * /30 onderschat het dagtarief met ~1,4% (365/360 − 1), waardoor de
+ * vrijheidstijd dezelfde fractie té lang oogt. `calculateFreedomTime` en
+ * `lib/core-metrics.ts` (regel 273) rekenen al op /365; deze helper is de
+ * gedeelde bron zodat élk oppervlak (widgets, loaders, AI) identiek rekent.
+ *
+ * Let op: dit verandert alléén de dag-conversie (×12/365), niet wélke
+ * uitgaven-basis een oppervlak kiest (essentieel/"must" vs. totaal blijft per
+ * oppervlak bewust verschillend — zie de FIRE-grondslag).
+ *
+ * @param monthlyExpenses - Maandelijkse uitgaven in EUR
+ * @returns Dagelijkse uitgaven in EUR (0 voor niet-positieve/niet-eindige input)
+ *
+ * @example
+ * dailyExpenseRate(3000) // 98.63  (≠ 100 die /30 zou geven)
+ */
+export function dailyExpenseRate(monthlyExpenses: number): number {
+  const safe = safeNumber(monthlyExpenses)
+  if (safe <= 0) return 0
+  return (safe * 12) / 365
+}
+
+/**
  * Freedom time breakdown from a EUR amount and daily expenses.
  */
 export interface FreedomTimeBreakdown {
