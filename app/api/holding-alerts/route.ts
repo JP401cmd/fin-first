@@ -6,7 +6,9 @@ export type HoldingAlertType = 'price_above' | 'price_below' | 'return_threshold
 export type HoldingAlert = {
   id: string
   user_id: string
-  holding_id: string | null
+  /** Typed FK's sinds migratie 20260502000004 — precies één is gezet. */
+  investment_holding_id: string | null
+  crypto_holding_id: string | null
   type: HoldingAlertType
   threshold: number
   is_active: boolean
@@ -19,6 +21,10 @@ export type HoldingAlert = {
  * GET /api/holding-alerts?holding_id=<uuid>
  *
  * List active alerts for a specific holding or all holdings.
+ *
+ * NB: het API-contract spreekt nog `holding_id` (de client op de holdings-
+ * detailpagina stuurt dat veld); de route vertaalt dat naar de typed kolom
+ * `investment_holding_id` — de legacy DB-kolom is gedropt en gaf 400's.
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -37,7 +43,7 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
 
   if (holdingId) {
-    query = query.eq('holding_id', holdingId)
+    query = query.eq('investment_holding_id', holdingId)
   }
 
   const { data: alerts, error } = await query
@@ -75,17 +81,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `type must be one of: ${validTypes.join(', ')}` }, { status: 400 })
     }
 
-    // For rebalance_drift, holding_id is optional (portfolio-wide)
-    // For price/return alerts, holding_id is required
-    if (type !== 'rebalance_drift' && !holding_id) {
-      return NextResponse.json({ error: 'holding_id is required for price and return alerts' }, { status: 400 })
+    // De DB-CHECK (holding_alerts_one_typed_fk) eist precies één typed FK —
+    // óók voor rebalance_drift; de UI stuurt altijd een holding mee, dus
+    // portfolio-breed zonder holding is geen geldig insert-pad meer.
+    if (!holding_id) {
+      return NextResponse.json({ error: 'holding_id is required' }, { status: 400 })
     }
 
     const { data: alert, error } = await supabase
       .from('holding_alerts')
       .insert({
         user_id: user.id,
-        holding_id: holding_id || null,
+        investment_holding_id: holding_id,
         type,
         threshold: Number(threshold),
         is_active: true,

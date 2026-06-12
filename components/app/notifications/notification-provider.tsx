@@ -52,12 +52,37 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Initial fetch + polling every 60s
+  // Initial fetch + polling every 10 min — bewust ruim (egress-reductie jun
+  // 2026): geen enkele notificatie hier is realtime-kritisch (budgetstatus,
+  // weekbriefing, jaarlijkse reminders). De poll pauzeert volledig wanneer
+  // de tab verborgen is; bij terugkeren volgt direct één verse fetch zodat
+  // de bel actueel voelt. Handmatig verversen kan altijd via `refresh()`.
   useEffect(() => {
+    const startPolling = () => {
+      if (intervalRef.current) return
+      intervalRef.current = setInterval(fetchNotifications, 600_000)
+    }
+    const stopPolling = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        stopPolling()
+      } else {
+        fetchNotifications()
+        startPolling()
+      }
+    }
+
     fetchNotifications()
-    intervalRef.current = setInterval(fetchNotifications, 60_000)
+    if (document.visibilityState !== 'hidden') startPolling()
+    document.addEventListener('visibilitychange', handleVisibility)
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [fetchNotifications])
 

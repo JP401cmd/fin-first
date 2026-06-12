@@ -33,6 +33,21 @@ export type Notification = {
   metadata?: Record<string, unknown>
 }
 
+// ── Langzame-checks cache ────────────────────────────────────────────
+// Egress-reductie (jun 2026): de poll draait per gebruiker elke 10 min en
+// deed ~22 queries per request. De checks die hooguit dagelijks/wekelijks
+// iets nieuws opleveren (sync-warnings, WOZ/pensioen-jaarreminders,
+// weekbriefing, level-up, budgetmodel-voorstellen, horizon- en
+// holding-alerts) worden hier per gebruiker 15 min gecached. Vers per poll
+// blijven alleen: read-state/prefs, budgetstatus en partner-transacties.
+//
+// Module-level Map = per serverproces (zelfde patroon als de idempotency-
+// cache in app/api/holdings/route.ts). Op serverless betekent dat hooguit
+// dubbele berekening per lambda — alle checks zijn idempotent en de
+// jaarlijkse/wekelijkse reminders zijn zelf al gegate via app_settings.
+const SLOW_CHECKS_TTL_MS = 15 * 60_000
+const slowChecksCache = new Map<string, { computedAt: number; items: Notification[] }>()
+
 // ── GET — Aggregate all active notifications ─────────────────────────
 
 export async function GET(request: NextRequest) {
@@ -87,6 +102,13 @@ export async function GET(request: NextRequest) {
     const notifications: Notification[] = []
     const now = new Date().toISOString()
 
+    // Langzame checks: cache-hit → secties 4/4b/4c/5/6b/7/8 overslaan en de
+    // gecachte items hergebruiken (read-state wordt bij de merge vers
+    // afgeleid). `slow` vangt de pushes van die secties op een cache-miss.
+    const cachedSlow = slowChecksCache.get(user.id)
+    const computeSlow = !cachedSlow || Date.now() - cachedSlow.computedAt >= SLOW_CHECKS_TTL_MS
+    const slow: Notification[] = []
+
     // Accept optional `days` query parameter (default: 7, clamped 1–90)
     const daysParam = request.nextUrl.searchParams.get('days')
     const days = daysParam ? Math.max(1, Math.min(90, parseInt(daysParam, 10) || 7)) : 7
@@ -124,10 +146,13 @@ export async function GET(request: NextRequest) {
         .gte('date', monthStart.toISOString().split('T')[0])
         .lt('date', monthEnd.toISOString().split('T')[0])
         .not('budget_id', 'is', null),
+      // NB: budget_amounts heeft géén user_id-kolom — RLS scopet via de
+      // budgets-join (zelfde patroon als lib/budgets-data-loader.ts). Het
+      // eerdere .eq('user_id', …) gaf elke poll een 400 waardoor effectieve
+      // limieten stil terugvielen op default_limit.
       supabase
         .from('budget_amounts')
-        .select('budget_id, effective_from, amount')
-        .eq('user_id', user.id),
+        .select('budget_id, effective_from, amount'),
       supabase
         .from('budget_rollovers')
         .select('budget_id, carried_amount')
@@ -265,10 +290,12 @@ export async function GET(request: NextRequest) {
 
     // ── 4. Sync warnings (stale bank accounts) ───────────────────────
 
-    const { data: bankAccounts } = await supabase
-      .from('bank_connection_accounts')
-      .select('id, iban, last_synced_at')
-      .eq('is_active', true)
+    const { data: bankAccounts } = computeSlow
+      ? await supabase
+          .from('bank_connection_accounts')
+          .select('id, iban, last_synced_at')
+          .eq('is_active', true)
+      : { data: null }
 
     if (bankAccounts) {
       const threeDaysAgo = new Date()
@@ -283,7 +310,7 @@ export async function GET(request: NextRequest) {
         const label = account.iban ? account.iban.replace(/(.{4})/g, '$1 ').trim().slice(-9) : 'Bankrekening'
         const id = `sync_${account.id}`
 
-        notifications.push({
+        slow.push({
           id,
           type: 'sync',
           priority: 2,
@@ -304,7 +331,7 @@ export async function GET(request: NextRequest) {
     // State per gebruiker in `app_settings.{woz,pension}_reminder_last_sent_*`
     // zorgt dat de reminder maximaal 1× per kalenderjaar verschijnt.
 
-    try {
+    if (computeSlow) try {
       const { data: reminderAssetRows } = await supabase
         .from('assets')
         .select('asset_type')
@@ -343,7 +370,7 @@ export async function GET(request: NextRequest) {
             .upsert({ key: wozKey, value: now }, { onConflict: 'key' })
 
           const id = `woz_reminder_${currentYear}`
-          notifications.push({
+          slow.push({
             id,
             ...WOZ_REMINDER_TEMPLATE,
             createdAt: now,
@@ -365,7 +392,7 @@ export async function GET(request: NextRequest) {
             .upsert({ key: pensionKey, value: now }, { onConflict: 'key' })
 
           const id = `pension_reminder_${currentYear}`
-          notifications.push({
+          slow.push({
             id,
             ...PENSION_REMINDER_TEMPLATE,
             createdAt: now,
@@ -385,7 +412,7 @@ export async function GET(request: NextRequest) {
     // app_settings-key, exact zoals de woz/pension-reminders hierboven.
     // De voorkeur-check zit hier (niet pas in het eind-filter) zodat een
     // uitgezette melding de week-key niet "opbrandt".
-    if (prefs.briefing !== false) try {
+    if (computeSlow && prefs.briefing !== false) try {
       const briefingWeekKey = `briefing_notified_week_${user.id}`
       const { data: lastBriefingWeekRow } = await supabase
         .from('app_settings')
@@ -398,7 +425,7 @@ export async function GET(request: NextRequest) {
           .from('app_settings')
           .upsert({ key: briefingWeekKey, value: currentWeek }, { onConflict: 'key' })
         const id = `briefing_${currentWeek}`
-        notifications.push({
+        slow.push({
           id,
           type: 'briefing',
           priority: 4,
@@ -418,11 +445,13 @@ export async function GET(request: NextRequest) {
 
     // ── 5. Level-up notifications ───────────────────────────────────
 
-    const { data: levelChangeData } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', `sovereignty_level_change_${user.id}`)
-      .maybeSingle()
+    const { data: levelChangeData } = computeSlow
+      ? await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', `sovereignty_level_change_${user.id}`)
+          .maybeSingle()
+      : { data: null }
 
     if (levelChangeData?.value) {
       try {
@@ -434,7 +463,7 @@ export async function GET(request: NextRequest) {
         // Only show if within the last 7 days
         if (change.timestamp >= sevenDaysAgo.toISOString()) {
           const id = `levelup_${change.newLevel}_${change.timestamp.split('T')[0]}`
-          notifications.push({
+          slow.push({
             id,
             type: 'levelup',
             priority: 1,
@@ -628,7 +657,7 @@ export async function GET(request: NextRequest) {
     // query al tot het eigen huishouden; we filteren op `proposed_by != user.id`
     // zodat de aanvrager zelf geen "actie vereist"-melding krijgt.
 
-    try {
+    if (computeSlow) try {
       const { data: budgetProposals } = await supabase
         .from('household_budget_model_proposals')
         .select('id, target_model, proposed_by, created_at')
@@ -661,7 +690,7 @@ export async function GET(request: NextRequest) {
             ? `${proposerName} stelt voor om jullie budgetten samen te voegen tot één gezamenlijk huishoudbudget.`
             : `${proposerName} stelt voor om terug te gaan naar gescheiden budgetten.`
 
-          notifications.push({
+          slow.push({
             id,
             type: 'budget_model_proposal',
             priority: 2,
@@ -691,7 +720,7 @@ export async function GET(request: NextRequest) {
     // Profile is hoisted here so the horizon alerts below can read it
     let profile: { date_of_birth?: string; expected_return?: number; inflation_rate?: number; active_modules?: string[] } | null = null
 
-    try {
+    if (computeSlow) try {
       const [profileRes, debtsRes, assetsRes] = await Promise.all([
         supabase
           .from('profiles')
@@ -716,7 +745,7 @@ export async function GET(request: NextRequest) {
       // Alert: no date of birth set
       if (!dateOfBirth) {
         const id = 'horizon_no_dob'
-        notifications.push({
+        slow.push({
           id,
           type: 'horizon',
           priority: 3,
@@ -735,7 +764,7 @@ export async function GET(request: NextRequest) {
       if (totalDebts > 0) {
         const id = 'horizon_has_debt'
         const debtFormatted = totalDebts.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 })
-        notifications.push({
+        slow.push({
           id,
           type: 'horizon',
           priority: 3,
@@ -764,7 +793,7 @@ export async function GET(request: NextRequest) {
 
         if (monthlySavings <= 0 && netWorth < monthlyExpenses * 12 * 25) {
           const id = 'horizon_fire_unreachable'
-          notifications.push({
+          slow.push({
             id,
             type: 'horizon',
             priority: 2,
@@ -785,16 +814,24 @@ export async function GET(request: NextRequest) {
 
     // ── 8. Holding alerts (price & rebalancing) ──────────────────────
 
-    try {
+    if (computeSlow) try {
+      // NB: `holding_id` is gesplitst in `investment_holding_id` /
+      // `crypto_holding_id` (migratie 20260502000004). De oude select gaf
+      // elke poll een 400. Prijs-alerts evalueren we alleen voor investment-
+      // holdings (crypto-alerts vinden geen holding en slaan stil over —
+      // de rebalance-drift-tak heeft geen holding nodig).
       const { data: activeAlerts } = await supabase
         .from('holding_alerts')
-        .select('id, holding_id, type, threshold, last_triggered_at')
+        .select('id, investment_holding_id, crypto_holding_id, type, threshold, last_triggered_at')
         .eq('user_id', user.id)
         .eq('is_active', true)
 
       if (activeAlerts && activeAlerts.length > 0) {
-        // Fetch holdings data for alert evaluation
-        const holdingIds = [...new Set(activeAlerts.filter(a => a.holding_id).map(a => a.holding_id))]
+        const alertHoldingId = (a: { investment_holding_id: string | null; crypto_holding_id: string | null }) =>
+          a.investment_holding_id ?? a.crypto_holding_id ?? null
+
+        // Fetch holdings data for alert evaluation (investment only)
+        const holdingIds = [...new Set(activeAlerts.map(a => a.investment_holding_id).filter((id): id is string => Boolean(id)))]
         const { data: holdingsData } = holdingIds.length > 0
           ? await supabase
               .from('investment_holdings')
@@ -834,7 +871,8 @@ export async function GET(request: NextRequest) {
         }
 
         for (const alert of activeAlerts) {
-          const holding = alert.holding_id ? holdingsMap.get(alert.holding_id) : null
+          const holdingId = alertHoldingId(alert)
+          const holding = alert.investment_holding_id ? holdingsMap.get(alert.investment_holding_id) : null
           const currentPrice = holding ? Number(holding.current_price) || 0 : 0
           const avgPrice = holding ? Number(holding.avg_purchase_price) || 0 : 0
           const holdingName = holding ? (holding.ticker || holding.name || 'Holding') : 'Portfolio'
@@ -880,7 +918,7 @@ export async function GET(request: NextRequest) {
 
           if (triggered) {
             const id = `holding_alert_${alert.id}`
-            notifications.push({
+            slow.push({
               id,
               type: 'holding_alert',
               priority: 2,
@@ -890,7 +928,7 @@ export async function GET(request: NextRequest) {
               color: alert.type === 'price_below' ? 'red' : alert.type === 'price_above' ? 'green' : 'blue',
               createdAt: now,
               read: readIds.includes(id),
-              actionUrl: alert.holding_id ? `/core/assets/holdings/${alert.holding_id}` : '/core/assets/holdings',
+              actionUrl: holdingId ? `/core/assets/holdings/${holdingId}` : '/core/assets/holdings',
             })
           }
         }
@@ -898,6 +936,18 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       console.error('Holding alert notification error:', err)
     }
+
+    // ── Merge langzame checks ────────────────────────────────────────
+    // Cache-miss: net berekende items cachen; cache-hit: gecachte items
+    // hergebruiken. Read-status wordt altijd vers afgeleid uit readIds —
+    // markeren-als-gelezen werkt dus ook binnen het TTL-venster direct.
+    if (computeSlow) {
+      slowChecksCache.set(user.id, { computedAt: Date.now(), items: slow })
+    }
+    const slowItems = computeSlow ? slow : (cachedSlow?.items ?? [])
+    notifications.push(
+      ...slowItems.map((n) => ({ ...n, read: readIds.includes(n.id) }))
+    )
 
     // Sort by priority (lower = higher priority)
     notifications.sort((a, b) => a.priority - b.priority)
@@ -942,16 +992,21 @@ export async function GET(request: NextRequest) {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
 
-    // Persist full 30-day history
-    await supabase
-      .from('app_settings')
-      .upsert(
-        {
-          key: `notifications_history_${user.id}`,
-          value: JSON.stringify(history),
-        },
-        { onConflict: 'key' }
-      )
+    // Persist full 30-day history — alleen wanneer er daadwerkelijk iets
+    // veranderd is. De poll draait periodiek; zonder deze guard schreef
+    // elke poll een identieke JSON-blob terug (onnodige write + egress).
+    const serializedHistory = JSON.stringify(history)
+    if (serializedHistory !== historyRes.data?.value) {
+      await supabase
+        .from('app_settings')
+        .upsert(
+          {
+            key: `notifications_history_${user.id}`,
+            value: serializedHistory,
+          },
+          { onConflict: 'key' }
+        )
+    }
 
     // Return only entries within the requested `days` window AND respect the
     // user's per-type voorkeuren. We persist the FULL history above (so

@@ -241,7 +241,13 @@ export function NieuwsOnlyClient() {
         setRefreshing(false)
       }
     }
-    const interval = setInterval(poll, 2500)
+    // Visibility-guard (egress-reductie): niet doorpollen in een verborgen
+    // tab — generatie loopt server-side gewoon door, bij terugkeren pakt de
+    // eerstvolgende poll de tussenstand weer op.
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden') return
+      poll()
+    }, 4000)
     return () => clearInterval(interval)
   }, [generating, newsFetched])
 

@@ -119,10 +119,17 @@ export function NotificationModal() {
     closeModal,
     markAsRead,
     markAllRead,
+    refresh,
   } = useNotifications()
 
   // Lock body scroll when modal is open
   useScrollLock(isModalOpen)
+
+  // Verse data bij openen — de achtergrond-poll loopt op 10 min (egress-
+  // reductie), dus het moment van openen is hét moment om te verversen.
+  useEffect(() => {
+    if (isModalOpen) refresh()
+  }, [isModalOpen, refresh])
 
   // Close on Escape
   useEffect(() => {

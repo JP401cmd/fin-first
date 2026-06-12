@@ -9,7 +9,9 @@ import { LogIn, AlertTriangle, Eye, EyeOff } from 'lucide-react'
  *
  * Behaviours:
  *  1. Listens to Supabase onAuthStateChange for SIGNED_OUT events
- *  2. Periodically checks if the session is still valid (every 60s)
+ *  2. Checks de sessie op een expiry-timer (één timeout op `expires_at − 30s`)
+ *     i.p.v. een eeuwigdraaiende 60s-poll; her-evaluatie bij TOKEN_REFRESHED
+ *     en bij zichtbaar worden van de tab (slaapstand-wake)
  *  3. Intercepts 401 responses from API routes via a global fetch wrapper
  *  4. When expiry detected: shows a friendly modal with inline re-login
  *  5. After successful re-login: closes modal, user continues on current page
@@ -24,7 +26,7 @@ export function SessionMonitor() {
   const [loading, setLoading] = useState(false)
   const [loginSuccess, setLoginSuccess] = useState(false)
   const supabaseRef = useRef(createClient())
-  const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const checkIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Track intentional sign-outs to avoid showing the modal
   const intentionalSignOutRef = useRef(false)
 
@@ -66,44 +68,69 @@ export function SessionMonitor() {
     }
   }, [handleSessionExpired])
 
-  // ── 2. Periodic session check (every 60 seconds) ─────────────────
+  // ── 2. Expiry-timer i.p.v. periodieke poll ────────────────────────
+  // Eén timeout op `expires_at − 30s` (her-gezet na elke token-refresh) in
+  // plaats van een 60s-interval dat eeuwig doorloopt. De supabase-js client
+  // refresht zelf al automatisch; deze check is het vangnet wanneer dat
+  // misgaat. Bij zichtbaar worden van de tab (slaapstand/wake) evalueren we
+  // de expiry opnieuw — een verlopen timer vuurt tijdens slaap niet af.
   useEffect(() => {
+    let cancelled = false
+
     const checkSession = async () => {
       try {
         const supabase = supabaseRef.current
         const { data: { session } } = await supabase.auth.getSession()
+        if (cancelled) return
 
         if (!session) {
           handleSessionExpired()
           return
         }
 
-        // Check if token expires within 30 seconds
         const expiresAt = session.expires_at
-        if (expiresAt) {
-          const now = Math.floor(Date.now() / 1000)
-          if (expiresAt < now + 30) {
-            // Try to refresh the token
-            const { error } = await supabase.auth.refreshSession()
-            if (error) {
-              handleSessionExpired()
-            }
+        if (!expiresAt) return
+
+        const now = Math.floor(Date.now() / 1000)
+        if (expiresAt < now + 30) {
+          // Binnen de marge (of al verlopen) — probeer te verversen.
+          const { error } = await supabase.auth.refreshSession()
+          if (!cancelled && error) {
+            handleSessionExpired()
+          } else if (!cancelled) {
+            // Geslaagd — de volgende run leest de nieuwe expires_at en zet
+            // de timer weer vlak vóór het volgende expiry-moment.
+            scheduleCheck(60_000)
           }
+        } else {
+          // Plan de volgende check vlak vóór expiry. TOKEN_REFRESHED (zie
+          // effect 1) komt vóór dit moment en triggert via getSession() dan
+          // automatisch een nieuwe, latere timer bij de volgende check.
+          scheduleCheck((expiresAt - now - 30) * 1000)
         }
       } catch {
         // Network error — don't trigger expiry modal for network issues
       }
     }
 
-    // Check every 60 seconds
-    checkIntervalRef.current = setInterval(checkSession, 60_000)
+    const scheduleCheck = (delayMs: number) => {
+      if (checkIntervalRef.current) clearTimeout(checkIntervalRef.current)
+      checkIntervalRef.current = setTimeout(checkSession, Math.max(delayMs, 5_000))
+    }
 
-    // Also check once on mount (after a small delay to let initial auth settle)
-    const initialCheck = setTimeout(checkSession, 5_000)
+    // Slaapstand-wake: de timer heeft stilgestaan — direct her-evalueren.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') checkSession()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    // Initial check (after a small delay to let initial auth settle)
+    scheduleCheck(5_000)
 
     return () => {
-      if (checkIntervalRef.current) clearInterval(checkIntervalRef.current)
-      clearTimeout(initialCheck)
+      cancelled = true
+      if (checkIntervalRef.current) clearTimeout(checkIntervalRef.current)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [handleSessionExpired])
 
