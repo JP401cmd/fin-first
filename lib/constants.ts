@@ -33,6 +33,9 @@ export const CLASSIC_MULTIPLIER = 1 / SWR // = 25
 /** Default annual inflation rate — 2% (ECB target). */
 export const INFLATION = 0.02
 
+/** Jaarlijks onderhoud eigen woning als fractie van de woningwaarde — 1%. */
+export const NL_HOME_MAINTENANCE_PCT = 0.01
+
 /** Dutch long-term average inflation — 2% (CBS). Alias for NL-specific FIRE calculations. */
 export const NL_INFLATIE = 0.02
 

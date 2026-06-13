@@ -1,0 +1,35 @@
+---
+status: aanvaard
+date: 2026-06-13
+elements: [as-planning, fn-toekomstplannen, as-vermogen]
+---
+
+# 0016 — Horizon v2: reëel-vs-nominaal productiekeuze (B3) + cutover-acceptatiecriteria (B1)
+
+## Context
+
+v2 (de grootboek-engine, ADR 0013) draait live achter een per-user flag. De validatiefase (Fase B uit `docs/horizon-tabel-rekenmotor-plan.md` §6) is grotendeels gedaan: de parity-review (B2) en de regressiesuites (B4) zijn klaar, en surfacede drie echte v2-bugs die inmiddels gefixt zijn — legacy-need-only (ADR 0014), eigen-huis-downsize als asset-liquidatie (ADR 0015) en de recurring-×12-eenheid (B2-fix, `horizon-engine-v2.md` §4.8). Vóór de **onomkeerbare** Fase C-cutover (alle FIRE-consumenten op v2, default flippen, legacy verwijderen) legt deze ADR twee dingen vast: de reëel-vs-nominaal-keuze (B3) en de expliciete go/no-go-criteria (B1).
+
+## Besluit B3 — Reëel intern, nominaal getoond (Route 2)
+
+v2 rekent **intern volledig reëel** (koopkracht heden; `realReturn = (1+nom)/(1+infl)−1`, vlakke reële uitgaven). De **adapter `ledgerToUnifiedResult` is het enige conversiepunt** en rekent terug naar **nominaal** (× (1+infl)^jaar), zodat /toekomst nominale bedragen toont op dezelfde schaal als v1 (INV-2). De `inflationFactor` blijft per rij bewaard zodat een reële weergave optioneel blijft.
+
+Rationale: continuïteit met v1 en met de rest van de app (gebruikers kennen nominale bedragen); de reële kern maakt de engine wél koopkracht-eerlijk en uitbreidbaar. **Gevolg, bewust geaccepteerd:** omdat reëel rendement < nominaal, is v2 structureel conservatiever dan v1 — gemeten op de persona (B2): FIRE **deplete +7 jr, legacy +6 jr**, perpetual +1, pensioen 0. Dit is een correcter (koopkracht-eerlijk) antwoord, géén bug; de diffs decomponeren volledig naar deze modelkeuze + de drie gefixte gedragingen.
+
+## Besluit B1 — Acceptatiecriteria vóór de cutover (Fase C)
+
+De globale flip mag pas wanneer **alle** criteria groen zijn:
+
+1. **Functionele dekking** — elke /toekomst-voorkeur + elk life-event aantoonbaar gehonoreerd in v2 (dekkingsmatrix §4 van het plan). *Status: grotendeels (Fase A); housing-downsize nu via ADR 0015.*
+2. **Zinnige FIRE per strategie** — deplete/perpetual/legacy/pensioen leveren voor representatieve profielen een haalbare, plausibele FIRE; geen spurious "onbereikbaar". *Status: ✓ na de drie fixes (B2).*
+3. **Decomponeerbare diffs** — elk materieel v1↔v2-verschil herleidbaar tot een gedocumenteerde modelkeuze (reëel-vs-nominaal, need-only legacy, housing-liquidatie), niet tot een onverklaarde fout. *Status: ✓ (B2-parity).*
+4. **Geen kapotte afgeleide metrics** — de consumenten van de FIRE-output (`computeFreedomProgress`/freedomPct, gezondheidsscore, sovereignty, horizon-hero, `net_worth_snapshots`, briefing, AI-context) blijven correct met v2's `requiredFirePortfolio`/`fireAge`. *Status: ✓ geverifieerd (13 jun, Fase D). Sterker nog: de cutover **corrigeert** een live v1-bug. `runUnifiedProjection.requiredAt` rekent voor perpetual met `verifyEndAge = candidateFireAge + 100` (≈ leeftijd 189) en crediteert de **levenslange** AOW/pensioen (`toAge: null`) over dat hele venster → het benodigd vermogen klapt in (gemeten: €1,29M bij AOW-tot-90 vs **€196k** bij levenslange AOW, identiek profiel). Daardoor is v1's freedomPct (= FIRE-eligible vermogen ÷ requiredFirePortfolio) voor perpetual+AOW-gebruikers — de gangbare pensioensituatie — structureel te hoog. v2 (backward `V_nodig` tot de échte eindleeftijd; AOW 67→90) geeft een plausibel benodigd vermogen (€1,08M) → freedomPct wordt realistischer (meestal lager). De verschuiving bij de flip is dus een correctie, geen regressie. v1 wordt niet apart gefixt (gemoot door C5).*
+5. **Regressiedekking** — engine-gedrag vastgelegd door tests: deplete→~€0, perpetual behoud, legacy ≥ doel, recurring ×12, housing netto-continuïteit. *Status: ✓ (`test/horizon-engine*.test.ts`, `test/horizon-housing-liquidation.test.ts`).*
+6. **Reëel-vs-nominaal bevestigd** — Besluit B3 hierboven. *Status: ✓.*
+7. **Surfaces convergeren** — /overzicht en /toekomst (en de snapshot-writer `computeFireProjection`) tonen ná de cutover dezelfde FIRE-leeftijd (de SSoT-doelstelling; zie [[project-fire-drie-engines-divergentie]]). *Status: AF TE VINKEN in Fase C (C1) — vandaag divergeren ze nog bewust (v2 alleen op /toekomst).*
+
+## Status & scope
+
+- B3 ✓ (dit besluit), B2 ✓, B4 ✓; B1-criteria gedefinieerd. Criteria 1/2/3/5/6 zijn groen; **4 en 7 zijn expliciet Fase C-werk** dat tegen deze criteria wordt afgevinkt.
+- De cutover (Fase C: C1 consumenten op v2 + /core-divergentie, C2 afgeleide metrics, C3 default flippen, C4 runSimulation-oppervlakken, C5 legacy verwijderen) blijft **onomkeerbaar en gated** — niet starten zonder owner-go én criteria 4 + 7 groen.
+- Gerelateerd: ADR 0013 (engine), 0014 (legacy), 0015 (housing); plan `docs/horizon-tabel-rekenmotor-plan.md` §6; invariantendoc `docs/architecture/horizon-engine-v2.md`.

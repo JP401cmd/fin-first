@@ -133,3 +133,29 @@
 ## 2026-06-12
 
 - Geen wijzigingen.
+
+## 2026-06-12
+
+- Geen wijzigingen.
+
+## 2026-06-13
+
+- **Schermen** toegevoegd: /beheer/grafiek-werking, /beheer/horizon-tabellen
+- **API-routes** toegevoegd: /api/horizon-engine
+
+## 2026-06-13
+
+- **Schermen** toegevoegd: /beheer/horizon-tabellen-mij
+- **API-routes** toegevoegd: /api/horizon-engine/ledger
+
+## 2026-06-13
+
+- Geen wijzigingen.
+
+## 2026-06-13
+
+- Geen wijzigingen.
+
+## 2026-06-13
+
+- Geen wijzigingen.

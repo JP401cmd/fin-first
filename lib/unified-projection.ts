@@ -217,6 +217,37 @@ export interface UnifiedProjectionInput {
    * Gebruikt voor de Kern vermogensprognose met een korte horizon (bijv. 20 jaar).
    */
   skipFireDetection?: boolean
+
+  // ── Asset-liquidaties (v2 grootboek-engine; v1 negeert dit veld) ──
+  /**
+   * Geplande asset-liquidaties. Gebruikt door de horizon v2-grootboek-engine voor
+   * de eigen-huis-downsize: op de trigger-leeftijd verkoopt de engine het asset
+   * (binnen het grootboek) i.p.v. het huis uit de FIRE-pot te filteren en de
+   * verkoop als eenmalig inkomen in te spuiten. Daardoor blijft het netto vermogen
+   * continu (alleen −verkoopkosten) en verspringt alléén de liquiditeit. v1
+   * (`runUnifiedProjection`) leest dit veld niet — daar blijft het filter+inkomen-
+   * model gelden. Zie ADR 0015.
+   */
+  assetLiquidations?: AssetLiquidation[]
+}
+
+/**
+ * Eén geplande asset-liquidatie voor de v2-grootboek-engine. Op `age` verkoopt de
+ * engine `assetId`: opbrengst = waarde × `salePricePct` × (1 − `salesCostsPct`); de
+ * gekoppelde schulden (`payoffDebtIds`) worden afgelost (saldo → 0, woonlast stopt);
+ * de netto-opbrengst (na aflossing) stroomt naar het liquide vermogen.
+ */
+export interface AssetLiquidation {
+  /** Asset dat verkocht wordt (bv. het eigen_huis). */
+  assetId: string
+  /** Leeftijd waarop de verkoop plaatsvindt. */
+  age: number
+  /** Verkoopprijs als fractie van de (geprojecteerde) marktwaarde (bv. 1.0). */
+  salePricePct: number
+  /** Verkoopkosten als fractie van de verkoopprijs (bv. 0.04). */
+  salesCostsPct: number
+  /** Gekoppelde schulden die met de opbrengst worden afgelost. */
+  payoffDebtIds: string[]
 }
 
 // ── Unified Projection Result ───────────────────────────────────────────────

@@ -60,7 +60,6 @@ import {
   projectMortgageStateAt,
   projectEigenHuisValuesAt,
   estimateReverseMortgagePayout,
-  resolveTriggerAge,
   getFireEligibleNetWorth,
 } from '@/lib/housing-strategy'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -479,7 +478,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
-  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows, effectiveLifeEvents } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -498,8 +497,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           monthlySavingsOverride,
           baseAnnualSavingsFromCashflow: initialData.baseAnnualSavingsFromCashflow,
           housingStrategy: initialData.housingStrategy,
+          horizonEngineV2: initialData.horizonEngineV2,
+          potRules: initialData.potRules,
         }
       : null,
+  )
+
+  // Events voor weergave: echte events + client-side geregenereerde
+  // housing-strategy-events uit de hook. De hook resolved het
+  // on_depletion-trigger-moment uit dezelfde unified projection als de
+  // grafiek — tijdlijn, chart-markers en EventPane consumeren deze set
+  // zodat het getoonde verkoop-moment per constructie samenvalt met het
+  // uitputtingsmoment in de grafiek. Fallback op de server-events zolang
+  // de sim nog niet gedraaid heeft.
+  const displayEvents = useMemo<LifeEvent[]>(
+    () => (effectiveLifeEvents.length > 0 ? effectiveLifeEvents : events),
+    [effectiveLifeEvents, events],
   )
 
   // Fetch dividend income client-side (not available from server loader)
@@ -982,11 +995,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
     setHealthScoreInput(newInput)
     setHealthScore(computeHealthScoreFromInputs(newInput, budgetingActive))
-    if (events.length > 0) {
-      setImpacts(computeCumulativeImpacts(effectiveInput, events))
+    if (displayEvents.length > 0) {
+      setImpacts(computeCumulativeImpacts(effectiveInput, displayEvents))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, fireSwr, fireParams, avgIncome6m, avgExpenses6m, fireStrategy])
+
+  // Houd de impact-lijst in sync met de client-geregenereerde housing-events.
+  // De setImpacts-callsites in loadData/refreshEvents werken op de ruwe
+  // `events`-state (met het server-trigger-moment); zodra de hook de
+  // housing-events met de actuele parameters heeft geregenereerd, wint deze
+  // sync — anders zou de impact-lijst het verkoop-event op een andere
+  // leeftijd kunnen tonen dan de marker/grafiek.
+  useEffect(() => {
+    if (!input || displayEvents.length === 0) return
+    setImpacts(computeCumulativeImpacts(input, displayEvents))
+  }, [input, displayEvents])
 
   // Lazy scenario computation — replay main sim with variant returns
   useEffect(() => {
@@ -1067,9 +1091,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   )
 
   const eventsForTimeline = useMemo(() => {
-    const base = showLifeEvents ? events : []
+    const base = showLifeEvents ? displayEvents : []
     return showNaturalMilestones ? [...base, ...naturalMilestonesAsEvents] : base
-  }, [showLifeEvents, showNaturalMilestones, events, naturalMilestonesAsEvents])
+  }, [showLifeEvents, showNaturalMilestones, displayEvents, naturalMilestonesAsEvents])
 
   // ── Chart event-overlay (markers boven/onder de bar) ───────────────────
   // Bouw één lijst met ChartEventOverlay-items uit gebruiker-events +
@@ -1093,7 +1117,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     // degrade (geen partner-pad) val je terug op de eigen lijn + eigen events.
     const showOwnEvents = !(isPartnerView && partnerLine !== null)
     if (showLifeEvents && showOwnEvents) {
-      for (const ev of events) {
+      for (const ev of displayEvents) {
         if (ev.target_age == null) continue
         const side = lifeEventSide(ev)
         out.push({
@@ -1156,7 +1180,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       }
     }
     return out
-  }, [showLifeEvents, showNaturalMilestones, events, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents])
+  }, [showLifeEvents, showNaturalMilestones, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents])
 
   // ── Natuurlijke-mijlpaal info-sheet state ─────────────────────────────
   const [selectedNaturalMilestone, setSelectedNaturalMilestone] =
@@ -1540,26 +1564,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       : null
     if (currentAgeFloor === null) return baseRows
 
-    // Trigger-leeftijd bepalen voor downsize en reverse_mortgage. Voor
-    // exclude_from_fire is er geen trigger (huis blijft permanent buiten
-    // de FIRE-pot, hypotheek loopt door of stopt op natuurlijke einddatum).
+    // Trigger-leeftijd voor downsize en reverse_mortgage: ÉÉN bron — het
+    // (client-side geregenereerde) housing-event zelf. Daardoor knikt de
+    // vastgoed-bar op exact dezelfde leeftijd als de event-marker én het
+    // verkoop-cashflow-moment in de sim. Voor exclude_from_fire is er geen
+    // trigger (huis blijft permanent buiten de FIRE-pot).
     let triggerAge: number | null = null
     if (housingCfg.mode === 'downsize' || housingCfg.mode === 'reverse_mortgage') {
-      const yearlyExp =
-        initialData.effectiveInput.yearlyMustExpenses > 0
-          ? initialData.effectiveInput.yearlyMustExpenses
-          : (initialData.effectiveInput.monthlyExpenses ?? 0) * 12
-      const netWorth = initialData.effectiveInput.totalAssets - initialData.effectiveInput.totalDebts
-      const equity = ctx.eigenHuisValue - ctx.mortgageBalance
-      const liquidEstimate = Math.max(0, netWorth - equity)
-      triggerAge = resolveTriggerAge(
-        housingCfg.trigger,
-        housingCfg.triggerAge,
-        housingCfg.depletionThresholdYears,
-        currentAgeFloor,
-        yearlyExp,
-        liquidEstimate,
-      )
+      const housingEvent = displayEvents.find(isHousingStrategyEvent)
+      triggerAge =
+        housingEvent?.target_age ?? Math.max(currentAgeFloor, housingCfg.triggerAge)
     }
 
     return baseRows.map((row) => {
@@ -1599,6 +1613,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         // Vanaf trigger: stapelende schaduwschuld vanwege opeethypotheek.
         // monthlyPayout uit config of auto-schatting op basis van equity bij
         // trigger. Schuld groeit als principal + rente over de looptijd.
+        // Uitkering uit het event-metadata (zelfde bron als de sim-cashflow);
+        // fallback: zelfde schatting als buildHousingLifeEventsAtAge.
+        const housingEvent = displayEvents.find(isHousingStrategyEvent)
+        const metaPayout = Number(
+          (housingEvent?.metadata as Record<string, unknown> | null | undefined)?.monthlyPayout,
+        )
         const equityAtTrigger = Math.max(
           0,
           projectEigenHuisValuesAt(eigenHuisAssets, Math.max(0, (triggerAge - currentAgeFloor) * 12))
@@ -1606,13 +1626,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             projectMortgageStateAt(mortgages, Math.max(0, (triggerAge - currentAgeFloor) * 12))
               .balance,
         )
-        const monthlyPayout =
-          housingCfg.monthlyPayout ??
-          estimateReverseMortgagePayout(
-            equityAtTrigger,
-            housingCfg.maxLoanPct,
-            Math.max(1, initialData.fireStrategy.endAge - triggerAge),
-          )
+        const monthlyPayout = Number.isFinite(metaPayout) && metaPayout > 0
+          ? metaPayout
+          : housingCfg.monthlyPayout ??
+            estimateReverseMortgagePayout(
+              equityAtTrigger,
+              housingCfg.maxLoanPct,
+              Math.max(1, initialData.fireStrategy.endAge - triggerAge),
+            )
         const yearsAfterTrigger = row.age - triggerAge
         const principal = monthlyPayout * 12 * yearsAfterTrigger
         const shadowDebt =
@@ -1623,7 +1644,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
       return row
     })
-  }, [chartMode, unifiedRows, initialData])
+  }, [chartMode, unifiedRows, initialData, displayEvents])
 
   // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode
   const ieBreakdownResult = useMemo(() => {
@@ -3066,7 +3087,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                   <p className="font-sans text-[12px] text-orange-700">
-                    FIRE niet bereikbaar voor leeftijd {simResult.displayEndAge} — verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.
+                    {simResult.strategy === 'legacy' ? (
+                      <>Je haalt je nalatenschapsdoel{fireStrategy?.legacyAmount ? ` van ${formatMaskedCurrency(fireStrategy.legacyAmount, masked)}` : ''} niet binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verlaag het nalatenschapsbedrag, verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>
+                    ) : simResult.strategy === 'perpetual' ? (
+                      <>Je vermogen is niet groot genoeg om er blijvend van te leven binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>
+                    ) : (
+                      <>FIRE niet haalbaar binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>
+                    )}
                   </p>
                 </div>
               )}
@@ -6071,7 +6098,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           rows={unifiedRows ?? []}
           assets={initialData.assets}
           debts={debts}
-          events={events}
+          events={displayEvents}
           cashflows={simCashflows}
           allRows={unifiedRows ?? []}
           monthlyIncome={effectiveInput?.monthlyIncome}
@@ -6098,7 +6125,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           rows={unifiedRows ?? []}
           inflationRate={fireParams.inflationRate}
           debts={debts}
-          events={events}
+          events={displayEvents}
           cashflows={simCashflows}
           allRows={unifiedRows ?? []}
           expectedReturn={fireParams.grossReturn}
@@ -6124,7 +6151,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           rows={unifiedRows ?? []}
           inflationRate={fireParams.inflationRate}
           debts={debts}
-          events={events}
+          events={displayEvents}
           cashflows={simCashflows}
           allRows={unifiedRows ?? []}
           expectedReturn={fireParams.grossReturn}
@@ -6714,7 +6741,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           onClose={() => setEventPaneOpen(false)}
           editingId={eventPaneEditingId}
           initialMode={eventPaneMode}
-          events={events}
+          events={displayEvents}
           baselineInput={input}
           baselineFire={fire}
           fireParams={fireParams}

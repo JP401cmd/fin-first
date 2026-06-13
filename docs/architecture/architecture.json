@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-12T21:36:48.397Z",
-  "generatedDate": "2026-06-12",
+  "generatedAt": "2026-06-13T15:58:42.772Z",
+  "generatedDate": "2026-06-13",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -182,9 +182,9 @@
     }
   },
   "stats": {
-    "routes": 319,
+    "routes": 322,
     "routesProduction": 94,
-    "api": 369,
+    "api": 371,
     "tables": 52,
     "migrations": 105,
     "integrations": 24,
@@ -314,6 +314,24 @@
     {
       "url": "/beheer/gebruikers",
       "file": "app/(app)/beheer/gebruikers/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/grafiek-werking",
+      "file": "app/(app)/beheer/grafiek-werking/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/horizon-tabellen",
+      "file": "app/(app)/beheer/horizon-tabellen/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/horizon-tabellen-mij",
+      "file": "app/(app)/beheer/horizon-tabellen-mij/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -2231,6 +2249,24 @@
       {
         "url": "/beheer/gebruikers",
         "file": "app/(app)/beheer/gebruikers/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/grafiek-werking",
+        "file": "app/(app)/beheer/grafiek-werking/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/horizon-tabellen",
+        "file": "app/(app)/beheer/horizon-tabellen/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/horizon-tabellen-mij",
+        "file": "app/(app)/beheer/horizon-tabellen-mij/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -5023,6 +5059,23 @@
       "url": "/api/holdings/refresh-prices/cron",
       "file": "app/api/holdings/refresh-prices/cron/route.ts",
       "domain": "holdings",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/horizon-engine",
+      "file": "app/api/horizon-engine/route.ts",
+      "domain": "horizon-engine",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "url": "/api/horizon-engine/ledger",
+      "file": "app/api/horizon-engine/ledger/route.ts",
+      "domain": "horizon-engine",
       "methods": [
         "GET"
       ]
@@ -8531,6 +8584,30 @@
             "GET",
             "PUT",
             "DELETE"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "horizon-engine",
+      "label": "horizon-engine",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/horizon-engine",
+          "file": "app/api/horizon-engine/route.ts",
+          "domain": "horizon-engine",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        },
+        {
+          "url": "/api/horizon-engine/ledger",
+          "file": "app/api/horizon-engine/ledger/route.ts",
+          "domain": "horizon-engine",
+          "methods": [
+            "GET"
           ]
         }
       ]
@@ -13998,6 +14075,12 @@
           "write": true
         }
       ],
+      "horizon-engine": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "household": [
         {
           "name": "app_settings",
@@ -14701,6 +14784,14 @@
           "write": true,
           "routes": [
             "/api/fire-settings"
+          ]
+        },
+        {
+          "domain": "horizon-engine",
+          "label": "horizon-engine",
+          "write": true,
+          "routes": [
+            "/api/horizon-engine"
           ]
         },
         {
@@ -17495,6 +17586,71 @@
       ],
       "summary": "FK's naar `budgets(id)` krijgen ON DELETE SET NULL (referentie-data: transacties, doelen, leer-regels) of CASCADE (levenscyclus-data: bedragen, rollovers, ouder-kind-relaties) — nooit de default NO ACTION. Alle tabelstructuur gaat via migraties in de repo; anders is ze onzichtbaa",
       "file": "docs/adr/0011-budget-referenties-on-delete-set-null.md"
+    },
+    {
+      "id": "0012-housing-trigger-uit-unified-projection",
+      "title": "Huis-strategie \"wanneer nodig\"-trigger uit de unified projection (vaste-punt-iteratie)",
+      "status": "aanvaard",
+      "date": "2026-06-13",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "Het trigger-moment van de eigen-huis-strategie (downsize / opeethypotheek × \"wanneer nodig\") wordt afgeleid uit **dezelfde unified-projection-engine als de grafiek**, via een capped vaste-punt-iteratie in `lib/housing-trigger.ts`. De event-marker, de verkoop-cashflow, de vastgoed",
+      "file": "docs/adr/0012-housing-trigger-uit-unified-projection.md"
+    },
+    {
+      "id": "0013-horizon-grootboek-engine-v2",
+      "title": "horizon grootboek engine v2",
+      "status": "aanvaard",
+      "date": "2026-06-13",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De productie-engine `runUnifiedProjection` (`lib/unified-projection.ts`) bepaalt de FIRE-leeftijd via een forward-loop met per-leeftijd een binary search (`requiredAt`, met geneste decumulatie-subsimulatie). Dat is ondoorzichtig, duur en moeilijk uit te breiden; een reeks gewenst",
+      "file": "docs/adr/0013-horizon-grootboek-engine-v2.md"
+    },
+    {
+      "id": "0014-horizon-v2-legacy-need-only",
+      "title": "horizon v2 legacy need only",
+      "status": "aanvaard",
+      "date": "2026-06-13",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De gedeelde onttrekkingsmotor `applyWithdrawalStrategy` (`lib/withdrawal-strategy.ts`) berekent voor de eindstrategie **legacy** een *spend-down-annuïteit*: `computeAnnuityBase` zet de contante waarde van het nalatenschapsbedrag apart en onttrekt het resterende surplus via een gr",
+      "file": "docs/adr/0014-horizon-v2-legacy-need-only.md"
+    },
+    {
+      "id": "0015-horizon-v2-downsize-asset-liquidatie",
+      "title": "horizon v2 downsize asset liquidatie",
+      "status": "aanvaard",
+      "date": "2026-06-13",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De downsize-strategie (verkoop eigen woning bij uitputting / op leeftijd) werd gemodelleerd op de v1-manier: `filterAssetsForFire` haalt het eigen huis + de gekoppelde hypotheek **uit de FIRE-pot**, en `resolveHousingEventsForSim` spuit de verkoop als een eenmalig **inkomen** in ",
+      "file": "docs/adr/0015-horizon-v2-downsize-asset-liquidatie.md"
+    },
+    {
+      "id": "0016-horizon-v2-cutover-acceptatie-en-reeel-nominaal",
+      "title": "horizon v2 cutover acceptatie en reeel nominaal",
+      "status": "aanvaard",
+      "date": "2026-06-13",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "v2 (de grootboek-engine, ADR 0013) draait live achter een per-user flag. De validatiefase (Fase B uit `docs/horizon-tabel-rekenmotor-plan.md` §6) is grotendeels gedaan: de parity-review (B2) en de regressiesuites (B4) zijn klaar, en surfacede drie echte v2-bugs die inmiddels gefi",
+      "file": "docs/adr/0016-horizon-v2-cutover-acceptatie-en-reeel-nominaal.md"
     }
   ],
   "churn": {
@@ -17502,15 +17658,15 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 76
+        "commits": 77
       },
       {
         "path": "lib/ai",
-        "commits": 37
+        "commits": 38
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 20
+        "commits": 21
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -17518,11 +17674,11 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 12
+        "commits": 13
       },
       {
         "path": "app/api/household",
-        "commits": 9
+        "commits": 10
       },
       {
         "path": "lib/horizon-data.ts",
@@ -17544,37 +17700,37 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6831,
-        "commits": 102
+        "loc": 6858,
+        "commits": 103
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 4847,
-        "commits": 25
+        "commits": 26
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 3813,
-        "commits": 40
+        "commits": 41
       },
       {
         "file": "lib/release-notes.ts",
         "loc": 2763,
-        "commits": 4
+        "commits": 5
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2639,
-        "commits": 22
+        "commits": 23
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 2608,
-        "commits": 14
+        "commits": 15
       },
       {
         "file": "lib/unified-projection.ts",
-        "loc": 2343,
+        "loc": 2374,
         "commits": 25
       },
       {
@@ -18246,7 +18402,7 @@
   },
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-12",
+    "previousDate": "2026-06-13",
     "hasChanges": false,
     "sections": []
   },
@@ -18268,6 +18424,13 @@
     {
       "date": "2026-06-12",
       "api": 369,
+      "components": 690,
+      "tables": 52,
+      "routesProduction": 94
+    },
+    {
+      "date": "2026-06-13",
+      "api": 371,
       "components": 690,
       "tables": 52,
       "routesProduction": 94

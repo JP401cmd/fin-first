@@ -6,6 +6,7 @@ import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { ManagedStrategy } from '@/lib/strategy-events'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
+import type { HousingPreviewData } from '@/lib/housing-trigger'
 import { StrategieModalShell } from './strategie-modal-shell'
 import { AowStrategieEditor } from './aow-strategie-editor'
 import { PensioenStrategieEditor } from './pensioen-strategie-editor'
@@ -16,6 +17,8 @@ export interface StrategieEditorsData {
   aowRows: AowLeeftijdRow[]
   dateOfBirth: string | null
   grossYearlyIncome: number
+  /** Basis voor de live preview in de Huis-strategie-modal (null = geen preview). */
+  housingPreview: HousingPreviewData | null
 }
 
 /**
@@ -80,6 +83,7 @@ export function StrategieEditors({
       >
         <HousingStrategySection
           showHeader={false}
+          preview={data.housingPreview}
           onSaved={() => {
             onClose()
             router.refresh()

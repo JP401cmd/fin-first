@@ -62,6 +62,12 @@ export default async function ToekomstGebeurtenissenPage() {
     aowRows,
     dateOfBirth: dob,
     grossYearlyIncome: (ei.monthlyIncome ?? 0) * 12,
+    // Live preview Huis-strategie: zelfde simBasis als waarmee de loader de
+    // virtuele housing-events resolvede — de modal rekent dan per definitie
+    // hetzelfde trigger-moment en dezelfde vrijheidsleeftijd als de grafiek.
+    housingPreview: horizonData.housingSimBasis
+      ? { simBasis: horizonData.housingSimBasis, context: horizonData.housingContext }
+      : null,
   }
 
   // Baseline FIRE-projectie voor de EventPane impact-preview — zelfde

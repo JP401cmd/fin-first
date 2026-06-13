@@ -66,7 +66,11 @@ export interface DownsizeConfig {
   trigger: HousingStrategyTrigger
   /** Trigger-leeftijd voor fixed_age; fallback-leeftijd voor on_depletion (als depletion nooit triggert). */
   triggerAge: number
-  /** Drempel in jaren liquide-vermogen voor on_depletion trigger. Bv. 2 = trigger als liquide < 2 × jaaruitgaven. */
+  /**
+   * Veiligheidsmarge in jaren uitgaven (geïndexeerd) bovenop de
+   * verkoopkosten-buffer voor de on_depletion-trigger. 0 = trigger precies
+   * wanneer liquide vermogen ≤ verkoopkosten. Zie lib/housing-trigger.ts.
+   */
   depletionThresholdYears: number
   /** % van WOZ-waarde dat de verkoopopbrengst representeert. Default 1.00. */
   salePricePct: number
@@ -80,6 +84,7 @@ export interface ReverseMortgageConfig {
   mode: 'reverse_mortgage'
   trigger: HousingStrategyTrigger
   triggerAge: number
+  /** Veiligheidsmarge in jaren uitgaven — zie DownsizeConfig.depletionThresholdYears. */
   depletionThresholdYears: number
   /** Max % van overwaarde dat als lening kan worden opgenomen. Default 0.50 (NL-marktstandaard 35-65%). */
   maxLoanPct: number
@@ -117,11 +122,15 @@ export const HOUSING_STRATEGY_DESCRIPTIONS: Record<HousingStrategyMode, string> 
 
 // ── Defaults ─────────────────────────────────────────────────
 
+// depletionThresholdYears default 0: sinds de simulatie-gebaseerde trigger
+// (lib/housing-trigger.ts) is dit veld een VEILIGHEIDSMARGE bovenop de
+// verkoopkosten-buffer (jaren uitgaven, geïndexeerd) — geen drempel meer.
+// 0 = trigger precies wanneer het echt nodig is (liquide ≤ verkoopkosten).
 export const DEFAULT_DOWNSIZE_CONFIG: DownsizeConfig = {
   mode: 'downsize',
   trigger: 'fixed_age',
   triggerAge: 67,
-  depletionThresholdYears: 2,
+  depletionThresholdYears: 0,
   salePricePct: 1.0,
   salesCostsPct: 0.04,
   newMonthlyHousingCost: null,
@@ -131,7 +140,7 @@ export const DEFAULT_REVERSE_MORTGAGE_CONFIG: ReverseMortgageConfig = {
   mode: 'reverse_mortgage',
   trigger: 'fixed_age',
   triggerAge: 67,
-  depletionThresholdYears: 2,
+  depletionThresholdYears: 0,
   maxLoanPct: 0.5,
   interestRate: 0.055,
   monthlyPayout: null,
@@ -523,6 +532,12 @@ export interface OnDepletionTriggerResult {
 }
 
 /**
+ * @deprecated Vervangen door `resolveHousingTriggerFromProjection` in
+ * lib/housing-trigger.ts (trigger uit de échte unified projection i.p.v.
+ * dit versimpelde 1D-model dat AOW/pensioen/events/aflossing negeert).
+ * Alleen nog gebruikt door de legacy `getHousingLifeEvents`-wrapper en
+ * bestaande tests; verwijderen in vervolg-PR.
+ *
  * Bepaal het verkoopmoment voor downsize × on_depletion.
  *
  * Definitie:
@@ -694,6 +709,10 @@ export function resolveDownsizeTriggerOnDepletion(
 // ── Trigger resolution ───────────────────────────────────────
 
 /**
+ * @deprecated Vervangen door `resolveHousingTriggerFromProjection` in
+ * lib/housing-trigger.ts. Alleen nog gebruikt door legacy
+ * `applyHousingStrategy`/`getHousingLifeEvents` en bestaande tests.
+ *
  * Bepaal de leeftijd waarop de strategie activeert.
  *
  * fixed_age:    direct uit config.
@@ -880,64 +899,38 @@ export function isHousingStrategyEvent(event: { id: string }): boolean {
 }
 
 /**
- * Genereer virtuele LifeEvents voor de gekozen housing strategy zodat ze in
- * de event-tijdlijn op /horizon zichtbaar worden. Worden niet naar de DB
- * geschreven — bestaan alleen in-memory en worden door `lifeEventsToCashflows`
- * (de bestaande LifeEvent → SimCashflow-pipeline) opgepikt voor de simulatie.
+ * Bouw de virtuele LifeEvents voor downsize/reverse_mortgage op een GEGEVEN
+ * trigger-leeftijd. De bedragen-logica (WOZ-projectie, hypotheek-amortisatie,
+ * sub-cashflows) is hier gecentraliseerd; het MOMENT komt van buiten —
+ * sinds de simulatie-gebaseerde trigger (lib/housing-trigger.ts) wordt dat
+ * uit dezelfde unified-projection-engine afgeleid als de grafiek, zodat de
+ * event-marker exact samenvalt met het uitputtingsmoment in de grafiek.
+ *
+ * `extraMetadata` wordt als laatste over de event-metadata gemerged
+ * (bv. `depletion`-uitleg, `triggerMode`).
  *
  * Per mode:
- *   include_full / exclude_from_fire → [] (geen tijdlijn-impact)
- *   downsize → 3 events op trigger-leeftijd:
- *     - Verkoop eigen woning (one_time_cost = -saleProceeds → income)
- *     - Einde hypotheekbetaling (monthly_cost_change = -mortgage → income)
- *     - Nieuwe woonkosten (monthly_cost_change = +newMonthlyHousingCost)
- *   reverse_mortgage → 1 event op trigger-leeftijd:
+ *   downsize → 1 event met 3 soorten sub-cashflows in metadata.cashflows:
+ *     - Verkoopopbrengst (one_time income)
+ *     - Bespaarde hypotheekbetaling per hypotheek (recurring income)
+ *     - Nieuwe woonkosten (recurring expense, geïndexeerd)
+ *   reverse_mortgage → 1 event:
  *     - Opeethypotheek-uitkering (monthly_income_change = monthlyPayout)
  */
-export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEvent[] {
-  const {
-    config,
-    context,
-    currentAge,
-    endAge,
-    yearlyExpenses,
-    currentLiquidPortfolio,
-    annualSavings = 0,
-    currentNetCashflowYearly,
-    grossReturn,
-    inflationRate,
-  } = input
+export function buildHousingLifeEventsAtAge(
+  config: DownsizeConfig | ReverseMortgageConfig,
+  context: HousingContext,
+  triggerAge: number,
+  currentAge: number,
+  endAge: number,
+  extraMetadata: Record<string, unknown> = {},
+): LifeEvent[] {
   if (!context.hasEigenHuis) return []
 
   const baseMetadata = { source: HOUSING_STRATEGY_EVENT_SOURCE, strategy: config.mode }
 
   switch (config.mode) {
-    case 'include_full':
-    case 'exclude_from_fire':
-      return []
-
     case 'downsize': {
-      // Trigger-moment. Voor on_depletion gebruiken we de nieuwe crossover-
-      // definitie (liquide vermogen < overwaarde tijdens afbouw); voor
-      // fixed_age direct de geconfigureerde leeftijd.
-      let triggerAge: number
-      let depletion: OnDepletionTriggerResult | null = null
-      if (config.trigger === 'on_depletion') {
-        depletion = resolveDownsizeTriggerOnDepletion(
-          currentAge,
-          config.triggerAge,
-          yearlyExpenses,
-          currentLiquidPortfolio,
-          context,
-          annualSavings,
-          currentNetCashflowYearly,
-          grossReturn,
-          inflationRate,
-        )
-        triggerAge = depletion.triggerAge
-      } else {
-        triggerAge = Math.max(currentAge, config.triggerAge)
-      }
       // Projecteer per-hypotheek saldo + maandlast + resterende looptijd
       // naar trigger-moment. Daarmee weten we (a) hoeveel cash de verkoop
       // oplevert, (b) hoeveel bespaarde lasten je nog ontvangt en (c) tot
@@ -1064,28 +1057,16 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
             yearsToTrigger: triggerAge - currentAge,
             newMonthly,
             isAutoEstimate: config.newMonthlyHousingCost == null,
-            // Trigger-uitleg (alleen bij on_depletion): laat zien waarom dit
-            // moment. Geeft data voor UI-breakdown.
-            depletion,
             triggerMode: config.trigger,
-            currentLiquidPortfolio,
-            yearlyExpenses,
-            annualSavings,
-            currentNetCashflowYearly,
+            // Trigger-uitleg (`depletion` e.d.) komt via extraMetadata van de
+            // resolver — laat zien waarom dit moment. Data voor UI-breakdown.
+            ...extraMetadata,
           },
         },
       ]
     }
 
     case 'reverse_mortgage': {
-      const triggerAge = resolveTriggerAge(
-        config.trigger,
-        config.triggerAge,
-        config.depletionThresholdYears,
-        currentAge,
-        yearlyExpenses,
-        currentLiquidPortfolio,
-      )
       // Projecteer hypotheek-saldo naar trigger — overwaarde groeit terwijl
       // de hypotheek wordt afgelost. Woning-waarde groeit nu ook mee via
       // het asset-specifieke `expected_return` zodat de equity-projectie
@@ -1138,9 +1119,80 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
             mortgageBalance: context.mortgageBalance,
             mortgageBalanceAtTrigger,
             yearsToTrigger: triggerAge - currentAge,
+            triggerMode: config.trigger,
+            ...extraMetadata,
           },
         },
       ]
+    }
+  }
+}
+
+/**
+ * @deprecated Vervangen door `resolveHousingEventsForSim` in
+ * lib/housing-trigger.ts, die het trigger-moment uit de unified projection
+ * afleidt (zelfde engine als de grafiek). Deze wrapper gebruikt nog de oude
+ * versimpelde 1D-resolvers en bestaat alleen voor legacy callers/tests;
+ * verwijderen in een vervolg-PR zodra de testmigratie rond is.
+ */
+export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEvent[] {
+  const {
+    config,
+    context,
+    currentAge,
+    endAge,
+    yearlyExpenses,
+    currentLiquidPortfolio,
+    annualSavings = 0,
+    currentNetCashflowYearly,
+    grossReturn,
+    inflationRate,
+  } = input
+  if (!context.hasEigenHuis) return []
+
+  switch (config.mode) {
+    case 'include_full':
+    case 'exclude_from_fire':
+      return []
+
+    case 'downsize': {
+      let triggerAge: number
+      let depletion: OnDepletionTriggerResult | null = null
+      if (config.trigger === 'on_depletion') {
+        depletion = resolveDownsizeTriggerOnDepletion(
+          currentAge,
+          config.triggerAge,
+          yearlyExpenses,
+          currentLiquidPortfolio,
+          context,
+          annualSavings,
+          currentNetCashflowYearly,
+          grossReturn,
+          inflationRate,
+        )
+        triggerAge = depletion.triggerAge
+      } else {
+        triggerAge = Math.max(currentAge, config.triggerAge)
+      }
+      return buildHousingLifeEventsAtAge(config, context, triggerAge, currentAge, endAge, {
+        depletion,
+        currentLiquidPortfolio,
+        yearlyExpenses,
+        annualSavings,
+        currentNetCashflowYearly,
+      })
+    }
+
+    case 'reverse_mortgage': {
+      const triggerAge = resolveTriggerAge(
+        config.trigger,
+        config.triggerAge,
+        config.depletionThresholdYears,
+        currentAge,
+        yearlyExpenses,
+        currentLiquidPortfolio,
+      )
+      return buildHousingLifeEventsAtAge(config, context, triggerAge, currentAge, endAge)
     }
   }
 }

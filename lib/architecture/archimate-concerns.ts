@@ -55,6 +55,14 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['app-comp'],
   },
   {
+    id: 'horizon-engine-v2-duaal',
+    title: 'Twee FIRE-engines live (v1 nominaal · v2 reëel grootboek)',
+    detail:
+      'lib/horizon-engine/ (v2) draait achter de per-user flag horizon_engine_v2 naast lib/unified-projection.ts (v1). Bewust voor de gated cutover, maar twee engines = driftrisico. Architectuur + invarianten: docs/architecture/horizon-engine-v2.md (ADR 0013). Twee bekende open punten bij troubleshooten: (1) hardgecodeerde Box 1/HRA-placeholderconstanten in engine.ts botsen met de "geen financiële constanten buiten constants.ts/box3-data.ts"-regel (Fase-2-schuld → lib/box1-tax.ts); (2) pot_rules nog niet doorgedraad (v2 gebruikt defaults). Houd vast: single source = LedgerRow[]; adapter is het enige reëel→nominaal-punt; FIRE = forward doel-zoektocht, geen crossing.',
+    severity: 'debt',
+    elementIds: ['as-planning', 'fn-toekomstplannen'],
+  },
+  {
     id: 'horizon-god-component',
     title: 'horizon-client.tsx is een god-component',
     detail:

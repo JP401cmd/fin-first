@@ -56,6 +56,15 @@ export interface WithdrawalContext {
   legacyAmount?: number
   /** Inflatiepercentage als decimaal (bijv. 0.02 voor 2%) — nodig voor reëel rendement in annuïteit */
   inflation?: number
+  /**
+   * Legacy alléén: onttrek de netto behoefte (need-only) en laat het residu naar
+   * de nalatenschap groeien, i.p.v. de spend-down-annuïteit die het surplus bóven
+   * het doel opspendt. Nodig voor grootboek-modellen (horizon-engine v2) waar het
+   * over-onttrokken surplus NIET geconsumeerd/herbelegd wordt en dus zou verdampen
+   * (waardoor de nalatenschap nooit gehaald wordt). Default false/undefined =
+   * spend-down-annuïteit (v1, consumptie-interpretatie). Zie ADR 0014.
+   */
+  legacyPreserveOnly?: boolean
 }
 
 /** State for bucket strategy — tracks allocation across 3 buckets */
@@ -190,6 +199,9 @@ function applyStatic(ctx: WithdrawalContext): number {
   // computeAnnuityBase already subtracts legacyAmount from availablePortfolio,
   // so the annuity depletes only the excess to ≈€0 by endAge while preserving the legacy.
   if (ctx.endStrategy === 'legacy') {
+    // Need-only modus (grootboek): onttrek alleen de behoefte; het residu groeit
+    // naar de nalatenschap (ADR 0014). De annuïteit zou het surplus opspenden.
+    if (ctx.legacyPreserveOnly) return netBaseExpenses
     const annuity = computeAnnuityBase(ctx)
     return Math.max(annuity, netBaseExpenses)
   }
@@ -285,7 +297,9 @@ function applyGuardrails(
   // Determine the base withdrawal:
   // For deplete/legacy: annuity recalculated each year (schuivende basis)
   // For perpetual/pensioen/undefined: classic netBaseExpenses
-  const useAnnuityBase = ctx.endStrategy === 'deplete' || ctx.endStrategy === 'legacy'
+  // Legacy in need-only modus (grootboek): geen spend-down-annuïteit als basis,
+  // maar de netto behoefte — het residu groeit naar de nalatenschap (ADR 0014).
+  const useAnnuityBase = ctx.endStrategy === 'deplete' || (ctx.endStrategy === 'legacy' && !ctx.legacyPreserveOnly)
   const annuityBase = useAnnuityBase ? computeAnnuityBase(ctx) : netBaseExpenses
   // The effective base is at least netBaseExpenses (never withdraw less than living costs)
   const effectiveBase = useAnnuityBase ? Math.max(annuityBase, netBaseExpenses) : netBaseExpenses
@@ -415,6 +429,10 @@ function applyBucket(
 ): number {
   const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
   void bucketState // bucket allocation tracked externally via waterfallWithdraw
+
+  // Legacy need-only modus (grootboek): onttrek alleen de behoefte, residu groeit
+  // naar de nalatenschap (ADR 0014).
+  if (ctx.endStrategy === 'legacy' && ctx.legacyPreserveOnly) return netBaseExpenses
 
   // For deplete/legacy, compute annuity-based withdrawal to force depletion
   // on the same sliding basis as applyStatic and applyGuardrails

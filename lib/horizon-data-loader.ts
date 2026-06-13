@@ -30,10 +30,14 @@ import {
   parseHousingStrategy,
   deriveHousingContext,
   getFireEligibleNetWorth,
-  getHousingLifeEvents,
   type HousingStrategyConfig,
   type HousingContext,
 } from '@/lib/housing-strategy'
+import { resolveHousingEventsForSim, type HousingTriggerSimBasis } from '@/lib/housing-trigger'
+import { lifeEventsToCashflows } from '@/lib/fire-simulation'
+import { NL_AOW_AGE } from '@/lib/constants'
+import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
+import { resolvePotRules, type PotRulesConfig } from '@/lib/pot-rules'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
 import { resolveEffectiveIncomeExpenses } from './effective-financials'
@@ -80,6 +84,10 @@ export interface HorizonPageData {
   box3Method: 'forfaitair' | 'werkelijk'
   /** Of de gebruiker een fiscaal partner heeft (voor heffingsvrij vermogen berekening) */
   hasPartner: boolean
+  /** Feature-flag: gebruik de grootboek-engine v2 op /toekomst (per-user opt-in). */
+  horizonEngineV2: boolean
+  /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde voor v2. */
+  potRules: PotRulesConfig
   /** Error message from profile query, null if successful */
   profileError: string | null
   /** Total balance of disconnected bank accounts (not linked to assets) */
@@ -115,6 +123,13 @@ export interface HorizonPageData {
   fireEligibleNetWorth: number
   /** ISO-timestamp wanneer de housing-strategy nudge-sheet is gedismist; null = nog niet getoond. */
   housingStrategyDismissedAt: string | null
+  /**
+   * Basis-input waarmee de housing-trigger-resolver server-side draaide.
+   * Doorgegeven aan de Huis-strategie-modal voor de live preview, zodat die
+   * met exact dezelfde engine-basis rekent als de grafiek. Null wanneer de
+   * basis niet kon worden gebouwd.
+   */
+  housingSimBasis: HousingTriggerSimBasis | null
 }
 
 /**
@@ -218,7 +233,7 @@ export async function loadHorizonData(
     // duplicate pair on the same table.
     supabase.from('assets').select('*').eq('is_active', true).limit(500),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
@@ -609,42 +624,62 @@ export async function loadHorizonData(
   // Maken downsize/reverse_mortgage zichtbaar op de tijdlijn. Worden door de
   // bestaande LifeEvent → SimCashflow-pipeline opgepikt voor de simulatie.
   // Read-only — UI markeert ze via metadata.source = 'housing-strategy'.
+  //
+  // Het on_depletion-trigger-moment komt uit `resolveHousingEventsForSim`
+  // (lib/housing-trigger.ts): dezelfde unified-projection-engine als de
+  // grafiek, zodat de event-marker samenvalt met het uitputtingsmoment in
+  // de grafiek. Op /toekomst regenereert de client-hook deze events met de
+  // actuele client-parameters; deze server-set is de initiële weergave.
   const currentAgeForHousing = dob ? ageAtDate(dob) : 40
-  const liquidEstimate = Math.max(
-    0,
-    netWorth - (housingContext.eigenHuisValue - housingContext.mortgageBalance),
-  )
-  // Annual savings = monthly_contribution × 12 (aggregaat over alle assets,
-  // of override uit profile). Wordt nog meegegeven als fallback maar de
-  // phase-gate gebruikt nu primair `currentNetCashflowYearly` (income −
-  // expenses) — robuuster wanneer asset-contributions niet zijn ingevuld.
+  const housingHouseholdType = String((profile as Record<string, unknown>).household_type ?? 'solo')
+  const housingHasPartner = housingHouseholdType === 'samenwonend' || housingHouseholdType === 'getrouwd'
+  // Annual savings: zelfde bron als de client-sim (override > cashflow-
+  // spaarquote > asset-contributies), zodat het trigger-moment overeenkomt.
   const housingOverrideRaw = savingsOverrideResult.error
     ? null
     : (savingsOverrideResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override ?? null
   const housingMonthlyOverride = housingOverrideRaw == null ? null : Number(housingOverrideRaw)
-  const effectiveMonthlyContribForHousing =
+  const annualSavingsForHousing =
     housingMonthlyOverride != null && housingMonthlyOverride >= 0
-      ? housingMonthlyOverride
-      : monthlyContributions
-  const annualSavingsForHousing = effectiveMonthlyContribForHousing * 12
-  // Phase-detectie: gebruiker zit in opbouw zolang z'n huidige cashflow
-  // (income − expenses) positief is. Komt uit transacties of profile-fallback.
-  const currentNetCashflowYearly = (effectiveMonthlyIncome - effectiveMonthlyExpenses) * 12
-  const housingEvents = getHousingLifeEvents({
-    config: housingStrategy,
-    context: housingContext,
+      ? housingMonthlyOverride * 12
+      : (baseAnnualSavingsFromCashflow != null && baseAnnualSavingsFromCashflow > 0
+          ? baseAnnualSavingsFromCashflow
+          : monthlyContributions * 12)
+  // Pensioen-modus: FIRE-moment is exogeen (AOW). Geen aow-tabel in deze
+  // loader — NL_AOW_AGE volstaat; de client regenereert met de echte
+  // fractionele AOW-leeftijd.
+  const housingIsPensioen = fireStrategy.strategy === 'pensioen'
+  const housingEndAge = housingIsPensioen
+    ? Math.max(fireStrategy.endAge, NL_AOW_AGE + 1)
+    : fireStrategy.endAge
+  // Basis voor de trigger-resolver én (via HorizonPageData) voor de live
+  // preview in de Huis-strategie-modal — één definitie, geen drift.
+  const housingSimBasis: HousingTriggerSimBasis = {
+    assets,
+    debts,
     currentAge: currentAgeForHousing,
-    endAge: fireStrategy.endAge,
-    yearlyExpenses: yearlyRetirementExpenses,
-    currentLiquidPortfolio: liquidEstimate,
+    endAge: housingEndAge,
+    yearlyExpenses: yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12,
     annualSavings: annualSavingsForHousing,
-    currentNetCashflowYearly,
-    // Rendement-parameters voor de on_depletion-trigger: zonder rendement
-    // valt de trigger te vroeg (liquide raakt sneller op dan in
-    // werkelijkheid omdat de groei niet meetelt).
+    monthlyIncome: effectiveMonthlyIncome,
     grossReturn: fireParams.grossReturn,
     inflationRate: fireParams.inflationRate,
-  })
+    box3Method: fireParams.box3Method,
+    cashflows: lifeEventsToCashflows(realEvents),
+    strategyConfig: housingIsPensioen ? { ...fireStrategy, endAge: housingEndAge } : fireStrategy,
+    withdrawalStrategy,
+    forcedFireAge: housingIsPensioen ? NL_AOW_AGE : undefined,
+    hasPartner: housingHasPartner,
+    bankAccountCash: unlinkedCash,
+  }
+  let housingEvents: LifeEvent[] = []
+  try {
+    housingEvents = resolveHousingEventsForSim(housingStrategy, housingContext, housingSimBasis).events
+  } catch (err) {
+    // Degradatie: zonder housing-events laden (zelfde gedrag als sim-failure
+    // elders) — beter een tijdlijn zonder verkoop-event dan een 500.
+    console.error('[horizon-data-loader] resolveHousingEventsForSim failed:', err)
+  }
   const loadedEvents: LifeEvent[] = [...realEvents, ...housingEvents]
 
   // Cumulative impacts
@@ -654,6 +689,8 @@ export async function loadHorizonData(
   const box3Method = fireParams.box3Method
   const householdType = String((profile as Record<string, unknown>).household_type ?? 'solo')
   const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
+  const horizonEngineV2 = isHorizonV2Enabled(profile as { feature_preferences?: Record<string, unknown> | null })
+  const potRules = resolvePotRules(profile as { pot_rules?: unknown })
   const numberOfChildren = Number((profile as Record<string, unknown>).number_of_children ?? 0)
 
   // ── Horizon setup-pane state ──────────────────────────────────────
@@ -699,6 +736,8 @@ export async function loadHorizonData(
     assets,
     box3Method,
     hasPartner,
+    horizonEngineV2,
+    potRules,
     profileError: profileResult.error
       ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`
       : null,
@@ -715,5 +754,6 @@ export async function loadHorizonData(
     housingContext,
     fireEligibleNetWorth,
     housingStrategyDismissedAt,
+    housingSimBasis,
   }
 }

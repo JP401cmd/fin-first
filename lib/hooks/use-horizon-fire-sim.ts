@@ -13,36 +13,18 @@
 
 import { useMemo, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import {
-  ageAtDate,
-  DEFAULT_RETURN,
-  INFLATION,
-  type FinancialInput,
-  type LifeEvent,
-} from '@/lib/horizon-data'
-import { NL_AOW_AGE } from '@/lib/constants'
-import {
-  lifeEventsToCashflows,
-  type SimResult,
-  type SimCashflow,
-} from '@/lib/fire-simulation'
-import { type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
-import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
-import {
-  runUnifiedProjection,
-  toSimResult,
-  type UnifiedProjectionInput,
-  type UnifiedProjectionResult,
-  type UnifiedProjectionRow,
-} from '@/lib/unified-projection'
+import { type FinancialInput, type LifeEvent } from '@/lib/horizon-data'
+import { type SimResult, type SimCashflow } from '@/lib/fire-simulation'
+import { type FireStrategyConfig } from '@/lib/fire-strategy'
+import { type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import { toSimResult, type UnifiedProjectionRow } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
+import type { PotRulesConfig } from '@/lib/pot-rules'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
-import {
-  filterAssetsForFire,
-  DEFAULT_HOUSING_STRATEGY,
-  type HousingStrategyConfig,
-} from '@/lib/housing-strategy'
+import { type HousingStrategyConfig } from '@/lib/housing-strategy'
 
 export interface HorizonFireSimResult {
   result: SimResult | null
@@ -55,6 +37,14 @@ export interface HorizonFireSimResult {
   originalFireAgeFractional: number | null
   /** Unified projection rows with per-asset-type detail (for vermogensopbouw chart) */
   unifiedRows: UnifiedProjectionRow[] | null
+  /**
+   * Echte life events + client-side geregenereerde housing-strategy-events.
+   * De virtuele events van de server worden gestript en hier opnieuw
+   * geresolved met de ACTUELE client-parameters (rendement, inflatie,
+   * strategie) zodat het on_depletion-trigger-moment meebeweegt — markers en
+   * tijdlijn horen deze array te consumeren, niet de server-events.
+   */
+  effectiveLifeEvents: LifeEvent[]
 }
 
 interface HorizonFireSimInput {
@@ -88,99 +78,44 @@ interface HorizonFireSimInput {
   baseAnnualSavingsFromCashflow?: number | null
   /** Eigen-woning-strategie uit profiles.housing_strategy_config. Default include_full. */
   housingStrategy?: HousingStrategyConfig
+  /** Feature-flag: gebruik de grootboek-engine v2 i.p.v. runUnifiedProjection.
+   *  Default false = byte-identiek aan de huidige productie-engine. Omkeerbaar (Fase 4). */
+  horizonEngineV2?: boolean
+  /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde voor v2. */
+  potRules?: PotRulesConfig
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, horizonEngineV2, potRules } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
-  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[] } | null>(() => {
-    if (!horizonInput) return null
+  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[] } | null>(() => {
+    // Input-assemblage via de gedeelde builder (single source — ook gebruikt door
+    // de beheer-tabel-API). Zie lib/horizon-engine/build-input.ts.
+    const built = buildHorizonInput({
+      horizonInput: horizonInput ?? null,
+      lifeEvents: lifeEvents ?? [],
+      fireStrategy,
+      withdrawalStrategy,
+      grossReturn: grossReturnParam,
+      inflation: inflationParam,
+      aowAgeFractional: aowAgeFractionalParam,
+      assets,
+      debts,
+      box3Method,
+      hasPartner,
+      bankAccountCash,
+      monthlySavingsOverride,
+      baseAnnualSavingsFromCashflow,
+      housingStrategy,
+      potRules,
+      horizonEngineV2: horizonEngineV2 ?? false,
+    })
+    if (!built) return null
+    const { input: unifiedInput, cashflows, effectiveLifeEvents, isPensioen, aowAge, aowAgeInt, strategyOptions } = built
 
-    const { monthlyContributions, yearlyMustExpenses, dateOfBirth, monthlyIncome } = horizonInput
-
-    // currentAge
-    const currentAge = dateOfBirth ? ageAtDate(dateOfBirth) : null
-    if (currentAge === null) return null
-
-    // yearlyExpenses = al berekend via computeRetirementExpenses in de pagina
-    const yearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : 0
-    if (yearlyExpenses <= 0) return null
-
-    // annualSavings — prioriteit:
-    //   1. expliciete spaar-override uit de FIRE-setup (monthlySavingsOverride × 12)
-    //   2. cashflow-spaarquote × inkomen (baseAnnualSavingsFromCashflow) — de
-    //      canonieke bron, gelijk aan wat /overzicht/cashflow toont
-    //   3. asset-contributie-aggregaat (legacy fallback voor lege data)
-    // De engine indexeert dit jaarbedrag zelf met inflatie over de opbouwjaren.
-    const annualSavings = monthlySavingsOverride != null && monthlySavingsOverride >= 0
-      ? monthlySavingsOverride * 12
-      : (baseAnnualSavingsFromCashflow != null && baseAnnualSavingsFromCashflow > 0
-          ? baseAnnualSavingsFromCashflow
-          : (monthlyContributions ?? 0) * 12)
-    const monthlySurplus = annualSavings / 12
-
-    const grossReturn = grossReturnParam ?? DEFAULT_RETURN
-    const inflationRate = inflationParam ?? INFLATION
-
-    // Strategy config — determines endAge and convergence target
-    const strategyForSim = fireStrategy ?? DEFAULT_FIRE_STRATEGY
-
-    // ── Pensioen strategy: force FIRE at AOW age, simulate full horizon ──
-    const isPensioen = strategyForSim.strategy === 'pensioen'
-    const aowAge = aowAgeFractionalParam ?? NL_AOW_AGE
-    const aowAgeInt = Math.ceil(aowAge)
-
-    // For pensioen: keep strategy as 'pensioen' so the withdrawal engine uses
-    // fixed expenses (not annuity). Ensure endAge is at least AOW+1.
-    const effectiveStrategy = isPensioen
-      ? { ...strategyForSim, endAge: Math.max(strategyForSim.endAge, aowAgeInt + 1) }
-      : strategyForSim
-    const simEndAge = effectiveStrategy.endAge
-
-    // forcedFireAge: skip binary-search, force accumulation→retirement at AOW
-    const forcedFireAge = isPensioen ? aowAgeInt : undefined
-
-    // ── Housing strategy pre-processing ───────────────────────────────
-    // Filter eigen_huis + linked mortgage uit bij exclude/downsize-modes.
-    // De virtuele LifeEvents voor downsize/reverse_mortgage (verkoop, einde
-    // hypotheek, nieuwe woonkost, opeethypotheek-uitkering) zitten al in de
-    // `lifeEvents`-array — toegevoegd door horizon-data-loader. Ze worden
-    // hieronder via lifeEventsToCashflows in cashflows omgezet.
-    const housingCfg = housingStrategy ?? DEFAULT_HOUSING_STRATEGY
-    const { assets: effectiveAssets, debts: effectiveDebts } = filterAssetsForFire(
-      housingCfg,
-      assets ?? [],
-      debts ?? [],
-    )
-
-    // Kasstromen — uit life events (incl. virtuele housing-strategy events)
-    const cashflows: SimCashflow[] = lifeEventsToCashflows(lifeEvents ?? [])
-
-    // ── Build UnifiedProjectionInput ──────────────────────────────────
-    const unifiedInput: UnifiedProjectionInput = {
-      assets: effectiveAssets,
-      debts: effectiveDebts,
-      currentAge,
-      endAge: simEndAge,
-      yearlyExpenses,
-      annualSavings,
-      monthlySurplus,
-      monthlyIncome: monthlyIncome ?? 0,
-      incomeGrowthRate: 0,  // conservatief: geen inkomensgroei in FIRE simulatie
-      grossReturn,
-      inflationRate,
-      box3Method: box3Method ?? 'forfaitair',
-      cashflows,
-      strategyConfig: effectiveStrategy,
-      withdrawalStrategy: withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
-      forcedFireAge,
-      hasPartner: hasPartner ?? false,
-      bankAccountCash: bankAccountCash ?? 0,
-    }
-
-    // ── Run unified projection engine ─────────────────────────────────
-    const unifiedResult = runUnifiedProjection(unifiedInput)
+    // ── Run projection engine (flag-selectie v1/v2, default v1) ────────
+    const unifiedResult = runSelectedProjection(unifiedInput, horizonEngineV2 ?? false, strategyOptions)
 
     // ── Convert to SimResult via toSimResult() for backwards compatibility ──
     const result = toSimResult(unifiedResult)
@@ -201,11 +136,11 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
         requiredFirePortfolio: result.firePortfolioAtFire,
       }
 
-      return { result: pensioenResult, cashflows, originalFireAge, originalFireAgeFractional, unifiedRows: unifiedResult.rows }
+      return { result: pensioenResult, cashflows, originalFireAge, originalFireAgeFractional, unifiedRows: unifiedResult.rows, effectiveLifeEvents }
     }
 
-    return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: unifiedResult.rows }
-  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy])
+    return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: unifiedResult.rows, effectiveLifeEvents }
+  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, horizonEngineV2, potRules])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -247,7 +182,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: null, effectiveLifeEvents: [] }
   }
 
   return {
@@ -258,5 +193,6 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     originalFireAge: simResult?.originalFireAge ?? null,
     originalFireAgeFractional: simResult?.originalFireAgeFractional ?? null,
     unifiedRows: simResult?.unifiedRows ?? null,
+    effectiveLifeEvents: simResult?.effectiveLifeEvents ?? lifeEvents ?? [],
   }
 }

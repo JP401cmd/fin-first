@@ -232,13 +232,22 @@ export function EventPaneView({
 
 // ── Berekenings-uitleg voor housing-strategy events ──────────────────
 
+/**
+ * Trigger-uitleg uit lib/housing-trigger.ts (`SimulatedDepletionResult`):
+ * het moment komt uit dezelfde unified projection als de grafiek.
+ */
 interface DepletionTriggerInfo {
+  method: 'simulation'
   triggerAge: number
+  reason: 'immediate' | 'crossover' | 'fallback'
   liquidAtTrigger: number
+  bufferAtTrigger: number
+  marginAtTrigger: number
   equityAtTrigger: number
-  reason: 'immediate' | 'crossover' | 'fallback' | 'still_accumulating'
-  phase: 'accumulation' | 'decumulation'
-  netDeclinePerYear: number
+  fireAgeUsed: number | null
+  iterations: number
+  converged: boolean
+  liquidPath: { age: number; liquid: number; buffer: number }[]
 }
 
 interface HousingMetadata {
@@ -266,16 +275,8 @@ interface HousingMetadata {
   eigenHuisValue?: number
   /** Trigger-mode ('fixed_age' | 'on_depletion'). */
   triggerMode?: 'fixed_age' | 'on_depletion'
-  /** Trigger-uitleg bij on_depletion: waarom dit moment. */
+  /** Trigger-uitleg bij on_depletion: waarom dit moment (uit de simulatie). */
   depletion?: DepletionTriggerInfo
-  /** Huidig liquide vermogen (voor on_depletion-uitleg). */
-  currentLiquidPortfolio?: number
-  /** Jaarlijkse uitgaven (voor on_depletion-uitleg). */
-  yearlyExpenses?: number
-  /** Jaarlijks netto-spaarsaldo (voor on_depletion phase-uitleg). */
-  annualSavings?: number
-  /** Huidig jaarlijks netto-cashflow (income − expenses) × 12. */
-  currentNetCashflowYearly?: number
 }
 
 function HousingCalculationBreakdown({ event }: { event: LifeEvent }) {
@@ -354,20 +355,16 @@ function DepletionReasoning({
   depletion: DepletionTriggerInfo
   meta: HousingMetadata
 }) {
-  const liquidNow = meta.currentLiquidPortfolio ?? 0
-  const equityNow = (meta.eigenHuisValue ?? meta.wozValue ?? 0) - (meta.mortgageBalance ?? 0)
-  const yearlyExp = meta.yearlyExpenses ?? 0
-  const annualSav = meta.annualSavings ?? 0
-  const isAccumulating = depletion.phase === 'accumulation'
+  const isDownsize = meta.formula === 'downsize'
+  const momentLabel = isDownsize ? 'Verkoop-moment' : 'Start uitkering'
+  const ageDisplay = Math.round(depletion.triggerAge)
 
   const intro =
-    depletion.reason === 'still_accumulating'
-      ? 'Je zit nu nog in de opbouw-fase: je spaart per jaar meer dan je uitgeeft. Het huis hoef je niet aan te spreken als reservepot — pas zodra je netto inteert op je vermogen wordt verkoop relevant.'
-      : depletion.reason === 'immediate'
-        ? 'Je hebt nu geen liquide vermogen meer en zit in de afbouw-fase. Het huis is je laatste reservepot — verkoop is direct nodig.'
-        : depletion.reason === 'crossover'
-          ? `Op leeftijd ${depletion.triggerAge} raakt je liquide vermogen op. Vanaf dat moment is het huis nodig om aan je uitgaven te kunnen voldoen.`
-          : `Liquide vermogen raakt niet op binnen je fallback-window. We forceren de verkoop op leeftijd ${depletion.triggerAge} als uiterste moment.`
+    depletion.reason === 'immediate'
+      ? `Je liquide vermogen zit nu al op of onder de drempel. Het huis is je laatste reservepot — ${isDownsize ? 'verkoop is direct nodig' : 'de uitkering start direct'}.`
+      : depletion.reason === 'crossover'
+        ? `Rond je ${ageDisplay}e raakt je liquide vermogen op: je totale vermogen daalt dan tot het niveau van je eigen-huis-vermogen. Vanaf dat moment is het huis nodig om aan je uitgaven te kunnen voldoen.`
+        : `In de volledige projectie raakt je liquide vermogen niet op vóór je uiterste leeftijd — bijvoorbeeld omdat je nog netto spaart of omdat AOW/pensioen je uitgaven dekt. We gebruiken leeftijd ${ageDisplay} als uiterste moment.`
 
   return (
     <div className="mt-4 rounded-[var(--r)] border border-l-4 border-l-[var(--module-active-500)] border-[var(--border-ed)] bg-[var(--paper)] p-4">
@@ -377,108 +374,71 @@ function DepletionReasoning({
       <p className="mb-3 font-sans text-[13px] leading-relaxed text-[var(--ink-2)]">{intro}</p>
 
       <p className="mb-1.5 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-3)]">
-        Stap 1 — Welke fase zit je in?
+        Stap 1 — Hoe is dit berekend?
       </p>
-      <p className="mb-2 font-sans text-[11px] italic leading-snug text-[var(--ink-3)]">
-        Opbouw = je inkomen overstijgt je uitgaven; je vermogen groeit netto. In dat geval is
-        verkoop niet nodig — los van wat de getallen zeggen.
+      <p className="mb-3 font-sans text-[11px] italic leading-snug text-[var(--ink-3)]">
+        Met je volledige vermogensprojectie — dezelfde berekening als de grafiek. AOW- en
+        pensioeninkomen, levensgebeurtenissen, rendement per vermogenstype, schuld-aflossing
+        en box 3 tellen allemaal mee. Het moment hieronder is dus exact het punt waar de
+        grafieklijn {isDownsize ? 'zonder verkoop ' : ''}onder de drempel zakt.
       </p>
-      <div className="mb-3 space-y-0.5">
-        {meta.currentNetCashflowYearly != null ? (
-          <>
-            <CalcRow
-              label="Huidig jaarlijks inkomen − uitgaven"
-              value={`${meta.currentNetCashflowYearly >= 0 ? '+' : '−'} ${formatCurrency(Math.abs(meta.currentNetCashflowYearly))}/jr`}
-            />
-            <CalcRow
-              label={
-                isAccumulating
-                  ? 'Positief: nog in opbouw-fase'
-                  : 'Negatief: tussen- of afbouw-fase'
-              }
-              value={isAccumulating ? '— geen trigger nu' : '— trigger eligible'}
-              emphasis
-              divider
-            />
-          </>
-        ) : (
-          <>
-            <CalcRow label="Jaarlijks netto-spaarsaldo" value={`+ ${formatCurrency(annualSav)}`} />
-            <CalcRow label="Jaarlijkse uitgaven" value={`− ${formatCurrency(yearlyExp)}`} />
-            <CalcRow
-              label={
-                isAccumulating
-                  ? 'Saldo positief — opbouw-fase'
-                  : 'Saldo negatief — tussen- of afbouw-fase'
-              }
-              value={`= ${annualSav - yearlyExp >= 0 ? '+' : '−'} ${formatCurrency(Math.abs(annualSav - yearlyExp))}/jr`}
-              emphasis
-              divider
-            />
-          </>
-        )}
-      </div>
 
-      {!isAccumulating && (
+      {depletion.reason !== 'fallback' ? (
         <>
           <p className="mb-1.5 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-3)]">
             Stap 2 — Wanneer is het huis nodig als reservepot?
           </p>
           <p className="mb-2 font-sans text-[11px] italic leading-snug text-[var(--ink-3)]">
-            Regel: zodra het totale vermogen daalt tot het niveau van het eigen-huis-vermogen
-            (= liquide raakt op).
+            Regel: zodra je liquide (niet-huis) vermogen daalt tot{' '}
+            {depletion.bufferAtTrigger > 0 ? 'de verkoopkosten-buffer' : 'nul'}
+            {depletion.marginAtTrigger > 0 ? ' plus je veiligheidsmarge' : ''} — iets vóór het
+            echte nulpunt, zodat de overstap betaalbaar blijft.
           </p>
           <div className="space-y-0.5">
-            <CalcRow label="Liquide vermogen nu" value={formatCurrency(liquidNow)} />
             <CalcRow
-              label="Eigen-huis-vermogen (WOZ − hypotheek)"
-              value={formatCurrency(equityNow)}
+              label={`Liquide vermogen net vóór leeftijd ${ageDisplay}`}
+              value={formatCurrency(Math.max(0, depletion.liquidAtTrigger))}
             />
-            <CalcRow
-              label="Totaal vermogen nu (liquide + eigen-huis)"
-              value={formatCurrency(liquidNow + equityNow)}
-            />
-            {depletion.reason !== 'immediate' && depletion.netDeclinePerYear > 0 && (
+            {depletion.bufferAtTrigger > 0 && (
               <CalcRow
-                label={`Liquide neemt netto af met ${formatCurrency(depletion.netDeclinePerYear)}/jaar`}
-                value=""
+                label="Verkoopkosten-buffer (makelaar, notaris, verhuizen)"
+                value={formatCurrency(depletion.bufferAtTrigger)}
+              />
+            )}
+            {depletion.marginAtTrigger > 0 && (
+              <CalcRow
+                label="Veiligheidsmarge (extra jaren uitgaven)"
+                value={formatCurrency(depletion.marginAtTrigger)}
               />
             )}
             <CalcRow
-              label={`Liquide vermogen op leeftijd ${depletion.triggerAge}`}
-              value={formatCurrency(depletion.liquidAtTrigger)}
-            />
-            <CalcRow
-              label={`Totaal = eigen-huis-vermogen op leeftijd ${depletion.triggerAge}`}
+              label={`Overwaarde op leeftijd ${ageDisplay} (woningwaarde − hypotheek)`}
               value={formatCurrency(depletion.equityAtTrigger)}
               divider
             />
-            <CalcRow
-              label="→ Verkoop-moment"
-              value={`leeftijd ${depletion.triggerAge}`}
-              emphasis
-            />
+            <CalcRow label={`→ ${momentLabel}`} value={`leeftijd ${ageDisplay}`} emphasis />
           </div>
         </>
-      )}
-
-      {isAccumulating && (
+      ) : (
         <>
           <p className="mb-1.5 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-3)]">
-            Stap 2 — Geen trigger nodig
+            Stap 2 — Geen kruising vóór je uiterste leeftijd
           </p>
           <p className="font-sans text-[13px] leading-relaxed text-[var(--ink-2)]">
-            Zolang je netto blijft sparen, groeit je vermogen vanzelf. Verkoop wordt pas
-            relevant zodra je inteert — dan komt deze trigger automatisch terug. Tot dan
-            gebruiken we leeftijd <strong>{depletion.triggerAge}</strong> als uiterste moment.
+            In de projectie blijft er tot leeftijd {ageDisplay} liquide vermogen over
+            (op dat moment: {formatCurrency(Math.max(0, depletion.liquidAtTrigger))}). Zou je
+            situatie verslechteren, dan schuift dit moment automatisch naar voren. Tot dan
+            geldt leeftijd <strong>{ageDisplay}</strong> als uiterste moment.
           </p>
         </>
       )}
 
       <p className="mt-3 font-sans text-[11px] italic text-[var(--ink-3)]">
-        Schatting: liquide vermogen daalt lineair met (uitgaven − spaarsaldo) per jaar;
-        rendement wordt niet meegerekend (conservatief). Overwaarde volgt de amortisatie
-        van je hypotheek per jaar.
+        Berekend met dezelfde projectie-engine als de grafiek
+        {depletion.fireAgeUsed != null
+          ? `, met pensioenmoment rond leeftijd ${Math.round(depletion.fireAgeUsed)}`
+          : ''}
+        . Overwaarde volgt de WOZ-groei en de amortisatie van je hypotheek.
       </p>
     </div>
   )
@@ -631,6 +591,9 @@ function ReversePayoutBreakdown({ meta }: { meta: HousingMetadata }) {
   const yearsToTrigger = meta.yearsToTrigger ?? 0
   return (
     <div>
+      {meta.triggerMode === 'on_depletion' && meta.depletion && (
+        <DepletionReasoning depletion={meta.depletion} meta={meta} />
+      )}
       {isAuto ? (
         <>
           <p className="font-sans text-[13px] text-[var(--ink-2)]">

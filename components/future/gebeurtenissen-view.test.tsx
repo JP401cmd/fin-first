@@ -33,6 +33,7 @@ const mockStrategieData: StrategieEditorsData = {
   aowRows: [],
   dateOfBirth: null,
   grossYearlyIncome: 0,
+  housingPreview: null,
 }
 
 // EventPane wordt dynamisch (ssr:false) geladen en rendert daardoor niets in de

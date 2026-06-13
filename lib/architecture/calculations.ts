@@ -209,6 +209,20 @@ export const CALCULATIONS: Calculation[] = [
     note: 'Wordt op álle pagina’s aangeroepen met lifeEventsToCashflows — nooit met [].',
   },
   {
+    id: 'horizon-grootboek-v2',
+    title: 'FIRE — grootboek-engine (v2, tabel-georiënteerd)',
+    domain: 'Toekomst (FIRE)',
+    summary:
+      'Alternatieve FIRE-engine: forward V_op (opgebouwd vermogen) + backward V_nodig (benodigd vermogen vanaf eindleeftijd terug — dus dalend), snijpunt = FIRE. Rekent reëel, volledig gedecomponeerd grootboek (tabellen A–G). Sluit de dode pot-regels aan (verdeling/onttrekkingsvolgorde) + Box 3-drag. Staat in productie achter een flag (default uit).',
+    inputs: ['assets', 'debts', 'FIRE-parameters', 'life_events (cashflows)', 'verdeling-/onttrekkingsstrategie'],
+    outputs: ['LedgerRow[] (grootboek)', 'V_nodig per jaar', 'FIRE-snijpunt', 'tabellen A–G'],
+    formula: 'forward: vermogen × (1+reëel rendement) + sparen − Box 3 − onttrekking; backward: V_nodig[i] = (V_nodig[i+1] + nettoBehoefte) / (1 + reële onttrekkingsvoet)',
+    files: ['lib/horizon-engine/engine.ts', 'lib/horizon-engine/strategies.ts', 'lib/horizon-engine/adapter.ts', 'lib/horizon-engine/compare.ts', 'lib/horizon-engine/build-input.ts', 'lib/withdrawal-strategy.ts'],
+    functions: ['runHorizonLedger', 'ledgerToUnifiedResult', 'runSelectedProjection', 'compareEngines', 'applyWithdrawalStrategy', 'buildHorizonInput'],
+    elementIds: ['as-planning', 'fn-toekomstplannen'],
+    note: 'Architectuur (invarianten + uitbreidingsregels): docs/architecture/horizon-engine-v2.md. Plan: docs/horizon-tabel-rekenmotor-plan.md. ADR 0013 + 0014 + 0015. Inspecteerbaar op /beheer/horizon-tabellen. Single source of truth = LedgerRow[] (per asset/schuld); intern reëel, de adapter is het ENIGE reëel→nominaal-punt; FIRE = forward doel-zoektocht (geen crossing); strategieën zijn pure plug-ins. Eindstrategie-onttrekking: deplete = spend-down-annuïteit (→ ~€0); legacy = need-only (residu groeit naar de nalatenschap, via ctx.legacyPreserveOnly in withdrawal-strategy.ts — anders verdampt het surplus in het grootboek; ADR 0014); perpetual/pensioen = need-only. Eigen-huis-downsize (v2): huis blijft niet-liquide asset in het grootboek, verkoop = asset-liquidatie op de trigger (UnifiedProjectionInput.assetLiquidations) i.p.v. filteren + inkomen — netto vermogen continu (alleen −verkoopkosten), liquiditeit verspringt; trigger op v2-liquide via buildHorizonInput (ADR 0015). Feature-flag profiles.feature_preferences.horizon_engine_v2 (isHorizonV2Enabled) — **default AAN sinds cutover C3 (ADR 0016); een expliciete `false` is de opt-out**. FIRE-consumenten (/toekomst-hook + dashboard-data-loader) kiezen via runSelectedProjection; /core/AI/briefing consumeren de bundel. C4/C5 (runSimulation-oppervlakken migreren + runUnifiedProjection/runSimulation verwijderen — 99 bestanden, 7 niet-FIRE-motoren) bewust aparte migratie. Productie-default flippen + legacy verwijderen is een aparte gated stap ná review van de parity-diffs (compareEngines). B2-parity (13 jun, na de fixes legacy-need-only/recurring-×12/housing-liquidatie): v2 ligt voor spend-down-strategieën later (persona deplete +7 jr, legacy +6 jr) door reëel-vs-nominaal, en gelijk voor behoud (perpetual +1, pensioen 0); eindnetto verschilt navenant. Owner legacy €200k: v1 onbereikbaar, v2 ~74 (haalbaar, eindigt ≥ doel).',
+  },
+  {
     id: 'vrijheidsvoortgang',
     title: 'Vrijheidsvoortgang (FIRE-eligible)',
     domain: 'Toekomst (FIRE)',
@@ -253,6 +267,32 @@ export const CALCULATIONS: Calculation[] = [
     files: ['lib/budget-utils.ts'],
     functions: ['computeRetirementExpenses'],
     elementIds: ['as-planning'],
+  },
+  {
+    id: 'huis-strategie-trigger',
+    title: 'Eigen-huis-strategie — "wanneer nodig"-trigger',
+    domain: 'Toekomst (FIRE)',
+    summary:
+      'Het moment waarop de woning wordt verkocht (downsize) of de opeethypotheek start: afgeleid uit dezelfde unified projection als de grafiek, zodat de event-marker exact samenvalt met het punt waar het liquide vermogen in de grafiek opraakt. Capped vaste-punt-iteratie lost de rondrekening op (het event beïnvloedt de FIRE-leeftijd en daarmee het pad vóór de trigger).',
+    inputs: [
+      'volledige projectie-basis (assets/schulden, sparen, rendement, inflatie, box 3, AOW/pensioen- en overige event-cashflows)',
+      'strategie-config (verkoopprijs%/verkoopkosten%, max-leen%/rente, veiligheidsmarge, fallback-leeftijd)',
+    ],
+    outputs: [
+      'trigger-leeftijd (= eerste jaar waar liquide ≤ verkoopkosten-buffer + veiligheidsmarge)',
+      'virtuele LifeEvents (verkoopopbrengst / bespaarde hypotheek / nieuwe huur / maanduitkering)',
+      'uitleg-bundel (reden, liquide pad, overwaarde bij trigger)',
+    ],
+    formula:
+      'meet(F) = unified projection zonder housing-event, gepind op forcedFireAge F; D₀ = eerste kruising; iteratie: F ← fireAge(run mét event op Dₖ), Dₖ₊₁ = meet(F); stop bij convergentie of na 3 iteraties (min-tie-break). Drempel(age) = WOZ(age) × verkoopprijs% × verkoopkosten% + marge-jaren × uitgaven × (1+inflatie)^jaren.',
+    files: ['lib/housing-trigger.ts', 'lib/housing-strategy.ts'],
+    functions: [
+      'resolveHousingTriggerFromProjection',
+      'resolveHousingEventsForSim',
+      'buildHousingLifeEventsAtAge',
+      'runHousingScenarioProjection',
+    ],
+    elementIds: ['as-planning', 'fn-toekomstplannen', 'as-vermogen'],
   },
 ]
 

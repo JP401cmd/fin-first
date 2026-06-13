@@ -507,7 +507,11 @@ export const SimChartWidget = memo(function SimChartWidget({
             <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
               <p className="font-sans text-[12px] text-orange-700">
-                FIRE niet bereikbaar voor leeftijd {simResult.displayEndAge} — verhoog je spaarquote of verlaag je uitgaven.
+                {simResult.strategy === 'legacy'
+                  ? `Je haalt je nalatenschapsdoel niet binnen je projectie (tot leeftijd ${simResult.displayEndAge}). Verlaag het nalatenschapsbedrag, verhoog je spaarquote of verlaag je uitgaven.`
+                  : simResult.strategy === 'perpetual'
+                    ? `Je vermogen is niet groot genoeg om er blijvend van te leven binnen je projectie (tot leeftijd ${simResult.displayEndAge}). Verhoog je spaarquote of verlaag je uitgaven.`
+                    : `FIRE niet haalbaar binnen je projectie (tot leeftijd ${simResult.displayEndAge}). Verhoog je spaarquote of verlaag je uitgaven.`}
               </p>
             </div>
           )}
@@ -524,7 +528,7 @@ export const SimChartWidget = memo(function SimChartWidget({
               <span className="font-sans text-[11px] text-[var(--ink-3)]">
                 {fireAgeFractional !== null
                   ? formatFireAge(fireAgeFractional) + ' oud'
-                  : `niet bereikbaar voor leeftijd ${simResult.displayEndAge}`}
+                  : `niet bereikbaar vóór leeftijd ${simResult.displayEndAge}`}
               </span>
             </div>
 

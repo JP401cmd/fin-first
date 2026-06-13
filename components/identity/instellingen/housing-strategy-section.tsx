@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Home, Sprout, Scissors, KeyRound } from 'lucide-react'
 import {
@@ -12,6 +12,12 @@ import {
   type HousingStrategyMode,
   type HousingStrategyTrigger,
 } from '@/lib/housing-strategy'
+import {
+  runHousingScenarioProjection,
+  type HousingPreviewData,
+  type HousingScenarioResult,
+} from '@/lib/housing-trigger'
+import { formatCurrency } from '@/lib/format'
 import { LabeledNumber, TriggerButton } from '@/components/future/strategie/fields'
 
 interface HousingStrategyContext {
@@ -77,9 +83,16 @@ const MODES: HousingStrategyMode[] = [
  */
 export function HousingStrategySection({
   showHeader = true,
+  preview = null,
   onSaved,
-}: { showHeader?: boolean; onSaved?: () => void } = {}) {
+}: {
+  showHeader?: boolean
+  /** Live-preview-basis (zelfde engine-input als de grafiek); null = geen preview. */
+  preview?: HousingPreviewData | null
+  onSaved?: () => void
+} = {}) {
   const [config, setConfig] = useState<HousingStrategyConfig>({ mode: 'include_full' })
+  const [savedConfig, setSavedConfig] = useState<HousingStrategyConfig | null>(null)
   const [context, setContext] = useState<HousingStrategyContext | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -96,6 +109,7 @@ export function HousingStrategySection({
             context: HousingStrategyContext
           }
           setConfig(data.config)
+          setSavedConfig(data.config)
           setContext(data.context)
         }
       } finally {
@@ -111,6 +125,29 @@ export function HousingStrategySection({
   const hasEigenHuis = context?.has_eigen_huis ?? false
   const estimatedWoz = context?.woz_value ?? 0
   const estimatedEquity = context?.estimated_equity ?? 0
+
+  // ── Live preview ────────────────────────────────────────────
+  // Zelfde resolver + engine als de grafiek (lib/housing-trigger.ts) — wat
+  // hier staat verschijnt na opslaan 1-op-1 op de tijdas. useDeferredValue
+  // houdt het typen in de invoervelden vloeiend (de engine-runs volgen).
+  const deferredConfig = useDeferredValue(config)
+  const canPreview = preview != null && preview.context.hasEigenHuis && !loading
+  const draftScenario = useMemo<HousingScenarioResult | null>(() => {
+    if (!canPreview || !preview) return null
+    try {
+      return runHousingScenarioProjection(deferredConfig, preview.context, preview.simBasis)
+    } catch {
+      return null
+    }
+  }, [canPreview, preview, deferredConfig])
+  const savedScenario = useMemo<HousingScenarioResult | null>(() => {
+    if (!canPreview || !preview || !savedConfig) return null
+    try {
+      return runHousingScenarioProjection(savedConfig, preview.context, preview.simBasis)
+    } catch {
+      return null
+    }
+  }, [canPreview, preview, savedConfig])
 
   const setMode = (mode: HousingStrategyMode) => {
     setMessage(null)
@@ -140,6 +177,7 @@ export function HousingStrategySection({
         return
       }
       setMessage({ type: 'success', text: 'Eigen-woning-strategie opgeslagen.' })
+      setSavedConfig(config)
       onSaved?.()
     } catch {
       setMessage({ type: 'error', text: 'Netwerkfout — probeer opnieuw' })
@@ -229,6 +267,15 @@ export function HousingStrategySection({
         />
       )}
 
+      {draftScenario && (
+        <ScenarioPreviewPanel
+          config={config}
+          draft={draftScenario}
+          saved={savedScenario}
+          isDirty={savedConfig != null && JSON.stringify(config) !== JSON.stringify(savedConfig)}
+        />
+      )}
+
       <div className="mt-5 flex items-center gap-3">
         <button
           type="button"
@@ -250,6 +297,107 @@ export function HousingStrategySection({
       <p className="mt-3 font-sans text-[11px] text-[var(--ink-3)]">
         Deze keuze beïnvloedt zowel de FIRE-leeftijd op je dashboard als de prognose-grafieken in
         de Horizon-module.
+      </p>
+    </div>
+  )
+}
+
+// ── Live preview: trigger-moment + vrijheidsleeftijd vóór opslaan ──
+
+function ScenarioPreviewPanel({
+  config,
+  draft,
+  saved,
+  isDirty,
+}: {
+  config: HousingStrategyConfig
+  draft: HousingScenarioResult
+  saved: HousingScenarioResult | null
+  isDirty: boolean
+}) {
+  const hasTrigger = config.mode === 'downsize' || config.mode === 'reverse_mortgage'
+  const event = draft.events[0]
+  const meta = (event?.metadata ?? {}) as Record<string, unknown>
+  const triggerAge = event?.target_age ?? draft.depletion?.triggerAge ?? null
+  const ageDisplay = triggerAge != null ? Math.round(triggerAge) : null
+
+  const triggerLabel = !hasTrigger
+    ? null
+    : hasTrigger && 'trigger' in config && config.trigger === 'fixed_age'
+      ? 'op je gekozen leeftijd'
+      : draft.depletion?.reason === 'immediate'
+        ? 'direct — je liquide vermogen zit al op de drempel'
+        : draft.depletion?.reason === 'crossover'
+          ? 'wanneer nodig — moment berekend uit je volledige projectie'
+          : 'uiterste leeftijd — je vermogen raakt niet eerder op'
+
+  const saleProceeds = Number(meta.saleProceeds)
+  const monthlyPayout = Number(meta.monthlyPayout)
+
+  const draftFire = draft.fireAgeFractional != null ? Math.round(draft.fireAgeFractional) : null
+  const savedFire =
+    saved?.fireAgeFractional != null ? Math.round(saved.fireAgeFractional) : null
+
+  return (
+    <div className="mt-4 rounded-xl border border-l-4 border-l-[var(--module-active-500)] border-[var(--border-ed)] bg-[var(--paper)] p-4">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+        Live preview — dit verschijnt op je tijdas
+      </p>
+      <div className="space-y-1.5 text-sm text-[var(--ink-2)]">
+        {hasTrigger && ageDisplay != null && (
+          <div>
+            {config.mode === 'downsize' ? 'Verkoop' : 'Uitkering start'}:{' '}
+            <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
+              rond je {ageDisplay}e
+            </span>
+            {triggerLabel && (
+              <span className="text-[11px] text-[var(--ink-3)]"> ({triggerLabel})</span>
+            )}
+          </div>
+        )}
+        {config.mode === 'downsize' && Number.isFinite(saleProceeds) && (
+          <div>
+            Verkoopopbrengst naar belegbaar vermogen:{' '}
+            <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
+              {formatCurrency(saleProceeds)}
+            </span>
+          </div>
+        )}
+        {config.mode === 'reverse_mortgage' && Number.isFinite(monthlyPayout) && monthlyPayout > 0 && (
+          <div>
+            Maandelijkse uitkering:{' '}
+            <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
+              {formatCurrency(monthlyPayout)}
+            </span>
+          </div>
+        )}
+        {hasTrigger && draft.events.length === 0 && (
+          <div className="text-[12px] text-amber-700">
+            Deze instellingen leveren geen gebeurtenis op (geen opbrengst/uitkering te
+            verwachten).
+          </div>
+        )}
+        <div className="border-t border-[var(--border-ed)] pt-1.5">
+          Vrijheidsleeftijd:{' '}
+          {savedFire != null && isDirty && savedFire !== draftFire && (
+            <>
+              <span className="font-mono tabular-nums">{savedFire}</span>
+              {' → '}
+            </>
+          )}
+          <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
+            {draftFire != null ? `${draftFire} jaar` : 'niet haalbaar binnen je horizon'}
+          </span>
+          {savedFire != null && draftFire != null && isDirty && draftFire !== savedFire && (
+            <span className={draftFire < savedFire ? 'text-emerald-700' : 'text-amber-700'}>
+              {' '}({draftFire < savedFire ? 'eerder vrij' : 'later vrij'})
+            </span>
+          )}
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
+        Berekend met dezelfde projectie als de grafiek — AOW, pensioen, gebeurtenissen,
+        rendement en box 3 tellen mee.
       </p>
     </div>
   )
@@ -301,7 +449,7 @@ function StrategyDetailsPanel({
           selected={config.trigger === 'on_depletion'}
           onClick={() => setTrigger('on_depletion')}
           title="Wanneer nodig"
-          subtitle="Pas activeren als liquide vermogen krap wordt."
+          subtitle="Automatisch op het moment dat je vermogen op raakt — berekend uit je volledige projectie."
         />
       </div>
 
@@ -320,7 +468,7 @@ function StrategyDetailsPanel({
       {config.trigger === 'on_depletion' && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <LabeledNumber
-            label="Drempel"
+            label="Veiligheidsmarge"
             unit="jaar uitgaven"
             value={config.depletionThresholdYears}
             min={0}
@@ -329,7 +477,7 @@ function StrategyDetailsPanel({
             onChange={(depletionThresholdYears) =>
               onChange({ ...config, depletionThresholdYears })
             }
-            hint="Activeer zodra liquide vermogen onder dit aantal jaarinkomens zakt."
+            hint="Extra buffer bovenop de verkoopkosten: activeer zoveel jaar uitgaven vóór je vermogen op is. 0 = pas wanneer het echt nodig is."
           />
           <LabeledNumber
             label="Fallback-leeftijd"
