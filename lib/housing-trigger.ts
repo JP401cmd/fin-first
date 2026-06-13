@@ -413,6 +413,12 @@ export function resolveHousingEventsForSim(
 export interface HousingPreviewData {
   simBasis: HousingTriggerSimBasis
   context: HousingContext
+  /**
+   * Draait deze gebruiker de v2-grootboek-engine? (`isHorizonV2Enabled` uit het
+   * profiel, via de loader.) Bepaalt of de modal-preview met v2 rekent zodat hij
+   * de v2-grafiek matcht (M2). Default/false = v1-engine (huidige gedrag).
+   */
+  horizonEngineV2?: boolean
 }
 
 export interface HousingScenarioResult {

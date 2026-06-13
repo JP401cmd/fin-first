@@ -652,6 +652,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           withdrawalStrategy,
           aowAgeInt: built.aowAgeInt,
           aowFractional: userAowAge.fractional,
+          // C4: editor-baseline draait door dezelfde engine als de Tijdas-grafiek.
+          useV2: horizonEngineV2,
+          strategyOptions: built.strategyOptions,
         }
         const unifiedResult = runSelectedProjection(built.input, horizonEngineV2, built.strategyOptions)
         const simResult = toSimResult(unifiedResult)

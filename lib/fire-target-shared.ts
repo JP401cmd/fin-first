@@ -10,16 +10,12 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ageAtDate } from '@/lib/horizon-data'
-import { lifeEventsToCashflows } from '@/lib/fire-simulation'
-import {
-  runUnifiedProjection,
-  toSimResult,
-  type UnifiedProjectionInput,
-} from '@/lib/unified-projection'
-import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import { toSimResult } from '@/lib/unified-projection'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
 
 /**
  * Compute het FIRE-doelbedrag identiek aan Horizon's `useHorizonFireSim`-hook.
@@ -57,58 +53,44 @@ export const computeHorizonFireTarget = cache(async function computeHorizonFireT
     // Fallback naar default — niet kritiek voor non-pensioen strategieën
   }
 
-  // ── Inputs guard-clauses ────────────────────────────────────
+  // ── Inputs guard-clause: geboortedatum vereist ──────────────
   const dob = data.effectiveInput.dateOfBirth
-  const currentAge = dob ? ageAtDate(dob) : null
-  if (currentAge === null) return null
+  if ((dob ? ageAtDate(dob) : null) === null) return null
 
-  const yearlyExpenses =
-    data.effectiveInput.yearlyMustExpenses > 0
-      ? data.effectiveInput.yearlyMustExpenses
-      : 0
-  if (yearlyExpenses <= 0) return null
-
-  // ── Strategie-aware setup (zelfde logica als de hook) ──
-  const isPensioen = data.fireStrategy.strategy === 'pensioen'
-  const aowAgeInt = Math.ceil(aowAgeFractional)
-  const effectiveStrategy = isPensioen
-    ? {
-        ...data.fireStrategy,
-        endAge: Math.max(data.fireStrategy.endAge, aowAgeInt + 1),
-      }
-    : data.fireStrategy
-  const forcedFireAge = isPensioen ? aowAgeInt : undefined
-
-  const annualSavings = (data.effectiveInput.monthlyContributions ?? 0) * 12
-  const cashflows = lifeEventsToCashflows(data.events ?? [])
-
-  const unifiedInput: UnifiedProjectionInput = {
+  // ── Cutover (C4/criterium 7, ADR 0016): gebruik DEZELFDE gedeelde input-
+  // assemblage (`buildHorizonInput`) + flag-bewuste engine-selectie als de
+  // /toekomst-hook en de /overzicht-loader. Daardoor leest de Kern (en alles
+  // wat hierop hangt — AI-context, freedomPct, gezondheidsscore, sovereignty)
+  // exact hetzelfde FIRE-doelbedrag als /toekomst en /overzicht. Bij v2 is dat
+  // inclusief de perpetual+AOW-correctie (v1 overcrediteert levenslange AOW).
+  const built = buildHorizonInput({
+    horizonInput: data.effectiveInput,
+    lifeEvents: data.events ?? [],
+    fireStrategy: data.fireStrategy,
+    withdrawalStrategy: data.withdrawalStrategy,
+    grossReturn: data.fireParams.grossReturn,
+    inflation: data.fireParams.inflationRate,
+    aowAgeFractional,
     assets: data.assets,
     debts: data.debts,
-    currentAge,
-    endAge: effectiveStrategy.endAge,
-    yearlyExpenses,
-    annualSavings,
-    monthlySurplus: data.effectiveInput.monthlyContributions ?? 0,
-    monthlyIncome: data.effectiveInput.monthlyIncome ?? 0,
-    incomeGrowthRate: 0,
-    grossReturn: data.fireParams.grossReturn,
-    inflationRate: data.fireParams.inflationRate,
     box3Method: data.box3Method,
-    cashflows,
-    strategyConfig: effectiveStrategy,
-    withdrawalStrategy: data.withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
-    forcedFireAge,
     hasPartner: data.hasPartner,
     bankAccountCash: data.unlinkedCash,
-  }
+    monthlySavingsOverride: data.monthlySavingsOverride,
+    baseAnnualSavingsFromCashflow: data.baseAnnualSavingsFromCashflow,
+    housingStrategy: data.housingStrategy,
+    potRules: data.potRules,
+    horizonEngineV2: data.horizonEngineV2,
+  })
+  if (!built) return null
 
-  const unified = runUnifiedProjection(unifiedInput)
-  const sim = toSimResult(unified)
+  const sim = toSimResult(
+    runSelectedProjection(built.input, data.horizonEngineV2, built.strategyOptions),
+  )
 
   // Pensioen post-processing: gebruik het werkelijk geprojecteerde portfolio
-  // op AOW-leeftijd i.p.v. het binary-search-minimum (zie hook regel 155-164).
-  if (isPensioen) {
+  // op AOW-leeftijd i.p.v. het binary-search-minimum (zie hook regel 124-137).
+  if (built.isPensioen) {
     const value = sim.firePortfolioAtFire ?? sim.requiredFirePortfolio
     return value > 0 ? value : null
   }

@@ -14,10 +14,11 @@
  */
 
 import {
-  runUnifiedProjection,
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import type { HorizonStrategyOptions } from '@/lib/horizon-engine/strategies'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
@@ -37,6 +38,19 @@ export interface RegelSimSnapshot {
   aowAgeInt: number
   /** Fractionele AOW-leeftijd (FIRE-leeftijd in pensioen-modus). */
   aowFractional: number
+  /**
+   * Cutover (C4, ADR 0016): of de gebruiker de v2-grootboek-engine draait
+   * (`isHorizonV2Enabled`). De editor-baseline MOET door dezelfde engine als de
+   * Tijdas-grafiek lopen, anders wijkt de baseline-curve af voor v2-gebruikers.
+   * Default false = byte-identiek aan v1 (oude gedrag).
+   */
+  useV2?: boolean
+  /**
+   * Uit de pot-regels afgeleide engine-opties (verdeling/onttrekkingsvolgorde).
+   * Alleen relevant voor v2; undefined = engine-defaults. Wordt door
+   * `buildHorizonInput` afgeleid — dezelfde set die de grafiek voedt.
+   */
+  strategyOptions?: Partial<HorizonStrategyOptions>
 }
 
 export interface RegelProjection {
@@ -78,7 +92,9 @@ export function runRegelProjection(
     forcedFireAge,
   }
 
-  const res = toSimResult(runUnifiedProjection(input))
+  // Flag-bewuste engine-selectie (C4): v2-gebruikers krijgen de grootboek-engine
+  // zodat de editor-baseline IDENTIEK is aan de Tijdas-grafiek. Flag uit = v1.
+  const res = toSimResult(runSelectedProjection(input, snapshot.useV2 ?? false, snapshot.strategyOptions))
   const fireAgeFractional = isPensioen ? snapshot.aowFractional : res.fireAgeFractional
 
   return { rows: res.rows, fireAgeFractional }

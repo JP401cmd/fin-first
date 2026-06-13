@@ -37,3 +37,9 @@ In v2 wordt de eigen-huis-**downsize** een **asset-liquidatie binnen het grootbo
 - **Trigger-FIRE-koppeling (tweede orde):** de liquidatie-opbrengst kan FIRE iets vervroegen; de trigger draait op één meetpass (geen vaste-punt-iteratie zoals het v1-pad). Bewust bounded.
 - **Cutover:** bij het globaal flippen van v2 (ADR 0013, gated) wordt dit hét downsize-model en kan het v1-filter+inkomen-pad voor downsize vervallen.
 - Catalogus-note `horizon-grootboek-v2` (`lib/architecture/calculations.ts`) + invariantendocument `docs/architecture/horizon-engine-v2.md` bijgewerkt.
+
+## Follow-ups (code-review, 13 jun 2026)
+
+- **M1 — trigger-uitleg.** `resolveDownsizeTriggerV2` retourneert nu náást de trigger-leeftijd een `SimulatedDepletionResult`-vormig uitleg-object (op v2's eigen liquide-pad, géén v1-meetrun); dit wordt via `extraMetadata` op het v2-huur-event gezet zodat de "Waarom dit moment?"-panel ook voor v2-downsize rendert.
+- **M2 — preview == grafiek.** De Huis-strategie-modal-preview kiest nu v1↔v2 op de profielvlag `horizonEngineV2` (via de loader → page → `HousingPreviewData`); v2 draait `runHousingScenarioProjectionV2` (gedeeld liquidatiemodel + v2-engine) zodat de modal-copy "zelfde engine als de grafiek" klopt.
+- **M4 — één valuatie-basis.** Verkoopopbrengst én verkoopkosten-buffer worden op **dezelfde** engine-asset-waarde (`current_value × inclusion`, reëel gegroeid) gemeten — de trigger leest die uit de meetrun-rij i.p.v. `projectEigenHuisValuesAt(...).wozValue` (nominaal + woz-fallback). De veiligheidsmarge in v2 is daarom vlak-reëel (geen nominale indexering). Voorheen vuurde de trigger op een licht verkeerd liquiditeitsniveau wanneer `woz_value ≠ current_value`.

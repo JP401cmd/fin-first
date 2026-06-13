@@ -159,3 +159,7 @@
 ## 2026-06-13
 
 - Geen wijzigingen.
+
+## 2026-06-13
+
+- **Componenten (aantal)** verwijderd: -2

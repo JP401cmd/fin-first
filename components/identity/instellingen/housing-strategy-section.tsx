@@ -17,6 +17,7 @@ import {
   type HousingPreviewData,
   type HousingScenarioResult,
 } from '@/lib/housing-trigger'
+import { runHousingScenarioProjectionV2 } from '@/lib/horizon-engine/build-input'
 import { formatCurrency } from '@/lib/format'
 import { LabeledNumber, TriggerButton } from '@/components/future/strategie/fields'
 
@@ -132,22 +133,32 @@ export function HousingStrategySection({
   // houdt het typen in de invoervelden vloeiend (de engine-runs volgen).
   const deferredConfig = useDeferredValue(config)
   const canPreview = preview != null && preview.context.hasEigenHuis && !loading
+  // Dezelfde engine als de grafiek: v2-grootboek wanneer de gebruiker die draait
+  // (M2), anders v1. Zonder dit zou de preview v1 rekenen terwijl de grafiek v2
+  // is — de modal-copy "zelfde engine als de grafiek" zou dan niet kloppen.
+  const runScenario = useMemo(
+    () =>
+      preview?.horizonEngineV2
+        ? runHousingScenarioProjectionV2
+        : runHousingScenarioProjection,
+    [preview?.horizonEngineV2],
+  )
   const draftScenario = useMemo<HousingScenarioResult | null>(() => {
     if (!canPreview || !preview) return null
     try {
-      return runHousingScenarioProjection(deferredConfig, preview.context, preview.simBasis)
+      return runScenario(deferredConfig, preview.context, preview.simBasis)
     } catch {
       return null
     }
-  }, [canPreview, preview, deferredConfig])
+  }, [canPreview, preview, deferredConfig, runScenario])
   const savedScenario = useMemo<HousingScenarioResult | null>(() => {
     if (!canPreview || !preview || !savedConfig) return null
     try {
-      return runHousingScenarioProjection(savedConfig, preview.context, preview.simBasis)
+      return runScenario(savedConfig, preview.context, preview.simBasis)
     } catch {
       return null
     }
-  }, [canPreview, preview, savedConfig])
+  }, [canPreview, preview, savedConfig, runScenario])
 
   const setMode = (mode: HousingStrategyMode) => {
     setMessage(null)

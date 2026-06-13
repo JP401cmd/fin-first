@@ -5,7 +5,8 @@ import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { ageAtDate, computeFireProjection } from '@/lib/horizon-data'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
-import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
 
 export const metadata: Metadata = {
   title: 'Gebeurtenissen — TriFinity',
@@ -42,20 +43,40 @@ export default async function ToekomstGebeurtenissenPage() {
 
   // Baseline + lookup-data voor de levensstrategie-editors (AOW/Pensioen/Huis).
   const ei = horizonData.effectiveInput
-  const strategieBaseline: PreviewBaseline | null =
-    currentAge != null && ei.yearlyMustExpenses > 0
-      ? {
-          currentAge,
-          endAge: horizonData.fireStrategy.endAge,
-          portfolio: ei.totalAssets - ei.totalDebts,
-          yearlyExpenses: ei.yearlyMustExpenses,
-          annualSavings: (ei.monthlyContributions ?? 0) * 12,
-          grossReturn: horizonData.fireParams.grossReturn,
-          inflation: horizonData.fireParams.inflationRate,
-          fireStrategy: horizonData.fireStrategy,
-          withdrawalStrategy: horizonData.withdrawalStrategy,
-        }
-      : null
+  // Cutover (C4, ADR 0016): bouw de preview-baseline via DEZELFDE gedeelde
+  // input-assemblage (`buildHorizonInput`) + flag-bewuste engine als de Tijdas-
+  // grafiek, i.p.v. de oude lossy `portfolio = totalAssets − totalDebts`-scalar
+  // op de legacy `runSimulation`. Daardoor matchen de AOW/Pensioen-previews per
+  // constructie de v2-grafiek voor v2-gebruikers (en blijven ze v1 als de flag
+  // uit staat). De editors injecteren hun events per-aanroep in deze input.
+  const aowFractional = lookupAowAge(aowRows, dob).fractional
+  const builtPreview = buildHorizonInput({
+    horizonInput: ei,
+    lifeEvents: [], // events per-aanroep geïnjecteerd door previewFireAge
+    fireStrategy: horizonData.fireStrategy,
+    withdrawalStrategy: horizonData.withdrawalStrategy,
+    grossReturn: horizonData.fireParams.grossReturn,
+    inflation: horizonData.fireParams.inflationRate,
+    aowAgeFractional: aowFractional,
+    assets: horizonData.assets,
+    debts: horizonData.debts,
+    box3Method: horizonData.box3Method,
+    hasPartner: horizonData.hasPartner,
+    bankAccountCash: horizonData.unlinkedCash,
+    monthlySavingsOverride: horizonData.monthlySavingsOverride,
+    baseAnnualSavingsFromCashflow: horizonData.baseAnnualSavingsFromCashflow,
+    housingStrategy: horizonData.housingStrategy,
+    potRules: horizonData.potRules,
+    horizonEngineV2: horizonData.horizonEngineV2,
+  })
+  const strategieBaseline: PreviewBaseline | null = builtPreview
+    ? {
+        input: builtPreview.input,
+        useV2: horizonData.horizonEngineV2,
+        strategyOptions: builtPreview.strategyOptions,
+        pensioenFireAgeFractional: builtPreview.isPensioen ? aowFractional : null,
+      }
+    : null
   const strategieData = {
     baseline: strategieBaseline,
     dailyExpenses: ei.yearlyMustExpenses > 0 ? ei.yearlyMustExpenses / 365 : 0,
@@ -66,7 +87,13 @@ export default async function ToekomstGebeurtenissenPage() {
     // virtuele housing-events resolvede — de modal rekent dan per definitie
     // hetzelfde trigger-moment en dezelfde vrijheidsleeftijd als de grafiek.
     housingPreview: horizonData.housingSimBasis
-      ? { simBasis: horizonData.housingSimBasis, context: horizonData.housingContext }
+      ? {
+          simBasis: horizonData.housingSimBasis,
+          context: horizonData.housingContext,
+          // Zelfde engine-keuze als de grafiek (profielvlag via de loader) zodat
+          // de modal-preview de v2-grafiek matcht (M2).
+          horizonEngineV2: horizonData.horizonEngineV2,
+        }
       : null,
   }
 

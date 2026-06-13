@@ -35,10 +35,11 @@ import {
   type SimCashflow,
 } from '@/lib/fire-simulation'
 import {
-  runUnifiedProjection,
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -122,6 +123,9 @@ export default function WhatIfPage() {
   /** Eigen-woning-strategie — bepaalt of het huis uit de FIRE-pot wordt gefilterd. */
   const [housingStrategy, setHousingStrategy] = useState<HousingStrategyConfig>({ mode: 'include_full' })
   const [withdrawalStrategyConfig, setWithdrawalStrategyConfig] = useState<WithdrawalStrategyConfig>(WITHDRAWAL_DEFAULTS)
+  /** Feature-flag (C4): draait de gebruiker de v2-grootboek-engine? Bepaalt of de
+   *  baseline + alle scenario-runs door v2 lopen — invariant: baseline == /toekomst. */
+  const [horizonEngineV2, setHorizonEngineV2] = useState(false)
 
   // ── Per-asset-type return-deltas (decimaal, bv. { investment: 0.02 }). ──
   const [returnDeltas, setReturnDeltas] = useState<Record<string, number>>({})
@@ -168,7 +172,7 @@ export default function WhatIfPage() {
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, net_monthly_income, income_source, expenses_source, monthly_savings_override, housing_strategy_config').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, net_monthly_income, income_source, expenses_source, monthly_savings_override, housing_strategy_config, feature_preferences').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
@@ -305,6 +309,10 @@ export default function WhatIfPage() {
 
       // Resolve withdrawal strategy from user profile
       setWithdrawalStrategyConfig(resolveWithdrawalStrategy(profileResult.data ?? {}))
+
+      // Feature-flag: v2-grootboek-engine (C4). Bepaalt of baseline + scenario's
+      // door v2 lopen zodat de baseline gelijk blijft aan /toekomst.
+      setHorizonEngineV2(isHorizonV2Enabled(profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null))
 
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
@@ -526,17 +534,17 @@ export default function WhatIfPage() {
   const baselineSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
     if (!baseUnifiedInput) return null
     const cashflows = lifeEventsToCashflows(baselineDbEvents)
-    const unifiedResult = runUnifiedProjection({ ...baseUnifiedInput, cashflows })
+    const unifiedResult = runSelectedProjection({ ...baseUnifiedInput, cashflows }, horizonEngineV2)
     return { result: toSimResult(unifiedResult), cashflows }
-  }, [baseUnifiedInput, baselineDbEvents])
+  }, [baseUnifiedInput, baselineDbEvents, horizonEngineV2])
 
   // ── Run what-if simulation (DB + scenario events; return override applied) ──
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
     if (!whatIfUnifiedInput) return null
     const cashflows = lifeEventsToCashflows(scenarioActiveEvents)
-    const unifiedResult = runUnifiedProjection({ ...whatIfUnifiedInput, cashflows })
+    const unifiedResult = runSelectedProjection({ ...whatIfUnifiedInput, cashflows }, horizonEngineV2)
     return { result: toSimResult(unifiedResult), cashflows }
-  }, [whatIfUnifiedInput, scenarioActiveEvents])
+  }, [whatIfUnifiedInput, scenarioActiveEvents, horizonEngineV2])
 
   // ── Pinned scenario overlays — re-run sim per pinned saved scenario ──
   const pinnedOverlays = useMemo<ScenarioOverlay[]>(() => {
@@ -569,7 +577,7 @@ export default function WhatIfPage() {
       const pinReturnDelta = (baseline && scenario.overrides?.expectedReturn != null)
         ? (scenario.overrides.expectedReturn - baseline.expectedReturn) / 100
         : 0
-      const sim = runUnifiedProjection({ ...baseUnifiedInput, cashflows, returnDelta: pinReturnDelta })
+      const sim = runSelectedProjection({ ...baseUnifiedInput, cashflows, returnDelta: pinReturnDelta }, horizonEngineV2)
       const rows = toSimResult(sim).rows
       const points: [number, number][] = []
       if (rows.length > 0) {
@@ -585,7 +593,7 @@ export default function WhatIfPage() {
       })
     }
     return result
-  }, [pinnedScenarioIds, savedScenariosMirror, baseUnifiedInput, baseline])
+  }, [pinnedScenarioIds, savedScenariosMirror, baseUnifiedInput, baseline, horizonEngineV2])
 
   // ── Monte Carlo overlay (when toggled on) ─────────────
   const mcResult = useMemo<MonteCarloResult | null>(() => {
@@ -612,12 +620,12 @@ export default function WhatIfPage() {
       ? scenarioActiveEvents
       : [...scenarioActiveEvents, event]
     const cfWith = lifeEventsToCashflows(eventsWithThis)
-    const simWith = toSimResult(runUnifiedProjection({ ...whatIfUnifiedInput, cashflows: cfWith }))
+    const simWith = toSimResult(runSelectedProjection({ ...whatIfUnifiedInput, cashflows: cfWith }, horizonEngineV2))
 
     // Simulate WITHOUT this event
     const eventsWithout = scenarioActiveEvents.filter(e => e.id !== eventId)
     const cfWithout = lifeEventsToCashflows(eventsWithout)
-    const simWithout = toSimResult(runUnifiedProjection({ ...whatIfUnifiedInput, cashflows: cfWithout }))
+    const simWithout = toSimResult(runSelectedProjection({ ...whatIfUnifiedInput, cashflows: cfWithout }, horizonEngineV2))
 
     // Calculate total cost of the event
     const oneTimeCost = Number(event.one_time_cost ?? 0)
@@ -635,7 +643,7 @@ export default function WhatIfPage() {
     }
 
     return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
-  }, [whatIfUnifiedInput, events, scenarioActiveEvents])
+  }, [whatIfUnifiedInput, events, scenarioActiveEvents, horizonEngineV2])
 
   // ── Derived values for display ───────────────────────────
   // (currentAge declared earlier at line ~288 for use in handleLoadScenario.)

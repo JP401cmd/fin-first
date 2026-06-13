@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-13T15:58:42.772Z",
+  "generatedAt": "2026-06-13T18:38:14.980Z",
   "generatedDate": "2026-06-13",
   "repo": {
     "name": "fin",
@@ -188,7 +188,7 @@
     "tables": 52,
     "migrations": 105,
     "integrations": 24,
-    "components": 690,
+    "components": 688,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -12450,11 +12450,11 @@
     }
   ],
   "components": {
-    "total": 690,
+    "total": 688,
     "groups": [
       {
         "group": "app",
-        "count": 299,
+        "count": 297,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12492,8 +12492,6 @@
           "box3-partner-modal",
           "box3-scenario-modal",
           "breadcrumb",
-          "bucket-projection-chart",
-          "bucket-projection-table",
           "budget-blob",
           "budget-donut",
           "budget-form",
@@ -17666,7 +17664,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 21
+        "commits": 22
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -17701,7 +17699,7 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 6858,
-        "commits": 103
+        "commits": 104
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17731,7 +17729,7 @@
       {
         "file": "lib/unified-projection.ts",
         "loc": 2374,
-        "commits": 25
+        "commits": 26
       },
       {
         "file": "app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx",
@@ -18403,8 +18401,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-06-13",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [],
+        "removed": [
+          "-2"
+        ]
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -18431,7 +18437,7 @@
     {
       "date": "2026-06-13",
       "api": 371,
-      "components": 690,
+      "components": 688,
       "tables": 52,
       "routesProduction": 94
     }
