@@ -317,3 +317,49 @@ describe('M4 — verkoopopbrengst en trigger-buffer delen één valuatie-basis',
     expect(sale.liquideVermogen).toBeGreaterThan(pre.liquideVermogen)
   })
 })
+
+// ── include_full = woning besteedbaar (ADR 0015 Optie A) ──────────────────
+// Regressie: deplete + include_full + groot huis. Zonder de fix bleef de woning
+// niet-liquide → deplete dronk alleen de liquide pot, het huis groeide door →
+// netto vermogen liep NIET naar 0 en FIRE schoof veel te laat. Met spendableAssetIds
+// telt de woning mee in de besteedbare pot (laatst in de volgorde): deplete loopt
+// naar ~0 en FIRE valt vroeger (herstelt het v1-gedrag).
+describe('include_full = woning besteedbaar (Optie A)', () => {
+  const HUIS_ASSETS: Asset[] = (
+    [
+      ['huis', 'Woning', 'eigen_huis', 1000000, 3.5, null],
+      ['cash', 'Betaalrekening', 'cash', 63000, 0, null],
+      ['bel', 'Beleggen', 'investment', 25000, 7, null],
+    ] as const
+  ).map(([id, name, t, v, r, dep]) => ({ id, name, asset_type: t, current_value: v, expected_return: r, is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: dep }) as unknown as Asset)
+
+  const mkInput = (spendable: boolean) => ({
+    assets: HUIS_ASSETS, debts: [], currentAge: 40, endAge: 90,
+    yearlyExpenses: 36300, annualSavings: 24000, monthlySurplus: 2000, monthlyIncome: 5000, incomeGrowthRate: 0,
+    grossReturn: 0.07, inflationRate: 0.02, box3Method: 'forfaitair' as const,
+    cashflows: [{ id: 'aow', name: 'AOW', type: 'recurring' as const, direction: 'income' as const, amount: 1600, fromAge: 67, toAge: null, indexed: true }],
+    strategyConfig: { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 },
+    withdrawalStrategy: WITHDRAWAL_DEFAULTS, hasPartner: false,
+    spendableAssetIds: spendable ? ['huis'] : undefined,
+  })
+
+  it('woning niet-besteedbaar (default): deplete laat netto vermogen NIET naar 0 lopen', () => {
+    const r = runHorizonLedger(mkInput(false))
+    const end = r.rows[r.rows.length - 1]
+    // Liquide gaat naar ~0, maar het (niet-verkochte) huis blijft → netto >> 0.
+    expect(end.liquideVermogen).toBeLessThan(1000)
+    expect(end.nettoVermogen).toBeGreaterThan(500000)
+  })
+
+  it('woning besteedbaar (include_full): deplete loopt naar ~0 én FIRE valt vroeger', () => {
+    const vast = runHorizonLedger(mkInput(false))
+    const besteedbaar = runHorizonLedger(mkInput(true))
+    const end = besteedbaar.rows[besteedbaar.rows.length - 1]
+    // Het huis wordt nu óók afgebouwd → netto vermogen ~0 op de eindleeftijd.
+    expect(end.nettoVermogen).toBeLessThan(5000)
+    expect(end.assets.find((a) => a.type === 'eigen_huis')!.eind).toBeLessThan(1)
+    // FIRE valt vroeger dan met de vastgezette woning (de hele pot telt mee).
+    expect(besteedbaar.fireReachable).toBe(true)
+    expect(besteedbaar.fireAge!).toBeLessThan(vast.fireAge!)
+  })
+})

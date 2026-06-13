@@ -41,6 +41,17 @@ import type {
 // Vermogensgroepen die NIET als liquide (besteedbaar) vermogen tellen.
 const NON_LIQUID: Set<AssetType> = new Set(['eigen_huis', 'vehicle', 'physical'])
 
+/**
+ * Een asset is niet-liquide o.b.v. zijn type, TENZIJ het expliciet als besteedbaar
+ * is gemarkeerd (`spendable`) — dat gebeurt bij housing-strategie `include_full`,
+ * waar de woning volledig in de besteedbare FIRE-pot meetelt (ADR 0015). Zo loopt
+ * een deplete/spend-down ook de woning af (laatst in de volgorde) i.p.v. dat 'ie
+ * onbespeelbaar blijft groeien.
+ */
+function isNonLiquid(a: { type: AssetType; spendable?: boolean }): boolean {
+  return NON_LIQUID.has(a.type) && !a.spendable
+}
+
 const ONDERHOUD_PCT = NL_HOME_MAINTENANCE_PCT
 const BOX3_YEAR = 2026 as const
 
@@ -61,6 +72,8 @@ interface RunningAsset {
   value: number
   realRet: number
   box3Cat: Box3Category
+  /** True = tel als besteedbaar/liquide ondanks het type (include_full-woning). */
+  spendable: boolean
 }
 
 interface RunningDebt {
@@ -98,6 +111,9 @@ export function runHorizonLedger(
   const realRetAvg = realReturn(input.grossReturn, inflation)
   const annualSavings = Math.max(0, input.annualSavings)
   const grossAnnualIncome = Math.max(0, input.monthlyIncome) * 12
+  // Assets die ondanks hun (niet-liquide) type tóch als besteedbaar meetellen —
+  // de include_full-woning (ADR 0015). Zie isNonLiquid.
+  const spendableIds = new Set(input.spendableAssetIds ?? [])
 
   // ── Fresh running-state per pass (assets/debts worden gemuteerd) ──
   function buildAssets(): RunningAsset[] {
@@ -116,10 +132,11 @@ export function runHorizonLedger(
         value,
         realRet: realReturn(nom, inflation),
         box3Cat: classifyAsset(a).category,
+        spendable: spendableIds.has(a.id),
       })
     }
     if (input.bankAccountCash && input.bankAccountCash > 0) {
-      out.push({ id: 'bank-cash', naam: 'Bankrekeningen (los)', type: 'cash', value: input.bankAccountCash, realRet: realReturn(0, inflation), box3Cat: 'spaargeld' })
+      out.push({ id: 'bank-cash', naam: 'Bankrekeningen (los)', type: 'cash', value: input.bankAccountCash, realRet: realReturn(0, inflation), box3Cat: 'spaargeld', spendable: false })
     }
     return out
   }
@@ -145,7 +162,7 @@ export function runHorizonLedger(
     const debts = buildDebts()
 
     const investableIds = assets.filter((a) => INVESTABLE_TYPES.includes(a.type)).map((a) => a.id)
-    const liquidIds = assets.filter((a) => !NON_LIQUID.has(a.type)).map((a) => a.id)
+    const liquidIds = assets.filter((a) => !isNonLiquid(a)).map((a) => a.id)
     // Surplus-doel (pot-regel "verdeling bij toename"): specifieke types indien gezet,
     // anders investable → liquide → eerste asset.
     let surplusTargets =
@@ -500,7 +517,7 @@ function snapshot(assets: RunningAsset[]): Record<string, number> {
 }
 
 function liquidValue(assets: RunningAsset[]): number {
-  return assets.filter((a) => !NON_LIQUID.has(a.type)).reduce((s, a) => s + Math.max(0, a.value), 0)
+  return assets.filter((a) => !isNonLiquid(a)).reduce((s, a) => s + Math.max(0, a.value), 0)
 }
 
 /** Waarde-gewogen reëel rendement van de liquide portefeuille (voor de annuïteit). */
@@ -508,7 +525,7 @@ function liquidRealReturn(assets: RunningAsset[]): number {
   let val = 0
   let wr = 0
   for (const a of assets) {
-    if (NON_LIQUID.has(a.type)) continue
+    if (isNonLiquid(a)) continue
     const v = Math.max(0, a.value)
     val += v
     wr += v * a.realRet
@@ -534,10 +551,11 @@ function withdrawFrom(
 }
 
 function liquidSumStart(input: UnifiedProjectionInput): number {
+  const spendable = new Set(input.spendableAssetIds ?? [])
   let s = 0
   for (const a of input.assets) {
     if (a.is_active === false) continue
-    if (NON_LIQUID.has(a.asset_type)) continue
+    if (NON_LIQUID.has(a.asset_type) && !spendable.has(a.id)) continue
     s += (a.current_value ?? 0) * ((a.net_worth_inclusion_pct ?? 100) / 100)
   }
   s += input.bankAccountCash ?? 0

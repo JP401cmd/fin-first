@@ -229,6 +229,17 @@ export interface UnifiedProjectionInput {
    * model gelden. Zie ADR 0015.
    */
   assetLiquidations?: AssetLiquidation[]
+
+  /**
+   * Asset-ids die normaal NIET-liquide zijn (bv. `eigen_huis`) maar voor déze
+   * projectie tóch als besteedbaar/liquide FIRE-vermogen meetellen. Gebruikt door
+   * de v2-grootboek-engine bij housing-strategie `include_full`: de woning telt dan
+   * volledig mee in de besteedbare pot (zoals v1), zodat een spend-down/deplete 'm
+   * óók afbouwt (laatst in de onttrekkingsvolgorde) en de lijn richting €0 loopt
+   * i.p.v. dat de woning onbespeelbaar blijft groeien. v1 (`runUnifiedProjection`)
+   * leest dit veld niet. Zie ADR 0015.
+   */
+  spendableAssetIds?: string[]
 }
 
 /**

@@ -399,6 +399,15 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
 
   const cashflows = lifeEventsToCashflows(effectiveLifeEvents)
 
+  // include_full: de woning telt volledig mee als besteedbaar FIRE-vermogen
+  // (ADR 0015, Optie A) — zodat een deplete/spend-down 'm óók afbouwt (laatst in de
+  // volgorde) en de lijn richting €0 loopt, i.p.v. dat de niet-liquide woning
+  // onbespeelbaar blijft groeien. v1 negeert dit veld (eigen huis-handling daar).
+  const spendableAssetIds =
+    housingCfg.mode === 'include_full' && housingContext.hasEigenHuis
+      ? housingContext.eigenHuisAssets.map((a) => a.id)
+      : undefined
+
   const input: UnifiedProjectionInput = {
     assets: effectiveAssets,
     debts: effectiveDebts,
@@ -419,6 +428,7 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
     hasPartner: p.hasPartner ?? false,
     bankAccountCash: p.bankAccountCash ?? 0,
     assetLiquidations,
+    spendableAssetIds,
   }
 
   return {
@@ -481,6 +491,11 @@ export function runHousingScenarioProjectionV2(
       forcedFireAge: sim.forcedFireAge,
       hasPartner: sim.hasPartner,
       bankAccountCash: sim.bankAccountCash,
+      // include_full: woning besteedbaar (Optie A, ADR 0015) — consistent met de grafiek.
+      spendableAssetIds:
+        config.mode === 'include_full' && context.hasEigenHuis
+          ? context.eigenHuisAssets.map((a) => a.id)
+          : undefined,
     }
     const result = runSelectedProjection(input, true)
     return { events, depletion, fireAgeFractional: result.fireAgeFractional, fireReachable: result.fireReachable }
