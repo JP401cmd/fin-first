@@ -27,6 +27,7 @@ Laat de `requirement-specialist` definiëren wat "gefixt" betekent: het correcte
 
 ### 3. Architectuur-impact triage — `architect` (kort)
 Laat de `architect` snel bepalen of de bug **structureel** is (raakt domeingrenzen, single-source-of-truth, RLS-model, een ADR). Zo ja: bepaal of de fix een ontwerpkeuze raakt en welke platen/ADR's straks mee moeten. Zo nee: noteer "lokaal, geen architectuurimpact" en ga door.
+- **Raakt de fix een functie die een union-type of meerdere modes/varianten bedient** (bv. `DownsizeConfig | ReverseMortgageConfig`, een flag-gated v1/v2-pad, een mode-enum)? Benoem dan expliciet *alle* varianten die die functie bedient en bepaal per variant of het nieuwe gedrag gewenst is — en eis in stap 4/6 een **regressietest per variant**, niet alleen voor de variant uit het bugrapport. Zo voorkom je "de genoemde case gefixt, de zuster-case geregresseerd".
 
 ### 4. Falende test vastleggen — `tester`
 Laat de `tester` de minimale repro vastleggen als een **falende** test (Vitest of een regression-suite-case in `lib/regression-tests/suites/*`). Bevestig dat hij **rood** is om de juiste reden — dit pint het echte probleem.
