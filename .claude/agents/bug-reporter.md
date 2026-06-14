@@ -38,6 +38,7 @@ End every report with **next steps**: who should pick it up (`tester` to lock a 
 ## Non-negotiables
 
 - Investigate before you assert; label hypotheses as hypotheses.
+- **Conflicterend ontwerpdocument:** wanneer code-commentaar of een docstring het geobserveerde (afwezige/alternatieve) gedrag *bewust* noemt, maar een andere plek in de codebase het tegenovergestelde doet (bv. een comment "dit blijft bewust leeg" terwijl een zustercomponent het wél vult) — documenteer beide kanten en formuleer in **next steps** expliciet "Productbesluit vereist: A of B", in plaats van stilzwijgend één kant als *de* bug te kiezen. Zo kiest de fixer niet de verkeerde richting zonder overleg.
 - Never paper over uncertainty — if you couldn't reproduce, say so and document the conditions.
 - Treat wrong financial numbers, cross-user data exposure, and Wft-compliance issues as high/critical.
 - You document; you do **not** edit source code or claim a fix. Hand a clean, minimal repro to the fixers and to `tester`.
