@@ -71,6 +71,7 @@ export const SimChart = memo(function SimChart({
   onEventClick,
   onEventDragEnd,
   onEventDragMove,
+  emphasis = null,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -128,6 +129,9 @@ export const SimChart = memo(function SimChart({
     newAge: number,
     kind: ChartEventKind,
   ) => void
+  /** Benadrukt één segment van de lijn (uitleg-walkthrough); rest wordt gedimd.
+   *  Default `null` = ongewijzigd gedrag voor alle bestaande call-sites. */
+  emphasis?: 'accumulation' | 'withdrawal' | 'fire' | null
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
@@ -318,6 +322,17 @@ export const SimChart = memo(function SimChart({
   // cashflow-/event-markers houden hun eigen kleur.
   const mainStrokeAcc = mainLineColor ?? COLOR_OPBOUW
   const mainStrokeDec = mainLineColor ?? (!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW)
+
+  // Emphasis (uitleg-walkthrough): dim de niet-benadrukte segmenten zodat het
+  // relevante stukje van de eigen curve eruit springt. Default null = ongewijzigd.
+  // Dim-contrast bewust 0.30 (niet lager): de gedimde segmenten blijven leesbaar
+  // bij lage helderheid, zodat het verschil niet puur op kleur/contrast leunt
+  // (a11y — vult de aria-labels op de CurveSlice-wrapper aan).
+  const DIMMED = 0.30
+  const accOpacity = emphasis === null || emphasis === 'accumulation' || emphasis === 'fire' ? 1 : DIMMED
+  const decOpacity = emphasis === null || emphasis === 'withdrawal' ? 1 : DIMMED
+  // De FIRE-stip pulseert wanneer het snijpunt-hoofdstuk actief is.
+  const firePulse = emphasis === 'fire'
 
   const yTicks = [0, 0.33, 0.66, 1.0].map(f => ({
     val: maxVal * f,
@@ -794,13 +809,14 @@ export const SimChart = memo(function SimChart({
             d={pointsToPath(accPts)}
             fill="none"
             stroke={mainStrokeAcc}
-            strokeWidth={2.5}
+            strokeWidth={emphasis === 'accumulation' ? 3.25 : 2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
             pathLength={1}
             strokeDasharray="1"
             strokeDashoffset={hasEntered ? 0 : 1}
-            style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)' : 'none' }}
+            opacity={accOpacity}
+            style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1), opacity 0.4s ease' : 'opacity 0.4s ease' }}
           />
         )}
 
@@ -810,13 +826,14 @@ export const SimChart = memo(function SimChart({
             d={pointsToPath(decPts)}
             fill="none"
             stroke={mainStrokeDec}
-            strokeWidth={2.5}
+            strokeWidth={emphasis === 'withdrawal' ? 3.25 : 2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
             pathLength={1}
             strokeDasharray="1"
             strokeDashoffset={hasEntered ? 0 : 1}
-            style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1) 0.15s' : 'none' }}
+            opacity={decOpacity}
+            style={{ transition: hasEntered ? 'stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1) 0.15s, opacity 0.4s ease' : 'opacity 0.4s ease' }}
           />
         )}
 
@@ -886,8 +903,17 @@ export const SimChart = memo(function SimChart({
 
         {/* Dot at FIRE junction (hidden in pensioen mode) */}
         {!isPensioenMode && xFire !== null && yFireDot !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
-          <circle cx={xFire} cy={yFireDot} r={5}
-            fill={mainStrokeAcc} stroke="var(--paper)" strokeWidth={1.5} />
+          <>
+            {firePulse && (
+              <circle cx={xFire} cy={yFireDot} r={5}
+                fill="none" stroke={mainStrokeAcc} strokeWidth={2}>
+                <animate attributeName="r" from="5" to="16" dur="1.6s" repeatCount="indefinite" />
+                <animate attributeName="opacity" from="0.7" to="0" dur="1.6s" repeatCount="indefinite" />
+              </circle>
+            )}
+            <circle cx={xFire} cy={yFireDot} r={firePulse ? 6 : 5}
+              fill={mainStrokeAcc} stroke="var(--paper)" strokeWidth={1.5} />
+          </>
         )}
 
         {/* One-time cashflow markers with amount labels */}

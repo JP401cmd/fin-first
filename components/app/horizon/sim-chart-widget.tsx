@@ -10,11 +10,12 @@
  */
 
 import { useState, useCallback, memo } from 'react'
-import { AlertTriangle, TrendingUp, TableProperties, ChevronDown, ChevronUp } from 'lucide-react'
+import { AlertTriangle, TrendingUp, TableProperties, ChevronDown, ChevronUp, Wrench } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { SimChart } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
+import { GrafiekUitlegWalkthrough } from '@/components/app/horizon/grafiek-uitleg/grafiek-uitleg-walkthrough'
 import { formatCurrency } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
@@ -73,6 +74,8 @@ export const SimChartModal = memo(function SimChartModal({
   const displayEndAge = simResult?.displayEndAge ?? 90
   const targetEndPortfolio = simResult?.targetEndPortfolio ?? 0
   const [tableExpanded, setTableExpanded] = useState(false)
+  // "Onder de motorkap" — technische onderbouwing, default ingeklapt (verhaal voorop).
+  const [motorkapExpanded, setMotorkapExpanded] = useState(false)
 
   if (!simResult) return null
 
@@ -92,7 +95,77 @@ export const SimChartModal = memo(function SimChartModal({
     <ShellOverlay open={open} onClose={onClose} kind="sheet" size="full" title="Simulatie Prognose">
       <div className="p-4 sm:p-6 space-y-6">
 
-        {/* 1. Kassabon — onderbouwing berekening */}
+        {/* 1. Verhaal voorop — "Zo werkt jouw grafiek" (4 hoofdstukken) */}
+        <GrafiekUitlegWalkthrough
+          simResult={simResult}
+          cashflows={cashflows}
+          currentAge={currentAge}
+          yearlyExpenses={yearlyExpenses}
+        />
+
+        {/* 2. Grafiek — blijft zichtbaar (de eigen vermogenslijn + legenda) */}
+        <div>
+          <p className="label-editorial text-[var(--ink-3)] mb-2">VERMOGENSGRAFIEK</p>
+          <div className="overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3">
+            <ZoomableChartContainer currentAge={resolvedCurrentAge} endAge={displayEndAge}>
+              {(visibleMin, visibleMax) => (
+                <SimChart
+                  rows={rows}
+                  fireAge={fireAge}
+                  fireAgeFractional={fireAgeFractional}
+                  currentAge={resolvedCurrentAge}
+                  endAge={displayEndAge}
+                  cashflows={cashflows}
+                  forModal
+                  strategy={strategy}
+                  targetEndPortfolio={targetEndPortfolio}
+                  visibleMinAge={visibleMin}
+                  visibleMaxAge={visibleMax}
+                />
+              )}
+            </ZoomableChartContainer>
+            <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-sans text-[var(--ink-4)]">
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-4 rounded-sm bg-horizon-600/70" /> Opbouwfase
+              </span>
+              <span className="flex items-center gap-1">
+                <span className={`inline-block h-2 w-4 rounded-sm ${strategy === 'perpetual' ? 'bg-horizon-600/70' : 'bg-kern-600/70'}`} /> {strategy === 'perpetual' ? 'Behoudfase' : 'Afbouwfase'}
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-horizon-600" /> Inkomen (AOW/pensioen)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-kern-600" /> Uitgave (levensgebeurtenis)
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Onder de motorkap — technische onderbouwing (default ingeklapt) */}
+        <div className="rounded-[var(--r)] border border-[var(--border-ed)]">
+          <button
+            type="button"
+            onClick={() => setMotorkapExpanded(v => !v)}
+            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+            aria-expanded={motorkapExpanded}
+          >
+            <span className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-[var(--ink-4)]" />
+              <span className="label-editorial text-[var(--ink-3)]">ONDER DE MOTORKAP</span>
+              <span className="font-sans text-[11px] normal-case text-[var(--ink-4)]">
+                onderbouwing &amp; jaar-op-jaar
+              </span>
+            </span>
+            {motorkapExpanded
+              ? <ChevronUp className="h-4 w-4 text-[var(--ink-4)]" />
+              : <ChevronDown className="h-4 w-4 text-[var(--ink-4)]" />
+            }
+          </button>
+
+          {motorkapExpanded && (
+          <div className="space-y-6 border-t border-[var(--border-ed)] p-4">
+
+        {/* Kassabon — onderbouwing berekening */}
         <KassabonShell>
           {/* Header */}
           <div className="mb-3 text-center">
@@ -247,45 +320,7 @@ export const SimChartModal = memo(function SimChartModal({
           </p>
         </KassabonShell>
 
-        {/* 2. Grafiek */}
-        <div>
-          <p className="label-editorial text-[var(--ink-3)] mb-2">VERMOGENSGRAFIEK</p>
-          <div className="overflow-hidden rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] p-3">
-            <ZoomableChartContainer currentAge={resolvedCurrentAge} endAge={displayEndAge}>
-              {(visibleMin, visibleMax) => (
-                <SimChart
-                  rows={rows}
-                  fireAge={fireAge}
-                  fireAgeFractional={fireAgeFractional}
-                  currentAge={resolvedCurrentAge}
-                  endAge={displayEndAge}
-                  cashflows={cashflows}
-                  forModal
-                  strategy={strategy}
-                  targetEndPortfolio={targetEndPortfolio}
-                  visibleMinAge={visibleMin}
-                  visibleMaxAge={visibleMax}
-                />
-              )}
-            </ZoomableChartContainer>
-            <div className="mt-2 flex flex-wrap gap-3 text-[10px] font-sans text-[var(--ink-4)]">
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-2 w-4 rounded-sm bg-horizon-600/70" /> Opbouwfase
-              </span>
-              <span className="flex items-center gap-1">
-                <span className={`inline-block h-2 w-4 rounded-sm ${strategy === 'perpetual' ? 'bg-horizon-600/70' : 'bg-kern-600/70'}`} /> {strategy === 'perpetual' ? 'Behoudfase' : 'Afbouwfase'}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-horizon-600" /> Inkomen (AOW/pensioen)
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-kern-600" /> Uitgave (levensgebeurtenis)
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Jaar-op-jaar tabel */}
+        {/* Jaar-op-jaar tabel */}
         <div>
           <button
             type="button"
@@ -426,6 +461,10 @@ export const SimChartModal = memo(function SimChartModal({
                 </p>
               </div>
             </div>
+          )}
+        </div>
+
+          </div>
           )}
         </div>
 
