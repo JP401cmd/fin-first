@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-13T18:38:14.980Z",
-  "generatedDate": "2026-06-13",
+  "generatedAt": "2026-06-14T09:18:00.428Z",
+  "generatedDate": "2026-06-14",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -188,7 +188,7 @@
     "tables": 52,
     "migrations": 105,
     "integrations": 24,
-    "components": 688,
+    "components": 692,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -12450,11 +12450,11 @@
     }
   ],
   "components": {
-    "total": 688,
+    "total": 692,
     "groups": [
       {
         "group": "app",
-        "count": 297,
+        "count": 301,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12525,6 +12525,8 @@
           "color-picker-card",
           "compound-interest-chart",
           "concept-flip-cards",
+          "concept-snijpunt",
+          "concept-terugrekening",
           "confirm-destructive",
           "confirm-destructive.test",
           "connected-account-card",
@@ -12582,6 +12584,7 @@
           "goal-detail-modal",
           "goal-form",
           "goal-progress-timeline",
+          "grafiek-uitleg-walkthrough",
           "guide-faq",
           "guide-horizon-uitleg",
           "guide-how-to",
@@ -12732,6 +12735,7 @@
           "transfer-confirm-sheet",
           "trend-chart",
           "uitgaven-pane",
+          "uitleg-chapter",
           "uncategorized-transactions-banner",
           "use-app-setup-state",
           "use-is-setup-completed",
@@ -17664,7 +17668,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 22
+        "commits": 23
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -17676,7 +17680,7 @@
       },
       {
         "path": "app/api/household",
-        "commits": 10
+        "commits": 9
       },
       {
         "path": "lib/horizon-data.ts",
@@ -17698,8 +17702,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6858,
-        "commits": 104
+        "loc": 6776,
+        "commits": 102
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17728,8 +17732,8 @@
       },
       {
         "file": "lib/unified-projection.ts",
-        "loc": 2374,
-        "commits": 26
+        "loc": 2385,
+        "commits": 27
       },
       {
         "file": "app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx",
@@ -18405,10 +18409,10 @@
     "sections": [
       {
         "label": "Componenten (aantal)",
-        "added": [],
-        "removed": [
-          "-2"
-        ]
+        "added": [
+          "+4"
+        ],
+        "removed": []
       }
     ]
   },
@@ -18438,6 +18442,13 @@
       "date": "2026-06-13",
       "api": 371,
       "components": 688,
+      "tables": 52,
+      "routesProduction": 94
+    },
+    {
+      "date": "2026-06-14",
+      "api": 371,
+      "components": 692,
       "tables": 52,
       "routesProduction": 94
     }

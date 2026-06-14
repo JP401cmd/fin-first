@@ -140,7 +140,7 @@ function resolveDownsizeTriggerV2(
   const baseDepletion = (over: Partial<SimulatedDepletionResult>): SimulatedDepletionResult => ({
     method: 'simulation',
     triggerAge: fallbackAge,
-    reason: 'fallback',
+    reason: 'no_sale',
     liquidAtTrigger: 0,
     bufferAtTrigger: 0,
     marginAtTrigger: 0,
@@ -152,8 +152,12 @@ function resolveDownsizeTriggerV2(
     ...over,
   })
 
+  // fixed_age: het huis wordt sowieso verkocht op de gekozen leeftijd — dit is
+  // GEEN depletie-trigger. `reason: 'no_sale'` is hier louter een placeholder
+  // (het rent-event krijgt bij fixed_age geen depletion-uitleg; zie
+  // `buildV2DownsizeHousing`). De verkoop zelf gebeurt onvoorwaardelijk.
   if (config.trigger === 'fixed_age') {
-    return { triggerAge: fallbackAge, depletion: baseDepletion({ triggerAge: fallbackAge, reason: 'fallback' }) }
+    return { triggerAge: fallbackAge, depletion: baseDepletion({ triggerAge: fallbackAge, reason: 'no_sale' }) }
   }
 
   let measure
@@ -174,8 +178,11 @@ function resolveDownsizeTriggerV2(
     houseValue: number
   } | null = null
 
+  // Scan de VOLLEDIGE horizon (alle measure-rows tot endAge) — NIET tot
+  // `fallbackAge` (= config.triggerAge). De eerste kruising, waar hij ook valt,
+  // is het verkoopmoment (ADR 0012/0015). `config.triggerAge` is uitsluitend
+  // het plafond voor het never-deplete-geval en mag de scan niet afkappen.
   for (const row of measure.rows) {
-    if (row.leeftijd > fallbackAge) break
     const houseValue = ledgerHouseValueAt(row)
     const buffer = houseValue * config.salePricePct * config.salesCostsPct
     // Reële marge (vlak, géén nominale indexering — de engine is volledig reëel).
@@ -217,13 +224,18 @@ function resolveDownsizeTriggerV2(
     }
   }
 
-  // Geen kruising vóór de cap → fallback op de config-cap.
+  // Geen kruising binnen de VOLLEDIGE horizon → verkoop is niet nodig
+  // ('no_sale'). Geen force-sale op het plafond: het huis blijft in het
+  // grootboek en groeit door tot endAge (groter eindvermogen). De
+  // orkestratie (`buildV2DownsizeHousing`) emit hierop GEEN liquidatie en
+  // GEEN huur-event. We rapporteren het plafond als `triggerAge` louter voor
+  // evt. UI-uitleg.
   const atFallback = liquidPath.find((p) => p.age >= fallbackAge - 1e-6)
   return {
     triggerAge: fallbackAge,
     depletion: baseDepletion({
       triggerAge: fallbackAge,
-      reason: 'fallback',
+      reason: 'no_sale',
       liquidAtTrigger: atFallback?.liquid ?? prevLiquid ?? 0,
       liquidPath,
     }),
@@ -245,6 +257,17 @@ function buildV2DownsizeHousing(
   simEndAge: number,
 ): { rentEvents: LifeEvent[]; assetLiquidations: AssetLiquidation[] | undefined; depletion: SimulatedDepletionResult; triggerAge: number } {
   const { triggerAge, depletion } = resolveDownsizeTriggerV2(downsizeCfg, housingContext, baseSimInput, currentAge)
+
+  // Never-deplete (alleen relevant bij on_depletion): het liquide pad raakt de
+  // verkoopkosten-buffer nooit binnen de horizon → verkoop is NIET nodig. Geen
+  // liquidatie en geen huur-event: het huis blijft als niet-liquide asset in
+  // het grootboek en groeit door tot endAge. Geen marker, geen "Waarom dit
+  // moment?"-panel (er is immers geen event). Bij fixed_age wordt het huis wél
+  // onvoorwaardelijk verkocht — die tak valt hier dus nooit door.
+  if (downsizeCfg.trigger === 'on_depletion' && depletion.reason === 'no_sale') {
+    return { rentEvents: [], assetLiquidations: undefined, depletion, triggerAge }
+  }
+
   // Alleen de nieuwe-woonkosten (huur) als cashflow; de verkoopopbrengst én de
   // afgeloste hypotheek worden door de liquidatie in de engine afgehandeld
   // (anders dubbeltelling). Hergebruik `buildHousingLifeEventsAtAge` zodat de

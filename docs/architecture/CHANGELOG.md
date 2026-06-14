@@ -163,3 +163,7 @@
 ## 2026-06-13
 
 - **Componenten (aantal)** verwijderd: -2
+
+## 2026-06-14
+
+- **Componenten (aantal)** toegevoegd: +4

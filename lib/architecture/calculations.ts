@@ -273,7 +273,7 @@ export const CALCULATIONS: Calculation[] = [
     title: 'Eigen-huis-strategie — "wanneer nodig"-trigger',
     domain: 'Toekomst (FIRE)',
     summary:
-      'Het moment waarop de woning wordt verkocht (downsize) of de opeethypotheek start: afgeleid uit dezelfde unified projection als de grafiek, zodat de event-marker exact samenvalt met het punt waar het liquide vermogen in de grafiek opraakt. Capped vaste-punt-iteratie lost de rondrekening op (het event beïnvloedt de FIRE-leeftijd en daarmee het pad vóór de trigger).',
+      'Het moment waarop de woning wordt verkocht (downsize) of de opeethypotheek start: afgeleid uit dezelfde unified projection als de grafiek, zodat de event-marker exact samenvalt met het punt waar het liquide vermogen in de grafiek opraakt. Capped vaste-punt-iteratie lost de rondrekening op (het event beïnvloedt de FIRE-leeftijd en daarmee het pad vóór de trigger). De uitputtings-scan dekt de VOLLEDIGE horizon; de fallback-leeftijd is enkel het never-deplete-plafond, nooit een vroege cap. Raakt het liquide vermogen de verkoopkosten-buffer nergens binnen de horizon, dan vindt er GEEN verkoop plaats (geen event; het huis blijft in het grootboek en groeit door naar de nalatenschap).',
     inputs: [
       'volledige projectie-basis (assets/schulden, sparen, rendement, inflatie, box 3, AOW/pensioen- en overige event-cashflows)',
       'strategie-config (verkoopprijs%/verkoopkosten%, max-leen%/rente, veiligheidsmarge, fallback-leeftijd)',
@@ -284,7 +284,7 @@ export const CALCULATIONS: Calculation[] = [
       'uitleg-bundel (reden, liquide pad, overwaarde bij trigger)',
     ],
     formula:
-      'meet(F) = unified projection zonder housing-event, gepind op forcedFireAge F; D₀ = eerste kruising; iteratie: F ← fireAge(run mét event op Dₖ), Dₖ₊₁ = meet(F); stop bij convergentie of na 3 iteraties (min-tie-break). Drempel(age) = WOZ(age) × verkoopprijs% × verkoopkosten% + marge-jaren × uitgaven × (1+inflatie)^jaren.',
+      'meet(F) = unified projection zonder housing-event, gepind op forcedFireAge F; D₀ = eerste kruising over de VOLLE horizon; iteratie: F ← fireAge(run mét event op Dₖ), Dₖ₊₁ = meet(F); stop bij convergentie of na 3 iteraties (min-tie-break). Drempel(age) = WOZ(age) × verkoopprijs% × verkoopkosten% + marge-jaren × uitgaven × (1+inflatie)^jaren. Géén kruising binnen de horizon ⇒ reason="no_sale": geen verkoop/event, huis blijft in de pot. De fallback-leeftijd is het never-deplete-plafond, geen cap op de scan.',
     files: ['lib/housing-trigger.ts', 'lib/housing-strategy.ts'],
     functions: [
       'resolveHousingTriggerFromProjection',

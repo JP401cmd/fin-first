@@ -239,7 +239,10 @@ export function EventPaneView({
 interface DepletionTriggerInfo {
   method: 'simulation'
   triggerAge: number
-  reason: 'immediate' | 'crossover' | 'fallback'
+  // 'no_sale' = liquide raakt de drempel nooit binnen de horizon → geen
+  // verkoop. Dit produceert per constructie GEEN event, dus dit panel rendert
+  // 'm nooit; de waarde staat in de union voor type-volledigheid.
+  reason: 'immediate' | 'crossover' | 'fallback' | 'no_sale'
   liquidAtTrigger: number
   bufferAtTrigger: number
   marginAtTrigger: number

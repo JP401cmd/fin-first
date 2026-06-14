@@ -363,3 +363,148 @@ describe('include_full = woning besteedbaar (Optie A)', () => {
     expect(besteedbaar.fireAge!).toBeLessThan(vast.fireAge!)
   })
 })
+
+// ── Issue 1 — on_depletion verkoopmoment scant de VOLLE horizon ───────────────
+//
+// Accepted semantics (architect): voor een on_depletion-downsize wordt het huis
+// verkocht op het EERSTE projectiejaar waarin het liquide (niet-huis) vermogen ≤
+// verkoopkosten-buffer (+ veiligheidsmarge) zakt, gescand over de VOLLE horizon
+// tot endAge. `config.triggerAge` is UITSLUITEND de fallback-plafond voor het
+// never-deplete-geval — het mag de verkoop NIET naar een eerder jaar kappen.
+//
+// Bug vandaag: `resolveDownsizeTriggerV2` (build-input.ts:178) breekt de scan af
+// met `if (row.leeftijd > fallbackAge) break`, waarbij `fallbackAge = config.
+// triggerAge`. Daardoor:
+//   • depletie ná triggerAge → wordt naar triggerAge gekapt (te vroeg verkocht
+//     terwijl er nog ~€1M liquide is);
+//   • nooit-depletie → force-sale op triggerAge (`reason:'fallback'`) i.p.v. geen
+//     verkoop.
+//
+// Onderstaande fixture (architect-repro): huis €600k, beleggingen €350k,
+// pensioen €250k, cash €60k, AOW 67, deplete tot 95. Met de cap WEG depleteert
+// het liquide pad op ~93; bij `triggerAge < 93` mag de verkoop NIET vervroegen.
+
+const I1_ASSETS: Asset[] = (
+  [
+    ['huis', 'Woning', 'eigen_huis', 600000, 600000, 3.5, null],
+    ['bel', 'Beleggen', 'investment', 350000, null, 6, null],
+    ['pen', 'Pensioen', 'retirement', 250000, null, 4, null],
+    ['cash', 'Spaar', 'cash', 60000, null, 0, null],
+  ] as const
+).map(([id, name, t, v, woz, r, dep]) => ({ id, name, asset_type: t, current_value: v, woz_value: woz, expected_return: r, is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: dep }) as unknown as Asset)
+
+const I1_DEBTS: Debt[] = [
+  { id: 'hyp', name: 'Hypotheek', debt_type: 'mortgage', current_balance: 250000, interest_rate: 2.9, monthly_payment: 1100, repayment_type: 'annuiteit', is_tax_deductible: true, linked_asset_id: 'huis', end_date: null, net_worth_inclusion_pct: 100, include_aflossing_in_savings: false, is_active: true } as unknown as Debt,
+]
+
+const I1_AOW = { id: 'aow', event_type: 'aow', name: 'AOW', target_age: 67, monthly_income_change: 1600, is_active: true, sort_order: 0 } as never
+
+function buildI1(triggerAge: number, opts?: { assets?: Asset[]; debts?: Debt[]; strategy?: 'deplete' | 'perpetual'; yearlyExpenses?: number }) {
+  const housing: DownsizeConfig = {
+    mode: 'downsize',
+    trigger: 'on_depletion',
+    triggerAge,
+    salePricePct: 1,
+    salesCostsPct: 0.04,
+    newMonthlyHousingCost: null,
+    depletionThresholdYears: 0,
+  } as unknown as DownsizeConfig
+  return buildHorizonInput({
+    horizonInput: { monthlyContributions: 0, yearlyMustExpenses: opts?.yearlyExpenses ?? 60000, dateOfBirth: '1959-01-01', monthlyIncome: 0 } as never,
+    lifeEvents: [I1_AOW],
+    fireStrategy: { strategy: opts?.strategy ?? 'deplete', endAge: 95, legacyAmount: 0 },
+    grossReturn: 0.05,
+    inflation: 0.02,
+    assets: opts?.assets ?? I1_ASSETS,
+    debts: opts?.debts ?? I1_DEBTS,
+    box3Method: 'forfaitair',
+    hasPartner: false,
+    housingStrategy: housing as HousingStrategyConfig,
+    horizonEngineV2: true,
+  })
+}
+
+/** Werkelijke depletie-leeftijd op v2's eigen liquide-pad, zonder cap, zonder liquidatie. */
+function trueDepletionAgeV2(): number {
+  const built = buildI1(95)! // cap = endAge → scant in de praktijk de volle horizon
+  const measure = runHorizonLedger({ ...built.input, assetLiquidations: undefined })
+  const houseAt = (r: (typeof measure.rows)[number]) =>
+    r.assets.filter((a) => a.type === 'eigen_huis').reduce((s, a) => s + Math.max(0, a.eind), 0)
+  for (const r of measure.rows) {
+    const buffer = houseAt(r) * 1 * 0.04
+    if (r.liquideVermogen - buffer <= 1) return r.leeftijd
+  }
+  throw new Error('liquide depleteert niet binnen de horizon — fixture klopt niet')
+}
+
+describe('Issue 1 — on_depletion downsize scant de volle horizon (RED vóór fix)', () => {
+  // 1a: depletie ná config.triggerAge → verkoop op de ECHTE depletie-leeftijd,
+  // NIET op triggerAge. Vandaag kapt de cap dit af → RED.
+  it('1a: depletie ná triggerAge → verkoop op de echte depletie, niet op de cap', () => {
+    const trueAge = trueDepletionAgeV2()
+    // Sanity: de echte depletie ligt ná de lage cap die we kiezen.
+    const lowCap = 75
+    expect(trueAge).toBeGreaterThan(lowCap)
+
+    const built = buildI1(lowCap)!
+    expect(built.input.assetLiquidations).toHaveLength(1)
+    const saleAge = built.input.assetLiquidations![0].age
+    // De accepted-semantics: verkoop op de ECHTE depletie (≈93), niet op de
+    // config-cap (75). Vandaag geeft de code 75 → deze assertie faalt (RED).
+    expect(saleAge).toBe(trueAge)
+    expect(saleAge).toBeGreaterThan(lowCap)
+  })
+
+  // 1b: liquide raakt NOOIT de buffer → GEEN verkoop. Vandaag force-sale op de
+  // cap met reason:'fallback' + een rent-event → RED.
+  it('1b: nooit-depletie → geen verkoop (geen assetLiquidations, geen huur-event)', () => {
+    const RICH: Asset[] = (
+      [
+        ['huis', 'Woning', 'eigen_huis', 600000, 600000, 3.5, null],
+        ['bel', 'Beleggen', 'investment', 1500000, null, 6, null],
+        ['cash', 'Spaar', 'cash', 100000, null, 0, null],
+      ] as const
+    ).map(([id, name, t, v, woz, r, dep]) => ({ id, name, asset_type: t, current_value: v, woz_value: woz, expected_return: r, is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: dep }) as unknown as Asset)
+
+    const built = buildI1(80, { assets: RICH, debts: [], strategy: 'perpetual', yearlyExpenses: 30000 })!
+    // Verificatie dat dit écht een nooit-depletie-fixture is: het liquide pad
+    // blijft over de hele horizon ruim boven nul.
+    const measure = runHorizonLedger({ ...built.input, assetLiquidations: undefined })
+    const minLiquid = Math.min(...measure.rows.map((r) => r.liquideVermogen))
+    expect(minLiquid).toBeGreaterThan(500_000)
+
+    // Accepted-semantics: geen kruising binnen de horizon → GEEN verkoop.
+    expect(built.input.assetLiquidations ?? []).toHaveLength(0)
+    const rentEvent = built.effectiveLifeEvents.find((e) => e.event_type === 'verkoop_eigen_woning')
+    expect(rentEvent).toBeUndefined()
+  })
+
+  // 1c: GREEN guard — fixed_age verkoopt exact op config.triggerAge. Moet blijven
+  // slagen (de fix mag dit niet breken).
+  it('1c: fixed_age verkoopt exact op config.triggerAge (regressie-guard, blijft GROEN)', () => {
+    const housing: HousingStrategyConfig = {
+      mode: 'downsize',
+      trigger: 'fixed_age',
+      triggerAge: 70,
+      salePricePct: 1,
+      salesCostsPct: 0.04,
+      newMonthlyHousingCost: null,
+      depletionThresholdYears: 0,
+    } as unknown as HousingStrategyConfig
+    const built = buildHorizonInput({
+      horizonInput: { monthlyContributions: 0, yearlyMustExpenses: 60000, dateOfBirth: '1959-01-01', monthlyIncome: 0 } as never,
+      lifeEvents: [I1_AOW],
+      fireStrategy: { strategy: 'deplete', endAge: 95, legacyAmount: 0 },
+      grossReturn: 0.05,
+      inflation: 0.02,
+      assets: I1_ASSETS,
+      debts: I1_DEBTS,
+      box3Method: 'forfaitair',
+      hasPartner: false,
+      housingStrategy: housing,
+      horizonEngineV2: true,
+    })!
+    expect(built.input.assetLiquidations).toHaveLength(1)
+    expect(built.input.assetLiquidations![0].age).toBe(70)
+  })
+})

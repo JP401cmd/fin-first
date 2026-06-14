@@ -49,3 +49,16 @@ In v2 wordt de eigen-huis-**downsize** een **asset-liquidatie binnen het grootbo
 **Bug (na de cutover, brede groep):** bij `deplete` + housing-mode `include_full` met een groot huis liep het getoonde netto vermogen NIET naar ~€0 en lag de vrijheidsleeftijd veel te hoog (gemeten owner: FIRE 63 i.p.v. v1's 45.6). Oorzaak: v2 behandelt `eigen_huis` als **niet-liquide** (`NON_LIQUID`), dus de deplete-onttrekking dronk alleen de liquide pot leeg terwijl de woning (3,5%) ongemoeid doorgroeide → netto vermogen stéég i.p.v. te dalen, en de liquide pot alléén moest het pensioen dragen → FIRE veel later. v1 telde de hele pot (incl. woning) als afbouwbaar.
 
 **Besluit (Optie A — herstel v1-gedrag):** bij `include_full` telt de woning **volledig mee als besteedbaar FIRE-vermogen**. Nieuw veld `UnifiedProjectionInput.spendableAssetIds` (v1 negeert het): `build-input` zet daarin de `eigen_huis`-ids wanneer de housing-mode `include_full` is; de engine-helper `isNonLiquid(a)` retourneert dan `false` voor die assets, zodat ze in `liquidValue`/`liquidRealReturn`/`liquidSumStart` + de onttrekkingsvolgorde (eigen_huis staat dáár al laatst) meetellen. Gevolg: deplete bouwt ook de woning af (laatst), de lijn loopt naar ~€0 en FIRE matcht v1 (gemeten 43 ≈ 45.6). `exclude_from_fire` blijft uitsluiten; `downsize`/`reverse_mortgage` houden het liquidatie-/event-model. Bewaakt door `test/horizon-housing-liquidation.test.ts` ("include_full = woning besteedbaar").
+
+## on_depletion verkoopmoment scant de volle horizon — `triggerAge` is geen cap (14 jun 2026)
+
+**Bug (fideliteit):** de on_depletion-trigger (`resolveDownsizeTriggerV2` in `build-input.ts`) begrensde zijn uitputtings-scan op `config.triggerAge`. Daardoor verkocht hij (of startte de opeethypotheek) **te vroeg** wanneer het liquide vermogen langer meeging dan die leeftijd, of forceerde hij een verkoop **op de cap** terwijl er geen uitputting was. Dat wijkt af van de eigen definitie van deze ADR (verkopen op het eerste jaar waarop het liquide vermogen de verkoopkosten-buffer raakt).
+
+**Herstel (geen nieuw beleid):**
+
+- De uitputtings-scan dekt nu de **volledige horizon** (tot end-of-horizon), niet tot `triggerAge`. `config.triggerAge` is **uitsluitend** het **never-deplete-plafond** (fallback-leeftijd), nooit een vroege cap.
+- Raakt het liquide vermogen de verkoopkosten-buffer **nergens binnen de horizon** → **geen verkoop**: geen `assetLiquidations`, geen huur-event. Het huis blijft tot het einde van de horizon in het grootboek staan, groeit door op `expected_return` en vergroot zo de **nalatenschap** — dit is dus géén "verkoop op de cap".
+- `SimulatedDepletionResult.reason` heeft hiervoor de waarde `'no_sale'` (voorheen `'fallback'`): de scan vond binnen de horizon geen uitputtings-kruising.
+- Een **reverse_mortgage** on_depletion-`no_sale` emit geen event ⇒ de vermogenssamenstelling-grafiek (`applyHousingToComposition`, leest de trigger-leeftijd uitsluitend uit `housingEvent?.target_age`) injecteert niets → **geen fantoom-schaduwschuld** meer.
+
+Herstelt de fideliteit aan de definities van deze ADR (en ADR 0012): verkopen op het eerste jaar dat liquide de buffer raakt, anders niet. Bewaakt door `test/horizon-housing-liquidation.test.ts` / `test/housing-trigger.test.ts`.

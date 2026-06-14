@@ -57,11 +57,9 @@ import { HousingStrategyNudgeSheet } from '@/components/app/horizon/housing-stra
 import {
   HOUSING_STRATEGY_LABELS,
   isHousingStrategyEvent,
-  projectMortgageStateAt,
-  projectEigenHuisValuesAt,
-  estimateReverseMortgagePayout,
   getFireEligibleNetWorth,
 } from '@/lib/housing-strategy'
+import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-housing'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -1549,100 +1547,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     if (!unifiedRows?.length) return []
     const baseRows = unifiedRowsToStackedRows(unifiedRows)
 
-    const housingCfg = initialData.housingStrategy
-    const ctx = initialData.housingContext
-    const eigenHuisAssets = ctx.eigenHuisAssets ?? []
-    const mortgages = ctx.eigenHuisMortgages
-    const hasHouse = ctx.hasEigenHuis && eigenHuisAssets.length > 0
-    // Geen huis → niets te injecteren, retourneer engine-output direct.
-    if (!hasHouse) return baseRows
-    // include_full: huis + hypotheek zitten al in de engine — geen injectie.
-    if (housingCfg.mode === 'include_full') return baseRows
-
     const currentAgeFloor = initialData.effectiveInput.dateOfBirth
       ? Math.floor(ageAtDate(initialData.effectiveInput.dateOfBirth))
       : null
     if (currentAgeFloor === null) return baseRows
 
-    // Trigger-leeftijd voor downsize en reverse_mortgage: ÉÉN bron — het
-    // (client-side geregenereerde) housing-event zelf. Daardoor knikt de
-    // vastgoed-bar op exact dezelfde leeftijd als de event-marker én het
-    // verkoop-cashflow-moment in de sim. Voor exclude_from_fire is er geen
-    // trigger (huis blijft permanent buiten de FIRE-pot).
-    let triggerAge: number | null = null
-    if (housingCfg.mode === 'downsize' || housingCfg.mode === 'reverse_mortgage') {
-      const housingEvent = displayEvents.find(isHousingStrategyEvent)
-      triggerAge =
-        housingEvent?.target_age ?? Math.max(currentAgeFloor, housingCfg.triggerAge)
-    }
-
-    return baseRows.map((row) => {
-      const monthsForward = Math.max(0, (row.age - currentAgeFloor) * 12)
-      const projectedHouse = projectEigenHuisValuesAt(eigenHuisAssets, monthsForward)
-      const mortgageState = projectMortgageStateAt(mortgages, monthsForward)
-
-      if (housingCfg.mode === 'exclude_from_fire') {
-        // Huis + hypotheek beide injecteren (groeien resp. amortiseren).
-        // Reden: filterAssetsForFire haalt ze uit de engine; ze moeten
-        // terugkomen voor de visualisatie zodat netto vermogen eerlijk is.
-        return {
-          ...row,
-          vastgoed: row.vastgoed + Math.round(projectedHouse.currentValue),
-          schulden: row.schulden - Math.round(mortgageState.balance),
-        }
-      }
-
-      if (housingCfg.mode === 'downsize') {
-        if (triggerAge !== null && row.age >= triggerAge) {
-          // Na trigger: huis verkocht, hypotheek afgelost via sale-cashflow.
-          // De verkoopopbrengst staat al in liquide (via lifeEventsToCashflows).
-          return row
-        }
-        // Vóór trigger: huis + hypotheek beide zichtbaar.
-        return {
-          ...row,
-          vastgoed: row.vastgoed + Math.round(projectedHouse.currentValue),
-          schulden: row.schulden - Math.round(mortgageState.balance),
-        }
-      }
-
-      if (housingCfg.mode === 'reverse_mortgage') {
-        // Huis blijft zichtbaar via baseRows (geen filter — reverse_mortgage
-        // houdt eigen_huis in de assets). Vóór trigger: niets extra.
-        if (triggerAge === null || row.age < triggerAge) return row
-        // Vanaf trigger: stapelende schaduwschuld vanwege opeethypotheek.
-        // monthlyPayout uit config of auto-schatting op basis van equity bij
-        // trigger. Schuld groeit als principal + rente over de looptijd.
-        // Uitkering uit het event-metadata (zelfde bron als de sim-cashflow);
-        // fallback: zelfde schatting als buildHousingLifeEventsAtAge.
-        const housingEvent = displayEvents.find(isHousingStrategyEvent)
-        const metaPayout = Number(
-          (housingEvent?.metadata as Record<string, unknown> | null | undefined)?.monthlyPayout,
-        )
-        const equityAtTrigger = Math.max(
-          0,
-          projectEigenHuisValuesAt(eigenHuisAssets, Math.max(0, (triggerAge - currentAgeFloor) * 12))
-            .currentValue -
-            projectMortgageStateAt(mortgages, Math.max(0, (triggerAge - currentAgeFloor) * 12))
-              .balance,
-        )
-        const monthlyPayout = Number.isFinite(metaPayout) && metaPayout > 0
-          ? metaPayout
-          : housingCfg.monthlyPayout ??
-            estimateReverseMortgagePayout(
-              equityAtTrigger,
-              housingCfg.maxLoanPct,
-              Math.max(1, initialData.fireStrategy.endAge - triggerAge),
-            )
-        const yearsAfterTrigger = row.age - triggerAge
-        const principal = monthlyPayout * 12 * yearsAfterTrigger
-        const shadowDebt =
-          principal * Math.pow(1 + housingCfg.interestRate, yearsAfterTrigger) - principal
-        if (shadowDebt <= 0) return row
-        return { ...row, schulden: row.schulden - Math.round(shadowDebt) }
-      }
-
-      return row
+    // Woonstrategie-injectie (pure helper): v1 injecteert huis/hypotheek terug,
+    // v2-downsize skipt (huis zit al in de engine-rijen — zie ADR 0015 / Issue 2).
+    return applyHousingToComposition(baseRows, {
+      housingCfg: initialData.housingStrategy,
+      ctx: initialData.housingContext,
+      displayEvents,
+      currentAgeFloor,
+      fireEndAge: initialData.fireStrategy.endAge,
+      isV2: initialData.horizonEngineV2,
     })
   }, [chartMode, unifiedRows, initialData, displayEvents])
 

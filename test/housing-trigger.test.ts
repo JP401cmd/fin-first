@@ -271,12 +271,49 @@ describe('trigger valt samen met grafiek-uitputting (downsize × on_depletion)',
     expect(depletion!.triggerAge).toBe(firstCross!.age)
   })
 
+  // REGRESSIE-GUARD (Issue 1, orkestratie-laag): het EMITTED verkoop-event mag
+  // PAST `config.triggerAge` vallen wanneer het liquide pad langer standhoudt.
+  // De oude bug kapte de scan op de cap → het event landde altijd ≤ triggerAge.
+  // Dit pint dat de publieke consumer (`resolveHousingEventsForSim`) de echte
+  // depletie-leeftijd doorgeeft, ook met een lage cap.
+  it('GUARD: verkoop-event valt voorbij config.triggerAge als liquide langer standhoudt', () => {
+    const basis = makeDecumulationBasis()
+    // Echte depletie zonder cap-effect (hoge cap = endAge).
+    const trueAge = resolveHousingEventsForSim(
+      downsizeOnDepletion({ triggerAge: 90 }),
+      contextFor(basis),
+      basis,
+    ).depletion!.triggerAge
+    const lowCap = 60
+    expect(trueAge).toBeGreaterThan(lowCap)
+
+    const { events, depletion } = resolveHousingEventsForSim(
+      downsizeOnDepletion({ triggerAge: lowCap }),
+      contextFor(basis),
+      basis,
+    )
+    expect(depletion!.reason).toBe('crossover')
+    expect(events).toHaveLength(1)
+    // Het event landt op de ECHTE depletie, niet gekapt op de lage cap.
+    expect(events[0].target_age).toBe(trueAge)
+    expect(events[0].target_age).toBeGreaterThan(lowCap)
+  })
+
   it('in de echte run-mét-event blijft het vermogen vóór de trigger boven de drempel', () => {
     const basis = makeDecumulationBasis()
     const config = downsizeOnDepletion()
     const context = contextFor(basis)
     const { events, depletion } = resolveHousingEventsForSim(config, context, basis)
-    expect(depletion!.converged).toBe(true)
+    // Self-consistentie i.p.v. `converged`: met de volle-horizon-scan (Issue 1)
+    // kan de kruising tegen het einde van de horizon vallen, waar de deplete-
+    // annuïteit + verkoop-injectie elkaar per jaar herrekenen → de vaste-punt-
+    // iteratie hoeft niet te convergeren. Het deterministische `min()`-resultaat
+    // is wél zelfconsistent: de trigger is de eerste kruising in zijn eigen
+    // liquide pad. Dát is de invariant die telt (marker == grafiek-uitputting).
+    const firstCrossSelf = depletion!.liquidPath.find((p) => p.liquid - p.buffer <= 1)
+    expect(firstCrossSelf).toBeDefined()
+    expect(depletion!.triggerAge).toBe(firstCrossSelf!.age)
+    expect(depletion!.reason).toBe('crossover')
 
     const { assets, debts } = filterAssetsForFire(config, basis.assets, basis.debts)
     const fullRun = runUnifiedProjection({
@@ -395,9 +432,15 @@ describe('vaste-punt-iteratie', () => {
     const config = downsizeOnDepletion({ triggerAge: 80 })
     const context = contextFor(basis)
     const result = resolveHousingTriggerFromProjection(config, context, basis)
+    // De iteratie blijft begrensd (≤ 3 passes) en deterministisch — ook al
+    // convergeert ze niet altijd bij een kruising tegen het einde van de
+    // horizon (Issue 1: de scan loopt door tot endAge, niet tot config.
+    // triggerAge=80). Het resultaat is hoe dan ook zelfconsistent.
     expect(result.iterations).toBeLessThanOrEqual(3)
     expect(result.triggerAge).toBeGreaterThanOrEqual(basis.currentAge)
-    expect(result.triggerAge).toBeLessThanOrEqual(80)
+    expect(result.triggerAge).toBeLessThanOrEqual(basis.endAge)
+    const again = resolveHousingTriggerFromProjection(config, context, basis)
+    expect(again.triggerAge).toBe(result.triggerAge)
   })
 })
 
@@ -432,28 +475,42 @@ describe('reasons', () => {
     expect(result.triggerAge).toBe(basis.currentAge)
   })
 
-  it('fallback: nog-sparende gebruiker kruist niet → uiterste leeftijd', () => {
+  it('no_sale: liquide raakt de drempel nooit binnen de horizon → geen verkoop', () => {
+    // Grote liquide pot + perpetual (alleen rendement opnemen, kapitaal blijft)
+    // → het liquide pad blijft over de hele horizon ruim boven de drempel.
+    // Accepted semantics (Issue 1): geen kruising → 'no_sale', GEEN force-sale
+    // op config.triggerAge.
     const basis = makeDecumulationBasis({
-      currentAge: 40,
-      annualSavings: 36_000,
-      monthlyIncome: 6_500,
+      assets: [makeAsset({ current_value: 2_000_000 }), makeEigenHuis()],
+      yearlyExpenses: 30_000,
+      strategyConfig: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 },
     })
     const config = downsizeOnDepletion({ triggerAge: 70 })
     const context = contextFor(basis)
     const result = resolveHousingTriggerFromProjection(config, context, basis)
-    // Met €36K sparen + rendement op €200K raakt liquide nooit op vóór 70.
-    expect(result.reason).toBe('fallback')
-    expect(result.triggerAge).toBe(70)
+    // Verificatie dat het écht nooit kruist in het liquide pad.
+    expect(result.liquidPath.some((p) => p.liquid - p.buffer <= 1)).toBe(false)
+    expect(result.reason).toBe('no_sale')
+    // GUARD: never-deplete short-circuit rapporteert converged (geen spurieuze
+    // niet-convergentie die een UI-marker zou triggeren) en doet 1 pass.
+    expect(result.converged).toBe(true)
+    expect(result.iterations).toBe(1)
+    // Geen verkoop-event: het huis blijft staan.
+    const { events } = resolveHousingEventsForSim(config, context, basis)
+    expect(events).toHaveLength(0)
   })
 
-  it('crossover: kruising binnen het venster', () => {
+  it('crossover: kruising binnen de horizon', () => {
     const basis = makeDecumulationBasis()
     const config = downsizeOnDepletion()
     const context = contextFor(basis)
     const result = resolveHousingTriggerFromProjection(config, context, basis)
     expect(result.reason).toBe('crossover')
     expect(result.triggerAge).toBeGreaterThan(basis.currentAge)
-    expect(result.triggerAge).toBeLessThan(85)
+    // De kruising ligt binnen de VOLLEDIGE horizon (tot endAge), niet
+    // gekapt op config.triggerAge (Issue 1). Met deplete + geen inkomen
+    // raakt liquide tegen het einde op (≈86).
+    expect(result.triggerAge).toBeLessThanOrEqual(basis.endAge)
   })
 })
 
@@ -555,6 +612,92 @@ describe('resolveHousingEventsForSim', () => {
     // Bedragen-metadata blijft gevuld door buildHousingLifeEventsAtAge.
     expect(meta.saleProceeds).toBeDefined()
     expect(meta.wozValueAtTrigger).toBeDefined()
+  })
+})
+
+// ── 1d. Issue 1 (v1-pariteit): scan kapt op config.triggerAge ─
+//
+// Het v1-pad heeft dezelfde cap-degeneratie als het v2-pad (build-input.ts):
+// `scanRows` (housing-trigger.ts:241) test `row.age <= fallbackAge + 1e-6` met
+// `fallbackAge = config.triggerAge`. Daardoor kruist de scan niet voorbij de cap:
+//   • depletie ná triggerAge → trigger wordt naar triggerAge gekapt (fallback);
+//   • nooit-depletie → fallback op triggerAge i.p.v. geen verkoop.
+//
+// Accepted semantics (architect): de scan loopt door tot endAge; triggerAge is
+// ALLEEN het never-deplete-plafond. Deze tests pinnen dat — RED vóór de fix.
+
+describe('Issue 1 (v1-pariteit): scan scant de volle horizon, niet tot triggerAge', () => {
+  // Architect-repro op de v1-engine: huis €600k, beleggingen €350k, pensioen
+  // €250k, cash €60k, AOW 67, deplete tot 95. Liquide depleteert ~92 zonder cap.
+  function richDecumulationBasis(over: Partial<HousingTriggerSimBasis> = {}): HousingTriggerSimBasis {
+    const huis = makeEigenHuis({ current_value: 600_000, woz_value: 600_000, expected_return: 3.5 })
+    return makeDecumulationBasis({
+      assets: [
+        makeAsset({ id: 'bel', current_value: 350_000, expected_return: 6 }),
+        makeAsset({ id: 'pen', asset_type: 'retirement', current_value: 250_000, expected_return: 4 }),
+        makeAsset({ id: 'cash', asset_type: 'cash', current_value: 60_000, expected_return: 0 }),
+        huis,
+      ],
+      debts: [makeMortgage(huis.id, { current_balance: 250_000 })],
+      currentAge: 67,
+      endAge: 95,
+      yearlyExpenses: 60_000,
+      cashflows: [
+        { id: 'aow', name: 'AOW', type: 'recurring', direction: 'income', amount: 1_600, fromAge: 67, toAge: null, indexed: true },
+      ],
+      strategyConfig: { strategy: 'deplete', endAge: 95, legacyAmount: 0 },
+      ...over,
+    })
+  }
+
+  it('1d-a: depletie ná triggerAge → trigger op de echte depletie, niet op de cap', () => {
+    const basis = richDecumulationBasis()
+    const context = contextFor(basis)
+    // Hoge cap (= endAge) onthult waar het liquide pad ECHT kruist.
+    const high = resolveHousingTriggerFromProjection(
+      downsizeOnDepletion({ triggerAge: 95 }),
+      context,
+      basis,
+    )
+    const trueAge = high.triggerAge
+    const lowCap = 75
+    expect(trueAge).toBeGreaterThan(lowCap) // sanity: depletie ligt ná de lage cap
+
+    // Lage cap mag de trigger NIET vervroegen: de scan moet de volle horizon zien.
+    const low = resolveHousingTriggerFromProjection(
+      downsizeOnDepletion({ triggerAge: lowCap }),
+      context,
+      basis,
+    )
+    expect(low.triggerAge).toBe(trueAge)
+    expect(low.triggerAge).toBeGreaterThan(lowCap)
+    expect(low.reason).toBe('crossover')
+  })
+
+  it('1d-b: nooit-depletie → geen kruising (reason ≠ fallback-force-sale op de cap)', () => {
+    // Grote pot + lage uitgaven + AOW + perpetual → liquide blijft ruim positief.
+    const basis = richDecumulationBasis({
+      assets: [
+        makeAsset({ id: 'bel', current_value: 1_500_000, expected_return: 6 }),
+        makeAsset({ id: 'cash', asset_type: 'cash', current_value: 100_000, expected_return: 0 }),
+        makeEigenHuis({ current_value: 600_000, woz_value: 600_000, expected_return: 3.5 }),
+      ],
+      debts: [],
+      yearlyExpenses: 30_000,
+      strategyConfig: { strategy: 'perpetual', endAge: 95, legacyAmount: 0 },
+    })
+    const context = contextFor(basis)
+    const result = resolveHousingTriggerFromProjection(
+      downsizeOnDepletion({ triggerAge: 80 }),
+      context,
+      basis,
+    )
+    // Het liquide pad raakt de drempel nooit → er is geen écht verkoopmoment.
+    const everCrosses = result.liquidPath.some((p) => p.liquid - p.buffer <= 1)
+    expect(everCrosses).toBe(false)
+    // Accepted semantics: geen kruising → geen force-sale op de cap.
+    // Vandaag: reason 'fallback' op triggerAge (80). Dit pint dat dat fout is.
+    expect(result.reason).not.toBe('fallback')
   })
 })
 

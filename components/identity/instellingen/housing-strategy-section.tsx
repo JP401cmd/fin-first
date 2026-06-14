@@ -355,7 +355,7 @@ function ScenarioPreviewPanel({
         Live preview — dit verschijnt op je tijdas
       </p>
       <div className="space-y-1.5 text-sm text-[var(--ink-2)]">
-        {hasTrigger && ageDisplay != null && (
+        {hasTrigger && ageDisplay != null && draft.events.length > 0 && (
           <div>
             {config.mode === 'downsize' ? 'Verkoop' : 'Uitkering start'}:{' '}
             <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">

@@ -100,11 +100,21 @@ export interface SimulatedDepletionResult {
   /**
    * Waarom dit moment:
    *   - 'immediate': liquide zit nu al op/onder de drempel.
-   *   - 'crossover': liquide kruist de drempel binnen het venster.
-   *   - 'fallback': geen kruising vóór de fallback-leeftijd (bv. gebruiker
-   *     bouwt nog op) → uiterste leeftijd uit de config.
+   *   - 'crossover': liquide kruist de drempel binnen de VOLLEDIGE horizon
+   *     (tot endAge); de eerste kruising — waar hij ook valt — is het moment.
+   *   - 'no_sale': het liquide pad raakt de drempel NOOIT binnen de horizon
+   *     (bv. gebruiker spaart netto, of AOW/pensioen + rendement dekken de
+   *     uitgaven volledig). Verkoop is dan niet nodig: er komt GEEN verkoop-
+   *     event en GEEN liquidatie — het huis blijft in het grootboek en groeit
+   *     door tot het einde van de horizon (groter eindvermogen). `config.
+   *     triggerAge` is uitsluitend het plafond voor dit never-deplete-geval
+   *     en mag de scan NIET naar een eerder jaar kappen (ADR 0012).
+   *
+   * NB: 'fallback' bestaat niet meer als "force-sale op het plafond". Geen
+   * kruising betekent geen verkoop ('no_sale'), niet een gedwongen verkoop op
+   * de cap.
    */
-  reason: 'immediate' | 'crossover' | 'fallback'
+  reason: 'immediate' | 'crossover' | 'no_sale'
   /** Liquide pad-waarde net vóór de trigger (einde voorgaand jaar). */
   liquidAtTrigger: number
   /** Verkoopkosten-buffer op de trigger-leeftijd (0 bij reverse_mortgage). */
@@ -230,17 +240,17 @@ function scanRows(
   let prevLiquid: number | null = null
   let crossing: { age: number; prevLiquid: number; buffer: number; margin: number } | null = null
 
+  // Scan de VOLLEDIGE horizon (tot endAge) — NIET tot `fallbackAge` (= config.
+  // triggerAge). De eerste kruising, waar hij ook valt, is het verkoopmoment
+  // (ADR 0012). `config.triggerAge` is uitsluitend het plafond voor het
+  // never-deplete-geval en mag de scan niet eerder afkappen.
   for (const row of rows) {
     const yearsFromNow = row.age - sim.currentAge
     const liquid = liquidFromRow(row, config.mode, context.eigenHuisMortgages)
     const buffer = bufferAt(config, context, yearsFromNow)
     const margin = marginAt(config, sim, yearsFromNow)
     liquidPath.push({ age: row.age, liquid, buffer: buffer + margin })
-    if (
-      crossing === null &&
-      row.age <= fallbackAge + 1e-6 &&
-      liquid - (buffer + margin) <= EPSILON
-    ) {
+    if (crossing === null && liquid - (buffer + margin) <= EPSILON) {
       crossing = {
         age: row.age,
         // Liquide "net vóór" de trigger: einde voorgaand jaar (of het
@@ -265,13 +275,16 @@ function scanRows(
     }
   }
 
-  // Geen kruising binnen het venster (bv. gebruiker bouwt nog op, of het
-  // vermogen houdt stand tot de fallback-leeftijd) → uiterste leeftijd.
+  // Geen kruising binnen de VOLLEDIGE horizon → verkoop is niet nodig
+  // ('no_sale'). Geen force-sale op het plafond: het huis blijft staan en
+  // groeit door. We rapporteren het plafond als `triggerAge` voor evt.
+  // UI-uitleg, maar de orkestratie (`resolveHousingEventsForSim`) bouwt op
+  // 'no_sale' GEEN event.
   const yearsToFallback = fallbackAge - sim.currentAge
   const atFallback = liquidPath.find((p) => p.age >= fallbackAge - 1e-6)
   return {
     triggerAge: fallbackAge,
-    reason: 'fallback',
+    reason: 'no_sale',
     liquidAtTrigger: atFallback?.liquid ?? prevLiquid ?? 0,
     bufferAtTrigger: bufferAt(config, context, yearsToFallback),
     marginAtTrigger: marginAt(config, sim, yearsToFallback),
@@ -303,6 +316,33 @@ export function resolveHousingTriggerFromProjection(
   let iterations = 0
   let converged = false
   let fireAgeUsed: number | null = sim.forcedFireAge ?? null
+
+  // Never-deplete: het liquide pad raakt de drempel nergens in de horizon →
+  // verkoop is niet nodig. Sla de vaste-punt-iteratie over: er is geen event
+  // om de fireAge op te pinnen, en een geforceerd event op het plafond zou
+  // een spurieuze kruising injecteren. We rapporteren 'no_sale' op het plafond
+  // (alleen voor evt. UI-uitleg); de orkestratie bouwt hierop GEEN event.
+  if (scan.reason === 'no_sale') {
+    const monthsToFallback = Math.max(0, (D - sim.currentAge) * 12)
+    const projectedHouseNS =
+      context.eigenHuisAssets.length > 0
+        ? projectEigenHuisValuesAt(context.eigenHuisAssets, monthsToFallback)
+        : { wozValue: context.wozValue, currentValue: context.eigenHuisValue }
+    const projectedMortgageNS = projectMortgageStateAt(context.eigenHuisMortgages, monthsToFallback)
+    return {
+      method: 'simulation',
+      triggerAge: D,
+      reason: 'no_sale',
+      liquidAtTrigger: scan.liquidAtTrigger,
+      bufferAtTrigger: scan.bufferAtTrigger,
+      marginAtTrigger: scan.marginAtTrigger,
+      equityAtTrigger: Math.max(0, projectedHouseNS.currentValue - projectedMortgageNS.balance),
+      fireAgeUsed,
+      iterations: 1,
+      converged: true,
+      liquidPath: scan.liquidPath,
+    }
+  }
 
   // Vaste-punt-iteratie: run-mét-event levert de fireAge waarop de meetrun
   // wordt gepind. Convergentie = trigger verschuift niet meer.
@@ -392,6 +432,14 @@ export function resolveHousingEventsForSim(
   }
 
   const depletion = resolveHousingTriggerFromProjection(config, context, sim)
+
+  // Never-deplete: liquide raakt de drempel nooit binnen de horizon → verkoop
+  // is niet nodig. Geen verkoop-/uitkering-event (en daarmee geen marker,
+  // geen "Waarom dit moment?"-panel, geen cashflow). Het huis blijft staan.
+  if (depletion.reason === 'no_sale') {
+    return { events: [], depletion }
+  }
+
   const events = buildHousingLifeEventsAtAge(
     config,
     context,
