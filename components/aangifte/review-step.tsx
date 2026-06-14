@@ -648,7 +648,12 @@ export function ReviewStep({ extraction, mode, onSuccess, onCancel }: ReviewStep
       )}
 
       {/* Action-bar — sticky bottom voor mobile */}
-      <div className="sticky bottom-0 -mx-1 px-1 py-3 bg-[var(--paper)]/95 backdrop-blur-sm border-t border-[var(--border-ed)] flex items-center justify-between gap-3">
+      {/* paddingBottom reserveert ruimte voor de zwevende mobiele nav-pill
+          (FloatingNavButton); de var is 0 boven 768px. */}
+      <div
+        className="sticky bottom-0 -mx-1 px-1 py-3 bg-[var(--paper)]/95 backdrop-blur-sm border-t border-[var(--border-ed)] flex items-center justify-between gap-3"
+        style={{ paddingBottom: 'calc(0.75rem + var(--mobile-nav-clearance))' }}
+      >
         <button
           type="button"
           onClick={onCancel}

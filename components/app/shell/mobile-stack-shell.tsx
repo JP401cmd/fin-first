@@ -137,8 +137,12 @@ function Tray({
 
       {/* Content scrollt binnen de tray. flex-1 vult de ruimte tussen
           TopBar en BottomBar; overflow-y-auto zodat lange pagina's scrollen
-          terwijl TopBar+BottomBar visueel "vast" lijken (binnen de tray). */}
-      <main className="flex-1 overflow-y-auto">{children}</main>
+          terwijl TopBar+BottomBar visueel "vast" lijken (binnen de tray).
+          `pb-[var(--mobile-nav-clearance)]` reserveert onderaan ruimte voor de
+          zwevende FloatingNavButton (zie globals.css) zodat de laatste content
+          en knoppen er niet onder verdwijnen; de var is 0 boven 768px waar de
+          pill verborgen is. */}
+      <main className="flex-1 overflow-y-auto pb-[var(--mobile-nav-clearance)]">{children}</main>
 
       {/* BottomBar slot — config bepaalt of het tabs / action-bar /
           context-actions / hidden wordt. */}

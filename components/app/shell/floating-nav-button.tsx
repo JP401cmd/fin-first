@@ -49,7 +49,12 @@ export function FloatingNavButton() {
         // z-[60] zit BOVEN de BottomSheet-portal (z-50), zodat de floating
         // button zichtbaar blijft wanneer het menu open is en de gebruiker
         // het kruisje kan tappen om weer te sluiten.
-        className="fixed left-1/2 -translate-x-1/2 z-[60] md:hidden"
+        // `lg:hidden` (niet md:hidden) zodat de pill zichtbaar blijft in de
+        // band 768–1023px — daar is de Sidebar (`hidden lg:flex`) nog verborgen
+        // én draait de mobiele tray-shell (`lg:hidden`), dus zonder de pill zou
+        // er geen navigatie-affordance zijn. Houd de breakpoint in sync met de
+        // `--mobile-nav-clearance`-media-query in globals.css.
+        className="fixed left-1/2 -translate-x-1/2 z-[60] lg:hidden"
         style={{
           bottom: `calc(var(--safe-area-bottom, 0px) + 12px)`,
         }}

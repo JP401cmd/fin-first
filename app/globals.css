@@ -319,6 +319,28 @@
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
   --bottom-nav-height: 56px;
+
+  /* Clearance voor de zwevende mobiele nav-pill (FloatingNavButton).
+     De pill staat op `bottom: safe-area + 12px` en is ~46px hoog; hij dekt
+     dus de onderste ~58px + safe-area van de viewport af. We reserveren
+     safe-area + 76px zodat content en knoppen er met wat lucht bovenuit
+     komen. Gebruik deze var overal waar content tegen de onderrand van de
+     viewport aanloopt op mobiel (scroll-containers, sticky/fixed footers).
+     De pill is `lg:hidden`, dus boven 1024px wordt de var op 0 gezet (zie de
+     media-query hieronder) en werkt elke consument automatisch responsive. */
+  --mobile-nav-clearance: calc(var(--safe-area-bottom, 0px) + 4.75rem);
+}
+
+/* Boven de lg-breakpoint (1024px) verbergt FloatingNavButton zich (`lg:hidden`)
+   en verschijnt de Sidebar; dan hoeft er geen onderruimte gereserveerd te
+   worden. Door de var hier op 0 te zetten is `var(--mobile-nav-clearance)`
+   overal vanzelf responsive, zonder dat elke consument een eigen
+   breakpoint-variant nodig heeft. Houd deze breakpoint in sync met de
+   `lg:hidden` op FloatingNavButton. */
+@media (min-width: 1024px) {
+  :root {
+    --mobile-nav-clearance: 0px;
+  }
 }
 
 @theme inline {

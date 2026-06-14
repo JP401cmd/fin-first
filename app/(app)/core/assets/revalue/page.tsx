@@ -420,7 +420,13 @@ export default function RevaluePage() {
       </div>
 
       {/* Footer summary */}
-      <div className="mt-6 sticky bottom-0 rounded-[var(--r-lg)] border border-kern-200 bg-[var(--paper)] p-4 sm:p-6 shadow-lg">
+      {/* paddingBottom houdt ruimte vrij voor de zwevende mobiele nav-pill
+          (FloatingNavButton) zodat de opslaan-actie er niet onder valt; de
+          var is 0 boven 768px, dus desktop houdt de reguliere sm:p-6-bodem. */}
+      <div
+        className="mt-6 sticky bottom-0 rounded-[var(--r-lg)] border border-kern-200 bg-[var(--paper)] p-4 sm:p-6 shadow-lg"
+        style={{ paddingBottom: 'calc(1.5rem + var(--mobile-nav-clearance))' }}
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-x-8 gap-y-2">
             {/* Current total */}

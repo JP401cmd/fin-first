@@ -562,7 +562,7 @@ export function BudgetPlanEditorSheet({
       {view === 'tree' && (
         <div
           className="sticky bottom-0 left-0 right-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 shadow-[0_-8px_16px_-8px_rgba(0,0,0,0.08)] sm:px-6"
-          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+          style={{ paddingBottom: 'calc(0.75rem + var(--mobile-nav-clearance))' }}
         >
           {error && (
             <div className="mb-2 flex items-start gap-2 rounded-[var(--r)] border border-red-200 bg-red-50 px-3 py-2" role="alert">
@@ -1142,7 +1142,7 @@ function TemplatePreview({
 
       <div
         className="sticky bottom-0 left-0 right-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 sm:px-6"
-        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'calc(0.75rem + var(--mobile-nav-clearance))' }}
       >
         <div className="flex justify-end gap-2">
           <button
@@ -1230,7 +1230,7 @@ function TemplateConfirm({
 
       <div
         className="sticky bottom-0 left-0 right-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 sm:px-6"
-        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'calc(0.75rem + var(--mobile-nav-clearance))' }}
       >
         <div className="flex justify-end gap-2">
           <button

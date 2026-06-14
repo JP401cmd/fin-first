@@ -495,11 +495,12 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
             primary/secondary acties altijd zichtbaar blijven. Border-top en
             paper-bg zijn consistent met de desktop SlideInPane-footer, zodat
             beide rendermodi visueel uitwisselbaar zijn.
-            Mobile pb is opgehoogd zodat de sticky knoppen NIET achter de
-            floating-nav-pill (z-[60], ~52px hoog, 12px boven safe-area)
-            verdwijnen. Op md+ valt die pill weg → normale py-3 padding. */}
+            Mobile pb gebruikt `--mobile-nav-clearance` (globals.css) zodat de
+            sticky knoppen NIET achter de floating-nav-pill (z-[60]) verdwijnen —
+            inclusief de iOS safe-area. Op lg+ is die var 0 (pill verborgen) →
+            `lg:pb-3` geeft de normale padding terug. */}
         {footerSlot && (
-          <div className="shrink-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-5 pt-3 pb-[76px] md:pb-3">
+          <div className="shrink-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-5 pt-3 pb-[var(--mobile-nav-clearance)] lg:pb-3">
             {footerSlot}
           </div>
         )}

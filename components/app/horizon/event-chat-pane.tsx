@@ -239,8 +239,12 @@ export function EventChatPane({ events, onAcceptSuggestion }: Props) {
       </div>
 
       {/* Sticky input onderin de pane (uitzondering op "alle knoppen onderin"-regel
-          — chat-input is een input, geen action-knop) */}
-      <div className="border-t border-[var(--border-ed)] bg-[var(--paper)] px-4 sm:px-6 py-3 sticky bottom-0">
+          — chat-input is een input, geen action-knop). paddingBottom houdt de
+          zwevende mobiele nav-pill (FloatingNavButton) vrij; var = 0 boven 768px. */}
+      <div
+        className="border-t border-[var(--border-ed)] bg-[var(--paper)] px-4 sm:px-6 py-3 sticky bottom-0"
+        style={{ paddingBottom: 'calc(0.75rem + var(--mobile-nav-clearance))' }}
+      >
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}

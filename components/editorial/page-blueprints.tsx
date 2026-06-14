@@ -193,8 +193,11 @@ export function PageActionBar({
   sticky?: boolean
   className?: string
 }) {
+  // Sticky-variant reserveert onderaan ruimte voor de zwevende mobiele nav-pill
+  // (FloatingNavButton) via `--mobile-nav-clearance` (incl. safe-area; 0 boven
+  // 768px). `pt-3` houdt de top-padding; de bottom komt volledig uit de var-calc.
   const stickyClass = sticky
-    ? 'sticky bottom-0 left-0 right-0 bg-[var(--bg)] border-t border-[var(--border-ed)] py-3 px-4 z-10 safe-bottom'
+    ? 'sticky bottom-0 left-0 right-0 bg-[var(--bg)] border-t border-[var(--border-ed)] pt-3 pb-[calc(0.75rem_+_var(--mobile-nav-clearance))] px-4 z-10'
     : 'py-3 border-t border-[var(--border-ed)]'
   return (
     <div

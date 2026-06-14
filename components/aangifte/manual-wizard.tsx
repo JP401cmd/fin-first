@@ -582,7 +582,12 @@ export function ManualWizard({
       </fieldset>
 
       {/* ── Action-bar ──────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border-ed)] sticky bottom-0 bg-[var(--paper)]/95 backdrop-blur-sm py-3 -mx-1 px-1">
+      {/* paddingBottom reserveert ruimte voor de zwevende mobiele nav-pill
+          (FloatingNavButton); de var is 0 boven 768px. */}
+      <div
+        className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border-ed)] sticky bottom-0 bg-[var(--paper)]/95 backdrop-blur-sm py-3 -mx-1 px-1"
+        style={{ paddingBottom: 'calc(0.75rem + var(--mobile-nav-clearance))' }}
+      >
         <div className="flex flex-col gap-1">
           <button
             type="button"
