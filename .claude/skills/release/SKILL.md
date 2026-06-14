@@ -18,6 +18,8 @@ De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: 
 
 ## Proces
 
+**Achtergrond-exitcodes liegen:** draai je een check als `cmd | tail; echo EXIT=$?` in de achtergrond, dan rapporteert de task-notificatie de exitcode van het hele *compound* commando (de laatste `echo` = altijd 0), níet die van het commando dat je toetst. Lees daarom bij elke poort de echte uitvoer en controleer de eigen exitcode (`PIPESTATUS[0]`), nooit alleen de wrapper-melding. Voorbeeld waar dit misging: `next build` faalde op een type-error terwijl de notificatie "exit code 0" meldde — alleen het lezen van de output ving het.
+
 ### 1. Scope & hygiëne
 `git status` + `git diff master...HEAD --stat`: gaan alleen bedoelde bestanden mee? Geen debug-rommel, geen vergeten bestanden. Nieuwe env-variabelen ⇒ placeholder in `env.example` én de echte waarde in de productie-omgeving gezet vóór deploy.
 
