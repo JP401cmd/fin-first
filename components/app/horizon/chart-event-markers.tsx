@@ -43,17 +43,44 @@ const STACK_SPACING = 20
 const TOP_GUTTER = 6
 const BOTTOM_GUTTER = 6
 const TICK_DASH = '2 2'
+/** Verticale afstand tussen het lijn-punt en het midden van het onderste icoon. */
+const LINE_GAP = 10
 
-/** Minimale extra PAD-bovenrand zodat events boven de bar passen. */
+/** Minimale extra PAD-bovenrand zodat een icoon-stapel boven de bar (legacy)
+ *  of vlak onder de chart-bovenrand op de lijn ankert zonder te clippen. */
 export function topPaddingFor(eventCount: number): number {
   const stack = Math.min(eventCount, MAX_STACK_VISIBLE)
-  return stack > 0 ? TOP_GUTTER + ICON_R * 2 + (stack - 1) * STACK_SPACING + 4 : 0
+  return stack > 0 ? TOP_GUTTER + ICON_R * 2 + (stack - 1) * STACK_SPACING + LINE_GAP : 0
 }
 
-/** Minimale extra PAD-onderrand zodat events onder de bar passen (boven x-axis-labels). */
+/** Minimale extra PAD-onderrand zodat events onder de bar passen (legacy
+ *  boven/onder-modus, bv. wealth-composition-chart die geen lijn-anker geeft). */
 export function bottomPaddingFor(eventCount: number): number {
   const stack = Math.min(eventCount, MAX_STACK_VISIBLE)
   return stack > 0 ? BOTTOM_GUTTER + ICON_R * 2 + (stack - 1) * STACK_SPACING + 4 : 0
+}
+
+/**
+ * Absoluut minimum-y (clamp-vloer) voor het centrum van het ONDERSTE icoon
+ * (stackIndex 0) wanneer de vermogenslijn zó hoog ligt dat de stapel anders
+ * tegen de plot-bovenrand klemt.
+ *
+ * De clamp gebruikt deze vloer i.p.v. binnen het plot te klemmen, zodat de
+ * iconen omhoog uitwijken in de via `topPaddingFor(maxStackAtAge)` gereserveerde
+ * marge BOVEN het plot-vlak — wég van de doellijn-/FIRE-labels die ín het plot
+ * staan. De vloer is zó gekozen dat de volledige stapel van `maxStackAtAge`
+ * iconen rechtop in die marge past: het ONDERSTE icoon zit
+ * `(stack-1)·STACK_SPACING` lager dan het bovenste, en het bovenste mag niet
+ * boven `chartGutterTop + TOP_GUTTER` uitkomen (SVG-bovenrand-vrij).
+ *
+ * @param maxStackAtAge  grootste stapel op één leeftijd (zoals doorgegeven aan
+ *                       topPaddingFor) — bepaalt hoe diep de vloer moet liggen.
+ * @param chartGutterTop de vaste bovenmarge van de host-chart (CHART_PAD.top),
+ *                       d.w.z. de bovenkant van de gereserveerde icoon-band.
+ */
+export function iconStackTopFloor(maxStackAtAge: number, chartGutterTop: number): number {
+  const stack = Math.min(Math.max(maxStackAtAge, 1), MAX_STACK_VISIBLE)
+  return chartGutterTop + TOP_GUTTER + ICON_R + (stack - 1) * STACK_SPACING
 }
 
 /**
@@ -74,6 +101,8 @@ export function ChartEventMarkers({
   padLeft,
   chartTopY,
   chartBottomY,
+  iconClampTopY,
+  lineYAt,
   visibleMinAge,
   visibleMaxAge,
   onEventClick,
@@ -86,6 +115,23 @@ export function ChartEventMarkers({
   padLeft: number
   chartTopY: number
   chartBottomY: number
+  /**
+   * Absolute minimum-y voor het centrum van het onderste (stackIndex 0) icoon
+   * bij lijn-verankering. Wanneer de vermogenslijn hoog ligt wijken de iconen
+   * hierop uit — in de gereserveerde marge BOVEN het plot — i.p.v. tegen de
+   * plot-bovenrand te klemmen (waar de doellijn-/FIRE-labels staan). Bereken
+   * met `iconStackTopFloor(maxStackAtAge, CHART_PAD.top)`. Zonder deze prop
+   * (legacy-consumer zonder lijn-anker) valt de clamp terug op het oude
+   * `chartTopY + ICON_R + 2`.
+   */
+  iconClampTopY?: number
+  /**
+   * SVG y-coördinaat van de vermogenslijn op een gegeven leeftijd. Wanneer
+   * aanwezig ankeren de iconen vlak BOVEN de lijn op het gebeurtenis-jaar en
+   * stapelen ze omhoog. Zonder deze prop (legacy/standalone) vallen ze terug
+   * op de boven/onder-padding-zones.
+   */
+  lineYAt?: (age: number) => number | null
   visibleMinAge: number
   visibleMaxAge: number
   onEventClick?: (id: string, kind: ChartEventKind, sourceId?: string) => void
@@ -170,8 +216,17 @@ export function ChartEventMarkers({
     return Math.max(visibleMinAge, Math.min(visibleMaxAge, age))
   }
 
-  const filtered = events.filter(e => e.age >= visibleMinAge && e.age <= visibleMaxAge)
-  if (filtered.length === 0) return null
+  const anchorOnLine = !!lineYAt
+  const filteredRaw = events.filter(e => e.age >= visibleMinAge && e.age <= visibleMaxAge)
+  if (filteredRaw.length === 0) return null
+
+  // Bij verankering op de lijn collabeert `side` naar "alles boven de lijn":
+  // we normaliseren naar 'above' zodat gebeurtenissen op hetzelfde jaar in één
+  // bucket vallen en netjes omhoog stapelen (i.p.v. in twee aparte boven/onder-
+  // stapels). Zonder lijn-anker blijft het oorspronkelijke boven/onder-gedrag.
+  const filtered = anchorOnLine
+    ? filteredRaw.map(e => ({ ...e, side: 'above' as const }))
+    : filteredRaw
 
   const positioned = positionChartEvents(filtered, { ageGroupingStrategy: 'integer' })
 
@@ -185,30 +240,58 @@ export function ChartEventMarkers({
         // jittert op sub-3-maand-niveau.
         const isDragging = drag?.id === p.id && drag?.moved
         const cxBase = padLeft + xScale(p.age)
-        const cx = isDragging
+        // Effectieve leeftijd onder het icoon (drag-bewust) — bepaalt zowel de
+        // x-positie als (bij lijn-verankering) de y op de vermogenslijn.
+        const effectiveAge = isDragging
           ? (() => {
               const minX = padLeft + xScale(visibleMinAge)
               const maxX = padLeft + xScale(visibleMaxAge)
               const clampedX = Math.max(minX, Math.min(maxX, drag!.currentX))
-              const snappedAge = snapAge(invXScale(clampedX - padLeft))
-              return padLeft + xScale(snappedAge)
+              return snapAge(invXScale(clampedX - padLeft))
             })()
-          : cxBase
+          : p.age
+        const cx = isDragging ? padLeft + xScale(effectiveAge) : cxBase
         const isAbove = p.side === 'above'
 
-        // Eerste icoon (stackIndex 0) net buiten plot-area; verdere iconen verder weg
-        const cy = isAbove
-          ? chartTopY - TOP_GUTTER - ICON_R - p.stackIndex * STACK_SPACING
-          : chartBottomY + BOTTOM_GUTTER + ICON_R + p.stackIndex * STACK_SPACING
+        // Anker-y van het ONDERSTE icoon in de stapel (stackIndex 0).
+        // Met lijn-verankering: vlak boven de vermogenslijn op het
+        // gebeurtenis-jaar; de stapel groeit omhoog. Geclampt zodat de
+        // bovenste marker niet boven de chart-bovenrand clipt. Zonder
+        // lijn-anker (legacy): de oude boven/onder-padding-zones.
+        const lineY = anchorOnLine ? lineYAt(effectiveAge) : null
+        const baseY = lineY != null
+          ? lineY - LINE_GAP - ICON_R
+          : isAbove
+            ? chartTopY - TOP_GUTTER - ICON_R
+            : chartBottomY + BOTTOM_GUTTER + ICON_R
+        const stackDir = lineY != null ? -1 : isAbove ? -1 : 1
+        const rawCy = baseY + stackDir * p.stackIndex * STACK_SPACING
+        // Voorkom clipping aan de bovenrand. Bij een hoge lijn wijken de iconen
+        // omhoog uit in de gereserveerde marge boven het plot (iconClampTopY),
+        // i.p.v. binnen het plot te klemmen op chartTopY + ICON_R + 2 (waar de
+        // doellijn-/FIRE-labels staan). De vloer geldt voor het onderste icoon
+        // (stackIndex 0); de stapel groeit van daaruit verder omhoog, dus we
+        // verrekenen de stack-offset zodat gestapelde iconen niet op één hoop
+        // squeezen maar netjes uit elkaar in de marge staan.
+        const clampFloor = iconClampTopY ?? chartTopY + ICON_R + 2
+        const stackOffset = p.stackIndex * STACK_SPACING
+        const cy = lineY != null
+          ? Math.max(clampFloor - stackOffset, rawCy)
+          : rawCy
 
         const isHovered = hoveredId === p.id
         const r = isHovered || isDragging ? ICON_R_HOVER : ICON_R
         const showCluster = p.stackIndex === MAX_STACK_VISIBLE - 1 && p.bucketSize > MAX_STACK_VISIBLE
         const hiddenCount = p.bucketSize - MAX_STACK_VISIBLE
 
-        // Tick-lijntje van icoon-rand naar plot-area-rand
+        // Tick-lijntje: bij lijn-verankering van de onderkant van het onderste
+        // icoon naar het exacte lijn-punt; anders naar de plot-rand (legacy).
         const tickStartY = isAbove ? cy + r : cy - r
-        const tickEndY = isAbove ? chartTopY : chartBottomY
+        const tickEndY = lineY != null
+          ? lineY
+          : isAbove
+            ? chartTopY
+            : chartBottomY
 
         const canDrag = !!onEventDragEnd && p.kind === 'life_event' && !p.readOnly
         const cursor = isDragging
@@ -405,8 +488,12 @@ export function ChartEventMarkers({
               const tooltipW = 140
               const tooltipH = hasDelta ? 42 : 30
               const tx = Math.max(2, cx - tooltipW / 2)
-              const ty = isAbove
-                ? Math.max(2, cy - r - tooltipH - 4)
+              // Flip naar onder wanneer er boven het icoon onvoldoende ruimte is
+              // (bv. wanneer cy hoog in de marge is geclampt) — anders wordt ty
+              // negatief/op y=2 vastgepind en clipt/overlapt de tooltip de icoon.
+              const fitsAbove = cy - r - tooltipH - 4 >= 2
+              const ty = isAbove && fitsAbove
+                ? cy - r - tooltipH - 4
                 : cy + r + 4
               const txCenter = Math.max(2 + tooltipW / 2, cx)
               const deltaAbs = Math.abs(deltaMonths)
@@ -499,8 +586,12 @@ export function ChartEventMarkers({
               const tooltipW = 168
               const tooltipH = p.detail ? 30 : 18
               const tx = Math.max(2, cx - tooltipW / 2)
-              const ty = isAbove
-                ? Math.max(2, cy - r - tooltipH - 4)
+              // Flip naar onder wanneer er boven het icoon onvoldoende ruimte is
+              // (geclampte cy hoog in de marge) — zo clipt de tooltip niet aan de
+              // SVG-bovenrand en overlapt 'ie de marker niet.
+              const fitsAbove = cy - r - tooltipH - 4 >= 2
+              const ty = isAbove && fitsAbove
+                ? cy - r - tooltipH - 4
                 : cy + r + 4
               const txCenter = Math.max(2 + tooltipW / 2, cx)
               return (

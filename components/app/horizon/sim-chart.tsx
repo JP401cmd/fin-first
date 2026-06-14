@@ -6,7 +6,7 @@ import type { SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import { NL_SWR, type ScenarioPath, type ProjectionMonth } from '@/lib/horizon-data'
 import { CHART_PAD } from '@/lib/chart-constants'
-import { ChartEventMarkers, topPaddingFor, bottomPaddingFor } from './chart-event-markers'
+import { ChartEventMarkers, topPaddingFor, iconStackTopFloor } from './chart-event-markers'
 import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -141,7 +141,6 @@ export const SimChart = memo(function SimChart({
   targetInflationFactors?: { age: number; factor: number }[]
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
-  const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
   const [hoveredAge, setHoveredAge] = useState<number | null>(null)
 
   const [containerW, setContainerW] = useState(600)
@@ -159,15 +158,24 @@ export const SimChart = memo(function SimChart({
   const W = containerW
   const isDesktop = containerW >= 768
 
-  // Dynamic padding for event markers (same approach as WealthCompositionChart)
-  const aboveCount = eventOverlay
-    ? eventOverlay.filter(e => e.side === 'above').length
+  // Dynamic padding for event markers. Markers now anchor INSIDE the plot,
+  // stacked upward just above the wealth line — so we only need head-room at
+  // the top (for a stack that sits near the chart's upper edge) and no extra
+  // bottom gutter. We size the top padding to the largest stack that can occur
+  // at a single age, capped at MAX_STACK_VISIBLE, so icons never clip the top.
+  const maxStackAtAge = eventOverlay && eventOverlay.length > 0
+    ? Math.max(
+        ...Object.values(
+          eventOverlay.reduce<Record<number, number>>((acc, e) => {
+            const a = Math.floor(e.age)
+            acc[a] = (acc[a] ?? 0) + 1
+            return acc
+          }, {}),
+        ),
+      )
     : 0
-  const belowCount = eventOverlay
-    ? eventOverlay.filter(e => e.side === 'below').length
-    : 0
-  const extraTop = topPaddingFor(aboveCount)
-  const extraBottom = bottomPaddingFor(belowCount)
+  const extraTop = topPaddingFor(maxStackAtAge)
+  const extraBottom = 0
   const PAD = {
     top: CHART_PAD.top + extraTop,
     right: CHART_PAD.right,
@@ -298,28 +306,26 @@ export const SimChart = memo(function SimChart({
   const xFire = fireAgeFractional !== null ? PAD.left + xScale(fireAgeFractional) : null
   const yZero = PAD.top + yScale(0)
 
-  // Vertical markers for all recurring cashflows — one line per unique fromAge
-  const recurringMarkers = (() => {
-    const seen = new Set<number>()
-    return cashflows
-      .filter(cf => cf.type === 'recurring' && cf.fromAge > minAge && cf.fromAge < maxAge)
-      .reduce<{ fromAge: number; label: string; direction: 'income' | 'expense'; amount: number }[]>((acc, cf) => {
-        if (seen.has(cf.fromAge)) {
-          const entry = acc.find(m => m.fromAge === cf.fromAge)!
-          entry.label = entry.label.includes('·') ? entry.label : `${entry.label} · ${cf.name.length > 6 ? cf.name.slice(0, 5) + '…' : cf.name}`
-          entry.amount += cf.direction === 'income' ? cf.amount : -cf.amount
-          return acc
-        }
-        seen.add(cf.fromAge)
-        acc.push({
-          fromAge: cf.fromAge,
-          label: cf.name.length > 8 ? cf.name.slice(0, 7) + '…' : cf.name,
-          direction: cf.direction,
-          amount: cf.direction === 'income' ? cf.amount : -cf.amount,
-        })
-        return acc
-      }, [])
-  })()
+  // SVG y-coördinaat van de hoofdlijn (vermogen) op een gegeven leeftijd.
+  // De event-iconen ankeren hierop: ze zweven vlak boven de lijn op het
+  // gebeurtenis-jaar. Lineaire interpolatie over `allPts` (= de getekende
+  // hoofdlijn) zodat ook fractionele leeftijden een correcte y krijgen.
+  const lineYAt = (age: number): number | null => {
+    if (allPts.length === 0) return null
+    if (age <= allPts[0][0]) return PAD.top + yScale(Math.max(allPts[0][1], 0))
+    const last = allPts[allPts.length - 1]
+    if (age >= last[0]) return PAD.top + yScale(Math.max(last[1], 0))
+    for (let i = 0; i < allPts.length - 1; i++) {
+      const [a0, v0] = allPts[i]
+      const [a1, v1] = allPts[i + 1]
+      if (age >= a0 && age <= a1) {
+        const t = a1 === a0 ? 0 : (age - a0) / (a1 - a0)
+        const v = v0 + t * (v1 - v0)
+        return PAD.top + yScale(Math.max(v, 0))
+      }
+    }
+    return null
+  }
 
   // Module-kleuren: Horizon goud voor opbouw/inkomen, Kern bruin voor afbouw/uitgaven
   const COLOR_OPBOUW = 'var(--hor-t, #8a6e42)'
@@ -329,6 +335,13 @@ export const SimChart = memo(function SimChart({
   // cashflow-/event-markers houden hun eigen kleur.
   const mainStrokeAcc = mainLineColor ?? COLOR_OPBOUW
   const mainStrokeDec = mainLineColor ?? (!isPensioenMode && strategy === 'perpetual' ? COLOR_OPBOUW : COLOR_AFBOUW)
+
+  // Veilige bovengrens voor in-plot labels (doellijn-/FIRE-label) zodat ze niet
+  // omhoog in de gereserveerde icoon-marge boven het plot kruipen en daar met de
+  // (bij een hoge lijn naar boven uitwijkende) event-iconen botsen. Net ónder de
+  // plot-bovenrand; bij events laten we extra ruimte voor de onderste icoon-rij
+  // die — wanneer geclampt — vlak boven de plot-rand kan eindigen.
+  const labelSafeTopY = PAD.top + (extraTop > 0 ? 14 : 2)
 
   // Emphasis (uitleg-walkthrough): dim de niet-benadrukte segmenten zodat het
   // relevante stukje van de eigen curve eruit springt. Default null = ongewijzigd.
@@ -446,45 +459,6 @@ export const SimChart = memo(function SimChart({
     }
   })() : null
 
-  // One-time cashflow markers (only for |amount| > 5000)
-  const oneTimeMarkers = cashflows
-    .filter(cf => cf.type === 'one_time' && Math.abs(cf.amount) > 5000)
-    .filter(cf => cf.fromAge > minAge && cf.fromAge < maxAge)
-    .map(cf => {
-      const pt = allPts.find(([age]) => age === cf.fromAge + 1) ?? null
-      const y = pt ? PAD.top + yScale(Math.max(pt[1], 0)) : null
-      return { cf, x: PAD.left + xScale(cf.fromAge + 1), y }
-    })
-
-  // Recurring cashflow bands (colored rectangles spanning fromAge → toAge)
-  const recurringBands = cashflows
-    .filter(cf => cf.type === 'recurring' && cf.fromAge < maxAge)
-    .map(cf => {
-      const startAge = Math.max(cf.fromAge, minAge)
-      const endCfAge = cf.toAge != null ? Math.min(cf.toAge, maxAge) : maxAge
-      if (endCfAge <= startAge) return null
-      const x1 = PAD.left + xScale(startAge)
-      const x2 = PAD.left + xScale(endCfAge)
-      return { cf, x1, x2, width: x2 - x1 }
-    })
-    .filter(Boolean) as { cf: SimCashflow; x1: number; x2: number; width: number }[]
-
-  // Freedom-time helper for tooltip
-  function freedomDaysFor(amount: number): string {
-    if (!dailyExpenseRate || dailyExpenseRate <= 0) return ''
-    const days = Math.round(amount / dailyExpenseRate)
-    if (days >= 365) return `${(days / 365).toFixed(1)} jr vrijheid`
-    if (days >= 30) return `${Math.round(days / 30)} mnd vrijheid`
-    return `${days} dgn vrijheid`
-  }
-
-  function fmtAmount(amount: number, direction: 'income' | 'expense'): string {
-    const prefix = direction === 'income' ? '+' : '−'
-    if (amount >= 1_000_000) return `${prefix}€${(amount / 1_000_000).toFixed(1)}M`
-    if (amount >= 1_000) return `${prefix}€${Math.round(amount / 1_000)}K`
-    return `${prefix}€${Math.round(amount)}`
-  }
-
   /** Format an absolute value for the crosshair tooltip (no sign prefix) */
   function fmtAbs(val: number): string {
     const abs = Math.abs(val)
@@ -550,21 +524,6 @@ export const SimChart = memo(function SimChart({
             stroke="var(--border-ed)" strokeWidth={1} strokeDasharray="4 4" />
         ))}
 
-        {/* Recurring cashflow duration bands (behind everything) */}
-        {recurringBands.map(({ cf, x1, width }) => (
-          <rect
-            key={`band-${cf.id}`}
-            x={x1} y={PAD.top}
-            width={width} height={innerH}
-            fill={cf.direction === 'income' ? COLOR_OPBOUW : COLOR_AFBOUW}
-            opacity={hoveredCfId === cf.id ? 0.12 : 0.05}
-            rx={2}
-            onMouseEnter={() => setHoveredCfId(cf.id)}
-            onMouseLeave={() => setHoveredCfId(null)}
-            style={{ cursor: 'default', transition: 'opacity 150ms ease' }}
-          />
-        ))}
-
         {/* Y-axis labels */}
         {yTicks.map(({ val, y }) => (
           <text key={val} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={9}
@@ -623,7 +582,7 @@ export const SimChart = memo(function SimChart({
                 strokeLinecap="round" strokeLinejoin="round"
               />
               <text
-                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={PAD.top + yScale(targetLine.labelVal) - 12}
+                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={Math.max(labelSafeTopY + 8, PAD.top + yScale(targetLine.labelVal) - 12)}
                 fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
                 fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
               >
@@ -632,7 +591,7 @@ export const SimChart = memo(function SimChart({
                   : `€${Math.round(targetLine.labelVal / 1000)}k`}
               </text>
               <text
-                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={PAD.top + yScale(targetLine.labelVal) - 4}
+                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={Math.max(labelSafeTopY + 16, PAD.top + yScale(targetLine.labelVal) - 4)}
                 fontSize={7} fill="var(--kern-t, #58362d)" textAnchor="end"
                 fontFamily="var(--font-dm-mono, monospace)" opacity={0.85}
               >
@@ -683,16 +642,6 @@ export const SimChart = memo(function SimChart({
             </>
           )
         })()}
-
-        {/* Recurring cashflow dashed verticals (one per unique fromAge) */}
-        {recurringMarkers.map(({ fromAge, direction }) => {
-          const x = PAD.left + xScale(fromAge)
-          const lineColor = direction === 'income' ? COLOR_OPBOUW : COLOR_AFBOUW
-          return (
-            <line key={`rec-vline-${fromAge}`} x1={x} x2={x} y1={PAD.top} y2={PAD.top + innerH}
-              stroke={lineColor} strokeWidth={1.5} strokeDasharray="4 3" opacity={0.7} />
-          )
-        })}
 
         {/* FIRE dashed vertical (hidden in pensioen mode) */}
         {!isPensioenMode && xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
@@ -946,6 +895,8 @@ export const SimChart = memo(function SimChart({
             padLeft={PAD.left}
             chartTopY={PAD.top}
             chartBottomY={PAD.top + innerH}
+            iconClampTopY={iconStackTopFloor(maxStackAtAge, CHART_PAD.top)}
+            lineYAt={lineYAt}
             visibleMinAge={minAge}
             visibleMaxAge={maxAge}
             onEventClick={onEventClick}
@@ -1000,68 +951,6 @@ export const SimChart = memo(function SimChart({
           </>
         )}
 
-        {/* One-time cashflow markers with amount labels */}
-        {oneTimeMarkers.map(({ cf, x, y }) => y !== null && (
-          <g
-            key={cf.id}
-            onMouseEnter={() => setHoveredCfId(cf.id)}
-            onMouseLeave={() => setHoveredCfId(null)}
-            style={{ cursor: 'default' }}
-          >
-            <circle cx={x} cy={y} r={hoveredCfId === cf.id ? 6 : 4}
-              fill={cf.direction === 'income' ? COLOR_OPBOUW : COLOR_AFBOUW}
-              stroke="var(--paper)" strokeWidth={1} opacity={0.9}
-              style={{ transition: 'r 150ms ease' }} />
-            <text x={x} y={y - 8} textAnchor="middle" fontSize={7}
-              fill={cf.direction === 'income' ? COLOR_OPBOUW : COLOR_AFBOUW}
-              fontFamily="var(--font-inter, sans-serif)" fontWeight={500}>
-              {cf.name.length > 8 ? cf.name.slice(0, 7) + '…' : cf.name}
-            </text>
-            {/* Amount label */}
-            <text x={x} y={y - 16} textAnchor="middle" fontSize={7.5}
-              fill={cf.direction === 'income' ? COLOR_OPBOUW : COLOR_AFBOUW}
-              fontFamily="var(--font-dm-mono, monospace)" fontWeight={600}>
-              {fmtAmount(cf.amount, cf.direction)}
-            </text>
-
-            {/* Hover tooltip with name, amount, freedom-time */}
-            {hoveredCfId === cf.id && (
-              <g>
-                <rect
-                  x={Math.max(PAD.left, Math.min(x - 65, W - PAD.right - 130))}
-                  y={Math.max(PAD.top, y - 52)}
-                  width={130} height={freedomDaysFor(cf.amount) ? 36 : 26}
-                  rx={4} fill="var(--ink)" opacity={0.92}
-                />
-                <text
-                  x={Math.max(PAD.left + 65, Math.min(x, W - PAD.right - 65))}
-                  y={Math.max(PAD.top + 11, y - 40)}
-                  textAnchor="middle" fontSize={8} fontWeight={600}
-                  fill="var(--paper)" fontFamily="var(--font-inter, sans-serif)">
-                  {cf.name}
-                </text>
-                <text
-                  x={Math.max(PAD.left + 65, Math.min(x, W - PAD.right - 65))}
-                  y={Math.max(PAD.top + 21, y - 29)}
-                  textAnchor="middle" fontSize={7}
-                  fill="var(--paper)" fontFamily="var(--font-dm-mono, monospace)">
-                  {fmtAmount(cf.amount, cf.direction)} · leeftijd {cf.fromAge}
-                </text>
-                {freedomDaysFor(cf.amount) && (
-                  <text
-                    x={Math.max(PAD.left + 65, Math.min(x, W - PAD.right - 65))}
-                    y={Math.max(PAD.top + 31, y - 19)}
-                    textAnchor="middle" fontSize={7}
-                    fill={cf.direction === 'income' ? '#6ee7b7' : '#fca5a5'}
-                    fontFamily="var(--font-inter, sans-serif)">
-                    {freedomDaysFor(cf.amount)}
-                  </text>
-                )}
-              </g>
-            )}
-          </g>
-        ))}
-
         {/* Phase label: OPBOUW / VERMOGENSGROEI */}
         {splitFractionalAge !== null && splitFractionalAge > minAge + 3 && (
           <text x={PAD.left + xScale((minAge + splitFractionalAge) / 2)} y={PAD.top + 14}
@@ -1081,9 +970,12 @@ export const SimChart = memo(function SimChart({
           </text>
         )}
 
-        {/* FIRE age label (hidden in pensioen mode) */}
+        {/* FIRE age label (hidden in pensioen mode). y geclampt onder de
+            gereserveerde icoon-marge (labelSafeTopY) zodat het label niet botst
+            met een event-icoon dat op/bij de FIRE-leeftijd boven de lijn staat —
+            vaak voorkomend (pensioen/erfenis-trigger op FIRE-leeftijd). */}
         {!isPensioenMode && xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
-          <text x={xFire + 4} y={PAD.top + 24} fontSize={8}
+          <text x={xFire + 4} y={Math.max(PAD.top + 24, labelSafeTopY + 18)} fontSize={8}
             fill={COLOR_OPBOUW} fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
             FIRE {fireAgeFractional.toFixed(1)}
           </text>
@@ -1107,69 +999,6 @@ export const SimChart = memo(function SimChart({
           </text>
         )}
 
-        {/* Recurring cashflow labels with € amount near bottom of chart */}
-        {recurringMarkers.map(({ fromAge, label, direction, amount }) => {
-          const x = PAD.left + xScale(fromAge)
-          const textColor = direction === 'income' ? COLOR_OPBOUW : COLOR_AFBOUW
-          const absAmt = Math.abs(amount)
-          const amtFmt = absAmt >= 1000 ? `€${(absAmt / 1000).toFixed(1)}k` : `€${Math.round(absAmt)}`
-          const prefix = direction === 'income' ? '+' : '−'
-          // Find matching cashflow for hover
-          const matchCf = cashflows.find(cf => cf.type === 'recurring' && cf.fromAge === fromAge)
-          return (
-            <g
-              key={`rec-label-${fromAge}`}
-              onMouseEnter={() => matchCf && setHoveredCfId(matchCf.id)}
-              onMouseLeave={() => setHoveredCfId(null)}
-              style={{ cursor: 'default' }}
-            >
-              <text x={x + 3} y={PAD.top + innerH - 14} fontSize={8}
-                fill={textColor} fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-                {label}
-              </text>
-              <text x={x + 3} y={PAD.top + innerH - 4} fontSize={7.5}
-                fill={textColor} fontFamily="var(--font-dm-mono, monospace)">
-                {prefix}{amtFmt}/mnd
-              </text>
-
-              {/* Hover tooltip for recurring */}
-              {matchCf && hoveredCfId === matchCf.id && (
-                <g>
-                  <rect
-                    x={Math.max(PAD.left, Math.min(x - 65, W - PAD.right - 130))}
-                    y={PAD.top + innerH - 56}
-                    width={130} height={freedomDaysFor(absAmt * 12) ? 36 : 26}
-                    rx={4} fill="var(--ink)" opacity={0.92}
-                  />
-                  <text
-                    x={Math.max(PAD.left + 65, Math.min(x, W - PAD.right - 65))}
-                    y={PAD.top + innerH - 45}
-                    textAnchor="middle" fontSize={8} fontWeight={600}
-                    fill="var(--paper)" fontFamily="var(--font-inter, sans-serif)">
-                    {matchCf.name}
-                  </text>
-                  <text
-                    x={Math.max(PAD.left + 65, Math.min(x, W - PAD.right - 65))}
-                    y={PAD.top + innerH - 34}
-                    textAnchor="middle" fontSize={7}
-                    fill="var(--paper)" fontFamily="var(--font-dm-mono, monospace)">
-                    {prefix}{amtFmt}/mnd · leeftijd {matchCf.fromAge}{matchCf.toAge ? `–${matchCf.toAge}` : ''}
-                  </text>
-                  {freedomDaysFor(absAmt * 12) && (
-                    <text
-                      x={Math.max(PAD.left + 65, Math.min(x, W - PAD.right - 65))}
-                      y={PAD.top + innerH - 23}
-                      textAnchor="middle" fontSize={7}
-                      fill={direction === 'income' ? '#6ee7b7' : '#fca5a5'}
-                      fontFamily="var(--font-inter, sans-serif)">
-                      {freedomDaysFor(absAmt * 12)}/jaar
-                    </text>
-                  )}
-                </g>
-              )}
-            </g>
-          )
-        })}
       </svg>
 
       {/* Crosshair tooltip (HTML overlay for crisp text rendering) */}
