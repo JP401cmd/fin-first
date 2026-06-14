@@ -914,8 +914,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
       {/* ── Preset confirmation dialog ───────────────────────── */}
       {selectedPreset && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setSelectedPreset(null)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[70] bg-black/30" onClick={() => setSelectedPreset(null)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="w-full max-w-sm rounded-xl border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s3)] p-5">
               <h3 className="text-sm font-semibold text-[var(--ink)]">
                 Preset toepassen
@@ -947,8 +947,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
       {/* Bulk-actie bevestigingsdialoog — vul alles op X / volledig leegmaken */}
       {bulkAction && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setBulkAction(null)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[70] bg-black/30" onClick={() => setBulkAction(null)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="w-full max-w-sm rounded-xl border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s3)] p-5">
               <h3 className="text-sm font-semibold text-[var(--ink)]">
                 {bulkAction.type === 'clear'
@@ -1061,9 +1061,9 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
       {showPicker && createPortal(
         <>
           {/* Backdrop */}
-          <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
+          <div className="fixed inset-0 z-[70] bg-black/30" onClick={onClose} />
           {/* Centered modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="w-full max-w-md max-h-[80vh] flex flex-col rounded-xl border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s3)]">
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-ed)]">

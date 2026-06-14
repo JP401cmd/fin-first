@@ -75,6 +75,18 @@ De gebruiker kiest op `/mijn/uiterlijk` drie accentkleuren: **kern** (=Overzicht
 
 Achtergrond + actieplan: `docs/accentkleuren-actieplan.md`.
 
+## Modal-conventie — boven de zwevende nav-pill (verplicht bij UI-werk)
+
+Op mobiel zweeft de `FloatingNavButton` (`z-[60]`) onderaan het scherm. **Elke modal/overlay rendert standaard BOVEN die pill, niet eronder** — de modal dekt de pill af, zodat content en (sticky) knoppen onderin de volle hoogte hebben i.p.v. erachter/eronder te verdwijnen. Z-index-laag van de app:
+
+- `z-[70]` — gewone modals/overlays (de standaard) · `z-[80]` sleepmodus · `z-[90]` share-dialog · `z-[200]` sessie-timeout
+- `z-[60]` — FloatingNavButton + command-palette (peers; palette wordt dóór de pill geopend)
+- `z-50` — **alleen** de `NavMenuSheet` (bewust ónder de pill: de pill-toggle moet 'm kunnen sluiten)
+
+Regels:
+- **Gedeelde `BottomSheet` (`components/app/bottom-sheet.tsx`) doet dit al automatisch** (default `z-[70]`); gebruik die waar mogelijk. Alleen `NavMenuSheet` zet de opt-out-prop `belowFloatingNav`.
+- **Bouw je een custom overlay** (`fixed inset-0 … flex items-end/center`)? Gebruik `z-[70]` (niet `z-50`/`z-40`) en geef de bodem enkel iOS-safe-area-padding — **géén** `--mobile-nav-clearance` (die is alleen nodig als de pill er nog bovenop staat). `--mobile-nav-clearance` blijft wél voor pagina-content/scrollcontainers die tegen de viewport-onderrand lopen.
+
 ## Project Specification
 
 <project_specification>

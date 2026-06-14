@@ -12,8 +12,14 @@
  * mee als onderdeel van de tray.
  *
  * Bewuste keuzes:
- *  - GEEN Playfair voor titel — Inter 14px medium is rustiger en beter
- *    leesbaar op smal scherm dan Playfair 16px (UI/UX skill validatie).
+ *  - Subpagina-titel ('simple' kind) staat bewust in editorial serif
+ *    (`var(--font-serif)`) + module-accentkleur (`var(--module-active-700)`),
+ *    op verzoek van de gebruiker als consistentie-fix van de bovenbalk: de
+ *    titel hoort visueel bij de actieve module en bij de editorial-toon van
+ *    de rest van de app. Rustig gehouden (~16px, één regel, truncate) — geen
+ *    EditorialHeadline-emphasis (te zwaar voor 48px-balk + breekt getByText).
+ *  - Tab-roots ('rich' kind: Overzicht/Toekomst/Mijn) blijven bewust
+ *    TITELLOOS — zij tonen het utility/icoon-cluster rechts, geen titel.
  *  - Module-aware via `--module-active-500` als 1px onderlijn op active-module
  *    routes. Op `/identity`, `/berichten`, etc. valt deze terug op
  *    `var(--border-ed)`.
@@ -38,6 +44,7 @@ import Link from 'next/link'
 import { Activity, ArrowLeft, Bell, Newspaper } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavStack, type TopBarKind } from './nav-stack-provider'
+import { resolveRouteTitle } from '@/lib/nav-config'
 import { PrivacyToggle } from '@/components/app/privacy-toggle'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
@@ -298,8 +305,20 @@ export function TopBar({
   const { activeTab, currentStack, pop } = useNavStack()
 
   const top = currentStack[currentStack.length - 1]
-  const title = titleOverride ?? top?.title ?? ''
   const kind = resolveTopBarKind(kindOverride, top?.topBar?.kind, currentStack.length)
+
+  // Titel-resolutie:
+  //  - `titleOverride` (outgoing-tray) wint altijd.
+  //  - Anders de stack-title (gezet door <NavStackMeta>).
+  //  - Lege stack-title op een 'simple'-subpagina → fallback op de nav-config
+  //    via de pathname van de stack-`top`-entry (NIET usePathname(), zodat de
+  //    outgoing-tray de OUDE entry blijft tonen). Self-healing: pagina's
+  //    zonder eigen NavStackMeta krijgen zo alsnog een titel.
+  //  - 'rich' (tab-roots) krijgt NOOIT een fallback-titel — die blijven leeg.
+  const stackTitle = titleOverride ?? top?.title ?? ''
+  const fallbackTitle =
+    kind === 'simple' && !stackTitle ? resolveRouteTitle(top?.pathname ?? '') ?? '' : ''
+  const title = stackTitle || fallbackTitle
 
   // 'hidden' — pagina wil full-screen content, geen TopBar. Pagina is dan
   // zelf verantwoordelijk voor terug-navigatie (bv. een eigen ←-knop in de
@@ -362,12 +381,23 @@ export function TopBar({
         )}
 
         {/* Midden — titel. aria-live='polite' voor smooth voorlees-update bij
-            stack-transities (plan §4.2 a11y). Inter 14px medium voor
-            leesbaarheid op smal scherm; truncate op één regel. */}
+            stack-transities (plan §4.2 a11y). Editorial serif + module-
+            accentkleur (op module-tabs) zodat de titel visueel bij de actieve
+            module + de editorial-toon hoort; truncate op één regel. Op niet-
+            module-routes valt de kleur terug op `var(--ink)`.
+            Bewust `--module-active-900` (niet -700): de horizon-accent is een
+            licht warm goud waarvan -700 op `var(--paper)` onder WCAG AA (4.5:1)
+            zakt bij 16px tekst; -900 blijft in de accent-familie maar haalt het
+            contrast. Expliciete fontWeight 400 voorkomt UA-bold op de serif-
+            fallback. (Kleur via inline-style, dus geen `text-*`-class hier.) */}
         <h1
           aria-live="polite"
-          className="text-center text-sm font-medium text-[var(--ink)] truncate min-w-0 leading-none"
-          style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+          className="text-center text-base truncate min-w-0 leading-tight"
+          style={{
+            fontFamily: 'var(--font-serif, Georgia, serif)',
+            fontWeight: 400,
+            color: isModuleTab ? 'var(--module-active-900)' : 'var(--ink)',
+          }}
         >
           {title}
         </h1>

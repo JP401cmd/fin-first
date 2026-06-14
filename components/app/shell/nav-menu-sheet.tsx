@@ -99,6 +99,10 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
       title="Navigatie"
       size="md"
       initialMobileHeight="80vh"
+      // Deze sheet wordt door de floating-pill ge(de)opend, dus de pill moet
+      // er BOVENOP blijven (anders kun je 'm niet meer dichttikken). Enige
+      // BottomSheet die bewust ONDER de pill rendert — vandaar de pb-24 hieronder.
+      belowFloatingNav
     >
       {/* pb-24 binnen de sheet zelf zodat de floating-pill (die BOVEN de
           sheet zit) de laatste "Overal beschikbaar"-knoppen niet bedekt. */}

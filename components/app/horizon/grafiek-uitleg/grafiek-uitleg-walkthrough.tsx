@@ -9,13 +9,14 @@
  *
  * Per hoofdstuk: leek-zin + eigen kerngetallen + een uitgelicht stukje van de
  * eigen curve (SimChart met `emphasis`), plus een concept-mini-diagram bij de
- * abstracte stappen (terugrekening, snijpunt).
+ * abstracte stappen (terugrekening, snijpunt) en — wanneer de rijkere
+ * grootboek-rijen (`unifiedRows`) beschikbaar zijn — extra detail per blok.
  *
  * Consume, don't recompute: alle getallen via deriveChapterData (puur) en
  * lib/format.ts. Geen lokale financiële constanten.
  */
 
-import { memo } from 'react'
+import { memo, type ReactNode } from 'react'
 import { SimChart } from '@/components/app/horizon/sim-chart'
 import { UitlegChapter, type JouwGetal } from './uitleg-chapter'
 import { ConceptTerugrekening } from './concept-terugrekening'
@@ -27,14 +28,18 @@ import {
   dailyExpenseRate,
 } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
+import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 
 export interface GrafiekUitlegWalkthroughProps {
   simResult: SimResult
   cashflows: SimCashflow[]
   currentAge: number | null
   yearlyExpenses: number
+  /** Optioneel: rijkere grootboek-rijen voor extra detail (graceful degradation). */
+  unifiedRows?: UnifiedProjectionRow[]
 }
 
 /**
@@ -58,6 +63,11 @@ function curveSliceAriaLabel(
     default:
       return 'Jouw vermogenslijn met het vrijheidsmoment benadrukt.'
   }
+}
+
+/** NL-label voor een vermogenstype/pot-key; valt terug op de ruwe key. */
+function assetTypeLabel(key: string): string {
+  return ASSET_TYPE_LABELS[key as AssetType] ?? key
 }
 
 /** Compacte real-curve slice met een benadrukt segment. */
@@ -97,13 +107,74 @@ function CurveSlice({
   )
 }
 
+/**
+ * Compacte vrijheidstijd-noot onder een bedrag (consume-only via lib/format.ts).
+ * `null` bij niet-zinvolle bedragen (≤ €100) zodat de aanroeper de regel weglaat.
+ */
+function freedomNote(amount: number, dailyRate: number, suffix = ''): string | null {
+  if (!(amount > 100) || dailyRate <= 0) return null
+  return (
+    formatWithFreedom(amount, dailyRate, {
+      includeCurrency: false,
+      format: 'short',
+    }) +
+    ' vrijheid' +
+    suffix
+  )
+}
+
+/** Eén regel "label — bedrag (+ vrijheidstijd)" in de detail-blokjes. */
+function DetailRow({
+  label,
+  amount,
+  dailyRate,
+  sign,
+  accent,
+  freedomSuffix = '',
+}: {
+  label: string
+  amount: number
+  dailyRate: number
+  sign?: '+' | '−'
+  accent?: 'horizon' | 'kern'
+  freedomSuffix?: string
+}) {
+  const note = freedomNote(amount, dailyRate, freedomSuffix)
+  const amountColor =
+    accent === 'horizon'
+      ? 'text-horizon-700'
+      : accent === 'kern'
+        ? 'text-kern-700'
+        : 'text-[var(--ink)]'
+  return (
+    <div className="flex items-start justify-between gap-3 py-1">
+      <span className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">{label}</span>
+      <span className="shrink-0 text-right">
+        <span className={`block font-mono text-[13px] font-semibold tabular-nums ${amountColor}`}>
+          {sign ?? ''}
+          {formatCurrency(amount)}
+        </span>
+        {note && (
+          <span className="block font-sans text-[11px] leading-tight text-horizon-700">{note}</span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+/** Kop boven een detail-blokje (zelfde editorial-stijl als "JOUW GETALLEN"). */
+function DetailHeading({ children }: { children: ReactNode }) {
+  return <h4 className="label-editorial mb-1 text-[var(--ink-4)]">{children}</h4>
+}
+
 export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
   simResult,
   cashflows,
   currentAge,
   yearlyExpenses,
+  unifiedRows,
 }: GrafiekUitlegWalkthroughProps) {
-  const data = deriveChapterData(simResult, cashflows)
+  const data = deriveChapterData(simResult, cashflows, unifiedRows)
   const resolvedCurrentAge = currentAge ?? 30
   // Canonieke €→tijd-dagbasis (×12/365) uit lib/format.ts — geen eigen som.
   const dailyRate = dailyExpenseRate(yearlyExpenses / 12)
@@ -117,13 +188,7 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
     {
       label: 'Inleg per jaar',
       value: formatCurrency(data.opbouw.yearlyInleg),
-      sub:
-        data.opbouw.yearlyInleg > 100
-          ? formatWithFreedom(data.opbouw.yearlyInleg, dailyRate, {
-              includeCurrency: false,
-              format: 'short',
-            }) + ' vrijheid/jaar'
-          : undefined,
+      sub: freedomNote(data.opbouw.yearlyInleg, dailyRate, '/jaar') ?? undefined,
     },
     {
       // #7: expliciet "gemiddelde groei" — start-gebaseerde inleg (×12, als de
@@ -131,13 +196,7 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
       // voorkomt dat het als dezelfde basis als de inleg gelezen wordt.
       label: 'Gemiddelde groei per jaar',
       value: formatCurrency(Math.round(data.opbouw.averageGrowth)),
-      sub:
-        data.opbouw.averageGrowth > 100
-          ? formatWithFreedom(data.opbouw.averageGrowth, dailyRate, {
-              includeCurrency: false,
-              format: 'short',
-            }) + ' vrijheid/jaar'
-          : undefined,
+      sub: freedomNote(data.opbouw.averageGrowth, dailyRate, '/jaar') ?? undefined,
     },
     {
       label: 'Opbouwjaren',
@@ -150,29 +209,45 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
   const opbouwLead =
     data.opbouw.opbouwjaren === 0
       ? 'Je hebt al genoeg vermogen — de opbouwfase is voorbij. Je vermogen werkt nu voor jou via rendement.'
-      : 'Je vermogen groeit elk jaar: wat je zelf inlegt, plus het rendement op wat er al staat, min belasting.'
+      : 'Je vermogen groeit elk jaar: wat je zelf inlegt, plus het rendement op wat er al staat, min belasting. Hoe langer dat doorloopt, hoe sterker het zichzelf voedt.'
+
+  const hasAccumulation = data.opbouw.opbouwjaren > 0
+  // Compounding-split alleen bij echte opbouw (anders "€0 ingelegd"-onzin).
+  const showCompoundingSplit =
+    hasAccumulation &&
+    data.opbouw.cumulativeContributions > 0 &&
+    data.opbouw.cumulativeGrowth > 0
+  const topAssetGrowth = hasAccumulation
+    ? (data.opbouw.assetTypeGrowth ?? []).filter(g => g.growth > 100).slice(0, 3)
+    : []
+  const showDebtPaid =
+    hasAccumulation &&
+    data.opbouw.debtPrincipalPaidDuringAccumulation != null &&
+    data.opbouw.debtPrincipalPaidDuringAccumulation > 0
 
   // ── Hoofdstuk 2 — Terugrekening ───────────────────────────────────────────
   const terugFigures: JouwGetal[] = [
     {
       label: 'Benodigd vermogen',
       value: formatCurrency(data.terugrekening.requiredFirePortfolio),
-      sub:
-        data.terugrekening.requiredFirePortfolio > 100
-          ? formatWithFreedom(data.terugrekening.requiredFirePortfolio, dailyRate, {
-              includeCurrency: false,
-              format: 'short',
-            }) + ' vrijheid'
-          : undefined,
+      sub: freedomNote(data.terugrekening.requiredFirePortfolio, dailyRate) ?? undefined,
     },
-    {
-      // #6: "25×" is jargon voor een leek — uitgeschreven als vuistregel,
-      // met de bekende 4%-regel als toelichting.
-      label: 'Vuistregel: 25× je uitgaven',
-      value: formatCurrency(data.terugrekening.classic25xTarget),
-      sub: '(de bekende 4%-regel)',
-    },
+    ...(data.terugrekening.incomeFloorMonthly != null
+      ? [
+          {
+            label: 'AOW + pensioen later',
+            value: `${formatCurrency(data.terugrekening.incomeFloorMonthly)}/mnd`,
+            sub: freedomNote(data.terugrekening.incomeFloorMonthly, dailyRate, '/mnd') ?? undefined,
+          } satisfies JouwGetal,
+        ]
+      : []),
   ]
+  // Inflatie-noot: alleen tonen als de factor merkbaar boven 1 ligt.
+  const inflationFactor = data.terugrekening.inflationFactorAtFire
+  const showInflationNote = inflationFactor != null && inflationFactor > 1.01
+  const inflationPct = showInflationNote
+    ? Math.round((inflationFactor! - 1) * 100)
+    : 0
 
   // ── Hoofdstuk 3 — Snijpunt ────────────────────────────────────────────────
   const snijpuntFigures: JouwGetal[] = data.snijpunt.reachable
@@ -185,12 +260,15 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
               : '—',
           sub:
             data.snijpunt.fireAgeFractional !== null
-              ? formatFireAge(data.snijpunt.fireAgeFractional)
+              ? data.snijpunt.yearsFromNow != null && data.snijpunt.yearsFromNow > 0
+                ? `${formatFireAge(data.snijpunt.fireAgeFractional)} · over ${data.snijpunt.yearsFromNow} jaar`
+                : formatFireAge(data.snijpunt.fireAgeFractional)
               : undefined,
         },
         {
           label: 'Vermogen op dat moment',
           value: formatCurrency(data.snijpunt.firePortfolioAtFire),
+          sub: freedomNote(data.snijpunt.firePortfolioAtFire, dailyRate) ?? undefined,
         },
         // #5: bij pensioen is FIRE exogeen (= AOW), dus de impliciete opnamerate
         // is daar niet betekenisvol — die rij alleen voor de overige strategieën.
@@ -199,6 +277,7 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
               {
                 label: 'Opnamepercentage',
                 value: `${(data.snijpunt.implicitWithdrawalRate * 100).toFixed(2)}%`,
+                sub: 'laag genoeg om niet op te maken',
               } satisfies JouwGetal,
             ]
           : []),
@@ -206,14 +285,16 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
     : []
 
   // ── Hoofdstuk 4 — Onttrekking ─────────────────────────────────────────────
+  const isPerpetual = data.onttrekking.strategy === 'perpetual'
+  const isDeplete = data.onttrekking.strategy === 'deplete'
+
   const onttrekkingFigures: JouwGetal[] = [
     {
       label: 'Strategie',
       value: STRATEGY_LABELS[data.onttrekking.strategy].name,
     },
     {
-      label:
-        data.onttrekking.strategy === 'perpetual' ? 'Behoudjaren' : 'Onttrekkingsjaren',
+      label: isPerpetual ? 'Behoudjaren' : 'Onttrekkingsjaren',
       value: `${data.onttrekking.withdrawalYears} jaar`,
     },
     {
@@ -225,10 +306,27 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
           {
             label: 'Eindvermogen (doel)',
             value: formatCurrency(data.onttrekking.targetEndPortfolio),
+            sub: freedomNote(data.onttrekking.targetEndPortfolio, dailyRate) ?? undefined,
           } satisfies JouwGetal,
         ]
       : []),
   ]
+
+  // Restvermogen-framing: strategie-bewust, alleen bij FIRE-bereikbaar (anders niet zinvol).
+  const showRestvermogen =
+    data.snijpunt.reachable && !isPerpetual && !isDeplete && data.onttrekking.endPortfolio > 100
+  const restvermogenLabel = 'Wat je nalaat (restvermogen)'
+  const showFirstWithdrawal =
+    data.snijpunt.reachable &&
+    data.onttrekking.firstYearWithdrawal != null &&
+    data.onttrekking.firstYearWithdrawal > 100
+  const withdrawalOrderLabels =
+    data.snijpunt.reachable && data.onttrekking.withdrawalOrder
+      ? data.onttrekking.withdrawalOrder.map(assetTypeLabel)
+      : []
+  const showWithdrawalOrder = withdrawalOrderLabels.length >= 2
+  const showBox3 =
+    data.onttrekking.totalBox3 != null && data.onttrekking.totalBox3 > 100
 
   return (
     <div className="space-y-4">
@@ -251,13 +349,68 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
           dailyRate={dailyRate}
           emphasis="accumulation"
         />
+
+        {/* Compounding: zelf ingelegd vs. rente-op-rente */}
+        {showCompoundingSplit && (
+          <div className="mt-4 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-3">
+            <DetailHeading>WAT JE VERMOGEN OPBOUWT</DetailHeading>
+            <DetailRow
+              label="Dit leg je zelf in"
+              amount={data.opbouw.cumulativeContributions}
+              dailyRate={dailyRate}
+              accent="horizon"
+            />
+            <DetailRow
+              label="Dit verdient je vermogen voor je (rente-op-rente)"
+              amount={data.opbouw.cumulativeGrowth}
+              dailyRate={dailyRate}
+              accent="horizon"
+            />
+            <p className="mt-2 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+              Het rendement levert zélf weer rendement op — daardoor groeit je vermogen
+              versneld. Eerder beginnen telt dubbel: die eerste euro&apos;s groeien het langst.
+            </p>
+          </div>
+        )}
+
+        {/* Waar je groei vandaan komt (top-types) */}
+        {topAssetGrowth.length > 0 && (
+          <div className="mt-4 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-3">
+            <DetailHeading>WAAR JE GROEI VANDAAN KOMT</DetailHeading>
+            {topAssetGrowth.map(g => (
+              <DetailRow
+                key={g.type}
+                label={assetTypeLabel(g.type)}
+                amount={g.growth}
+                dailyRate={dailyRate}
+                sign="+"
+                accent="horizon"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Schuld = vrijheid die je terugkoopt */}
+        {showDebtPaid && (
+          <p className="mt-4 rounded-[var(--r-sm)] border-l-[3px] border-l-horizon-500 bg-horizon-50/40 px-3 py-2 text-[12px] leading-relaxed text-[var(--ink-2)]">
+            Onderweg koop je{' '}
+            <span className="font-mono font-semibold tabular-nums text-horizon-700">
+              {formatCurrency(data.opbouw.debtPrincipalPaidDuringAccumulation!)}
+            </span>{' '}
+            vrijheid terug door schuld af te lossen
+            {freedomNote(data.opbouw.debtPrincipalPaidDuringAccumulation!, dailyRate) && (
+              <> — zo&apos;n {freedomNote(data.opbouw.debtPrincipalPaidDuringAccumulation!, dailyRate)}</>
+            )}
+            . Elke afgeloste euro is rente die je niet meer kwijt bent.
+          </p>
+        )}
       </UitlegChapter>
 
       {/* 2. Terugrekening */}
       <UitlegChapter
         number={2}
         title="Terugrekening"
-        lead="De app rekent áchteruit: hoeveel vermogen heb je nodig om de rest van je leven van te leven? Dat bedrag daalt naarmate je later stopt."
+        lead="De app rekent áchteruit vanaf je uitgaven: je vermogen moet zóveel opleveren dat het rendement je uitgaven draagt, zónder dat je het hoeft op te eten. Hoe later in je leven, hoe minder je nog nodig hebt — daarom daalt die benodigde lijn met je leeftijd."
         figures={terugFigures}
       >
         <ConceptTerugrekening
@@ -265,13 +418,37 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
           requiredFirePortfolio={data.terugrekening.requiredFirePortfolio}
           hasIncomeFloor={data.terugrekening.hasIncomeFloor}
         />
+
+        {/* Inkomensbodem verlaagt wat je zelf moet opbouwen */}
+        {data.terugrekening.incomeFloorMonthly != null && (
+          <p className="mt-3 rounded-[var(--r-sm)] border-l-[3px] border-l-horizon-500 bg-horizon-50/40 px-3 py-2 text-[12px] leading-relaxed text-[var(--ink-2)]">
+            AOW en pensioen dragen later{' '}
+            <span className="font-mono font-semibold tabular-nums text-horizon-700">
+              {formatCurrency(data.terugrekening.incomeFloorMonthly)}/mnd
+            </span>{' '}
+            bij
+            {freedomNote(data.terugrekening.incomeFloorMonthly, dailyRate, '/mnd') && (
+              <> ({freedomNote(data.terugrekening.incomeFloorMonthly, dailyRate, '/mnd')})</>
+            )}
+            . Daardoor hoef je minder zelf op te bouwen.
+          </p>
+        )}
+
+        {/* Reëel vs nominaal — euro's van later */}
+        {showInflationNote && (
+          <p className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+            Dit benodigde bedrag is uitgedrukt in euro&apos;s van het moment dat je stopt — zo&apos;n{' '}
+            {inflationPct}% hoger dan vandaag door inflatie. De grafiek laat die meegroei al zien,
+            zodat je koopkracht gelijk blijft.
+          </p>
+        )}
       </UitlegChapter>
 
       {/* 3. Snijpunt = vrijheid */}
       <UitlegChapter
         number={3}
         title="Snijpunt = vrijheid"
-        lead="Vrijheid is het moment waarop je opbouw de terugrekening inhaalt: je hebt dan precies genoeg."
+        lead="Je opgebouwde vermogen stijgt, het nog benodigde bedrag daalt met je leeftijd. Waar die twee samenkomen heb je precies genoeg — dat kruispunt is je vrijheidsmoment."
         figures={snijpuntFigures}
       >
         {data.snijpunt.reachable ? (
@@ -306,37 +483,98 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
           emphasis="withdrawal"
         />
 
+        {/* Wat er met je pot gebeurt — strategie-bewust detail */}
+        {(showFirstWithdrawal || showRestvermogen || showWithdrawalOrder || showBox3) && (
+          <div className="mt-4 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 p-3">
+            <DetailHeading>WAT ER MET JE POT GEBEURT</DetailHeading>
+            {showFirstWithdrawal && (
+              <DetailRow
+                label="In je eerste vrije jaar haal je uit je vermogen"
+                amount={data.onttrekking.firstYearWithdrawal!}
+                dailyRate={dailyRate}
+                sign="−"
+                accent="kern"
+                freedomSuffix="/jaar"
+              />
+            )}
+            {showRestvermogen && (
+              <DetailRow
+                label={restvermogenLabel}
+                amount={data.onttrekking.endPortfolio}
+                dailyRate={dailyRate}
+                accent="horizon"
+              />
+            )}
+            {showBox3 && (
+              <DetailRow
+                label="Vermogensbelasting (Box 3) over je hele vrije periode"
+                amount={data.onttrekking.totalBox3!}
+                dailyRate={dailyRate}
+                sign="−"
+                accent="kern"
+              />
+            )}
+            {showWithdrawalOrder && (
+              <p className="mt-2 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+                Je haalt eerst uit{' '}
+                {withdrawalOrderLabels.map((label, i) => (
+                  <span key={label}>
+                    {i > 0 && (i === withdrawalOrderLabels.length - 1 ? ' en dan ' : ', dan ')}
+                    <span className="font-medium text-[var(--ink-2)]">{label}</span>
+                  </span>
+                ))}
+                {' '}— zo blijven je beleggingen het langst doorgroeien.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Impact-markers (AOW/pensioen + levensgebeurtenissen) */}
         {data.onttrekking.impacts.length > 0 && (
           <div className="mt-3">
-            <p className="label-editorial mb-2 text-[var(--ink-4)]">WAT JE OPNAME BEÏNVLOEDT</p>
+            <h4 className="label-editorial mb-2 text-[var(--ink-4)]">WAT JE OPNAME BEÏNVLOEDT</h4>
             <ul className="space-y-1">
-              {data.onttrekking.impacts.map(impact => (
-                <li
-                  key={impact.id}
-                  className="flex items-center justify-between gap-2 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-2.5 py-1.5"
-                >
-                  <span className="font-sans text-[12px] text-[var(--ink-2)]">
-                    {impact.label}{' '}
-                    <span className="text-[10px] text-[var(--ink-4)]">
-                      (
-                      {impact.type === 'one_time'
-                        ? `eenmalig, leeftijd ${impact.fromAge}`
-                        : `leeftijd ${impact.fromAge}${impact.toAge ? `–${impact.toAge}` : '+'}`}
-                      )
-                    </span>
-                  </span>
-                  <span
-                    className={`font-mono text-[12px] font-medium tabular-nums ${
-                      impact.direction === 'income' ? 'text-horizon-700' : 'text-kern-700'
-                    }`}
+              {data.onttrekking.impacts.map(impact => {
+                // Vrijheidstijd-noot op het maandbedrag (recurring) of eenmalig bedrag.
+                const impactNote = freedomNote(
+                  impact.amount,
+                  dailyRate,
+                  impact.type === 'recurring' ? '/mnd' : '',
+                )
+                return (
+                  <li
+                    key={impact.id}
+                    className="flex items-center justify-between gap-2 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-2.5 py-1.5"
                   >
-                    {impact.direction === 'income' ? '+' : '−'}
-                    {formatCurrency(impact.amount)}
-                    {impact.type === 'recurring' ? '/mnd' : ''}
-                  </span>
-                </li>
-              ))}
+                    <span className="font-sans text-[12px] text-[var(--ink-2)]">
+                      {impact.label}{' '}
+                      <span className="text-[10px] text-[var(--ink-4)]">
+                        (
+                        {impact.type === 'one_time'
+                          ? `eenmalig, leeftijd ${impact.fromAge}`
+                          : `leeftijd ${impact.fromAge}${impact.toAge ? `–${impact.toAge}` : '+'}`}
+                        )
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span
+                        className={`block font-mono text-[12px] font-medium tabular-nums ${
+                          impact.direction === 'income' ? 'text-horizon-700' : 'text-kern-700'
+                        }`}
+                      >
+                        {impact.direction === 'income' ? '+' : '−'}
+                        {formatCurrency(impact.amount)}
+                        {impact.type === 'recurring' ? '/mnd' : ''}
+                      </span>
+                      {impactNote && (
+                        <span className="block font-sans text-[10px] leading-tight text-horizon-700">
+                          {impactNote}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         )}

@@ -24,7 +24,7 @@ You are the **Frontend / UI Builder** for TriFinity — a Dutch personal-finance
 
 - **Module hero** sections with gradient backgrounds in the module color.
 - **KPI stat cards** in 4-column grids, with info tooltips.
-- **BottomSheet** modals for deep-dive analysis.
+- **BottomSheet** modals for deep-dive analysis. It renders ABOVE the mobile floating nav-pill by default (`z-[70]` > pill `z-[60]`), so modal content/sticky buttons get the full height — prefer it over a hand-rolled overlay. Only `NavMenuSheet` opts out via `belowFloatingNav`.
 - **Charts** following the existing chart components (look at `components/core/*` and `components/app/horizon/*`).
 - Find the nearest existing component and mirror its structure, props, and Tailwind usage before writing new markup. Reuse shared components rather than cloning.
 
@@ -35,6 +35,16 @@ Gating is **user-selectable module + tier based** (sovereignty levels are motiva
 - `<FeatureGate featureId="..." fallback="hidden" | "locked" | <Node>>` — gate by feature (ids in `lib/feature-registry.ts` / `lib/feature-phases.ts`).
 - `<ModuleGate moduleId={...} fallback="hidden" | <Node>>` — gate by active module (`MODULE_CATALOG` / `ModuleId` in `lib/module-registry.ts`).
 - Tier-locked surfaces use the `TierLockedCard` pattern (e.g. `connected`, `ai`). Choose `hidden` vs. `locked` deliberately: hidden for "doesn't apply", locked for "upgrade to unlock".
+
+## Mobiele bovenbalk-titel (verplicht voor nieuwe routes)
+
+Elke nieuwe app-route onder `app/(app)/**` die **geen** tab-hoofdpagina is (Overzicht/Toekomst/Mijn = bewust titelloos), MOET op mobiel een titel in de TopBar tonen — anders staat de bovenbalk leeg (bekende klasse bugs).
+
+- **Self-healing default:** zodra de route in `lib/nav-config.ts` staat (in `mainNav`, een `navGroups[].items`/`children`, `OVERVIEW_APP_SUBROUTES` of `globalNav`), vult `resolveRouteTitle()` de titel automatisch — je hoeft niets te doen. Voeg een nieuwe subroute dus ook dáár toe (dan verschijnt 'ie meteen in sidebar + sheet én topbar).
+- **Statisch buiten nav-config:** zit de route niet in de nav-structuur, voeg 'm toe aan `EXTRA_ROUTE_TITLES` in `lib/nav-config.ts`.
+- **Runtime-/dynamische titel** (`[type]`/`[id]`-detailpagina, titel hangt van data af): render expliciet `<NavStackMeta title={runtimeLabel} />` in de pagina (een server component mag de client-`NavStackMeta` als kind renderen). De statische resolver dekt dynamische routes bewust niet.
+- De TopBar-titel rendert in **module-accentkleur (`--module-active-900`) + editorial serif** — dat zit centraal in `components/app/shell/top-bar.tsx`, niet per pagina regelen.
+- **Verifieer** na het bouwen van een nieuwe subpagina op een smal viewport dat de titel daadwerkelijk verschijnt.
 
 ## Workflow
 
@@ -48,6 +58,7 @@ Gating is **user-selectable module + tier based** (sovereignty levels are motiva
 
 - No bare significant amounts — always pair EUR with vrijheidstijd.
 - Reuse the design system (heroes, KPI cards, BottomSheets, module colors); don't invent a parallel style.
+- **Modals/overlays render ABOVE the floating nav-pill.** Use `BottomSheet` (auto `z-[70]`); for a custom `fixed inset-0` overlay use `z-[70]` (never `z-50`/`z-40`) + iOS-safe-area bottom padding, never `--mobile-nav-clearance`. Only `NavMenuSheet` sits below the pill. See CLAUDE.md "Modal-conventie".
 - Dutch, informal, empowering, no emoji.
 - Correct gating, deliberate fallback.
 - Never invent financial numbers in the UI — render what the engines/loaders provide.

@@ -40,3 +40,7 @@ Interpret creatively and make unexpected choices that feel genuinely designed fo
 **IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
 
 Remember: Claude is capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
+
+## TriFinity project-conventie — mobiele bovenbalk-titel
+
+Bouw of wijzig je een pagina in het TriFinity-project, dan geldt aanvullend: **elke app-route onder `app/(app)/**` die geen tab-hoofdpagina is, MOET op mobiel een titel in de TopBar tonen** (anders blijft de bovenbalk leeg). Dit gaat automatisch zodra de route in `lib/nav-config.ts` staat — de `resolveRouteTitle()`-fallback vult de titel. Staat de route daar niet, voeg 'm toe aan `EXTRA_ROUTE_TITLES`; hangt de titel van runtime-data af (`[type]`/`[id]`-detailpagina's), render dan expliciet `<NavStackMeta title={runtimeLabel} />` in de pagina. Tab-hoofdpagina's (Overzicht/Toekomst/Mijn) blijven bewust titelloos. De titel-styling (module-accentkleur + editorial serif) zit centraal in `components/app/shell/top-bar.tsx` — niet per pagina regelen. Verifieer op een smal viewport dat de titel verschijnt.

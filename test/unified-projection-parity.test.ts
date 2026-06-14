@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { PERSONAS, type PersonaKey, PERSONA_KEYS, type PersonaData } from '@/lib/test-personas'
+import { hasPartner } from '@/lib/household-type'
 import { runSimulation, lifeEventsToCashflows, type SimResult, type SimCashflow } from '@/lib/fire-simulation'
 import {
   runUnifiedProjection,
@@ -272,7 +273,10 @@ function buildUnifiedInput(key: PersonaKey): UnifiedProjectionInput {
     strategyConfig: params.strategyConfig,
     withdrawalStrategy: params.wConfig,
     forcedFireAge: params.forcedFireAge,
-    hasPartner: profile.household_type === 'samenwonend' || profile.household_type === 'getrouwd',
+    // Canonieke afleiding (zelfde helper als de source-engines). Personas
+    // gebruiken 'solo'/'samen'/'gezin' → de oude '=== samenwonend || getrouwd'
+    // gaf hier altijd false (= dezelfde bug die de source had).
+    hasPartner: hasPartner(profile.household_type),
   }
 }
 

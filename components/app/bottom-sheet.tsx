@@ -30,6 +30,19 @@ type BottomSheetProps = {
    * ook op mobile zichtbaar zijn. Wanneer leeggelaten: alleen close-knop.
    */
   actions?: ReactNode
+  /**
+   * STANDAARD rendert elke BottomSheet BOVEN de zwevende mobiele nav-pill
+   * (FloatingNavButton, z-[60]): de modal dekt de pill af, zodat content en
+   * (sticky) knoppen onderin de volle hoogte hebben i.p.v. achter/onder de
+   * pill te verdwijnen. Footer-clearance valt daardoor terug op enkel de iOS
+   * safe-area (de 76px nav-clearance is overbodig als de pill is afgedekt).
+   *
+   * Zet `belowFloatingNav` ALLEEN voor de NavMenuSheet zelf: die wordt door de
+   * pill-toggle ge(de)opend, dus de pill moet er bovenop blijven (z-50 <
+   * z-[60]) en de footer behoudt de nav-clearance. Voor alle andere modals
+   * laat je dit `false` — dat is de app-brede standaard.
+   */
+  belowFloatingNav?: boolean
 }
 
 const sizeClasses = {
@@ -45,7 +58,7 @@ const DISMISS_PERCENT = 0.3    // 30% of sheet height
 const SPRING_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const VELOCITY_SAMPLES = 5
 
-export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
   const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -408,7 +421,7 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
   return createPortal(
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-end justify-center md:items-center"
+      className={`fixed inset-0 ${belowFloatingNav ? 'z-50' : 'z-[70]'} flex items-end justify-center md:items-center`}
       style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
       onClick={handleBackdrop}
     >
@@ -495,12 +508,13 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
             primary/secondary acties altijd zichtbaar blijven. Border-top en
             paper-bg zijn consistent met de desktop SlideInPane-footer, zodat
             beide rendermodi visueel uitwisselbaar zijn.
-            Mobile pb gebruikt `--mobile-nav-clearance` (globals.css) zodat de
-            sticky knoppen NIET achter de floating-nav-pill (z-[60]) verdwijnen —
-            inclusief de iOS safe-area. Op lg+ is die var 0 (pill verborgen) →
-            `lg:pb-3` geeft de normale padding terug. */}
+            Standaard (modal boven de pill) gebruikt de footer enkel de iOS
+            safe-area als bodempadding — de pill is immers afgedekt. Alleen in
+            `belowFloatingNav` (NavMenuSheet) staat de pill nog bovenop en is
+            `--mobile-nav-clearance` nodig zodat sticky knoppen er niet achter
+            verdwijnen. Op lg+ is die var 0 (pill verborgen). */}
         {footerSlot && (
-          <div className="shrink-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-5 pt-3 pb-[var(--mobile-nav-clearance)] lg:pb-3">
+          <div className={`shrink-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-5 pt-3 lg:pb-3 ${belowFloatingNav ? 'pb-[var(--mobile-nav-clearance)]' : 'pb-[calc(var(--safe-area-bottom,0px)+0.75rem)]'}`}>
             {footerSlot}
           </div>
         )}

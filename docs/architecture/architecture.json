@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-14T09:18:00.428Z",
+  "generatedAt": "2026-06-14T14:05:20.161Z",
   "generatedDate": "2026-06-14",
   "repo": {
     "name": "fin",
@@ -182,13 +182,13 @@
     }
   },
   "stats": {
-    "routes": 322,
+    "routes": 317,
     "routesProduction": 94,
     "api": 371,
     "tables": 52,
     "migrations": 105,
     "integrations": 24,
-    "components": 692,
+    "components": 687,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -604,36 +604,6 @@
       "file": "app/(app)/horizon/page.tsx",
       "group": "horizon",
       "isTest": false
-    },
-    {
-      "url": "/horizon/doorrekening-test",
-      "file": "app/(app)/horizon/doorrekening-test/page.tsx",
-      "group": "horizon",
-      "isTest": true
-    },
-    {
-      "url": "/horizon/doorrekening-test/afbouw",
-      "file": "app/(app)/horizon/doorrekening-test/afbouw/page.tsx",
-      "group": "horizon",
-      "isTest": true
-    },
-    {
-      "url": "/horizon/doorrekening-test/gebeurtenissen",
-      "file": "app/(app)/horizon/doorrekening-test/gebeurtenissen/page.tsx",
-      "group": "horizon",
-      "isTest": true
-    },
-    {
-      "url": "/horizon/doorrekening-test/opbouw",
-      "file": "app/(app)/horizon/doorrekening-test/opbouw/page.tsx",
-      "group": "horizon",
-      "isTest": true
-    },
-    {
-      "url": "/horizon/doorrekening-test/overzicht",
-      "file": "app/(app)/horizon/doorrekening-test/overzicht/page.tsx",
-      "group": "horizon",
-      "isTest": true
     },
     {
       "url": "/horizon/inflatie-koopkracht",
@@ -3847,36 +3817,6 @@
         "isTest": false
       },
       {
-        "url": "/horizon/doorrekening-test",
-        "file": "app/(app)/horizon/doorrekening-test/page.tsx",
-        "group": "horizon",
-        "isTest": true
-      },
-      {
-        "url": "/horizon/doorrekening-test/afbouw",
-        "file": "app/(app)/horizon/doorrekening-test/afbouw/page.tsx",
-        "group": "horizon",
-        "isTest": true
-      },
-      {
-        "url": "/horizon/doorrekening-test/gebeurtenissen",
-        "file": "app/(app)/horizon/doorrekening-test/gebeurtenissen/page.tsx",
-        "group": "horizon",
-        "isTest": true
-      },
-      {
-        "url": "/horizon/doorrekening-test/opbouw",
-        "file": "app/(app)/horizon/doorrekening-test/opbouw/page.tsx",
-        "group": "horizon",
-        "isTest": true
-      },
-      {
-        "url": "/horizon/doorrekening-test/overzicht",
-        "file": "app/(app)/horizon/doorrekening-test/overzicht/page.tsx",
-        "group": "horizon",
-        "isTest": true
-      },
-      {
         "url": "/horizon/inflatie-koopkracht",
         "file": "app/(app)/horizon/inflatie-koopkracht/page.tsx",
         "group": "horizon",
@@ -5064,15 +5004,6 @@
       ]
     },
     {
-      "url": "/api/horizon-engine",
-      "file": "app/api/horizon-engine/route.ts",
-      "domain": "horizon-engine",
-      "methods": [
-        "GET",
-        "PUT"
-      ]
-    },
-    {
       "url": "/api/horizon-engine/ledger",
       "file": "app/api/horizon-engine/ledger/route.ts",
       "domain": "horizon-engine",
@@ -5557,6 +5488,14 @@
       "domain": "onboarding",
       "methods": [
         "POST"
+      ]
+    },
+    {
+      "url": "/api/overzicht/cashflow-status",
+      "file": "app/api/overzicht/cashflow-status/route.ts",
+      "domain": "overzicht",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -8589,30 +8528,6 @@
       ]
     },
     {
-      "domain": "horizon-engine",
-      "label": "horizon-engine",
-      "count": 2,
-      "routes": [
-        {
-          "url": "/api/horizon-engine",
-          "file": "app/api/horizon-engine/route.ts",
-          "domain": "horizon-engine",
-          "methods": [
-            "GET",
-            "PUT"
-          ]
-        },
-        {
-          "url": "/api/horizon-engine/ledger",
-          "file": "app/api/horizon-engine/ledger/route.ts",
-          "domain": "horizon-engine",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "pension",
       "label": "pension",
       "count": 2,
@@ -9182,6 +9097,21 @@
       ]
     },
     {
+      "domain": "horizon-engine",
+      "label": "horizon-engine",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/horizon-engine/ledger",
+          "file": "app/api/horizon-engine/ledger/route.ts",
+          "domain": "horizon-engine",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "housing-strategy",
       "label": "housing-strategy",
       "count": 1,
@@ -9318,6 +9248,21 @@
           "methods": [
             "GET",
             "PUT"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "overzicht",
+      "label": "overzicht",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/overzicht/cashflow-status",
+          "file": "app/api/overzicht/cashflow-status/route.ts",
+          "domain": "overzicht",
+          "methods": [
+            "GET"
           ]
         }
       ]
@@ -12450,11 +12395,11 @@
     }
   ],
   "components": {
-    "total": 692,
+    "total": 687,
     "groups": [
       {
         "group": "app",
-        "count": 301,
+        "count": 298,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12532,7 +12477,6 @@
           "connected-account-card",
           "cost-split-calculator",
           "counterparty-analysis-panel",
-          "cross-check-panel",
           "crypto-holdings.config",
           "dashboard-type-provider",
           "debt-comparison-chart",
@@ -12549,7 +12493,6 @@
           "discover-carousel",
           "dividend-tracker",
           "domain-card",
-          "doorrekening-inline-section",
           "dream-transition-context",
           "eerder-stoppen",
           "empty-state",
@@ -12692,7 +12635,6 @@
           "responsive-shell",
           "roadmap-modal",
           "sankey-diagram",
-          "savings-tables",
           "scenario-overlay-picker",
           "scenarios-modal",
           "schulden-samenvatting",
@@ -12761,7 +12703,7 @@
       },
       {
         "group": "overview",
-        "count": 117,
+        "count": 115,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -12845,8 +12787,6 @@
           "nieuwe-tegenpartijen",
           "off-track-doelen-lijst",
           "off-track-doelen-lijst.test",
-          "onboarding-nudges",
-          "onboarding-nudges.test",
           "overzicht-hero",
           "periode-selector",
           "periode-trend",
@@ -14077,12 +14017,6 @@
           "write": true
         }
       ],
-      "horizon-engine": [
-        {
-          "name": "profiles",
-          "write": true
-        }
-      ],
       "household": [
         {
           "name": "app_settings",
@@ -14786,14 +14720,6 @@
           "write": true,
           "routes": [
             "/api/fire-settings"
-          ]
-        },
-        {
-          "domain": "horizon-engine",
-          "label": "horizon-engine",
-          "write": true,
-          "routes": [
-            "/api/horizon-engine"
           ]
         },
         {
@@ -17668,7 +17594,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 23
+        "commits": 24
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -17702,8 +17628,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6776,
-        "commits": 102
+        "loc": 6818,
+        "commits": 104
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17736,9 +17662,9 @@
         "commits": 27
       },
       {
-        "file": "app/(app)/horizon/doorrekening-test/opbouw/opbouw-client.tsx",
-        "loc": 2243,
-        "commits": 30
+        "file": "app/(app)/core/checkin/page.tsx",
+        "loc": 2206,
+        "commits": 9
       }
     ]
   },
@@ -18404,15 +18330,17 @@
   },
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-13",
+    "previousDate": "2026-06-14",
     "hasChanges": true,
     "sections": [
       {
-        "label": "Componenten (aantal)",
+        "label": "API-routes",
         "added": [
-          "+4"
+          "/api/overzicht/cashflow-status"
         ],
-        "removed": []
+        "removed": [
+          "/api/horizon-engine"
+        ]
       }
     ]
   },
@@ -18448,7 +18376,7 @@
     {
       "date": "2026-06-14",
       "api": 371,
-      "components": 692,
+      "components": 687,
       "tables": 52,
       "routesProduction": 94
     }

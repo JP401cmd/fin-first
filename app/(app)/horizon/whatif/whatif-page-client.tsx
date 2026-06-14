@@ -56,6 +56,7 @@ import { WhatIfBeslishulp } from '@/components/app/horizon/whatif-beslishulp'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { computeDebtAflossingMonthly, savingsRateFromAggregates, resolveSavingsSource } from '@/lib/savings-source'
 import { filterAssetsForFire, parseHousingStrategy, type HousingStrategyConfig } from '@/lib/housing-strategy'
+import { hasPartner as deriveHasPartner } from '@/lib/household-type'
 import {
   deriveOverridesFromEvents,
   buildSliderEvent,
@@ -304,8 +305,10 @@ export default function WhatIfPage() {
       setHousingStrategy(parseHousingStrategy(profileResult.data?.housing_strategy_config))
 
       setBox3Method(fireParams.box3Method)
+      // Bug-fix: voorheen tegen de verouderde woordenschat ('samenwonend'/
+      // 'getrouwd') die household_type nooit is → altijd false. Canonieke helper.
       const householdType = profileResult.data?.household_type
-      setHasPartner(householdType === 'samenwonend' || householdType === 'getrouwd')
+      setHasPartner(deriveHasPartner(householdType))
 
       // Resolve withdrawal strategy from user profile
       setWithdrawalStrategyConfig(resolveWithdrawalStrategy(profileResult.data ?? {}))

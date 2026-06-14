@@ -74,7 +74,7 @@ export function UitlegChapter({ number, title, lead, figures, children }: Uitleg
                   {f.value}
                 </p>
                 {f.sub && (
-                  <p className="mt-0.5 font-sans text-[10px] leading-tight text-horizon-700">
+                  <p className="mt-0.5 font-sans text-[11px] leading-tight text-horizon-700">
                     {f.sub}
                   </p>
                 )}

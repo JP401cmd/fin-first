@@ -90,25 +90,7 @@ export default async function OverzichtPage() {
   const endAge = horizonData?.fireStrategy?.endAge ?? null
   const isPensioenMode = horizonData?.fireStrategy?.strategy === 'pensioen'
 
-  // Onboarding-nudges flags (plan R-1 + R-7):
-  // - hasDob = DOB ingevuld
-  // - hasAssets = ≥1 totalAssets via healthScoreInput
-  // - hasGoals = ≥1 actief doel
-  // - accountAgeDays = dagen sinds auth-user.created_at — voedt de
-  //   briefing-nudge (plan §6.7: pas na dag 7 verschijnt)
-  const hasDob = dob != null
-  const hasAssets = (horizonData?.healthScoreInput?.totalAssets ?? 0) > 0
-  const hasGoals = (willData.goals?.length ?? 0) > 0
   const { data: authUser } = await supabase.auth.getUser()
-  const createdAt = authUser.user?.created_at
-  const accountAgeDays = createdAt
-    ? Math.max(
-        0,
-        Math.floor(
-          (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24),
-        ),
-      )
-    : 0
 
   // Liquide cash = niet-gekoppelde bank-accounts + cash/savings-typed
   // assets. Basis voor de CompoundInsightCard (plan T-4) zodat we
@@ -293,10 +275,6 @@ export default async function OverzichtPage() {
         dashboardData={dashboardData}
         activeWidgets={activeWidgets}
         allWidgetPrefs={allWidgetPrefs}
-        hasDob={hasDob}
-        hasAssets={hasAssets}
-        hasGoals={hasGoals}
-        accountAgeDays={accountAgeDays}
         liquidCash={liquidCash}
         hasCompletedHorizonSetup={horizonData?.hasCompletedHorizonSetup ?? true}
       />

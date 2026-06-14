@@ -46,9 +46,10 @@ export function FloatingNavButton() {
   return (
     <>
       <div
-        // z-[60] zit BOVEN de BottomSheet-portal (z-50), zodat de floating
-        // button zichtbaar blijft wanneer het menu open is en de gebruiker
-        // het kruisje kan tappen om weer te sluiten.
+        // z-[60] zit tussen de NavMenuSheet (z-50, `belowFloatingNav`) en de
+        // gewone content-modals (z-[70], standaard BOVEN de pill). Zo blijft de
+        // toggle-knop tappbaar wanneer hét nav-menu open is, terwijl een gewone
+        // modal de pill juist afdekt (volle hoogte voor content/knoppen onderin).
         // `lg:hidden` (niet md:hidden) zodat de pill zichtbaar blijft in de
         // band 768–1023px — daar is de Sidebar (`hidden lg:flex`) nog verborgen
         // én draait de mobiele tray-shell (`lg:hidden`), dus zonder de pill zou

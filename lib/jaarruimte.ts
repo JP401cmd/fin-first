@@ -24,6 +24,8 @@
  * franchise €19.172, max jaarruimte €35.589, factor A 13,3%.
  */
 
+import type { LeverageStatus } from '@/lib/leverage-status'
+
 export const JAARRUIMTE_FACTOR_A = 0.133
 
 // ── 2025 ──────────────────────────────────────────────────────
@@ -103,4 +105,38 @@ export function computeJaarruimte(
     franchise,
     max,
   }
+}
+
+/**
+ * Box 1-status uit netto-maandinkomen + marginaal tarief — SINGLE SOURCE voor
+ * zowel de Belasting-landingskaart (Box 1) als de sidebar-status-dot.
+ *
+ * Het bruto jaarinkomen wordt afgeleid uit het netto-maandinkomen via
+ * `bruto ≈ netto / (1 − marginaal)` (identiek aan de Belasting-pagina), en de
+ * onbenutte jaarruimte bepaalt de status:
+ *  - neutral: geen inkomen (grossYearly ≤ 0)
+ *  - warn:    onbenutte jaarruimte > 0 → belastingbesparingskans
+ *  - good:    ruimte volledig benut
+ *
+ * Geeft óók de afgeleide `grossYearly` terug zodat de pagina die kan hergebruiken
+ * (geen tweede afleiding → geen drift).
+ */
+export function box1JaarruimteStatus(input: {
+  /** Netto maandinkomen (effectief — manual of transactie-afgeleid). */
+  netMonthly: number
+  /** Marginaal IB-tarief (0–1), bv. 0.3697 of 0.4950. */
+  marginaalTarief: number
+}): { status: LeverageStatus; grossYearly: number } {
+  const { netMonthly, marginaalTarief } = input
+  const grossYearly =
+    netMonthly > 0 && marginaalTarief > 0 && marginaalTarief < 1
+      ? (netMonthly * 12) / (1 - marginaalTarief)
+      : 0
+  const jaarruimte = computeJaarruimte(grossYearly, 0)
+  const status: LeverageStatus = !jaarruimte.hasData
+    ? 'neutral'
+    : jaarruimte.jaarruimte > 0
+      ? 'warn'
+      : 'good'
+  return { status, grossYearly }
 }

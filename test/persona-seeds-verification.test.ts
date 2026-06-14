@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey, type PersonaData } from '@/lib/test-personas'
+import { hasPartner } from '@/lib/household-type'
 import { runUnifiedProjection, type UnifiedProjectionInput, type UnifiedProjectionRow } from '@/lib/unified-projection'
 import { classifyAsset, BOX3_PARAMS } from '@/lib/box3-data'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
@@ -125,7 +126,9 @@ function buildUnifiedInputForPersona(key: PersonaKey): UnifiedProjectionInput {
     box3Method: 'forfaitair', cashflows, strategyConfig,
     withdrawalStrategy: wConfig,
     forcedFireAge: profile.fire_end_strategy === 'pensioen' ? 67 : undefined,
-    hasPartner: profile.household_type === 'samenwonend' || profile.household_type === 'getrouwd',
+    // Canonieke afleiding (zelfde helper als de source-engines). Personas
+    // gebruiken 'solo'/'samen'/'gezin'.
+    hasPartner: hasPartner(profile.household_type),
   }
 }
 

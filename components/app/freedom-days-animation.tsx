@@ -54,7 +54,7 @@ export function FreedomDaysAnimationProvider({ children }: { children: React.Rea
       {/* Floating animation overlay */}
       {animations.length > 0 && (
         <div
-          className="pointer-events-none fixed inset-0 z-50 overflow-hidden"
+          className="pointer-events-none fixed inset-0 z-[70] overflow-hidden"
           aria-hidden="true"
           data-testid="freedom-days-animation-overlay"
         >

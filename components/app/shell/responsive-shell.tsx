@@ -46,8 +46,6 @@ import type { LeverageStatus } from '@/lib/leverage-status'
 export type SidebarSignals = {
   /** Tips & acties: open/uitgestelde acties óf aanbevelingen. */
   tipsActions: boolean
-  /** Ongecategoriseerde uitgaven deze maand. */
-  uncategorizedTx: boolean
   /** Minstens één budget overschreden. */
   budgetOver: boolean
   /** Aandelen-koersen ouder dan de staleness-drempel. */

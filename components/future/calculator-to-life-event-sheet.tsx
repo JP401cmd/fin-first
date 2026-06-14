@@ -93,7 +93,7 @@ export function CalculatorToLifeEventSheet({
       role="dialog"
       aria-modal="true"
       aria-label="Levensgebeurtenis maken"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4"
       onClick={onClose}
     >
       <div

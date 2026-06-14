@@ -16,9 +16,10 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { SimChart } from '@/components/app/horizon/sim-chart'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
 import { GrafiekUitlegWalkthrough } from '@/components/app/horizon/grafiek-uitleg/grafiek-uitleg-walkthrough'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { DEFAULT_RETURN } from '@/lib/constants'
 
@@ -46,6 +47,49 @@ function fmt(n: number): string {
   return formatCurrency(Math.round(n))
 }
 
+/**
+ * Compacte vrijheidstijd-noot voor een bedrag in de Kassabon (consume-only via
+ * lib/format.ts). `null` bij niet-zinvolle bedragen (≤ €100) of zonder dagbasis.
+ */
+function freedomSub(amount: number, dailyRate: number, suffix = ''): string | null {
+  if (!(Math.abs(amount) > 100) || dailyRate <= 0) return null
+  return (
+    formatWithFreedom(amount, dailyRate, { includeCurrency: false, format: 'short' }) +
+    ' vrijheid' +
+    suffix
+  )
+}
+
+/** Eén Kassabon-regel: label links, bedrag rechts + optionele vrijheidstijd-subregel. */
+function KassabonRow({
+  label,
+  amount,
+  dailyRate,
+  emphasis,
+  freedomSuffix = '',
+}: {
+  label: string
+  amount: number
+  dailyRate: number
+  emphasis?: boolean
+  freedomSuffix?: string
+}) {
+  const sub = freedomSub(amount, dailyRate, freedomSuffix)
+  return (
+    <div className="flex items-start justify-between gap-3 py-0.5">
+      <span className="font-sans text-sm text-[var(--ink-2)]">{label}</span>
+      <span className="shrink-0 text-right">
+        <span className={`block font-mono tabular-nums ${emphasis ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink)]'}`}>
+          {fmt(amount)}
+        </span>
+        {sub && (
+          <span className="block font-sans text-[10px] leading-tight text-horizon-700">{sub}</span>
+        )}
+      </span>
+    </div>
+  )
+}
+
 // ── SimChartModal ─────────────────────────────────────────────────────────────
 // Alleen de overlay (ShellOverlay kind="sheet" size="full") — geen card-wrapper.
 // Gebruik dit in de merged hero.
@@ -58,6 +102,8 @@ export interface SimChartModalProps {
   currentAge: number | null
   retirementExpenseMethod: string | null
   yearlyExpenses: number
+  /** Optioneel: de rijkere grootboek-rijen voor extra detail (graceful degradation). */
+  unifiedRows?: UnifiedProjectionRow[]
 }
 
 export const SimChartModal = memo(function SimChartModal({
@@ -68,6 +114,7 @@ export const SimChartModal = memo(function SimChartModal({
   currentAge,
   retirementExpenseMethod,
   yearlyExpenses,
+  unifiedRows,
 }: SimChartModalProps) {
   // Derive strategy from simResult
   const strategy: FireEndStrategy = simResult?.strategy ?? 'deplete'
@@ -81,7 +128,7 @@ export const SimChartModal = memo(function SimChartModal({
 
   const {
     fireAgeFractional, fireAge, fireReachable, rows,
-    requiredFirePortfolio, classic25xTarget, implicitWithdrawalRate,
+    requiredFirePortfolio, implicitWithdrawalRate,
     firePortfolioAtFire,
   } = simResult
 
@@ -90,6 +137,8 @@ export const SimChartModal = memo(function SimChartModal({
   const annualSavingsFromRows = rows.find(r => r.phase === 'accumulation')?.savings ?? 0
   const accumulationRows = rows.filter(r => r.phase === 'accumulation')
   const retirementRows = rows.filter(r => r.phase === 'retirement')
+  // Canonieke €→tijd-dagbasis (×12/365) uit lib/format.ts — geen eigen som.
+  const dailyRate = dailyExpenseRate(yearlyExpenses / 12)
 
   return (
     <ShellOverlay open={open} onClose={onClose} kind="sheet" size="full" title="Simulatie Prognose">
@@ -101,6 +150,7 @@ export const SimChartModal = memo(function SimChartModal({
           cashflows={cashflows}
           currentAge={currentAge}
           yearlyExpenses={yearlyExpenses}
+          unifiedRows={unifiedRows}
         />
 
         {/* 2. Grafiek — blijft zichtbaar (de eigen vermogenslijn + legenda) */}
@@ -196,37 +246,28 @@ export const SimChartModal = memo(function SimChartModal({
             <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-4)]">
               Invoerparameters
             </p>
-            <div className="flex justify-between py-0.5">
-              <span className="font-sans text-sm text-[var(--ink-2)]">Huidig netto vermogen</span>
-              <span className="tabular-nums text-[var(--ink)]">{fmt(startPortfolio)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="font-sans text-sm text-[var(--ink-2)]">Jaarlijkse uitgaven (pensioen)</span>
-              <span className="tabular-nums text-[var(--ink)]">{fmt(yearlyExpenses)}</span>
-            </div>
+            <KassabonRow label="Huidig netto vermogen" amount={startPortfolio} dailyRate={dailyRate} />
+            <KassabonRow label="Jaarlijkse uitgaven (pensioen)" amount={yearlyExpenses} dailyRate={dailyRate} freedomSuffix="/jaar" />
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Dagelijkse uitgaven</span>
-              <span className="tabular-nums text-[var(--ink)]">{fmt(yearlyExpenses / 365)}/dag</span>
+              <span className="font-mono tabular-nums text-[var(--ink)]">{fmt(yearlyExpenses / 365)}/dag</span>
             </div>
-            <div className="flex justify-between py-0.5">
-              <span className="font-sans text-sm text-[var(--ink-2)]">Jaarlijkse inleg (assets)</span>
-              <span className="tabular-nums text-[var(--ink)]">{fmt(annualSavingsFromRows * 12)}</span>
-            </div>
+            <KassabonRow label="Jaarlijkse inleg (assets)" amount={annualSavingsFromRows} dailyRate={dailyRate} freedomSuffix="/jaar" />
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Bruto rendement</span>
-              <span className="tabular-nums text-[var(--ink)]">{(GROSS_RETURN * 100).toFixed(0)}% per jaar</span>
+              <span className="font-mono tabular-nums text-[var(--ink)]">{(GROSS_RETURN * 100).toFixed(0)}% per jaar</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Inflatie</span>
-              <span className="tabular-nums text-[var(--ink)]">2% per jaar</span>
+              <span className="font-mono tabular-nums text-[var(--ink)]">2% per jaar</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Uitgavenmethode</span>
-              <span className="tabular-nums text-[var(--ink)]">{methodLabel(retirementExpenseMethod)}</span>
+              <span className="font-mono tabular-nums text-[var(--ink)]">{methodLabel(retirementExpenseMethod)}</span>
             </div>
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Eindstrategie</span>
-              <span className="tabular-nums text-[var(--ink)]">{STRATEGY_LABELS[strategy].name}</span>
+              <span className="font-mono tabular-nums text-[var(--ink)]">{STRATEGY_LABELS[strategy].name}</span>
             </div>
           </div>
 
@@ -235,23 +276,20 @@ export const SimChartModal = memo(function SimChartModal({
             <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-4)]">
               Benodigde FIRE-vermogen
             </p>
-            <div className="flex justify-between py-0.5">
-              <span className="font-sans text-sm text-[var(--ink-2)]">Simulatie-berekend vereist bedrag</span>
-              <span className="tabular-nums font-semibold text-[var(--ink)]">{fmt(requiredFirePortfolio)}</span>
-            </div>
-            <div className="flex justify-between py-0.5">
-              <span className="font-sans text-sm text-[var(--ink-2)]">Klassiek 25× doel (4%-regel)</span>
-              <span className="tabular-nums text-[var(--ink-3)]">{fmt(classic25xTarget)}</span>
-            </div>
+            <KassabonRow label="Simulatie-berekend vereist bedrag" amount={requiredFirePortfolio} dailyRate={dailyRate} emphasis />
             {fireReachable && (
-              <div className="flex justify-between py-0.5">
-                <span className="font-sans text-sm text-[var(--ink-2)]">Vermogen op FIRE-moment</span>
-                <span className="tabular-nums text-[var(--ink-3)]">{fmt(firePortfolioAtFire)}</span>
-              </div>
+              <KassabonRow label="Vermogen op FIRE-moment" amount={firePortfolioAtFire} dailyRate={dailyRate} />
+            )}
+            {targetEndPortfolio > 0 && (
+              <KassabonRow
+                label={strategy === 'legacy' ? 'Nalatenschapsdoel (eindvermogen)' : 'Eindvermogen (doel)'}
+                amount={targetEndPortfolio}
+                dailyRate={dailyRate}
+              />
             )}
             <div className="flex justify-between py-0.5">
               <span className="font-sans text-sm text-[var(--ink-2)]">Impliciete opnamerate</span>
-              <span className="tabular-nums text-[var(--ink)]">{(implicitWithdrawalRate * 100).toFixed(2)}%</span>
+              <span className="font-mono tabular-nums text-[var(--ink)]">{(implicitWithdrawalRate * 100).toFixed(2)}%</span>
             </div>
           </div>
 
@@ -261,19 +299,27 @@ export const SimChartModal = memo(function SimChartModal({
               <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-4)]">
                 Meegenomen kasstromen
               </p>
-              {cashflows.map(cf => (
-                <div key={cf.id} className="flex justify-between py-0.5">
-                  <span className="font-sans text-[11px] text-[var(--ink-2)]">
-                    {cashflowLabel(cf)}{' '}
-                    <span className="text-[var(--ink-4)] text-[10px]">
-                      ({cf.type === 'one_time' ? `eenmalig leeftijd ${cf.fromAge}` : `leeftijd ${cf.fromAge}${cf.toAge ? `–${cf.toAge}` : '+'}`})
+              {cashflows.map(cf => {
+                const sub = freedomSub(cf.amount, dailyRate, cf.type === 'recurring' ? '/mnd' : '')
+                return (
+                  <div key={cf.id} className="flex items-start justify-between gap-3 py-0.5">
+                    <span className="font-sans text-[11px] text-[var(--ink-2)]">
+                      {cashflowLabel(cf)}{' '}
+                      <span className="text-[var(--ink-4)] text-[10px]">
+                        ({cf.type === 'one_time' ? `eenmalig leeftijd ${cf.fromAge}` : `leeftijd ${cf.fromAge}${cf.toAge ? `–${cf.toAge}` : '+'}`})
+                      </span>
                     </span>
-                  </span>
-                  <span className={`tabular-nums text-[11px] font-medium ${cf.direction === 'income' ? 'text-horizon-700' : 'text-kern-700'}`}>
-                    {cf.direction === 'income' ? '+' : '−'}{fmt(cf.amount)}{cf.type === 'recurring' ? '/mnd' : ''}
-                  </span>
-                </div>
-              ))}
+                    <span className="shrink-0 text-right">
+                      <span className={`block tabular-nums text-[11px] font-medium ${cf.direction === 'income' ? 'text-horizon-700' : 'text-kern-700'}`}>
+                        {cf.direction === 'income' ? '+' : '−'}{fmt(cf.amount)}{cf.type === 'recurring' ? '/mnd' : ''}
+                      </span>
+                      {sub && (
+                        <span className="block font-sans text-[10px] leading-tight text-horizon-700">{sub}</span>
+                      )}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           )}
 

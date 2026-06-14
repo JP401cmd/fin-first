@@ -33,6 +33,57 @@ function signed(value: number): string {
   return `${value >= 0 ? '+' : ''}${formatCurrency(value)}`
 }
 
+// ── Pure status-helpers (SINGLE SOURCE) ───────────────────────────────────
+//
+// De vier cashflow-kaartstatussen als kleine pure functies, zodat ZOWEL
+// `buildCashflowCards` (de kaarten) ALS de sidebar-status-dots (via
+// /api/overzicht/cashflow-status → buildCashflowCards) exact dezelfde
+// LeverageStatus produceren. Geen gedupliceerde drempels meer.
+
+/** Budget: budgetdekkings-score (pillarStatus) wanneer een budget actief is. */
+export function budgetCardStatus(input: {
+  budgetingActive: boolean
+  expenseLimit: number
+  budgetScore: number
+}): LeverageStatus {
+  const active = input.budgetingActive && input.expenseLimit > 0
+  return active ? pillarStatus(input.budgetScore) : 'neutral'
+}
+
+/** Transacties: maand-spaarquote (netto/inkomen). ≥20% good, ≥0% warn, <0 bad. */
+export function transactiesCardStatus(input: {
+  monthlyIncome: number
+  monthlyExpenses: number
+}): LeverageStatus {
+  const { monthlyIncome, monthlyExpenses } = input
+  const monthlyNet = monthlyIncome - monthlyExpenses
+  const hasTx = monthlyIncome > 0 || monthlyExpenses > 0
+  const rate = monthlyIncome > 0 ? (monthlyNet / monthlyIncome) * 100 : null
+  if (!hasTx || rate == null) return 'neutral'
+  return rate >= 20 ? 'good' : rate >= 0 ? 'warn' : 'bad'
+}
+
+/** Vaste lasten: aandeel van inkomen. <50% good, ≤70% warn, anders bad. */
+export function vasteLastenCardStatus(input: {
+  totalMonthly: number
+  count: number
+  monthlyIncome: number
+}): LeverageStatus {
+  const hasVaste = input.count > 0
+  const ratio = input.monthlyIncome > 0 ? input.totalMonthly / input.monthlyIncome : null
+  if (!hasVaste || ratio == null) return 'neutral'
+  return ratio < 0.5 ? 'good' : ratio <= 0.7 ? 'warn' : 'bad'
+}
+
+/** Forecast: netto per maand. >0 good, <0 bad, ==0 warn; geen forecast → neutral. */
+export function forecastCardStatus(input: {
+  netPerMonth: number
+  hasForecast: boolean
+}): LeverageStatus {
+  if (!input.hasForecast) return 'neutral'
+  return input.netPerMonth > 0 ? 'good' : input.netPerMonth < 0 ? 'bad' : 'warn'
+}
+
 export function buildCashflowCards(
   dashboardData: DashboardData,
   cashflow: CashflowData,
@@ -43,7 +94,11 @@ export function buildCashflowCards(
   const budgetSpent = dashboardData.budgetTotals.expense.spent
   const budgetScore = dashboardData.monthSummary.budgetScore
   const budgetActive = dashboardData.budgetingActive && budgetLimit > 0
-  const budgetStatus: LeverageStatus = budgetActive ? pillarStatus(budgetScore) : 'neutral'
+  const budgetStatus: LeverageStatus = budgetCardStatus({
+    budgetingActive: dashboardData.budgetingActive,
+    expenseLimit: budgetLimit,
+    budgetScore,
+  })
   const budget: CashflowCard = {
     key: 'budget',
     label: 'Budget',
@@ -74,13 +129,7 @@ export function buildCashflowCards(
   const monthlyNet = monthlyIncome - monthlyExpenses
   const hasTx = monthlyIncome > 0 || monthlyExpenses > 0
   const rate = monthlyIncome > 0 ? (monthlyNet / monthlyIncome) * 100 : null
-  const txStatus: LeverageStatus = !hasTx || rate == null
-    ? 'neutral'
-    : rate >= 20
-      ? 'good'
-      : rate >= 0
-        ? 'warn'
-        : 'bad'
+  const txStatus: LeverageStatus = transactiesCardStatus({ monthlyIncome, monthlyExpenses })
   const transacties: CashflowCard = {
     key: 'transacties',
     label: 'Transacties',
@@ -111,13 +160,11 @@ export function buildCashflowCards(
   const vasteCount = vasteLastenSummary.count
   const hasVaste = vasteCount > 0
   const vasteRatio = monthlyIncome > 0 ? vastePerMonth / monthlyIncome : null
-  const vasteStatus: LeverageStatus = !hasVaste || vasteRatio == null
-    ? 'neutral'
-    : vasteRatio < 0.5
-      ? 'good'
-      : vasteRatio <= 0.7
-        ? 'warn'
-        : 'bad'
+  const vasteStatus: LeverageStatus = vasteLastenCardStatus({
+    totalMonthly: vastePerMonth,
+    count: vasteCount,
+    monthlyIncome,
+  })
   const vasteLasten: CashflowCard = {
     key: 'vaste-lasten',
     label: 'Vaste lasten',
@@ -152,13 +199,7 @@ export function buildCashflowCards(
   const endBalance = rows[rows.length - 1]?.cumulative ?? cashflow.startingBalance
   const hasForecast =
     cashflow.baselineIncome > 0 || cashflow.baselineExpenses > 0 || cashflow.recurrings.length > 0
-  const fcStatus: LeverageStatus = !hasForecast
-    ? 'neutral'
-    : netPerMonth > 0
-      ? 'good'
-      : netPerMonth < 0
-        ? 'bad'
-        : 'warn'
+  const fcStatus: LeverageStatus = forecastCardStatus({ netPerMonth, hasForecast })
   const forecast: CashflowCard = {
     key: 'forecast',
     label: 'Forecast',

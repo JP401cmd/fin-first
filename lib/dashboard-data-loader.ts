@@ -48,6 +48,7 @@ import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
 import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
+import { hasPartner } from '@/lib/household-type'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { resolveDepreciation, type Asset } from '@/lib/asset-data'
 import { type Debt } from '@/lib/debt-data'
@@ -614,9 +615,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     try {
       // Look up actual AOW age from aow_leeftijden table (consistent with horizon page)
       const userAowAge = lookupAowAge((aowResult.data ?? []) as AowLeeftijdRow[], dob)
-      // Derive hasPartner from profile household_type (consistent with horizon-data-loader)
+      // Derive hasPartner from profile household_type via canonieke helper.
+      // Bug-fix: voorheen vergeleek deze plek met de verouderde woordenschat
+      // ('samenwonend'/'getrouwd') die household_type nooit is → altijd false.
       const householdType = (profileResult.data as Record<string, unknown> | null)?.household_type as string | null
-      const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
+      const hasPartnerFlag = hasPartner(householdType)
       const withdrawalStrategy = resolveWithdrawalStrategy(profileResult.data as Record<string, unknown> ?? {})
       const dashboardYearlyExpenses = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12
       // Cutover (C1, ADR 0016): /overzicht gebruikt nu DEZELFDE gedeelde input-
@@ -637,7 +640,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         assets: dashboardAssetsArr,
         debts: dashboardDebtsArr,
         box3Method: fireParams.box3Method,
-        hasPartner,
+        hasPartner: hasPartnerFlag,
         bankAccountCash: unlinkedCash,
         monthlySavingsOverride: dashboardSavingsOverride,
         baseAnnualSavingsFromCashflow: dashboardBaseAnnualSavings,

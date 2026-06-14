@@ -20,6 +20,7 @@
  */
 
 import type { HealthScoreInput } from '@/lib/financial-health'
+import { hasPartner } from '@/lib/household-type'
 
 // ── Box 3 (educatief "kans"-inzicht; sinds v2 geen score-pijler, ADR 0010) ───
 
@@ -71,8 +72,9 @@ export function buildTaxData(
       .filter((a) => a.asset_type && BOX3_ASSET_TYPES.has(a.asset_type))
       .reduce((s, a) => s + Number(a.current_value ?? 0), 0) + unlinkedCash
   if (box3Bezittingen < 1_000) return null
-  const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
-  const heffingsvrijVermogen = hasPartner ? 114_000 : 57_000
+  // Bug-fix: voorheen tegen de verouderde woordenschat ('samenwonend'/'getrouwd')
+  // die householdType nooit is → altijd false. Nu via canonieke helper.
+  const heffingsvrijVermogen = hasPartner(householdType) ? 114_000 : 57_000
   const rendementsgrondslag = Math.max(0, box3Bezittingen - heffingsvrijVermogen)
   const box3Tax = Math.round(rendementsgrondslag * 0.0588 * 0.36)
   return { box3Bezittingen, box3Tax, heffingsvrijVermogen, rendementsgrondslag }

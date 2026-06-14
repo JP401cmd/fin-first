@@ -2636,9 +2636,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   }
 
   return (
-    <div className="mx-auto max-w-6xl py-5 sm:py-8">
+    <div className="mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6">
       {/* === Editorial header — blueprint Type 1 (Module-landing) === */}
-      <header className="relative mb-6 space-y-2 px-4 sm:px-6">
+      <header className="relative mb-6 space-y-2">
         <PageInfoButton
           description={pageInfoText}
           className="absolute right-4 top-0 sm:right-6"
@@ -3657,6 +3657,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           currentAge={currentAge}
           retirementExpenseMethod={null}
           yearlyExpenses={effectiveInput?.yearlyMustExpenses ?? 0}
+          unifiedRows={unifiedRows ?? undefined}
         />
       )}
 

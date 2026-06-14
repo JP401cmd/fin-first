@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { BelastingBoxCards, type BelastingBoxCard } from './belasting-box-cards'
+
+/**
+ * BelastingBoxCards hergebruikt nu de gedeelde LeverageCard-shell (zoals
+ * ToekomstNavCards op /toekomst): afgeronde kaart + chevron-drilldown. De
+ * "Box N"-kicker en de subtitle-beschrijving zijn van de KAARTVOORKANT naar
+ * het uitklap-paneel verhuisd — die zijn dus PAS zichtbaar na een klik op de
+ * chevron-<button> (aria-label "Toon detail {label}"). KPI (€…/jr of '—') en
+ * de status-substext blijven op de voorkant.
+ */
 
 function makeCards(
   overrides: Partial<Record<'1' | '2' | '3', Partial<BelastingBoxCard>>> = {},
@@ -38,11 +47,18 @@ function makeCards(
 }
 
 describe('BelastingBoxCards — render', () => {
-  it('rendert drie box-kaarten (Box 1 / 2 / 3)', () => {
+  it('rendert drie box-kaarten met een chevron-toggle per kaart', () => {
     render(<BelastingBoxCards cards={makeCards()} />)
-    expect(screen.getByText('Box 1')).toBeTruthy()
-    expect(screen.getByText('Box 2')).toBeTruthy()
-    expect(screen.getByText('Box 3')).toBeTruthy()
+    // De "Box N"-kicker is naar de drilldown verhuisd en dus standaard NIET
+    // op de voorkant zichtbaar — we herkennen de drie kaarten nu aan hun
+    // chevron-toggle (LeverageCard geeft die aria-label "Toon detail {label}").
+    expect(screen.getByRole('button', { name: 'Toon detail Werk + woning' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Toon detail Aanmerkelijk belang' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Toon detail Sparen + beleggen' })).toBeTruthy()
+    // "Box 1/2/3" zit in de (dichtgeklapte) drilldown, dus niet zichtbaar.
+    expect(screen.queryByText('Box 1')).toBeNull()
+    expect(screen.queryByText('Box 2')).toBeNull()
+    expect(screen.queryByText('Box 3')).toBeNull()
   })
 
   it('toont label per box', () => {
@@ -89,5 +105,67 @@ describe('BelastingBoxCards — render', () => {
     expect(hrefs).toContain('/overzicht/belasting/box1')
     expect(hrefs).toContain('/overzicht/belasting/box2')
     expect(hrefs).toContain('/overzicht/belasting/box3')
+  })
+})
+
+// ── Chevron-drilldown (hergebruik LeverageCard-shell) ─────────────────────
+
+describe('BelastingBoxCards — chevron-drilldown', () => {
+  it('rendert per kaart een chevron-<button> met aria-expanded=false', () => {
+    render(<BelastingBoxCards cards={makeCards()} />)
+    const buttons = screen.getAllByRole('button', { name: /^Toon detail / })
+    expect(buttons.length).toBe(3)
+    buttons.forEach((b) => expect(b.getAttribute('aria-expanded')).toBe('false'))
+  })
+
+  it('is standaard dichtgeklapt: subtitle + "Box N" + action-link nog niet zichtbaar', () => {
+    const { container } = render(<BelastingBoxCards cards={makeCards()} />)
+    // De drilldown-inhoud (subtitle/beschrijving, "Box N"-kicker, action-link)
+    // wordt pas gerenderd na uitklappen.
+    expect(screen.queryByText('Loon, ondernemerswinst en eigen huis.')).toBeNull()
+    expect(screen.queryByText('Bekijk Box 1')).toBeNull()
+    expect(screen.queryByText('Box 1')).toBeNull()
+    // Standaard alleen de drie heel-kaart-Links (geen uitgeklapte action-links).
+    expect(container.querySelectorAll('a').length).toBe(3)
+  })
+
+  it('klikken op de chevron klapt het drilldown-paneel uit zonder te navigeren', () => {
+    const { container } = render(<BelastingBoxCards cards={makeCards()} />)
+    const toggle = screen.getByRole('button', { name: 'Toon detail Werk + woning' })
+    fireEvent.click(toggle)
+
+    // "Box 1"-kicker, de beschrijving (subtitle) en de action-link verschijnen.
+    expect(screen.getByText('Box 1')).toBeTruthy()
+    expect(screen.getByText('Loon, ondernemerswinst en eigen huis.')).toBeTruthy()
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+
+    // De action-link wijst naar dezelfde box-subpagina (navigatie, geen toggle).
+    const actionLink = screen.getByText('Bekijk Box 1').closest('a')
+    expect(actionLink?.getAttribute('href')).toBe('/overzicht/belasting/box1')
+
+    // Nu zijn er 4 anchors (3 kaarten + 1 uitgeklapte action-link).
+    expect(container.querySelectorAll('a').length).toBe(4)
+  })
+
+  it('opent maximaal één drilldown tegelijk (accordeon)', () => {
+    render(<BelastingBoxCards cards={makeCards()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Toon detail Werk + woning' }))
+    expect(screen.getByText('Bekijk Box 1')).toBeTruthy()
+
+    // Tweede kaart openen sluit de eerste.
+    fireEvent.click(screen.getByRole('button', { name: 'Toon detail Sparen + beleggen' }))
+    expect(screen.getByText('Bekijk Box 3')).toBeTruthy()
+    expect(screen.queryByText('Bekijk Box 1')).toBeNull()
+  })
+
+  it('toont voor Box 2 (tax=null) een kale "—" als drilldown-waarde, niet de status-tekst', () => {
+    render(<BelastingBoxCards cards={makeCards()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Toon detail Aanmerkelijk belang' }))
+    // De drilldown is open (action-link zichtbaar)…
+    expect(screen.getByText('Bekijk Box 2')).toBeTruthy()
+    // …maar de numerieke waarde-kolom (mono tabular) blijft '—'. De status
+    // "Geen aanmerkelijk belang" staat alléén op de kaartvoorkant (substext),
+    // niet in het getallen-veld → precies 1 voorkomen.
+    expect(screen.getAllByText('Geen aanmerkelijk belang').length).toBe(1)
   })
 })

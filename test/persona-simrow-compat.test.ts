@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { PERSONAS, type PersonaKey, PERSONA_KEYS, type PersonaData } from '@/lib/test-personas'
+import { hasPartner } from '@/lib/household-type'
 import { runSimulation, lifeEventsToCashflows, type SimRow, type SimCashflow } from '@/lib/fire-simulation'
 import { ageAtDate } from '@/lib/horizon-data'
 import { type FireStrategyConfig } from '@/lib/fire-strategy'
@@ -587,7 +588,9 @@ describe('Persona seed data × SimRow compatibility (#356)', () => {
         strategyConfig: params.strategyConfig,
         withdrawalStrategy: params.wConfig,
         forcedFireAge: profile.fire_end_strategy === 'pensioen' ? 67 : undefined,
-        hasPartner: profile.household_type === 'samenwonend' || profile.household_type === 'getrouwd',
+        // Canonieke afleiding (zelfde helper als de source-engines). Personas
+        // gebruiken 'solo'/'samen'/'gezin'.
+        hasPartner: hasPartner(profile.household_type),
       }
     }
 

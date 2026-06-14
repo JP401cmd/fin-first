@@ -167,3 +167,13 @@
 ## 2026-06-14
 
 - **Componenten (aantal)** toegevoegd: +4
+
+## 2026-06-14
+
+- **Schermen** verwijderd: /horizon/doorrekening-test, /horizon/doorrekening-test/afbouw, /horizon/doorrekening-test/gebeurtenissen, /horizon/doorrekening-test/opbouw, /horizon/doorrekening-test/overzicht
+- **Componenten (aantal)** verwijderd: -5
+
+## 2026-06-14
+
+- **API-routes** toegevoegd: /api/overzicht/cashflow-status
+- **API-routes** verwijderd: /api/horizon-engine

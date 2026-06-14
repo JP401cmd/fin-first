@@ -50,6 +50,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavStack, type StackEntry, type BottomBarConfig, type TopBarKind } from './nav-stack-provider'
+import { resolveRouteTitle } from '@/lib/nav-config'
 import { TopBar } from './top-bar'
 import { MobileBottomBar } from './mobile-bottom-bar'
 
@@ -241,7 +242,17 @@ export function MobileStackShell({
             Krijgt aria-hidden=true zodra animatie start (plan §4.2 a11y). */}
         <div className={outgoingClass} style={{ position: 'absolute', inset: 0 }}>
           <Tray
-            entryTitle={transition.outgoing?.title}
+            // Outgoing-titel: de OUDE entry's eigen titel. Viel die leeg (een
+            // subpagina zonder NavStackMeta), val dan tijdens de transitie óók
+            // terug op de nav-config-resolver via de OUDE pathname — anders zou
+            // de outgoing-TopBar de fallback van de NIEUWE top-entry pakken.
+            // Alleen voor 'simple'-subpagina's; tab-roots ('rich') blijven leeg.
+            entryTitle={
+              transition.outgoing?.title ||
+              (transition.outgoing?.topBar?.kind === 'simple'
+                ? resolveRouteTitle(transition.outgoing?.pathname ?? '') ?? ''
+                : '')
+            }
             bottomBar={transition.outgoing?.bottomBar}
             topBarActions={topBarActions}
             // Outgoing toont back-knop alsof het nog op zijn diepte zat —

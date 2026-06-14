@@ -1,28 +1,35 @@
+'use client'
+
 /**
  * ToekomstNavCards — de vier navigatiekaarten bovenaan de /toekomst-landing.
  *
- * Visueel 1-op-1 gespiegeld op de vier-hefbomen-rij van /overzicht
- * (components/overview/overzicht-hero/hefbomen-nav.tsx → HefbomenNav):
+ * Visueel én functioneel 1-op-1 gespiegeld op de vier-hefbomen-rij van
+ * /overzicht (components/overview/overzicht-hero/hefbomen-nav.tsx → HefbomenNav)
+ * door dezelfde gedeelde shell te HERGEBRUIKEN (components/overview/
+ * leverage-card.tsx → LeverageCard):
  *  - grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3
  *  - per kaart: rounded-2xl border bg-[var(--paper)] p-3 sm:p-4
  *  - status-dot rechtsboven (emerald/amber/red/stone — dezelfde semantiek
  *    als LEVERAGE_STATUS_DOT)
- *  - icoon in getinte box, label, grote KPI (font-serif tabular-nums),
- *    gekleurde status-substext
+ *  - icoon in getinte box (horizon-accent), label, grote KPI
+ *    (font-serif tabular-nums), gekleurde status-substext
+ *  - chevron-toggle rechtsonder die een drilldown-detailpaneel uitklapt
+ *    (net als HefbomenNav). De hele kaart blijft een <Link> naar de subpagina;
+ *    alleen de chevron-<button> toggelt het paneel (navigeert niet).
  *
- * In tegenstelling tot HefbomenNav GÉÉN chevron-drilldown: de hele kaart is
- * een <Link> naar de respectievelijke subpagina (de "detail" is de subpagina).
- *
- * Server component (geen 'use client', geen hooks). De KPI + status worden
- * uit props afgeleid via pure helper-functies (geëxporteerd voor tests).
+ * Client component met accordeon-state (één kaart open per keer), net als
+ * HefbomenNav. Alle props zijn plain serializable data (server → client). De
+ * KPI + status + drilldown-inhoud worden uit props afgeleid via pure helpers
+ * (geëxporteerd voor tests) — geen nieuwe data-fetch of berekening.
  */
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { Target, CalendarClock, SlidersHorizontal, Calculator } from 'lucide-react'
+import { ArrowRight, Target, CalendarClock, SlidersHorizontal, Calculator } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { LeverageCard } from '@/components/overview/leverage-card'
 import {
-  LEVERAGE_STATUS_DOT,
-  LEVERAGE_STATUS_LABEL,
+  leverageStatusBgClass,
   leverageStatusTextClass,
   type LeverageStatus,
 } from '@/lib/leverage-status'
@@ -47,6 +54,23 @@ export type GoalProgress = {
   eta: string | null
 }
 
+/**
+ * Drilldown-detail per kaart — getoond in het uitklap-paneel (chevron).
+ * Analoog aan HefboomDetailCard op /overzicht: een uppercase label, een
+ * mono tabular-nums value, een korte tip en een action-link. Alle waarden
+ * zijn al uit de bestaande props afgeleid — geen extra data.
+ */
+type NavCardDetail = {
+  /** Uppercase label-regel (bv. 'OP KOERS'). */
+  detailLabel: string
+  /** Mono tabular value-regel rechts van het label. */
+  value: string
+  /** Korte tip-zin. */
+  tip: string
+  /** Tekst van de action-link. */
+  actionLabel: string
+}
+
 /** Afgeleide weergave per kaart. */
 type NavCard = {
   key: string
@@ -58,6 +82,7 @@ type NavCard = {
   kpi: string
   status: LeverageStatus
   subText: string | null
+  detail: NavCardDetail
 }
 
 // ── Helpers (pure, geëxporteerd voor tests) ────────────────────────────
@@ -178,6 +203,7 @@ export function buildNavCards({
 }): NavCard[] {
   // Doelen — enige kaart met een betekenisvolle kleur-status.
   const doelen = deriveDoelenStatus(goals, goalProgresses)
+  const onTrackCount = doelen.activeCount - doelen.attentionCount
   const doelenSubText =
     doelen.activeCount === 0
       ? 'Stel je eerste doel in'
@@ -207,6 +233,18 @@ export function buildNavCards({
       kpi: countKpi(doelen.activeCount, 'doel', 'doelen'),
       status: doelen.status,
       subText: doelenSubText,
+      detail: {
+        detailLabel: 'Op koers',
+        value:
+          doelen.activeCount === 0 ? '—' : `${onTrackCount}/${doelen.activeCount}`,
+        tip:
+          doelen.activeCount === 0
+            ? 'Nog geen actieve doelen — bepaal waar je vrijheid voor opbouwt.'
+            : doelen.attentionCount > 0
+              ? `${doelen.attentionCount} ${doelen.attentionCount === 1 ? 'doel loopt' : 'doelen lopen'} achter op schema.`
+              : 'Al je actieve doelen liggen op koers.',
+        actionLabel: 'Beheer doelen',
+      },
     },
     {
       key: 'gebeurtenissen',
@@ -217,6 +255,12 @@ export function buildNavCards({
       kpi: countKpi(eventCount, 'gebeurtenis', 'gebeurtenissen'),
       status: 'neutral',
       subText: next ?? 'Nog niets gepland',
+      detail: {
+        detailLabel: 'Gepland',
+        value: countKpi(eventCount, 'gebeurtenis', 'gebeurtenissen'),
+        tip: next ?? 'Plan je eerste gebeurtenis in op de tijdas.',
+        actionLabel: 'Bekijk tijdas',
+      },
     },
     {
       key: 'voorkeuren',
@@ -227,6 +271,12 @@ export function buildNavCards({
       kpi: strategy.name,
       status: 'neutral',
       subText: `${withdrawalName} · SWR ${formatPct(fireParams.effectiveSwr)}`,
+      detail: {
+        detailLabel: 'Onttrekking',
+        value: withdrawalName,
+        tip: `${strategy.name} · rendement ${formatPct(fireParams.grossReturn)} · inflatie ${formatPct(fireParams.inflationRate)}`,
+        actionLabel: 'Pas voorkeuren aan',
+      },
     },
     {
       key: 'rekenhulp',
@@ -237,6 +287,15 @@ export function buildNavCards({
       kpi: countKpi(calcCount, 'rekenhulp', 'rekenhulpen'),
       status: 'neutral',
       subText: calcCount > 0 ? 'Nieuwe met Will' : 'Nog geen rekenhulpen',
+      detail: {
+        detailLabel: 'Eigen rekenhulpen',
+        value: countKpi(calcCount, 'rekenhulp', 'rekenhulpen'),
+        tip:
+          calcCount > 0
+            ? 'Will houdt je rekenhulpen bij en maakt er nieuwe.'
+            : 'Nog geen rekenhulpen — begin er één met Will.',
+        actionLabel: 'Open rekenhulpen',
+      },
     },
   ]
 }
@@ -254,47 +313,77 @@ export function ToekomstNavCards(props: {
 }) {
   const cards = buildNavCards(props)
 
+  // Eén kaart-expand per keer — open/dicht via chevron. Accordeon-state leeft
+  // in de parent, exact zoals HefbomenNav LeverageCard aanstuurt.
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+
   return (
     <nav
       aria-label="Toekomst-navigatie"
       className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3"
     >
       {cards.map((card) => {
-        const { key, label, href, Icon, tint, kpi, status, subText } = card
+        const { key, label, href, Icon, tint, kpi, status, subText, detail } = card
+        const expanded = expandedKey === key
         return (
-          <Link
+          <LeverageCard
             key={key}
+            Icon={Icon}
+            tint={tint}
+            label={label}
+            kpi={kpi}
+            status={status}
+            subText={subText}
             href={href}
-            className="group relative flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 transition-all hover:border-[var(--ink-3)] hover:shadow-sm"
+            expandable
+            expanded={expanded}
+            onToggleExpand={() => setExpandedKey(expanded ? null : key)}
           >
-            <span
-              className={`absolute right-2.5 top-2.5 sm:right-3 sm:top-3 w-2 h-2 rounded-full ${LEVERAGE_STATUS_DOT[status]}`}
-              aria-hidden="true"
-              title={LEVERAGE_STATUS_LABEL[status]}
-            />
-            <div
-              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${tint}`}
-            >
-              <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-            <div className="mt-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
-              {label}
-            </div>
-            <div className="mt-0.5 text-base sm:text-lg font-serif font-semibold text-[var(--ink)] tabular-nums">
-              {kpi}
-            </div>
-            <div className="mt-1 flex items-end justify-between gap-2 min-h-[16px]">
-              {subText ? (
-                <span className={`text-[11px] font-medium ${leverageStatusTextClass(status)}`}>
-                  {subText}
-                </span>
-              ) : (
-                <span />
-              )}
-            </div>
-          </Link>
+            <NavDrilldownCard detail={detail} status={status} href={href} />
+          </LeverageCard>
         )
       })}
     </nav>
+  )
+}
+
+/**
+ * Drilldown-detail-content per navigatiekaart. Analoog aan HefboomDetailCard
+ * op /overzicht: uppercase label + mono tabular value, een korte tip-zin en
+ * een deep-link naar de subpagina. Tekst-/achtergrondkleur volgt de status
+ * (groen/oranje/rood/neutraal) via dezelfde gedeelde helpers.
+ */
+function NavDrilldownCard({
+  detail,
+  status,
+  href,
+}: {
+  detail: NavCardDetail
+  status: LeverageStatus
+  href: string
+}) {
+  return (
+    <div
+      className={`mt-2 -mx-3 sm:-mx-4 px-3 sm:px-4 py-3 border-t border-[var(--border-ed)] ${leverageStatusBgClass(status)}`}
+    >
+      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+        <span className="text-[10px] uppercase tracking-[0.1em] font-semibold text-[var(--ink-3)]">
+          {detail.detailLabel}
+        </span>
+        <span className={`text-[11px] font-mono tabular-nums font-semibold ${leverageStatusTextClass(status)}`}>
+          {detail.value}
+        </span>
+      </div>
+      <p className={`text-xs leading-snug ${leverageStatusTextClass(status)}`}>
+        {detail.tip}
+      </p>
+      <Link
+        href={href}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--ink-2)] hover:text-[var(--ink)] hover:underline"
+      >
+        {detail.actionLabel}
+        <ArrowRight className="w-3 h-3" aria-hidden="true" />
+      </Link>
+    </div>
   )
 }

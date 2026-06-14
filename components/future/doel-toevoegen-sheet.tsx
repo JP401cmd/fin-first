@@ -209,7 +209,7 @@ export function DoelToevoegenSheet() {
           role="dialog"
           aria-label="Doel toevoegen"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4"
           onClick={() => {
             setOpen(false)
             reset()

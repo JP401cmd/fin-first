@@ -1,3 +1,4 @@
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { BerichtenClient } from '@/components/berichten/berichten-client'
 
 // Berichtencentrum — alle meldingen die de gebruiker ontvangt, op één plek.
@@ -5,5 +6,14 @@ import { BerichtenClient } from '@/components/berichten/berichten-client'
 // komt client-side uit de NotificationProvider + de 30-daagse history-fetch,
 // dus deze pagina hoeft geen server-data te laden.
 export default function BerichtenPage() {
-  return <BerichtenClient />
+  return (
+    <>
+      {/* /berichten is een globale hoofd-bestemming (tab 'other') → 'rich'
+          TopBar zodat de mobiele utility-cluster (kompas + privacy + nieuws +
+          meldingen + account) zichtbaar blijft. Zonder expliciete topBar kiest
+          de pathname-watcher 'simple' (geen cluster). */}
+      <NavStackMeta title="Berichten" topBar={{ kind: 'rich' }} />
+      <BerichtenClient />
+    </>
+  )
 }

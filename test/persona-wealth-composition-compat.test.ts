@@ -13,6 +13,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { PERSONAS, type PersonaKey, PERSONA_KEYS } from '@/lib/test-personas'
+import { hasPartner } from '@/lib/household-type'
 import {
   projectWealthComposition,
   unifiedRowsToStackedRows,
@@ -212,7 +213,9 @@ function buildUnifiedInputFromPersona(key: PersonaKey): UnifiedProjectionInput {
     },
     withdrawalStrategy: { strategy: 'static', guardrailFloor: 0.8, guardrailCeiling: 1.2, guardrailCutStep: 0.1, guardrailRaiseStep: 0.1 },
     forcedFireAge: profile.fire_end_strategy === 'pensioen' ? 67 : undefined,
-    hasPartner: profile.household_type === 'samenwonend' || profile.household_type === 'getrouwd',
+    // Canonieke afleiding (zelfde helper als de source-engines). Personas
+    // gebruiken 'solo'/'samen'/'gezin'.
+    hasPartner: hasPartner(profile.household_type),
   }
 }
 

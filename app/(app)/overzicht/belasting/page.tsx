@@ -5,12 +5,11 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import {
   BelastingBoxCards,
   type BelastingBoxCard,
-  type BelastingBoxStatus,
 } from '@/components/overview/belasting-box-cards'
-import { computeJaarruimte } from '@/lib/jaarruimte'
+import { computeJaarruimte, box1JaarruimteStatus } from '@/lib/jaarruimte'
 import { dailyExpenseRate } from '@/lib/format'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
-import { pillarStatus } from '@/lib/leverage-status'
+import { computeBox3TaxableInput, box3TaxStatus } from '@/lib/box3-taxable-input'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { getServerPerspective } from '@/lib/household/server-perspective'
@@ -107,6 +106,16 @@ export default async function OverzichtBelastingPage() {
   } = await supabase.auth.getUser()
   const hasAanmerkelijkBelang = user ? await hasBox2Relevance(supabase, user.id) : false
 
+  // Huishoudtype voor de Box 3-statushelper: exact dezelfde bron (rauwe
+  // profiles.household_type, vocabulaire 'solo'|'samen'|'gezin') die de sidebar-
+  // layout aan computeLeverScores/box3TaxStatus voert, zodat de partner-detectie
+  // — en dus de Box 3-status — 1-op-1 matcht met de sidebar-dot.
+  const householdTypeRes = user
+    ? await supabase.from('profiles').select('household_type').eq('id', user.id).maybeSingle()
+    : null
+  const householdType =
+    (householdTypeRes?.data?.household_type as string | undefined) ?? undefined
+
   // Dag-uitgaven voor de vrijheidstijd-omrekening (canonieke jaar/365-dagbasis
   // via dailyExpenseRate). Fallback op €100/dag zodat de vrijheidstijd nooit
   // door nul deelt.
@@ -118,33 +127,42 @@ export default async function OverzichtBelastingPage() {
   // en voeden dat aan de pure Box 1-engine (`computeBox1Tax`) voor een
   // accuratere heffing dan een platte bruto × marginaal — voldoende voor de
   // KPI-tegel, niet voor aangifte.
-  let box1Tax: number | null = null
-  let grossYearly = 0
+  // Box 1-status + bruto jaarinkomen via de gedeelde helper (box1JaarruimteStatus)
+  // — dezelfde bron die de sidebar-Box-1-dot in app/(app)/layout.tsx leest, zodat
+  // kaart-status == sidebar-status. De helper leidt grossYearly af uit
+  // netto-maandinkomen / (1 − marginaal); we hergebruiken die grossYearly voor de
+  // KPI-heffing (computeBox1Tax) zodat er geen tweede afleiding ontstaat.
   const netMonthly = horizonData.effectiveInput?.monthlyIncome ?? 0
   const marg = horizonData.fireParams?.marginaalTarief ?? 0.3697
-  if (netMonthly > 0 && marg > 0 && marg < 1) {
-    grossYearly = (netMonthly * 12) / (1 - marg)
+  const { status: box1Status, grossYearly } = box1JaarruimteStatus({
+    netMonthly,
+    marginaalTarief: marg,
+  })
+  let box1Tax: number | null = null
+  if (grossYearly > 0) {
     const box1 = computeBox1Tax({ grossYearlyIncome: grossYearly, year: 2026, dailyExpenses })
     box1Tax = Math.round(box1.tax)
   }
 
-  // Box 1-status uit onbenutte jaarruimte: een onbenutte ruimte is een
-  // belastingbesparingskans → amber ("aandacht"); volledig benut → groen.
+  // Jaarruimte-detail voor de hub-secties hieronder (besparing C4).
   const jaarruimte = computeJaarruimte(grossYearly, 0)
-  const box1Status: BelastingBoxStatus = !jaarruimte.hasData
-    ? 'neutral'
-    : jaarruimte.jaarruimte > 0
-      ? 'warn'
-      : 'good'
   const box1StatusText = !jaarruimte.hasData
     ? 'Inkomen onbekend'
     : jaarruimte.jaarruimte > 0
       ? 'Onbenutte jaarruimte'
       : 'Ruimte benut'
 
-  // Box 3-status uit de tax_optimization-pillar (gedeeld met de hefbomen-rij).
-  const taxPillar = horizonData.healthScore?.pillars.find((p) => p.id === 'tax_optimization')
-  const box3Status = pillarStatus(taxPillar?.score)
+  // Box 3-status uit de canonieke tax-lever-bron (box3-taxable-input.ts) —
+  // dezelfde helper die de sidebar-Box-3-dot voedt, zodat kaart == sidebar.
+  // De vorige bron (gezondheids-pillar 'tax_optimization') is verwijderd in
+  // ADR 0010 → die find() gaf altijd undefined → status ALTIJD 'neutral'. Nu
+  // toont de kaart een echt signaal: box3-belast vermogen boven de vrijstelling.
+  const box3TaxableInput = computeBox3TaxableInput(
+    horizonData.assets,
+    horizonData.debts,
+    householdType,
+  )
+  const box3Status = box3TaxStatus(box3TaxableInput)
   const box3StatusText =
     box3Status === 'good'
       ? 'Geen actie nodig'

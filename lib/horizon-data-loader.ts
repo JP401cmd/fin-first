@@ -36,6 +36,7 @@ import {
 import { resolveHousingEventsForSim, type HousingTriggerSimBasis } from '@/lib/housing-trigger'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { NL_AOW_AGE } from '@/lib/constants'
+import { hasPartner } from '@/lib/household-type'
 import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
 import { resolvePotRules, type PotRulesConfig } from '@/lib/pot-rules'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
@@ -233,7 +234,7 @@ export async function loadHorizonData(
     // duplicate pair on the same table.
     supabase.from('assets').select('*').eq('is_active', true).limit(500),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
@@ -632,7 +633,9 @@ export async function loadHorizonData(
   // actuele client-parameters; deze server-set is de initiële weergave.
   const currentAgeForHousing = dob ? ageAtDate(dob) : 40
   const housingHouseholdType = String((profile as Record<string, unknown>).household_type ?? 'solo')
-  const housingHasPartner = housingHouseholdType === 'samenwonend' || housingHouseholdType === 'getrouwd'
+  // Bug-fix: voorheen tegen de verouderde woordenschat ('samenwonend'/'getrouwd')
+  // die household_type nooit is → altijd false. Nu via canonieke helper.
+  const housingHasPartner = hasPartner(housingHouseholdType)
   // Annual savings: zelfde bron als de client-sim (override > cashflow-
   // spaarquote > asset-contributies), zodat het trigger-moment overeenkomt.
   const housingOverrideRaw = savingsOverrideResult.error
@@ -690,10 +693,12 @@ export async function loadHorizonData(
   // Cumulative impacts
   const impacts = computeCumulativeImpacts(effectiveInput, loadedEvents)
 
-  // Derive box3Method from fireParams and hasPartner from household_type
+  // Derive box3Method from fireParams and hasPartner from household_type.
+  // Bug-fix: voorheen tegen de verouderde woordenschat ('samenwonend'/'getrouwd')
+  // die household_type nooit is → altijd false. Nu via canonieke helper.
   const box3Method = fireParams.box3Method
   const householdType = String((profile as Record<string, unknown>).household_type ?? 'solo')
-  const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
+  const hasPartnerFlag = hasPartner(householdType)
   const potRules = resolvePotRules(profile as { pot_rules?: unknown })
   const numberOfChildren = Number((profile as Record<string, unknown>).number_of_children ?? 0)
 
@@ -739,7 +744,7 @@ export async function loadHorizonData(
     budgetingActive,
     assets,
     box3Method,
-    hasPartner,
+    hasPartner: hasPartnerFlag,
     horizonEngineV2,
     potRules,
     profileError: profileResult.error

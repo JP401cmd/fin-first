@@ -1129,7 +1129,7 @@ export function CashOverview({
       {/* === Nested account detail modal (embedded mode) === */}
       {embedded && detailAccountId && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setDetailAccountId(null) }}
         >
           <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[var(--r-lg)] bg-[var(--paper)] shadow-2xl">

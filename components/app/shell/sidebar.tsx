@@ -56,7 +56,10 @@ import {
 } from '@/lib/leverage-status'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { useNewsUnread } from '@/lib/hooks/use-news-unread'
-import { useVasteLastenUnconfirmed } from '@/lib/hooks/use-vaste-lasten-unconfirmed'
+import {
+  useCashflowCardStatuses,
+  type CashflowCardStatuses,
+} from '@/lib/hooks/use-cashflow-card-statuses'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
@@ -812,16 +815,17 @@ function FreshnessDot({ active, label }: { active: boolean; label: string }) {
 /** Surface-specifieke labels (actief/inactief) per freshness-dot. */
 type FreshnessLabels = { on: string; off: string }
 
-// Cashflow-children (SubTagStrip), gemapt op child-href.
-const CASHFLOW_FRESHNESS: Record<string, { key: 'budgetOver' | 'uncategorizedTx'; labels: FreshnessLabels }> = {
-  '/overzicht/cashflow/budget': {
-    key: 'budgetOver',
-    labels: { on: 'Budget overschreden', off: 'Budgetten op schema' },
-  },
-  '/overzicht/cashflow/transacties': {
-    key: 'uncategorizedTx',
-    labels: { on: 'Ongecategoriseerde transacties', off: 'Alles gecategoriseerd' },
-  },
+// Cashflow-children (SubTagStrip): status-mirror i.p.v. freshness. Elke child-
+// href mapt op een sleutel in CashflowCardStatuses, gevuld door
+// `useCashflowCardStatuses()` (→ /api/overzicht/cashflow-status →
+// buildCashflowCards). Hierdoor toont elke dot EXACT dezelfde LeverageStatus als
+// de bijbehorende cashflow-landingskaart (Budget/Transacties/Vaste lasten/
+// Forecast) — één bron, geen drift.
+const CASHFLOW_STATUS_BY_HREF: Record<string, keyof CashflowCardStatuses> = {
+  '/overzicht/cashflow/budget': 'budget',
+  '/overzicht/cashflow/transacties': 'transacties',
+  '/overzicht/cashflow/vaste-lasten': 'vasteLasten',
+  '/overzicht/cashflow/forecast': 'forecast',
 }
 
 // Belasting-children (status-mirror), gemapt op child-href → belasting-key.
@@ -870,6 +874,10 @@ function SubTagStrip({
   sidebarSignals?: SidebarSignals
 }) {
   const pathname = usePathname() ?? '/'
+  // Cashflow-kaartstatussen: één hook-call op strip-niveau (Rules of Hooks),
+  // gedeeld door alle vier cashflow-children. De hook is lazy — fetcht alleen op
+  // een /overzicht/cashflow*-route en retourneert anders neutrale statussen.
+  const cashflowStatuses = useCashflowCardStatuses()
   // Dimmed-state op non-active modules: een toon lichter zodat de actieve
   // module visueel blijft dominen, maar de sub-pages wel scanbaar zijn.
   const baseColorClass = dimmed ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
@@ -916,6 +924,7 @@ function SubTagStrip({
                     active={isOnTag(child.href)}
                     linkHoverClass={linkHoverClass}
                     sidebarSignals={sidebarSignals}
+                    cashflowStatuses={cashflowStatuses}
                   />
                 ))}
               </div>
@@ -929,49 +938,39 @@ function SubTagStrip({
 
 /**
  * Eén child-rij in SubTagStrip (derde niveau, bv. Box 1/2/3 onder Belasting of
- * Budget/Transacties/Vaste lasten/Forecast onder Cashflow). Krijgt een
- * trailing status-dot:
- *  - Belasting Box 1/2/3 → status-mirror (LEVERAGE_STATUS_DOT).
- *  - Cashflow Budget/Transacties → binaire freshness uit sidebarSignals.
- *  - Cashflow Vaste lasten → binaire freshness via client-hook (lazy: rendert
- *    alleen op cashflow-routes).
- *  - Cashflow Forecast → altijd grijze freshness-dot (afgeleid, geen signaal).
- * Eigen component zodat de Vaste-lasten-hook per-rij legaal kan draaien.
+ * Budget/Transacties/Vaste lasten/Forecast onder Cashflow). Krijgt een trailing
+ * 4-kleuren status-mirror-dot (LEVERAGE_STATUS_DOT), die EXACT dezelfde
+ * LeverageStatus toont als de bijbehorende landingskaart:
+ *  - Belasting Box 1/2/3 → `sidebarSignals.belasting[boxN]` (server-berekend,
+ *    gedeelde helpers met de Belasting-kaart).
+ *  - Cashflow Budget/Transacties/Vaste lasten/Forecast → `cashflowStatuses[key]`
+ *    (client-hook → /api/overzicht/cashflow-status → buildCashflowCards, exact
+ *    dezelfde bron als de cashflow-kaarten).
+ *
+ * Geen freshness-dots meer op deze twee surfaces: de gebruiker vroeg dat de
+ * sidebar-dots de KAART-statussen spiegelen, dus beide zijn nu status-mirrors.
  */
 function SubTagChild({
   child,
   active,
   linkHoverClass,
   sidebarSignals,
+  cashflowStatuses,
 }: {
   child: SubTag
   active: boolean
   linkHoverClass: string
   sidebarSignals?: SidebarSignals
+  cashflowStatuses: CashflowCardStatuses
 }) {
   const belastingBox = BELASTING_BOX_BY_HREF[child.href]
-  const cashflow = CASHFLOW_FRESHNESS[child.href]
-  const isVasteLasten = child.href === '/overzicht/cashflow/vaste-lasten'
-  const isForecast = child.href === '/overzicht/cashflow/forecast'
-
-  // Vaste lasten heeft een eigen client-signaal (fetch). We isoleren dat in een
-  // eigen component zodat de hook ALLEEN op die ene rij draait — de overige
-  // children (Box 1/2/3, Budget, Transacties, Forecast) triggeren géén fetch.
-  if (isVasteLasten) {
-    return <VasteLastenChild child={child} active={active} linkHoverClass={linkHoverClass} />
-  }
+  const cashflowKey = CASHFLOW_STATUS_BY_HREF[child.href]
 
   let dot: React.ReactNode = null
   if (belastingBox) {
-    // Status-mirror dot (meerkleurig). Default 'neutral' wanneer geen signaal.
+    // Belasting-status-mirror. Default 'neutral' wanneer geen signaal.
     const status: LeverageStatus = sidebarSignals?.belasting[belastingBox] ?? 'neutral'
-    // Box 3 gets a clarifier: de score is een globale belastingbenadering,
-    // geen box3-specifiek oordeel. Box 1 en 2 tonen het label zonder toevoeging.
-    const statusLabel = LEVERAGE_STATUS_LABEL[status]
-    const dotLabel =
-      belastingBox === 'box3'
-        ? `${child.label}: ${statusLabel} (globale belastingscore)`
-        : `${child.label}: ${statusLabel}`
+    const dotLabel = `${child.label}: ${LEVERAGE_STATUS_LABEL[status]}`
     dot = (
       <span
         className={`w-1.5 h-1.5 rounded-full shrink-0 ${LEVERAGE_STATUS_DOT[status]}`}
@@ -979,17 +978,23 @@ function SubTagChild({
         title={dotLabel}
       />
     )
-  } else if (cashflow) {
-    const on = sidebarSignals?.[cashflow.key] ?? false
-    dot = <FreshnessDot active={on} label={on ? cashflow.labels.on : cashflow.labels.off} />
-  } else if (isForecast) {
-    dot = <FreshnessDot active={false} label="Prognose — geen directe acties" />
+  } else if (cashflowKey) {
+    // Cashflow-status-mirror — exact de kaart-status (zie use-cashflow-card-statuses).
+    const status: LeverageStatus = cashflowStatuses[cashflowKey]
+    const dotLabel = `${child.label}: ${LEVERAGE_STATUS_LABEL[status]}`
+    dot = (
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${LEVERAGE_STATUS_DOT[status]}`}
+        aria-label={dotLabel}
+        title={dotLabel}
+      />
+    )
   }
 
   return <SubTagChildLink child={child} active={active} linkHoverClass={linkHoverClass} dot={dot} />
 }
 
-/** Gedeelde child-link-markup zodat dot-bron (signal vs hook) los staat van layout. */
+/** Gedeelde child-link-markup zodat dot-bron los staat van layout. */
 function SubTagChildLink({
   child,
   active,
@@ -1015,32 +1020,6 @@ function SubTagChildLink({
   )
 }
 
-/** Vaste-lasten-rij — eigen component zodat de fetch-hook alleen hier draait. */
-function VasteLastenChild({
-  child,
-  active,
-  linkHoverClass,
-}: {
-  child: SubTag
-  active: boolean
-  linkHoverClass: string
-}) {
-  const unconfirmed = useVasteLastenUnconfirmed()
-  return (
-    <SubTagChildLink
-      child={child}
-      active={active}
-      linkHoverClass={linkHoverClass}
-      dot={
-        <FreshnessDot
-          active={unconfirmed}
-          label={unconfirmed ? 'Nieuwe vaste last gedetecteerd' : 'Geen nieuwe vaste lasten'}
-        />
-      }
-    />
-  )
-}
-
 /**
  * Apps-strip onder de categorie-tags. Visueel ondergeschikt: kleine mono-kicker
  * "apps" + dezelfde middle-dot-separator als SubTagStrip, maar lichter ink
@@ -1056,6 +1035,10 @@ function AppTagStrip({
   dimmed?: boolean
   sidebarSignals?: SidebarSignals
 }) {
+  // Actieve route vergelijken op pathname-only (negeer ?tab= query-strings).
+  // usePathname() vóór de early-return zodat de hook-volgorde stabiel blijft
+  // (react-hooks/rules-of-hooks).
+  const pathname = usePathname() ?? '/'
   if (apps.length === 0) return null
   // Op non-active modules toont de strip wel apps maar in een lichtere ink,
   // zodat de actieve module visueel blijft domineren. Kicker-streep gebruikt
@@ -1063,8 +1046,6 @@ function AppTagStrip({
   const bodyColorClass = dimmed ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
   const linkHoverClass = dimmed ? 'hover:text-[var(--ink-2)]' : 'hover:text-[var(--ink)]'
   const stripeColor = dimmed ? 'var(--rule-soft, var(--border-ed))' : 'var(--module-active-500)'
-  // Actieve route vergelijken op pathname-only (negeer ?tab= query-strings).
-  const pathname = usePathname() ?? '/'
   const isAppActive = (href: string) => {
     // href kan een query-string bevatten (bv. /overzicht?tab=budgetteren) —
     // vergelijk uitsluitend het pad-deel zodat de rij correct highlight.

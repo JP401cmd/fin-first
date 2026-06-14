@@ -156,3 +156,90 @@ export const globalNav: GlobalNavItem[] = [
   { label: 'Vraag Will', icon: MessageCircle, action: 'open-chat' },
   { label: 'Account', icon: Settings, action: 'open-account' },
 ]
+
+/**
+ * Canonieke subpagina-titels die NIET in de nav-structuur (mainNav/navGroups/
+ * OVERVIEW_APP_SUBROUTES/globalNav) staan, maar wél een eigen route + pagina
+ * hebben. Bron voor de mobiele TopBar-titel-fallback (`resolveRouteTitle`).
+ *
+ * Elke route hieronder is geverifieerd tegen `app/(app)/<route>/page.tsx`.
+ * Dynamische routes (bv. /toekomst/bibliotheek/[id]) horen hier bewust NIET:
+ * die hebben een runtime-afhankelijke titel en leveren die via <NavStackMeta>.
+ */
+export const EXTRA_ROUTE_TITLES: Record<string, string> = {
+  '/toekomst/strategie': 'Strategie',
+  '/toekomst/bibliotheek': 'Rekenhulp-bibliotheek',
+  '/toekomst/inflatie-koopkracht': 'Inflatie & koopkracht',
+  '/toekomst/samengestelde-interest': 'Samengestelde interest',
+  '/toekomst/uitgaven-na-pensioen': 'Uitgaven na pensioen',
+  '/mijn/checkins': 'Check-ins',
+  '/mijn/feedback': 'Feedback',
+}
+
+/**
+ * Strip querystring + hash + trailing slash van een pathname zodat de
+ * exact-match-lookup robuust blijft tegen URL-varianten.
+ */
+function normalizePathname(pathname: string): string {
+  let p = pathname.split('?')[0]!.split('#')[0]!
+  if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1)
+  return p
+}
+
+/**
+ * Bouw één keer een exact-match map `href → label` uit alle nav-bronnen.
+ * Module-lazy gemaakt zodat we niet bij elke lookup opnieuw bouwen.
+ */
+let routeTitleMap: Map<string, string> | null = null
+
+function buildRouteTitleMap(): Map<string, string> {
+  const map = new Map<string, string>()
+
+  const add = (href: string | undefined, label: string) => {
+    if (!href) return
+    const key = normalizePathname(href)
+    // Eerste winnaar behouden — mainNav/navGroups gaan vóór EXTRA's.
+    if (!map.has(key)) map.set(key, label)
+  }
+
+  // Hoofdpagina's. Bewust óók opgenomen voor volledigheid; de TopBar vult
+  // alleen op `simple`-subpagina's een fallback in, dus tab-roots blijven leeg.
+  for (const item of mainNav) add(item.href, item.label)
+
+  // Alle subroutes onder elke hoofdpagina, inclusief geneste children (Box 1/2/3).
+  for (const group of navGroups) {
+    for (const item of group.items) {
+      add(item.href, item.label)
+      if (item.children) {
+        for (const child of item.children) add(child.href, child.label)
+      }
+    }
+  }
+
+  // Deep-app-tools — strip querystring uit hun href (zie OVERVIEW_APP_SUBROUTES).
+  for (const item of OVERVIEW_APP_SUBROUTES) add(item.href, item.label)
+
+  // Globale items met een echte route (Krant/Berichten); action-items overslaan.
+  for (const item of globalNav) add(item.href, item.label)
+
+  // Canonieke extra-routes buiten de nav-structuur.
+  for (const [href, label] of Object.entries(EXTRA_ROUTE_TITLES)) add(href, label)
+
+  return map
+}
+
+/**
+ * Resolve de paginatitel voor een route via exact-match tegen de nav-config
+ * (single source). Gebruikt door de mobiele TopBar als fallback wanneer een
+ * subpagina geen `<NavStackMeta title>` registreert.
+ *
+ * - EXACT-match (geen prefix-magie): dynamische routes worden bewust via
+ *   <NavStackMeta> afgehandeld, niet hier.
+ * - Querystring/hash/trailing-slash worden genormaliseerd vóór de lookup.
+ * - Retourneert `null` als er geen match is.
+ */
+export function resolveRouteTitle(pathname: string): string | null {
+  if (!pathname) return null
+  if (!routeTitleMap) routeTitleMap = buildRouteTitleMap()
+  return routeTitleMap.get(normalizePathname(pathname)) ?? null
+}

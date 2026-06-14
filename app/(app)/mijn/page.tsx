@@ -25,7 +25,11 @@ export const metadata: Metadata = {
 export default function MijnPage() {
   return (
     <>
-      <NavStackMeta title="Mijn" bottomBar={{ kind: 'tabs' }} />
+      {/* /mijn is een tab-root → 'rich' TopBar zodat de mobiele utility-cluster
+          (kompas + privacy + nieuws + meldingen + account) zichtbaar blijft.
+          Zonder expliciete topBar valt NavStackMeta terug op 'simple' en zou
+          de cluster verdwijnen (zie nav-stack-meta.tsx DEFAULT_TOP_BAR). */}
+      <NavStackMeta title="Mijn" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
       <MijnOverview />
     </>
   )

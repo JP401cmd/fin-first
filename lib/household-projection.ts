@@ -54,6 +54,7 @@ import { resolveFireParams } from '@/lib/fire-params'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { Box3Method } from '@/lib/bucket-projection'
 import { computeSharePct, type SplitMode } from '@/lib/household-data'
+import { hasPartner } from '@/lib/household-type'
 
 // ── Result types ────────────────────────────────────────────────────────────
 
@@ -778,7 +779,9 @@ export async function buildHouseholdProjectionInput(
     // FIRE-projectie.
     const fireParams = profile ? resolveFireParams(profile) : { grossReturn: DEFAULT_RETURN, inflationRate: INFLATION, effectiveSwr: HOUSEHOLD_SWR, box3Method: 'forfaitair' as Box3Method }
     const fireStrategy = profile ? resolveFireStrategyWithOverride(profile) : DEFAULT_FIRE_STRATEGY
-    const hasPartnerTax = (profile?.household_type === 'samenwonend' || profile?.household_type === 'getrouwd')
+    // Bug-fix: voorheen tegen de verouderde woordenschat ('samenwonend'/
+    // 'getrouwd') die household_type nooit is → altijd false. Nu via canonieke helper.
+    const hasPartnerTax = hasPartner(profile?.household_type)
     const strategyOpts = {
       strategy: (profile?.fire_end_strategy ?? undefined) as 'perpetual' | 'legacy' | 'deplete' | undefined,
       endAge: profile?.fire_end_age ?? undefined,

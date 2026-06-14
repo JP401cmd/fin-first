@@ -6,6 +6,8 @@
  * (e.g. lever-compass.tsx, responsive-shell.tsx).
  */
 
+import { box3TaxStatus } from '@/lib/box3-taxable-input'
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type LeverStatus = 'green' | 'amber' | 'red' | 'neutral'
@@ -250,10 +252,30 @@ export function computeLeverScores(input: {
     origDebt > 0 ? Math.round(((origDebt - input.totalDebts) / origDebt) * 100) :
     null
 
+  // Tax-status komt uit de gedeelde canonieke helper (box3-taxable-input.ts) —
+  // dezelfde bron die de Belasting-kaart (Box 3) en de sidebar-Box-3-dot lezen,
+  // zodat alle drie altijd dezelfde status tonen. De score (taxScore) blijft voor
+  // de tooltip/ring; de status komt single-sourced uit box3TaxStatus, gemapt van
+  // het LeverageStatus-vocabulaire (good/warn/bad) naar LeverStatus
+  // (green/amber/red) dat het kompas rendert.
+  const taxLeverageStatus = box3TaxStatus({
+    box3TaxableAboveThreshold: input.box3TaxableAboveThreshold,
+    hasBox3Assets: hasBox3,
+    householdType: input.householdType,
+  })
+  const taxStatus: LeverStatus =
+    taxLeverageStatus === 'good'
+      ? 'green'
+      : taxLeverageStatus === 'warn'
+        ? 'amber'
+        : taxLeverageStatus === 'bad'
+          ? 'red'
+          : 'neutral'
+
   return {
     assets: { score: assetScore, status: statusFromScore(assetScore), detail: assetDetail },
     debts: { score: debtScore, status: statusFromScore(debtScore), detail: debtDetail, progress: debtProgress },
     cashflow: { score: cashflowScore, status: statusFromScore(cashflowScore), detail: cashflowDetail },
-    tax: { score: taxScore, status: statusFromScore(taxScore), detail: taxDetail },
+    tax: { score: taxScore, status: taxStatus, detail: taxDetail },
   }
 }

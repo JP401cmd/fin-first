@@ -33,7 +33,6 @@ import {
   useHeroRailState,
 } from './hero-widget-rail'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { OnboardingNudges } from './onboarding-nudges'
 import { CompoundInsightCard } from './compound-insight-card'
 import { PrintOverzichtButton } from './print-overzicht-button'
 
@@ -79,14 +78,6 @@ type OverzichtHeroProps = {
   /** Geschat maandelijks spaarritme — back-cast voor ontbrekende
    *  historie-maanden in de mini-vermogen-grafiek. */
   monthlySavings?: number | null
-  /** Heeft de user een geboortejaar gezet? Voor onboarding-nudges. */
-  hasDob?: boolean
-  /** Heeft de user minimaal 1 actief asset of bank-account? */
-  hasAssets?: boolean
-  /** Heeft de user minimaal 1 doel? */
-  hasGoals?: boolean
-  /** Dagen sinds account-aanmaak — voor de briefing-nudge (≥ 7d trigger). */
-  accountAgeDays?: number
   /** Liquide cash op spaarrekeningen — voor compound-insight reveal. */
   liquidCash?: number
   /** Doelbedrag bij vrijheid uit de simulatie — toont op de chart als
@@ -162,10 +153,6 @@ export function OverzichtHero({
   dashboardData,
   activeWidgets,
   allWidgetPrefs,
-  hasDob,
-  hasAssets,
-  hasGoals,
-  accountAgeDays,
   liquidCash,
   hasCompletedHorizonSetup = true,
 }: OverzichtHeroProps) {
@@ -243,15 +230,6 @@ export function OverzichtHero({
           {`${greeting}${userName ? `, ${userName}` : ''}`}
         </EditorialHeadline>
       </header>
-
-      {(hasDob !== undefined || hasAssets !== undefined || hasGoals !== undefined) && (
-        <OnboardingNudges
-          hasDob={hasDob ?? false}
-          hasAssets={hasAssets ?? false}
-          hasGoals={hasGoals ?? false}
-          accountAgeDays={accountAgeDays ?? 0}
-        />
-      )}
 
       <HefbomenNav health={health} totals={totals} />
 

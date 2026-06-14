@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, fireEvent } from '@testing-library/react'
 import {
   ToekomstNavCards,
   deriveDoelenStatus,
@@ -17,9 +17,15 @@ import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
  * Tests voor ToekomstNavCards — de vier navigatiekaarten bovenaan de
  * /toekomst-landing (Doelen · Gebeurtenissen · Voorkeuren · Rekenhulp).
  *
- * ToekomstNavCards is een server-component zónder hooks (alle data komt via
- * props, KPI/status worden afgeleid door pure helpers). Geen next/navigation-
- * of supabase-mock nodig — alleen <Link> rendert naar een <a href>.
+ * ToekomstNavCards is een client-component met accordeon-state (useState; één
+ * kaart-drilldown open per keer). De data komt via props en KPI/status worden
+ * afgeleid door pure helpers; de kaart-shell wordt hergebruikt via LeverageCard
+ * (inclusief chevron-toggle + uitklap-paneel, identiek aan HefbomenNav).
+ *
+ * Geen next/navigation- of supabase-mock nodig — de heel-kaart-<Link> rendert
+ * naar een <a href> en de chevron is een <button>. Het drilldown-paneel (met
+ * action-link) wordt PAS gerenderd wanneer de kaart is uitgeklapt, dus
+ * standaard is er per kaart precies één anchor.
  */
 
 // ── Mock-fabrieken ──────────────────────────────────────────────────────
@@ -146,6 +152,53 @@ describe('ToekomstNavCards — kaarten & hrefs', () => {
     expect(cardByHref(container, '/toekomst/gebeurtenissen')).toBeTruthy()
     expect(cardByHref(container, '/toekomst/voorkeuren')).toBeTruthy()
     expect(cardByHref(container, '/toekomst/rekenhulp')).toBeTruthy()
+  })
+})
+
+// ── Chevron-drilldown (hergebruik LeverageCard-shell) ─────────────────────
+
+describe('ToekomstNavCards — chevron-drilldown', () => {
+  it('rendert per kaart een chevron-<button> met aria-expanded=false', () => {
+    renderCards()
+    // LeverageCard geeft de toggle een aria-label "Toon detail {label}".
+    const buttons = screen.getAllByRole('button', { name: /^Toon detail / })
+    expect(buttons.length).toBe(4)
+    buttons.forEach((b) => expect(b.getAttribute('aria-expanded')).toBe('false'))
+  })
+
+  it('toont standaard per kaart precies één anchor (geen drilldown-link vóór uitklappen)', () => {
+    const { container } = renderCards()
+    // 4 heel-kaart-Links, géén action-links → 4 anchors totaal.
+    expect(container.querySelectorAll('a').length).toBe(4)
+    expect(screen.queryByText('Beheer doelen')).toBeNull()
+  })
+
+  it('klikken op de chevron klapt het drilldown-paneel uit zonder te navigeren', () => {
+    const { container } = renderCards()
+    const toggle = screen.getByRole('button', { name: 'Toon detail Doelen' })
+    fireEvent.click(toggle)
+
+    // Tip + action-link van de Doelen-drilldown verschijnen nu.
+    expect(screen.getByText('Beheer doelen')).toBeTruthy()
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+
+    // De action-link wijst naar dezelfde subpagina (navigatie, geen toggle).
+    const actionLink = screen.getByText('Beheer doelen').closest('a')
+    expect(actionLink?.getAttribute('href')).toBe('/toekomst/doelen')
+
+    // Nu zijn er 5 anchors (4 kaarten + 1 uitgeklapte action-link).
+    expect(container.querySelectorAll('a').length).toBe(5)
+  })
+
+  it('opent maximaal één drilldown tegelijk (accordeon)', () => {
+    renderCards()
+    fireEvent.click(screen.getByRole('button', { name: 'Toon detail Doelen' }))
+    expect(screen.getByText('Beheer doelen')).toBeTruthy()
+
+    // Tweede kaart openen sluit de eerste.
+    fireEvent.click(screen.getByRole('button', { name: 'Toon detail Gebeurtenissen' }))
+    expect(screen.getByText('Bekijk tijdas')).toBeTruthy()
+    expect(screen.queryByText('Beheer doelen')).toBeNull()
   })
 })
 

@@ -64,6 +64,24 @@ const eslintConfig = defineConfig([
           message:
             "Gebruik lib/month-range.ts (localMonthBounds / localMonthStart / localMonthStartMonthsAgo) i.p.v. new Date(jaar, maand, …).toISOString() — die schuift de maandgrens in NL een dag terug.",
         },
+        // Huishoudtype-vocabulaire-vangrail (hasPartner-bug, jun 2026): verbied
+        // élke (in)gelijkheidsvergelijking van `household_type`/`householdType`
+        // met de DODE woordenschat 'samenwonend'/'getrouwd'. De canonieke waarden
+        // zijn 'solo'/'samen'/'gezin', dus zo'n vergelijking is ALTIJD false →
+        // partners werden als alleenstaand behandeld (te lage Box 3-vrijstelling,
+        // foute FIRE/gezondheid). Eén selector dekt beide vormen: de identifier
+        // `household_type`/`householdType` matcht zowel een losse variabele als de
+        // property van een member-access (profile.household_type). Bewust gescheiden
+        // van de AOW-`leefsituatie`-enum ('alleenstaand'|'samenwonend'), die WEL
+        // legitiem met 'samenwonend' vergelijkt en hier niet matcht (geen
+        // household_type-operand). Enige toegestane plek = lib/household-type.ts
+        // (gerichte eslint-disable).
+        {
+          selector:
+            'BinaryExpression[operator=/^[!=]==?$/]:has(Literal[value=/^(samenwonend|getrouwd)$/]):has(Identifier[name=/^household_?[Tt]ype$/])',
+          message:
+            "Gebruik hasPartner(...) uit lib/household-type.ts i.p.v. household_type/householdType te vergelijken met 'samenwonend'/'getrouwd' — dat is dode vocabulaire (canoniek: 'solo'/'samen'/'gezin') die hasPartner altijd false maakte voor partners.",
+        },
       ],
     },
   },
