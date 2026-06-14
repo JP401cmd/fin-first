@@ -109,6 +109,12 @@ export default async function ToekomstGebeurtenissenPage() {
   )
 
   // Prop-bundle voor de herstelde EventPane (catalogus + bewerken vrije events).
+  // `previewBaseline` (C5-pre): DEZELFDE flag-bewuste, per-asset input als de Tijdas-
+  // grafiek en de strategie-editors (gebouwd via `buildHorizonInput`). De EventPane-
+  // delta-previews (view + edit) draaien hierop via `runSelectedProjection` i.p.v. de
+  // oude lossy `portfolio = totalAssets − totalDebts`-scalar op de legacy `runSimulation`
+  // — zodat v2-gebruikers v2-consistente "FIRE-impact"-delta's zien (en flag-uit v1).
+  // De fire-params/strategy/withdrawal blijven als fallback wanneer de baseline null is.
   const eventPaneData = {
     baselineInput: ei,
     baselineFire,
@@ -117,6 +123,7 @@ export default async function ToekomstGebeurtenissenPage() {
     withdrawalStrategy: horizonData.withdrawalStrategy,
     endAge: horizonData.fireStrategy.endAge ?? 90,
     householdMode: horizonData.hasPartner ?? false,
+    previewBaseline: strategieBaseline,
   }
 
   return (

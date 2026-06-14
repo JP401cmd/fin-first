@@ -135,7 +135,10 @@ import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { runUnifiedProjection, toSimResult, runSimulationUnified as runSimAowStop, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import { toSimResult, runSimulationUnified as runSimAowStop, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
+import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
@@ -365,8 +368,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [monthlySavingsOverride, setMonthlySavingsOverride] = useState<number | null>(initialData.monthlySavingsOverride)
   const kernEmpty = (initialData.assets?.length ?? 0) === 0 && (initialData.debts?.length ?? 0) === 0
 
-  // Feature #800: doorrekening-inline query param state
-
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -512,6 +513,42 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     () => (effectiveLifeEvents.length > 0 ? effectiveLifeEvents : events),
     [effectiveLifeEvents, events],
   )
+
+  // ── EventPane preview-baseline (C5-pre) ──────────────────────────────────
+  // Bouw DEZELFDE flag-bewuste, per-asset projectie-input als de Tijdas-grafiek
+  // (via de gedeelde `buildHorizonInput` met dezelfde parameters als de hook),
+  // zodat de EventPane-delta-previews op deze /horizon-route ook via
+  // `runSelectedProjection` lopen — v2-consistent voor v2-gebruikers i.p.v. de
+  // oude scalar-portfolio runSimulation. De `cashflows` worden per preview-aanroep
+  // door de pane vervangen. Pensioen-leeftijd matcht de hook (grafiek).
+  const eventPanePreviewBaseline = useMemo<PreviewBaseline | null>(() => {
+    const built = buildHorizonInput({
+      horizonInput: input,
+      lifeEvents: [], // events worden per preview-aanroep geïnjecteerd
+      fireStrategy,
+      withdrawalStrategy: withdrawalStrategyConfig,
+      grossReturn: fireParams.grossReturn,
+      inflation: fireParams.inflationRate,
+      aowAgeFractional: userAowAge.fractional,
+      assets: initialData.assets,
+      debts,
+      box3Method: initialData.box3Method,
+      hasPartner: initialData.hasPartner,
+      bankAccountCash: initialData.unlinkedCash,
+      monthlySavingsOverride,
+      baseAnnualSavingsFromCashflow: initialData.baseAnnualSavingsFromCashflow,
+      housingStrategy: initialData.housingStrategy,
+      potRules: initialData.potRules,
+      horizonEngineV2: initialData.horizonEngineV2,
+    })
+    if (!built) return null
+    return {
+      input: built.input,
+      useV2: initialData.horizonEngineV2,
+      strategyOptions: built.strategyOptions,
+      pensioenFireAgeFractional: built.isPensioen ? built.aowAge : null,
+    }
+  }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, monthlySavingsOverride, initialData])
 
   // Fetch dividend income client-side (not available from server loader)
   useEffect(() => {
@@ -1409,8 +1446,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   })()
 
   // ── AOW-stop simulatie (lokale wat-als bij shortfall) ───────────────────
-  // Gebruikt dezelfde runUnifiedProjection engine als de hoofdsimulatie,
-  // maar met forcedFireAge op AOW-leeftijd (identiek aan pensioen-modus).
+  // Gebruikt DEZELFDE flag-bewuste engine-selector als de hoofdsimulatie
+  // (runSelectedProjection met initialData.horizonEngineV2), maar met forcedFireAge
+  // op AOW-leeftijd (identiek aan pensioen-modus). Zo zien v2-gebruikers ook in
+  // deze lokale AOW-stop-wat-als v2-consistente cijfers (single source of truth
+  // met de grafiek); flag-uit blijft v1.
   const aowStopSimResult = useMemo(() => {
     if (!isShortfallScenario || !effectiveInput || currentAge == null) return null
     const aowAgeInt = Math.ceil(userAowAge.fractional)
@@ -1438,7 +1478,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       hasPartner: initialData.hasPartner ?? false,
       bankAccountCash: initialData.unlinkedCash ?? 0,
     }
-    const unifiedResult = runUnifiedProjection(unifiedInput)
+    const unifiedResult = runSelectedProjection(unifiedInput, initialData.horizonEngineV2)
     const result = toSimResult(unifiedResult)
     return {
       ...result,
@@ -1448,7 +1488,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       fireReachable: true,
       requiredFirePortfolio: result.firePortfolioAtFire,
     }
-  }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireParams.grossReturn, fireParams.inflationRate, simCashflows, fireStrategy, withdrawalStrategyConfig, debts, initialData.assets, initialData.box3Method, initialData.hasPartner, initialData.unlinkedCash])
+  }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireParams.grossReturn, fireParams.inflationRate, simCashflows, fireStrategy, withdrawalStrategyConfig, debts, initialData.assets, initialData.box3Method, initialData.hasPartner, initialData.unlinkedCash, initialData.horizonEngineV2])
 
   const effectiveSimRows = isAowStopActive && aowStopSimResult ? aowStopSimResult.rows : (simResult?.rows ?? [])
   // Partner-view: vervang de hoofdlijn door het PARTNER-pad (eigen as + FIRE-
@@ -6667,6 +6707,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           withdrawalStrategy={withdrawalStrategyConfig}
           endAge={fireStrategy.endAge ?? 90}
           householdMode={initialData.hasPartner ?? false}
+          previewBaseline={eventPanePreviewBaseline}
           onChanged={() => loadData()}
         />
       )}

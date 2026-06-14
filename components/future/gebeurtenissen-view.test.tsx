@@ -47,6 +47,9 @@ const mockEventPaneData: EventPaneData = {
   withdrawalStrategy: {} as WithdrawalStrategyConfig,
   endAge: 90,
   householdMode: false,
+  // EventPane is dynamisch (ssr:false) en rendert niets in deze test; null →
+  // legacy fallback-pad, geen v2-engine-aanroep nodig in de mock.
+  previewBaseline: null,
 }
 
 function renderView(props: {

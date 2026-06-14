@@ -4,8 +4,9 @@
  * HorizonYearDetailsSheet — kassabon-stijl drilldown voor één jaar in de
  * vermogensopbouw-chart op `/horizon`.
  *
- * Geïnspireerd op `YearDetailsSheet` uit `/horizon/doorrekening-test/overzicht`,
- * maar geconsumeerd op de bestaande horizon-data-pipeline:
+ * Geïnspireerd op een vroege `YearDetailsSheet`-referentie (de doorrekening-test-
+ * route is in C5-pre verwijderd), maar geconsumeerd op de bestaande
+ * horizon-data-pipeline:
  *  - `unifiedRows: UnifiedProjectionRow[]` (uit `lib/unified-projection.ts`)
  *  - `simResult: SimResult` (voor fase-detectie via `runSimulation`)
  *  - `assets`, `debts`, `lifeEvents`, `cashflows`

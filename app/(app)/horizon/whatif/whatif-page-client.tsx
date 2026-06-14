@@ -1344,6 +1344,7 @@ export default function WhatIfPage() {
             scenarioEvents={scenarioActiveEvents}
             currentAge={currentAge ?? 30}
             debts={fullDebts}
+            useV2={horizonEngineV2}
           />
 
           {/* Marktbias — per-asset-groep rendement-delta */}

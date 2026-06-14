@@ -12,7 +12,11 @@ import {
 import {
   runSimulation,
   lifeEventsToCashflows,
+  type SimResult,
 } from '@/lib/fire-simulation'
+import { toSimResult } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
@@ -31,6 +35,12 @@ interface Props {
   fireStrategy: FireStrategyConfig
   withdrawalStrategy: WithdrawalStrategyConfig
   endAge: number
+  /**
+   * Flag-bewuste, per-asset projectie-input (zelfde assemblage als de Tijdas-
+   * grafiek). Wanneer gezet, draait de impact-preview via `runSelectedProjection`
+   * (v2-consistent voor v2-gebruikers); null → legacy `runSimulation`-fallback.
+   */
+  previewBaseline?: PreviewBaseline | null
 }
 
 export function EventPaneView({
@@ -41,6 +51,7 @@ export function EventPaneView({
   fireStrategy,
   withdrawalStrategy,
   endAge,
+  previewBaseline,
 }: Props) {
   const currentAge = baselineInput.dateOfBirth ? Math.floor(ageAtDate(baselineInput.dateOfBirth)) : 30
 
@@ -48,6 +59,27 @@ export function EventPaneView({
     const eventsWithout = baselineEvents.filter(e => e.id !== event.id)
     const baselineCashflows = lifeEventsToCashflows(eventsWithout)
     const withCashflows = lifeEventsToCashflows([...eventsWithout, event])
+
+    // Cutover (C5-pre): wanneer de server een flag-bewuste per-asset baseline
+    // levert, draaien beide runs door DEZELFDE engine-selector als de grafiek
+    // (runSelectedProjection met de gebruikersflag). Daardoor is de "FIRE-impact"-
+    // delta v2-consistent voor v2-gebruikers — i.p.v. de lossy scalar-portfolio op
+    // de legacy runSimulation. Flag-uit (of geen baseline) → byte-identiek v1.
+    if (previewBaseline) {
+      const run = (cf: ReturnType<typeof lifeEventsToCashflows>): SimResult =>
+        toSimResult(
+          runSelectedProjection(
+            { ...previewBaseline.input, cashflows: cf },
+            previewBaseline.useV2,
+            previewBaseline.strategyOptions,
+          ),
+        )
+      return {
+        baselineSim: run(baselineCashflows),
+        withSim: run(withCashflows),
+      }
+    }
+
     const yearlyExp = baselineInput.yearlyMustExpenses > 0 ? baselineInput.yearlyMustExpenses : 0
     const annualSavings = (baselineInput.monthlyContributions ?? 0) * 12
     const portfolio = baselineInput.totalAssets - baselineInput.totalDebts
@@ -65,7 +97,7 @@ export function EventPaneView({
       baselineSim: runSimulation(...args, baselineCashflows, fireStrategy, withdrawalStrategy),
       withSim: runSimulation(...args, withCashflows, fireStrategy, withdrawalStrategy),
     }
-  }, [event, baselineEvents, baselineInput, fireParams, fireStrategy, withdrawalStrategy, endAge, currentAge])
+  }, [event, baselineEvents, baselineInput, fireParams, fireStrategy, withdrawalStrategy, endAge, currentAge, previewBaseline])
 
   const fireDeltaMonths =
     baselineSim.fireAgeFractional != null && withSim.fireAgeFractional != null

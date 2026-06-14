@@ -184,7 +184,10 @@ export async function POST(req: NextRequest) {
       label: l.name,
       sublabel: 'Levensgebeurtenis',
       module: 'horizon',
-      href: `/horizon/doorrekening-test/gebeurtenissen?event=${l.id}`,
+      // Canonieke gebeurtenissen-surface (de oude /horizon/doorrekening-test-route is
+      // verwijderd in C5-pre). De pagina leest geen ?event= deep-link, maar de query
+      // is onschadelijk en bewaart de event-id voor evt. toekomstige auto-open.
+      href: `/toekomst/gebeurtenissen?event=${l.id}`,
     })
   }
 

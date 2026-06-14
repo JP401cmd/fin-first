@@ -22,6 +22,7 @@ import type { LifeEvent, FinancialInput, FireProjection } from '@/lib/horizon-da
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { computeEventImpact } from '@/lib/event-impact'
 import {
   isStrategyManagedEvent,
@@ -46,6 +47,13 @@ export interface EventPaneData {
   withdrawalStrategy: WithdrawalStrategyConfig
   endAge: number
   householdMode: boolean
+  /**
+   * Flag-bewuste, per-asset projectie-input (zelfde `buildHorizonInput`-assemblage
+   * als de Tijdas-grafiek). Wanneer gezet, draaien de EventPane-delta-previews via
+   * `runSelectedProjection` (v2-consistent voor v2-gebruikers); null → legacy
+   * `runSimulation`-fallback. Zie gebeurtenissen/page.tsx.
+   */
+  previewBaseline: PreviewBaseline | null
 }
 
 /**
@@ -458,6 +466,7 @@ export function GebeurtenissenView({
         withdrawalStrategy={eventPaneData.withdrawalStrategy}
         endAge={eventPaneData.endAge}
         householdMode={eventPaneData.householdMode}
+        previewBaseline={eventPaneData.previewBaseline}
         onChanged={() => router.refresh()}
       />
 

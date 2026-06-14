@@ -13,6 +13,7 @@ import {
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { EventPaneCatalog } from './event-pane-catalog'
 import { EventChatPane, type SuggestedLifeEventPayload } from './event-chat-pane'
 import {
@@ -40,6 +41,12 @@ interface Props {
   withdrawalStrategy: WithdrawalStrategyConfig
   endAge: number
   householdMode: boolean
+  /**
+   * Flag-bewuste, per-asset projectie-input (zelfde assemblage als de Tijdas-
+   * grafiek). Wanneer gezet, draaien de EventPaneView/Edit-delta-previews via
+   * `runSelectedProjection` (v2-consistent); null → legacy `runSimulation`-fallback.
+   */
+  previewBaseline: PreviewBaseline | null
   /** Callback na save of delete — horizon-client moet events herladen. */
   onChanged: () => void
 }
@@ -57,6 +64,7 @@ export function EventPane({
   withdrawalStrategy,
   endAge,
   householdMode,
+  previewBaseline,
   onChanged,
 }: Props) {
   const [mode, setMode] = useState<EventPaneMode>(initialMode)
@@ -319,6 +327,7 @@ export function EventPane({
             fireStrategy={fireStrategy}
             withdrawalStrategy={withdrawalStrategy}
             endAge={endAge}
+            previewBaseline={previewBaseline}
           />
         )}
         {mode === 'edit' && formState && (
@@ -333,6 +342,7 @@ export function EventPane({
             fireStrategy={fireStrategy}
             withdrawalStrategy={withdrawalStrategy}
             endAge={endAge}
+            previewBaseline={previewBaseline}
             saving={saving}
             saveError={saveError}
             onSave={handleSave}

@@ -13,6 +13,9 @@ import {
   lifeEventsToCashflows,
   type SimResult,
 } from '@/lib/fire-simulation'
+import { toSimResult } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
@@ -267,6 +270,12 @@ interface Props {
   fireStrategy: FireStrategyConfig
   withdrawalStrategy: WithdrawalStrategyConfig
   endAge: number
+  /**
+   * Flag-bewuste, per-asset projectie-input (zelfde assemblage als de Tijdas-
+   * grafiek). Wanneer gezet, draait de live impact-preview via
+   * `runSelectedProjection` (v2-consistent); null → legacy `runSimulation`-fallback.
+   */
+  previewBaseline?: PreviewBaseline | null
   saving: boolean
   saveError: string | null
   onSave: (event: LifeEvent) => void
@@ -289,6 +298,7 @@ export function EventPaneEdit({
   fireStrategy,
   withdrawalStrategy,
   endAge,
+  previewBaseline,
   saving,
   saveError,
   onSave,
@@ -311,6 +321,22 @@ export function EventPaneEdit({
       : baselineEvents
     const baselineCashflows = lifeEventsToCashflows(eventsWithoutEditing)
     const draftCashflows = lifeEventsToCashflows([...eventsWithoutEditing, draftEvent])
+
+    // Cutover (C5-pre): met een flag-bewuste per-asset baseline draaien beide runs
+    // door DEZELFDE engine-selector als de grafiek (runSelectedProjection met de
+    // gebruikersflag) → v2-consistente live FIRE-impact-delta. Flag-uit (of geen
+    // baseline) → byte-identiek aan de oude scalar-portfolio runSimulation.
+    if (previewBaseline) {
+      const run = (cf: ReturnType<typeof lifeEventsToCashflows>): SimResult =>
+        toSimResult(
+          runSelectedProjection(
+            { ...previewBaseline.input, cashflows: cf },
+            previewBaseline.useV2,
+            previewBaseline.strategyOptions,
+          ),
+        )
+      return { baselineSim: run(baselineCashflows), draftSim: run(draftCashflows) }
+    }
 
     const yearlyExp =
       baselineInput.yearlyMustExpenses > 0 ? baselineInput.yearlyMustExpenses : 0
@@ -354,6 +380,7 @@ export function EventPaneEdit({
     withdrawalStrategy,
     endAge,
     currentAge,
+    previewBaseline,
   ])
 
   const fireDeltaMonths =

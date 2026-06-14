@@ -3,10 +3,10 @@
 import { useMemo, useState } from 'react'
 import { Coins, TrendingUp, Landmark, Shield, ChevronDown, ChevronUp, ArrowRight, Info } from 'lucide-react'
 import {
-  runUnifiedProjection,
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { lifeEventsToCashflows, type SimCashflow, type SimResult } from '@/lib/fire-simulation'
 import { formatFireAge } from '@/lib/horizon-data'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
@@ -25,9 +25,9 @@ import type { LifeEventImpactKind } from '@/lib/calculator/to-life-event'
  * tijdas worden gezet via de bestaande CalculatorToLifeEventSheet.
  *
  * ── Modelkeuzes (motor-eerlijk) ─────────────────────────────────────────────
- * De motor (`runUnifiedProjection`) routeert élke terugkerende `income`-
- * cashflow als surplus naar beleggingsbuckets op het VERWACHTE rendement; er is
- * GEEN per-cashflow rendement en GEEN versnelde schuldafbouw. Daarom:
+ * De motor (`runSelectedProjection`, flag-bewust v1/v2) routeert élke terugkerende
+ * `income`-cashflow als surplus naar beleggingsbuckets op het VERWACHTE rendement;
+ * er is GEEN per-cashflow rendement en GEEN versnelde schuldafbouw. Daarom:
  *
  * 1. BELEGGEN  — exact: een `extra_inleg`-event (monthly_income_change = +X),
  *    identiek aan de bestaande extra-inleg-slider. Compound op verwacht
@@ -35,7 +35,8 @@ import type { LifeEventImpactKind } from '@/lib/calculator/to-life-event'
  *
  * 2. AFLOSSEN  — gegarandeerd, eigen tarief: aflossen levert het VASTE
  *    rentetarief van je schuld op (r_debt = saldo-gewogen), doorgaans lager
- *    dan het onzekere marktrendement. We raken de gedeelde motor niet aan;
+ *    dan het onzekere marktrendement. We raken de gedeelde motor niet aan
+ *    (zowel v1 als v2 leveren het basispad + doel via `runSelectedProjection`);
  *    in plaats daarvan groeit een aparte "aflossen-pot" van €X/mnd op r_debt
  *    bovenop het netto-vermogenspad van het basisscenario, en bereikt FIRE
  *    zodra basispad + pot ≥ het motor-doelvermogen (`requiredFirePortfolio`).
@@ -77,6 +78,7 @@ export function WhatIfBeslishulp({
   scenarioEvents,
   currentAge,
   debts,
+  useV2,
 }: {
   /**
    * De what-if UnifiedProjectionInput van de pagina (incl. return-deltas).
@@ -89,6 +91,13 @@ export function WhatIfBeslishulp({
   currentAge: number
   /** Actieve schulden — voor de aflossen-rente in de voetnoot. */
   debts: Debt[]
+  /**
+   * Draait de gebruiker de v2-grootboek-engine? (`isHorizonV2Enabled`). Bepaalt
+   * via `runSelectedProjection` of de baseline- én optie-runs door v2 of v1 lopen
+   * — zodat de FIRE-maand-delta's per constructie consistent zijn met de Tijdas-
+   * grafiek en de what-if-baseline van de pagina (single source of truth).
+   */
+  useV2: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [amount, setAmount] = useState(200)
@@ -132,8 +141,10 @@ export function WhatIfBeslishulp({
   // pad én het motor-doelvermogen hergebruikt.
   const baselineSim = useMemo<SimResult | null>(() => {
     if (!baseInput) return null
-    return toSimResult(runUnifiedProjection({ ...baseInput, cashflows: scenarioCashflows }))
-  }, [baseInput, scenarioCashflows])
+    return toSimResult(
+      runSelectedProjection({ ...baseInput, cashflows: scenarioCashflows }, useV2),
+    )
+  }, [baseInput, scenarioCashflows, useV2])
 
   const baselineFireAge = baselineSim?.fireAgeFractional ?? null
 
@@ -146,7 +157,7 @@ export function WhatIfBeslishulp({
 
     const runWith = (extra: SimCashflow[]): number | null => {
       const sim = toSimResult(
-        runUnifiedProjection({ ...baseInput, cashflows: [...scenarioCashflows, ...extra] }),
+        runSelectedProjection({ ...baseInput, cashflows: [...scenarioCashflows, ...extra] }, useV2),
       )
       return sim.fireAgeFractional
     }
@@ -214,7 +225,7 @@ export function WhatIfBeslishulp({
 
     return raw.map(o => ({ ...o, isWinner: o.id === winnerId }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseInput, baselineSim, amount, scenarioCashflows, baselineFireAge, hasDebt, debtRate, currentAge])
+  }, [baseInput, baselineSim, amount, scenarioCashflows, baselineFireAge, hasDebt, debtRate, currentAge, useV2])
 
   if (!baseInput) return null
 
