@@ -86,6 +86,7 @@ When reviewing code, you will systematically evaluate against these criteria:
 
 2. **Then, conduct manual review:**
    - Read through the code thoroughly
+   - Voor een gedrags-wijziging in een gedeelde/geëxporteerde functie (een functie met meerdere consumers): grep ALLE call-sites en stel per call-site vast of het nieuwe gedrag dáár correct is — een diff die in isolatie klopt kan een consumer breken die je niet in de diff ziet.
    - Identify issues in each of the categories above
    - Note both critical issues and minor improvements
 
