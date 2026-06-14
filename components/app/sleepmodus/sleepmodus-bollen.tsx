@@ -31,6 +31,18 @@ function tintFor(hex: string, strength: number): string {
 
 // ── Centrale transactie-bol ───────────────────────────────────────────────────
 
+/**
+ * Gouden munt-laag: dubbele rand (buitenrand + concentrische binnenring) plus
+ * een warme metallic sheen via kern-tokens. Gebruikt als achtergrond voor zowel
+ * de centrale bol als de zwerm-muntjes, zodat ze als één muntfamilie lezen.
+ */
+const COIN_SHEEN =
+  'radial-gradient(circle at 32% 28%, ' +
+  'color-mix(in oklch, var(--color-kern-200) 70%, white) 0%, ' +
+  'color-mix(in oklch, var(--color-kern-200) 35%, var(--paper)) 38%, ' +
+  'var(--paper) 72%, ' +
+  'color-mix(in oklch, var(--color-kern-300) 30%, var(--paper)) 100%)'
+
 export function CentraleBolVisual({ tx, siblingCount, dimmed }: {
   tx: QueueTx
   siblingCount: number
@@ -39,21 +51,30 @@ export function CentraleBolVisual({ tx, siblingCount, dimmed }: {
   return (
     <div
       className={[
-        'flex flex-col items-center justify-center rounded-full text-center select-none',
-        'bg-[var(--paper)] border-2 border-kern-600 shadow-[0_6px_18px_rgba(60,40,20,0.20)]',
+        'relative flex flex-col items-center justify-center rounded-full text-center select-none',
+        'border-2 border-kern-600 shadow-[0_6px_18px_rgba(60,40,20,0.20)]',
         dimmed ? 'opacity-40' : '',
       ].join(' ')}
-      style={{ width: 'clamp(104px, 30vw, 128px)', height: 'clamp(104px, 30vw, 128px)' }}
+      style={{
+        width: 'clamp(104px, 30vw, 128px)',
+        height: 'clamp(104px, 30vw, 128px)',
+        background: COIN_SHEEN,
+      }}
     >
-      <p className="px-3 font-[var(--font-playfair)] text-[13px] font-semibold leading-tight text-[var(--ink)] line-clamp-2">
+      {/* Concentrische binnenring — de tweede rand van een munt. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-[6px] rounded-full border border-kern-400/70"
+      />
+      <p className="relative px-3 font-[var(--font-playfair)] text-[13px] font-semibold leading-tight text-[var(--ink)] line-clamp-2">
         {tx.counterparty_name || tx.description}
       </p>
-      <p className={`mt-1 font-[var(--font-dm-mono)] text-[15px] font-medium tabular-nums ${tx.amount > 0 ? 'text-positive' : 'text-[var(--ink)]'}`}>
+      <p className={`relative mt-1 font-[var(--font-dm-mono)] text-[15px] font-medium tabular-nums ${tx.amount > 0 ? 'text-positive' : 'text-[var(--ink)]'}`}>
         {tx.amount > 0 ? '+' : ''}{formatCurrencyDecimals(tx.amount)}
       </p>
-      <p className="mt-0.5 font-serif text-[9px] italic text-[var(--ink-3)]">{formatDate(tx.date)}</p>
+      <p className="relative mt-0.5 font-serif text-[9px] italic text-[var(--ink-3)]">{formatDate(tx.date)}</p>
       {siblingCount > 0 && (
-        <p className="mt-0.5 font-serif text-[9px] italic text-kern-700">+ {siblingCount} vergelijkbaar</p>
+        <p className="relative mt-0.5 font-serif text-[9px] italic text-kern-700">+ {siblingCount} vergelijkbaar</p>
       )}
     </div>
   )
@@ -62,6 +83,54 @@ export function CentraleBolVisual({ tx, siblingCount, dimmed }: {
 // ── Budget-bol op een ringslot ────────────────────────────────────────────────
 
 export type BolState = 'normal' | 'hot' | 'dim' | 'armed'
+
+/**
+ * Spaarvarken-silhouet: gevuld met de budget-type-tint, omlijnd in de
+ * budget-type-kleur (spiegelt de oude rand+tint van de ronde bol). Body, oor,
+ * snuit, pootjes en een muntgleuf bovenop — clean/editorial, leesbaar op ~70px.
+ * Schaalt mee met de container (width/height 100%).
+ */
+function PiggySilhouette({ fill, stroke }: { fill: string; stroke: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 100 84"
+      className="absolute inset-0 h-full w-full"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {/* Oor */}
+      <path
+        d="M66 20 q9 -11 16 -7 q3 8 -5 16 Z"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      {/* Body */}
+      <path
+        d="M50 16
+           C26 16 10 30 10 47
+           C10 56 15 63 22 67
+           L22 75 a4 4 0 0 0 8 0 L30 70
+           a55 55 0 0 0 30 0 L60 75 a4 4 0 0 0 8 0 L68 66
+           C81 61 90 52 90 42
+           C90 27 75 16 50 16 Z"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      {/* Snuit */}
+      <ellipse cx="86" cy="44" rx="9" ry="8" fill={fill} stroke={stroke} strokeWidth={2} />
+      <circle cx="83.5" cy="44" r="1.6" fill={stroke} />
+      <circle cx="88.5" cy="44" r="1.6" fill={stroke} />
+      {/* Oog */}
+      <circle cx="68" cy="38" r="2" fill={stroke} />
+      {/* Muntgleuf bovenop */}
+      <line x1="42" y1="20" x2="58" y2="20" stroke={stroke} strokeWidth={2.5} strokeLinecap="round" />
+    </svg>
+  )
+}
 
 export function BudgetBol({ droppableId, budget, pos, state, isChild, pulse, stagger, onTap, label }: {
   droppableId: string
@@ -107,27 +176,33 @@ export function BudgetBol({ droppableId, budget, pos, state, isChild, pulse, sta
         disabled={state === 'dim' || !onTap}
         aria-label={label}
         className={[
-          'relative flex flex-col items-center justify-center gap-0.5 rounded-full text-center',
-          'border-[1.5px] transition-[box-shadow,background-color,border-width] duration-200',
-          highlighted ? 'border-2' : '',
+          'relative flex flex-col items-center justify-center gap-0.5 text-center',
+          'transition-[filter] duration-200',
           pulse ? 'animate-sleep-check-pulse' : '',
         ].join(' ')}
         style={{
           width: size,
           height: size,
-          borderColor: colors.hex,
-          // Vaag ingekleurd met de budget-type-kleur; sterker bij hover/voorstel.
-          backgroundColor: tintFor(colors.hex, highlighted ? 18 : state === 'hot' ? 14 : 8),
-          boxShadow: state === 'hot' && !highlighted
-            ? `0 0 0 5px color-mix(in oklch, ${colors.hex} 12%, transparent), 0 4px 12px color-mix(in oklch, ${colors.hex} 25%, transparent)`
-            : highlighted
-              ? `0 0 0 6px color-mix(in oklch, ${colors.hex} 18%, transparent)`
-              : undefined,
+          // Een box-shadow-ring sluit niet aan op een niet-rond silhouet;
+          // de gloed komt daarom van een gekleurde drop-shadow ACHTER de vorm.
+          filter: highlighted
+            ? `drop-shadow(0 0 7px color-mix(in oklch, ${colors.hex} 60%, transparent)) drop-shadow(0 3px 6px color-mix(in oklch, ${colors.hex} 30%, transparent))`
+            : state === 'hot'
+              ? `drop-shadow(0 0 5px color-mix(in oklch, ${colors.hex} 40%, transparent))`
+              : 'drop-shadow(0 2px 4px rgba(60,40,20,0.16))',
           ['--sleep-pulse-color' as string]: colors.hex,
         }}
       >
-        <BudgetIcon name={budget.icon} className="h-4 w-4" />
-        <span className="max-w-[64px] px-0.5 font-serif text-[9.5px] italic leading-[1.05] text-[var(--ink)] line-clamp-2">
+        {/* Het spaarvarken-silhouet — fill = tint, stroke = type-kleur. Tint
+            sterker bij hover/voorstel, mirroring de oude achtergrond-inkleur. */}
+        <PiggySilhouette
+          fill={tintFor(colors.hex, highlighted ? 24 : state === 'hot' ? 18 : 11)}
+          stroke={colors.hex}
+        />
+        <span className="relative mt-1 inline-flex h-4 w-4 items-center justify-center">
+          <BudgetIcon name={budget.icon} className="h-4 w-4" />
+        </span>
+        <span className="relative max-w-[60px] px-0.5 font-serif text-[9.5px] italic leading-[1.05] text-[var(--ink)] line-clamp-2">
           {budget.name}
         </span>
       </button>
@@ -218,10 +293,15 @@ const ZWERM_OFFSETS = [
 function MiniBol({ amount, size, opacity }: { amount: number; size: number; opacity?: number }) {
   return (
     <div
-      className="flex items-center justify-center rounded-full border-[1.5px] border-kern-600 bg-[var(--paper)] shadow-[0_2px_6px_rgba(60,40,20,0.16)]"
-      style={{ width: size, height: size, opacity }}
+      className="relative flex items-center justify-center rounded-full border-[1.5px] border-kern-600 shadow-[0_2px_6px_rgba(60,40,20,0.16)]"
+      style={{ width: size, height: size, opacity, background: COIN_SHEEN }}
     >
-      <span className="font-[var(--font-dm-mono)] text-[7.5px] tabular-nums text-[var(--ink-2)]">
+      {/* Concentrische binnenring — muntje. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-[2.5px] rounded-full border border-kern-400/70"
+      />
+      <span className="relative font-[var(--font-dm-mono)] text-[7.5px] tabular-nums text-[var(--ink-2)]">
         {Math.abs(amount).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </span>
     </div>
