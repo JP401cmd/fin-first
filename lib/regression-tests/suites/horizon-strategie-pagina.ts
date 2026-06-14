@@ -14,7 +14,8 @@ import {
   applyWithdrawalStrategy,
   type WithdrawalContext,
 } from '@/lib/withdrawal-strategy'
-import { runSimulation, type SimCashflow } from '@/lib/fire-simulation'
+import { type SimCashflow } from '@/lib/fire-simulation'
+import { runScalarProjectionV2 as runSimulation } from '@/lib/horizon-engine/scalar-bridge'
 import { type FireStrategyConfig, parseFireStrategy, STRATEGY_LABELS as FIRE_STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
 import { ageAtDate, DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'

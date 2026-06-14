@@ -11,7 +11,7 @@ import {
   type SimResult,
   type ReturnModel,
 } from '@/lib/fire-simulation'
-import { runSimulationUnified as runSimulation } from '@/lib/unified-projection'
+import { runScalarProjectionV2 as runSimulation } from '@/lib/horizon-engine/scalar-bridge'
 import { type FireStrategyConfig } from '@/lib/fire-strategy'
 import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { NL_AOW_MONTHLY, BOX3_DRAG } from '@/lib/constants'

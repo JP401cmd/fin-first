@@ -8,10 +8,12 @@
  * niet meer gelezen.
  *
  * De functie-signatuur en `HORIZON_V2_FLAG` blijven bewust bestaan: veel callers
- * roepen `isHorizonV2Enabled(profile)` nog aan (productie-FIRE-paden), en de
- * parity/compare-tooling (`runSelectedProjection(input, false)`, `compareEngines`,
- * de ledger-API) houdt de v1-engine (`runUnifiedProjection`/`runSimulation`)
- * expliciet bereikbaar. v1 verwijderen (C5-c) is een aparte, nog gated migratie.
+ * roepen `isHorizonV2Enabled(profile)` nog aan (productie-FIRE-paden). Sinds de
+ * volledige verwijdering (C5-c, Optie B) is er GEEN v1-engine meer:
+ * `runUnifiedProjection`/`runSimulation` zijn fysiek verwijderd en de
+ * parity/compare-tooling (`compareEngines`, de ledger-API) is mee weggehaald.
+ * `runSelectedProjection` is v2-only en negeert zijn `useV2`-parameter; de flag
+ * is daarmee functioneel een no-op die altijd `true` teruggeeft.
  */
 
 export const HORIZON_V2_FLAG = 'horizon_engine_v2' as const

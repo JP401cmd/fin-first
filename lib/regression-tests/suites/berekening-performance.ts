@@ -10,10 +10,10 @@ import {
 import type { TestCase } from '../test-types'
 
 import {
-  runSimulation,
   type SimCashflow,
   type ReturnModel,
 } from '@/lib/fire-simulation'
+import { runScalarProjectionV2 as runSimulation } from '@/lib/horizon-engine/scalar-bridge'
 import {
   computeFireRange,
   runBacktest,

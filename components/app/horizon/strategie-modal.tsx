@@ -21,12 +21,12 @@ import {
   resolveWithdrawalStrategy,
 } from '@/lib/withdrawal-strategy'
 import {
-  runSimulation,
   lifeEventsToCashflows,
   type SimResult,
   type SimRow,
   type SimCashflow,
 } from '@/lib/fire-simulation'
+import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
 import {
   computeYearlyMustExpenses,
   computeRetirementExpenses,
@@ -719,7 +719,8 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
         strategy: strat,
       }
 
-      results[strat] = runSimulation(
+      // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c).
+      results[strat] = runScalarProjectionV2(
         currentAge,
         strategyForSim.endAge,
         currentPortfolio,

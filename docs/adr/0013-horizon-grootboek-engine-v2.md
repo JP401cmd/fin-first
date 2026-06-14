@@ -35,6 +35,6 @@ Een tweede, **tabel-georiënteerde** engine in `lib/horizon-engine/` naast de be
 - **Pot-regels** (`profiles.pot_rules`: onttrekkingsvolgorde / verdeling-bij-toename / onttrekking-bij-afname) nog niet doorgedraad naar de engine-opties; v2 gebruikt defaults.
 - **Box 1** in de projectie is nog een vereenvoudigde placeholder (tabel D).
 - **Werkelijke tabellen voor de eigen gebruiker** (transparantie) nog te ontsluiten.
-- De **onomkeerbare** stap — v2 als globale default + verwijderen van `runUnifiedProjection`/`runSimulation` (raakt fee-analyse/hypotheek/household) — blijft gated tot de live-test akkoord is.
+- ~~De **onomkeerbare** stap — v2 als globale default + verwijderen van `runUnifiedProjection`/`runSimulation` — blijft gated tot de live-test akkoord is.~~ **C5-c AFGEROND (14 jun 2026):** `runUnifiedProjection` en `runSimulation` zijn fysiek verwijderd. De gedeelde types/helpers in `lib/unified-projection.ts`/`lib/fire-simulation.ts` zijn bewaard. Scalar-bridge toegevoegd: `runScalarProjectionV2` (`lib/horizon-engine/scalar-bridge.ts`) is een drop-in voor de scalar-portfolio-signatuur. De parity-tooling (`compareEngines`, `/beheer/horizon-tabellen`) is bewust behouden per productbeslissing D3 (`docs/horizon-v1-verwijderplan-c5.md`). 238 bestanden / 3389 tests groen, tsc schoon.
 
 Bewaakt door `test/horizon-engine.test.ts`, `test/horizon-persona.test.ts`, `test/horizon-engine-compare.test.ts` en de catalogus-entry `horizon-grootboek-v2` in `lib/architecture/calculations.ts`.

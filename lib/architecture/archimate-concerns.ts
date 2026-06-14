@@ -23,14 +23,6 @@ export interface ArchiConcern {
 
 export const ARCHI_CONCERNS: ArchiConcern[] = [
   {
-    id: 'whatif-unified',
-    title: 'WhatIf nog niet op de unified projection',
-    detail:
-      '/toekomst draait op runUnifiedProjection, maar de losse what-if-doorrekening gebruikt nog een eigen pad. Risico op uiteenlopende FIRE-uitkomsten tussen de tijdas en de wat-als.',
-    severity: 'debt',
-    elementIds: ['as-planning', 'fn-toekomstplannen'],
-  },
-  {
     id: 'legacy-backing-routes',
     title: 'Legacy backing-routes blijven leven',
     detail:
@@ -53,14 +45,6 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
       'De nieuwe sidebar/mobile-shell staat achter feature-flag new_navigation_shell. Fase 0-3 zijn af; de opruimfase (oude shell verwijderen) loopt nog.',
     severity: 'debt',
     elementIds: ['app-comp'],
-  },
-  {
-    id: 'horizon-engine-v2-duaal',
-    title: 'v2 is de enige FIRE-engine; v1 = niet-FIRE-rekenbibliotheek',
-    detail:
-      'Cutover C4 voltooid (ADR 0013/0016): lib/horizon-engine/ (v2, reëel grootboek) is de ENIGE engine die FIRE-cijfers produceert — alle FIRE-oppervlakken (/toekomst, /overzicht, /core, AI-context, freedomPct/gezondheidsscore/sovereignty, what-if, regel-sim, AOW/Pensioen-previews) lopen via runSelectedProjection(input, isHorizonV2Enabled(profile), options). lib/unified-projection.ts (runUnifiedProjection) en runSimulation blijven bewust bestaan als NIET-FIRE-rekenbibliotheek: fee-analyse, hypotheek-vs-beleggen, household-projection, de housing-trigger-meetrun en de accumulation-only Kern-prognose. Geen driftrisico meer op FIRE (één bron = LedgerRow[]; adapter is het enige reëel→nominaal-punt; FIRE = forward doel-zoektocht). Architectuur + invarianten: docs/architecture/horizon-engine-v2.md.',
-    severity: 'debt',
-    elementIds: ['as-planning', 'fn-toekomstplannen'],
   },
   {
     id: 'horizon-god-component',

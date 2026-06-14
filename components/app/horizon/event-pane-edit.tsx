@@ -9,12 +9,12 @@ import {
   type FireProjection,
 } from '@/lib/horizon-data'
 import {
-  runSimulation,
   lifeEventsToCashflows,
   type SimResult,
 } from '@/lib/fire-simulation'
 import { toSimResult } from '@/lib/unified-projection'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -322,10 +322,10 @@ export function EventPaneEdit({
     const baselineCashflows = lifeEventsToCashflows(eventsWithoutEditing)
     const draftCashflows = lifeEventsToCashflows([...eventsWithoutEditing, draftEvent])
 
-    // Cutover (C5-pre): met een flag-bewuste per-asset baseline draaien beide runs
-    // door DEZELFDE engine-selector als de grafiek (runSelectedProjection met de
-    // gebruikersflag) → v2-consistente live FIRE-impact-delta. Flag-uit (of geen
-    // baseline) → byte-identiek aan de oude scalar-portfolio runSimulation.
+    // Met een per-asset baseline draaien beide runs door DEZELFDE engine-selector
+    // als de grafiek (runSelectedProjection) → consistente live FIRE-impact-delta.
+    // Zonder baseline → scalar-portefeuille via de v2-bridge (C5-c: v2 is de enige
+    // engine; geen legacy `runSimulation`-fallback meer).
     if (previewBaseline) {
       const run = (cf: ReturnType<typeof lifeEventsToCashflows>): SimResult =>
         toSimResult(
@@ -342,7 +342,7 @@ export function EventPaneEdit({
       baselineInput.yearlyMustExpenses > 0 ? baselineInput.yearlyMustExpenses : 0
     const annualSavings = (baselineInput.monthlyContributions ?? 0) * 12
     const portfolio = baselineInput.totalAssets - baselineInput.totalDebts
-    const baseline = runSimulation(
+    const baseline = runScalarProjectionV2(
       currentAge,
       endAge,
       portfolio,
@@ -355,7 +355,7 @@ export function EventPaneEdit({
       fireStrategy,
       withdrawalStrategy,
     )
-    const draft = runSimulation(
+    const draft = runScalarProjectionV2(
       currentAge,
       endAge,
       portfolio,

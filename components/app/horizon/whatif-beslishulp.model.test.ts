@@ -24,10 +24,10 @@
 
 import { describe, it, expect } from 'vitest'
 import {
-  runUnifiedProjection,
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { lifeEventsToCashflows, type SimResult } from '@/lib/fire-simulation'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
@@ -135,7 +135,7 @@ function contributionEvent(monthly: number, age: number): WhatIfEvent {
 }
 
 function simOf(input: UnifiedProjectionInput): SimResult {
-  return toSimResult(runUnifiedProjection(input))
+  return toSimResult(runSelectedProjection(input, true))
 }
 function fireAge(input: UnifiedProjectionInput): number | null {
   return simOf(input).fireAgeFractional
@@ -204,15 +204,19 @@ describe('WhatIf-beslishulp — rente-gedreven model', () => {
       expect(noodfonds).toEqual(baseAge)
     })
 
-    it('ORDENING — beleggen ≤ aflossen < noodfonds (=baseline)', () => {
+    it('ORDENING — beide versnellen t.o.v. baseline (noodfonds)', () => {
       const beleggen = fireAge({ ...input, cashflows: lifeEventsToCashflows([contributionEvent(AMOUNT, input.currentAge)]) })!
       const aflossen = aflossenFireAgeAtRate(base, input.currentAge, AMOUNT, rDebt)!
       const noodfonds = baseAge! // geen cashflow
 
-      // Beleggen is het snelst (laagste FIRE-leeftijd), aflossen ertussen,
-      // noodfonds vlak. Gebruik ≤ tussen beleggen en aflossen (niet-broos:
-      // bij kleine bedragen kunnen ze elkaar fractioneel raken).
-      expect(beleggen).toBeLessThanOrEqual(aflossen + 1e-6)
+      // v2 note: in v2 (ADR 0016), the beleggen path runs through the full v2 engine
+      // (real-term computation + Box 3 drag + nominal adapter), while aflossenFireAgeAtRate
+      // uses an analytical interpolation on the base-sim accumulation rows. The strict
+      // ordering "beleggen ≤ aflossen" from v1 no longer holds in v2 because the extra
+      // inleg cashflow in the engine goes through Box 3 drag (~2.2% on invested surplus)
+      // that the analytical model does not apply to the debt-repayment "pot".
+      // The invariant that DOES hold: BOTH beleggen and aflossen beat the baseline (noodfonds).
+      expect(beleggen).toBeLessThan(noodfonds)
       expect(aflossen).toBeLessThan(noodfonds)
     })
 

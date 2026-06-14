@@ -14,7 +14,7 @@ import {
   linearAmortization,
   interestOnlySchedule,
 } from '@/lib/debt-data'
-import { runSimulation, type SimCashflow } from '@/lib/fire-simulation'
+import { type SimCashflow } from '@/lib/fire-simulation'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
@@ -385,7 +385,7 @@ export function buildHvBSimInput(
  * t.o.v. v1 — maar de gerapporteerde DELTA (aflossen − beleggen, in maanden) blijft
  * betekenisvol: bij rendement boven de hypotheekrente wint beleggen op beide engines.
  */
-function computeFireImpact(params: HvBParams, useV2 = false): number | null {
+function computeFireImpact(params: HvBParams): number | null {
   const { currentAge, currentPortfolio, yearlyExpenses, annualSavings,
           verwachtRendement, inflatie, cashflows, extraBedrag } = params
 
@@ -395,50 +395,24 @@ function computeFireImpact(params: HvBParams, useV2 = false): number | null {
     return null
   }
 
-  const endAge = FIRE_IMPACT_END_AGE
   const baseCashflows = cashflows ?? []
   const extraJaarlijks = extraBedrag * 12
 
-  let ageA: number | null
-  let ageB: number | null
-
-  if (useV2) {
-    // Beide scenario's op de geselecteerde engine (v2-grootboek). Aflossen houdt
-    // de spaarruimte gelijk; beleggen verhoogt `annualSavings` met de jaarinleg.
-    const simAflossen = toSimResult(runSelectedProjection(
-      buildHvBSimInput(currentAge, currentPortfolio, yearlyExpenses, annualSavings,
-        verwachtRendement, inflatie, baseCashflows),
-      true,
-    ))
-    const simBeleggen = toSimResult(runSelectedProjection(
-      buildHvBSimInput(currentAge, currentPortfolio, yearlyExpenses, annualSavings + extraJaarlijks,
-        verwachtRendement, inflatie, baseCashflows),
-      true,
-    ))
-    ageA = simAflossen.fireAgeFractional
-    ageB = simBeleggen.fireAgeFractional
-  } else {
-    // Byte-identiek aan vóór de migratie: legacy v1-engine (`runSimulation`) direct.
-    // Scenario A: extra aflossen → lagere maandlasten (= meer spaarruimte)
-    // Vereenvoudigd: extra bedrag gaat naar schuld, niet naar portfolio
-    const simAflossen = runSimulation(
-      currentAge, endAge, currentPortfolio,
-      yearlyExpenses, annualSavings, // savings stay the same (extra goes to mortgage)
-      verwachtRendement, 'nl_box3', inflatie,
-      baseCashflows,
-    )
-
-    // Scenario B: extra beleggen → hogere jaarlijkse besparingen
-    const simBeleggen = runSimulation(
-      currentAge, endAge, currentPortfolio,
-      yearlyExpenses, annualSavings + extraJaarlijks,
-      verwachtRendement, 'nl_box3', inflatie,
-      baseCashflows,
-    )
-
-    ageA = simAflossen.fireAgeFractional
-    ageB = simBeleggen.fireAgeFractional
-  }
+  // Beide scenario's op de v2-grootboek-engine (de enige engine sinds C5-c).
+  // Aflossen houdt de spaarruimte gelijk; beleggen verhoogt `annualSavings` met
+  // de jaarinleg.
+  const simAflossen = toSimResult(runSelectedProjection(
+    buildHvBSimInput(currentAge, currentPortfolio, yearlyExpenses, annualSavings,
+      verwachtRendement, inflatie, baseCashflows),
+    true,
+  ))
+  const simBeleggen = toSimResult(runSelectedProjection(
+    buildHvBSimInput(currentAge, currentPortfolio, yearlyExpenses, annualSavings + extraJaarlijks,
+      verwachtRendement, inflatie, baseCashflows),
+    true,
+  ))
+  const ageA: number | null = simAflossen.fireAgeFractional
+  const ageB: number | null = simBeleggen.fireAgeFractional
 
   if (ageA == null && ageB == null) return null
   if (ageA == null) return 120 // aflossen bereikt FIRE niet → groot voordeel beleggen
@@ -462,7 +436,7 @@ function computeFireImpact(params: HvBParams, useV2 = false): number | null {
  *   amortisatie-/groeischema's (geen FIRE-engine) en zijn dus flag-onafhankelijk.
  * @returns HvBResult met beide scenario's, breakeven en FIRE-impact
  */
-export function compareMortgageVsInvest(params: HvBParams, useV2 = false): HvBResult {
+export function compareMortgageVsInvest(params: HvBParams, _useV2 = false): HvBResult {
   // Edge case: bij 0 extra bedrag is er geen verschil
   if (params.extraBedrag <= 0) {
     return {
@@ -509,7 +483,7 @@ export function compareMortgageVsInvest(params: HvBParams, useV2 = false): HvBRe
   }
 
   // FIRE-impact
-  const fireImpactMaanden = computeFireImpact(params, useV2)
+  const fireImpactMaanden = computeFireImpact(params)
 
   // Aanbeveling
   const DREMPEL = 100 // €100 verschil = praktisch gelijk

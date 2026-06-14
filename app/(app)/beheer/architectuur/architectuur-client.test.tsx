@@ -132,8 +132,8 @@ describe('ArchitectuurClient — aandachtspunten-lens', () => {
   it('toont aandachtspunten en navigeert naar het element', () => {
     renderClient()
     fireEvent.click(screen.getByRole('tab', { name: 'Aandachtspunten' }))
-    fireEvent.click(screen.getByRole('button', { name: /WhatIf nog niet op de unified projection/i }))
-    expect(screen.getByRole('heading', { level: 3, name: /Planningsdienst/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /horizon-client\.tsx is een god-component/i }))
+    expect(screen.getByRole('heading', { level: 3, name: /Toekomstplannen/ })).toBeInTheDocument()
   })
 
   it('element-detail toont zijn aandachtspunten', () => {

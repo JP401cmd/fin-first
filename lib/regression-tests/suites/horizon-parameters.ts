@@ -11,7 +11,8 @@ import {
   type WithdrawalStrategyType,
 } from '@/lib/withdrawal-strategy'
 import { DEFAULT_RETURN, INFLATION, BOX3_DRAG, NL_AOW_AGE } from '@/lib/constants'
-import { runSimulation, type SimResult } from '@/lib/fire-simulation'
+import { type SimResult } from '@/lib/fire-simulation'
+import { runScalarProjectionV2 as runSimulation } from '@/lib/horizon-engine/scalar-bridge'
 
 const CAT = 'horizon.parameters'
 

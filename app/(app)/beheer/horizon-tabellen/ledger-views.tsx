@@ -33,7 +33,6 @@ import {
   type HorizonLedgerResult,
   type LedgerRow,
   type TypeRollup,
-  type EngineDiff,
 } from '@/lib/horizon-engine'
 import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 
@@ -882,91 +881,6 @@ function BreakdownView({
             </tr>
           )
         })}
-      </TableShell>
-    </div>
-  )
-}
-
-// ── Engine-vergelijking (v1 ↔ v2) ────────────────────────────────
-
-function CompareStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)] font-mono">
-        {label}
-      </div>
-      <div className="mt-1 text-lg font-bold font-mono tabular-nums text-[var(--ink)] leading-tight">
-        {value}
-      </div>
-    </div>
-  )
-}
-
-function deltaYears(d: number | null): string {
-  if (d == null) return '—'
-  if (d === 0) return '±0 jr'
-  const sign = d > 0 ? '+' : '−'
-  return `${sign}${Math.abs(d).toFixed(1).replace('.', ',')} jr`
-}
-
-export function CompareView({ diff }: { diff: EngineDiff }) {
-  const fireV1 = diff.fireAgeOld != null ? `${diff.fireAgeOld}` : '—'
-  const fireV2 = diff.fireAgeNew != null ? `${diff.fireAgeNew}` : '—'
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5">
-        <Kicker>Rapportage · geen gelijkheid</Kicker>
-        <p className="mt-3 text-sm leading-relaxed text-[var(--ink-2)]">
-          De productie-engine (v1, nominaal) vs de nieuwe grootboek-engine (v2, reëel). De modellen
-          verschillen bewust — dit is rapportage, geen gelijkheid. v2 staat in productie achter een
-          flag (default uit).
-        </p>
-      </div>
-
-      {/* Summary row */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <CompareStat
-          label="FIRE v1 → v2"
-          value={`${fireV1} → ${fireV2}  (${deltaYears(diff.fireAgeDeltaYears)})`}
-        />
-        <CompareStat
-          label="Benodigd v1 / v2"
-          value={`${eurShort(diff.requiredOld)} / ${eurShort(diff.requiredNew)}`}
-        />
-        <CompareStat
-          label="Eind-netto v1 / v2"
-          value={`${eurShort(diff.endNetWorthOld)} / ${eurShort(diff.endNetWorthNew)}`}
-        />
-      </div>
-
-      {/* Per-age table */}
-      <TableShell
-        note="Δ% = procentueel verschil van v2 t.o.v. v1 per leeftijd. Positief = v2 ligt hoger, negatief = lager."
-        head={
-          <>
-            <th className={TH}>Leeftijd</th>
-            <th className={`${TH} text-right`}>Netto v1</th>
-            <th className={`${TH} text-right`}>Netto v2</th>
-            <th className={`${TH} text-right`}>Δ%</th>
-          </>
-        }
-      >
-        {diff.perAge.map((p) => (
-          <tr key={p.age} className="border-b border-[var(--border-ed)] hover:bg-[var(--subtle)]">
-            <td className={`${TD} font-mono tabular-nums`}>{p.age}</td>
-            <td className={TDNUM}><Num value={p.netOld} signColor={false} /></td>
-            <td className={TDNUM}><Num value={p.netNew} signColor={false} /></td>
-            <td className={TDNUM}>
-              <span
-                className="font-mono tabular-nums"
-                style={{ color: p.pctDiff < 0 ? 'var(--negative)' : 'var(--positive)' }}
-              >
-                {`${p.pctDiff >= 0 ? '+' : '−'}${Math.abs(p.pctDiff).toFixed(1).replace('.', ',')}%`}
-              </span>
-            </td>
-          </tr>
-        ))}
       </TableShell>
     </div>
   )

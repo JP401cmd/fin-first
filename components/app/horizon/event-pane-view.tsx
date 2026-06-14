@@ -10,12 +10,12 @@ import {
   ageAtDate,
 } from '@/lib/horizon-data'
 import {
-  runSimulation,
   lifeEventsToCashflows,
   type SimResult,
 } from '@/lib/fire-simulation'
 import { toSimResult } from '@/lib/unified-projection'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -60,11 +60,11 @@ export function EventPaneView({
     const baselineCashflows = lifeEventsToCashflows(eventsWithout)
     const withCashflows = lifeEventsToCashflows([...eventsWithout, event])
 
-    // Cutover (C5-pre): wanneer de server een flag-bewuste per-asset baseline
-    // levert, draaien beide runs door DEZELFDE engine-selector als de grafiek
-    // (runSelectedProjection met de gebruikersflag). Daardoor is de "FIRE-impact"-
-    // delta v2-consistent voor v2-gebruikers — i.p.v. de lossy scalar-portfolio op
-    // de legacy runSimulation. Flag-uit (of geen baseline) → byte-identiek v1.
+    // Wanneer de server een per-asset baseline levert, draaien beide runs door
+    // DEZELFDE engine-selector als de grafiek (runSelectedProjection). Daardoor is
+    // de "FIRE-impact"-delta consistent met de grafiek — i.p.v. de lossy scalar-
+    // portefeuille. Zonder baseline → scalar-portefeuille via de v2-bridge (C5-c:
+    // v2 is de enige engine; geen legacy `runSimulation`-fallback meer).
     if (previewBaseline) {
       const run = (cf: ReturnType<typeof lifeEventsToCashflows>): SimResult =>
         toSimResult(
@@ -93,9 +93,10 @@ export function EventPaneView({
       'nl_box3' as const,
       fireParams.inflationRate,
     ] as const
+    // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c).
     return {
-      baselineSim: runSimulation(...args, baselineCashflows, fireStrategy, withdrawalStrategy),
-      withSim: runSimulation(...args, withCashflows, fireStrategy, withdrawalStrategy),
+      baselineSim: runScalarProjectionV2(...args, baselineCashflows, fireStrategy, withdrawalStrategy),
+      withSim: runScalarProjectionV2(...args, withCashflows, fireStrategy, withdrawalStrategy),
     }
   }, [event, baselineEvents, baselineInput, fireParams, fireStrategy, withdrawalStrategy, endAge, currentAge, previewBaseline])
 

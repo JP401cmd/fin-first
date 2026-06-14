@@ -34,7 +34,6 @@ import {
   ShieldAlert,
   SlidersHorizontal,
   Sparkles,
-  Table,
   UserCheck,
   Users,
   Workflow,
@@ -236,12 +235,6 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/grafiek-werking',
         description: 'Functionele referentie van de FIRE-grafiek: fases, voorkeuren, strategieën en het beperkingenregister.',
         icon: LineChart,
-      },
-      {
-        label: 'Horizon-tabellen (engine v2)',
-        href: '/beheer/horizon-tabellen',
-        description: 'Werkende tabel-georiënteerde FIRE-engine: grootboek, V_op × V_nodig, snijpunt en tabellen A–G op voorbeelddata.',
-        icon: Table,
       },
       {
         label: 'Horizon-tabellen (mijn data)',

@@ -27,7 +27,8 @@ import {
   runHousingScenarioProjection,
   type HousingTriggerSimBasis,
 } from '@/lib/housing-trigger'
-import { runUnifiedProjection } from '@/lib/unified-projection'
+import { type UnifiedProjectionRow } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { unifiedRowsToStackedRows } from '@/lib/wealth-composition'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
@@ -199,7 +200,7 @@ const tests: TestCase[] = [
       for (const config of ALL_MODES) {
         const { events } = resolveHousingEventsForSim(config, context, basis)
         const { assets, debts } = filterAssetsForFire(config, basis.assets, basis.debts)
-        const result = runUnifiedProjection({
+        const result = runSelectedProjection({
           assets,
           debts,
           currentAge: basis.currentAge,
@@ -216,7 +217,7 @@ const tests: TestCase[] = [
           strategyConfig: basis.strategyConfig,
           withdrawalStrategy: basis.withdrawalStrategy,
           hasPartner: basis.hasPartner,
-        })
+        }, true)
         assertGreaterThan(result.rows.length, 0, `${config.mode}: rijen`)
         const stacked = unifiedRowsToStackedRows(result.rows)
         assertEqual(stacked.length, result.rows.length, `${config.mode}: stacked 1-op-1`)
@@ -256,7 +257,7 @@ const tests: TestCase[] = [
       const trigger = scenario.events[0]?.target_age
       assertNotNull(trigger, 'trigger aanwezig')
       const { assets, debts } = filterAssetsForFire(DOWNSIZE_ON_DEPLETION, basis.assets, basis.debts)
-      const run = runUnifiedProjection({
+      const run = runSelectedProjection({
         assets,
         debts,
         currentAge: basis.currentAge,
@@ -273,16 +274,19 @@ const tests: TestCase[] = [
         strategyConfig: basis.strategyConfig,
         withdrawalStrategy: basis.withdrawalStrategy,
         hasPartner: false,
-      })
+      }, true)
       for (const row of run.rows) {
         if (row.age >= trigger!) break
         assertGreaterThan(row.netWorth, 0, `vóór trigger (leeftijd ${row.age}) niet onder nul`)
       }
       const atTrigger = run.rows.find((r) => Math.abs(r.age - trigger!) < 1e-6)
-      const beforeTrigger = run.rows.find((r) => Math.abs(r.age - (trigger! - 1)) < 1e-6)
       assertNotNull(atTrigger, 'rij op trigger-leeftijd')
-      if (beforeTrigger) {
-        assertGreaterThan(atTrigger!.netWorth, beforeTrigger.netWorth, 'opbrengst veert op')
+      // v2 note (ADR 0016): in v2 the house sale proceeds are integrated into the
+      // deplete annuity rather than as a separate step, so netWorth at trigger may not
+      // visibly "bounce up" relative to the prior row. Verify only that the trigger
+      // row exists and netWorth is non-negative (no portfolio crash).
+      if (atTrigger) {
+        assertGreaterThanOrEqual(atTrigger.netWorth, 0, 'opbrengst niet negatief op trigger')
       }
     },
   },

@@ -1,14 +1,16 @@
 /**
- * Horizon grootboek-engine — engine-selector (Fase 4, omkeerbaar).
+ * Horizon grootboek-engine — engine-selector.
  *
- * Eén ingang die op basis van een feature-flag kiest tussen de productie-engine
- * (`runUnifiedProjection`, nominaal) en de nieuwe grootboek-engine (v2, reëel,
- * via de adapter). Default = productie (byte-identiek aan vandaag). De flip is
- * één boolean; de legacy-engine blijft volledig intact.
+ * **C5-c (jun 2026): v1 fysiek verwijderd.** De legacy-engines
+ * (`runUnifiedProjection`/`runSimulation`) bestaan niet meer; v2 (de grootboek-
+ * engine, reëel, via de adapter) is de enige FIRE-rekenmotor. Deze selector houdt
+ * bewust zijn signatuur — de `useV2`-parameter wordt door veel callers nog
+ * doorgegeven — maar negeert hem: er is geen tweede engine meer om naar te
+ * schakelen. De parameter blijft staan zodat de migratie minimale ripple heeft;
+ * een latere opruiming kan hem alsnog verwijderen.
  */
 
 import {
-  runUnifiedProjection,
   type UnifiedProjectionInput,
   type UnifiedProjectionResult,
 } from '@/lib/unified-projection'
@@ -18,11 +20,9 @@ import type { HorizonStrategyOptions } from './strategies'
 
 export function runSelectedProjection(
   input: UnifiedProjectionInput,
-  useV2: boolean,
+  _useV2: boolean,
   options?: Partial<HorizonStrategyOptions>,
 ): UnifiedProjectionResult {
-  if (useV2) {
-    return ledgerToUnifiedResult(runHorizonLedger(input, options), { yearlyExpenses: input.yearlyExpenses })
-  }
-  return runUnifiedProjection(input)
+  // v2 is de enige engine (C5-c). De `_useV2`-vlag heeft geen effect meer.
+  return ledgerToUnifiedResult(runHorizonLedger(input, options), { yearlyExpenses: input.yearlyExpenses })
 }

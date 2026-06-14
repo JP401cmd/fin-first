@@ -136,8 +136,9 @@ import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { toSimResult, runSimulationUnified as runSimAowStop, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
@@ -1663,7 +1664,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
     const results: Array<{
       overlay: ScenarioOverlay
-      rows: ReturnType<typeof runSimAowStop>['rows']
+      rows: SimRow[]
       events: Array<{ id: string; name: string; event_type: string; target_age: number | null; one_time_cost: number; monthly_cost_change: number; monthly_income_change: number; duration_months: number; is_active: boolean; sort_order: number; is_indexed: boolean; icon: string; metadata?: Record<string, unknown> }>
       color: string
       scenarioName: string
@@ -1704,7 +1705,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       const grossReturn = adjustedInput.expectedReturn ?? initialFireParams.grossReturn
       const endStrategy = initialFireStrategy ?? DEFAULT_FIRE_STRATEGY
 
-      const result = runSimAowStop(
+      // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c).
+      const result = runScalarProjectionV2(
         currentAgeVal,
         endStrategy.endAge ?? 90,
         currentPortfolio,

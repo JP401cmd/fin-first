@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-14T14:05:20.161Z",
+  "generatedAt": "2026-06-14T19:56:02.763Z",
   "generatedDate": "2026-06-14",
   "repo": {
     "name": "fin",
@@ -184,7 +184,7 @@
   "stats": {
     "routes": 317,
     "routesProduction": 94,
-    "api": 371,
+    "api": 370,
     "tables": 52,
     "migrations": 105,
     "integrations": 24,
@@ -324,8 +324,8 @@
       "isTest": false
     },
     {
-      "url": "/beheer/horizon-tabellen",
-      "file": "app/(app)/beheer/horizon-tabellen/page.tsx",
+      "url": "/beheer/horizon-strategie",
+      "file": "app/(app)/beheer/horizon-strategie/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -2229,8 +2229,8 @@
         "isTest": false
       },
       {
-        "url": "/beheer/horizon-tabellen",
-        "file": "app/(app)/beheer/horizon-tabellen/page.tsx",
+        "url": "/beheer/horizon-strategie",
+        "file": "app/(app)/beheer/horizon-strategie/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -4999,14 +4999,6 @@
       "url": "/api/holdings/refresh-prices/cron",
       "file": "app/api/holdings/refresh-prices/cron/route.ts",
       "domain": "holdings",
-      "methods": [
-        "GET"
-      ]
-    },
-    {
-      "url": "/api/horizon-engine/ledger",
-      "file": "app/api/horizon-engine/ledger/route.ts",
-      "domain": "horizon-engine",
       "methods": [
         "GET"
       ]
@@ -9092,21 +9084,6 @@
             "POST",
             "PATCH",
             "DELETE"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "horizon-engine",
-      "label": "horizon-engine",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/horizon-engine/ledger",
-          "file": "app/api/horizon-engine/ledger/route.ts",
-          "domain": "horizon-engine",
-          "methods": [
-            "GET"
           ]
         }
       ]
@@ -17579,6 +17556,18 @@
       ],
       "summary": "v2 (de grootboek-engine, ADR 0013) draait live achter een per-user flag. De validatiefase (Fase B uit `docs/horizon-tabel-rekenmotor-plan.md` §6) is grotendeels gedaan: de parity-review (B2) en de regressiesuites (B4) zijn klaar, en surfacede drie echte v2-bugs die inmiddels gefi",
       "file": "docs/adr/0016-horizon-v2-cutover-acceptatie-en-reeel-nominaal.md"
+    },
+    {
+      "id": "0017-horizon-v2-legacy-doelzoekende-fire",
+      "title": "horizon v2 legacy doelzoekende fire",
+      "status": "aanvaard",
+      "date": "2026-06-14",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "ADR 0014 legde vast dat de eindstrategie **legacy** in de v2-grootboek-engine (`lib/horizon-engine/engine.ts`) **need-only** onttrekt: alleen de netto leefbehoefte wordt onttrokken, het residu blijft belegd en groeit naar de nalatenschap. Dat besluit blijft staan — `lib/withdrawa",
+      "file": "docs/adr/0017-horizon-v2-legacy-doelzoekende-fire.md"
     }
   ],
   "churn": {
@@ -17586,7 +17575,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 77
+        "commits": 79
       },
       {
         "path": "lib/ai",
@@ -17594,7 +17583,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 24
+        "commits": 26
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -17628,7 +17617,7 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6818,
+        "loc": 6910,
         "commits": 104
       },
       {
@@ -17657,13 +17646,13 @@
         "commits": 15
       },
       {
-        "file": "lib/unified-projection.ts",
-        "loc": 2385,
-        "commits": 27
-      },
-      {
         "file": "app/(app)/core/checkin/page.tsx",
         "loc": 2206,
+        "commits": 9
+      },
+      {
+        "file": "lib/horizon-data.ts",
+        "loc": 2199,
         "commits": 9
       }
     ]
@@ -18334,12 +18323,19 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "API-routes",
+        "label": "Schermen",
         "added": [
-          "/api/overzicht/cashflow-status"
+          "/beheer/horizon-strategie"
         ],
         "removed": [
-          "/api/horizon-engine"
+          "/beheer/horizon-tabellen"
+        ]
+      },
+      {
+        "label": "API-routes",
+        "added": [],
+        "removed": [
+          "/api/horizon-engine/ledger"
         ]
       }
     ]
@@ -18375,7 +18371,7 @@
     },
     {
       "date": "2026-06-14",
-      "api": 371,
+      "api": 370,
       "components": 687,
       "tables": 52,
       "routesProduction": 94

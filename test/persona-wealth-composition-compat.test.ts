@@ -21,7 +21,8 @@ import {
   type StackedRow,
   type WealthGroup,
 } from '@/lib/wealth-composition'
-import { runUnifiedProjection, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import { type UnifiedProjectionInput } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { ageAtDate } from '@/lib/horizon-data'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -565,7 +566,7 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
     for (const key of PERSONA_KEYS) {
       it(`${key}: unifiedRowsToStackedRows produces valid StackedRow[]`, () => {
         const input = buildUnifiedInputFromPersona(key)
-        const result = runUnifiedProjection(input)
+        const result = runSelectedProjection(input, true)
         const stackedRows = unifiedRowsToStackedRows(result.rows)
 
         expect(stackedRows.length).toBe(result.rows.length)
@@ -577,7 +578,7 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
 
       it(`${key}: first row has non-zero assets`, () => {
         const input = buildUnifiedInputFromPersona(key)
-        const result = runUnifiedProjection(input)
+        const result = runSelectedProjection(input, true)
         const stackedRows = unifiedRowsToStackedRows(result.rows)
 
         expect(stackedRows.length).toBeGreaterThan(0)
@@ -594,7 +595,7 @@ describe('Persona seed data × Wealth Composition compatibility', () => {
         if (p.debts.length === 0) continue
 
         const input = buildUnifiedInputFromPersona(key)
-        const result = runUnifiedProjection(input)
+        const result = runSelectedProjection(input, true)
         const stackedRows = unifiedRowsToStackedRows(result.rows)
 
         if (stackedRows.length > 0) {

@@ -7,7 +7,7 @@
  * TER = Total Expense Ratio, stored as decimal (e.g. 0.0022 = 0.22%).
  */
 
-import { runSimulation, type SimCashflow, type ReturnModel } from '@/lib/fire-simulation'
+import { type SimCashflow, type ReturnModel } from '@/lib/fire-simulation'
 import { DEFAULT_FIRE_STRATEGY, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
@@ -290,55 +290,17 @@ export function buildFeeSimInput(
 export function computeFeeImpactOnFire(
   simParams: FeeSimParams,
   weightedTER: number,
-  useV2 = false,
+  _useV2 = false,
 ): FeeImpact {
   const effectiveReturn = simParams.grossReturn - weightedTER
 
-  let fireAgeWithoutFees: number | null
-  let fireAgeWithFees: number | null
-  let bothReachable: boolean
-
-  if (useV2) {
-    // Beide scenario's op de geselecteerde engine (v2-grootboek). De fee zit in de
-    // (lagere) effectieve return op dezelfde input-vorm.
-    const simWithout = toSimResult(runSelectedProjection(buildFeeSimInput(simParams, simParams.grossReturn), true))
-    const simWith = toSimResult(runSelectedProjection(buildFeeSimInput(simParams, effectiveReturn), true))
-    fireAgeWithoutFees = simWithout.fireAgeFractional
-    fireAgeWithFees = simWith.fireAgeFractional
-    bothReachable = simWithout.fireReachable && simWith.fireReachable
-  } else {
-    // Byte-identiek aan vóór de migratie: legacy v1-engine (`runSimulation`) direct.
-    const simWithout = runSimulation(
-      simParams.currentAge,
-      simParams.endAge,
-      simParams.currentPortfolio,
-      simParams.yearlyExpenses,
-      simParams.annualSavings,
-      simParams.grossReturn,
-      simParams.returnModel,
-      simParams.inflation,
-      simParams.cashflows,
-      simParams.strategyConfig,
-      simParams.withdrawalStrategy,
-    )
-    // Simulation with fee drag: reduce gross return by weighted TER
-    const simWith = runSimulation(
-      simParams.currentAge,
-      simParams.endAge,
-      simParams.currentPortfolio,
-      simParams.yearlyExpenses,
-      simParams.annualSavings,
-      effectiveReturn,
-      simParams.returnModel,
-      simParams.inflation,
-      simParams.cashflows,
-      simParams.strategyConfig,
-      simParams.withdrawalStrategy,
-    )
-    fireAgeWithoutFees = simWithout.fireAgeFractional
-    fireAgeWithFees = simWith.fireAgeFractional
-    bothReachable = simWithout.fireReachable && simWith.fireReachable
-  }
+  // Beide scenario's op de v2-grootboek-engine (de enige engine sinds C5-c). De
+  // fee zit in de (lagere) effectieve return op dezelfde input-vorm.
+  const simWithout = toSimResult(runSelectedProjection(buildFeeSimInput(simParams, simParams.grossReturn), true))
+  const simWith = toSimResult(runSelectedProjection(buildFeeSimInput(simParams, effectiveReturn), true))
+  const fireAgeWithoutFees: number | null = simWithout.fireAgeFractional
+  const fireAgeWithFees: number | null = simWith.fireAgeFractional
+  const bothReachable: boolean = simWithout.fireReachable && simWith.fireReachable
 
   // Calculate impact in months
   let feeImpactMonths = 0

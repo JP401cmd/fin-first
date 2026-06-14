@@ -8,11 +8,11 @@
 
 ## 1. Doel & scope
 
-`lib/horizon-engine/` is de **tweede, tabel-georiënteerde FIRE-rekenmotor** (v2) naast de productie-engine `lib/unified-projection.ts` (v1). Hij vervangt de imperatieve forward-loop-met-binary-search door een **grootboek-model**: één forward-pass die een volledig gedecomponeerde jaartabel bouwt, één backward-pass die het benodigd vermogen per jaar afleidt, en een **forward doel-zoektocht** voor het FIRE-moment. Elke weergave (lijn, bar, in/uit, beheer-tabellen A–G) en de front-end-adapter zijn **pure views** op dezelfde jaarrijen.
+`lib/horizon-engine/` is sinds C5-c (Optie B) de **enige FIRE-rekenmotor** (v2). Hij ontstond als tabel-georiënteerde tegenhanger van de inmiddels verwijderde v1-engine (`runUnifiedProjection`, `lib/unified-projection.ts`) en verving de imperatieve forward-loop-met-binary-search door een **grootboek-model**: één forward-pass die een volledig gedecomponeerde jaartabel bouwt, één backward-pass die het benodigd vermogen per jaar afleidt, en een **forward doel-zoektocht** voor het FIRE-moment. Elke weergave (lijn, bar, in/uit, beheer-tabellen A–G) en de front-end-adapter zijn **pure views** op dezelfde jaarrijen.
 
 **In scope:** de achterkant — hoe het vermogenspad, V_nodig en de FIRE-leeftijd worden berekend, per individueel asset en per individuele schuld, intern in reële termen. De voorkant blijft ongewijzigd via een adapter naar `UnifiedProjectionResult`.
 
-**Niet in scope (bewust):** de visuele componenten op `/toekomst`, de what-if-doorrekening, de fee-/hypotheek-/household-oppervlakken (die draaien nog op v1), en de onomkeerbare productie-flip. Zie §9.
+**Niet in scope (bewust):** de visuele componenten op `/toekomst` en de what-if-doorrekening. De fee-/hypotheek-/household-oppervlakken en de scalar-portfolio-callers (strategie-modal e.d.) draaien sinds C5 óók op v2 (via `runSelectedProjection` resp. de scalar-bridge `runScalarProjectionV2`). De productie-flip is afgerond. Zie §8/§9.
 
 **Waarom een tweede engine en niet een refactor van v1:** de modellen verschillen fundamenteel (reëel vs nominaal; backward V_nodig vs binary search). Parallel laten lopen achter een flag maakt vergelijking en een gecontroleerde, omkeerbare cutover mogelijk — zie §8 (de grens met v1).
 
@@ -27,13 +27,13 @@
 | `engine.ts` | **De rekenkern** `runHorizonLedger`: forward-pass (V_op, per asset/schuld), backward-pass (`backwardVnodig`), FIRE-doel-zoektocht (`meetsStrategyTarget`). Hergebruikt domein-resolvers. | `unified-projection` (input-type), `constants` (NL_AOW_AGE), `box3-data` (BOX3_PARAMS, classifyAsset), `fire-simulation` (SimCashflow), `withdrawal-strategy` (applyWithdrawalStrategy), `./strategies`, `./types` |
 | `views.ts` | **Pure selectors** voor grafiek/tabel: `buildChartSeries`, `rollupByType` (per-asset → per-type), `keyAges` (mijlpaal-jaren). | `./types`, `@/lib/asset-data` |
 | `adapter.ts` | **Het enige reëel→nominaal-punt.** `ledgerToUnifiedResult`: rollup per asset-type + × (1+inflatie)^jaar → `UnifiedProjectionResult` (drop-in voor de bestaande grafiek). | `unified-projection` (result-types), `./types` |
-| `compare.ts` | **Parity-/diff-harness.** `compareEngines`: draait v1 én v2 op dezelfde input, rapporteert verschillen (geen gelijkheids-assertie). Beslisinstrument vóór de flip. | `unified-projection` (runUnifiedProjection), `./engine`, `./adapter` |
-| `select.ts` | **Engine-selector.** `runSelectedProjection(input, useV2)`: kiest v1 of v2 op één boolean. Default = v1. De enige plek waar de keuze valt. | `unified-projection`, `./engine`, `./adapter` |
-| `flag.ts` | **Feature-flag.** `isHorizonV2Enabled(profile)` leest `profiles.feature_preferences.horizon_engine_v2`; `HORIZON_V2_FLAG`. Default false. | — (puur) |
+| `select.ts` | **Engine-selector (v2-only sinds C5-c).** `runSelectedProjection(input, useV2)`: roept ALTIJD `runHorizonLedger` aan en negeert de `useV2`-vlag; er is geen v1-arm meer. | `unified-projection` (input-type), `./engine`, `./adapter` |
+| `scalar-bridge.ts` | **Drop-in voor de oude scalar-portfolio-signatuur.** `runScalarProjectionV2`: routeert scalar-portfolio-callers (strategie-modal, hypotheek-vs-beleggen, event-panes, scenario-overlays) naar v2. | `./engine`, `./adapter`, `unified-projection` (types) |
+| `flag.ts` | **Feature-flag (no-op).** `isHorizonV2Enabled(profile)` retourneert altijd `true`; `HORIZON_V2_FLAG` blijft als constante bestaan. Het profielveld wordt niet meer gelezen. | — (puur) |
 | `index.ts` | **Publieke API.** Re-export van de bovenstaande types/functies. | alle bovenstaande |
 
 **Afhankelijkheidsrichting (mag nooit cyclisch):**
-`types` ← `strategies` ← `engine` ← {`adapter`, `compare`, `select`} ; `views`/`adapter` lezen `types`; `flag` staat los. Niets in `lib/horizon-engine/` importeert Supabase of een React-component. De afhankelijkheid op `unified-projection` is **alleen voor types** (`UnifiedProjectionInput`/`Result`) — behalve `compare.ts`/`select.ts` die v1 bewust óók aanroepen.
+`types` ← `strategies` ← `engine` ← {`adapter`, `select`, `scalar-bridge`} ; `views`/`adapter` lezen `types`; `flag` staat los. Niets in `lib/horizon-engine/` importeert Supabase of een React-component. De afhankelijkheid op `unified-projection` is **alleen voor types** (`UnifiedProjectionInput`/`Result`) — sinds C5-c roept geen enkel bestand de (verwijderde) v1-engine meer aan.
 
 ---
 
@@ -132,21 +132,21 @@ De engine rekent volledig **reëel** (koopkracht heden): `realReturn = (1+nomina
 
 `buildAssets()` geeft elk asset een eigen `realRet` (uit `expected_return`, of negatief bij `depreciation_rate`, plus de scenario-delta) en een eigen `box3Cat` (via `classifyAsset` uit `box3-data`). Losse bankrekening-cash wordt als pseudo-asset toegevoegd. `buildDebts()` geeft elke schuld eigen rente/aflossingsschema/HRA-aftrekbaarheid. Box 3-drag wordt **per asset** berekend (forfait × tarief, na het heffingsvrij vermogen pro-rata over de box 3-assets). De deplete-annuïteit gebruikt het **werkelijke gewogen reële rendement van de LIQUIDE portefeuille** (`liquidRealReturn`), niet `grossReturn` — zodat cash/crypto de onttrekking drukken en de lijn correct op ~€0 eindigt i.p.v. vroegtijdig leeg.
 
-**Legacy onttrekt daarentegen need-only** (via `ctx.legacyPreserveOnly`, gezet door `engine.ts`, afgehandeld in `lib/withdrawal-strategy.ts`): in het grootboek wordt het surplus bóven de leefbehoefte **niet geconsumeerd/herbelegd**, dus de spend-down-annuïteit (die het surplus opspendt) zou het laten verdampen en de nalatenschap onhaalbaar maken. Door alleen de behoefte te onttrekken groeit het residu vanzelf naar het nalatenschapsbedrag. Default in de gedeelde functie blijft de annuïteit (v1 ongewijzigd). Zie ADR 0014.
+**Legacy onttrekt daarentegen need-only** (via `ctx.legacyPreserveOnly`, gezet door `engine.ts`, afgehandeld in `lib/withdrawal-strategy.ts`): in het grootboek wordt het surplus bóven de leefbehoefte **niet geconsumeerd/herbelegd**, dus de spend-down-annuïteit (die het surplus opspendt) zou het laten verdampen en de nalatenschap onhaalbaar maken. Door alleen de behoefte te onttrekken groeit het residu vanzelf naar het nalatenschapsbedrag. Default in de gedeelde `lib/withdrawal-strategy.ts`-functie blijft de annuïteit; alleen v2 zet `legacyPreserveOnly`. Zie ADR 0014.
 
 ### 4.7 Eigen-huis-downsize = asset-liquidatie in het grootboek (ADR 0015)
 
 De v1-aanpak filtert het eigen huis + hypotheek uit de pot en spuit de verkoop als eenmalig inkomen in → het netto vermogen **springt** bij verkoop (de overwaarde zat er niet in en "verschijnt" als cash) en de woningwaarde-groei is onzichtbaar. v2 lost dit op met een **asset-liquidatie**:
 
-- Het huis blijft een **niet-liquide asset in het grootboek** (`NON_LIQUID`: in netto vermogen, groeit op `expected_return`, niet besteedbaar). v2 filtert het huis dus niet; v1 wel (byte-identiek).
-- Op de trigger-leeftijd (`UnifiedProjectionInput.assetLiquidations`, gevuld door `build-input.ts`; v1 negeert het veld) verkoopt de engine het asset: huiswaarde verlaat het grootboek, de gekoppelde hypotheek wordt afgelost (saldo → 0, woonlast stopt), de **netto-opbrengst** stroomt naar liquide. Netto-vermogenseffect = **−verkoopkosten**; alleen de liquiditeit verspringt.
+- Het huis blijft een **niet-liquide asset in het grootboek** (`NON_LIQUID`: in netto vermogen, groeit op `expected_return`, niet besteedbaar). v2 filtert het huis dus niet (de verwijderde v1 deed dat wel — historisch contrast).
+- Op de trigger-leeftijd (`UnifiedProjectionInput.assetLiquidations`, gevuld door `build-input.ts`) verkoopt de engine het asset: huiswaarde verlaat het grootboek, de gekoppelde hypotheek wordt afgelost (saldo → 0, woonlast stopt), de **netto-opbrengst** stroomt naar liquide. Netto-vermogenseffect = **−verkoopkosten**; alleen de liquiditeit verspringt.
 - Het verkoopmoment ligt op **v2's eigen liquide-pad** (`resolveDownsizeTriggerV2` in `build-input.ts`), niet op een v1-meetrun. De uitputtings-scan dekt de **volledige horizon**; `config.triggerAge` is **uitsluitend het never-deplete-plafond** (fallback-leeftijd), nooit een vroege cap. Raakt het liquide vermogen de verkoopkosten-buffer **nergens binnen de horizon** → **geen verkoop** (`reason: 'no_sale'`): geen `assetLiquidations`, geen huur-event; het huis blijft tot end-of-horizon in het grootboek en groeit door naar de nalatenschap (dus géén "verkoop op de cap"). Een **reverse_mortgage** `no_sale` emit geen event ⇒ `applyHousingToComposition` (`lib/horizon/wealth-composition-housing.ts`, leest de trigger-leeftijd enkel uit `housingEvent?.target_age`) injecteert niets → **geen fantoom-schaduwschuld** in de vermogenssamenstelling.
 - **Eén valuatie-basis (code-review M4).** Zowel de daadwerkelijke verkoopopbrengst (`engine.ts`) als de verkoopkosten-buffer die het trigger-moment bepaalt (`resolveDownsizeTriggerV2`) worden op **dezelfde** grondslag gemeten: de **engine-asset-waarde** van het huis in het grootboek (= `current_value × inclusion`, jaarlijks gegroeid op het *reële* `expected_return`). De trigger leest die waarde rechtstreeks uit de meetrun-rij (`row.assets[eigen_huis].eind`) — **niet** `projectEigenHuisValuesAt(...).wozValue` (dat groeit nominaal en valt terug op `woz_value`, dat van `current_value` kan afwijken). Daarmee zijn buffer en opbrengst per constructie consistent én beide reëel; de veiligheidsmarge krijgt daarom géén nominale `(1+inflatie)^jaar`-indexering (de engine is volledig reëel).
 - **Trigger-uitleg op v2's eigen pad (code-review M1).** `resolveDownsizeTriggerV2` levert náást de trigger-leeftijd een `SimulatedDepletionResult`-vormig uitleg-object (zelfde shape als `lib/housing-trigger.ts`), berekend op het v2-liquide-pad. Dat wordt via `extraMetadata` (`depletion` + `triggerMode`) op het v2-huur-event gezet zodat het "Waarom dit moment?"-panel (`event-pane-view.tsx` → `DepletionReasoning`) ook voor v2-downsize-gebruikers rendert — net als v1, maar zonder de v1-meetrun te herintroduceren.
 
-Dit respecteert INV-4 (asset-level interventie als data op de input + verwerking in de pure jaar-loop, geen bespoke som buiten het grootboek). Scope = downsize; reverse_mortgage/include/exclude houden voorlopig het v1-model. De modal-preview (`runHousingScenarioProjectionV2` in `build-input.ts`, gekozen door de component op de profielvlag `horizonEngineV2`) draait hetzelfde model + dezelfde engine als de grafiek, zodat de copy "zelfde engine als de grafiek" klopt (code-review M2). *Bewaakt door* `test/horizon-housing-liquidation.test.ts`.
+Dit respecteert INV-4 (asset-level interventie als data op de input + verwerking in de pure jaar-loop, geen bespoke som buiten het grootboek). Scope van de asset-liquidatie = downsize; reverse_mortgage/include/exclude gebruiken hun eigen v2-verwerking (er is sinds C5-c geen v1-model meer om op terug te vallen). De modal-preview (`runHousingScenarioProjectionV2` in `build-input.ts`) draait hetzelfde model + dezelfde engine (v2) als de grafiek, zodat de copy "zelfde engine als de grafiek" klopt (code-review M2). *Bewaakt door* `test/horizon-housing-liquidation.test.ts`.
 
-**include_full = woning besteedbaar (Optie A, ADR 0015).** Bij housing-mode `include_full` telt de woning volledig mee als **besteedbaar** FIRE-vermogen i.p.v. niet-liquide: `build-input` zet de `eigen_huis`-ids in `UnifiedProjectionInput.spendableAssetIds`, en de engine-helper `isNonLiquid(a)` (= `NON_LIQUID.has(type) && !spendable`) retourneert dan `false`. Zo bouwt een deplete/spend-down de woning óók af (eigen_huis staat al laatst in de onttrekkingsvolgorde), loopt de lijn naar ~€0 en matcht FIRE v1 — i.p.v. dat de niet-liquide woning ongemoeid bleef groeien (waardoor het netto vermogen nooit naar 0 liep en FIRE veel te laat viel). `exclude_from_fire` blijft uitsluiten; v1 negeert `spendableAssetIds`. *Bewaakt door* `test/horizon-housing-liquidation.test.ts` ("include_full = woning besteedbaar").
+**include_full = woning besteedbaar (Optie A, ADR 0015).** Bij housing-mode `include_full` telt de woning volledig mee als **besteedbaar** FIRE-vermogen i.p.v. niet-liquide: `build-input` zet de `eigen_huis`-ids in `UnifiedProjectionInput.spendableAssetIds`, en de engine-helper `isNonLiquid(a)` (= `NON_LIQUID.has(type) && !spendable`) retourneert dan `false`. Zo bouwt een deplete/spend-down de woning óók af (eigen_huis staat al laatst in de onttrekkingsvolgorde) en loopt de lijn naar ~€0 — i.p.v. dat de niet-liquide woning ongemoeid bleef groeien (waardoor het netto vermogen nooit naar 0 liep en FIRE veel te laat viel). `exclude_from_fire` blijft uitsluiten. *Bewaakt door* `test/horizon-housing-liquidation.test.ts` ("include_full = woning besteedbaar").
 
 ### 4.8 Recurring-eenheid: `amount` is een MAANDbedrag (× 12)
 
@@ -164,7 +164,7 @@ Alle views (A–G, grafiek) en de adapter zijn pure functies van `LedgerRow[]`; 
 
 **INV-2 — Intern reëel; de adapter is het ENIGE reëel→nominaal-punt.**
 `realReturn`/`liquidRealReturn` in de engine; `× (1+inflatie)^jaar` uitsluitend in `adapter.rowToUnified`. Geen `inflationFactor`-vermenigvuldiging in `engine.ts`/`views.ts`.
-*Bewaakt door:* `test/horizon-engine-compare.test.ts` (de bewuste −4…−14% nominale schaal-diff bevestigt dat de adapter terugrekent), code-review tegen deze invariant. **Borgvoorstel (§11):** een grep-/unit-guard dat `engine.ts` en `views.ts` geen `Math.pow(1 + inflation` bevatten.
+*Bewaakt door:* `test/horizon-engine.test.ts` (reële kern + nominale adapter-output), code-review tegen deze invariant. (De oude `test/horizon-engine-compare.test.ts` parity-test is met de v1-engine verwijderd.) **Borgvoorstel (§11):** een grep-/unit-guard dat `engine.ts` en `views.ts` geen `Math.pow(1 + inflation` bevatten.
 
 **INV-3 — FIRE = forward doel-zoektocht (`meetsStrategyTarget`), geen crossing.**
 De getoonde lijn is de geslaagde retire-at-f run; V_nodig is referentie.
@@ -177,9 +177,9 @@ Verdeling/volgorde via `strategies.ts`; onttrekkingsbedrag via het hergebruikte 
 **INV-5 — Engine is puur (geen Supabase); input = `UnifiedProjectionInput` (drop-in); hergebruikt bestaande domein-resolvers.**
 *Bewaakt door:* `test/horizon-engine.test.ts` (construeert pure input, geen mocks); de imports in `engine.ts` (`classifyAsset`, `BOX3_PARAMS`, `applyWithdrawalStrategy`, `FireEndStrategy`, `NL_AOW_AGE`) — geen `@/lib/supabase`. **Borgvoorstel (§11):** grep-guard dat `lib/horizon-engine/**` geen `supabase` importeert.
 
-**INV-6 — Flag-gated, default uit; selectie alleen in `runSelectedProjection`; legacy ongemoeid.**
-`flag.isHorizonV2Enabled` (default false) → `loadHorizonData` → `/toekomst` → `useHorizonFireSim` → `runSelectedProjection`. v1 (`runUnifiedProjection`/`runSimulation`) blijft intact.
-*Bewaakt door:* `select.ts` (één keuzepunt), de loader-keten (geverifieerd), en de plan-claim "default uit = byte-identiek aan v1, 16 integratietests groen".
+**INV-6 — Selectie alleen via `runSelectedProjection`; sinds C5-c is dat v2-only.**
+`loadHorizonData` → `/toekomst` → `useHorizonFireSim` → `runSelectedProjection`, dat altijd `runHorizonLedger` aanroept. `isHorizonV2Enabled` retourneert altijd `true`; de v1-engine (`runUnifiedProjection`/`runSimulation`) is fysiek verwijderd, dus er valt geen keuze meer te maken — de invariant is nu "alle FIRE-paden lopen via deze ene selector".
+*Bewaakt door:* `select.ts` (één keuzepunt, v2-only), de loader-keten (geverifieerd).
 
 **INV-7 — Box 3-drag per asset; deplete-annuïteit op het werkelijke gewogen reële rendement van de LIQUIDE portefeuille.**
 `box3ById` per asset (forfait via `BOX3_PARAMS`); `liquidRealReturn(assets)` voedt `ctx.yearReturn`.
@@ -223,11 +223,11 @@ INV-4 ("geen special-case in de loop") en de "consume, don't recompute"-regel zi
 | Granulariteit | per asset-type | per individueel asset + per schuld |
 | FIRE | binary-search-scalar | vroegste leeftijd waarop `meetsStrategyTarget` |
 | Pot-regels | opgeslagen, genegeerd | aangesloten via plug-ins (default-opties) |
-| Status | productie-default voor iedereen | per-user flag, default uit |
+| Status | **VERWIJDERD (C5-c, 14 jun 2026)** | **enige productie-FIRE-engine** |
 
-**De flag.** `profiles.feature_preferences.horizon_engine_v2` (`isHorizonV2Enabled`). De keuze valt op exact één plek: `runSelectedProjection(input, useV2)` in `use-horizon-fire-sim.ts`. Toggle per gebruiker via `GET/PUT /api/horizon-engine` + `app/(app)/beheer/horizon-tabellen/horizon-v2-toggle.tsx` (schrijft alleen de eigen profielrij — RLS-correct, raakt geen andere gebruiker). Default uit = byte-identiek aan v1.
+**De flag — achterhaald (C5-a/c, Optie B).** `isHorizonV2Enabled` retourneert altijd `true`; de toggle-UI (`horizon-v2-toggle.tsx`) en de GET/PUT `/api/horizon-engine`-route zijn verwijderd. `runSelectedProjection(input, useV2)` is **v2-only**: de `useV2`-parameter blijft in de signatuur staan maar wordt genegeerd — er is **geen v1-arm** meer in de selector, en `compareEngines`/de parity-tooling is verwijderd. Het profileveld `profiles.feature_preferences.horizon_engine_v2` is irrelevant maar onschadelijk.
 
-**Meta-oppervlakken (bewust NIET in de ArchiMate-topologie/HLD).** `/beheer/horizon-tabellen` (inspector, tabellen A–G + "Vergelijk v1↔v2") en de tijdelijke `/beheer/grafiek-werking` (functionele referentie) zijn ontwikkel-/inzicht-tooling. Ze horen niet op de plaat — ze beschrijven de plaat.
+**Meta-oppervlakken (bewust NIET in de ArchiMate-topologie/HLD).** `/beheer/horizon-tabellen-mij` (inspector op de echte-gebruiker-tabellen A–G) en de tijdelijke `/beheer/grafiek-werking` (functionele referentie) zijn ontwikkel-/inzicht-tooling. Ze horen niet op de plaat — ze beschrijven de plaat. De oude v1↔v2-vergelijk-inspector `/beheer/horizon-tabellen` is met de parity-tooling verwijderd (geen v1 meer om tegen te vergelijken).
 
 ---
 
@@ -237,7 +237,7 @@ INV-4 ("geen special-case in de loop") en de "consume, don't recompute"-regel zi
 2. **Pot-regels nog niet doorgedraad.** `profiles.pot_rules` (onttrekkingsvolgorde / verdeling-bij-toename / onttrekking-bij-afname) is niet aangesloten; v2 gebruikt `DEFAULT_STRATEGY_OPTIONS`. *Op te ruimen:* map `pot_rules` → `HorizonStrategyOptions` in de loader, doorgeven via `optsOverride`. De plug-in-architectuur (INV-4) ondersteunt dit al — het is louter de wiring.
 3. **Income-growth = 0.** `incomeGrowthRate` wordt door de loader op 0 gezet en de engine modelleert (nog) geen carrièregroei. *Op te ruimen:* een reële inkomensdrift-kolom; INV-2 (reëel) blijft.
 4. **Werkelijke tabellen voor de eigen gebruiker.** De inspector draait nu op persona-data; de echte-gebruiker-tabellen (transparantie) zijn nog te ontsluiten. Pure view op `LedgerRow[]` — raakt geen invariant.
-5. **Cutover (onomkeerbaar, gated).** v2 als globale default + verwijderen van `runUnifiedProjection`/`runSimulation` raakt fee-analyse, hypotheek-vs-beleggen en household. Blijft gated tot de parity-diffs (`compareEngines`) akkoord zijn. **Vóór de flip:** adapter dekt álle huidige features (fase-kleuring, fractionele FIRE, scenario/MC/household-overlays, bronnen-breakdown, kassabon), what-if op dezelfde engine, en de Berekeningen-catalogus + ADR's bijgewerkt.
+5. ~~**Cutover (onomkeerbaar, gated).**~~ **AFGEROND via Optie B — volledige fysieke verwijdering (C5-c, 14 jun 2026).** `runUnifiedProjection` en `runSimulation` zijn fysiek verwijderd. v2 is de enige FIRE-engine; `runSelectedProjection` is v2-only (negeert `useV2`). De gedeelde types/helpers zijn behouden in `lib/unified-projection.ts`/`lib/fire-simulation.ts`. Scalar-bridge beschikbaar als `runScalarProjectionV2` (routeert de scalar-portfolio-callers, incl. `strategie-modal.tsx`, naar v2). **Parity-/compare-tooling is VERWIJDERD** (Optie B overrulede D3): `compareEngines`, de ledger-API en de v1↔v2-vergelijk-inspector `/beheer/horizon-tabellen` + parity-tests zijn weg. Géén openstaand v1-werkpakket meer (`strategie-modal.tsx` draait op v2).
 
 ---
 

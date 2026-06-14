@@ -5,7 +5,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 import type { SimCashflow, SimRow, ReturnModel } from '@/lib/fire-simulation'
-import { runSimulationUnified as runSimulation } from '@/lib/unified-projection'
+import { runScalarProjectionV2 as runSimulation } from '@/lib/horizon-engine/scalar-bridge'
 import { buildBreakdownFromSimRows as buildBreakdown } from '@/lib/income-expense-breakdown'
 
 const CAT = 'horizon.inkomen-uitgaven'

@@ -177,3 +177,9 @@
 
 - **API-routes** toegevoegd: /api/overzicht/cashflow-status
 - **API-routes** verwijderd: /api/horizon-engine
+
+## 2026-06-14
+
+- **Schermen** toegevoegd: /beheer/horizon-strategie
+- **Schermen** verwijderd: /beheer/horizon-tabellen
+- **API-routes** verwijderd: /api/horizon-engine/ledger

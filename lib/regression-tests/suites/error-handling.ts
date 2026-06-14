@@ -408,7 +408,7 @@ const tests: TestCase[] = [
     async fn() {
       // Test via dynamic import of pure function
       try {
-        const { runSimulation } = await import('@/lib/fire-simulation')
+        const { runScalarProjectionV2: runSimulation } = await import('@/lib/horizon-engine/scalar-bridge')
         const result = runSimulation(
           35,    // currentAge
           90,    // endAge
@@ -444,7 +444,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 300,
     async fn() {
       try {
-        const { runSimulation } = await import('@/lib/fire-simulation')
+        const { runScalarProjectionV2: runSimulation } = await import('@/lib/horizon-engine/scalar-bridge')
         const result = runSimulation(
           35,     // currentAge
           90,     // endAge
@@ -620,7 +620,7 @@ const tests: TestCase[] = [
     estimatedDurationMs: 2000,
     async fn() {
       try {
-        const { runSimulation } = await import('@/lib/fire-simulation')
+        const { runScalarProjectionV2: runSimulation } = await import('@/lib/horizon-engine/scalar-bridge')
         const start = performance.now()
         const result = runSimulation(
           20,      // very young start

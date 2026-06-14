@@ -10,7 +10,8 @@
 import { describe, it, expect } from 'vitest'
 import { PERSONAS, PERSONA_KEYS, type PersonaKey, type PersonaData } from '@/lib/test-personas'
 import { hasPartner } from '@/lib/household-type'
-import { runUnifiedProjection, type UnifiedProjectionInput, type UnifiedProjectionRow } from '@/lib/unified-projection'
+import { type UnifiedProjectionInput, type UnifiedProjectionRow } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { classifyAsset, BOX3_PARAMS } from '@/lib/box3-data'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { ageAtDate } from '@/lib/horizon-data'
@@ -193,7 +194,7 @@ describe('Persona seeds × Unified Projection verification (#506)', () => {
   // Step 5 — Daan: heffingsvrij eliminates Box 3
   describe('Step 5 — Daan: heffingsvrij eliminates Box 3 completely', () => {
     const input = buildUnifiedInputForPersona('daan')
-    const result = runUnifiedProjection(input)
+    const result = runSelectedProjection(input, true)
     const heffingsvrij = BOX3_PARAMS[2026].heffingsvrijSingle
 
     it('total Box 3 assets are below heffingsvrij threshold', () => {
@@ -214,7 +215,7 @@ describe('Persona seeds × Unified Projection verification (#506)', () => {
   // Step 6 — Willem: per-asset allocation and no mortgage
   describe('Step 6 — Willem: per-asset allocation and no debts', () => {
     const input = buildUnifiedInputForPersona('willem')
-    const result = runUnifiedProjection(input)
+    const result = runSelectedProjection(input, true)
 
     it('asset buckets contain expected types', () => {
       const types = Object.keys(result.rows[0].assetBuckets)
@@ -253,7 +254,7 @@ describe('Persona seeds × Unified Projection verification (#506)', () => {
   describe('Step 7 — Marijke: forcedFireAge + guardrails withdrawal', () => {
     const input = buildUnifiedInputForPersona('marijke')
     expect(input.forcedFireAge).toBe(67)
-    const result = runUnifiedProjection(input)
+    const result = runSelectedProjection(input, true)
 
     it('fireAge equals forced value of 67', () => {
       expect(result.fireAge).toBe(67)
@@ -294,14 +295,14 @@ describe('Persona seeds × Unified Projection verification (#506)', () => {
     it('projection runs with life-event cashflows and all rows are finite', () => {
       const input = buildUnifiedInputForPersona('lisa')
       expect(input.cashflows.length).toBeGreaterThan(0)
-      const result = runUnifiedProjection(input)
+      const result = runSelectedProjection(input, true)
       expect(result.rows.length).toBeGreaterThan(0)
       for (const row of result.rows) assertRowFinite(row, `lisa age=${row.age}`)
     })
 
     it('sabbatical and erfenis ages show cashflow effects', () => {
       const p = PERSONAS['lisa']
-      const result = runUnifiedProjection(buildUnifiedInputForPersona('lisa'))
+      const result = runSelectedProjection(buildUnifiedInputForPersona('lisa'), true)
       const sabbatical = p.life_events.find(e => e.is_active && e.event_type === 'sabbatical')
       const erfenis = p.life_events.find(e => e.is_active && e.event_type === 'erfenis')
 

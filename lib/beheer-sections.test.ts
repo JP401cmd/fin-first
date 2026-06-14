@@ -8,8 +8,8 @@ describe('BEHEER_GROUPS', () => {
     expect(BEHEER_GROUPS.map((g) => g.id)).toEqual(['technisch', 'functioneel', 'test', 'info'])
   })
 
-  it('bevat 35 tools met unieke routes onder /beheer/', () => {
-    expect(allTools).toHaveLength(35)
+  it('bevat 34 tools met unieke routes onder /beheer/', () => {
+    expect(allTools).toHaveLength(34)
     const hrefs = allTools.map((t) => t.href)
     expect(new Set(hrefs).size).toBe(hrefs.length)
     for (const href of hrefs) {
@@ -42,6 +42,8 @@ describe('BEHEER_GROUPS', () => {
       '/beheer/will-avatar',
       '/beheer/widgets-test',
       '/beheer/propositie',
+      // C5-c: de v1↔v2 parity-inspector is verwijderd (v2 is de enige engine).
+      '/beheer/horizon-tabellen',
     ]) {
       expect(hrefs).not.toContain(removed)
     }
