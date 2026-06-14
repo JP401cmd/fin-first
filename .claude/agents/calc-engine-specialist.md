@@ -40,6 +40,7 @@ If a value already exists in one of these, **import it — do not recompute**. D
 ## Non-negotiables
 
 - One formula, one home. Never copy a calculation into a second file.
+- **Flag suspicious scale conventions — never silently preserve them.** When a new derived display number depends on a scale assumption (monthly vs. annual, ×12, /365, /12) that contradicts the *verified* source-of-truth semantics — especially when it sits next to a pre-existing number using the opposite assumption — treat the pre-existing value as a **suspected bug** and call it out explicitly in your report (don't keep it as a "locked convention" just because it predates you). Verify the field's real unit at its producer/mapper, not just its name or comment, before trusting either number.
 - No hardcoded financial assumptions (no fixed SWR/return/inflation) — derive per user via the params layer.
 - Every constant is named and lives in `lib/constants.ts` (or the box-tax data files).
 - Never report a calculation change as done without passing tests proving it.
