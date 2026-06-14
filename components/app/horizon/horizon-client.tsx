@@ -3089,7 +3089,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                   <p className="font-sans text-[12px] text-orange-700">
-                    {simResult.strategy === 'legacy' ? (
+                    {withdrawalStrategyConfig.strategy === 'vpw' && simResult.strategy !== 'deplete' ? (
+                      <>De onttrekkingsstrategie <strong>Variabel percentage (VPW)</strong> trekt je vermogen tegen je einddatum volledig leeg — die combineert daarom alléén met &quot;Vermogen opeten&quot;, niet met {simResult.strategy === 'legacy' ? 'Nalatenschap' : simResult.strategy === 'perpetual' ? 'Vermogen behouden' : 'deze eindstrategie'}. Kies &quot;Vermogen opeten&quot; als eindstrategie, of een andere onttrekkingsstrategie (bijv. vast percentage).</>
+                    ) : simResult.strategy === 'legacy' ? (
                       <>Je haalt je nalatenschapsdoel{fireStrategy?.legacyAmount ? ` van ${formatMaskedCurrency(fireStrategy.legacyAmount, masked)}` : ''} niet binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verlaag het nalatenschapsbedrag, verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>
                     ) : simResult.strategy === 'perpetual' ? (
                       <>Je vermogen is niet groot genoeg om er blijvend van te leven binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>

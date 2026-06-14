@@ -11,7 +11,7 @@ import { lifeEventsToCashflows, type SimCashflow, type SimResult } from '@/lib/f
 import { formatFireAge } from '@/lib/horizon-data'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import type { Debt } from '@/lib/debt-data'
-import { weightedDebtRate, aflossenFireAgeAtRate } from '@/components/app/horizon/whatif-beslishulp.model'
+import { weightedDebtRate, fireAgeFromSim, aflossenFireAge } from '@/components/app/horizon/whatif-beslishulp.model'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { CalculatorToLifeEventSheet } from '@/components/future/calculator-to-life-event-sheet'
 import type { LifeEventImpactKind } from '@/lib/calculator/to-life-event'
@@ -34,15 +34,18 @@ import type { LifeEventImpactKind } from '@/lib/calculator/to-life-event'
  *    rendement via de echte motor. Geen benadering.
  *
  * 2. AFLOSSEN  — gegarandeerd, eigen tarief: aflossen levert het VASTE
- *    rentetarief van je schuld op (r_debt = saldo-gewogen), doorgaans lager
- *    dan het onzekere marktrendement. We raken de gedeelde motor niet aan
- *    (zowel v1 als v2 leveren het basispad + doel via `runSelectedProjection`);
- *    in plaats daarvan groeit een aparte "aflossen-pot" van €X/mnd op r_debt
- *    bovenop het netto-vermogenspad van het basisscenario, en bereikt FIRE
- *    zodra basispad + pot ≥ het motor-doelvermogen (`requiredFirePortfolio`).
- *    Zie `whatif-beslishulp.model.ts` (`aflossenFireAgeAtRate`). Distinct van
- *    beleggen: lager-maar-gegarandeerd → kleinere FIRE-versnelling wanneer
- *    r_debt < verwacht rendement (en groter wanneer r_debt hoger ligt).
+ *    rentetarief van je schuld op (r_debt = saldo-gewogen) en is BOX-3-VRIJ (een
+ *    schuld terugbetalen wordt niet belast). We raken de gedeelde motor niet aan
+ *    voor een tweede definitie; in plaats daarvan groeit een aparte "aflossen-pot"
+ *    van €X/mnd op r_debt (onbelast) bovenop het netto-vermogenspad dat de motor
+ *    zélf voor het basisscenario teruggeeft, en bereikt FIRE zodra basispad + pot
+ *    ≥ het motor-doelvermogen (`requiredFirePortfolio`). Zie
+ *    `whatif-beslishulp.model.ts` (`aflossenFireAge`). Bij €0 extra identiek aan
+ *    de motor-baseline (`fireAgeFromSim(base)`) → beide kaarten delen dezelfde
+ *    grondslag; het enige verschil met beleggen is de groeivoet + Box 3. Distinct
+ *    van beleggen: lager-maar-gegarandeerd-en-onbelast → kleinere FIRE-versnelling
+ *    wanneer r_debt onder het (Box-3-belaste) beleggingspad blijft, en groter
+ *    wanneer r_debt hoog genoeg is om dat pad te verslaan.
  *
  * 3. NOODFONDS — bewust bijna-vlak: een liquide buffer op ~0% rendement koopt
  *    veiligheid, geen snelheid. De motor stuurt élke terugkerende income-
@@ -146,7 +149,10 @@ export function WhatIfBeslishulp({
     )
   }, [baseInput, scenarioCashflows, useV2])
 
-  const baselineFireAge = baselineSim?.fireAgeFractional ?? null
+  // Fractionele baseline-FIRE-leeftijd uit de MOTOR-rijen (kruispunt opgebouwd ×
+  // benodigd vermogen) — exact dezelfde grondslag als de Aflossen-pot, zodat
+  // beleggen en aflossen onderling vergelijkbaar zijn (consume, don't recompute).
+  const baselineFireAge = baselineSim ? fireAgeFromSim(baselineSim) : null
 
   // ── Bereken per optie de FIRE-leeftijd MET de optie ─────────────────────
   // Beleggen/Aflossen: scenario-cashflows + de extra-contributie-cashflow.
@@ -159,7 +165,8 @@ export function WhatIfBeslishulp({
       const sim = toSimResult(
         runSelectedProjection({ ...baseInput, cashflows: [...scenarioCashflows, ...extra] }, useV2),
       )
-      return sim.fireAgeFractional
+      // Zelfde fractionele grondslag als de Aflossen-pot (motor-kruispunt).
+      return fireAgeFromSim(sim)
     }
 
     const deltaFrom = (withAge: number | null): number | null =>
@@ -190,7 +197,7 @@ export function WhatIfBeslishulp({
     // basispad → distinct van beleggen (lager-maar-zeker wanneer r_debt onder
     // het marktrendement ligt; hoger wanneer r_debt erboven ligt).
     if (hasDebt && debtRate !== null) {
-      const aflossenAge = aflossenFireAgeAtRate(baselineSim, currentAge, amount, debtRate)
+      const aflossenAge = aflossenFireAge(baselineSim, currentAge, amount, debtRate)
       raw.push({
         id: 'aflossen',
         label: 'Aflossen',

@@ -240,11 +240,12 @@ describe('Withdrawal Strategy Integration — strategy-dependent FIRE age', () =
     expect(bucketResult.requiredFirePortfolio).toBe(staticResult.requiredFirePortfolio)
   })
 
-  it('VPW + perpetual — v2 produces valid output (no incompatibility detection in v2)', () => {
-    // v1 used to short-circuit VPW+perpetual as "incompatible" (VPW targets full
-    // depletion at endAge, conflicting with perpetual). v2 does not implement this
-    // guard — it runs the VPW formula regardless of strategy and produces valid rows.
-    // This is a deliberate v2 simplification (ADR 0016).
+  it('VPW + perpetual — v2 blocks the incompatible combination (guard restored)', () => {
+    // VPW targets full depletion at endAge (vpwRate=1.0 last year), which conflicts
+    // with perpetual (preserve purchasing power). v1 short-circuited this; v2 had
+    // regressed to silently returning fireReachable=true at fireAge=100 with €0 end
+    // value. The engine-level guard (runHorizonLedger) now mirrors v1: it early-
+    // returns an empty/unreachable result. Bewaakt door test/horizon-vpw-guard.test.ts.
     const vpw: WithdrawalStrategyConfig = {
       strategy: 'vpw',
       guardrailFloor: 0.80,
@@ -256,21 +257,17 @@ describe('Withdrawal Strategy Integration — strategy-dependent FIRE age', () =
 
     const result = runStandard({}, [], perpetual, vpw)
 
-    // v2 runs normally — verify it produces coherent output
-    expect(result.fireReachable).toBe(true)
-    expect(result.fireAge).not.toBeNull()
-    expect(result.rows.length).toBeGreaterThan(0)
-    for (const row of result.rows) {
-      expect(Number.isFinite(row.withdrawal)).toBe(true)
-      expect(Number.isFinite(row.endPortfolio)).toBe(true)
-    }
+    // Guard active → onbereikbaar + leeg (geen stille fireAge=100 op €0 meer).
+    expect(result.fireReachable).toBe(false)
+    expect(result.fireAge).toBeNull()
+    expect(result.rows.length).toBe(0)
   })
 
-  it('VPW + legacy — v2 produces rows without crashing (binary search may fail)', () => {
-    // v1 explicitly blocked VPW+legacy as "incompatible". v2 does not implement this
-    // guard but the binary search may fail to find a portfolio that satisfies both
-    // VPW depletion AND leaving legacyAmount at endAge (these goals conflict mathematically).
-    // The key invariant: v2 does NOT crash and produces rows with finite values.
+  it('VPW + legacy — v2 blocks the incompatible combination (guard restored)', () => {
+    // v1 explicitly blocked VPW+legacy (VPW depletes fully at endAge, conflicting
+    // with leaving legacyAmount). v2 had regressed to fireReachable=false with a full
+    // 51-row path (misleading "save more"). The engine guard now early-returns an
+    // empty/unreachable result. Bewaakt door test/horizon-vpw-guard.test.ts.
     const vpw: WithdrawalStrategyConfig = {
       strategy: 'vpw',
       guardrailFloor: 0.80,
@@ -282,15 +279,10 @@ describe('Withdrawal Strategy Integration — strategy-dependent FIRE age', () =
 
     const result = runStandard({}, [], legacy, vpw)
 
-    // v2 may return fireReachable=false when the binary search can't satisfy
-    // VPW depletion + legacy reserve simultaneously — this is expected behavior.
     expect(result).toBeDefined()
-    expect(result.rows).toBeDefined()
-    // All rows that exist must be finite
-    for (const row of result.rows) {
-      expect(Number.isFinite(row.withdrawal)).toBe(true)
-      expect(Number.isFinite(row.endPortfolio)).toBe(true)
-    }
+    expect(result.fireReachable).toBe(false)
+    expect(result.fireAge).toBeNull()
+    expect(result.rows.length).toBe(0)
   })
 
   it('legacy end strategy + compatible withdrawal strategies converges correctly', () => {

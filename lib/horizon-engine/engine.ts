@@ -106,6 +106,36 @@ export function runHorizonLedger(
   const endAge =
     strategy === 'perpetual' ? Math.max(input.strategyConfig.endAge, 100) : input.strategyConfig.endAge
   const withdrawalType = input.withdrawalStrategy.strategy
+
+  // ── VPW × legacy/perpetual/pensioen is onverenigbaar (spiegelt de v1-block;
+  //    was in fire-simulation.ts vóór 1417a4568). VPW (`applyVpw`) onttrekt per
+  //    definitie het volledige restant binnen de horizon (vpwRate = 1.0 in het
+  //    laatste jaar → portfolio → ~€0), wat botst met nalatenschap (legacy),
+  //    eeuwigdurend vermogensbehoud (perpetual) en de vaste pensioen-onttrekking.
+  //    VPW is alléén compatibel met 'deplete'. Zonder deze guard gaf v2
+  //    misleidende uitkomsten: vpw×legacy → fireReachable=false ("verhoog je
+  //    spaarquote"), vpw×perpetual → stil fireReachable=true op fireAge=100 met
+  //    €0 eindvermogen. Vroege uitgang met de lege/onbereikbare resultaat-shape
+  //    die de adapter/toSimResult verwacht. ──
+  if (
+    withdrawalType === 'vpw' &&
+    (strategy === 'legacy' || strategy === 'perpetual' || strategy === 'pensioen')
+  ) {
+    return {
+      rows: [],
+      vNodig: [],
+      fireAge: null,
+      fireAgeFractional: null,
+      fireReachable: false,
+      requiredFirePortfolioAtFire: 0,
+      liquideAtFire: 0,
+      displayEndAge: endAge,
+      strategy,
+      inflationRate: inflation,
+      legacyTargetUnavoidablyExceeded: false,
+    }
+  }
+
   const box3Params = BOX3_PARAMS[BOX3_YEAR]
   const box3Vrij = input.hasPartner ? box3Params.heffingsvrijPartner : box3Params.heffingsvrijSingle
   const realRetAvg = realReturn(input.grossReturn, inflation)

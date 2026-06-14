@@ -1,34 +1,50 @@
 /**
  * WhatIf-beslishulp — reken-model (pure, testbaar).
  *
- * Bevat de twee modelkeuzes die de UI-kaart "Wat doe je met €X/maand extra?"
+ * Bevat de modelkeuzes die de UI-kaart "Wat doe je met €X/maand extra?"
  * aandrijven en die los van React getest worden:
  *
- *   • weightedDebtRate(debts)            → saldo-gewogen schuldrente (decimaal)
- *   • aflossenFireAgeAtRate(...)         → FIRE-leeftijd als €X/mnd op het
- *                                          GEGARANDEERDE schuldrente-tarief
- *                                          compoundt bovenop het basispad.
+ *   • weightedDebtRate(debts)        → saldo-gewogen schuldrente (decimaal)
+ *   • fireAgeFromSim(sim)            → fractionele FIRE-leeftijd uit de
+ *                                      ENGINE-rijen (kruispunt opgebouwd
+ *                                      vermogen × benodigd vermogen)
+ *   • aflossenFireAge(base, …)       → fractionele FIRE-leeftijd als €X/mnd op
+ *                                      het GEGARANDEERDE schuldrente-tarief
+ *                                      (Box-3-vrij) bovenop het ENGINE-basispad
+ *                                      groeit
  *
- * ── Waarom Aflossen een EIGEN model heeft (en niet "≈ beleggen") ─────────────
- * De gedeelde motor (`runUnifiedProjection`) routeert élke terugkerende income-
- * cashflow naar beleggingsbuckets op het VERWACHTE rendement. Daardoor zou
- * extra aflossen, als `extra_inleg`-event, exact samenvallen met beleggen —
- * terwijl aflossen in werkelijkheid het GEGARANDEERDE rentetarief van je schuld
- * oplevert (r_debt), doorgaans lager dan het onzekere marktrendement.
+ * ── Eén motor voor BEIDE opties (consume, don't recompute) ───────────────────
+ * Zowel Beleggen als Aflossen worden tegen DEZELFDE motor (`runSelectedProjection`
+ * → v2-grootboek) gemeten, zodat ze allebei het motor-basispad reproduceren bij
+ * €0 extra en alléén in de toegepaste groeivoet verschillen:
  *
- * We raken de gedeelde motor BEWUST niet aan (74 projectie-tests = vangnet).
- * In plaats daarvan leunen we op wat de motor al per scenario teruggeeft:
- *   1. het netto-vermogenspad van het BASISSCENARIO (rows: start/eind per jaar);
- *   2. het FIRE-doelvermogen dat de motor zelf hanteert (requiredFirePortfolio).
- * Bovenop dat pad groeit een aparte "aflossen-pot" van €X/mnd op r_debt. De
- * aflossen-FIRE-leeftijd is het eerste (fractionele) jaar waarin
- * basispad + pot ≥ het doelvermogen. Box 3, schuldaflossing, onttrekkings-
- * strategie en partnervrijstelling zitten al in zowel het pad als het doel —
- * we voegen enkel een gegarandeerd-rente zijpotje toe. Self-consistent met de
- * Beleggen-berekening (zelfde doel, zelfde basispad).
+ *   • BELEGGEN  — een extra `extra_inleg`-cashflow in de ECHTE motor. De extra
+ *                 inleg compoundt op het VERWACHTE rendement, mét Box 3-drag (de
+ *                 motor belast élke beleggings-instroom forfaitair). De FIRE-
+ *                 leeftijd komt uit `fireAgeFromSim` op die motor-run.
+ *
+ *   • AFLOSSEN  — schuld aflossen levert het GEGARANDEERDE schuldrente-tarief
+ *                 (`r_debt`, saldo-gewogen) op, en is BOX-3-VRIJ (een schuld
+ *                 terugbetalen wordt niet belast). We raken de motor niet aan voor
+ *                 een tweede definitie; in plaats daarvan groeit een aparte
+ *                 "aflossen-pot" van €X/mnd op `r_debt` (onbelast) bovenop het
+ *                 netto-vermogenspad dat de motor zélf voor het basisscenario
+ *                 teruggeeft. FIRE = het eerste (fractionele) jaar waarin
+ *                 basispad(n) + pot(n) ≥ het motor-doelvermogen
+ *                 (`requiredFirePortfolio`). Eén inflatie-epoche en hetzelfde doel
+ *                 als de motor → géén gemengde-inflatie-bug, en bij €0 extra
+ *                 identiek aan `fireAgeFromSim(base)`.
+ *
+ * Daarom wint beleggen bij een lage schuldrente (de onzekere markt na Box 3
+ * verslaat een lage gegarandeerde rente) en wint aflossen pas wanneer de
+ * gegarandeerde schuldrente hoog genoeg is om het motor-beleggingspad te
+ * verslaan. De eerdere `aflossenFireAgeAtRate` liep NIET door de motor (zijpot op
+ * de rauwe schuldrente, vergeleken tegen een FIRE-jaar-geïnflateerd doel terwijl
+ * het pad per-jaar-geïnflateerd was — gemengde inflatie-epoches) en kon het
+ * basispad niet eens reproduceren; daardoor "won" aflossen op élk rentetarief.
  */
 
-import type { SimResult } from '@/lib/fire-simulation'
+import type { SimResult, SimRow } from '@/lib/fire-simulation'
 import type { Debt } from '@/lib/debt-data'
 
 /**
@@ -58,93 +74,137 @@ export function weightedDebtRate(debts: Debt[]): number | null {
 }
 
 /**
- * Bereken de FIRE-leeftijd wanneer €`monthly`/maand op het GEGARANDEERDE
- * schuldrente-tarief (`annualDebtRate`) compoundt bovenop het basispad.
+ * Eindwaarde van het opbouwjaar dat op leeftijd `age` eindigt (motor-rijen).
+ * Vóór de eerste rij geldt het startvermogen op `currentAge`; voorbij het laatste
+ * opbouwjaar het laatst bekende eindvermogen.
+ */
+function accumulationPath(sim: SimResult): {
+  startNetWorth: number
+  endByAge: Map<number, number>
+  lastAge: number
+  lastValue: number
+  firstAge: number
+} {
+  const acc: SimRow[] = sim.rows.filter((r) => r.phase === 'accumulation')
+  const startNetWorth = sim.rows[0]?.startPortfolio ?? 0
+  const endByAge = new Map<number, number>()
+  for (const r of acc) endByAge.set(r.age + 1, r.endPortfolio)
+  const last = acc[acc.length - 1]
+  return {
+    startNetWorth,
+    endByAge,
+    lastAge: last ? last.age + 1 : (sim.rows[0]?.age ?? 0),
+    lastValue: last ? last.endPortfolio : startNetWorth,
+    firstAge: sim.rows[0]?.age ?? 0,
+  }
+}
+
+/**
+ * Lineair interpoleer het (fractionele) jaar waarin een MONOTOON STIJGEND pad het
+ * doel bereikt. `valueAt(age)` is het gecombineerde vermogen aan het EIND van het
+ * jaar dat op `age` eindigt; de loop start op `firstAge` (vermogen = `startValue`).
+ */
+function crossingAge(
+  startAge: number,
+  startValue: number,
+  target: number,
+  lastAge: number,
+  valueAt: (age: number) => number,
+): number | null {
+  if (startValue >= target) return startAge
+  let prevAge = startAge
+  let prevValue = startValue
+  for (let age = startAge + 1; age <= lastAge; age++) {
+    const value = valueAt(age)
+    if (value >= target) {
+      const span = value - prevValue
+      const t = span > 0 ? (target - prevValue) / span : 0
+      return prevAge + Math.max(0, Math.min(1, t)) * (age - prevAge)
+    }
+    prevAge = age
+    prevValue = value
+  }
+  return null
+}
+
+/**
+ * Fractionele FIRE-leeftijd uit de MOTOR-rijen: het (geïnterpoleerde) jaar waarin
+ * het opgebouwde netto vermogen het door de motor berekende doelvermogen
+ * (`requiredFirePortfolio`) bereikt. Eén inflatie-epoche (de nominale motor-rijen),
+ * één Box 3-behandeling (die van de motor). Valt terug op `fireAgeFractional` als
+ * er geen bruikbaar doel/pad is.
  *
- * Model:
- *   • basePath: het netto-vermogenspad van het basisscenario (de motor-rows).
- *     Per jaar `n` gebruiken we het EINDvermogen (endPortfolio) op leeftijd
- *     `currentAge + n`, plus een impliciet startpunt op `currentAge`.
+ * Gebruikt voor de Beleggen-kaart: meet de motor-run (basis + extra inleg) op
+ * exact dezelfde grondslag als de Aflossen-kaart, zodat de twee vergelijkbaar zijn.
+ */
+export function fireAgeFromSim(sim: SimResult): number | null {
+  const target = sim.requiredFirePortfolio
+  if (!(target > 0) || sim.rows.length === 0) return sim.fireAgeFractional
+  const { startNetWorth, endByAge, lastAge, lastValue, firstAge } = accumulationPath(sim)
+  const crossing = crossingAge(firstAge, startNetWorth, target, lastAge, (age) =>
+    endByAge.get(age) ?? lastValue,
+  )
+  return crossing ?? sim.fireAgeFractional
+}
+
+/**
+ * Fractionele FIRE-leeftijd wanneer €`monthly`/maand op het GEGARANDEERDE
+ * schuldrente-tarief (`annualDebtRate`) BOX-3-VRIJ compoundt bovenop het
+ * motor-basispad.
+ *
+ * Model (motor-consistent — zelfde doel en pad als `fireAgeFromSim`):
+ *   • basispad: het netto-vermogenspad uit de motor-rijen van het BASISSCENARIO.
  *   • pot_n: een aparte pot die op `currentAge` op 0 staat en jaarlijks groeit:
  *       pot_{n+1} = pot_n · (1 + r_debt) + 12·monthly
- *     (eerst groei op de bestaande pot, dan de jaarbijdrage erbij — consistent
- *     met de accumulatie van de motor: end = start + start·rendement + inleg).
- *   • FIRE wordt bereikt op het eerste jaar waarin
- *       basePath(n) + pot(n) ≥ requiredFirePortfolio.
- *     Tussen twee jaren wordt lineair geïnterpoleerd voor sub-jaar precisie.
+ *     (groei op de bestaande pot, dan de jaarbijdrage — consistent met de
+ *     accumulatie van de motor). r_debt is ONBELAST: een schuld aflossen wordt
+ *     niet in Box 3 betrokken, dus geen drag op deze pot.
+ *   • FIRE = eerste jaar waarin basispad(n) + pot(n) ≥ requiredFirePortfolio,
+ *     met lineaire interpolatie voor sub-jaar precisie.
  *
- * @param base               SimResult van het BASISSCENARIO (rows + target).
- * @param currentAge         Huidige leeftijd (potstart).
- * @param monthly            Extra inleg per maand (EUR, positief).
- * @param annualDebtRate     Saldo-gewogen schuldrente in DECIMAAL (r_debt).
+ * Bij `monthly = 0` is de pot 0 en valt dit per constructie samen met
+ * `fireAgeFromSim(base)` — beide kaarten reproduceren de motor-baseline.
+ *
+ * @param base            SimResult van het BASISSCENARIO (rows + target uit de motor).
+ * @param currentAge      Huidige leeftijd (potstart).
+ * @param monthly         Extra aflossing per maand (EUR, positief).
+ * @param annualDebtRate  Saldo-gewogen schuldrente in DECIMAAL (r_debt).
  * @returns fractionele FIRE-leeftijd, of `null` als onbereikbaar binnen het pad
- *   óf als het basisscenario zelf geen bereikbaar FIRE-doel heeft.
+ *   óf als het basisscenario zelf geen bruikbaar FIRE-doel heeft.
  */
-export function aflossenFireAgeAtRate(
+export function aflossenFireAge(
   base: SimResult,
   currentAge: number,
   monthly: number,
   annualDebtRate: number,
 ): number | null {
   const target = base.requiredFirePortfolio
-  // Geen bruikbaar doel (bijv. FIRE onbereikbaar of niet-deplete edge) → laat
-  // de aanroeper terugvallen op de motor-uitkomst i.p.v. hier iets te verzinnen.
+  // Geen bruikbaar doel (bijv. FIRE onbereikbaar of niet-deplete edge) → laat de
+  // aanroeper terugvallen op de motor-uitkomst i.p.v. hier iets te verzinnen.
   if (!(target > 0) || base.rows.length === 0) return null
 
   const annualContribution = Math.max(0, monthly) * 12
+  const { startNetWorth, endByAge, lastAge, lastValue, firstAge } = accumulationPath(base)
 
-  // Netto-vermogen op leeftijd `age` uit het basispad. Vóór de eerste rij
-  // gebruiken we het startPortfolio van rij 0 (vermogen op currentAge); daarna
-  // het endPortfolio van het jaar dat eindigt op die leeftijd.
-  const accumulationRows = base.rows.filter(r => r.phase === 'accumulation')
-  // Map leeftijd → eindvermogen van dat accumulatiejaar.
-  const endByAge = new Map<number, number>()
-  for (const r of accumulationRows) endByAge.set(r.age + 1, r.endPortfolio)
-  const startNetWorth = base.rows[0]?.startPortfolio ?? 0
-
-  const netWorthAt = (age: number): number => {
-    if (age <= currentAge) return startNetWorth
-    const v = endByAge.get(age)
-    if (v !== undefined) return v
-    // Voorbij het laatste accumulatiejaar: gebruik het laatst bekende eindpunt.
-    return accumulationRows.length > 0
-      ? accumulationRows[accumulationRows.length - 1].endPortfolio
-      : startNetWorth
-  }
-
-  // Pot per leeftijd, opgebouwd vanaf currentAge.
-  // potAt(currentAge) = 0; potAt(currentAge + k) = pot na k jaargroei+inleg.
+  // Pot per leeftijd, opgebouwd vanaf currentAge (onbelast op r_debt).
+  let pot = 0
   const potByAge = new Map<number, number>()
   potByAge.set(currentAge, 0)
-  let pot = 0
-
-  // Gecombineerd vermogen op currentAge (pot = 0).
-  let prevAge = currentAge
-  let prevCombined = startNetWorth // + pot(0) = + 0
-
-  // Als we op currentAge al boven het doel zitten, is FIRE nu.
-  if (prevCombined >= target) return currentAge
-
-  // Loop over de accumulatiejaren; bepaal het eerste jaar dat het doel haalt.
-  const maxAge = accumulationRows.length > 0
-    ? accumulationRows[accumulationRows.length - 1].age + 1
-    : currentAge
-  for (let age = currentAge + 1; age <= maxAge; age++) {
+  for (let age = currentAge + 1; age <= lastAge; age++) {
     pot = pot * (1 + annualDebtRate) + annualContribution
     potByAge.set(age, pot)
-    const combined = netWorthAt(age) + pot
-
-    if (combined >= target) {
-      // Lineaire interpolatie tussen prevAge (onder doel) en age (op/boven doel).
-      const span = combined - prevCombined
-      const t = span > 0 ? (target - prevCombined) / span : 0
-      return prevAge + Math.max(0, Math.min(1, t))
-    }
-
-    prevAge = age
-    prevCombined = combined
+  }
+  const potAt = (age: number): number => {
+    if (age <= currentAge) return 0
+    const v = potByAge.get(age)
+    if (v !== undefined) return v
+    return pot // voorbij het laatste pad-jaar: laatst bekende pot
   }
 
-  // Doel niet gehaald binnen het basispad.
-  return null
+  const netWorthAt = (age: number): number => {
+    if (age <= firstAge) return startNetWorth
+    return endByAge.get(age) ?? lastValue
+  }
+
+  return crossingAge(firstAge, startNetWorth, target, lastAge, (age) => netWorthAt(age) + potAt(age))
 }

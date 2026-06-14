@@ -2,24 +2,30 @@
  * Model-validatie voor de WhatIf-beslishulp (B1).
  *
  * Bewijst dat de drie bestemmingen voor extra maandgeld zich gedragen zoals de
- * UI-kaarten beweren — nu met een EIGEN, rente-gedreven model voor Aflossen:
+ * UI-kaarten beweren — met EÉN motor voor zowel Beleggen als Aflossen:
  *
  *   1. BELEGGEN  — extra_inleg-cashflow in de ECHTE motor → compoundt op het
- *                  VERWACHTE rendement → grootste FIRE-versnelling (delta < 0).
+ *                  VERWACHTE rendement (mét Box 3-drag). FIRE via `fireAgeFromSim`
+ *                  op die motor-run.
  *   2. AFLOSSEN  — €X/mnd compoundt op het GEGARANDEERDE saldo-gewogen
- *                  schuldrente-tarief (r_debt) bovenop het basispad
- *                  (`aflossenFireAgeAtRate`). Bij r_debt < verwacht rendement
- *                  ligt de versnelling TUSSEN beleggen en noodfonds in. Bij
- *                  r_debt ≥ verwacht rendement mag aflossen beleggen evenaren
- *                  of verslaan (een hoog gegarandeerd tarief verslaat de
- *                  onzekere markt).
- *   3. NOODFONDS — geen FIRE-versnelling → vrijheidsdatum gelijk aan baseline
- *                  (een ~0%-buffer koopt veiligheid, geen snelheid).
+ *                  schuldrente-tarief (r_debt), BOX-3-VRIJ, bovenop het motor-
+ *                  basispad (`aflossenFireAge`). Bij €0 extra identiek aan
+ *                  `fireAgeFromSim(base)` → zelfde grondslag als beleggen.
+ *   3. NOODFONDS — geen FIRE-versnelling → vrijheidsdatum gelijk aan baseline.
  *
- * De Beleggen-tak gebruikt exact wat `whatif-beslishulp.tsx` doet (extra_inleg-
- * event in de motor). De Aflossen-tak importeert dezelfde pure helper als de
- * component (`aflossenFireAgeAtRate`), zodat dit een echte rooktest van het
- * UI-model is — niet een parallelle herimplementatie.
+ * ── Wat de vorige opzet maskeerde (de bug) ──────────────────────────────────
+ * De oude `aflossenFireAgeAtRate` liep NIET door de motor: een zijpot op de rauwe
+ * schuldrente, vergeleken tegen een FIRE-jaar-geïnflateerd doel terwijl het pad
+ * per-jaar-geïnflateerd was (gemengde inflatie-epoches). Hij kon het motor-
+ * basispad niet eens reproduceren (65,7 vs motor 68 bij €0 extra) en liet aflossen
+ * op ÉLK rentetarief "winnen" (zelfs 1,5% vs 7% markt) — actief verkeerd advies.
+ * De test was daarop versoepeld tot "beide verslaan baseline". Nu meten beide
+ * opties via dezelfde motor en geldt de juiste ordening: bij een lage schuldrente
+ * wint beleggen; aflossen wint pas wanneer de gegarandeerde rente hoog genoeg is.
+ *
+ * Beide takken importeren de pure helpers die de component óók gebruikt
+ * (`fireAgeFromSim`, `aflossenFireAge`), zodat dit een echte rooktest van het
+ * UI-model is — geen parallelle herimplementatie.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -35,7 +41,8 @@ import type { Debt } from '@/lib/debt-data'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import {
   weightedDebtRate,
-  aflossenFireAgeAtRate,
+  fireAgeFromSim,
+  aflossenFireAge,
 } from '@/components/app/horizon/whatif-beslishulp.model'
 
 function makeAsset(o: Partial<Asset> & { asset_type: string; current_value: number }): Asset {
@@ -137,11 +144,14 @@ function contributionEvent(monthly: number, age: number): WhatIfEvent {
 function simOf(input: UnifiedProjectionInput): SimResult {
   return toSimResult(runSelectedProjection(input, true))
 }
-function fireAge(input: UnifiedProjectionInput): number | null {
-  return simOf(input).fireAgeFractional
+/** Beleggen-FIRE: motor-run (basis + extra inleg) → fractioneel kruispunt. */
+function beleggenAge(input: UnifiedProjectionInput, amount: number): number | null {
+  return fireAgeFromSim(
+    simOf({ ...input, cashflows: lifeEventsToCashflows([contributionEvent(amount, input.currentAge)]) }),
+  )
 }
 
-describe('WhatIf-beslishulp — rente-gedreven model', () => {
+describe('WhatIf-beslishulp — één-motor-model', () => {
   // ── weightedDebtRate ──────────────────────────────────────────────────────
   describe('weightedDebtRate', () => {
     it('geeft null zonder actieve schuld (no-debt edge → kaart verborgen)', () => {
@@ -161,92 +171,107 @@ describe('WhatIf-beslishulp — rente-gedreven model', () => {
     })
   })
 
-  // ── Ordering: r_debt duidelijk < verwacht rendement ───────────────────────
-  describe('ordering bij r_debt duidelijk < verwacht rendement (1,5% schuld vs 7% markt)', () => {
-    // Eén lage-rente schuld @ 1,5%. De schuld zit óók in de input zodat het
-    // basispad de aflossing/rente al meeneemt.
-    //
-    // ⚠️ Waarom géén 4%-schuld hier: beleggen wordt in de motor BELAST via Box 3
-    // (forfaitair ~6% × 36% ≈ 2,2% drag), terwijl aflossen Box-3-VRIJ is
-    // (schuld terugbetalen wordt niet belast). Het effectieve marginale
-    // beleggen-rendement is dus ~7% − 2,2% ≈ 4,8% — bij een 4%-schuld vallen
-    // beleggen en aflossen daardoor vrijwel samen (correct, maar broos voor een
-    // strikte ordening). Met 1,5% is de marge ondubbelzinnig: beleggen wint.
+  // ── Beide opties reproduceren de motor-baseline bij €0 extra ───────────────
+  describe('baseline-reproductie (€0 extra)', () => {
     const debt = makeDebt({ current_balance: 25_000, interest_rate: 1.5, monthly_payment: 250 })
     const input = makeInput({ debts: [debt] })
     const base = simOf(input)
-    const baseAge = base.fireAgeFractional
+    const baseFrac = fireAgeFromSim(base)
     const rDebt = weightedDebtRate([debt])! // 0.015
-    const AMOUNT = 300
 
-    it('baseline FIRE-leeftijd is bereikbaar (fixture sanity)', () => {
-      expect(baseAge).not.toBeNull()
-      expect(baseAge!).toBeGreaterThan(42)
-      expect(baseAge!).toBeLessThan(90)
+    it('fireAgeFromSim levert een bereikbare fractionele leeftijd (fixture sanity)', () => {
+      expect(baseFrac).not.toBeNull()
+      expect(baseFrac!).toBeGreaterThan(42)
+      expect(baseFrac!).toBeLessThan(90)
       expect(rDebt).toBeCloseTo(0.015, 6)
     })
 
-    it('BELEGGEN — extra inleg vervroegt de vrijheidsdatum (delta < 0)', () => {
-      const beleggen = fireAge({ ...input, cashflows: lifeEventsToCashflows([contributionEvent(AMOUNT, input.currentAge)]) })
-      expect(beleggen).not.toBeNull()
-      expect(beleggen!).toBeLessThan(baseAge!)
+    it('aflossen bij €0 extra == de motor-baseline (geen drift)', () => {
+      const afl0 = aflossenFireAge(base, input.currentAge, 0, rDebt)
+      expect(afl0).not.toBeNull()
+      expect(afl0!).toBeCloseTo(baseFrac!, 6)
     })
 
-    it('AFLOSSEN — vervroegt de vrijheidsdatum, maar minder dan beleggen', () => {
-      const aflossen = aflossenFireAgeAtRate(base, input.currentAge, AMOUNT, rDebt)
-      expect(aflossen).not.toBeNull()
-      // Sneller dan baseline (noodfonds): het pot-geld zet wél aan het werk.
-      expect(aflossen!).toBeLessThan(baseAge!)
-    })
-
-    it('NOODFONDS — geen versnelling ⇒ vrijheidsdatum gelijk aan baseline', () => {
-      const noodfonds = fireAge({ ...input, cashflows: [] })
-      expect(noodfonds).toEqual(baseAge)
-    })
-
-    it('ORDENING — beide versnellen t.o.v. baseline (noodfonds)', () => {
-      const beleggen = fireAge({ ...input, cashflows: lifeEventsToCashflows([contributionEvent(AMOUNT, input.currentAge)]) })!
-      const aflossen = aflossenFireAgeAtRate(base, input.currentAge, AMOUNT, rDebt)!
-      const noodfonds = baseAge! // geen cashflow
-
-      // v2 note: in v2 (ADR 0016), the beleggen path runs through the full v2 engine
-      // (real-term computation + Box 3 drag + nominal adapter), while aflossenFireAgeAtRate
-      // uses an analytical interpolation on the base-sim accumulation rows. The strict
-      // ordering "beleggen ≤ aflossen" from v1 no longer holds in v2 because the extra
-      // inleg cashflow in the engine goes through Box 3 drag (~2.2% on invested surplus)
-      // that the analytical model does not apply to the debt-repayment "pot".
-      // The invariant that DOES hold: BOTH beleggen and aflossen beat the baseline (noodfonds).
-      expect(beleggen).toBeLessThan(noodfonds)
-      expect(aflossen).toBeLessThan(noodfonds)
-    })
-
-    it('AFLOSSEN — meer inleg = niet later vrij (monotoon, niet-broos)', () => {
-      const small = aflossenFireAgeAtRate(base, input.currentAge, 100, rDebt)!
-      const big = aflossenFireAgeAtRate(base, input.currentAge, 600, rDebt)!
-      expect(big).toBeLessThanOrEqual(small + 1e-6)
+    it('beleggen bij €0 extra == de motor-baseline (geen drift)', () => {
+      const bel0 = beleggenAge(input, 0)
+      expect(bel0).not.toBeNull()
+      expect(bel0!).toBeCloseTo(baseFrac!, 6)
     })
   })
 
-  // ── Edge: r_debt ≥ verwacht rendement ─────────────────────────────────────
-  describe('edge bij r_debt ≥ verwacht rendement (12% schuld vs 7% markt)', () => {
-    // Een dure schuld (12%). Aflossen op 12% gegarandeerd verslaat — of evenaart
-    // minstens — beleggen op 7% onzeker. We forceren GEEN strikte ongelijkheid
-    // de verkeerde kant op; we laten de wiskunde spreken.
-    const debt = makeDebt({ current_balance: 18_000, interest_rate: 12, monthly_payment: 300 })
+  // ── Lage schuldrente (1,5%) → BELEGGEN wint ───────────────────────────────
+  describe('lage schuldrente (1,5% schuld vs 7% markt) → beleggen ≤ aflossen', () => {
+    const debt = makeDebt({ current_balance: 25_000, interest_rate: 1.5, monthly_payment: 250 })
     const input = makeInput({ debts: [debt] })
     const base = simOf(input)
-    const baseAge = base.fireAgeFractional!
-    const rDebt = weightedDebtRate([debt])! // 0.12
-    const AMOUNT = 400
+    const baseFrac = fireAgeFromSim(base)!
+    const rDebt = weightedDebtRate([debt])! // 0.015
+    const AMOUNT = 300
 
-    it('aflossen verslaat of evenaart beleggen (hoog gegarandeerd > onzeker)', () => {
-      const beleggen = fireAge({ ...input, cashflows: lifeEventsToCashflows([contributionEvent(AMOUNT, input.currentAge)]) })!
-      const aflossen = aflossenFireAgeAtRate(base, input.currentAge, AMOUNT, rDebt)!
-      // Aflossen niet later vrij dan beleggen (≤). Geen harde strikte assertie
-      // die zou breken als ze fractioneel gelijk uitkomen.
-      expect(aflossen).toBeLessThanOrEqual(beleggen + 1e-6)
-      // En beide brengen vrijheid dichterbij dan niets doen.
-      expect(aflossen).toBeLessThan(baseAge)
+    it('BELEGGEN vervroegt de vrijheidsdatum (delta < 0)', () => {
+      expect(beleggenAge(input, AMOUNT)!).toBeLessThan(baseFrac)
+    })
+
+    it('AFLOSSEN vervroegt de vrijheidsdatum, maar minder dan beleggen', () => {
+      const aflossen = aflossenFireAge(base, input.currentAge, AMOUNT, rDebt)!
+      const beleggen = beleggenAge(input, AMOUNT)!
+      expect(aflossen).toBeLessThan(baseFrac)
+      // De kern van de fix: bij een lage gegarandeerde rente verslaat de
+      // (Box-3-belaste) markt het aflossen. Beleggen wint (≤ aflossen).
+      expect(beleggen).toBeLessThanOrEqual(aflossen + 1e-9)
+      // En strikt: niet langer "aflossen wint" zoals de bug deed.
+      expect(aflossen).toBeGreaterThan(beleggen - 1e-9)
+    })
+
+    it('AFLOSSEN — meer inleg = niet later vrij (monotoon)', () => {
+      const small = aflossenFireAge(base, input.currentAge, 100, rDebt)!
+      const big = aflossenFireAge(base, input.currentAge, 600, rDebt)!
+      expect(big).toBeLessThanOrEqual(small + 1e-6)
+    })
+
+    it('NOODFONDS — geen versnelling ⇒ vrijheidsdatum gelijk aan baseline', () => {
+      // De component voedt noodfonds NIET als cashflow → identiek aan baseline.
+      const noodfonds = fireAgeFromSim(simOf(input))!
+      expect(noodfonds).toBeCloseTo(baseFrac, 9)
+    })
+  })
+
+  // ── Hoge schuldrente → AFLOSSEN wint ──────────────────────────────────────
+  describe('hoge schuldrente (12% schuld) → aflossen wint', () => {
+    // Een dure schuld (12%): aflossen levert 12% gegarandeerd-en-onbelast, wat het
+    // (Box-3-belaste) ~7%-beleggingspad verslaat. Aflossen vervroegt FIRE meer.
+    const debt = makeDebt({ current_balance: 25_000, interest_rate: 12, monthly_payment: 250 })
+    const input = makeInput({ debts: [debt] })
+    const base = simOf(input)
+    const baseFrac = fireAgeFromSim(base)!
+    const rDebt = weightedDebtRate([debt])! // 0.12
+    const AMOUNT = 300
+
+    it('aflossen verslaat beleggen (hoog gegarandeerd-en-onbelast > onzeker-belast)', () => {
+      const beleggen = beleggenAge(input, AMOUNT)!
+      const aflossen = aflossenFireAge(base, input.currentAge, AMOUNT, rDebt)!
+      expect(aflossen).toBeLessThan(beleggen - 1e-9)
+      // Beide brengen vrijheid dichterbij dan niets doen.
+      expect(aflossen).toBeLessThan(baseFrac)
+      expect(beleggen).toBeLessThan(baseFrac)
+    })
+  })
+
+  // ── De crossover ligt tussen laag en hoog (sanity op de richting) ──────────
+  describe('crossover: aflossen wint pas boven een drempel-rente', () => {
+    const AMOUNT = 300
+    const mk = (ratePct: number) => {
+      const debt = makeDebt({ current_balance: 25_000, interest_rate: ratePct, monthly_payment: 250 })
+      const input = makeInput({ debts: [debt] })
+      const base = simOf(input)
+      const beleggen = beleggenAge(input, AMOUNT)!
+      const aflossen = aflossenFireAge(base, input.currentAge, AMOUNT, ratePct / 100)!
+      return { beleggen, aflossen, aflossenWint: aflossen < beleggen - 1e-9 }
+    }
+
+    it('1,5% → beleggen wint; 12% → aflossen wint (monotone richting)', () => {
+      expect(mk(1.5).aflossenWint).toBe(false)
+      expect(mk(12).aflossenWint).toBe(true)
     })
   })
 })
