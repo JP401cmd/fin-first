@@ -425,7 +425,10 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     // vermogen exemption (€59,357). For small portfolios (Daan), the heffingsvrij
     // eliminates Box 3 drag for years, causing larger differences vs the old engine's
     // flat BOX3_DRAG. Large portfolios (Willem, Lisa) are within 1 year.
-    const TOLERANCE: Record<PersonaKey, number> = {
+    // compleet is bewust afwezig: die persona is gebouwd voor de horizon-strategie-
+    // matrix (productie-engine v2) en wordt daar volledig gevalideerd, niet in deze
+    // legacy v1↔unified-pariteitstabel met handgetunede tolerances per levensfase.
+    const TOLERANCE: Partial<Record<PersonaKey, number>> = {
       daan: 12,     // starter with tiny portfolio, heffingsvrij eliminates drag for years.
                     //   Bovendien indexeert de unified engine het jaarlijkse sparen nu met
                     //   inflatie (income × spaarquote groeit nominaal mee) — een bewuste
@@ -440,7 +443,9 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     }
 
     for (const key of PERSONA_KEYS) {
-      it(`${PERSONAS[key].meta.name} (${key}): FIRE-leeftijd verschil ≤ ${TOLERANCE[key]} jaar`, () => {
+      const tol = TOLERANCE[key]
+      if (tol === undefined) continue // compleet: gedekt door de horizon-strategie-matrix
+      it(`${PERSONAS[key].meta.name} (${key}): FIRE-leeftijd verschil ≤ ${tol} jaar`, () => {
         const params = buildOldSimParams(key)
 
         // Old engine
@@ -490,7 +495,7 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
           expect(
             diff,
             `${key}: old FIRE=${oldResult.fireAge}, new FIRE=${newResult.fireAge}, diff=${diff}`,
-          ).toBeLessThanOrEqual(TOLERANCE[key])
+          ).toBeLessThanOrEqual(tol)
         }
       })
     }
@@ -669,7 +674,8 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     // - Depreciating assets (vehicle, physical) reduce overall portfolio return
     // - Per-type Box 3 with heffingsvrij exemption changes effective drag
     // These are CORRECT differences — the per-asset engine is more accurate.
-    const FIRE_AGE_TOLERANCE: Record<PersonaKey, number> = {
+    // compleet: zie noot bij TOLERANCE hierboven — gedekt door de horizon-strategie-matrix.
+    const FIRE_AGE_TOLERANCE: Partial<Record<PersonaKey, number>> = {
       daan: 10,     // Tiny portfolio, heffingsvrij eliminates all Box 3 for years
       lisa: 15,     // Multiple asset types (eigen_huis, vehicle) — per-asset returns diverge significantly from flat grossReturn
       willem: 15,   // Large diverse portfolio (1.46M) — per-asset returns differ from flat 7%
@@ -677,7 +683,9 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
     }
 
     for (const key of PERSONA_KEYS) {
-      it(`${PERSONAS[key].meta.name} (${key}): FIRE-leeftijd afwijking ≤ ${FIRE_AGE_TOLERANCE[key]} jaar`, () => {
+      const tol = FIRE_AGE_TOLERANCE[key]
+      if (tol === undefined) continue // compleet: gedekt door de horizon-strategie-matrix
+      it(`${PERSONAS[key].meta.name} (${key}): FIRE-leeftijd afwijking ≤ ${tol} jaar`, () => {
         const params = buildOldSimParams(key)
 
         // Old engine (with simple flat Box 3 drag)
@@ -709,7 +717,7 @@ describe('Unified Projection Engine — Fase 1e: Parity & Orchestratie (#493)', 
         expect(
           diff,
           `${key}: old FIRE=${oldResult.fireAge}, new FIRE=${newResult.fireAge}, diff=${diff} (per-asset Box 3 afwijking)`,
-        ).toBeLessThanOrEqual(FIRE_AGE_TOLERANCE[key])
+        ).toBeLessThanOrEqual(tol)
       })
     }
   })

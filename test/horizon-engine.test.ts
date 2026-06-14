@@ -132,9 +132,10 @@ describe('horizon-engine grootboek (Fase 1)', () => {
       const r = mkLegacy(L)
       expect(r.fireReachable).toBe(true)
       const end = r.rows[r.rows.length - 1].liquideVermogen
-      // residu groeit naar de nalatenschap → eindigt op/boven het doel (2% tol),
-      // en zeker niet ~€0 zoals bij de oude annuïteit-verdamping.
-      expect(end).toBeGreaterThanOrEqual(L * 0.98)
+      // residu groeit naar de nalatenschap → eindigt op/boven het doel (ADR 0017:
+      // doel-check is ≥ legacyAmount, geen tolerantie), en zeker niet ~€0 zoals
+      // bij de oude annuïteit-verdamping.
+      expect(end).toBeGreaterThanOrEqual(L)
     }
   })
 
@@ -182,5 +183,93 @@ describe('horizon-engine grootboek (Fase 1)', () => {
     const non = mk(false).rows.find((x) => x.leeftijd === 70)!.aowEnPensioen
     expect(idx).toBeCloseTo(12_000, 0) // vlak reëel
     expect(non).toBeLessThan(idx) // nominaal vlak → reëel lager 20 jaar later
+  })
+
+  // ── Legacy = doel-zoekende FIRE-selectie (ADR 0017, vult ADR 0014 aan) ──────
+  // De legacy-tak van meetsStrategyTarget koos de vroegste FIRE-leeftijd die de
+  // brug naar pensioen overleefde (buffer-eis `minMid > 1`) ÉN ≥ legacyAmount−2%.
+  // De −2%-tolerantie liet FIRE een jaar te vroeg accepteren waar het eindvermogen
+  // nog ÓNDER de nalatenschap eindigde (bv. €197.778 voor een €200k-doel) — de
+  // afbouw-lijn haalde het doel dus niet. Fix (ADR 0017): doel-check `≥ legacyAmount`
+  // (geen −2%) → nooit ónder het doel; en de brug-ondergrens versoepelt van
+  // `minMid > 1` naar floor 0 (de brug mág richting €0 dippen — de buffer zit al in
+  // het door de gebruiker ingevoerde nalatenschapsbedrag — maar het liquide pad mag
+  // nóóit negatief worden). Need-only-onttrekking blijft (ADR 0014).
+  const mkLegacyHealthy = (legacyAmount: number) =>
+    runHorizonLedger(mkInput({ annualSavings: 25_000, monthlySurplus: 25_000 / 12, strategyConfig: { strategy: 'legacy', endAge: 90, legacyAmount } }))
+
+  // Config waar de oude −2%-tolerantie aantoonbaar een te-vroege FIRE accepteerde
+  // die ÓNDER het doel eindigde. Geverifieerd via een OLD↔NEW-engine-sweep:
+  //   OLD-gate: FIRE=48, eindvermogen €197.778  (< €200k → lijn haalt doel NIET)
+  //   NEW-gate: FIRE=49, eindvermogen €346.910  (≥ €200k → doel gehaald)
+  // (cv=200k, jaaruitgaven=25k, sparen=25k, AOW €1.500/mnd geïndexeerd, L=200k.)
+  const mkLegacyBugConfig = (legacyAmount: number) =>
+    runHorizonLedger(mkInput({
+      assets: [{ id: 'a1', name: 'Beleggingen', asset_type: 'investment', current_value: 200_000, expected_return: 7, is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: null } as unknown as Asset],
+      yearlyExpenses: 25_000,
+      annualSavings: 25_000, monthlySurplus: 25_000 / 12,
+      cashflows: [{ id: 'aow', name: 'AOW', type: 'recurring', direction: 'income', amount: 1500, fromAge: 67, toAge: null, indexed: true } as never],
+      strategyConfig: { strategy: 'legacy', endAge: 90, legacyAmount },
+    }))
+
+  it('legacy (bug-regressie): afbouw-lijn eindigt NIET ónder het doel (oude −2%-tolerantie weg)', () => {
+    const L = 200_000
+    const r = mkLegacyBugConfig(L)
+    expect(r.fireReachable).toBe(true)
+    const end = r.rows[r.rows.length - 1].liquideVermogen
+    // ROOD vóór de fix: de OLD-gate eindigde op €197.778 (< €200k).
+    expect(end).toBeGreaterThanOrEqual(L)
+  })
+
+  it('legacy: FIRE schuift bij de bug-config een jaar later, zodat de lijn het doel haalt', () => {
+    // De −2%-tolerantie liet FIRE één jaar te vroeg accepteren (FIRE=48, eindigend
+    // ónder het doel). Na de fix ligt FIRE op 49 en haalt de lijn het doel.
+    const r = mkLegacyBugConfig(200_000)
+    expect(r.fireAge).toBe(49) // oud: 48 (te vroeg, eindigde op €197.778 < doel)
+  })
+
+  it('legacy: eindvermogen blijft nooit ónder het doel (bias naar boven)', () => {
+    for (const L of [50_000, 200_000, 300_000, 497_000]) {
+      const r = mkLegacyHealthy(L)
+      expect(r.fireReachable).toBe(true)
+      const end = r.rows[r.rows.length - 1].liquideVermogen
+      expect(end).toBeGreaterThanOrEqual(L)
+    }
+    // Ook op de bug-config (waar de oude tolerantie ónder het doel uitkwam):
+    for (const L of [200_000, 497_000]) {
+      const r = mkLegacyBugConfig(L)
+      expect(r.fireReachable).toBe(true)
+      expect(r.rows[r.rows.length - 1].liquideVermogen).toBeGreaterThanOrEqual(L)
+    }
+  })
+
+  it('legacy: onvermijdelijke overshoot — zeer hoog vermogen, laag doel → FIRE nu, signaal gezet', () => {
+    const r = runHorizonLedger(mkInput({
+      assets: [{ id: 'big', name: 'Beleggen', asset_type: 'investment', current_value: 2_000_000, expected_return: 7, is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: null } as unknown as Asset],
+      annualSavings: 25_000,
+      monthlySurplus: 25_000 / 12,
+      strategyConfig: { strategy: 'legacy', endAge: 90, legacyAmount: 50_000 },
+    }))
+    expect(r.fireReachable).toBe(true)
+    // FIRE zeer vroeg (kan nu al stoppen): de vroegste kandidaat (f = startAge)
+    // eindigt al ≥ doel.
+    expect(r.fireAge!).toBe(40)
+    // Eindvermogen ligt onvermijdelijk boven het doel.
+    const end = r.rows[r.rows.length - 1].liquideVermogen
+    expect(end).toBeGreaterThan(50_000)
+    // Signaal-veld staat aan voor de UI ("je kunt nu al stoppen").
+    expect(r.legacyTargetUnavoidablyExceeded).toBe(true)
+  })
+
+  it('legacy: gewone (niet-onvermijdelijke) case zet het overshoot-signaal NIET', () => {
+    const r = mkLegacyHealthy(200_000)
+    expect(r.legacyTargetUnavoidablyExceeded).toBe(false)
+  })
+
+  it('perpetual & deplete: overshoot-signaal is altijd false (alleen legacy)', () => {
+    const perp = runHorizonLedger(mkInput({ strategyConfig: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 } }))
+    const dep = runHorizonLedger(mkInput())
+    expect(perp.legacyTargetUnavoidablyExceeded).toBe(false)
+    expect(dep.legacyTargetUnavoidablyExceeded).toBe(false)
   })
 })

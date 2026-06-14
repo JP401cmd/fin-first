@@ -442,6 +442,9 @@ export function runHorizonLedger(
   // lijn ÍS die run, dus de grafiek en de FIRE-leeftijd kloppen per constructie.
   let fireAge: number | null = null
   let displayRows = pass1.rows
+  // Legacy-signaal (ADR 0017): de vroegst mogelijke FIRE-leeftijd (stoppen = nu)
+  // eindigt al ≥ nalatenschap → de lijn schiet onvermijdelijk over het doel.
+  let legacyTargetUnavoidablyExceeded = false
   if (input.forcedFireAge != null) {
     fireAge = Math.round(input.forcedFireAge)
     displayRows = runForward(fireAge).rows
@@ -451,6 +454,10 @@ export function runHorizonLedger(
       if (meetsStrategyTarget(run.rows, f, endAge, strategy, input.strategyConfig.legacyAmount)) {
         fireAge = f
         displayRows = run.rows
+        // De vroegste passerende leeftijd is meteen de start → onvermijdelijke
+        // overshoot (alléén betekenisvol voor legacy; need-only laat het residu
+        // boven het doel uitgroeien). Geen onbereikbaarheid: FIRE = nu.
+        if (strategy === 'legacy' && f === startAge) legacyTargetUnavoidablyExceeded = true
         break
       }
     }
@@ -477,6 +484,7 @@ export function runHorizonLedger(
     displayEndAge: endAge,
     strategy,
     inflationRate: inflation,
+    legacyTargetUnavoidablyExceeded,
   }
 }
 
@@ -484,7 +492,8 @@ export function runHorizonLedger(
  * Haalt een retire-at-FIRE-run het einddoel van de strategie?
  *  - niet vroegtijdig leeg (liquide > €1 vóór de eindleeftijd) voor álle strategieën;
  *  - perpetual: eindvermogen ≥ vermogen op FIRE (koopkracht behouden);
- *  - legacy: eindvermogen ≥ nalatenschapsbedrag;
+ *  - legacy: eindvermogen ≥ nalatenschapsbedrag, de brug mág richting €0 dippen
+ *    maar het liquide pad mag nóóit negatief worden (ADR 0017);
  *  - deplete/pensioen: niet vroegtijdig leeg volstaat (de annuïteit eindigt ~€0).
  */
 function meetsStrategyTarget(rows: LedgerRow[], fireAge: number, endAge: number, strategy: string, legacyAmount: number): boolean {
@@ -492,13 +501,24 @@ function meetsStrategyTarget(rows: LedgerRow[], fireAge: number, endAge: number,
   if (ret.length === 0) return false
   const endLiquide = ret[ret.length - 1].liquideVermogen
 
-  if (strategy === 'perpetual' || strategy === 'legacy') {
-    // Mag tussendoor niet leeg raken; eindvermogen moet het doel halen.
+  if (strategy === 'legacy') {
+    // Doel-zoekende selectie (ADR 0017). De brug naar pensioen mág richting €0
+    // dippen — de buffer zit al in het door de gebruiker ingevoerde
+    // nalatenschapsbedrag — maar het liquide pad mag nóóit negatief worden.
+    // Geen −2%-tolerantie meer: eindvermogen ≥ legacyAmount (nooit ónder het doel).
+    // Omdat het eindvermogen monotoon stijgt in de FIRE-leeftijd, levert de
+    // vroegste passerende leeftijd (de break in de zoek-loop) automatisch de
+    // uitkomst die het dichtst bij — en ≥ — het doel eindigt.
+    for (let i = 0; i < ret.length - 1; i++) if (ret[i].liquideVermogen < 0) return false
+    return endLiquide >= legacyAmount
+  }
+
+  if (strategy === 'perpetual') {
+    // Mag tussendoor niet leeg raken; eindvermogen ≥ vermogen op FIRE (koopkracht).
     let minMid = Number.POSITIVE_INFINITY
     for (let i = 0; i < ret.length - 1; i++) minMid = Math.min(minMid, ret[i].liquideVermogen)
     if (minMid <= 1) return false
-    const target = strategy === 'perpetual' ? ret[0].liquideVermogen * 0.99 : legacyAmount - Math.max(1, legacyAmount * 0.02)
-    return endLiquide >= target
+    return endLiquide >= ret[0].liquideVermogen * 0.99
   }
 
   // deplete / pensioen: niet vroegtijdig leeg vóór de terminale 2 jaar (de

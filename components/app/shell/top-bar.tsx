@@ -18,8 +18,10 @@
  *    titel hoort visueel bij de actieve module en bij de editorial-toon van
  *    de rest van de app. Rustig gehouden (~16px, één regel, truncate) — geen
  *    EditorialHeadline-emphasis (te zwaar voor 48px-balk + breekt getByText).
- *  - Tab-roots ('rich' kind: Overzicht/Toekomst/Mijn) blijven bewust
- *    TITELLOOS — zij tonen het utility/icoon-cluster rechts, geen titel.
+ *  - Tab-roots ('rich' kind: Overzicht/Toekomst/Mijn) tonen hun tab-label als
+ *    titel (via NavStackMeta op de pagina) NAAST het utility/icoon-cluster
+ *    rechts. De `kind === 'simple'` fallback met resolveRouteTitle springt
+ *    bewust niet voor 'rich'; de titel komt daar dus van de NavStackMeta-prop.
  *  - Module-aware via `--module-active-500` als 1px onderlijn op active-module
  *    routes. Op `/identity`, `/berichten`, etc. valt deze terug op
  *    `var(--border-ed)`.
@@ -330,6 +332,15 @@ export function TopBar({
   // tijdens transitie van sub-page naar tab-root.
   const showBack = showBackOverride ?? (kind === 'simple' && currentStack.length > 1)
 
+  // "Terug naar overzicht" op de secundaire tab-roots (Toekomst/Mijn). Die
+  // tonen normaliter géén ←-knop ('rich' kind), maar de gebruiker wil van
+  // daaruit altijd één tik terug naar het Overzicht — de "home" tab-root.
+  // Kern (Overzicht zelf) krijgt 'm niet; sub-pages houden hun eigen pop-←.
+  // Tab-bepaald (niet pad-exact) zodat de knop op de outgoing rich-tray
+  // tijdens een within-tab transitie blijft staan i.p.v. weg te flikkeren.
+  const showHomeBack =
+    !showBack && kind === 'rich' && (activeTab === 'horizon' || activeTab === 'identity')
+
   // Module-aware onderlijn: hoofdmodules krijgen `--module-active-500`-streep,
   // andere tabs (identity, other) → defaultkleur.
   const isModuleTab = activeTab === 'kern' || activeTab === 'wil' || activeTab === 'horizon'
@@ -376,6 +387,14 @@ export function TopBar({
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
+        ) : showHomeBack ? (
+          <Link
+            href="/overzicht"
+            aria-label="Terug naar overzicht"
+            className="touch-target text-[var(--ink-2)] hover:bg-[var(--subtle)] tap-highlight"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
         ) : (
           <span aria-hidden className="block h-11 w-11" />
         )}

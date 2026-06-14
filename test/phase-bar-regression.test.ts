@@ -215,6 +215,7 @@ describe('PhaseBar buildSegments — all 4 personas', () => {
     lisa: { totalAssets: 498500, totalDebts: 368270, description: 'gezinsverdeler, legacy' },
     willem: { totalAssets: 1619700, totalDebts: 0, description: 'near-FI, deplete' },
     marijke: { totalAssets: 820200, totalDebts: 0, description: 'retired, pensioen' },
+    compleet: { totalAssets: 1551000, totalDebts: 454020, description: 'complete tester, deplete' },
   }
 
   for (const key of PERSONA_KEYS) {

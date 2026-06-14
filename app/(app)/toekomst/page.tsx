@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { loadWillData } from '@/lib/will-data-loader'
@@ -108,6 +109,10 @@ export default async function ToekomstPage({
 
   return (
     <>
+      {/* Tab-root → 'rich' TopBar (utility-cluster) + tab-titel in de mobiele
+          bovenbalk, gelijk aan /overzicht en /mijn. Zonder expliciete topBar
+          valt NavStackMeta terug op 'simple' en verdwijnt de cluster. */}
+      <NavStackMeta title="Toekomst" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
         <header className="mb-4 flex items-start justify-between gap-3">
           <div>

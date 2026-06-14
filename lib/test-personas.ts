@@ -1,11 +1,13 @@
 /**
  * Test persona definitions for superadmin testdata seeding.
  *
- * 4 personas at different financial life stages:
+ * 5 personas at different financial life stages:
  * 1. Daan Bakker — "De starter" (young professional starting out)
  * 2. Lisa de Groot — "De gezinsverdeler" (family, complex wealth across 13 assets + 10 debts)
  * 3. Willem Jansen — "Bijna binnen" (near financial independence)
  * 4. Marijke Vermeer — "De gepensioneerde" (retired, pensioen strategy + legacy planning)
+ * 5. Tessa Compleet — "De complete tester" (every asset/debt type + all in-depth apps;
+ *    bron voor de horizon-strategie-regressietest)
  */
 
 import { BUDGET_SLUGS } from '@/lib/budget-data'
@@ -33,7 +35,7 @@ function monthsAgo(months: number, day = 1): string {
 
 // ── Types ─────────────────────────────────────────────────────
 
-export type PersonaKey = 'daan' | 'lisa' | 'willem' | 'marijke'
+export type PersonaKey = 'daan' | 'lisa' | 'willem' | 'marijke' | 'compleet'
 
 export type SovereigntyPhase = 'recovery' | 'stability' | 'momentum' | 'mastery'
 
@@ -1872,6 +1874,261 @@ const marijkeData: PersonaData = {
   ],
 }
 
+// ══════════════════════════════════════════════════════════════
+// PERSONA 5: Tessa Compleet — "De complete tester"
+// ══════════════════════════════════════════════════════════════
+//
+// Bewust maximaal-volledige persona: élk asset-type, élk schuld-type, een
+// volledige cashflow én alle in-depth apps (holdings, woonbalans, verhuur,
+// hypotheekplanner) aan. Dient twee doelen:
+//   1. Visuele/seed-dekking op /beheer/testdata (alle categoriekaarten gevuld).
+//   2. Bron voor de horizon-strategie-regressietest (zie
+//      lib/regression-tests/horizon-strategie/persona-fixture.ts) — een
+//      DGA-huishouden met genoeg belegbaar vermogen dat FIRE binnen de horizon
+//      bereikbaar is, ook nadat het eigen huis uit de FIRE-pot valt.
+
+const tessaTransactions: PersonaTransactionTemplate[] = [
+  ...generateMonthlyTransactions(15, [
+    // Inkomen
+    { day: 25, amount: 5200, description: 'Salaris (DGA)', counterparty_name: 'Volkert Compleet Holding BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.SALARIS_UITKERING, is_income: true },
+    { day: 25, amount: 1450, description: 'Salaris partner', counterparty_name: 'Onderwijsgroep Midden BV', counterparty_iban: 'NL39RABO0300065264', budgetSlug: S.SALARIS_UITKERING, is_income: true, accountIndex: 0 },
+    { day: 10, amount: 950, description: 'Huurinkomsten appartement', counterparty_name: 'Huurder M. de Wit', counterparty_iban: null, budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true },
+    // Vaste lasten wonen
+    { day: 1, amount: -1280, description: 'Hypotheek', counterparty_name: 'ABN AMRO Hypotheken', counterparty_iban: 'NL26ABNA0123456789', budgetSlug: S.HUUR_HYPOTHEEK, is_income: false },
+    { day: 1, amount: -210, description: 'Energie', counterparty_name: 'Vattenfall', counterparty_iban: 'NL20INGB0001234567', budgetSlug: S.GAS_WATER_LICHT, is_income: false, jitterPct: 0.15 },
+    { day: 1, amount: -195, description: 'Verzekeringen wonen', counterparty_name: 'Interpolis', counterparty_iban: 'NL75ABNA0500100200', budgetSlug: S.VERZEKERINGEN_WONEN, is_income: false },
+    { day: 15, amount: -110, description: 'Gemeentelijke lasten', counterparty_name: 'Gemeente Amersfoort', counterparty_iban: 'NL45BNGH0285000522', budgetSlug: S.GEMEENTELIJKE_LASTEN, is_income: false },
+    // Vervoer
+    { day: 1, amount: -125, description: 'Autoverzekering', counterparty_name: 'Allianz', counterparty_iban: 'NL02ABNA0450884700', budgetSlug: S.AUTO_VASTE_LASTEN, is_income: false },
+    { day: 12, amount: -95, description: 'Laden + brandstof', counterparty_name: 'Fastned', counterparty_iban: null, budgetSlug: S.BRANDSTOF_OV, is_income: false, jitterPct: 0.20 },
+    // Dagelijks / huishouden
+    { day: 8, amount: -55, description: 'Drogist + huishoudelijk', counterparty_name: 'Etos', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false, jitterPct: 0.20 },
+    { day: 5, amount: -340, description: 'Kinderopvang', counterparty_name: 'KDV De Vlinder', counterparty_iban: 'NL68INGB0009988776', budgetSlug: S.KINDEREN_SCHOOL, is_income: false },
+    // Leuke dingen
+    { day: 14, amount: -85, description: 'Uit eten', counterparty_name: 'Restaurant Blok', counterparty_iban: null, budgetSlug: S.UIT_ETEN_HORECA, is_income: false, jitterPct: 0.25 },
+    { day: 7, amount: -17.99, description: 'Streaming', counterparty_name: 'Netflix', counterparty_iban: null, budgetSlug: S.VRIJE_TIJD_SPORT, is_income: false },
+    // Sparen & beleggen
+    { day: 2, amount: -1500, description: 'Meesman maandinleg', counterparty_name: 'Meesman', counterparty_iban: 'NL15RABO0300000003', budgetSlug: S.INVESTEREN_FIRE, is_income: false },
+    { day: 2, amount: -200, description: 'Spaarrekening storting', counterparty_name: 'Spaarrekening', counterparty_iban: 'NL11RABO0100000002', budgetSlug: S.SPAREN_NOODBUFFER, is_income: false },
+  ]),
+  ...generateGroceryTransactions(15, 130, 30),
+  ...generateIrregularTransactions([
+    { monthsAgo: 2, day: 22, amount: -1850, description: 'Zomervakantie Italië', counterparty_name: 'Booking.com', counterparty_iban: null, budgetSlug: S.VAKANTIE, is_income: false },
+    { monthsAgo: 5, day: 12, amount: -640, description: 'Onderhoud verhuurd appartement', counterparty_name: 'Klusbedrijf Van Dam', counterparty_iban: null, budgetSlug: S.HUISHOUDEN_VERZORGING, is_income: false },
+    { monthsAgo: 8, day: 3, amount: -420, description: 'Tandarts gezin', counterparty_name: 'Tandartspraktijk Amersfoort', counterparty_iban: null, budgetSlug: S.MEDISCHE_KOSTEN, is_income: false },
+    { monthsAgo: 1, day: 18, amount: 2400, description: 'Dividenduitkering eigen BV', counterparty_name: 'Volkert Compleet Holding BV', counterparty_iban: 'NL91ABNA0417164300', budgetSlug: S.OVERIGE_INKOMSTEN, is_income: true },
+    { monthsAgo: 4, day: 9, amount: -310, description: 'Winterkleding gezin', counterparty_name: 'De Bijenkorf', counterparty_iban: null, budgetSlug: S.KLEDING_OVERIGE, is_income: false },
+  ]),
+]
+
+const tessaData: PersonaData = {
+  meta: {
+    name: 'Tessa Compleet',
+    subtitle: 'De complete tester',
+    description: 'DGA-huishouden met élk type bezitting en schuld, volledige cashflow en alle in-depth apps actief. Referentie-persona voor de horizon-strategie-regressietest.',
+    color: 'amber',
+    avatarColor: '#C98A3C',
+    netWorth: 1180000,
+    income: 7600,
+    expenses: 4100,
+    backgroundStory: 'Tessa is DGA van een klein adviesbureau en woont met haar partner en twee jonge kinderen in Amersfoort. Over de jaren heeft het huishouden een brede dwarsdoorsnede van vermogen opgebouwd: een eigen woning met hypotheek, een verhuurd appartement, een fors beleggingsportefeuille bij Meesman, een belang in de eigen BV, crypto, pensioen, een oude spaarpolis en wat vorderingen. Daar staan diverse kleine en grote schulden tegenover. Deze persona is bewust ontworpen om élk scherm, élke categoriekaart én alle strategie-combinaties van de horizon-grafiek te raken.',
+    challenges: ['Eigen woning wel of niet meetellen in de FIRE-pot', 'Optimale eindstrategie kiezen (opmaken vs. nalaten)', 'Belegbaar vermogen vs. niet-liquide BV-belang en vastgoed'],
+    currentSituation: 'Ruim belegbaar vermogen, stabiele DGA-cashflow en een verhuurd appartement. FIRE is binnen de horizon bereikbaar, óók wanneer de eigen woning buiten de FIRE-pot blijft.',
+    firstGoal: 'Volledige vrijheid (FIRE) vóór 55 — en bepalen wat er daarna met het vermogen gebeurt',
+    sovereignty: 'mastery',
+    modules: ALL_MODULES,
+  },
+  profile: {
+    full_name: 'Tessa Compleet',
+    date_of_birth: '1984-05-20',
+    household_type: 'gezin',
+    temporal_balance: 4,
+    expected_return: 0.07,
+    inflation_rate: 0.02,
+    fire_end_strategy: 'deplete',
+    fire_end_age: 90,
+    fire_legacy_amount: 0,
+    retirement_expense_method: 'essential_budgets',
+    withdrawal_strategy: 'static',
+    net_monthly_income: 7600,
+    estimated_monthly_expenses: 4100,
+    marginaal_tarief: 0.4950,
+    feature_preferences: { _welcome_seen: true },
+    widget_prefs: makeWidgetPrefs([
+      'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
+      'assets', 'holdings', 'budgetten', { id: 'uitgaven_heatmap', size: 'half' },
+      'monte_carlo', 'trend_sparen', 'acties', { id: 'inflatie_impact', size: 'mini' },
+    ]),
+    active_modules: ALL_MODULES,
+  },
+  bank_accounts: [
+    { name: 'Gezamenlijke rekening ABN', iban: 'NL26ABNA0123456789', bank_name: 'ABN AMRO', account_type: 'checking', balance: 8200, is_active: true, sort_order: 0 },
+    { name: 'Spaarrekening gezin', iban: 'NL11RABO0100000002', bank_name: 'Rabobank', account_type: 'savings', balance: 21500, is_active: true, sort_order: 1 },
+    { name: 'Zakelijke buffer', iban: 'NL68INGB0009988776', bank_name: 'ING', account_type: 'business', balance: 4300, is_active: true, sort_order: 2 },
+  ],
+  assets: [
+    // Belegbaar / liquide
+    { name: 'Spaargeld direct opneembaar', asset_type: 'cash', current_value: 30000, purchase_value: 30000, purchase_date: '2022-01-01', expected_return: 0, monthly_contribution: 0, institution: 'ABN AMRO', subtype: 'savings_account' },
+    { name: 'Spaardeposito 3-jaar', asset_type: 'savings', current_value: 45000, purchase_value: 45000, purchase_date: '2024-01-15', expected_return: 3, monthly_contribution: 200, institution: 'Rabobank', subtype: 'deposito', risk_profile: 'laag', is_liquid: false, lock_end_date: '2027-01-15' },
+    { name: 'Meesman Wereldwijd Totaal', asset_type: 'investment', current_value: 300000, purchase_value: 210000, purchase_date: '2016-03-01', expected_return: 7, monthly_contribution: 1500, institution: 'Meesman', subtype: 'indexfonds', risk_profile: 'middel', ticker_symbol: 'MEESMAN-WWT', has_holdings_tracking: true },
+    { name: 'Pensioenfonds ABP', asset_type: 'retirement', current_value: 120000, purchase_value: 0, purchase_date: '2008-01-01', expected_return: 5, monthly_contribution: 0, institution: 'ABP', subtype: 'uitkeringsregeling', risk_profile: 'laag', tax_benefit: true, retirement_provider_type: 'bedrijfspensioenfonds' },
+    { name: 'Crypto portefeuille', asset_type: 'crypto', current_value: 20000, purchase_value: 9000, purchase_date: '2021-02-01', expected_return: 0, monthly_contribution: 0, institution: 'Bitvavo', subtype: 'bitcoin', risk_profile: 'hoog' },
+    // Niet-liquide / overig
+    { name: 'Eigen woning Amersfoort', asset_type: 'eigen_huis', current_value: 560000, purchase_value: 410000, purchase_date: '2014-06-01', expected_return: 3, monthly_contribution: 0, institution: '', woz_value: 540000, address_postcode: '3811 AA', address_house_number: '12', has_woonbalans_tracking: true },
+    { name: 'Verhuurd appartement Utrecht', asset_type: 'real_estate', current_value: 185000, purchase_value: 150000, purchase_date: '2019-09-01', expected_return: 3, monthly_contribution: 0, institution: '', subtype: 'beleggingspand', rental_income: 950, has_rental_tracking: true },
+    { name: 'Auto (elektrisch)', asset_type: 'vehicle', current_value: 28000, purchase_value: 46000, purchase_date: '2023-03-01', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'auto_eigendom', depreciation_rate: 12 },
+    { name: 'Kunst + sieraden', asset_type: 'physical', current_value: 14000, purchase_value: 11000, purchase_date: '2017-08-15', expected_return: 0, monthly_contribution: 0, institution: '', subtype: 'kunst' },
+    { name: 'Belang Volkert Compleet Holding BV', asset_type: 'deelneming', current_value: 180000, purchase_value: 18000, purchase_date: '2012-01-01', expected_return: 6, monthly_contribution: 0, institution: 'Volkert Compleet Holding BV', subtype: 'eigen_bv' },
+    { name: 'Kapitaalverzekering (oud)', asset_type: 'levensverzekering', current_value: 28000, purchase_value: 19000, purchase_date: '2004-09-01', expected_return: 2, monthly_contribution: 0, institution: 'Nationale-Nederlanden', subtype: 'kapitaalverzekering' },
+    { name: 'Rekening-courant vordering BV', asset_type: 'vordering', current_value: 35000, purchase_value: 35000, purchase_date: '2023-01-01', expected_return: 3, monthly_contribution: 0, institution: 'Volkert Compleet Holding BV', subtype: 'rekening_courant' },
+    { name: 'Aanhangwagen + gereedschap', asset_type: 'other', current_value: 6000, purchase_value: 9000, purchase_date: '2020-05-01', expected_return: 0, monthly_contribution: 0, institution: '' },
+  ],
+  debts: [
+    { name: 'Hypotheek eigen woning', debt_type: 'mortgage', original_amount: 360000, current_balance: 300000, interest_rate: 3.1, minimum_payment: 1280, monthly_payment: 1280, start_date: '2014-06-01', creditor: 'ABN AMRO', subtype: 'annuiteit', is_tax_deductible: true, nhg: false, linked_asset_name: 'Eigen woning Amersfoort', repayment_type: 'annuiteit', has_hypotheekplanner_tracking: true },
+    { name: 'Beleggingshypotheek appartement', debt_type: 'mortgage', original_amount: 130000, current_balance: 110000, interest_rate: 3.6, minimum_payment: 330, monthly_payment: 330, start_date: '2019-09-01', creditor: 'RNHB', subtype: 'aflossingsvrij', is_tax_deductible: false, nhg: false, linked_asset_name: 'Verhuurd appartement Utrecht', repayment_type: 'aflossingsvrij' },
+    { name: 'Persoonlijke lening verbouwing', debt_type: 'personal_loan', original_amount: 12000, current_balance: 5200, interest_rate: 6.2, minimum_payment: 210, monthly_payment: 210, start_date: '2022-09-01', creditor: 'Santander', subtype: 'aflopend', repayment_type: 'annuiteit' },
+    { name: 'DUO studielening', debt_type: 'student_loan', original_amount: 22000, current_balance: 3800, interest_rate: 0.46, minimum_payment: 90, monthly_payment: 90, start_date: '2004-09-01', creditor: 'DUO', subtype: 'oud_stelsel', repayment_type: 'annuiteit' },
+    { name: 'Autolening (restant)', debt_type: 'car_loan', original_amount: 20000, current_balance: 6500, interest_rate: 4.2, minimum_payment: 280, monthly_payment: 280, start_date: '2023-03-01', creditor: 'Alphabet', repayment_type: 'annuiteit', linked_asset_name: 'Auto (elektrisch)' },
+    { name: 'Creditcard saldo', debt_type: 'credit_card', original_amount: 0, current_balance: 420, interest_rate: 14.0, minimum_payment: 40, monthly_payment: 40, start_date: '2025-11-01', creditor: 'ICS Visa', subtype: 'regulier', credit_limit: 5000, repayment_type: 'aflossingsvrij' },
+    { name: 'Doorlopend krediet', debt_type: 'revolving_credit', original_amount: 8000, current_balance: 1500, interest_rate: 8.5, minimum_payment: 75, monthly_payment: 75, start_date: '2020-05-01', creditor: 'ICS', subtype: 'doorlopend_krediet', credit_limit: 8000, repayment_type: 'aflossingsvrij' },
+    { name: 'Betalingsregeling zonnepanelen', debt_type: 'payment_plan', original_amount: 6000, current_balance: 2400, interest_rate: 0, minimum_payment: 150, monthly_payment: 150, start_date: '2024-08-01', creditor: 'Solar Totaal BV', repayment_type: 'lineair' },
+    { name: 'Belastingaanslag IB', debt_type: 'belastingschuld', original_amount: 4200, current_balance: 2800, interest_rate: 4.0, minimum_payment: 200, monthly_payment: 200, start_date: '2025-09-01', creditor: 'Belastingdienst', subtype: 'inkomstenbelasting', repayment_type: 'lineair' },
+    { name: 'Lening van ouders', debt_type: 'familielening', original_amount: 25000, current_balance: 12000, interest_rate: 1.5, minimum_payment: 200, monthly_payment: 200, start_date: '2018-06-01', creditor: 'Ouders Compleet', subtype: 'ouders', repayment_type: 'lineair' },
+    { name: 'Rekening-courant schuld BV', debt_type: 'dga_schuld', original_amount: 15000, current_balance: 9000, interest_rate: 5.0, minimum_payment: 125, monthly_payment: 125, start_date: '2023-01-01', creditor: 'Volkert Compleet Holding BV', repayment_type: 'lineair' },
+    { name: 'Openstaande factuur leverancier', debt_type: 'other', original_amount: 900, current_balance: 400, interest_rate: 0, minimum_payment: 100, monthly_payment: 100, start_date: '2025-10-15', creditor: 'Leverancier Bouwmaat', repayment_type: 'lineair' },
+  ],
+  budgets: makeBudgets({
+    [S.INKOMEN]: 7600, [S.SALARIS_UITKERING]: 6650,
+    [S.TOESLAGEN_KINDERBIJSLAG]: 280, [S.TERUGGAVE_BELASTING]: 0, [S.OVERIGE_INKOMSTEN]: 950,
+    [S.VASTE_LASTEN_WONEN]: 1795, [S.HUUR_HYPOTHEEK]: 1280, [S.GAS_WATER_LICHT]: 210,
+    [S.VERZEKERINGEN_WONEN]: 195, [S.GEMEENTELIJKE_LASTEN]: 110,
+    [S.DAGELIJKSE_UITGAVEN]: 1080, [S.BOODSCHAPPEN]: 560, [S.HUISHOUDEN_VERZORGING]: 130,
+    [S.KINDEREN_SCHOOL]: 340, [S.MEDISCHE_KOSTEN]: 50,
+    [S.VERVOER]: 345, [S.BRANDSTOF_OV]: 95, [S.AUTO_VASTE_LASTEN]: 125,
+    [S.AUTO_ONDERHOUD]: 65, [S.FIETS_DEELVERVOER]: 60,
+    [S.LEUKE_DINGEN]: 420, [S.UIT_ETEN_HORECA]: 150, [S.VRIJE_TIJD_SPORT]: 90,
+    [S.VAKANTIE]: 130, [S.KLEDING_OVERIGE]: 50,
+    [S.SPAREN_SCHULDEN]: 1700, [S.SPAREN_NOODBUFFER]: 200, [S.INVESTEREN_FIRE]: 1500,
+    [S.SCHULDEN_AFLOSSINGEN_PARENT]: 0, [S.SCHULDEN_AFLOSSINGEN]: 0, [S.EXTRA_AFLOSSING_HYPOTHEEK]: 0,
+  }),
+  transactions: tessaTransactions,
+  goals: [
+    { name: 'Volledige vrijheid (FIRE)', description: 'Belegbaar vermogen naar het FIRE-doel — volledige vrijheid vóór 55', goal_type: 'net_worth', target_value: 1650000, current_value: 960000, target_date: monthsAgo(-156), icon: 'Target', color: 'amber', is_completed: false },
+    { name: 'Hypotheek appartement aflossen', description: 'Aflossingsvrije beleggingshypotheek terugbrengen naar nul', goal_type: 'debt_payoff', target_value: 110000, current_value: 20000, target_date: monthsAgo(-120), icon: 'Home', color: 'purple', is_completed: false },
+  ],
+  life_events: [
+    { name: 'Kinderen naar middelbare school', event_type: 'children', target_age: 48, target_date: null, one_time_cost: 2000, monthly_cost_change: -250, monthly_income_change: 0, duration_months: 84, icon: 'GraduationCap', is_active: true, sort_order: 0 },
+    { name: 'Verbouwing eigen woning', event_type: 'renovation', target_age: 50, target_date: null, one_time_cost: 45000, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Hammer', is_active: true, sort_order: 1 },
+    { name: 'Schenking aan kinderen', event_type: 'schenking', target_age: 60, target_date: null, one_time_cost: 30000, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Gift', is_active: true, sort_order: 2 },
+    { name: 'Aanvullend pensioen', event_type: 'pension', target_age: 67, target_date: null, one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1100, duration_months: 0, icon: 'PiggyBank', is_active: true, sort_order: 3, is_indexed: true },
+    { name: 'AOW', event_type: 'aow', target_age: 67, target_date: null, one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 1050, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 4, is_indexed: true, metadata: { leefsituatie: 'samenwonend' } },
+  ],
+  recommendations: [
+    {
+      title: 'Eigen woning bewust uit de FIRE-pot houden',
+      description: 'Je woning telt nu volledig mee in je FIRE-pot, maar je hebt het geld pas liquide na verkoop of opeethypotheek. Overweeg de strategie "uitsluiten" of "verkopen op leeftijd" voor een realistischer beeld.',
+      recommendation_type: 'budget_optimization',
+      euro_impact_monthly: 0,
+      euro_impact_yearly: 0,
+      freedom_days_per_year: 0,
+      related_budget_slug: null,
+      priority_score: 3,
+      status: 'pending',
+      suggested_actions: [
+        { title: 'Vergelijk de vier eigen-woning-strategieën op /toekomst', freedom_days_impact: 0 },
+      ],
+      actions: [
+        { source: 'ai', title: 'Kies een eigen-woning-strategie', description: 'Open de Huis-strategie-modal op /toekomst en vergelijk include_full vs. exclude vs. downsize', freedom_days_impact: 0, euro_impact_monthly: 0, status: 'open', priority_score: 3, scheduled_week: getNextWeek() },
+      ],
+    },
+  ],
+  net_worth_snapshots: [
+    { monthsAgo: 14, total_assets: 1505000, total_debts: 470000, net_worth: 1035000 },
+    { monthsAgo: 13, total_assets: 1512000, total_debts: 467500, net_worth: 1044500 },
+    { monthsAgo: 12, total_assets: 1519000, total_debts: 465000, net_worth: 1054000 },
+    { monthsAgo: 11, total_assets: 1526500, total_debts: 462500, net_worth: 1064000 },
+    { monthsAgo: 10, total_assets: 1534000, total_debts: 460000, net_worth: 1074000 },
+    { monthsAgo: 9, total_assets: 1542000, total_debts: 457500, net_worth: 1084500 },
+    { monthsAgo: 8, total_assets: 1550000, total_debts: 455000, net_worth: 1095000 },
+    { monthsAgo: 7, total_assets: 1559000, total_debts: 452500, net_worth: 1106500 },
+    { monthsAgo: 6, total_assets: 1568000, total_debts: 450000, net_worth: 1118000 },
+    { monthsAgo: 5, total_assets: 1577500, total_debts: 447500, net_worth: 1130000 },
+    { monthsAgo: 4, total_assets: 1587000, total_debts: 445000, net_worth: 1142000 },
+    { monthsAgo: 3, total_assets: 1597000, total_debts: 442500, net_worth: 1154500 },
+    { monthsAgo: 2, total_assets: 1607500, total_debts: 440000, net_worth: 1167500 },
+    { monthsAgo: 1, total_assets: 1618000, total_debts: 437500, net_worth: 1180500 },
+    { monthsAgo: 0, total_assets: 1626000, total_debts: 435000, net_worth: 1191000 },
+  ],
+  holdings: [
+    {
+      assetName: 'Meesman Wereldwijd Totaal',
+      ticker: 'MEESMAN-WWT',
+      isin: null,
+      name: 'Meesman Wereldwijd Totaal',
+      units: 2215,
+      avg_purchase_price: 94.81,
+      current_price: 135.48,
+      purchase_date_monthsAgo: 120,
+      asset_class: 'equity',
+      sector: null,
+      geography: 'global',
+      is_favorite: true,
+      currency: 'EUR',
+      ter: 0.0050,
+      ter_source: 'manual',
+      transactions: [
+        { type: 'buy', units: 700, price_per_unit: 84.00, total_amount: 58800, monthsAgo: 120, notes: 'Initiële inleg' },
+        { type: 'buy', units: 520, price_per_unit: 96.00, total_amount: 49920, monthsAgo: 84, notes: null },
+        { type: 'buy', units: 430, price_per_unit: 108.00, total_amount: 46440, monthsAgo: 48, notes: null },
+        { type: 'buy', units: 360, price_per_unit: 122.00, total_amount: 43920, monthsAgo: 24, notes: null },
+        { type: 'buy', units: 205, price_per_unit: 132.00, total_amount: 27060, monthsAgo: 6, notes: 'Bijstorting' },
+        { type: 'dividend', units: 0, price_per_unit: 0, total_amount: 1850, monthsAgo: 6, notes: 'Halfjaarlijks dividend' },
+      ],
+    },
+  ],
+  target_allocations: [
+    { view_mode: 'asset_class', category: 'equity', target_pct: 80 },
+    { view_mode: 'asset_class', category: 'bonds', target_pct: 10 },
+    { view_mode: 'asset_class', category: 'cash', target_pct: 10 },
+  ],
+  balance_snapshots: [
+    ...generateBalanceSnapshots([
+      { name: 'Gezamenlijke rekening ABN', entity_type: 'asset', currentValue: 8200, monthlyDelta: 80, jitterPct: 0.20 },
+      { name: 'Spaarrekening gezin', entity_type: 'asset', currentValue: 21500, monthlyDelta: 200, jitterPct: 0.02 },
+      { name: 'Zakelijke buffer', entity_type: 'asset', currentValue: 4300, jitterPct: 0.25 },
+    ]),
+    ...generateBalanceSnapshots([
+      { name: 'Spaargeld direct opneembaar', entity_type: 'asset', currentValue: 30000, monthlyDelta: 50 },
+      { name: 'Spaardeposito 3-jaar', entity_type: 'asset', currentValue: 45000, monthlyDelta: 200 },
+      { name: 'Meesman Wereldwijd Totaal', entity_type: 'asset', currentValue: 300000, monthlyDelta: 2200, jitterPct: 0.015 },
+      { name: 'Pensioenfonds ABP', entity_type: 'asset', currentValue: 120000, monthlyDelta: 550 },
+      { name: 'Crypto portefeuille', entity_type: 'asset', currentValue: 20000, jitterPct: 0.18 },
+      { name: 'Eigen woning Amersfoort', entity_type: 'asset', currentValue: 560000, monthlyDelta: 800 },
+      { name: 'Verhuurd appartement Utrecht', entity_type: 'asset', currentValue: 185000, monthlyDelta: 250 },
+      { name: 'Auto (elektrisch)', entity_type: 'asset', currentValue: 28000, monthlyDelta: -280 },
+      { name: 'Kunst + sieraden', entity_type: 'asset', currentValue: 14000 },
+      { name: 'Belang Volkert Compleet Holding BV', entity_type: 'asset', currentValue: 180000, monthlyDelta: 600 },
+      { name: 'Kapitaalverzekering (oud)', entity_type: 'asset', currentValue: 28000, monthlyDelta: 35 },
+      { name: 'Rekening-courant vordering BV', entity_type: 'asset', currentValue: 35000 },
+      { name: 'Aanhangwagen + gereedschap', entity_type: 'asset', currentValue: 6000, monthlyDelta: -30 },
+    ]),
+    ...generateBalanceSnapshots([
+      { name: 'Hypotheek eigen woning', entity_type: 'debt', currentValue: 300000, monthlyDelta: -450 },
+      { name: 'Beleggingshypotheek appartement', entity_type: 'debt', currentValue: 110000 },
+      { name: 'Persoonlijke lening verbouwing', entity_type: 'debt', currentValue: 5200, monthlyDelta: -205 },
+      { name: 'DUO studielening', entity_type: 'debt', currentValue: 3800, monthlyDelta: -90 },
+      { name: 'Autolening (restant)', entity_type: 'debt', currentValue: 6500, monthlyDelta: -270 },
+      { name: 'Creditcard saldo', entity_type: 'debt', currentValue: 420, jitterPct: 0.30 },
+      { name: 'Doorlopend krediet', entity_type: 'debt', currentValue: 1500, monthlyDelta: -75 },
+      { name: 'Betalingsregeling zonnepanelen', entity_type: 'debt', currentValue: 2400, monthlyDelta: -150 },
+      { name: 'Belastingaanslag IB', entity_type: 'debt', currentValue: 2800, monthlyDelta: -200 },
+      { name: 'Lening van ouders', entity_type: 'debt', currentValue: 12000, monthlyDelta: -200 },
+      { name: 'Rekening-courant schuld BV', entity_type: 'debt', currentValue: 9000, monthlyDelta: -125 },
+      { name: 'Openstaande factuur leverancier', entity_type: 'debt', currentValue: 400, monthlyDelta: -100 },
+    ]),
+  ],
+}
+
 // Export
 // ══════════════════════════════════════════════════════════════
 
@@ -1880,6 +2137,7 @@ export const PERSONAS: Record<PersonaKey, PersonaData> = {
   lisa: lisaData,
   willem: willemData,
   marijke: marijkeData,
+  compleet: tessaData,
 }
 
-export const PERSONA_KEYS: PersonaKey[] = ['daan', 'lisa', 'willem', 'marijke']
+export const PERSONA_KEYS: PersonaKey[] = ['daan', 'lisa', 'willem', 'marijke', 'compleet']

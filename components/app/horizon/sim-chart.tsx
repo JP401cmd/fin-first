@@ -72,6 +72,7 @@ export const SimChart = memo(function SimChart({
   onEventDragEnd,
   onEventDragMove,
   emphasis = null,
+  targetInflationFactors,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -132,6 +133,12 @@ export const SimChart = memo(function SimChart({
   /** Benadrukt één segment van de lijn (uitleg-walkthrough); rest wordt gedimd.
    *  Default `null` = ongewijzigd gedrag voor alle bestaande call-sites. */
   emphasis?: 'accumulation' | 'withdrawal' | 'fire' | null
+  /** Inflatie-indexfactor per leeftijd (uit `unifiedRows`, `inflationFactor` =
+   *  (1+inflatie)^jaar). Wanneer aanwezig tekent de legacy/perpetual-doellijn
+   *  als OPLOPENDE lijn: het reële doel-van-nu groeit met inflatie mee naar de
+   *  nominale eindwaarde (`targetEndPortfolio`). Zonder deze prop blijft de
+   *  doellijn vlak (byte-identiek voor call-sites zonder unifiedRows). */
+  targetInflationFactors?: { age: number; factor: number }[]
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredCfId, setHoveredCfId] = useState<string | null>(null)
@@ -348,6 +355,52 @@ export const SimChart = memo(function SimChart({
 
   const yFireDot = fireFractionalPt !== null ? PAD.top + yScale(Math.max(fireFractionalPt[1], 0)) : null
 
+  // Meegroeiende erfenis/koopkracht-doellijn (legacy/perpetual). `targetEndPortfolio`
+  // is de NOMINALE eindwaarde op eindleeftijd; gedeeld door de inflatie-indexfactor
+  // op die leeftijd geeft het REËLE doel-van-nu (bv. €200k i.p.v. €497k). Per
+  // leeftijd: nominaal doel = reëelDoel × factor(leeftijd). We tekenen een polyline
+  // over de zichtbare reeks i.p.v. één vlakke lijn, zodat zichtbaar is dat het doel
+  // een bedrag-van-nu is dat met inflatie meegroeit. Consume-only: alle factoren
+  // komen uit `targetInflationFactors` (afgeleid van `unifiedRows`), geen eigen
+  // inflatie-aanname hier. Zonder de prop (bv. standalone widget) blijft de lijn vlak.
+  const targetLine = (() => {
+    if (targetEndPortfolio == null || targetEndPortfolio <= 0) return null
+    if (!(strategy === 'legacy' || strategy === 'perpetual')) return null
+    const factors = targetInflationFactors
+    if (!factors || factors.length === 0) return null
+    const byAge = new Map(factors.map((f) => [f.age, f.factor]))
+    // Factor op de laatste leeftijd ↔ waar targetEndPortfolio (nominaal) op slaat.
+    const lastAge = Math.max(...factors.map((f) => f.age))
+    const endFactor = byAge.get(lastAge) ?? 1
+    if (!(endFactor > 0)) return null
+    const realTargetNow = targetEndPortfolio / endFactor
+    // Punten over de zichtbare leeftijdsreeks; interpoleer factor lineair tussen
+    // bekende jaren waar nodig (factoren zijn per heel jaar gegeven).
+    const factorAt = (age: number): number => {
+      const exact = byAge.get(age)
+      if (exact != null) return exact
+      const lo = Math.floor(age)
+      const hi = Math.ceil(age)
+      const fLo = byAge.get(lo)
+      const fHi = byAge.get(hi)
+      if (fLo != null && fHi != null && hi !== lo) return fLo + (fHi - fLo) * (age - lo)
+      return fLo ?? fHi ?? endFactor
+    }
+    const pts: [number, number][] = []
+    for (const f of factors) {
+      if (f.age < minAge - 1 || f.age > maxAge + 1) continue
+      pts.push([f.age, realTargetNow * f.factor])
+    }
+    if (pts.length < 2) return null
+    return {
+      d: pointsToPath(pts),
+      realTargetNow,
+      // Y voor het eindlabel = de nominale waarde op de laatste zichtbare leeftijd.
+      labelAge: pts[pts.length - 1][0],
+      labelVal: realTargetNow * factorAt(pts[pts.length - 1][0]),
+    }
+  })()
+
   // Pre-compute Monte Carlo band SVG paths (gradient confidence band)
   const mcPaths = monteCarloOverlay ? (() => {
     const mc = monteCarloOverlay
@@ -557,24 +610,55 @@ export const SimChart = memo(function SimChart({
           </>
         )}
 
-        {/* Legacy/Perpetual target — horizontal dashed line at target portfolio value (hidden in pensioen mode) */}
+        {/* Legacy/Perpetual target — doellijn (hidden in pensioen mode).
+            Met inflatie-factoren tekenen we de OPLOPENDE lijn (reëel doel-van-nu →
+            nominale eindwaarde); zonder factoren valt 'ie terug op een vlakke lijn. */}
         {!isPensioenMode && (strategy === 'legacy' || strategy === 'perpetual') && targetEndPortfolio != null && targetEndPortfolio > 0 && (
-          <>
-            <line
-              x1={PAD.left} x2={PAD.left + innerW}
-              y1={PAD.top + yScale(targetEndPortfolio)} y2={PAD.top + yScale(targetEndPortfolio)}
-              stroke="var(--kern-t, #58362d)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
-            />
-            <text
-              x={PAD.left + innerW - 2} y={PAD.top + yScale(targetEndPortfolio) - 4}
-              fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
-              fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
-            >
-              {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'} {targetEndPortfolio >= 1_000_000
-                ? `€${(targetEndPortfolio / 1_000_000).toFixed(1)}M`
-                : `€${Math.round(targetEndPortfolio / 1000)}k`}
-            </text>
-          </>
+          targetLine ? (
+            <>
+              <path
+                d={targetLine.d}
+                fill="none"
+                stroke="var(--kern-t, #58362d)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
+                strokeLinecap="round" strokeLinejoin="round"
+              />
+              <text
+                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={PAD.top + yScale(targetLine.labelVal) - 12}
+                fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
+                fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
+              >
+                {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'} {targetLine.labelVal >= 1_000_000
+                  ? `€${(targetLine.labelVal / 1_000_000).toFixed(1)}M`
+                  : `€${Math.round(targetLine.labelVal / 1000)}k`}
+              </text>
+              <text
+                x={Math.max(PAD.left + 44, PAD.left + xScale(targetLine.labelAge) - 2)} y={PAD.top + yScale(targetLine.labelVal) - 4}
+                fontSize={7} fill="var(--kern-t, #58362d)" textAnchor="end"
+                fontFamily="var(--font-dm-mono, monospace)" opacity={0.85}
+              >
+                {targetLine.realTargetNow >= 1_000_000
+                  ? `€${(targetLine.realTargetNow / 1_000_000).toFixed(1)}M nu`
+                  : `€${Math.round(targetLine.realTargetNow / 1000)}k nu`}
+              </text>
+            </>
+          ) : (
+            <>
+              <line
+                x1={PAD.left} x2={PAD.left + innerW}
+                y1={PAD.top + yScale(targetEndPortfolio)} y2={PAD.top + yScale(targetEndPortfolio)}
+                stroke="var(--kern-t, #58362d)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
+              />
+              <text
+                x={PAD.left + innerW - 2} y={PAD.top + yScale(targetEndPortfolio) - 4}
+                fontSize={8} fill="var(--kern-t, #58362d)" textAnchor="end"
+                fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
+              >
+                {strategy === 'perpetual' ? 'koopkracht' : 'erfenis'} {targetEndPortfolio >= 1_000_000
+                  ? `€${(targetEndPortfolio / 1_000_000).toFixed(1)}M`
+                  : `€${Math.round(targetEndPortfolio / 1000)}k`}
+              </text>
+            </>
+          )
         )}
 
         {/* Zero baseline */}

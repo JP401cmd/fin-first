@@ -14,6 +14,7 @@ import {
   FileSearch,
   FlaskConical,
   Gauge,
+  GitCompareArrows,
   Goal,
   History,
   Inbox,
@@ -211,6 +212,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/regressietest',
         description: 'Regressiesuite draaien met live resultaten per module.',
         icon: ListChecks,
+      },
+      {
+        label: 'Horizon-strategietest',
+        href: '/beheer/horizon-strategie',
+        description: 'Regressietest: horizon-grafiek × strategie-combinaties (huisvesting/eind/onttrekking) op de complete persona, met FIRE- en doelbedrag-marges.',
+        icon: GitCompareArrows,
       },
       {
         label: 'Extractie Test',

@@ -76,6 +76,16 @@ export interface BuiltHorizonInput {
   aowAgeInt: number
   /** Uit de pot-regels afgeleide engine-opties (undefined = engine-defaults). */
   strategyOptions?: Partial<HorizonStrategyOptions>
+  /**
+   * True wanneer de woning in deze projectie NOOIT verkocht wordt terwijl de
+   * gebruiker downsize + `on_depletion` heeft ingesteld: het liquide vermogen
+   * raakt de verkoopkosten-buffer nooit (`depletion.reason === 'no_sale'`),
+   * dus de trigger vuurt niet en het huis blijft als niet-liquide asset in het
+   * grootboek doorgroeien tot eindleeftijd. Alleen mogelijk in de v2-downsize-
+   * tak (ADR 0015); in alle andere takken `false`. Voedt de "huis wordt nooit
+   * verkocht"-melding op /toekomst (beschrijvend, geen advies).
+   */
+  housingHeldToEnd: boolean
 }
 
 /**
@@ -366,6 +376,8 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
   let effectiveDebts: Debt[]
   let effectiveLifeEvents: LifeEvent[] = p.lifeEvents ?? []
   let assetLiquidations: AssetLiquidation[] | undefined
+  // Wordt true wanneer downsize + on_depletion nooit triggert (huis blijft staan).
+  let housingHeldToEnd = false
 
   if (useV2Downsize) {
     // Huis + hypotheek blijven in het grootboek; verkoop = asset-liquidatie.
@@ -395,6 +407,12 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
     const v2Housing = buildV2DownsizeHousing(downsizeCfg, housingContext, baseSimInput, currentAge, simEndAge)
     effectiveLifeEvents = [...realEvents, ...v2Housing.rentEvents]
     assetLiquidations = v2Housing.assetLiquidations
+    // Huis nooit verkocht: on_depletion-trigger vuurde niet (liquide vermogen
+    // raakte de verkoopkosten-buffer nooit) → geen liquidatie, huis groeit door.
+    housingHeldToEnd =
+      downsizeCfg.trigger === 'on_depletion' &&
+      v2Housing.depletion.reason === 'no_sale' &&
+      v2Housing.assetLiquidations === undefined
   } else {
     // v1 / niet-downsize: bestaand filter + inkomen-model (byte-identiek).
     const filtered = filterAssetsForFire(housingCfg, p.assets ?? [], p.debts ?? [])
@@ -467,6 +485,7 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
     aowAge,
     aowAgeInt,
     strategyOptions,
+    housingHeldToEnd,
   }
 }
 

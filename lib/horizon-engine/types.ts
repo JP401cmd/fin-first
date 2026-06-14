@@ -127,4 +127,11 @@ export interface HorizonLedgerResult {
   strategy: FireEndStrategy
   /** Inflatie waarmee gerekend is — nodig voor reëel→nominaal in de adapter. */
   inflationRate: number
+  /**
+   * Legacy alléén: zelfs de vroegst mogelijke FIRE-leeftijd (stoppen = nu)
+   * eindigt al ≥ nalatenschapsbedrag, dus de afbouw-lijn schiet onvermijdelijk
+   * over het doel — "je kunt nu al stoppen". GEEN onbereikbaarheid (fireReachable
+   * blijft true). Voor andere strategieën altijd false. Zie ADR 0017.
+   */
+  legacyTargetUnavoidablyExceeded: boolean
 }

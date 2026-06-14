@@ -162,7 +162,7 @@ function UpgradeSheet({ plan, onClose }: { plan: AddonPlan; onClose: () => void 
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[var(--paper)] p-6 shadow-xl"
+        className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-[var(--paper)] p-6 pb-[calc(1.5rem+var(--safe-area-bottom,0px))] sm:pb-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">

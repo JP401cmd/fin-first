@@ -45,6 +45,13 @@ export interface HorizonFireSimResult {
    * tijdlijn horen deze array te consumeren, niet de server-events.
    */
   effectiveLifeEvents: LifeEvent[]
+  /**
+   * True wanneer de woning in deze projectie nooit verkocht wordt (downsize +
+   * on_depletion, maar de trigger vuurt niet — het huis blijft staan en groeit
+   * door tot eindleeftijd). Voedt de "huis wordt nooit verkocht"-melding op
+   * /toekomst. Default false in loading/null-paden.
+   */
+  housingHeldToEnd: boolean
 }
 
 interface HorizonFireSimInput {
@@ -89,7 +96,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, horizonEngineV2, potRules } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
-  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[] } | null>(() => {
+  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[]; housingHeldToEnd: boolean } | null>(() => {
     // Input-assemblage via de gedeelde builder (single source — ook gebruikt door
     // de beheer-tabel-API). Zie lib/horizon-engine/build-input.ts.
     const built = buildHorizonInput({
@@ -112,7 +119,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       horizonEngineV2: horizonEngineV2 ?? false,
     })
     if (!built) return null
-    const { input: unifiedInput, cashflows, effectiveLifeEvents, isPensioen, aowAge, aowAgeInt, strategyOptions } = built
+    const { input: unifiedInput, cashflows, effectiveLifeEvents, isPensioen, aowAge, aowAgeInt, strategyOptions, housingHeldToEnd } = built
 
     // ── Run projection engine (flag-selectie v1/v2, default v1) ────────
     const unifiedResult = runSelectedProjection(unifiedInput, horizonEngineV2 ?? false, strategyOptions)
@@ -136,10 +143,10 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
         requiredFirePortfolio: result.firePortfolioAtFire,
       }
 
-      return { result: pensioenResult, cashflows, originalFireAge, originalFireAgeFractional, unifiedRows: unifiedResult.rows, effectiveLifeEvents }
+      return { result: pensioenResult, cashflows, originalFireAge, originalFireAgeFractional, unifiedRows: unifiedResult.rows, effectiveLifeEvents, housingHeldToEnd }
     }
 
-    return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: unifiedResult.rows, effectiveLifeEvents }
+    return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: unifiedResult.rows, effectiveLifeEvents, housingHeldToEnd }
   }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, horizonEngineV2, potRules])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
@@ -182,7 +189,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: null, effectiveLifeEvents: [] }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: null, effectiveLifeEvents: [], housingHeldToEnd: false }
   }
 
   return {
@@ -194,5 +201,6 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     originalFireAgeFractional: simResult?.originalFireAgeFractional ?? null,
     unifiedRows: simResult?.unifiedRows ?? null,
     effectiveLifeEvents: simResult?.effectiveLifeEvents ?? lifeEvents ?? [],
+    housingHeldToEnd: simResult?.housingHeldToEnd ?? false,
   }
 }

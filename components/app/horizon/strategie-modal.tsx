@@ -409,18 +409,28 @@ function CompatibilityMatrix({ selectedWithdrawal, activeWithdrawal, activeEnd }
 
 // ── Modal component ────────────────────────────────────────────────────────
 
+type StrategyTab = 'eind' | 'onttrekking' | 'woning'
+
 interface StrategieModalProps {
   open: boolean
   onClose: () => void
   /** Initiele eigen-woning-strategie voor het header-badge. Het paneel zelf
    *  laadt/saveert via /api/housing-strategy onafhankelijk. */
   housingStrategy?: HousingStrategyConfig
+  /** Tab die actief is bij openen (deep-link, bv. direct naar 'woning' vanuit
+   *  de "huis wordt nooit verkocht"-melding). Default 'eind'. */
+  initialTab?: StrategyTab | null
 }
 
-type StrategyTab = 'eind' | 'onttrekking' | 'woning'
+export function StrategieModal({ open, onClose, housingStrategy, initialTab }: StrategieModalProps) {
+  const [activeTab, setActiveTab] = useState<StrategyTab>(initialTab ?? 'eind')
 
-export function StrategieModal({ open, onClose, housingStrategy }: StrategieModalProps) {
-  const [activeTab, setActiveTab] = useState<StrategyTab>('eind')
+  // Synchroniseer de actieve tab wanneer de modal opent met een expliciete
+  // voorkeurs-tab (bv. deep-link naar 'woning'). Alleen bij open=true zodat een
+  // handmatige tabwissel tijdens het openstaan niet teruggezet wordt.
+  useEffect(() => {
+    if (open && initialTab) setActiveTab(initialTab)
+  }, [open, initialTab])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

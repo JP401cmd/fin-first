@@ -133,12 +133,13 @@ function assertValidSimRow(row: SimRow, label: string) {
 
 describe('Persona seed data × SimRow compatibility (#356)', () => {
   // Step 1: seed-persona.ts and test-personas.ts don't need changes (SimRow is runtime)
-  it('should have 4 persona keys defined', () => {
-    expect(PERSONA_KEYS).toHaveLength(4)
+  it('should have 5 persona keys defined', () => {
+    expect(PERSONA_KEYS).toHaveLength(5)
     expect(PERSONA_KEYS).toContain('daan')
     expect(PERSONA_KEYS).toContain('lisa')
     expect(PERSONA_KEYS).toContain('willem')
     expect(PERSONA_KEYS).toContain('marijke')
+    expect(PERSONA_KEYS).toContain('compleet')
   })
 
   // Run simulation for each persona

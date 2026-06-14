@@ -10,7 +10,7 @@ import { previewEventCashflows, lifeEventsToCashflows, type SimCashflow, type Si
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
-import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency, dailyExpenseRate } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   computeFireProjection, computeFireRange,
@@ -51,6 +51,7 @@ import {
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw, GitBranch,
   ChevronDown, ChevronUp, Compass, FileText, SlidersHorizontal,
+  Home,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { HousingStrategyNudgeSheet } from '@/components/app/horizon/housing-strategy-nudge-sheet'
@@ -270,6 +271,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
+  // Voorkeurs-tab bij het openen van de StrategieModal (bv. direct naar 'woning'
+  // vanuit de "huis wordt nooit verkocht"-melding). Reset naar null bij sluiten.
+  const [strategieInitialTab, setStrategieInitialTab] = useState<'eind' | 'onttrekking' | 'woning' | null>(null)
   const [simModalOpen, setSimModalOpen] = useState(false)
   const [activeFaseModal, setActiveFaseModal] = useState<'opbouw' | 'overgang' | 'onttrekking' | null>(null)
 
@@ -477,7 +481,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
-  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows, effectiveLifeEvents } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows, effectiveLifeEvents, housingHeldToEnd } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -1444,6 +1448,44 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       yearlyAow,
     }
   })()
+
+  // Inflatie-indexfactor per leeftijd (consume-only uit unifiedRows). Voedt de
+  // meegroeiende erfenis/koopkracht-doellijn in SimChart: het reële doel-van-nu
+  // groeit met inflatie mee naar de nominale eindwaarde. Geen eigen inflatie-som.
+  const targetInflationFactors = useMemo(
+    () => (unifiedRows ?? []).map(r => ({ age: r.age, factor: r.inflationFactor })),
+    [unifiedRows],
+  )
+
+  // "Huis wordt nooit verkocht"-melding (Wft-veilig, beschrijvend). Verschijnt
+  // wanneer downsize + on_depletion nooit triggert: het huis blijft staan en
+  // domineert het getoonde eindvermogen. Alle bedragen consume-only uit de
+  // laatste unifiedRow + de strategie-config — geen eigen scommen.
+  const housingHeldNotice = useMemo(() => {
+    if (!housingHeldToEnd) return null
+    const rows = unifiedRows ?? []
+    if (rows.length === 0) return null
+    const lastRow = rows[rows.length - 1]
+    const houseValue = Math.round(lastRow.assetBuckets.eigen_huis?.endValue ?? 0)
+    const netWorth = Math.round(lastRow.netWorth)
+    if (houseValue <= 0 || netWorth <= 0) return null
+    const sharePct = Math.round((houseValue / netWorth) * 100)
+    // Reëel erfenisdoel: het door de gebruiker ingestelde (niet-geïndexeerde)
+    // bedrag indien legacy-strategie; anders het nominale eind-doel terug naar
+    // "nu" gerekend via de inflatie-indexfactor op eindleeftijd.
+    const realLegacyTarget =
+      fireStrategy?.strategy === 'legacy' && (fireStrategy.legacyAmount ?? 0) > 0
+        ? Math.round(fireStrategy.legacyAmount)
+        : lastRow.inflationFactor > 0
+          ? Math.round((simResult?.targetEndPortfolio ?? 0) / lastRow.inflationFactor)
+          : 0
+    return {
+      houseValue,
+      sharePct,
+      endAge: lastRow.age,
+      realLegacyTarget,
+    }
+  }, [housingHeldToEnd, unifiedRows, fireStrategy, simResult])
 
   // ── AOW-stop simulatie (lokale wat-als bij shortfall) ───────────────────
   // Gebruikt DEZELFDE flag-bewuste engine-selector als de hoofdsimulatie
@@ -3056,6 +3098,50 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 </div>
               )}
 
+              {/* "Huis wordt nooit verkocht" — beschrijvende info (geen advies, Wft-veilig).
+                  Neutrale horizon-toon, niet de rode "fout"-stijl. */}
+              {housingHeldNotice && !isPensioenMode && (() => {
+                const dRate = dailyExpenseRate((effectiveInput?.monthlyExpenses ?? 0))
+                const freedom = dRate > 0
+                  ? formatWithFreedom(housingHeldNotice.houseValue, dRate, { includeCurrency: false, format: 'long', includeDays: false })
+                  : null
+                return (
+                  <div className="mb-4 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 px-3.5 py-3">
+                    <div className="flex items-start gap-2.5">
+                      <Home className="mt-0.5 h-4 w-4 shrink-0 text-horizon-600" />
+                      <div className="min-w-0">
+                        <p className="font-sans text-[13px] font-semibold text-horizon-800">
+                          Je huis wordt in deze projectie nooit verkocht
+                        </p>
+                        <p className="mt-1 font-sans text-[12px] leading-relaxed text-[var(--ink-2)]">
+                          Je hebt ingesteld: verkopen zodra je geld opraakt — maar je inkomen blijft je
+                          uitgaven dekken, dus dat moment komt niet. Daardoor blijft je huis staan en
+                          groeit het mee in je vermogen:{' '}
+                          <span className="font-semibold text-[var(--ink)]">
+                            {formatMaskedCurrency(housingHeldNotice.houseValue, masked)}
+                          </span>
+                          {freedom && !masked ? <> ({freedom} vrijheid)</> : null}, oftewel{' '}
+                          <span className="font-semibold text-[var(--ink)]">{housingHeldNotice.sharePct}%</span>{' '}
+                          van je vermogen op leeftijd {housingHeldNotice.endAge}. Daardoor ligt je getoonde
+                          nalatenschap ver boven je doel
+                          {housingHeldNotice.realLegacyTarget > 0
+                            ? <> van {formatMaskedCurrency(housingHeldNotice.realLegacyTarget, masked)}</>
+                            : null}.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => { setStrategieInitialTab('woning'); setActiveModal('strategie') }}
+                          className="mt-2 inline-flex items-center gap-1 font-sans text-[12px] font-medium text-horizon-800 underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
+                          style={{ minHeight: 44 }}
+                        >
+                          Wil je je huis eerder verkopen of een andere woonstrategie? Pas je woonstrategie aan &rarr;
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* ── Overlay toggles boven de grafiek ── */}
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
                 {/* AOW-stop toggle — alleen bij shortfall scenario (FIRE > AOW) */}
@@ -3334,6 +3420,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             fireTarget={simResult.requiredFirePortfolio}
                             strategy={simResult.strategy}
                             targetEndPortfolio={simResult.targetEndPortfolio}
+                            // Meegroeiende doellijn alleen op de basis-projectie (niet op
+                            // partner-/huishoud-/AOW-stop-lijnen — die hebben eigen rijen).
+                            targetInflationFactors={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : targetInflationFactors}
                             mainLineLabel={useHouseholdMainLine ? 'Gezamenlijk' : usePartnerMainLine ? (partnerName ?? 'Partner') : undefined}
                             // Partner- én huishoud-projectie krijgen dezelfde teal als de
                             // partner-event-markers, zodat de lijn + de partner-gebeurtenissen
@@ -6677,8 +6766,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       )}
       <StrategieModal
         open={activeModal === 'strategie'}
-        onClose={() => { setActiveModal(null); loadData(); router.refresh() }}
+        onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData(); router.refresh() }}
         housingStrategy={initialData.housingStrategy}
+        initialTab={strategieInitialTab}
       />
       <UitgavenPane open={uitgavenPaneOpen} onClose={() => { setUitgavenPaneOpen(false); loadData() }} />
 

@@ -844,6 +844,7 @@ const tests: TestCase[] = [
         lisa: { totalAssets: 100000, totalDebts: 0, fireAge: 60, fireReachable: true },
         willem: { totalAssets: 1457000, totalDebts: 0, fireAge: ageAtDate('1968-11-30'), fireReachable: true },
         marijke: { totalAssets: 850000, totalDebts: 0, fireAge: ageAtDate('1957-06-20'), fireReachable: true },
+        compleet: { totalAssets: 1551000, totalDebts: 454020, fireAge: 50, fireReachable: true },
       }
 
       for (const key of PERSONA_KEYS) {

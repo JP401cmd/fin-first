@@ -169,6 +169,7 @@ export const SimChartModal = memo(function SimChartModal({
                   forModal
                   strategy={strategy}
                   targetEndPortfolio={targetEndPortfolio}
+                  targetInflationFactors={unifiedRows?.map(r => ({ age: r.age, factor: r.inflationFactor }))}
                   visibleMinAge={visibleMin}
                   visibleMaxAge={visibleMax}
                 />
@@ -187,6 +188,11 @@ export const SimChartModal = memo(function SimChartModal({
               <span className="flex items-center gap-1">
                 <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-kern-600" /> Uitgave (levensgebeurtenis)
               </span>
+              {(strategy === 'legacy' || strategy === 'perpetual') && targetEndPortfolio > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-0.5 w-4 border-t-2 border-dashed" style={{ borderColor: 'var(--kern-t, #58362d)' }} /> {strategy === 'perpetual' ? 'Koopkrachtdoel' : 'Erfenisdoel'}
+                </span>
+              )}
             </div>
           </div>
         </div>

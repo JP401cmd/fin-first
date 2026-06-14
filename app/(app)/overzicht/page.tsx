@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { createClient } from '@/lib/supabase/server'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadWillData } from '@/lib/will-data-loader'
@@ -247,6 +248,10 @@ export default async function OverzichtPage() {
 
   return (
     <>
+      {/* Tab-root → 'rich' TopBar (utility-cluster) + tab-titel in de mobiele
+          bovenbalk, gelijk aan /toekomst en /mijn. Zonder expliciete topBar
+          valt NavStackMeta terug op 'simple' en verdwijnt de cluster. */}
+      <NavStackMeta title="Overzicht" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
       <WelcomeGuideBanner />
       <CheckinBanner />
       <OverzichtHero

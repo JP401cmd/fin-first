@@ -453,6 +453,8 @@ describe('Issue 1 — on_depletion downsize scant de volle horizon (RED vóór f
     // config-cap (75). Vandaag geeft de code 75 → deze assertie faalt (RED).
     expect(saleAge).toBe(trueAge)
     expect(saleAge).toBeGreaterThan(lowCap)
+    // Verkoop vindt plaats ⇒ huis NIET tot het einde aangehouden.
+    expect(built.housingHeldToEnd).toBe(false)
   })
 
   // 1b: liquide raakt NOOIT de buffer → GEEN verkoop. Vandaag force-sale op de
@@ -477,6 +479,9 @@ describe('Issue 1 — on_depletion downsize scant de volle horizon (RED vóór f
     expect(built.input.assetLiquidations ?? []).toHaveLength(0)
     const rentEvent = built.effectiveLifeEvents.find((e) => e.event_type === 'verkoop_eigen_woning')
     expect(rentEvent).toBeUndefined()
+    // Afleiding voor de "huis wordt nooit verkocht"-melding: downsize +
+    // on_depletion dat nooit triggert ⇒ housingHeldToEnd = true.
+    expect(built.housingHeldToEnd).toBe(true)
   })
 
   // 1c: GREEN guard — fixed_age verkoopt exact op config.triggerAge. Moet blijven
@@ -506,5 +511,7 @@ describe('Issue 1 — on_depletion downsize scant de volle horizon (RED vóór f
     })!
     expect(built.input.assetLiquidations).toHaveLength(1)
     expect(built.input.assetLiquidations![0].age).toBe(70)
+    // fixed_age verkoopt onvoorwaardelijk ⇒ nooit "tot het einde aangehouden".
+    expect(built.housingHeldToEnd).toBe(false)
   })
 })

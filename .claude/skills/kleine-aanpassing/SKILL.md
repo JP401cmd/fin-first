@@ -35,6 +35,8 @@ Valt het buiten de poort, **escaleer** in plaats van te forceren — meld kort w
 
 Twijfel je of het klein genoeg is? Dan is het dat niet — escaleer.
 
+**Uitzondering — gevalideerde tweak verheven tot standaard:** verheft de gebruiker tijdens de run een al op één plek geverifieerde aanpassing expliciet tot app-brede standaard ("maak dit overal zo", "doe dit voor de hele app"), dan mag je in-place doorgaan — ook al raakt dat >3 bestanden: werk het gedeelde component bij, audit de hele app (`Explore`), rol uit via fan-out naar de juiste specialist(en), en leg de conventie vast in de betrokken skill/agent-definitie + CLAUDE.md. De aanpak is immers al bewezen; escaleren voegt dan alleen ceremonie toe. De overige vangrails blijven onverkort gelden (verificatie, UX-/security-gate, platen-check).
+
 ### 2. Plek & impact lokaliseren — `Explore` (kort, alleen indien nodig)
 Weet je al precies welk bestand/regel het betreft (vaak bij een tekst/label/marge)? Sla dit over. Zo niet: laat `Explore` gericht de exacte plek en de directe blast radius vinden (importers, gedeelde component, hergebruik elders). Lees de conclusie, niet de file-dumps. Bevestigt dit alsnog dat het groter is dan gedacht → terug naar de poort (stap 1) en escaleer.
 
