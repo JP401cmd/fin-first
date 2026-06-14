@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
+import { HORIZON_SETUP_COMPLETED_SLUG } from '@/lib/horizon-data-loader'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { type ModuleId, type IntentId } from '@/lib/module-registry'
 import { extractFinancialData } from '@/lib/ai/extract-financial-data'
@@ -127,6 +128,58 @@ async function insertOnboardingGoal(
 }
 
 /**
+ * Bepaal retirement_expense_method + retirement_expense_custom_amount voor het
+ * onboarding-profiel.
+ *
+ * Product-beslissing: standaard = 80% van huidige jaaruitgaven ("custom_amount").
+ * Dit overschrijft de vroegere default ("current_income") zodat de /toekomst-
+ * grafiek direct een realistische pensioenuitgave toont.
+ *
+ * Uitzondering: als de gebruiker in de onboarding-UI expliciet een methode heeft
+ * gekozen (horizonData.retirement_expense_method aanwezig), respecteren we die.
+ *
+ * Guard: als de maanduitgaven onbekend zijn (niet ingevuld / uitgesteld), vallen
+ * we terug op "current_income" met null custom_amount — geen 0 of garbage invullen.
+ */
+function resolveRetirementExpenseDefaults(
+  explicitMethod: 'essential_budgets' | 'custom_amount' | 'current_income' | undefined,
+  explicitCustomAmount: number | undefined,
+  identityMethod: 'essential_budgets' | 'custom_amount' | 'current_income' | undefined,
+  estimatedMonthlyExpenses: number | undefined,
+): {
+  retirement_expense_method: 'essential_budgets' | 'custom_amount' | 'current_income'
+  retirement_expense_custom_amount: number | null
+} {
+  // Gebruiker koos expliciet een methode via de onboarding-UI → respecteer die keuze
+  if (explicitMethod != null) {
+    return {
+      retirement_expense_method: explicitMethod,
+      retirement_expense_custom_amount: explicitCustomAmount ?? null,
+    }
+  }
+  // Legacy: identity bevat al een keuze (oudere clients)
+  if (identityMethod != null) {
+    return {
+      retirement_expense_method: identityMethod,
+      retirement_expense_custom_amount: explicitCustomAmount ?? null,
+    }
+  }
+  // Default: 80% van huidige jaaruitgaven — maar alleen als expenses bekend zijn
+  if (estimatedMonthlyExpenses != null && estimatedMonthlyExpenses > 0) {
+    return {
+      retirement_expense_method: 'custom_amount',
+      // 80% van huidige jaaruitgaven (maand × 12 × 0.8)
+      retirement_expense_custom_amount: Math.round(estimatedMonthlyExpenses * 12 * 0.8),
+    }
+  }
+  // Expenses onbekend (overgeslagen stap) → generieke fallback zonder garbage-waarde
+  return {
+    retirement_expense_method: 'current_income',
+    retirement_expense_custom_amount: null,
+  }
+}
+
+/**
  * Build the RPC payload for the atomic save_onboarding_data function.
  * Structures all onboarding data into the format expected by the plpgsql function.
  *
@@ -170,14 +223,25 @@ function buildRpcPayload(
       // FIRE params — from horizonData if provided, else from identity (backwards compat), else defaults
       expected_return: identity.expected_return ?? null,
       inflation_rate: identity.inflation_rate ?? null,
-      retirement_expense_method: horizonData?.retirement_expense_method ?? identity.retirement_expense_method ?? 'current_income',
-      retirement_expense_custom_amount: horizonData?.retirement_custom_amount ?? identity.retirement_custom_amount ?? null,
+      // Pensioenuitgaven-default: 80% van huidige jaaruitgaven, tenzij de gebruiker
+      // in de onboarding-UI expliciet een methode heeft gekozen (horizonData bevat dan
+      // een retirement_expense_method). Alleen schrijven als expenses bekend is — bij
+      // een overgeslagen/uitgestelde expenses-stap geen 0/garbage invullen.
+      ...resolveRetirementExpenseDefaults(
+        horizonData?.retirement_expense_method,
+        horizonData?.retirement_custom_amount ?? identity.retirement_custom_amount,
+        identity.retirement_expense_method,
+        identity.estimated_monthly_expenses,
+      ),
       fire_end_strategy: horizonData?.fire_end_strategy ?? identity.fire_end_strategy ?? 'deplete',
       fire_legacy_amount: horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null,
       fire_end_age: horizonData?.fire_end_age ?? identity.fire_end_age ?? 90,
       temporal_balance: horizonData?.temporal_balance ?? identity.temporal_balance ?? 3,
       news_description: newsDescription ?? null,
       onboarding_intent: intent ?? null,
+      // Housing: include_full is de DB-default maar we zetten het expliciet zodat
+      // de horizonmotor altijd een geldige config heeft, ook zonder migratie-default.
+      housing_strategy_config: { mode: 'include_full' },
     },
     budget_amounts: budgetAmounts,
     budgettering_mode: budgetteringMode ?? 'manual',
@@ -637,12 +701,26 @@ export async function POST(req: Request) {
       }
       // Set initial phase
       if (!result.already_completed) {
+        // Retirement defaults + housing strategy: de RPC-functie kent
+        // housing_strategy_config nog niet en heeft geen spreekwoord voor de
+        // 80%-pensioen-default — we zetten beide hier via een extra update.
+        const retirementRpcDefaults = resolveRetirementExpenseDefaults(
+          horizonData?.retirement_expense_method,
+          horizonData?.retirement_custom_amount ?? identity.retirement_custom_amount,
+          identity.retirement_expense_method,
+          identity.estimated_monthly_expenses,
+        )
         const profileUpdates: Record<string, unknown> = {
           last_known_phase: 'recovery',
           completed_onboarding_steps: completedSteps,
           onboarding_intent: intent ?? null,
           primary_goal_slug: primaryGoalSlug ?? null,
           selected_goal_slugs: selectedGoalSlugs.length > 0 ? selectedGoalSlugs : null,
+          // 80%-pensioenuitgave-default (overschrijft de RPC's 'current_income'-default)
+          retirement_expense_method: retirementRpcDefaults.retirement_expense_method,
+          retirement_expense_custom_amount: retirementRpcDefaults.retirement_expense_custom_amount,
+          // Housing: include_full expliciet (RPC kent dit veld niet)
+          housing_strategy_config: { mode: 'include_full' },
         }
         // Onboarding-schattingen = handmatige bron ("eigen bedrag") voor het
         // blok "Instellingen & toekomst" op /overzicht/cashflow. Zo drijven
@@ -783,6 +861,21 @@ export async function POST(req: Request) {
         if (onboardingGoal) {
           await insertOnboardingGoal(supabase, user.id, onboardingGoal)
         }
+
+        // Markeer horizon-setup als voltooid zodat /toekomst direct de FIRE-
+        // grafiek toont i.p.v. de setup-card. Non-blocking — een mislukte
+        // upsert mag onboarding niet stoppen; de gebruiker kan de setup-card
+        // dan alsnog via /toekomst doorlopen.
+        try {
+          await supabase
+            .from('user_feature_visits')
+            .upsert(
+              { user_id: user.id, feature_slug: HORIZON_SETUP_COMPLETED_SLUG },
+              { onConflict: 'user_id,feature_slug', ignoreDuplicates: true },
+            )
+        } catch (horizonFlagErr) {
+          console.warn('[onboarding-save] horizon-setup flag upsert failed (non-fatal):', horizonFlagErr)
+        }
       }
       // Invalideer de server-cache voor de eerste pagina's die de gebruiker
       // na onboarding bezoekt — voorkomt dat een Next.js-cache de oude
@@ -836,8 +929,17 @@ export async function POST(req: Request) {
     // Add FIRE parameters — horizonData takes priority, then identity (backwards compat)
     if (identity.expected_return != null) profileData.expected_return = identity.expected_return
     if (identity.inflation_rate != null) profileData.inflation_rate = identity.inflation_rate
-    profileData.retirement_expense_method = horizonData?.retirement_expense_method ?? identity.retirement_expense_method ?? 'current_income'
-    profileData.retirement_expense_custom_amount = horizonData?.retirement_custom_amount ?? identity.retirement_custom_amount ?? null
+    // Pensioenuitgaven-default: zie resolveRetirementExpenseDefaults() hierboven.
+    const retirementDefaults = resolveRetirementExpenseDefaults(
+      horizonData?.retirement_expense_method,
+      horizonData?.retirement_custom_amount ?? identity.retirement_custom_amount,
+      identity.retirement_expense_method,
+      identity.estimated_monthly_expenses,
+    )
+    profileData.retirement_expense_method = retirementDefaults.retirement_expense_method
+    profileData.retirement_expense_custom_amount = retirementDefaults.retirement_expense_custom_amount
+    // Housing: include_full is de DB-default maar we zetten het expliciet (robustness).
+    profileData.housing_strategy_config = { mode: 'include_full' }
     profileData.fire_end_strategy = horizonData?.fire_end_strategy ?? identity.fire_end_strategy ?? 'deplete'
     profileData.fire_legacy_amount = horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null
     profileData.fire_end_age = horizonData?.fire_end_age ?? identity.fire_end_age ?? 90
@@ -901,6 +1003,7 @@ export async function POST(req: Request) {
       'financial_context',
       'income_source',
       'expenses_source',
+      'housing_strategy_config',
     ] as const
     let profileErr: { message?: string; code?: string } | null = null
     for (let attempt = 0; attempt < OPTIONAL_PROFILE_COLUMNS.length + 1; attempt++) {
@@ -1173,6 +1276,19 @@ export async function POST(req: Request) {
     // brengen, dus user.id is gegarandeerd persistent.
     if (onboardingGoal) {
       await insertOnboardingGoal(supabase, user.id, onboardingGoal)
+    }
+
+    // 6e. Markeer horizon-setup als voltooid — zelfde semantiek als het RPC-pad.
+    // Non-blocking: zie uitleg in het RPC-pad hierboven.
+    try {
+      await supabase
+        .from('user_feature_visits')
+        .upsert(
+          { user_id: user.id, feature_slug: HORIZON_SETUP_COMPLETED_SLUG },
+          { onConflict: 'user_id,feature_slug', ignoreDuplicates: true },
+        )
+    } catch (horizonFlagErr) {
+      console.warn('[onboarding-save] horizon-setup flag upsert failed (non-fatal):', horizonFlagErr)
     }
 
     // 7. Mark onboarding as completed LAST — only after all data is saved successfully

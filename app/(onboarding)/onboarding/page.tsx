@@ -1302,7 +1302,7 @@ export default function OnboardingPage() {
                 // soft-navigation kan de server-layout de nét-geschreven row missen en
                 // redirecten naar /onboarding, wat de Suspense-fallback laat knipperen
                 // tot een browser-refresh de sessie opnieuw aligneert.
-                window.location.assign('/overzicht')
+                window.location.assign('/toekomst')
               }}
             />
           )}
