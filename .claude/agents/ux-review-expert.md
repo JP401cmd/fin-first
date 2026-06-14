@@ -66,6 +66,7 @@ For every piece of UI you review, systematically evaluate:
 
 **5. Toegankelijkheid (Accessibility)**
 - Sufficient color contrast (WCAG AA minimum, AAA preferred)?
+  - Voor module-accentkleuren als tekst op `var(--paper)`: verifieer altijd de concrete hex/oklch-waarde van `--module-active-{700..900}` per module (kern/wil/horizon) tegen WCAG-contrast bij de doel-fontmaat. Horizons warm-goud palet is het bekende risicogeval (`--module-active-700` zakt onder AA bij ~16px tekst).
 - Proper semantic HTML (headings, landmarks, lists)?
 - Are interactive elements keyboard-accessible?
 - Do images/icons have appropriate alt text or aria-labels?
