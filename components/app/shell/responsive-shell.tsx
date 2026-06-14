@@ -35,6 +35,32 @@ import { MobileAppStripProvider } from '@/components/app/shell/mobile-app-strip-
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import type { CategoryAppLink } from '@/lib/category-app-nav'
 import type { LeverScores } from '@/components/app/shell/lever-compass'
+import type { LeverageStatus } from '@/lib/leverage-status'
+
+/**
+ * Goedkope sidebar-signalen voor de status-dots, voorberekend in
+ * `app/(app)/layout.tsx` (server). Twee dot-talen:
+ *  - binaire freshness-booleans ("iets nieuws / iets te doen")
+ *  - status-mirror `belasting` (good/warn/bad/neutral) voor Box 1/2/3.
+ */
+export type SidebarSignals = {
+  /** Tips & acties: open/uitgestelde acties óf aanbevelingen. */
+  tipsActions: boolean
+  /** Ongecategoriseerde uitgaven deze maand. */
+  uncategorizedTx: boolean
+  /** Minstens één budget overschreden. */
+  budgetOver: boolean
+  /** Aandelen-koersen ouder dan de staleness-drempel. */
+  aandelenStale: boolean
+  /** Crypto-koersen ouder dan de staleness-drempel. */
+  cryptoStale: boolean
+  /** Hypotheek-rentevaste periode loopt binnen het venster af. */
+  hypotheekRateReset: boolean
+  /** Verhuurd onroerend goed zonder ingevulde huurinkomsten. */
+  verhuurMissingIncome: boolean
+  /** Status-mirror voor de Box 1/2/3-subpagina's onder Belasting. */
+  belasting: { box1: LeverageStatus; box2: LeverageStatus; box3: LeverageStatus }
+}
 
 export type SidebarMetrics = {
   /** Netto vermogen (assets − debts, gewogen volgens inclusion-pct). */
@@ -60,6 +86,12 @@ export type SidebarMetrics = {
    * backwards-compatibiliteit.
    */
   leverScores?: LeverScores
+  /**
+   * Goedkope sidebar-signalen voor de status-dots (freshness + belasting-
+   * status-mirror). Optioneel: bij weglaten tonen de dots hun grijze/neutrale
+   * inactieve staat.
+   */
+  sidebarSignals?: SidebarSignals
 }
 
 // ── CategoryAppLinks context ────────────────────────────────────────────────
@@ -203,6 +235,7 @@ function ShellContent({
     () => sidebarMetrics?.leverScores ?? DEFAULT_LEVER_SCORES,
     [sidebarMetrics?.leverScores],
   )
+  const sidebarSignals = sidebarMetrics?.sidebarSignals
 
   // Media-query-gated single-mount: pre-hydratie blijven beide shells in de
   // boom (SSR-output matcht, geen flash op eerste paint). Direct na de eerste
@@ -233,6 +266,7 @@ function ShellContent({
           role={role}
           activeAppKeys={activeAppKeys}
           leverScores={leverScores}
+          sidebarSignals={sidebarSignals}
         />
       </SidebarPortal>
 

@@ -16,7 +16,7 @@ import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
 import { PerspectiveProvider } from '@/components/app/perspective-provider'
 import { NotificationProvider } from '@/components/app/notifications/notification-provider'
 import { NotificationModal } from '@/components/app/notifications/notification-panel'
-import { ResponsiveShell } from '@/components/app/shell/responsive-shell'
+import { ResponsiveShell, type SidebarSignals } from '@/components/app/shell/responsive-shell'
 import { PlatformBanner } from '@/components/app/platform-banner'
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { CommandPaletteProvider } from '@/components/command-palette/command-palette-provider'
@@ -32,6 +32,8 @@ import {
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { computeLeverScores } from '@/components/app/shell/lever-scores'
+import type { LeverStatus } from '@/components/app/shell/lever-compass'
+import type { LeverageStatus } from '@/lib/leverage-status'
 import { WillHome } from '@/components/app/will/will-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
@@ -44,6 +46,12 @@ import {
 } from '@/lib/color-palette'
 import type { ModuleColorConfig, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 import type { FontTheme } from '@/components/app/module-color-provider'
+
+// ── Sidebar status-dot drempels ─────────────────────────────────────
+// Holdings-koers ouder dan dit = "ververs nodig" (sidebar staleness-dot).
+const HOLDINGS_STALE_DAYS = 7
+// Hypotheek-rentevaste periode loopt binnen dit venster af = "actie" (sidebar dot).
+const RATE_RESET_MONTHS = 6
 
 function generateFontVars(theme: string): Record<string, string> {
   if (theme === 'andada') {
@@ -84,6 +92,8 @@ export default async function AppLayout({
     budgetTxRes,
     coachConfigRes,
     platformStatusRes,
+    recsCountRes,
+    uncatCountRes,
   ] = await Promise.all([
     // profile-select bevat velden voor sidebar/feature-access/theming.
     // expected_return + inflation_rate voeden de coach-data-gap `hasFireParams`
@@ -94,12 +104,12 @@ export default async function AppLayout({
     // sidebar apps-strip: een app verschijnt alleen als minstens één
     // gekoppeld asset/debt de vlag aan heeft staan (zie
     // components/core/category-deepening-registry.ts).
-    supabase.from('assets').select('current_value, asset_type, net_worth_inclusion_pct, has_budget_tracking, has_holdings_tracking, has_woonbalans_tracking, has_rental_tracking').eq('user_id', user.id).eq('is_active', true),
+    supabase.from('assets').select('current_value, asset_type, net_worth_inclusion_pct, has_budget_tracking, has_holdings_tracking, has_woonbalans_tracking, has_rental_tracking, rental_income').eq('user_id', user.id).eq('is_active', true),
     // debts: `net_worth_inclusion_pct` voor netto-vermogen-weging,
     // `has_hypotheekplanner_tracking` voor de Hypotheekplanner-app
     // (mortgage-only). Aflosstrategie is sinds de v2-refactor globaal en
     // kent geen per-debt opt-in meer.
-    supabase.from('debts').select('current_balance, original_amount, debt_type, net_worth_inclusion_pct, has_hypotheekplanner_tracking').eq('user_id', user.id).eq('is_active', true),
+    supabase.from('debts').select('current_balance, original_amount, debt_type, net_worth_inclusion_pct, has_hypotheekplanner_tracking, fixed_rate_end_date').eq('user_id', user.id).eq('is_active', true),
     // transactions: 3-maand-window voor `computeFeatureAccess` (income/expense
     // signalen voor phase-detectie).
     supabase.from('transactions').select('amount, is_income').eq('user_id', user.id).gte('date', dateStr),
@@ -126,6 +136,32 @@ export default async function AppLayout({
     supabase.from('app_settings').select('value').eq('key', 'coach_config').maybeSingle(),
     // Platform-status: onderhoud/aankondiging (banner) + AI-kill-switch.
     supabase.from('app_settings').select('value').eq('key', 'platform_status').maybeSingle(),
+    // Sidebar-dot "Tips & acties": openstaande/uitgestelde aanbevelingen.
+    // RLS-gescoped op de gebruiker (geen .eq('user_id') — spiegelt de
+    // actionsCountRes-query hierboven en de recommendations-query in
+    // will-data-loader.ts). Head-only + count: 'exact' = geen rows-payload.
+    supabase.from('recommendations').select('id', { count: 'exact', head: true }).in('status', ['pending', 'postponed']),
+    // Sidebar-dot "Transacties": ongecategoriseerde uitgaven DEZE maand.
+    // Criteria spiegelen EXACT lib/budgets-data-loader.ts:208-216
+    // (budget_id IS NULL, NOT is_split, transaction_type NOT IN
+    // ('transfer','income'), amount < 0). Maand-grenzen identiek aan de
+    // budgetTxRes-IIFE hierboven. Head-only + count: 'exact'.
+    (() => {
+      const now = new Date()
+      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
+      return supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('budget_id', null)
+        .eq('is_split', false)
+        .not('transaction_type', 'in', '(transfer,income)')
+        .lt('amount', 0)
+        .gte('date', monthStart)
+        .lt('date', monthEnd)
+    })(),
   ])
 
   const platformStatus = parsePlatformStatus(platformStatusRes.data?.value as string | undefined)
@@ -166,8 +202,8 @@ export default async function AppLayout({
   // `vermogensregistratie`). Houdt het cijfer in de sidebar consistent met
   // dashboard-headers.
   const sidebarHasVermogen = activeModules.includes('vermogensregistratie')
-  type AssetRow = { current_value: number | string; asset_type?: string | null; net_worth_inclusion_pct?: number | null; has_budget_tracking?: boolean; has_holdings_tracking?: boolean; has_woonbalans_tracking?: boolean; has_rental_tracking?: boolean }
-  type DebtRow = { current_balance: number | string; original_amount?: number | string | null; debt_type?: string | null; net_worth_inclusion_pct?: number | null; has_hypotheekplanner_tracking?: boolean }
+  type AssetRow = { current_value: number | string; asset_type?: string | null; net_worth_inclusion_pct?: number | null; has_budget_tracking?: boolean; has_holdings_tracking?: boolean; has_woonbalans_tracking?: boolean; has_rental_tracking?: boolean; rental_income?: number | string | null }
+  type DebtRow = { current_balance: number | string; original_amount?: number | string | null; debt_type?: string | null; net_worth_inclusion_pct?: number | null; has_hypotheekplanner_tracking?: boolean; fixed_rate_end_date?: string | null }
   const assetRows = (assetsRes.data ?? []) as AssetRow[]
   const debtRows = (debtsRes.data ?? []) as DebtRow[]
   // App-zichtbaarheid in sidebar: derived van tracking-flags. Een app
@@ -177,6 +213,65 @@ export default async function AppLayout({
     assetRows as unknown as Asset[],
     debtRows as unknown as Debt[],
   )
+
+  // ── Sidebar status-dots: holdings-staleness (gated op actieve app) ──────
+  // Alleen querien wanneer de bijbehorende holdings-app daadwerkelijk in de
+  // sidebar staat (egress-besparing). De koers is "verouderd" als de jongste
+  // last_price_update ouder is dan HOLDINGS_STALE_DAYS. Head-only count.
+  const staleCutoffIso = new Date(
+    Date.now() - HOLDINGS_STALE_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString()
+  const [aandelenStaleRes, cryptoStaleRes] = await Promise.all([
+    sidebarActiveAppKeys.includes('aandelen-holdings')
+      ? supabase
+          .from('investment_holdings')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .lt('last_price_update', staleCutoffIso)
+      : Promise.resolve(null),
+    sidebarActiveAppKeys.includes('crypto-holdings')
+      ? supabase
+          .from('crypto_holdings')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .lt('last_price_update', staleCutoffIso)
+      : Promise.resolve(null),
+  ])
+  const sidebarAandelenStale = (aandelenStaleRes?.count ?? 0) > 0
+  const sidebarCryptoStale = (cryptoStaleRes?.count ?? 0) > 0
+
+  // ── Sidebar status-dot: hypotheek-renteherziening (gratis, app-gated) ───
+  // Rentevaste periode van een hypotheek loopt af binnen RATE_RESET_MONTHS
+  // maanden: actiegericht signaal. Alleen einddatums tussen vandaag en het
+  // cutoff-venster tellen mee.
+  const rateResetNow = new Date()
+  const rateResetTodayIso = rateResetNow.toISOString().split('T')[0]
+  const rateResetCutoff = new Date(rateResetNow)
+  rateResetCutoff.setMonth(rateResetCutoff.getMonth() + RATE_RESET_MONTHS)
+  const rateResetCutoffIso = rateResetCutoff.toISOString().split('T')[0]
+  const sidebarHypotheekRateReset =
+    sidebarActiveAppKeys.includes('hypotheekplanner') &&
+    debtRows.some(
+      (d) =>
+        d.debt_type === 'mortgage' &&
+        d.fixed_rate_end_date != null &&
+        d.fixed_rate_end_date >= rateResetTodayIso &&
+        d.fixed_rate_end_date <= rateResetCutoffIso,
+    )
+
+  // ── Sidebar status-dot: verhuur zonder huurinkomsten (gratis, app-gated) ─
+  // Verhuurd onroerend goed (real_estate + has_rental_tracking) zonder
+  // ingevulde huurinkomsten = onvolledige gegevens.
+  const sidebarVerhuurMissingIncome =
+    sidebarActiveAppKeys.includes('verhuurrendement') &&
+    assetRows.some(
+      (a) =>
+        a.asset_type === 'real_estate' &&
+        a.has_rental_tracking === true &&
+        (a.rental_income == null || Number(a.rental_income) === 0),
+    )
   // Mobile-shell app-strip data: één rij `CategoryAppLink` per actieve
   // category-app (cash → Budgetteren, investment → Aandelen holdings, etc.).
   // Bron is identiek aan het Will-dashboard (`CategoryAppNavBar`), zodat de
@@ -257,6 +352,33 @@ export default async function AppLayout({
     budgetsOnTrack,
     budgetsOver,
   })
+
+  // ── Sidebar status-dots: belasting status-mirror + bundeling ───────────
+  // box3: afgeleid uit de reeds-berekende canonieke lever-score
+  // (sidebarLeverScores.tax.status). LeverStatus → LeverageStatus mapping.
+  // APPROXIMATED — gedocumenteerd: consumeert dezelfde bron als de Belasting-
+  // categorie-dot, maar is geen volledige Box 3-berekening.
+  const leverToLeverageStatus = (s: LeverStatus): LeverageStatus =>
+    s === 'green' ? 'good' : s === 'amber' ? 'warn' : s === 'red' ? 'bad' : 'neutral'
+  const sidebarSignals: SidebarSignals = {
+    tipsActions: sidebarActionCount > 0 || (recsCountRes.count ?? 0) > 0,
+    uncategorizedTx: (uncatCountRes.count ?? 0) > 0,
+    budgetOver: budgetsOver > 0,
+    aandelenStale: sidebarAandelenStale,
+    cryptoStale: sidebarCryptoStale,
+    hypotheekRateReset: sidebarHypotheekRateReset,
+    verhuurMissingIncome: sidebarVerhuurMissingIncome,
+    belasting: {
+      // box1: ALTIJD 'neutral' — inkomen/healthScore niet goedkoop in de
+      // layout beschikbaar (APPROXIMATED).
+      box1: 'neutral',
+      // box2: ALTIJD 'neutral' — matcht de Belasting-pagina die status:'neutral'
+      // hardcodeert voor Box 2 (FAITHFUL).
+      box2: 'neutral',
+      // box3: afgeleid uit de canonieke lever-score (APPROXIMATED, zie boven).
+      box3: leverToLeverageStatus(sidebarLeverScores.tax.status),
+    },
+  }
 
   // ── Coach-bubble data gaps ──────────────────────────────
   // Lichtgewicht signalen voor de post-onboarding coach-bubble.
@@ -414,6 +536,7 @@ export default async function AppLayout({
                               activeAppKeys: sidebarActiveAppKeys,
                               categoryAppLinks: sidebarCategoryAppLinks,
                               leverScores: sidebarLeverScores,
+                              sidebarSignals,
                             }}
                           >
                             <PlatformBanner status={platformStatus} />

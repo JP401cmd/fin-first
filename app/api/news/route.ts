@@ -396,6 +396,28 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url)
   const forceRefresh = url.searchParams.get('refresh') === '1'
+  // Peek-modus: cache-only "is er een editie?"-signaal. Uitsluitend leeswerk —
+  // dit pad mag NOOIT een AI-generatie starten (de gewone GET doet dat fire-
+  // and-forget bij een koude cache). De sidebar-freshness-dot op "Nieuws"
+  // rendert op élke app-pagina en gebruikt deze modus zodat een sidebar-dot
+  // nooit token-kosten/egress veroorzaakt. Retourneert de gecachte items als
+  // die er zijn (of de items van een afgeronde/lopende achtergrond-generatie),
+  // anders een lege lijst — generatie wordt hier nooit getriggerd.
+  const peek = url.searchParams.get('peek') === '1'
+  if (peek) {
+    const state = await readGenerationState(supabase, user.id)
+    if (state && !state.error && state.items.length > 0) {
+      // Lopende of afgeronde generatie met al-beschikbare items — stuur alleen
+      // de id's: de sidebar-freshness-dot heeft de volledige payload niet nodig.
+      return NextResponse.json({ ids: state.items.map((i: NewsItem) => i.id), cached: false, peek: true })
+    }
+    const cached = await getCachedNews(supabase, user.id)
+    return NextResponse.json({
+      ids: (cached?.items ?? []).map((i: NewsItem) => i.id),
+      cached: cached != null,
+      peek: true,
+    })
+  }
 
   const editionNr = await getNextEditionNr(supabase, user.id)
   const jaargang = new Date().getFullYear() - 2025

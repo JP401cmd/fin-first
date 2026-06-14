@@ -48,6 +48,15 @@ import { LeverCompassCollapsed, type LeverScores, type LeverStatus } from '@/com
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
+import type { SidebarSignals } from '@/components/app/shell/responsive-shell'
+import {
+  LEVERAGE_STATUS_DOT,
+  LEVERAGE_STATUS_LABEL,
+  type LeverageStatus,
+} from '@/lib/leverage-status'
+import { useNotifications } from '@/components/app/notifications/notification-provider'
+import { useNewsUnread } from '@/lib/hooks/use-news-unread'
+import { useVasteLastenUnconfirmed } from '@/lib/hooks/use-vaste-lasten-unconfirmed'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
@@ -59,8 +68,6 @@ export type SidebarProps = {
   netWorth: number
   /** Aantal openstaande acties — getoond als "· {n} acties" rechts van "Overzicht". */
   actionCount: number
-  /** Aantal ongelezen berichten in Inbox-rij. */
-  unreadMessageCount?: number
   /** 1-2 letter avatar-initialen, uppercase. */
   userInitials: string
   /** Volledige naam in profiel-pill. */
@@ -76,6 +83,12 @@ export type SidebarProps = {
   activeAppKeys?: string[]
   /** Vier-hefbomen-kompas scores. Optioneel; valt terug op neutrale status. */
   leverScores?: LeverScores
+  /**
+   * Goedkope status-signalen voor de sidebar-dots (freshness + belasting
+   * status-mirror), voorberekend in `app/(app)/layout.tsx`. Undefined-safe:
+   * dots tonen dan hun inactieve (grijze/neutrale) staat.
+   */
+  sidebarSignals?: SidebarSignals
 }
 
 // ── Module-config ────────────────────────────────────────────────────────────
@@ -285,12 +298,12 @@ const DEFAULT_LEVER_SCORES: LeverScores = {
 export function Sidebar({
   netWorth,
   actionCount,
-  unreadMessageCount = 0,
   userInitials,
   userName,
   role,
   activeAppKeys = [],
   leverScores = DEFAULT_LEVER_SCORES,
+  sidebarSignals,
 }: SidebarProps) {
   const pathname = usePathname() ?? '/'
   const [collapsed, setCollapsed] = useSidebarCollapsed()
@@ -332,13 +345,14 @@ export function Sidebar({
         netWorth={netWorth}
         actionCount={actionCount}
         leverScores={leverScores}
+        sidebarSignals={sidebarSignals}
       />
 
       <div className="border-t border-[var(--border-ed)]" aria-hidden />
 
       <OverigeSection
         collapsed={collapsed}
-        unreadMessageCount={unreadMessageCount}
+        sidebarSignals={sidebarSignals}
       />
 
       {/* Kompas-sectie verplaatst onder Het Overzicht (zie ModulesSection).
@@ -494,6 +508,7 @@ function ModulesSection({
   netWorth,
   actionCount,
   leverScores,
+  sidebarSignals,
 }: {
   collapsed: boolean
   activeModule: NavModule | null
@@ -502,6 +517,7 @@ function ModulesSection({
   netWorth: number
   actionCount: number
   leverScores: LeverScores
+  sidebarSignals?: SidebarSignals
 }) {
   // Netto vermogen is een saldo → honoreert de privacy-toggle (Bedragen
   // verbergen). Bij masked toont formatNetWorthShort de bullet-placeholder.
@@ -526,6 +542,7 @@ function ModulesSection({
             metric={metrics[mod.key]}
             activeAppKeys={activeAppKeys}
             leverScores={leverScores}
+            sidebarSignals={sidebarSignals}
           />
         ))}
       </div>
@@ -556,6 +573,7 @@ function ModuleRow({
   metric,
   activeAppKeys,
   leverScores,
+  sidebarSignals,
 }: {
   module: ModuleEntry
   collapsed: boolean
@@ -564,6 +582,7 @@ function ModuleRow({
   metric: string
   activeAppKeys: string[]
   leverScores: LeverScores
+  sidebarSignals?: SidebarSignals
 }) {
   const Icon = module.Icon
   const styleVars = moduleVars(module.key)
@@ -696,7 +715,7 @@ function ModuleRow({
           sidebar visueel rustig te houden. leverScores wordt doorgegeven
           zodat tags met `leverKey` een status-dot tonen. */}
       {isActive && isEnabled && module.subTags.length > 0 && (
-        <SubTagStrip subTags={module.subTags} leverScores={leverScores} />
+        <SubTagStrip subTags={module.subTags} leverScores={leverScores} sidebarSignals={sidebarSignals} />
       )}
 
       {/* Apps-strip — alleen op active+enabled module met apps die door
@@ -705,6 +724,7 @@ function ModuleRow({
       {isActive && isEnabled && module.apps && module.apps.length > 0 && (
         <AppTagStrip
           apps={module.apps.filter((a) => activeAppKeys.includes(a.appKey))}
+          sidebarSignals={sidebarSignals}
         />
       )}
 
@@ -759,14 +779,95 @@ const SUBTAG_STATUS_LABEL: Record<LeverStatus, string> = {
   neutral: 'Geen data',
 }
 
+// ── Status-dots ───────────────────────────────────────────────────────────
+//
+// Twee dot-talen, bewust gescheiden:
+//  1. FreshnessDot — binair: groen = "iets nieuws / iets te doen", grijs =
+//     "niets". Eén herbruikbaar component, met aria-label + title (Dutch).
+//  2. Status-mirror (Belasting Box 1/2/3) — meerkleurig via het bestaande
+//     LEVERAGE_STATUS_DOT (good/warn/bad/neutral). Inline afgehandeld in
+//     SubTagStrip, NIET via dit component.
+// De bestaande categorie-tag-gezondheidsdots (SUBTAG_STATUS_DOT hierboven)
+// staan los hiervan en blijven ongewijzigd.
+
+/**
+ * Binaire freshness-dot: groen gevuld wanneer `active`, anders een grijze
+ * holle ring. Bewust kleiner (w-1/h-1) dan de health/status-dots (w-1.5/h-1.5)
+ * zodat de twee dot-talen in één oogopslag te onderscheiden zijn.
+ */
+function FreshnessDot({ active, label }: { active: boolean; label: string }) {
+  return (
+    <span
+      className={
+        active
+          ? 'w-1 h-1 rounded-full shrink-0 bg-emerald-500'
+          : 'w-1 h-1 rounded-full shrink-0 bg-transparent ring-1 ring-inset ring-[var(--ink-4)]'
+      }
+      aria-label={label}
+      title={label}
+    />
+  )
+}
+
+/** Surface-specifieke labels (actief/inactief) per freshness-dot. */
+type FreshnessLabels = { on: string; off: string }
+
+// Cashflow-children (SubTagStrip), gemapt op child-href.
+const CASHFLOW_FRESHNESS: Record<string, { key: 'budgetOver' | 'uncategorizedTx'; labels: FreshnessLabels }> = {
+  '/overzicht/cashflow/budget': {
+    key: 'budgetOver',
+    labels: { on: 'Budget overschreden', off: 'Budgetten op schema' },
+  },
+  '/overzicht/cashflow/transacties': {
+    key: 'uncategorizedTx',
+    labels: { on: 'Ongecategoriseerde transacties', off: 'Alles gecategoriseerd' },
+  },
+}
+
+// Belasting-children (status-mirror), gemapt op child-href → belasting-key.
+const BELASTING_BOX_BY_HREF: Record<string, 'box1' | 'box2' | 'box3'> = {
+  '/overzicht/belasting/box1': 'box1',
+  '/overzicht/belasting/box2': 'box2',
+  '/overzicht/belasting/box3': 'box3',
+}
+
+// Apps (AppTagStrip), gemapt op AppTag.appKey.
+const APP_FRESHNESS: Record<
+  string,
+  { key: 'budgetOver' | 'aandelenStale' | 'cryptoStale' | 'hypotheekRateReset' | 'verhuurMissingIncome'; labels: FreshnessLabels }
+> = {
+  budgetteren: {
+    key: 'budgetOver',
+    labels: { on: 'Budget overschreden', off: 'Budgetten op schema' },
+  },
+  'aandelen-holdings': {
+    key: 'aandelenStale',
+    labels: { on: 'Koersen verouderd', off: 'Koersen actueel' },
+  },
+  'crypto-holdings': {
+    key: 'cryptoStale',
+    labels: { on: 'Koersen verouderd', off: 'Koersen actueel' },
+  },
+  hypotheekplanner: {
+    key: 'hypotheekRateReset',
+    labels: { on: 'Rentevaste periode loopt af', off: 'Geen renteherziening op komst' },
+  },
+  verhuurrendement: {
+    key: 'verhuurMissingIncome',
+    labels: { on: 'Huurinkomsten ontbreken', off: 'Huurgegevens compleet' },
+  },
+}
+
 function SubTagStrip({
   subTags,
   dimmed = false,
   leverScores,
+  sidebarSignals,
 }: {
   subTags: SubTag[]
   dimmed?: boolean
   leverScores?: LeverScores
+  sidebarSignals?: SidebarSignals
 }) {
   const pathname = usePathname() ?? '/'
   // Dimmed-state op non-active modules: een toon lichter zodat de actieve
@@ -808,23 +909,15 @@ function SubTagStrip({
             </Link>
             {showChildren && (
               <div className="flex flex-col border-l border-[var(--border-ed)] ml-1 pl-3 mt-0.5 mb-1">
-                {tag.children!.map((child) => {
-                  const childActive = isOnTag(child.href)
-                  return (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      aria-current={childActive ? 'page' : undefined}
-                      className={`py-0.5 transition-colors duration-150 ${
-                        childActive
-                          ? 'text-[var(--ink)] font-medium'
-                          : `text-[var(--ink-3)] ${linkHoverClass}`
-                      }`}
-                    >
-                      {child.label}
-                    </Link>
-                  )
-                })}
+                {tag.children!.map((child) => (
+                  <SubTagChild
+                    key={child.href}
+                    child={child}
+                    active={isOnTag(child.href)}
+                    linkHoverClass={linkHoverClass}
+                    sidebarSignals={sidebarSignals}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -835,12 +928,134 @@ function SubTagStrip({
 }
 
 /**
+ * Eén child-rij in SubTagStrip (derde niveau, bv. Box 1/2/3 onder Belasting of
+ * Budget/Transacties/Vaste lasten/Forecast onder Cashflow). Krijgt een
+ * trailing status-dot:
+ *  - Belasting Box 1/2/3 → status-mirror (LEVERAGE_STATUS_DOT).
+ *  - Cashflow Budget/Transacties → binaire freshness uit sidebarSignals.
+ *  - Cashflow Vaste lasten → binaire freshness via client-hook (lazy: rendert
+ *    alleen op cashflow-routes).
+ *  - Cashflow Forecast → altijd grijze freshness-dot (afgeleid, geen signaal).
+ * Eigen component zodat de Vaste-lasten-hook per-rij legaal kan draaien.
+ */
+function SubTagChild({
+  child,
+  active,
+  linkHoverClass,
+  sidebarSignals,
+}: {
+  child: SubTag
+  active: boolean
+  linkHoverClass: string
+  sidebarSignals?: SidebarSignals
+}) {
+  const belastingBox = BELASTING_BOX_BY_HREF[child.href]
+  const cashflow = CASHFLOW_FRESHNESS[child.href]
+  const isVasteLasten = child.href === '/overzicht/cashflow/vaste-lasten'
+  const isForecast = child.href === '/overzicht/cashflow/forecast'
+
+  // Vaste lasten heeft een eigen client-signaal (fetch). We isoleren dat in een
+  // eigen component zodat de hook ALLEEN op die ene rij draait — de overige
+  // children (Box 1/2/3, Budget, Transacties, Forecast) triggeren géén fetch.
+  if (isVasteLasten) {
+    return <VasteLastenChild child={child} active={active} linkHoverClass={linkHoverClass} />
+  }
+
+  let dot: React.ReactNode = null
+  if (belastingBox) {
+    // Status-mirror dot (meerkleurig). Default 'neutral' wanneer geen signaal.
+    const status: LeverageStatus = sidebarSignals?.belasting[belastingBox] ?? 'neutral'
+    // Box 3 gets a clarifier: de score is een globale belastingbenadering,
+    // geen box3-specifiek oordeel. Box 1 en 2 tonen het label zonder toevoeging.
+    const statusLabel = LEVERAGE_STATUS_LABEL[status]
+    const dotLabel =
+      belastingBox === 'box3'
+        ? `${child.label}: ${statusLabel} (globale belastingscore)`
+        : `${child.label}: ${statusLabel}`
+    dot = (
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${LEVERAGE_STATUS_DOT[status]}`}
+        aria-label={dotLabel}
+        title={dotLabel}
+      />
+    )
+  } else if (cashflow) {
+    const on = sidebarSignals?.[cashflow.key] ?? false
+    dot = <FreshnessDot active={on} label={on ? cashflow.labels.on : cashflow.labels.off} />
+  } else if (isForecast) {
+    dot = <FreshnessDot active={false} label="Prognose — geen directe acties" />
+  }
+
+  return <SubTagChildLink child={child} active={active} linkHoverClass={linkHoverClass} dot={dot} />
+}
+
+/** Gedeelde child-link-markup zodat dot-bron (signal vs hook) los staat van layout. */
+function SubTagChildLink({
+  child,
+  active,
+  linkHoverClass,
+  dot,
+}: {
+  child: SubTag
+  active: boolean
+  linkHoverClass: string
+  dot: React.ReactNode
+}) {
+  return (
+    <Link
+      href={child.href}
+      aria-current={active ? 'page' : undefined}
+      className={`flex items-center gap-2 py-0.5 transition-colors duration-150 ${
+        active ? 'text-[var(--ink)] font-medium' : `text-[var(--ink-3)] ${linkHoverClass}`
+      }`}
+    >
+      <span className="flex-1">{child.label}</span>
+      {dot}
+    </Link>
+  )
+}
+
+/** Vaste-lasten-rij — eigen component zodat de fetch-hook alleen hier draait. */
+function VasteLastenChild({
+  child,
+  active,
+  linkHoverClass,
+}: {
+  child: SubTag
+  active: boolean
+  linkHoverClass: string
+}) {
+  const unconfirmed = useVasteLastenUnconfirmed()
+  return (
+    <SubTagChildLink
+      child={child}
+      active={active}
+      linkHoverClass={linkHoverClass}
+      dot={
+        <FreshnessDot
+          active={unconfirmed}
+          label={unconfirmed ? 'Nieuwe vaste last gedetecteerd' : 'Geen nieuwe vaste lasten'}
+        />
+      }
+    />
+  )
+}
+
+/**
  * Apps-strip onder de categorie-tags. Visueel ondergeschikt: kleine mono-kicker
  * "apps" + dezelfde middle-dot-separator als SubTagStrip, maar lichter ink
  * en 11px (vs 12px) zodat hij rustig hangt. Wordt alleen gerenderd wanneer
  * er minstens één app actief is na filtering.
  */
-function AppTagStrip({ apps, dimmed = false }: { apps: AppTag[]; dimmed?: boolean }) {
+function AppTagStrip({
+  apps,
+  dimmed = false,
+  sidebarSignals,
+}: {
+  apps: AppTag[]
+  dimmed?: boolean
+  sidebarSignals?: SidebarSignals
+}) {
   if (apps.length === 0) return null
   // Op non-active modules toont de strip wel apps maar in een lichtere ink,
   // zodat de actieve module visueel blijft domineren. Kicker-streep gebruikt
@@ -848,6 +1063,14 @@ function AppTagStrip({ apps, dimmed = false }: { apps: AppTag[]; dimmed?: boolea
   const bodyColorClass = dimmed ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'
   const linkHoverClass = dimmed ? 'hover:text-[var(--ink-2)]' : 'hover:text-[var(--ink)]'
   const stripeColor = dimmed ? 'var(--rule-soft, var(--border-ed))' : 'var(--module-active-500)'
+  // Actieve route vergelijken op pathname-only (negeer ?tab= query-strings).
+  const pathname = usePathname() ?? '/'
+  const isAppActive = (href: string) => {
+    // href kan een query-string bevatten (bv. /overzicht?tab=budgetteren) —
+    // vergelijk uitsluitend het pad-deel zodat de rij correct highlight.
+    const hrefPath = href.split('?')[0]
+    return pathname === hrefPath || pathname.startsWith(hrefPath + '/')
+  }
   // Vertical stack — zelfde indent als SubTagStrip (pl-[42px]) zodat alle
   // children van de module onder de label uitlijnen. Kicker "apps" staat
   // boven de stack als sectie-marker.
@@ -865,15 +1088,26 @@ function AppTagStrip({ apps, dimmed = false }: { apps: AppTag[]; dimmed?: boolea
         className={`flex flex-col text-[11px] leading-snug ${bodyColorClass}`}
         style={{ fontFamily: SOURCE_SERIF }}
       >
-        {apps.map((app) => (
-          <Link
-            key={app.href}
-            href={app.href}
-            className={`block py-0.5 ${linkHoverClass} transition-colors duration-150`}
-          >
-            {app.label}
-          </Link>
-        ))}
+        {apps.map((app) => {
+          const freshness = APP_FRESHNESS[app.appKey]
+          const on = freshness ? (sidebarSignals?.[freshness.key] ?? false) : false
+          const active = isAppActive(app.href)
+          return (
+            <Link
+              key={app.href}
+              href={app.href}
+              aria-current={active ? 'page' : undefined}
+              className={`flex items-center gap-2 py-0.5 transition-colors duration-150 ${
+                active ? 'text-[var(--ink)] font-medium' : linkHoverClass
+              }`}
+            >
+              <span className="flex-1">{app.label}</span>
+              {freshness && (
+                <FreshnessDot active={on} label={on ? freshness.labels.on : freshness.labels.off} />
+              )}
+            </Link>
+          )
+        })}
       </div>
     </div>
   )
@@ -885,24 +1119,25 @@ function AppTagStrip({ apps, dimmed = false }: { apps: AppTag[]; dimmed?: boolea
 
 function OverigeSection({
   collapsed,
-  unreadMessageCount,
+  sidebarSignals,
 }: {
   collapsed: boolean
-  unreadMessageCount: number
+  sidebarSignals?: SidebarSignals
 }) {
-  // Berichten krijgt een dynamische badge; andere entries blijven statisch.
-  const entries = OVERIGE_BASE.map((e) =>
-    e.label === 'Berichten' && unreadMessageCount > 0
-      ? { ...e, badge: `· ${unreadMessageCount}` }
-      : e,
-  )
-
+  // Live bronnen leven in OverigeRow (useNotifications/useNewsUnread) zodat de
+  // badge + freshness-dot consistent en actueel zijn. Hier alleen de statische
+  // entries doorgeven; de dynamiek per rij wordt in OverigeRow afgehandeld.
   return (
     <div className="flex flex-col px-2 py-3">
       {!collapsed && <OverigeSectionLabel />}
       <div className="flex flex-col">
-        {entries.map((entry) => (
-          <OverigeRow key={entry.label} entry={entry} collapsed={collapsed} />
+        {OVERIGE_BASE.map((entry) => (
+          <OverigeRow
+            key={entry.label}
+            entry={entry}
+            collapsed={collapsed}
+            sidebarSignals={sidebarSignals}
+          />
         ))}
       </div>
     </div>
@@ -925,12 +1160,51 @@ function OverigeSectionLabel() {
 function OverigeRow({
   entry,
   collapsed,
+  sidebarSignals,
 }: {
-  entry: OverigeEntry & { badge?: string }
+  entry: OverigeEntry
   collapsed: boolean
+  sidebarSignals?: SidebarSignals
 }) {
   const Icon = entry.Icon
+
+  // Live bronnen — onvoorwaardelijk (Rules of Hooks). Berichten consumeert het
+  // ongelezen-aantal uit de notificatie-provider (badge + dot consistent en
+  // live); Nieuws via een eenmalige cache-fetch.
+  const { unreadCount } = useNotifications()
+  const newsUnread = useNewsUnread()
+
+  // Bepaal per rij: numerieke badge (alleen Berichten) + freshness-dot.
+  const isBerichten = entry.label === 'Berichten'
+  const badge = isBerichten && unreadCount > 0 ? `· ${unreadCount}` : null
+
+  // Freshness-dot per surface. Tips & acties + Berichten + Nieuws zijn live;
+  // Rapportages is altijd grijs (zelf te genereren — geen signaal).
+  let dotActive = false
+  let dotLabelOn = ''
+  let dotLabelOff = ''
+  if (entry.label === 'Tips & acties') {
+    dotActive = sidebarSignals?.tipsActions ?? false
+    dotLabelOn = 'Er zijn tips of acties'
+    dotLabelOff = 'Geen openstaande acties'
+  } else if (isBerichten) {
+    dotActive = unreadCount > 0
+    dotLabelOn = 'Ongelezen berichten'
+    dotLabelOff = 'Geen nieuwe berichten'
+  } else if (entry.label === 'Nieuws') {
+    dotActive = newsUnread
+    dotLabelOn = 'Ongelezen nieuws'
+    dotLabelOff = 'Nieuws gelezen'
+  } else if (entry.label === 'Rapportages') {
+    dotActive = false
+    dotLabelOn = 'Rapportages op aanvraag'
+    dotLabelOff = 'Rapportages op aanvraag'
+  }
+  const dotLabel = dotActive ? dotLabelOn : dotLabelOff
+
   if (collapsed) {
+    // Collapsed: alleen icoon + (voor Berichten) numerieke badge. Freshness-
+    // dots zijn een no-op in collapsed (consistent met de strip-surfaces).
     return (
       <Link
         href={entry.href}
@@ -939,12 +1213,12 @@ function OverigeRow({
         className="relative flex items-center justify-center h-9 text-[var(--ink-3)] hover:bg-[var(--subtle)]/50 hover:text-[var(--ink-2)] transition-colors duration-150"
       >
         <Icon className="w-4 h-4" aria-hidden />
-        {entry.badge && (
+        {badge && (
           <span
             className="absolute top-1 right-2 font-mono text-[9px] text-[var(--ink-3)]"
             aria-hidden
           >
-            {entry.badge.replace('· ', '')}
+            {badge.replace('· ', '')}
           </span>
         )}
       </Link>
@@ -959,11 +1233,14 @@ function OverigeRow({
         <Icon className="w-[14px] h-[14px] shrink-0" aria-hidden />
         <span className="text-[12px] truncate">{entry.label}</span>
       </span>
-      {entry.badge && (
-        <span className="font-mono text-[10px] text-[var(--ink-3)] tabular-nums">
-          {entry.badge}
-        </span>
-      )}
+      <span className="flex items-center gap-2 shrink-0">
+        {badge && (
+          <span className="font-mono text-[10px] text-[var(--ink-3)] tabular-nums">
+            {badge}
+          </span>
+        )}
+        <FreshnessDot active={dotActive} label={dotLabel} />
+      </span>
     </Link>
   )
 }
