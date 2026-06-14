@@ -2,14 +2,17 @@
  * lib/fee-analysis.ts
  *
  * Pure utility module for portfolio fee/TER analysis.
- * No database calls — only imports runSimulation for FIRE impact calculations.
+ * No database calls — only imports the FIRE engines for FIRE impact calculations.
  *
  * TER = Total Expense Ratio, stored as decimal (e.g. 0.0022 = 0.22%).
  */
 
 import { runSimulation, type SimCashflow, type ReturnModel } from '@/lib/fire-simulation'
-import type { FireStrategyConfig } from '@/lib/fire-strategy'
-import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import { DEFAULT_FIRE_STRATEGY, type FireStrategyConfig } from '@/lib/fire-strategy'
+import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import type { Asset } from '@/lib/asset-data'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -184,52 +187,158 @@ export function computeTotalAnnualFee(holdings: HoldingForFees[]): number {
 }
 
 /**
+ * Bouw een `UnifiedProjectionInput` voor een fee-scenario-run (geen itemized
+ * assets): het portfolio wordt door één synthetisch liquide investment-asset
+ * gerepresenteerd, met `expected_return` = de (effectieve) bruto return. De fee
+ * is een return-reductie, dus het scenario "met fees" voert simpelweg een lagere
+ * return in op exact dezelfde inputvorm.
+ *
+ * Identiek van vorm aan de totalen-bridge in `lib/household-projection.ts`
+ * (`buildTotalsInput`), maar bewust LOKAAL gehouden zodat dit module puur en
+ * DB-vrij blijft (geen koppeling naar de household-laag). Geëxporteerd voor de
+ * flag-honouring-regressie (test/fee-analysis-flag.test.ts).
+ */
+export function buildFeeSimInput(
+  simParams: FeeSimParams,
+  effectiveReturn: number,
+): UnifiedProjectionInput {
+  const strategyConfig = simParams.strategyConfig ?? { ...DEFAULT_FIRE_STRATEGY, endAge: simParams.endAge }
+  const syntheticAsset = {
+    id: 'fee-synthetic-portfolio',
+    user_id: 'fee-analysis',
+    name: 'Portfolio',
+    asset_type: 'investment',
+    current_value: Math.max(0, simParams.currentPortfolio),
+    purchase_value: Math.max(0, simParams.currentPortfolio),
+    purchase_date: null,
+    expected_return: effectiveReturn * 100, // decimaal → percentage (asset-veld is %)
+    monthly_contribution: 0, // sparen loopt apart via annualSavings
+    institution: null,
+    account_number: null,
+    notes: null,
+    is_active: true,
+    sort_order: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    subtype: null,
+    risk_profile: null,
+    tax_benefit: null,
+    is_liquid: true,
+    lock_end_date: null,
+    ticker_symbol: null,
+    rental_income: null,
+    woz_value: null,
+    retirement_provider_type: null,
+    depreciation_rate: null,
+    address_postcode: null,
+    address_house_number: null,
+    expiry_date: null,
+    beneficiary: null,
+    kvk_number: null,
+    ownership_percentage: null,
+    annual_dividend: null,
+    linked_asset_id: null,
+    ownership: 'personal',
+    household_id: null,
+    net_worth_inclusion_pct: 100,
+    has_budget_tracking: false,
+    has_holdings_tracking: false,
+    has_woonbalans_tracking: false,
+    has_rental_tracking: false,
+    monthly_maintenance_cost: 0,
+    vva_fee: 0,
+    vacancy_log: [],
+  } as Asset
+  return {
+    assets: [syntheticAsset],
+    debts: [],
+    currentAge: simParams.currentAge,
+    endAge: strategyConfig.endAge,
+    yearlyExpenses: simParams.yearlyExpenses,
+    annualSavings: simParams.annualSavings,
+    monthlySurplus: simParams.annualSavings / 12,
+    monthlyIncome: (simParams.yearlyExpenses + simParams.annualSavings) / 12,
+    incomeGrowthRate: 0,
+    grossReturn: effectiveReturn,
+    inflationRate: simParams.inflation,
+    box3Method: 'forfaitair', // returnModel 'nl_box3' → forfaitaire Box 3-drag per asset
+    cashflows: simParams.cashflows,
+    strategyConfig,
+    withdrawalStrategy: simParams.withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
+    hasPartner: false,
+  }
+}
+
+/**
  * Compute the FIRE impact of portfolio fees.
  *
- * Runs runSimulation twice:
+ * Runs TWO FIRE scenarios and reports the delta:
  * 1. With the original grossReturn (no fee drag)
  * 2. With effectiveReturn = grossReturn - weightedTER
+ *
+ * Engine-selectie (C5-b, engine 3 van 4): met `useV2 = false` (default) draaien
+ * beide scenario's byte-identiek op de legacy v1-engine (`runSimulation`) — exact
+ * het gedrag van vóór deze migratie. Met `useV2 = true` (de horizon-grootboek-flag
+ * van de gebruiker) draaien BEIDE scenario's op v2 via `runSelectedProjection` op
+ * de synthetisch-portfolio-bridge. De fee is een return-reductie, die v2 schoon
+ * representeert via `grossReturn` in `UnifiedProjectionInput`. v2 rekent reëel, dus
+ * de absolute FIRE-leeftijden verschuiven t.o.v. v1 — maar de gerapporteerde DELTA
+ * (de fee-impact) blijft betekenisvol en monotoon stijgend met de TER.
  *
  * Returns the difference in FIRE age (months) and the total missed returns.
  */
 export function computeFeeImpactOnFire(
   simParams: FeeSimParams,
   weightedTER: number,
+  useV2 = false,
 ): FeeImpact {
-  // Simulation without fee drag
-  const simWithout = runSimulation(
-    simParams.currentAge,
-    simParams.endAge,
-    simParams.currentPortfolio,
-    simParams.yearlyExpenses,
-    simParams.annualSavings,
-    simParams.grossReturn,
-    simParams.returnModel,
-    simParams.inflation,
-    simParams.cashflows,
-    simParams.strategyConfig,
-    simParams.withdrawalStrategy,
-  )
-
-  // Simulation with fee drag: reduce gross return by weighted TER
   const effectiveReturn = simParams.grossReturn - weightedTER
-  const simWith = runSimulation(
-    simParams.currentAge,
-    simParams.endAge,
-    simParams.currentPortfolio,
-    simParams.yearlyExpenses,
-    simParams.annualSavings,
-    effectiveReturn,
-    simParams.returnModel,
-    simParams.inflation,
-    simParams.cashflows,
-    simParams.strategyConfig,
-    simParams.withdrawalStrategy,
-  )
 
-  const fireAgeWithoutFees = simWithout.fireAgeFractional
-  const fireAgeWithFees = simWith.fireAgeFractional
-  const bothReachable = simWithout.fireReachable && simWith.fireReachable
+  let fireAgeWithoutFees: number | null
+  let fireAgeWithFees: number | null
+  let bothReachable: boolean
+
+  if (useV2) {
+    // Beide scenario's op de geselecteerde engine (v2-grootboek). De fee zit in de
+    // (lagere) effectieve return op dezelfde input-vorm.
+    const simWithout = toSimResult(runSelectedProjection(buildFeeSimInput(simParams, simParams.grossReturn), true))
+    const simWith = toSimResult(runSelectedProjection(buildFeeSimInput(simParams, effectiveReturn), true))
+    fireAgeWithoutFees = simWithout.fireAgeFractional
+    fireAgeWithFees = simWith.fireAgeFractional
+    bothReachable = simWithout.fireReachable && simWith.fireReachable
+  } else {
+    // Byte-identiek aan vóór de migratie: legacy v1-engine (`runSimulation`) direct.
+    const simWithout = runSimulation(
+      simParams.currentAge,
+      simParams.endAge,
+      simParams.currentPortfolio,
+      simParams.yearlyExpenses,
+      simParams.annualSavings,
+      simParams.grossReturn,
+      simParams.returnModel,
+      simParams.inflation,
+      simParams.cashflows,
+      simParams.strategyConfig,
+      simParams.withdrawalStrategy,
+    )
+    // Simulation with fee drag: reduce gross return by weighted TER
+    const simWith = runSimulation(
+      simParams.currentAge,
+      simParams.endAge,
+      simParams.currentPortfolio,
+      simParams.yearlyExpenses,
+      simParams.annualSavings,
+      effectiveReturn,
+      simParams.returnModel,
+      simParams.inflation,
+      simParams.cashflows,
+      simParams.strategyConfig,
+      simParams.withdrawalStrategy,
+    )
+    fireAgeWithoutFees = simWithout.fireAgeFractional
+    fireAgeWithFees = simWith.fireAgeFractional
+    bothReachable = simWithout.fireReachable && simWith.fireReachable
+  }
 
   // Calculate impact in months
   let feeImpactMonths = 0

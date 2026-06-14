@@ -39,16 +39,16 @@ import { NL_AOW_AGE, NL_SWR } from '@/lib/constants'
 import { localMonthStart } from '@/lib/month-range'
 import {
   lifeEventsToCashflows,
-  runSimulation,
   type SimCashflow,
   type SimRow,
 } from '@/lib/fire-simulation'
 import {
-  runUnifiedProjection,
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
-import { DEFAULT_FIRE_STRATEGY, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
+import { DEFAULT_FIRE_STRATEGY, resolveFireStrategyWithOverride, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -342,6 +342,95 @@ function buildAowCashflow(
   }
 }
 
+/**
+ * Bouw een `UnifiedProjectionInput` voor een TOTALEN-run (geen itemized assets):
+ * het netto vermogen wordt door één synthetisch investment-asset gerepresenteerd.
+ *
+ * Dit is exact dezelfde bridge als de portfolio-totalen-run die voorheen via
+ * `runSimulation(currentAge, endAge, netWorth, …)` liep (en die `runSimulationUnified`
+ * intern bouwt). Door 'm als `UnifiedProjectionInput` uit te drukken kan de
+ * totalen-tak óók via `runSelectedProjection` flag-bewust v1 of v2 kiezen — bij v1
+ * byte-identiek aan de oude `runSimulation`-totalen-run, bij v2 de grootboek-engine.
+ *
+ * Geëxporteerd voor de flag-honouring-regressie (test/household-projection-flag.test.ts).
+ */
+export function buildTotalsInput(
+  currentAge: number,
+  netWorth: number,
+  yearlyExpenses: number,
+  annualSavings: number,
+  grossReturn: number,
+  inflationRate: number,
+  strategyConfig: FireStrategyConfig,
+  cashflows: SimCashflow[],
+  hasPartner: boolean,
+): UnifiedProjectionInput {
+  const syntheticAsset = {
+    id: 'household-synthetic-portfolio',
+    user_id: 'household',
+    name: 'Portfolio',
+    asset_type: 'investment',
+    current_value: Math.max(0, netWorth),
+    purchase_value: Math.max(0, netWorth),
+    purchase_date: null,
+    expected_return: grossReturn * 100, // decimaal → percentage (asset-veld is %)
+    monthly_contribution: 0, // sparen loopt apart via annualSavings
+    institution: null,
+    account_number: null,
+    notes: null,
+    is_active: true,
+    sort_order: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    subtype: null,
+    risk_profile: null,
+    tax_benefit: null,
+    is_liquid: true,
+    lock_end_date: null,
+    ticker_symbol: null,
+    rental_income: null,
+    woz_value: null,
+    retirement_provider_type: null,
+    depreciation_rate: null,
+    address_postcode: null,
+    address_house_number: null,
+    expiry_date: null,
+    beneficiary: null,
+    kvk_number: null,
+    ownership_percentage: null,
+    annual_dividend: null,
+    linked_asset_id: null,
+    ownership: 'personal',
+    household_id: null,
+    net_worth_inclusion_pct: 100,
+    has_budget_tracking: false,
+    has_holdings_tracking: false,
+    has_woonbalans_tracking: false,
+    has_rental_tracking: false,
+    monthly_maintenance_cost: 0,
+    vva_fee: 0,
+    vacancy_log: [],
+  } as Asset
+  return {
+    assets: [syntheticAsset],
+    debts: [],
+    currentAge,
+    endAge: strategyConfig.endAge,
+    yearlyExpenses,
+    annualSavings,
+    monthlySurplus: annualSavings / 12,
+    monthlyIncome: (yearlyExpenses + annualSavings) / 12,
+    incomeGrowthRate: 0,
+    grossReturn,
+    inflationRate,
+    box3Method: 'forfaitair',
+    cashflows,
+    strategyConfig,
+    withdrawalStrategy: WITHDRAWAL_DEFAULTS,
+    hasPartner,
+  }
+}
+
 // ── Hoofdbouwer ──────────────────────────────────────────────────────────────
 
 /**
@@ -433,6 +522,7 @@ export async function buildHouseholdProjectionInput(
     partnerDebtsRes,
     partnerIncomeRes,
     partnerEventsRes,
+    ownFlagRes,
   ] = await Promise.all([
     // Profiles RLS is own-only; de RPC levert (privacy-respecterend) de
     // projectie-velden van ALLE huishoudleden — incl. partner-DOB/-naam.
@@ -448,9 +538,20 @@ export async function buildHouseholdProjectionInput(
     supabase.rpc('household_partner_items', { p_category: 'income' }),
     // Partner-levensgebeurtenissen (RLS-blind anders; gedeeld binnen huishouden).
     supabase.rpc('household_partner_life_events'),
+    // Eigen Horizon-engine-flag (own-RLS op profiles). De huishoud-projectie wordt
+    // in de browsersessie van de HUIDIGE gebruiker gedraaid en getoond, dus de
+    // engine-keuze (v1/v2) volgt diens eigen flag — net als /toekomst, /overzicht
+    // en het dashboard. Zo zijn de gecombineerde lijn én beide partnerlijnen die
+    // de viewer ziet onderling consistent op één engine. v2 is sinds de cutover de
+    // default; alleen een expliciete opt-out schakelt terug naar v1 (byte-identiek).
+    supabase.from('profiles').select('feature_preferences').eq('id', user.id).maybeSingle(),
   ])
 
   const profiles = (profilesRes.data ?? []) as MemberProfile[]
+  // Engine-keuze (v1/v2) van de huidige gebruiker — één boolean voor de hele
+  // huishoud-projectie (combined + beide partnerlijnen), zodat de viewer overal
+  // dezelfde engine ziet. Flag-uit → byte-identiek aan v1.
+  const useV2 = isHorizonV2Enabled(ownFlagRes.data as { feature_preferences?: Record<string, unknown> | null } | null)
   const baseAssets = (baseAssetsRes.data ?? []) as Asset[]
   const baseDebts = (baseDebtsRes.data ?? []) as Debt[]
   const allBudgets = (budgetsRes.data ?? []) as Array<{ id: string; name: string; default_limit: number; interval: string; budget_type: string; is_essential: boolean; parent_id: string | null; user_id: string; ownership: 'personal' | 'shared' }>
@@ -692,18 +793,14 @@ export async function buildHouseholdProjectionInput(
     let projectionFireAgeFractional: number | null = null
     if (isOtherAggregateOnly && currentAge !== null && yearlyExpenses > 0) {
       // Partner deelt alleen totalen → totalen-simulatie (geen itemized cashflows).
-      const sim = runSimulation(
-        currentAge,
-        fireStrategy.endAge,
-        netWorth,
-        yearlyExpenses,
-        monthlyContributions * 12,
-        fireParams.grossReturn,
-        'nl_box3',
-        fireParams.inflationRate,
-        [],
-        fireStrategy,
-      )
+      // Flag-bewust via de engine-selector: een synthetisch portfolio-asset
+      // representeert het netto vermogen, identiek aan de runSimulation-totalen-run
+      // (en aan runSimulationUnified). v1 = byte-identiek; v2 = grootboek.
+      const sim = toSimResult(runSelectedProjection(
+        buildTotalsInput(currentAge, netWorth, yearlyExpenses, monthlyContributions * 12,
+          fireParams.grossReturn, fireParams.inflationRate, fireStrategy, [], hasPartnerTax),
+        useV2,
+      ))
       projection = simResultToProjection(netWorth, monthlyIncome, monthlyExpenses, yearlyExpenses, currentAge, sim)
       projectionRows = sim.rows
       projectionFireAgeFractional = sim.fireAgeFractional
@@ -732,7 +829,7 @@ export async function buildHouseholdProjectionInput(
         withdrawalStrategy: WITHDRAWAL_DEFAULTS,
         hasPartner: hasPartnerTax,
       }
-      const sim = toSimResult(runUnifiedProjection(input))
+      const sim = toSimResult(runSelectedProjection(input, useV2))
       projection = simResultToProjection(netWorth, monthlyIncome, monthlyExpenses, yearlyExpenses, currentAge, sim)
       projectionRows = sim.rows
       projectionFireAgeFractional = sim.fireAgeFractional
@@ -900,19 +997,15 @@ export async function buildHouseholdProjectionInput(
   let combinedRows: SimRow[] = []
   let combinedFireAgeFractional: number | null = null
   if (partnerAggregateOnly && headAge !== null && combinedYearlyExpenses > 0) {
-    // Partner deelt alleen totalen → gecombineerde totalen-simulatie (geen itemized cashflows).
-    const sim = runSimulation(
-      headAge,
-      headFireStrategy.endAge,
-      combinedNetWorth,
-      combinedYearlyExpenses,
-      combinedMonthlyContributions * 12,
-      headFireParams.grossReturn,
-      'nl_box3',
-      headFireParams.inflationRate,
-      [],
-      headFireStrategy,
-    )
+    // Partner deelt alleen totalen → gecombineerde totalen-simulatie (geen itemized
+    // cashflows). Flag-bewust via de engine-selector op een synthetisch portfolio
+    // (= het gecombineerde netto vermogen), identiek aan de runSimulation-totalen-run.
+    const sim = toSimResult(runSelectedProjection(
+      buildTotalsInput(headAge, combinedNetWorth, combinedYearlyExpenses,
+        combinedMonthlyContributions * 12, headFireParams.grossReturn,
+        headFireParams.inflationRate, headFireStrategy, [], true),
+      useV2,
+    ))
     combinedProjection = simResultToProjection(
       combinedNetWorth, combinedMonthlyIncome, combinedMonthlyExpenses, combinedYearlyExpenses, headAge, sim,
     )
@@ -944,7 +1037,7 @@ export async function buildHouseholdProjectionInput(
       withdrawalStrategy: WITHDRAWAL_DEFAULTS,
       hasPartner: true, // huishouden = fiscaal partner voor Box 3 heffingsvrij
     }
-    const sim = toSimResult(runUnifiedProjection(input))
+    const sim = toSimResult(runSelectedProjection(input, useV2))
     combinedProjection = simResultToProjection(
       combinedNetWorth, combinedMonthlyIncome, combinedMonthlyExpenses, combinedYearlyExpenses, headAge, sim,
     )

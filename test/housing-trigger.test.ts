@@ -550,6 +550,68 @@ describe('reverse_mortgage × on_depletion', () => {
   })
 })
 
+// ── 7b. Flag-aware meetrun (C5-b): v1 vs v2-grootboek ────────
+//
+// `resolveHousingTriggerFromProjection`/`resolveHousingEventsForSim`/
+// `runHousingScenarioProjection` kiezen de MEETRUN-engine via een `useV2`-flag
+// (default false). Flag-uit = byte-identiek aan v1 (zie alle tests hierboven die
+// de flag weglaten). Flag-aan = de meetrun draait op de v2-grootboek-engine,
+// zodat een v2-gebruiker met reverse_mortgage zijn trigger op DEZELFDE engine
+// gemeten krijgt als de getoonde grafieklijn. De scan-/trigger-LOGICA verandert
+// niet: het is nog steeds de eerste volle-horizon-kruising van het eigen liquide
+// pad met de drempel.
+
+describe('flag-aware meetrun (useV2)', () => {
+  it('default (geen flag) == expliciete useV2=false — byte-identiek v1', () => {
+    const basis = makeDecumulationBasis()
+    const context = contextFor(basis)
+    const impliciet = resolveHousingTriggerFromProjection(downsizeOnDepletion(), context, basis)
+    const expliciet = resolveHousingTriggerFromProjection(downsizeOnDepletion(), context, basis, false)
+    expect(expliciet).toEqual(impliciet)
+  })
+
+  it('useV2=true: trigger blijft zelfconsistent op het EIGEN (v2) liquide pad', () => {
+    // De engine-swap mag de scan-logica niet breken: de trigger is nog steeds de
+    // eerste kruising in zijn eigen liquidPath (nu een v2-pad).
+    const basis = makeDecumulationBasis()
+    const context = contextFor(basis)
+    const v2 = resolveHousingTriggerFromProjection(reverseOnDepletion(), context, basis, true)
+    const firstCross = v2.liquidPath.find((p) => p.liquid - p.buffer <= 1)
+    expect(firstCross).toBeDefined()
+    expect(v2.triggerAge).toBe(firstCross!.age)
+    expect(v2.reason).toBe('crossover')
+    // En de trigger ligt op/ná de gevonden FIRE-leeftijd (geen depletie tijdens opbouw).
+    if (v2.fireAgeUsed != null) {
+      expect(v2.triggerAge).toBeGreaterThanOrEqual(v2.fireAgeUsed)
+    }
+  })
+
+  it('useV2 leidt tot een ANDERE (reëel-gemeten) trigger dan v1 op dezelfde fixture', () => {
+    // v2 is intern reëel (koopkracht), v1 nominaal — het liquide pad verschilt,
+    // dus de kruising valt op een ander jaar. We pinnen niet de exacte v2-leeftijd
+    // (engine-detail) maar wél dat de flag daadwerkelijk een andere engine kiest.
+    const basis = makeDecumulationBasis()
+    const context = contextFor(basis)
+    const v1 = resolveHousingTriggerFromProjection(reverseOnDepletion(), context, basis, false)
+    const v2 = resolveHousingTriggerFromProjection(reverseOnDepletion(), context, basis, true)
+    expect(v1.triggerAge).not.toBe(v2.triggerAge)
+    // Beide blijven binnen de horizon en ≥ currentAge (geen ontspoorde meting).
+    for (const r of [v1, v2]) {
+      expect(r.triggerAge).toBeGreaterThanOrEqual(basis.currentAge)
+      expect(r.triggerAge).toBeLessThanOrEqual(basis.endAge)
+    }
+  })
+
+  it('resolveHousingEventsForSim met useV2=true emit een event op de v2-trigger', () => {
+    const basis = makeDecumulationBasis()
+    const context = contextFor(basis)
+    const { events, depletion } = resolveHousingEventsForSim(reverseOnDepletion(), context, basis, true)
+    expect(depletion).not.toBeNull()
+    expect(events).toHaveLength(1)
+    expect(events[0].target_age).toBe(depletion!.triggerAge)
+  })
+})
+
 // ── 8. Veiligheidsmarge (depletionThresholdYears) ────────────
 
 describe('veiligheidsmarge', () => {

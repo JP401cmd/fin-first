@@ -1685,7 +1685,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         inflation: fireParams.inflationRate,
         cashflows: lifeEventsToCashflows(((eventsResult.data ?? []) as LifeEvent[])),
       }
-      const impact = computeFeeImpactOnFire(feeSimParams, feeAnalysis.weightedTER)
+      // Engine-keuze (v1/v2) volgt de horizon-grootboek-flag van de gebruiker, net
+      // als de rest van /overzicht. Flag UIT (expliciete opt-out) = byte-identiek
+      // aan de legacy v1-fee-drag (runSimulation); flag AAN/afwezig = v2 (default
+      // sinds de cutover). Zo is de fee-impact-vertraging consistent met de FIRE-
+      // engine die de gebruiker overal ziet (C5-b, engine 3 van 4).
+      const feeUseV2 = isHorizonV2Enabled(profileResult.data as { feature_preferences?: Record<string, unknown> | null })
+      const impact = computeFeeImpactOnFire(feeSimParams, feeAnalysis.weightedTER, feeUseV2)
       feeImpactMonths = impact.feeImpactMonths
     } catch {
       // Simulation may fail — keep feeImpactMonths at 0
@@ -1711,6 +1717,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const remainingTermMonths = Number((mortgageDebt as { remaining_term_months?: number | null }).remaining_term_months ?? 360)
 
       if (rente > 0) {
+        // Engine-selectie (C5-b, engine 4 van 4): flag UIT/onbekend = legacy v1-
+        // FIRE-impact (runSimulation, byte-identiek); flag AAN/afwezig = v2 (default
+        // sinds de cutover). NB: dit summary-blok geeft géén FIRE-impact-params mee,
+        // dus `computeFireImpact` retourneert hier sowieso `null` en de engine-arm
+        // wordt niet bereikt — `hvbSummary` leest enkel breakeven + aanbeveling
+        // (deterministische schema's, flag-onafhankelijk). De flag wordt
+        // doorgegeven voor consistentie met de FIRE-engine die de gebruiker ziet.
+        const hvbUseV2 = isHorizonV2Enabled(profileResult.data as { feature_preferences?: Record<string, unknown> | null })
         const hvbResult = compareMortgageVsInvest({
           extraBedrag: 200, // standaard €200/maand extra
           hypotheekBalance: balance,
@@ -1723,7 +1737,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           inflatie: fireParams.inflationRate,
           hasPartner: false,
           horizonJaren: 10,
-        })
+        }, hvbUseV2)
         hvbSummary = {
           restschuld: balance,
           rente,

@@ -17,10 +17,13 @@
  * veiligheidsmarge (`depletionThresholdYears`, in jaren uitgaven).
  *
  * Mechanisme:
- *   1. MEETRUN — `runUnifiedProjection` ZONDER housing-events. Voor downsize
- *      met huis+hypotheek gefilterd (dan is `row.netWorth` exact het liquide
- *      pad — dezelfde pot als de echte grafiekrun); voor reverse_mortgage
- *      ongefilterd met liquide = netWorth − huisbucket + hypotheeksaldi.
+ *   1. MEETRUN — `runSelectedProjection(.., useV2)` ZONDER housing-events: de
+ *      meetrun draait op DEZELFDE engine die de gebruiker in de grafiek ziet
+ *      (flag-uit → v1 `runUnifiedProjection`, byte-identiek; flag-aan → v2-
+ *      grootboek). Voor downsize met huis+hypotheek gefilterd (dan is
+ *      `row.netWorth` exact het liquide pad — dezelfde pot als de echte
+ *      grafiekrun); voor reverse_mortgage ongefilterd met liquide = netWorth −
+ *      huisbucket + hypotheeksaldi.
  *   2. SCAN — eerste leeftijd waar liquide_einde_jaar ≤ buffer + marge.
  *      Omdat eenmalige cashflows in de engine aan het BEGIN van het jaar
  *      landen en wij einde-jaar meten, arriveert de verkoopopbrengst vóórdat
@@ -49,10 +52,11 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import {
-  runUnifiedProjection,
   type UnifiedProjectionInput,
   type UnifiedProjectionRow,
 } from '@/lib/unified-projection'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import type { HorizonStrategyOptions } from '@/lib/horizon-engine/strategies'
 import {
   buildHousingLifeEventsAtAge,
   filterAssetsForFire,
@@ -297,16 +301,28 @@ function scanRows(
 /**
  * Bepaal het on_depletion-trigger-moment uit de unified projection.
  * Zie de module-docstring voor het mechanisme en het convergentie-argument.
+ *
+ * `useV2` (default false): kiest de rekenmotor van de MEETRUN via
+ * `runSelectedProjection` — flag-uit → v1 (`runUnifiedProjection`, byte-identiek
+ * aan vandaag), flag-aan → v2-grootboek. Dit houdt de meetrun consistent met de
+ * engine die de gebruiker werkelijk in de grafiek ziet (anders meet een
+ * v2-gebruiker zijn reverse_mortgage-trigger op v1 terwijl de lijn v2 is). De
+ * scan-/trigger-LOGICA (volle-horizon-scan; triggerAge = never-deplete-plafond;
+ * geen kruising → 'no_sale') verandert NIET — alleen welke engine de rijen levert.
+ * `strategyOptions` stuurt (alleen bij v2) de verdeling-/onttrekkingsvolgorde-
+ * plug-ins; v1 negeert het.
  */
 export function resolveHousingTriggerFromProjection(
   config: OnDepletionConfig,
   context: HousingContext,
   sim: HousingTriggerSimBasis,
+  useV2 = false,
+  strategyOptions?: Partial<HorizonStrategyOptions>,
 ): SimulatedDepletionResult {
   const fallbackAge = Math.max(sim.currentAge, config.triggerAge)
 
   const measure = (forced: number | undefined): ScanResult => {
-    const result = runUnifiedProjection(buildMeasurementInput(config, sim, forced))
+    const result = runSelectedProjection(buildMeasurementInput(config, sim, forced), useV2, strategyOptions)
     return scanRows(result.rows, config, context, sim, fallbackAge)
   }
 
@@ -353,7 +369,7 @@ export function resolveHousingTriggerFromProjection(
       ...buildMeasurementInput(config, sim, sim.forcedFireAge),
       cashflows: [...sim.cashflows, ...lifeEventsToCashflows(events)],
     }
-    const full = runUnifiedProjection(fullInput)
+    const full = runSelectedProjection(fullInput, useV2, strategyOptions)
     const pin = sim.forcedFireAge ?? full.fireAge ?? undefined
     fireAgeUsed = pin ?? null
     const next = measure(pin)
@@ -417,6 +433,8 @@ export function resolveHousingEventsForSim(
   config: HousingStrategyConfig,
   context: HousingContext,
   sim: HousingTriggerSimBasis,
+  useV2 = false,
+  strategyOptions?: Partial<HorizonStrategyOptions>,
 ): { events: LifeEvent[]; depletion: SimulatedDepletionResult | null } {
   if (!context.hasEigenHuis) return { events: [], depletion: null }
   if (config.mode === 'include_full' || config.mode === 'exclude_from_fire') {
@@ -431,7 +449,7 @@ export function resolveHousingEventsForSim(
     }
   }
 
-  const depletion = resolveHousingTriggerFromProjection(config, context, sim)
+  const depletion = resolveHousingTriggerFromProjection(config, context, sim, useV2, strategyOptions)
 
   // Never-deplete: liquide raakt de drempel nooit binnen de horizon → verkoop
   // is niet nodig. Geen verkoop-/uitkering-event (en daarmee geen marker,
@@ -488,13 +506,15 @@ export function runHousingScenarioProjection(
   config: HousingStrategyConfig,
   context: HousingContext,
   sim: HousingTriggerSimBasis,
+  useV2 = false,
+  strategyOptions?: Partial<HorizonStrategyOptions>,
 ): HousingScenarioResult {
-  const { events, depletion } = resolveHousingEventsForSim(config, context, sim)
+  const { events, depletion } = resolveHousingEventsForSim(config, context, sim, useV2, strategyOptions)
   const input: UnifiedProjectionInput = {
     ...buildMeasurementInput(config, sim, sim.forcedFireAge),
     cashflows: [...sim.cashflows, ...lifeEventsToCashflows(events)],
   }
-  const result = runUnifiedProjection(input)
+  const result = runSelectedProjection(input, useV2, strategyOptions)
   return {
     events,
     depletion,

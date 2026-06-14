@@ -672,9 +672,14 @@ export async function loadHorizonData(
     hasPartner: housingHasPartner,
     bankAccountCash: unlinkedCash,
   }
+  // De housing-meetrun draait op DEZELFDE engine die de gebruiker in de grafiek
+  // ziet: flag-aan → v2-grootboek, flag-uit → v1 (byte-identiek). Zonder dit zou
+  // een v2-gebruiker met reverse_mortgage zijn trigger op v1 gemeten krijgen
+  // terwijl de lijn v2 is. (Berekend vóór de housing-call; verderop hergebruikt.)
+  const horizonEngineV2 = isHorizonV2Enabled(profile as { feature_preferences?: Record<string, unknown> | null })
   let housingEvents: LifeEvent[] = []
   try {
-    housingEvents = resolveHousingEventsForSim(housingStrategy, housingContext, housingSimBasis).events
+    housingEvents = resolveHousingEventsForSim(housingStrategy, housingContext, housingSimBasis, horizonEngineV2).events
   } catch (err) {
     // Degradatie: zonder housing-events laden (zelfde gedrag als sim-failure
     // elders) — beter een tijdlijn zonder verkoop-event dan een 500.
@@ -689,7 +694,6 @@ export async function loadHorizonData(
   const box3Method = fireParams.box3Method
   const householdType = String((profile as Record<string, unknown>).household_type ?? 'solo')
   const hasPartner = householdType === 'samenwonend' || householdType === 'getrouwd'
-  const horizonEngineV2 = isHorizonV2Enabled(profile as { feature_preferences?: Record<string, unknown> | null })
   const potRules = resolvePotRules(profile as { pot_rules?: unknown })
   const numberOfChildren = Number((profile as Record<string, unknown>).number_of_children ?? 0)
 

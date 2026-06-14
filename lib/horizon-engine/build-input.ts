@@ -354,7 +354,12 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
   //    liquiditeit verspringt. De trigger ligt op v2's eigen liquide-pad.
   const housingCfg = p.housingStrategy ?? DEFAULT_HOUSING_STRATEGY
   const housingContext = deriveHousingContext(p.assets ?? [], p.debts ?? [])
-  const useV2Downsize = p.horizonEngineV2 === true && housingCfg.mode === 'downsize' && housingContext.hasEigenHuis
+  const useV2 = p.horizonEngineV2 === true
+  const useV2Downsize = useV2 && housingCfg.mode === 'downsize' && housingContext.hasEigenHuis
+  // Pot-regels → engine-opties: één keer afleiden zodat de housing-meetrun
+  // (v1-tak hieronder, voor reverse_mortgage onder v2) op DEZELFDE verdeling-/
+  // onttrekkingsvolgorde rekent als de getoonde grafiekrun. undefined = defaults.
+  const strategyOptions = potRulesToStrategyOptions(p.potRules)
 
   const realEvents = (p.lifeEvents ?? []).filter((e) => !isHousingStrategyEvent(e))
   let effectiveAssets: Asset[]
@@ -413,7 +418,7 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
         forcedFireAge,
         hasPartner: p.hasPartner ?? false,
         bankAccountCash: p.bankAccountCash ?? 0,
-      })
+      }, useV2, strategyOptions)
       effectiveLifeEvents = [...realEvents, ...housingEvents]
     } catch {
       // Degradatie: val terug op de meegegeven events.
@@ -461,7 +466,7 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
     isPensioen,
     aowAge,
     aowAgeInt,
-    strategyOptions: potRulesToStrategyOptions(p.potRules),
+    strategyOptions,
   }
 }
 
@@ -490,10 +495,12 @@ export function runHousingScenarioProjectionV2(
   const useV2Downsize = config.mode === 'downsize' && context.hasEigenHuis
 
   if (!useV2Downsize) {
-    // Niet-downsize: bouw de events met het gedeelde v1-pad (filter + events),
-    // maar draai de uiteindelijke projectie door de v2-engine zodat de getoonde
-    // FIRE-leeftijd overeenkomt met de v2-grafiek.
-    const { events, depletion } = resolveHousingEventsForSim(config, context, sim)
+    // Niet-downsize (incl. reverse_mortgage onder v2): bouw de events met het
+    // gedeelde resolver-pad, maar laat zowel de trigger-MEETRUN als de
+    // uiteindelijke projectie door de v2-engine lopen (useV2 = true) zodat de
+    // getoonde FIRE-leeftijd én het verkoop-/uitkering-moment overeenkomen met
+    // de v2-grafiek — niet een v1-gemeten trigger op een v2-lijn.
+    const { events, depletion } = resolveHousingEventsForSim(config, context, sim, true)
     const { assets, debts } = filterAssetsForFire(config, sim.assets, sim.debts)
     const input: UnifiedProjectionInput = {
       assets,

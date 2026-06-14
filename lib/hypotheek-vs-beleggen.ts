@@ -15,6 +15,11 @@ import {
   interestOnlySchedule,
 } from '@/lib/debt-data'
 import { runSimulation, type SimCashflow } from '@/lib/fire-simulation'
+import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
+import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
+import type { Asset } from '@/lib/asset-data'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -277,11 +282,110 @@ function computeBreakevenRendement(params: HvBParams, aflossingsNetto: number): 
 
 // ── FIRE-impact ───────────────────────────────────────────────────────────────
 
+/** Vaste FIRE-horizon (eindleeftijd) voor de twee FIRE-impact-scenario's. */
+const FIRE_IMPACT_END_AGE = 100
+
+/**
+ * Bouw een `UnifiedProjectionInput` voor één FIRE-impact-scenario (geen itemized
+ * assets): het portfolio wordt door één synthetisch liquide investment-asset
+ * gerepresenteerd, exact zoals de fee-bridge in `lib/fee-analysis.ts`
+ * (`buildFeeSimInput`). De twee HvB-scenario's verschillen alléén in
+ * `annualSavings` (aflossen = ongewijzigd, beleggen = + extra·12) — een scalar
+ * die v2 schoon op deze vorm representeert.
+ *
+ * Bewust LOKAAL gehouden zodat dit module puur en DB-vrij blijft. Geëxporteerd
+ * voor de flag-honouring-regressie (test/hypotheek-vs-beleggen-flag.test.ts).
+ */
+export function buildHvBSimInput(
+  currentAge: number,
+  currentPortfolio: number,
+  yearlyExpenses: number,
+  annualSavings: number,
+  grossReturn: number,
+  inflation: number,
+  cashflows: SimCashflow[],
+): UnifiedProjectionInput {
+  const strategyConfig = { ...DEFAULT_FIRE_STRATEGY, endAge: FIRE_IMPACT_END_AGE }
+  const syntheticAsset = {
+    id: 'hvb-synthetic-portfolio',
+    user_id: 'hypotheek-vs-beleggen',
+    name: 'Portfolio',
+    asset_type: 'investment',
+    current_value: Math.max(0, currentPortfolio),
+    purchase_value: Math.max(0, currentPortfolio),
+    purchase_date: null,
+    expected_return: grossReturn * 100, // decimaal → percentage (asset-veld is %)
+    monthly_contribution: 0, // sparen loopt apart via annualSavings
+    institution: null,
+    account_number: null,
+    notes: null,
+    is_active: true,
+    sort_order: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    subtype: null,
+    risk_profile: null,
+    tax_benefit: null,
+    is_liquid: true,
+    lock_end_date: null,
+    ticker_symbol: null,
+    rental_income: null,
+    woz_value: null,
+    retirement_provider_type: null,
+    depreciation_rate: null,
+    address_postcode: null,
+    address_house_number: null,
+    expiry_date: null,
+    beneficiary: null,
+    kvk_number: null,
+    ownership_percentage: null,
+    annual_dividend: null,
+    linked_asset_id: null,
+    ownership: 'personal',
+    household_id: null,
+    net_worth_inclusion_pct: 100,
+    has_budget_tracking: false,
+    has_holdings_tracking: false,
+    has_woonbalans_tracking: false,
+    has_rental_tracking: false,
+    monthly_maintenance_cost: 0,
+    vva_fee: 0,
+    vacancy_log: [],
+  } as Asset
+  return {
+    assets: [syntheticAsset],
+    debts: [],
+    currentAge,
+    endAge: strategyConfig.endAge,
+    yearlyExpenses,
+    annualSavings,
+    monthlySurplus: annualSavings / 12,
+    monthlyIncome: (yearlyExpenses + annualSavings) / 12,
+    incomeGrowthRate: 0,
+    grossReturn,
+    inflationRate: inflation,
+    box3Method: 'forfaitair', // returnModel 'nl_box3' → forfaitaire Box 3-drag per asset
+    cashflows,
+    strategyConfig,
+    withdrawalStrategy: WITHDRAWAL_DEFAULTS,
+    hasPartner: false,
+  }
+}
+
 /**
  * Bereken FIRE-impact: verschil in fireAge tussen aflossen- en beleggen-scenario.
  * Positief = beleggen brengt FIRE eerder.
+ *
+ * Engine-selectie (C5-b, engine 4 van 4): met `useV2 = false` (default) draaien
+ * beide scenario's byte-identiek op de legacy v1-engine (`runSimulation`) — exact
+ * het gedrag van vóór deze migratie. Met `useV2 = true` (de horizon-grootboek-flag
+ * van de gebruiker) draaien BEIDE scenario's op v2 via `runSelectedProjection` op
+ * dezelfde synthetisch-portfolio-bridge. De twee scenario's verschillen enkel in
+ * `annualSavings`; v2 rekent reëel, dus de absolute FIRE-leeftijden verschuiven
+ * t.o.v. v1 — maar de gerapporteerde DELTA (aflossen − beleggen, in maanden) blijft
+ * betekenisvol: bij rendement boven de hypotheekrente wint beleggen op beide engines.
  */
-function computeFireImpact(params: HvBParams): number | null {
+function computeFireImpact(params: HvBParams, useV2 = false): number | null {
   const { currentAge, currentPortfolio, yearlyExpenses, annualSavings,
           verwachtRendement, inflatie, cashflows, extraBedrag } = params
 
@@ -291,29 +395,50 @@ function computeFireImpact(params: HvBParams): number | null {
     return null
   }
 
-  const endAge = 100
+  const endAge = FIRE_IMPACT_END_AGE
   const baseCashflows = cashflows ?? []
-
-  // Scenario A: extra aflossen → lagere maandlasten (= meer spaarruimte)
-  // Vereenvoudigd: extra bedrag gaat naar schuld, niet naar portfolio
-  const simAflossen = runSimulation(
-    currentAge, endAge, currentPortfolio,
-    yearlyExpenses, annualSavings, // savings stay the same (extra goes to mortgage)
-    verwachtRendement, 'nl_box3', inflatie,
-    baseCashflows,
-  )
-
-  // Scenario B: extra beleggen → hogere jaarlijkse besparingen
   const extraJaarlijks = extraBedrag * 12
-  const simBeleggen = runSimulation(
-    currentAge, endAge, currentPortfolio,
-    yearlyExpenses, annualSavings + extraJaarlijks,
-    verwachtRendement, 'nl_box3', inflatie,
-    baseCashflows,
-  )
 
-  const ageA = simAflossen.fireAgeFractional
-  const ageB = simBeleggen.fireAgeFractional
+  let ageA: number | null
+  let ageB: number | null
+
+  if (useV2) {
+    // Beide scenario's op de geselecteerde engine (v2-grootboek). Aflossen houdt
+    // de spaarruimte gelijk; beleggen verhoogt `annualSavings` met de jaarinleg.
+    const simAflossen = toSimResult(runSelectedProjection(
+      buildHvBSimInput(currentAge, currentPortfolio, yearlyExpenses, annualSavings,
+        verwachtRendement, inflatie, baseCashflows),
+      true,
+    ))
+    const simBeleggen = toSimResult(runSelectedProjection(
+      buildHvBSimInput(currentAge, currentPortfolio, yearlyExpenses, annualSavings + extraJaarlijks,
+        verwachtRendement, inflatie, baseCashflows),
+      true,
+    ))
+    ageA = simAflossen.fireAgeFractional
+    ageB = simBeleggen.fireAgeFractional
+  } else {
+    // Byte-identiek aan vóór de migratie: legacy v1-engine (`runSimulation`) direct.
+    // Scenario A: extra aflossen → lagere maandlasten (= meer spaarruimte)
+    // Vereenvoudigd: extra bedrag gaat naar schuld, niet naar portfolio
+    const simAflossen = runSimulation(
+      currentAge, endAge, currentPortfolio,
+      yearlyExpenses, annualSavings, // savings stay the same (extra goes to mortgage)
+      verwachtRendement, 'nl_box3', inflatie,
+      baseCashflows,
+    )
+
+    // Scenario B: extra beleggen → hogere jaarlijkse besparingen
+    const simBeleggen = runSimulation(
+      currentAge, endAge, currentPortfolio,
+      yearlyExpenses, annualSavings + extraJaarlijks,
+      verwachtRendement, 'nl_box3', inflatie,
+      baseCashflows,
+    )
+
+    ageA = simAflossen.fireAgeFractional
+    ageB = simBeleggen.fireAgeFractional
+  }
 
   if (ageA == null && ageB == null) return null
   if (ageA == null) return 120 // aflossen bereikt FIRE niet → groot voordeel beleggen
@@ -329,9 +454,15 @@ function computeFireImpact(params: HvBParams): number | null {
  * Vergelijk extra aflossen vs. extra beleggen.
  *
  * @param params — Alle input parameters
+ * @param useV2  — Engine-selectie voor de FIRE-impact (C5-b, engine 4 van 4).
+ *   `false` (default) = byte-identiek aan vóór de migratie (legacy v1 `runSimulation`);
+ *   `true` (de horizon-grootboek-flag van de gebruiker) = beide FIRE-scenario's via
+ *   `runSelectedProjection` op v2. Raakt ALLEEN `fireImpactMaanden`; de
+ *   aflossing-/beleggen-scenario's en breakeven draaien op deterministische
+ *   amortisatie-/groeischema's (geen FIRE-engine) en zijn dus flag-onafhankelijk.
  * @returns HvBResult met beide scenario's, breakeven en FIRE-impact
  */
-export function compareMortgageVsInvest(params: HvBParams): HvBResult {
+export function compareMortgageVsInvest(params: HvBParams, useV2 = false): HvBResult {
   // Edge case: bij 0 extra bedrag is er geen verschil
   if (params.extraBedrag <= 0) {
     return {
@@ -378,7 +509,7 @@ export function compareMortgageVsInvest(params: HvBParams): HvBResult {
   }
 
   // FIRE-impact
-  const fireImpactMaanden = computeFireImpact(params)
+  const fireImpactMaanden = computeFireImpact(params, useV2)
 
   // Aanbeveling
   const DREMPEL = 100 // €100 verschil = praktisch gelijk
