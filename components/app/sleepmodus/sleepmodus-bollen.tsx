@@ -72,9 +72,19 @@ export function CentraleBolVisual({ tx, siblingCount, dimmed }: {
       <p className={`relative mt-1 font-[var(--font-dm-mono)] text-[15px] font-medium tabular-nums ${tx.amount > 0 ? 'text-positive' : 'text-[var(--ink)]'}`}>
         {tx.amount > 0 ? '+' : ''}{formatCurrencyDecimals(tx.amount)}
       </p>
-      <p className="relative mt-0.5 font-serif text-[9px] italic text-[var(--ink-3)]">{formatDate(tx.date)}</p>
+      <p
+        className="relative mt-0.5 font-serif text-[9px] italic text-[var(--ink-3)]"
+        style={{ textShadow: '0 0 2px var(--paper), 0 0 3px var(--paper)' }}
+      >
+        {formatDate(tx.date)}
+      </p>
       {siblingCount > 0 && (
-        <p className="relative mt-0.5 font-serif text-[9px] italic text-kern-700">+ {siblingCount} vergelijkbaar</p>
+        <p
+          className="relative mt-0.5 font-serif text-[9px] italic text-kern-700"
+          style={{ textShadow: '0 0 2px var(--paper), 0 0 3px var(--paper)' }}
+        >
+          + {siblingCount} vergelijkbaar
+        </p>
       )}
     </div>
   )
@@ -90,7 +100,7 @@ export type BolState = 'normal' | 'hot' | 'dim' | 'armed'
  * snuit, pootjes en een muntgleuf bovenop — clean/editorial, leesbaar op ~70px.
  * Schaalt mee met de container (width/height 100%).
  */
-function PiggySilhouette({ fill, stroke }: { fill: string; stroke: string }) {
+function PiggySilhouette({ fill, stroke, strokeWidth = 2 }: { fill: string; stroke: string; strokeWidth?: number }) {
   return (
     <svg
       aria-hidden="true"
@@ -103,7 +113,7 @@ function PiggySilhouette({ fill, stroke }: { fill: string; stroke: string }) {
         d="M66 20 q9 -11 16 -7 q3 8 -5 16 Z"
         fill={fill}
         stroke={stroke}
-        strokeWidth={2}
+        strokeWidth={strokeWidth}
         strokeLinejoin="round"
       />
       {/* Body */}
@@ -117,17 +127,25 @@ function PiggySilhouette({ fill, stroke }: { fill: string; stroke: string }) {
            C90 27 75 16 50 16 Z"
         fill={fill}
         stroke={stroke}
-        strokeWidth={2}
+        strokeWidth={strokeWidth}
         strokeLinejoin="round"
       />
       {/* Snuit */}
-      <ellipse cx="86" cy="44" rx="9" ry="8" fill={fill} stroke={stroke} strokeWidth={2} />
+      <ellipse cx="86" cy="44" rx="9" ry="8" fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
       <circle cx="83.5" cy="44" r="1.6" fill={stroke} />
       <circle cx="88.5" cy="44" r="1.6" fill={stroke} />
       {/* Oog */}
       <circle cx="68" cy="38" r="2" fill={stroke} />
-      {/* Muntgleuf bovenop */}
-      <line x1="42" y1="20" x2="58" y2="20" stroke={stroke} strokeWidth={2.5} strokeLinecap="round" />
+      {/* Muntgleuf bovenop — dikker als het de actieve doelvariant is. */}
+      <line
+        x1="42"
+        y1="20"
+        x2="58"
+        y2="20"
+        stroke={stroke}
+        strokeWidth={strokeWidth + 0.5}
+        strokeLinecap="round"
+      />
     </svg>
   )
 }
@@ -177,12 +195,18 @@ export function BudgetBol({ droppableId, budget, pos, state, isChild, pulse, sta
         aria-label={label}
         className={[
           'relative flex flex-col items-center justify-center gap-0.5 text-center',
-          'transition-[filter] duration-200',
+          'transition-[filter,transform] duration-200 ease-out',
           pulse ? 'animate-sleep-check-pulse' : '',
         ].join(' ')}
         style={{
           width: size,
           height: size,
+          // Twéé signalen voor het actieve doel, niet alleen kleur (a11y):
+          // (1) een merkbare schaalsprong die de bol vóór de buren tilt en
+          // (2) een dikkere, vollere omlijning (hieronder in PiggySilhouette).
+          // De zwakkere 'hot'-kandidaat blijft op normale schaal — zo rangt
+          // 'highlighted' altijd zichtbaar bóven 'hot' uit.
+          transform: highlighted ? 'scale(1.08)' : 'scale(1)',
           // Een box-shadow-ring sluit niet aan op een niet-rond silhouet;
           // de gloed komt daarom van een gekleurde drop-shadow ACHTER de vorm.
           filter: highlighted
@@ -194,15 +218,22 @@ export function BudgetBol({ droppableId, budget, pos, state, isChild, pulse, sta
         }}
       >
         {/* Het spaarvarken-silhouet — fill = tint, stroke = type-kleur. Tint
-            sterker bij hover/voorstel, mirroring de oude achtergrond-inkleur. */}
+            sterker bij hover/voorstel; bij het actieve doel een duidelijk
+            dikkere omlijning in de vólle type-kleur, mirroring de oude rand. */}
         <PiggySilhouette
           fill={tintFor(colors.hex, highlighted ? 24 : state === 'hot' ? 18 : 11)}
           stroke={colors.hex}
+          strokeWidth={highlighted ? 3.25 : 2}
         />
         <span className="relative mt-1 inline-flex h-4 w-4 items-center justify-center">
           <BudgetIcon name={budget.icon} className="h-4 w-4" />
         </span>
-        <span className="relative max-w-[60px] px-0.5 font-serif text-[9.5px] italic leading-[1.05] text-[var(--ink)] line-clamp-2">
+        <span
+          className="relative max-w-[60px] px-0.5 font-serif text-[9.5px] italic leading-[1.05] text-[var(--ink)] line-clamp-2"
+          // Subtiele papier-halo houdt de naam leesbaar over donkere/verzadigde
+          // type-tinten — geen kaartje, alleen de gloed.
+          style={{ textShadow: '0 0 2px var(--paper), 0 0 3px var(--paper)' }}
+        >
           {budget.name}
         </span>
       </button>
