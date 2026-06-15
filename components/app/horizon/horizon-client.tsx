@@ -2,11 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import Link from 'next/link'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
-import { previewEventCashflows, lifeEventsToCashflows, type SimCashflow, type SimRow } from '@/lib/fire-simulation'
+import { lifeEventsToCashflows, type SimCashflow, type SimRow } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
@@ -14,13 +13,13 @@ import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency, fo
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   computeFireProjection, computeFireRange,
-  formatFireAge, formatCountdown,
-  computeLifeEventImpact, ageAtDate, deriveCountdown,
+  formatFireAge,
+  ageAtDate, deriveCountdown,
   runMonteCarlo,
-  LIFE_EVENT_CATALOG, LIFE_EVENT_GROUPS, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, berekenKinderopvangNetto, kinderbijslagPerMaand, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
+  LIFE_EVENT_CATALOG, nibudChildrenCost, berekenSchenkbelasting, berekenAutoMaandkosten, berekenErfbelasting, berekenKinderopvangNetto, kinderbijslagPerMaand, WERELDREIS_STIJL_PRESETS, VERBOUWING_TYPE_KOSTEN, STUDIE_TYPE_KOSTEN, BRUILOFT_BUDGET_PRESETS,
   type LifeEventGroup,
   type FinancialInput, type FireProjection, type FireRange,
-  type LifeEvent, type LifeEventImpact, splitLifeEvents, computeLifeEventNetImpact,
+  type LifeEvent, type LifeEventImpact,
   type MonteCarloResult, type CatalogField,
   type UserDefinedCashflow,
 } from '@/lib/horizon-data'
@@ -43,15 +42,14 @@ import {
 import { NaturalMilestoneSheet } from '@/components/app/horizon/natural-milestone-sheet'
 import { HorizonYearDetailsSheet } from '@/components/app/horizon/horizon-year-details-sheet'
 import { ActionCard } from '@/components/app/action-card'
-import { EVENT_ICONS } from '@/components/app/horizon/log-timeline'
 import dynamic from 'next/dynamic'
 import {
-  Hourglass, TrendingUp, Percent, Shield, Info,
-  AlertTriangle, Calendar, BarChart3, Clock, FlaskConical, Landmark,
+  Hourglass, TrendingUp, Percent, Info,
+  AlertTriangle, Calendar, BarChart3, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw, GitBranch,
   ChevronDown, ChevronUp, Compass, FileText, SlidersHorizontal,
-  Home,
+  Home, Lightbulb,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { HousingStrategyNudgeSheet } from '@/components/app/horizon/housing-strategy-nudge-sheet'
@@ -154,8 +152,8 @@ import {
   getWealthCompositionTips,
   getIncomeExpenseTips,
 } from '@/lib/chart-tips'
-import { HorizonFireIntroCard } from '@/components/app/horizon/horizon-fire-intro-card'
-import { HorizonSetupPane } from '@/components/app/horizon/horizon-setup-pane'
+import { ToekomstOverlay, OVERLAY_ICONS, type OverlayBalloonDef } from '@/components/app/horizon/toekomst-overlay'
+import { ToekomstWelcome } from '@/components/app/horizon/toekomst-welcome'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
@@ -306,9 +304,17 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       if (storedNat !== null) setShowNaturalMilestones(storedNat === 'true')
       const storedLife = localStorage.getItem('horizon_show_life_events')
       if (storedLife !== null) setShowLifeEvents(storedLife === 'true')
+      // Overlay-zichtbaarheid: default AAN de eerste keer (geen key), daarna
+      // de opgeslagen voorkeur. Onafhankelijk van de welkomsttekst-state.
+      const storedOverlay = localStorage.getItem('horizon_overlay_visible')
+      if (storedOverlay !== null) setOverlayVisible(storedOverlay === 'true')
     } catch {
       // ignore — localStorage kan disabled zijn (private mode)
     }
+  }, [])
+  const persistOverlayVisible = useCallback((val: boolean) => {
+    setOverlayVisible(val)
+    try { localStorage.setItem('horizon_overlay_visible', String(val)) } catch { /* noop */ }
   }, [])
   const persistNaturalMilestones = useCallback((val: boolean) => {
     setShowNaturalMilestones(val)
@@ -360,18 +366,23 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     setSelectedScenarioIds(new Set())
   }, [])
 
-  // ── Horizon FIRE-prognose setup-pane state ──────────────────────
-  // hasCompletedHorizonSetup: true zodra de gebruiker de setup-pane
-  // heeft doorlopen + opgeslagen. Server-loader vult de initiële waarde,
-  // lokaal updaten we direct na succesvolle save zodat de chart
-  // verschijnt zonder reload.
-  const [hasCompletedHorizonSetup, setHasCompletedHorizonSetup] = useState<boolean>(initialData.hasCompletedHorizonSetup)
-  const [setupPaneOpen, setSetupPaneOpen] = useState(false)
+  // ── Toekomst-overlay (ballonnen) + welkomsttekst ─────────────────
+  // De grafiek wordt sinds juni 2026 altijd getoond (de oude setup-pane is
+  // verwijderd). In plaats daarvan: (a) een eenmalige welkomsttekst en (b) een
+  // toggle-bare ballonnen-overlay die wijst naar de inline-editors.
+  //
+  // welcomeDismissed: lokale "weg"-state voor de welkomstbanner. Initieel
+  // afgeleid uit de server-marker (hasSeenWelcome) — al gezien → meteen weg.
+  const [welcomeDismissed, setWelcomeDismissed] = useState<boolean>(initialData.hasSeenWelcome)
+  // overlayVisible: zichtbaarheid van de ballonnen-laag. Default AAN de eerste
+  // keer (geen localStorage-key), daarna gepersisteerd. Onafhankelijk van de
+  // welkomsttekst-state.
+  const [overlayVisible, setOverlayVisible] = useState(true)
+  // overlayEmphasis: welke grafiekfase een gehoverde/gefocuste ballon accentueert.
+  const [overlayEmphasis, setOverlayEmphasis] = useState<'accumulation' | 'withdrawal' | 'fire' | null>(null)
   // monthlySavingsOverride wordt doorgegeven aan useHorizonFireSim zodat
   // de prognose de override-waarde gebruikt boven het asset-aggregaat.
-  // We houden lokaal state aan zodat een save in de pane direct doorwerkt.
-  const [monthlySavingsOverride, setMonthlySavingsOverride] = useState<number | null>(initialData.monthlySavingsOverride)
-  const kernEmpty = (initialData.assets?.length ?? 0) === 0 && (initialData.debts?.length ?? 0) === 0
+  const [monthlySavingsOverride] = useState<number | null>(initialData.monthlySavingsOverride)
 
   // Deep-link: open modal via ?modal= URL param (from dashboard widgets)
   const searchParams = useSearchParams()
@@ -419,13 +430,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         setEventPaneMode(eventEditParam === 'true' ? 'edit' : 'view')
         setEventPaneOpen(true)
       }
-      shouldReplace = true
-    }
-
-    // Support ?horizonSetup=open — geopend vanuit HorizonFireIntroCard.
-    const horizonSetupParam = searchParams.get('horizonSetup')
-    if (horizonSetupParam === 'open') {
-      setSetupPaneOpen(true)
       shouldReplace = true
     }
 
@@ -2642,51 +2646,117 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const fireNotReachable = effectiveCountdown.fireDate === 'Niet haalbaar'
   const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
 
-  // ── Paginabrede gating: voorkeuren-eerst ─────────────────────────────
-  // Zolang de gebruiker de FIRE-prognose-voorkeuren niet heeft ingesteld,
-  // vervangen we de VOLLEDIGE pagina-body (KPI-hero, vrijheidsbalk, grafiek
-  // en alle onderliggende secties) door één setup-melding. De setup-pane
-  // blijft hier gemount zodat de CTA hem in-place opent; na save flipt
-  // hasCompletedHorizonSetup en verschijnt de volledige pagina zonder reload.
-  // (Deze guard staat ná alle hooks zodat de hook-volgorde stabiel blijft.)
-  if (!hasCompletedHorizonSetup) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-        <HorizonFireIntroCard
-          kernEmpty={kernEmpty}
-          onOpenSetup={() => setSetupPaneOpen(true)}
-        />
-        <HorizonSetupPane
-          key={setupPaneOpen ? 'horizonSetup-open' : 'horizonSetup-closed'}
-          open={setupPaneOpen}
-          onClose={() => setSetupPaneOpen(false)}
-          onCompleted={(saved) => {
-            setHasCompletedHorizonSetup(true)
-            setMonthlySavingsOverride(saved.monthlySavingsOverride)
-          }}
-          initialMonthlySavingsOverride={monthlySavingsOverride}
-          monthlyContributionFromAssets={initialData.monthlyContributionFromAssets}
-          monthlySurplusFromBudget={initialData.monthlySurplusFromBudget}
-          baseMonthlySavingsFromCashflow={initialData.baseAnnualSavingsFromCashflow > 0 ? Math.round(initialData.baseAnnualSavingsFromCashflow / 12) : null}
-          budgetingActive={initialData.budgetingActive}
-          initialEndStrategy={initialData.fireStrategy.strategy}
-          initialEndAge={initialData.fireStrategy.endAge}
-          initialLegacyAmount={initialData.fireStrategy.legacyAmount}
-          initialRetirementMethod={initialData.retirementExpenseMethod}
-          initialRetirementCustomAmount={initialData.retirementExpenseCustomAmount}
-        />
-      </div>
-    )
-  }
+  // ── STEP 2: geen paginabrede setup-gate meer ─────────────────────────
+  // De grafiek wordt nu altijd getoond. De projectie handelt simResult===null
+  // / fireAge===null netjes af (lege/foutmelding in de grafiek-sectie). Alle
+  // voorkeuren zijn bereikbaar via de inline-editors (uitgaven-pane,
+  // strategie-modal, event-pane) — geapunteerd door de ToekomstOverlay.
+
+  // ── STEP 4: ballon-definities, gewired aan de bestaande in-page editors ──
+  // Elke ballon opent een editor zodat de grafiek live meebeweegt; alleen
+  // 'echt inkomen' navigeert (naar /mijn/profiel, waar het inkomen woont).
+  // setState-setters (setEventPaneEditingId etc.) zijn stabiel per React-garantie
+  // en worden bewust weggelaten uit de dep-array.
+  const toekomstOverlayBalloons: OverlayBalloonDef[] = useMemo(() => [
+    {
+      id: 'inkomen',
+      icon: OVERLAY_ICONS.income,
+      kicker: 'Je inkomen',
+      body: 'Klopt je inkomen? Dat bepaalt mee hoe snel je vrijheid opbouwt.',
+      cta: 'Inkomen aanpassen',
+      anchor: { row: 'top', side: 'left' },
+      emphasis: 'accumulation',
+      onActivate: () => router.push('/mijn/profiel'),
+    },
+    {
+      id: 'gebeurtenis',
+      icon: OVERLAY_ICONS.event,
+      kicker: 'Levensgebeurtenis',
+      body: 'Een verbouwing, kind of wereldreis op komst? Reken ’m mee.',
+      cta: 'Gebeurtenis toevoegen',
+      anchor: { row: 'top', side: 'right' },
+      emphasis: 'accumulation',
+      onActivate: () => {
+        setEventPaneEditingId(null)
+        setEventPaneMode('catalog')
+        setEventPaneOpen(true)
+      },
+    },
+    {
+      id: 'pensioen',
+      icon: OVERLAY_ICONS.pension,
+      kicker: 'Pensioenstrategie',
+      body: 'Stel in hoe je AOW en pensioen meewegen in je vrijheidsmoment.',
+      cta: 'Pensioen instellen',
+      anchor: { row: 'mid-high', side: 'left' },
+      emphasis: 'fire',
+      onActivate: () => { setStrategieInitialTab('eind'); setActiveModal('strategie') },
+    },
+    {
+      id: 'eindstrategie',
+      icon: OVERLAY_ICONS.end,
+      kicker: 'Eindstrategie',
+      body: 'Vermogen behouden, opeten of nalaten? Dat bepaalt je einddoel.',
+      cta: 'Eindstrategie kiezen',
+      anchor: { row: 'mid-high', side: 'right' },
+      emphasis: 'fire',
+      onActivate: () => { setStrategieInitialTab('eind'); setActiveModal('strategie') },
+    },
+    {
+      id: 'woning',
+      icon: OVERLAY_ICONS.housing,
+      kicker: 'Je woning',
+      body: 'Verkopen, kleiner wonen of opeten? Je huis kan vrijheid vrijspelen.',
+      cta: 'Woonstrategie kiezen',
+      anchor: { row: 'mid-low', side: 'left' },
+      emphasis: 'withdrawal',
+      onActivate: () => { setStrategieInitialTab('woning'); setActiveModal('strategie') },
+    },
+    {
+      id: 'uitgaven',
+      icon: OVERLAY_ICONS.expenses,
+      kicker: 'Uitgaven na pensioen',
+      body: 'Hoeveel heb je later per jaar nodig? Dit zet je vrijheidsdoel.',
+      cta: 'Uitgaven aanpassen',
+      anchor: { row: 'bottom', side: 'left' },
+      emphasis: 'withdrawal',
+      onActivate: () => setUitgavenPaneOpen(true),
+    },
+    {
+      id: 'onttrekking',
+      icon: OVERLAY_ICONS.withdrawal,
+      kicker: 'Onttrekkingsstrategie',
+      body: 'Hoe haal je later geld uit je vermogen? Dat bepaalt de daling.',
+      cta: 'Onttrekking instellen',
+      anchor: { row: 'bottom', side: 'right' },
+      emphasis: 'withdrawal',
+      onActivate: () => { setStrategieInitialTab('onttrekking'); setActiveModal('strategie') },
+    },
+  ], [router])
 
   return (
     <div className="mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6">
       {/* === Editorial header — blueprint Type 1 (Module-landing) === */}
       <header className="relative mb-6 space-y-2">
-        <PageInfoButton
-          description={pageInfoText}
-          className="absolute right-4 top-0 sm:right-6"
-        />
+        <div className="absolute right-4 top-0 flex items-center gap-1.5 sm:right-6">
+          {/* STEP 3b: overlay-toggle naast de "i" — wijst-tips aan/uit. */}
+          <button
+            type="button"
+            onClick={() => persistOverlayVisible(!overlayVisible)}
+            aria-pressed={overlayVisible}
+            aria-label={overlayVisible ? 'Aanscherp-tips verbergen' : 'Aanscherp-tips tonen'}
+            title={overlayVisible ? 'Tips verbergen' : 'Tips tonen'}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition-colors ${
+              overlayVisible
+                ? 'border-[var(--module-active-300)] bg-[var(--module-active-50)] text-[var(--module-active-700)]'
+                : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+            }`}
+          >
+            <Lightbulb className="h-3.5 w-3.5" aria-hidden />
+            <span className="hidden sm:inline">Tips</span>
+          </button>
+          <PageInfoButton description={pageInfoText} />
+        </div>
         {/* Kicker met 28×1px Horizon-streep */}
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
           <span
@@ -3395,11 +3465,27 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 </div>
               )}
 
+              {/* STEP 3a: eenmalige welkomsttekst — staat LOS van de overlay. */}
+              <ToekomstWelcome
+                visible={!welcomeDismissed}
+                netWorth={effectiveNetWorth}
+                dailyExpenseRate={(effectiveInput?.monthlyExpenses ?? 0) > 0 ? dailyExpenseRate(effectiveInput!.monthlyExpenses) : 0}
+                masked={masked}
+                onDismiss={() => setWelcomeDismissed(true)}
+              />
+
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
                 <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={simResult.displayEndAge}>
                   {(visibleMin, visibleMax, controls) => (
                     <>
                       <div className="relative">
+                        {/* STEP 3b/4: ballonnen-overlay — wijst naar de inline-editors. */}
+                        <ToekomstOverlay
+                          visible={overlayVisible && chartMode === 'vermogenspad'}
+                          onClose={() => persistOverlayVisible(false)}
+                          onEmphasisChange={setOverlayEmphasis}
+                          balloons={toekomstOverlayBalloons}
+                        />
                         {/* Vermogenspad (SimChart) */}
                         <div
                           className="transition-opacity duration-300 ease-in-out"
@@ -3415,6 +3501,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         >
                           <SimChart
                             key={planningMode}
+                            emphasis={overlayEmphasis}
                             rows={useHouseholdMainLine ? householdMainLine!.rows : usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? effectiveSimRows : simResult.rows)}
                             fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge)}
                             fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional)}
@@ -6870,34 +6957,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           const maxA = rows[rows.length - 1].age
           setSelectedYearAge(Math.max(minA, Math.min(newAge, maxA)))
         }}
-      />
-
-      {/*
-        HorizonSetupPane — basis-instellingen voor de FIRE-prognose.
-        Opent vanuit HorizonFireIntroCard (CTA "Stel je prognose-voorkeuren in")
-        of via deep-link ?horizonSetup=open. Na succesvolle save vervangt de
-        chart de intro-card direct (lokale state-update, geen reload).
-        Key forceert remount per open zodat initial-values uit props
-        opnieuw worden geinitialiseerd na een eerdere annulering.
-      */}
-      <HorizonSetupPane
-        key={setupPaneOpen ? 'horizonSetup-open' : 'horizonSetup-closed'}
-        open={setupPaneOpen}
-        onClose={() => setSetupPaneOpen(false)}
-        onCompleted={(saved) => {
-          setHasCompletedHorizonSetup(true)
-          setMonthlySavingsOverride(saved.monthlySavingsOverride)
-        }}
-        initialMonthlySavingsOverride={monthlySavingsOverride}
-        monthlyContributionFromAssets={initialData.monthlyContributionFromAssets}
-        monthlySurplusFromBudget={initialData.monthlySurplusFromBudget}
-        baseMonthlySavingsFromCashflow={initialData.baseAnnualSavingsFromCashflow > 0 ? Math.round(initialData.baseAnnualSavingsFromCashflow / 12) : null}
-        budgetingActive={initialData.budgetingActive}
-        initialEndStrategy={initialData.fireStrategy.strategy}
-        initialEndAge={initialData.fireStrategy.endAge}
-        initialLegacyAmount={initialData.fireStrategy.legacyAmount}
-        initialRetirementMethod={initialData.retirementExpenseMethod}
-        initialRetirementCustomAmount={initialData.retirementExpenseCustomAmount}
       />
 
       {/* Eigen-woning-strategie nudge — verschijnt eenmaal bij eerste bezoek. */}

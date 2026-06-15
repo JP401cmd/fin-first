@@ -96,8 +96,12 @@ export interface HorizonPageData {
   /** Number of children from profile (for erfgenamen calculation) */
   numberOfChildren: number
   /** Of de gebruiker de Horizon-prognose setup-pane heeft doorlopen + opgeslagen.
-   *  Bepaalt of de intro-card de hoofd-grafiek vervangt op /horizon. */
+   *  Legacy-marker — de grafiek wordt sinds juni 2026 altijd getoond; deze flag
+   *  bepaalt dat niet langer. Behouden voor achterwaartse compatibiliteit. */
   hasCompletedHorizonSetup: boolean
+  /** Of de eenmalige welkomsttekst bovenaan de /toekomst-grafiek al is getoond.
+   *  False → toon de welkomstbanner (en markeer 'm bij eerste render). */
+  hasSeenWelcome: boolean
   /** Maandelijks spaar-override uit profiles.monthly_savings_override.
    *  NULL = gebruik asset-aggregaat (monthlyContributionFromAssets). */
   monthlySavingsOverride: number | null
@@ -163,10 +167,19 @@ function computeCumulativeImpacts(
 }
 
 /** Feature slug used to track whether the user has completed the Horizon
- *  prognose setup-pane. Stored in user_feature_visits. Shared with
- *  components/app/horizon/horizon-setup-pane.tsx so the POST after save
- *  matches the slug the loader reads. */
+ *  prognose setup-pane. Stored in user_feature_visits.
+ *
+ *  De setup-pane zelf is per juni 2026 vervangen door de altijd-zichtbare
+ *  grafiek met inline-editors (STEP 2). De slug blijft bestaan voor
+ *  achterwaartse compatibiliteit met oude records, maar bepaalt niet langer
+ *  of de grafiek wordt getoond. */
 export const HORIZON_SETUP_COMPLETED_SLUG = 'horizon_setup_completed'
+
+/** Feature slug die bijhoudt of de eenmalige welkomsttekst bovenaan de
+ *  /toekomst-grafiek al is getoond. Stored in user_feature_visits, gespiegeld
+ *  aan HORIZON_SETUP_COMPLETED_SLUG. Wordt door de client gePOST bij eerste
+ *  render zodat de welkomsttekst nooit terugkomt (los van de overlay-toggle). */
+export const HORIZON_WELCOME_SHOWN_SLUG = 'horizon_welcome_shown'
 
 /** Default profile fallback values when profile query fails */
 const PROFILE_DEFAULTS = {
@@ -225,6 +238,7 @@ export async function loadHorizonData(
     bankAccountsResult,
     wsResult,
     horizonSetupVisitResult,
+    horizonWelcomeVisitResult,
     savingsOverrideResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
@@ -265,14 +279,22 @@ export async function loadHorizonData(
       .from('profiles')
       .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step')
       .maybeSingle(),
-    // Horizon-setup-pane voltooid-marker. Wordt geschreven door
-    // components/app/horizon/horizon-setup-pane.tsx na een succesvolle save.
-    // Bepaalt of de intro-card de hoofd-grafiek vervangt op /horizon.
-    // .maybeSingle() + try/catch downstream — table kan ontbreken op legacy DBs.
+    // Legacy setup-marker (de setup-pane is verwijderd — zie STEP 2). Nog
+    // gelezen voor achterwaartse compatibiliteit; bepaalt geen weergave meer.
+    // .maybeSingle() + null-fallback downstream — table kan ontbreken op legacy DBs.
     supabase
       .from('user_feature_visits')
       .select('feature_slug')
       .eq('feature_slug', HORIZON_SETUP_COMPLETED_SLUG)
+      .maybeSingle(),
+    // Welkomsttekst-marker. Gespiegeld aan de setup-marker hierboven; bepaalt
+    // of de eenmalige welkomstbanner bovenaan de grafiek nog wordt getoond.
+    // .maybeSingle() + null-fallback zodat een ontbrekende tabel op legacy DBs
+    // niet de hele loader laat falen.
+    supabase
+      .from('user_feature_visits')
+      .select('feature_slug')
+      .eq('feature_slug', HORIZON_WELCOME_SHOWN_SLUG)
       .maybeSingle(),
     // monthly_savings_override profile-kolom. Aparte .maybeSingle()-query
     // zodat een ontbrekende kolom op legacy DBs (migratie 20260513000001
@@ -709,6 +731,12 @@ export async function loadHorizonData(
   const hasCompletedHorizonSetup = !horizonSetupVisitResult.error
     && horizonSetupVisitResult.data?.feature_slug === HORIZON_SETUP_COMPLETED_SLUG
 
+  // hasSeenWelcome: true zodra de welkomsttekst-marker bestaat. Bij een
+  // ontbrekende tabel (error) → behandel als "nog niet gezien" zodat de
+  // welkomsttekst minstens één keer verschijnt (graceful degrade).
+  const hasSeenWelcome = !horizonWelcomeVisitResult.error
+    && horizonWelcomeVisitResult.data?.feature_slug === HORIZON_WELCOME_SHOWN_SLUG
+
   // monthlySavingsOverride: handmatige override uit profiles. Null = geen
   // override, simulator gebruikt monthlyContributionFromAssets.
   const overrideRaw = savingsOverrideResult.error
@@ -753,6 +781,7 @@ export async function loadHorizonData(
     unlinkedCash,
     numberOfChildren,
     hasCompletedHorizonSetup,
+    hasSeenWelcome,
     monthlySavingsOverride,
     monthlyContributionFromAssets,
     monthlySurplusFromBudget,

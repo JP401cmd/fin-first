@@ -497,12 +497,23 @@ export function getFirstUndismissedSuggestion(
     }
   }
 
+  // De-dup met de /toekomst-overlay: op /toekomst-routes wijzen de
+  // ballonnen al naar rendement/parameters en levensgebeurtenissen. Bied die
+  // twee gaps daar dus niet óók via de coach aan (anders dubbel). Andere gaps +
+  // de deferred-veld-nudges blijven ongemoeid.
+  const onToekomst = pathname === '/toekomst' || pathname.startsWith('/toekomst/')
+  const TOEKOMST_OVERLAY_KEYS = new Set(['gap_fire_params', 'gap_life_events'])
+
   // 1. Data-gap suggesties — module-gated wanneer activeModules is meegegeven
   if (dataGaps) {
     for (const entry of DATA_GAP_SUGGESTIONS) {
       // Module-gating: sla over wanneer de regel aan een module hangt die niet
       // actief is. Alleen toegepast als activeModules expliciet is meegegeven.
       if (entry.moduleId && activeModules && !activeModules.includes(entry.moduleId)) {
+        continue
+      }
+      // Overlay-overlap op /toekomst — zie comment hierboven.
+      if (onToekomst && TOEKOMST_OVERLAY_KEYS.has(entry.key)) {
         continue
       }
       if (entry.check(dataGaps) && !dismissed.has(entry.key) && isEnabled(entry.key)) {

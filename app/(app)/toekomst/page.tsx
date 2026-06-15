@@ -107,6 +107,10 @@ export default async function ToekomstPage({
   ])
   const calculatorCount = calcCountRes.count ?? 0
 
+  // Een echte tijdas-projectie vereist een leeftijd (geboortedatum). Zonder die
+  // kan er geen FIRE-pad berekend worden — dan tonen we ook geen print/deel-knop.
+  const hasProjection = horizonData.effectiveInput?.dateOfBirth != null
+
   return (
     <>
       {/* Tab-root → 'rich' TopBar (utility-cluster) + tab-titel in de mobiele
@@ -131,24 +135,23 @@ export default async function ToekomstPage({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <PageInfoButton description={PAGE_INFO['/toekomst'] ?? ''} />
-            {horizonData.hasCompletedHorizonSetup && <PrintTijdasButton />}
+            {/* Print/Deel toont op basis van een ECHTE projectie (geboortedatum
+                aanwezig → tijdas berekenbaar), niet langer op de verwijderde
+                setup-flag. Geen data-backfill nodig. */}
+            {hasProjection && <PrintTijdasButton />}
           </div>
         </header>
 
-        {/* Navkaarten + tijdas-projectie tonen we pas zodra de FIRE-voorkeuren
-            zijn ingesteld. Daarvoor staat in <HorizonPage> één paginabrede
-            setup-melding; alleen deze header blijft erboven staan. */}
-        {horizonData.hasCompletedHorizonSetup && (
-          <ToekomstNavCards
-            goals={willData.goals}
-            goalProgresses={willData.goalProgresses}
-            events={horizonData.events}
-            fireStrategy={horizonData.fireStrategy}
-            withdrawalStrategy={horizonData.withdrawalStrategy}
-            fireParams={horizonData.fireParams}
-            calculatorCount={calculatorCount}
-          />
-        )}
+        {/* Navkaarten staan nu altijd boven de altijd-zichtbare tijdas. */}
+        <ToekomstNavCards
+          goals={willData.goals}
+          goalProgresses={willData.goalProgresses}
+          events={horizonData.events}
+          fireStrategy={horizonData.fireStrategy}
+          withdrawalStrategy={horizonData.withdrawalStrategy}
+          fireParams={horizonData.fireParams}
+          calculatorCount={calculatorCount}
+        />
       </section>
 
       <HorizonPage initialData={horizonData} />

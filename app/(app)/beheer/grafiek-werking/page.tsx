@@ -184,7 +184,7 @@ function DataStroom() {
     { t: 'DB-tabellen', d: 'assets · debts · budgets · transactions · life_events · profiles · bank_accounts' },
     { t: 'Loaders (server)', d: 'horizon-data-loader.ts · dashboard-data-loader.ts → spaarquote, uitgaven, FIRE-params, huis-events' },
     { t: 'Client-hook', d: 'useHorizonFireSim — bouwt UnifiedProjectionInput, regenereert huis-events met live params' },
-    { t: 'Engine', d: 'runUnifiedProjection (puur, geen Supabase)' },
+    { t: 'Engine', d: 'runSelectedProjection → runHorizonLedger — grootboek-engine v2 (puur, geen Supabase)' },
     { t: 'Grafiek', d: 'SimChart (lijn) · WealthCompositionChart (bar) · IncomeExpenseChart (in/uit)' },
   ]
   return (
@@ -229,7 +229,6 @@ const GAPS: { titel: string; onderdeel: string; impact: string; ernst: Ernst; fi
   { titel: 'Opeethypotheek-rente is display-only', onderdeel: 'Strategieën', ernst: 'hoog', impact: 'De schaduw-schuld van de opeethypotheek drukt niet op de simulatie (ADR 0012 erkent dit expliciet). FIRE-leeftijd/vermogen worden overschat: de lening wordt nooit afgelost, het huis blijft in het vermogen.', files: 'lib/housing-strategy.ts · components/app/horizon/horizon-client.tsx · docs/adr/0012-*' },
   { titel: 'Geen Box 1 in de projectie', onderdeel: 'Belasting', ernst: 'hoog', impact: 'AOW/pensioen stromen onbelast binnen (AOW als netto-constante, pensioen bruto). Geen loonheffing per jaar → besteedbaar pensioeninkomen wordt overschat. box1-tax.ts bestaat maar wordt niet gebruikt in de sim.', files: 'lib/fire-simulation.ts · lib/horizon-data.ts · lib/box1-tax.ts' },
   { titel: '/core wijkt af van /toekomst & /dashboard', onderdeel: 'Databedrading', ernst: 'hoog', impact: 'fire-target-shared gebruikt alleen monthlyContributions×12 als sparen (negeert spaarquote + override) en past geen huis-filtering toe → andere FIRE-datum voor dezelfde gebruiker, ondanks claim van identieke output.', files: 'lib/fire-target-shared.ts:82,86' },
-  { titel: 'Twee engines naast elkaar', onderdeel: 'Engines', ernst: 'midden', impact: 'runUnifiedProjection (grafiek) vs legacy runSimulation (fee-analyse, hypotheek-vs-beleggen, deel household). De AOW/Pensioen-previews draaien op de oude engine → kunnen afwijken van de echte grafiek. Alleen de Huis-preview is consistent.', files: 'lib/strategy-preview.ts · lib/fee-analysis.ts · lib/hypotheek-vs-beleggen.ts · lib/household-projection.ts' },
   { titel: 'Overbruggingsfase heeft geen eigen gedrag', onderdeel: 'Werking', ernst: 'midden', impact: "transition en withdrawal zijn rekenkundig identiek. 'Vóór AOW anders/meer uitgeven dan erna' is niet als strategie uit te drukken, alleen met handmatige cashflows.", files: 'lib/unified-projection.ts (decumulatie-loop)' },
   { titel: 'Vrijgekomen geld na afgeloste schuld weggegooid', onderdeel: 'Inflatie & rendement', ernst: 'midden', impact: 'freedSurplus (vrijgekomen maandlasten na een afgeloste schuld) wordt berekend maar nooit herbelegd — "wat gebeurt er als de hypotheek weg is" is niet zichtbaar.', files: 'lib/unified-projection.ts:687,1524,1816' },
   { titel: 'Eenmalige meevallers gedwongen belegd', onderdeel: 'Gebeurtenissen', ernst: 'midden', impact: 'Erfenis/verkoopopbrengst wordt altijd over investable buckets verdeeld; "in cash houden" of "schuld mee aflossen" kan niet.', files: 'lib/unified-projection.ts:1490' },
@@ -240,7 +239,7 @@ const GAPS: { titel: string; onderdeel: string; impact: string; ernst: Ernst; fi
   { titel: 'VPW × niet-deplete = lege grafiek', onderdeel: 'Voorkeuren', ernst: 'laag', impact: 'VPW-onttrekking levert lege rijen bij perpetual/legacy/pensioen; in de UI afgevangen, maar de combinatie is gewoon niet mogelijk.', files: 'lib/unified-projection.ts:972' },
   { titel: 'Bucket-strategie half geïmplementeerd', onderdeel: 'Voorkeuren', ernst: 'laag', impact: 'De 3-bucket-rebalancing draait niet echt in de engine; het is een benadering via de asset-waterfall i.p.v. een echte cash/obligatie/aandelen-glidepath.', files: 'lib/withdrawal-strategy.ts:417' },
   { titel: 'Pensioen-annuïteit vast op 1,5% reëel', onderdeel: 'Strategieën', ernst: 'laag', impact: 'annuitizePension gebruikt een vast reëel rendement, los van de eigen expected_return-aanname.', files: 'lib/horizon-data.ts:315' },
-  { titel: 'marginaal_tarief genegeerd door de grafiek', onderdeel: 'Voorkeuren', ernst: 'laag', impact: 'Wordt geresolved maar nergens door runUnifiedProjection gelezen; raakt alleen de Box 1-pagina.', files: 'lib/fire-params.ts' },
+  { titel: 'marginaal_tarief genegeerd door de grafiek', onderdeel: 'Voorkeuren', ernst: 'laag', impact: 'Wordt geresolved maar nergens door de grafiek-engine (runHorizonLedger) gelezen; raakt alleen de Box 1-pagina.', files: 'lib/fire-params.ts' },
   { titel: 'target_savings_rate is een doel, geen graph-input', onderdeel: 'Voorkeuren', ernst: 'laag', impact: 'De projectie gebruikt het werkelijke/afgeleide sparen, niet het ingestelde spaardoel (alleen monthly_savings_override stuurt de lijn).', files: 'lib/savings-source.ts' },
   { titel: 'Engine is jaarlijks (geen maand-granulariteit)', onderdeel: 'Werking', ernst: 'laag', impact: 'Intra-jaar-timing van verkoop/huur/uitputting wordt benaderd (begin-jaar-injectie + buffer compenseert).', files: 'docs/adr/0012-*' },
 ]
@@ -317,7 +316,7 @@ export default function GrafiekWerkingPage() {
           basis om daarna per onderdeel een technische analyse te doen en de werking (geheel of in delen) te herzien. Bewust statisch.
         </p>
         <p className="text-[12px] text-[var(--ink-3)]">
-          Canonieke engine: <C>runUnifiedProjection</C> (<F>lib/unified-projection.ts</F>). Gecureerde tegenhanger:{' '}
+          Canonieke engine: <C>runSelectedProjection</C> → <C>runHorizonLedger</C> (grootboek-engine v2, <F>lib/horizon-engine/</F>). Gecureerde tegenhanger:{' '}
           <a className="underline decoration-[var(--ink-4)] underline-offset-2 hover:text-[var(--ink)]" href="/beheer/architectuur?view=berekeningen">
             Berekeningen-view
           </a>
@@ -350,8 +349,9 @@ export default function GrafiekWerkingPage() {
         <Sub>1a · Algemeen & het FIRE-snijpunt</Sub>
         <p>
           De grafiek zet het <strong>netto vermogen</strong> uit tegen je leeftijd, jaar voor jaar tot de eindleeftijd. Hij draait
-          op de canonieke engine <C>runUnifiedProjection</C>, client-side aangeroepen via de hook <C>useHorizonFireSim</C> (de oude{' '}
-          <C>runSimulation</C> is hier vervangen). De engine is een pure functie zonder database.
+          op de <strong>grootboek-engine v2</strong> (<C>runHorizonLedger</C>, reëel gerekend), client-side aangeroepen via de selector{' '}
+          <C>runSelectedProjection</C> in de hook <C>useHorizonFireSim</C>. Sinds C5-c (jun 2026) is dit de enige FIRE-rekenmotor; de
+          oude scalar-engine (<C>runSimulation</C>/<C>runUnifiedProjection</C>) is verwijderd. De engine is een pure functie zonder database.
         </p>
         <p>
           Het <strong>FIRE-moment (snijpunt)</strong> is géén simpele <C>uitgaven / SWR</C>-lijn. Het is de eerste leeftijd waarop het
@@ -495,10 +495,10 @@ export default function GrafiekWerkingPage() {
           met het moment waarop het liquide vermogen in de grafiek opraakt. Downsize geeft verkoopopbrengst + bespaarde hypotheek +
           nieuwe woonkosten; reverse geeft een maand-uitkering (huis blijft in de pot).
         </Note>
-        <Gap>
-          AOW- en Pensioen-previews gebruiken nog de <strong>oude engine</strong> (<C>runSimulation</C> via <C>previewFireAge</C>) en
-          kunnen daardoor afwijken van de echte grafiek; alleen de Huis-preview draait op <C>runUnifiedProjection</C>.
-        </Gap>
+        <Note>
+          Sinds C5-c draaien álle previews (AOW, Pensioen, Huis) via <C>previewFireAge</C> → <C>runSelectedProjection</C> op
+          dezelfde grootboek-engine v2 als de grafiek; ze matchen daardoor de echte lijn.
+        </Note>
       </Sec>
 
       {/* 5 — Uitgave na pensioen */}
@@ -562,12 +562,14 @@ export default function GrafiekWerkingPage() {
 
       {/* + Engines & databedrading */}
       <Sec id="engines" kicker="+ Aanvullend" title="Engines & databedrading">
-        <Sub>Twee engines</Sub>
+        <Sub>Eén engine (sinds C5-c)</Sub>
         <p>
-          <C>runUnifiedProjection</C> (canoniek, de grafiek) heeft per-asset rendement + Box 3, echte schuld-amortisatie en drie
-          fases. De legacy <C>runSimulation</C> (vlakke Box 3, één portfolio-scalar, twee fases, grow-then-withdraw) voedt nog
-          fee-analyse, hypotheek-vs-beleggen, deel van de household-projectie én de AOW/Pensioen-previews — een latente bron van
-          afwijkingen.
+          De <strong>grootboek-engine v2</strong> (<C>runHorizonLedger</C>, reëel gerekend, via de selector <C>runSelectedProjection</C>)
+          is sinds C5-c (jun 2026) de <strong>enige</strong> FIRE-rekenmotor: per-asset rendement + Box 3, echte schuld-amortisatie en
+          drie fases. De legacy scalar-engine (<C>runSimulation</C>/<C>runUnifiedProjection</C>) is verwijderd. De scalar-callers
+          (fee-analyse, hypotheek-vs-beleggen, household-projectie én de AOW/Pensioen-previews) draaien nu óók op v2 — direct of via de{' '}
+          <C>scalar-bridge</C> (<C>runScalarProjectionV2</C>), die een synthetische één-asset-portefeuille door dezelfde engine draait.
+          De vroegere &ldquo;twee engines&rdquo;-divergentie is daarmee weg.
         </p>
         <Sub>Databedrading</Sub>
         <DataStroom />

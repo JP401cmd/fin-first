@@ -7,7 +7,7 @@ import type { AppSetupConfig, AppSetupValidation } from './types'
 /**
  * Form-state + save-handler voor één AppSetup-config.
  *
- * Save-flow (parallel met `HorizonSetupPane`):
+ * Save-flow (POST + feature-visit-marker + router.refresh):
  *  1. POST naar `config.endpoint` met de payload uit `config.buildPayload(state)`
  *     — dat endpoint schrijft de app-specifieke data + zet zelf de
  *     feature-visit-marker (binnen één DB-roundtrip is netter dan twee

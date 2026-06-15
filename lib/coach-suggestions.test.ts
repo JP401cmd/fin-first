@@ -75,6 +75,18 @@ describe('getFirstUndismissedSuggestion priority', () => {
     expect(getFirstUndismissedSuggestion(full(), '/overzicht/cashflow/budget', none, [])?.key).toBe('path_budgets')
     expect(getFirstUndismissedSuggestion(full(), '/overzicht/bezittingen', none, [])?.key).toBe('path_core')
   })
+
+  it('suppresses fire-params/life-events gaps on /toekomst (overlay de-dup)', () => {
+    // Op /toekomst wijzen de overlay-ballonnen al naar rendement/parameters en
+    // levensgebeurtenissen — die twee gaps worden daar dus NIET via de coach
+    // aangeboden; de selectie valt door naar de pad-suggestie.
+    const fireGap: CoachDataGaps = { ...full(), hasFireParams: false }
+    const lifeGap: CoachDataGaps = { ...full(), hasLifeEvents: false }
+    expect(getFirstUndismissedSuggestion(fireGap, '/toekomst', none, [])?.key).toBe('path_horizon')
+    expect(getFirstUndismissedSuggestion(lifeGap, '/toekomst/voorkeuren', none, [])?.key).toBe('path_horizon')
+    // Buiten /toekomst vuren ze gewoon (geen overlay daar).
+    expect(getFirstUndismissedSuggestion(fireGap, '/random', none, [])?.key).toBe('gap_fire_params')
+  })
 })
 
 describe('module-gated data gaps (absorbed nudges)', () => {
