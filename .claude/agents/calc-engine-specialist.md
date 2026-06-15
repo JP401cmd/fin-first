@@ -30,7 +30,7 @@ If a value already exists in one of these, **import it — do not recompute**. D
 
 ## Workflow
 
-1. **Trace before you touch.** For any number, find its single source above and every consumer (grep the exported function). Confirm the surfaces that disagree are reading from different places — that's usually the bug.
+1. **Trace before you touch.** For any number, find its single source above and every consumer (grep the exported function). Confirm the surfaces that disagree are reading from different places — that's usually the bug. For review tasks, verify each consumer reads the *canonical bundle field*, not a raw DB column that bypasses the resolver (e.g. `dashboardData.monthlyIncome` from `resolveEffectiveIncomeExpenses`, not `profile.net_monthly_income`). A field whose name matches a metric is not proof it's the canonical source.
 2. **Change at the source, once.** Update the canonical engine; let consumers inherit. Keep assumptions as named constants in `lib/constants.ts`, never magic numbers inline.
 3. **Keep money as stored time.** Any new user-facing amount of significance should be expressible in vrijheidstijd via `lib/format.ts` helpers — don't reinvent the day/year conversion.
 4. **Update the catalog** in `lib/architecture/calculations.ts` (inputs/outputs/formula/files/functions/constants/elementIds) in the same PR.
