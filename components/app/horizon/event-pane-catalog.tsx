@@ -27,6 +27,9 @@ export function EventPaneCatalog({ onSelect, onOpenChat, householdMode }: Props)
     }
     for (const [type, entry] of Object.entries(LIFE_EVENT_CATALOG)) {
       if (entry.householdOnly && !householdMode) continue
+      // Vervangen door een multi-step strategie (bv. part_time/career_change →
+      // Werk-strategie): niet los aanmaakbaar, entry blijft voor lookups bestaan.
+      if (entry.hiddenFromCatalog) continue
       const group = entry.group
       out[group].push({ type, entry })
     }

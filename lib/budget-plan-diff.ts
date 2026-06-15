@@ -28,6 +28,60 @@ export type DraftBudget = {
    * and no amount row is written.
    */
   amount: number | null
+  // ── Detail-velden ──────────────────────────────────────────────
+  // Bewerkt in het detail-subscherm. Reizen door dezelfde diff + atomische
+  // save_budget_plan-RPC als de structuurvelden hierboven, zodat boom- én
+  // detailwijzigingen in één "Opslaan" landen (geen tweede save-model).
+  // ownership/household + koppeling aan een los `goals`-record blijven bewust
+  // op het directe-write-pad (zie BudgetForm).
+  priorityScore: number
+  limitType: Budget['limit_type']
+  alertThreshold: number
+  isInflationIndexed: boolean
+  goalType: string | null
+  goalAmount: number | null
+  goalDate: string | null
+  goalFrequency: string | null
+}
+
+/** De acht detail-velden van een DraftBudget, los herbruikbaar. */
+export type DraftDetailFields = Pick<
+  DraftBudget,
+  | 'priorityScore'
+  | 'limitType'
+  | 'alertThreshold'
+  | 'isInflationIndexed'
+  | 'goalType'
+  | 'goalAmount'
+  | 'goalDate'
+  | 'goalFrequency'
+>
+
+/** Detail-veld-defaults voor een nieuw (leeg) budget — gelijk aan de
+ *  COALESCE-defaults in de save_budget_plan-RPC (priority 3, alert 80, soft). */
+export const NEW_BUDGET_DETAIL_DEFAULTS: DraftDetailFields = {
+  priorityScore: 3,
+  limitType: 'soft',
+  alertThreshold: 80,
+  isInflationIndexed: false,
+  goalType: null,
+  goalAmount: null,
+  goalDate: null,
+  goalFrequency: null,
+}
+
+/** Detail-velden uit een opgeslagen Budget overnemen in een draft. */
+export function detailFieldsFromBudget(b: Budget): DraftDetailFields {
+  return {
+    priorityScore: b.priority_score ?? 3,
+    limitType: b.limit_type ?? 'soft',
+    alertThreshold: b.alert_threshold ?? 80,
+    isInflationIndexed: !!b.is_inflation_indexed,
+    goalType: b.goal_type ?? null,
+    goalAmount: b.goal_amount ?? null,
+    goalDate: b.goal_date ?? null,
+    goalFrequency: b.goal_frequency ?? null,
+  }
 }
 
 export type BudgetInsert = {
@@ -44,6 +98,15 @@ export type BudgetInsert = {
   sort_order: number
   interval: Budget['interval']
   rollover_type: Budget['rollover_type']
+  // Detail-velden (zie DraftBudget)
+  priority_score: number
+  limit_type: Budget['limit_type']
+  alert_threshold: number
+  is_inflation_indexed: boolean
+  goal_type: string | null
+  goal_amount: number | null
+  goal_date: string | null
+  goal_frequency: string | null
 }
 
 export type BudgetUpdate = {
@@ -58,6 +121,15 @@ export type BudgetUpdate = {
   sort_order?: number
   interval?: Budget['interval']
   rollover_type?: Budget['rollover_type']
+  // Detail-velden (zie DraftBudget)
+  priority_score?: number
+  limit_type?: Budget['limit_type']
+  alert_threshold?: number
+  is_inflation_indexed?: boolean
+  goal_type?: string | null
+  goal_amount?: number | null
+  goal_date?: string | null
+  goal_frequency?: string | null
 }
 
 export type BudgetAmountUpsert = {
@@ -142,7 +214,46 @@ function buildUpdateDelta(draft: DraftBudget, original: Budget): BudgetUpdate | 
     changed = true
   }
 
+  // ── Detail-velden ──────────────────────────────────────────────
+  if (Number(draft.priorityScore) !== Number(original.priority_score)) {
+    delta.priority_score = draft.priorityScore
+    changed = true
+  }
+  if (draft.limitType !== original.limit_type) {
+    delta.limit_type = draft.limitType
+    changed = true
+  }
+  if (Number(draft.alertThreshold) !== Number(original.alert_threshold)) {
+    delta.alert_threshold = draft.alertThreshold
+    changed = true
+  }
+  if (draft.isInflationIndexed !== original.is_inflation_indexed) {
+    delta.is_inflation_indexed = draft.isInflationIndexed
+    changed = true
+  }
+  if ((draft.goalType ?? null) !== (original.goal_type ?? null)) {
+    delta.goal_type = draft.goalType
+    changed = true
+  }
+  if (numOrNull(draft.goalAmount) !== numOrNull(original.goal_amount)) {
+    delta.goal_amount = draft.goalAmount
+    changed = true
+  }
+  if ((draft.goalDate ?? null) !== (original.goal_date ?? null)) {
+    delta.goal_date = draft.goalDate
+    changed = true
+  }
+  if ((draft.goalFrequency ?? null) !== (original.goal_frequency ?? null)) {
+    delta.goal_frequency = draft.goalFrequency
+    changed = true
+  }
+
   return changed ? delta : null
+}
+
+/** Normalise an optional numeric to a comparable value (null stays null). */
+function numOrNull(v: number | null | undefined): number | null {
+  return v === null || v === undefined ? null : Number(v)
 }
 
 export function computeBudgetPlanDiff(
@@ -178,6 +289,14 @@ export function computeBudgetPlanDiff(
         sort_order: row.sortOrder,
         interval: row.interval,
         rollover_type: row.rolloverType,
+        priority_score: row.priorityScore,
+        limit_type: row.limitType,
+        alert_threshold: row.alertThreshold,
+        is_inflation_indexed: row.isInflationIndexed,
+        goal_type: row.goalType,
+        goal_amount: row.goalAmount,
+        goal_date: row.goalDate,
+        goal_frequency: row.goalFrequency,
       })
       if (row.amount !== null) {
         amounts.push({

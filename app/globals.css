@@ -632,6 +632,13 @@ body {
   box-shadow: var(--s1);
   transform: translateY(-1px);
 }
+/* Tips-modus (/toekomst): de hero-kaart mag dan GEEN hover-transform doen — een
+   transform maakt een stacking context die de boven-de-scrim getilde grafiek zou
+   "vangen" en alsnog vervaagt. Hogere specificiteit wint van de regel hierboven. */
+.card-editorial.no-hover-lift:hover {
+  transform: none;
+  box-shadow: var(--s0);
+}
 
 .label-editorial {
   font-size: 11px;
@@ -768,6 +775,25 @@ body {
   animation: sleep-ring-fade 200ms ease-out both;
   animation-delay: var(--stagger, 0ms);
 }
+/* Voorstel-bol "ademt": continue scale- + glow-puls die de aandacht trekt naar
+   het gesuggereerde (deel)budget. Kleur via --sleep-suggest-color. Stuurt
+   transform + filter zelf, dus de bol zet die inline NIET wanneer hij voorstelt
+   (anders overrulet de inline-stijl deze keyframe). */
+@keyframes sleep-suggest-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 5px color-mix(in oklch, var(--sleep-suggest-color, var(--color-kern-500)) 45%, transparent))
+            drop-shadow(0 2px 5px rgba(60, 40, 20, 0.18));
+  }
+  50% {
+    transform: scale(1.07);
+    filter: drop-shadow(0 0 12px color-mix(in oklch, var(--sleep-suggest-color, var(--color-kern-500)) 70%, transparent))
+            drop-shadow(0 4px 8px rgba(60, 40, 20, 0.24));
+  }
+}
+.animate-sleep-suggest {
+  animation: sleep-suggest-pulse 1.9s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .animate-sleep-bol-enter,
   .animate-sleep-fly,
@@ -777,6 +803,13 @@ body {
   }
   /* Zwerm-bolletjes verdwijnen direct in plaats van te vliegen. */
   .animate-sleep-fly { opacity: 0; }
+  /* Geen beweging, maar het voorstel blijft statisch opvallen (scale + glow). */
+  .animate-sleep-suggest {
+    animation: none !important;
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 9px color-mix(in oklch, var(--sleep-suggest-color, var(--color-kern-500)) 60%, transparent))
+            drop-shadow(0 3px 6px rgba(60, 40, 20, 0.22));
+  }
 }
 /* Grijpend handje tijdens de hele drag — de sleep-kloon heeft pointer-events
    none, dus de elementen erónder bepalen anders de cursor. */

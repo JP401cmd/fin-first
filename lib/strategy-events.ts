@@ -8,14 +8,14 @@
 
 import { isHousingStrategyEvent } from '@/lib/housing-strategy'
 
-export type ManagedStrategy = 'aow' | 'pensioen' | 'huis'
+export type ManagedStrategy = 'aow' | 'pensioen' | 'huis' | 'werk'
 
 /**
  * Welke strategie (indien aanwezig) beheert dit event.
  * `null` = vrij bewerkbaar via EventBewerkenSheet.
  *
- * Huis-events zijn virtueel (id-prefix 'housing-strategy:'); AOW en Pensioen
- * zijn echte life_events-rijen, herkenbaar aan hun event_type.
+ * Huis-events zijn virtueel (id-prefix 'housing-strategy:'); AOW, Pensioen en
+ * Werk zijn echte life_events-rijen, herkenbaar aan hun event_type.
  */
 export function isStrategyManagedEvent(
   event: { id: string; event_type: string },
@@ -23,6 +23,7 @@ export function isStrategyManagedEvent(
   if (isHousingStrategyEvent(event)) return 'huis'
   if (event.event_type === 'aow') return 'aow'
   if (event.event_type === 'pension') return 'pensioen'
+  if (event.event_type === 'werk') return 'werk'
   return null
 }
 
@@ -30,4 +31,5 @@ export const STRATEGY_BADGE_LABEL: Record<ManagedStrategy, string> = {
   aow: 'Beheerd via AOW-strategie',
   pensioen: 'Beheerd via Pensioen-strategie',
   huis: 'Beheerd via Eigen-woning-strategie',
+  werk: 'Beheerd via Werk-strategie',
 }

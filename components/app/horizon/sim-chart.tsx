@@ -73,6 +73,7 @@ export const SimChart = memo(function SimChart({
   onEventDragMove,
   emphasis = null,
   targetInflationFactors,
+  disableCrosshair = false,
 }: {
   rows: SimRow[]
   fireAge: number | null
@@ -139,6 +140,8 @@ export const SimChart = memo(function SimChart({
    *  nominale eindwaarde (`targetEndPortfolio`). Zonder deze prop blijft de
    *  doellijn vlak (byte-identiek voor call-sites zonder unifiedRows). */
   targetInflationFactors?: { age: number; factor: number }[]
+  /** Onderdruk de crosshair-tooltip (bv. in de tips-modus van /toekomst). */
+  disableCrosshair?: boolean
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, forModal })
   const [hoveredAge, setHoveredAge] = useState<number | null>(null)
@@ -490,6 +493,10 @@ export const SimChart = memo(function SimChart({
 
   /** SVG x-position of the hovered age crosshair */
   const crosshairX = hoveredAge !== null ? PAD.left + xScale(hoveredAge) : null
+
+  /** Crosshair onderdrukken (tips-modus): verbergt lijn/dot/tooltip — ook bij een
+   *  achtergebleven hoveredAge — en de overlay-rect vangt geen muis meer. */
+  const showCrosshair = !disableCrosshair && hoveredAge !== null
 
   /** Compute the portfolio value at hoveredAge for the dot on the line */
   const crosshairY = useMemo(() => {
@@ -910,14 +917,14 @@ export const SimChart = memo(function SimChart({
           x={PAD.left} y={PAD.top}
           width={innerW} height={innerH}
           fill="transparent"
-          pointerEvents="all"
+          pointerEvents={disableCrosshair ? 'none' : 'all'}
           style={{ cursor: 'crosshair' }}
           onMouseMove={handleOverlayMouseMove}
           onMouseLeave={handleOverlayMouseLeave}
         />
 
         {/* Crosshair vertical line */}
-        {hoveredAge !== null && crosshairX !== null && (
+        {showCrosshair && crosshairX !== null && (
           <line
             x1={crosshairX} x2={crosshairX}
             y1={PAD.top} y2={PAD.top + innerH}
@@ -927,7 +934,7 @@ export const SimChart = memo(function SimChart({
         )}
 
         {/* Crosshair dot on the wealth line */}
-        {hoveredAge !== null && crosshairX !== null && crosshairY !== null && (
+        {showCrosshair && crosshairX !== null && crosshairY !== null && (
           <circle
             cx={crosshairX} cy={crosshairY} r={4}
             fill={crosshairDotColor}
@@ -1002,7 +1009,7 @@ export const SimChart = memo(function SimChart({
       </svg>
 
       {/* Crosshair tooltip (HTML overlay for crisp text rendering) */}
-      {hoveredAge !== null && hoveredRow && crosshairX !== null && (() => {
+      {showCrosshair && hoveredRow && crosshairX !== null && (() => {
         // Convert SVG crosshair X to CSS percentage within the container
         const pctX = crosshairX / W
         // Position tooltip to the right by default; flip left if too close to right edge

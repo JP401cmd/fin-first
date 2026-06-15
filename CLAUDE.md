@@ -30,6 +30,18 @@ You have MCP tools available for feature management. Use them directly by callin
 - Always run `npx tsc --noEmit` (and relevant vitest paths) after a multi-file change to catch regressions before reporting "done".
 - Always include a final user-facing summary of what changed and what's next.
 
+### Skill-routing — óók bij vervolgberichten (verplicht)
+
+Elke inhoudelijke opdracht routeert via de bijpassende pijplijn-skill — niet alleen het eerste bericht van een sessie. De match bepaalt de skill:
+
+- **defect / "werkt niet" / "klopt niet" / "is niet juist" / bug** → `bug-fix`
+- **kleine wens / "kun je … aanpassen/kleiner/mooier/anders"** → `kleine-aanpassing`
+- **uitbreiding van iets bestaands** → `extend-feature` · **iets nieuws** → `new-feature` · **herstructureren zonder gedragswijziging** → `refactor`
+- **nieuwe AI-functionaliteit** → `ai-feature` · **hoe de AI antwoordt/zich gedraagt** → `ai-gedrag`
+- **"ship het" / af / live** → `release`
+
+**Harde regel: een vervolgbericht binnen een lopende sessie telt als een nieuwe opdracht.** Een bugmelding die ná feature-werk komt start opnieuw `bug-fix`; een nieuwe tweak start opnieuw `kleine-aanpassing`. Sla de skill NIET over omdat je al middenin een sessie zit, al code aan het lezen bent, of de vorige stap een andere skill gebruikte. Bij twijfel tussen "klein vs. defect vs. uitbreiding": kies de skill die past bij de aard van de vraag, niet de makkelijkste. Begin pas met onderzoeken/implementeren ná het invoken van de skill.
+
 ## Architectuurpagina (verplicht bijhouden)
 
 `/beheer/architectuur` heeft **vier views** (switcher bovenaan, `?view=`): **Praatplaat** (HLD vanuit gebruikersperspectief), **Plaat** (ArchiMate), **Database** (ERD) en **Berekeningen** (rekenmotoren). Alle volgen één principe — *feiten gescand, betekenis gecureerd, zelf-actualiserend* — en MOETEN meebewegen met wijzigingen. **Laat de documentatie beter achter dan je 'm vond:** raak je een domein/tabel/rekenmotor/functionaliteit, werk dan de bijbehorende curatie/scanner bij in dezelfde PR.

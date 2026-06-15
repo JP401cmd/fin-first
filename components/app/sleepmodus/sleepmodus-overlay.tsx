@@ -52,6 +52,7 @@ import {
   type AssignScope,
 } from '@/lib/sleepmodus/queue'
 import { resolveEigenRekeningBudgetId, type Budget } from '@/lib/budget-data'
+import { getTypeColors } from '@/components/app/budget-shared'
 import type { AutoCatContext } from '@/lib/auto-categorize'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
@@ -193,6 +194,8 @@ export function SleepmodusOverlay({
   const [flyDelta, setFlyDelta] = useState<{ x: number; y: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
+  /** Helptekst + accentkleur van het doel waar je tijdens het slepen overheen zweeft. */
+  const [hoverHelp, setHoverHelp] = useState<{ name: string; description: string | null; color: string | null } | null>(null)
   const [reducedMotion] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   )
@@ -351,10 +354,36 @@ export function SleepmodusOverlay({
     return false
   }, [childrenByParent, dropOnBudget, eigenRekeningBudgetId, expandedParentId])
 
+  // Naam + helptekst van een doel — voedt de helper boven de transactie zodat
+  // je vóór het loslaten zeker weet op welk (deel)budget je terechtkomt.
+  const describeTarget = useCallback((overId: string | null): { name: string; description: string | null; color: string | null } | null => {
+    if (!overId) return null
+    // Eigen-rekening = overboeking (archive-type) → de archive-accentkleur.
+    if (overId === 'zone:eigen') return { name: 'Eigen rekening', description: 'Markeer als overboeking tussen je eigen rekeningen — telt niet mee in je budgetten.', color: getTypeColors('archive').hex }
+    // Geen budget → neutrale fallback (kern) in de render.
+    if (overId === 'zone:skip') return { name: 'Overslaan', description: 'Sla deze transactie nu over; hij komt later weer langs.', color: null }
+    if (overId === 'meer') return { name: 'Meer budgetten', description: 'Open de overige budgetten.', color: null }
+    let id: string | null = null
+    if (overId.startsWith('child:')) id = overId.slice('child:'.length)
+    else if (overId.startsWith('parent:')) id = overId.slice('parent:'.length)
+    else return null // __dim:* en onbekende doelen geven geen helper
+    const budget = id ? budgetById.get(id) : null
+    if (!budget) return null
+    const hasChildren = (childrenByParent.get(budget.id)?.length ?? 0) >= 2
+    return {
+      name: budget.name,
+      description: hasChildren ? 'Kies hieronder het juiste deelbudget.' : (budget.description || null),
+      // Accentkleur volgt het budgettype: inkomen, sparen, vaste lasten enz.
+      // hebben elk hun eigen kleur (getTypeColors).
+      color: getTypeColors(budget.budget_type).hex,
+    }
+  }, [budgetById, childrenByParent])
+
   // Alleen openen — sluiten gebeurt geometrisch (direct) in de pointermove-
   // handler zodra de cursor buiten de deelbudget-ring komt.
   const handleDragOver = useCallback((event: DragOverEvent) => {
     const overId = event.over?.id != null ? String(event.over.id) : null
+    setHoverHelp(describeTarget(overId))
     if (overId === 'meer') {
       setExpandedParentId(MEER_EXPANDED)
       return
@@ -365,10 +394,11 @@ export function SleepmodusOverlay({
         setExpandedParentId(parentId)
       }
     }
-  }, [childrenByParent])
+  }, [childrenByParent, describeTarget])
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setIsDragging(false)
+    setHoverHelp(null)
     const overId = event.over?.id != null ? String(event.over.id) : null
     if (!overId || overId === 'meer') {
       dispatch({ type: 'DRAG_CANCEL' })
@@ -629,6 +659,7 @@ export function SleepmodusOverlay({
           onDragStart={(event) => {
             setIsDragging(true)
             setShowDetails(false)
+            setHoverHelp(null)
             const activator = event.activatorEvent as Partial<PointerEvent> | null
             if (typeof activator?.clientX === 'number' && typeof activator?.clientY === 'number') {
               dragPosRef.current = { x: activator.clientX, y: activator.clientY }
@@ -637,7 +668,7 @@ export function SleepmodusOverlay({
           }}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => { setIsDragging(false); dispatch({ type: 'DRAG_CANCEL' }) }}
+          onDragCancel={() => { setIsDragging(false); setHoverHelp(null); dispatch({ type: 'DRAG_CANCEL' }) }}
         >
           {/* ── Speelveld — begrensd zodat de ring op desktop compact om de bol blijft ── */}
           <div ref={fieldRef} className="relative mx-auto w-full max-w-2xl flex-1 overflow-hidden" style={{ minHeight: 0 }}>
@@ -762,6 +793,27 @@ export function SleepmodusOverlay({
                 entering
                 onTap={() => setShowDetails((v) => !v)}
               />
+            )}
+
+            {/* Doel-helper in het midden van de cirkel (waar de transactie-bol staat —
+                die is tijdens het slepen verborgen): alléén tekst in de kern-accentkleur,
+                geen kaart/achtergrond. Zo weet je vóór het loslaten zeker op welk
+                (deel)budget je terechtkomt. pointer-events-none zodat hij de
+                drop-detectie niet in de weg zit. */}
+            {isDragging && hoverHelp && (
+              <div
+                className="pointer-events-none absolute left-1/2 top-1/2 z-[6] w-[min(80%,220px)] -translate-x-1/2 -translate-y-1/2 text-center text-kern-700"
+                style={hoverHelp.color ? { color: hoverHelp.color } : undefined}
+              >
+                <p className="font-[var(--font-playfair)] text-base font-bold leading-tight">
+                  {hoverHelp.name}
+                </p>
+                {hoverHelp.description && (
+                  <p className="mt-1 font-serif text-[11px] italic leading-snug opacity-80">
+                    {hoverHelp.description}
+                  </p>
+                )}
+              </div>
             )}
 
             {/* Transactiedetails — tik op de bol om te openen/sluiten */}

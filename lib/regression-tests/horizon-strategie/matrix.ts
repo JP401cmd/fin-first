@@ -6,10 +6,11 @@
  * **vrijheidsleeftijd (FIRE)** en het **doelbedrag** tegen een vooraf opgezette
  * verwachting (golden) mét marges, plus structurele en relationele invarianten.
  *
- * Drie groepen (12 combinaties), telkens twee dimensies op de standaard-baseline:
+ * Vier groepen (16 combinaties), telkens op de standaard-baseline:
  *   A — Huisvesting varieert  (× deplete × static)
  *   B — Eindstrategie varieert (× include_full × static)
  *   C — Onttrekking varieert   (× include_full × deplete)
+ *   D — Werk-strategie varieert (inkomenslijn-life-event op de baseline)
  *
  * Eén bron: `buildHorizonInput` → `runSelectedProjection(input, /*useV2*‍/ true)`
  * — exact het pad van `/toekomst`. Puur/synchroon: geen Supabase, geen netwerk.
@@ -28,6 +29,7 @@ import {
 } from '@/lib/housing-strategy'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import type { LifeEvent, WerkMetadata } from '@/lib/horizon-data'
 import { buildCompleetHorizonFixture } from './persona-fixture'
 
 // ── Marges ───────────────────────────────────────────────────
@@ -45,12 +47,24 @@ const STD_WITHDRAWAL: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strat
 const LEGACY_AMOUNT = 100_000
 
 // ── Combinatie-definities ────────────────────────────────────
-export type GroupKey = 'housing' | 'end' | 'withdrawal'
+export type GroupKey = 'housing' | 'end' | 'withdrawal' | 'werk'
+
+/**
+ * Werk-strategie-trajectorie voor een combinatie (de vorm; het netto inkomen en
+ * de huidige leeftijd worden in `runCombo` uit de fixture gebonden). `null` =
+ * geen werk-event (baseline-referentie).
+ */
+export type ComboWerk = Pick<
+  WerkMetadata,
+  'reeleGroeiPct' | 'groeiTotLeeftijd' | 'plafondNettoMaand' | 'faseStappen' | 'sprongen'
+> | null
 
 export interface ComboConfig {
   housing: HousingStrategyConfig
   end: FireStrategyConfig
   withdrawal: WithdrawalStrategyConfig
+  /** Werk-strategie-life-event dat bovenop de baseline wordt geïnjecteerd. */
+  werk?: ComboWerk
 }
 
 export interface ComboDef {
@@ -64,6 +78,7 @@ export const GROUP_LABELS: Record<GroupKey, string> = {
   housing: 'A — Huisvestingsstrategie (× opmaken × vast)',
   end: 'B — Eindstrategie (× woning meetellen × vast)',
   withdrawal: 'C — Onttrekkingsstrategie (× woning meetellen × opmaken)',
+  werk: 'D — Werk-strategie (× woning meetellen × opmaken × vast)',
 }
 
 export const COMBOS: ComboDef[] = [
@@ -84,6 +99,12 @@ export const COMBOS: ComboDef[] = [
   { id: 'C-guardrails', label: 'Guardrails (Guyton-Klinger)', group: 'withdrawal', config: { housing: STD_HOUSING, end: STD_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' } } },
   { id: 'C-vpw', label: 'Variabel percentage (VPW)', group: 'withdrawal', config: { housing: STD_HOUSING, end: STD_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' } } },
   { id: 'C-bucket', label: 'Emmer-strategie (bucket)', group: 'withdrawal', config: { housing: STD_HOUSING, end: STD_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' } } },
+
+  // ── Groep D — werk-strategie varieert (inkomenslijn-life-event op de baseline) ──
+  { id: 'D-geen', label: 'Geen werk-strategie (referentie)', group: 'werk', config: { housing: STD_HOUSING, end: STD_END, withdrawal: STD_WITHDRAWAL, werk: null } },
+  { id: 'D-groei', label: 'Salarisgroei 4%/jr reëel', group: 'werk', config: { housing: STD_HOUSING, end: STD_END, withdrawal: STD_WITHDRAWAL, werk: { reeleGroeiPct: 0.04, faseStappen: [], sprongen: [] } } },
+  { id: 'D-deeltijd', label: 'Minder werken: 60% vanaf 44', group: 'werk', config: { housing: STD_HOUSING, end: STD_END, withdrawal: STD_WITHDRAWAL, werk: { reeleGroeiPct: 0, faseStappen: [{ fromAge: 44, pct: 60 }], sprongen: [] } } },
+  { id: 'D-combi', label: 'Groei 3% + plafond + grote promotie', group: 'werk', config: { housing: STD_HOUSING, end: STD_END, withdrawal: STD_WITHDRAWAL, werk: { reeleGroeiPct: 0.03, plafondNettoMaand: 12000, faseStappen: [], sprongen: [{ atAge: 43, deltaNettoMaand: 2500 }] } } },
 ]
 
 // ── Verwachtingen (golden) ───────────────────────────────────
@@ -114,6 +135,10 @@ export const EXPECTED: Record<string, ComboExpectation> = {
   'C-guardrails': { fireAgeFractional: 45, doelbedrag: 1672485 },
   'C-vpw': { fireAgeFractional: 44, doelbedrag: 2083402 },
   'C-bucket': { fireAgeFractional: 47, doelbedrag: 1667397 },
+  'D-geen': { fireAgeFractional: 47, doelbedrag: 1667397 },
+  'D-groei': { fireAgeFractional: 47, doelbedrag: 1669922 },
+  'D-deeltijd': { fireAgeFractional: 48, doelbedrag: 1662606 },
+  'D-combi': { fireAgeFractional: 46, doelbedrag: 1671337 },
 }
 // GENERATED:GOLDEN:END
 
@@ -157,12 +182,49 @@ export interface MatrixResult {
   currentAge: number
 }
 
+/**
+ * Bouw het Werk-strategie-life-event voor een combinatie (of geen, bij `null`).
+ * Het netto inkomen en de huidige leeftijd worden uit de fixture gebonden zodat
+ * de delta's op de juiste schaal staan en deterministisch blijven.
+ */
+function werkEventFor(werk: ComboWerk, fx: ReturnType<typeof buildCompleetHorizonFixture>): LifeEvent[] {
+  if (!werk) return []
+  const metadata: WerkMetadata = {
+    huidigNettoMaand: fx.financialInput.monthlyIncome,
+    reeleGroeiPct: werk.reeleGroeiPct ?? 0,
+    groeiTotLeeftijd: werk.groeiTotLeeftijd,
+    plafondNettoMaand: werk.plafondNettoMaand,
+    faseStappen: werk.faseStappen ?? [],
+    sprongen: werk.sprongen ?? [],
+    source: 'werk-strategy',
+    schemaVersie: 1,
+  }
+  return [
+    {
+      id: 'werk-regression',
+      name: 'Werk & inkomen',
+      event_type: 'werk',
+      target_age: fx.currentAge,
+      target_date: null,
+      one_time_cost: 0,
+      monthly_cost_change: 0,
+      monthly_income_change: 0,
+      duration_months: 0,
+      icon: 'Briefcase',
+      is_active: true,
+      sort_order: 0,
+      is_indexed: true,
+      metadata: metadata as unknown as Record<string, unknown>,
+    },
+  ]
+}
+
 // ── Run één combinatie via de productie-engine (v2) ──────────
 export function runCombo(combo: ComboDef, pinnedAge?: number): ComboActual {
   const fx = buildCompleetHorizonFixture(pinnedAge)
   const built = buildHorizonInput({
     horizonInput: fx.financialInput,
-    lifeEvents: fx.lifeEvents,
+    lifeEvents: [...fx.lifeEvents, ...werkEventFor(combo.config.werk ?? null, fx)],
     assets: fx.assets,
     debts: fx.debts,
     hasPartner: fx.hasPartner,
@@ -356,6 +418,38 @@ function relationalChecks(byId: Map<string, ComboActual>): Map<string, Check[]> 
     })
   }
 
+  // ── Werk-strategie — semantische ordening t.o.v. de referentie (geen werk) ──
+  const geen = byId.get('D-geen')
+  const groei = byId.get('D-groei')
+  const deeltijd = byId.get('D-deeltijd')
+  const fa = (a?: ComboActual) => a?.fireAgeFractional ?? null
+  // De referentie zonder werk-event MOET gelijk zijn aan de standaard-baseline
+  // (include_full × deplete × static) — anders lekt het lege werk-event iets.
+  const baseInc = byId.get('A-include_full')
+  if (geen && baseInc) {
+    add('D-geen', {
+      name: 'Referentie = baseline (geen werk-event is inert)',
+      pass: fa(geen) === fa(baseInc) && Math.abs(geen.requiredFirePortfolio - baseInc.requiredFirePortfolio) < 1,
+      detail: `vrijheidsleeftijd ${fa(geen) ?? '—'} vs ${fa(baseInc) ?? '—'}`,
+    })
+  }
+  // Salarisgroei (volledig gespaard) ⇒ eerder of gelijk vrij dan zonder werk.
+  if (groei && geen && fa(groei) !== null && fa(geen) !== null) {
+    add('D-groei', {
+      name: 'Salarisgroei ⇒ eerder (of gelijk) vrij',
+      pass: fa(groei)! <= fa(geen)! + 1e-6,
+      detail: `groei ${fa(groei)} ≤ referentie ${fa(geen)}`,
+    })
+  }
+  // Minder werken ⇒ later of gelijk vrij dan zonder werk.
+  if (deeltijd && geen && fa(deeltijd) !== null && fa(geen) !== null) {
+    add('D-deeltijd', {
+      name: 'Minder werken ⇒ later (of gelijk) vrij',
+      pass: fa(deeltijd)! >= fa(geen)! - 1e-6,
+      detail: `deeltijd ${fa(deeltijd)} ≥ referentie ${fa(geen)}`,
+    })
+  }
+
   return out
 }
 
@@ -390,7 +484,7 @@ export function runHorizonStrategyMatrix(pinnedAge?: number): MatrixResult {
     groupsMap.set(combo.group, arr)
   }
 
-  const groups: GroupResult[] = (['housing', 'end', 'withdrawal'] as GroupKey[]).map((key) => ({
+  const groups: GroupResult[] = (['housing', 'end', 'withdrawal', 'werk'] as GroupKey[]).map((key) => ({
     key,
     label: GROUP_LABELS[key],
     combos: groupsMap.get(key) ?? [],

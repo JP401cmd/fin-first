@@ -18,7 +18,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-import type { LifeEvent, FinancialInput, FireProjection } from '@/lib/horizon-data'
+import type { LifeEvent, FinancialInput, FireProjection, WerkMetadata } from '@/lib/horizon-data'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
@@ -77,6 +77,7 @@ const EVENT_ICONS: Record<string, typeof Compass> = {
   kind: Baby,
   career: Briefcase,
   zzp: Briefcase,
+  werk: Briefcase,
   retirement: Compass,
   housing: Home,
   inheritance: HeartHandshake,
@@ -102,7 +103,28 @@ function formatEventDate(event: LifeEvent): string {
   return 'Datum onbekend'
 }
 
+/** Korte samenvatting van de Werk-strategie uit de metadata (delta's, niet één bedrag). */
+function werkSummary(event: LifeEvent): string {
+  const m = (event.metadata ?? {}) as WerkMetadata
+  const parts: string[] = []
+  if (m.reeleGroeiPct && m.reeleGroeiPct > 0) {
+    parts.push(`groei ${Math.round(m.reeleGroeiPct * 1000) / 10}%/jr`)
+  }
+  if (m.plafondNettoMaand && m.plafondNettoMaand > 0) {
+    parts.push(`plafond ${formatCurrency(m.plafondNettoMaand)}`)
+  }
+  if (m.faseStappen && m.faseStappen.length > 0) {
+    const first = [...m.faseStappen].sort((a, b) => a.fromAge - b.fromAge)[0]!
+    parts.push(`minder werken vanaf ${first.fromAge}`)
+  }
+  if (m.sprongen && m.sprongen.length > 0) {
+    parts.push(`${m.sprongen.length} sprong${m.sprongen.length === 1 ? '' : 'en'}`)
+  }
+  return parts.length > 0 ? parts.join(' · ') : 'Inkomenslijn ingesteld'
+}
+
 function eventImpact(event: LifeEvent): string {
+  if (event.event_type === 'werk') return werkSummary(event)
   const parts: string[] = []
   if (event.one_time_cost > 0) {
     parts.push(`Eenmalig ${formatCurrency(event.one_time_cost)}`)
@@ -155,6 +177,15 @@ const LEVENSSTRATEGIEEN: {
     bg: 'bg-amber-50',
     text: 'text-amber-700',
   },
+  {
+    key: 'werk',
+    label: 'Werk-strategie',
+    description:
+      'Salarisgroei, een plafond, minder werken en promotie-sprongen — je inkomenslijn over de jaren.',
+    Icon: Briefcase,
+    bg: 'bg-sky-50',
+    text: 'text-sky-700',
+  },
 ]
 
 export function GebeurtenissenView({
@@ -194,7 +225,7 @@ export function GebeurtenissenView({
   // (Disjunct van het bestaande ?strategie=open van de horizon-strategiekiezer.)
   useEffect(() => {
     const s = searchParams.get('strategie')
-    if (s === 'aow' || s === 'pensioen' || s === 'huis') setOpenStrategy(s)
+    if (s === 'aow' || s === 'pensioen' || s === 'huis' || s === 'werk') setOpenStrategy(s)
   }, [searchParams])
 
   function closeStrategy() {
@@ -407,7 +438,7 @@ export function GebeurtenissenView({
             Toekomst — levensstrategieën
           </div>
           <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            Drie multi-step strategieën
+            Vier multi-step strategieën
           </h2>
           <p className="mt-1 text-xs text-[var(--ink-3)]">
             Anders dan losse gebeurtenissen: strategieën hebben eigen
@@ -415,7 +446,7 @@ export function GebeurtenissenView({
           </p>
         </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {LEVENSSTRATEGIEEN.map((strat) => {
             const Icon = strat.Icon
             const cls =

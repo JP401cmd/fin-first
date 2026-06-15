@@ -1,13 +1,31 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, AlertTriangle, Check, X, RotateCcw, Save, LayoutTemplate, ChevronRight, Info } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle, Check, X, RotateCcw, Save, LayoutTemplate, ChevronRight, Info, GripVertical, SlidersHorizontal } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useToast } from '@/components/app/toast-provider'
-import { BudgetIcon } from '@/components/app/budget-shared'
+import { BudgetIconPicker } from '@/components/app/budget-icon-picker'
+import { BudgetDetailPane } from '@/components/app/budget-detail-pane'
 import {
   type Budget,
   type BudgetWithChildren,
@@ -23,12 +41,14 @@ import {
   countDiff,
   isTempId,
   resolveActiveAmount,
+  detailFieldsFromBudget,
+  NEW_BUDGET_DETAIL_DEFAULTS,
   type BudgetAmountLite,
   type DraftBudget,
 } from '@/lib/budget-plan-diff'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
-type EditorView = 'tree' | 'template-pick' | 'template-preview' | 'template-confirm'
+type EditorView = 'tree' | 'detail' | 'template-pick' | 'template-preview' | 'template-confirm'
 
 type BudgetType = Budget['budget_type']
 
@@ -63,6 +83,7 @@ function budgetToDraft(b: Budget, amountForMonth: number | null): DraftBudget {
     interval: b.interval,
     rolloverType: b.rollover_type,
     amount: amountForMonth,
+    ...detailFieldsFromBudget(b),
   }
 }
 
@@ -109,7 +130,7 @@ export function BudgetPlanEditorSheet({
   open,
   onClose,
   onSaved,
-  onRequestNewBudget,
+  onEditAdvanced,
   budgets,
   budgetAmounts,
   rollovers,
@@ -120,11 +141,11 @@ export function BudgetPlanEditorSheet({
   open: boolean
   onClose: () => void
   onSaved: () => void
-  /** Aangeroepen vanuit de "+ Nieuw budget"-CTA in de toolbar. De parent
-   *  (BudgetsClient) sluit de sheet en opent de uitgebreide BudgetForm-pane
-   *  via `?newBudget=true`. Bij dirty-state geeft de sheet eerst een
-   *  bevestigings-prompt. */
-  onRequestNewBudget?: () => void
+  /** Escape-hatch vanuit het detail-subscherm voor eigendom/delen + koppelen
+   *  aan een bestaand spaardoel. De parent (BudgetsClient) sluit de sheet en
+   *  opent het uitgebreide BudgetForm-bewerkscherm (`?budget=<id>&edit=true`).
+   *  Alleen aangeboden voor reeds opgeslagen budgetten. */
+  onEditAdvanced?: (budgetId: string) => void
   budgets: BudgetWithChildren[]
   budgetAmounts: BudgetAmountLite[]
   rollovers: BudgetRollover[]
@@ -142,6 +163,8 @@ export function BudgetPlanEditorSheet({
   }, [monthDate])
 
   const [view, setView] = useState<EditorView>('tree')
+  // Geselecteerd budget voor het detail-subscherm (view === 'detail').
+  const [detailId, setDetailId] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftBudget[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -161,6 +184,14 @@ export function BudgetPlanEditorSheet({
   const [confirmText, setConfirmText] = useState('')
 
   const { addToast } = useToast()
+
+  // Sleep-sensoren: kleine afstand vóór activatie zodat tikken op de inputs
+  // niet als drag wordt opgevat (de listeners zitten bovendien alléén op de
+  // grip-handle). Keyboard-sensor voor toetsenbordherordening.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   // Reset state when sheet transitions from closed → open. Sibling prop
   // changes (budgets, amounts) are intentionally captured only at open-time
@@ -265,6 +296,7 @@ export function BudgetPlanEditorSheet({
         interval: 'monthly',
         rolloverType: 'reset',
         amount: 0,
+        ...NEW_BUDGET_DETAIL_DEFAULTS,
       }
       return [...prev, row]
     })
@@ -288,6 +320,7 @@ export function BudgetPlanEditorSheet({
         interval: 'monthly',
         rolloverType: 'reset',
         amount: 0,
+        ...NEW_BUDGET_DETAIL_DEFAULTS,
       }
       return [...prev, row]
     })
@@ -303,12 +336,47 @@ export function BudgetPlanEditorSheet({
 
   function confirmDelete() {
     if (!pendingDelete) return
+    // Sta je in het detail-subscherm van een budget dat zojuist is verwijderd,
+    // keer dan terug naar de boom.
+    if (detailId && pendingDelete.ids.includes(detailId)) {
+      setView('tree')
+      setDetailId(null)
+    }
     setDraft((prev) => prev.filter((r) => !pendingDelete.ids.includes(r.id)))
     setPendingDelete(null)
   }
 
   function resetAll() {
     setDraft(treeToDraft(budgets, budgetAmounts, effectiveFrom))
+  }
+
+  // ── Herordenen ───────────────────────────────────────────────
+  // Eén DndContext over de hele boom; per groep (top-level per type, of de
+  // kinderen van één ouder) een eigen SortableContext. We herordenen alléén
+  // binnen dezelfde groep en hernummeren `sortOrder` 0..n — de diff pikt dat
+  // op als sort_order-update, de RPC bewaart het. Geen herouderen in v1.
+  function groupKey(r: DraftBudget): string {
+    return r.parentId ?? `top:${r.budgetType}`
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setDraft((prev) => {
+      const a = prev.find((r) => r.id === active.id)
+      const b = prev.find((r) => r.id === over.id)
+      if (!a || !b || groupKey(a) !== groupKey(b)) return prev
+      const key = groupKey(a)
+      const group = prev
+        .filter((r) => groupKey(r) === key)
+        .sort((x, y) => (x.sortOrder - y.sortOrder) || x.name.localeCompare(y.name))
+      const oldIndex = group.findIndex((r) => r.id === active.id)
+      const newIndex = group.findIndex((r) => r.id === over.id)
+      if (oldIndex < 0 || newIndex < 0) return prev
+      const reordered = arrayMove(group, oldIndex, newIndex)
+      const orderMap = new Map(reordered.map((r, i) => [r.id, i]))
+      return prev.map((r) => (orderMap.has(r.id) ? { ...r, sortOrder: orderMap.get(r.id)! } : r))
+    })
   }
 
   // ── Template flow ────────────────────────────────────────────
@@ -361,6 +429,7 @@ export function BudgetPlanEditorSheet({
         // (amount = null → de view toont de som). Een childless hoofdbudget
         // (minimalistisch) draagt zelf het bedrag.
         amount: children.length > 0 ? null : parent.default_limit,
+        ...NEW_BUDGET_DETAIL_DEFAULTS,
       })
       children.forEach((child, idx) => {
         next.push({
@@ -377,6 +446,7 @@ export function BudgetPlanEditorSheet({
           interval: 'monthly',
           rolloverType: 'reset',
           amount: child.default_limit,
+          ...NEW_BUDGET_DETAIL_DEFAULTS,
         })
       })
     })
@@ -435,10 +505,19 @@ export function BudgetPlanEditorSheet({
     onClose()
   }
 
-  function handleRequestNewBudget() {
-    if (!onRequestNewBudget) return
-    if (changes > 0 && !confirm('Je hebt nog niet-opgeslagen plan-wijzigingen. Doorgaan naar uitgebreid nieuw-budget formulier zonder opslaan?')) return
-    onRequestNewBudget()
+  // Open het detail-subscherm voor één budget (bewerkt de draft live).
+  function openDetail(id: string) {
+    setDetailId(id)
+    setView('detail')
+  }
+
+  // Escape-hatch: laat de parent het uitgebreide bewerkscherm openen voor
+  // eigendom/koppeling. Waarschuwt eerst bij niet-opgeslagen wijzigingen,
+  // want de parent sluit deze sheet (draft gaat dan verloren).
+  function handleEditAdvanced(id: string) {
+    if (!onEditAdvanced) return
+    if (changes > 0 && !confirm('Je hebt nog niet-opgeslagen plan-wijzigingen. Doorgaan naar het uitgebreide bewerkscherm zonder opslaan?')) return
+    onEditAdvanced(id)
   }
 
   // ── Render ────────────────────────────────────────────────────
@@ -461,7 +540,7 @@ export function BudgetPlanEditorSheet({
             className="mt-2 max-w-[60ch] border-l-2 border-[var(--module-active-500)] pl-3 text-sm italic text-[var(--ink-2)]"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
-            Pas bedragen aan, voeg een rij toe per type, of klik op <em>Nieuw budget</em> voor de uitgebreide invoer met icoon, doeltype en prioriteit.
+            Pas bedragen en namen aan, wissel een icoon, sleep om te ordenen, of voeg een budget toe per type. Tik op een rij voor <em>details</em> (doeltype, prioriteit, rollover).
           </p>
         </div>
       )}
@@ -486,41 +565,52 @@ export function BudgetPlanEditorSheet({
             <RotateCcw className="h-3.5 w-3.5" />
             Wijzigingen terugdraaien
           </button>
-
-          {/* Uitgebreide create-flow — opent een pane met de volledige
-              BudgetForm (icoon, prioriteit, doeltype, eigendoms-keuze, …).
-              Onderscheidt zich visueel van de twee outline-knoppen via een
-              solid ink-fill, en staat rechts uitgelijnd zodat de toolbar
-              leest als "bulk-acties links · nieuwe entiteit rechts". */}
-          {onRequestNewBudget && (
-            <button
-              type="button"
-              onClick={handleRequestNewBudget}
-              className="ml-auto inline-flex items-center gap-1.5 bg-[var(--ink)] px-3 text-xs font-medium leading-none text-[var(--paper)] hover:bg-[var(--ink-2)] min-h-[44px]"
-              style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Nieuw budget
-            </button>
-          )}
         </div>
       )}
 
       {view === 'tree' && (
         <div className="px-4 pb-40 pt-4 sm:px-6">
-          <TreeSection
-            grouped={grouped}
-            onAddTopLevel={addTopLevel}
-            onAddChild={addChildOf}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <TreeSection
+              grouped={grouped}
+              onAddTopLevel={addTopLevel}
+              onAddChild={addChildOf}
+              onUpdate={updateRow}
+              onAmountInput={handleAmountInput}
+              onTakeOver={handleTakeOver}
+              takenOverIds={takenOverIds}
+              onOpenDetail={openDetail}
+              monthlyAverages={monthlyAverages}
+            />
+          </DndContext>
+        </div>
+      )}
+
+      {/* Detail-subscherm — bewerkt de geselecteerde draft-rij; "Opslaan"
+          gebeurt nog steeds via de boom-footer (terug → Opslaan). */}
+      {view === 'detail' && (() => {
+        const row = detailId ? draft.find((r) => r.id === detailId) : null
+        if (!row) return null
+        const kids = draft.filter((r) => r.parentId === row.id)
+        const childSum = kids.reduce((s, k) => s + (k.amount ?? k.defaultLimit ?? 0), 0)
+        const amountReadOnly = kids.length > 0
+        const amountValue = amountReadOnly ? childSum : (row.amount ?? row.defaultLimit ?? 0)
+        return (
+          <BudgetDetailPane
+            row={row}
+            amountValue={amountValue}
+            amountReadOnly={amountReadOnly}
+            average={monthlyAverages[row.id]}
+            takenOver={takenOverIds.has(row.id)}
             onUpdate={updateRow}
             onAmountInput={handleAmountInput}
             onTakeOver={handleTakeOver}
-            takenOverIds={takenOverIds}
             onDelete={requestDelete}
-            monthlyAverages={monthlyAverages}
+            onBack={() => { setView('tree'); setDetailId(null) }}
+            onEditAdvanced={onEditAdvanced ? handleEditAdvanced : undefined}
           />
-        </div>
-      )}
+        )
+      })()}
 
       {/* Template picker step */}
       {view === 'template-pick' && (
@@ -664,7 +754,7 @@ function TreeSection({
   onAmountInput,
   onTakeOver,
   takenOverIds,
-  onDelete,
+  onOpenDetail,
   monthlyAverages,
 }: {
   grouped: ReturnType<typeof groupForRender>
@@ -674,7 +764,7 @@ function TreeSection({
   onAmountInput: (id: string, n: number) => void
   onTakeOver: (id: string, amount: number) => void
   takenOverIds: Set<string>
-  onDelete: (id: string) => void
+  onOpenDetail: (id: string) => void
   monthlyAverages: Record<string, { avg: number; months: number }>
 }) {
   return (
@@ -712,55 +802,156 @@ function TreeSection({
             </p>
           )}
 
-          <div className="space-y-3">
-            {parents.map((parent) => {
-              const kids = childrenBy[parent.id] ?? []
-              const childSum = kids.reduce((s, k) => s + (k.amount ?? k.defaultLimit ?? 0), 0)
-              const parentAmount = kids.length > 0 ? childSum : (parent.amount ?? parent.defaultLimit ?? 0)
-              return (
-                <div key={parent.id} className="rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)]">
-                  <Row
-                    row={parent}
-                    amountValue={parentAmount}
-                    amountReadOnly={kids.length > 0}
-                    onUpdate={onUpdate}
-                    onAmountInput={onAmountInput}
-                    onTakeOver={onTakeOver}
-                    takenOver={takenOverIds.has(parent.id)}
-                    onDelete={onDelete}
-                    onAddSibling={() => onAddChild(parent.id, parent.budgetType)}
-                    addLabel={kids.length > 0 ? 'Deelbudget' : 'Deelbudget'}
-                    indent={false}
-                    average={monthlyAverages[parent.id]}
-                  />
-
-                  {kids.length > 0 && (
-                    <div className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/30">
-                      {kids.map((child) => (
-                        <Row
-                          key={child.id}
-                          row={child}
-                          amountValue={child.amount ?? child.defaultLimit ?? 0}
-                          amountReadOnly={child.budgetType === 'archive'}
-                          onUpdate={onUpdate}
-                          onAmountInput={onAmountInput}
-                          onTakeOver={onTakeOver}
-                          takenOver={takenOverIds.has(child.id)}
-                          onDelete={onDelete}
-                          onAddSibling={() => onAddChild(parent.id, parent.budgetType)}
-                          addLabel="Sibling"
-                          indent={true}
-                          average={monthlyAverages[child.id]}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          <SortableContext items={parents.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-3">
+              {parents.map((parent) => (
+                <SortableParent
+                  key={parent.id}
+                  parent={parent}
+                  kids={childrenBy[parent.id] ?? []}
+                  onAddChild={onAddChild}
+                  onUpdate={onUpdate}
+                  onAmountInput={onAmountInput}
+                  onTakeOver={onTakeOver}
+                  takenOverIds={takenOverIds}
+                  onOpenDetail={onOpenDetail}
+                  monthlyAverages={monthlyAverages}
+                />
+              ))}
+            </div>
+          </SortableContext>
         </section>
       ))}
+    </div>
+  )
+}
+
+type RowCallbacks = {
+  onUpdate: (id: string, patch: Partial<DraftBudget>) => void
+  onAmountInput: (id: string, n: number) => void
+  onTakeOver: (id: string, amount: number) => void
+  takenOverIds: Set<string>
+  onOpenDetail: (id: string) => void
+  monthlyAverages: Record<string, { avg: number; months: number }>
+}
+
+/** Sleep-grip — gedeelde knop-stijl voor parent & child. */
+function gripClass(extra = '') {
+  return `inline-flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-[var(--ink-4)] hover:text-[var(--ink-2)] active:cursor-grabbing ${extra}`
+}
+
+function SortableParent({
+  parent,
+  kids,
+  onAddChild,
+  onUpdate,
+  onAmountInput,
+  onTakeOver,
+  takenOverIds,
+  onOpenDetail,
+  monthlyAverages,
+}: { parent: DraftBudget; kids: DraftBudget[]; onAddChild: (parentId: string, type: BudgetType) => void } & RowCallbacks) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: parent.id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+  const childSum = kids.reduce((s, k) => s + (k.amount ?? k.defaultLimit ?? 0), 0)
+  const parentAmount = kids.length > 0 ? childSum : (parent.amount ?? parent.defaultLimit ?? 0)
+
+  const handle = (
+    <button ref={setActivatorNodeRef} type="button" aria-label="Versleep budget" {...attributes} {...listeners} className={gripClass()}>
+      <GripVertical className="h-4 w-4" />
+    </button>
+  )
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] ${isDragging ? 'relative z-10 opacity-80 shadow-[var(--s2)]' : ''}`}
+    >
+      <Row
+        row={parent}
+        amountValue={parentAmount}
+        amountReadOnly={kids.length > 0}
+        onUpdate={onUpdate}
+        onAmountInput={onAmountInput}
+        onTakeOver={onTakeOver}
+        takenOver={takenOverIds.has(parent.id)}
+        onOpenDetail={onOpenDetail}
+        indent={false}
+        average={monthlyAverages[parent.id]}
+        handle={handle}
+      />
+
+      {kids.length > 0 && (
+        <div className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/30">
+          <SortableContext items={kids.map((k) => k.id)} strategy={verticalListSortingStrategy}>
+            {kids.map((child) => (
+              <SortableChild
+                key={child.id}
+                child={child}
+                onUpdate={onUpdate}
+                onAmountInput={onAmountInput}
+                onTakeOver={onTakeOver}
+                takenOverIds={takenOverIds}
+                onOpenDetail={onOpenDetail}
+                monthlyAverages={monthlyAverages}
+              />
+            ))}
+          </SortableContext>
+        </div>
+      )}
+
+      {/* Deelbudget toevoegen — duidelijke, volledige actie onder de groep
+          i.p.v. een gedrongen icoontje per rij. */}
+      {parent.budgetType !== 'archive' && (
+        <button
+          type="button"
+          onClick={() => onAddChild(parent.id, parent.budgetType)}
+          className="flex w-full items-center gap-1.5 border-t border-dashed border-[var(--border-ed)] px-3 py-2 pl-9 text-[11px] font-medium text-[var(--ink-3)] hover:bg-[var(--subtle)]/50 hover:text-kern-600 sm:pl-12"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Deelbudget toevoegen
+        </button>
+      )}
+    </div>
+  )
+}
+
+function SortableChild({
+  child,
+  onUpdate,
+  onAmountInput,
+  onTakeOver,
+  takenOverIds,
+  onOpenDetail,
+  monthlyAverages,
+}: { child: DraftBudget } & RowCallbacks) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: child.id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+
+  const handle = (
+    <button ref={setActivatorNodeRef} type="button" aria-label="Versleep deelbudget" {...attributes} {...listeners} className={gripClass()}>
+      <GripVertical className="h-4 w-4" />
+    </button>
+  )
+
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? 'relative z-10 bg-[var(--paper)] opacity-80 shadow-[var(--s1)]' : ''}>
+      <Row
+        row={child}
+        amountValue={child.amount ?? child.defaultLimit ?? 0}
+        amountReadOnly={child.budgetType === 'archive'}
+        onUpdate={onUpdate}
+        onAmountInput={onAmountInput}
+        onTakeOver={onTakeOver}
+        takenOver={takenOverIds.has(child.id)}
+        onOpenDetail={onOpenDetail}
+        indent
+        average={monthlyAverages[child.id]}
+        handle={handle}
+      />
     </div>
   )
 }
@@ -773,11 +964,10 @@ function Row({
   onAmountInput,
   onTakeOver,
   takenOver,
-  onDelete,
-  onAddSibling,
-  addLabel,
+  onOpenDetail,
   indent,
   average,
+  handle,
 }: {
   row: DraftBudget
   amountValue: number
@@ -786,11 +976,10 @@ function Row({
   onAmountInput: (id: string, n: number) => void
   onTakeOver: (id: string, amount: number) => void
   takenOver: boolean
-  onDelete: (id: string) => void
-  onAddSibling: () => void
-  addLabel: string
+  onOpenDetail: (id: string) => void
   indent: boolean
   average?: { avg: number; months: number }
+  handle?: React.ReactNode
 }) {
   const { masked } = useMaskedAmounts()
   const amountInputId = `amount-${row.id}`
@@ -810,19 +999,16 @@ function Row({
   const averageTitle = `Gemiddelde per maand, afgelopen ${months} maand${months === 1 ? '' : 'en'}`
 
   return (
-    <div className={`px-3 py-2 ${indent ? 'pl-6 sm:pl-10' : ''}`}>
-      <div className="flex items-center gap-2">
-        {/* Budget-icoon — visuele herkenning per rij. Klikbaar wijzigen
-            niet in de planeditor (light-weight) — dat doet de uitgebreide
-            form via "+ Nieuw budget" of de detail-edit-flow. Temp-rows
-            tonen het default 'Circle'-icoon (uit makeTmpRow) zodat ook
-            ongesaved rijen visueel passen in het ritme. */}
-        <span
-          className={`inline-flex h-7 w-7 shrink-0 items-center justify-center text-[var(--ink-2)] ${isTempId(row.id) ? 'text-[var(--ink-4)]' : ''}`}
-          aria-hidden
-        >
-          <BudgetIcon name={row.icon} className="h-4 w-4" />
-        </span>
+    <div className={`px-3 py-2 ${indent ? 'pl-2 sm:pl-6' : ''}`}>
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {handle}
+        {/* Budget-icoon — nu direct klikbaar (compacte icoon-kiezer). */}
+        <BudgetIconPicker
+          value={row.icon}
+          onChange={(icon) => onUpdate(row.id, { icon })}
+          size="sm"
+          ariaLabel={`Icoon voor ${row.name || 'budget'}`}
+        />
         <input
           type="text"
           value={row.name}
@@ -833,10 +1019,7 @@ function Row({
         />
 
         {/* Inline 12-month average + Overnemen — sits between the name
-            input and the amount input. `shrink-0` keeps it from being
-            compressed; the extra `mr-1` plus the outer gap-2 yields ~12px
-            visual breathing room to the € input so the two read as
-            separate units. */}
+            input and the amount input. */}
         {showAverage && average && (
           <div className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap mr-1 sm:flex">
             <span
@@ -853,8 +1036,6 @@ function Row({
                 type="button"
                 onClick={() => onTakeOver(row.id, roundedAvg)}
                 aria-label={`Neem gemiddelde van ${formatMaskedCurrency(roundedAvg, masked)} over als budgetbedrag`}
-                // py-1 preserves ~23-24px hit area even though the text is
-                // 11px; no negative margins because we're in a flex row.
                 className="py-1 text-[11px] text-[var(--ink-2)] underline underline-offset-2 decoration-[var(--border-ed)] hover:text-[var(--ink)] hover:decoration-[var(--ink-2)] transition-colors duration-150"
               >
                 Overnemen
@@ -863,7 +1044,7 @@ function Row({
           </div>
         )}
 
-        <div className="relative w-24 sm:w-28">
+        <div className="relative w-20 sm:w-28">
           <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-3)]">€</span>
           <label htmlFor={amountInputId} className="sr-only">
             Bedrag voor {row.name || 'budget'}
@@ -893,29 +1074,22 @@ function Row({
           )}
         </div>
 
+        {/* Details — opent het detail-subscherm (doeltype, prioriteit,
+            rollover, verwijderen, …). */}
         <button
           type="button"
-          onClick={onAddSibling}
-          aria-label={`${addLabel} toevoegen`}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r)] text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-kern-600"
+          onClick={() => onOpenDetail(row.id)}
+          aria-label={`Details van ${row.name || 'budget'}`}
+          title="Details"
+          className="inline-flex h-9 w-8 shrink-0 items-center justify-center rounded-[var(--r)] text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink)]"
         >
-          <Plus className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete(row.id)}
-          aria-label={`${row.name || 'budget'} verwijderen`}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--r)] text-[var(--ink-4)] hover:bg-red-50 hover:text-red-600"
-        >
-          <Trash2 className="h-4 w-4" />
+          <SlidersHorizontal className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Mobile fallback (<640px): show the mini-row below the input to
-          avoid squeezing the name field under ~140px. Visible only on
-          phones; the sm: inline version above hides this via sm:hidden. */}
+      {/* Mobile fallback (<640px): show the average mini-row below. */}
       {showAverage && average && (
-        <div className="mt-1 flex items-center justify-end gap-1.5 sm:hidden" style={{ paddingRight: 'calc(5.5rem + 1rem)' }}>
+        <div className="mt-1 flex items-center justify-end gap-1.5 sm:hidden" style={{ paddingRight: 'calc(5rem + 2.5rem)' }}>
           <span
             className="font-mono tabular-nums text-[11px] text-[var(--ink-3)]"
             title={averageTitle}

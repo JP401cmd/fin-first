@@ -2657,82 +2657,140 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // 'echt inkomen' navigeert (naar /mijn/profiel, waar het inkomen woont).
   // setState-setters (setEventPaneEditingId etc.) zijn stabiel per React-garantie
   // en worden bewust weggelaten uit de dep-array.
-  const toekomstOverlayBalloons: OverlayBalloonDef[] = useMemo(() => [
-    {
-      id: 'inkomen',
-      icon: OVERLAY_ICONS.income,
-      kicker: 'Je inkomen',
-      body: 'Klopt je inkomen? Dat bepaalt mee hoe snel je vrijheid opbouwt.',
-      cta: 'Inkomen aanpassen',
-      anchor: { row: 'top', side: 'left' },
-      emphasis: 'accumulation',
-      onActivate: () => router.push('/mijn/profiel'),
-    },
-    {
-      id: 'gebeurtenis',
-      icon: OVERLAY_ICONS.event,
-      kicker: 'Levensgebeurtenis',
-      body: 'Een verbouwing, kind of wereldreis op komst? Reken ’m mee.',
-      cta: 'Gebeurtenis toevoegen',
-      anchor: { row: 'top', side: 'right' },
-      emphasis: 'accumulation',
-      onActivate: () => {
-        setEventPaneEditingId(null)
-        setEventPaneMode('catalog')
-        setEventPaneOpen(true)
+  const toekomstOverlayBalloons: OverlayBalloonDef[] = useMemo(() => {
+    // Huidige situatie van de gebruiker — voor de "nu geschat/ingevuld op €X"-copy.
+    // Bedragen via formatMaskedCurrency zodat privacy-modus ze maskeert.
+    const yearlyIncome = (effectiveInput?.monthlyIncome ?? 0) * 12
+    const totalAssets = effectiveInput?.totalAssets ?? 0
+    const totalDebts = effectiveInput?.totalDebts ?? 0
+    const yearlyExpenses = (effectiveInput?.monthlyExpenses ?? 0) * 12
+    return [
+      // ── Bovenste rij — je gegevens NU (waaruit de opbouw groeit) ──
+      {
+        id: 'inkomen',
+        icon: OVERLAY_ICONS.income,
+        kicker: 'Je inkomen',
+        body: yearlyIncome > 0
+          ? `Je situatie rekent nu met ${formatMaskedCurrency(yearlyIncome, masked)} inkomen per jaar. Scherp 'm aan door je inkomen bij te werken.`
+          : 'Klopt je inkomen? Dat bepaalt mee hoe snel je vrijheid opbouwt.',
+        cta: 'Inkomen aanpassen',
+        row: 'top',
+        emphasis: 'accumulation',
+        onActivate: () => router.push('/mijn/profiel'),
       },
-    },
-    {
-      id: 'pensioen',
-      icon: OVERLAY_ICONS.pension,
-      kicker: 'Pensioenstrategie',
-      body: 'Stel in hoe je AOW en pensioen meewegen in je vrijheidsmoment.',
-      cta: 'Pensioen instellen',
-      anchor: { row: 'mid-high', side: 'left' },
-      emphasis: 'fire',
-      onActivate: () => { setStrategieInitialTab('eind'); setActiveModal('strategie') },
-    },
-    {
-      id: 'eindstrategie',
-      icon: OVERLAY_ICONS.end,
-      kicker: 'Eindstrategie',
-      body: 'Vermogen behouden, opeten of nalaten? Dat bepaalt je einddoel.',
-      cta: 'Eindstrategie kiezen',
-      anchor: { row: 'mid-high', side: 'right' },
-      emphasis: 'fire',
-      onActivate: () => { setStrategieInitialTab('eind'); setActiveModal('strategie') },
-    },
-    {
-      id: 'woning',
-      icon: OVERLAY_ICONS.housing,
-      kicker: 'Je woning',
-      body: 'Verkopen, kleiner wonen of opeten? Je huis kan vrijheid vrijspelen.',
-      cta: 'Woonstrategie kiezen',
-      anchor: { row: 'mid-low', side: 'left' },
-      emphasis: 'withdrawal',
-      onActivate: () => { setStrategieInitialTab('woning'); setActiveModal('strategie') },
-    },
-    {
-      id: 'uitgaven',
-      icon: OVERLAY_ICONS.expenses,
-      kicker: 'Uitgaven na pensioen',
-      body: 'Hoeveel heb je later per jaar nodig? Dit zet je vrijheidsdoel.',
-      cta: 'Uitgaven aanpassen',
-      anchor: { row: 'bottom', side: 'left' },
-      emphasis: 'withdrawal',
-      onActivate: () => setUitgavenPaneOpen(true),
-    },
-    {
-      id: 'onttrekking',
-      icon: OVERLAY_ICONS.withdrawal,
-      kicker: 'Onttrekkingsstrategie',
-      body: 'Hoe haal je later geld uit je vermogen? Dat bepaalt de daling.',
-      cta: 'Onttrekking instellen',
-      anchor: { row: 'bottom', side: 'right' },
-      emphasis: 'withdrawal',
-      onActivate: () => { setStrategieInitialTab('onttrekking'); setActiveModal('strategie') },
-    },
-  ], [router])
+      {
+        id: 'inkomensstrategie',
+        icon: OVERLAY_ICONS.incomeStrategy,
+        kicker: 'Inkomensstrategie',
+        body: 'Salarisgroei, promotie of minder werken — bepaal hoe je inkomen meebeweegt over de jaren.',
+        cta: 'Inkomensstrategie instellen',
+        row: 'top',
+        emphasis: 'accumulation',
+        onActivate: () => router.push('/toekomst/gebeurtenissen?strategie=werk'),
+      },
+      {
+        id: 'bezittingen',
+        icon: OVERLAY_ICONS.assets,
+        kicker: 'Bezittingen',
+        body: totalAssets > 0
+          ? `Je bezittingen staan nu op ${formatMaskedCurrency(totalAssets, masked)}. Werk ze bij voor een scherper startpunt.`
+          : 'Spaargeld, beleggingen en je huis vormen je startkapitaal — klopt het?',
+        cta: 'Bezittingen bijwerken',
+        row: 'top',
+        emphasis: 'accumulation',
+        onActivate: () => router.push('/overzicht/bezittingen'),
+      },
+      {
+        id: 'schulden',
+        icon: OVERLAY_ICONS.debts,
+        kicker: 'Schulden',
+        body: totalDebts > 0
+          ? `Je schulden staan nu op ${formatMaskedCurrency(totalDebts, masked)} — elke aflossing koopt vrijheid terug.`
+          : 'Geen schulden ingevuld — klopt dat? Schulden remmen je vrijheid.',
+        cta: 'Schulden bijwerken',
+        row: 'top',
+        emphasis: 'accumulation',
+        onActivate: () => router.push('/overzicht/schulden'),
+      },
+      {
+        id: 'gebeurtenis',
+        icon: OVERLAY_ICONS.event,
+        kicker: 'Levensgebeurtenis',
+        body: 'Een verbouwing, kind of wereldreis op komst? Reken ’m mee.',
+        cta: 'Gebeurtenis toevoegen',
+        row: 'top',
+        emphasis: 'accumulation',
+        onActivate: () => {
+          setEventPaneEditingId(null)
+          setEventPaneMode('catalog')
+          setEventPaneOpen(true)
+        },
+      },
+      // ── Onderste rij — je strategie LATER (de afbouw + einddoel) ──
+      {
+        id: 'aow',
+        icon: OVERLAY_ICONS.aow,
+        kicker: 'AOW-strategie',
+        body: 'Vanaf welke leeftijd, welke leefsituatie en opbouw — stel je AOW in.',
+        cta: 'AOW instellen',
+        row: 'bottom',
+        emphasis: 'fire',
+        onActivate: () => router.push('/toekomst/gebeurtenissen?strategie=aow'),
+      },
+      {
+        id: 'pensioen',
+        icon: OVERLAY_ICONS.pension,
+        kicker: 'Pensioenstrategie',
+        body: 'Stel in hoe je werknemerspensioen, lijfrente en banksparen meewegen.',
+        cta: 'Pensioen instellen',
+        row: 'bottom',
+        emphasis: 'fire',
+        onActivate: () => router.push('/toekomst/gebeurtenissen?strategie=pensioen'),
+      },
+      {
+        id: 'eindstrategie',
+        icon: OVERLAY_ICONS.end,
+        kicker: 'Eindstrategie',
+        body: 'Vermogen behouden, opeten of nalaten? Dat bepaalt je einddoel.',
+        cta: 'Eindstrategie kiezen',
+        row: 'bottom',
+        emphasis: 'fire',
+        onActivate: () => router.push('/toekomst/voorkeuren'),
+      },
+      {
+        id: 'woning',
+        icon: OVERLAY_ICONS.housing,
+        kicker: 'Je woning',
+        body: 'Verkopen, kleiner wonen of opeten? Je huis kan vrijheid vrijspelen.',
+        cta: 'Woonstrategie kiezen',
+        row: 'bottom',
+        emphasis: 'withdrawal',
+        onActivate: () => router.push('/toekomst/gebeurtenissen?strategie=huis'),
+      },
+      {
+        id: 'uitgaven',
+        icon: OVERLAY_ICONS.expenses,
+        kicker: 'Uitgaven na pensioen',
+        body: yearlyExpenses > 0
+          ? `Je rekent nu met ${formatMaskedCurrency(yearlyExpenses, masked)} uitgaven per jaar — dat zet je vrijheidsdoel. Klopt dat voor later?`
+          : 'Hoeveel heb je later per jaar nodig? Dit zet je vrijheidsdoel.',
+        cta: 'Uitgaven aanpassen',
+        row: 'bottom',
+        emphasis: 'withdrawal',
+        onActivate: () => setUitgavenPaneOpen(true),
+      },
+      {
+        id: 'onttrekking',
+        icon: OVERLAY_ICONS.withdrawal,
+        kicker: 'Onttrekkingsstrategie',
+        body: 'Hoe haal je later geld uit je vermogen? Dat bepaalt de daling.',
+        cta: 'Onttrekking instellen',
+        row: 'bottom',
+        emphasis: 'withdrawal',
+        onActivate: () => router.push('/toekomst/voorkeuren'),
+      },
+    ]
+  }, [router, masked, effectiveInput])
 
   return (
     <div className="mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6">
@@ -2784,7 +2842,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       </header>
 
       {/* === 1. Hero + Simulatie (één gecombineerd blok) === */}
-      <section data-testid="horizon-hero" className="card-editorial overflow-hidden">
+      <section data-testid="horizon-hero" className={`card-editorial overflow-hidden ${overlayVisible && chartMode === 'vermogenspad' ? 'no-hover-lift' : ''}`}>
         {/* Module-active accent (Horizon-500 op /horizon/**) */}
         <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
 
@@ -3478,14 +3536,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={simResult.displayEndAge}>
                   {(visibleMin, visibleMax, controls) => (
                     <>
+                      {/* STEP 3b/4: tips-laag wikkelt de grafiek — markers in een rij
+                          boven + onder; de grafiek vervaagt zolang de tips aan staan. */}
+                      <ToekomstOverlay
+                        visible={overlayVisible && chartMode === 'vermogenspad'}
+                        onEmphasisChange={setOverlayEmphasis}
+                        balloons={toekomstOverlayBalloons}
+                        onClose={() => persistOverlayVisible(false)}
+                      >
                       <div className="relative">
-                        {/* STEP 3b/4: ballonnen-overlay — wijst naar de inline-editors. */}
-                        <ToekomstOverlay
-                          visible={overlayVisible && chartMode === 'vermogenspad'}
-                          onClose={() => persistOverlayVisible(false)}
-                          onEmphasisChange={setOverlayEmphasis}
-                          balloons={toekomstOverlayBalloons}
-                        />
                         {/* Vermogenspad (SimChart) */}
                         <div
                           className="transition-opacity duration-300 ease-in-out"
@@ -3502,6 +3561,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           <SimChart
                             key={planningMode}
                             emphasis={overlayEmphasis}
+                            disableCrosshair={overlayVisible && chartMode === 'vermogenspad'}
                             rows={useHouseholdMainLine ? householdMainLine!.rows : usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? effectiveSimRows : simResult.rows)}
                             fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge)}
                             fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional)}
@@ -3567,6 +3627,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           />
                         </div>
                       </div>
+                      </ToekomstOverlay>
                       {/* ── Inkomen & Uitgaven toggle + collapsible chart ── */}
                       <div className="flex w-full items-center border-t border-[var(--border-ed)]">
                         <button

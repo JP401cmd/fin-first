@@ -275,7 +275,7 @@ export function runHorizonLedger(
       const woonkosten = schuldlasten + onderhoud
 
       // 4. Cashflows
-      const rec = activeRecurring(input.cashflows, age, inflation, startAge)
+      const rec = activeRecurring(input.cashflows, age, inflation, startAge, werkt)
       const one = oneTimeFlows(input.cashflows, age)
       const recurringIncome = rec.income
       const eventsUitgave = rec.expense + one.expense
@@ -455,7 +455,14 @@ export function runHorizonLedger(
         events: collectEvents(input.cashflows, age),
       })
 
-      netNeed.push(Math.max(0, input.yearlyExpenses + woonkosten + eventsUitgave - recurringIncome - eventsInkomen))
+      // Retire-now behoefte (bron voor V_nodig/doelbedrag): je STOPT met werken,
+      // dus werk-gebonden salaris-delta's (onlyWhileWorking) tellen hier NIET mee —
+      // evalueer de recurring cashflows met werkt=false. Voor niet-werk-events is
+      // dit identiek aan `rec` (byte-identiek voor bestaande projecties).
+      const recRetired = activeRecurring(input.cashflows, age, inflation, startAge, false)
+      netNeed.push(
+        Math.max(0, input.yearlyExpenses + woonkosten + recRetired.expense + one.expense - recRetired.income - eventsInkomen),
+      )
     }
 
     return { rows, netNeed }
@@ -648,6 +655,7 @@ function activeRecurring(
   age: number,
   inflation: number,
   startAge: number,
+  werkt: boolean,
 ): { income: number; expense: number } {
   let income = 0
   let expense = 0
@@ -655,6 +663,9 @@ function activeRecurring(
     if (cf.type !== 'recurring') continue
     if (age < cf.fromAge) continue
     if (cf.toAge != null && age >= cf.toAge) continue
+    // Werk-gebonden flows (salaris-delta's van de Werk-strategie) volgen de
+    // werk-stopgrens, net als het basissalaris — niet de onttrekkingsfase in.
+    if (cf.onlyWhileWorking && !werkt) continue
     const realFactor = cf.indexed ? 1 : 1 / Math.pow(1 + inflation, Math.max(0, age - startAge))
     const jaarbedrag = cf.amount * 12 * realFactor
     if (cf.direction === 'income') income += jaarbedrag

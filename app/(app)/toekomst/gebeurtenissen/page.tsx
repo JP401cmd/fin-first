@@ -77,12 +77,19 @@ export default async function ToekomstGebeurtenissenPage() {
         pensioenFireAgeFractional: builtPreview.isPensioen ? aowFractional : null,
       }
     : null
+  // Netto maandinkomen voor de Werk-strategie: 6-maands transactie-inkomen
+  // (zelfde grondslag als de spaarquote); fallback ~65% van het bruto-profiel.
+  const currentNetMonthly = Math.round(
+    horizonData.avgIncome6m > 0 ? horizonData.avgIncome6m : (ei.monthlyIncome ?? 0) * 0.65,
+  )
   const strategieData = {
     baseline: strategieBaseline,
     dailyExpenses: ei.yearlyMustExpenses > 0 ? ei.yearlyMustExpenses / 365 : 0,
     aowRows,
     dateOfBirth: dob,
     grossYearlyIncome: (ei.monthlyIncome ?? 0) * 12,
+    currentAge,
+    currentNetMonthly,
     // Live preview Huis-strategie: zelfde simBasis als waarmee de loader de
     // virtuele housing-events resolvede — de modal rekent dan per definitie
     // hetzelfde trigger-moment en dezelfde vrijheidsleeftijd als de grafiek.

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-14T19:56:02.763Z",
-  "generatedDate": "2026-06-14",
+  "generatedAt": "2026-06-15T17:11:15.828Z",
+  "generatedDate": "2026-06-15",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -182,13 +182,13 @@
     }
   },
   "stats": {
-    "routes": 317,
-    "routesProduction": 94,
-    "api": 370,
+    "routes": 318,
+    "routesProduction": 95,
+    "api": 371,
     "tables": 52,
-    "migrations": 105,
+    "migrations": 106,
     "integrations": 24,
-    "components": 687,
+    "components": 691,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -854,6 +854,12 @@
     {
       "url": "/rapportages/balans",
       "file": "app/(app)/rapportages/balans/page.tsx",
+      "group": "persoonlijk",
+      "isTest": false
+    },
+    {
+      "url": "/rapportages/benchmark",
+      "file": "app/(app)/rapportages/benchmark/page.tsx",
       "group": "persoonlijk",
       "isTest": false
     },
@@ -2413,6 +2419,12 @@
       {
         "url": "/rapportages/balans",
         "file": "app/(app)/rapportages/balans/page.tsx",
+        "group": "persoonlijk",
+        "isTest": false
+      },
+      {
+        "url": "/rapportages/benchmark",
+        "file": "app/(app)/rapportages/benchmark/page.tsx",
         "group": "persoonlijk",
         "isTest": false
       },
@@ -5655,6 +5667,14 @@
       ]
     },
     {
+      "url": "/api/report/benchmark",
+      "file": "app/api/report/benchmark/route.ts",
+      "domain": "report",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/report/budget",
       "file": "app/api/report/budget/route.ts",
       "domain": "report",
@@ -8071,6 +8091,63 @@
       ]
     },
     {
+      "domain": "report",
+      "label": "Rapportages",
+      "count": 6,
+      "routes": [
+        {
+          "url": "/api/report",
+          "file": "app/api/report/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET",
+            "POST",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/report/balans",
+          "file": "app/api/report/balans/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/report/benchmark",
+          "file": "app/api/report/benchmark/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/report/budget",
+          "file": "app/api/report/budget/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/report/persoonlijk-plan",
+          "file": "app/api/report/persoonlijk-plan/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/report/vermogen",
+          "file": "app/api/report/vermogen/route.ts",
+          "domain": "report",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "assets",
       "label": "Bezittingen",
       "count": 5,
@@ -8113,55 +8190,6 @@
           "domain": "assets",
           "methods": [
             "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "report",
-      "label": "Rapportages",
-      "count": 5,
-      "routes": [
-        {
-          "url": "/api/report",
-          "file": "app/api/report/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET",
-            "POST",
-            "DELETE"
-          ]
-        },
-        {
-          "url": "/api/report/balans",
-          "file": "app/api/report/balans/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/report/budget",
-          "file": "app/api/report/budget/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/report/persoonlijk-plan",
-          "file": "app/api/report/persoonlijk-plan/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/report/vermogen",
-          "file": "app/api/report/vermogen/route.ts",
-          "domain": "report",
-          "methods": [
-            "GET"
           ]
         }
       ]
@@ -12058,7 +12086,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 105
+    "migrationCount": 106
   },
   "tablesByDomain": [
     {
@@ -12372,11 +12400,11 @@
     }
   ],
   "components": {
-    "total": 687,
+    "total": 691,
     "groups": [
       {
         "group": "app",
-        "count": 298,
+        "count": 301,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12415,10 +12443,12 @@
           "box3-scenario-modal",
           "breadcrumb",
           "budget-blob",
+          "budget-detail-pane",
           "budget-donut",
           "budget-form",
           "budget-heatmap",
           "budget-hub.test",
+          "budget-icon-picker",
           "budget-merge-wizard",
           "budget-plan-editor-sheet",
           "budget-sankey",
@@ -12520,10 +12550,8 @@
           "holdings-heatmap",
           "horizon-cashflow-sankey",
           "horizon-client",
-          "horizon-fire-intro-card",
           "horizon-fire-params-panel",
           "horizon-helpers",
-          "horizon-setup-pane",
           "horizon-trend-grid",
           "horizon-trend-grid.test",
           "horizon-year-details-sheet",
@@ -12647,6 +12675,9 @@
           "swipe-back-tracker",
           "sync-status-badge",
           "toast-provider",
+          "toekomst-overlay",
+          "toekomst-overlay.test",
+          "toekomst-welcome",
           "top-bar",
           "transacties-feed",
           "transacties-feed.test",
@@ -12935,7 +12966,7 @@
       },
       {
         "group": "future",
-        "count": 49,
+        "count": 50,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
@@ -12985,7 +13016,8 @@
           "voorkeur-bewerken-sheet",
           "voorkeur-bewerken-sheet.test",
           "voorkeuren-view",
-          "voorkeuren-view.test"
+          "voorkeuren-view.test",
+          "werk-strategie-editor"
         ]
       },
       {
@@ -14244,6 +14276,10 @@
         {
           "name": "profiles",
           "write": true
+        },
+        {
+          "name": "user_feature_visits",
+          "write": true
         }
       ],
       "onboarding-steps": [
@@ -14938,6 +14974,7 @@
           "routes": [
             "/api/report",
             "/api/report/balans",
+            "/api/report/benchmark",
             "/api/report/budget",
             "/api/report/persoonlijk-plan",
             "/api/report/vermogen"
@@ -15217,6 +15254,14 @@
           "write": true,
           "routes": [
             "/api/hypotheekplanner/setup"
+          ]
+        },
+        {
+          "domain": "onboarding",
+          "label": "Onboarding",
+          "write": true,
+          "routes": [
+            "/api/onboarding/save-own-data"
           ]
         },
         {
@@ -17568,6 +17613,19 @@
       ],
       "summary": "ADR 0014 legde vast dat de eindstrategie **legacy** in de v2-grootboek-engine (`lib/horizon-engine/engine.ts`) **need-only** onttrekt: alleen de netto leefbehoefte wordt onttrokken, het residu blijft belegd en groeit naar de nalatenschap. Dat besluit blijft staan — `lib/withdrawa",
       "file": "docs/adr/0017-horizon-v2-legacy-doelzoekende-fire.md"
+    },
+    {
+      "id": "0018-benchmark-gemodelleerde-referentie-peer",
+      "title": "benchmark gemodelleerde referentie peer",
+      "status": "aanvaard",
+      "date": "2026-06-15",
+      "elements": [
+        "as-rapport",
+        "as-planning",
+        "as-vermogen"
+      ],
+      "summary": "De benchmarkrapportage op `/rapportages/benchmark` vergelijkt vijf canonieke gebruikersmaten (gezondheidsscore, vrijheidsleeftijd, spaarquote, netto vermogen, geschat jaarinkomen) met een referentie. Voor drie van de vijf maten bestaan officiële NL-statistieken (CBS Vermogen 2024",
+      "file": "docs/adr/0018-benchmark-gemodelleerde-referentie-peer.md"
     }
   ],
   "churn": {
@@ -17579,11 +17637,11 @@
       },
       {
         "path": "lib/ai",
-        "commits": 38
+        "commits": 36
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 26
+        "commits": 27
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -17599,7 +17657,7 @@
       },
       {
         "path": "lib/horizon-data.ts",
-        "commits": 9
+        "commits": 8
       },
       {
         "path": "components/horizon",
@@ -17617,18 +17675,18 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6910,
-        "commits": 104
+        "loc": 7032,
+        "commits": 102
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 4847,
+        "loc": 4863,
         "commits": 26
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 3813,
-        "commits": 41
+        "commits": 40
       },
       {
         "file": "lib/release-notes.ts",
@@ -17638,21 +17696,21 @@
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2639,
-        "commits": 23
+        "commits": 13
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 2608,
-        "commits": 15
+        "loc": 2614,
+        "commits": 14
+      },
+      {
+        "file": "lib/horizon-data.ts",
+        "loc": 2250,
+        "commits": 8
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
         "loc": 2206,
-        "commits": 9
-      },
-      {
-        "file": "lib/horizon-data.ts",
-        "loc": 2199,
         "commits": 9
       }
     ]
@@ -18319,24 +18377,15 @@
   },
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-14",
+    "previousDate": "2026-06-15",
     "hasChanges": true,
     "sections": [
       {
-        "label": "Schermen",
+        "label": "Componenten (aantal)",
         "added": [
-          "/beheer/horizon-strategie"
+          "+3"
         ],
-        "removed": [
-          "/beheer/horizon-tabellen"
-        ]
-      },
-      {
-        "label": "API-routes",
-        "added": [],
-        "removed": [
-          "/api/horizon-engine/ledger"
-        ]
+        "removed": []
       }
     ]
   },
@@ -18375,6 +18424,13 @@
       "components": 687,
       "tables": 52,
       "routesProduction": 94
+    },
+    {
+      "date": "2026-06-15",
+      "api": 371,
+      "components": 691,
+      "tables": 52,
+      "routesProduction": 95
     }
   ]
 }

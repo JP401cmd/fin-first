@@ -88,6 +88,7 @@ export function buildHldModel(): HldModel {
           { title: 'Budgetten maken en bewaken', desc: 'Zie per categorie hoeveel je deze maand nog hebt.' },
           { title: 'Zien hoeveel je overhoudt', desc: 'Je spaarquote: welk deel van je inkomen je spaart.' },
           { title: 'Je bezittingen en schulden bijhouden', desc: 'Van spaargeld tot huis en hypotheek — je netto vermogen in beeld.' },
+          { title: 'Jezelf spiegelen aan Nederland en de wereld', desc: 'Zie hoe je gezondheid, spaarquote, vermogen en vrijheidsleeftijd zich verhouden tot een vergelijkbare doelgroep — en waar je staat wereldwijd.' },
         ],
       },
       {
@@ -100,6 +101,7 @@ export function buildHldModel(): HldModel {
           { title: 'Grote gebeurtenissen meenemen', desc: 'Huis kopen, pensioen, kinderen — alles op je tijdlijn.' },
           { title: 'Je vermogen jaren vooruit zien groeien', desc: 'Simulaties en een toets tegen echte beurshistorie.' },
           { title: 'Snappen hoe je vrijheidsgrafiek is opgebouwd', desc: 'In vier stappen met je eigen cijfers: opbouw, benodigd vermogen, het vrijheidsmoment en onttrekking.' },
+          { title: 'Je loopbaan en inkomen meenemen', desc: 'Salarisgroei, een plafond of minder werken — zie wat het met je vrijheidsdatum doet.' },
         ],
       },
       {

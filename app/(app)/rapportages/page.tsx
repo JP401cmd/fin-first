@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { ReportConfig } from '@/lib/report-data'
-import { FileText, Trash2, Eye, Sparkles, Scale, BarChart3, Layers, Compass } from 'lucide-react'
+import { FileText, Trash2, Eye, Sparkles, Scale, BarChart3, Layers, Compass, Users } from 'lucide-react'
 import {
   Kicker,
   EditorialHeadline,
@@ -547,6 +547,51 @@ export default function RapportagesPage() {
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
             >
               Geen prognoses — alleen de input-zijde, zodat je kunt controleren of de parameters nog kloppen.
+            </p>
+          </div>
+        </div>
+      </CardEditorial>
+
+      {/* === VI. Benchmark — de spiegel === */}
+      <CardEditorial accent className="flex flex-col">
+        <div className="flex flex-1 flex-col p-6 sm:p-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Kicker size="small">
+              <Users className="h-3 w-3" aria-hidden />
+              <span>Spiegel</span>
+            </Kicker>
+            <span
+              className="italic text-sm text-[var(--module-active-700)]"
+              style={{ fontFamily: 'var(--font-playfair, serif)' }}
+              aria-hidden
+            >
+              vi.
+            </span>
+          </div>
+
+          <EditorialHeadline level="h2" size="sm" emphasis="náást anderen" className="mb-2">
+            Hoe je ervoor staat — náást anderen
+          </EditorialHeadline>
+
+          <EditorialDeck className="mb-5">
+            Je gezondheid, vrijheidsleeftijd, spaarquote, vermogen en inkomen naast een vergelijkbare doelgroep — en naast de wereld.
+          </EditorialDeck>
+
+          <div className="mt-auto">
+            <button
+              type="button"
+              onClick={() => router.push('/rapportages/benchmark')}
+              className="flex w-full items-center justify-center gap-2 bg-[var(--ink)] px-4 py-3 font-inter text-sm font-medium text-[var(--paper)] transition-all hover:bg-[var(--ink-2)]"
+            >
+              <Users className="h-4 w-4" />
+              Open de spiegel
+            </button>
+
+            <p
+              className="mt-4 italic text-[12px] leading-snug text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Op basis van officiële NL-statistiek voor jouw leeftijd en huishoudtype. Geen data van andere gebruikers.
             </p>
           </div>
         </div>

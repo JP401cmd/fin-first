@@ -10,11 +10,12 @@
 
 import { useEffect, useRef } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { ArrowLeftRight, ArrowRight, Check, CheckCircle, MoreHorizontal, X } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, Check, CheckCircle, MoreHorizontal, Sparkles, X } from 'lucide-react'
 import { BudgetIcon, getTypeColors, formatCurrencyDecimals } from '@/components/app/budget-shared'
 import type { Budget } from '@/lib/budget-data'
 import type { QueueTx, AssignScope } from '@/lib/sleepmodus/queue'
 import type { RingSlot } from '@/lib/sleepmodus/ring'
+import { shortBudgetLabel } from '@/lib/sleepmodus/short-label'
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('nl-NL', {
@@ -170,6 +171,12 @@ export function BudgetBol({ droppableId, budget, pos, state, isChild, pulse, sta
   const colors = getTypeColors(budget.budget_type)
   const size = isChild ? 'clamp(56px, 16vw, 64px)' : 'clamp(68px, 19vw, 78px)'
   const highlighted = isOver || state === 'armed'
+  // 'hot' = het door regels/historie voorgestelde (deel)budget. Dat lichten we
+  // nadrukkelijk uit zodat het opvalt — óók als het een subbudget is. Het
+  // "ademt" (pulse) alleen wanneer het niet tegelijk het actieve doel is; dan
+  // neemt de sterkere highlighted-staat het visueel over.
+  const suggested = state === 'hot'
+  const pulsing = suggested && !highlighted
 
   return (
     <div
@@ -183,7 +190,8 @@ export function BudgetBol({ droppableId, budget, pos, state, isChild, pulse, sta
         ['--stagger' as string]: `${stagger ?? 0}ms`,
         transition: 'opacity 200ms ease-out',
         opacity: state === 'dim' ? 0.25 : 1,
-        zIndex: isChild || highlighted ? 2 : 1,
+        // Voorstel tilt bóven de buren (z 2), het actieve doel daar weer bovenop (z 3).
+        zIndex: highlighted ? 3 : isChild || suggested ? 2 : 1,
       }}
     >
       {/* De droppable hit-area is ruimer dan de zichtbare bol ("naderen"). */}
@@ -197,6 +205,7 @@ export function BudgetBol({ droppableId, budget, pos, state, isChild, pulse, sta
           'relative flex flex-col items-center justify-center gap-0.5 text-center',
           'transition-[filter,transform] duration-200 ease-out',
           pulse ? 'animate-sleep-check-pulse' : '',
+          pulsing ? 'animate-sleep-suggest' : '',
         ].join(' ')}
         style={{
           width: size,
@@ -204,37 +213,53 @@ export function BudgetBol({ droppableId, budget, pos, state, isChild, pulse, sta
           // Twéé signalen voor het actieve doel, niet alleen kleur (a11y):
           // (1) een merkbare schaalsprong die de bol vóór de buren tilt en
           // (2) een dikkere, vollere omlijning (hieronder in PiggySilhouette).
-          // De zwakkere 'hot'-kandidaat blijft op normale schaal — zo rangt
-          // 'highlighted' altijd zichtbaar bóven 'hot' uit.
-          transform: highlighted ? 'scale(1.08)' : 'scale(1)',
+          // Bij het voorstel sturen transform + filter via de pulse-keyframe —
+          // daarom hier NIET inline zetten (anders overrulet de inline-stijl 'm).
+          transform: highlighted ? 'scale(1.08)' : pulsing ? undefined : 'scale(1)',
           // Een box-shadow-ring sluit niet aan op een niet-rond silhouet;
           // de gloed komt daarom van een gekleurde drop-shadow ACHTER de vorm.
           filter: highlighted
             ? `drop-shadow(0 0 7px color-mix(in oklch, ${colors.hex} 60%, transparent)) drop-shadow(0 3px 6px color-mix(in oklch, ${colors.hex} 30%, transparent))`
-            : state === 'hot'
-              ? `drop-shadow(0 0 5px color-mix(in oklch, ${colors.hex} 40%, transparent))`
+            : pulsing
+              ? undefined
               : 'drop-shadow(0 2px 4px rgba(60,40,20,0.16))',
           ['--sleep-pulse-color' as string]: colors.hex,
+          ['--sleep-suggest-color' as string]: colors.hex,
         }}
       >
+        {/* "Voorstel"-badge: maakt het gesuggereerde (deel)budget onmiskenbaar,
+            ook in een drukke ring. Donkere ink-pill voor maximaal contrast. */}
+        {suggested && (
+          <span className="pointer-events-none absolute -top-2 left-1/2 z-[4] flex -translate-x-1/2 items-center gap-0.5 whitespace-nowrap rounded-full bg-[var(--ink)] px-1.5 py-px font-[var(--font-dm-mono)] text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--paper)] shadow-[0_1px_3px_rgba(26,25,22,0.3)]">
+            <Sparkles className="h-2 w-2" aria-hidden="true" />
+            voorstel
+          </span>
+        )}
         {/* Het spaarvarken-silhouet — fill = tint, stroke = type-kleur. Tint
             sterker bij hover/voorstel; bij het actieve doel een duidelijk
             dikkere omlijning in de vólle type-kleur, mirroring de oude rand. */}
         <PiggySilhouette
-          fill={tintFor(colors.hex, highlighted ? 24 : state === 'hot' ? 18 : 11)}
+          fill={tintFor(colors.hex, highlighted ? 26 : suggested ? 22 : 11)}
           stroke={colors.hex}
-          strokeWidth={highlighted ? 3.25 : 2}
+          strokeWidth={highlighted ? 3.25 : suggested ? 2.75 : 2}
         />
-        <span className="relative mt-1 inline-flex h-4 w-4 items-center justify-center">
-          <BudgetIcon name={budget.icon} className="h-4 w-4" />
+        {/* Het icoon woont gecentreerd ín het varken; de naam staat eronder als
+            los naamplaatje (zie hieronder), zodat tekst en buik elkaar niet meer
+            overlappen. */}
+        <span className="relative inline-flex h-[18px] w-[18px] items-center justify-center">
+          <BudgetIcon name={budget.icon} className="h-[18px] w-[18px]" />
         </span>
+        {/* Naamplaatje los ónder het varken: recht (niet cursief), Inter, op een
+            paper-plaatje zodat het zowel van de cream-field als van de gekleurde
+            type-tint loskomt. pointer-events-none zodat het plaatje — dat in een
+            krappe cluster een buur-varken kan naderen — nooit diens tik onderschept;
+            het varken zelf (≥56px) blijft het ruime tik-doel. Verkort label houdt
+            'm op 1–2 regels; de volledige naam zit in title + aria-label. */}
         <span
-          className="relative max-w-[60px] px-0.5 font-serif text-[9.5px] italic leading-[1.05] text-[var(--ink)] line-clamp-2"
-          // Subtiele papier-halo houdt de naam leesbaar over donkere/verzadigde
-          // type-tinten — geen kaartje, alleen de gloed.
-          style={{ textShadow: '0 0 2px var(--paper), 0 0 3px var(--paper)' }}
+          title={budget.name}
+          className="pointer-events-none absolute left-1/2 top-full z-[3] mt-0.5 -translate-x-1/2 max-w-[88px] whitespace-normal border border-[var(--border-ed)]/60 bg-[var(--paper)]/90 px-1 py-px text-center font-sans text-[10.5px] font-medium not-italic leading-[1.15] text-[var(--ink-2)] line-clamp-2"
         >
-          {budget.name}
+          {shortBudgetLabel(budget.name)}
         </span>
       </button>
     </div>

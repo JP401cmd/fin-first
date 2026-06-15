@@ -502,6 +502,44 @@ export interface WerkloosheidMetadata {
   zoektijd?: number
 }
 
+/**
+ * Werk-strategie — de doorlopende loopbaan-/inkomenslijn (event_type='werk').
+ * Eén life_events-rij draagt het hele traject in metadata; `werkMetadataToCashflows`
+ * (lib/werk-strategie.ts) expandeert het naar reële inkomens-DELTA-kasstromen
+ * t.o.v. het vlakke basisinkomen dat de engine al via de spaarquote meeneemt.
+ */
+
+/** Eén "minder werken"-stap: vanaf `fromAge` werk je nog `pct`% van voltijd. */
+export interface WerkFase {
+  fromAge: number
+  /** 0–100: percentage van het voltijd-salaris dat je vanaf deze leeftijd verdient. */
+  pct: number
+}
+
+/** Eenmalige salarissprong (promotie/stap): +€ netto/mnd op `atAge`, bovenop de curve. */
+export interface WerkSprong {
+  atAge: number
+  /** Verandering in netto maandinkomen (positief = promotie, kan negatief). */
+  deltaNettoMaand: number
+}
+
+export interface WerkMetadata {
+  /** Huidig netto maandinkomen (voltijd) — basis voor de delta-berekening. */
+  huidigNettoMaand?: number
+  /** Reële stijging per jaar BOVEN inflatie (decimaal, 0.02 = 2%). */
+  reeleGroeiPct?: number
+  /** Leeftijd waarop reële groei stopt (undefined = groeit door tot het plafond/horizon). */
+  groeiTotLeeftijd?: number
+  /** Reëel plafond (netto €/mnd, huidige koopkracht). 0/undefined = geen plafond. */
+  plafondNettoMaand?: number
+  /** Deeltijd-stappen, oplopend op fromAge. */
+  faseStappen?: WerkFase[]
+  /** Promotie-/salarissprongen. */
+  sprongen?: WerkSprong[]
+  source?: 'werk-strategy'
+  schemaVersie?: number
+}
+
 export interface SchenkingMetadata {
   relatieOntvanger?: 'kind' | 'kleinkind' | 'overig'
   eenmaligOfJaarlijks?: 'eenmalig' | 'jaarlijks'
@@ -631,6 +669,7 @@ export type LifeEventMetadataMap = {
   werkloosheid: WerkloosheidMetadata
   schenking: SchenkingMetadata
   begrafenis: BegrafenisMetadata
+  werk: WerkMetadata
   custom: Record<string, unknown>
 }
 
@@ -757,6 +796,12 @@ export interface LifeEventCatalogEntry {
   fields?: CatalogField[]
   /** If true, this event is only available in household mode */
   householdOnly?: boolean
+  /**
+   * If true, this type is hidden from the "Levensgebeurtenis toevoegen"-picker
+   * (event-pane-catalog) — bv. vervangen door een multi-step strategie. De entry
+   * blijft bestaan voor label/icoon/field-lookups in wat-als/scenario/AI.
+   */
+  hiddenFromCatalog?: boolean
 }
 
 /**
@@ -946,6 +991,9 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     label: 'Carrière switch',
     icon: 'Briefcase',
     group: 'werk',
+    // Vervangen door de Werk-strategie op /toekomst/gebeurtenissen (jun 2026):
+    // niet meer los aanmaakbaar, maar de entry blijft voor wat-als/scenario/AI-lookups.
+    hiddenFromCatalog: true,
     impactRange: '€5K–€30K totaal',
     defaultCost: 3000,
     defaultMonthlyCost: 0,
@@ -965,6 +1013,9 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     label: 'Part-time werken',
     icon: 'Clock',
     group: 'werk',
+    // Vervangen door de Werk-strategie op /toekomst/gebeurtenissen (jun 2026):
+    // niet meer los aanmaakbaar, maar de entry blijft voor wat-als/scenario/AI-lookups.
+    hiddenFromCatalog: true,
     impactRange: '€500–€1.500/mnd inkomensverlies',
     defaultCost: 0,
     defaultMonthlyCost: 0,

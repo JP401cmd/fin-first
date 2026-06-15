@@ -10,6 +10,7 @@ import type { HousingPreviewData } from '@/lib/housing-trigger'
 import { StrategieModalShell } from './strategie-modal-shell'
 import { AowStrategieEditor } from './aow-strategie-editor'
 import { PensioenStrategieEditor } from './pensioen-strategie-editor'
+import { WerkStrategieEditor } from './werk-strategie-editor'
 
 export interface StrategieEditorsData {
   baseline: PreviewBaseline | null
@@ -17,6 +18,10 @@ export interface StrategieEditorsData {
   aowRows: AowLeeftijdRow[]
   dateOfBirth: string | null
   grossYearlyIncome: number
+  /** Huidige leeftijd uit DOB (null = onbekend) — basis voor de Werk-strategie. */
+  currentAge: number | null
+  /** Huidig netto maandinkomen (prefill Werk-strategie). */
+  currentNetMonthly: number
   /** Basis voor de live preview in de Huis-strategie-modal (null = geen preview). */
   housingPreview: HousingPreviewData | null
 }
@@ -67,6 +72,23 @@ export function StrategieEditors({
         dailyExpenses={data.dailyExpenses}
         aowAge={aowAge}
         grossYearlyIncome={data.grossYearlyIncome}
+        onClose={onClose}
+        readOnly={readOnly}
+      />
+    )
+  }
+
+  if (open === 'werk') {
+    const werkEvent = events.find((e) => e.event_type === 'werk') ?? null
+    return (
+      <WerkStrategieEditor
+        event={werkEvent}
+        allEvents={events}
+        baseline={data.baseline}
+        dailyExpenses={data.dailyExpenses}
+        currentAge={data.currentAge}
+        currentNetMonthly={data.currentNetMonthly}
+        aowAge={Math.ceil(lookupAowAge(data.aowRows, data.dateOfBirth).fractional)}
         onClose={onClose}
         readOnly={readOnly}
       />

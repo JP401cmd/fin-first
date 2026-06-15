@@ -183,3 +183,16 @@
 - **Schermen** toegevoegd: /beheer/horizon-strategie
 - **Schermen** verwijderd: /beheer/horizon-tabellen
 - **API-routes** verwijderd: /api/horizon-engine/ledger
+
+## 2026-06-15
+
+- **Schermen** toegevoegd: /rapportages/benchmark
+- **API-routes** toegevoegd: /api/report/benchmark
+
+## 2026-06-15
+
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-06-15
+
+- **Componenten (aantal)** toegevoegd: +3

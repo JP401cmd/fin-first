@@ -1471,14 +1471,16 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     setBudgetFormActions(null)
   }, [router, pathname, searchParams])
 
-  // Aangeroepen vanuit BudgetPlanEditorSheet's "+ Nieuw budget"-CTA. Sluit de
-  // planeditor-sheet eerst (sheet-over-pane stapelt focus-traps en geeft een
-  // visuele dubbele overlay), zet daarna de query-param zodat de pane opent.
-  const openNewBudgetPane = useCallback(() => {
+  // Escape-hatch vanuit het detail-subscherm van de planeditor: eigendom/delen
+  // + koppelen aan een bestaand spaardoel zitten op het uitgebreide
+  // BudgetForm-pad. Sluit de sheet eerst (sheet-over-pane stapelt focus-traps)
+  // en opent het bewerkscherm voor dit budget (?budget=<id>&edit=true).
+  const openBudgetEditAdvanced = useCallback((budgetId: string) => {
     setShowPlanEditor(false)
     const next = new URLSearchParams(searchParams.toString())
     next.delete(OVERLAY_QUERY_KEYS.planEditor)
-    next.set(OVERLAY_QUERY_KEYS.newBudget, 'true')
+    next.set(OVERLAY_QUERY_KEYS.budget, budgetId)
+    next.set(OVERLAY_QUERY_KEYS.edit, 'true')
     router.replace(`${pathname}?${next.toString()}`, { scroll: false })
   }, [router, pathname, searchParams])
 
@@ -2152,26 +2154,35 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
               className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--ink-3)]"
             >
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              Alles gekoppeld
+              <span className="max-sm:hidden">Alles gekoppeld</span>
             </span>
           ) : (
             <button
               type="button"
               onClick={() => setShowAICategorize(true)}
+              aria-label="Transacties koppelen"
               className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors"
             >
               <Link2 className="h-3.5 w-3.5" />
               <span className="max-sm:hidden">Transacties koppelen</span>
-              <span className="sm:hidden">Koppelen</span>
+              {/* Op mobiel valt de tekst weg; een count-badge houdt zichtbaar
+                  hoeveel er nog te koppelen valt (all-time). Cap op 99 → ">99".
+                  Verborgen zolang het aantal nog laadt (null). */}
+              {allTimeUncatCount != null && allTimeUncatCount > 0 && (
+                <span className="sm:hidden inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-kern-600 px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
+                  {allTimeUncatCount > 99 ? '>99' : allTimeUncatCount}
+                </span>
+              )}
             </button>
           )}
           <button
             type="button"
             onClick={() => setShowPlanEditor(true)}
+            aria-label="Plan bewerken"
             className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
-            Plan bewerken
+            <span className="max-sm:hidden">Plan bewerken</span>
           </button>
         </div>
       </div>
@@ -2333,7 +2344,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           loadBudgets()
           loadSpending()
         }}
-        onRequestNewBudget={openNewBudgetPane}
+        onEditAdvanced={openBudgetEditAdvanced}
         budgets={budgets}
         budgetAmounts={budgetAmounts}
         rollovers={rollovers}

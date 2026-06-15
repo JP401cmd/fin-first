@@ -22,8 +22,10 @@ import {
   berekenErfbelasting,
   berekenKinderopvangNetto,
   kinderbijslagPerMaand,
+  type WerkMetadata,
 } from '@/lib/horizon-data'
 import { type FireEndStrategy } from '@/lib/fire-strategy'
+import { werkMetadataToCashflows } from '@/lib/werk-strategie'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,13 @@ export interface SimCashflow {
    * Examples: -0.37 = 37% drop, +0.20 = 20% gain.
    */
   portfolioPct?: number
+  /**
+   * Als `true`, telt deze recurring flow alléén mee zolang de gebruiker werkt
+   * (de engine `werkt`-gate). Gebruikt door de Werk-strategie zodat salaris-
+   * delta's exact dezelfde werk-stopgrens volgen als het basissalaris en niet
+   * de onttrekkingsfase in lekken. AOW/pensioen laten dit ongezet (inkomen ná werk).
+   */
+  onlyWhileWorking?: boolean
 }
 
 export interface IncomeExpenseItem {
@@ -237,6 +246,22 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
           indexed: m.isGeindexeerd ?? ev.is_indexed ?? false,
         })
       }
+      skipGenericCost = true
+      skipGenericMonthlyCost = true
+      skipGenericMonthlyIncome = true
+    }
+
+    // WERK-strategie: loopbaan-/inkomenslijn → reële inkomens-DELTA-kasstromen
+    // (groei/plafond/deeltijd/sprongen) t.o.v. het basisinkomen. Alle delta's
+    // dragen onlyWhileWorking zodat ze de werk-stopgrens volgen. Vervangt de
+    // generieke maandinkomen-fallback volledig.
+    if (ev.event_type === 'werk') {
+      const werkFlows = werkMetadataToCashflows(meta as WerkMetadata, {
+        eventId: ev.id,
+        name: ev.name,
+        currentAge: age,
+      })
+      flows.push(...werkFlows)
       skipGenericCost = true
       skipGenericMonthlyCost = true
       skipGenericMonthlyIncome = true

@@ -22,7 +22,7 @@ function failedChecks(c: ComboResult): string[] {
 describe('horizon-strategie regressiematrix', () => {
   const result = runHorizonStrategyMatrix()
 
-  it('draait alle 12 combinaties', () => {
+  it('draait alle combinaties', () => {
     expect(allCombos(result)).toHaveLength(COMBOS.length)
     expect(result.summary.total).toBe(COMBOS.length)
   })

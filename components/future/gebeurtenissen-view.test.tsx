@@ -33,6 +33,8 @@ const mockStrategieData: StrategieEditorsData = {
   aowRows: [],
   dateOfBirth: null,
   grossYearlyIncome: 0,
+  currentAge: null,
+  currentNetMonthly: 0,
   housingPreview: null,
 }
 
@@ -189,11 +191,12 @@ describe('GebeurtenissenView — event-impact-badge (plan F-5)', () => {
 })
 
 describe('GebeurtenissenView — strategieën-sectie', () => {
-  it('rendert drie levensstrategieën altijd', () => {
+  it('rendert vier levensstrategieën altijd', () => {
     renderView({ events: [] })
     expect(screen.getByText('AOW-strategie')).toBeTruthy()
     expect(screen.getByText('Pensioen-strategie')).toBeTruthy()
     expect(screen.getByText('Huis-strategie')).toBeTruthy()
+    expect(screen.getByText('Werk-strategie')).toBeTruthy()
   })
 
   it('strategie-kaarten zijn geen dode focus-deeplinks meer', () => {

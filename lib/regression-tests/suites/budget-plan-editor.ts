@@ -23,6 +23,8 @@ import {
   firstOfCurrentMonth,
   isTempId,
   resolveActiveAmount,
+  detailFieldsFromBudget,
+  NEW_BUDGET_DETAIL_DEFAULTS,
   type BudgetAmountLite,
   type DraftBudget,
 } from '@/lib/budget-plan-diff'
@@ -85,6 +87,7 @@ function draftFromBudget(b: Budget, amount: number | null): DraftBudget {
     interval: b.interval,
     rolloverType: b.rollover_type,
     amount,
+    ...detailFieldsFromBudget(b),
   }
 }
 
@@ -123,7 +126,7 @@ const tests: TestCase[] = [
         id: 'tmp-abc', parentId: null, name: 'Nieuw', slug: null, icon: 'Circle',
         description: null, budgetType: 'expense', defaultLimit: 100,
         isEssential: false, sortOrder: 0, interval: 'monthly', rolloverType: 'reset',
-        amount: 150,
+        amount: 150, ...NEW_BUDGET_DETAIL_DEFAULTS,
       }]
       const diff = computeBudgetPlanDiff([], draft, [], '2026-04-01')
       assertEqual(diff.to_insert.length, 1, '1 insert')
@@ -216,11 +219,13 @@ const tests: TestCase[] = [
         id: 'tmp-p', parentId: null, name: 'Parent', slug: null, icon: 'Circle',
         description: null, budgetType: 'expense', defaultLimit: 0, isEssential: false,
         sortOrder: 0, interval: 'monthly', rolloverType: 'reset', amount: null,
+        ...NEW_BUDGET_DETAIL_DEFAULTS,
       }
       const child: DraftBudget = {
         id: 'tmp-c', parentId: 'tmp-p', name: 'Kind', slug: null, icon: 'Circle',
         description: null, budgetType: 'expense', defaultLimit: 50, isEssential: false,
         sortOrder: 0, interval: 'monthly', rolloverType: 'reset', amount: 50,
+        ...NEW_BUDGET_DETAIL_DEFAULTS,
       }
       const diff = computeBudgetPlanDiff([], [parent, child], [], '2026-04-01')
       assertEqual(diff.to_insert.length, 2, '2 inserts')

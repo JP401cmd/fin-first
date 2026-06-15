@@ -270,6 +270,53 @@ export const CALCULATIONS: Calculation[] = [
     elementIds: ['as-planning'],
   },
   {
+    id: 'benchmark-referentie-peer',
+    title: 'Gemodelleerde referentie-peer (benchmark)',
+    domain: 'Vermogen',
+    summary:
+      'Modelleer een "typische peer" voor de benchmarkrapportage op /rapportages/benchmark: bouw uit cohort-mediane CBS/Nibud/DNB-invoer (vermogen, inkomen, spaarquote, leeftijd × huishoudtype) een synthetische HealthScoreInput en FinancialInput aan en draai die door dezelfde canonieke rekenmotoren als de gebruiker. Geeft referentie-gezondheidsscore en referentie-vrijheidsleeftijd — bewust gemarkeerd als \'modelled\' (niet een gemeten gemiddelde). Eigen-gebruikerscijfers worden nooit herberekend: de rapportage consumeert de DashboardData-bundel.',
+    inputs: [
+      'cohort-mediaan netto vermogen (CBS Vermogen 2024, leeftijdsband × huishoudtype)',
+      'cohort-mediaan besteedbaar inkomen (CBS Besteedbaar inkomen)',
+      'indicatieve spaarquote (Nibud, leeftijdsband)',
+      'midAge (midden van de cohort-leeftijdsband)',
+      'huishoudtype (via getNibudHouseholdType)',
+    ],
+    outputs: [
+      'referentie-gezondheidsscore (0–100)',
+      'referentie-vrijheidsleeftijd (fractioneel, of null)',
+      'referentie-vrijheids-% (consistente grondslag)',
+      'wereld-vermogenspercentiel (UBS Global Wealth Report)',
+      'wereld-inkomenspercentiel (World Inequality Database)',
+    ],
+    formula:
+      'cohort-medianen → synthetische FinancialInput + HealthScoreInput → computeFireProjection (default rendement/SWR/inflatie) + computeHealthScoreFromInputs → ReferencePeerResult; budgetdiscipline- en concentratie-pijler inactief voor de peer (geen budgetdata); noodfonds aanname = 3 maanden.',
+    files: [
+      'lib/benchmark/reference-peer.ts',
+      'lib/benchmark/build-benchmark.ts',
+      'lib/benchmark/nl-reference.ts',
+      'lib/benchmark/global-reference.ts',
+      'lib/benchmark/cohort.ts',
+      'lib/benchmark-report-data.ts',
+      'app/api/report/benchmark/route.ts',
+    ],
+    functions: [
+      'computeReferencePeer',
+      'buildBenchmarkReport',
+      'getCohortReference',
+      'deriveCohort',
+      'wealthTopPercent',
+      'incomeTopPercent',
+    ],
+    constants: [
+      { label: 'Peer noodfonds aanname', value: '3 maanden (PEER_EMERGENCY_FUND_MONTHS; transparant, indicatief)' },
+      { label: 'Bronnen NL-statistieken', value: 'CBS Vermogen 2024, CBS Besteedbaar inkomen, indicatieve Nibud spaarquote + huishoudaanpassing' },
+      { label: 'Bronnen wereld-statistieken', value: 'UBS Global Wealth Report + World Inequality Database (WID)' },
+    ],
+    elementIds: ['as-rapport', 'as-planning', 'as-vermogen'],
+    note: 'Bewust geen cross-user-aggregatie (privacy): de peer is volledig synthetisch, opgebouwd uit publieke NL-statistieken. Gemeten CBS-maten (vermogen, inkomen) zijn tier:"measured"; gemodelleerde uitkomsten (gezondheidsscore, vrijheidsleeftijd) zijn tier:"modelled". Zie ADR 0018.',
+  },
+  {
     id: 'huis-strategie-trigger',
     title: 'Eigen-huis-strategie — "wanneer nodig"-trigger',
     domain: 'Toekomst (FIRE)',
@@ -294,6 +341,29 @@ export const CALCULATIONS: Calculation[] = [
       'runHousingScenarioProjection',
     ],
     elementIds: ['as-planning', 'fn-toekomstplannen', 'as-vermogen'],
+  },
+  {
+    id: 'werk-strategie',
+    title: 'Werk-strategie — loopbaan/inkomenslijn naar FIRE',
+    domain: 'Toekomst (FIRE)',
+    summary:
+      'Vertaalt een loopbaan-/inkomensambitie (reële salarisgroei, plafond, deeltijd-stappen, salarissprongen) naar reële inkomens-DELTA-kasstromen t.o.v. het basisinkomen dat de FIRE-engine al via de spaarquote (annualSavings) meeneemt. Geen dubbeltelling: alléén het netto surplus of deficit boven het huidige netto maandinkomen wordt toegevoegd. Alle delta\'s dragen `onlyWhileWorking:true` — de engine sluit ze uit zodra de werk-stopgrens (werkt=false) is bereikt; salarisgroei lekt zo nooit de onttrekkingsfase in.',
+    inputs: [
+      'life_events (event_type=werk, metadata: WerkMetadata — huidigNettoMaand, reeleGroeiPct, plafondNettoMaand, groeiTotLeeftijd, faseStappen, sprongen)',
+      'huidige leeftijd (target_age van de werk-rij, afgeleid uit geboortedatum)',
+      'netto maandinkomen (basisinkomen = huidigNettoMaand; bron: spaarquote-grondslag)',
+    ],
+    outputs: ['SimCashflow[] reële inkomens-delta\'s (indexed:true, onlyWhileWorking:true)'],
+    formula:
+      'salaryAt(age) = base × Π(1+groei, tot plafond) + Σ(sprongen ≤ age) × deeltijdFactor(age); delta = salaryAt(sampleAge) − huidigNettoMaand; cashflow = delta × 12 (jaar); aangrenzende segmenten met dezelfde delta worden samengevoegd; delta=0-segmenten weggelaten.',
+    files: ['lib/werk-strategie.ts', 'lib/fire-simulation.ts'],
+    functions: ['werkMetadataToCashflows', 'salaryAt', 'lifeEventsToCashflows'],
+    constants: [
+      { label: 'GROWTH_STEP_YEARS', value: '5 — samplecadans (jaren) voor de gladde groeicurve tussen structurele grenzen' },
+      { label: 'WERK_HORIZON_CAP', value: '71 — maximale leeftijd waartoe segmenten worden gegenereerd (onlyWhileWorking kapt eerder af)' },
+    ],
+    elementIds: ['as-planning', 'fn-toekomstplannen'],
+    note: 'Geen dubbeltelling basisinkomen: de engine telt annualSavings (spaarquote × basisinkomen) altijd mee; werk-strategie draagt uitsluitend de delta daarboven. onlyWhileWorking-gating zorgt dat salarisgroei stopt op dezelfde werk-stopgrens als het basissalaris — beide routes volgen dezelfde `werkt`-vlag in lib/horizon-engine/engine.ts.',
   },
 ]
 

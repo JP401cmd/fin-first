@@ -1,245 +1,473 @@
 'use client'
 
 /**
- * ToekomstOverlay — toggle-bare editorial ballonnen-laag over de FIRE-grafiek.
+ * ToekomstOverlay — "Tips-modus" rond de FIRE-grafiek.
  *
- * Doel: een leek wijzen op de plekken waar hij de prognose kan aanscherpen,
- * zónder een zware modal. Transparante laag bovenop de grafiek met een aantal
- * editorial speech-balloons die NAAR een aanpassing wijzen (pointer/tail).
- * Elke ballon opent een BESTAANDE in-page editor (geen navigatie, behalve waar
- * dat triviaal is) zodat de grafiek live meebeweegt.
+ * Wikkelt de grafiek. Zolang de tips AAN staan:
+ *   • verschijnt er een rij gelabelde markers BOVEN en een rij ONDER de grafiek
+ *     (icoon + titel), buiten het tekengebied — ze staan dus nooit over de lijn;
+ *   • vervaagt de grafiek zelf (blur) zodat de markers de aandacht trekken.
+ * De rijen worden alleen TOEGEVOEGD als de tips aan staan; de grafiek behoudt
+ * zijn volledige hoogte (geen krimp). Tips uit → scherpe, interactieve grafiek
+ * zonder markers.
  *
- * Geen eigen rekenlogica — puur presentatie + callbacks naar de parent
- * (horizon-client). De parent geeft `onHover(emphasis)` mee zodat een ballon de
- * relevante grafiekfase kan accentueren via `SimChart.emphasis`.
+ * Elke marker opent op hover (desktop) of tik (mobiel) de volledige ballon als
+ * popover (kicker + uitleg + CTA naar een bestaande in-page editor). Geen eigen
+ * rekenlogica — `onEmphasisChange` laat de parent de relevante grafiekfase
+ * accentueren via `SimChart.emphasis`.
  *
  * Module-accent: Toekomst = horizon/paars via `--module-active-*`.
  */
 
-import type { ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import { createPortal } from 'react-dom'
 import {
   Wallet,
   TrendingDown,
+  TrendingUp,
   Landmark,
+  Umbrella,
   Flag,
   ArrowDownWideNarrow,
   Home,
   CalendarPlus,
+  PiggyBank,
+  CreditCard,
   X,
 } from 'lucide-react'
+import { useMediaQuery } from '@/lib/hooks/use-media-query'
 
-/** Welke grafiekfase een ballon accentueert bij hover/focus. */
+/** Welke grafiekfase een ballon accentueert bij openen. */
 type OverlayEmphasis = 'accumulation' | 'withdrawal' | 'fire' | null
 
-/** Verticale rij + horizontale uitlijning. */
-type BalloonAnchor = {
-  /** Verticale plek in de overlay (top / hoger-midden / lager-midden / onder). */
-  row: 'top' | 'mid-high' | 'mid-low' | 'bottom'
-  /** Horizontale uitlijning — bepaalt de kant van de pointer-tail. */
-  side: 'left' | 'right'
-}
+/** In welke rij (boven of onder de grafiek) de marker staat. */
+type BalloonRow = 'top' | 'bottom'
 
 export interface OverlayBalloonDef {
   id: string
   icon: ReactNode
-  /** Korte editorial kop (mono kicker). */
+  /** Korte editorial kop (mono) — dient óók als zichtbaar marker-label. */
   kicker: string
   /** Eén zin uitleg — leek-taal, vrijheidstijd-framing waar passend. */
   body: string
   /** CTA-label op de knop. */
   cta: string
-  anchor: BalloonAnchor
-  /** Grafiekfase die deze ballon accentueert bij hover/focus. */
+  /** Rij: 'top' (boven de grafiek) of 'bottom' (onder de grafiek). */
+  row: BalloonRow
+  /** Grafiekfase die deze ballon accentueert bij openen. */
   emphasis: OverlayEmphasis
   /** Opent de bijbehorende in-page editor. */
   onActivate: () => void
 }
 
 export interface ToekomstOverlayProps {
-  /** Of de overlay zichtbaar is (toggle in de header). */
+  /** Of de tips-modus aan staat (toggle in de header). */
   visible: boolean
   /** Ballon-definities (door horizon-client samengesteld + gewired). */
   balloons: OverlayBalloonDef[]
   /** Accentueer de gegeven grafiekfase (of reset met null). */
   onEmphasisChange: (emphasis: OverlayEmphasis) => void
-  /** Sluit de overlay (toggle uit). */
+  /** De grafiek zelf — staat in de overlay gecentreerd op een witte kaart. */
+  children: ReactNode
+  /** Sluit de tips-overlay (zet de "Tips"-toggle uit). */
   onClose: () => void
 }
 
-const ROW_CLASS: Record<BalloonAnchor['row'], string> = {
-  top: 'top-3 sm:top-4',
-  'mid-high': 'top-[34%] -translate-y-1/2',
-  'mid-low': 'top-[64%] -translate-y-1/2',
-  bottom: 'bottom-3 sm:bottom-4',
-}
-
-/**
- * Bouw de ballon-definities. Geëxporteerd zodat horizon-client de set kan
- * samenstellen met zijn eigen editor-openers, en de volgorde/teksten op één
- * plek staan.
- */
 export function ToekomstOverlay({
   visible,
   balloons,
   onEmphasisChange,
+  children,
   onClose,
 }: ToekomstOverlayProps) {
-  if (!visible) return null
+  // Apparaten met echte hover (desktop) openen de popover bij hover; touch
+  // gebruikt tik-om-te-openen + tik-naast/✕ om te sluiten.
+  const canHover = useMediaQuery('(hover: hover)')
+  // Portal-mount voor het ✕ (document bestaat niet tijdens SSR).
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  // De échte scroll-container (`ChatLayoutWrapper`, `[data-scroll-container]`,
+  // `contain: layout`). De blur-scrim moet een DIRECTE child hiervan zijn — niet
+  // genest in de z-[50]-grafiek-wrapper — anders sampelt `backdrop-filter` alleen
+  // binnen die wrapper en blijft de rest van de pagina scherp.
+  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setScrollContainer(
+      (wrapperRef.current?.closest('[data-scroll-container]') as HTMLElement | null) ??
+        document.body,
+    )
+  }, [])
+  const [openId, setOpenId] = useState<string | null>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current)
+      closeTimer.current = null
+    }
+  }, [])
+
+  const open = useCallback(
+    (def: OverlayBalloonDef) => {
+      clearCloseTimer()
+      setOpenId(def.id)
+      onEmphasisChange(def.emphasis)
+    },
+    [clearCloseTimer, onEmphasisChange],
+  )
+
+  const close = useCallback(() => {
+    clearCloseTimer()
+    setOpenId(null)
+    onEmphasisChange(null)
+  }, [clearCloseTimer, onEmphasisChange])
+
+  // Hover-uit met korte vertraging zodat de muis van marker naar popover kan
+  // bewegen zonder dat 'ie tussendoor dichtklapt.
+  const scheduleClose = useCallback(() => {
+    clearCloseTimer()
+    closeTimer.current = setTimeout(() => {
+      setOpenId(null)
+      onEmphasisChange(null)
+    }, 140)
+  }, [clearCloseTimer, onEmphasisChange])
+
+  // Reset wanneer de tips uitgaan of de component unmount.
+  useEffect(() => {
+    if (!visible) close()
+    return clearCloseTimer
+  }, [visible, close, clearCloseTimer])
+
+  // Escape: eerst een open popover sluiten, anders de hele tips-overlay.
+  useEffect(() => {
+    if (!visible) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (openId) close()
+      else onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [visible, openId, close, onClose])
+
+  // Scroll-lock: zolang de tips aan staan kan de pagina NIET scrollen — zo blijft
+  // de grafiek in beeld en kan de blur niet "weggescrold" worden. We vergrendelen
+  // html + body én elke scrollbare voorouder (op mobiel scrollt een
+  // `<main overflow-y-auto>`, niet de body).
+  useEffect(() => {
+    if (!visible) return
+    // 1. Centreer de grafiek verticaal in beeld VOORDAT we de scroll vergrendelen,
+    //    zodat bij het aanzetten van de tips de juiste info middenin staat.
+    //    (defensief: scrollIntoView bestaat niet in elke omgeving, bv. jsdom.)
+    const el = wrapperRef.current
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'center', behavior: 'auto' })
+    }
+    // 2. Scroll-lock zodat de pagina NIET kan scrollen en de blur niet weg te
+    //    scrollen is.
+    const restores: Array<() => void> = []
+    const lock = (el: HTMLElement | null | undefined) => {
+      if (!el) return
+      const prev = el.style.overflow
+      el.style.overflow = 'hidden'
+      restores.push(() => {
+        el.style.overflow = prev
+      })
+    }
+    lock(document.documentElement)
+    lock(document.body)
+    let node = wrapperRef.current?.parentElement ?? null
+    while (node) {
+      const oy = getComputedStyle(node).overflowY
+      if (oy === 'auto' || oy === 'scroll') lock(node)
+      node = node.parentElement
+    }
+    return () => restores.forEach((fn) => fn())
+  }, [visible])
+
+  const topBalloons = balloons.filter((b) => b.row === 'top')
+  const bottomBalloons = balloons.filter((b) => b.row === 'bottom')
+
+  const rowProps = {
+    canHover,
+    openId,
+    onOpen: open,
+    onScheduleClose: scheduleClose,
+    onCloseNow: close,
+  }
 
   return (
-    /* role="region" zodat screenreaders dit blok kunnen vinden via landmark-navigatie. */
-    <div
-      role="region"
-      className="pointer-events-none absolute inset-0 z-20"
-      aria-label="Aanscherp-tips over de grafiek"
-    >
-      {/* Sluit-knop rechtsboven — pointer-events terug aan op de knop zelf. */}
-      <button
-        type="button"
-        onClick={onClose}
-        className="pointer-events-auto absolute right-2 top-2 z-30 inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)]/90 text-[var(--ink-3)] backdrop-blur-sm transition-colors hover:text-[var(--ink)]"
-        aria-label="Tips verbergen"
-        title="Tips verbergen"
-      >
-        <X className="h-3.5 w-3.5" aria-hidden />
-      </button>
+    // Tips UIT → grafiek gewoon in-flow. Tips AAN → spotlight: de grafiek blijft op
+    // EXACT dezelfde plek (in-flow, z-[50] erboven), de pagina is scroll-locked en de
+    // rest vervaagt via een scrim; de markers staan in een rij boven + onder. De
+    // grafiek (`children`) staat in beide gevallen op dezelfde plek in de React-tree
+    // zodat 'ie niet re-mount/re-animeert.
+    <div ref={wrapperRef} className={visible ? 'relative z-[50]' : 'relative'}>
+      {/* Blur-scrim als DIRECTE child van de scroll-container (niet genest in de
+          z-[50]-grafiek-wrapper) zodat `backdrop-filter` de HÉLE pagina vervaagt.
+          z-[45] → onder de grafiek + markers (z-[50]) maar boven de rest. Klik sluit. */}
+      {visible &&
+        scrollContainer &&
+        createPortal(
+          <button
+            type="button"
+            aria-label="Tips sluiten"
+            onClick={onClose}
+            className="absolute inset-0 z-[45] cursor-default bg-[var(--ink)]/15 backdrop-blur-md"
+          />,
+          scrollContainer,
+        )}
 
-      {/* Desktop: zwevende ballonnen over de grafiek heen (hidden op sm en smaller). */}
-      <div className="hidden sm:block">
-        {balloons.map((b) => (
-          <OverlayBalloon
-            key={b.id}
-            def={b}
-            onEmphasisChange={onEmphasisChange}
-          />
-        ))}
-      </div>
+      {/* ✕ — via portal naar <body> zodat 'ie écht rechtsboven in het SCHERM staat en
+          klikbaar is. De shell zet `contain: layout`; een gewone position:fixed zou
+          anders t.o.v. de content-container i.p.v. de viewport staan (en buiten beeld
+          scrollen). */}
+      {visible &&
+        mounted &&
+        createPortal(
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Tips sluiten"
+            className="pointer-events-auto fixed right-3 z-[250] inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] shadow-lg transition-colors hover:text-[var(--ink)]"
+            style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}
+          >
+            <X className="h-5 w-5" aria-hidden />
+          </button>,
+          document.body,
+        )}
 
-      {/* Mobile: compacte gestapelde lijst onder de grafiek (<sm).
-          Geen chart-ankering of staarten — simpele tappable rijen.
-          Onderaan ruimte voor de zwevende mobiele nav via --mobile-nav-clearance. */}
+      {/* Bovenste rij — alleen als de tips aan staan. */}
+      {visible && topBalloons.length > 0 && (
+        <MarkerRow position="top" balloons={topBalloons} {...rowProps} />
+      )}
+
+      {/* Witte kaart achter de grafiek (alleen in tips-modus) zodat de vervaagde
+          pagina niet door de grafiek heen schijnt. De grafiek blijft op z'n plek. */}
       <div
-        className="pointer-events-auto sm:hidden"
-        style={{ paddingBottom: 'var(--mobile-nav-clearance, 5rem)' }}
+        className={
+          visible
+            ? 'overflow-hidden rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl'
+            : ''
+        }
       >
-        <MobileTipList balloons={balloons} />
+        {children}
       </div>
+
+      {/* Onderste rij — alleen als de tips aan staan. */}
+      {visible && bottomBalloons.length > 0 && (
+        <MarkerRow position="bottom" balloons={bottomBalloons} {...rowProps} />
+      )}
     </div>
   )
 }
 
-function OverlayBalloon({
-  def,
-  onEmphasisChange,
+function MarkerRow({
+  position,
+  balloons,
+  canHover,
+  openId,
+  onOpen,
+  onScheduleClose,
+  onCloseNow,
 }: {
-  def: OverlayBalloonDef
-  onEmphasisChange: (emphasis: OverlayEmphasis) => void
+  position: BalloonRow
+  balloons: OverlayBalloonDef[]
+  canHover: boolean
+  openId: string | null
+  onOpen: (def: OverlayBalloonDef) => void
+  onScheduleClose: () => void
+  onCloseNow: () => void
 }) {
-  const sideClass = def.anchor.side === 'left' ? 'left-3 sm:left-5' : 'right-3 sm:right-5'
-  // Tail aan de onderkant, naar de grafiek toe; horizontaal aan de ballon-kant.
-  const tailSide = def.anchor.side === 'left' ? 'left-5' : 'right-5'
-
   return (
     <div
-      className={`pointer-events-auto absolute ${ROW_CLASS[def.anchor.row]} ${sideClass} w-[min(15rem,calc(100vw-2.5rem))]`}
-      onMouseEnter={() => onEmphasisChange(def.emphasis)}
-      onMouseLeave={() => onEmphasisChange(null)}
-      onFocus={() => onEmphasisChange(def.emphasis)}
-      onBlur={() => onEmphasisChange(null)}
-    >
-      <div
-        className="relative bg-[var(--paper)]/95 p-3 text-sm leading-snug text-[var(--ink-2)] shadow-md backdrop-blur-sm"
-        style={{
-          fontFamily: 'var(--font-source-serif, Georgia, serif)',
-          border: '1px solid var(--ink)',
-          borderLeftWidth: '4px',
-          borderLeftColor: 'var(--module-active-500)',
-        }}
-      >
-        {/* Kicker: 10px mono uppercase — gebruik -800 voor WCAG AA contrast op lichte achtergrond. */}
-        <div className="mb-1.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--module-active-800)]">
-          <span aria-hidden className="inline-flex">
-            {def.icon}
-          </span>
-          {def.kicker}
-        </div>
-        <p className="italic">{def.body}</p>
-        {/* CTA-knop: tekst op -700 is 12px normaal gewicht — AA-grens ligt hier lager dan 10px kicker. */}
-        <button
-          type="button"
-          onClick={def.onActivate}
-          className="mt-2.5 inline-flex min-h-[36px] items-center gap-1 rounded-[var(--r-sm)] border border-[var(--module-active-300)] bg-[var(--module-active-50)] px-2.5 py-1 font-sans text-[12px] font-medium not-italic text-[var(--module-active-800)] transition-colors hover:bg-[var(--module-active-100)]"
-        >
-          {def.cta}
-        </button>
-
-        {/* Pointer/tail naar de grafiek — kleine driehoek onder de ballon.
-            Positie: -bottom-[6px] zodat de bovenste helft van het vierkant
-            de kaart-rand overlapt en de onderste helft als driehoek uitsteekt.
-            De kaartrand (1px solid ink) valt hierdoor niet dubbel met de
-            tail-rand. box-shadow als border voorkomt dat de niet-zichtbare
-            kanten van het rotated vierkant de kaartrand doubleren. */}
-        <span
-          aria-hidden
-          className={`absolute -bottom-[6px] ${tailSide} h-3 w-3 rotate-45 bg-[var(--paper)]`}
-          style={{
-            boxShadow: '1px 1px 0 0 var(--ink)',
-          }}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ── Mobile-only gestapelde tippenlijst ─────────────────────────────────────
-// Dezelfde balloon-definities als de desktop-laag, maar zonder
-// chart-ankering of staarten. Tappable rijen met icon + kicker + body + CTA.
-function MobileTipList({ balloons }: { balloons: OverlayBalloonDef[] }) {
-  if (balloons.length === 0) return null
-
-  return (
-    <div
-      className="mt-3 flex flex-col gap-2 px-3"
-      aria-label="Aanscherp-tips"
+      className={`relative z-10 flex flex-wrap items-center justify-center gap-2 px-3 ${
+        position === 'top' ? 'pb-3' : 'pt-3'
+      }`}
     >
       {balloons.map((b) => (
-        <button
+        <MarkerWithPopover
           key={b.id}
-          type="button"
-          onClick={b.onActivate}
-          className="flex w-full items-start gap-3 border border-[var(--border-ed)] bg-[var(--paper)]/95 p-3 text-left transition-colors hover:bg-[var(--paper)] active:bg-[var(--subtle)]"
-          style={{ borderLeftWidth: '3px', borderLeftColor: 'var(--module-active-500)' }}
-          aria-label={`${b.kicker} — ${b.cta}`}
-        >
-          <span aria-hidden className="mt-0.5 flex-shrink-0 text-[var(--module-active-600)]">
-            {b.icon}
-          </span>
-          <span className="min-w-0 flex-1">
-            {/* Kicker: 10px mono uppercase — -800 voor WCAG AA contrast. */}
-            <span className="block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--module-active-800)]">
-              {b.kicker}
-            </span>
-            <span
-              className="mt-0.5 block text-[13px] italic leading-snug text-[var(--ink-2)]"
-              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-            >
-              {b.body}
-            </span>
-            <span className="mt-1.5 block text-[12px] font-medium text-[var(--module-active-800)] underline-offset-2 hover:underline">
-              {b.cta} →
-            </span>
-          </span>
-        </button>
+          def={b}
+          position={position}
+          isOpen={openId === b.id}
+          dimmed={openId != null && openId !== b.id}
+          canHover={canHover}
+          onOpen={() => onOpen(b)}
+          onScheduleClose={onScheduleClose}
+          onCloseNow={onCloseNow}
+        />
       ))}
     </div>
   )
 }
 
+function MarkerWithPopover({
+  def,
+  position,
+  isOpen,
+  dimmed,
+  canHover,
+  onOpen,
+  onScheduleClose,
+  onCloseNow,
+}: {
+  def: OverlayBalloonDef
+  position: BalloonRow
+  isOpen: boolean
+  dimmed: boolean
+  canHover: boolean
+  onOpen: () => void
+  onScheduleClose: () => void
+  onCloseNow: () => void
+}) {
+  const popoverId = useId()
+  const popRef = useRef<HTMLDivElement>(null)
+  // Horizontale verschuiving zodat de popover niet van het scherm valt (mobiel);
+  // de pijl blijft op de marker staan, alleen het kaartje schuift mee in beeld.
+  const [shiftX, setShiftX] = useState(0)
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setShiftX(0)
+      return
+    }
+    const el = popRef.current
+    if (!el) return
+    // Meet de natuurlijke (gecentreerde) positie, bepaal dan de clamp.
+    el.style.transform = 'translateX(-50%)'
+    const rect = el.getBoundingClientRect()
+    const margin = 8
+    let shift = 0
+    if (rect.left < margin) shift = margin - rect.left
+    else if (rect.right > window.innerWidth - margin) shift = window.innerWidth - margin - rect.right
+    setShiftX(shift)
+  }, [isOpen])
+
+  // Bovenste rij opent omlaag (over de grafiek), onderste rij omhoog. De
+  // `-translate-x-1/2` zit in de inline-style (samen met de clamp-shift).
+  const popoverPos = position === 'top' ? 'top-full mt-2 left-1/2' : 'bottom-full mb-2 left-1/2'
+  const tailPos =
+    position === 'top'
+      ? '-top-[5px] left-1/2 -translate-x-1/2'
+      : '-bottom-[5px] left-1/2 -translate-x-1/2'
+  const tailShadow = position === 'top' ? '-1px -1px 0 0 var(--ink)' : '1px 1px 0 0 var(--ink)'
+
+  // Hover (alleen hover-apparaten) + focus (toetsenbord) op de WRAPPER zodat
+  // focus van marker → CTA in de popover binnen dezelfde subtree blijft.
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => {
+        if (canHover) onOpen()
+      }}
+      onMouseLeave={() => {
+        if (canHover) onScheduleClose()
+      }}
+      onFocus={onOpen}
+      onBlur={onScheduleClose}
+    >
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={popoverId}
+        aria-label={`Tip: ${def.kicker}`}
+        onClick={() => {
+          // Op hover-apparaten doet hover/focus het werk; op touch togglet de klik.
+          if (canHover) return
+          if (isOpen) onCloseNow()
+          else onOpen()
+        }}
+        className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full border bg-[var(--paper)]/90 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] shadow-sm backdrop-blur-sm transition sm:min-h-[34px] sm:px-2.5 ${
+          dimmed ? 'opacity-40' : 'opacity-100'
+        }`}
+        style={{
+          borderColor: isOpen ? 'var(--module-active-500)' : 'var(--module-active-300)',
+          color: 'var(--module-active-800)',
+          boxShadow: isOpen ? '0 0 0 1px var(--module-active-400)' : undefined,
+        }}
+      >
+        <span aria-hidden className="inline-flex text-[var(--module-active-600)]">
+          {def.icon}
+        </span>
+        <span className="whitespace-nowrap">{def.kicker}</span>
+      </button>
+
+      {isOpen && (
+        <div
+          ref={popRef}
+          id={popoverId}
+          role="group"
+          aria-label={def.kicker}
+          className={`absolute z-20 w-[min(15rem,calc(100vw-2.5rem))] ${popoverPos}`}
+          style={{ transform: `translateX(calc(-50% + ${shiftX}px))` }}
+        >
+          <div
+            className="relative bg-[var(--paper)]/97 p-3 text-sm leading-snug text-[var(--ink-2)] shadow-md backdrop-blur-sm motion-safe:animate-sheet-enter"
+            style={{
+              fontFamily: 'var(--font-source-serif, Georgia, serif)',
+              border: '1px solid var(--ink)',
+              borderLeftWidth: '4px',
+              borderLeftColor: 'var(--module-active-500)',
+            }}
+          >
+            <div className="mb-1.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--module-active-800)]">
+              <span aria-hidden className="inline-flex">
+                {def.icon}
+              </span>
+              {def.kicker}
+            </div>
+            <p className="italic">{def.body}</p>
+            <button
+              type="button"
+              onClick={def.onActivate}
+              className="mt-2.5 inline-flex min-h-[36px] items-center gap-1 rounded-[var(--r-sm)] border border-[var(--module-active-300)] bg-[var(--module-active-50)] px-2.5 py-1 font-sans text-[12px] font-medium not-italic text-[var(--module-active-800)] transition-colors hover:bg-[var(--module-active-100)]"
+            >
+              {def.cta}
+            </button>
+
+            {/* Sluit-knopje — vooral handig op touch (geen hover-uit). */}
+            {!canHover && (
+              <button
+                type="button"
+                onClick={onCloseNow}
+                aria-label="Tip sluiten"
+                className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            )}
+
+            {/* Pijltje naar de marker. */}
+            <span
+              aria-hidden
+              className={`absolute h-2.5 w-2.5 rotate-45 bg-[var(--paper)] ${tailPos}`}
+              style={{ boxShadow: tailShadow }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Iconen voor de standaard-ballonset ─────────────────────────────────────
-// Geëxporteerd zodat horizon-client dezelfde iconen kan hergebruiken bij het
+// Geëxporteerd zodat horizon-client dezelfde iconen hergebruikt bij het
 // samenstellen van de ballon-definities (één bron, geen drift).
 export const OVERLAY_ICONS = {
   income: <Wallet className="h-3.5 w-3.5" />,
+  incomeStrategy: <TrendingUp className="h-3.5 w-3.5" />,
+  aow: <Umbrella className="h-3.5 w-3.5" />,
+  assets: <PiggyBank className="h-3.5 w-3.5" />,
+  debts: <CreditCard className="h-3.5 w-3.5" />,
   expenses: <TrendingDown className="h-3.5 w-3.5" />,
   pension: <Landmark className="h-3.5 w-3.5" />,
   end: <Flag className="h-3.5 w-3.5" />,
