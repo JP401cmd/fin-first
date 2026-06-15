@@ -4,10 +4,9 @@ import { BodyFigure } from './body-figure'
 import type { BenchmarkMetric } from '@/lib/benchmark-report-data'
 
 /**
- * Regressie: de getekende torso MOET meebewegen met het gezondheidscijfer.
+ * Regressie: de lichaams-lijntekening MOET meebewegen met het gezondheidscijfer.
  * We renderen het lichaam bij verschillende scores en controleren dat elke band
- * een herkenbaar eigen silhouet oplevert (band-specifieke paden) en dat de vier
- * banden onderling verschillen.
+ * de juiste PNG-`href` rendert en dat de vier banden onderling verschillen.
  */
 function render(score: number | null): string {
   const metrics: BenchmarkMetric[] = [
@@ -19,14 +18,14 @@ function render(score: number | null): string {
   )
 }
 
-// Band-specifieke handtekening-paden uit body-figure.tsx.
-const LOW = 'M246 414'                     // buikplooi (zwaar/rond)
-const MID = 'M260 406'                     // zachte buik (gemiddeld)
-const FIT = 'M180 268 Q192 342 220 396'    // lats V-taper (atletisch)
-const PEAK = 'Q244 432 300 474'            // V-cut (gespierd)
+// Band-specifieke PNG-handtekeningen uit body-figure.tsx (BODY_SRC).
+const LOW = 'body-low.png'    // zwaar/rond
+const MID = 'body-mid.png'    // gemiddeld
+const FIT = 'body-fit.png'    // atletisch
+const PEAK = 'body-peak.png'  // gespierd
 
-describe('BodyFigure — torso volgt het gezondheidscijfer', () => {
-  it('elke band rendert een herkenbaar eigen lichaam, en de vier verschillen', () => {
+describe('BodyFigure — lichaam volgt het gezondheidscijfer', () => {
+  it('elke band rendert de juiste PNG-href, en de vier verschillen', () => {
     const low = render(30), mid = render(50), fit = render(70), peak = render(98)
     expect(low).toContain(LOW)
     expect(mid).toContain(MID)
