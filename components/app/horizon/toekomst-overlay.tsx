@@ -106,6 +106,22 @@ export function ToekomstOverlay({
         document.body,
     )
   }, [])
+  // Volledige inhoudshoogte van de scroll-container. De scrim is een child van die
+  // container (moet dáár blijven: de shell-wrapper is `position: fixed` → eigen
+  // stacking-context, dus een body-scrim zou ÓVER de grafiek vallen). Binnen de
+  // container is positionering relatief aan de (gescrolde) inhoud, niet de viewport
+  // — een `inset-0`/`fixed` scrim is daardoor maar één viewport hoog en hangt aan de
+  // inhoud-oorsprong. Bij scrollTop > 0 (we centreren de grafiek bij openen) dekt 'ie
+  // dan alleen de bovenste strook en lijkt de blur "te hoog". Door 'm de VOLLE
+  // scrollHeight te geven dekt 'ie alle inhoud, ongeacht de scrollpositie.
+  const [scrimHeight, setScrimHeight] = useState<number | null>(null)
+  useEffect(() => {
+    if (!visible || !scrollContainer) return
+    const measure = () => setScrimHeight(scrollContainer.scrollHeight)
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [visible, scrollContainer])
   const [openId, setOpenId] = useState<string | null>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -214,7 +230,12 @@ export function ToekomstOverlay({
     <div ref={wrapperRef} className={visible ? 'relative z-[50]' : 'relative'}>
       {/* Blur-scrim als DIRECTE child van de scroll-container (niet genest in de
           z-[50]-grafiek-wrapper) zodat `backdrop-filter` de HÉLE pagina vervaagt.
-          z-[45] → onder de grafiek + markers (z-[50]) maar boven de rest. Klik sluit. */}
+          z-[45] → onder de grafiek + markers (z-[50]) maar boven de rest. Klik sluit.
+          `top-0` + expliciete `height` = de VOLLE inhoudshoogte van de container: een
+          `inset-0`-scrim is maar één viewport hoog en hangt aan de inhoud-oorsprong,
+          dus bij scrollTop > 0 (de grafiek wordt gecentreerd) dekt 'ie alleen de
+          bovenkant en lijkt de blur "te hoog". De volle scrollHeight dekt alle inhoud,
+          ongeacht de scrollpositie. */}
       {visible &&
         scrollContainer &&
         createPortal(
@@ -222,7 +243,8 @@ export function ToekomstOverlay({
             type="button"
             aria-label="Tips sluiten"
             onClick={onClose}
-            className="absolute inset-0 z-[45] cursor-default bg-[var(--ink)]/15 backdrop-blur-md"
+            className="absolute left-0 right-0 top-0 z-[45] cursor-default bg-[var(--ink)]/15 backdrop-blur-md"
+            style={{ height: scrimHeight ?? '100%' }}
           />,
           scrollContainer,
         )}
