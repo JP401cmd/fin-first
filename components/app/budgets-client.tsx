@@ -2098,6 +2098,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
           <button
             onClick={() => toggleViewMode('tree')}
+            aria-label="Boom"
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'tree'
                 ? 'bg-zinc-900 text-white'
@@ -2105,10 +2106,11 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
             }`}
           >
             <GitFork className="h-3.5 w-3.5" />
-            Boom
+            <span className="hidden sm:inline">Boom</span>
           </button>
           <button
             onClick={() => toggleViewMode('donut')}
+            aria-label="Ring"
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'donut'
                 ? 'bg-zinc-900 text-white'
@@ -2116,10 +2118,11 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
             }`}
           >
             <CircleDot className="h-3.5 w-3.5" />
-            Ring
+            <span className="hidden sm:inline">Ring</span>
           </button>
           <button
             onClick={() => toggleViewMode('heatmap')}
+            aria-label="Heatmap"
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === 'heatmap'
                 ? 'bg-zinc-900 text-white'
@@ -2127,7 +2130,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
             }`}
           >
             <LayoutGrid className="h-3.5 w-3.5" />
-            Heatmap
+            <span className="hidden sm:inline">Heatmap</span>
           </button>
         </div>
 
