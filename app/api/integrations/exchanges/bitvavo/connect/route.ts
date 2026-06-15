@@ -74,7 +74,30 @@ export async function POST(request: NextRequest) {
     }, { status: 400 })
   }
 
-  const apiKeyHash = blindIndex(apiKey)
+  // Versleutelen kan falen als de server-side encryptie-sleutel ontbreekt of
+  // misgeconfigureerd is. Vang dat af met een NETTE JSON-fout — een onafgevangen
+  // throw geeft anders een 500 zonder JSON-body, die de client verkeerd als
+  // "Netwerkfout" toont. Geen detail/credentials loggen of teruggeven.
+  let apiKeyHash: string
+  let apiKeyEncrypted: string | null
+  let apiSecretEncrypted: string | null
+  try {
+    apiKeyHash = blindIndex(apiKey)
+    apiKeyEncrypted = encryptField(apiKey)
+    apiSecretEncrypted = encryptField(apiSecret)
+  } catch {
+    // Bewust alléén een message loggen (nooit het error-object of de credentials)
+    // zodat on-call "encryptie-sleutel kapot" kan onderscheiden van een
+    // gebruikersfout, zonder een secret-in-logs-lek.
+    console.error('[bitvavo/connect] encryption failed')
+    return NextResponse.json({ error: 'Kon de koppeling niet beveiligen. Probeer het later opnieuw.' }, { status: 500 })
+  }
+  // Tripwire: encryptField geeft voor niet-lege input nooit null, maar maak de
+  // write-kant net zo defensief als de read-kant (sync/route.ts) — en dit narrow't
+  // het type terug naar string voor de insert.
+  if (!apiKeyEncrypted || !apiSecretEncrypted) {
+    return NextResponse.json({ error: 'Kon de koppeling niet beveiligen. Probeer het later opnieuw.' }, { status: 500 })
+  }
   const last4 = apiKey.slice(-4)
 
   const { data: inserted, error } = await supabase
@@ -82,8 +105,8 @@ export async function POST(request: NextRequest) {
     .insert({
       user_id: user.id,
       exchange: 'bitvavo',
-      api_key_encrypted: encryptField(apiKey),
-      api_secret_encrypted: encryptField(apiSecret),
+      api_key_encrypted: apiKeyEncrypted,
+      api_secret_encrypted: apiSecretEncrypted,
       api_key_hash: apiKeyHash,
       api_key_last4: last4,
       label,

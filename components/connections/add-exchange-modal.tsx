@@ -215,9 +215,13 @@ export function AddExchangeModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: apiKey.trim(), apiSecret: apiSecret.trim() }),
       })
-      const json = await res.json()
+      // Guard: een 5xx van de infra (timeout/proxy) kan een niet-JSON body geven.
+      const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) {
-        setTestState({ kind: 'error', message: typeof json?.error === 'string' ? json.error : 'Validatie mislukt.' })
+        setTestState({
+          kind: 'error',
+          message: typeof json?.error === 'string' ? json.error : `Validatie mislukt (status ${res.status}).`,
+        })
         return
       }
       setTestState({ kind: 'ok' })
@@ -229,6 +233,10 @@ export function AddExchangeModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitError(null)
+    // Het groene "Verbinding werkt"-bericht hoort bij de Test-actie. Zodra je
+    // Koppelt is het submit-resultaat de enige relevante status — anders staan
+    // groen "werkt" + een rood foutbericht tegelijk in beeld (verwarrend).
+    setTestState({ kind: 'idle' })
     if (apiKey.trim().length < 16) {
       setSubmitError('API-key is te kort. Controleer of je de volledige key hebt geplakt.')
       return
@@ -249,9 +257,11 @@ export function AddExchangeModal({
           linkedAssetId,
         }),
       })
-      const json = await res.json()
+      // Guard: een 5xx van de infra (timeout/proxy) kan een niet-JSON body geven —
+      // toon dan de status i.p.v. 'm verkeerd als "Netwerkfout" te labelen.
+      const json = await res.json().catch(() => null)
       if (!res.ok) {
-        setSubmitError(typeof json?.error === 'string' ? json.error : 'Koppelen mislukt.')
+        setSubmitError(typeof json?.error === 'string' ? json.error : `Koppelen mislukt (status ${res.status}).`)
         setSubmitting(false)
         return
       }
