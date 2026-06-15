@@ -24,7 +24,12 @@ export function Header() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    supabase.auth
+      .getUser()
+      .then(({ data }) => setUser(data.user))
+      // Transiente netwerkfout niet als unhandled rejection laten doorlekken;
+      // onAuthStateChange hieronder corrigeert de user-state alsnog.
+      .catch(() => {})
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => setUser(session?.user ?? null)
     )

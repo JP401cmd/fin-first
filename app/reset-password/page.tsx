@@ -16,9 +16,14 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(Boolean(session))
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setHasSession(Boolean(session))
+      })
+      // Transiente netwerkfout: behandel als "geen sessie" (veilige fallback —
+      // gebruiker kan een nieuwe reset-link aanvragen) i.p.v. unhandled reject.
+      .catch(() => setHasSession(false))
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {

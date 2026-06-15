@@ -427,9 +427,15 @@ export function CashAccountView({
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setCurrentUserId(user.id)
-    })
+    supabase.auth
+      .getUser()
+      .then(({ data: { user } }) => {
+        if (user) setCurrentUserId(user.id)
+      })
+      // Best-effort: een transiente netwerkfout op de auth-check (slaapstand/
+      // wake, korte offline) mag geen unhandled rejection worden. currentUserId
+      // blijft null en lost zich op via onAuthStateChange / volgende interactie.
+      .catch(() => {})
   }, [])
 
   // Load budgeting_active flag once on mount. Treat missing/error as `true`

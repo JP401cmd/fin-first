@@ -892,9 +892,14 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
-      setCurrentUserId(data.user?.id ?? null)
-    })
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        setCurrentUserId(data.user?.id ?? null)
+      })
+      // Best-effort: transiente netwerkfout op de auth-check niet laten
+      // doorlekken als unhandled rejection (zie cash-account-view).
+      .catch(() => {})
   }, [])
 
   // All-time aantal ongekoppelde transacties — los van `uncategorizedCount`
