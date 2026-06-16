@@ -1248,9 +1248,10 @@ export default function OnboardingPage() {
 
           {state.step === 'klaar' && (
             <OnboardingKlaar
-              selectedGoals={state.selectedGoals}
               netMonthlyIncome={netMonthlyIncomeForKlaar}
               netWorth={netWorthForKlaar}
+              assets={state.quickAssets}
+              debts={state.quickDebts}
               spaardoel={
                 state.spaardoel.skipped
                   || !state.spaardoel.presetKey

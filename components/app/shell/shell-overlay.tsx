@@ -23,6 +23,7 @@
 
 import type { ReactNode } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ModalFooter } from '@/components/app/modal-footer'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import { SlideInPane, type PaneAction } from './slide-in-pane'
 
@@ -119,31 +120,34 @@ export function ShellOverlay({
         {footerInfo && (
           <div className="text-[var(--ink-2)]">{footerInfo}</div>
         )}
-        {hasFooter && (
-          <div className="flex items-center gap-2">
-            {primaryAction && (
-              <button
-                type="button"
-                onClick={primaryAction.onClick}
-                disabled={primaryAction.disabled || primaryAction.loading}
-                className="inline-flex flex-1 min-h-11 items-center justify-center bg-[var(--ink)] px-4 text-sm font-medium leading-none text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
-              >
-                {primaryAction.loading ? `${primaryAction.label} …` : primaryAction.label}
-              </button>
-            )}
-            {secondaryAction && (
-              <button
-                type="button"
-                onClick={secondaryAction.onClick}
-                disabled={secondaryAction.disabled}
-                className="inline-flex flex-1 min-h-11 items-center justify-center border-2 border-[var(--ink)] bg-[var(--paper)] px-4 text-sm font-medium leading-none text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
-              >
-                {secondaryAction.label}
-              </button>
-            )}
-          </div>
+        {/* Stacked full-width footer-knoppen via de gedeelde ModalFooter.
+            `layout="stacked"` reproduceert exact de eerdere `flex items-center
+            gap-2`-rij met twee `flex-1`-knoppen (mobiel BottomSheet-footerSlot).
+            Volgorde primary EERST (links), secondary erna — ongewijzigd.
+            NB: ModalFooter rendert altijd een primary; deze tak draait alleen
+            wanneer `hasFooter` (dus `primaryAction || secondaryAction`). Bij een
+            secondary-only footer toont ModalFooter de secondary-tekst als
+            primary-knop — in de praktijk levert elke pane-flow een primaryAction
+            mee, dus dit randgeval treedt hier niet op. */}
+        {hasFooter && primaryAction && (
+          <ModalFooter
+            layout="stacked"
+            primary={{
+              label: primaryAction.label,
+              onClick: primaryAction.onClick,
+              disabled: primaryAction.disabled,
+              loading: primaryAction.loading,
+            }}
+            secondary={
+              secondaryAction
+                ? {
+                    label: secondaryAction.label,
+                    onClick: secondaryAction.onClick,
+                    disabled: secondaryAction.disabled,
+                  }
+                : undefined
+            }
+          />
         )}
       </div>
     ) : undefined

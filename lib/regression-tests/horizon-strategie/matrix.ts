@@ -123,22 +123,22 @@ export interface ComboExpectation {
  * GENERATED:GOLDEN:START
  */
 export const EXPECTED: Record<string, ComboExpectation> = {
-  'A-include_full': { fireAgeFractional: 47, doelbedrag: 1667397 },
+  'A-include_full': { fireAgeFractional: 45, doelbedrag: 1665830 },
   'A-exclude': { fireAgeFractional: 46, doelbedrag: 1186411 },
-  'A-downsize': { fireAgeFractional: 50, doelbedrag: 2071910 },
+  'A-downsize': { fireAgeFractional: 51, doelbedrag: 2036804 },
   'A-reverse': { fireAgeFractional: 50, doelbedrag: 1525903 },
-  'B-deplete': { fireAgeFractional: 47, doelbedrag: 1667397 },
-  'B-legacy': { fireAgeFractional: 48, doelbedrag: 1704878 },
-  'B-perpetual': { fireAgeFractional: 54, doelbedrag: 2229618 },
+  'B-deplete': { fireAgeFractional: 45, doelbedrag: 1665830 },
+  'B-legacy': { fireAgeFractional: 46, doelbedrag: 1704777 },
+  'B-perpetual': { fireAgeFractional: 49, doelbedrag: 2171265 },
   'B-pensioen': { fireAgeFractional: 67, doelbedrag: 1049325 },
-  'C-static': { fireAgeFractional: 47, doelbedrag: 1667397 },
-  'C-guardrails': { fireAgeFractional: 45, doelbedrag: 1672485 },
-  'C-vpw': { fireAgeFractional: 44, doelbedrag: 2083402 },
-  'C-bucket': { fireAgeFractional: 47, doelbedrag: 1667397 },
-  'D-geen': { fireAgeFractional: 47, doelbedrag: 1667397 },
-  'D-groei': { fireAgeFractional: 47, doelbedrag: 1669922 },
-  'D-deeltijd': { fireAgeFractional: 48, doelbedrag: 1662606 },
-  'D-combi': { fireAgeFractional: 46, doelbedrag: 1671337 },
+  'C-static': { fireAgeFractional: 45, doelbedrag: 1665830 },
+  'C-guardrails': { fireAgeFractional: 44, doelbedrag: 1669340 },
+  'C-vpw': { fireAgeFractional: 42, doelbedrag: 2285091 },
+  'C-bucket': { fireAgeFractional: 45, doelbedrag: 1665830 },
+  'D-geen': { fireAgeFractional: 45, doelbedrag: 1665830 },
+  'D-groei': { fireAgeFractional: 45, doelbedrag: 1668727 },
+  'D-deeltijd': { fireAgeFractional: 46, doelbedrag: 1661676 },
+  'D-combi': { fireAgeFractional: 45, doelbedrag: 1668391 },
 }
 // GENERATED:GOLDEN:END
 

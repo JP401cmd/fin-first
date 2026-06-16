@@ -119,7 +119,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
           {/* Spaarquote */}
           <div>
             <div className="flex items-center gap-1">
-              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote · 6 mnd</p>
               <TrendArrow value={savingsRate} />
             </div>
             <p className="font-mono text-base font-semibold tabular-nums text-[var(--ink)]">
@@ -206,7 +206,7 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
 
           <div>
             <div className="flex items-center justify-between">
-              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote · 6 mnd</p>
               <TrendArrow value={savingsRate} />
             </div>
             <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">

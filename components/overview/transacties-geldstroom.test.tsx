@@ -82,14 +82,14 @@ describe('TransactiesGeldstroom', () => {
 
   it('toont "sterk" label bij spaarquote ≥30%', () => {
     render(<TransactiesGeldstroom transactions={[tx('1', 1000), tx('2', -500)]} />)
-    // 500/1000 = 50% → sterk
-    expect(screen.getByText('sterk')).toBeTruthy()
+    // 500/1000 = 50% → sterk; sub is "deze maand · <label>" (C2-harmonisatie)
+    expect(screen.getByText('deze maand · sterk')).toBeTruthy()
   })
 
   it('toont "laag" label bij spaarquote <15%', () => {
     render(<TransactiesGeldstroom transactions={[tx('1', 1000), tx('2', -950)]} />)
-    // 50/1000 = 5% → laag
-    expect(screen.getByText('laag')).toBeTruthy()
+    // 50/1000 = 5% → laag; sub is "deze maand · <label>" (C2-harmonisatie)
+    expect(screen.getByText('deze maand · laag')).toBeTruthy()
   })
 
   it('handelt 0 inkomen → spaarquote 0%', () => {

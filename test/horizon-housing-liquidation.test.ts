@@ -7,6 +7,7 @@ import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { deriveHousingContext, type HousingStrategyConfig, type DownsizeConfig } from '@/lib/housing-strategy'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { HousingTriggerSimBasis } from '@/lib/housing-trigger'
+import type { LifeEvent } from '@/lib/horizon-data'
 
 // Regressie voor ADR 0015: downsize in v2 = huis als niet-liquide asset in het
 // grootboek + liquidatie-event op de trigger (i.p.v. huis filteren + verkoop als
@@ -19,9 +20,16 @@ const ASSETS: Asset[] = (
     ['huis', 'Woning', 'eigen_huis', 385000, 385000, 3.5, null],
     ['bel', 'Beleggen', 'investment', 42000, null, 7, null],
     ['cash', 'Spaar', 'cash', 18000, null, 0, null],
+    // sale_config niet_verkopen: deze test draait om de huis-downsize, niet voertuig-liquidatie.
+    // Zonder dit zou de auto default-on (wanneer_nodig) krijgen → assetLiquidations.length = 2.
     ['auto', 'Auto', 'vehicle', 8000, null, 0, 12],
   ] as const
-).map(([id, name, t, v, woz, r, dep]) => ({ id, name, asset_type: t, current_value: v, woz_value: woz, expected_return: r, is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: dep }) as unknown as Asset)
+).map(([id, name, t, v, woz, r, dep]) => ({
+  id, name, asset_type: t, current_value: v, woz_value: woz, expected_return: r,
+  is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: dep,
+  // Niet-huis-vehicle: bewust niet_verkopen zodat de huis-downsize de enige liquidatie is.
+  ...(t === 'vehicle' ? { sale_config: { stand: 'niet_verkopen' } } : {}),
+}) as unknown as Asset)
 
 const DEBTS: Debt[] = [
   { id: 'hyp', name: 'Hypotheek', debt_type: 'mortgage', current_balance: 300000, interest_rate: 2.9, monthly_payment: 1100, repayment_type: 'annuiteit', is_tax_deductible: true, linked_asset_id: 'huis', end_date: null, net_worth_inclusion_pct: 100, include_aflossing_in_savings: false, is_active: true } as unknown as Debt,
@@ -361,6 +369,139 @@ describe('include_full = woning besteedbaar (Optie A)', () => {
     // FIRE valt vroeger dan met de vastgezette woning (de hele pot telt mee).
     expect(besteedbaar.fireReachable).toBe(true)
     expect(besteedbaar.fireAge!).toBeLessThan(vast.fireAge!)
+  })
+})
+
+// ── C (M1, review): huis-trigger-meetrun ziet de generieke liquidatie ─────────
+// De v2-downsize-trigger-meetrun (resolveDownsizeTriggerV2 via baseSimInput) moet
+// DEZELFDE liquide opbrengsten zien als de getoonde grafiek. Vóór de fix bevatte
+// baseSimInput géén assetLiquidations → een generieke verkoop (bv. een waardevol
+// beleggingspand) injecteerde liquiditeit die de meetrun niet zag → de
+// huis-on_depletion-trigger kon iets te vroeg vuren. Met genericLiq.liquidations
+// op baseSimInput ziet de meetrun die cash en schuift de huis-trigger later op
+// (of gelijk), accurater t.o.v. de grafiek.
+describe('C — huis-trigger-meetrun ziet generieke liquidatie (M1)', () => {
+  // 58-jarige, gestopt met werken; downsize + on_depletion met cap = endAge.
+  // Een fors beleggingspand (real_estate, niet-liquide) wordt op 70 verkocht en
+  // levert liquide op die de huis-verkoop ná die leeftijd uitstelt.
+  // Pand heeft sale_config vast_moment: de nieuwe ENIGE bron voor verkoop-timing.
+  // Het pandSale-life-event dient alleen nog als kalibratie (verkoopprijs).
+  // Zonder sale_config zou het pand op wanneer_nodig (on_demand) staan en de
+  // vaste-leeftijds-assertion in test 1 zou mislukken.
+  const C_ASSETS: Asset[] = (
+    [
+      ['huis', 'Woning', 'eigen_huis', 450000, 3.0, null],
+      ['bel', 'Beleggen', 'investment', 90000, 5, null],
+      ['cash', 'Spaar', 'cash', 25000, 0, null],
+      ['pand', 'Beleggingspand', 'real_estate', 300000, 3, null],
+    ] as const
+  ).map(([id, name, t, v, r, dep]) => ({
+    id, name, asset_type: t, current_value: v, expected_return: r,
+    is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: dep,
+    // Pand: vast_moment op 70 (= PAND_SALE_AGE, gedeclareerd ná C_ASSETS om TDZ te
+    // vermijden) — sale_config is de SSoT (ADR 0020). Het life-event levert kalibratie
+    // (verkoopprijs 300k). Literal 70 gebruiken, PAND_SALE_AGE is nog niet beschikbaar.
+    ...(id === 'pand' ? { sale_config: { stand: 'vast_moment', triggerAge: 70 } } : {}),
+  }) as unknown as Asset)
+
+  const C_DEBTS: Debt[] = [
+    { id: 'hyp', name: 'Hypotheek', debt_type: 'mortgage', current_balance: 120000, interest_rate: 3.0, monthly_payment: 800, repayment_type: 'annuiteit', is_tax_deductible: true, linked_asset_id: 'huis', end_date: null, net_worth_inclusion_pct: 100, include_aflossing_in_savings: false, is_active: true } as unknown as Debt,
+  ]
+
+  const C_DOWNSIZE: DownsizeConfig = {
+    mode: 'downsize',
+    trigger: 'on_depletion',
+    triggerAge: 90,
+    salePricePct: 1,
+    salesCostsPct: 0.05,
+    newMonthlyHousingCost: null,
+    depletionThresholdYears: 0,
+  } as unknown as DownsizeConfig
+
+  const PAND_SALE_AGE = 70
+  const pandSale: LifeEvent = {
+    id: 'sale-pand', name: 'Beleggingspand verkopen', event_type: 'custom',
+    target_age: PAND_SALE_AGE, target_date: null, one_time_cost: 0,
+    monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0,
+    icon: 'Home', is_active: true, sort_order: 1, is_indexed: false,
+    metadata: { verkoopprijs: 300000 }, linked_asset_id: 'pand',
+  } as unknown as LifeEvent
+
+  const buildC = (events: LifeEvent[]) =>
+    buildHorizonInput({
+      horizonInput: { monthlyContributions: 0, yearlyMustExpenses: 40000, dateOfBirth: '1968-01-01', monthlyIncome: 0 } as never,
+      lifeEvents: events,
+      fireStrategy: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+      grossReturn: 0.05,
+      inflation: 0.02,
+      assets: C_ASSETS,
+      debts: C_DEBTS,
+      box3Method: 'forfaitair',
+      hasPartner: false,
+      housingStrategy: C_DOWNSIZE,
+      horizonEngineV2: true,
+    })!
+
+  it('de generieke pand-liquidatie staat in de uiteindelijke input én is gemerged met (geen) huis-liquidatie', () => {
+    const built = buildC([pandSale])
+    const liqs = built.input.assetLiquidations ?? []
+    // De pand-liquidatie zit erin (de huis-liquidatie alleen als de trigger vuurt).
+    expect(liqs.some((l) => l.assetId === 'pand' && l.age === PAND_SALE_AGE)).toBe(true)
+  })
+
+  it('huis-on_depletion-trigger schuift later op (of gelijk) doordat de meetrun de pand-opbrengst ziet', () => {
+    // Met het pand-event: de meetrun ziet de liquide opbrengst op 70 → de
+    // huis-verkoop-trigger vuurt later (of valt weg = geen huis-liquidatie).
+    const withSale = buildC([pandSale])
+    // Zonder het pand-event: de meetrun mist die liquiditeit → de huis-trigger
+    // vuurt vroeger.
+    const without = buildC([])
+
+    const houseAge = (built: ReturnType<typeof buildC>): number | null =>
+      (built.input.assetLiquidations ?? []).find((l) => l.assetId === 'huis')?.age ?? null
+
+    const ageWith = houseAge(withSale)
+    const ageWithout = houseAge(without)
+
+    // Baseline-sanity: zonder de extra liquiditeit vuurt de huis-trigger ergens
+    // binnen de horizon.
+    expect(ageWithout).not.toBeNull()
+
+    // Met de pand-opbrengst zichtbaar in de meetrun: ofwel geen huis-verkoop meer
+    // nodig (null = uitgesteld voorbij de horizon), ofwel een latere leeftijd.
+    if (ageWith === null) {
+      expect(withSale.housingHeldToEnd).toBe(true)
+    } else {
+      expect(ageWith).toBeGreaterThanOrEqual(ageWithout!)
+    }
+  })
+
+  it('niet_verkopen op pand → geen generieke liquidatie, alleen (hooguit) huis-liquidatie', () => {
+    // Met sale_config de ENIGE bron (ADR 0020) is de switch niet meer "wel/geen life event"
+    // maar "niet_verkopen vs. vast_moment/wanneer_nodig". Dit borgt de M1-invariant:
+    // een pand dat bewust NIET verkocht wordt (niet_verkopen) levert geen genericLiq →
+    // baseSimInput ziet die cash niet → huis-trigger vuurt eerder.
+    const C_ASSETS_NIET_VERKOPEN = C_ASSETS.map((a) =>
+      a.id === 'pand' ? { ...a, sale_config: { stand: 'niet_verkopen' as const } } : a,
+    )
+    const buildCNiet = (events: LifeEvent[]) =>
+      buildHorizonInput({
+        horizonInput: { monthlyContributions: 0, yearlyMustExpenses: 40000, dateOfBirth: '1968-01-01', monthlyIncome: 0 } as never,
+        lifeEvents: events,
+        fireStrategy: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+        grossReturn: 0.05,
+        inflation: 0.02,
+        assets: C_ASSETS_NIET_VERKOPEN,
+        debts: C_DEBTS,
+        box3Method: 'forfaitair',
+        hasPartner: false,
+        housingStrategy: C_DOWNSIZE,
+        horizonEngineV2: true,
+      })!
+    const built = buildCNiet([])
+    const liqs = built.input.assetLiquidations ?? []
+    // Alleen (hooguit) de huis-liquidatie, nooit een pand-liquidatie.
+    expect(liqs.every((l) => l.assetId === 'huis')).toBe(true)
   })
 })
 

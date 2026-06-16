@@ -96,3 +96,40 @@ describe('resolveSavingsSource — keuzeregel onaangetast', () => {
     expect(r.baseAnnualSavings).toBeCloseTo(48000 * 0.18, 6)
   })
 })
+
+describe('resolveSavingsSource — handmatig pad gelijkgetrokken met transactie-pad', () => {
+  it('zonder aflossing/spaarbudget (default 0) == oude (inkomen − uitgaven)/inkomen', () => {
+    const r = resolveSavingsSource({
+      incomeSource: 'manual', expensesSource: 'manual',
+      netMonthlyIncome: 4000, estimatedAnnualIncome: 0,
+      estimatedMonthlyExpenses: 3000, savingsRate6m: 99,
+    })
+    // 4000−3000)/4000 = 25% — byte-gelijk aan vóór de gelijktrekking.
+    expect(r.effectiveSavingsRatePct).toBeCloseTo(25, 10)
+  })
+
+  it('telt schuldaflossing op en spaarbudget van de uitgaven af', () => {
+    const r = resolveSavingsSource({
+      incomeSource: 'manual', expensesSource: 'manual',
+      netMonthlyIncome: 4000, estimatedAnnualIncome: 0,
+      estimatedMonthlyExpenses: 3000, savingsRate6m: 99,
+      monthlyDebtAflossing: 200,
+      monthlySavingsContribution: 100,
+    })
+    // (4000 − (3000 − 100) + 200) / 4000 = 1300/4000 = 32,5%
+    expect(r.effectiveSavingsRatePct).toBeCloseTo(32.5, 10)
+  })
+
+  it('handmatig pad == savingsRateFromAggregates(inkomen, uitgaven − sb, afl)', () => {
+    const income = 4000, expenses = 3000, afl = 250, sb = 150
+    const r = resolveSavingsSource({
+      incomeSource: 'manual', expensesSource: 'manual',
+      netMonthlyIncome: income, estimatedAnnualIncome: 0,
+      estimatedMonthlyExpenses: expenses, savingsRate6m: 0,
+      monthlyDebtAflossing: afl, monthlySavingsContribution: sb,
+    })
+    expect(r.effectiveSavingsRatePct).toBeCloseTo(
+      savingsRateFromAggregates(income, expenses - sb, afl), 10,
+    )
+  })
+})

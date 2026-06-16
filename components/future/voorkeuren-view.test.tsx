@@ -6,7 +6,9 @@ import { VoorkeurenView } from './voorkeuren-view'
 // (de 5 regels). Mock next/navigation + supabase client, en stub de pane (die op
 // matchMedia/ShellOverlay leunt) zodat de card-tests gefocust blijven.
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/toekomst/voorkeuren',
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({

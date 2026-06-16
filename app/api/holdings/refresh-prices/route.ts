@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchPriceData } from '@/lib/price-feed'
+import { fetchPriceData, resolveYahooSymbol } from '@/lib/price-feed'
+import { fetchBatchForexRates, getEURRateSync } from '@/lib/forex'
 import {
   syncAssetValueFromInvestmentHoldings,
   syncAssetValueFromCryptoHoldings,
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
     if (!bucketFilter || bucketFilter === 'investment') {
       let invQuery = supabase
         .from('investment_holdings')
-        .select('id, asset_id, ticker, isin, name, current_price, last_price_update, units, avg_purchase_price')
+        .select('id, asset_id, ticker, isin, name, currency, current_price, last_price_update, units, avg_purchase_price')
         .eq('user_id', user.id)
         .eq('is_active', true)
       if (holdingId && bucketFilter === 'investment') invQuery = invQuery.eq('id', holdingId)
@@ -74,6 +75,25 @@ export async function POST(request: NextRequest) {
       }
 
       for (const holding of invHoldings ?? []) {
+        const h = holding as {
+          id: string
+          ticker: string | null
+          units: number | string | null
+          current_price: number | null
+        }
+        // Gesloten positie (0 stuks) → geen koers nodig; de waarde is 0. Scheelt
+        // ook Yahoo-calls op de lange staart aan volledig verkochte posities.
+        if (Math.abs(Number(h.units) || 0) < 1e-9) {
+          results.push({
+            id: h.id,
+            bucket: 'investment',
+            ticker: h.ticker,
+            status: 'skipped',
+            message: 'Gesloten positie (0 stuks)',
+            current_price: h.current_price,
+          })
+          continue
+        }
         const result = await refreshInvestmentHolding(supabase, user.id, holding as never)
         results.push(result)
         if (result.status === 'updated' && (holding as { asset_id?: string }).asset_id) {
@@ -199,25 +219,47 @@ async function refreshInvestmentHolding(
     asset_id: string | null
     ticker: string | null
     isin: string | null
+    name: string | null
+    currency: string | null
     current_price: number | null
     last_price_update: string | null
   },
 ): Promise<RefreshResult> {
-  if (!holding.ticker && !holding.isin) {
+  if (!holding.ticker && !holding.isin && !holding.name) {
     return {
       id: holding.id,
       bucket: 'investment',
       ticker: null,
       status: 'skipped',
-      message: 'Geen ticker of ISIN beschikbaar',
+      message: 'Geen ticker, ISIN of naam beschikbaar',
       current_price: holding.current_price,
       last_price_update: holding.last_price_update,
     }
   }
 
+  // Koers-resolutie. Probeer eerst de opgeslagen ticker; faalt die (bij broker-
+  // imports is de "ticker" vaak de productnaam, geen beurssymbool), resolve dan
+  // via Yahoo-search op ISIN — en als laatste redmiddel op de naam — naar een
+  // echt symbool, en prijs daarop. Het gevonden symbool wordt opgeslagen zodat
+  // een volgende refresh direct prijst.
   let priceData: Awaited<ReturnType<typeof fetchPriceData>> = null
+  let resolvedTicker: string | null = null
   try {
-    priceData = await fetchPriceData(holding.ticker || holding.isin || '')
+    if (holding.ticker) {
+      priceData = await fetchPriceData(holding.ticker)
+    }
+    if (!priceData) {
+      const symbol =
+        (holding.isin ? await resolveYahooSymbol(holding.isin) : null) ||
+        (holding.name ? await resolveYahooSymbol(holding.name) : null)
+      if (symbol) {
+        const bySymbol = await fetchPriceData(symbol)
+        if (bySymbol) {
+          priceData = bySymbol
+          resolvedTicker = symbol
+        }
+      }
+    }
   } catch {
     return {
       id: holding.id,
@@ -242,13 +284,36 @@ async function refreshInvestmentHolding(
     }
   }
 
+  // EUR-normalisatie. Een EUR-gedenomineerde holding (kostbasis in EUR — zoals
+  // alle DEGIRO-imports) met een niet-EUR Yahoo-koers (US-aandelen → USD) wordt
+  // omgerekend naar EUR, zodat waarde én rendement consistent blijven met de
+  // (EUR) transactie-kostbasis. Holdings met een eigen native currency laten we
+  // ongemoeid — de loader rekent die zelf om via forex.
+  let price = priceData.price
+  let previousClose = priceData.previousClose
+  let storeCurrency = priceData.currency
+  const holdingCur = (holding.currency ?? 'EUR').toUpperCase()
+  const priceCur = (priceData.currency ?? holdingCur).toUpperCase()
+  if (holdingCur === 'EUR' && priceCur !== 'EUR') {
+    await fetchBatchForexRates([priceCur])
+    const rate = getEURRateSync(priceCur)
+    if (rate > 0) {
+      price = priceData.price * rate
+      previousClose = priceData.previousClose != null ? priceData.previousClose * rate : null
+      storeCurrency = 'EUR'
+    }
+  }
+
   const updateFields: Record<string, unknown> = {
-    current_price: priceData.price,
+    current_price: price,
     last_price_update: new Date().toISOString(),
   }
-  if (priceData.previousClose !== null) updateFields.previous_close = priceData.previousClose
+  // Bewaar het via ISIN/naam gevonden symbool zodat een volgende refresh direct
+  // prijst (en de detail-/lijst-UI een net symbool toont i.p.v. de productnaam).
+  if (resolvedTicker) updateFields.ticker = resolvedTicker
+  if (previousClose !== null) updateFields.previous_close = previousClose
   if (priceData.dailyChangePercent !== null) updateFields.daily_change_percent = priceData.dailyChangePercent
-  if (priceData.currency) updateFields.currency = priceData.currency
+  if (storeCurrency) updateFields.currency = storeCurrency
 
   const { error: updateError } = await supabase
     .from('investment_holdings')
@@ -276,8 +341,8 @@ async function refreshInvestmentHolding(
       {
         holding_id: holding.id,
         date: today,
-        close_price: priceData.price,
-        currency: priceData.currency || 'EUR',
+        close_price: price,
+        currency: storeCurrency || 'EUR',
         source: priceData.source === 'cache' ? 'yahoo_finance' : priceData.source,
       },
       { onConflict: 'holding_id,date' },
@@ -286,13 +351,13 @@ async function refreshInvestmentHolding(
   return {
     id: holding.id,
     bucket: 'investment',
-    ticker: holding.ticker,
+    ticker: resolvedTicker ?? holding.ticker,
     status: 'updated',
-    price: priceData.price,
-    previousClose: priceData.previousClose,
+    price,
+    previousClose,
     dailyChange: priceData.dailyChange,
     dailyChangePercent: priceData.dailyChangePercent,
-    currency: priceData.currency,
+    currency: storeCurrency,
     displayName: priceData.displayName,
     last_price_update: new Date().toISOString(),
   }

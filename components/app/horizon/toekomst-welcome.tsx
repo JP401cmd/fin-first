@@ -11,8 +11,9 @@
  *     vrijheidstijd (Geld is opgeslagen tijd),
  *   • dat de prognose een schatting is (jouw gegevens + slimme aannames),
  *   • dat de instellingen al voor je klaarstaan (geen aparte setup nodig).
- * Wegklikken (✕ / "Bekijk je grafiek" / Escape / klik op de achtergrond) onthult
- * de grafiek met de aanscherp-markers eromheen.
+ * De primaire CTA "Bekijk je grafiek" (onViewChart) onthult de grafiek met de
+ * aanscherp-markers eromheen; stil sluiten (✕ / Escape / klik op de achtergrond
+ * → onDismiss) klikt de kaart alleen weg zonder die overlay te openen.
  *
  * First-visit-only: de parent geeft `visible` (afgeleid van de server-marker
  * `hasSeenWelcome`) en bij eerste render wordt de slug `horizon_welcome_shown`
@@ -30,6 +31,7 @@ import { createPortal } from 'react-dom'
 import { Sparkles, X, ArrowRight } from 'lucide-react'
 import { formatWithFreedom } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { EditorialHeadline } from '@/components/editorial'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 
 export interface ToekomstWelcomeProps {
@@ -39,18 +41,37 @@ export interface ToekomstWelcomeProps {
   netWorth: number
   /** Dagtarief (uitgaven per dag) voor de €→vrijheidstijd-omrekening. */
   dailyExpenseRate: number
+  /**
+   * Vrijheids-/FIRE-leeftijd — canoniek door de parent aangeleverd (NIET hier
+   * herberekend). null/onbekend/niet-eindig → zin zonder leeftijd.
+   */
+  freedomAge: number | null
+  /** Of de vrijheidsleeftijd de pensioen-/AOW-leeftijd is (framing-nuance). */
+  isPensioen?: boolean
   /** Of bedragen gemaskeerd zijn (privacy-modus). */
   masked: boolean
-  /** Markeer de welkomsttekst als gezien (POST naar feature-visits) + lokaal weg. */
+  /**
+   * Stil sluiten: markeer de welkomsttekst als gezien (POST naar feature-visits)
+   * + lokaal weg. Opent NIET de uitgelichte grafiek. Gebruikt door ✕, Escape en
+   * een klik op de achtergrond.
+   */
   onDismiss: () => void
+  /**
+   * Primaire actie "Bekijk je grafiek": sluit de welkomstkaart én opent de
+   * uitgelichte grafiek met de tip-bubbels eromheen. Alleen de CTA roept dit aan.
+   */
+  onViewChart: () => void
 }
 
 export function ToekomstWelcome({
   visible,
   netWorth,
   dailyExpenseRate,
+  freedomAge,
+  isPensioen = false,
   masked,
   onDismiss,
+  onViewChart,
 }: ToekomstWelcomeProps) {
   // Portal pas na mount (document bestaat niet tijdens SSR).
   const [mounted, setMounted] = useState(false)
@@ -103,11 +124,22 @@ export function ToekomstWelcome({
         })
       : null
 
+  // Vrijheidsleeftijd-zin. Bij een geldige eindige leeftijd tonen we het hele
+  // getal met "e"-achtervoegsel (zelfde stijl als de overlay: "65e"); anders
+  // een nette alternatieve zin zonder kapot getal.
+  const hasFreedomAge =
+    freedomAge !== null && Number.isFinite(freedomAge) && freedomAge > 0
+  const freedomAgeLabel = hasFreedomAge ? `${Math.round(freedomAge!)}e` : null
+  // Alternatieve zin als de vrijheidsleeftijd (nog) niet bekend/eindig is —
+  // geen kapot getal ("rond je undefined"), wel dezelfde empowering toon.
+  const choiceSentenceFallback =
+    'Werken wordt steeds meer een keuze naarmate je vrijheid opbouwt.'
+
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Welkom op je toekomst"
+      aria-labelledby="welcome-dialog-title"
       className="fixed inset-0 z-[70] flex items-center justify-center p-4"
     >
       {/* Achtergrond: hele pagina vervaagt + dimt. Klik sluit (standaard modal). */}
@@ -130,8 +162,36 @@ export function ToekomstWelcome({
         {/* Kicker: 10px mono uppercase — -800 voor WCAG AA contrast. */}
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.20em] text-[var(--module-active-800)]">
           <Sparkles className="h-3.5 w-3.5" aria-hidden />
-          Welkom op je toekomst :)
+          Welkom op je toekomst
         </div>
+
+        {/* Dubbel-gekleurde editorial titel: "toekomst" in horizon-accent.
+            Wrapper-div draagt het id: EditorialHeadline accepteert geen id-prop,
+            en de dialog koppelt zijn naam via aria-labelledby aan deze zichtbare
+            heading (WCAG). h2 omdat de pagina zelf al een h1 heeft. */}
+        <div id="welcome-dialog-title">
+          <EditorialHeadline level="h2" size="sm" emphasis="toekomst" className="mt-3">
+            Welkom op je toekomst pagina
+          </EditorialHeadline>
+        </div>
+
+        {/* De belofte: werken wordt een keuze rond je vrijheidsleeftijd. */}
+        <p
+          className="mt-3 max-w-[60ch] text-[15px] italic leading-relaxed text-[var(--ink)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          {hasFreedomAge ? (
+            <>
+              Werken wordt voor jou een keuze rond je{' '}
+              <span className="not-italic font-semibold text-[var(--module-active-700)]">
+                {isPensioen ? `${freedomAgeLabel} (AOW-leeftijd)` : freedomAgeLabel}
+              </span>
+              .
+            </>
+          ) : (
+            choiceSentenceFallback
+          )}
+        </p>
 
         <p
           className="mt-3 max-w-[60ch] text-[15px] italic leading-relaxed text-[var(--ink-2)]"
@@ -152,16 +212,17 @@ export function ToekomstWelcome({
           . De prognose hierachter is een{' '}
           <span className="not-italic font-semibold text-[var(--ink)]">schatting</span> op
           basis van je gegevens en een paar slimme aannames — je instellingen staan
-          al klaar, je hoeft niets eerst in te stellen. Wil je 'm scherper maken? Volg
+          al klaar, je hoeft niets te configureren. Wil je 'm scherper maken? Volg
           de tips bij de grafiek.
         </p>
 
-        {/* Primaire afsluit-knop — onthult de grafiek + markers. */}
+        {/* Primaire knop — sluit de kaart én onthult de grafiek + tip-markers.
+            Anders dan ✕/Escape/achtergrond (stil sluiten via onDismiss). */}
         <div className="mt-5 flex justify-end">
           <button
             ref={ctaRef}
             type="button"
-            onClick={onDismiss}
+            onClick={onViewChart}
             className="inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--module-active-300)] bg-[var(--module-active-50)] px-4 py-1.5 font-sans text-[13px] font-medium text-[var(--module-active-800)] transition-colors hover:bg-[var(--module-active-100)]"
           >
             Bekijk je grafiek

@@ -113,8 +113,17 @@ export interface SimResult {
 /**
  * Converteert app-data LifeEvents naar SimCashflows voor de simulatie-engine.
  * AOW wordt niet hardcoded toegevoegd — het staat als levensgebeurtenis in de DB.
+ *
+ * `skipEventIds` (optioneel): events waarvan de OPBRENGST-portie al door de
+ * v2-grootboek-engine wordt afgehandeld als asset-liquidatie (generieke niet-
+ * liquide verkoop, zie `buildGenericAssetLiquidations`). Voor die events wordt
+ * UITSLUITEND de eenmalige opbrengst onderdrukt — de generieke `one_time_cost`-
+ * cashflow ÉN custom `metadata.cashflows` van het event — zodat de verkoop niet
+ * dubbel telt (één keer als liquidatie + één keer als inkomen-cashflow). De
+ * `monthly_cost_change` (bv. wegvallend onderhoud) en `monthly_income_change`
+ * BLIJVEN bestaan: dat zijn legitieme losse gevolgen van de verkoop.
  */
-export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
+export function lifeEventsToCashflows(events: LifeEvent[], skipEventIds?: Set<string>): SimCashflow[] {
   const flows: SimCashflow[] = []
 
   for (const ev of events) {
@@ -124,6 +133,11 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
 
     const isIndexed = ev.is_indexed ?? true
     const meta = ev.metadata ?? {}
+
+    // Verkoop-event dat de engine al als asset-liquidatie verwerkt: onderdruk de
+    // opbrengst-cashflows (one_time_cost + custom cashflows), behoud de
+    // maandelijkse gevolgen. Zie de doc-comment hierboven.
+    const liquidationHandled = skipEventIds?.has(ev.id) === true
 
     // ── Metadata-enhanced processing per event type ──
     // When metadata is present, generate more accurate phased cashflows
@@ -344,7 +358,11 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
     }
 
     // ── User-defined custom cashflows from metadata ──
-    const customFlows = (meta.cashflows as UserDefinedCashflow[] | undefined) ?? []
+    // Bij een door de engine afgehandelde liquidatie worden deze opbrengst-
+    // cashflows onderdrukt (anders dubbeltelling met de asset-liquidatie).
+    const customFlows = liquidationHandled
+      ? []
+      : (meta.cashflows as UserDefinedCashflow[] | undefined) ?? []
     if (customFlows.length > 0) {
       for (const cf of customFlows) {
         const dur = cf.durationMonths > 0 ? Math.ceil(cf.durationMonths / 12) : null
@@ -367,8 +385,10 @@ export function lifeEventsToCashflows(events: LifeEvent[]): SimCashflow[] {
 
     // ── Generic fallback: use stored amounts (backward compatible) ──
 
-    // 1. Eenmalige kosten (one_time_cost) — eenmalige bedragen zijn nooit geïndexeerd
-    if (!skipGenericCost) {
+    // 1. Eenmalige kosten (one_time_cost) — eenmalige bedragen zijn nooit geïndexeerd.
+    //    Bij een door de engine afgehandelde liquidatie wordt de eenmalige
+    //    opbrengst (one_time_cost < 0) onderdrukt zodat de verkoop niet dubbel telt.
+    if (!skipGenericCost && !liquidationHandled) {
       const cost = Number(ev.one_time_cost ?? 0)
       if (cost !== 0) {
         flows.push({

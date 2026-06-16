@@ -10,6 +10,10 @@ import {
   type AssetConnectionSummary,
 } from '@/lib/connections-data'
 import {
+  loadBrokerConnectionForAsset,
+  type BrokerConnectionRow,
+} from '@/lib/broker-connections-data'
+import {
   loadCryptoHoldingsForAsset,
   type CryptoHoldingRow,
 } from '@/lib/crypto-holdings-data'
@@ -89,6 +93,8 @@ export function AssetDetailFlow({
   // initialiseren op `undefined` om "nog niet geladen" te onderscheiden van
   // "geladen, maar geen koppeling" (`null`).
   const [connection, setConnection] = useState<AssetConnectionSummary | null | undefined>(undefined)
+  // Broker-koppeling (Trading 212) — investment-only, anders altijd `null`.
+  const [brokerConnection, setBrokerConnection] = useState<BrokerConnectionRow | null>(null)
   // Typed holding-rijen (R5). Alleen geladen voor crypto/investment assets
   // — voor andere types blijven beide arrays leeg en rendert de modal de
   // sectie niet. `null` = nog niet geladen, `[]` = geladen maar geen
@@ -114,6 +120,12 @@ export function AssetDetailFlow({
       assetType === 'crypto' || assetType === 'investment'
         ? loadConnectionForAsset(supabase, assetId).catch(() => null)
         : Promise.resolve(null)
+    // Broker-koppeling (Trading 212) is investment-only — voor andere types
+    // resolvet de promise direct met `null` (geen extra Supabase-roundtrip).
+    const brokerConnectionPromise: Promise<BrokerConnectionRow | null> =
+      assetType === 'investment'
+        ? loadBrokerConnectionForAsset(supabase, assetId).catch(() => null)
+        : Promise.resolve(null)
     // Typed-holdings fetches per asset — net als de connection-fetch parallel
     // en type-gated. Bij andere asset-types resolven beide direct met `[]`
     // zodat de modal weet dat er geen sectie te tonen is.
@@ -134,6 +146,7 @@ export function AssetDetailFlow({
       essentialBudgetsRes,
       childBudgetsRes,
       connectionResult,
+      brokerConnectionResult,
       cryptoHoldingsResult,
       investmentHoldingsResult,
     ] = await Promise.all([
@@ -169,11 +182,13 @@ export function AssetDetailFlow({
         .select('id, parent_id, default_limit, is_essential, interval, budget_type')
         .not('parent_id', 'is', null),
       connectionPromise,
+      brokerConnectionPromise,
       cryptoHoldingsPromise,
       investmentHoldingsPromise,
     ])
 
     setConnection(connectionResult)
+    setBrokerConnection(brokerConnectionResult)
     setCryptoHoldings(cryptoHoldingsResult)
     setInvestmentHoldings(investmentHoldingsResult)
     setValuations((valuationsRes.data ?? []) as Valuation[])
@@ -290,6 +305,7 @@ export function AssetDetailFlow({
         linkedBankAccounts={linkedBankAccounts}
         budgetingActive={budgetingActive}
         initialConnection={connection ?? null}
+        initialBrokerConnection={brokerConnection}
         onClose={() => setModalStep('detail')}
         onSaved={() => {
           setModalStep('detail')

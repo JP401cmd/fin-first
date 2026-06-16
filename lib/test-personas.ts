@@ -14,6 +14,7 @@ import { BUDGET_SLUGS } from '@/lib/budget-data'
 import type { ModuleId } from '@/lib/module-registry'
 import { ALL_MODULES } from '@/lib/module-registry'
 import type { WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
+import type { SaleConfig } from '@/lib/sale-config'
 import { getCurrentWeek, getNextWeek } from '@/lib/week-utils'
 
 const S = BUDGET_SLUGS
@@ -127,6 +128,12 @@ export interface PersonaAsset {
   has_rental_tracking?: boolean
   /** Voor eigen_huis-assets: woonbalans-app tracking actief. */
   has_woonbalans_tracking?: boolean
+  /**
+   * Verkoop-/liquidatie-config voor niet-liquide bezittingen (zie lib/sale-config.ts).
+   * SSoT voor het of/wanneer van verkoop in de v2-grootboek-engine. Wordt als JSONB
+   * op `assets.sale_config` geseed (seed-persona.ts).
+   */
+  sale_config?: SaleConfig
 }
 
 export interface PersonaDebt {
@@ -207,6 +214,13 @@ export interface PersonaLifeEvent {
   is_active: boolean
   sort_order: number
   is_indexed?: boolean
+  /**
+   * Naam van het asset dat dit verkoop-event liquideert. Wordt na de insert via
+   * `assetNameToId` omgezet naar `life_events.linked_asset_id` (seed-persona.ts),
+   * waarna de v2-grootboek-engine de generieke niet-liquide asset-liquidatie
+   * aanstuurt (zie `buildGenericAssetLiquidations`).
+   */
+  linked_asset_name?: string
   metadata?: Record<string, unknown>
 }
 
@@ -1689,7 +1703,7 @@ const marijkeData: PersonaData = {
   assets: [
     { name: 'Beleggingsportefeuille Rabobank', asset_type: 'investment', current_value: 320000, purchase_value: 260000, purchase_date: '2005-01-01', expected_return: 5, monthly_contribution: 0, institution: 'Rabobank', subtype: 'etf', risk_profile: 'laag', has_holdings_tracking: true },
     { name: 'Eigen woning Zwolle', asset_type: 'eigen_huis', current_value: 420000, purchase_value: 180000, purchase_date: '1992-03-01', expected_return: 3, monthly_contribution: 0, institution: '', woz_value: 440000, address_postcode: '8024 AA', address_house_number: '12' },
-    { name: 'Stacaravan Drenthe', asset_type: 'physical', current_value: 25000, purchase_value: 35000, purchase_date: '2018-06-01', expected_return: -5, monthly_contribution: 0, institution: '', depreciation_rate: 5 },
+    { name: 'Stacaravan Drenthe', asset_type: 'physical', current_value: 25000, purchase_value: 35000, purchase_date: '2018-06-01', expected_return: -5, monthly_contribution: 0, institution: '', depreciation_rate: 5, sale_config: { stand: 'vast_moment', triggerAge: 73 } },
   ],
   debts: [], // Hypotheekvrij
   budgets: makeBudgets({
@@ -1713,7 +1727,7 @@ const marijkeData: PersonaData = {
   ],
   life_events: [
     { name: 'Pensioen', event_type: 'early_retirement', target_age: 65, target_date: '2022-06-20', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Sunset', is_active: false, sort_order: 0, metadata: { gewensteMaandinkomen: 3400, pensioenUitkering: 1800 } },
-    { name: 'Stacaravan verkopen', event_type: 'custom', target_age: 73, target_date: '2030-06-20', one_time_cost: 0, monthly_cost_change: -100, monthly_income_change: 0, duration_months: 0, icon: 'Home', is_active: true, sort_order: 1, metadata: { verkoopprijs: 20000, reden: 'Te oud om te onderhouden' } },
+    { name: 'Stacaravan verkopen', event_type: 'custom', target_age: 73, target_date: '2030-06-20', one_time_cost: 0, monthly_cost_change: -100, monthly_income_change: 0, duration_months: 0, icon: 'Home', is_active: true, sort_order: 1, linked_asset_name: 'Stacaravan Drenthe', metadata: { verkoopprijs: 20000, reden: 'Te oud om te onderhouden' } },
     { name: 'AOW partner Henk', event_type: 'aow', target_age: null, target_date: '2025-03-15', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Landmark', is_active: true, sort_order: 2, is_indexed: true, metadata: { leefsituatie: 'samenwonend' } },
     { name: 'Lijfrente-uitkering', event_type: 'custom', target_age: 70, target_date: '2027-06-20', one_time_cost: 0, monthly_cost_change: 0, monthly_income_change: 400, duration_months: 180, icon: 'Banknote', is_active: true, sort_order: 3, metadata: { reden: 'Opgebouwde lijfrente komt tot uitkering, 15 jaar looptijd' } },
     { name: 'Verbouwing badkamer', event_type: 'custom', target_age: 69, target_date: '2026-09-01', one_time_cost: -8500, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0, icon: 'Wrench', is_active: true, sort_order: 4, metadata: { reden: 'Senioren-aanpassing badkamer met inloopdouche' } },

@@ -100,7 +100,7 @@ export function buildBenchmarkReport(args: BuildBenchmarkArgs): BenchmarkReportD
     metrics.push(buildNetWorthMetric(user.netWorth, ref.netWorthMedian, ref.netWorthMean, user.dailyExpenseRate))
     addSource(SOURCE_CBS_VERMOGEN)
 
-    // 5. Geschat jaarinkomen (CBS-mediaan)
+    // 5. Geschat jaarinkomen (CBS gestandaardiseerd inkomen, geraamd per huishoudtype)
     metrics.push(buildIncomeMetric(user.yearlyIncome, ref.incomeMedian))
     addSource(SOURCE_CBS_INKOMEN)
   }
@@ -215,7 +215,9 @@ function buildNetWorthMetric(
     caption,
     explanation: 'De mediaan is het middelste vermogen in jouw doelgroep: de helft heeft meer, de helft '
       + 'minder. Het NL-gemiddelde ligt hoger doordat een kleine groep zeer rijke huishoudens het optrekt — '
-      + 'daarom is de mediaan een eerlijker ijkpunt. Bron: CBS, Vermogen van huishoudens (2024).',
+      + 'daarom is de mediaan een eerlijker ijkpunt. De leeftijdscijfers komen van CBS; de verdeling naar '
+      + 'huishoudtype is een geraamde correctie (CBS publiceert geen vermogen per leeftijd × huishoudtype). '
+      + 'Bron: CBS, Vermogen van huishoudens (Materiële welvaart 2024).',
     curve: { mode: median, max: curveMax, spread: 0.95 },
     source: SOURCE_CBS_VERMOGEN,
   }
@@ -226,16 +228,18 @@ function buildIncomeMetric(userValue: number | null, median: number): BenchmarkM
   if (userValue != null) {
     const d = userValue - median
     caption = Math.abs(d) < 500
-      ? 'Rond de mediaan van jouw doelgroep.'
-      : `${eur(Math.abs(d))} ${d >= 0 ? 'boven' : 'onder'} de mediaan van jouw doelgroep.`
+      ? 'Rond de referentie van jouw doelgroep.'
+      : `${eur(Math.abs(d))} ${d >= 0 ? 'boven' : 'onder'} de referentie van jouw doelgroep.`
   }
   const curveMax = Math.round(Math.max(userValue ?? 0, median) * 2.5) || 1
   return {
     key: 'income', label: 'Geschat jaarinkomen', unit: 'eur',
     userValue, referenceValue: median, higherIsBetter: true, tier: 'measured',
     caption,
-    explanation: 'De mediaan is het middelste besteedbare huishoudinkomen in jouw doelgroep. We vergelijken '
-      + 'je netto inkomen, vergelijkbaar met het CBS-cijfer. Bron: CBS, Besteedbaar inkomen van huishoudens (2024).',
+    explanation: 'De referentie is het gemiddeld besteedbaar inkomen voor jouw leeftijdsgroep, geraamd naar '
+      + 'jouw huishoudtype via de CBS-equivalentiefactoren (CBS publiceert het inkomen per leeftijd '
+      + 'gestandaardiseerd — herrekend naar een alleenstaande — en niet per leeftijd × huishoudtype). We '
+      + 'vergelijken je netto inkomen. Bron: CBS, Besteedbaar inkomen (Materiële welvaart 2024).',
     curve: { mode: median, max: curveMax, spread: 0.5 },
     source: SOURCE_CBS_INKOMEN,
   }

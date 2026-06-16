@@ -7,17 +7,23 @@ import { APP_SETUP_SLUGS } from '@/lib/app-setup-status'
  * POST /api/crypto-holdings/setup — Eerste-keer setup voor de
  * Crypto-holdings-app.
  *
- * Body: { sources: string[], inputMethod: 'manual' | 'csv' | 'api' }
+ * Body: {
+ *   selectedAssetIds: string[] (uuid),
+ *   sources: string[],
+ *   inputMethod: 'manual' | 'csv' | 'api'
+ * }
  *
  * Wat deze route doet:
  *  1. Slaat bron-voorkeur + inputMethod op in `profiles.crypto_input_method`
  *     en `profiles.crypto_sources` (jsonb). Gracieuze fallback bij
  *     ontbrekende kolommen — zelfde patroon als aandelen-setup.
- *  2. Markeert alle crypto-assets met `has_holdings_tracking = true`.
+ *  2. Markeert de geselecteerde crypto-assets met `has_holdings_tracking = true`
+ *     en alle andere crypto-assets op false (absolute selectie).
  *  3. Schrijft de feature-visit-marker.
  */
 
 const bodySchema = z.object({
+  selectedAssetIds: z.array(z.string().uuid()).min(1),
   sources: z.array(z.string()).min(1),
   inputMethod: z.enum(['manual', 'csv', 'api']),
 })
@@ -44,7 +50,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const { sources, inputMethod } = parsed.data
+  const { selectedAssetIds, sources, inputMethod } = parsed.data
 
   try {
     const profileUpdate: Record<string, unknown> = {
@@ -65,11 +71,20 @@ export async function POST(req: Request) {
       console.warn('[crypto-holdings-setup] profile-kolommen ontbreken, voortzetten zonder voorkeur')
     }
 
-    await supabase
+    // ── Tracking-flags op crypto-assets (clear-all-then-mark-selected) ──
+    const { error: clearErr } = await supabase
+      .from('assets')
+      .update({ has_holdings_tracking: false })
+      .eq('user_id', user.id)
+      .eq('asset_type', 'crypto')
+    if (clearErr) throw new Error(`Crypto-assets bijwerken mislukt: ${clearErr.message}`)
+
+    const { error: markErr } = await supabase
       .from('assets')
       .update({ has_holdings_tracking: true })
       .eq('user_id', user.id)
-      .eq('asset_type', 'crypto')
+      .in('id', selectedAssetIds)
+    if (markErr) throw new Error(`Crypto-assets markeren mislukt: ${markErr.message}`)
 
     await supabase
       .from('user_feature_visits')

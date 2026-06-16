@@ -101,6 +101,7 @@ const MOCK_DATA: DashboardData = {
     optimistic: { fireTarget: 750000, netWorth: 125000, freedomPercentage: 35, fireAge: 50, currentAge: 40, fireDate: 'jan 2036', countdownDays: 3650, countdownYears: 10, countdownMonths: 0, freedomYears: 2, freedomMonths: 11, monthlyPassiveIncome: 400, monthlySavings: 1500, savingsRate: 30 },
   },
   simRows: null,
+  simNetWorthRows: null,
   simRequiredPortfolio: 750000,
   backtestSuccessRate: 85,
   backtestNamedPaths: null,

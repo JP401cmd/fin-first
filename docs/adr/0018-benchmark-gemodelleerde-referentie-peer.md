@@ -1,6 +1,6 @@
 ---
 status: aanvaard
-date: 2026-06-15
+date: 2026-06-16
 elements: [as-rapport, as-planning, as-vermogen]
 ---
 
@@ -39,3 +39,45 @@ Kernkeuzes:
 - `lib/benchmark/` bevat vier bestanden met zuivere pure functies (geen I/O, testbaar).
 - Een toekomstige eigen-gebruikersbasis-variant kan naast de synthetische peer worden toegevoegd als een opt-in feature, zonder de bestaande rapportage te breken.
 - Cross-user-aggregatie is bewust uitgesteld en gedocumenteerd; wanneer de gebruikerspopulatie groot genoeg is voor statistisch zinvolle cohorten kan dit worden heroverwogen met een expliciete AVG-afweging.
+
+---
+
+## Correctie — 2026-06-16: methodiek `HOUSEHOLD_ADJUST`-factoren
+
+### Wat was het probleem
+
+De oorspronkelijke `HOUSEHOLD_ADJUST`-factoren in `lib/benchmark/nl-reference.ts` werden toegepast op de CBS-leeftijdsband-cijfers zonder te realiseren dat die cijfers al **gestandaardiseerd (geëquivaleerd)** zijn: CBS tabel 2.4.1 rapporteert *besteedbaar inkomen per equivalent* (CBS-equivalentieschaal), en de medianen per leeftijdsband zijn gebaseerd op die geëquivaleerde maat. Een alleenstaand persoon met equivalentiefactor 1,00 heeft daarin al een "gecorrigeerd" inkomen — de factor 0,62 die daarvóór werd toegepast was een dubbeldiscount.
+
+Hetzelfde gold voor het vermogen: de CBS-vermogensstatistiek (Materiële welvaart 2024) levert medianen per leeftijdsband over alle huishoudtypen; de factoren werden toegepast op die gecombineerde mediaan zonder rekening te houden met het inherente gewicht van alleenstaanden (laag vermogen) in die populatie.
+
+### Gecorrigeerde factoren (nl-reference.ts, HOUSEHOLD_ADJUST)
+
+**Inkomen** — nu CBS-equivalentiefactoren (Budgetonderzoek 2015, verslagjaar ≥2018):
+
+| huishoudtype   | oud   | nieuw (CBS) |
+|---------------|-------|-------------|
+| alleenstaand  | 0,62  | 1,00        |
+| paar          | 1,28  | 1,40        |
+| gezin\_jong   | 1,22  | 1,75        |
+| gezin\_tiener | 1,34  | 1,91        |
+
+Ratio: CBS gestandaardiseerd inkomen × equivalentiefactor = ruw huishoudinkomen. Een alleenstaande heeft equivalentiefactor 1,00 (de referentiehuishouding in de CBS-schaal); geen correctie nodig.
+
+**Vermogen** — expliciet gemodelleerd (geen gepubliceerde CBS-kruistabel leeftijd × huishoudtype beschikbaar):
+
+| huishoudtype   | oud   | nieuw (gemodelleerd) |
+|---------------|-------|----------------------|
+| alleenstaand  | 0,55  | 0,35                 |
+| paar          | 1,30  | 1,45                 |
+| gezin\_jong   | 1,05  | 1,25                 |
+| gezin\_tiener | 1,20  | 1,55                 |
+
+Grondslag: CBS vermogen per huishoudtype 2022 (alleenstaand mediaan ~€18k, meerpersoons ~€218k), gematigd voor leeftijdsband. De richting (alleenstaand lager dan gemiddelde mediaan, paar en gezin hoger) is CBS-gegrond; de precieze waarden zijn een modelschatting.
+
+### Presentatie-aanpassing
+
+De UI-badge "CBS-cijfer" is hernoemd naar **"Geraamde referentie (CBS-basis)"** (badge op kaart-niveau) en **"Geraamde referentie (CBS-basis)"** (tooltiptekst). Reden: de fijnmazige leeftijd × huishoudtype-kruising is een modelschatting — er bestaat geen gepubliceerde CBS-tabel op dat niveau. De CBS-leeftijdsbasis van de ruwdata is echter ongewijzigd; alleen de huishoudtype-splitsing is geraamd.
+
+### Gevolgen voor punt 3 van dit besluit
+
+Punt 3 (eerlijkheidspositionering measured vs. modelled) blijft van kracht; de aanpassing verfijnt het onderscheid: de leeftijdsbasis-medianen zijn `tier:'measured'` (CBS), de huishoudtype-verdeling is nu expliciet gelabeld als geraamd (`tier:'modelled'`) ook in de UI, niet alleen intern. De architectuurkeuze (synthetische peer, geen cross-user-aggregatie) is ongewijzigd.

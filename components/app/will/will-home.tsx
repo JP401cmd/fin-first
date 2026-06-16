@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { WillDots } from '@/components/app/will-dots'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
+import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
 import { useCoachSuggestion } from '@/lib/hooks/use-coach-suggestion'
 import { useTypewriter } from '@/lib/hooks/use-typewriter'
 import { CoachMelding } from './coach-melding'
@@ -36,6 +37,11 @@ export function WillHome({
   headerLabel = DEFAULT_COACH_HEADER,
 }: WillHomeProps) {
   const { isOpen, toggle, open, openWithMessage } = useChatContext()
+  // Zwevende bottom-FAB: verberg de Will-bubbel zolang er een modal/overlay
+  // open is (scroll-lock actief). Anders bloedt de halftransparante z-[70]-
+  // backdrop door en lijkt de FAB bovenop de primaire actieknop onderin de
+  // sheet te staan — net zoals de nav-pill door zo'n overlay wordt afgedekt.
+  const overlayOpen = useOverlayOpen()
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -105,6 +111,9 @@ export function WillHome({
   }, [dismiss, open])
 
   if (isOpen) return null
+  // Verberg zodra een overlay/modal open is — de FAB mag niet door de
+  // halftransparante backdrop heen over de sheet-CTA verschijnen.
+  if (overlayOpen) return null
 
   const fabAria = postponedReady > 0
     ? `Open chat met Will — ${postponedReady} uitgestelde tip${postponedReady === 1 ? '' : 's'} klaar`

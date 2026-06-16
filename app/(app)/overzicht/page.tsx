@@ -226,16 +226,17 @@ export default async function OverzichtPage() {
   }
 
   // Mini-vermogen-grafiek-inputs: gebruik dezelfde simulatie-data als
-  // /toekomst (simRows + simRequiredPortfolio uit runUnifiedProjection)
-  // zodat de curve en het doelbedrag bij vrijheid 1:1 matchen tussen
-  // /overzicht en /toekomst. netWorthHistory + currentNetWorth zijn hierboven
-  // al berekend (voor de vrijheidstijd-hero).
+  // /toekomst (simNetWorthRows = geprojecteerd VOLLEDIG netto vermogen, +
+  // simRequiredPortfolio als liquide vrijheidsdoel) uit de loader, zodat de
+  // curve continu doorloopt vanuit het Vandaag-punt (volledig vermogen incl.
+  // huis) i.p.v. te dippen naar de FIRE-portefeuille zónder huis.
+  // netWorthHistory + currentNetWorth zijn hierboven al berekend.
   // fireAge: gebruik fractional (afgerond) als beschikbaar.
   const fireAge =
     dashboardData.fireAgeFractional != null
       ? Math.round(dashboardData.fireAgeFractional)
       : null
-  const simRows = dashboardData.simRows ?? null
+  const simNetWorthRows = dashboardData.simNetWorthRows ?? null
   const simRequiredPortfolio = dashboardData.simRequiredPortfolio ?? null
   // Geschat maandelijks spaarritme voor de back-cast van ontbrekende
   // historie-maanden (< 3 echte waarderingen): bewuste maandinleg als die
@@ -274,7 +275,7 @@ export default async function OverzichtPage() {
         netWorthHistory={netWorthHistory}
         currentNetWorth={currentNetWorth}
         fireAge={fireAge}
-        simRows={simRows}
+        simNetWorthRows={simNetWorthRows}
         simRequiredPortfolio={simRequiredPortfolio}
         monthlySavings={monthlySavings}
         dashboardData={dashboardData}

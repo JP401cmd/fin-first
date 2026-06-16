@@ -90,6 +90,13 @@ export interface Asset {
   household_id: string | null
   // Net worth inclusion
   net_worth_inclusion_pct: number // 0–100, default 100
+  // ── Verkoop-/liquidatie-configuratie (zie lib/sale-config.ts) ──
+  // Per niet-liquide bezitting (vehicle/physical/other/deelneming/real_estate):
+  // het of/wanneer van verkoop in de horizon v2-grootboek-engine. JSONB; NULL →
+  // resolve-time default `wanneer_nodig` (parseSaleConfig). De ENIGE bron voor
+  // niet-liquide verkoop (SSoT) — prevaleert boven life-event `linked_asset_id`.
+  // eigen_huis valt hier nooit onder (eigen downsize-pad, housing_strategy_config).
+  sale_config?: unknown
   // Budget tracking (cash assets)
   has_budget_tracking: boolean
   // Holdings tracking (investment assets managed by portfolio tracker)
@@ -385,21 +392,29 @@ export const ASSET_SUBTYPE_DEFAULTS: Record<string, Partial<{
   overig_vordering: { risk_profile: 'middel', is_liquid: false, expected_return: 3 },
 }
 
-/** Which type-specific fields to show per asset_type */
+/**
+ * Which type-specific fields to show per asset_type.
+ *
+ * `sale_config` (verkoop-instelling) staat bij de niet-liquide types die de
+ * v2-grootboek-engine kan liquideren — vehicle/physical/other/deelneming/
+ * real_estate. eigen_huis NIET (eigen downsize-pad via housing_strategy_config);
+ * liquide types NIET (worden direct als pot besteed). De UI-agent rendert het blok;
+ * de engine leest het via build-input (`buildGenericAssetLiquidations`).
+ */
 export const ASSET_TYPE_FIELDS: Record<AssetType, string[]> = {
   cash: ['subtype', 'is_liquid'],
   savings: ['subtype', 'is_liquid', 'lock_end_date'],
   investment: ['subtype', 'risk_profile', 'ticker_symbol'],
   retirement: ['subtype', 'risk_profile', 'tax_benefit', 'retirement_provider_type'],
   eigen_huis: ['woz_value', 'rental_income', 'address_postcode', 'address_house_number'],
-  real_estate: ['subtype', 'rental_income', 'woz_value'],
+  real_estate: ['subtype', 'rental_income', 'woz_value', 'sale_config'],
   crypto: ['subtype', 'risk_profile', 'ticker_symbol'],
-  vehicle: ['subtype', 'depreciation_rate'],
-  physical: ['subtype', 'depreciation_rate'],
-  deelneming: ['subtype', 'institution', 'kvk_number', 'ownership_percentage', 'annual_dividend', 'risk_profile'],
+  vehicle: ['subtype', 'depreciation_rate', 'sale_config'],
+  physical: ['subtype', 'depreciation_rate', 'sale_config'],
+  deelneming: ['subtype', 'institution', 'kvk_number', 'ownership_percentage', 'annual_dividend', 'risk_profile', 'sale_config'],
   levensverzekering: ['subtype', 'risk_profile', 'is_liquid', 'expiry_date', 'beneficiary'],
   vordering: ['subtype', 'institution', 'lock_end_date'],
-  other: [],
+  other: ['sale_config'],
 }
 
 // ── Projection calculations ──────────────────────────────────
@@ -426,6 +441,26 @@ export function resolveDepreciation(a: Asset): { rate: number; baseValue: number
   return effectiveDepRate > 0
     ? { rate: effectiveDepRate, baseValue: Number(a.purchase_value) || Number(a.current_value) }
     : null
+}
+
+/**
+ * Verwachte jaarlijkse koerswinst (€) over de meegenomen assets — gebruikt door de
+ * eerlijker net-worth-delta-spaarquote (koerswinst is geen sparen, dus eraf).
+ * BELANGRIJK: `expected_return` is een jaarlijks PERCENTAGE (bv. 7 = 7%), dus /100.
+ * Depreciërende assets tellen als 0; gewogen met net_worth_inclusion_pct zodat het
+ * aansluit op de (gewogen) netto-vermogen-delta. Eén gedeelde bron voor beide loaders
+ * zodat de eenheid niet kan driften.
+ */
+export function computeExpectedAnnualAppreciation(assets: Asset[]): number {
+  let total = 0
+  for (const a of assets) {
+    if (resolveDepreciation(a)) continue
+    const ret = Number(a.expected_return ?? 0) / 100
+    if (!(ret > 0)) continue
+    const incl = Number((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100
+    total += Number(a.current_value ?? 0) * ret * incl
+  }
+  return total
 }
 
 /**

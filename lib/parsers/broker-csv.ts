@@ -55,8 +55,13 @@ export const BROKER_PRESETS: BrokerPreset[] = [
   {
     id: 'degiro',
     label: 'DEGIRO',
-    description: 'Portfolio of transactie-export uit DEGIRO',
-    exampleHeader: 'Product,ISIN,Beurs,...',
+    // Steer the user to the right export: only Portfolio (Posities) and
+    // Transactie (Transacties) are supported. The Rekeningoverzicht
+    // (Account.csv) holds cash-mutations, not positions, so it cannot be
+    // imported as holdings — say so explicitly to prevent the wrong upload.
+    description:
+      'Portfolio- of Transactie-export uit DEGIRO — niet het Rekeningoverzicht (Account.csv)',
+    exampleHeader: 'Product,ISIN,Beurs,... (of Product;ISIN;Beurs;...)',
   },
   {
     id: 'saxo',
@@ -234,12 +239,33 @@ function buildRawRecord(headers: string[], fields: string[]): Record<string, str
 }
 
 /**
- * Case-insensitive, whitespace-trimmed column lookup.
+ * Case-insensitive, whitespace-trimmed column lookup (exact match).
  * Returns the field value or empty string if not found.
  */
 function col(headers: string[], fields: string[], name: string): string {
   const target = name.trim().toLowerCase()
   const idx = headers.findIndex((h) => h.trim().toLowerCase() === target)
+  if (idx === -1) return ''
+  return fields[idx] ?? ''
+}
+
+/**
+ * Case-insensitive column lookup by substring match (contains).
+ * Returns the value of the FIRST matching header, or empty string.
+ *
+ * Use this for columns whose full name varies across export versions, e.g.:
+ *   "Transactiekosten en/of" (old)  vs
+ *   "Transactiekosten en/of kosten van derden EUR" (new web export)
+ * Both contain "transactiekosten", so `colContains(h, f, 'transactiekosten')`
+ * matches either.
+ *
+ * For "Waarde EUR" vs "Waarde": pass the longer/specific string first and fall
+ * back manually — do NOT use colContains("waarde") alone because it would also
+ * hit "Lokale waarde".
+ */
+function colContains(headers: string[], fields: string[], needle: string): string {
+  const target = needle.trim().toLowerCase()
+  const idx = headers.findIndex((h) => h.trim().toLowerCase().includes(target))
   if (idx === -1) return ''
   return fields[idx] ?? ''
 }
@@ -299,11 +325,29 @@ export function detectBroker(content: string): BrokerType | null {
 }
 
 /**
- * Pick the column delimiter for a given broker. Dutch brokers (DEGIRO, Saxo,
- * ING) use semicolons; Trading 212 and eToro both use commas.
+ * Pick the column delimiter for a given broker. Trading 212 and eToro always
+ * use commas. Saxo and ING Beleggen use semicolons. For DEGIRO use
+ * `detectDelimiter` on the actual header line instead — both comma-delimited
+ * (web export) and semicolon-delimited (older desktop export) exist in the wild.
  */
 function delimiterFor(broker: BrokerType): ',' | ';' {
   return broker === 'trading212' || broker === 'etoro' ? ',' : ';'
+}
+
+/**
+ * Auto-detect the delimiter of a single header line by counting occurrences of
+ * `;`, `,` and tab. Returns the most-frequent one, or the provided fallback
+ * when counts are equal (avoids guessing on ambiguous single-column headers).
+ *
+ * This mirrors the logic in `app/(app)/core/cash/import/page.tsx` ~line 732-741
+ * and `lib/parsers/csv.ts` (splitCSVLine) — kept here to avoid a dependency on
+ * the bank-CSV module from the broker module.
+ */
+function detectDelimiter(headerLine: string, fallback: ',' | ';' = ';'): ',' | ';' {
+  const semicolons = (headerLine.match(/;/g) ?? []).length
+  const commas = (headerLine.match(/,/g) ?? []).length
+  if (semicolons === commas) return fallback
+  return semicolons > commas ? ';' : ','
 }
 
 // ---------------------------------------------------------------------------
@@ -318,6 +362,44 @@ function isDegiroTransaction(headersLower: string[]): boolean {
   return (
     headersLower.some((h) => h.startsWith('datum')) &&
     headersLower.some((h) => h.startsWith('transactiekosten'))
+  )
+}
+
+/**
+ * Marker columns that uniquely identify the DEGIRO "Rekeningoverzicht"
+ * (Account.csv) — a COMMA-delimited cash-mutation export. The triple
+ * Valutadatum + Mutatie + Saldo appears together ONLY in the account overview:
+ * the Portfolio and Transactie exports lack all three. (Product/ISIN are NOT
+ * discriminators — the account overview has them too, so we key on the
+ * cash-mutation columns instead.)
+ */
+const DEGIRO_ACCOUNT_MARKERS = ['valutadatum', 'mutatie', 'saldo']
+
+/**
+ * Single, specific, actionable error for an uploaded DEGIRO Rekeningoverzicht.
+ * We deliberately do NOT support Account.csv (it is cash-mutations, not
+ * holdings); instead we name the format and redirect the user to the Portfolio
+ * (actuele posities) or Transactie (handelshistorie) export. The wording is
+ * load-bearing: it must contain "Rekeningoverzicht" and mention Portfolio +
+ * Transacties so the user knows exactly which file to export instead.
+ */
+const DEGIRO_ACCOUNT_OVERVIEW_ERROR =
+  'Dit is het DEGIRO Rekeningoverzicht (cash-mutaties). Exporteer in DEGIRO je Portfolio voor je actuele posities (of Transacties voor je handelshistorie) en upload dat bestand.'
+
+/**
+ * Detect the DEGIRO Rekeningoverzicht from its (lowercased) header.
+ *
+ * Returns true when all of Valutadatum, Mutatie and Saldo appear among the
+ * headers. `some(...includes...)` per marker keeps this robust to the blank /
+ * duplicate header columns and stray whitespace in the real export.
+ *
+ * NOTE: the account overview is COMMA-delimited, so callers must pass a header
+ * representation that isn't mangled by the DEGIRO ';' delimiter — see the
+ * raw-line check in parseBrokerCSV.
+ */
+function isDegiroAccountOverview(headersLower: string[]): boolean {
+  return DEGIRO_ACCOUNT_MARKERS.every((marker) =>
+    headersLower.some((h) => h.includes(marker)),
   )
 }
 
@@ -336,27 +418,65 @@ function parseDegiroRow(
   if (isTransaction) {
     const dateStr = col(headers, fields, 'Datum')
     const units = parseNLNumber(col(headers, fields, 'Aantal'))
-    const price = parseNLNumber(col(headers, fields, 'Koers'))
-    const total = parseNLNumber(col(headers, fields, 'Waarde'))
-    const fees = parseNLNumber(col(headers, fields, 'Transactiekosten en/of'))
+
+    // "Waarde EUR" is the EUR-denominated value (used in the real DEGIRO web
+    // export). Older semicolon exports may label this column "Waarde". We try
+    // an EXACT "Waarde EUR" match first, then a substring match for variant
+    // spellings, and finally fall back to bare "Waarde" for backwards compat.
+    // IMPORTANT: "Lokale waarde" must NOT match here — it is in local currency
+    // (e.g. USD) and would give a wrong total. Preferring the exact match over
+    // the substring match removes any column-ordering dependency: if DEGIRO
+    // ever introduces a "Lokale waarde EUR" column, the exact "Waarde EUR"
+    // header is still picked instead of the first substring hit.
+    const waardeEurRaw =
+      col(headers, fields, 'Waarde EUR') !== ''
+        ? col(headers, fields, 'Waarde EUR')
+        : colContains(headers, fields, 'waarde eur')
+    const total = waardeEurRaw !== ''
+      ? parseNLNumber(waardeEurRaw)
+      : parseNLNumber(col(headers, fields, 'Waarde'))
+
+    // price_per_unit is derived in EUR: |WaardeEUR| / |Aantal|
+    // NOT the "Koers" column which is in local currency (e.g. USD).
+    // Guard against division by zero.
+    const absUnits = Math.abs(units)
+    const absTotal = Math.abs(total)
+    const price_per_unit = absUnits > 0 ? absTotal / absUnits : 0
+
+    // Fees: real export column is "Transactiekosten en/of kosten van derden EUR".
+    // Older exports use a shorter name. colContains matches both.
+    const fees = Math.abs(parseNLNumber(colContains(headers, fields, 'transactiekosten')))
 
     // Determine type from sign of units (positive = buy, negative = sell).
     // If units is exactly 0 this row is likely not a trade — skip it.
+    if (absUnits === 0) return null
     const type: HoldingRowType = units >= 0 ? 'buy' : 'sell'
+
+    // Order ID: DEGIRO quirk — the last header field is empty, so the UUID
+    // is one position to the right of the "Order ID" header. We therefore read
+    // it robustly: take the last non-empty field in the data row that looks like
+    // a UUID (8-4-4-4-12 hex). This is more reliable than relying on the
+    // shifted column index.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const orderId = [...fields].reverse().find((f) => UUID_RE.test(f.trim())) ?? ''
+
+    // Store the order-id in raw["Order ID"] so downstream import steps can
+    // persist it as an external_id without needing type changes.
+    const rawWithOrderId = { ...raw, 'Order ID': orderId }
 
     return {
       name,
       ticker: null,
       isin,
-      units: Math.abs(units),
-      price_per_unit: Math.abs(price),
-      total_amount: Math.abs(total),
+      units: absUnits,
+      price_per_unit,
+      total_amount: absTotal,
       date: parseNLDate(dateStr),
       type,
-      fees: Math.abs(fees),
+      fees,
       currency: 'EUR',
       exchange,
-      raw,
+      raw: rawWithOrderId,
     }
   }
 
@@ -589,7 +709,30 @@ export function parseBrokerCSV(content: string, broker: BrokerType): BrokerParse
     return result
   }
 
-  const delim = delimiterFor(broker)
+  // DEGIRO Rekeningoverzicht (Account.csv) is COMMA-delimited cash-mutations and
+  // is deliberately NOT supported. Detect it BEFORE parsing so the user gets a
+  // specific, actionable error instead of the generic "wrong brokerformat" one.
+  // The header line is comma-separated, but delimiterFor('degiro') is ';', so a
+  // ';'-split would yield one field (the whole line). We therefore detect on the
+  // raw header line, split on comma, lowercased.
+  if (broker === 'degiro') {
+    const accountHeaderLower = lines[headerIdx]
+      .split(',')
+      .map((h) => h.toLowerCase())
+    if (isDegiroAccountOverview(accountHeaderLower)) {
+      result.errors.push(DEGIRO_ACCOUNT_OVERVIEW_ERROR)
+      return result // rows stay empty; no generic fallback message
+    }
+  }
+
+  // For DEGIRO: auto-detect the actual delimiter from the header line because
+  // the web export uses commas while the older desktop/classic export uses
+  // semicolons. All other brokers keep their hardcoded delimiter.
+  const delim: ',' | ';' =
+    broker === 'degiro'
+      ? detectDelimiter(lines[headerIdx], ';')
+      : delimiterFor(broker)
+
   const rawHeaders = splitLine(lines[headerIdx], delim)
   const headers = normaliseHeaders(rawHeaders)
 
@@ -648,9 +791,19 @@ export function parseBrokerCSV(content: string, broker: BrokerType): BrokerParse
   }
 
   if (result.rows.length === 0 && result.skipped > 0) {
-    result.errors.push(
-      'Geen geldige rijen gevonden. Controleer of het juiste brokerformaat is geselecteerd.',
-    )
+    // Make the generic fallback format-aware: if this is a DEGIRO upload whose
+    // header still looks like the Rekeningoverzicht (defensive — the early
+    // return above normally catches it), surface the specific redirect instead
+    // of the unhelpful generic text. `headersLower` here comes from the ';'-split
+    // header, but isDegiroAccountOverview matches substrings, so it still hits
+    // the comma-joined account header.
+    if (broker === 'degiro' && isDegiroAccountOverview(headersLower)) {
+      result.errors.push(DEGIRO_ACCOUNT_OVERVIEW_ERROR)
+    } else {
+      result.errors.push(
+        'Geen geldige rijen gevonden. Controleer of het juiste brokerformaat is geselecteerd.',
+      )
+    }
   }
 
   return result

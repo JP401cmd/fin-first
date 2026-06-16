@@ -675,14 +675,14 @@ export default function BelastingPage() {
                               ? 'bg-blue-400'
                               : ac.category === 'beleggingen'
                               ? 'bg-amber-400'
-                              : 'bg-gray-300'
+                              : 'bg-[var(--border-md)]'
                           }`}
                         />
                         <span className="truncate text-[var(--ink-2)]">{ac.asset.name}</span>
                         {ac.asset.asset_type === 'vordering' && ac.asset.subtype === 'dga_lening' && (
                           <span className="group relative shrink-0">
                             <Info className="h-3 w-3 text-[var(--ink-4)] cursor-help" />
-                            <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-56 rounded bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-56 rounded bg-[var(--ink)] px-2 py-1 text-[10px] text-[var(--paper)] opacity-0 group-hover:opacity-100 transition-opacity z-10">
                               {BOX3_TOOLTIPS.vorderingDGA}
                             </span>
                           </span>
@@ -690,7 +690,7 @@ export default function BelastingPage() {
                         {ac.note && (
                           <span className="group relative shrink-0">
                             <Info className="h-3 w-3 text-[var(--ink-4)] cursor-help" />
-                            <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-56 rounded bg-gray-900 px-2 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-56 rounded bg-[var(--ink)] px-2 py-1 text-[10px] text-[var(--paper)] opacity-0 group-hover:opacity-100 transition-opacity z-10">
                               {ac.note}
                             </span>
                           </span>
@@ -724,7 +724,7 @@ export default function BelastingPage() {
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <span
                             className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-                              dc.inBox3 ? 'bg-red-400' : 'bg-gray-300'
+                              dc.inBox3 ? 'bg-red-400' : 'bg-[var(--border-md)]'
                             }`}
                           />
                           <span className="truncate text-[var(--ink-2)]">{dc.debt.name}</span>

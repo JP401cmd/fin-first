@@ -47,6 +47,7 @@
  */
 
 import { MobileBottomBarLive } from '@/components/app/shell/mobile-bottom-bar-live'
+import { ModalFooter } from '@/components/app/modal-footer'
 import type { PaneAction } from '@/components/app/shell/slide-in-pane'
 
 export type PageActionBarProps = {
@@ -137,28 +138,30 @@ export function PageActionBar({
             right: 'var(--chat-sidebar-width, 0px)',
           }}
         >
-          <button
-            type="button"
-            onClick={primaryAction.onClick}
-            disabled={primaryAction.disabled || primaryAction.loading}
-            className="inline-flex min-h-11 items-center justify-center bg-[var(--ink)] px-4 text-sm font-medium leading-none text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
-          >
-            {primaryAction.loading
-              ? `${primaryAction.label} …`
-              : primaryAction.label}
-          </button>
-          {secondaryAction && (
-            <button
-              type="button"
-              onClick={secondaryAction.onClick}
-              disabled={secondaryAction.disabled}
-              className="inline-flex min-h-11 items-center justify-center border-2 border-[var(--ink)] bg-[var(--paper)] px-4 text-sm font-medium leading-none text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
-            >
-              {secondaryAction.label}
-            </button>
-          )}
+          {/* Knoppen via de gedeelde ModalFooter (layout="inline", primary
+              EERST/links). De inner `flex items-center gap-3 justify-start`
+              die ModalFooter rendert is visueel identiek aan de eerdere
+              hand-gerolde knoppenrij; de buitenste fixed-strip blijft de
+              positionering/backdrop verzorgen. */}
+          <ModalFooter
+            layout="inline"
+            align="start"
+            primary={{
+              label: primaryAction.label,
+              onClick: primaryAction.onClick,
+              disabled: primaryAction.disabled,
+              loading: primaryAction.loading,
+            }}
+            secondary={
+              secondaryAction
+                ? {
+                    label: secondaryAction.label,
+                    onClick: secondaryAction.onClick,
+                    disabled: secondaryAction.disabled,
+                  }
+                : undefined
+            }
+          />
         </div>
       )}
     </>

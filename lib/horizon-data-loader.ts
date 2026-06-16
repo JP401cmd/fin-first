@@ -251,7 +251,7 @@ export async function loadHorizonData(
     supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
-    supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
+    supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
     supabase
       .from('actions')
       .select('*, recommendation:recommendations(title, recommendation_type)')
@@ -547,6 +547,9 @@ export async function loadHorizonData(
     estimatedAnnualIncome: extrapolatedIncome,
     estimatedMonthlyExpenses: profileMonthlyExpenses,
     savingsRate6m,
+    // Handmatig pad volgt dezelfde definitie als het transactie-pad.
+    monthlyDebtAflossing: debtAflossing6m / 6,
+    monthlySavingsContribution: extSavingsBudget6 / 6,
   })
 
 

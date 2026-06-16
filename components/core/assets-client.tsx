@@ -78,10 +78,16 @@ import {
   RETIREMENT_PROVIDER_LABELS,
   projectPortfolio,
 } from '@/lib/asset-data'
+import {
+  type SaleConfig,
+  type SaleStand,
+  parseSaleConfig,
+} from '@/lib/sale-config'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
 import { AangifteImportPane } from '@/components/onboarding/aangifte-import-pane'
 import { AssetEditConnectionSection } from './asset-edit-connection-section'
+import { AssetEditBrokerSection } from './asset-edit-broker-section'
 import { CryptoHoldingCard } from '@/components/holdings/crypto-holding-card'
 import { InvestmentHoldingCard } from '@/components/holdings/investment-holding-card'
 import { VermogenAssetCard } from './vermogen-asset-card'
@@ -923,6 +929,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           defaultType={newAssetType ?? undefined}
           linkedBankAccounts={linkedBankAccounts}
           budgetingActive={budgetingActive}
+          dailyExpenses={dailyExpenses}
           onClose={() => { setShowForm(false); setEditAsset(null); setNewAssetType(null) }}
           onSaved={() => {
             setShowForm(false)
@@ -2573,8 +2580,10 @@ export function AssetForm({
   onSaved,
   budgetingActive = true,
   initialConnection = null,
+  initialBrokerConnection = null,
   embedded = false,
   onActionsChange,
+  dailyExpenses = 0,
 }: {
   asset?: Asset
   defaultType?: AssetType
@@ -2590,6 +2599,13 @@ export function AssetForm({
    */
   initialConnection?: import('@/lib/connections-data').AssetConnectionSummary | null
   /**
+   * Initiële broker-koppeling voor de "Externe koppeling"-sectie van
+   * `investment`-assets (Trading 212 / CSV). Alleen relevant voor investment —
+   * voor andere types is dit altijd `null` en wordt de sectie niet gerenderd.
+   * Wordt door de pane/flow meegegeven uit de batch-fetch bij modal-open.
+   */
+  initialBrokerConnection?: import('@/lib/broker-connections-data').BrokerConnectionRow | null
+  /**
    * Wanneer true rendert deze component alleen de body en publiceert het
    * save-state naar de pane-wrapper via `onActionsChange`. Geen interne
    * BottomSheet, geen interne Annuleren/Opslaan-knoppen.
@@ -2601,6 +2617,13 @@ export function AssetForm({
    * pane-footer die `state.save()` aanroept.
    */
   onActionsChange?: (state: AssetEditActionsState) => void
+  /**
+   * Dagtarief (€/dag) voor de vrijheidstijd-context bij de verkoopstrategie
+   * ("dit staat voor X vrijheidsdagen"). Optioneel: alleen het standalone
+   * bewerkscherm (`assets-client.tsx`) geeft 'm mee; embedded pane/flow-callers
+   * laten 'm weg en de vrijheidstijd-regel verdwijnt dan gracieus (0 → verborgen).
+   */
+  dailyExpenses?: number
 }) {
   const fc = useFc()
   const isEdit = !!asset
@@ -2674,6 +2697,34 @@ export function AssetForm({
   const [expiryDate, setExpiryDate] = useState(asset?.expiry_date ?? '')
   const [beneficiary, setBeneficiary] = useState(asset?.beneficiary ?? '')
   const [linkedAssetId, setLinkedAssetId] = useState(asset?.linked_asset_id ?? '')
+  // ── Verkoopstrategie in prognose (zie lib/sale-config.ts) ──
+  // Initiële stand + velden uit de bestaande sale_config (parser geeft de
+  // resolve-time default `wanneer_nodig` terug voor een config-loze niet-liquide
+  // asset, zodat "Automatisch bij behoefte" actief toont).
+  const initialSaleConfig = useMemo(() => parseSaleConfig(asset?.sale_config), [asset?.sale_config])
+  const [saleStand, setSaleStand] = useState<SaleStand>(initialSaleConfig.stand)
+  const [saleTriggerAge, setSaleTriggerAge] = useState(
+    initialSaleConfig.stand !== 'niet_verkopen' && initialSaleConfig.triggerAge != null
+      ? String(initialSaleConfig.triggerAge)
+      : ''
+  )
+  const [saleTriggerDate, setSaleTriggerDate] = useState(
+    initialSaleConfig.stand === 'vast_moment' && initialSaleConfig.triggerDate ? initialSaleConfig.triggerDate : ''
+  )
+  // 'leeftijd' | 'datum' — welk veld de gebruiker voor het vaste moment invult.
+  const [saleMomentMode, setSaleMomentMode] = useState<'leeftijd' | 'datum'>(
+    initialSaleConfig.stand === 'vast_moment' && initialSaleConfig.triggerDate ? 'datum' : 'leeftijd'
+  )
+  const [saleCostsPct, setSaleCostsPct] = useState(
+    initialSaleConfig.stand !== 'niet_verkopen' && initialSaleConfig.salesCostsPct != null
+      ? String(Math.round(initialSaleConfig.salesCostsPct * 1000) / 10) // fractie → % (bv. 0.06 → 6)
+      : ''
+  )
+  const [salePayoffDebtIds, setSalePayoffDebtIds] = useState<string[]>(
+    initialSaleConfig.stand !== 'niet_verkopen' && initialSaleConfig.payoffDebtIds ? initialSaleConfig.payoffDebtIds : []
+  )
+  // Actieve schulden van de gebruiker voor de "Aflossen bij verkoop"-keuze.
+  const [activeDebts, setActiveDebts] = useState<{ id: string; name: string }[]>([])
   const [deelnemingOptions, setDeelnemingOptions] = useState<{ id: string; name: string }[]>([])
   const [dgaTotal, setDgaTotal] = useState(0)
   const [wozLoading, setWozLoading] = useState(false)
@@ -2686,6 +2737,9 @@ export function AssetForm({
 
   const subtypeOptions = ASSET_SUBTYPE_LABELS[assetType]
   const visibleFields = ASSET_TYPE_FIELDS[assetType]
+  // Toont de verkoopstrategie-sectie? Geldt voor de niet-liquide types die de
+  // v2-grootboek-engine kan liquideren (sale_config in ASSET_TYPE_FIELDS).
+  const showSaleConfig = visibleFields.includes('sale_config')
 
   // Load deelneming options + DGA total when subtype is dga_lening
   useEffect(() => {
@@ -2707,6 +2761,22 @@ export function AssetForm({
         setDgaTotal(total)
       })
   }, [subtype, asset?.id])
+
+  // Laad de actieve schulden voor "Aflossen bij verkoop" zodra de
+  // verkoopstrategie-sectie zichtbaar is (niet-liquide type).
+  useEffect(() => {
+    if (!showSaleConfig) {
+      setActiveDebts([])
+      return
+    }
+    const supabase = createClient()
+    supabase
+      .from('debts')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .then(({ data }) => setActiveDebts((data as { id: string; name: string }[]) ?? []))
+  }, [showSaleConfig])
 
   function handleTypeChange(type: AssetType) {
     setAssetType(type)
@@ -2805,6 +2875,37 @@ export function AssetForm({
 
     const isCashType = assetType === 'cash'
 
+    // Bouw de SaleConfig uit de UI-state. Alleen voor niet-liquide types die de
+    // sectie tonen; anders null (laat de DB-default/parser z'n werk doen).
+    const showSaleConfigOnSave = ASSET_TYPE_FIELDS[assetType].includes('sale_config')
+    let saleConfigPayload: SaleConfig | null = null
+    if (showSaleConfigOnSave) {
+      const pctNum = saleCostsPct ? Number(saleCostsPct) : NaN
+      const salesCostsPct = Number.isFinite(pctNum) && pctNum > 0 ? pctNum / 100 : undefined // % → fractie
+      const ageNum = saleTriggerAge ? Number(saleTriggerAge) : NaN
+      const triggerAge = Number.isFinite(ageNum) && ageNum > 0 ? ageNum : undefined
+      const payoffDebtIds = salePayoffDebtIds.length > 0 ? salePayoffDebtIds : undefined
+      if (saleStand === 'niet_verkopen') {
+        saleConfigPayload = { stand: 'niet_verkopen' }
+      } else if (saleStand === 'vast_moment') {
+        saleConfigPayload = {
+          stand: 'vast_moment',
+          ...(saleMomentMode === 'datum'
+            ? { triggerDate: saleTriggerDate || null }
+            : { triggerAge: triggerAge ?? null }),
+          ...(salesCostsPct !== undefined ? { salesCostsPct } : {}),
+          ...(payoffDebtIds ? { payoffDebtIds } : {}),
+        }
+      } else {
+        saleConfigPayload = {
+          stand: 'wanneer_nodig',
+          ...(triggerAge !== undefined ? { triggerAge } : {}),
+          ...(salesCostsPct !== undefined ? { salesCostsPct } : {}),
+          ...(payoffDebtIds ? { payoffDebtIds } : {}),
+        }
+      }
+    }
+
     const row = {
       user_id: user.id,
       name,
@@ -2830,6 +2931,9 @@ export function AssetForm({
       depreciation_rate: depreciationRate ? Number(depreciationRate) : null,
       address_postcode: addressPostcode || null,
       address_house_number: addressHouseNumber || null,
+      // Verkoopstrategie in prognose (alleen niet-liquide types; anders null →
+      // parser/DB-default `wanneer_nodig`). Zie lib/sale-config.ts.
+      sale_config: showSaleConfigOnSave ? saleConfigPayload : null,
       // Household fields
       ownership: ownership,
       household_id: ownership === 'shared' ? householdId : null,
@@ -3314,6 +3418,17 @@ export function AssetForm({
             />
           )}
 
+          {/* Broker-koppeling sectie — alleen voor investment-assets, en alleen
+              bij bewerken van een bestaand asset (een koppeling vereist een
+              persistente asset-ID). Trading 212 (sync) of CSV-import. */}
+          {isEdit && asset && assetType === 'investment' && (
+            <AssetEditBrokerSection
+              assetId={asset.id}
+              assetName={asset.name}
+              initialConnection={initialBrokerConnection}
+            />
+          )}
+
           {/* Hypotheekplanner-app toggle (eigen_huis only) — patroon analoog aan budget/holdings hierboven. */}
           {assetType === 'eigen_huis' && (
             <label className="flex items-start gap-3 rounded-[var(--r)] border border-kern-200 bg-kern-50/30 p-3 cursor-pointer">
@@ -3597,6 +3712,213 @@ export function AssetForm({
                   </>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* ── Verkoopstrategie in prognose ──
+              Stelt assets.sale_config in: of/wanneer de horizon-prognose dit
+              bezit verkoopt. Horizon-context (dit voedt de toekomstprognose),
+              dus horizon-accenten. */}
+          {showSaleConfig && (
+            <div className="space-y-3 rounded-[var(--r)] border border-horizon-100 bg-horizon-50/30 p-3">
+              <div>
+                <p id="sale-config-legend" className="text-xs font-semibold uppercase text-horizon-700/60">Verkoopstrategie in prognose</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-3)]">
+                  Bepaal hoe je toekomstprognose dit bezit behandelt: wel of niet verkopen, en wanneer.
+                </p>
+              </div>
+
+              {/* Vrijheidstijd-context bij de waarde — "geld is opgeslagen tijd". */}
+              {dailyExpenses > 0 && Number(currentValue) > 0 && (
+                <p className="text-[11px] text-[var(--ink-3)]">
+                  Deze waarde van <span className="font-medium text-[var(--ink-2)]">{fc(Number(currentValue))}</span> staat voor{' '}
+                  <span className="font-medium text-horizon-700">
+                    {formatFreedomTimeString(calculateFreedomTime(Number(currentValue), dailyExpenses), 'long')}
+                  </span>{' '}
+                  vrijheid.
+                </p>
+              )}
+
+              {/* Drie-weg keuze — verticale radio-cards (375px-proof). */}
+              <div role="radiogroup" aria-labelledby="sale-config-legend" className="space-y-2">
+                {([
+                  {
+                    stand: 'wanneer_nodig' as SaleStand,
+                    title: 'Automatisch bij behoefte',
+                    desc: 'Verkoop pas zodra je liquide middelen tekortschieten.',
+                  },
+                  {
+                    stand: 'vast_moment' as SaleStand,
+                    title: 'Op een vast moment',
+                    desc: 'Verkoop op een vaste leeftijd of datum.',
+                  },
+                  {
+                    stand: 'niet_verkopen' as SaleStand,
+                    title: 'Niet verkopen',
+                    desc: 'Dit bezit blijft staan in de prognose.',
+                  },
+                ]).map((opt) => {
+                  const active = saleStand === opt.stand
+                  return (
+                    <label
+                      key={opt.stand}
+                      className={`flex cursor-pointer items-start gap-3 rounded-[var(--r)] border p-3 transition-colors ${
+                        active
+                          ? 'border-horizon-400 bg-horizon-50'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:bg-[var(--subtle)]'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="sale-stand"
+                        value={opt.stand}
+                        aria-label={opt.title}
+                        checked={active}
+                        onChange={() => setSaleStand(opt.stand)}
+                        className="mt-0.5 shrink-0 accent-horizon-600"
+                      />
+                      <span className="min-w-0">
+                        <span className={`block text-sm font-medium ${active ? 'text-horizon-800' : 'text-[var(--ink)]'}`}>
+                          {opt.title}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] leading-relaxed text-[var(--ink-3)]">{opt.desc}</span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+
+              {/* Conditionele velden per stand. */}
+              {saleStand === 'wanneer_nodig' && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                    Uiterlijke leeftijd <span className="text-[var(--ink-4)]">(optioneel)</span>
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={saleTriggerAge}
+                    onChange={(e) => setSaleTriggerAge(e.target.value)}
+                    placeholder="Bijv. 75"
+                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                    Laat leeg om alleen bij een tekort te verkopen. Vul in om uiterlijk op deze leeftijd te verkopen, ook zonder tekort.
+                  </p>
+                </div>
+              )}
+
+              {saleStand === 'vast_moment' && (
+                <div className="space-y-3">
+                  {/* Leeftijd of datum — één van beide. */}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSaleMomentMode('leeftijd')}
+                      className={`flex-1 rounded-[var(--r)] border px-3 py-2.5 text-xs font-medium transition-colors ${
+                        saleMomentMode === 'leeftijd'
+                          ? 'border-horizon-400 bg-horizon-50 text-horizon-800'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+                      }`}
+                    >
+                      Op leeftijd
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSaleMomentMode('datum')}
+                      className={`flex-1 rounded-[var(--r)] border px-3 py-2.5 text-xs font-medium transition-colors ${
+                        saleMomentMode === 'datum'
+                          ? 'border-horizon-400 bg-horizon-50 text-horizon-800'
+                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+                      }`}
+                    >
+                      Op datum
+                    </button>
+                  </div>
+                  {saleMomentMode === 'leeftijd' ? (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Leeftijd</label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={saleTriggerAge}
+                        onChange={(e) => setSaleTriggerAge(e.target.value)}
+                        placeholder="Bijv. 67"
+                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Datum</label>
+                      <input
+                        type="date"
+                        value={saleTriggerDate}
+                        onChange={(e) => setSaleTriggerDate(e.target.value)}
+                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Gedeelde optionele velden bij 'vast_moment' en 'wanneer_nodig'. */}
+              {saleStand !== 'niet_verkopen' && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                      Verkoopkosten % <span className="text-[var(--ink-4)]">(optioneel)</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="100"
+                      inputMode="decimal"
+                      value={saleCostsPct}
+                      onChange={(e) => setSaleCostsPct(e.target.value)}
+                      placeholder="Bijv. 6"
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                    />
+                    <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+                      Kosten die van de opbrengst afgaan (makelaar, overdracht). Leeg = standaard voor dit type.
+                    </p>
+                  </div>
+
+                  {activeDebts.length > 0 && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
+                        Aflossen bij verkoop <span className="text-[var(--ink-4)]">(optioneel)</span>
+                      </label>
+                      <p className="mb-2 text-[10px] text-[var(--ink-4)]">
+                        Kies welke schulden je met de opbrengst aflost.
+                      </p>
+                      <div className="space-y-1.5">
+                        {activeDebts.map((d) => {
+                          const checked = salePayoffDebtIds.includes(d.id)
+                          return (
+                            <label
+                              key={d.id}
+                              className="flex cursor-pointer items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) =>
+                                  setSalePayoffDebtIds((prev) =>
+                                    e.target.checked ? [...prev, d.id] : prev.filter((id) => id !== d.id)
+                                  )
+                                }
+                                className="rounded border-[var(--border-md)] accent-horizon-600"
+                              />
+                              <span className="min-w-0 truncate">{d.name}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 

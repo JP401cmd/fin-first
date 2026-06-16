@@ -10,12 +10,13 @@
  */
 
 import { ageAtDate, DEFAULT_RETURN, INFLATION, type FinancialInput, type LifeEvent } from '@/lib/horizon-data'
-import { NL_AOW_AGE } from '@/lib/constants'
+import { NL_AOW_AGE, SALES_COSTS_BY_TYPE, DEFAULT_SALES_COSTS_PCT } from '@/lib/constants'
 import { lifeEventsToCashflows, type SimCashflow } from '@/lib/fire-simulation'
 import { type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { UnifiedProjectionInput, AssetLiquidation } from '@/lib/unified-projection'
-import type { Asset } from '@/lib/asset-data'
+import type { Asset, AssetType } from '@/lib/asset-data'
+import { parseSaleConfig } from '@/lib/sale-config'
 import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import {
@@ -34,7 +35,7 @@ import {
   type HousingTriggerSimBasis,
   type HousingScenarioResult,
 } from '@/lib/housing-trigger'
-import { expandGroupsToAssetTypes, isDefaultGroupOrder, type PotRulesConfig } from '@/lib/pot-rules'
+import { expandGroupsToAssetTypes, expandSingleGroupToAssetTypes, isDefaultGroupOrder, type PotRulesConfig } from '@/lib/pot-rules'
 import { runHorizonLedger } from './engine'
 import { runSelectedProjection } from './select'
 import type { HorizonStrategyOptions } from './strategies'
@@ -106,7 +107,12 @@ function potRulesToStrategyOptions(config: PotRulesConfig | undefined): Partial<
   if (config.surplusGroup === 'schuld_aflossen') {
     opts.surplus = 'aflossen-eerst'
   } else {
-    opts.surplusTargetTypes = expandGroupsToAssetTypes([config.surplusGroup])
+    // Surplus-DOEL = exclusief de gekozen pot (bv. spaargeld → cash/savings),
+    // NIET de volledige 10-type-waterfall. `expandGroupsToAssetTypes` vult de
+    // overige groepen aan (juist voor een onttrekkings-volgorde, fout voor een
+    // bestemming) → dat liet overschot/liquidatie-opbrengst pro-rata over álle
+    // potten lopen i.p.v. naar de voorkeurspot. Zie expandSingleGroupToAssetTypes.
+    opts.surplusTargetTypes = expandSingleGroupToAssetTypes(config.surplusGroup)
   }
   return opts
 }
@@ -324,6 +330,173 @@ function buildV2DownsizeHousing(
   return { rentEvents, assetLiquidations, depletion, triggerAge }
 }
 
+/**
+ * Niet-liquide asset-types die via een verkoop-life-event binnen het v2-grootboek
+ * geliquideerd kunnen worden (ADR 0015, generiek). Bewust GEEN `eigen_huis`: dat
+ * loopt via het downsize-pad (`buildV2DownsizeHousing`) met zijn eigen trigger +
+ * gebruiker-instelbare verkoopkosten. Liquide types (cash/savings/investment/
+ * retirement/crypto) zijn nooit in scope — die worden direct als liquide pot
+ * besteed; ze "verkopen" voegt niets toe.
+ *
+ * `levensverzekering` en `vordering` staan hier bewust NIET in: het zijn liquide-
+ * achtige uitkeringen/vorderingen die als geldstroom binnenkomen (een life event
+ * met monthly_income_change/one_time inkomen), niet als een te liquideren
+ * niet-liquide bezit. Toevoegen zou hen ten onrechte als asset-verkoop modelleren.
+ */
+const LIQUIDATABLE_NON_LIQUID: Set<AssetType> = new Set([
+  'vehicle',
+  'physical',
+  'other',
+  'deelneming',
+  'real_estate',
+])
+
+/**
+ * Voeg de (optionele) huis-downsize-liquidatie samen met de generieke verkoop-
+ * liquidaties tot één `AssetLiquidation[]`. Lege uitkomst → undefined (zodat het
+ * veld weg blijft als er niets te liquideren valt — bestaande callers/tests
+ * verwachten undefined i.p.v. een lege array bij geen huis-downsize).
+ */
+function mergeLiquidations(
+  housing: AssetLiquidation[] | undefined,
+  generic: AssetLiquidation[],
+): AssetLiquidation[] | undefined {
+  const merged = [...(housing ?? []), ...generic]
+  return merged.length > 0 ? merged : undefined
+}
+
+/**
+ * Bouw de generieke (niet-eigen_huis) asset-liquidaties uit de **`sale_config` per
+ * asset** — de ENIGE bron voor het of/wanneer van een niet-liquide verkoop (ADR
+ * 0020). Iedere actieve, niet-liquide (`LIQUIDATABLE_NON_LIQUID`), niet-`eigen_huis`
+ * asset met waarde > 0 wordt geëvalueerd:
+ *   • `niet_verkopen`  → geen entry (asset blijft staan).
+ *   • `vast_moment`    → `fixed_age`-`AssetLiquidation` op de leeftijd (of datum →
+ *                        `ageAtDate`); verleden = stille skip.
+ *   • `wanneer_nodig`  → `on_demand`-`AssetLiquidation` (geen vaste leeftijd; de
+ *                        engine verkoopt bij liquiditeitstekort). Optioneel
+ *                        `triggerAge` = fallback-plafond; ontbreekt het → géén
+ *                        plafond (`Number.POSITIVE_INFINITY`).
+ *
+ * RESOLVE-TIME DEFAULT: een asset zónder (geldige) `sale_config` valt via
+ * `parseSaleConfig` terug op `wanneer_nodig` (geen backfill). Alleen een expliciete
+ * `niet_verkopen` zet verkoop uit.
+ *
+ * SSoT — `sale_config` PREVALEERT boven `linked_asset_id`: de oude life-event-driver
+ * is geen bron meer. We lezen wél nog `metadata.verkoopprijs`/`verkoopkostenPct`/
+ * `payoffDebtIds` van een eventueel gekoppeld verkoop-event (via `linked_asset_id`)
+ * als KALIBRATIE/aanvulling, en onderdrukken dan diens eenmalige opbrengst-cashflow
+ * (`handledEventIds`) om dubbeltelling te voorkomen. De maandelijkse gevolgen
+ * (bv. wegvallend onderhoud) van zo'n event blijven bewust bestaan.
+ *
+ * Opbrengst wordt op de ECHTE engine-asset-waarde op het verkoopjaar berekend
+ * ("consume don't recompute"); `salePricePct` schaalt alleen de prijs-fractie.
+ */
+function buildGenericAssetLiquidations(
+  events: LifeEvent[],
+  assets: Asset[],
+  currentAge: number,
+  dateOfBirth: string | null,
+): { liquidations: AssetLiquidation[]; handledEventIds: Set<string> } {
+  const liquidations: AssetLiquidation[] = []
+  const handledEventIds = new Set<string>()
+
+  // Verkoop-events gekoppeld aan een asset (voor optionele kalibratie + onderdrukking
+  // van hun opbrengst-cashflow). Eén event per asset volstaat (eerste actieve).
+  //
+  // AANNAME (M2): een `linked_asset_id` op een life_event betekent UITSLUITEND een
+  // verkoop-/liquidatie-koppeling. We filteren bewust NIET op `event_type`: de
+  // verkoop-events dragen vandaag het generieke type `'custom'` (er bestaat geen
+  // dedicated `'verkoop'`-type — zie test-personas "Stacaravan verkopen" +
+  // migratie 20260616020000), dus een type-filter zou óf niets afvangen óf legitieme
+  // verkopen wegfilteren. De DB-kolom (`life_events.linked_asset_id`, ON DELETE SET
+  // NULL) en het `LifeEvent`-type documenteren dezelfde betekenis. Krijgt een ander
+  // event-type later óók een `linked_asset_id` met andere semantiek, dan moet hier
+  // alsnog een expliciet type-filter komen.
+  const eventByAssetId = new Map<string, LifeEvent>()
+  for (const ev of events) {
+    if (!ev.is_active || !ev.linked_asset_id) continue
+    if (!eventByAssetId.has(ev.linked_asset_id)) eventByAssetId.set(ev.linked_asset_id, ev)
+  }
+
+  for (const asset of assets) {
+    if (asset.is_active === false) continue
+    // eigen_huis loopt via het downsize-pad; liquide types zijn niet in scope.
+    if (asset.asset_type === 'eigen_huis') continue
+    if (!LIQUIDATABLE_NON_LIQUID.has(asset.asset_type)) continue
+    // Waardeloos/negatief asset → niets te verkopen (stille skip).
+    const currentValue = Number(asset.current_value ?? 0)
+    if (!Number.isFinite(currentValue) || currentValue <= 0) continue
+
+    const cfg = parseSaleConfig((asset as { sale_config?: unknown }).sale_config)
+    if (cfg.stand === 'niet_verkopen') {
+      // M1: asset blijft staan (geen liquidatie), MAAR onderdruk wél de eenmalige
+      // opbrengst van een eventueel gekoppeld verkoop-event. Anders zou die
+      // opbrengst-cashflow (one_time_cost < 0 of metadata.cashflows-income) als
+      // "geld uit het niets" binnenstromen terwijl het asset nooit verkocht wordt.
+      // De maandelijkse gevolgen (bv. wegvallend onderhoud) blijven via
+      // lifeEventsToCashflows bestaan; alleen de opbrengst-portie vervalt.
+      const nietVerkopenEvent = eventByAssetId.get(asset.id)
+      if (nietVerkopenEvent) handledEventIds.add(nietVerkopenEvent.id)
+      continue
+    }
+
+    // Optioneel gekoppeld verkoop-event: kalibratie + opbrengst-onderdrukking.
+    const linkedEvent = eventByAssetId.get(asset.id)
+    const meta = (linkedEvent?.metadata ?? {}) as Record<string, unknown>
+
+    // salePricePct = verkoopprijs / huidige waarde, geclampt op [0, 2]; ontbrekend
+    // → 1.0 (verkoop tegen de geprojecteerde marktwaarde zelf).
+    const verkoopprijs = Number(meta.verkoopprijs ?? 0)
+    const salePricePct =
+      Number.isFinite(verkoopprijs) && verkoopprijs > 0
+        ? Math.min(2, Math.max(0, verkoopprijs / currentValue))
+        : 1.0
+
+    // Verkoopkosten: sale_config-override > per-event override > type-default > fallback.
+    // Alle overrides al gevalideerd op [0, 0.20] (parseSaleConfig / hieronder).
+    const eventOverridePct = Number(meta.verkoopkostenPct)
+    const eventCosts =
+      Number.isFinite(eventOverridePct) && eventOverridePct >= 0 && eventOverridePct <= 0.2
+        ? eventOverridePct
+        : undefined
+    const salesCostsPct =
+      cfg.salesCostsPct ?? eventCosts ?? SALES_COSTS_BY_TYPE[asset.asset_type] ?? DEFAULT_SALES_COSTS_PCT
+
+    // payoffDebtIds: sale_config > event-metadata.
+    const rawEventPayoff = meta.payoffDebtIds
+    const eventPayoff = Array.isArray(rawEventPayoff)
+      ? rawEventPayoff.filter((d): d is string => typeof d === 'string')
+      : []
+    const payoffDebtIds = cfg.payoffDebtIds ?? eventPayoff
+
+    if (cfg.stand === 'vast_moment') {
+      // Vaste leeftijd: primair triggerAge; anders triggerDate → ageAtDate.
+      let age: number | null = cfg.triggerAge ?? null
+      if ((age === null) && cfg.triggerDate && dateOfBirth) {
+        const derived = ageAtDate(dateOfBirth, new Date(cfg.triggerDate))
+        if (Number.isFinite(derived)) age = derived
+      }
+      if (age === null || !Number.isFinite(age)) continue
+      // Verleden-verkoop overslaan (consistent met de huis-trigger).
+      if (age < currentAge) continue
+      liquidations.push({ assetId: asset.id, age, trigger: 'fixed_age', salePricePct, salesCostsPct, payoffDebtIds })
+      if (linkedEvent) handledEventIds.add(linkedEvent.id)
+      continue
+    }
+
+    // wanneer_nodig (incl. resolve-time default): on_demand. `triggerAge` = optioneel
+    // fallback-plafond; ontbreekt het → geen plafond.
+    const plafond = cfg.triggerAge != null && Number.isFinite(cfg.triggerAge)
+      ? cfg.triggerAge
+      : Number.POSITIVE_INFINITY
+    liquidations.push({ assetId: asset.id, age: plafond, trigger: 'on_demand', salePricePct, salesCostsPct, payoffDebtIds })
+    if (linkedEvent) handledEventIds.add(linkedEvent.id)
+  }
+
+  return { liquidations, handledEventIds }
+}
+
 export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput | null {
   if (!p.horizonInput) return null
   const { monthlyContributions, yearlyMustExpenses, dateOfBirth, monthlyIncome } = p.horizonInput
@@ -379,6 +552,18 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
   // Wordt true wanneer downsize + on_depletion nooit triggert (huis blijft staan).
   let housingHeldToEnd = false
 
+  // Generieke (niet-eigen_huis) asset-liquidaties uit verkoop-life-events (ADR
+  // 0015, generiek) — alléén onder v2 (v1 negeert assetLiquidations). Eén bron;
+  // `genericHandledEventIds` onderdrukt de opbrengst-cashflows van deze events in
+  // ELKE lifeEventsToCashflows-aanroep (meetruns + de getoonde grafiekrun) zodat
+  // de verkoop niet dubbel telt — de maandelijkse gevolgen (bv. wegvallend
+  // onderhoud) blijven wél. Zie `buildGenericAssetLiquidations`.
+  const genericLiq = useV2
+    ? buildGenericAssetLiquidations(realEvents, p.assets ?? [], currentAge, dateOfBirth)
+    : { liquidations: [], handledEventIds: new Set<string>() }
+  const genericHandledEventIds = genericLiq.handledEventIds
+  const skipIds = genericHandledEventIds.size > 0 ? genericHandledEventIds : undefined
+
   if (useV2Downsize) {
     // Huis + hypotheek blijven in het grootboek; verkoop = asset-liquidatie.
     effectiveAssets = p.assets ?? []
@@ -396,17 +581,26 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
       grossReturn,
       inflationRate,
       box3Method: p.box3Method ?? 'forfaitair',
-      cashflows: lifeEventsToCashflows(realEvents),
+      cashflows: lifeEventsToCashflows(realEvents, skipIds),
       strategyConfig: effectiveStrategy,
       withdrawalStrategy: p.withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
       forcedFireAge,
       hasPartner: p.hasPartner ?? false,
       bankAccountCash: p.bankAccountCash ?? 0,
+      // M1 (review): de downsize-trigger-meetrun (buildV2DownsizeHousing →
+      // resolveDownsizeTriggerV2) moet DEZELFDE liquide opbrengsten zien als de
+      // getoonde grafiek. Anders mist de meetrun de cash van een generieke verkoop
+      // (bv. stacaravan) en kan de huis-verkoop-trigger iets te vroeg vuren t.o.v.
+      // de grafiek. genericLiq is hier al berekend; het huis zit nog NIET in deze
+      // lijst (dat is juist wat de meetrun bepaalt). Verandert alleen trigger-
+      // timing-accuratesse, niet het huis-model zelf.
+      assetLiquidations: genericLiq.liquidations.length > 0 ? genericLiq.liquidations : undefined,
     }
     const downsizeCfg = housingCfg as DownsizeConfig
     const v2Housing = buildV2DownsizeHousing(downsizeCfg, housingContext, baseSimInput, currentAge, simEndAge)
     effectiveLifeEvents = [...realEvents, ...v2Housing.rentEvents]
-    assetLiquidations = v2Housing.assetLiquidations
+    // Merge huis-downsize-liquidatie + generieke verkoop-liquidaties (één array).
+    assetLiquidations = mergeLiquidations(v2Housing.assetLiquidations, genericLiq.liquidations)
     // Huis nooit verkocht: on_depletion-trigger vuurde niet (liquide vermogen
     // raakte de verkoopkosten-buffer nooit) → geen liquidatie, huis groeit door.
     housingHeldToEnd =
@@ -430,7 +624,7 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
         grossReturn,
         inflationRate,
         box3Method: p.box3Method ?? 'forfaitair',
-        cashflows: lifeEventsToCashflows(realEvents),
+        cashflows: lifeEventsToCashflows(realEvents, skipIds),
         strategyConfig: effectiveStrategy,
         withdrawalStrategy: p.withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
         forcedFireAge,
@@ -441,9 +635,14 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
     } catch {
       // Degradatie: val terug op de meegegeven events.
     }
+    // Generieke verkoop-liquidaties gelden ook zónder huis-downsize (v2). v1
+    // negeert assetLiquidations volledig, dus dit raakt het v1-pad niet (genericLiq
+    // is daar leeg). De geliquideerde assets worden NIET uit de pot gefilterd —
+    // ze blijven in het grootboek en verlaten het op de verkoop (engine-block 6b).
+    assetLiquidations = mergeLiquidations(undefined, genericLiq.liquidations)
   }
 
-  const cashflows = lifeEventsToCashflows(effectiveLifeEvents)
+  const cashflows = lifeEventsToCashflows(effectiveLifeEvents, skipIds)
 
   // include_full: de woning telt volledig mee als besteedbaar FIRE-vermogen
   // (ADR 0015, Optie A) — zodat een deplete/spend-down 'm óók afbouwt (laatst in de

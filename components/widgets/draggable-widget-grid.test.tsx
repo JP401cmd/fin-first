@@ -101,6 +101,7 @@ const mockData: DashboardData = {
   fireAgeFractional: null,
   fireRange: null,
   simRows: null,
+  simNetWorthRows: null,
   simRequiredPortfolio: null,
   backtestSuccessRate: null,
   backtestNamedPaths: null,

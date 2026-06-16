@@ -196,3 +196,41 @@
 ## 2026-06-15
 
 - **Componenten (aantal)** toegevoegd: +3
+
+## 2026-06-16
+
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-06-16
+
+- **Tabellen** toegevoegd: broker_connections
+
+## 2026-06-16
+
+- **API-routes** toegevoegd: /api/integrations/brokers/[id], /api/integrations/brokers/[id]/sync, /api/integrations/brokers/[id]/test, /api/integrations/brokers/trading212/connect, /api/integrations/brokers/trading212/validate
+- **Componenten (aantal)** toegevoegd: +2
+
+## 2026-06-16
+
+- Geen wijzigingen.
+
+## 2026-06-16
+
+- **Integraties** toegevoegd: Aandelen-brokers (Trading 212)
+
+## 2026-06-16
+
+- Geen wijzigingen.
+
+## 2026-06-16
+
+- **API-routes** toegevoegd: /api/snapshots/history
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-06-16
+
+- Geen wijzigingen.
+
+## 2026-06-16
+
+- Geen wijzigingen.

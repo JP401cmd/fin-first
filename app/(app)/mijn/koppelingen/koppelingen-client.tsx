@@ -11,6 +11,7 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { useToast } from '@/components/app/toast-provider'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
 import { computeFreshness, type ConnectionsData, type ExchangeConnectionRow, type ExchangeId, type WalletAddressRow, type WalletChain } from '@/lib/connections-data'
+import type { BrokerConnectionRow, BrokerId } from '@/lib/broker-connections-data'
 import type { AangifteImportSummary } from '@/lib/aangifte/imports-loader'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -26,6 +27,12 @@ export interface CryptoAssetOption {
 
 interface KoppelingenClientProps {
   initialData: ConnectionsData
+  /**
+   * Broker-koppelingen (Trading 212, …) van de gebruiker, nieuwste eerst.
+   * Server-loaded via `loadBrokerConnectionsForUser()`. Beheer (koppelen/
+   * loskoppelen) leeft per-asset; hier tonen we een overzicht + sync/test.
+   */
+  brokerConnections: BrokerConnectionRow[]
   /**
    * Lijst van eerdere aangifte-imports, gegroepeerd op `imported_peildatum`.
    * Server-loaded via `loadAangifteImports()`. Lege array als de gebruiker
@@ -59,6 +66,10 @@ const CHAIN_TICKER: Record<WalletChain, string> = {
   solana: 'SOL',
 }
 
+const BROKER_LABEL: Record<BrokerId, string> = {
+  trading212: 'Trading 212',
+}
+
 function maskAddress(address: string): string {
   if (address.length <= 14) return address
   return `${address.slice(0, 8)}…${address.slice(-6)}`
@@ -76,7 +87,7 @@ function linkedAssetHref(linkedAssetType: string): string {
   return `/core/assets/${linkedAssetType}`
 }
 
-export function KoppelingenClient({ initialData, aangifteImports }: KoppelingenClientProps) {
+export function KoppelingenClient({ initialData, brokerConnections, aangifteImports }: KoppelingenClientProps) {
   const router = useRouter()
   const pathname = usePathname()
   const moduleContext = pathname?.startsWith('/mijn') ? 'Mijn' : 'Identiteit'
@@ -85,6 +96,7 @@ export function KoppelingenClient({ initialData, aangifteImports }: KoppelingenC
 
   const [exchanges, setExchanges] = useState<ExchangeConnectionRow[]>(initialData.exchanges)
   const [wallets, setWallets] = useState<WalletAddressRow[]>(initialData.wallets)
+  const [brokers, setBrokers] = useState<BrokerConnectionRow[]>(brokerConnections)
   const [imports, setImports] = useState<AangifteImportSummary[]>(aangifteImports)
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
@@ -264,6 +276,68 @@ export function KoppelingenClient({ initialData, aangifteImports }: KoppelingenC
     }
   }
 
+  // ── Broker-acties (Trading 212) ──────────────────────────────
+  async function handleBrokerSync(id: string) {
+    if (syncingId || testingId) return
+    setSyncingId(id)
+    try {
+      const res = await fetch(`/api/integrations/brokers/${id}/sync`, { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.status === 'error') {
+        const message = typeof json?.error === 'string' ? json.error : 'Synchronisatie mislukt.'
+        addToast({ type: 'error', title: 'Sync-fout', message })
+        setBrokers((prev) => prev.map((r) => (r.id === id ? { ...r, lastSyncError: message } : r)))
+      } else {
+        const total = typeof json?.totalEur === 'number' ? formatMaskedCurrency(json.totalEur, masked) : null
+        addToast({
+          type: 'success',
+          title: 'Posities opgehaald',
+          message: total ? `Bijgewerkt — ${total}.` : 'Bijgewerkt.',
+        })
+        setBrokers((prev) =>
+          prev.map((r) =>
+            r.id === id
+              ? {
+                  ...r,
+                  lastSyncedAt: typeof json?.lastSyncedAt === 'string' ? json.lastSyncedAt : new Date().toISOString(),
+                  lastSyncError: null,
+                }
+              : r,
+          ),
+        )
+        refresh()
+      }
+    } catch {
+      addToast({ type: 'error', title: 'Netwerkfout', message: 'Sync kon niet worden uitgevoerd. Probeer opnieuw.' })
+    } finally {
+      setSyncingId(null)
+    }
+  }
+
+  async function handleBrokerTest(id: string) {
+    if (testingId || syncingId) return
+    setTestingId(id)
+    try {
+      const res = await fetch(`/api/integrations/brokers/${id}/test`, { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      const latency = typeof json?.latencyMs === 'number' ? `${json.latencyMs}ms` : null
+      if (res.ok && json?.ok === true) {
+        addToast({
+          type: 'success',
+          title: 'Verbinding OK',
+          message: latency ? `Reactie binnen ${latency}.` : 'Reactie ontvangen.',
+        })
+      } else {
+        const reason = typeof json?.error === 'string' ? json.error : 'Onbekende fout.'
+        addToast({ type: 'error', title: 'Test mislukt', message: reason })
+      }
+    } catch {
+      addToast({ type: 'error', title: 'Netwerkfout', message: 'Test kon niet worden uitgevoerd. Probeer opnieuw.' })
+    } finally {
+      setTestingId(null)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       {/* Editorial header — blueprint Type 2 (List) */}
@@ -388,10 +462,46 @@ export function KoppelingenClient({ initialData, aangifteImports }: KoppelingenC
         )}
       </ConnectionSection>
 
-      {/* ── Beleggingen ────────────────────────────────────────────── */}
+      {/* ── Beleggingen — broker-koppelingen ───────────────────────── */}
       <ConnectionSection
-        title="Beleggingen"
-        description="Brokers leveren geen consumer-API. Werk met CSV-import of een ISIN-resolver."
+        title="Beleggingen — broker-koppelingen"
+        description="Trading 212 levert read-only sync van je posities. Koppelen doe je per belegging."
+      >
+        {brokers.length === 0 ? (
+          <WidgetEmpty
+            variant="first-use"
+            icon={Link2}
+            title="Nog geen broker gekoppeld"
+            description="Koppel Trading 212 op een belegging om je posities automatisch op te halen."
+            action={{ label: 'Naar beleggingen', href: '/core/assets/investment' }}
+          />
+        ) : (
+          brokers.map((conn) => {
+            const fullLabel = `${BROKER_LABEL[conn.broker]}${conn.label ? ` · ${conn.label}` : ''}`
+            return (
+              <ConnectionCard
+                key={conn.id}
+                status={computeFreshness(conn.lastSyncedAt, conn.lastSyncError)}
+                label={fullLabel}
+                sublabel={`API-key ${maskApiKey(conn.apiKeyLast4)}`}
+                lastSyncedAt={conn.lastSyncedAt}
+                errorMessage={conn.lastSyncError}
+                syncing={syncingId === conn.id}
+                testing={testingId === conn.id}
+                onSync={() => handleBrokerSync(conn.id)}
+                onTest={() => handleBrokerTest(conn.id)}
+                linkedAssetHref={linkedAssetHref(conn.linkedAssetType)}
+                linkedAssetName={conn.linkedAssetName}
+              />
+            )
+          })
+        )}
+      </ConnectionSection>
+
+      {/* ── Beleggingen — CSV-import ────────────────────────────────── */}
+      <ConnectionSection
+        title="Beleggingen — CSV-import"
+        description="Andere brokers leveren geen consumer-API. Werk met CSV-import of een ISIN-resolver."
       >
         <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5">
           <div className="flex items-start gap-3">
@@ -401,13 +511,13 @@ export function KoppelingenClient({ initialData, aangifteImports }: KoppelingenC
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-[var(--ink)]">CSV-importers</p>
               <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                Ondersteund: DEGIRO, Saxo, ING. Trading 212 en eToro volgen binnenkort.
+                Ondersteund: DEGIRO, Saxo, ING. Importeer een afschrift direct op de belegging.
               </p>
               <Link
-                href="/overzicht/bezittingen/investment?tab=aandelen-holdings"
+                href="/core/assets/investment"
                 className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[var(--ink)] underline underline-offset-4 hover:text-[var(--ink-2)]"
               >
-                Open holdings-import
+                Naar beleggingen
               </Link>
             </div>
           </div>

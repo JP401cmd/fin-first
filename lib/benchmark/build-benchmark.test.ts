@@ -118,7 +118,7 @@ describe('buildBenchmarkReport — volledig cohort', () => {
 
 describe('buildBenchmarkReport — deltaFreedom op net_worth', () => {
   it('deltaFreedom is aanwezig wanneer dailyExpenseRate > 0 en delta ≥ €100', () => {
-    // netWorth=200_000, mediaan 35-45 alleenstaand ≈ 120_100 × 0.55 = 66_055 → delta ≈ +133_945
+    // netWorth=200_000, mediaan 35-45 alleenstaand ≈ 120_100 × 0.35 = 42_035 → delta ≈ +157_965
     const report = buildBenchmarkReport(makeArgs())
     const nw = report.metrics.find(m => m.key === 'net_worth')!
     // Delta is groot genoeg en dailyRate=50 → deltaFreedom moet gevuld zijn
@@ -127,7 +127,7 @@ describe('buildBenchmarkReport — deltaFreedom op net_worth', () => {
   })
 
   it('deltaFreedom bevat "voorsprong" wanneer netWorth boven mediaan zit', () => {
-    // netWorth=200_000 > mediaan alleenstaand ~66_055
+    // netWorth=200_000 > mediaan alleenstaand ~42_035
     const report = buildBenchmarkReport(makeArgs())
     const nw = report.metrics.find(m => m.key === 'net_worth')!
     expect(nw.deltaFreedom).toMatch(/voorsprong/)

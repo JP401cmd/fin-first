@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-15T17:11:15.828Z",
-  "generatedDate": "2026-06-15",
+  "generatedAt": "2026-06-16T17:10:03.229Z",
+  "generatedDate": "2026-06-16",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -85,6 +85,10 @@
       {
         "name": "Crypto-exchanges (Bitvavo / Coinbase / Kraken)",
         "category": "Crypto"
+      },
+      {
+        "name": "Aandelen-brokers (Trading 212)",
+        "category": "Brokerage"
       }
     ],
     "tableDomains": {
@@ -117,6 +121,7 @@
       "Externe koppelingen": [
         "external_connections",
         "exchange_connections",
+        "broker_connections",
         "wallet_addresses"
       ],
       "Huishouden": [
@@ -184,11 +189,11 @@
   "stats": {
     "routes": 318,
     "routesProduction": 95,
-    "api": 371,
-    "tables": 52,
-    "migrations": 106,
-    "integrations": 24,
-    "components": 691,
+    "api": 377,
+    "tables": 53,
+    "migrations": 110,
+    "integrations": 25,
+    "components": 699,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -5155,6 +5160,46 @@
       ]
     },
     {
+      "url": "/api/integrations/brokers/[id]",
+      "file": "app/api/integrations/brokers/[id]/route.ts",
+      "domain": "integrations",
+      "methods": [
+        "DELETE"
+      ]
+    },
+    {
+      "url": "/api/integrations/brokers/[id]/sync",
+      "file": "app/api/integrations/brokers/[id]/sync/route.ts",
+      "domain": "integrations",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/integrations/brokers/[id]/test",
+      "file": "app/api/integrations/brokers/[id]/test/route.ts",
+      "domain": "integrations",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/integrations/brokers/trading212/connect",
+      "file": "app/api/integrations/brokers/trading212/connect/route.ts",
+      "domain": "integrations",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/integrations/brokers/trading212/validate",
+      "file": "app/api/integrations/brokers/trading212/validate/route.ts",
+      "domain": "integrations",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/integrations/connections",
       "file": "app/api/integrations/connections/route.ts",
       "domain": "integrations",
@@ -5790,6 +5835,15 @@
       "domain": "snapshots",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/snapshots/history",
+      "file": "app/api/snapshots/history/route.ts",
+      "domain": "snapshots",
+      "methods": [
+        "GET",
+        "POST"
       ]
     },
     {
@@ -7417,7 +7471,7 @@
     {
       "domain": "integrations",
       "label": "Externe koppelingen",
-      "count": 18,
+      "count": 23,
       "routes": [
         {
           "url": "/api/integrations/blockchain/test",
@@ -7425,6 +7479,46 @@
           "domain": "integrations",
           "methods": [
             "GET"
+          ]
+        },
+        {
+          "url": "/api/integrations/brokers/[id]",
+          "file": "app/api/integrations/brokers/[id]/route.ts",
+          "domain": "integrations",
+          "methods": [
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/integrations/brokers/[id]/sync",
+          "file": "app/api/integrations/brokers/[id]/sync/route.ts",
+          "domain": "integrations",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/integrations/brokers/[id]/test",
+          "file": "app/api/integrations/brokers/[id]/test/route.ts",
+          "domain": "integrations",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/integrations/brokers/trading212/connect",
+          "file": "app/api/integrations/brokers/trading212/connect/route.ts",
+          "domain": "integrations",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/integrations/brokers/trading212/validate",
+          "file": "app/api/integrations/brokers/trading212/validate/route.ts",
+          "domain": "integrations",
+          "methods": [
+            "POST"
           ]
         },
         {
@@ -8195,6 +8289,55 @@
       ]
     },
     {
+      "domain": "snapshots",
+      "label": "Snapshots",
+      "count": 5,
+      "routes": [
+        {
+          "url": "/api/snapshots",
+          "file": "app/api/snapshots/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/snapshots/auto",
+          "file": "app/api/snapshots/auto/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/snapshots/balances",
+          "file": "app/api/snapshots/balances/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/snapshots/cron",
+          "file": "app/api/snapshots/cron/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/snapshots/history",
+          "file": "app/api/snapshots/history/route.ts",
+          "domain": "snapshots",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "subscriptions",
       "label": "subscriptions",
       "count": 5,
@@ -8319,46 +8462,6 @@
           "methods": [
             "GET",
             "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "snapshots",
-      "label": "Snapshots",
-      "count": 4,
-      "routes": [
-        {
-          "url": "/api/snapshots",
-          "file": "app/api/snapshots/route.ts",
-          "domain": "snapshots",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/snapshots/auto",
-          "file": "app/api/snapshots/auto/route.ts",
-          "domain": "snapshots",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/snapshots/balances",
-          "file": "app/api/snapshots/balances/route.ts",
-          "domain": "snapshots",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/snapshots/cron",
-          "file": "app/api/snapshots/cron/route.ts",
-          "domain": "snapshots",
-          "methods": [
-            "GET"
           ]
         }
       ]
@@ -11914,6 +12017,10 @@
         "migration": "supabase/migrations/20260518000001_create_briefing_history.sql"
       },
       {
+        "name": "broker_connections",
+        "migration": "supabase/migrations/20260616010000_create_broker_connections.sql"
+      },
+      {
         "name": "budgets",
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
@@ -12086,7 +12193,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 106
+    "migrationCount": 110
   },
   "tablesByDomain": [
     {
@@ -12323,6 +12430,23 @@
       ]
     },
     {
+      "domain": "Externe koppelingen",
+      "tables": [
+        {
+          "name": "broker_connections",
+          "migration": "supabase/migrations/20260616010000_create_broker_connections.sql"
+        },
+        {
+          "name": "exchange_connections",
+          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
+        },
+        {
+          "name": "wallet_addresses",
+          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
+        }
+      ]
+    },
+    {
       "domain": "Huishouden",
       "tables": [
         {
@@ -12336,19 +12460,6 @@
         {
           "name": "households",
           "migration": "supabase/migrations/20260218000001_add_household_support.sql"
-        }
-      ]
-    },
-    {
-      "domain": "Externe koppelingen",
-      "tables": [
-        {
-          "name": "exchange_connections",
-          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
-        },
-        {
-          "name": "wallet_addresses",
-          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
         }
       ]
     }
@@ -12400,11 +12511,11 @@
     }
   ],
   "components": {
-    "total": 691,
+    "total": 699,
     "groups": [
       {
         "group": "app",
-        "count": 301,
+        "count": 304,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12558,7 +12669,6 @@
           "household-fire-section",
           "household-retirement-pane",
           "household-section",
-          "housing-strategy-nudge-sheet",
           "huis-verkopen",
           "hypotheek-vs-beleggen-modal",
           "hypotheek-vs-beleggen-opbouw",
@@ -12585,6 +12695,8 @@
           "mobile-preview-frame",
           "mobile-preview-provider",
           "mobile-stack-shell",
+          "modal-footer",
+          "modal-footer.test",
           "module-activation-modal",
           "module-color-provider",
           "module-color-provider.persist.test",
@@ -12675,9 +12787,11 @@
           "swipe-back-tracker",
           "sync-status-badge",
           "toast-provider",
+          "toekomst-exit-notice",
           "toekomst-overlay",
           "toekomst-overlay.test",
           "toekomst-welcome",
+          "toekomst-welcome.test",
           "top-bar",
           "transacties-feed",
           "transacties-feed.test",
@@ -12711,7 +12825,7 @@
       },
       {
         "group": "overview",
-        "count": 115,
+        "count": 117,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -12747,6 +12861,7 @@
           "cashflow-forecast",
           "cashflow-forecast.test",
           "cashflow-instellingen-blok",
+          "cashflow-instellingen-blok.test",
           "cashflow-kalender",
           "cashflow-kalender.test",
           "cashflow-landing-cards",
@@ -12792,6 +12907,7 @@
           "mini-timeline-strip",
           "mini-timeline-strip.test",
           "networth-history-sheet",
+          "networth-history-sheet.test",
           "nieuwe-tegenpartijen",
           "off-track-doelen-lijst",
           "off-track-doelen-lijst.test",
@@ -12832,7 +12948,7 @@
       },
       {
         "group": "core",
-        "count": 61,
+        "count": 62,
         "items": [
           "add-category-card",
           "amortisation-chart",
@@ -12840,6 +12956,7 @@
           "asset-app-chip",
           "asset-category-page",
           "asset-detail-flow",
+          "asset-edit-broker-section",
           "asset-edit-connection-section",
           "assets-client",
           "box3-comparison",
@@ -13096,9 +13213,11 @@
       },
       {
         "group": "connections",
-        "count": 8,
+        "count": 10,
         "items": [
+          "add-broker-modal",
           "add-exchange-modal",
+          "add-exchange-modal.test",
           "add-wallet-modal",
           "blockchain-sources-card",
           "connection-card",
@@ -13255,6 +13374,10 @@
     {
       "name": "TrueLayer (bank-connect / PSD2)",
       "category": "Banking"
+    },
+    {
+      "name": "Aandelen-brokers (Trading 212)",
+      "category": "Brokerage"
     },
     {
       "name": "Crypto-exchanges (Bitvavo / Coinbase / Kraken)",
@@ -14093,6 +14216,10 @@
         }
       ],
       "integrations": [
+        {
+          "name": "broker_connections",
+          "write": true
+        },
         {
           "name": "exchange_connections",
           "write": true
@@ -16565,7 +16692,8 @@
           "routes": [
             "/api/snapshots",
             "/api/snapshots/auto",
-            "/api/snapshots/cron"
+            "/api/snapshots/cron",
+            "/api/snapshots/history"
           ]
         },
         {
@@ -16783,6 +16911,35 @@
           ]
         }
       ],
+      "broker_connections": [
+        {
+          "domain": "integrations",
+          "label": "Externe koppelingen",
+          "write": true,
+          "routes": [
+            "/api/integrations/brokers/[id]",
+            "/api/integrations/brokers/[id]/sync",
+            "/api/integrations/brokers/[id]/test",
+            "/api/integrations/brokers/trading212/connect"
+          ]
+        }
+      ],
+      "external_data_sources": [
+        {
+          "domain": "integrations",
+          "label": "Externe koppelingen",
+          "write": true,
+          "routes": [
+            "/api/integrations/brokers/[id]",
+            "/api/integrations/brokers/[id]/sync",
+            "/api/integrations/exchanges/[id]",
+            "/api/integrations/exchanges/[id]/sync",
+            "/api/integrations/wallets",
+            "/api/integrations/wallets/[id]",
+            "/api/integrations/wallets/[id]/sync"
+          ]
+        }
+      ],
       "exchange_connections": [
         {
           "domain": "integrations",
@@ -16795,20 +16952,6 @@
             "/api/integrations/exchanges/bitvavo/connect",
             "/api/integrations/exchanges/coinbase/connect",
             "/api/integrations/exchanges/kraken/connect"
-          ]
-        }
-      ],
-      "external_data_sources": [
-        {
-          "domain": "integrations",
-          "label": "Externe koppelingen",
-          "write": true,
-          "routes": [
-            "/api/integrations/exchanges/[id]",
-            "/api/integrations/exchanges/[id]/sync",
-            "/api/integrations/wallets",
-            "/api/integrations/wallets/[id]",
-            "/api/integrations/wallets/[id]/sync"
           ]
         }
       ],
@@ -16947,6 +17090,11 @@
         "column": "household_id"
       },
       {
+        "from": "broker_connections",
+        "to": "assets",
+        "column": "linked_asset_id"
+      },
+      {
         "from": "budgets",
         "to": "households",
         "column": "household_id"
@@ -17013,6 +17161,11 @@
       },
       {
         "from": "holding_alerts",
+        "to": "crypto_holdings",
+        "column": "crypto_holding_id"
+      },
+      {
+        "from": "holding_alerts",
         "to": "holdings",
         "column": "holding_id"
       },
@@ -17057,9 +17210,19 @@
         "column": "asset_id"
       },
       {
+        "from": "investment_holdings",
+        "to": "broker_connections",
+        "column": "source_broker_connection_id"
+      },
+      {
         "from": "investment_transactions",
         "to": "investment_holdings",
         "column": "holding_id"
+      },
+      {
+        "from": "life_events",
+        "to": "assets",
+        "column": "linked_asset_id"
       },
       {
         "from": "net_worth_snapshots",
@@ -17397,6 +17560,11 @@
         "user": true,
         "household": false,
         "rls": true
+      },
+      "broker_connections": {
+        "user": true,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -17618,7 +17786,7 @@
       "id": "0018-benchmark-gemodelleerde-referentie-peer",
       "title": "benchmark gemodelleerde referentie peer",
       "status": "aanvaard",
-      "date": "2026-06-15",
+      "date": "2026-06-16",
       "elements": [
         "as-rapport",
         "as-planning",
@@ -17626,6 +17794,45 @@
       ],
       "summary": "De benchmarkrapportage op `/rapportages/benchmark` vergelijkt vijf canonieke gebruikersmaten (gezondheidsscore, vrijheidsleeftijd, spaarquote, netto vermogen, geschat jaarinkomen) met een referentie. Voor drie van de vijf maten bestaan officiële NL-statistieken (CBS Vermogen 2024",
       "file": "docs/adr/0018-benchmark-gemodelleerde-referentie-peer.md"
+    },
+    {
+      "id": "0019-surplus-doel-exclusieve-bestemming",
+      "title": "Surplus-doel = exclusieve bestemming (niet de volledige waterfall)",
+      "status": "aanvaard",
+      "date": "2026-06-16",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Wanneer de gebruiker een pot-voorkeur (\"verdeling bij toename\") instelt, moet een surplus of liquidatie-opbrengst uitsluitend naar de gekozen pot gaan — niet pro-rata over alle asset-types worden verdeeld. De onttrekkings-volgorde (waterfall) houdt de brede, geordende verdeling.",
+      "file": "docs/adr/0019-surplus-doel-exclusieve-bestemming.md"
+    },
+    {
+      "id": "0020-spaarquote-een-definitie-en-hypotheek-rentevrijval",
+      "title": "Spaarquote één definitie overal + rente-vrijval bij hypotheek-payoff",
+      "status": "aanvaard",
+      "date": "2026-06-16",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren",
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "De spaarquote heeft één definitie — `(inkomen − (uitgaven − spaarbudget) + aflossing) / inkomen` — die geldt op zowel het transactie-pad als het handmatige pad én op elke afnemer (dashboard, /toekomst, what-if, rapportage). In de FIRE-projectie valt na het volledig aflossen van e",
+      "file": "docs/adr/0020-spaarquote-een-definitie-en-hypotheek-rentevrijval.md"
+    },
+    {
+      "id": "0021-sale-config-per-bezitting-en-in-loop-liquidatie",
+      "title": "Verkoop/liquidatie per niet-liquide bezitting via sale_config + default-on + in-loop on-demand",
+      "status": "aanvaard",
+      "date": "2026-06-16",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De verkoopkeuze voor een niet-liquide bezitting is een **first-class veld op de bezitting zelf** (`assets.sale_config`, JSONB). De engine besluit op grond van dit veld of en wanneer een asset wordt geliquideerd. De SSoT voor het of/wanneer verschuift daarmee van een `life_event` ",
+      "file": "docs/adr/0021-sale-config-per-bezitting-en-in-loop-liquidatie.md"
     }
   ],
   "churn": {
@@ -17641,7 +17848,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 27
+        "commits": 28
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -17657,7 +17864,7 @@
       },
       {
         "path": "lib/horizon-data.ts",
-        "commits": 8
+        "commits": 9
       },
       {
         "path": "components/horizon",
@@ -17675,23 +17882,23 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 7032,
-        "commits": 102
+        "loc": 7042,
+        "commits": 98
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 4863,
+        "loc": 4866,
         "commits": 26
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 3813,
+        "loc": 4135,
         "commits": 40
       },
       {
         "file": "lib/release-notes.ts",
         "loc": 2763,
-        "commits": 5
+        "commits": 4
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -17705,8 +17912,8 @@
       },
       {
         "file": "lib/horizon-data.ts",
-        "loc": 2250,
-        "commits": 8
+        "loc": 2257,
+        "commits": 9
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -17970,6 +18177,11 @@
         "name": "bug-fix",
         "description": "End-to-end bug-fix pijplijn voor TriFinity die de juiste subagents in volgorde inzet — van reproduceerbaar bugrapport naar gefixte, geverifieerde en (indien nodig) architectuur-gereviewde oplossing. Gebruik deze skill wanneer een bug gemeld of waargenomen is en je 'm gestructureerd wilt oplossen in plaats van ad-hoc te patchen.",
         "steps": [
+          {
+            "index": 0,
+            "title": "Fast-path-poort",
+            "agents": []
+          },
           {
             "index": 1,
             "title": "Rapporteren & reproduceren",
@@ -18377,17 +18589,9 @@
   },
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-15",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+3"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-06-16",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -18430,6 +18634,13 @@
       "api": 371,
       "components": 691,
       "tables": 52,
+      "routesProduction": 95
+    },
+    {
+      "date": "2026-06-16",
+      "api": 377,
+      "components": 699,
+      "tables": 53,
       "routesProduction": 95
     }
   ]

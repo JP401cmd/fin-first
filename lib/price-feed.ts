@@ -164,6 +164,67 @@ export async function fetchPriceData(ticker: string): Promise<PriceData | null> 
   }
 }
 
+// ── Symbol resolution (ISIN / name → Yahoo ticker) ──────────────
+//
+// Broker-imports (m.n. DEGIRO-transactie-exports) leveren GEEN beurssymbool —
+// de `ticker` is daar de productnaam ("MARVELL TECHNOLOGY INC"). Yahoo's
+// chart-API kent die niet, dus de prijs-refresh vond niets. Yahoo's search-
+// endpoint resolveert wél een ISIN of naam naar een verhandelbaar symbool
+// (US5738741041 → MRVL, NL0012747059 → CMCOM.AS). We cachen het resultaat
+// lang (ISIN→symbool is stabiel) zodat een herhaalde refresh direct op het
+// symbool kan prijzen.
+
+const SYMBOL_CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 uur
+const symbolCache = new Map<string, { symbol: string | null; expiresAt: number }>()
+
+/**
+ * Resolveer een ISIN of instrument-naam naar een Yahoo-Finance-symbool via de
+ * publieke search-API. Geeft het eerste verhandelbare (EQUITY/ETF) symbool
+ * terug, of `null` als er geen match is. Geen API-key nodig; deelt de rate-
+ * limiter met `fetchPriceData`.
+ */
+export async function resolveYahooSymbol(query: string): Promise<string | null> {
+  const q = (query ?? '').trim()
+  if (q.length === 0) return null
+  const key = q.toUpperCase()
+
+  const cached = symbolCache.get(key)
+  if (cached && Date.now() < cached.expiresAt) return cached.symbol
+
+  if (!acquireRateLimitToken()) return null
+
+  try {
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=6&newsCount=0`
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; TriFinity/1.0)',
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return null
+
+    const data = await res.json()
+    const quotes: Array<{ symbol?: string; quoteType?: string }> = Array.isArray(
+      data?.quotes,
+    )
+      ? data.quotes
+      : []
+
+    // Prefereer een echt verhandelbaar instrument; val anders terug op de
+    // eerste match met een symbool.
+    const tradeable = quotes.find(
+      (qt) => qt.symbol && (qt.quoteType === 'EQUITY' || qt.quoteType === 'ETF'),
+    )
+    const symbol = tradeable?.symbol ?? quotes.find((qt) => qt.symbol)?.symbol ?? null
+
+    symbolCache.set(key, { symbol, expiresAt: Date.now() + SYMBOL_CACHE_TTL_MS })
+    return symbol
+  } catch {
+    return null
+  }
+}
+
 /**
  * Simple price-only fetch (backward compatible with existing fetchTickerPrice signature).
  * Returns just the price number, or null if unavailable.

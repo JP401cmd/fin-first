@@ -267,7 +267,7 @@ export default function BeheerTestdataPage() {
 
         {/* Confirmation dialog */}
         {confirmPersona && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
             <div className="mx-4 w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
               <h3 className="text-lg font-semibold text-[var(--ink)]">Bevestiging</h3>
               <p className="mt-2 text-sm text-[var(--ink-2)]">
@@ -546,7 +546,7 @@ export default function BeheerTestdataPage() {
 
       {/* Template bevestigingsdialog */}
       {confirmTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-md rounded-[var(--r-lg)] bg-[var(--paper)] p-6 shadow-[var(--s2)]">
             <h3 className="text-lg font-semibold text-[var(--ink)]">Template laden</h3>
             <p className="mt-2 text-sm text-[var(--ink-2)]">
@@ -588,7 +588,7 @@ export default function BeheerTestdataPage() {
 
       {/* Onboarding confirmation dialog */}
       {showOnboardingConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-[var(--ink)]">Onboarding testen</h3>
             <p className="mt-2 text-sm text-[var(--ink-2)]">
@@ -834,7 +834,7 @@ function CheckinManager() {
 
       {/* Confirm delete all */}
       {confirmDeleteAll && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-md rounded-xl bg-[var(--paper)] p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-[var(--ink)]">Alle check-ins wissen?</h3>
             <p className="mt-2 text-sm text-[var(--ink-2)]">
@@ -1064,7 +1064,7 @@ function TestUserManager() {
 
       {/* Confirm reset dialog */}
       {confirmReset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-md bg-[var(--paper)] p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-[var(--ink)]">Testgebruiker resetten?</h3>
             <p className="mt-2 text-sm text-[var(--ink-2)]">
@@ -1092,7 +1092,7 @@ function TestUserManager() {
 
       {/* Password change dialog */}
       {passwordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-md bg-[var(--paper)] p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-[var(--ink)]">Wachtwoord wijzigen</h3>
             <p className="mt-2 text-sm text-[var(--ink-2)]">

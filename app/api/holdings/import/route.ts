@@ -31,14 +31,30 @@ interface ImportTransaction {
   external_trade_id?: string | null
 }
 
+// Import mode:
+// - 'append'   (default): legacy behaviour — match across ALL of the user's
+//   active holdings and ADD units to any match. Backward-compatible.
+// - 'snapshot': the CSV is treated as the COMPLETE portfolio of a single asset.
+//   Matches REPLACE units/prices (no accumulation), unmatched holdings of that
+//   asset are soft-deactivated (sold), so re-uploading the same file is idempotent.
+type ImportMode = 'snapshot' | 'append'
+
 interface ImportRequestBody {
   holdings: ImportHolding[]
   transactions: ImportTransaction[]
   broker: string
+  // Optional; defaults to 'append'. Snapshot mode requires targetAssetId.
+  mode?: ImportMode
+  // The asset a snapshot import reconciles against. Required for 'snapshot'.
+  targetAssetId?: string
 }
 
 const VALID_BROKERS = ['degiro', 'saxo', 'ing_beleggen', 'trading212', 'etoro']
 const VALID_TX_TYPES = ['buy', 'sell', 'dividend']
+const VALID_MODES: ImportMode[] = ['snapshot', 'append']
+
+// Simple RFC 4122 UUID shape check — targetAssetId must be a uuid.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -134,6 +150,44 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // --- Resolve import mode (default 'append' = backward-compatible) ---
+
+    const mode: ImportMode = body.mode ?? 'append'
+    if (!VALID_MODES.includes(mode)) {
+      return NextResponse.json({
+        error: `Mode moet een van de volgende zijn: ${VALID_MODES.join(', ')}`,
+      }, { status: 400 })
+    }
+
+    // Snapshot mode reconciles a single asset's complete portfolio, so it MUST
+    // be told which asset. Validate the shape and the ownership up front.
+    let snapshotAssetId: string | null = null
+    if (mode === 'snapshot') {
+      if (!body.targetAssetId || typeof body.targetAssetId !== 'string') {
+        return NextResponse.json({
+          error: 'Snapshot-import vereist een doel-asset (targetAssetId)',
+        }, { status: 400 })
+      }
+      if (!UUID_RE.test(body.targetAssetId)) {
+        return NextResponse.json({
+          error: 'targetAssetId moet een geldige uuid zijn',
+        }, { status: 400 })
+      }
+      // Ownership check: the target asset must belong to the current user.
+      const { data: targetAsset } = await supabase
+        .from('assets')
+        .select('id')
+        .eq('id', body.targetAssetId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!targetAsset) {
+        return NextResponse.json({
+          error: 'Doel-asset niet gevonden',
+        }, { status: 404 })
+      }
+      snapshotAssetId = targetAsset.id
+    }
+
     // --- Validate individual holdings ---
 
     for (let i = 0; i < body.holdings.length; i++) {
@@ -161,12 +215,20 @@ export async function POST(request: NextRequest) {
     defaultAssetId = investmentAsset?.id || null
 
     // --- Fetch existing active investment_holdings for duplicate detection ---
+    //
+    // Append mode: match across ALL of the user's active holdings (legacy).
+    // Snapshot mode: scope strictly to the target asset, so reconciliation only
+    // ever touches that asset's holdings.
 
-    const { data: existingHoldings } = await supabase
+    let existingQuery = supabase
       .from('investment_holdings')
       .select('id, ticker, isin, units, avg_purchase_price, asset_id')
       .eq('user_id', user.id)
       .eq('is_active', true)
+    if (mode === 'snapshot' && snapshotAssetId) {
+      existingQuery = existingQuery.eq('asset_id', snapshotAssetId)
+    }
+    const { data: existingHoldings } = await existingQuery
 
     type ExistingRow = {
       id: string
@@ -191,11 +253,15 @@ export async function POST(request: NextRequest) {
 
     let holdingsCreated = 0
     let holdingsUpdated = 0
+    let holdingsDeactivated = 0
     let transactionsCreated = 0
     // Maps import index → created/updated holding ID
     const holdingIdMap = new Map<number, string>()
     // Track which asset_ids need syncing afterwards
     const assetIdsToSync = new Set<string>()
+    // Snapshot reconciliation: IDs of existing holdings that the CSV matched.
+    // Anything in the target asset NOT in this set has been sold → deactivate.
+    const matchedExistingIds = new Set<string>()
 
     for (let i = 0; i < body.holdings.length; i++) {
       const h = body.holdings[i]
@@ -208,20 +274,30 @@ export async function POST(request: NextRequest) {
         || null
 
       if (existing) {
-        // Merge into existing holding: add units, recalculate weighted average price.
-        const oldUnits = existing.units
-        const oldAvg = existing.avg_purchase_price ?? 0
-        const newUnits = oldUnits + h.units
-        // Weighted average purchase price.
-        const newAvg = newUnits > 0
-          ? ((oldAvg * oldUnits) + (h.avg_purchase_price * h.units)) / newUnits
-          : 0
-
         const updates: Record<string, unknown> = {
-          units: newUnits,
-          avg_purchase_price: Math.round(newAvg * 100) / 100,
           updated_at: new Date().toISOString(),
         }
+
+        if (mode === 'snapshot') {
+          // Snapshot: the CSV is the source of truth — REPLACE the position
+          // (no accumulation) so a re-upload is idempotent. Re-activate in case
+          // the holding was previously deactivated by an earlier snapshot.
+          updates.units = h.units
+          updates.avg_purchase_price = Math.round(h.avg_purchase_price * 100) / 100
+          updates.is_active = true
+        } else {
+          // Append (legacy): add units, recalculate weighted average price.
+          const oldUnits = existing.units
+          const oldAvg = existing.avg_purchase_price ?? 0
+          const newUnits = oldUnits + h.units
+          // Weighted average purchase price.
+          const newAvg = newUnits > 0
+            ? ((oldAvg * oldUnits) + (h.avg_purchase_price * h.units)) / newUnits
+            : 0
+          updates.units = newUnits
+          updates.avg_purchase_price = Math.round(newAvg * 100) / 100
+        }
+
         // Update current_price if the import provides one.
         if (h.current_price !== null && h.current_price !== undefined) {
           updates.current_price = h.current_price
@@ -242,11 +318,16 @@ export async function POST(request: NextRequest) {
 
         holdingIdMap.set(i, existing.id)
         holdingsUpdated++
+        matchedExistingIds.add(existing.id)
 
         if (existing.asset_id) assetIdsToSync.add(existing.asset_id)
       } else {
-        // Create new holding. asset_id is NOT NULL — fall back to broker-named bucket.
-        let resolvedAssetId = h.asset_id || defaultAssetId
+        // Create new holding. asset_id is NOT NULL.
+        // Snapshot: always pin to the target asset (never the default/bucket).
+        // Append: keep legacy precedence with broker-named bucket fallback.
+        let resolvedAssetId = mode === 'snapshot'
+          ? snapshotAssetId
+          : (h.asset_id || defaultAssetId)
         if (!resolvedAssetId) {
           const { data: newAsset } = await supabase
             .from('assets')
@@ -313,6 +394,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // --- Snapshot reconciliation: soft-deactivate sold positions ---
+    //
+    // Any holding that lived in the target asset but did NOT appear in the CSV
+    // has been sold. Zero it out and deactivate (kept for history, excluded from
+    // the value rollup). Append mode never deactivates anything.
+    if (mode === 'snapshot' && snapshotAssetId && existingHoldings) {
+      const soldIds = (existingHoldings as ExistingRow[])
+        .filter((row) => !matchedExistingIds.has(row.id))
+        .map((row) => row.id)
+
+      if (soldIds.length > 0) {
+        const { error: deactivateError } = await supabase
+          .from('investment_holdings')
+          .update({ units: 0, is_active: false, updated_at: new Date().toISOString() })
+          .in('id', soldIds)
+          .eq('user_id', user.id)
+
+        if (deactivateError) {
+          return NextResponse.json({
+            error: `Fout bij deactiveren verkochte holdings: ${deactivateError.message}`,
+          }, { status: 500 })
+        }
+        holdingsDeactivated = soldIds.length
+        assetIdsToSync.add(snapshotAssetId)
+      }
+    }
+
     // --- Process transactions ---
 
     if (body.transactions.length > 0) {
@@ -348,7 +456,13 @@ export async function POST(request: NextRequest) {
       // Split rows: those with an external_trade_id go through upsert (idempotent
       // re-imports), the rest through plain insert (no dedup possible).
       const upsertRows = txRows.filter((r) => r.external_trade_id != null)
-      const insertRows = txRows.filter((r) => r.external_trade_id == null)
+      // Snapshot mode must stay idempotent: a plain insert (no external_trade_id)
+      // would duplicate the same mutation on every re-upload. So in snapshot we
+      // only persist rows that CAN be deduped (have an external_trade_id) and
+      // skip the plain-insert path entirely. Append keeps the legacy behaviour.
+      const insertRows = mode === 'snapshot'
+        ? []
+        : txRows.filter((r) => r.external_trade_id == null)
 
       if (upsertRows.length > 0) {
         const { error: upsertErr } = await supabase
@@ -371,7 +485,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      transactionsCreated = txRows.length
+      // Count only rows we actually persisted (upserts + any plain inserts).
+      transactionsCreated = upsertRows.length + insertRows.length
     }
 
     // --- Sync asset values for all affected assets ---
@@ -392,6 +507,7 @@ export async function POST(request: NextRequest) {
       summary: {
         holdings_created: holdingsCreated,
         holdings_updated: holdingsUpdated,
+        holdings_deactivated: holdingsDeactivated,
         transactions_created: transactionsCreated,
         total_value: Math.round(totalValue * 100) / 100,
         broker: body.broker,

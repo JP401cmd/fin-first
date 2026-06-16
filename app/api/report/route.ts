@@ -9,7 +9,7 @@ import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/re
 import { checkTierGate } from '@/lib/require-tier'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeFreedomProgress } from '@/lib/core-metrics'
-import { resolveSavingsSource } from '@/lib/savings-source'
+import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import {
   deriveHousingContext,
   getFireEligibleNetWorth,
@@ -532,14 +532,18 @@ export async function GET(request: Request) {
     const avgMonthlyIncome = monthsWithData.length > 0 ? totalIncome / monthsWithData.length : 0
     const avgMonthlyExpenses = monthsWithData.length > 0 ? totalExpenses / monthsWithData.length : 0
 
-    // Spaarbron via resolveSavingsSource (zelfde keuzeregel als de cashflow-
-    // pagina en /toekomst): handmatig inkomen/uitgaven winnen, anders het
-    // periode-gemiddelde × de canonieke spaarquote. Vervangt de oude
-    // asset.monthly_contribution-som, die computeFireProjection bovendien niet
-    // eens als spaarbron gebruikte (de motor rekent op inkomen − uitgaven).
-    const reportSavingsRatePct = avgMonthlyIncome > 0
-      ? Math.max(0, ((avgMonthlyIncome - avgMonthlyExpenses) / avgMonthlyIncome) * 100)
-      : 0
+    // Spaarbron via resolveSavingsSource (zelfde keuzeregel én definitie als de
+    // cashflow-pagina en /toekomst): handmatig inkomen/uitgaven winnen, anders het
+    // periode-gemiddelde × de canonieke spaarquote. Spaarbudgetten tellen als sparen
+    // (van uitgaven af), schuldaflossing als vermogensopbouw (erbij) — zowel op het
+    // berekende als het handmatige pad, zodat het rapport niet afwijkt van /toekomst.
+    const reportDebtAflossingMonthly = computeDebtAflossingMonthly(debts as unknown as Debt[])
+    const reportMonthlySavingsBudget = monthsWithData.length > 0 ? totalSavingsBudgetSpent / monthsWithData.length : 0
+    const reportSavingsRatePct = Math.max(0, savingsRateFromAggregates(
+      avgMonthlyIncome,
+      avgMonthlyExpenses - reportMonthlySavingsBudget,
+      reportDebtAflossingMonthly,
+    ))
     const { baseAnnualSavings } = resolveSavingsSource({
       incomeSource: profile?.income_source,
       expensesSource: profile?.expenses_source,
@@ -547,6 +551,8 @@ export async function GET(request: Request) {
       estimatedAnnualIncome: avgMonthlyIncome * 12,
       estimatedMonthlyExpenses: Number(profile?.estimated_monthly_expenses ?? 0),
       savingsRate6m: reportSavingsRatePct,
+      monthlyDebtAflossing: reportDebtAflossingMonthly,
+      monthlySavingsContribution: reportMonthlySavingsBudget,
     })
     const monthlySavingsForFire = baseAnnualSavings / 12
 

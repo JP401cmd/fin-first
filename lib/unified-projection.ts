@@ -239,16 +239,36 @@ export interface UnifiedProjectionInput {
 }
 
 /**
- * Eén geplande asset-liquidatie voor de v2-grootboek-engine. Op `age` verkoopt de
- * engine `assetId`: opbrengst = waarde × `salePricePct` × (1 − `salesCostsPct`); de
+ * Eén geplande asset-liquidatie voor de v2-grootboek-engine. De engine verkoopt
+ * `assetId`: opbrengst = waarde × `salePricePct` × (1 − `salesCostsPct`); de
  * gekoppelde schulden (`payoffDebtIds`) worden afgelost (saldo → 0, woonlast stopt);
  * de netto-opbrengst (na aflossing) stroomt naar het liquide vermogen.
+ *
+ * De `trigger` bepaalt WANNEER:
+ *  - `fixed_age` — verkoop onvoorwaardelijk op de vaste `age` (huidig gedrag; o.a.
+ *    de eigen-huis-downsize op de trigger-leeftijd, en `vast_moment`-verkopen).
+ *  - `on_demand` — géén vaste `age`; de engine verkoopt het asset IN de loop zodra de
+ *    liquide pot een tekort niet meer dekt (Optie A, ADR 0020). De optionele `age`
+ *    fungeert dan als fallback-plafond: uiterlijk op die leeftijd verkopen, ook
+ *    zónder tekort (NaN/Infinity = geen plafond). De verkoopvolgorde bij meerdere
+ *    `on_demand`-assets volgt de bestaande onttrekkingsvolgorde (minst-liquide laatst,
+ *    `eigen_huis` allerlaatst). v1 (`runUnifiedProjection`) leest dit veld niet.
  */
 export interface AssetLiquidation {
   /** Asset dat verkocht wordt (bv. het eigen_huis). */
   assetId: string
-  /** Leeftijd waarop de verkoop plaatsvindt. */
+  /**
+   * Bij `fixed_age`: de leeftijd waarop onvoorwaardelijk verkocht wordt.
+   * Bij `on_demand`: een optioneel fallback-plafond (uiterlijk-verkoopleeftijd);
+   * gebruik `Number.POSITIVE_INFINITY` (of `NaN`) voor "geen plafond".
+   */
   age: number
+  /**
+   * Verkoopmoment-discriminator. `fixed_age` = vaste leeftijd (default voor
+   * achterwaartse compatibiliteit met bestaande callers die `trigger` weglaten).
+   * `on_demand` = in-loop verkoop bij liquiditeitstekort.
+   */
+  trigger?: 'fixed_age' | 'on_demand'
   /** Verkoopprijs als fractie van de (geprojecteerde) marktwaarde (bv. 1.0). */
   salePricePct: number
   /** Verkoopkosten als fractie van de verkoopprijs (bv. 0.04). */

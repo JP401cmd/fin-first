@@ -161,6 +161,21 @@ export function expandGroupsToAssetTypes(groups: WealthGroup[]): AssetType[] {
   return ordered
 }
 
+/**
+ * Vertaal ÉÉN wealth-groep naar uitsluitend de asset-types in díe groep
+ * (canonieke onderlinge volgorde). Anders dan `expandGroupsToAssetTypes` vult dit
+ * NIET de overige groepen aan: het is bedoeld voor een surplus-DOEL (een
+ * exclusieve bestemming "waar gaat overschot/opbrengst heen"), niet voor een
+ * onttrekkings-VOLGORDE (die juist alle groepen als complete waterfall nodig
+ * heeft). Bug-fix (review A, jun 2026): `expandGroupsToAssetTypes([group])`
+ * leverde de volledige 10-type-lijst op → de engine-`surplusTargets` matchten
+ * álle assets → overschot/liquidatie-opbrengst werd pro-rata over alle potten
+ * verdeeld i.p.v. naar de gekozen pot (bv. "cash" kreeg slechts een fractie).
+ */
+export function expandSingleGroupToAssetTypes(group: WealthGroup): AssetType[] {
+  return CANONICAL_ASSET_ORDER.filter((at) => WEALTH_GROUPS[at] === group)
+}
+
 /** True wanneer een groep-volgorde gelijk is aan de default (→ engine mag WATERFALL_ORDER gebruiken). */
 export function isDefaultGroupOrder(groups: WealthGroup[]): boolean {
   return (

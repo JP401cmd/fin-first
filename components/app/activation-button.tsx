@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { FfinAvatar } from '@/components/app/avatars'
+import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
 
 import type { FeatureAccessData } from '@/lib/compute-feature-access'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -31,6 +32,10 @@ const PHASE_LABELS: Record<string, string> = {
 export function ActivationButton({ data }: { data: FeatureAccessData }) {
   const [showModal, setShowModal] = useState(false)
   const [activating, setActivating] = useState(false)
+  // Zwevende bottom-FAB: verberg zolang een modal/overlay open is (scroll-lock
+  // actief), zodat de FAB niet door de halftransparante backdrop over de
+  // sheet-CTA bloedt. Eén consistente regel met de Will-chat-FAB.
+  const overlayOpen = useOverlayOpen()
 
   const gradientStyle = PHASE_GRADIENT_STYLE[data.phase] ?? PHASE_GRADIENT_STYLE.recovery
   const badgeStyle = PHASE_BADGE_STYLE[data.phase] ?? PHASE_BADGE_STYLE.recovery
@@ -60,7 +65,9 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
 
   return (
     <>
-      {/* FAB — positioned left of chat FAB */}
+      {/* FAB — positioned left of chat FAB. Verborgen zolang een externe
+          overlay/modal open is, zodat hij niet over een sheet-CTA bloedt. */}
+      {!overlayOpen && (
       <button
         onClick={() => setShowModal(true)}
         className="group fixed bottom-[calc(var(--bottom-nav-height)+1.5rem)] right-[88px] z-50 flex h-14 w-14 items-center justify-center rounded-full bg-horizon-600 text-white shadow-[var(--s2)] transition-transform hover:scale-105 active:scale-95 animate-pulse md:bottom-6"
@@ -72,6 +79,7 @@ export function ActivationButton({ data }: { data: FeatureAccessData }) {
           Bekijk je startpositie en activeer je routekaart
         </span>
       </button>
+      )}
 
       {/* Modal */}
       {showModal && (

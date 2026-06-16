@@ -5,6 +5,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/format'
 import { HoldingSourceBadge, type HoldingSourceForBadge } from '@/components/holdings/holding-source-badge'
+import { computePositionFromTransactions, valuePosition } from '@/lib/holdings-aggregation'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -100,7 +101,7 @@ export default async function InvestmentHoldingDetailPage({
     .select('id, type, units, price_per_unit, total_amount, currency, date, notes, external_source')
     .eq('holding_id', holdingId)
     .order('date', { ascending: false })
-    .limit(200)
+    .limit(1000)
 
   const txs = (txData ?? []) as Array<{
     id: string
@@ -121,16 +122,49 @@ export default async function InvestmentHoldingDetailPage({
   }
   const asset = pickOne(holding.asset as AssetRef | AssetRef[] | null)
 
-  const units = Number(holding.units) || 0
   const currency = ((holding.currency as string | null) ?? 'EUR').toUpperCase()
   const currentPrice = holding.current_price != null ? Number(holding.current_price) : null
-  const avgPrice = holding.avg_purchase_price != null ? Number(holding.avg_purchase_price) : null
-  const value = currentPrice != null ? units * currentPrice : 0
-  const costBasis = avgPrice != null ? units * avgPrice : null
-  const returnVal = costBasis != null ? value - costBasis : null
-  const returnPct = costBasis != null && costBasis !== 0 ? ((value - costBasis) / costBasis) * 100 : null
   const dayChange = holding.daily_change_percent != null ? Number(holding.daily_change_percent) : null
   const ter = holding.ter != null ? Number(holding.ter) : null
+
+  // ── Positie afgeleid uit de transactiehistorie (single source of truth) ──
+  // Heeft de holding transacties, dan zijn eenheden, kostprijs en winst/verlies
+  // het netto resultaat van koop/verkoop (consume, don't recompute via
+  // lib/holdings-aggregation). Een handmatige holding zonder transacties valt
+  // terug op de opgeslagen velden.
+  const hasTx = txs.length > 0
+  const agg = computePositionFromTransactions(
+    txs.map((t) => ({
+      type: t.type,
+      units: t.units,
+      price_per_unit: t.price_per_unit,
+      total_amount: t.total_amount,
+      date: t.date,
+    })),
+  )
+  const valued = valuePosition(agg, currentPrice)
+
+  const storedUnits = Number(holding.units) || 0
+  const storedAvg = holding.avg_purchase_price != null ? Number(holding.avg_purchase_price) : null
+  const fallbackCost = storedAvg != null ? storedUnits * storedAvg : null
+
+  const units = hasTx ? agg.netUnits : storedUnits
+  const value = hasTx ? valued.currentValue : currentPrice != null ? storedUnits * currentPrice : 0
+  const isClosed = hasTx && agg.isClosed
+
+  // Totale winst/verlies = gerealiseerd + ongerealiseerd. Zonder transacties:
+  // simpele markt − kostbasis op de opgeslagen velden.
+  const realizedPnL = hasTx ? agg.realizedPnL : null
+  const unrealizedPnL = hasTx ? valued.unrealizedPnL : null
+  const totalPnL = hasTx
+    ? valued.totalPnL
+    : currentPrice != null && fallbackCost != null
+      ? storedUnits * currentPrice - fallbackCost
+      : null
+  // % t.o.v. de inleg (Σ aankopen) — werkt ook voor een gesloten positie.
+  const pnlBase = hasTx ? agg.totalInvested : fallbackCost
+  const totalPnLPct =
+    totalPnL != null && pnlBase != null && pnlBase > 0 ? (totalPnL / pnlBase) * 100 : null
 
   const externalSource = holding.external_source as string | null
   const source: HoldingSourceForBadge = externalSource
@@ -194,17 +228,43 @@ export default async function InvestmentHoldingDetailPage({
           sub={dayChange != null ? `${dayChange >= 0 ? '+' : ''}${dayChange.toFixed(2)}% vandaag` : undefined}
           tone={dayChange != null ? (dayChange >= 0 ? 'positive' : 'negative') : undefined}
         />
-        {costBasis != null && returnPct != null && returnVal != null ? (
+        {totalPnL != null ? (
           <KpiBlock
-            label="Rendement"
-            value={`${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(1)}%`}
-            sub={`${returnVal >= 0 ? '+' : ''}${currency === 'EUR' ? formatCurrency(returnVal) : formatCurrencyOf(returnVal, currency)}`}
-            tone={returnPct >= 0 ? 'positive' : 'negative'}
+            label={isClosed ? 'Resultaat (gerealiseerd)' : 'Resultaat'}
+            value={`${totalPnL >= 0 ? '+' : ''}${currency === 'EUR' ? formatCurrency(totalPnL) : formatCurrencyOf(totalPnL, currency)}`}
+            sub={totalPnLPct != null ? `${totalPnLPct >= 0 ? '+' : ''}${totalPnLPct.toFixed(1)}% op inleg` : undefined}
+            tone={totalPnL >= 0 ? 'positive' : 'negative'}
           />
         ) : (
-          <KpiBlock label="Rendement" value="—" sub="kostenbasis onbekend" />
+          <KpiBlock label="Resultaat" value="—" sub="geen transacties" />
         )}
       </section>
+
+      {hasTx && realizedPnL != null && (
+        <p className="mt-4 text-[11px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+          <span>
+            Gerealiseerd {realizedPnL >= 0 ? '+' : ''}
+            {currency === 'EUR' ? formatCurrency(realizedPnL) : formatCurrencyOf(realizedPnL, currency)}
+          </span>
+          {!isClosed && unrealizedPnL != null && (
+            <>
+              {' · '}
+              <span>
+                Ongerealiseerd {unrealizedPnL >= 0 ? '+' : ''}
+                {currency === 'EUR'
+                  ? formatCurrency(unrealizedPnL)
+                  : formatCurrencyOf(unrealizedPnL, currency)}
+              </span>
+            </>
+          )}
+          {isClosed && (
+            <>
+              {' · '}
+              <span>Positie gesloten</span>
+            </>
+          )}
+        </p>
+      )}
 
       {(lastPriceFormatted || ter != null) && (
         <p className="mt-4 text-[11px] uppercase tracking-[0.08em] text-[var(--ink-4)]">

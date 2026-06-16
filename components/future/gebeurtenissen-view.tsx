@@ -256,6 +256,25 @@ export function GebeurtenissenView({
     setEventPaneMode('catalog')
     setEventPaneOpen(true)
   }
+
+  // Deep-link: ?nieuw=1|true opent de EventPane direct in catalog-mode
+  // (vanuit een overlay-CTA op de Tijdas-grafiek). Spiegelt het ?strategie=-effect.
+  // Na openCatalog gedeclareerd zodat de functie in scope is bij mount.
+  useEffect(() => {
+    const n = searchParams.get('nieuw')
+    if (n === '1' || n === 'true') openCatalog()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  // Sluit de EventPane én ruim een eventuele ?nieuw-param op (spiegelt closeStrategy).
+  function closeEventPane() {
+    setEventPaneOpen(false)
+    if (searchParams.get('nieuw')) {
+      const p = new URLSearchParams(searchParams)
+      p.delete('nieuw')
+      router.replace(`${pathname}${p.toString() ? `?${p}` : ''}`, { scroll: false })
+    }
+  }
   // Sort events op target_date (alfabet als fallback). Events met datum
   // tonen we eerst chronologisch, daarna events met alleen target_age,
   // tenslotte events zonder timing.
@@ -486,7 +505,7 @@ export function GebeurtenissenView({
 
       <EventPane
         open={eventPaneOpen}
-        onClose={() => setEventPaneOpen(false)}
+        onClose={closeEventPane}
         editingId={eventPaneEditingId}
         initialMode={eventPaneMode}
         events={events}

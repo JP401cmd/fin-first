@@ -471,6 +471,11 @@ export interface DashboardData {
   fireRange: FireRange | null
   // Horizon: simplified sim rows for vermogenspad chart (age + portfolio + phase)
   simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number }[] | null
+  // Horizon: geprojecteerd VOLLEDIG netto vermogen per jaar (FIRE-pot + meegroeiende
+  // niet-liquide assets die uit de FIRE-pot zijn gefilterd). Náást simRows/endPortfolio,
+  // zodat de /overzicht-vermogensgrafiek de projectielijn continu houdt met het
+  // Vandaag-punt (= volledig netto vermogen incl. huis). null als de sim niet kon draaien.
+  simNetWorthRows: { age: number; netWorth: number }[] | null
   // Horizon: requiredFirePortfolio uit runSimulation (null als geen birth_date)
   simRequiredPortfolio: number | null
   // Horizon: backtesting success rate + named crash paths

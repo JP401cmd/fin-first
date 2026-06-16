@@ -25,6 +25,7 @@ import type { WidgetPref, WidgetPrefs } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import {
   computeFireProjection,
   computeFireRange,
@@ -43,6 +44,7 @@ import { toSimResult } from '@/lib/unified-projection'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
+import { buildSimNetWorthRows } from '@/lib/horizon-engine/networth-projection'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
@@ -50,7 +52,7 @@ import { calculateBox3, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
-import { resolveDepreciation, type Asset } from '@/lib/asset-data'
+import { resolveDepreciation, computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import { type Debt } from '@/lib/debt-data'
 import {
   parseHousingStrategy,
@@ -177,7 +179,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('actions')
       .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
       .in('status', ['open', 'postponed', 'completed']),
-    supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, metadata').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
+    supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
     supabase.from('recommendations').select('id, title, freedom_days_per_year, priority_score, recommendation_type, status').in('status', ['pending', 'postponed']),
     supabase.from('goals').select('id, name, goal_type, current_value, target_value, target_date, color, icon').eq('is_completed', false).order('sort_order', { ascending: true }),
     supabase.from('recurring_transactions').select('id, name, amount, frequency, budget_id').eq('is_active', true),
@@ -462,8 +464,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   // ── 6-month rolling average savings rate ─────────────────────
-  const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1))
-    .toISOString().split('T')[0]
+  // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde 7 maanden — off-by-one)
+  const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
 
   const income6m = (income12Result.data ?? [])
     .filter(t => isRealTx(t) && (t as { date: string }).date >= sixMonthsAgo)
@@ -519,9 +521,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // (matches core-data-loader fallback for consistency)
   const earlySnapshotRows = netWorthSnapshotsResult.data ?? []
   if (savingsRateIsEstimate && earlySnapshotRows.length >= 2 && effectiveMonthlyIncome > 0) {
+    // Verwachte koerswinst op beleggingen — geen sparen, dus afhalen voor een
+    // eerlijker fallback-quote. Gedeelde helper (expected_return is een %, dus /100).
+    const expectedAnnualAppreciation = computeExpectedAnnualAppreciation((assetsResult.data ?? []) as Asset[])
     const deltaResult = computeSavingsRateFromNetWorthDelta(
       earlySnapshotRows as { snapshot_date: string; net_worth: number }[],
       effectiveMonthlyIncome,
+      { expectedAnnualAppreciation },
     )
     if (deltaResult) {
       savingsRate6m = deltaResult.rate
@@ -553,6 +559,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     estimatedAnnualIncome: extrapolatedIncome,
     estimatedMonthlyExpenses: profileMonthlyExpenses,
     savingsRate6m,
+    // Handmatig pad volgt dezelfde definitie als het transactie-pad.
+    monthlyDebtAflossing: debtAflossingMonthly,
+    monthlySavingsContribution: extSavingsBudget6 / 6,
   })
   // dashboardSavingsOverride + dashboardBaseAnnualSavings worden als parameters aan
   // buildHorizonInput doorgegeven (dezelfde annualSavings-prioriteit als de
@@ -607,6 +616,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Uses runUnifiedProjection() — the same engine as the horizon page — for per-asset-type
   // rendement, per-schuld aflossing, and proper Box 3 per asset category.
   let simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number }[] | null = null
+  // Geprojecteerd VOLLEDIG netto vermogen per jaar (FIRE-pot + meegroeiende
+  // niet-liquide assets die uit de FIRE-pot gefilterd zijn). Náást endPortfolio,
+  // zodat de /overzicht-grafiek de Vandaag→projectie-lijn continu houdt met het
+  // Vandaag-punt (= volledig netto vermogen incl. huis). Zie buildSimNetWorthRows.
+  let simNetWorthRows: { age: number; netWorth: number }[] | null = null
   let simRequiredPortfolio: number | null = null
   let simFireAgeFractional: number | null = null
   // Snapshot voor de /toekomst Voorkeuren-bewerkschermen (regel-sim baseline = Tijdas-curve).
@@ -669,6 +683,28 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           flowOut: r.flowOut,
           oneTimeNet: r.oneTimeNet,
         }))
+        // Geprojecteerd VOLLEDIG netto vermogen per jaar (incl. niet-liquide
+        // assets). Voor filterende housing-modi (exclude_from_fire, v1-downsize)
+        // telt de meegroeiende huis-overwaarde bij endPortfolio; voor de overige
+        // modi (huis al in de pot) is het ≡ endPortfolio. Verankerd op netWorth
+        // (zelfde "vandaag"-grondslag als het Vandaag-punt). Eén bron: de
+        // canonieke huiswaarde-/hypotheek-projectie (geen tweede engine-run).
+        const v1DownsizeSaleAge =
+          !horizonEngineV2 && housingStrategyCfg.mode === 'downsize'
+            ? built.effectiveLifeEvents.find(
+                (e) => e.event_type === 'verkoop_eigen_woning' && e.target_age != null,
+              )?.target_age ?? null
+            : null
+        simNetWorthRows = buildSimNetWorthRows({
+          simRows,
+          currentNetWorth: netWorth,
+          housingStrategy: housingStrategyCfg,
+          useV2: horizonEngineV2,
+          assets: dashboardAssetsArr,
+          debts: dashboardDebtsArr,
+          dateOfBirth: dob,
+          v1DownsizeSaleAge,
+        })
         // Pensioen post-processing: use actual projected portfolio at AOW age
         // instead of binary-search minimum (consistent with useHorizonFireSim).
         if (built.isPensioen) {
@@ -682,6 +718,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     } catch (err) {
       console.error('[dashboard-data-loader] FIRE-projectie faalde:', err)
       simRows = null
+      simNetWorthRows = null
       simRequiredPortfolio = null
       simFireAgeFractional = null
     }
@@ -1846,6 +1883,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     totalPurchaseValue,
     fireRange,
     simRows,
+    simNetWorthRows,
     simRequiredPortfolio,
     backtestSuccessRate,
     backtestNamedPaths,

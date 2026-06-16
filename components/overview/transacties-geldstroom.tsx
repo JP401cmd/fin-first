@@ -109,7 +109,7 @@ export function TransactiesGeldstroom({
         <Kpi
           label="Spaarquote"
           value={`${aggregates.savingsRate}%`}
-          sub={savingsRateLabel}
+          sub={`deze maand · ${savingsRateLabel}`}
           tone="neutral"
         />
       </div>

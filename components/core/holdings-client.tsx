@@ -468,6 +468,19 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     return list
   }, [chipFiltered, sortKey])
 
+  // Open vs. gesloten posities. Volledig verkochte posities (0 stuks) horen niet
+  // in de actieve lijst — hun marktwaarde is 0 — maar blijven bereikbaar via een
+  // inklapbare sectie en hun detailpagina (waar de gerealiseerde winst staat).
+  const openHoldings = useMemo(
+    () => sortedHoldings.filter((h) => Math.abs(h.units) > 1e-9),
+    [sortedHoldings],
+  )
+  const closedHoldings = useMemo(
+    () => sortedHoldings.filter((h) => Math.abs(h.units) <= 1e-9),
+    [sortedHoldings],
+  )
+  const [showClosed, setShowClosed] = useState(false)
+
   // Top-3 winnaars op return% — voor highlight-marker op marktwaarde-bedrag
   // in de mini-artikel-blueprint. Skill r94: max één marker per pagina-sectie,
   // hier breed geïnterpreteerd als "alleen de beste prestatie binnen de lijst"
@@ -945,7 +958,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
           </p>
         )}
 
-        {sortedHoldings.map((holding) => {
+        {openHoldings.map((holding) => {
           const price = holding.current_price ?? holding.avg_purchase_price
           const value = price * Math.max(0, holding.units)
           const stale = isPriceStale(holding)
@@ -1008,6 +1021,62 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
             />
           )
         })}
+
+        {/* Gesloten posities — volledig verkocht (0 stuks). Uit de actieve lijst
+            gehouden, maar bereikbaar via een inklapbare sectie; de detailpagina
+            toont hun gerealiseerde winst/verlies. */}
+        {closedHoldings.length > 0 && (
+          <div className="pt-3">
+            <button
+              type="button"
+              onClick={() => setShowClosed((v) => !v)}
+              className="flex w-full items-center justify-between border-t border-[var(--rule-soft)] pt-3 text-left"
+            >
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                Gesloten posities ({closedHoldings.length})
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
+                {showClosed ? 'Verberg' : 'Toon'}
+              </span>
+            </button>
+            {showClosed && (
+              <ul className="mt-2 space-y-1">
+                {closedHoldings.map((holding) => {
+                  const bucket = (holding as Holding & { bucket?: string }).bucket
+                  const href =
+                    bucket === 'crypto'
+                      ? `/core/assets/crypto/${holding.id}`
+                      : `/core/assets/investment/${holding.id}`
+                  return (
+                    <li key={holding.id}>
+                      <Link
+                        href={href}
+                        className="flex items-center justify-between gap-3 border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 transition-colors hover:bg-[var(--subtle)]/50"
+                      >
+                        <span className="flex min-w-0 items-baseline gap-2">
+                          <span className="font-mono text-[12px] tabular-nums text-[var(--ink)]">
+                            {holding.ticker?.toUpperCase() || holding.name}
+                          </span>
+                          {holding.ticker && (
+                            <span
+                              className="truncate font-serif text-[12px] italic text-[var(--ink-3)]"
+                              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                            >
+                              {holding.name}
+                            </span>
+                          )}
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+                          gesloten
+                        </span>
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        )}
       </section>
 
       {/* New holding form modal */}

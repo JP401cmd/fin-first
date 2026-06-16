@@ -39,13 +39,13 @@ describe('getCohortReference — met huishoudtype', () => {
     expect(ref.householdAdjusted).toBe(true)
   })
 
-  it('alleenstaand heeft lager netWorthMedian dan base (factor 0.55)', () => {
+  it('alleenstaand heeft lager netWorthMedian dan base (factor 0.35)', () => {
     const base = getCohortReference('35-45', null)
     const solo = getCohortReference('35-45', 'alleenstaand')
     expect(solo.netWorthMedian).toBeLessThan(base.netWorthMedian)
   })
 
-  it('paar heeft hoger netWorthMedian dan base (factor 1.30)', () => {
+  it('paar heeft hoger netWorthMedian dan base (factor 1.45)', () => {
     const base = getCohortReference('35-45', null)
     const paar = getCohortReference('35-45', 'paar')
     expect(paar.netWorthMedian).toBeGreaterThan(base.netWorthMedian)
@@ -59,11 +59,14 @@ describe('getCohortReference — met huishoudtype', () => {
     expect(paar.netWorthMedian).toBeGreaterThan(base.netWorthMedian)
   })
 
-  it('ordening alleenstaand < base < paar voor incomeMedian', () => {
+  it('ordening alleenstaand === base < paar voor incomeMedian', () => {
+    // Na de methodologie-fix is de alleenstaand income-factor 1.00 (CBS-equivalentiebasis
+    // = alleenstaande). Het gestandaardiseerde inkomen is per definitie al herleid naar een
+    // alleenstaande, dus de solo-waarde equals de ongecorrigeerde base.
     const base = getCohortReference('35-45', null)
     const solo = getCohortReference('35-45', 'alleenstaand')
     const paar = getCohortReference('35-45', 'paar')
-    expect(solo.incomeMedian).toBeLessThan(base.incomeMedian)
+    expect(solo.incomeMedian).toBe(base.incomeMedian)
     expect(paar.incomeMedian).toBeGreaterThan(base.incomeMedian)
   })
 
@@ -85,6 +88,47 @@ describe('getCohortReference — met huishoudtype', () => {
     const solo = getCohortReference('45-55', 'alleenstaand')
     const gezin = getCohortReference('45-55', 'gezin_jong')
     expect(gezin.incomeMedian).toBeGreaterThan(solo.incomeMedian)
+  })
+})
+
+// ── Absolute-waarde regressiebeveiliging — HOUSEHOLD_ADJUST-fix (jun 2026) ──
+// Deze asserties pinnen de gecorrigeerde celwaarden na de bugfix waarbij
+// huishoudtype-factoren werden toegepast op al-gestandaardiseerde CBS-cijfers
+// (dubbel-verdiscontering voor alleenstaanden). Als HOUSEHOLD_ADJUST of
+// AGE_REFERENCE verandert, moeten deze bewust worden bijgesteld.
+
+describe('getCohortReference — absolute regressiewaarden na HOUSEHOLD_ADJUST-fix', () => {
+  it('(35-45, alleenstaand) incomeMedian = 39000', () => {
+    expect(getCohortReference('35-45', 'alleenstaand').incomeMedian).toBe(39_000)
+  })
+
+  it('(35-45, alleenstaand) netWorthMedian = 42035', () => {
+    expect(getCohortReference('35-45', 'alleenstaand').netWorthMedian).toBe(42_035)
+  })
+
+  it('(35-45, alleenstaand) netWorthMean = 86240', () => {
+    expect(getCohortReference('35-45', 'alleenstaand').netWorthMean).toBe(86_240)
+  })
+
+  it('(35-45, paar) incomeMedian = 54600', () => {
+    expect(getCohortReference('35-45', 'paar').incomeMedian).toBe(54_600)
+  })
+
+  it('(35-45, gezin_tiener) incomeMedian = 74490', () => {
+    expect(getCohortReference('35-45', 'gezin_tiener').incomeMedian).toBe(74_490)
+  })
+
+  it('(45-55, alleenstaand) incomeMedian = 42300', () => {
+    expect(getCohortReference('45-55', 'alleenstaand').incomeMedian).toBe(42_300)
+  })
+
+  it('(35-45, alleenstaand) incomeMedian is strikt hoger dan CBS all-ages alleenstaand-gemiddelde (€25.800)', () => {
+    // Regressiebewaker voor de gemelde bug: de oude factor (0.62) gaf €24.180 voor de
+    // 35-45-band — lager dan het CBS-gemiddelde van €25.800 voor alle leeftijden samen.
+    // Een 35-45-jarige verdient structureel meer dan het all-ages gemiddelde; een uitkomst
+    // ónder die drempel is per definitie fout. De nieuwe factor (1.00) geeft €39.000. ✓
+    const ref = getCohortReference('35-45', 'alleenstaand')
+    expect(ref.incomeMedian).toBeGreaterThan(25_800)
   })
 })
 

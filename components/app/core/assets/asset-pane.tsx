@@ -33,6 +33,10 @@ import {
   type AssetConnectionSummary,
 } from '@/lib/connections-data'
 import {
+  loadBrokerConnectionForAsset,
+  type BrokerConnectionRow,
+} from '@/lib/broker-connections-data'
+import {
   loadCryptoHoldingsForAsset,
   type CryptoHoldingRow,
 } from '@/lib/crypto-holdings-data'
@@ -89,6 +93,7 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const [budgetingActive, setBudgetingActive] = useState(true)
   const [connection, setConnection] = useState<AssetConnectionSummary | null>(null)
+  const [brokerConnection, setBrokerConnection] = useState<BrokerConnectionRow | null>(null)
   const [cryptoHoldings, setCryptoHoldings] = useState<CryptoHoldingRow[]>([])
   const [investmentHoldings, setInvestmentHoldings] = useState<InvestmentHoldingRow[]>([])
 
@@ -127,6 +132,12 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
       assetType === 'crypto' || assetType === 'investment'
         ? loadConnectionForAsset(supabase, assetId).catch(() => null)
         : Promise.resolve(null)
+    // Broker-koppeling (Trading 212) is investment-only — voor andere types
+    // resolvet de promise direct met `null` (geen extra Supabase-roundtrip).
+    const brokerPromise: Promise<BrokerConnectionRow | null> =
+      assetType === 'investment'
+        ? loadBrokerConnectionForAsset(supabase, assetId).catch(() => null)
+        : Promise.resolve(null)
     const cryptoPromise: Promise<CryptoHoldingRow[]> =
       assetType === 'crypto'
         ? loadCryptoHoldingsForAsset(supabase, assetId).catch(() => [])
@@ -145,6 +156,7 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
       essentialBudgetsRes,
       childBudgetsRes,
       connectionResult,
+      brokerResult,
       cryptoResult,
       investmentResult,
     ] = await Promise.all([
@@ -180,11 +192,13 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
         .select('id, parent_id, default_limit, is_essential, interval, budget_type')
         .not('parent_id', 'is', null),
       connectionPromise,
+      brokerPromise,
       cryptoPromise,
       investmentPromise,
     ])
 
     setConnection(connectionResult)
+    setBrokerConnection(brokerResult)
     setCryptoHoldings(cryptoResult)
     setInvestmentHoldings(investmentResult)
     setValuations((valuationsRes.data ?? []) as Valuation[])
@@ -383,6 +397,7 @@ export function AssetPane({ asset, onClose, onChanged }: AssetPaneProps) {
             linkedBankAccounts={linkedBankAccounts}
             budgetingActive={budgetingActive}
             initialConnection={connection}
+            initialBrokerConnection={brokerConnection}
             onClose={() => setMode('view')}
             onSaved={() => {
               setMode('view')

@@ -44,6 +44,7 @@ import {
   X,
 } from 'lucide-react'
 import { useMediaQuery } from '@/lib/hooks/use-media-query'
+import { formatMaskedCurrency } from '@/lib/format'
 
 /** Welke grafiekfase een ballon accentueert bij openen. */
 type OverlayEmphasis = 'accumulation' | 'withdrawal' | 'fire' | null
@@ -68,11 +69,32 @@ export interface OverlayBalloonDef {
   onActivate: () => void
 }
 
+/**
+ * Compacte samenvatting bovenin de tips-overlay: twee feiten in één regel.
+ * Gestructureerde data zodat formattering + maskering hier editorial-consistent
+ * gebeurt (geen vooraf-geformatteerde string van de parent).
+ */
+export interface ToekomstOverlaySummary {
+  /** Netto vermogen (= bezittingen − schulden), uit de canonieke bron. */
+  netWorth: number
+  /** Vrijheids-/FIRE-leeftijd zoals de pagina 'm toont; null = nog niet in zicht. */
+  freedomAge: number | null
+  /** Privacy-maskering — volgt dezelfde toggle als de marker-bedragen. */
+  masked: boolean
+  /** Pensioenmodus → frame de leeftijd als "pensioenleeftijd" i.p.v. een keuze. */
+  isPensioen?: boolean
+}
+
 export interface ToekomstOverlayProps {
   /** Of de tips-modus aan staat (toggle in de header). */
   visible: boolean
   /** Ballon-definities (door horizon-client samengesteld + gewired). */
   balloons: OverlayBalloonDef[]
+  /**
+   * Optionele één-regel-samenvatting bovenin de overlay (netto vermogen +
+   * vrijheidsleeftijd). Alleen gerenderd als `visible && summary`.
+   */
+  summary?: ToekomstOverlaySummary
   /** Accentueer de gegeven grafiekfase (of reset met null). */
   onEmphasisChange: (emphasis: OverlayEmphasis) => void
   /** De grafiek zelf — staat in de overlay gecentreerd op een witte kaart. */
@@ -84,6 +106,7 @@ export interface ToekomstOverlayProps {
 export function ToekomstOverlay({
   visible,
   balloons,
+  summary,
   onEmphasisChange,
   children,
   onClose,
@@ -175,39 +198,88 @@ export function ToekomstOverlay({
     return () => window.removeEventListener('keydown', onKey)
   }, [visible, openId, close, onClose])
 
-  // Scroll-lock: zolang de tips aan staan kan de pagina NIET scrollen — zo blijft
-  // de grafiek in beeld en kan de blur niet "weggescrold" worden. We vergrendelen
-  // html + body én elke scrollbare voorouder (op mobiel scrollt een
-  // `<main overflow-y-auto>`, niet de body).
+  // Geschatte hoogte van de sticky paginakop/TopBar (binnen de tray): ~48px
+  // (`h-12`) plus wat lucht. We trekken 'm van de viewport af om de beschikbare
+  // hoogte voor de overlay te bepalen — en hij is de doel-top bij `block:'start'`.
+  const HEADER_OFFSET = 64
+
+  // Scroll-lock — MAAR alleen als de hele overlay (samenvatting + beide
+  // marker-rijen + grafiek) binnen de beschikbare viewport-hoogte past. Past 'ie
+  // → statische spotlight (lock voorkomt dat de blur weggescrold wordt). Past 'ie
+  // NIET (kleine schermen: de onderste markers vallen eraf) → NIET locken, zodat
+  // de gebruiker naar de onderste bubbels kan scrollen. De scrim dekt de volle
+  // scrollHeight, dus de blur blijft de hele pagina vervagen tijdens het scrollen
+  // en de grafiek (z-[50]) blijft scherp boven de scrim (z-[45]).
   useEffect(() => {
     if (!visible) return
-    // 1. Centreer de grafiek verticaal in beeld VOORDAT we de scroll vergrendelen,
-    //    zodat bij het aanzetten van de tips de juiste info middenin staat.
+    // 1. Lijn de overlay (top-markerrij → grafiek → bottom-markerrij) in beeld
+    //    VOORDAT we eventueel de scroll vergrendelen, zodat de juiste info
+    //    zichtbaar is.
+    //    - Mobiel: zo HOOG mogelijk (block:'start'), net onder de sticky paginakop
+    //      via scroll-margin-top (zie de wrapper-div), zodat het geheel hoog in
+    //      beeld start.
+    //    - Desktop (ruimer scherm): centreren blijft de mooiste weergave.
     //    (defensief: scrollIntoView bestaat niet in elke omgeving, bv. jsdom.)
     const el = wrapperRef.current
+    const isCompact =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 1023px)').matches
     if (el && typeof el.scrollIntoView === 'function') {
-      el.scrollIntoView({ block: 'center', behavior: 'auto' })
+      el.scrollIntoView({ block: isCompact ? 'start' : 'center', behavior: 'auto' })
     }
-    // 2. Scroll-lock zodat de pagina NIET kan scrollen en de blur niet weg te
-    //    scrollen is.
-    const restores: Array<() => void> = []
-    const lock = (el: HTMLElement | null | undefined) => {
-      if (!el) return
-      const prev = el.style.overflow
-      el.style.overflow = 'hidden'
+
+    // 2. Bepaal of de overlay overflowt: is de inhoudshoogte van de wrapper groter
+    //    dan de beschikbare viewport (viewport − header)? Meet op de wrapper zelf
+    //    (niet de paginabrede scrollHeight, die is altijd groter). We her-meten bij
+    //    resize zodat een draai/herschaal de lock-conditie corrigeert.
+    let restores: Array<() => void> = []
+
+    const lock = (node: HTMLElement | null | undefined) => {
+      if (!node) return
+      const prev = node.style.overflow
+      node.style.overflow = 'hidden'
       restores.push(() => {
-        el.style.overflow = prev
+        node.style.overflow = prev
       })
     }
-    lock(document.documentElement)
-    lock(document.body)
-    let node = wrapperRef.current?.parentElement ?? null
-    while (node) {
-      const oy = getComputedStyle(node).overflowY
-      if (oy === 'auto' || oy === 'scroll') lock(node)
-      node = node.parentElement
+
+    const release = () => {
+      restores.forEach((fn) => fn())
+      restores = []
     }
-    return () => restores.forEach((fn) => fn())
+
+    const applyLock = () => {
+      release()
+      const wrapper = wrapperRef.current
+      if (!wrapper) return
+      const available =
+        (typeof window !== 'undefined' ? window.innerHeight : 0) - HEADER_OFFSET
+      // Inhoudshoogte van de overlay (samenvatting + beide marker-rijen + grafiek).
+      const contentHeight = wrapper.scrollHeight
+      const overflows = contentHeight > available
+      // Past alles → lock (statische spotlight). Overflow → NIET locken: laat de
+      // scroll-container scrollen zodat de onderste bubbels bereikbaar zijn.
+      if (overflows) return
+      lock(document.documentElement)
+      lock(document.body)
+      let node = wrapper.parentElement ?? null
+      while (node) {
+        const oy = getComputedStyle(node).overflowY
+        if (oy === 'auto' || oy === 'scroll') lock(node)
+        node = node.parentElement
+      }
+    }
+
+    // Eerste meting (na de scrollIntoView). Layout-waarden zijn dan stabiel.
+    applyLock()
+    // Her-meet bij resize: een draai of toetsenbord-overlap verandert de
+    // beschikbare hoogte en dus de lock-conditie.
+    window.addEventListener('resize', applyLock)
+    return () => {
+      window.removeEventListener('resize', applyLock)
+      release()
+    }
   }, [visible])
 
   const topBalloons = balloons.filter((b) => b.row === 'top')
@@ -227,7 +299,14 @@ export function ToekomstOverlay({
     // rest vervaagt via een scrim; de markers staan in een rij boven + onder. De
     // grafiek (`children`) staat in beide gevallen op dezelfde plek in de React-tree
     // zodat 'ie niet re-mount/re-animeert.
-    <div ref={wrapperRef} className={visible ? 'relative z-[50]' : 'relative'}>
+    // `scroll-mt-2` (0.5rem = 8px): wanneer de tips de overlay met block:'start'
+    // naar boven scrollen (mobiel), landt de samenvattingsregel zo hóóg mogelijk —
+    // net onder de paginakop. De scroll-container (`<main>`) begint al ONDER de
+    // sticky TopBar (~48px `h-12`), dus hier is alleen nog een kleine ademruimte
+    // nodig; een grotere marge zou de overlay onnodig naar beneden duwen.
+    // (HEADER_OFFSET in de lock-effect is een aparte, conservatieve drempel voor
+    // de overflow-detectie en hoeft hier niet mee overeen te komen.)
+    <div ref={wrapperRef} className={visible ? 'relative z-[50] scroll-mt-2' : 'relative'}>
       {/* Blur-scrim als DIRECTE child van de scroll-container (niet genest in de
           z-[50]-grafiek-wrapper) zodat `backdrop-filter` de HÉLE pagina vervaagt.
           z-[45] → onder de grafiek + markers (z-[50]) maar boven de rest. Klik sluit.
@@ -243,6 +322,12 @@ export function ToekomstOverlay({
             type="button"
             aria-label="Tips sluiten"
             onClick={onClose}
+            // Stop pointerdown van bubbelen (via de React-portal-tree) naar de
+            // ZoomableChartContainer: die doet `setPointerCapture` op élke
+            // pointerdown, waardoor de pointer-capture de click naar de grafiek
+            // omleidt en deze sluit-knop nooit zijn `onClick` krijgt. Zelfde
+            // guard als de markers/✕.
+            onPointerDown={(e) => e.stopPropagation()}
             className="absolute left-0 right-0 top-0 z-[45] cursor-default bg-[var(--ink)]/15 backdrop-blur-md"
             style={{ height: scrimHeight ?? '100%' }}
           />,
@@ -259,6 +344,12 @@ export function ToekomstOverlay({
           <button
             type="button"
             onClick={onClose}
+            // Zonder dit kaapt de ZoomableChartContainer de klik: deze knop is via
+            // de portal weliswaar een DOM-kind van <body>, maar in de REACT-tree
+            // nog steeds een afstammeling van de grafiek-container, dus de
+            // pointerdown bubbelt daarheen en `setPointerCapture` leidt de click weg
+            // (→ ✕ leek dood). Stop de pointerdown vóór de container 'm ziet.
+            onPointerDown={(e) => e.stopPropagation()}
             aria-label="Tips sluiten"
             className="pointer-events-auto fixed right-3 z-[250] inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] shadow-lg transition-colors hover:text-[var(--ink)]"
             style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}
@@ -267,6 +358,11 @@ export function ToekomstOverlay({
           </button>,
           document.body,
         )}
+
+      {/* Slanke samenvatting bovenin — eerste element van de overlay. Eén regel
+          (twee op smal scherm), met dunne divider eronder. Mag de bubbels nauwelijks
+          omlaag duwen, zodat de mobiele top-alignment hoog in beeld blijft. */}
+      {visible && summary && <SummaryLine summary={summary} />}
 
       {/* Bovenste rij — alleen als de tips aan staan. */}
       {visible && topBalloons.length > 0 && (
@@ -289,6 +385,67 @@ export function ToekomstOverlay({
       {visible && bottomBalloons.length > 0 && (
         <MarkerRow position="bottom" balloons={bottomBalloons} {...rowProps} />
       )}
+
+      {/* Subtiele hint: hoe je dit Tips-scherm later terugvindt. `onPointerDown`
+          stopPropagation net als de markers/samenvatting (consistentie; staat
+          buiten een MarkerRow). */}
+      {visible && (
+        <p
+          onPointerDown={(e) => e.stopPropagation()}
+          className="relative z-10 mx-auto mt-1.5 max-w-[min(34rem,calc(100vw-2rem))] px-3 text-center text-[11px] leading-snug text-[var(--ink-3)]"
+        >
+          Je kan dit scherm weer vinden als je op{' '}
+          <span className="font-medium text-[var(--ink-2)]">De toekomst</span> drukt
+          en <span className="font-medium text-[var(--ink-2)]">Tips</span> aanzet.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Eén-regel-samenvatting: netto vermogen + de leeftijd waarop werken een keuze
+ * wordt. Understated/editorial zodat 'ie de markers niet overschreeuwt; bedrag in
+ * mono/tabular-nums; module-accent via `--module-active-*`. Geen eigen rekenlogica
+ * — alle getallen komen kant-en-klaar uit de parent (single-source).
+ */
+function SummaryLine({ summary }: { summary: ToekomstOverlaySummary }) {
+  const { netWorth, freedomAge, masked, isPensioen } = summary
+  // Hele jaren — "rond je 65e" leest natuurlijker dan "65.0".
+  const ageLabel =
+    freedomAge != null ? (
+      isPensioen ? (
+        <>
+          je pensioen valt rond je{' '}
+          <span className="font-semibold text-[var(--module-active-800)]">{Math.round(freedomAge)}e</span>
+        </>
+      ) : (
+        <>
+          werken wordt een keuze rond je{' '}
+          <span className="font-semibold text-[var(--module-active-800)]">{Math.round(freedomAge)}e</span>
+        </>
+      )
+    ) : (
+      <span className="text-[var(--ink-3)]">vrijheid nog niet in zicht</span>
+    )
+
+  return (
+    <div
+      onPointerDown={(e) => e.stopPropagation()}
+      className="relative z-10 mx-auto mb-3 flex max-w-[min(34rem,calc(100vw-2rem))] flex-col items-center gap-y-0.5 border-b border-[var(--border-md)] px-3 pb-2.5 text-center"
+    >
+      <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[13px] leading-snug text-[var(--ink-2)]">
+        <span>
+          <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
+            {formatMaskedCurrency(netWorth, masked)}
+          </span>{' '}
+          <span className="text-[var(--ink-2)]">netto vermogen</span>
+        </span>
+        <span aria-hidden className="text-[var(--ink-4)]">
+          ·
+        </span>
+        <span>{ageLabel}</span>
+      </p>
     </div>
   )
 }
@@ -312,6 +469,11 @@ function MarkerRow({
 }) {
   return (
     <div
+      // Stop pointerdown van bubbelen naar de ZoomableChartContainer: die doet
+      // `setPointerCapture` op élke pointerdown, waardoor anders de klik/tap op een
+      // marker of CTA-knop wordt opgeslokt (CTA navigeert niet, mobiele tik voelt
+      // dood). Zelfde patroon als de Inkomen&Uitgaven-toggle in horizon-client.
+      onPointerDown={(e) => e.stopPropagation()}
       className={`relative z-10 flex flex-wrap items-center justify-center gap-2 px-3 ${
         position === 'top' ? 'pb-3' : 'pt-3'
       }`}
@@ -385,6 +547,13 @@ function MarkerWithPopover({
 
   // Hover (alleen hover-apparaten) + focus (toetsenbord) op de WRAPPER zodat
   // focus van marker → CTA in de popover binnen dezelfde subtree blijft.
+  //
+  // ⚠️ `onFocus`/`onBlur` MOETEN — net als de mouse-handlers — op `canHover`
+  // gegate zijn. Op touch (geen hover) focust de pointerdown de knop al vóór de
+  // click; een ongegate `onFocus={onOpen}` opent dan de popover, waarna de
+  // daaropvolgende `onClick`-toggle 'm meteen weer sluit → "eerste tik doet
+  // niets, tweede tik opent". Op touch togglet alleen de klik; toetsenbord-focus
+  // op hover-apparaten opent nog steeds de popover.
   return (
     <div
       className="relative"
@@ -394,8 +563,12 @@ function MarkerWithPopover({
       onMouseLeave={() => {
         if (canHover) onScheduleClose()
       }}
-      onFocus={onOpen}
-      onBlur={onScheduleClose}
+      onFocus={() => {
+        if (canHover) onOpen()
+      }}
+      onBlur={() => {
+        if (canHover) onScheduleClose()
+      }}
     >
       <button
         type="button"
@@ -429,6 +602,11 @@ function MarkerWithPopover({
           id={popoverId}
           role="group"
           aria-label={def.kicker}
+          // Eigen pointerdown-guard op de popover (naast die op de MarkerRow): de
+          // CTA hierin navigeert; zonder deze guard kan de `setPointerCapture` van
+          // de ZoomableChartContainer de click naar de grafiek omleiden waardoor de
+          // link-knop niet werkt. Zelf-beschermend, los van de ancestor-structuur.
+          onPointerDown={(e) => e.stopPropagation()}
           className={`absolute z-20 w-[min(15rem,calc(100vw-2.5rem))] ${popoverPos}`}
           style={{ transform: `translateX(calc(-50% + ${shiftX}px))` }}
         >

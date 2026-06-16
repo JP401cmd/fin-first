@@ -182,6 +182,19 @@ function countKpi(n: number, singular: string, plural: string): string {
   return `${n} ${n === 1 ? singular : plural}`
 }
 
+/**
+ * Icon-chip-tint per kaart. Alleen een kaart met een betekenisvolle (niet-
+ * neutrale) status draagt het module-accent — op /toekomst is dat de horizon-
+ * kleur (geldige module-identiteit-class voor Toekomst/Horizon). De overige
+ * kaarten krijgen een neutrale ink-behandeling zodat het accent de aandacht
+ * trekt waar het ertoe doet i.p.v. op alle vier de kaarten te verwateren.
+ */
+function tintForStatus(status: LeverageStatus): string {
+  return status === 'neutral'
+    ? 'text-[var(--ink-2)] bg-[var(--subtle)]'
+    : 'text-horizon-700 bg-horizon-50'
+}
+
 // ── Card-afleiding ─────────────────────────────────────────────────────
 
 export function buildNavCards({
@@ -229,7 +242,7 @@ export function buildNavCards({
       label: 'Doelen',
       href: '/toekomst/doelen',
       Icon: Target,
-      tint: 'text-horizon-700 bg-horizon-50',
+      tint: tintForStatus(doelen.status),
       kpi: countKpi(doelen.activeCount, 'doel', 'doelen'),
       status: doelen.status,
       subText: doelenSubText,
@@ -251,7 +264,7 @@ export function buildNavCards({
       label: 'Gebeurtenissen',
       href: '/toekomst/gebeurtenissen',
       Icon: CalendarClock,
-      tint: 'text-horizon-700 bg-horizon-50',
+      tint: tintForStatus('neutral'),
       kpi: countKpi(eventCount, 'gebeurtenis', 'gebeurtenissen'),
       status: 'neutral',
       subText: next ?? 'Nog niets gepland',
@@ -267,7 +280,7 @@ export function buildNavCards({
       label: 'Voorkeuren',
       href: '/toekomst/voorkeuren',
       Icon: SlidersHorizontal,
-      tint: 'text-horizon-700 bg-horizon-50',
+      tint: tintForStatus('neutral'),
       kpi: strategy.name,
       status: 'neutral',
       subText: `${withdrawalName} · SWR ${formatPct(fireParams.effectiveSwr)}`,
@@ -283,7 +296,7 @@ export function buildNavCards({
       label: 'Rekenhulp',
       href: '/toekomst/rekenhulp',
       Icon: Calculator,
-      tint: 'text-horizon-700 bg-horizon-50',
+      tint: tintForStatus('neutral'),
       kpi: countKpi(calcCount, 'rekenhulp', 'rekenhulpen'),
       status: 'neutral',
       subText: calcCount > 0 ? 'Nieuwe met Will' : 'Nog geen rekenhulpen',

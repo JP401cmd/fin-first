@@ -35,3 +35,37 @@ export async function validateLinkedAsset(
   }
   return { ok: true, assetId: data.id as string }
 }
+
+// Broker-variant of validateLinkedAsset. Identical ownership + existence
+// contract, but requires `asset_type === 'investment'` (a beleggingsrekening)
+// rather than 'crypto'. Brokers (Trading 212, …) sync equity positions into
+// `investment_holdings`, so coupling them to anything but an investment asset
+// would write holdings the rollup can't value. Kept here next to the crypto
+// variant so the two stay symmetric and reviewable in one place.
+export async function validateLinkedInvestmentAsset(
+  supabase: SupabaseClient,
+  userId: string,
+  rawId: unknown,
+): Promise<LinkedAssetCheckResult> {
+  if (typeof rawId !== 'string' || rawId.trim().length === 0) {
+    return { ok: false, status: 400, message: 'linkedAssetId is verplicht.' }
+  }
+  const assetId = rawId.trim()
+
+  const { data, error } = await supabase
+    .from('assets')
+    .select('id, user_id, asset_type')
+    .eq('id', assetId)
+    .maybeSingle()
+
+  if (error || !data) {
+    return { ok: false, status: 404, message: 'Asset niet gevonden.' }
+  }
+  if ((data.user_id as string) !== userId) {
+    return { ok: false, status: 403, message: 'Geen toegang tot dit asset.' }
+  }
+  if ((data.asset_type as string) !== 'investment') {
+    return { ok: false, status: 400, message: 'Alleen beleggingsrekeningen kunnen aan een broker gekoppeld worden.' }
+  }
+  return { ok: true, assetId: data.id as string }
+}

@@ -375,9 +375,9 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     },
     {
       id: 't-marktdata', x: 1250, y: row(4), w: 185, h: 66, kind: 'tech',
-      title: 'Marktdata & exchange-adapters',
-      lead: 'Koersen en fundamentals (CoinGecko, FMP) en exchange-/wallet-synchronisatie (Bitvavo, Coinbase, Kraken, Blockchair).',
-      items: ['exchange-adapter', 'coingecko-client', 'fmp-client', 'wallet-sync'],
+      title: 'Marktdata & koppel-adapters',
+      lead: 'Koersen en fundamentals (CoinGecko, FMP), exchange-/wallet-synchronisatie (Bitvavo, Coinbase, Kraken, Blockchair) en broker-synchronisatie (Trading 212).',
+      items: ['exchange-adapter', 'broker-adapter', 'coingecko-client', 'fmp-client', 'wallet-sync'],
     },
     {
       id: 't-platform', x: 1250, y: row(5), w: 185, h: 66, kind: 'tech',
@@ -463,10 +463,16 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       items: ['TrueLayer API'],
     },
     {
-      id: 'ext-exchanges', x: 1465, y: 591, w: 160, h: 56, kind: 'ext',
+      id: 'ext-exchanges', x: 1465, y: 527, w: 160, h: 56, kind: 'ext',
       title: 'Crypto-exchanges',
       lead: 'Bitvavo, Coinbase, Kraken en on-chain via Blockchair.',
       items: ['Bitvavo', 'Coinbase', 'Kraken', 'Blockchair'],
+    },
+    {
+      id: 'ext-brokers', x: 1465, y: 591, w: 160, h: 56, kind: 'ext',
+      title: 'Aandelen-brokers',
+      lead: 'Trading 212 (read-only API) en CSV-portefeuille-import voor effecten.',
+      items: ['Trading 212', 'CSV-snapshot'],
     },
     {
       id: 'ext-marktdata', x: 1465, y: 655, w: 160, h: 56, kind: 'ext',
@@ -508,7 +514,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'ext-supabase->t-supabase': { payload: 'Beheerde Postgres, Auth en Realtime', mechanism: 'realtime', cadence: 'realtime' },
     'ext-claude->t-aigateway': { payload: 'LLM-completions (primaire provider)', mechanism: 'compute', cadence: 'on-demand' },
     'ext-truelayer->t-bankconnect': { payload: 'PSD2-bankdata: rekeningen en saldi', mechanism: 'rest', cadence: 'daily' },
-    'ext-exchanges->t-marktdata': { payload: 'Crypto-saldi en on-chain transacties', mechanism: 'rest', cadence: 'daily' },
+    'ext-exchanges->t-marktdata': { payload: 'Crypto-saldi en on-chain transacties', mechanism: 'rest', cadence: 'daily', contractDomains: ['integrations'] },
+    'ext-brokers->t-marktdata': { payload: 'Aandelenposities en saldi (Trading 212 read-only of CSV-snapshot per investment-asset)', mechanism: 'rest', cadence: 'daily', contractDomains: ['integrations'] },
     'ext-marktdata->t-marktdata': { payload: 'Koersen en fundamentals', mechanism: 'rest', cadence: 'daily' },
     'ext-vercel->t-platform': { payload: 'Hosting, edge en observability', mechanism: 'build', cadence: 'build' },
     // Applicatie ↔ data
@@ -592,6 +599,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     ['ext-claude', 't-aigateway'],
     ['ext-truelayer', 't-bankconnect'],
     ['ext-exchanges', 't-marktdata', 1452],
+    ['ext-brokers', 't-marktdata', 1448],
     ['ext-marktdata', 't-marktdata', 1456],
     ['ext-vercel', 't-platform'],
   ]

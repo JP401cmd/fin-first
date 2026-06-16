@@ -50,7 +50,9 @@ function subLine(m: BenchmarkMetric, fmt: BodyFigureProps['formatValue']): strin
     }
     case 'eur': {
       const sign = diff >= 0 ? '+' : '−'
-      return `${sign}${fmt(Math.abs(diff), 'eur')} vs mediaan`
+      // Inkomen is een geraamde referentie (equivalentiefactor), géén mediaan.
+      const ref = m.key === 'income' ? 'referentie' : 'mediaan'
+      return `${sign}${fmt(Math.abs(diff), 'eur')} vs ${ref}`
     }
     case 'score': {
       return `peer ${Math.round(m.referenceValue)}`

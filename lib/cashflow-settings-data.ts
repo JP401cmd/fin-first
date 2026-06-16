@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadCoreData } from '@/lib/core-data-loader'
-import type { FinancialInput } from '@/lib/core-metrics'
+import type { FinancialInput, SavingsRateMethod } from '@/lib/core-metrics'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 
 export interface CashflowSettingsData {
@@ -21,6 +21,13 @@ export interface CashflowSettingsData {
   incomeSource: 'auto' | 'manual'
   /** Whether expenses come from DB field ('manual') or transaction-computed average ('auto'). */
   expensesSource: 'auto' | 'manual'
+  /**
+   * Hoe de getoonde spaarquote tot stand kwam: 'transaction' (echte 6-mnd
+   * transacties), 'estimate' (uit profiel-schattingen) of 'net_worth_delta'
+   * (afgeleid uit vermogensgroei). De UI toont een schatting-badge bij de
+   * laatste twee, zodat de gebruiker weet dat het een benadering is.
+   */
+  savingsRateMethod: SavingsRateMethod
   /** Transaction-computed monthly expenses (distinct from estimatedMonthlyExpenses = stored profile value). */
   computedMonthlyExpenses: number
   /** 6-maands spaarbudget-stortingen (correctie-component van savingsRate6m). */
@@ -108,6 +115,7 @@ export async function loadCashflowSettingsData(
     },
     incomeSource: (profile?.income_source as 'auto' | 'manual') ?? 'auto',
     expensesSource: (profile?.expenses_source as 'auto' | 'manual') ?? 'auto',
+    savingsRateMethod: core.savingsRateMethod,
     // Transactie-berekend (6-mnd gemiddelde), bewust NIET rf.monthlyExpenses —
     // dat is de effectieve (post-resolver) waarde die bij een handmatige
     // override gelijk is aan het ingevoerde bedrag. extHalfYearExpenses komt

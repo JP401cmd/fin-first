@@ -88,6 +88,7 @@ export function buildHldModel(): HldModel {
           { title: 'Budgetten maken en bewaken', desc: 'Zie per categorie hoeveel je deze maand nog hebt.' },
           { title: 'Zien hoeveel je overhoudt', desc: 'Je spaarquote: welk deel van je inkomen je spaart.' },
           { title: 'Je bezittingen en schulden bijhouden', desc: 'Van spaargeld tot huis en hypotheek — je netto vermogen in beeld.' },
+          { title: 'Je broker koppelen of je portefeuille importeren', desc: 'Trading 212 koppelen of een bestand inladen — je aandelen en fondsen kloppen automatisch, net als bij je crypto.' },
           { title: 'Jezelf spiegelen aan Nederland en de wereld', desc: 'Zie hoe je gezondheid, spaarquote, vermogen en vrijheidsleeftijd zich verhouden tot een vergelijkbare doelgroep — en waar je staat wereldwijd.' },
         ],
       },

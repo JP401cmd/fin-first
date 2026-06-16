@@ -312,7 +312,7 @@ export default function BenchmarkPage() {
                       className="shrink-0 border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.06em]"
                       style={{ borderColor: VIZ.brown, color: VIZ.brown }}
                     >
-                      {metric.tier === 'measured' ? 'CBS-cijfer' : 'gemodelleerd'}
+                      {metric.tier === 'measured' ? 'Geraamd (CBS-basis)' : 'gemodelleerd'}
                     </span>
                   </div>
 
@@ -343,6 +343,7 @@ export default function BenchmarkPage() {
                         curve={metric.curve}
                         you={metric.userValue}
                         peer={metric.referenceValue}
+                        peerLabel={metric.key === 'income' ? 'referentie' : 'mediaan'}
                         avg={metric.referenceMean ?? null}
                         gradientId={`bench-curve-${metric.key}-${idx}`}
                         masked={masked}
@@ -359,7 +360,7 @@ export default function BenchmarkPage() {
                     <span style={{ color: VIZ.line }}>|</span>
                     <span>
                       <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: VIZ.purpleSoft }} />
-                      mediaan {formatValue(metric.referenceValue, metric.unit)}
+                      {metric.key === 'income' ? 'referentie' : 'mediaan'} {formatValue(metric.referenceValue, metric.unit)}
                     </span>
                     {metric.referenceMean != null && (
                       <>

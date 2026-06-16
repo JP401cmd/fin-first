@@ -423,7 +423,11 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between gap-3 px-4 h-9 border-t border-[var(--border-ed)] text-[11px] text-[var(--ink-3)] shrink-0">
+        {/* min-h i.p.v. vaste h zodat de iOS-safe-area-padding de balk laat
+            groeien (mobiel bottom-anchored: items-end) i.p.v. de home-indicator
+            over de hints te laten vallen. Safe-area = 0 op desktop → geen
+            visuele regressie. */}
+        <div className="flex items-center justify-between gap-3 px-4 min-h-9 pb-[var(--safe-area-bottom,0px)] md:pb-0 border-t border-[var(--border-ed)] text-[11px] text-[var(--ink-3)] shrink-0">
           <div className="flex items-center gap-3">
             <KbdHint icon={ArrowUp} icon2={ArrowDown}>
               Navigeer

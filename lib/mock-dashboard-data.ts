@@ -131,6 +131,11 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
       oneTimeNet: 0,
     }
   }),
+  // include_full-achtige mock: geprojecteerd VOLLEDIG netto vermogen ≡ endPortfolio.
+  simNetWorthRows: Array.from({ length: 10 }, (_, i) => ({
+    age: 35 + i * 3,
+    netWorth: 187500 + i * 52000,
+  })),
   simRequiredPortfolio: 580000,
   backtestSuccessRate: 87,
   backtestNamedPaths: [

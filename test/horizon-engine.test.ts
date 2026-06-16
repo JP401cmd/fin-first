@@ -272,4 +272,152 @@ describe('horizon-engine grootboek (Fase 1)', () => {
     expect(perp.legacyTargetUnavoidablyExceeded).toBe(false)
     expect(dep.legacyTargetUnavoidablyExceeded).toBe(false)
   })
+
+  // ── Woonlast-RENTE-vrijval bij payoff (Fase B, gecorrigeerd) ────────────────
+  // Een geflagde schuld (include_aflossing_in_savings) heeft zijn HELE jaarlast
+  // (rente + aflossing) als "uitgave" in de spaarquote-baseline verrekend en de
+  // aflossing daarna teruggeteld. Netto blijft binnen annualSavings dus alleen de
+  // RENTE permanent afgetrokken; de aflossing valt weg. Bij payoff brengt
+  // `flaggedAflossing → 0` de aflossing AL terug in het surplus — dus mag
+  // uitsluitend het RENTE-deel nog vrijvallen. (De eerdere implementatie liet de
+  // volledige jaarlast vrijvallen → de aflossing werd dubbel hersteld, R te hoog.)
+  //
+  // Een geflagde hypotheek die in ~2 jaar afgelost is: balance 20k, rate 5%,
+  // maandlast 11_000/12 → jaarlast 11_000 (rente+aflossing).
+  //   age 40: begin 20k, rente 1.0k, aflossing 10k → eind 10k (loopt → lastRente=1.0k, freed 0)
+  //   age 41: begin 10k, rente 0.5k, aflossing 10k (cap) → eind 0 (loopt → lastRente=0.5k, freed 0)
+  //   age 42: begin 0  → afgelost → freedHousingCost = lastActiveRente = 0.5k (alléén rente)
+  const LAST_ACTIVE_RENTE = 500 // rente van het laatste lopende jaar (age 41: 10k × 5%)
+  const flaggedMortgage = (over: Record<string, unknown> = {}) => ({
+    id: 'hyp',
+    name: 'Hypotheek',
+    debt_type: 'mortgage',
+    current_balance: 20_000,
+    interest_rate: 5,
+    monthly_payment: 11_000 / 12,
+    repayment_type: 'annuiteit',
+    is_tax_deductible: false,
+    is_active: true,
+    net_worth_inclusion_pct: 100,
+    include_aflossing_in_savings: true,
+    ...over,
+  }) as unknown as UnifiedProjectionInput['debts'][number]
+
+  // We willen alléén de accumulatie-jaren vergelijken (FIRE/onttrekking buiten
+  // beschouwing) → forceer FIRE laat zodat 40..42 zeker in de opbouwfase zitten.
+  const accInput = (debts: UnifiedProjectionInput['debts']) =>
+    mkInput({ debts, forcedFireAge: 67 })
+  const accSurplus = (r: ReturnType<typeof runHorizonLedger>, age: number) =>
+    r.rows.find((x) => x.leeftijd === age)!.cashflowNetto
+
+  it('vrijval: na payoff stijgt het surplus met ALLEEN het rente-deel (niet de volledige jaarlast)', () => {
+    const r = runHorizonLedger(accInput([flaggedMortgage()]))
+    const running = accSurplus(r, 41) // schuld loopt nog → baseline, geen vrijval
+    const freed = accSurplus(r, 42)   // afgelost → alléén de rente valt vrij
+    // De stijging t.o.v. het lopende jaar = (aflossing-aftrek vervalt: flagged→0,
+    // de 10k aflossing keert terug) + (rente van het laatste lopende jaar: 0.5k).
+    // De totale delta is dus ~10.5k, NIET de volledige jaarlast (11k) en zeker geen
+    // 11k bovenóp het terugkeren van de aflossing.
+    const lopendeAflossing = 10_000
+    expect(freed - running).toBeCloseTo(lopendeAflossing + LAST_ACTIVE_RENTE, 6)
+    // Strikt: de vrijval bovenóp het terugkeren van de aflossing is exact de rente
+    // (0.5k), niet de volledige jaarlast.
+    expect(freed - running - lopendeAflossing).toBeCloseTo(LAST_ACTIVE_RENTE, 6)
+  })
+
+  it('vrijval (economie-pin): het surplus na payoff = de loader-economie inkomen − E_overig (geen dubbeltelling)', () => {
+    // LOADER-CONSISTENTE pin. We bouwen annualSavings zoals de loader hem levert:
+    //   annualSavings = inkomen − E_overig − rente   (aflossing zit in flaggedAflossing → netto 0)
+    // Met inkomen=40k, E_overig=22k en rente uit het laatste lopende jaar (0.5k):
+    //   annualSavings = 40_000 − 22_000 − 500 = 17_500.
+    // Tijdens de looptijd: surplus = annualSavings − flaggedAflossing(=10k) = 7_500.
+    // Na payoff (geen woonlast meer) moet het ECONOMISCH juiste surplus
+    //   inkomen − E_overig = 40_000 − 22_000 = 18_000 zijn — de rente valt vrij,
+    // de aflossing was al netto-0. Dit is precies de test die de DUBBELTELLING vangt:
+    // de oude formule gaf 40_000 − 22_000 + 10_000(aflossing terug) + 11_000(jaarlast)
+    // = 29_000 (R=10k te hoog).
+    const inkomen = 40_000
+    const eOverig = 22_000
+    const renteLaatsteJaar = LAST_ACTIVE_RENTE // 0.5k
+    const annualSavings = inkomen - eOverig - renteLaatsteJaar // 17_500
+    const r = runHorizonLedger(
+      mkInput({ debts: [flaggedMortgage()], forcedFireAge: 67, annualSavings, monthlySurplus: annualSavings / 12 }),
+    )
+    // Looptijd: byte-identiek aan de baseline (geen vrijval) = annualSavings − aflossing.
+    expect(accSurplus(r, 41)).toBeCloseTo(annualSavings - 10_000, 6) // 7_500
+    // Na payoff: exact inkomen − E_overig (de rente valt vrij, aflossing al hersteld).
+    expect(accSurplus(r, 42)).toBeCloseTo(inkomen - eOverig, 6) // 18_000
+  })
+
+  it('regressie: tijdens de looptijd is het surplus byte-identiek aan de pre-feature baseline', () => {
+    // freedHousingCost = 0 zolang de schuld loopt → het lopende-jaar surplus moet
+    // exact gelijk zijn aan dezelfde run zonder de freed-term. We pinnen dit door
+    // de lopende jaren (40, 41) te vergelijken met de hand-uitgerekende baseline-
+    // formule: surplus = annualSavings − flaggedAflossing.
+    //   age 40: 15_000 − 10_000 = 5_000
+    //   age 41: 15_000 − 10_000 = 5_000  (aflossing cap op begin 10k)
+    const r = runHorizonLedger(accInput([flaggedMortgage()]))
+    expect(accSurplus(r, 40)).toBeCloseTo(5_000, 6)
+    expect(accSurplus(r, 41)).toBeCloseTo(5_000, 6)
+  })
+
+  it('regressie: zonder geflagde schuld is freedHousingCost altijd 0 (surplus = annualSavings)', () => {
+    const r = runHorizonLedger(accInput([]))
+    // Geen schuld → geen baseline → surplus = annualSavings (15k) elk opbouwjaar.
+    expect(accSurplus(r, 40)).toBeCloseTo(15_000, 6)
+    expect(accSurplus(r, 45)).toBeCloseTo(15_000, 6)
+  })
+
+  it('aflossingsvrije hypotheek: geen vrijval (balance daalt nooit → begin > 0 blijft true)', () => {
+    // Interest-only: begin > 0 blijft elk jaar → de schuld bereikt nooit begin === 0
+    // → freedHousingCost blijft 0 → surplus volgt de baseline. Correct: de woonlast
+    // (rente) verdwijnt immers nooit.
+    const io = flaggedMortgage({ repayment_type: 'aflossingsvrij', monthly_payment: 1_000 / 12, interest_rate: 5 })
+    const r = runHorizonLedger(accInput([io]))
+    // surplus = annualSavings − flaggedAflossing(0, want aflossingsvrij) + freed(0)
+    //         = 15_000 elk jaar (geen aflossing, geen vrijval).
+    expect(accSurplus(r, 40)).toBeCloseTo(15_000, 6)
+    expect(accSurplus(r, 60)).toBeCloseTo(15_000, 6) // nog steeds geen vrijval
+  })
+
+  it('niet-geflagde schuld: telt niet mee in de baseline → geen vrijval', () => {
+    // include_aflossing_in_savings = false → de aflossing zat NIET in de spaarquote,
+    // dus geen flaggedAflossing-aftrek én geen freedHousingCost. Een lening die
+    // tijdens de looptijd afgelost wordt verandert het surplus niet via vrijval.
+    const lening = flaggedMortgage({ debt_type: 'loan', include_aflossing_in_savings: false })
+    const r = runHorizonLedger(accInput([lening]))
+    // surplus = annualSavings (15k) elk jaar; payoff verandert daar niets aan.
+    expect(accSurplus(r, 40)).toBeCloseTo(15_000, 6)
+    expect(accSurplus(r, 42)).toBeCloseTo(15_000, 6) // na payoff: nog steeds 15k
+  })
+
+  it('meerdere geflagde schulden: alleen de afgeloste valt vrij (alléén diens rente)', () => {
+    // Schuld A lost in ~2 jaar af (laatste-jaar-rente 0.5k); schuld B is een lange,
+    // nog lopende geflagde lening (hoog saldo). Na A's payoff valt alléén A's
+    // laatste-lopende-jaar-RENTE vrij; B blijft lopen en valt niet vrij.
+    const A = flaggedMortgage({ id: 'A', name: 'Hyp A' }) // 20k @5% → payoff ~age 42, lastRente 0.5k
+    const B = flaggedMortgage({ id: 'B', name: 'Lening B', current_balance: 200_000, interest_rate: 3, monthly_payment: 3_000 / 12 }) // blijft lopen
+    const r = runHorizonLedger(accInput([A, B]))
+    // Referentie: alleen B (lopend) → het surplus daar bevat A's vrijval niet.
+    const refB = runHorizonLedger(accInput([flaggedMortgage({ id: 'B', name: 'Lening B', current_balance: 200_000, interest_rate: 3, monthly_payment: 3_000 / 12 })]))
+    // Na A's payoff (age 42) is het verschil precies A's laatste-jaar-rente (0.5k):
+    // alleen A's rente viel vrij, niet A's volledige jaarlast.
+    const freed = accSurplus(r, 42) - accSurplus(refB, 42)
+    expect(freed).toBeCloseTo(LAST_ACTIVE_RENTE, 6)
+  })
+
+  it('vrijval: het rente-bedrag dat vrijvalt stroomt ook daadwerkelijk de assets in (vs. referentierun)', () => {
+    // Het hogere surplus na payoff moet zichtbaar zijn als extra instroom in de
+    // (investable) assets. We pinnen het BEDRAG t.o.v. een referentierun met een
+    // identieke hypotheek die al op €0 begint (volledig afgelost vanaf jaar 0):
+    // daar is er geen aflossing-terugkeer (flagged al 0) — alléén de rente-vrijval
+    // ontbreekt, want lastActiveRente is dan nooit gezet → freed = 0.
+    const r = runHorizonLedger(accInput([flaggedMortgage()]))
+    const ref = runHorizonLedger(accInput([flaggedMortgage({ current_balance: 0 })]))
+    const instroom = (run: ReturnType<typeof runHorizonLedger>, age: number) =>
+      run.rows.find((x) => x.leeftijd === age)!.assets.reduce((s, a) => s + a.instroom, 0)
+    // Na payoff (age 42) belegt de lopende-hypotheek-run exact de rente méér dan de
+    // al-afgeloste referentie (die mist de lastActiveRente-vrijval).
+    expect(instroom(r, 42) - instroom(ref, 42)).toBeCloseTo(LAST_ACTIVE_RENTE, 4)
+  })
 })

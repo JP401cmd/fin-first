@@ -17,7 +17,7 @@
  */
 
 import type { AssetType } from '@/lib/asset-data'
-import type { UnifiedProjectionInput } from '@/lib/unified-projection'
+import type { UnifiedProjectionInput, AssetLiquidation } from '@/lib/unified-projection'
 import { NL_AOW_AGE, NL_HOME_MAINTENANCE_PCT } from '@/lib/constants'
 import { BOX3_PARAMS, classifyAsset, type Box3Category } from '@/lib/box3-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
@@ -47,8 +47,19 @@ const NON_LIQUID: Set<AssetType> = new Set(['eigen_huis', 'vehicle', 'physical']
  * waar de woning volledig in de besteedbare FIRE-pot meetelt (ADR 0015). Zo loopt
  * een deplete/spend-down ook de woning af (laatst in de volgorde) i.p.v. dat 'ie
  * onbespeelbaar blijft groeien.
+ *
+ * `saleManaged` markeert een asset dat via een verkoop-config (`sale_config` →
+ * `assetLiquidations`) als UNIT verkocht wordt (mét verkoopkosten + schuld-
+ * aflossing). Zo'n asset telt tot het verkoopmoment NIET als besteedbare liquide
+ * pot — ook als zijn type normaal liquide is (bv. `real_estate`/`deelneming`) —
+ * en wordt nooit rauw onttrokken; het verlaat het grootboek uitsluitend via de
+ * verkoop (ADR 0020). Daardoor werkt `payoffDebtIds` consistent voor álle
+ * liquidatable types, zonder de globale `NON_LIQUID`/`INVESTABLE_TYPES`-classificatie
+ * te wijzigen (kleinste blast radius: de reclassificatie is per-asset en alleen
+ * actief wanneer er werkelijk een verkoop-config is).
  */
-function isNonLiquid(a: { type: AssetType; spendable?: boolean }): boolean {
+function isNonLiquid(a: { type: AssetType; spendable?: boolean; saleManaged?: boolean }): boolean {
+  if (a.saleManaged) return true
   return NON_LIQUID.has(a.type) && !a.spendable
 }
 
@@ -74,6 +85,12 @@ interface RunningAsset {
   box3Cat: Box3Category
   /** True = tel als besteedbaar/liquide ondanks het type (include_full-woning). */
   spendable: boolean
+  /**
+   * True = dit asset wordt als UNIT verkocht via een verkoop-config
+   * (`assetLiquidations`), niet rauw onttrokken. Tot de verkoop telt het NIET als
+   * liquide pot (ook niet als zijn type normaal liquide is). Zie isNonLiquid.
+   */
+  saleManaged: boolean
 }
 
 interface RunningDebt {
@@ -86,6 +103,14 @@ interface RunningDebt {
   isMortgage: boolean
   deductible: boolean
   flagged: boolean
+  /**
+   * Rente uit het LAATSTE lopende jaar van een geflagde schuld (`begin * rate`,
+   * dus AL gewogen met net_worth_inclusion_pct via de balance). Wordt elk jaar
+   * bijgewerkt zolang `begin > 0`; zodra de schuld volledig is afgelost valt
+   * uitsluitend dit rente-deel vrij als extra surplus (de aflossing is al
+   * hersteld doordat flaggedAflossing → 0). Zie de schuld-loop.
+   */
+  lastActiveRente: number
 }
 
 interface ForwardResult {
@@ -144,6 +169,15 @@ export function runHorizonLedger(
   // Assets die ondanks hun (niet-liquide) type tóch als besteedbaar meetellen —
   // de include_full-woning (ADR 0015). Zie isNonLiquid.
   const spendableIds = new Set(input.spendableAssetIds ?? [])
+  // Assets die via een verkoop-config (`assetLiquidations`) als UNIT verkocht
+  // worden — tot de verkoop niet-liquide, nooit rauw onttrokken (ADR 0020). Geldt
+  // voor zowel fixed_age (huis-downsize / vast_moment) als on_demand. Niet voor
+  // assets die óók `spendable` zijn (include_full-woning blijft besteedbaar; de
+  // downsize-liquidatie op die woning is fixed_age en de woning is dan niet
+  // spendable — geen overlap in de praktijk).
+  const saleManagedIds = new Set(
+    (input.assetLiquidations ?? []).map((l) => l.assetId).filter((id) => !spendableIds.has(id)),
+  )
 
   // ── Fresh running-state per pass (assets/debts worden gemuteerd) ──
   function buildAssets(): RunningAsset[] {
@@ -163,10 +197,11 @@ export function runHorizonLedger(
         realRet: realReturn(nom, inflation),
         box3Cat: classifyAsset(a).category,
         spendable: spendableIds.has(a.id),
+        saleManaged: saleManagedIds.has(a.id),
       })
     }
     if (input.bankAccountCash && input.bankAccountCash > 0) {
-      out.push({ id: 'bank-cash', naam: 'Bankrekeningen (los)', type: 'cash', value: input.bankAccountCash, realRet: realReturn(0, inflation), box3Cat: 'spaargeld', spendable: false })
+      out.push({ id: 'bank-cash', naam: 'Bankrekeningen (los)', type: 'cash', value: input.bankAccountCash, realRet: realReturn(0, inflation), box3Cat: 'spaargeld', spendable: false, saleManaged: false })
     }
     return out
   }
@@ -183,6 +218,7 @@ export function runHorizonLedger(
         isMortgage: d.debt_type === 'mortgage',
         deductible: d.is_tax_deductible === true,
         flagged: d.include_aflossing_in_savings === true,
+        lastActiveRente: 0,
       }))
   }
 
@@ -202,17 +238,57 @@ export function runHorizonLedger(
     if (surplusTargets.length === 0) {
       surplusTargets = investableIds.length ? investableIds : liquidIds.length ? liquidIds : assets.length ? [assets[0].id] : []
     }
+    // Verkoop-opbrengst-bestemming: ALLEEN liquide doelen. Een verkoopopbrengst
+    // (cash) mag nooit teruggestopt worden in een niet-liquide / sale-managed asset
+    // (bv. het zojuist verkochte beleggingspand) — dat zou de asset herleven en de
+    // on_demand-verkooplus laten herhalen (oneindige lus). Houdt de
+    // surplusTargets-VOORKEUR (pot-regel) maar valt terug op de algemene liquide pot.
+    const liquidProceedsTargets = (() => {
+      const liquidPreferred = surplusTargets.filter((id) => liquidIds.includes(id))
+      if (liquidPreferred.length) return liquidPreferred
+      if (liquidIds.length) return liquidIds
+      const cashId = assets.find((a) => a.type === 'cash')?.id
+      return cashId ? [cashId] : []
+    })()
     const firstInvestId = investableIds[0] ?? surplusTargets[0]
     const firstCashId = assets.find((a) => a.type === 'cash')?.id ?? surplusTargets[0]
-    const orderIdsFor = (types: AssetType[]): string[] => {
+    // Volgorde-helper op type-niveau. `liquidOnly` (default true) beperkt de lijst
+    // tot LIQUIDE (besteedbare) assets: niet-liquide assets (eigen_huis/vehicle/
+    // physical, tenzij `spendable`) worden NIET rauw onttrokken — die verlaten het
+    // grootboek uitsluitend via een echte verkoop (fixed_age of on_demand, block 6b),
+    // mét verkoopkosten en schuld-aflossing. Zo blijft een `niet_verkopen`-bezitting
+    // staan i.p.v. ongemerkt leeggetrokken te worden. `liquidOnly:false` (volledige
+    // staart, niet-liquide laatst) blijft beschikbaar voor de on_demand-verkoop-
+    // volgorde, die juist de niet-liquide staart nodig heeft.
+    const orderIdsFor = (types: AssetType[], liquidOnly = true): string[] => {
       const ids: string[] = []
-      for (const t of types) for (const a of assets) if (a.type === t) ids.push(a.id)
-      for (const a of assets) if (!ids.includes(a.id)) ids.push(a.id)
+      const want = (a: RunningAsset) => (liquidOnly ? !isNonLiquid(a) : true)
+      for (const t of types) for (const a of assets) if (a.type === t && want(a)) ids.push(a.id)
+      for (const a of assets) if (want(a) && !ids.includes(a.id)) ids.push(a.id)
       return ids
     }
-    // Onttrekkingsvolgorde (decumulatie) + aparte tekort-volgorde (opbouwfase).
+    // Onttrekkingsvolgorde (decumulatie) + aparte tekort-volgorde (opbouwfase) —
+    // beide LIQUIDE-only (zie hierboven). De niet-liquide on_demand-verkoopvolgorde
+    // (`onDemandOrderIds`) is apart en volgt de volledige staart.
     const withdrawalOrderIds = orderIdsFor(opts.withdrawalOrder)
     const deficitOrderIds = orderIdsFor(opts.deficitOrder ?? opts.withdrawalOrder)
+    // Volledige onttrekkingsvolgorde (incl. niet-liquide staart, eigen_huis laatst):
+    // de bron voor de on_demand-verkoopvolgorde. Tie-break binnen één type =
+    // assets.sort_order (al gerespecteerd via de input-volgorde van buildAssets,
+    // die de assets-array volgt), anders asset-id. Géén nieuw sorteersysteem.
+    const fullOrderIds = orderIdsFor(opts.withdrawalOrder, false)
+    // Map asset-id → on_demand-liquidatie (alleen niet-liquide assets met trigger
+    // 'on_demand'). Liquide assets worden direct als pot besteed; een on_demand-
+    // config op een liquide asset is daarom inert (geen entry hier).
+    const onDemandById = new Map<string, AssetLiquidation>()
+    for (const liq of input.assetLiquidations ?? []) {
+      if (liq.trigger !== 'on_demand') continue
+      const a = assets.find((x) => x.id === liq.assetId)
+      if (a && isNonLiquid(a)) onDemandById.set(liq.assetId, liq)
+    }
+    // Verkoop-volgorde: niet-liquide on_demand-assets in de volledige onttrekkings-
+    // volgorde (minst-liquide laatst, eigen_huis allerlaatst).
+    const onDemandOrderIds = fullOrderIds.filter((id) => onDemandById.has(id))
 
     const stopAt = stopWorkAtAge ?? aowAge
     const rows: LedgerRow[] = []
@@ -259,6 +335,23 @@ export function runHorizonLedger(
       const schuldenRow: SchuldBeweging[] = []
       let schuldlasten = 0
       let flaggedAflossing = 0
+      // Vrijval van de woonlast-RENTE bij payoff (Fase B, gecorrigeerd):
+      // de spaarquote-baseline (`annualSavings = inkomen − uitgaven + flagged_aflossing`)
+      // heeft van een geflagde schuld de héle jaarlast (rente + aflossing) als
+      // "uitgave" verrekend en daarna de aflossing weer teruggeteld. NETTO blijft
+      // binnen annualSavings dus alleen de RENTE permanent afgetrokken; de aflossing
+      // valt weg (uitgave − terugtelling = 0). Zodra de schuld is afgelost brengt
+      // `flaggedAflossing → 0` de aflossing AL terug in het surplus. Daarom mag
+      // uitsluitend het RENTE-deel nog vrijvallen — niet de volledige jaarlast.
+      // Anders zou de aflossing dubbel hersteld worden (R te hoog).
+      // We onthouden per geflagde schuld de rente van haar LAATSTE lopende jaar
+      // (`lastActiveRente`, bijgewerkt zolang begin > 0) en laten die vrijvallen
+      // zodra de schuld dit jaar op begin === 0 staat (volledig afgelost).
+      // De rente = `begin * rate`, met `begin = d.balance` AL gewogen via
+      // net_worth_inclusion_pct (buildDebts) → automatisch consistent met
+      // flaggedAflossing en de baseline. Aflossingsvrij: begin daalt nooit naar 0
+      // → valt nooit vrij (correct, woonlast verdwijnt immers niet).
+      let freedHousingCost = 0
       for (const d of debts) {
         const begin = d.balance
         const rente = begin * d.rate
@@ -267,7 +360,17 @@ export function runHorizonLedger(
         aflossing = Math.min(aflossing, begin)
         d.balance = Math.max(0, begin - aflossing)
         schuldlasten += rente + aflossing
-        if (d.flagged) flaggedAflossing += aflossing
+        if (d.flagged) {
+          flaggedAflossing += aflossing
+          if (begin > 0) {
+            // Schuld loopt nog: onthoud de rente van dit (mogelijk laatste) jaar.
+            d.lastActiveRente = rente
+          } else {
+            // begin === 0 → volledig afgelost: alléén de rente uit het laatste
+            // lopende jaar valt vrij (de aflossing kwam al terug via flaggedAflossing).
+            freedHousingCost += d.lastActiveRente
+          }
+        }
         schuldenRow.push({ id: d.id, naam: d.naam, begin, rente, aflossing, extraAflossing: 0, eind: d.balance })
       }
       const eigenHuisWaarde = assets.filter((a) => a.type === 'eigen_huis').reduce((s, a) => s + Math.max(0, a.value), 0)
@@ -296,17 +399,22 @@ export function runHorizonLedger(
         }
       }
 
-      // 6b. Asset-liquidatie (bv. eigen-huis-downsize): verkoop het asset BINNEN
-      // het grootboek i.p.v. het uit de pot te filteren + de verkoop als inkomen
-      // in te spuiten. Het niet-liquide asset (huiswaarde, na groei dit jaar)
-      // verlaat het grootboek; de gekoppelde hypotheek wordt afgelost (saldo → 0,
-      // woonlast stopt vanaf volgend jaar); de netto-opbrengst stroomt naar
-      // liquide. Netto vermogen blijft daardoor continu (alleen −verkoopkosten),
-      // alléén de liquiditeit verspringt. Zie ADR 0015.
-      for (const liq of input.assetLiquidations ?? []) {
-        if (Math.round(liq.age) !== age) continue
+      // 6b. Asset-liquidatie: verkoop het asset BINNEN het grootboek i.p.v. het uit
+      // de pot te filteren + de verkoop als inkomen in te spuiten. Het niet-liquide
+      // asset (marktwaarde, na groei dit jaar) verlaat het grootboek; de gekoppelde
+      // schuld wordt afgelost (saldo → 0, woonlast stopt vanaf volgend jaar); de
+      // netto-opbrengst stroomt naar liquide. Netto vermogen blijft daardoor continu
+      // (alleen −verkoopkosten), alléén de liquiditeit verspringt. Zie ADR 0015/0020.
+      //
+      // Gedeelde mechaniek voor zowel `fixed_age` (hier, onvoorwaardelijk op `age`)
+      // als `on_demand` (in de withdraw-helper, bij liquiditeitstekort). Retourneert
+      // de NETTO-opbrengst (na aflossing) zodat de on_demand-caller weet hoeveel er
+      // aan de pot is toegevoegd. Een onderwater-verkoop (negatieve netto-opbrengst)
+      // wordt hier NIET verder onttrokken — dat is de verantwoordelijkheid van de
+      // aanroepende fase (de on_demand-helper onttrekt het restant alsnog liquide).
+      const sellAsset = (liq: AssetLiquidation): number => {
         const asset = assets.find((a) => a.id === liq.assetId)
-        if (!asset || asset.value <= 0) continue
+        if (!asset || asset.value <= 0) return 0
         const marktwaarde = asset.value
         const verkoopprijs = marktwaarde * liq.salePricePct
         let afgelost = 0
@@ -325,17 +433,71 @@ export function runHorizonLedger(
         // Het asset verlaat het grootboek (uitstroom = volledige marktwaarde).
         uitstroomById[asset.id] = (uitstroomById[asset.id] ?? 0) + marktwaarde
         asset.value = 0
-        // Netto-opbrengst → liquide (zelfde verdeel-doelen als surplus/eenmalig
-        // inkomen). Onderwater (negatief) → onttrek het tekort in de tekort-volgorde.
+        // Netto-opbrengst → LIQUIDE pot (nooit terug in een niet-liquide/sale-managed
+        // asset; zie liquidProceedsTargets — anders herleeft het zojuist verkochte
+        // asset en loopt de on_demand-verkooplus eeuwig door).
         if (opbrengstNetto > 0) {
-          const alloc = allocateProRata(snapshot(assets), surplusTargets, opbrengstNetto)
+          const alloc = allocateProRata(snapshot(assets), liquidProceedsTargets, opbrengstNetto)
           for (const [id, v] of Object.entries(alloc)) {
             instroomById[id] = (instroomById[id] ?? 0) + v
             const a = assets.find((x) => x.id === id)
             if (a) a.value += v
           }
-        } else if (opbrengstNetto < 0) {
+        }
+        return opbrengstNetto
+      }
+
+      // `fixed_age`-liquidaties (incl. eigen-huis-downsize en `vast_moment`-verkopen):
+      // onvoorwaardelijk op de vaste leeftijd. Entries zonder expliciete `trigger`
+      // tellen als `fixed_age` (achterwaartse compatibiliteit). Een onderwater-
+      // verkoop onttrekt het tekort in de tekort-volgorde.
+      for (const liq of input.assetLiquidations ?? []) {
+        if (liq.trigger === 'on_demand') continue // afgehandeld in de withdraw-helper
+        if (Math.round(liq.age) !== age) continue
+        const asset = assets.find((a) => a.id === liq.assetId)
+        if (!asset || asset.value <= 0) continue
+        const opbrengstNetto = sellAsset(liq)
+        if (opbrengstNetto < 0) {
           withdrawFrom(assets, deficitOrderIds, opts.shortfall, -opbrengstNetto, uitstroomById)
+        }
+      }
+
+      // 6c. On_demand-fallback-plafond: een on_demand-asset met een eindig `age`-
+      // plafond ≤ huidige leeftijd wordt uiterlijk nu verkocht, ook zónder tekort.
+      // (Een tekort verkoopt het eerder via de withdraw-helper; deze regel garandeert
+      // dat het plafond niet wordt overschreden.)
+      for (const id of onDemandOrderIds) {
+        const liq = onDemandById.get(id)!
+        if (!Number.isFinite(liq.age) || age < Math.round(liq.age)) continue
+        const a = assets.find((x) => x.id === id)
+        if (a && a.value > 0) sellAsset(liq)
+      }
+
+      // Verkoop het eerstvolgende niet-liquide on_demand-asset (verkoopvolgorde =
+      // onttrekkingsvolgorde) en geef de netto-opbrengst terug; 0 als er niets meer
+      // te verkopen valt. Gebruikt door de withdraw-helper bij een onbedekt tekort.
+      const sellNextOnDemand = (): number => {
+        for (const id of onDemandOrderIds) {
+          const a = assets.find((x) => x.id === id)
+          if (!a || a.value <= 0) continue
+          return sellAsset(onDemandById.get(id)!)
+        }
+        return 0
+      }
+
+      // Onttrek `need` liquide; dekt de liquide pot het niet, verkoop dan het
+      // eerstvolgende on_demand-asset (proper sale) en onttrek het restant opnieuw
+      // uit de nu-aangevulde pot. Herhaalt tot het tekort gedekt is of er geen
+      // on_demand-assets meer zijn. Een verkoop kan het tekort méér dan dekken
+      // (lumpy) → het overschot blijft als liquide pot staan voor latere jaren
+      // (zelf-regulerend). Zonder on_demand-assets is dit byte-identiek aan een
+      // kale `withdrawFrom` (de while-lus draait dan nul keer).
+      const withdrawWithOnDemand = (orderIds: string[], need: number): void => {
+        let tekort = withdrawFrom(assets, orderIds, opts.shortfall, need, uitstroomById)
+        while (tekort > 0.01) {
+          const opbrengst = sellNextOnDemand()
+          if (opbrengst <= 0) break // niets meer te verkopen → tekort blijft (zoals voorheen)
+          tekort = withdrawFrom(assets, orderIds, opts.shortfall, tekort, uitstroomById)
         }
       }
 
@@ -345,7 +507,11 @@ export function runHorizonLedger(
       if (werkt) {
         // ── Accumulatie ──
         leefuitgaven = Math.max(0, salaris - woonkosten - annualSavings)
-        const surplus = annualSavings - flaggedAflossing + (recurringIncome - rec.expense) - one.expense
+        // freedHousingCost is 0 zolang een geflagde schuld nog loopt → BYTE-IDENTIEK
+        // aan de pre-feature baseline tijdens de looptijd (cruciaal voor regressie).
+        // Pas na payoff valt alleen het RENTE-deel van die schuld vrij; de aflossing
+        // is dan al hersteld doordat flaggedAflossing → 0 (zie de schuld-loop).
+        const surplus = annualSavings - flaggedAflossing + freedHousingCost + (recurringIncome - rec.expense) - one.expense
         cashflowNetto = surplus + eventsInkomen
         if (surplus > 0) {
           let rem = surplus
@@ -370,7 +536,7 @@ export function runHorizonLedger(
             if (a) a.value += v
           }
         } else if (surplus < 0) {
-          withdrawFrom(assets, deficitOrderIds, opts.shortfall, -surplus, uitstroomById)
+          withdrawWithOnDemand(deficitOrderIds, -surplus)
         }
       } else {
         // ── Decumulatie: onttrekking volgens strategie ──
@@ -406,7 +572,7 @@ export function runHorizonLedger(
         }
         const withdrawal = applyWithdrawalStrategy(input.withdrawalStrategy, ctx)
         prevWithdrawal = withdrawal
-        withdrawFrom(assets, withdrawalOrderIds, opts.shortfall, withdrawal, uitstroomById)
+        withdrawWithOnDemand(withdrawalOrderIds, withdrawal)
         cashflowNetto = recurringIncome + eventsInkomen - withdrawal
       }
 
@@ -590,14 +756,19 @@ function liquidRealReturn(assets: RunningAsset[]): number {
   return val > 0 ? wr / val : 0
 }
 
+/**
+ * Onttrek `need` uit de assets in `orderIds`. Retourneert het ONBEDEKTE restant
+ * (shortfall) — voorheen stil weggegooid; de on_demand-verkoop heeft het nodig om
+ * te weten of er een niet-liquide asset verkocht moet worden.
+ */
 function withdrawFrom(
   assets: RunningAsset[],
   orderIds: string[],
   shortfall: 'sequentieel' | 'pro-rata',
   need: number,
   uitstroomById: Record<string, number>,
-): void {
-  if (need <= 0) return
+): number {
+  if (need <= 0) return 0
   const values = snapshot(assets)
   const res = shortfall === 'pro-rata' ? withdrawProRata(values, orderIds, need) : withdrawSequential(values, orderIds, need)
   for (const [id, v] of Object.entries(res.taken)) {
@@ -605,6 +776,7 @@ function withdrawFrom(
     const a = assets.find((x) => x.id === id)
     if (a) a.value -= v
   }
+  return res.shortfall
 }
 
 function liquidSumStart(input: UnifiedProjectionInput): number {

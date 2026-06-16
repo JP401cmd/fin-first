@@ -116,6 +116,7 @@ export const annotations = {
     { name: 'TrueLayer (bank-connect / PSD2)', category: 'Banking' },
     { name: 'Polar (betalingen)', category: 'Payments' },
     { name: 'Crypto-exchanges (Bitvavo / Coinbase / Kraken)', category: 'Crypto' },
+    { name: 'Aandelen-brokers (Trading 212)', category: 'Brokerage' },
   ],
 
   // Groepering van tabellen per domein (keyword-match op tabelnaam). Tabellen
@@ -125,7 +126,7 @@ export const annotations = {
     'Kern / financieel': ['profiles', 'assets', 'debts', 'transactions', 'recurring_transactions', 'bank_accounts', 'budgets'],
     'Beleggingen': ['holdings', 'investment_holdings', 'crypto_holdings', 'holding_transactions', 'holding_prices', 'investment_holding_prices', 'crypto_holding_prices', 'holding_alerts', 'target_allocations', 'crypto_transactions'],
     'Snapshots & historie': ['net_worth_snapshots', 'balance_snapshots', 'valuations'],
-    'Externe koppelingen': ['external_connections', 'exchange_connections', 'wallet_addresses'],
+    'Externe koppelingen': ['external_connections', 'exchange_connections', 'broker_connections', 'wallet_addresses'],
     'Huishouden': ['households', 'household_members', 'household_invitations'],
     'Toekomst & doelen': ['goals', 'life_events', 'aow_leeftijd', 'retirement'],
     'AI & calculators': ['ai_calculator_usage', 'custom_calculators', 'calculator_likes', 'calculator_reports', 'calculators'],

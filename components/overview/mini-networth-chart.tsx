@@ -11,11 +11,13 @@ import { NetWorthHistorySheet, type HistoryPoint } from './networth-history-shee
  * MiniNetWorthChart — compacte netto-vermogen-grafiek voor /overzicht hero.
  *
  * Bron-van-waarheid: gebruikt **dezelfde simulatie-data** als de grafiek
- * op /toekomst (`simRows` uit `runUnifiedProjection`). Geen lineaire
- * benadering, geen eigen groei-rate — exact dezelfde curve als
- * /toekomst toont voor het vandaag → vrijheid-segment. Hierdoor komen
- * vrijheidsleeftijd én doelbedrag bij vrijheid 1:1 overeen tussen de
- * twee pagina's.
+ * op /toekomst (`simRows` uit de horizon-engine), maar dan als
+ * **geprojecteerd VOLLEDIG netto vermogen** (`simNetWorthRows` uit de loader):
+ * de FIRE-portefeuille (`endPortfolio`) plús meegroeiende niet-liquide assets
+ * (huis) die uit de FIRE-pot zijn gefilterd. Hierdoor loopt de projectielijn
+ * continu door vanuit het Vandaag-punt (= volledig netto vermogen incl. huis)
+ * i.p.v. te dippen naar de FIRE-portefeuille zónder huis. Geen lineaire
+ * benadering, geen eigen groei-rate — de loader is de enige bron.
  *
  * Visueel:
  *  - Twee tijdschalen: het verleden heeft een VAST segment van 25%
@@ -47,7 +49,7 @@ export function MiniNetWorthChart({
   fireAge,
   endAge,
   isPensioenMode,
-  simRows,
+  simNetWorthRows,
   simRequiredPortfolio,
   monthlySavings,
 }: {
@@ -58,15 +60,17 @@ export function MiniNetWorthChart({
   endAge: number | null
   isPensioenMode?: boolean
   /**
-   * Per-jaar projectie-rijen uit `runUnifiedProjection`. Wanneer aanwezig:
-   * de chart gebruikt deze waardes 1:1 (consistent met /toekomst). Wanneer
-   * afwezig (sim mislukt op server): empty-state-CTA.
+   * Per-jaar geprojecteerd VOLLEDIG netto vermogen (FIRE-pot + meegroeiende
+   * niet-liquide assets) uit de loader (`DashboardData.simNetWorthRows`).
+   * Wanneer aanwezig: de chart gebruikt deze waardes 1:1 — continu met het
+   * Vandaag-punt. Wanneer afwezig (sim mislukt op server): empty-state-CTA.
    */
-  simRows?: { age: number; endPortfolio: number }[] | null
+  simNetWorthRows?: { age: number; netWorth: number }[] | null
   /**
-   * Vereist FIRE-portfolio bij vrijheidsmoment uit de simulatie. Wanneer
-   * gegeven gebruikt de chart deze waarde voor het eind-marker-bedrag
-   * i.p.v. de simRows-waarde op fireAge. Verzekert dat /overzicht en
+   * Vereist FIRE-portfolio bij vrijheidsmoment uit de simulatie — het LIQUIDE
+   * vrijheidsdoel (€). Bewust APART van de netto-vermogen-as: het wordt als los
+   * doel-label getoond, NIET als marker-hoogte (die hoogte = geprojecteerd
+   * netto vermogen op de vrijheidsleeftijd). Verzekert dat /overzicht en
    * /toekomst exact hetzelfde "doelbedrag bij vrijheid" tonen.
    */
   simRequiredPortfolio?: number | null
@@ -109,7 +113,7 @@ export function MiniNetWorthChart({
         ? endAge
         : null
 
-  if (currentAge == null || projectionEndAge == null || !simRows || simRows.length === 0) {
+  if (currentAge == null || projectionEndAge == null || !simNetWorthRows || simNetWorthRows.length === 0) {
     return (
       <Link
         href="/toekomst"
@@ -133,15 +137,25 @@ export function MiniNetWorthChart({
   const startAge: number = currentAge
   const finalAge: number = projectionEndAge
 
-  // Projectie-segment: simRows van vandaag → finalAge. Voeg vandaag-punt
-  // bovenaan toe (currentNetWorth) zodat het startpunt scherp is en niet
-  // mogelijk verschilt van simRows[0] (dat het einde van jaar 0 is).
-  const projRowsInRange = simRows.filter(
+  // Projectie-segment: simNetWorthRows (= geprojecteerd VOLLEDIG netto vermogen)
+  // van vandaag → finalAge. Voeg het Vandaag-punt bovenaan toe (currentNetWorth)
+  // zodat het startpunt scherp is.
+  //
+  // Continuïteit: de loader verankert simNetWorthRows al op zijn eigen netWorth-
+  // grondslag, maar de `currentNetWorth`-prop kan (in huishoud-/partnerweergave
+  // of door een temporeel/grondslag-verschil) een fractie afwijken van de
+  // engine-start. We her-verankeren daarom op de getoonde `currentNetWorth` met
+  // een vlakke euro-offset, zodat de lijn ZICHTBAAR naadloos doorloopt vanuit het
+  // Vandaag-punt. Consume, don't recompute: dit verschuift de reeks, het
+  // herberekent niets aan de engine-groei.
+  const projRowsInRange = simNetWorthRows.filter(
     (r) => r.age >= startAge && r.age <= finalAge,
   )
+  const anchorOffset =
+    projRowsInRange.length > 0 ? currentNetWorth - projRowsInRange[0].netWorth : 0
   const projection: { age: number; value: number }[] = [
     { age: startAge, value: currentNetWorth },
-    ...projRowsInRange.map((r) => ({ age: r.age, value: r.endPortfolio })),
+    ...projRowsInRange.map((r) => ({ age: r.age, value: r.netWorth + anchorOffset })),
   ]
   // Dedupe identieke leeftijden (currentAge kan al in simRows zitten);
   // hou de eerste — currentNetWorth is de waarheid voor vandaag.
@@ -152,15 +166,19 @@ export function MiniNetWorthChart({
     return true
   })
 
-  // Eindwaarde komt primair uit simRequiredPortfolio (= "doelbedrag bij
-  // vrijheid" zoals /toekomst dat ook toont). Bij bereikte vrijheid is
-  // het marker-bedrag de gesimuleerde stand op de eindleeftijd, niet het
-  // (al gehaalde) doelbedrag.
+  // Eindmarker-HOOGTE = geprojecteerd VOLLEDIG netto vermogen op de
+  // vrijheidsleeftijd (laatste punt van de reeks), consistent met de netto-
+  // vermogen-as. NIET simRequiredPortfolio: dat is het LIQUIDE vrijheidsdoel en
+  // hoort niet op de netto-vermogen-as (zou de marker laten zweven t.o.v. de
+  // lijn). Het doelbedrag tonen we apart als los label (zie freedomTargetLabel).
   const endValue =
-    !fireReached && simRequiredPortfolio != null && simRequiredPortfolio > 0
-      ? simRequiredPortfolio
-      : dedupedProjection[dedupedProjection.length - 1]?.value ?? currentNetWorth
+    dedupedProjection[dedupedProjection.length - 1]?.value ?? currentNetWorth
   const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
+  // Liquide vrijheidsdoel (€) — APART, expliciet gelabeld. Niet op de as.
+  const freedomTargetLabel =
+    !fireReached && simRequiredPortfolio != null && simRequiredPortfolio > 0
+      ? `Vrijheidsdoel ${formatMaskedCurrency(simRequiredPortfolio, masked)} liquide`
+      : null
 
   // ── Historie: minimaal 3 maanden ─────────────────────────────────
   // Echte waarderingen (max 12 maanden, bron = net_worth_snapshots) als
@@ -367,7 +385,7 @@ export function MiniNetWorthChart({
         <span className="text-xs font-mono tabular-nums text-[var(--ink-3)]">
           {fireReached
             ? `${endLabel} bereikt — verloop tot ${finalAgeLabel}`
-            : `→ ${formatMaskedCurrency(endValue, masked)} bij ${endLabel.toLowerCase()}`}
+            : `Vermogen bij ${endLabel.toLowerCase()} → ${formatMaskedCurrency(endValue, masked)}`}
         </span>
       </header>
       <div className="font-serif text-xl font-semibold text-[var(--ink)] tabular-nums">
@@ -527,7 +545,7 @@ export function MiniNetWorthChart({
             x={ageToX(finalAge)}
             y={PAD_TOP - 4}
             textAnchor="end"
-            className="fill-[var(--color-horizon-700)] font-mono"
+            className="fill-[var(--color-horizon-800)] font-mono"
             fontSize="9"
           >
             {endMarkerText}
@@ -623,12 +641,45 @@ export function MiniNetWorthChart({
             />
             Onzekerheid (P40–P60)
           </span>
+          {/* Liquide vrijheidsdoel — APART van de netto-vermogen-as. De lijn toont
+              je volledige vermogen (incl. huis); dit is het liquide bedrag dat je
+              voor vrijheid nodig hebt. Bewust een los label, geen marker-hoogte. */}
+          {freedomTargetLabel && (
+            <span
+              className="inline-flex items-center gap-1.5 font-mono tabular-nums"
+              title="Het liquide vermogen dat je nodig hebt voor vrijheid (apart van je volledige netto vermogen incl. eigen woning)"
+            >
+              <span
+                className="inline-block w-[2px] h-3 rounded-sm"
+                style={{ background: 'var(--color-horizon-500)' }}
+                aria-hidden="true"
+              />
+              {freedomTargetLabel}
+            </span>
+          )}
+          {/* Eindmarker-duiding wanneer er geen apart liquide doel-label is
+              (simRequiredPortfolio null/0 of vrijheid al bereikt): de SVG toont
+              dan nog wél een horizon-eindmarker — zorg dat die kleur niet zonder
+              legenda-context staat. Spiegelt de verticale lijn-marker. */}
+          {!freedomTargetLabel && (
+            <span
+              className="inline-flex items-center gap-1.5"
+              title="Het vrijheidsmoment in de projectie"
+            >
+              <span
+                className="inline-block w-[2px] h-3 rounded-sm"
+                style={{ background: 'var(--color-horizon-500)' }}
+                aria-hidden="true"
+              />
+              {endMarkerText}
+            </span>
+          )}
         </div>
         <Link
           href="/toekomst"
           className="text-[11px] font-semibold text-horizon-700 hover:underline shrink-0"
         >
-          Bekijk afbouw →
+          {fireReached ? 'Bekijk afbouw →' : 'Bekijk projectie →'}
         </Link>
       </div>
       {/* Popup: netto-vermogen-verloop (klik op verleden-zone) */}

@@ -1,16 +1,25 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 
+// MiniNetWorthChart rendert NetWorthHistorySheet onvoorwaardelijk (de `open`-prop
+// gate't alleen zichtbaarheid); die child roept sinds de handmatige-historie-editor
+// `useRouter()` aan. Zonder app-router-context crasht elke render hier — mock
+// next/navigation zodat de chart-tests de sheet kunnen mounten.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}))
+
 /**
  * Tests voor MiniNetWorthChart — compacte projectie-chart naast Health
- * Score. Gebruikt nu simRows uit `runUnifiedProjection` (dezelfde bron
- * als /toekomst) zodat de curve 1:1 matcht. Tests valideren render-
- * states + simRows-injectie + Vrijheid-marker + de twee klikzones
- * (verleden → popup, toekomst → /toekomst) + geschatte historie.
+ * Score. Gebruikt nu `simNetWorthRows` uit de loader (geprojecteerd VOLLEDIG
+ * netto vermogen, incl. niet-liquide assets) zodat de projectielijn continu
+ * doorloopt vanuit het Vandaag-punt (geen dip op huis-filterende modi). Tests
+ * valideren render-states + reeks-injectie + Vrijheid-marker + het aparte
+ * liquide-vrijheidsdoel-label + de twee klikzones + geschatte historie.
  */
 
 function buildHistory(values: number[]): { month: string; value: number }[] {
@@ -25,12 +34,12 @@ function buildSimRows(
   fireAge: number,
   startValue: number,
   growthRate = 0.07,
-): { age: number; endPortfolio: number }[] {
-  const rows: { age: number; endPortfolio: number }[] = []
+): { age: number; netWorth: number }[] {
+  const rows: { age: number; netWorth: number }[] = []
   let value = startValue
   for (let age = startAge; age <= fireAge; age++) {
     value = value * (1 + growthRate)
-    rows.push({ age, endPortfolio: Math.round(value) })
+    rows.push({ age, netWorth: Math.round(value) })
   }
   return rows
 }
@@ -86,7 +95,7 @@ describe('MiniNetWorthChart — render-states', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={null}
+        simNetWorthRows={null}
       />,
     )
     expect(screen.getByText(/Vul je profiel aan/)).toBeTruthy()
@@ -116,7 +125,7 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 110_000)}
+        simNetWorthRows={buildSimRows(35, 52, 110_000)}
       />,
     )
     expect(screen.getByText('Netto vermogen door de tijd')).toBeTruthy()
@@ -130,7 +139,7 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 187_400)}
+        simNetWorthRows={buildSimRows(35, 52, 187_400)}
       />,
     )
     expect(container.textContent).toContain('€')
@@ -146,10 +155,12 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         fireAge={52}
         endAge={67}
         isPensioenMode={false}
-        simRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
       />,
     )
-    expect(screen.getByText(/Vrijheid 52/)).toBeTruthy()
+    // Zonder simRequiredPortfolio staat het label zowel op de SVG-eindmarker
+    // als (N2) in de legenda die de marker duidt — getAllByText i.p.v. getByText.
+    expect(screen.getAllByText(/Vrijheid 52/).length).toBeGreaterThan(0)
   })
 
   it('rendert pensioen-marker bij isPensioenMode', () => {
@@ -161,10 +172,10 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         fireAge={67}
         endAge={67}
         isPensioenMode={true}
-        simRows={buildSimRows(35, 67, 100_000)}
+        simNetWorthRows={buildSimRows(35, 67, 100_000)}
       />,
     )
-    expect(screen.getByText(/Pensioen 67/)).toBeTruthy()
+    expect(screen.getAllByText(/Pensioen 67/).length).toBeGreaterThan(0)
   })
 
   it('toont vandaag-leeftijd-label', () => {
@@ -175,7 +186,7 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         currentAge={42}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(42, 52, 100_000)}
+        simNetWorthRows={buildSimRows(42, 52, 100_000)}
       />,
     )
     expect(screen.getByText(/Vandaag.*42/)).toBeTruthy()
@@ -203,7 +214,7 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
       />,
     )
     // Voorheen: "Benadering met X%/jaar groei". Sinds we de echte
@@ -212,7 +223,7 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
     expect(container.textContent).not.toMatch(/Benadering/)
   })
 
-  it('gebruikt simRequiredPortfolio als eindwaarde-bedrag', () => {
+  it('toont simRequiredPortfolio als APART liquide-vrijheidsdoel-label', () => {
     const { container } = render(
       <MiniNetWorthChart
         netWorthHistory={buildHistory([100_000])}
@@ -220,13 +231,34 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
         simRequiredPortfolio={915_600}
       />,
     )
-    // Bedrag bij vrijheid moet uit simRequiredPortfolio komen, niet uit
-    // de simRows-eindwaarde. €915.600 zoals door /toekomst getoond.
+    // Het liquide vrijheidsdoel (€915.600) wordt APART getoond als label, niet
+    // als marker-hoogte op de netto-vermogen-as. Het bedrag blijft zichtbaar.
+    // Het label maakt expliciet dat het om een LIQUIDE doel gaat (B3).
     expect(container.textContent).toContain('915')
+    expect(container.textContent).toMatch(/Vrijheidsdoel/)
+    expect(container.textContent).toMatch(/liquide/)
+  })
+
+  it('header beschrijft de líjn ("Vermogen bij vrijheid →"), niet een doel (B4)', () => {
+    const { container } = render(
+      <MiniNetWorthChart
+        netWorthHistory={buildHistory([100_000])}
+        currentNetWorth={100_000}
+        currentAge={35}
+        fireAge={52}
+        endAge={67}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
+      />,
+    )
+    // Nieuwe formulering: "Vermogen bij vrijheid → €X" beschrijft het verloop
+    // van de lijn, niet een spaardoel. De oude copy "→ €X bij vrijheid" (die een
+    // leek als doel kon lezen) mag niet meer voorkomen.
+    expect(container.textContent).toMatch(/Vermogen bij vrijheid →/)
+    expect(container.textContent).not.toMatch(/€[\d.]+ bij vrijheid/)
   })
 
   it('rendert confidence-band als zachte gradient polygon (plan F-4)', () => {
@@ -237,7 +269,7 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
       />,
     )
     // Band is een <path> met fill (geen stroke) en lage opacity
@@ -254,7 +286,7 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
       />,
     )
     expect(screen.getByText(/Onzekerheid \(P40–P60\)/i)).toBeTruthy()
@@ -268,7 +300,7 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
       />,
     )
     // Zoek paths met stroke-dasharray (history is dashed, projectie niet)
@@ -286,7 +318,7 @@ describe('MiniNetWorthChart — minimaal 3 maanden historie', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
         monthlySavings={1_000}
       />,
     )
@@ -302,7 +334,7 @@ describe('MiniNetWorthChart — minimaal 3 maanden historie', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
         monthlySavings={1_000}
       />,
     )
@@ -317,7 +349,7 @@ describe('MiniNetWorthChart — minimaal 3 maanden historie', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 100_000)}
+        simNetWorthRows={buildSimRows(35, 52, 100_000)}
         monthlySavings={1_000}
       />,
     )
@@ -332,7 +364,7 @@ describe('MiniNetWorthChart — klikzones', () => {
     currentAge: 35,
     fireAge: 52,
     endAge: 67,
-    simRows: buildSimRows(35, 52, 100_000),
+    simNetWorthRows: buildSimRows(35, 52, 100_000),
   }
 
   it('verleden-zone is een button die de verloop-popup opent', () => {
@@ -381,10 +413,12 @@ describe('MiniNetWorthChart — vrijheid bereikt → doorlopen tot eindleeftijd'
         currentAge={55}
         fireAge={50}
         endAge={90}
-        simRows={buildSimRows(55, 90, 1_000_000, 0.03)}
+        simNetWorthRows={buildSimRows(55, 90, 1_000_000, 0.03)}
       />,
     )
-    expect(screen.getByText(/Tot 90/)).toBeTruthy()
+    // "Tot 90" staat op de SVG-eindmarker én (N2, geen liquide doel) in de
+    // duidende legenda — getAllByText. De header-tekst blijft uniek.
+    expect(screen.getAllByText(/Tot 90/).length).toBeGreaterThan(0)
     expect(screen.getByText(/Vrijheid bereikt — verloop tot 90/)).toBeTruthy()
   })
 
@@ -396,10 +430,10 @@ describe('MiniNetWorthChart — vrijheid bereikt → doorlopen tot eindleeftijd'
         currentAge={35}
         fireAge={52}
         endAge={90}
-        simRows={buildSimRows(35, 90, 100_000)}
+        simNetWorthRows={buildSimRows(35, 90, 100_000)}
       />,
     )
-    expect(screen.getByText(/Vrijheid 52/)).toBeTruthy()
+    expect(screen.getAllByText(/Vrijheid 52/).length).toBeGreaterThan(0)
     expect(screen.queryByText(/Tot 90/)).toBeNull()
   })
 })
@@ -422,7 +456,7 @@ describe('MiniNetWorthChart — privacy-masking voor saldi', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 187_400)}
+        simNetWorthRows={buildSimRows(35, 52, 187_400)}
         simRequiredPortfolio={915_600}
       />,
     )
@@ -438,7 +472,7 @@ describe('MiniNetWorthChart — privacy-masking voor saldi', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 187_400)}
+        simNetWorthRows={buildSimRows(35, 52, 187_400)}
         simRequiredPortfolio={915_600}
       />,
     )
@@ -455,7 +489,7 @@ describe('MiniNetWorthChart — privacy-masking voor saldi', () => {
         currentAge={35}
         fireAge={52}
         endAge={67}
-        simRows={buildSimRows(35, 52, 187_400)}
+        simNetWorthRows={buildSimRows(35, 52, 187_400)}
       />,
     )
     // Leeftijden zijn geen saldo en blijven leesbaar.

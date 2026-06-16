@@ -159,11 +159,17 @@ export type SavingsRateMethod = 'transaction' | 'estimate' | 'net_worth_delta'
  * Used when budgetteren is not active — compares net worth change over time
  * relative to estimated monthly income.
  *
+ * `opts.expectedAnnualAppreciation` (€/jaar): de verwachte koerswinst/rendement op
+ * beleggingen over de periode. Vermogensgroei door koerswinst is GEEN sparen, dus
+ * dat deel wordt van de delta afgetrokken voordat de quote wordt bepaald. Default 0
+ * → byte-gelijk aan het oude gedrag.
+ *
  * Returns null if insufficient data (need >= 2 snapshots spanning >= 28 days).
  */
 export function computeSavingsRateFromNetWorthDelta(
   snapshots: { snapshot_date: string; net_worth: number }[],
   monthlyIncome: number,
+  opts?: { expectedAnnualAppreciation?: number },
 ): { rate: number; months: number } | null {
   if (snapshots.length < 2 || monthlyIncome <= 0) return null
 
@@ -183,7 +189,9 @@ export function computeSavingsRateFromNetWorthDelta(
 
   const months = daysDiff / 30.44 // average days per month
   const deltaNetWorth = last.net_worth - first.net_worth
-  const avgMonthlySaving = deltaNetWorth / months
+  // Koerswinst over de periode is geen sparen → eraf voor een eerlijker quote.
+  const appreciation = (opts?.expectedAnnualAppreciation ?? 0) * (months / 12)
+  const avgMonthlySaving = (deltaNetWorth - appreciation) / months
   const rate = (avgMonthlySaving / monthlyIncome) * 100
 
   return { rate: Math.round(rate * 10) / 10, months: Math.round(months) }

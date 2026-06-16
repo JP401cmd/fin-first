@@ -6,10 +6,46 @@ import {
   computeFreedomPercentage,
   computeFreedomTime,
   computeSavingsRate,
+  computeSavingsRateFromNetWorthDelta,
   // NB: bestaat nog niet — canonieke helper uit het fix-ontwerp.
   // Tests hieronder pinnen de gewenste semantiek; ze zijn ROOD tot de helper bestaat.
   computeFreedomProgress,
 } from './core-metrics'
+
+// ── computeSavingsRateFromNetWorthDelta ─────────────────────
+
+describe('computeSavingsRateFromNetWorthDelta', () => {
+  // 12 maanden, netto vermogen +12.000 → 1.000/maand sparen op 4.000 inkomen = 25%.
+  const snaps = [
+    { snapshot_date: '2025-01-01', net_worth: 100000 },
+    { snapshot_date: '2025-12-31', net_worth: 112000 },
+  ]
+
+  it('zonder appreciation-aftrek (default) telt de hele delta als sparen', () => {
+    const r = computeSavingsRateFromNetWorthDelta(snaps, 4000)
+    expect(r).not.toBeNull()
+    expect(r!.rate).toBeCloseTo(25, 0)
+  })
+
+  it('trekt verwachte koerswinst eraf → lagere, eerlijker quote', () => {
+    // €6.000/jaar koerswinst over ~12 mnd → spaardeel 12.000−6.000 = 6.000 → 12,5%.
+    const r = computeSavingsRateFromNetWorthDelta(snaps, 4000, { expectedAnnualAppreciation: 6000 })
+    expect(r).not.toBeNull()
+    expect(r!.rate).toBeLessThan(25)
+    expect(r!.rate).toBeCloseTo(12.5, 0)
+  })
+
+  it('appreciation 0 == byte-gelijk aan geen opts', () => {
+    const a = computeSavingsRateFromNetWorthDelta(snaps, 4000)
+    const b = computeSavingsRateFromNetWorthDelta(snaps, 4000, { expectedAnnualAppreciation: 0 })
+    expect(b!.rate).toBe(a!.rate)
+  })
+
+  it('te weinig data → null', () => {
+    expect(computeSavingsRateFromNetWorthDelta([snaps[0]], 4000)).toBeNull()
+    expect(computeSavingsRateFromNetWorthDelta(snaps, 0)).toBeNull()
+  })
+})
 
 // ── computeEffectiveExpenses ────────────────────────────────
 

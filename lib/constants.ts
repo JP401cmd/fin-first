@@ -10,7 +10,12 @@
  * - Dutch tax system (Box 3, 2025)
  * - Dutch social security (AOW)
  * - Inflation
+ * - Transaction costs (verkoopkosten per asset-type)
  */
+
+// Type-only import: bij compilatie geheel weg-erased, dus geen runtime-cycle
+// (asset-data.ts importeert constants.ts niet). Houdt deze leaf vrij van runtime-deps.
+import type { AssetType } from '@/lib/asset-data'
 
 // ── Investment Assumptions ──────────────────────────────────────
 
@@ -68,3 +73,32 @@ export const NL_SWR = DEFAULT_RETURN - BOX3_DRAG - NL_INFLATIE
 
 /** NL FIRE multiplier — 1 / NL_SWR ≈ 34.7× annual expenses. */
 export const NL_MULTIPLIER = 1 / NL_SWR
+
+// ── Transaction Costs — verkoopkosten per asset-type ────────────
+
+/**
+ * Verkoopkosten (transactiekosten) bij liquidatie van een niet-liquide asset, als
+ * fractie van de verkoopprijs. Gebruikt door de generieke asset-liquidatie in de
+ * v2-grootboek-engine (`buildGenericAssetLiquidations`, lib/horizon-engine/build-input.ts).
+ *
+ *  • Roerende zaken (voertuig/inboedel/overig/deelneming): ~2% — bemiddeling/
+ *    overdracht, geen overdrachtsbelasting/notaris.
+ *  • Vastgoed (real_estate ≠ eigen_huis, bv. beleggingspand): ~3% — makelaar +
+ *    overdrachtskosten, lager dan een eigen-huis-verkoop omdat het downsize-pad
+ *    (eigen_huis) zijn eigen, door de gebruiker instelbare salesCostsPct draagt.
+ *
+ * `eigen_huis` staat hier bewust NIET in: dat loopt via het housing-downsize-pad
+ * (`buildV2DownsizeHousing`) met een door de gebruiker gekozen verkoopkosten-%.
+ * Een type dat ontbreekt valt terug op `DEFAULT_SALES_COSTS_PCT` (= roerend 2%).
+ * Per-event override via `metadata.verkoopkostenPct` (geldig in [0, 0.20]) wint.
+ */
+export const SALES_COSTS_BY_TYPE: Partial<Record<AssetType, number>> = {
+  vehicle: 0.02,
+  physical: 0.02,
+  other: 0.02,
+  deelneming: 0.02,
+  real_estate: 0.03,
+}
+
+/** Fallback-verkoopkosten voor een asset-type dat niet in SALES_COSTS_BY_TYPE staat — roerend 2%. */
+export const DEFAULT_SALES_COSTS_PCT = 0.02

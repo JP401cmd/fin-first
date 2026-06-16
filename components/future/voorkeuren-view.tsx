@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { SlidersHorizontal, ArrowRight, TrendingUp, Wallet, Pencil } from 'lucide-react'
 import type { FireParams } from '@/lib/fire-params'
@@ -12,7 +12,7 @@ import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
 import { AfbouwOverzichtCard } from './afbouw-overzicht-card'
 import { RegelBewerkenPane } from './regel-bewerken-pane'
-import type { RegelId } from '@/lib/future/regel-registry'
+import { REGEL_ORDER, type RegelId } from '@/lib/future/regel-registry'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import type { PotRulesConfig, SurplusGroup } from '@/lib/pot-rules'
 import { WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
@@ -111,6 +111,8 @@ export function VoorkeurenView({
   potBalances: Record<WealthGroup, number>
 }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   // Inline-editor state voor de markt-aannames (inflatie/rendement).
   const [editing, setEditing] = useState<
     | null
@@ -123,6 +125,26 @@ export function VoorkeurenView({
   >(null)
   // Welke "Regel op de hele tijdas" wordt bewerkt (null = gesloten).
   const [editingRegel, setEditingRegel] = useState<RegelId | null>(null)
+
+  // Deep-link: ?regel=eindstrategie|onttrekkingsstrategie|… opent het
+  // bijbehorende regel-bewerkscherm (spiegelt het ?strategie=-patroon van
+  // gebeurtenissen-view). Valideert tegen de geldige RegelId-set.
+  useEffect(() => {
+    const r = searchParams.get('regel')
+    if (r && (REGEL_ORDER as string[]).includes(r)) {
+      setEditingRegel(r as RegelId)
+    }
+  }, [searchParams])
+
+  // Sluit het regel-bewerkscherm én ruim de ?regel-param op (spiegelt closeStrategy).
+  function closeRegel() {
+    setEditingRegel(null)
+    if (searchParams.get('regel')) {
+      const p = new URLSearchParams(searchParams)
+      p.delete('regel')
+      router.replace(`${pathname}${p.toString() ? `?${p}` : ''}`, { scroll: false })
+    }
+  }
 
   const endStrategy = STRATEGY_LABELS[fireStrategy.strategy]
   const wsLabel = WITHDRAWAL_LABELS[withdrawalStrategy.strategy] ?? {
@@ -310,7 +332,7 @@ export function VoorkeurenView({
       <RegelBewerkenPane
         open={editingRegel !== null}
         regelId={editingRegel}
-        onClose={() => setEditingRegel(null)}
+        onClose={closeRegel}
         onSaved={() => router.refresh()}
         simSnapshot={simSnapshot}
         fireStrategy={fireStrategy}

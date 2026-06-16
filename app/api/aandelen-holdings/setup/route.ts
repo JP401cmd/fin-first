@@ -7,19 +7,24 @@ import { APP_SETUP_SLUGS } from '@/lib/app-setup-status'
  * POST /api/aandelen-holdings/setup — Eerste-keer setup voor de
  * Aandelen-holdings-app.
  *
- * Body: { brokers: string[], inputMethod: 'manual' | 'csv' | 'api' }
+ * Body: {
+ *   selectedAssetIds: string[] (uuid),
+ *   brokers: string[],
+ *   inputMethod: 'manual' | 'csv' | 'api'
+ * }
  *
  * Wat deze route doet:
  *  1. Slaat broker-voorkeur + inputMethod op in `profiles.aandelen_input_method`
  *     en `profiles.aandelen_brokers` (jsonb). Bij ontbrekende kolommen
  *     (migratie nog niet toegepast) wordt gracieus gedegradeerd — alleen
  *     de feature-visit-marker wordt dan gezet zodat de gate verdwijnt.
- *  2. Markeert alle investment-assets met `has_holdings_tracking = true` —
- *     conform de bestaande tracking-flag-semantiek.
+ *  2. Markeert de geselecteerde investment-assets met `has_holdings_tracking = true`
+ *     en alle andere investment-assets op false (absolute selectie).
  *  3. Schrijft de feature-visit-marker.
  */
 
 const bodySchema = z.object({
+  selectedAssetIds: z.array(z.string().uuid()).min(1),
   brokers: z.array(z.string()).min(1),
   inputMethod: z.enum(['manual', 'csv', 'api']),
 })
@@ -46,7 +51,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const { brokers, inputMethod } = parsed.data
+  const { selectedAssetIds, brokers, inputMethod } = parsed.data
 
   try {
     // ── 1. Voorkeur opslaan op profile ─────────────────────────
@@ -71,12 +76,20 @@ export async function POST(req: Request) {
       console.warn('[aandelen-holdings-setup] profile-kolommen ontbreken, voortzetten zonder voorkeur')
     }
 
-    // ── 2. Tracking-flags op investment-assets ─────────────────
-    await supabase
+    // ── 2. Tracking-flags op investment-assets (clear-all-then-mark-selected) ──
+    const { error: clearErr } = await supabase
+      .from('assets')
+      .update({ has_holdings_tracking: false })
+      .eq('user_id', user.id)
+      .eq('asset_type', 'investment')
+    if (clearErr) throw new Error(`Beleggingen bijwerken mislukt: ${clearErr.message}`)
+
+    const { error: markErr } = await supabase
       .from('assets')
       .update({ has_holdings_tracking: true })
       .eq('user_id', user.id)
-      .eq('asset_type', 'investment')
+      .in('id', selectedAssetIds)
+    if (markErr) throw new Error(`Beleggingen markeren mislukt: ${markErr.message}`)
 
     // ── 3. Feature-visit-marker ────────────────────────────────
     await supabase

@@ -346,7 +346,8 @@ function scanTableRelations(knownTables) {
   const REF = /references\s+(?:"?(public|auth)"?\.)?"?([a-z_][a-z0-9_]*)"?/i
   for (const f of files) {
     let current = null
-    for (const line of read(f).split('\n')) {
+    const src = read(f)
+    for (const line of src.split('\n')) {
       const ct = line.match(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?/i)
       if (ct) {
         current = ct[1].toLowerCase()
@@ -360,17 +361,20 @@ function scanTableRelations(knownTables) {
         const ref = line.match(REF)
         if (col && ref) addRef(current, col[1].toLowerCase(), (ref[1] || '').toLowerCase(), ref[2].toLowerCase())
       }
-      // ALTER TABLE ADD COLUMN ... REFERENCES (één regel)
-      const at = line.match(/alter\s+table\s+(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?\s+add\s+column\s+(?:if\s+not\s+exists\s+)?"?([a-z_][a-z0-9_]*)"?/i)
-      if (at && tableSet.has(at[1].toLowerCase()) && REF.test(line)) {
-        const ref = line.match(REF)
-        addRef(at[1].toLowerCase(), at[2].toLowerCase(), (ref[1] || '').toLowerCase(), ref[2].toLowerCase())
-      }
       // RLS
       const rls = line.match(/alter\s+table\s+(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?\s+enable\s+row\s+level\s+security/i)
       if (rls && tableSet.has(rls[1].toLowerCase())) ensure(rls[1].toLowerCase()).rls = true
       const pol = line.match(/create\s+policy\s+.*\bon\s+(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?/i)
       if (pol && tableSet.has(pol[1].toLowerCase())) ensure(pol[1].toLowerCase()).rls = true
+    }
+    // ALTER TABLE … ADD COLUMN … REFERENCES — statement-scan, óók multi-line
+    // (kolomnaam en REFERENCES op aparte regels). `[^;]` blijft binnen één
+    // statement maar staat newlines toe; addRef dedupt, dus geen dubbele edge.
+    const alterRef =
+      /alter\s+table\s+(?:"?public"?\.)?"?([a-z_][a-z0-9_]*)"?\s+add\s+column\s+(?:if\s+not\s+exists\s+)?"?([a-z_][a-z0-9_]*)"?[^;]*?references\s+(?:"?(public|auth)"?\.)?"?([a-z_][a-z0-9_]*)"?/gi
+    for (const m of src.matchAll(alterRef)) {
+      if (tableSet.has(m[1].toLowerCase()))
+        addRef(m[1].toLowerCase(), m[2].toLowerCase(), (m[3] || '').toLowerCase(), m[4].toLowerCase())
     }
   }
   relations.sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to))

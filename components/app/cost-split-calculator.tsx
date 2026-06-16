@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  Users, User, Percent, ArrowRight, Scale,
-  Wallet, UserCheck, Settings, PiggyBank,
+  Users, User, ArrowRight, Scale,
+  Wallet, UserCheck, Settings,
   TrendingDown, Info, ChevronDown, ChevronUp,
 } from 'lucide-react'
 
@@ -150,11 +150,23 @@ const MODE_ICONS: Record<SplitMode, typeof Scale> = {
   one_carries_all: UserCheck,
 }
 
+// Split-modes zijn geen module-identiteit — een verdelingsmodus "hoort" niet bij
+// Kern/Will/Toekomst. We tonen de actieve modus daarom in het route-accent
+// (`--module-active-*`) en de niet-actieve modi neutraal (ink-tokens), i.p.v.
+// elke modus een eigen module-/standaardkleur (incl. de eerdere kale `blue-*`)
+// te geven. De `isActive`-styling in SplitModeCard bepaalt welke variant zichtbaar is.
+const ACTIVE_MODE_COLORS = {
+  bg: 'bg-[var(--subtle)]',
+  text: 'text-[var(--module-active-700)]',
+  border: 'border-[var(--module-active-300)]',
+  accent: 'bg-[var(--module-active-500)]',
+} as const
+
 const MODE_COLORS: Record<SplitMode, { bg: string; text: string; border: string; accent: string }> = {
-  equal: { bg: 'bg-wil-50', text: 'text-wil-700', border: 'border-wil-200', accent: 'bg-wil-500' },
-  income_ratio: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', accent: 'bg-blue-500' },
-  custom: { bg: 'bg-kern-50', text: 'text-kern-700', border: 'border-kern-200', accent: 'bg-kern-500' },
-  one_carries_all: { bg: 'bg-horizon-50', text: 'text-horizon-700', border: 'border-horizon-200', accent: 'bg-horizon-500' },
+  equal: ACTIVE_MODE_COLORS,
+  income_ratio: ACTIVE_MODE_COLORS,
+  custom: ACTIVE_MODE_COLORS,
+  one_carries_all: ACTIVE_MODE_COLORS,
 }
 
 // ─── Per-Partner Contribution Bar ─────────────────────────────
@@ -239,7 +251,7 @@ function SplitModeCard({
       onClick={onSelect}
       className={`flex flex-col gap-2 rounded-[var(--r-lg)] border-2 p-4 text-left transition-all ${
         isActive
-          ? `${colors.bg} ${colors.border} ${colors.text} shadow-[var(--s0)] ring-1 ring-${colors.border}`
+          ? `${colors.bg} ${colors.border} ${colors.text} shadow-[var(--s0)]`
           : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]'
       }`}
       data-testid={`split-mode-${result.mode}`}
@@ -350,9 +362,9 @@ export function PartnerContributionSummary({
 
       {/* Fairness indicator for income_ratio mode */}
       {result.mode === 'income_ratio' && result.partners[0].income && result.partners[1].income && (
-        <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-blue-50 px-3 py-2" data-testid="income-ratio-info">
-          <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
-          <p className="text-[10px] text-blue-700">
+        <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-[var(--subtle)] px-3 py-2" data-testid="income-ratio-info">
+          <Info className="h-3.5 w-3.5 text-[var(--ink-3)] shrink-0 mt-0.5" />
+          <p className="text-[10px] text-[var(--ink-2)]">
             Verdeling gebaseerd op inkomenratio:{' '}
             <span className="font-medium">
               {<MaskedAmount value={result.partners[0].income!} tone="wil" />} vs {<MaskedAmount value={result.partners[1].income!} tone="wil" />}
@@ -709,8 +721,8 @@ export function CostSplitCalculator({
 
           {/* Custom percentage slider */}
           {activeMode === 'custom' && (
-            <div className="rounded-[var(--r-lg)] border border-kern-200 bg-kern-50 p-4" data-testid="custom-pct-editor">
-              <label className="block text-xs font-medium text-kern-700 mb-2">
+            <div className="rounded-[var(--r-lg)] border border-[var(--module-active-300)] bg-[var(--subtle)] p-4" data-testid="custom-pct-editor">
+              <label className="block text-xs font-medium text-[var(--module-active-700)] mb-2">
                 Jouw aandeel: {localCustomPct}%
               </label>
               <input
@@ -719,18 +731,18 @@ export function CostSplitCalculator({
                 max="100"
                 value={localCustomPct}
                 onChange={(e) => handleCustomPctChange(Number(e.target.value))}
-                className="w-full h-2 bg-kern-200 rounded-lg appearance-none cursor-pointer accent-kern-500"
+                className="w-full h-2 bg-[var(--module-active-300)] rounded-lg appearance-none cursor-pointer accent-[var(--module-active-500)]"
                 data-testid="custom-pct-slider"
               />
-              <div className="flex justify-between mt-1 text-[10px] text-kern-600">
+              <div className="flex justify-between mt-1 text-[10px] text-[var(--ink-3)]">
                 <span>0% (partner betaalt alles)</span>
                 <span>100% (jij betaalt alles)</span>
               </div>
               <div className="flex justify-between mt-2 text-xs">
-                <span className="font-medium text-kern-700">
+                <span className="font-medium text-[var(--module-active-700)]">
                   Jij: {<MaskedAmount value={totalAmount * (localCustomPct / 100)} tone="wil" />}
                 </span>
-                <span className="font-medium text-kern-700">
+                <span className="font-medium text-[var(--module-active-700)]">
                   Partner: {<MaskedAmount value={totalAmount * ((100 - localCustomPct) / 100)} tone="wil" />}
                 </span>
               </div>

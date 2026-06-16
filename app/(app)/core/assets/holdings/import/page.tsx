@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Upload,
@@ -24,6 +25,7 @@ import {
 } from '@/lib/parsers/broker-csv'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { computePositionFromTransactions } from '@/lib/holdings-aggregation'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,6 +47,8 @@ type PreviewRow = ParsedHoldingRow & {
 type ImportSummary = {
   holdings_created: number
   holdings_updated: number
+  // Only present for snapshot imports (positions sold since the last upload).
+  holdings_deactivated?: number
   transactions_created: number
   total_value: number
   broker: string
@@ -102,6 +106,14 @@ function typeColor(type: ParsedHoldingRow['type']): string {
 
 export default function HoldingsImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Per-asset context: `?asset=<uuid>` means "this CSV is the full portfolio of
+  // that asset". We then import in idempotent snapshot mode (replace + sold-out
+  // deactivation) instead of the generic append mode. Without it, the page keeps
+  // the legacy append behaviour.
+  const searchParams = useSearchParams()
+  const targetAssetId = searchParams.get('asset')
+  const isSnapshot = Boolean(targetAssetId)
 
   // Step management (1 = upload, 2 = preview, 3 = result)
   const [step, setStep] = useState(1)
@@ -333,18 +345,49 @@ export default function HoldingsImportPage() {
         }
       }
 
-      // Build holdings array
-      const holdings = Array.from(holdingMap.values()).map((entry) => ({
-        name: entry.row.name,
-        ticker: entry.row.ticker,
-        isin: entry.row.isin,
-        units: entry.row.units,
-        avg_purchase_price: entry.row.price_per_unit,
-        current_price: entry.row.price_per_unit,
-        purchase_date: entry.row.date,
-        exchange: entry.row.exchange,
-        asset_id: null,
-      }))
+      // Build holdings array. Het huidige bezit volgt uit de transactiehistorie:
+      // een positie-export (Portfolio.csv) levert het aantal direct, een
+      // transactie-export (Transactions.csv) wordt genet via de canonieke
+      // aggregatie — zodat 10 koop + 5 verkoop = 5 over, niet 15 of 1 rij.
+      const holdings = Array.from(holdingMap.values()).map((entry) => {
+        if (entry.row.type === 'position') {
+          return {
+            name: entry.row.name,
+            ticker: entry.row.ticker,
+            isin: entry.row.isin,
+            units: entry.row.units,
+            avg_purchase_price: entry.row.price_per_unit,
+            current_price: entry.row.price_per_unit,
+            purchase_date: entry.row.date,
+            exchange: entry.row.exchange,
+            asset_id: null,
+          }
+        }
+        // Transactie-export: netto positie + gemiddelde kostprijs uit de historie.
+        const agg = computePositionFromTransactions(
+          entry.transactions.map((t) => ({
+            type: t.type,
+            units: t.units,
+            price_per_unit: t.price_per_unit,
+            total_amount: t.total_amount,
+            date: t.date,
+          })),
+        )
+        const avgCost = agg.netUnits > 0 ? agg.avgCost : 0
+        return {
+          name: entry.row.name,
+          ticker: entry.row.ticker,
+          isin: entry.row.isin,
+          units: agg.netUnits,
+          avg_purchase_price: avgCost,
+          // Geen live koers in een transactie-export; gemiddelde kostprijs als
+          // neutrale placeholder tot een koers-refresh de actuele prijs ophaalt.
+          current_price: avgCost,
+          purchase_date: entry.row.date,
+          exchange: entry.row.exchange,
+          asset_id: null,
+        }
+      })
 
       // Build holding index lookup for transactions
       const holdingKeys = Array.from(holdingMap.keys())
@@ -387,6 +430,11 @@ export default function HoldingsImportPage() {
           holdings,
           transactions,
           broker: selectedBroker,
+          // With an asset context the upload is the full portfolio of that asset,
+          // so reconcile it idempotently. Otherwise keep the generic append flow.
+          ...(isSnapshot
+            ? { mode: 'snapshot', targetAssetId }
+            : {}),
         }),
       })
 
@@ -407,7 +455,7 @@ export default function HoldingsImportPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedBroker, previewRows])
+  }, [selectedBroker, previewRows, isSnapshot, targetAssetId])
 
   /** Reset wizard to the beginning for another import. */
   const resetWizard = useCallback(() => {
@@ -876,6 +924,19 @@ export default function HoldingsImportPage() {
               <p className="text-xs text-[var(--ink-3)]">geimporteerd</p>
             </div>
           </div>
+
+          {/* Snapshot-only: positions that were in the portfolio before but not
+              in this upload are treated as sold and deactivated. */}
+          {(importSummary.holdings_deactivated ?? 0) > 0 && (
+            <p className="text-center text-sm text-[var(--ink-3)]">
+              <span className="font-mono font-bold tabular-nums text-[var(--ink)]">
+                {importSummary.holdings_deactivated}
+              </span>{' '}
+              {importSummary.holdings_deactivated === 1
+                ? 'positie stond niet meer in dit overzicht en is als verkocht gemarkeerd.'
+                : 'posities stonden niet meer in dit overzicht en zijn als verkocht gemarkeerd.'}
+            </p>
+          )}
 
           {/* Action buttons */}
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">

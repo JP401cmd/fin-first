@@ -72,9 +72,10 @@ type OverzichtHeroProps = {
   netWorthHistory?: { month: string; value: number }[]
   currentNetWorth?: number | null
   fireAge?: number | null
-  /** Per-jaar projectie uit `runUnifiedProjection` — zelfde bron als
-   *  /toekomst zodat curves overeenkomen. */
-  simRows?: { age: number; endPortfolio: number }[] | null
+  /** Per-jaar geprojecteerd VOLLEDIG netto vermogen (FIRE-pot + niet-liquide
+   *  assets) uit de loader — zodat de curve continu doorloopt vanuit het
+   *  Vandaag-punt zonder dip op huis-filterende housing-modi. */
+  simNetWorthRows?: { age: number; netWorth: number }[] | null
   /** Geschat maandelijks spaarritme — back-cast voor ontbrekende
    *  historie-maanden in de mini-vermogen-grafiek. */
   monthlySavings?: number | null
@@ -147,7 +148,7 @@ export function OverzichtHero({
   netWorthHistory,
   currentNetWorth,
   fireAge,
-  simRows,
+  simNetWorthRows,
   monthlySavings,
   simRequiredPortfolio,
   dashboardData,
@@ -270,7 +271,7 @@ export function OverzichtHero({
                 fireAge={fireAge ?? null}
                 endAge={endAge ?? null}
                 isPensioenMode={isPensioenMode ?? false}
-                simRows={simRows ?? null}
+                simNetWorthRows={simNetWorthRows ?? null}
                 simRequiredPortfolio={simRequiredPortfolio ?? null}
                 monthlySavings={monthlySavings ?? null}
               />

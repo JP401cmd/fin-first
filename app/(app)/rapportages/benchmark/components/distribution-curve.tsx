@@ -2,7 +2,8 @@
 
 /**
  * DistributionCurve — log-normale verdelingscurve voor een continue metric
- * (netto vermogen / inkomen) met verticale markers voor jou, de mediaan en
+ * (netto vermogen / inkomen) met verticale markers voor jou, de peer-referentie
+ * (label via `peerLabel`: "mediaan" voor vermogen, "referentie" voor inkomen) en
  * (alleen vermogen) het NL-gemiddelde.
  *
  * Pure presentatie: de curve-vorm komt uit `curve{mode,max,spread}` en de
@@ -24,6 +25,8 @@ export interface DistributionCurveProps {
   you: number | null
   /** Mediaan/peer (purpleSoft, dashed). */
   peer: number | null
+  /** Marker-label voor de peer-lijn (vermogen = "mediaan", inkomen = "referentie"). */
+  peerLabel?: string
   /** NL-gemiddeld (gold, dashed) — alleen vermogen. */
   avg?: number | null
   /** Uniek id voor de gradient-def. */
@@ -53,7 +56,7 @@ interface Marker {
   yShift: number
 }
 
-export function DistributionCurve({ curve, you, peer, avg, gradientId, masked = false }: DistributionCurveProps) {
+export function DistributionCurve({ curve, you, peer, peerLabel = 'mediaan', avg, gradientId, masked = false }: DistributionCurveProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1100, threshold: 0.2 })
 
   const geometry = useMemo(() => {
@@ -99,7 +102,7 @@ export function DistributionCurve({ curve, you, peer, avg, gradientId, masked = 
       markers.push({ x: sx(avg), color: VIZ.gold, label: 'NL-gem.', sub: sub(avg), dash: '4 3', yShift: 0 })
     }
     if (peer != null) {
-      markers.push({ x: sx(peer), color: VIZ.purpleSoft, label: 'mediaan', sub: sub(peer), dash: '4 3', yShift: 0 })
+      markers.push({ x: sx(peer), color: VIZ.purpleSoft, label: peerLabel, sub: sub(peer), dash: '4 3', yShift: 0 })
     }
     if (you != null) {
       const shiftYou = peer != null && near(you, peer) ? 26 : 0
@@ -107,7 +110,7 @@ export function DistributionCurve({ curve, you, peer, avg, gradientId, masked = 
     }
 
     return { area, stroke, x0, x1, y0, y1, markers }
-  }, [curve, you, peer, avg, masked])
+  }, [curve, you, peer, peerLabel, avg, masked])
 
   return (
     <div ref={ref}>

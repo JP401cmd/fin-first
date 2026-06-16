@@ -30,7 +30,6 @@ import {
 import { resolveFireParams } from '@/lib/fire-params'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import {
-  lifeEventsToCashflows,
   type SimResult,
   type SimCashflow,
 } from '@/lib/fire-simulation'
@@ -39,6 +38,10 @@ import {
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
+import type { HorizonStrategyOptions } from '@/lib/horizon-engine/strategies'
+import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
+import { type LifeEvent } from '@/lib/horizon-data'
 import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
@@ -55,7 +58,7 @@ import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app
 import { WhatIfBeslishulp } from '@/components/app/horizon/whatif-beslishulp'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { computeDebtAflossingMonthly, savingsRateFromAggregates, resolveSavingsSource } from '@/lib/savings-source'
-import { filterAssetsForFire, parseHousingStrategy, type HousingStrategyConfig } from '@/lib/housing-strategy'
+import { parseHousingStrategy, type HousingStrategyConfig } from '@/lib/housing-strategy'
 import { hasPartner as deriveHasPartner } from '@/lib/household-type'
 import {
   deriveOverridesFromEvents,
@@ -127,6 +130,9 @@ export default function WhatIfPage() {
   /** Feature-flag (C4): draait de gebruiker de v2-grootboek-engine? Bepaalt of de
    *  baseline + alle scenario-runs door v2 lopen — invariant: baseline == /toekomst. */
   const [horizonEngineV2, setHorizonEngineV2] = useState(false)
+  /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde. Zelfde bron
+   *  als /toekomst zodat de baseline-surplus-/opbrengstbestemming identiek is. */
+  const [potRules, setPotRules] = useState<PotRulesConfig>(POT_RULES_DEFAULTS)
 
   // ── Per-asset-type return-deltas (decimaal, bv. { investment: 0.02 }). ──
   const [returnDeltas, setReturnDeltas] = useState<Record<string, number>>({})
@@ -296,6 +302,9 @@ export default function WhatIfPage() {
         estimatedAnnualIncome: extrapolatedIncome,
         estimatedMonthlyExpenses: profileMonthlyExpenses,
         savingsRate6m: cashflowSavingsRate6m ?? 0,
+        // Handmatig pad volgt dezelfde definitie als het transactie-pad.
+        // Spaarbudget wordt hier (nog) niet geladen → bewust default 0.
+        monthlyDebtAflossing: aflossing6m / 6,
       })
       setBaseAnnualSavingsFromCashflow(baseAnnualSavings)
 
@@ -316,6 +325,17 @@ export default function WhatIfPage() {
       // Feature-flag: v2-grootboek-engine (C4). Bepaalt of baseline + scenario's
       // door v2 lopen zodat de baseline gelijk blijft aan /toekomst.
       setHorizonEngineV2(isHorizonV2Enabled(profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null))
+
+      // Pot-regels (B): defensieve aparte fetch (zelfde patroon als
+      // dashboard-data-loader) zodat een ontbrekende kolom de what-if-load niet
+      // laat falen. Geeft de baseline dezelfde surplus-/opbrengstbestemming als
+      // /toekomst. resolvePotRules valt terug op defaults bij missing/lege waarde.
+      try {
+        const { data: potData } = await supabase.from('profiles').select('pot_rules').single()
+        if (potData) setPotRules(resolvePotRules(potData))
+      } catch {
+        // Non-critical — val terug op POT_RULES_DEFAULTS.
+      }
 
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
@@ -473,59 +493,55 @@ export default function WhatIfPage() {
   }, [baseline, scenarioOnlyEvents, returnDeltas])
 
 
-  // ── Base UnifiedProjectionInput (built once from loaded data) ──────────
-  const baseUnifiedInput = useMemo<UnifiedProjectionInput | null>(() => {
-    if (!input) return null
-    const currentAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
-    if (currentAge === null) return null
-    const yearlyExpenses = input.yearlyMustExpenses > 0 ? input.yearlyMustExpenses : 0
-    if (yearlyExpenses <= 0) return null
-    const strategyForSim = fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 }
+  // ── Gedeelde input-assemblage via buildHorizonInput (B, ADR 0015/0016) ──
+  // SINGLE SOURCE: de what-if-baseline gebruikt nu DEZELFDE builder als
+  // /toekomst (use-horizon-fire-sim) en /overzicht (dashboard-data-loader) i.p.v.
+  // een eigen inline-opbouw. Daardoor krijgt de baseline — net als de hoofd-
+  // grafiek — de juiste `assetLiquidations` (gekoppelde verkoop-events),
+  // `skipEventIds`-onderdrukking (geen dubbeltelling) én het housing-model
+  // (downsize-als-liquidatie). De factory bouwt cashflows + liquidaties per
+  // event-set samen (ze horen bij elkaar), zodat een sim NIET losse cashflows
+  // mag overschrijven zonder de bijbehorende liquidaties — vandaar per-sim de
+  // factory aanroepen i.p.v. één base-input met losse cashflows.
+  const buildInputForEvents = useCallback(
+    (evs: LifeEvent[]): { input: UnifiedProjectionInput; strategyOptions?: Partial<HorizonStrategyOptions> } | null => {
+      if (!input) return null
+      const built = buildHorizonInput({
+        horizonInput: input,
+        lifeEvents: evs,
+        fireStrategy,
+        withdrawalStrategy: withdrawalStrategyConfig,
+        grossReturn: userGrossReturn,
+        inflation: userInflation,
+        aowAgeFractional: userAowAge.fractional,
+        assets: fullAssets,
+        debts: fullDebts,
+        box3Method,
+        hasPartner,
+        bankAccountCash,
+        monthlySavingsOverride,
+        baseAnnualSavingsFromCashflow,
+        housingStrategy,
+        potRules,
+        horizonEngineV2,
+      })
+      if (!built) return null
+      return { input: built.input, strategyOptions: built.strategyOptions }
+    },
+    [input, fireStrategy, withdrawalStrategyConfig, userGrossReturn, userInflation, userAowAge, fullAssets, fullDebts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, potRules, horizonEngineV2],
+  )
 
-    // Eigen-woning uit de FIRE-pot filteren bij exclude/downsize — zelfde
-    // bewerking als use-horizon-fire-sim.ts (/toekomst), zodat het huis alleen
-    // meetelt voor zover de strategie het vrijspeelt.
-    const { assets: fireAssets, debts: fireDebts } = filterAssetsForFire(
-      housingStrategy, fullAssets, fullDebts,
-    )
-
-    // annualSavings — zelfde prioriteit als use-horizon-fire-sim.ts:116-120:
-    //   1. handmatige override (monthlySavingsOverride × 12)
-    //   2. cashflow-spaarquote × inkomen (baseAnnualSavingsFromCashflow)
-    //   3. asset-contributie-aggregaat (legacy fallback voor lege data)
-    const annualSavings = monthlySavingsOverride != null && monthlySavingsOverride >= 0
-      ? monthlySavingsOverride * 12
-      : (baseAnnualSavingsFromCashflow > 0
-          ? baseAnnualSavingsFromCashflow
-          : (input.monthlyContributions ?? 0) * 12)
-
-    return {
-      assets: fireAssets,
-      debts: fireDebts,
-      currentAge,
-      endAge: strategyForSim.endAge,
-      yearlyExpenses,
-      annualSavings,
-      monthlySurplus: annualSavings / 12,
-      monthlyIncome: input.monthlyIncome ?? 0,
-      incomeGrowthRate: 0,
-      grossReturn: userGrossReturn,
-      inflationRate: userInflation,
-      box3Method,
-      cashflows: [], // filled per-simulation
-      strategyConfig: strategyForSim,
-      withdrawalStrategy: withdrawalStrategyConfig,
-      forcedFireAge: strategyForSim.strategy === 'pensioen' ? Math.ceil(userAowAge.fractional) : undefined,
-      hasPartner,
-      bankAccountCash,
-    }
-  }, [input, fullAssets, fullDebts, fireStrategy, userGrossReturn, userInflation, box3Method, hasPartner, bankAccountCash, withdrawalStrategyConfig, userAowAge, housingStrategy, monthlySavingsOverride, baseAnnualSavingsFromCashflow])
+  // ── Base UnifiedProjectionInput (geen scenario-events) — voor consumers die
+  //    zelf cashflows overlayen (WhatIfBeslishulp) en voor annualSavings. ──────
+  const baseBuilt = useMemo(() => buildInputForEvents(baselineDbEvents), [buildInputForEvents, baselineDbEvents])
+  const baseUnifiedInput = baseBuilt?.input ?? null
 
   // ── What-if UnifiedProjectionInput — per-asset-type return-deltas toegepast in engine ──
+  const whatIfBuilt = useMemo(() => buildInputForEvents(scenarioActiveEvents), [buildInputForEvents, scenarioActiveEvents])
   const whatIfUnifiedInput = useMemo<UnifiedProjectionInput | null>(() => {
-    if (!baseUnifiedInput) return null
-    return { ...baseUnifiedInput, returnDeltaByAssetType: returnDeltas }
-  }, [baseUnifiedInput, returnDeltas])
+    if (!whatIfBuilt) return null
+    return { ...whatIfBuilt.input, returnDeltaByAssetType: returnDeltas }
+  }, [whatIfBuilt, returnDeltas])
 
   // ── Legacy what-if FinancialInput (for dailyExpenses display only) ──────
   const { adjustedInput: whatIfInput, annualSavings: whatIfAnnualSavings_sim } = useMemo(() => {
@@ -533,25 +549,26 @@ export default function WhatIfPage() {
     return applyWhatIfOverrides(input, overrides, baseline)
   }, [input, overrides, baseline])
 
-  // ── Run baseline simulation (DB events only) ──────────────────
+  // ── Run baseline simulation (DB events only) — IDENTIEK aan /toekomst ──────
+  // De baseline draait door buildHorizonInput → assetLiquidations + skipIds +
+  // housing-model identiek aan de hoofd-grafiek. cashflows komen uit built.input
+  // (NIET losse lifeEventsToCashflows) zodat skipIds-onderdrukking meeloopt.
   const baselineSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
-    if (!baseUnifiedInput) return null
-    const cashflows = lifeEventsToCashflows(baselineDbEvents)
-    const unifiedResult = runSelectedProjection({ ...baseUnifiedInput, cashflows }, horizonEngineV2)
-    return { result: toSimResult(unifiedResult), cashflows }
-  }, [baseUnifiedInput, baselineDbEvents, horizonEngineV2])
+    if (!baseBuilt) return null
+    const unifiedResult = runSelectedProjection(baseBuilt.input, horizonEngineV2, baseBuilt.strategyOptions)
+    return { result: toSimResult(unifiedResult), cashflows: baseBuilt.input.cashflows }
+  }, [baseBuilt, horizonEngineV2])
 
   // ── Run what-if simulation (DB + scenario events; return override applied) ──
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
-    if (!whatIfUnifiedInput) return null
-    const cashflows = lifeEventsToCashflows(scenarioActiveEvents)
-    const unifiedResult = runSelectedProjection({ ...whatIfUnifiedInput, cashflows }, horizonEngineV2)
-    return { result: toSimResult(unifiedResult), cashflows }
-  }, [whatIfUnifiedInput, scenarioActiveEvents, horizonEngineV2])
+    if (!whatIfBuilt || !whatIfUnifiedInput) return null
+    const unifiedResult = runSelectedProjection(whatIfUnifiedInput, horizonEngineV2, whatIfBuilt.strategyOptions)
+    return { result: toSimResult(unifiedResult), cashflows: whatIfBuilt.input.cashflows }
+  }, [whatIfBuilt, whatIfUnifiedInput, horizonEngineV2])
 
   // ── Pinned scenario overlays — re-run sim per pinned saved scenario ──
   const pinnedOverlays = useMemo<ScenarioOverlay[]>(() => {
-    if (!baseUnifiedInput || pinnedScenarioIds.length === 0) return []
+    if (!input || pinnedScenarioIds.length === 0) return []
     const result: ScenarioOverlay[] = []
     for (const id of pinnedScenarioIds) {
       const scenario = savedScenariosMirror.find(s => s.id === id)
@@ -575,12 +592,15 @@ export default function WhatIfPage() {
           is_indexed: false,
           metadata: e.metadata ?? {},
         }))
-      const cashflows = lifeEventsToCashflows(scenarioEvents)
+      // Build via de gedeelde factory zodat gekoppelde verkoop-events ook in een
+      // pinned scenario liquideren (cashflows + assetLiquidations samen).
+      const pinBuilt = buildInputForEvents(scenarioEvents)
+      if (!pinBuilt) continue
       // Translate scenario's saved absolute return → uniform delta across all asset-types.
       const pinReturnDelta = (baseline && scenario.overrides?.expectedReturn != null)
         ? (scenario.overrides.expectedReturn - baseline.expectedReturn) / 100
         : 0
-      const sim = runSelectedProjection({ ...baseUnifiedInput, cashflows, returnDelta: pinReturnDelta }, horizonEngineV2)
+      const sim = runSelectedProjection({ ...pinBuilt.input, returnDelta: pinReturnDelta }, horizonEngineV2, pinBuilt.strategyOptions)
       const rows = toSimResult(sim).rows
       const points: [number, number][] = []
       if (rows.length > 0) {
@@ -596,7 +616,7 @@ export default function WhatIfPage() {
       })
     }
     return result
-  }, [pinnedScenarioIds, savedScenariosMirror, baseUnifiedInput, baseline, horizonEngineV2])
+  }, [pinnedScenarioIds, savedScenariosMirror, input, buildInputForEvents, baseline, horizonEngineV2])
 
   // ── Monte Carlo overlay (when toggled on) ─────────────
   const mcResult = useMemo<MonteCarloResult | null>(() => {
@@ -613,22 +633,26 @@ export default function WhatIfPage() {
 
   // ── Impact computation (per-event FIRE delta within the scenario) ──────────────
   const computeImpact = useCallback((eventId: string) => {
-    if (!whatIfUnifiedInput) return null
+    if (!input) return null
 
     const event = events.find(e => e.id === eventId)
     if (!event) return null
 
-    // Simulate WITH this event (all currently-active scenario events)
+    // Simulate WITH this event (all currently-active scenario events) — via de
+    // factory zodat een gekoppeld verkoop-event ook hier liquideert (cashflows +
+    // assetLiquidations samen), en met de return-deltas erop.
     const eventsWithThis = scenarioActiveEvents.some(e => e.id === eventId)
       ? scenarioActiveEvents
       : [...scenarioActiveEvents, event]
-    const cfWith = lifeEventsToCashflows(eventsWithThis)
-    const simWith = toSimResult(runSelectedProjection({ ...whatIfUnifiedInput, cashflows: cfWith }, horizonEngineV2))
+    const builtWith = buildInputForEvents(eventsWithThis)
+    if (!builtWith) return null
+    const simWith = toSimResult(runSelectedProjection({ ...builtWith.input, returnDeltaByAssetType: returnDeltas }, horizonEngineV2, builtWith.strategyOptions))
 
     // Simulate WITHOUT this event
     const eventsWithout = scenarioActiveEvents.filter(e => e.id !== eventId)
-    const cfWithout = lifeEventsToCashflows(eventsWithout)
-    const simWithout = toSimResult(runSelectedProjection({ ...whatIfUnifiedInput, cashflows: cfWithout }, horizonEngineV2))
+    const builtWithout = buildInputForEvents(eventsWithout)
+    if (!builtWithout) return null
+    const simWithout = toSimResult(runSelectedProjection({ ...builtWithout.input, returnDeltaByAssetType: returnDeltas }, horizonEngineV2, builtWithout.strategyOptions))
 
     // Calculate total cost of the event
     const oneTimeCost = Number(event.one_time_cost ?? 0)
@@ -646,7 +670,7 @@ export default function WhatIfPage() {
     }
 
     return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
-  }, [whatIfUnifiedInput, events, scenarioActiveEvents, horizonEngineV2])
+  }, [input, buildInputForEvents, events, scenarioActiveEvents, returnDeltas, horizonEngineV2])
 
   // ── Derived values for display ───────────────────────────
   // (currentAge declared earlier at line ~288 for use in handleLoadScenario.)

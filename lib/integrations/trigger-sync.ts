@@ -66,3 +66,41 @@ export async function triggerAssetSync(
     return { ok: false, error: 'Sync kon niet worden uitgevoerd. Probeer opnieuw.' }
   }
 }
+
+/**
+ * Triggert een sync op één broker-koppeling (Trading 212, …). Apart van
+ * `triggerAssetSync` omdat `AssetConnectionSummary` (nog) geen broker-tak
+ * kent — dit voorkomt dat we de bestaande exchange/wallet-handtekening
+ * aanraken. Parst de respons identiek aan de exchange-tak (ok, lastSyncedAt,
+ * totalEur). Native balance is niet van toepassing op brokers.
+ */
+export async function triggerBrokerSync(
+  connectionId: string,
+): Promise<TriggerSyncResult> {
+  if (!connectionId) {
+    return { ok: false, error: 'Geen koppeling om te synchroniseren.' }
+  }
+
+  try {
+    const res = await fetch(`/api/integrations/brokers/${connectionId}/sync`, {
+      method: 'POST',
+    })
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+
+    if (!res.ok || json?.status === 'error') {
+      const error = typeof json?.error === 'string' ? json.error : 'Synchronisatie mislukt.'
+      return { ok: false, error }
+    }
+
+    return {
+      ok: true,
+      lastSyncedAt:
+        typeof json?.lastSyncedAt === 'string'
+          ? json.lastSyncedAt
+          : new Date().toISOString(),
+      totalEur: typeof json?.totalEur === 'number' ? json.totalEur : undefined,
+    }
+  } catch {
+    return { ok: false, error: 'Sync kon niet worden uitgevoerd. Probeer opnieuw.' }
+  }
+}

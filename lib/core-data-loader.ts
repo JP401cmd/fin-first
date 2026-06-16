@@ -8,9 +8,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { SparklineDataPoint } from '@/components/app/budget-sparkline'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
-import type { Asset } from '@/lib/asset-data'
+import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import { type Debt, computeRenteAflossingsSplit, DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
+import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import type { FireParams } from '@/lib/fire-params'
 import {
   type SavingsRateMethod,
@@ -544,8 +545,8 @@ export const loadCoreData = cache(async function loadCoreData(
   }))
 
   // ── Last 6 months expenses & savings rate (rolling average) ──
-  const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1))
-    .toISOString().split('T')[0]
+  // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde 7 maanden — off-by-one)
+  const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
   const last6MonthsIncome = realIncome12
     .filter(t => t.date >= sixMonthsAgo)
     .reduce((s, t) => s + Number(t.amount), 0)
@@ -720,7 +721,8 @@ export const loadCoreData = cache(async function loadCoreData(
   }
 
   // ── Batch 2: Budget alerts + debt progress + asset valuations + goals + 6m spending ──
-  const sixMonthsAgoForBudgets = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 6, 1)).toISOString().split('T')[0]
+  // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde 7 maanden — off-by-one)
+  const sixMonthsAgoForBudgets = localMonthStartMonthsAgo(now, 5)
   const prevMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().split('T')[0]
   const [
     budgetResult, spendingResult, snapshotResult,
@@ -904,9 +906,13 @@ export const loadCoreData = cache(async function loadCoreData(
 
   // Try net-worth-delta method when still on 'estimate' and snapshots are available
   if (savingsRateMethod === 'estimate' && snapshotResult.data && effectiveMonthlyIncome > 0) {
+    // Verwachte koerswinst op beleggingen — geen sparen, dus afhalen voor een
+    // eerlijker fallback-quote. Gedeelde helper (expected_return is een %, dus /100).
+    const expectedAnnualAppreciation = computeExpectedAnnualAppreciation(assetsResult.data as unknown as Asset[])
     const deltaResult = computeSavingsRateFromNetWorthDelta(
       snapshotResult.data as NetWorthSnapshot[],
       effectiveMonthlyIncome,
+      { expectedAnnualAppreciation },
     )
     if (deltaResult) {
       computedSavingsRate6m = deltaResult.rate

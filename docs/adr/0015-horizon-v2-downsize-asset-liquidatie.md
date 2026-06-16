@@ -62,3 +62,40 @@ In v2 wordt de eigen-huis-**downsize** een **asset-liquidatie binnen het grootbo
 - Een **reverse_mortgage** on_depletion-`no_sale` emit geen event ⇒ de vermogenssamenstelling-grafiek (`applyHousingToComposition`, leest de trigger-leeftijd uitsluitend uit `housingEvent?.target_age`) injecteert niets → **geen fantoom-schaduwschuld** meer.
 
 Herstelt de fideliteit aan de definities van deze ADR (en ADR 0012): verkopen op het eerste jaar dat liquide de buffer raakt, anders niet. Bewaakt door `test/horizon-housing-liquidation.test.ts` / `test/housing-trigger.test.ts`.
+
+## Generieke niet-liquide asset-liquidatie (16 jun 2026)
+
+**Status & scope (bijgewerkt):** dit ADR dekte aanvankelijk uitsluitend het eigen-huis-downsize-pad. Vanaf 16 jun 2026 voedt ook `buildGenericAssetLiquidations` (`lib/horizon-engine/build-input.ts`) dezelfde `assetLiquidations`-array en hetzelfde engine-block 6b. De "status & scope"-beperking "alleen voor v2 + downsize" geldt nog steeds voor het eigen-huis-downsize-pad; het generieke pad is een toevoeging bovenop dat mechanisme.
+
+**Wat is uitgebreid:** elk `life_event` met een `linked_asset_id` dat verwijst naar een **niet-liquide, niet-`eigen_huis`** asset (`vehicle`, `physical`, `other`, `deelneming`, `real_estate` ≠ `eigen_huis`) wordt door `buildGenericAssetLiquidations` omgezet naar een `AssetLiquidation` op `target_age`. De leeftijd wordt afgeleid uit `target_age` als dat veld aanwezig is; anders via `ageAtDate(geboortedatum, target_date)` (M2: leeftijd-inferentie uit datum). Verkoopkosten via `SALES_COSTS_BY_TYPE` (override: `metadata.verkoopkostenPct`); verkoopprijs via `metadata.verkoopprijs` (kalibreert `salePricePct`; ontbrekend → 1.0). Opbrengst belandt in de pot die de `pot_rules.surplus_group` aanwijst via `expandSingleGroupToAssetTypes` (zie ADR 0019).
+
+**Buiten scope (bewust):** `eigen_huis` (eigen downsize-pad via `buildV2DownsizeHousing`), liquide asset-typen, `levensverzekering` en `vordering` (komen als geldstroom binnen).
+
+**Nieuwe FK:** `life_events.linked_asset_id` → `assets(id)` (migratie `20260616020000_add_life_events_linked_asset_id.sql`, al op remote toegepast). `lifeEventsToCashflows` onderdrukt via `skipEventIds` uitsluitend de opbrengst-portie van een als liquidatie afgehandeld event; de `monthly_cost_change` (bv. wegvallend onderhoud) blijft een losse cashflow — geen dubbeltelling.
+
+**What-if-consolidatie (M3/B):** `whatif-page-client.tsx` roept nu `buildHorizonInput` aan via een gedeelde `buildInputForEvents`-factory, zodat de what-if-baseline dezelfde `assetLiquidations` en `skipEventIds` erft als de hoofdgrafiek (SSoT).
+
+**M1:** de huis-downsize-trigger-meetrun (`baseSimInput` in `build-input.ts`) krijgt de generieke liquidaties mee zodat de meetrun hetzelfde liquide beeld heeft als de grafiek.
+
+Bewaakt door `test/horizon-generic-liquidation.test.ts`, `test/horizon-housing-liquidation.test.ts` (M1), `test/whatif-baseline-consistency.test.ts` (B/M3).
+
+## /overzicht-netto-vermogensgrafiek: netto-vermogen-grondslag via `simNetWorthRows` (jun 2026)
+
+**Aanleiding:** de mini-netto-vermogensgrafiek op `/overzicht` toonde de FIRE-portefeuille (`endPortfolio`) als projectielijn. Dat veroorzaakte een sprong bij het begin: de FIRE-pot is gefilterd (eigen huis eruit bij `exclude_from_fire` / v1-downsize), waardoor de lijn lager startte dan het Vandaag-punt (volledig netto vermogen incl. huis). Oorzaak is het omgekeerde van de downsize-sprong die dit ADR beschrijft: niet de verkoop die netto vermogen laat springen, maar de beginwaarde die de huis-overwaarde mist.
+
+**Besluit:** nieuw afgeleide reeks `simNetWorthRows` via `buildSimNetWorthRows` (`lib/horizon-engine/networth-projection.ts`). Per jaar:
+
+```
+netWorth = endPortfolio + houseEquity(age) + reconcileOffset
+```
+
+- `houseEquity(age)` = `max(0, projectEigenHuisValuesAt(...).currentValue − projectMortgageStateAt(...).balance)` — uitsluitend actief bij `exclude_from_fire` of v1-downsize mét een eigen huis; 0 bij `include_full` / `reverse_mortgage` / v2-downsize (huis zit al in `endPortfolio`). Bij v1-downsize: 0 vanaf de verkoopleeftijd (opbrengst zit dan al in `endPortfolio`).
+- `reconcileOffset` = `currentNetWorth − (endPortfolio[0] + houseEquity[0])`: verankert jaar 0 op de Vandaag-grondslag (volledig netto vermogen incl. huis), zodat de lijn naadloos aansluit op de historiegrafiek.
+
+**FIRE-grootheden ongewijzigd:** `requiredFirePortfolio`, `fireAge` en `freedomPct` blijven op de FIRE-eligible (liquide) grondslag — dit ADR of de nieuwe reeks raken die berekeningen niet.
+
+**Marker op de grafiek:** de eindmarker (`age = fireAge`) geeft de hoogte van het geprojecteerd netto vermogen op de vrijheidsleeftijd. Het liquide vrijheidsdoel (`simRequiredPortfolio`) wordt apart gelabeld als referentielijn — niet als hoogte op de netto-vermogen-as.
+
+**Geen tweede engine-run, geen tweede WOZ-formule:** `endPortfolio` komt 1:1 uit de engine, huiswaarde-groei uit de canonieke `projectEigenHuisValuesAt`, hypotheek-afbouw uit `projectMortgageStateAt` — dezelfde helpers die ook `huis-strategie-trigger` gebruikt. Geen nieuwe aannames.
+
+**Bestanden:** `lib/horizon-engine/networth-projection.ts` (nieuw), `lib/dashboard-data-loader.ts` (levert `simNetWorthRows` in de `DashboardData`-bundel), `components/overview/mini-networth-chart.tsx` (consumeert). Bewaakt door de berekeningen-catalogus (`lib/architecture/calculations.ts`, calc-id `sim-netto-vermogen-projectie`) en de `calculations.test.ts`-suite.

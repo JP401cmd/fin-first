@@ -102,6 +102,12 @@ export function CashOverview({
   const [hasOtherMonthTx, setHasOtherMonthTx] = useState(false)
   const [latestTxDate, setLatestTxDate] = useState<string | null>(null)
 
+  // Of er de afgelopen 90 dagen enige transactie-activiteit was (gelogd of
+  // binnengekomen) — los van de geselecteerde maand. Bepaalt of het hele
+  // geldstroom-blok getoond wordt of vervangen door een lege-staat
+  // call-to-action. null = nog aan het laden (toon dan het normale blok).
+  const [hasRecentActivity, setHasRecentActivity] = useState<boolean | null>(null)
+
   // Kassabon state
   const [showIncomeReceipt, setShowIncomeReceipt] = useState(false)
   const [showExpenseReceipt, setShowExpenseReceipt] = useState(false)
@@ -150,23 +156,25 @@ export function CashOverview({
 
   const loadAccounts = useCallback(async () => {
     const supabase = createClient()
-    // We laden alleen rekeningen waarvan het gekoppelde cash-asset
-    // `has_budget_tracking=true` heeft. Dit zijn de rekeningen die in de
-    // geldstroom-secties (inkomsten/uitgaven, totaal liquiditeit) horen
-    // mee te tellen — handmatig ingevoerde cash-assets zonder
-    // bank_accounts-rij vallen automatisch buiten de query.
+    // Alle ACTIEVE cash-rekeningen voeden de geldstroom. Transacties hangen via
+    // `account_id` aan `bank_accounts` — niet aan assets — dus de weergave op de
+    // cashflow-pagina mag NIET afhangen van `has_budget_tracking` (een veld van
+    // het optioneel gekoppelde cash-asset). Een ongekoppelde of niet-getrackte
+    // rekening liet anders ál zijn transacties volledig verdwijnen uit dit
+    // overzicht, terwijl cash-account-view ze wél toont (alle actieve
+    // rekeningen). RLS begrenst dit tot EIGEN rekeningen (bank_accounts is
+    // own-row: auth.uid()=user_id, géén household-verbreding zoals bij
+    // assets/budgets); in 'personal' versmalt een extra ownership-filter verder
+    // tot je niet-gedeelde rekeningen. Handmatige cash-assets zonder
+    // bank_accounts-rij vallen sowieso buiten deze query.
     let q = supabase
       .from('bank_accounts')
-      .select('*, linked_asset:assets!bank_accounts_linked_asset_id_fkey(has_budget_tracking)')
+      .select('*')
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
     if (perspective === 'personal') q = q.eq('ownership', 'personal')
     const { data } = await q
-    if (data) {
-      const filtered = (data as Array<Account & { linked_asset?: { has_budget_tracking: boolean | null } | null }>)
-        .filter((a) => a.linked_asset?.has_budget_tracking === true)
-      setAccounts(filtered as Account[])
-    }
+    if (data) setAccounts(data as Account[])
   }, [perspective])
 
   // Laadt ALLE cash-rekeningen (bank-gekoppeld én handmatige cash-assets) —
@@ -391,6 +399,32 @@ export function CashOverview({
     }
     checkOtherMonths()
   }, [transactions.length, perspective])
+
+  // Globale check (los van de geselecteerde maand): is er in de laatste 90
+  // dagen enige transactie gelogd of binnengekomen? Zelfde perspectief-scoping
+  // als de andere-maand-check hierboven. Bepaalt de lege-staat van het
+  // geldstroom-blok.
+  useEffect(() => {
+    let cancelled = false
+    const checkRecentActivity = async () => {
+      const supabase = createClient()
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 90)
+      // Lokale YYYY-MM-DD grens (NIET via toISOString: dat schuift in UTC+
+      // tijdzones een dag terug).
+      const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
+      let query = supabase
+        .from('transactions')
+        .select('id')
+        .gte('date', cutoffStr)
+        .limit(1)
+      if (perspective === 'personal') query = query.eq('ownership', 'personal')
+      const { data } = await query
+      if (!cancelled) setHasRecentActivity((data?.length ?? 0) > 0)
+    }
+    checkRecentActivity()
+    return () => { cancelled = true }
+  }, [perspective])
 
   function goToLatestTransaction() {
     if (!latestTxDate) return
@@ -805,6 +839,23 @@ export function CashOverview({
 
       {/* === 2. Geldstroom — Sankey + banner-style figures-strip === */}
       <section className="mt-5 sm:mt-8">
+        {hasRecentActivity === false ? (
+          // Geen transactie-activiteit in de laatste 90 dagen → vervang het
+          // hele geldstroom-blok (maand-banner + KPI's + grafiek) door een
+          // lege-staat call-to-action.
+          <div
+            className="rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-10 text-center"
+            data-testid="cashflow-empty-90d"
+          >
+            <p
+              className="text-sm text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+            >
+              Voeg transacties toe om je cashflow te zien.
+            </p>
+          </div>
+        ) : (
+          <>
         {/* Editorial banner: maand-selector links + Kicker rechts */}
         <div className="border-t border-b border-[var(--ink)]">
           {/* Top-rij: maand-selector + label */}
@@ -999,6 +1050,8 @@ export function CashOverview({
               </button>
             )}
           </div>
+        )}
+          </>
         )}
       </section>
 

@@ -52,7 +52,6 @@ import {
   Home, Lightbulb,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { HousingStrategyNudgeSheet } from '@/components/app/horizon/housing-strategy-nudge-sheet'
 import {
   HOUSING_STRATEGY_LABELS,
   isHousingStrategyEvent,
@@ -154,6 +153,7 @@ import {
 } from '@/lib/chart-tips'
 import { ToekomstOverlay, OVERLAY_ICONS, type OverlayBalloonDef } from '@/components/app/horizon/toekomst-overlay'
 import { ToekomstWelcome } from '@/components/app/horizon/toekomst-welcome'
+import { ToekomstExitNotice } from '@/components/app/horizon/toekomst-exit-notice'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
@@ -234,24 +234,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [healthScoreInput, setHealthScoreInput] = useState<HealthScoreInput>(initialData.healthScoreInput)
   const [budgetingActive] = useState(initialData.budgetingActive)
 
-  // Eigen-woning-strategie nudge: toon eenmaal bij eerste Horizon-bezoek
-  // voor users met een eigen woning + include_full + niet eerder dismissed.
-  // Server bevestigt dismiss via PUT /api/housing-strategy { mark_dismissed }.
-  const shouldShowHousingNudge =
-    initialData.housingContext.hasEigenHuis &&
-    initialData.housingStrategy.mode === 'include_full' &&
-    initialData.housingStrategyDismissedAt === null
-  const [housingNudgeOpen, setHousingNudgeOpen] = useState(shouldShowHousingNudge)
-  function dismissHousingNudge() {
-    setHousingNudgeOpen(false)
-    // Fire-and-forget — UX heeft geen waarde bij failure (worst case: sheet
-    // verschijnt nog een keer bij volgende bezoek).
-    fetch('/api/housing-strategy', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ mark_dismissed: true }),
-    }).catch(() => {})
-  }
   const [avgIncome6m, setAvgIncome6m] = useState<number | null>(initialData.avgIncome6m)
   const [avgExpenses6m, setAvgExpenses6m] = useState<number | null>(initialData.avgExpenses6m)
   const [resilienceSnapshots, setResilienceSnapshots] = useState<SnapshotForTrend[]>(initialData.resilienceSnapshots)
@@ -316,6 +298,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     setOverlayVisible(val)
     try { localStorage.setItem('horizon_overlay_visible', String(val)) } catch { /* noop */ }
   }, [])
+  // Exit-notice: rustige, dismissible melding bij het verlaten van het tip-/
+  // bubbel-overlay-scherm. `exitNoticeKey` is een nonce die de notice opnieuw
+  // laat mounten (en de auto-dismiss-timer reset) bij elke echte exit; null =
+  // verborgen. Alleen de échte user-exits triggeren dit via handleOverlayExit().
+  const [exitNoticeKey, setExitNoticeKey] = useState<number | null>(null)
+  const handleOverlayExit = useCallback(() => {
+    persistOverlayVisible(false)
+    setExitNoticeKey(Date.now())
+  }, [persistOverlayVisible])
   const persistNaturalMilestones = useCallback((val: boolean) => {
     setShowNaturalMilestones(val)
     try { localStorage.setItem('horizon_show_natural_milestones', String(val)) } catch { /* noop */ }
@@ -2652,11 +2643,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // voorkeuren zijn bereikbaar via de inline-editors (uitgaven-pane,
   // strategie-modal, event-pane) — geapunteerd door de ToekomstOverlay.
 
-  // ── STEP 4: ballon-definities, gewired aan de bestaande in-page editors ──
-  // Elke ballon opent een editor zodat de grafiek live meebeweegt; alleen
-  // 'echt inkomen' navigeert (naar /mijn/profiel, waar het inkomen woont).
-  // setState-setters (setEventPaneEditingId etc.) zijn stabiel per React-garantie
-  // en worden bewust weggelaten uit de dep-array.
+  // ── STEP 4: ballon-definities — elke CTA verlaat de grafiekpagina ──
+  // Alle ballonnen navigeren naar de pagina waar de betreffende gegevens wonen
+  // (router.push). Waar het invoeren via een modal/pane gaat, opent die op de
+  // doelpagina via een URL-deeplink (zelfde patroon als ?strategie=).
   const toekomstOverlayBalloons: OverlayBalloonDef[] = useMemo(() => {
     // Huidige situatie van de gebruiker — voor de "nu geschat/ingevuld op €X"-copy.
     // Bedragen via formatMaskedCurrency zodat privacy-modus ze maskeert.
@@ -2720,11 +2710,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         cta: 'Gebeurtenis toevoegen',
         row: 'top',
         emphasis: 'accumulation',
-        onActivate: () => {
-          setEventPaneEditingId(null)
-          setEventPaneMode('catalog')
-          setEventPaneOpen(true)
-        },
+        onActivate: () => router.push('/toekomst/gebeurtenissen?nieuw=1'),
       },
       // ── Onderste rij — je strategie LATER (de afbouw + einddoel) ──
       {
@@ -2755,7 +2741,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         cta: 'Eindstrategie kiezen',
         row: 'bottom',
         emphasis: 'fire',
-        onActivate: () => router.push('/toekomst/voorkeuren'),
+        onActivate: () => router.push('/toekomst/voorkeuren?regel=eindstrategie'),
       },
       {
         id: 'woning',
@@ -2777,7 +2763,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         cta: 'Uitgaven aanpassen',
         row: 'bottom',
         emphasis: 'withdrawal',
-        onActivate: () => setUitgavenPaneOpen(true),
+        onActivate: () => router.push('/toekomst/uitgaven-na-pensioen'),
       },
       {
         id: 'onttrekking',
@@ -2787,7 +2773,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         cta: 'Onttrekking instellen',
         row: 'bottom',
         emphasis: 'withdrawal',
-        onActivate: () => router.push('/toekomst/voorkeuren'),
+        onActivate: () => router.push('/toekomst/voorkeuren?regel=onttrekkingsstrategie'),
       },
     ]
   }, [router, masked, effectiveInput])
@@ -2800,7 +2786,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           {/* STEP 3b: overlay-toggle naast de "i" — wijst-tips aan/uit. */}
           <button
             type="button"
-            onClick={() => persistOverlayVisible(!overlayVisible)}
+            onClick={() => { if (overlayVisible) handleOverlayExit(); else persistOverlayVisible(true) }}
             aria-pressed={overlayVisible}
             aria-label={overlayVisible ? 'Aanscherp-tips verbergen' : 'Aanscherp-tips tonen'}
             title={overlayVisible ? 'Tips verbergen' : 'Tips tonen'}
@@ -2840,6 +2826,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           ?
         </h1>
       </header>
+
+      {/* Exit-notice: verschijnt bovenaan zodra de gebruiker de tip-overlay
+          verlaat (Tips-toggle uit, of ✕/Escape/achtergrond op de overlay).
+          `key` reset de mount + auto-dismiss-timer bij elke nieuwe exit. */}
+      {exitNoticeKey !== null && (
+        <ToekomstExitNotice
+          key={exitNoticeKey}
+          onClose={() => setExitNoticeKey(null)}
+        />
+      )}
 
       {/* === 1. Hero + Simulatie (één gecombineerd blok) === */}
       <section data-testid="horizon-hero" className={`card-editorial overflow-hidden ${overlayVisible && chartMode === 'vermogenspad' ? 'no-hover-lift' : ''}`}>
@@ -3528,8 +3524,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 visible={!welcomeDismissed}
                 netWorth={effectiveNetWorth}
                 dailyExpenseRate={(effectiveInput?.monthlyExpenses ?? 0) > 0 ? dailyExpenseRate(effectiveInput!.monthlyExpenses) : 0}
+                freedomAge={hasPerspectiveHero ? perspectiveHero!.fireAge : isPensioenMode ? userAowAge.fractional : simResult?.fireAgeFractional ?? fire.fireAge}
+                isPensioen={isPensioenMode}
                 masked={masked}
+                // Stil sluiten (✕/Escape/achtergrond): alleen wegklikken, de
+                // tip-overlay NIET openen.
                 onDismiss={() => setWelcomeDismissed(true)}
+                // Primaire CTA "Bekijk je grafiek": wegklikken én de uitgelichte
+                // grafiek met tip-bubbels tonen.
+                onViewChart={() => { setWelcomeDismissed(true); persistOverlayVisible(true) }}
               />
 
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
@@ -3542,7 +3545,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         visible={overlayVisible && chartMode === 'vermogenspad'}
                         onEmphasisChange={setOverlayEmphasis}
                         balloons={toekomstOverlayBalloons}
-                        onClose={() => persistOverlayVisible(false)}
+                        summary={{
+                          // Netto vermogen: zelfde canonieke afleiding als ToekomstWelcome.
+                          netWorth: effectiveNetWorth,
+                          // Vrijheidsleeftijd: EXACT dezelfde bron + precedentie als de
+                          // hero-KPI "vrijheidsleeftijd" (single-source, niet herberekend).
+                          freedomAge: hasPerspectiveHero
+                            ? perspectiveHero!.fireAge
+                            : isPensioenMode
+                              ? userAowAge.fractional
+                              : simResult?.fireAgeFractional ?? fire.fireAge,
+                          masked,
+                          isPensioen: isPensioenMode,
+                        }}
+                        onClose={handleOverlayExit}
                       >
                       <div className="relative">
                         {/* Vermogenspad (SimChart) */}
@@ -7018,12 +7034,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           const maxA = rows[rows.length - 1].age
           setSelectedYearAge(Math.max(minA, Math.min(newAge, maxA)))
         }}
-      />
-
-      {/* Eigen-woning-strategie nudge — verschijnt eenmaal bij eerste bezoek. */}
-      <HousingStrategyNudgeSheet
-        open={housingNudgeOpen}
-        onDismiss={dismissHousingNudge}
       />
     </div>
   )

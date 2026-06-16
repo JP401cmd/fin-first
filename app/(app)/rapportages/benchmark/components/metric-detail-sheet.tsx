@@ -6,7 +6,7 @@
  * metric komt via props.
  *
  * Gebruikt de gedeelde `BottomSheet` (rendert boven de zwevende nav-pill,
- * z-[70]). Toont: jouw waarde, de mediaan (doelgroep), het NL-gemiddeld
+ * z-[70]). Toont: jouw waarde, de referentie (doelgroep), het NL-gemiddeld
  * (indien aanwezig), de vrijheidstijd-duiding, de tier met betekenis, de
  * volledige uitleg en de bron.
  *
@@ -24,7 +24,10 @@ export interface MetricDetailSheetProps {
 }
 
 const TIER_MEANING: Record<BenchmarkMetric['tier'], { label: string; meaning: string }> = {
-  measured: { label: 'CBS-cijfer', meaning: 'gemeten CBS-cijfer' },
+  measured: {
+    label: 'Geraamde referentie (CBS-basis)',
+    meaning: 'CBS-leeftijdscijfer, per huishoudtype geraamd via equivalentiefactoren',
+  },
   modelled: {
     label: 'Gemodelleerd',
     meaning: 'gemodelleerde peer via dezelfde rekenmotoren',
@@ -51,6 +54,16 @@ function DetailRow({ label, value, accent }: { label: string; value: string; acc
 
 export function MetricDetailSheet({ metric, open, onClose, formatValue }: MetricDetailSheetProps) {
   const tier = metric ? TIER_MEANING[metric.tier] : null
+  // Eerlijk label per metric: vermogen is een (geraamde) CBS-mediaan; inkomen is een
+  // gestandaardiseerd gemiddelde × equivalentiefactor (géén mediaan); gemodelleerde
+  // maten (gezondheid/vrijheidsleeftijd/spaarquote) zijn een typische peer.
+  const referenceRowLabel = !metric
+    ? ''
+    : metric.tier === 'modelled'
+      ? 'Typische peer'
+      : metric.key === 'net_worth'
+        ? 'Mediaan (doelgroep)'
+        : 'Referentie (doelgroep)'
 
   return (
     <BottomSheet open={open} onClose={onClose} title={metric?.label ?? 'Toelichting'} size="md">
@@ -60,7 +73,7 @@ export function MetricDetailSheet({ metric, open, onClose, formatValue }: Metric
           <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--subtle)]/40 px-4 py-1">
             <DetailRow label="Jouw waarde" value={formatValue(metric.userValue, metric.unit)} accent />
             <DetailRow
-              label="Mediaan (doelgroep)"
+              label={referenceRowLabel}
               value={formatValue(metric.referenceValue, metric.unit)}
             />
             {metric.referenceMean != null && (

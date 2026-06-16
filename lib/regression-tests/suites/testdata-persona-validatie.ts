@@ -9,7 +9,7 @@ import {
   PERSONAS, PERSONA_KEYS,
   type PersonaKey, type PersonaData,
 } from '@/lib/test-personas'
-import { deleteAllUserData, seedPersonaData } from '@/lib/seed-persona'
+import { deleteAllUserData, seedPersonaData, buildSeedAssetRow } from '@/lib/seed-persona'
 
 const CAT = 'data.testdata'
 
@@ -118,13 +118,13 @@ const tests: TestCase[] = [
 
   {
     id: 'tp-all-personas-have-profile',
-    name: 'Alle 4 personas: profiel compleet',
+    name: 'Alle 5 personas: profiel compleet',
     category: CAT,
     description: 'Every persona has required profile fields',
     priority: 'critical',
     estimatedDurationMs: 300,
     fn() {
-      assertEqual(PERSONA_KEYS.length, 4, '4 personas')
+      assertEqual(PERSONA_KEYS.length, 5, '5 personas')
       for (const key of PERSONA_KEYS) {
         const persona = PERSONAS[key]
         assertNotNull(persona.profile.full_name, `${key}: full_name`)
@@ -413,6 +413,36 @@ const tests: TestCase[] = [
     },
   },
 
+  {
+    id: 'tp-seed-asset-row-carries-sale-config',
+    name: 'Seed: sale_config wordt meegeseed naar de assets-rij',
+    category: CAT,
+    description: 'Regressie: buildSeedAssetRow kopieert sale_config (anders valt verkoop terug op default wanneer_nodig). Marijke-stacaravan = vast_moment/73.',
+    priority: 'critical',
+    estimatedDurationMs: 200,
+    fn() {
+      // Borg via de ECHTE seed-transform (niet een her-implementatie): een
+      // persona-asset MÉT sale_config moet dat veld in de in-te-voegen rij dragen.
+      const marijke = p('marijke')
+      const stacaravan = marijke.assets.find((a) => a.name === 'Stacaravan Drenthe')
+      assertDefined(stacaravan, 'Marijke heeft Stacaravan Drenthe')
+      assertDefined(stacaravan!.sale_config, 'persona-asset draagt sale_config')
+
+      const row = buildSeedAssetRow(stacaravan!, 'user-test', 2) as { sale_config: unknown }
+      assertNotNull(row.sale_config, 'geseede rij draagt sale_config (niet null)')
+      const cfg = row.sale_config as { stand?: string; triggerAge?: number }
+      assertEqual(cfg.stand, 'vast_moment', 'sale_config.stand = vast_moment')
+      assertEqual(cfg.triggerAge, 73, 'sale_config.triggerAge = 73')
+
+      // Tegenproef: een asset ZONDER sale_config seedt expliciet null (kolom blijft
+      // aanwezig voor PostgREST bulk-insert consistentie).
+      const zonder = marijke.assets.find((a) => a.sale_config === undefined)
+      assertDefined(zonder, 'Marijke heeft minstens één asset zonder sale_config')
+      const rowZonder = buildSeedAssetRow(zonder!, 'user-test', 0) as { sale_config: unknown }
+      assertEqual(rowZonder.sale_config, null, 'asset zonder config → sale_config = null')
+    },
+  },
+
   // ── Step 5: deleteAllUserData structure ─────────────────────────────
 
   {
@@ -668,9 +698,12 @@ const tests: TestCase[] = [
           }
         }
 
-        // Every transaction should reference a valid budget slug
+        // Every transaction should reference a valid budget slug.
+        // '__none__' is de sentinel voor bewust ongecategoriseerde transacties
+        // (bv. "PIN BETALING ONBEKEND") — geen echte budget-slug, dus overslaan.
+        // Zie ook lib/counterparty-analysis.ts dat dezelfde sentinel gebruikt.
         for (const tx of persona.transactions) {
-          if (tx.budgetSlug) {
+          if (tx.budgetSlug && tx.budgetSlug !== '__none__') {
             assert(
               validSlugs.has(tx.budgetSlug),
               `${key}: tx "${tx.description}" references unknown slug "${tx.budgetSlug}"`,
@@ -917,7 +950,7 @@ export function register() {
   registerCategory({
     id: CAT,
     label: 'Data — Testdata',
-    description: 'Persona seed validatie: 4 personas, financiële consistentie, metadata constraints, idempotentie, gezondheids score',
+    description: 'Persona seed validatie: 5 personas, financiële consistentie, metadata constraints, idempotentie, gezondheids score',
     icon: 'Users',
     testCount: 0,
   })

@@ -185,6 +185,13 @@ export interface LifeEvent {
   is_active: boolean
   sort_order: number
   is_indexed: boolean
+  /**
+   * Harde koppeling van een verkoop-life-event naar het DB-asset dat het
+   * liquideert (migratie 20260616000000). Stuurt de generieke niet-liquide
+   * asset-liquidatie in de v2-grootboek-engine aan (zie
+   * `buildGenericAssetLiquidations` in lib/horizon-engine/build-input.ts).
+   */
+  linked_asset_id?: string | null
   /** Event-type-specific details (stored as JSONB in life_events table) */
   metadata?: Record<string, unknown>
 }

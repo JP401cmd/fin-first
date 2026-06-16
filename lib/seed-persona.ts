@@ -7,7 +7,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { PersonaData } from '@/lib/test-personas'
+import type { PersonaData, PersonaAsset } from '@/lib/test-personas'
 import {
   blindIndex,
   encryptField,
@@ -29,6 +29,45 @@ function monthsAgoDate(months: number): string {
   d.setDate(1) // Set day to 1st BEFORE changing month to avoid overflow (e.g. Mar 31 → Feb 31 → Mar 3)
   d.setMonth(d.getMonth() - months)
   return d.toISOString().split('T')[0]
+}
+
+// ── Helper: persona-asset → DB insert-rij ─────────────────────
+
+/**
+ * Transformeer één `PersonaAsset` naar de `assets`-insert-rij. Pure functie zodat
+ * de seed-laag en de regressietest exact dezelfde mapping delen (geen
+ * her-implementatie die kan wegdriften). Borgt o.a. dat `sale_config` — de SSoT
+ * voor verkoop/liquidatie — meegeseed wordt (anders valt een geconfigureerde
+ * asset bij resolve terug op de default `wanneer_nodig`).
+ */
+export function buildSeedAssetRow(a: PersonaAsset, userId: string, sortOrder: number) {
+  return {
+    user_id: userId,
+    name: a.name,
+    asset_type: a.asset_type,
+    current_value: a.current_value,
+    purchase_value: a.purchase_value,
+    purchase_date: a.purchase_date,
+    expected_return: a.expected_return,
+    monthly_contribution: a.monthly_contribution,
+    institution: a.institution || null,
+    is_active: true,
+    sort_order: sortOrder,
+    subtype: a.subtype || null,
+    risk_profile: a.risk_profile || null,
+    tax_benefit: a.tax_benefit ?? null,
+    is_liquid: a.is_liquid ?? null,
+    lock_end_date: a.lock_end_date || null,
+    ticker_symbol: a.ticker_symbol || null,
+    rental_income: a.rental_income ?? null,
+    woz_value: a.woz_value ?? null,
+    retirement_provider_type: a.retirement_provider_type || null,
+    depreciation_rate: a.depreciation_rate ?? null,
+    address_postcode: a.address_postcode || null,
+    address_house_number: a.address_house_number || null,
+    has_holdings_tracking: a.has_holdings_tracking ?? false,
+    sale_config: a.sale_config ?? null,
+  }
 }
 
 // ── Helper: delete from table ─────────────────────────────────
@@ -327,32 +366,7 @@ export async function seedPersonaData(
     linked_asset_id: cashAssetIds[i] ?? null,
   }))
 
-  const assetRows = persona.assets.map((a, i) => ({
-    user_id: userId,
-    name: a.name,
-    asset_type: a.asset_type,
-    current_value: a.current_value,
-    purchase_value: a.purchase_value,
-    purchase_date: a.purchase_date,
-    expected_return: a.expected_return,
-    monthly_contribution: a.monthly_contribution,
-    institution: a.institution || null,
-    is_active: true,
-    sort_order: i,
-    subtype: a.subtype || null,
-    risk_profile: a.risk_profile || null,
-    tax_benefit: a.tax_benefit ?? null,
-    is_liquid: a.is_liquid ?? null,
-    lock_end_date: a.lock_end_date || null,
-    ticker_symbol: a.ticker_symbol || null,
-    rental_income: a.rental_income ?? null,
-    woz_value: a.woz_value ?? null,
-    retirement_provider_type: a.retirement_provider_type || null,
-    depreciation_rate: a.depreciation_rate ?? null,
-    address_postcode: a.address_postcode || null,
-    address_house_number: a.address_house_number || null,
-    has_holdings_tracking: a.has_holdings_tracking ?? false,
-  }))
+  const assetRows = persona.assets.map((a, i) => buildSeedAssetRow(a, userId, i))
 
   const goalRows = persona.goals.map((g, i) => ({
     user_id: userId,
@@ -426,6 +440,29 @@ export async function seedPersonaData(
     for (let i = 0; i < insertedAssets.length; i++) {
       assetNameToId[persona.assets[i].name] = insertedAssets[i].id
     }
+  }
+
+  // Link verkoop-life-events to the asset they liquidate via linked_asset_id.
+  // Positionele koppeling: eventsResult bewaart de insert-volgorde van
+  // persona.life_events. Spiegelt de hypotheek→asset-koppeling hierboven, zodat de
+  // v2-grootboek-engine het juiste asset uit het grootboek liquideert.
+  const insertedEvents = eventsResult.data
+  if (insertedEvents) {
+    const eventLinkPromises = []
+    for (let i = 0; i < persona.life_events.length; i++) {
+      const eventDef = persona.life_events[i]
+      const assetId = eventDef.linked_asset_name ? assetNameToId[eventDef.linked_asset_name] : undefined
+      if (assetId && insertedEvents[i]) {
+        eventLinkPromises.push(
+          supabase
+            .from('life_events')
+            .update({ linked_asset_id: assetId })
+            .eq('id', insertedEvents[i].id)
+            .then(),
+        )
+      }
+    }
+    if (eventLinkPromises.length > 0) await Promise.all(eventLinkPromises)
   }
 
   // ── Phase 2: Dependent inserts (parallel where possible) ────

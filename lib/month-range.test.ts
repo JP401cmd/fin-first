@@ -55,6 +55,33 @@ describe('localMonthStartMonthsAgo — N maanden terug, eerste dag (tijdzone-vei
   it('0 maanden terug = huidige maandstart', () => {
     expect(localMonthStartMonthsAgo(new Date(2025, 8, 17), 0)).toBe('2025-09-01')
   })
+
+  describe('6-kalendermaands-venster (savingsRate6m) — 5 maanden terug, incl. huidige maand', () => {
+    it('juni 2026: 5 maanden terug → 2026-01-01 (Jan..Jun = 6 maanden, NIET 7)', () => {
+      // Het savingsRate6m-venster moet exact de laatste 6 maand-slots dekken
+      // die de kassabon toont (monthlyIncomeExpenseSeries.slice(-6) = Jan..Jun
+      // voor now=juni). 5 maanden terug vanaf 15 juni 2026 = 1 januari 2026.
+      expect(localMonthStartMonthsAgo(new Date(2026, 5, 15), 5)).toBe('2026-01-01')
+    })
+
+    it('jaarwissel: februari 2026, 5 maanden terug → 2025-09-01', () => {
+      // Sep, Okt, Nov, Dec, Jan, Feb = 6 maanden.
+      expect(localMonthStartMonthsAgo(new Date(2026, 1, 15), 5)).toBe('2025-09-01')
+    })
+
+    it('REGRESSIE off-by-one: helper(−5) wijkt af van het oude inline −6-patroon én is correct', () => {
+      // Het oude loader-patroon `new Date(Date.UTC(y, m - 6, 1)).toISOString()`
+      // gaf voor now=juni 2026 de ondergrens 2025-12-01 → Dec..Jun = 7 maanden
+      // (vandaar ~54% in de kassabon vs ~50% canoniek). Dit is DE bewijs-assertie:
+      // de oude expressie levert de 7-maands-start, de helper de 6-maands-start.
+      const oudeInlineWaarde = new Date(Date.UTC(2026, 5 - 6, 1)).toISOString().split('T')[0]
+      expect(oudeInlineWaarde).toBe('2025-12-01') // 7-maands venster (de bug)
+
+      const nieuweHelperWaarde = localMonthStartMonthsAgo(new Date(2026, 5, 15), 5)
+      expect(nieuweHelperWaarde).not.toBe(oudeInlineWaarde) // off-by-one bewezen
+      expect(nieuweHelperWaarde).toBe('2026-01-01') // 6-maands venster (correct)
+    })
+  })
 })
 
 describe('localMonthEnd — laatste dag van de maand als string (tijdzone-veilig)', () => {

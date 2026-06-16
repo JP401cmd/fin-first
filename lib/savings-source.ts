@@ -6,9 +6,13 @@
  *
  *   - inkomen     = handmatig ? net_monthly_income × 12 : extrapolated jaarinkomen
  *   - spaarquote  = uitgaven-handmatig
- *                     ? (inkomen − handmatige uitgaven) / inkomen
+ *                     ? (inkomen − (handmatige uitgaven − spaarbudget) + aflossing) / inkomen
  *                     : savingsRate6m  (incl. spaarbudgetten + schuldaflossing)
  *   - baseAnnualSavings = inkomen × spaarquote%
+ *
+ * Beide paden volgen dus dezelfde definitie (spaarbudgetten + aflossing tellen als
+ * sparen). Op het handmatige pad zijn die correcties optioneel (default 0) en
+ * geldt de aanname dat het handmatige uitgavenbedrag de VOLLEDIGE uitstroom is.
  *
  * Door precies dezelfde keuzeregel te gebruiken kan de prognose nooit
  * divergeren van wat de gebruiker op de cashflow-pagina ziet.
@@ -28,6 +32,18 @@ export interface SavingsSourceInput {
   estimatedMonthlyExpenses: number
   /** Canonieke 6-maands spaarquote (%) incl. spaarbudgetten + aflossing-correctie. */
   savingsRate6m: number
+  /**
+   * Maandelijkse schuldaflossing die als sparen telt (computeDebtAflossingMonthly).
+   * Optioneel; default 0. Wordt op het HANDMATIGE pad bij het spaardeel opgeteld,
+   * zodat dat pad dezelfde definitie volgt als het transactie-pad (savingsRate6m).
+   */
+  monthlyDebtAflossing?: number
+  /**
+   * Maandelijkse storting op spaarbudgetten (savings-type budgetten).
+   * Optioneel; default 0. Wordt op het HANDMATIGE pad van de uitgaven afgetrokken
+   * (telt als sparen, niet als uitgave), symmetrisch met het transactie-pad.
+   */
+  monthlySavingsContribution?: number
 }
 
 export interface SavingsSource {
@@ -81,10 +97,19 @@ export function resolveSavingsSource(input: SavingsSourceInput): SavingsSource {
   const effectiveMonthlyIncome = effectiveAnnualIncome / 12
 
   const expensesManual = input.expensesSource === 'manual'
+  // Handmatig pad volgt dezelfde definitie als het transactie-pad: spaarbudgetten
+  // van de uitgaven af, schuldaflossing erbij. Aanname: het handmatige
+  // estimated_monthly_expenses is de VOLLEDIGE maandelijkse uitstroom (incl.
+  // hypotheeklast en spaarstortingen) — de cashflow-UI maakt dat expliciet.
+  // Met defaults 0 valt dit terug op de oude (inkomen − uitgaven)/inkomen.
+  const monthlyAflossing = input.monthlyDebtAflossing ?? 0
+  const monthlySavingsContribution = input.monthlySavingsContribution ?? 0
   const effectiveSavingsRatePct = expensesManual
-    ? (effectiveMonthlyIncome > 0
-        ? ((effectiveMonthlyIncome - input.estimatedMonthlyExpenses) / effectiveMonthlyIncome) * 100
-        : 0)
+    ? savingsRateFromAggregates(
+        effectiveMonthlyIncome,
+        input.estimatedMonthlyExpenses - monthlySavingsContribution,
+        monthlyAflossing,
+      )
     : input.savingsRate6m
 
   const baseAnnualSavings = effectiveAnnualIncome * (effectiveSavingsRatePct / 100)

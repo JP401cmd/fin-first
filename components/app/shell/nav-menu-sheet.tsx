@@ -21,7 +21,9 @@ const statusDotClass: Record<LeverStatus, string> = {
   green: 'bg-emerald-500',
   amber: 'bg-amber-500',
   red: 'bg-red-500',
-  neutral: 'bg-stone-300',
+  // green/amber/red = stoplicht-semantiek (bewust eigen systeem); neutral =
+  // "geen meting" → neutrale ink-token i.p.v. een module-/stone-kleur.
+  neutral: 'bg-[var(--ink-4)]',
 }
 
 const statusTitle: Record<LeverStatus, string> = {
@@ -52,7 +54,7 @@ const colorClasses: Record<NavColor, { active: string; idle: string; icon: strin
   amber:  { active: 'bg-kern-50 text-kern-900 border-kern-300',     idle: 'hover:bg-kern-50/40',     icon: 'text-kern-700',    subActive: 'bg-kern-100 text-kern-900',    subIdle: 'hover:bg-kern-50/40 text-[var(--ink-2)]' },
   purple: { active: 'bg-horizon-50 text-horizon-900 border-horizon-300', idle: 'hover:bg-horizon-50/40', icon: 'text-horizon-700', subActive: 'bg-horizon-100 text-horizon-900', subIdle: 'hover:bg-horizon-50/40 text-[var(--ink-2)]' },
   teal:   { active: 'bg-wil-50 text-wil-900 border-wil-300',         idle: 'hover:bg-wil-50/40',     icon: 'text-wil-700',     subActive: 'bg-wil-100 text-wil-900',      subIdle: 'hover:bg-wil-50/40 text-[var(--ink-2)]' },
-  stone:  { active: 'bg-stone-100 text-stone-900 border-stone-300', idle: 'hover:bg-stone-100',     icon: 'text-stone-700',   subActive: 'bg-stone-200 text-stone-900',  subIdle: 'hover:bg-stone-100 text-[var(--ink-2)]' },
+  stone:  { active: 'bg-[var(--subtle)] text-[var(--ink)] border-[var(--border-md)]', idle: 'hover:bg-[var(--subtle)]', icon: 'text-[var(--ink-2)]', subActive: 'bg-[var(--subtle)] text-[var(--ink)]', subIdle: 'hover:bg-[var(--subtle)] text-[var(--ink-2)]' },
 }
 
 type NavMenuSheetProps = {
@@ -207,10 +209,10 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
                     href={item.href}
                     onClick={onClose}
                     className={`flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors ${
-                      active ? 'bg-stone-100 text-stone-900' : 'hover:bg-stone-100/60'
+                      active ? 'bg-[var(--subtle)] text-[var(--ink)]' : 'hover:bg-[var(--subtle)]/60'
                     }`}
                   >
-                    <Icon size={16} className="text-stone-600" />
+                    <Icon size={16} className="text-[var(--ink-2)]" />
                     <span className="font-medium text-[13px]">{item.label}</span>
                   </Link>
                 )
@@ -222,9 +224,9 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
                     if (item.action && onAction) onAction(item.action)
                     onClose()
                   }}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-stone-100/60 transition-colors text-left"
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-[var(--subtle)]/60 transition-colors text-left"
                 >
-                  <Icon size={16} className="text-stone-600" />
+                  <Icon size={16} className="text-[var(--ink-2)]" />
                   <span className="font-medium text-[13px]">{item.label}</span>
                 </button>
               )

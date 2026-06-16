@@ -355,7 +355,7 @@ export function ShareDialog({
       {/* Dialog panel */}
       <div
         ref={dialogRef}
-        className="relative z-10 w-full max-w-md rounded-t-2xl sm:rounded-[var(--r-lg)] bg-[var(--paper)] p-6 shadow-2xl animate-in slide-in-from-bottom sm:slide-in-from-bottom-0"
+        className="relative z-10 w-full max-w-md rounded-t-2xl sm:rounded-[var(--r-lg)] bg-[var(--paper)] p-6 pb-[calc(1.5rem+var(--safe-area-bottom,0px))] shadow-2xl animate-in slide-in-from-bottom sm:slide-in-from-bottom-0"
         data-testid="share-dialog-panel"
       >
         {/* Header */}

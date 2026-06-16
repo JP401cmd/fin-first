@@ -4,8 +4,10 @@ import path from 'node:path'
 import {
   parseTrading212,
   parseEtoro,
+  parseBrokerCSV,
   detectBroker,
   parseENNumber,
+  parseNLNumber,
   parseISODatePrefix,
   parseEtoroDate,
 } from './broker-csv'
@@ -138,5 +140,130 @@ describe('parseEtoro', () => {
 
   it('marks rows as USD currency', () => {
     expect(result.rows.every((r) => r.currency === 'USD')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// DEGIRO
+// ---------------------------------------------------------------------------
+
+const GENERIC_ERROR =
+  'Geen geldige rijen gevonden. Controleer of het juiste brokerformaat is geselecteerd.'
+
+describe('DEGIRO — Rekeningoverzicht (Account.csv) — bug regression', () => {
+  // (a) This is the RED test: today parseBrokerCSV returns 0 rows but with the
+  // generic error message.  After the fix it must return a SPECIFIC error that
+  // names "Rekeningoverzicht" and points to Portfolio/Transactie.
+  const result = parseBrokerCSV(fixture('degiro-account-sample.csv'), 'degiro')
+
+  it('produces zero parsed rows for an Account.csv', () => {
+    expect(result.rows.length).toBe(0)
+  })
+
+  it('returns a SPECIFIC error — not the generic brokerformat message (RED until fix)', () => {
+    // After the fix: errors[0] must mention the unsupported format by name and
+    // redirect to the correct export type.
+    expect(result.errors[0]).not.toBe(GENERIC_ERROR)
+    expect(result.errors[0]).toMatch(/Rekeningoverzicht/i)
+    expect(result.errors[0]).toMatch(/Portfolio|Transactie/i)
+  })
+})
+
+describe('DEGIRO — Portfolio export', () => {
+  const result = parseBrokerCSV(fixture('degiro-portfolio-sample.csv'), 'degiro')
+
+  it('parses at least one position row', () => {
+    expect(result.rows.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('first row has correct name, ISIN, units and price', () => {
+    const row = result.rows[0]
+    expect(row.name).toBe('VANGUARD FTSE ALL-WORLD UCITS ETF')
+    expect(row.isin).toBe('IE00BK5BQT80')
+    expect(row.units).toBe(50)
+    expect(row.price_per_unit).toBeCloseTo(130.05, 2)
+    expect(row.type).toBe('position')
+  })
+
+  it('price_per_unit and units are positive numbers', () => {
+    for (const row of result.rows) {
+      expect(row.units).toBeGreaterThan(0)
+      expect(row.price_per_unit).toBeGreaterThan(0)
+    }
+  })
+
+  it('detects DEGIRO broker from portfolio fixture header', () => {
+    expect(detectBroker(fixture('degiro-portfolio-sample.csv'))).toBe('degiro')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// DEGIRO — Transaction export (echt komma-gescheiden formaat, SpaceX-rij)
+// ---------------------------------------------------------------------------
+// Het oude describe-blok ('DEGIRO — Transaction export') is verwijderd omdat
+// de onderliggende fixture (degiro-transaction-sample.csv) verzonnen was:
+// puntkomma-gescheiden, met een 'Waarde'-kolom die niet overeenkomt met de
+// echte DEGIRO-export. De nieuwe fixture (degiro-transaction-real.csv) bevat
+// een echte DEGIRO-exportrij en sterke asserts op exacte waarden.
+// ---------------------------------------------------------------------------
+
+describe('DEGIRO — Transaction export (echt formaat)', () => {
+  const result = parseBrokerCSV(fixture('degiro-transaction-real.csv'), 'degiro')
+
+  it('parses at least 1 row (preview toont de rij)', () => {
+    expect(result.rows.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('detectBroker herkent het komma-gescheiden transactiebestand als degiro', () => {
+    expect(detectBroker(fixture('degiro-transaction-real.csv'))).toBe('degiro')
+  })
+
+  it('name is correct', () => {
+    expect(result.rows[0].name).toBe('SPACE EXPLORATION TECHNOLOGIES CORP CLASS A')
+  })
+
+  it('isin is correct', () => {
+    expect(result.rows[0].isin).toBe('US84615Q1031')
+  })
+
+  it('exchange is correct', () => {
+    expect(result.rows[0].exchange).toBe('NDQ')
+  })
+
+  it('type is sell (Aantal negatief)', () => {
+    expect(result.rows[0].type).toBe('sell')
+  })
+
+  it('units is absolute value (5)', () => {
+    expect(result.rows[0].units).toBe(5)
+  })
+
+  it('total_amount comes from Waarde EUR (712.93), not Lokale waarde', () => {
+    expect(result.rows[0].total_amount).toBe(712.93)
+  })
+
+  it('price_per_unit is Waarde EUR / |Aantal| in EUR, not USD Koers', () => {
+    // 712.93 / 5 = 142.586
+    expect(result.rows[0].price_per_unit).toBeCloseTo(142.586, 3)
+  })
+
+  it('fees is absolute value of Transactiekosten EUR (2.00)', () => {
+    expect(result.rows[0].fees).toBe(2.00)
+  })
+
+  it('currency is EUR', () => {
+    expect(result.rows[0].currency).toBe('EUR')
+  })
+
+  it('date is parsed correctly', () => {
+    expect(result.rows[0].date).toBe('2026-06-12')
+  })
+
+  it('order-id (UUID) is stored in raw["Order ID"]', () => {
+    // DEGIRO-quirk: de UUID staat in het veld NA de "Order ID"-header
+    // (kolomverschuiving door lege laatste header). We lezen hem robuust uit
+    // als het laatste niet-lege, UUID-achtige veld van de rij en slaan op in
+    // raw["Order ID"] zodat de import-stap hem kan persisteren.
+    expect(result.rows[0].raw['Order ID']).toBe('44e0f390-58cf-466b-b229-0354863a8d4b')
   })
 })

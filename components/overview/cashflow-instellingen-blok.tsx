@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { TrendingUp, Target, ShoppingCart, Check, PencilLine } from 'lucide-react'
+import { TrendingUp, Target, ShoppingCart, Check, PencilLine, ChevronDown } from 'lucide-react'
 import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -50,6 +50,21 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
   const [expensesManual, setExpensesManual] = useState(data.expensesSource === 'manual')
   const [sheet, setSheet] = useState<Sheet>(null)
 
+  // Bij 'transaction' is de 6-maands transactie-kassabon de leidende bron; bij
+  // 'estimate'/'net_worth_delta' produceerden die maandrijen het percentage NIET,
+  // dus tonen we daar een compacte uitleg i.p.v. een misleidende transactie-breakdown.
+  const isTransactionMethod = data.savingsRateMethod === 'transaction'
+
+  // Herkomst van de getoonde spaarquote — bij een schatting maken we dat zichtbaar
+  // zodat de gebruiker weet dat het geen exacte 6-maands transactie-meting is.
+  const savingsRateSub = expensesManual
+    ? 'eigen invoer'
+    : data.savingsRateMethod === 'net_worth_delta'
+      ? 'geschat uit vermogensgroei'
+      : data.savingsRateMethod === 'estimate'
+        ? 'geschat uit profiel'
+        : 'laatste 6 maanden'
+
   const persist = useCallback(async (patch: Record<string, number | string | null>) => {
     await fetch('/api/parameters', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
@@ -86,7 +101,7 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
           sub={`€${Math.round(triple.monthlyIncome).toLocaleString('nl-NL')}/mnd`} onClick={() => setSheet('income')} />
         <SettingCard icon={<Target className="h-4 w-4" />} label="Spaarquote"
           value={`${expensesManual ? Math.round(triple.savingsRate) : Math.round(data.savingsRate6m)}%`} manual={expensesManual}
-          sub="laatste 6 maanden" onClick={() => setSheet('savings')} />
+          sub={savingsRateSub} onClick={() => setSheet('savings')} />
         <SettingCard icon={<ShoppingCart className="h-4 w-4" />} label="Geschatte uitgaven"
           value={<MaskedAmount value={triple.monthlyExpenses} tone="kern" />} manual={expensesManual}
           sub="per maand" onClick={() => setSheet('expenses')} />
@@ -141,44 +156,88 @@ export function CashflowInstellingenBlok({ data }: { data: CashflowSettingsData 
           <ChoiceRow computedLabel={`Gebruik berekend (€${Math.round(computedExpenses).toLocaleString('nl-NL')}/mnd)`}
             isManual={expensesManual} onUseComputed={() => applyComputed('expenses')}
             manualValue={Math.round(triple.monthlyExpenses)} onManual={(v) => editField('expenses', v)} unit="€/mnd" />
+          <p className="text-[11px] text-[var(--ink-4)]">Vul je <strong>totale</strong> maandelijkse uitgaven in — inclusief je hypotheeklast en wat je naar spaar- of beleggingspotjes overmaakt. Sparen in budgetten en schuldaflossing tellen we daarna weer als sparen mee, zodat je spaarquote klopt.</p>
         </div>
       </BottomSheet>
 
       <BottomSheet open={sheet === 'savings'} onClose={() => setSheet(null)} title="Spaarquote">
         <div className="space-y-3 p-4">
-          <p className="text-[11px] text-[var(--ink-3)]">Berekend over je transacties van de afgelopen 6 maanden.</p>
-          <KassabonShell>
-            <div className="space-y-1.5">
-              {sixMonth.months.map((m, i) => {
-                const net = m.income - m.expenses
-                return (
-                  <div key={`${m.label}-${i}`} className="flex items-center justify-between text-[var(--ink-3)]">
-                    <span className="capitalize">{m.label}</span>
-                    <span className="tabular-nums">
-                      <MaskedAmount value={net} tone="kern" signPrefix={net >= 0 ? '+' : ''} className="text-[11px]" />
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-            <div className="mt-2 space-y-1 border-t border-dashed border-[var(--border-md)] pt-2">
-              <div className="flex items-center justify-between"><span>Σ Inkomen (6 mnd)</span><span className="tabular-nums"><MaskedAmount value={sixMonth.income} tone="kern" /></span></div>
-              <div className="flex items-center justify-between"><span>Σ Uitgaven (6 mnd)</span><span className="tabular-nums">−<MaskedAmount value={sixMonth.expenses} tone="kern" /></span></div>
-              {data.savingsBudgetTotal6m > 0 && (
-                <div className="flex items-center justify-between text-[var(--ink-3)]"><span>+ Sparen in budgetten</span><span className="tabular-nums"><MaskedAmount value={data.savingsBudgetTotal6m} tone="kern" /></span></div>
-              )}
-              {data.debtAflossingTotal6m > 0 && (
-                <div className="flex items-center justify-between text-[var(--ink-3)]"><span>+ Schuldaflossing</span><span className="tabular-nums"><MaskedAmount value={data.debtAflossingTotal6m} tone="kern" /></span></div>
-              )}
-              <div className="flex items-center justify-between"><span>Gespaard</span><span className="tabular-nums"><MaskedAmount value={sixMonth.saved + data.savingsBudgetTotal6m + data.debtAflossingTotal6m} tone="kern" signPrefix={(sixMonth.saved + data.savingsBudgetTotal6m + data.debtAflossingTotal6m) >= 0 ? '+' : ''} /></span></div>
-              <div className="mt-1 flex items-center justify-between border-t border-dashed border-[var(--border-md)] pt-1.5 font-bold">
-                <span>Spaarquote</span><span className="tabular-nums">{Math.round(data.savingsRate6m)}%</span></div>
-            </div>
-          </KassabonShell>
+          {isTransactionMethod ? (
+            <>
+              <p className="text-[11px] text-[var(--ink-3)]">Berekend over je transacties van de afgelopen 6 maanden.</p>
+              <KassabonShell>
+                <div className="space-y-1.5">
+                  {sixMonth.months.map((m, i) => {
+                    const net = m.income - m.expenses
+                    return (
+                      <div key={`${m.label}-${i}`} className="flex items-center justify-between text-[var(--ink-3)]">
+                        <span className="capitalize">{m.label}</span>
+                        <span className="tabular-nums">
+                          <MaskedAmount value={net} tone="kern" signPrefix={net >= 0 ? '+' : ''} className="text-[11px]" />
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-2 space-y-1 border-t border-dashed border-[var(--border-md)] pt-2">
+                  <div className="flex items-center justify-between"><span>Σ Inkomen (6 mnd)</span><span className="tabular-nums"><MaskedAmount value={sixMonth.income} tone="kern" /></span></div>
+                  <div className="flex items-center justify-between"><span>Σ Uitgaven (6 mnd)</span><span className="tabular-nums">−<MaskedAmount value={sixMonth.expenses} tone="kern" /></span></div>
+                  {data.savingsBudgetTotal6m > 0 && (
+                    <div className="flex items-center justify-between text-[var(--ink-3)]"><span>+ Sparen in budgetten</span><span className="tabular-nums"><MaskedAmount value={data.savingsBudgetTotal6m} tone="kern" /></span></div>
+                  )}
+                  {data.debtAflossingTotal6m > 0 && (
+                    <div className="flex items-center justify-between text-[var(--ink-3)]"><span>+ Schuldaflossing</span><span className="tabular-nums"><MaskedAmount value={data.debtAflossingTotal6m} tone="kern" /></span></div>
+                  )}
+                  <div className="flex items-center justify-between"><span>Gespaard</span><span className="tabular-nums"><MaskedAmount value={sixMonth.saved + data.savingsBudgetTotal6m + data.debtAflossingTotal6m} tone="kern" signPrefix={(sixMonth.saved + data.savingsBudgetTotal6m + data.debtAflossingTotal6m) >= 0 ? '+' : ''} /></span></div>
+                  <div className="mt-1 flex items-center justify-between border-t border-dashed border-[var(--border-md)] pt-1.5 font-bold">
+                    <span>Spaarquote</span><span className="tabular-nums">{Math.round(data.savingsRate6m)}%</span></div>
+                </div>
+              </KassabonShell>
+            </>
+          ) : (
+            <>
+              <p className="text-[11px] text-[var(--ink-3)]">
+                {data.savingsRateMethod === 'net_worth_delta'
+                  ? 'Geschat uit de groei van je vermogen — er zijn nog te weinig transacties voor een 6-maands berekening.'
+                  : 'Geschat uit je opgegeven inkomsten en uitgaven — er zijn nog te weinig transacties voor een 6-maands berekening.'}
+              </p>
+              <p className="text-[11px] text-[var(--ink-4)]">Zodra je meer transacties hebt, rekenen we je spaarquote over die echte maanden.</p>
+              <KassabonShell>
+                <div className="flex items-center justify-between border-t border-dashed border-[var(--border-md)] pt-1.5 font-bold">
+                  <span>Spaarquote</span><span className="tabular-nums">{Math.round(data.savingsRate6m)}%</span>
+                </div>
+              </KassabonShell>
+            </>
+          )}
           <ChoiceRow computedLabel={`Gebruik berekend (${Math.round(data.savingsRate6m)}%)`}
             isManual={expensesManual} onUseComputed={() => applyComputed('expenses')}
             manualValue={Math.round(triple.savingsRate)} onManual={(v) => editField('savingsRate', v)} unit="%" />
-          <p className="text-[11px] text-[var(--ink-4)]">Een handmatige spaarquote past je geschatte uitgaven aan (inkomen blijft gelijk).</p>
+
+          <div className="space-y-2 border-t border-[var(--border-md)] pt-3">
+            <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
+              Sparen in je budgetten en het aflossen van schulden rekenen we mee als sparen — dat geld verdwijnt niet, het bouwt vermogen op. Een handmatige spaarquote (eigen percentage) volgt dezelfde definitie en past je geschatte uitgaven aan; je inkomen blijft gelijk.
+            </p>
+            <details className="group text-[var(--ink-4)]">
+              <summary className="flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] [&::-webkit-details-marker]:hidden">
+                <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+                Zo rekenen we je spaarquote
+              </summary>
+              <div className="mt-1.5 space-y-1 text-[10px] leading-relaxed">
+                <p>
+                  Spaarquote = gespaard ÷ inkomen. Wat je spaart is <span className="font-mono tabular-nums">(inkomen − uitgaven) + sparen in budgetten + schuldaflossing</span>. Zo telt elke euro die vermogen opbouwt mee als opgeslagen tijd, niet alleen wat op je spaarrekening blijft staan.
+                </p>
+                <p>
+                  Bron op dit moment:{' '}
+                  {data.savingsRateMethod === 'transaction'
+                    ? 'je transacties van de afgelopen 6 maanden'
+                    : data.savingsRateMethod === 'net_worth_delta'
+                      ? 'de groei van je vermogen (nog te weinig transacties)'
+                      : 'je opgegeven inkomsten en uitgaven (nog te weinig transacties)'}
+                  .
+                </p>
+              </div>
+            </details>
+          </div>
         </div>
       </BottomSheet>
     </section>
