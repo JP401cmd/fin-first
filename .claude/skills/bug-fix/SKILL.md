@@ -18,6 +18,9 @@ De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: 
 
 ## Proces
 
+### 0. Fast-path-poort — al firsthand gediagnosticeerd? (zelf, geen agent)
+Levert de opdracht de bug al **firsthand gediagnosticeerd** aan — oorzaak, exacte locatie(s) én fix-richting, niet slechts een symptoom — handel stap 1–3 (rapport, verwachting, triage) dan af als een **korte bevestiging in de hoofdthread** i.p.v. drie aparte subagent-runs, en ga direct naar stap 4 (falende test). Dit bespaart 2–3 subagent-runs en context bij een al-doorgrond probleem. Voorwaarden: de **firsthand-verificatieplicht blijft hard** (lees zelf de betrokken regels/diff, draai zelf `tsc`/de relevante tests — vertrouw geen aangeleverde diagnose blind), en blijkt de diagnose bij die verificatie tóch onvolledig of fout, val dan terug op de volledige stappen 1–3. Bij twijfel over de diagnose: niet de fast-path nemen.
+
 ### 1. Rapporteren & reproduceren — `bug-reporter`
 Zet de `bug-reporter` in voor een volledig rapport: titel, samenvatting, omgeving/context, **deterministische repro-stappen**, verwacht vs. werkelijk gedrag, **geraakte use cases/user journeys**, impact & ernst, vermoedelijke oorzaak/locatie en bewijs. Lever een **minimale repro** op.
 - Kun je niet reproduceren? Stop en meld dat terug met de condities — niet blind gaan fixen.
