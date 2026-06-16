@@ -5,6 +5,8 @@ import { formatCurrency } from '@/components/app/budget-shared'
 import { AlertTriangle } from 'lucide-react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { formatMaskedCurrency } from '@/lib/format'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import { getCashflowForecastTips } from '@/lib/chart-tips'
 
@@ -39,6 +41,7 @@ type Props = {
 export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forecast, alerts, currentBalance }: Props) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 700 })
+  const { masked } = useMaskedAmounts()
 
   if (!forecast || forecast.length < 2) {
     return (
@@ -346,11 +349,11 @@ export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forec
                     x={x}
                     y={y - 15}
                     textAnchor="middle"
-                    className="fill-zinc-700"
+                    className="fill-zinc-700 font-mono tabular-nums"
                     fontSize="10"
                     fontWeight="600"
                   >
-                    {<MaskedAmount value={point.projectedBalance} tone="horizon" />}
+                    {formatMaskedCurrency(point.projectedBalance, masked)}
                   </text>
                 </g>
               )}

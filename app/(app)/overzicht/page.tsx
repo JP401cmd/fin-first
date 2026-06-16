@@ -282,7 +282,6 @@ export default async function OverzichtPage() {
         activeWidgets={activeWidgets}
         allWidgetPrefs={allWidgetPrefs}
         liquidCash={liquidCash}
-        hasCompletedHorizonSetup={horizonData?.hasCompletedHorizonSetup ?? true}
       />
     </>
   )

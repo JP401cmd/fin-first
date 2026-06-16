@@ -21,6 +21,8 @@ import {
   ALLOCATION_COLORS,
 } from '@/lib/portfolio-allocation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { formatMaskedCurrency } from '@/lib/format'
 
 // Re-export types and utilities for consumers
 export type { AllocationViewMode, HoldingForAllocation, TargetAllocation, AllocationSlice }
@@ -47,6 +49,7 @@ function AllocationDonut({
   size?: number
   hasEntered?: boolean
 }) {
+  const { masked } = useMaskedAmounts()
   const cx = size / 2
   const cy = size / 2
   const r = size * 0.35
@@ -93,8 +96,8 @@ function AllocationDonut({
           />
         )
       })}
-      <text x={cx} y={cy - 6} textAnchor="middle" fontSize="12" fontWeight="700" fill="#18181b">
-        {<MaskedAmount value={total} tone="kern" />}
+      <text x={cx} y={cy - 6} textAnchor="middle" className="font-mono tabular-nums" fontSize="12" fontWeight="700" fill="#18181b">
+        {formatMaskedCurrency(total, masked)}
       </text>
       <text x={cx} y={cy + 8} textAnchor="middle" fontSize="8" fill="#a1a1aa">
         totaal

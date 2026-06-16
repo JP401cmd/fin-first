@@ -6,6 +6,8 @@ import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/bu
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { Eye, EyeOff, ChevronDown } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { formatMaskedCurrency } from '@/lib/format'
 
 const HIDDEN_BUDGETS_KEY = 'donut-hidden-budgets'
 const COLLAPSED_TYPES_KEY = 'donut-collapsed-types'
@@ -209,6 +211,7 @@ interface TypeDonutProps {
 }
 
 function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHidden, isCollapsed, onToggleCollapse }: TypeDonutProps) {
+  const { masked } = useMaskedAmounts()
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 1200 })
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
@@ -283,7 +286,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
           {activeChild.name}
         </text>
         <text x={cx} y={cy + 4} textAnchor="middle" className="fill-[var(--ink-3)] font-mono text-[9px]">
-          {<MaskedAmount value={activeChild.spent} tone="wil" />} / {<MaskedAmount value={activeChild.limit} tone="wil" />}
+          {formatMaskedCurrency(activeChild.spent, masked)} / {formatMaskedCurrency(activeChild.limit, masked)}
         </text>
         <text x={cx} y={cy + 18} textAnchor="middle"
           className={`font-mono text-[10px] font-bold ${activeChild.spent > activeChild.limit ? (isOverPositive(budgetType) ? 'fill-emerald-500' : 'fill-red-500') : 'fill-[var(--ink)]'}`}
@@ -300,7 +303,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
           {activeSeg.name}
         </text>
         <text x={cx} y={cy + 4} textAnchor="middle" className="fill-[var(--ink-3)] font-mono text-[9px]">
-          {<MaskedAmount value={activeSeg.spent} tone="wil" />} / {<MaskedAmount value={activeSeg.limit} tone="wil" />}
+          {formatMaskedCurrency(activeSeg.spent, masked)} / {formatMaskedCurrency(activeSeg.limit, masked)}
         </text>
         <text x={cx} y={cy + 18} textAnchor="middle"
           className={`font-mono text-[10px] font-semibold ${activeSeg.spent > activeSeg.limit ? (isOverPositive(budgetType) ? 'fill-emerald-500' : 'fill-red-500') : 'fill-[var(--ink)]'}`}
@@ -313,10 +316,10 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
     centerContent = (
       <g>
         <text x={cx} y={cy - 10} textAnchor="middle" className="fill-[var(--ink)] font-mono text-[14px] font-bold">
-          {<MaskedAmount value={totalSpent} tone="wil" />}
+          {formatMaskedCurrency(totalSpent, masked)}
         </text>
         <text x={cx} y={cy + 6} textAnchor="middle" className="fill-[var(--ink-4)] font-sans text-[9px]">
-          van {<MaskedAmount value={totalBudget} tone="wil" />}
+          van {formatMaskedCurrency(totalBudget, masked)}
         </text>
         <text x={cx} y={cy + 20} textAnchor="middle"
           className={`font-mono text-[10px] font-semibold ${pctUsed > 100 ? (isOverPositive(budgetType) ? 'fill-emerald-500' : 'fill-red-500') : 'fill-[var(--ink-3)]'}`}
