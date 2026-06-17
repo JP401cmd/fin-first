@@ -166,19 +166,18 @@ const tests: TestCase[] = [
   },
   {
     id: 'dw-default-prefs',
-    name: 'Widget catalog: DEFAULT_WIDGET_PREFS bevat alle widgets',
+    name: 'Widget catalog: DEFAULT_WIDGET_PREFS bevat alle widgets, geen enabled',
     category: CAT,
-    description: 'Defaults match catalog lengte, 7 enabled',
+    description: 'Defaults match catalog lengte, 0 enabled (onaangeraakt account → doelen + fire-line)',
     priority: 'high',
     estimatedDurationMs: 5,
     fn() {
       assertEqual(DEFAULT_WIDGET_PREFS.widgets.length, WIDGET_CATALOG.length, 'prefs length == catalog')
+      // Bewust 0 enabled: een onaangeraakt account toont de standaard
+      // Voortgang-doelen + Vrijheidsstrip in de /overzicht hero-rail. De
+      // widget-grid verschijnt alleen na expliciet aanzetten of een favoriet.
       const enabled = DEFAULT_WIDGET_PREFS.widgets.filter(w => w.enabled)
-      assertEqual(enabled.length, 7, '7 widgets enabled by default')
-      const enabledIds = new Set(enabled.map(w => w.id))
-      for (const id of ['netto_vermogen', 'cash_flow', 'fire_prognose', 'acties', 'spaarquote', 'vrijheidsvoortgang', 'jouw_pad']) {
-        assert(enabledIds.has(id), `${id} should be enabled by default`)
-      }
+      assertEqual(enabled.length, 0, '0 widgets enabled by default')
     },
   },
   {

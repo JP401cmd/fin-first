@@ -646,7 +646,14 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
         </div>
       )}
 
-      {!isCollapsed && (<>
+      {/* Collapse alleen honoreren wanneer de header (met de uitklap-toggle)
+          ook getoond wordt. In host-context (hideHeader, zoals de /overzicht
+          hero-rail) bestaat die toggle niet, dus een ingeklapte staat zou de
+          hele inhoud — widgets ÉN de bewerk-picker — permanent verbergen zonder
+          herstelmogelijkheid. Een stale `dashboard-collapsed=true` in
+          localStorage (uit een oudere build met header) maakte zo het hele
+          dashboard-blok onzichtbaar. */}
+      {(hideHeader || !isCollapsed) && (<>
       {/* Categorie-app-balk — direct onder de titel zodat de Kern-apps van
           de gebruiker (Bezittingen + Schulden) als snelkoppelingen zichtbaar
           zijn vóór de widget-grid. Conditioneel via `categoryNavVisible`

@@ -443,10 +443,22 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   },
 ]
 
+/**
+ * Standaard-widgetprefs voor een gebruiker zónder opgeslagen `widget_prefs`.
+ *
+ * Bewust ALLE widgets uit (`enabled: false`). De enige render-plek van de
+ * widget-grid is de /overzicht hero-rail (`HeroWidgetRail`), die bij
+ * `hasActiveWidgets === false` de standaard Voortgang-doelen + Vrijheidsstrip
+ * toont. Een onaangeraakt account hoort die defaults te zien — niet de
+ * widget-grid. De grid verschijnt alleen wanneer de gebruiker (a) zelf een
+ * widget aanzet, of (b) een budget/holding favoriet maakt (de loader injecteert
+ * dan een enabled `budget_fav:`/`holding_fav:`-pref). Vroeger stonden hier 7
+ * widgets default aan, waardoor élk vers account de grid zag i.p.v. de defaults.
+ */
 export const DEFAULT_WIDGET_PREFS: WidgetPrefs = {
   widgets: WIDGET_CATALOG.map((w, i) => ({
     id: w.id,
-    enabled: ['netto_vermogen', 'cash_flow', 'fire_prognose', 'acties', 'spaarquote', 'vrijheidsvoortgang', 'jouw_pad'].includes(w.id),
+    enabled: false,
     size: w.defaultSize,
     order: i,
   })),

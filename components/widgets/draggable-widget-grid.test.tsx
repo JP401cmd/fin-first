@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { DraggableWidgetGrid } from './draggable-widget-grid'
+import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 
@@ -290,5 +291,98 @@ describe('DraggableWidgetGrid', () => {
     fireEvent.click(editBtn)
 
     expect(screen.getByTestId('auto-dashboard-btn')).toBeInTheDocument()
+  })
+})
+
+// ── Regressietest — stale dashboard-collapsed localStorage + hideHeader ────
+//
+// Bug (jun 2026): alle grid-content zat achter `{!isCollapsed && (...)}`.
+// Bij hideHeader=true (hero-rail op /overzicht) bestaat de uitklap-toggle
+// niet, waardoor een stale `dashboard-collapsed=true` in localStorage de
+// widgets en de bewerk-picker permanent verborg zonder herstelmogelijkheid.
+// Fix: `{(hideHeader || !isCollapsed) && (...)}` — collapse wordt alleen
+// gehonoreerd als er een toggle-header aanwezig is.
+describe('DraggableWidgetGrid — collapsed-localStorage regressie (hideHeader)', () => {
+  beforeEach(() => {
+    // Zet stale "ingeklapte" staat in localStorage — precies de situatie
+    // die de bug triggerde voor gebruikers die ooit de collapse-toggle
+    // hadden gebruikt vóórdat de header uit /overzicht verdween.
+    localStorage.setItem('dashboard-collapsed', 'true')
+    mockFetch.mockResolvedValue({ ok: true })
+  })
+
+  it('toont widget-items ondanks collapsed=true wanneer hideHeader=true', async () => {
+    const prefs = makePrefs(['netto_vermogen', 'acties'])
+    await act(async () => {
+      render(
+        // DashboardTypeProvider leest localStorage op in useEffect na mount,
+        // waardoor isCollapsed na de eerste render op `true` springt.
+        <DashboardTypeProvider>
+          <DraggableWidgetGrid
+            initialPrefs={prefs}
+            allPrefs={prefs}
+            data={mockData}
+            hideHeader={true}
+          />
+        </DashboardTypeProvider>
+      )
+    })
+
+    // Widgets moeten zichtbaar zijn — de fix honoreert collapsed NIET wanneer
+    // hideHeader=true (geen toggle aanwezig).
+    expect(screen.getByTestId('widget-item-netto_vermogen')).toBeInTheDocument()
+    expect(screen.getByTestId('widget-item-acties')).toBeInTheDocument()
+  })
+
+  it('toont "Widget toevoegen"-CTA in edit-mode ondanks collapsed=true bij hideHeader=true', async () => {
+    // Lege prefs → de suppressIntroSheet-CTA ("Widget toevoegen") wordt
+    // getoond zodra de gebruiker edit-mode activeert. Zonder de fix was
+    // deze CTA ook onbereikbaar omdat de hele content-blok verborgen was.
+    const emptyPrefs: WidgetPref[] = []
+
+    await act(async () => {
+      render(
+        <DashboardTypeProvider>
+          <DraggableWidgetGrid
+            initialPrefs={emptyPrefs}
+            allPrefs={emptyPrefs}
+            data={mockData}
+            hideHeader={true}
+            suppressIntroSheet={true}
+            // Geef controlled edit-mode door zodat de CTA direct zichtbaar is
+            editMode={true}
+            onEditModeChange={() => {}}
+          />
+        </DashboardTypeProvider>
+      )
+    })
+
+    // De compacte "+ Widget toevoegen"-CTA moet zichtbaar zijn ondanks collapsed.
+    expect(
+      screen.getByRole('button', { name: /widget toevoegen/i })
+    ).toBeInTheDocument()
+  })
+
+  it('honoreert collapsed=true WANNEER hideHeader=false (normale dashboard-header)', async () => {
+    // Baseline: bij een grid met header moet collapsed wél werken —
+    // de toggle is beschikbaar voor herstel.
+    const prefs = makePrefs(['netto_vermogen'])
+    await act(async () => {
+      render(
+        <DashboardTypeProvider>
+          <DraggableWidgetGrid
+            initialPrefs={prefs}
+            allPrefs={prefs}
+            data={mockData}
+            // hideHeader=false (default) → toggle is aanwezig → collapsed gaat aan
+          />
+        </DashboardTypeProvider>
+      )
+    })
+
+    // Met hideHeader=false (standaard) EN collapsed=true in localStorage
+    // zijn de widgets NIET zichtbaar — dit is het beoogde gedrag voor
+    // gebruikers die het dashboard bewust hebben ingeklapt.
+    expect(screen.queryByTestId('widget-item-netto_vermogen')).not.toBeInTheDocument()
   })
 })
