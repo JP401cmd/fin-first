@@ -13,10 +13,22 @@
 
 set -e
 
+# In een verse/CI-container (bv. Claude Code op het web) zijn de dependencies
+# vaak niet geïnstalleerd. `npx tsc` downloadt dan een losse compiler die
+# zonder node_modules élk type (react, lucide-react, JSX, …) als "Cannot find
+# module" rapporteert → de hook faalt op een schijnreden en blokkeert élke
+# push. Dat veroorzaakt een push-loop (push → faalt → opnieuw). Ontbreekt de
+# lokale tsc-binary, sla de check dan over; Vercel draait de volledige check.
+if [ ! -x "node_modules/.bin/tsc" ]; then
+  echo "⚠ node_modules/.bin/tsc ontbreekt (dependencies niet geïnstalleerd) — tsc-check overgeslagen. Vercel draait de volledige check bij ontvangst."
+  exit 0
+fi
+
 echo "→ Running tsc --noEmit on production code…"
 
 # Capture output, filter test-file errors, fail als er productie-errors zijn
-output=$(npx tsc --noEmit 2>&1 || true)
+# (lokale binary, niet `npx`, zodat er nooit een losse compiler gedownload wordt)
+output=$(node_modules/.bin/tsc --noEmit 2>&1 || true)
 # Filter test-file errors (pre-existing strict-type issues, Vercel skipt ze)
 # en .next/types errors (gegenereerde route-validators raken stale bij
 # folder-renames; Vercel regenereert ze bij elke build).
