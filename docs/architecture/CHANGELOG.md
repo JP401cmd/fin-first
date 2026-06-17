@@ -234,3 +234,10 @@
 ## 2026-06-16
 
 - Geen wijzigingen.
+
+## 2026-06-17
+
+- **Schermen** toegevoegd: /check, /check/activeren, /check/rapport
+- **API-routes** toegevoegd: /api/check/activate, /api/check/submit
+- **Tabellen** toegevoegd: intake_rate_limit, lead_intakes
+- **Componenten (aantal)** toegevoegd: +25

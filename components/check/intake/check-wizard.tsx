@@ -1,0 +1,348 @@
+'use client'
+
+/**
+ * CheckWizard — 8-staps publieke Vrijheidscheck-wizard.
+ *
+ * Orkestreert de intake-stappen, het draft-systeem, de live vrijheidstijd-teller
+ * en de e-mailpoort. Na submit: POST /api/check/submit → redirect naar /check/rapport?token=.
+ *
+ * Architectuur-keuze: alle stap-componenten zijn "dumb" — ze ontvangen state + handlers
+ * via props. De draft-state woont in `useCheckDraft` (localStorage-backed).
+ *
+ * QuickAddWizard-noot: de wizard-instructies vermelden QuickAddWizard collect-mode voor
+ * stap ⑤ en ⑥. Die wizard verwacht een `BottomSheet`-context (ToastProvider etc.) die
+ * niet beschikbaar is op een publieke route buiten de (app)-layout. Daarom hebben ⑤ en ⑥
+ * eigen lichtgewichte add-forms die hetzelfde `CheckIntakeAsset`/`CheckIntakeDebt`-contract
+ * produceren. Gemeld als gedeeld-bestand-behoefte (zie rapport onderaan).
+ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  useCheckDraft,
+  INTAKE_STEPS,
+  stepIndex,
+  clearCheckDraft,
+  type CheckStep,
+} from '@/lib/check/use-check-draft'
+import {
+  calculateFreedomTime,
+  formatFreedomTimeString,
+  dailyExpenseRate,
+} from '@/lib/format'
+import type { CheckIntake, CheckSubmitPayload } from '@/lib/check/types'
+
+import { StepJij } from './steps/step-jij'
+import { StepInkomen } from './steps/step-inkomen'
+import { StepUitgaven } from './steps/step-uitgaven'
+import { StepBuffer } from './steps/step-buffer'
+import { StepBezittingen } from './steps/step-bezittingen'
+import { StepSchulden } from './steps/step-schulden'
+import { StepPensioen } from './steps/step-pensioen'
+import { StepDoel } from './steps/step-doel'
+import { StepEmail } from './steps/step-email'
+
+// ── Stap-meta ───────────────────────────────────────────────────────────────
+
+const STEP_META: Record<
+  Exclude<CheckStep, 'verzenden'>,
+  { num: string; title: string; sub: string }
+> = {
+  jij:          { num: '①', title: 'Wie ben jij?', sub: 'leeftijd · gezin · naam' },
+  inkomen:      { num: '②', title: 'Inkomen', sub: 'netto maand · bruto jaar' },
+  uitgaven:     { num: '③', title: 'Uitgaven', sub: 'wonen · lasten · vrij' },
+  buffer:       { num: '④', title: 'Buffer', sub: 'noodfonds · dekking' },
+  bezittingen:  { num: '⑤', title: 'Bezittingen', sub: 'spaar · beleggen · woning' },
+  schulden:     { num: '⑥', title: 'Schulden', sub: 'hypotheek · leningen · rest' },
+  pensioen:     { num: '⑦', title: 'Pensioen & rendement', sub: 'AOW · risicoprofiel' },
+  doel:         { num: '⑧', title: 'Grootste doel', sub: 'optioneel · vrij tekstveld' },
+  email:        { num: '✉', title: 'Je rapport', sub: 'e-mail · AVG-consent' },
+}
+
+// ── Live vrijheidstijd-teller ────────────────────────────────────────────────
+
+function useFreedomTicker(intake: Partial<CheckIntake> & { assets: CheckIntake['assets'] }) {
+  return useMemo(() => {
+    const monthly = intake.monthlyIncomeNet ?? 0
+    const exp = intake.expenses?.totaalMaand ?? 0
+    if (monthly <= 0 || exp <= 0) return null
+
+    // Tel FIRE-eligible vermogen: alles behalve eigen huis
+    const totalAssets =
+      (intake.assets ?? [])
+        .filter((a) => a.assetType !== 'eigen_huis')
+        .reduce((s, a) => s + a.value, 0) +
+      (intake.emergencyFund ?? 0)
+
+    if (totalAssets <= 0) return null
+
+    const daily = dailyExpenseRate(exp)
+    if (daily <= 0) return null
+
+    const breakdown = calculateFreedomTime(totalAssets, daily)
+    if (breakdown.isDeficit) return null
+
+    return formatFreedomTimeString(breakdown, 'short')
+  }, [intake])
+}
+
+// ── Voortgangsbalk ───────────────────────────────────────────────────────────
+
+function ProgressBar({ current }: { current: CheckStep }) {
+  const currentIdx = INTAKE_STEPS.indexOf(current)
+  // email-stap valt buiten INTAKE_STEPS maar telt mee als laatste
+  const total = INTAKE_STEPS.length + 1 // +1 voor email
+  const progress = current === 'email' ? total : currentIdx + 1
+
+  return (
+    <div role="progressbar" aria-valuenow={progress} aria-valuemin={1} aria-valuemax={total}>
+      <div className="flex gap-1">
+        {Array.from({ length: total }).map((_, i) => (
+          <div
+            key={i}
+            className={`h-1 flex-1 transition-colors duration-300 ${
+              i < progress ? 'bg-kern-600' : 'bg-[var(--border-ed)]'
+            }`}
+          />
+        ))}
+      </div>
+      <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-[var(--ink-4)]">
+        Stap {progress} van {total}
+      </p>
+    </div>
+  )
+}
+
+// ── Hoofd-component ──────────────────────────────────────────────────────────
+
+export function CheckWizard() {
+  const router = useRouter()
+  const {
+    draft,
+    step,
+    goTo,
+    next,
+    back,
+    patchIntake,
+    setEmail,
+    setFirstName,
+    setConsentAt,
+    isLoaded,
+  } = useCheckDraft()
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Vrijheidstijd-teller
+  const freedomTick = useFreedomTicker(draft.intake)
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+
+  const handleSubmit = useCallback(async () => {
+    setIsSubmitting(true)
+    setSubmitError(null)
+
+    // Haal Turnstile-token op via de widget indien aanwezig
+    let turnstileToken = ''
+    if (typeof window !== 'undefined') {
+      const response = (window as Window & { turnstile?: { getResponse: () => string } }).turnstile?.getResponse()
+      if (response) turnstileToken = response
+    }
+
+    const intake = draft.intake as CheckIntake
+
+    const payload: CheckSubmitPayload = {
+      intake,
+      email: draft.email,
+      consentAt: draft.consentAt ?? new Date().toISOString(),
+      turnstileToken,
+    }
+
+    try {
+      const res = await fetch('/api/check/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const text = await res.text()
+        let msg = 'Er ging iets mis — probeer het opnieuw.'
+        try {
+          const json = JSON.parse(text)
+          if (json?.error) msg = json.error
+        } catch { /* ignore */ }
+        setSubmitError(msg)
+        setIsSubmitting(false)
+        return
+      }
+
+      const data = await res.json() as { token?: string }
+      clearCheckDraft()
+
+      if (data.token) {
+        router.push(`/check/rapport?token=${data.token}`)
+      } else {
+        setSubmitError('Rapport kon niet worden gegenereerd. Probeer het opnieuw.')
+        setIsSubmitting(false)
+      }
+    } catch {
+      setSubmitError('Verbinding mislukt — controleer je internet en probeer opnieuw.')
+      setIsSubmitting(false)
+    }
+  }, [draft, router])
+
+  // ── Render helpers ────────────────────────────────────────────────────────
+
+  // Zolang draft geladen wordt, toon niets (voorkomt hydration-mismatch)
+  if (!isLoaded) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-ed)] border-t-kern-600" />
+      </div>
+    )
+  }
+
+  // Stap-meta voor de actieve stap
+  const meta = step !== 'verzenden' ? STEP_META[step] : null
+
+  // Bereken actieve intake-index voor progressbalk
+  const intakeIdx = INTAKE_STEPS.indexOf(step)
+  const isIntakeStep = intakeIdx !== -1
+  const isEmailStep = step === 'email'
+
+  return (
+    <div className="w-full">
+      {/* Vrijheidstijd-teller — verschijnt zodra inkomen + uitgaven + vermogen bekend zijn */}
+      {freedomTick && (
+        <div
+          className="sticky top-0 z-10 flex items-center justify-end gap-2 border-b border-[var(--border-ed)] bg-[var(--bg)]/95 px-4 py-2 backdrop-blur-sm"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--ink-4)]">
+            Al vrijgekocht
+          </span>
+          <span className="font-mono tabular-nums text-base font-medium text-kern-700">
+            {freedomTick}
+          </span>
+        </div>
+      )}
+
+      {/* Wizard-kaart */}
+      <div className="mx-auto max-w-xl px-4 py-8 sm:px-6">
+
+        {/* Voortgangsbalk — alleen tijdens intake-stappen en e-mailstap */}
+        {(isIntakeStep || isEmailStep) && (
+          <div className="mb-8">
+            <ProgressBar current={step} />
+          </div>
+        )}
+
+        {/* Stap-kop */}
+        {meta && (
+          <header className="mb-8 border-b border-[var(--border-ed)] pb-6">
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--ink-4)]">
+              {meta.num} · {meta.sub}
+            </p>
+            <h2 className="font-display text-2xl font-bold leading-tight tracking-tight text-[var(--ink)] md:text-3xl">
+              {meta.title}
+            </h2>
+          </header>
+        )}
+
+        {/* Stap-inhoud */}
+        <div>
+          {step === 'jij' && (
+            <StepJij
+              intake={draft.intake}
+              onChange={patchIntake}
+              onNext={next}
+            />
+          )}
+          {step === 'inkomen' && (
+            <StepInkomen
+              intake={draft.intake}
+              onChange={patchIntake}
+              onNext={next}
+              onBack={back}
+            />
+          )}
+          {step === 'uitgaven' && (
+            <StepUitgaven
+              intake={draft.intake}
+              onChange={patchIntake}
+              onNext={next}
+              onBack={back}
+            />
+          )}
+          {step === 'buffer' && (
+            <StepBuffer
+              intake={draft.intake}
+              onChange={patchIntake}
+              onNext={next}
+              onBack={back}
+            />
+          )}
+          {step === 'bezittingen' && (
+            <StepBezittingen
+              intake={draft.intake}
+              onChange={patchIntake}
+              onNext={next}
+              onBack={back}
+            />
+          )}
+          {step === 'schulden' && (
+            <StepSchulden
+              intake={draft.intake}
+              onChange={patchIntake}
+              onNext={next}
+              onBack={back}
+            />
+          )}
+          {step === 'pensioen' && (
+            <StepPensioen
+              intake={draft.intake}
+              onChange={patchIntake}
+              onNext={next}
+              onBack={back}
+            />
+          )}
+          {step === 'doel' && (
+            <StepDoel
+              intake={draft.intake}
+              onChange={patchIntake}
+              onNext={next}
+              onBack={back}
+            />
+          )}
+          {step === 'email' && (
+            <StepEmail
+              draft={draft}
+              onEmailChange={setEmail}
+              onFirstNameChange={setFirstName}
+              onConsentChange={setConsentAt}
+              onSubmit={handleSubmit}
+              onBack={back}
+              isSubmitting={isSubmitting}
+              submitError={submitError}
+            />
+          )}
+          {step === 'verzenden' && (
+            <div className="flex flex-col items-center gap-6 py-12 text-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-ed)] border-t-kern-600" />
+              <div className="space-y-2">
+                <p className="font-display text-xl font-bold text-[var(--ink)]">
+                  Je rapport wordt samengesteld…
+                </p>
+                <p className="font-serif text-sm italic text-[var(--ink-3)]">
+                  Dit duurt een moment — we rekenen je vrijheidsperspectief uit.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

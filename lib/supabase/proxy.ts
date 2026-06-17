@@ -41,6 +41,12 @@ export async function updateSession(request: NextRequest) {
     '/api/health',
     '/api/schema-check',
     '/api/dev-login',
+    // Vrijheidscheck — publieke lead-gen-funnel (ADR 0022). De wizard, het
+    // rapport en de twee anonieme API's zijn bewust publiek; /check/activeren en
+    // /api/check/activate blijven achter auth (conversie ná inloggen).
+    '/check',
+    '/check/rapport',
+    '/api/check/submit',
     '/test-chat',
     '/test-breadcrumb',
     '/test-snapshots',

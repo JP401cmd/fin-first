@@ -17,11 +17,20 @@ export default function SignupPage() {
     setError(null)
 
     const supabase = createClient()
+    // Vrijheidscheck-conversie: draagt het check-token door de e-mailbevestiging
+    // heen, zodat de gebruiker na inloggen op /check/activeren landt en de intake
+    // wordt overgezet naar het nieuwe account.
+    const checkToken = new URLSearchParams(window.location.search).get('check')
+    const next = checkToken
+      ? `/check/activeren?token=${encodeURIComponent(checkToken)}`
+      : null
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: next
+          ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+          : `${window.location.origin}/auth/callback`,
       },
     })
 

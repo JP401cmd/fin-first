@@ -83,6 +83,7 @@ export function buildHldModel(): HldModel {
         goal: 'Ik wil grip op mijn geld vandaag',
         accent: 'kern',
         items: [
+          { title: 'Gratis weten waar je staat vóór je een account maakt', desc: 'Doe de Vrijheidscheck: een paar vragen en je krijgt meteen je vrijheidsrapport — pas daarna kies je of je een account aanmaakt.' },
           { title: 'Je bank koppelen of een bestand importeren', desc: 'Transacties komen automatisch binnen — geen handwerk.' },
           { title: 'Al je uitgaven en inkomsten op een rij', desc: 'Overzichtelijk, met categorieën en grootste posten.' },
           { title: 'Budgetten maken en bewaken', desc: 'Zie per categorie hoeveel je deze maand nog hebt.' },

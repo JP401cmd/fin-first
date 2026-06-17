@@ -71,6 +71,14 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['as-budget', 'as-import'],
   },
   {
+    id: 'public-intake-write',
+    title: 'Eerste publieke service-role-schrijfpad',
+    detail:
+      'De Vrijheidscheck-funnel laat een anonieme bezoeker (geen auth.uid()) server-side wegschrijven naar lead_intakes — het eerste publieke schrijfpad dat via de service-role RLS omzeilt. De vangrails (zod + payload-grens + IP-rate-limit + Turnstile, fail-closed) zijn ontworpen en security gaf een voorwaardelijke GO, maar de migratie/secrets zijn nog niet uitgerold. Tot de hardening getest én gedeployed is, blijft dit het scherpste structurele risico. Verwijder dit punt zodra deploy + GO rond zijn.',
+    severity: 'risk',
+    elementIds: ['as-vrijheidscheck', 't-supabase', 'do-lead'],
+  },
+  {
     id: 'migration-drift',
     title: 'Supabase migratie-drift',
     detail:

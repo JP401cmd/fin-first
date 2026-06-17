@@ -394,6 +394,31 @@ export const CALCULATIONS: Calculation[] = [
     elementIds: ['as-planning', 'fn-toekomstplannen'],
     note: 'Geen dubbeltelling basisinkomen: de engine telt annualSavings (spaarquote × basisinkomen) altijd mee; werk-strategie draagt uitsluitend de delta daarboven. onlyWhileWorking-gating zorgt dat salarisgroei stopt op dezelfde werk-stopgrens als het basissalaris — beide routes volgen dezelfde `werkt`-vlag in lib/horizon-engine/engine.ts.',
   },
+  {
+    id: 'vrijheidscheck-rapport',
+    title: 'Vrijheidscheck — rapport-aggregatie (consument, geen eigen motor)',
+    domain: 'Toekomst (FIRE)',
+    summary:
+      'GEEN nieuwe rekenmotor (ADR 0022): een pure server-side AGGREGATIE-/mapperlaag van de publieke Vrijheidscheck-funnel (/check) die een genormaliseerde intake (wizard-output) omzet naar het volledige rapport-DTO (CheckReportData = report_snapshot). Herberekent NIETS zelf — consumeert uitsluitend de bestaande canonieke engines (zelfde grondslag als de ingelogde app; horizon v2 byte-identiek) en mapt hun output naar de rapport-secties (foto van nu, gezondheidsgetal, de kruising, twee toekomsten, gevoeligheid, onttrekkingsstrategieën, levenspad, Wills zetten). Bouwt synthetische Asset[]/Debt[] uit de intake-velden zodat de engines ongewijzigd draaien. Staat in deze catalogus omdat het een nieuw afgeleide-getallen-OPPERVLAK (het rapport) documenteert, niet een nieuwe formule.',
+    inputs: [
+      'CheckIntake (wizard): geboortedatum, huishouden, netto maandinkomen, uitgaven-categorieën, noodfonds, bezittingen, schulden, pensioen/rendement, doel',
+      'afgeleide engine-inputs: FIRE-parameters, FIRE-eligible vermogen, spaarquote, AOW-maandbedrag, cohort-referentie',
+    ],
+    outputs: [
+      'CheckReportData (DTO): masthead, lifeGrid, snapshot, dualBars, monthBalance, health, benchmark, kruising, twoFutures, fireCards, sensitivity[4 her-runs], withdrawalStrategies[3], lifePath, will.moves, cta, disclaimers',
+    ],
+    formula:
+      'intake → synthetische Asset[]/Debt[] (groei-types erven grossReturn; cash/savings/eigen woning 0) → engines: runHorizonLedger (V_op=liquideVermogen, V_nodig, fireAge, decumulatie) + computeFireProjection (snapshot-FIRE) + computeFreedomProgress (vrijheids-%) + buildHealthScoreInput→computeHealthScoreFromInputs (gezondheidsgetal, budget-pijler inactief) + resolveSavingsSource (spaarquote, handmatig pad) + computeEmergencyFundMonths (buffer) + getCohortReference+computeReferencePeer (benchmark) + calculateFreedomTime/dailyExpenseRate (€→tijd). Gevoeligheid = 4 engine-her-runs (spaarquote +4pp / rendement +1pp / uitgaven +€200 / +€20k lump); strategieën = 3 her-runs (SWR static / VPW / Guyton-Klinger). Eindleeftijd = vaste 90.',
+    files: ['lib/check/build-report.ts', 'lib/check/types.ts'],
+    functions: ['buildReport', 'runHorizonLedger', 'computeFireProjection', 'computeFreedomProgress', 'buildHealthScoreInput', 'resolveSavingsSource', 'computeEmergencyFundMonths', 'getCohortReference', 'computeReferencePeer', 'getFireEligibleNetWorth', 'calculateFreedomTime', 'dailyExpenseRate'],
+    constants: [
+      { label: 'REPORT_END_AGE', value: '90 — vaste rapport-eindleeftijd (= DEFAULT_FIRE_STRATEGY.endAge); geen aparte aanname' },
+      { label: 'Housing-conventie', value: 'exclude_from_fire — de eigen woning telt NIET mee voor FIRE ("dat is je dak, niet je rendement"); huis + gekoppelde hypotheek gefilterd uit de engine-pot, volledige vermogen blijft zichtbaar in snapshot/dual-bars/levenspad' },
+      { label: 'Per-asset rendement', value: 'groei-types (investment/retirement/real_estate/crypto/deelneming/vordering/levensverzekering) erven het profiel-grossReturn (params-laag); cash/savings/eigen woning groeien niet op rendement — de intake verzamelt geen per-asset rendement' },
+    ],
+    elementIds: ['as-vrijheidscheck', 'as-planning', 'fn-toekomstplannen', 'as-rapport', 'as-vermogen'],
+    note: 'Consume, don\'t recompute: build-report.ts is een pure MAPPER zonder eigen formules of Supabase — JSON-serialiseerbaar (report_snapshot in lead_intakes). Jaar-1-passief-inkomen leidt de motor af uit de engine-identiteit in de onttrekkingsfase (withdrawal = aowEnPensioen − cashflowNetto van de eerste niet-werk-rij; LedgerRow draagt geen los withdrawal-veld). Levenspad = NETTO vermogen incl. huis: de engine-pot heeft het huis gefilterd, dus de meegroeiende overwaarde wordt per jaar bijgeteld via de canonieke projectEigenHuisValuesAt + projectMortgageStateAt (spiegelt calc sim-netto-vermogen-projectie; geen eigen WOZ/groeiformule). Zero-portfolio-guard: het grootboek kan een trivial-late fireAge ≈ eindleeftijd melden bij een lege belegbare pot (meetsStrategyTarget toetst alleen ≤ endAge−2, dus de laatste kandidaat "slaagt" zonder vroeg venster) — build-report behandelt een FIRE met €0 liquide vermogen op het snijpunt als onhaalbaar en valt terug op computeFireProjection. Benchmark gebruikt DEZELFDE bron als de in-app benchmarkrapportage (getCohortReference + computeReferencePeer) zodat score/buffer-referentie niet driften; badge "Geraamd (CBS-basis)" (ADR 0018). will.intro blijft leeg (AI-framing W6); will.moves zijn deterministisch uit de metrics. VPW draait alleen met deplete (engine-guard). Geverifieerd met lib/check/__tests__/build-report.test.ts (realistische "Sanne"-intake + randgevallen: nul/negatief inkomen, deficit, geen schulden, alleen-huis, oneindige vrijheid, lege optionele velden, onbekende type-strings).',
+  },
 ]
 
 /** Berekeningen gegroepeerd per domein, in vaste domein-volgorde. */

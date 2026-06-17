@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-16T17:10:03.229Z",
-  "generatedDate": "2026-06-16",
+  "generatedAt": "2026-06-17T08:43:45.710Z",
+  "generatedDate": "2026-06-17",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 318,
-    "routesProduction": 95,
-    "api": 377,
-    "tables": 53,
-    "migrations": 110,
+    "routes": 321,
+    "routesProduction": 98,
+    "api": 379,
+    "tables": 55,
+    "migrations": 111,
     "integrations": 25,
-    "components": 699,
+    "components": 724,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -422,6 +422,24 @@
       "url": "/berichten",
       "file": "app/(app)/berichten/page.tsx",
       "group": "persoonlijk",
+      "isTest": false
+    },
+    {
+      "url": "/check",
+      "file": "app/check/page.tsx",
+      "group": "overig",
+      "isTest": false
+    },
+    {
+      "url": "/check/activeren",
+      "file": "app/check/activeren/page.tsx",
+      "group": "overig",
+      "isTest": false
+    },
+    {
+      "url": "/check/rapport",
+      "file": "app/check/rapport/page.tsx",
+      "group": "overig",
       "isTest": false
     },
     {
@@ -2452,215 +2470,25 @@
         "isTest": false
       }
     ],
-    "publiek": [
-      {
-        "url": "/contact",
-        "file": "app/contact/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      },
-      {
-        "url": "/forgot-password",
-        "file": "app/forgot-password/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      },
-      {
-        "url": "/login",
-        "file": "app/login/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      },
-      {
-        "url": "/logout",
-        "file": "app/logout/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      },
-      {
-        "url": "/over",
-        "file": "app/over/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      },
-      {
-        "url": "/privacy",
-        "file": "app/privacy/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      },
-      {
-        "url": "/reset-password",
-        "file": "app/reset-password/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      },
-      {
-        "url": "/signup",
-        "file": "app/signup/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      },
-      {
-        "url": "/voorwaarden",
-        "file": "app/voorwaarden/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      },
-      {
-        "url": "/wft",
-        "file": "app/wft/page.tsx",
-        "group": "publiek",
-        "isTest": false
-      }
-    ],
-    "kern": [
-      {
-        "url": "/core",
-        "file": "app/(app)/core/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/assets",
-        "file": "app/(app)/core/assets/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/assets/[type]",
-        "file": "app/(app)/core/assets/[type]/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/assets/cash/[accountId]",
-        "file": "app/(app)/core/assets/cash/[accountId]/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/assets/crypto/[holdingId]",
-        "file": "app/(app)/core/assets/crypto/[holdingId]/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/assets/holdings",
-        "file": "app/(app)/core/assets/holdings/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/assets/holdings/[id]",
-        "file": "app/(app)/core/assets/holdings/[id]/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/assets/holdings/import",
-        "file": "app/(app)/core/assets/holdings/import/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/assets/investment/[holdingId]",
-        "file": "app/(app)/core/assets/investment/[holdingId]/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/assets/revalue",
-        "file": "app/(app)/core/assets/revalue/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/belasting",
-        "file": "app/(app)/core/belasting/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/budgets",
-        "file": "app/(app)/core/budgets/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/budgets/[id]",
-        "file": "app/(app)/core/budgets/[id]/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/budgets/[id]/edit",
-        "file": "app/(app)/core/budgets/[id]/edit/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/budgets/new",
-        "file": "app/(app)/core/budgets/new/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/cash",
-        "file": "app/(app)/core/cash/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/cash/connect",
-        "file": "app/(app)/core/cash/connect/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/cash/connect/callback",
-        "file": "app/(app)/core/cash/connect/callback/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/cash/connect/success",
-        "file": "app/(app)/core/cash/connect/success/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/cash/import",
-        "file": "app/(app)/core/cash/import/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/checkin",
-        "file": "app/(app)/core/checkin/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/checkin/historie",
-        "file": "app/(app)/core/checkin/historie/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/debts",
-        "file": "app/(app)/core/debts/page.tsx",
-        "group": "kern",
-        "isTest": false
-      },
-      {
-        "url": "/core/debts/[type]",
-        "file": "app/(app)/core/debts/[type]/page.tsx",
-        "group": "kern",
-        "isTest": false
-      }
-    ],
     "overig": [
+      {
+        "url": "/check",
+        "file": "app/check/page.tsx",
+        "group": "overig",
+        "isTest": false
+      },
+      {
+        "url": "/check/activeren",
+        "file": "app/check/activeren/page.tsx",
+        "group": "overig",
+        "isTest": false
+      },
+      {
+        "url": "/check/rapport",
+        "file": "app/check/rapport/page.tsx",
+        "group": "overig",
+        "isTest": false
+      },
       {
         "url": "/dashboard",
         "file": "app/(app)/dashboard/page.tsx",
@@ -3826,6 +3654,214 @@
         "isTest": false
       }
     ],
+    "publiek": [
+      {
+        "url": "/contact",
+        "file": "app/contact/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      },
+      {
+        "url": "/forgot-password",
+        "file": "app/forgot-password/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      },
+      {
+        "url": "/login",
+        "file": "app/login/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      },
+      {
+        "url": "/logout",
+        "file": "app/logout/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      },
+      {
+        "url": "/over",
+        "file": "app/over/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      },
+      {
+        "url": "/privacy",
+        "file": "app/privacy/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      },
+      {
+        "url": "/reset-password",
+        "file": "app/reset-password/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      },
+      {
+        "url": "/signup",
+        "file": "app/signup/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      },
+      {
+        "url": "/voorwaarden",
+        "file": "app/voorwaarden/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      },
+      {
+        "url": "/wft",
+        "file": "app/wft/page.tsx",
+        "group": "publiek",
+        "isTest": false
+      }
+    ],
+    "kern": [
+      {
+        "url": "/core",
+        "file": "app/(app)/core/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/assets",
+        "file": "app/(app)/core/assets/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/assets/[type]",
+        "file": "app/(app)/core/assets/[type]/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/assets/cash/[accountId]",
+        "file": "app/(app)/core/assets/cash/[accountId]/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/assets/crypto/[holdingId]",
+        "file": "app/(app)/core/assets/crypto/[holdingId]/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/assets/holdings",
+        "file": "app/(app)/core/assets/holdings/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/assets/holdings/[id]",
+        "file": "app/(app)/core/assets/holdings/[id]/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/assets/holdings/import",
+        "file": "app/(app)/core/assets/holdings/import/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/assets/investment/[holdingId]",
+        "file": "app/(app)/core/assets/investment/[holdingId]/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/assets/revalue",
+        "file": "app/(app)/core/assets/revalue/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/belasting",
+        "file": "app/(app)/core/belasting/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/budgets",
+        "file": "app/(app)/core/budgets/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/budgets/[id]",
+        "file": "app/(app)/core/budgets/[id]/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/budgets/[id]/edit",
+        "file": "app/(app)/core/budgets/[id]/edit/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/budgets/new",
+        "file": "app/(app)/core/budgets/new/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/cash",
+        "file": "app/(app)/core/cash/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/cash/connect",
+        "file": "app/(app)/core/cash/connect/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/cash/connect/callback",
+        "file": "app/(app)/core/cash/connect/callback/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/cash/connect/success",
+        "file": "app/(app)/core/cash/connect/success/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/cash/import",
+        "file": "app/(app)/core/cash/import/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/checkin",
+        "file": "app/(app)/core/checkin/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/checkin/historie",
+        "file": "app/(app)/core/checkin/historie/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/debts",
+        "file": "app/(app)/core/debts/page.tsx",
+        "group": "kern",
+        "isTest": false
+      },
+      {
+        "url": "/core/debts/[type]",
+        "file": "app/(app)/core/debts/[type]/page.tsx",
+        "group": "kern",
+        "isTest": false
+      }
+    ],
     "horizon": [
       {
         "url": "/horizon",
@@ -4690,6 +4726,22 @@
       "domain": "cashflow-forecast",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/check/activate",
+      "file": "app/api/check/activate/route.ts",
+      "domain": "check",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/check/submit",
+      "file": "app/api/check/submit/route.ts",
+      "domain": "check",
+      "methods": [
+        "POST"
       ]
     },
     {
@@ -8598,6 +8650,29 @@
       ]
     },
     {
+      "domain": "check",
+      "label": "check",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/check/activate",
+          "file": "app/api/check/activate/route.ts",
+          "domain": "check",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/check/submit",
+          "file": "app/api/check/submit/route.ts",
+          "domain": "check",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "goals",
       "label": "Doelen",
       "count": 2,
@@ -12101,6 +12176,10 @@
         "migration": "supabase/migrations/20260218000001_add_household_support.sql"
       },
       {
+        "name": "intake_rate_limit",
+        "migration": "supabase/migrations/20260617000000_lead_intakes.sql"
+      },
+      {
         "name": "investment_holding_prices",
         "migration": "supabase/migrations/20260502000003_split_holdings_tables.sql"
       },
@@ -12115,6 +12194,10 @@
       {
         "name": "job_runs",
         "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
+      },
+      {
+        "name": "lead_intakes",
+        "migration": "supabase/migrations/20260617000000_lead_intakes.sql"
       },
       {
         "name": "life_events",
@@ -12193,7 +12276,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 110
+    "migrationCount": 111
   },
   "tablesByDomain": [
     {
@@ -12242,6 +12325,43 @@
       ]
     },
     {
+      "domain": "Overig",
+      "tables": [
+        {
+          "name": "ai_token_usage",
+          "migration": "supabase/migrations/20260611140000_create_ai_token_usage.sql"
+        },
+        {
+          "name": "badges",
+          "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
+        },
+        {
+          "name": "category_corrections",
+          "migration": "supabase/migrations/20260213122235_add_category_corrections.sql"
+        },
+        {
+          "name": "external_data_sources",
+          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
+        },
+        {
+          "name": "household_budget_model_proposals",
+          "migration": "supabase/migrations/20260611000002_household_budget_model_consent.sql"
+        },
+        {
+          "name": "intake_rate_limit",
+          "migration": "supabase/migrations/20260617000000_lead_intakes.sql"
+        },
+        {
+          "name": "job_runs",
+          "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
+        },
+        {
+          "name": "lead_intakes",
+          "migration": "supabase/migrations/20260617000000_lead_intakes.sql"
+        }
+      ]
+    },
+    {
       "domain": "Beleggingen",
       "tables": [
         {
@@ -12275,35 +12395,6 @@
         {
           "name": "target_allocations",
           "migration": "supabase/migrations/20260316100001_add_holdings_classification_and_target_allocations.sql"
-        }
-      ]
-    },
-    {
-      "domain": "Overig",
-      "tables": [
-        {
-          "name": "ai_token_usage",
-          "migration": "supabase/migrations/20260611140000_create_ai_token_usage.sql"
-        },
-        {
-          "name": "badges",
-          "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
-        },
-        {
-          "name": "category_corrections",
-          "migration": "supabase/migrations/20260213122235_add_category_corrections.sql"
-        },
-        {
-          "name": "external_data_sources",
-          "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
-        },
-        {
-          "name": "household_budget_model_proposals",
-          "migration": "supabase/migrations/20260611000002_household_budget_model_consent.sql"
-        },
-        {
-          "name": "job_runs",
-          "migration": "supabase/migrations/20260610010000_create_job_runs.sql"
         }
       ]
     },
@@ -12511,11 +12602,11 @@
     }
   ],
   "components": {
-    "total": 699,
+    "total": 724,
     "groups": [
       {
         "group": "app",
-        "count": 304,
+        "count": 305,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12784,6 +12875,7 @@
           "success-banner",
           "success-banner.test",
           "surplus-gap-chart",
+          "svg-text-no-html-nesting.test",
           "swipe-back-tracker",
           "sync-status-badge",
           "toast-provider",
@@ -13167,6 +13259,36 @@
           "palette-picker.test",
           "privacy-overview",
           "privacy-overview.test"
+        ]
+      },
+      {
+        "group": "check",
+        "count": 24,
+        "items": [
+          "BlikOpToekomst",
+          "CtaSection",
+          "DeKruising",
+          "FotoVanNu",
+          "Gezondheidsgetal",
+          "LifeGrid",
+          "Masthead",
+          "NavIndex",
+          "RapportFooter",
+          "RapportView",
+          "ReadingProgress",
+          "TweeToekomsten",
+          "WillZetten",
+          "check-wizard",
+          "check-wizard-section",
+          "step-bezittingen",
+          "step-buffer",
+          "step-doel",
+          "step-email",
+          "step-inkomen",
+          "step-jij",
+          "step-pensioen",
+          "step-schulden",
+          "step-uitgaven"
         ]
       },
       {
@@ -13865,6 +13987,20 @@
         {
           "name": "transactions",
           "write": false
+        }
+      ],
+      "check": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "lead_intakes",
+          "write": true
+        },
+        {
+          "name": "profiles",
+          "write": true
         }
       ],
       "checkin": [
@@ -14839,6 +14975,14 @@
           ]
         },
         {
+          "domain": "check",
+          "label": "check",
+          "write": true,
+          "routes": [
+            "/api/check/activate"
+          ]
+        },
+        {
           "domain": "crypto-holdings",
           "label": "Crypto",
           "write": true,
@@ -15227,6 +15371,14 @@
           "routes": [
             "/api/admin/user-diagnose",
             "/api/admin/user-export"
+          ]
+        },
+        {
+          "domain": "check",
+          "label": "check",
+          "write": false,
+          "routes": [
+            "/api/check/activate"
           ]
         },
         {
@@ -16624,6 +16776,17 @@
           ]
         }
       ],
+      "lead_intakes": [
+        {
+          "domain": "check",
+          "label": "check",
+          "write": true,
+          "routes": [
+            "/api/check/activate",
+            "/api/check/submit"
+          ]
+        }
+      ],
       "goals": [
         {
           "domain": "goals",
@@ -17565,6 +17728,16 @@
         "user": true,
         "household": false,
         "rls": true
+      },
+      "lead_intakes": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "intake_rate_limit": {
+        "user": false,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -17833,6 +18006,21 @@
       ],
       "summary": "De verkoopkeuze voor een niet-liquide bezitting is een **first-class veld op de bezitting zelf** (`assets.sale_config`, JSONB). De engine besluit op grond van dit veld of en wanneer een asset wordt geliquideerd. De SSoT voor het of/wanneer verschuift daarmee van een `life_event` ",
       "file": "docs/adr/0021-sale-config-per-bezitting-en-in-loop-liquidatie.md"
+    },
+    {
+      "id": "0022-vrijheidscheck-publieke-intake",
+      "title": "Vrijheidscheck — publieke pre-account intake en conversie",
+      "status": "aanvaard",
+      "date": "2026-06-17",
+      "elements": [
+        "as-vrijheidscheck",
+        "sp-vrijheidscheck",
+        "b-bezoeker",
+        "do-lead",
+        "t-supabase"
+      ],
+      "summary": "De publieke Vrijheidscheck-funnel (`/check`) laat een anonieme bezoeker een korte intake doen, krijgt server-side een Vrijheidsrapport berekend en converteert daarna naar een account. Omdat de bezoeker op dat moment nog niet in `auth.users` bestaat, loopt het schrijven via een se",
+      "file": "docs/adr/0022-vrijheidscheck-publieke-intake.md"
     }
   ],
   "churn": {
@@ -17840,7 +18028,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 79
+        "commits": 81
       },
       {
         "path": "lib/ai",
@@ -17852,18 +18040,18 @@
       },
       {
         "path": "lib/fire-simulation.ts",
-        "commits": 19
+        "commits": 20
       },
       {
         "path": "app/api/ai",
         "commits": 13
       },
       {
-        "path": "app/api/household",
-        "commits": 9
+        "path": "lib/horizon-data.ts",
+        "commits": 10
       },
       {
-        "path": "lib/horizon-data.ts",
+        "path": "app/api/household",
         "commits": 9
       },
       {
@@ -17883,7 +18071,7 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 7042,
-        "commits": 98
+        "commits": 99
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17893,7 +18081,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4135,
-        "commits": 40
+        "commits": 41
       },
       {
         "file": "lib/release-notes.ts",
@@ -17913,7 +18101,7 @@
       {
         "file": "lib/horizon-data.ts",
         "loc": 2257,
-        "commits": 9
+        "commits": 10
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -18590,8 +18778,41 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-06-16",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Schermen",
+        "added": [
+          "/check",
+          "/check/activeren",
+          "/check/rapport"
+        ],
+        "removed": []
+      },
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/check/activate",
+          "/api/check/submit"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Tabellen",
+        "added": [
+          "intake_rate_limit",
+          "lead_intakes"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+25"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -18642,6 +18863,13 @@
       "components": 699,
       "tables": 53,
       "routesProduction": 95
+    },
+    {
+      "date": "2026-06-17",
+      "api": 379,
+      "components": 724,
+      "tables": 55,
+      "routesProduction": 98
     }
   ]
 }

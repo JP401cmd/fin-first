@@ -220,6 +220,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       items: ['huishouden-koppeling', 'perspectieven: eigen · huishouden · partner'],
     },
     {
+      id: 'b-bezoeker', x: 510, y: 110, w: 200, h: 56, kind: 'bizactor',
+      title: 'Bezoeker — nog geen account',
+      lead: 'Anonieme bezoeker die de publieke Vrijheidscheck doet vóór er een account bestaat. Bestaat (nog) niet in auth.users; converteert via een token naar een echte gebruiker en wordt daarmee de regisseur-actor.',
+      items: ['business actor', 'publiek (pre-account)', '/check'],
+    },
+    {
       id: 'b-main', x: 40, y: ROW0, w: 250, h: 710, kind: 'bizproc',
       title: 'Persoonlijke financiën regisseren',
       lead: 'Het overkoepelende bedrijfsproces richting volledige vrijheid. Bestaat uit acht deelprocessen die elk door een applicatieservice worden bediend.',
@@ -272,6 +278,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       title: 'Delen & rapporteren',
       lead: 'Rapporten en snapshots, de deelbare freedom-card en het uitnodigen van een partner in het huishouden.',
       items: ['/rapportages', 'freedom-card', 'huishouden-uitnodiging'],
+    },
+    {
+      id: 'sp-vrijheidscheck', x: 722, y: 110, w: 200, h: 56, kind: 'bizproc',
+      title: 'Vrijheidscheck doen',
+      lead: 'Publiek instroomproces (geen functionele module): een bezoeker doet anoniem een korte intake, krijgt server-berekend een Vrijheidsrapport en converteert daarna naar een account. Dit is de voordeur naar het hoofdproces, niet zelf een deel ervan.',
+      items: ['/check', 'anonieme intake', 'rapport', 'conversie naar account'],
     },
 
     // ── Applicatieservices ──
@@ -328,6 +340,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       title: 'Huishouden- & perspectiefdienst',
       lead: 'Partner-koppeling en de drie kijk-perspectieven (eigen / huishouden / partner). Dwarsdoorsnijdend: bezittingen, schulden, cashflow, belasting en FIRE lezen erdoorheen via RLS-veilige RPC’s.',
       items: ['/api/household/*', 'perspectief-loaders', 'RLS + RPC'],
+    },
+    {
+      id: 'as-vrijheidscheck', x: 934, y: 110, w: 215, h: 56, kind: 'appsvc',
+      title: 'Vrijheidscheck-dienst',
+      lead: 'Bedient de publieke Vrijheidscheck-funnel: anonieme intake valid+ versleuteld wegschrijven, het Vrijheidsrapport server-side bouwen (consumeert de bestaande rekenmotoren, herberekent niets) en de conversie naar een echt account. Fundament-dienst, géén functionele module — het is een instroomproces, geen gebruiker-activeerbare capability.',
+      items: ['/api/check/submit', '/api/check/activate', 'lib/check/build-report', 'lib/check/intake-to-persona'],
     },
 
     // ── Applicatiecomponent + functies (modules) ──
@@ -388,7 +406,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
 
     // ── Data ──
     {
-      id: 'data-cont', x: 700, y: 1064, w: 600, h: 212, kind: 'group',
+      id: 'data-cont', x: 700, y: 1064, w: 600, h: 280, kind: 'group',
       title: 'TriFinity-gegevens (informatieobjecten)',
       lead: 'De data-objecten waarmee de applicatie werkt — beheerd in Supabase Postgres met Row Level Security.',
       items: [],
@@ -435,6 +453,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       title: 'Profiel & snapshots',
       lead: 'Profielen, vermogens-snapshots en app-instellingen.',
       items: ['profiles', 'net_worth_snapshots', 'app_settings'],
+    },
+    {
+      id: 'do-lead', x: 716, y: 1252, w: 180, h: 56, kind: 'data',
+      title: 'Lead-intake',
+      lead: 'Anonieme pre-account Vrijheidscheck-intake (versleuteld) plus het server-berekende rapport-snapshot en de IP-rate-limit-tellers. Uitsluitend service-role-bereikbaar: RLS aan, géén policies (ADR 0022).',
+      items: ['lead_intakes', 'intake_rate_limit'],
     },
 
     // ── Externe partijen ──
@@ -510,6 +534,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'as-nieuws->sp-nieuws': { payload: 'Nieuwsfeed en meldingen', mechanism: 'rest', cadence: 'daily', contractDomains: ['news', 'notifications'] },
     'as-rapport->sp-delen': { payload: 'Rapporten, snapshots, export en freedom-card', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['report', 'snapshots', 'export', 'share'] },
     'as-huishouden->sp-delen': { payload: 'Partner-koppeling en perspectief-context', mechanism: 'rpc', cadence: 'on-demand', contractDomains: ['household', 'perspective'], note: 'Leest cross-user via RLS-veilige RPC’s; nooit directe tabel-selects over de huishoudgrens.' },
+    'as-vrijheidscheck->sp-vrijheidscheck': { payload: 'Anonieme intake, vrijheidsrapport en conversie-token', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['check'], note: 'Publiek service-role-schrijfpad (fail-closed: zod + payload-grens + IP-rate-limit + Turnstile). Het rapport consumeert de bestaande rekenmotoren — geen herberekening (ADR 0022).' },
     // Externe partij → technologie
     'ext-supabase->t-supabase': { payload: 'Beheerde Postgres, Auth en Realtime', mechanism: 'realtime', cadence: 'realtime' },
     'ext-claude->t-aigateway': { payload: 'LLM-completions (primaire provider)', mechanism: 'compute', cadence: 'on-demand' },
@@ -539,6 +564,9 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   addEdge({ from: 'b-actor', to: 'b-main', type: 'assignment', label: 'Voert uit', fromSide: 'B', toSide: 'T', fromOffset: 147, toOffset: 147 })
   addEdge({ from: 'b-partner', to: 'b-main', type: 'assignment', fromSide: 'B', toSide: 'T', fromOffset: 382, toOffset: 260 })
 
+  // Bezoeker doet de publieke Vrijheidscheck (instroomproces vóór account)
+  addEdge({ from: 'b-bezoeker', to: 'sp-vrijheidscheck', type: 'assignment', fromSide: 'R', toSide: 'L' })
+
   // Hoofdproces bestaat uit deelprocessen. Aggregatie (holle ruit) i.p.v.
   // compositie: de deelprocessen zijn zelfstandig genoeg om los te bestaan —
   // ArchiMate-zuiverder dan de sterke "deelt-levenscyclus"-compositie.
@@ -565,6 +593,9 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   // Huishouden-dienst bedient het deelproces 'Delen & rapporteren' (en dwarsdoorsnijdend de rest)
   addEdge({ from: 'as-huishouden', to: 'sp-delen', type: 'serving', fromSide: 'L', toSide: 'R', midX: 545 })
 
+  // Vrijheidscheck-dienst bedient het publieke instroomproces
+  addEdge({ from: 'as-vrijheidscheck', to: 'sp-vrijheidscheck', type: 'serving', fromSide: 'L', toSide: 'R', label: 'Bedient' })
+
   // Module-functies realiseren hun services (gegenereerd uit MODULE_CATALOG)
   MODULE_CATALOG.forEach((m, i) => {
     FUNCTION_SERVICE_MAP[m.id].forEach((svc, j) => {
@@ -580,6 +611,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   addEdge({ from: 'app-comp', to: 'as-import', type: 'realization', fromSide: 'L', toSide: 'R', fromOffset: row(0) + 33 })
   addEdge({ from: 'app-comp', to: 'as-rapport', type: 'realization', fromSide: 'B', toSide: 'R', fromOffset: 850, via: [[850, row(7) + 33]] })
   addEdge({ from: 'app-comp', to: 'as-huishouden', type: 'realization', fromSide: 'B', toSide: 'R', fromOffset: 880, via: [[880, row(8) + 33]] })
+  addEdge({ from: 'app-comp', to: 'as-vrijheidscheck', type: 'realization', fromSide: 'T', toSide: 'B', fromOffset: 1041, toOffset: 107 })
 
   // De applicatie voldoet aan de motivatie
   addEdge({ from: 'app-comp', to: 'm-filo', type: 'realization', fromSide: 'T', toSide: 'B', fromOffset: 900, toOffset: 710, label: 'Voldoet aan' })
@@ -610,7 +642,10 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   // De applicatie leest en schrijft de gegevens
   addEdge({ from: 'app-comp', to: 'data-cont', type: 'access', fromSide: 'B', toSide: 'T', fromOffset: 1140, toOffset: 1140, label: 'Leest en schrijft', readWrite: true })
 
-  return { width: 1660, height: 1300, nodes, edges }
+  // De Vrijheidscheck-dienst leest en schrijft het lead-intake-object (service-role)
+  addEdge({ from: 'as-vrijheidscheck', to: 'do-lead', type: 'access', fromSide: 'B', toSide: 'L', readWrite: true, via: [[806, 1280]] })
+
+  return { width: 1660, height: 1370, nodes, edges }
 }
 
 // ── Afgeleide helpers ────────────────────────────────────────────────────────
