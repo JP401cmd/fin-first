@@ -3,7 +3,7 @@ import { section, formatCurrency, formatFreedomTime, formatPercentage } from './
 import { calculateFreedomTime } from '@/lib/format'
 import { computeBox1Tax, marginalRateAt } from '@/lib/box1-tax'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
-import { computeJaarruimte } from '@/lib/jaarruimte'
+import { computeJaarruimte, resolvePensionFactorA } from '@/lib/jaarruimte'
 import { getTaxDeadlines } from '@/lib/tax-calendar'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 
@@ -73,18 +73,25 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return ''
 
-    // Profiel: netto maandinkomen voor bruto-schatting. PII (naam/geboortedatum)
-    // bewust NIET geselecteerd — deze sectie blijft feiten/bedragen-only.
+    // Profiel: netto maandinkomen voor bruto-schatting + factor A (persistente
+    // pensioenaangroei) voor de jaarruimte. PII (naam/geboortedatum) bewust NIET
+    // geselecteerd — deze sectie blijft feiten/bedragen-only.
     let netMonthlyIncome = 0
+    let factorA = 0
     try {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('net_monthly_income')
+        .select('net_monthly_income, pension_factor_a, pension_factor_a_source')
         .eq('id', user.id)
         .single()
       netMonthlyIncome = Number(profile?.net_monthly_income ?? 0)
+      factorA = resolvePensionFactorA({
+        pension_factor_a: profile?.pension_factor_a,
+        pension_factor_a_source: profile?.pension_factor_a_source,
+      }).factorA
     } catch {
       netMonthlyIncome = 0
+      factorA = 0
     }
 
     const grossYearly = estimateGrossYearly(netMonthlyIncome)
@@ -145,7 +152,7 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
     let jaarruimteLines: string[] = []
     try {
       if (grossYearly > 0) {
-        const jr = computeJaarruimte(grossYearly, 0, TAX_YEAR)
+        const jr = computeJaarruimte(grossYearly, factorA, TAX_YEAR)
         if (jr.hasData && jr.jaarruimte > 0) {
           // Besparing ≈ onbenutte ruimte × marginaal tarief (aftrek in Box 1).
           const besparing = marginalRate > 0

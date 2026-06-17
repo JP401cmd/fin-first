@@ -1,6 +1,11 @@
 import type { ReportWill, ReportWillMove } from '@/lib/check/types'
+import { WillDots } from '@/components/app/will-dots'
 
-/** Sectie 6 — Will: avatar + intro + de zetten. Statische server-render. */
+/**
+ * Sectie 6 — Will: avatar + intro + de zetten. Server-render; de Will-avatar is de
+ * gedeelde `WillDots` (client-component) die op de client haar idle-animatie draait
+ * — consistent met de overige geanimeerde rapport-componenten (LifeGrid e.d.).
+ */
 export function WillZetten({ will }: { will: ReportWill }) {
   return (
     <section id="s6">
@@ -12,7 +17,9 @@ export function WillZetten({ will }: { will: ReportWill }) {
         <h2>Wat je morgen al kunt doen</h2>
 
         <div className="will-intro">
-          <div className="will-av" aria-hidden="true" />
+          <div className="will-av-dots">
+            <WillDots size={54} />
+          </div>
           <div className="txt">
             <div className="who">Will · jouw budgetcoach</div>
             <p>{will.intro}</p>

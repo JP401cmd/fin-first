@@ -80,6 +80,7 @@ When reviewing code, you will systematically evaluate against these criteria:
    - Execute lint checks (e.g., `npm run lint`, `pylint`, `eslint`, etc.)
    - Execute type checks (e.g., `npm run type-check`, `mypy`, `tsc --noEmit`, etc.)
    - Run any project-specific quality tools
+   - Voer de **eigen testsuite van de feature** uit (`npx vitest run <gewijzigde testpaden>`), niet alléén `tsc`/lint — een 'tsc-clean'-claim verbergt routinematig rode unit-tests (een groene type-check bewijst niets over falende assertions). Scope op de gewijzigde testbestanden voor snelheid en rapporteer pass/fail expliciet.
    - Report all findings from these tools
    - Bij een scoped diff-review: stel eerst de before-staat vast met `git diff HEAD -- <files>` én `git show HEAD:<file>` per doelbestand — de vorige versie onthult of de wijziging nieuw gedrag introduceert (andere blast radius) of bestaand gedrag aanpast.
    - Bevat de diff een Supabase-migratie? Verifieer dan altijd de **uitvoervolgorde op een verse DB**: grep alle migraties die dezelfde tabel/constraint aanraken, sorteer op timestamp, en controleer of elke top-level `ALTER`/`DROP` een `CREATE TABLE` op een *eerder* tijdstip heeft (anders breekt `db reset`/CI ook al ziet de remote er goed uit).

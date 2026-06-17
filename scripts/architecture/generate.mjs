@@ -573,6 +573,7 @@ function computeDiff(prev, data) {
     ['Briefing-kaarten', (prev.patterns?.briefing?.tools || []).map((t) => ({ t })), data.patterns.briefing.tools.map((t) => ({ t })), (x) => x.t],
     ['Integraties', prev.integrations, data.integrations, (i) => i.name],
     ['Functionele modules', prev.modules?.modules, data.modules.modules, (m) => m.id],
+    ['Integratie-clients', prev.integrationClients, data.integrationClients, (c) => c.file],
   ]
   const sections = []
   for (const [label, p, c, key] of specs) {
@@ -584,6 +585,94 @@ function computeDiff(prev, data) {
     sections.push({ label: 'Componenten (aantal)', added: data.components.total > prevComp ? [`+${data.components.total - prevComp}`] : [], removed: data.components.total < prevComp ? [`-${prevComp - data.components.total}`] : [] })
   }
   return { baseline: false, previousDate: prev.generatedDate || null, hasChanges: sections.length > 0, sections }
+}
+
+// ── integratie-clients (broncode-scan) ──────────────────────────────────────-
+// Feiten gescand: welke integratie-clients bestaan, welke base-URLs gebruiken
+// ze, hebben ze een adapter-interface. Defensief → [] bij fout.
+// Sla over: *-adapter.ts, *-cron.ts, *-sync.ts, *.test.ts, index.ts, shared.ts
+function scanIntegrationClients() {
+  const empty = []
+  const SKIP_SUFFIXES = ['-adapter.ts', '-cron.ts', '-sync.ts', '.test.ts', '.d.ts']
+  const SKIP_NAMES = [
+    'index.ts', 'shared.ts',
+    // support/helper files in integration dirs (not API clients)
+    'types.ts', 'mapper.ts', 'feature-flag.ts',
+    'linked-asset.ts', 'wallet-validation.ts',
+    'category-mapping.ts', 'reference-data.ts',
+    // infra/probe/registry files — geen extern API-client
+    'health-probe.ts', 'version-registry.ts',
+    // parser-support (geen formaat-client)
+    'format-contracts.ts', 'categorize.ts', 'counterparty-normalize.ts',
+  ]
+
+  const dirs = [
+    join(ROOT, 'lib', 'integrations'),
+    join(ROOT, 'lib', 'parsers'),
+    join(ROOT, 'lib', 'truelayer'),
+    join(ROOT, 'lib', 'nibud'),
+  ]
+
+  const extraFiles = [
+    join(ROOT, 'app', 'api', 'pension', 'parse', 'route.ts'),
+  ]
+
+  const allFiles = []
+  for (const dir of dirs) {
+    try {
+      const entries = readdirSync(dir).filter(f => f.endsWith('.ts'))
+      for (const f of entries) {
+        const base = f.toLowerCase()
+        if (SKIP_NAMES.includes(base)) continue
+        if (SKIP_SUFFIXES.some(s => base.endsWith(s))) continue
+        allFiles.push(join(dir, f))
+      }
+    } catch { /* dir missing — skip */ }
+  }
+  for (const f of extraFiles) {
+    if (existsSync(f)) allFiles.push(f)
+  }
+
+  const results = []
+  for (const file of allFiles) {
+    try {
+      const src = read(file)
+      if (!src) continue
+      const filePath = rel(file)
+      const exists = true
+
+      // base-URL: `const \w*BASE\w* = '...'` or `const \w*HOST\w* = '...'`
+      // HOST-consts (bv. Coinbase: 'api.coinbase.com') hebben geen scheme → prepend https://
+      let baseUrl = ''
+      const baseRe = /const\s+\w*(?:BASE|HOST)\w*\s*=\s*['"]([^'"]+)['"]/
+      const baseM = src.match(baseRe)
+      if (baseM) {
+        const val = baseM[1]
+        baseUrl = val.startsWith('http') ? val : `https://${val}`
+      }
+      // fallback: first inline https:// literal (for FMP/NIBUD/TrueLayer inline URLs)
+      // Knip af na het host-stuk (+ optioneel /vN-pad), niet verder
+      if (!baseUrl) {
+        const httpsM = src.match(/https:\/\/[a-z0-9._-]+(?:\/(?:api\/)?v\d+)?/i)
+        if (httpsM) baseUrl = httpsM[0]
+      }
+
+      // hasAdapter: implements ExchangeAdapter or BrokerAdapter
+      const hasAdapter = /:\s*ExchangeAdapter\b|:\s*BrokerAdapter\b/.test(src)
+
+      // parser format: detect by filename patterns
+      let parserFormat = null
+      const fname = filePath.split('/').pop() || ''
+      if (fname.includes('mt940')) parserFormat = 'mt940'
+      else if (fname.includes('ofx')) parserFormat = 'ofx'
+      else if (fname.includes('broker-csv') || fname.includes('broker_csv')) parserFormat = 'csv'
+      else if (fname.includes('csv') && filePath.includes('parsers')) parserFormat = 'csv'
+
+      results.push({ file: filePath, exists, baseUrl: baseUrl || null, hasAdapter, parserFormat })
+    } catch { /* skip on error */ }
+  }
+
+  return results
 }
 
 // ── build ───────────────────────────────────────────────────────────────--
@@ -608,6 +697,7 @@ function build() {
   const adrs = scanAdrs()
   const churn = scanChurn()
   const claudeTeam = scanClaudeTeam()
+  const integrationClients = scanIntegrationClients()
 
   // groeperingen voor de UI
   const routesByGroup = {}
@@ -656,6 +746,7 @@ function build() {
     adrs,
     churn,
     claudeTeam,
+    integrationClients,
   }
 
   const prev = existsSync(DATA_FILE) ? JSON.parse(read(DATA_FILE) || 'null') : null
@@ -709,6 +800,7 @@ function printSummary(data) {
   console.log(`  Datatoegang: ${Object.keys(ta.byTable).length} tabellen geraakt · ${ta.multiWriter.length} multi-writer · ADR's ${data.adrs.length} · Churn ${data.churn ? data.churn.areas.length + ' gebieden' : 'n.v.t.'}`)
   console.log(`  Datarelaties: ${data.tableRelations.relations.length} FK-edges · ${Object.values(data.tableRelations.meta).filter((m) => m.rls).length} tabellen met RLS`)
   console.log(`  Claude-team: ${data.claudeTeam.agents.length} agents · ${data.claudeTeam.skills.length} skills`)
+  console.log(`  Integratie-clients: ${data.integrationClients.length} gescand`)
   const d = data.diff
   if (d.baseline) console.log('  Diff: baseline (eerste run).')
   else if (!d.hasChanges) console.log(`  Diff: geen wijzigingen sinds ${d.previousDate}.`)

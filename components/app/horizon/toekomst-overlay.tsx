@@ -11,8 +11,12 @@
  * zijn volledige hoogte (geen krimp). Tips uit → scherpe, interactieve grafiek
  * zonder markers.
  *
- * Elke marker opent op hover (desktop) of tik (mobiel) de volledige ballon als
- * popover (kicker + uitleg + CTA naar een bestaande in-page editor). Geen eigen
+ * Op ruime schermen (≥1024px) tonen de markers hun volledige inhoud (kicker +
+ * uitleg) DIRECT leesbaar als statische kaart — niet uitklapbaar. Op smallere
+ * schermen, waar de volle bodies niet naast elkaar passen, vallen de markers
+ * terug op een inklapbare popover die op hover (desktop) of tik (mobiel) opent.
+ * De tip-teksten zijn puur informatief (uitleg van de grafiek in
+ * "Geld is opgeslagen tijd"-geest), zonder navigerende CTA. Geen eigen
  * rekenlogica — `onEmphasisChange` laat de parent de relevante grafiekfase
  * accentueren via `SimChart.emphasis`.
  *
@@ -43,7 +47,7 @@ import {
   CreditCard,
   X,
 } from 'lucide-react'
-import { useMediaQuery } from '@/lib/hooks/use-media-query'
+import { useIsLgUp, useMediaQuery } from '@/lib/hooks/use-media-query'
 import { formatMaskedCurrency } from '@/lib/format'
 
 /** Welke grafiekfase een ballon accentueert bij openen. */
@@ -57,16 +61,21 @@ export interface OverlayBalloonDef {
   icon: ReactNode
   /** Korte editorial kop (mono) — dient óók als zichtbaar marker-label. */
   kicker: string
-  /** Eén zin uitleg — leek-taal, vrijheidstijd-framing waar passend. */
+  /** Eén zin uitleg — informatief/leek-taal, vrijheidstijd-framing waar passend. */
   body: string
-  /** CTA-label op de knop. */
-  cta: string
+  /**
+   * Optioneel CTA-label op een knop. De standaard tip-ballonnen zijn puur
+   * informatief en hebben dit NIET (de knop wordt alleen gerenderd als zowel
+   * `cta` als `onActivate` aanwezig zijn). Behouden als optioneel zodat de
+   * component een actie-knop blijft ondersteunen waar dat ooit nodig is.
+   */
+  cta?: string
   /** Rij: 'top' (boven de grafiek) of 'bottom' (onder de grafiek). */
   row: BalloonRow
   /** Grafiekfase die deze ballon accentueert bij openen. */
   emphasis: OverlayEmphasis
-  /** Opent de bijbehorende in-page editor. */
-  onActivate: () => void
+  /** Optioneel: opent een bijbehorende in-page editor (alleen samen met `cta`). */
+  onActivate?: () => void
 }
 
 /**
@@ -101,6 +110,15 @@ export interface ToekomstOverlayProps {
   children: ReactNode
   /** Sluit de tips-overlay (zet de "Tips"-toggle uit). */
   onClose: () => void
+  /**
+   * Schort de eigen Escape-afhandeling op. De exit-melding-modal verschijnt
+   * VÓÓRDAT de overlay sluit en blijft de overlay dus `visible` terwijl de modal
+   * open is. Beide luisteren op `window` keydown; zonder deze gate zouden twee
+   * Escape-handlers tegelijk vuren (correct-bij-toeval, afhankelijk van
+   * registratie-volgorde). Staat de modal open, dan bezit hij Escape exclusief
+   * en doet de overlay niets.
+   */
+  escapeSuspended?: boolean
 }
 
 export function ToekomstOverlay({
@@ -110,10 +128,19 @@ export function ToekomstOverlay({
   onEmphasisChange,
   children,
   onClose,
+  escapeSuspended = false,
 }: ToekomstOverlayProps) {
   // Apparaten met echte hover (desktop) openen de popover bij hover; touch
   // gebruikt tik-om-te-openen + tik-naast/✕ om te sluiten.
   const canHover = useMediaQuery('(hover: hover)')
+  // Adaptieve weergave: op ruime schermen (≥1024px, de `lg:`-breakpoint die ook
+  // de lock-/scroll-logica hieronder gebruikt) tonen we de volledige ballon-
+  // inhoud (kicker + body) DIRECT leesbaar als statische kaart — niet
+  // uitklapbaar. Op smallere schermen passen 5-6 volle bodies per rij niet naast
+  // elkaar zonder overlap/overflow, dus vallen we terug op de inklapbare popover
+  // (tik/hover om te openen). Eén verdedigbare heuristiek, hergebruikt de
+  // bestaande breakpoint zodat layout-gedrag consistent kantelt.
+  const inline = useIsLgUp()
   // Portal-mount voor het ✕ (document bestaat niet tijdens SSR).
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -180,6 +207,24 @@ export function ToekomstOverlay({
     }, 140)
   }, [clearCloseTimer, onEmphasisChange])
 
+  // Inline-kaarten (≥1024px) zijn niet uitklapbaar, maar accentueren bij hover
+  // wél de bijbehorende grafiekfase — net als de popover-markers deden. Bewust
+  // EMPHASIS-ONLY: géén `openId` zetten. Anders zou (a) Escape op de overlay
+  // `close()` doen ("sluit popover") i.p.v. `onClose()` ("verlaat tips"), en
+  // (b) zouden de kaarten elkaar gaan dimmen. De korte leave-vertraging voorkomt
+  // geflikker van de grafiek-emphasis bij het bewegen tussen kaarten.
+  const emphasize = useCallback(
+    (def: OverlayBalloonDef) => {
+      clearCloseTimer()
+      onEmphasisChange(def.emphasis)
+    },
+    [clearCloseTimer, onEmphasisChange],
+  )
+  const releaseEmphasis = useCallback(() => {
+    clearCloseTimer()
+    closeTimer.current = setTimeout(() => onEmphasisChange(null), 140)
+  }, [clearCloseTimer, onEmphasisChange])
+
   // Reset wanneer de tips uitgaan of de component unmount.
   useEffect(() => {
     if (!visible) close()
@@ -187,8 +232,11 @@ export function ToekomstOverlay({
   }, [visible, close, clearCloseTimer])
 
   // Escape: eerst een open popover sluiten, anders de hele tips-overlay.
+  // Staat de exit-melding-modal open (`escapeSuspended`), dan bezit die Escape
+  // exclusief — de overlay doet dan niets (zie de prop-doc) en registreert zelfs
+  // geen listener, zodat er nooit twee window-keydown-handlers tegelijk vuren.
   useEffect(() => {
-    if (!visible) return
+    if (!visible || escapeSuspended) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (openId) close()
@@ -196,7 +244,7 @@ export function ToekomstOverlay({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [visible, openId, close, onClose])
+  }, [visible, escapeSuspended, openId, close, onClose])
 
   // Geschatte hoogte van de sticky paginakop/TopBar (binnen de tray): ~48px
   // (`h-12`) plus wat lucht. We trekken 'm van de viewport af om de beschikbare
@@ -286,11 +334,14 @@ export function ToekomstOverlay({
   const bottomBalloons = balloons.filter((b) => b.row === 'bottom')
 
   const rowProps = {
+    inline,
     canHover,
     openId,
     onOpen: open,
     onScheduleClose: scheduleClose,
     onCloseNow: close,
+    onEmphasize: emphasize,
+    onReleaseEmphasis: releaseEmphasis,
   }
 
   return (
@@ -453,44 +504,108 @@ function SummaryLine({ summary }: { summary: ToekomstOverlaySummary }) {
 function MarkerRow({
   position,
   balloons,
+  inline,
   canHover,
   openId,
   onOpen,
   onScheduleClose,
   onCloseNow,
+  onEmphasize,
+  onReleaseEmphasis,
 }: {
   position: BalloonRow
   balloons: OverlayBalloonDef[]
+  inline: boolean
   canHover: boolean
   openId: string | null
   onOpen: (def: OverlayBalloonDef) => void
   onScheduleClose: () => void
   onCloseNow: () => void
+  onEmphasize: (def: OverlayBalloonDef) => void
+  onReleaseEmphasis: () => void
 }) {
   return (
     <div
       // Stop pointerdown van bubbelen naar de ZoomableChartContainer: die doet
       // `setPointerCapture` op élke pointerdown, waardoor anders de klik/tap op een
-      // marker of CTA-knop wordt opgeslokt (CTA navigeert niet, mobiele tik voelt
-      // dood). Zelfde patroon als de Inkomen&Uitgaven-toggle in horizon-client.
+      // marker of CTA-knop wordt opgeslokt (mobiele tik voelt dood). Zelfde patroon
+      // als de Inkomen&Uitgaven-toggle in horizon-client.
       onPointerDown={(e) => e.stopPropagation()}
-      className={`relative z-10 flex flex-wrap items-center justify-center gap-2 px-3 ${
+      className={`relative z-10 flex flex-wrap items-stretch justify-center gap-2 px-3 ${
         position === 'top' ? 'pb-3' : 'pt-3'
       }`}
     >
-      {balloons.map((b) => (
-        <MarkerWithPopover
-          key={b.id}
-          def={b}
-          position={position}
-          isOpen={openId === b.id}
-          dimmed={openId != null && openId !== b.id}
-          canHover={canHover}
-          onOpen={() => onOpen(b)}
-          onScheduleClose={onScheduleClose}
-          onCloseNow={onCloseNow}
-        />
-      ))}
+      {balloons.map((b) =>
+        inline ? (
+          // Ruim scherm: volledige inhoud direct leesbaar als statische kaart.
+          // flex-wrap (op de rij) + vaste max-breedte hier garandeert dat de
+          // kaarten netjes naar meerdere regels breken — geen overlap, niets valt
+          // van het scherm.
+          <InlineBalloonCard
+            key={b.id}
+            def={b}
+            onEmphasize={() => onEmphasize(b)}
+            onReleaseEmphasis={onReleaseEmphasis}
+          />
+        ) : (
+          <MarkerWithPopover
+            key={b.id}
+            def={b}
+            position={position}
+            isOpen={openId === b.id}
+            dimmed={openId != null && openId !== b.id}
+            canHover={canHover}
+            onOpen={() => onOpen(b)}
+            onScheduleClose={onScheduleClose}
+            onCloseNow={onCloseNow}
+          />
+        ),
+      )}
+    </div>
+  )
+}
+
+/**
+ * Statische, volledig-leesbare ballon-kaart (kicker + body) — gebruikt op ruime
+ * schermen (≥1024px) waar er genoeg ruimte is om alle tips tegelijk te tonen
+ * zonder uitklappen. Vaste breedte + flex-wrap op de rij voorkomen overlap en
+ * van-het-scherm-vallen. Geen open/close-state, geen CTA: puur informatief.
+ *
+ * Bij hover accentueert de kaart wél de bijbehorende grafiekfase (emphasis-only,
+ * via de parent) — zo blijft de visuele koppeling kaart↔grafiek die de
+ * popover-markers ook hadden, zonder de kaart uitklapbaar te maken. De kaart
+ * zelf is niet-interactief (geen knop, geen tab-stop): de uitleg is altijd
+ * volledig leesbaar, de highlight is een progressieve verrijking voor
+ * muis-/trackpad-gebruikers (precies de apparaten waar inline-modus speelt).
+ */
+function InlineBalloonCard({
+  def,
+  onEmphasize,
+  onReleaseEmphasis,
+}: {
+  def: OverlayBalloonDef
+  onEmphasize: () => void
+  onReleaseEmphasis: () => void
+}) {
+  return (
+    <div
+      onMouseEnter={onEmphasize}
+      onMouseLeave={onReleaseEmphasis}
+      className="w-[min(15rem,calc((100vw-6rem)/3))] shrink-0 bg-[var(--paper)]/97 p-3 text-left text-sm leading-snug text-[var(--ink-2)] shadow-md backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg"
+      style={{
+        fontFamily: 'var(--font-source-serif, Georgia, serif)',
+        border: '1px solid var(--ink)',
+        borderLeftWidth: '4px',
+        borderLeftColor: 'var(--module-active-500)',
+      }}
+    >
+      <div className="mb-1.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--module-active-800)]">
+        <span aria-hidden className="inline-flex text-[var(--module-active-600)]">
+          {def.icon}
+        </span>
+        {def.kicker}
+      </div>
+      <p className="italic">{def.body}</p>
     </div>
   )
 }
@@ -626,13 +741,18 @@ function MarkerWithPopover({
               {def.kicker}
             </div>
             <p className="italic">{def.body}</p>
-            <button
-              type="button"
-              onClick={def.onActivate}
-              className="mt-2.5 inline-flex min-h-[36px] items-center gap-1 rounded-[var(--r-sm)] border border-[var(--module-active-300)] bg-[var(--module-active-50)] px-2.5 py-1 font-sans text-[12px] font-medium not-italic text-[var(--module-active-800)] transition-colors hover:bg-[var(--module-active-100)]"
-            >
-              {def.cta}
-            </button>
+            {/* Optionele actie-knop — de standaard tip-ballonnen zijn puur
+                informatief (geen cta/onActivate), dus deze blijft normaliter weg.
+                Alleen gerenderd als de def expliciet een actie meegeeft. */}
+            {def.cta && def.onActivate && (
+              <button
+                type="button"
+                onClick={def.onActivate}
+                className="mt-2.5 inline-flex min-h-[36px] items-center gap-1 rounded-[var(--r-sm)] border border-[var(--module-active-300)] bg-[var(--module-active-50)] px-2.5 py-1 font-sans text-[12px] font-medium not-italic text-[var(--module-active-800)] transition-colors hover:bg-[var(--module-active-100)]"
+              >
+                {def.cta}
+              </button>
+            )}
 
             {/* Sluit-knopje — vooral handig op touch (geen hover-uit). */}
             {!canHover && (

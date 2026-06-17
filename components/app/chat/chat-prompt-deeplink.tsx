@@ -19,9 +19,16 @@ import { useChatContext } from './chat-provider'
  * dezelfde prompt opnieuw afvuurt.
  */
 
+/**
+ * Kick-off-prompt voor "doorlicht mijn financiën". Eén bron van waarheid zodat
+ * zowel deze deeplink als de in-pagina "Vraag Will"-knoppen (tips-lijst /
+ * tips-teaser) exact dezelfde tekst gebruiken.
+ */
+export const ANALYSE_FINANCIEN_PROMPT =
+  'Doorlicht mijn financiën voor optimalisaties. Begin met de belangrijkste tip die je nu ziet en stel die voor.'
+
 const PROMPTS: Record<string, (params: URLSearchParams) => string> = {
-  'analyseer-mijn-financien': () =>
-    'Doorlicht mijn financiën voor optimalisaties. Begin met de belangrijkste tip die je nu ziet en stel die voor.',
+  'analyseer-mijn-financien': () => ANALYSE_FINANCIEN_PROMPT,
   'herbekijk-uitgesteld': () =>
     'Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met de belangrijkste.',
 }

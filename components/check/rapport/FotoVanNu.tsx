@@ -4,6 +4,7 @@ import type {
   ReportSnapshot,
   ReportDualBar,
   ReportMonthBalance,
+  ReportHouseInclusion,
 } from '@/lib/check/types'
 import { formatCurrency } from '@/lib/format'
 import { useInViewOnce, useReducedMotion } from './hooks'
@@ -13,6 +14,7 @@ interface FotoVanNuProps {
   snapshot: ReportSnapshot
   dualBars: ReportDualBar[]
   monthBalance: ReportMonthBalance
+  houseInclusion?: ReportHouseInclusion | null
 }
 
 function nlNum(value: number, decimals = 0): string {
@@ -22,13 +24,19 @@ function nlNum(value: number, decimals = 0): string {
 }
 
 /** Sectie 1 — Foto van nu: snapshot-cellen + dual-bars + maandbalans. */
-export function FotoVanNu({ snapshot, dualBars, monthBalance }: FotoVanNuProps) {
+export function FotoVanNu({
+  snapshot,
+  dualBars,
+  monthBalance,
+  houseInclusion = null,
+}: FotoVanNuProps) {
   const reduce = useReducedMotion()
   const { ref: dualRef, inView } = useInViewOnce<HTMLDivElement>(0.3)
 
-  // FIRE-inzetbaar totaal (alles dat meetelt) — voor de toelichting onder de bars.
-  const fireBuckets = dualBars.filter((b) => b.countsForFire)
-  const fireEur = fireBuckets.reduce((s, b) => s + b.eur, 0)
+  // Vrijheidsvermogen: het €-bedrag waaróp de vrijheidstijd rust (FIRE-eligible,
+  // huis voor 50% meegerekend). Komt rechtstreeks uit de data-laag — NIET zelf
+  // optellen uit de buckets, anders mist de 50%-huisweging.
+  const freedomBaseEur = snapshot.freedomBaseEur
 
   return (
     <section id="s1">
@@ -51,10 +59,36 @@ export function FotoVanNu({ snapshot, dualBars, monthBalance }: FotoVanNuProps) 
             </div>
             <div className="snap-value">{formatCurrency(snapshot.netWorth)}</div>
             <div className="snap-sub">
-              Genoeg om{' '}
-              <span className="vt gold">{snapshot.netWorthFreedomLabel}</span> van
-              te leven op je huidige uitgaven, zonder één euro bij te verdienen.
+              {snapshot.netWorthFreedom.isDeficit ? (
+                <>
+                  Je vrijheidsvermogen staat nog onder nul — eerst aflossen of
+                  sparen, dán begin je vrijheid op te bouwen.
+                </>
+              ) : (
+                <>
+                  Niet alles is even vrij opneembaar. Je{' '}
+                  <b className="mono tabular-nums">{formatCurrency(freedomBaseEur)}</b>{' '}
+                  vrijheidsvermogen koopt{' '}
+                  <span className="vt gold">{snapshot.netWorthFreedomLabel}</span>{' '}
+                  vrij op je huidige uitgaven — je eigen woning telt daarin voor
+                  de helft mee.
+                </>
+              )}
             </div>
+            {houseInclusion && (
+              <p
+                style={{
+                  marginTop: 10,
+                  fontSize: 12.5,
+                  lineHeight: 1.5,
+                  color: 'var(--ink-soft)',
+                  borderTop: '1px solid var(--rule)',
+                  paddingTop: 10,
+                }}
+              >
+                {houseInclusion.note}
+              </p>
+            )}
           </div>
           <div className="snap-cell">
             <div className="snap-label">
@@ -151,9 +185,26 @@ export function FotoVanNu({ snapshot, dualBars, monthBalance }: FotoVanNuProps) 
               marginTop: 16,
             }}
           >
-            De netto huiswaarde telt niet mee voor je FIRE — dat is je dak, niet
-            je rendement. De inzetbare potten ({formatCurrency(fireEur)}) vormen
-            samen je vrijgekochte tijd.
+            {snapshot.netWorthFreedom.isDeficit ? (
+              <>
+                {houseInclusion
+                  ? 'Je eigen woning telt voor de helft mee, maar samen '
+                  : 'Samen '}
+                staan je potten nog onder nul — eerst aflossen of sparen, dán
+                bouw je vrijheidsvermogen op.
+              </>
+            ) : (
+              <>
+                {houseInclusion
+                  ? 'Je eigen woning is je dak, geen spaarpot — daarom telt ze voor de helft mee. '
+                  : ''}
+                Samen vormen je potten{' '}
+                <b className="mono tabular-nums">{formatCurrency(freedomBaseEur)}</b>{' '}
+                vrijheidsvermogen: het bedrag waaruit je je{' '}
+                <span className="vt gold">{snapshot.netWorthFreedomLabel}</span>{' '}
+                vrijheid opneemt.
+              </>
+            )}
           </p>
         </div>
 

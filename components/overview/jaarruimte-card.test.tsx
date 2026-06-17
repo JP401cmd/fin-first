@@ -10,15 +10,15 @@ describe('JaarruimteCard — render (default 2026)', () => {
 
   it('toont jaarruimte-bedrag bij modaal inkomen', () => {
     render(<JaarruimteCard grossYearlyIncome={50_000} />)
-    // €4.100 onbenut (2026-franchise €19.172). Verschijnt zowel als headline
-    // als de default inleg-waarde van de slider → meerdere matches.
-    expect(screen.getAllByText(/€\s*4\.100/).length).toBeGreaterThan(0)
+    // €9.248 onbenut (30% × (50000 − 19172), 2026-franchise). Verschijnt zowel
+    // als headline als de default inleg-waarde van de slider → meerdere matches.
+    expect(screen.getAllByText(/€\s*9\.248/).length).toBeGreaterThan(0)
     expect(screen.getByText(/onbenut/i)).toBeTruthy()
   })
 
   it('toont "€ 0 onbenut" bij ruimte = 0', () => {
     render(<JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={10_000} />)
-    // pensioenAangroei > basis = 0 ruimte
+    // factor A €10.000 × 6,27 = 62.700 ≫ basis 9.248 → 0 ruimte
     expect(screen.getByText(/€ 0/)).toBeTruthy()
     expect(screen.getByText(/Je werkgever vult je pensioenaangroei volledig/i)).toBeTruthy()
   })
@@ -30,24 +30,24 @@ describe('JaarruimteCard — render (default 2026)', () => {
         marginaalTarief={0.3697}
       />,
     )
-    // Simulator-inleg default = volledige jaarruimte €4.100.
-    // 4100 × 0.3697 = 1515.77 → afgerond €1.516
-    expect(screen.getByText(/€\s*1\.51[567]/)).toBeTruthy()
+    // Simulator-inleg default = volledige jaarruimte €9.248.
+    // 9248 × 0.3697 = 3418.99 → afgerond €3.419
+    expect(screen.getByText(/€\s*3\.41[89]/)).toBeTruthy()
     expect(screen.getByText(/Belastingbesparing/i)).toBeTruthy()
   })
 
   it('toont formule-disclaimer met 2026-waarden in footer', () => {
     render(<JaarruimteCard grossYearlyIncome={50_000} />)
-    expect(screen.getByText(/13.3%/)).toBeTruthy()
+    expect(screen.getByText(/30%/)).toBeTruthy()
     expect(screen.getByText(/19\.172/)).toBeTruthy()
     expect(screen.getByText(/35\.589/)).toBeTruthy()
   })
 
   it('respecteert expliciet jaar 2025', () => {
     render(<JaarruimteCard grossYearlyIncome={50_000} year={2025} />)
-    // €4.317 onbenut (2025-franchise €17.545) — headline + slider-default.
-    expect(screen.getAllByText(/€\s*4\.317/).length).toBeGreaterThan(0)
-    expect(screen.getByText(/17\.545/)).toBeTruthy()
+    // €9.458 onbenut (30% × (50000 − 18475), 2025-franchise) — headline + slider.
+    expect(screen.getAllByText(/€\s*9\.458/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/18\.475/)).toBeTruthy()
   })
 })
 
@@ -75,55 +75,49 @@ describe('JaarruimteCard — lijfrente-simulator', () => {
   })
 })
 
-describe('JaarruimteCard — interactieve pensioen-aangroei', () => {
-  it('toont input-veld voor pensioenaangroei', () => {
+describe('JaarruimteCard — interactieve factor A', () => {
+  it('toont input-veld voor factor A', () => {
     render(<JaarruimteCard grossYearlyIncome={50_000} />)
-    expect(screen.getByLabelText(/Pensioenaangroei werkgever/i)).toBeTruthy()
+    expect(screen.getByLabelText(/Factor A/i)).toBeTruthy()
   })
 
-  it('default aangroei = 0 wanneer geen prop', () => {
+  it('default factor A = 0 wanneer geen prop', () => {
     render(<JaarruimteCard grossYearlyIncome={50_000} />)
-    const input = screen.getByLabelText(
-      /Pensioenaangroei werkgever/i,
-    ) as HTMLInputElement
+    const input = screen.getByLabelText(/Factor A/i) as HTMLInputElement
     expect(input.value).toBe('0')
   })
 
-  it('default aangroei = prop-waarde wanneer aanwezig', () => {
+  it('default factor A = prop-waarde wanneer aanwezig', () => {
     render(
-      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={3000} />,
+      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={500} />,
     )
-    const input = screen.getByLabelText(
-      /Pensioenaangroei werkgever/i,
-    ) as HTMLInputElement
-    expect(input.value).toBe('3000')
+    const input = screen.getByLabelText(/Factor A/i) as HTMLInputElement
+    expect(input.value).toBe('500')
   })
 
-  it('wijziging update de jaarruimte-berekening live', () => {
+  it('wijziging update de jaarruimte-berekening live (× 6,27)', () => {
     const { container } = render(<JaarruimteCard grossYearlyIncome={50_000} />)
-    // €50k bruto, aangroei 0 → ruimte ≈ €4.100 (2026)
-    expect(container.textContent).toMatch(/€\s*4\.100/)
-    const input = screen.getByLabelText(/Pensioenaangroei werkgever/i)
-    fireEvent.change(input, { target: { value: '2000' } })
-    // Met €2000 aangroei → ruimte ≈ €2.100
-    expect(container.textContent).toMatch(/€\s*2\.100/)
+    // €50k bruto, factor A 0 → ruimte €9.248 (2026)
+    expect(container.textContent).toMatch(/€\s*9\.248/)
+    const input = screen.getByLabelText(/Factor A/i)
+    fireEvent.change(input, { target: { value: '500' } })
+    // factor A €500 × 6,27 = 3135 → 9248 − 3135 = €6.113
+    expect(container.textContent).toMatch(/€\s*6\.113/)
   })
 
-  it('reset-knop verschijnt wanneer aangroei > 0', () => {
+  it('reset-knop verschijnt wanneer factor A > 0', () => {
     render(
-      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={3000} />,
+      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={500} />,
     )
     expect(screen.getByLabelText('Reset naar 0')).toBeTruthy()
   })
 
-  it('reset-knop zet aangroei terug naar 0', () => {
+  it('reset-knop zet factor A terug naar 0', () => {
     render(
-      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={3000} />,
+      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={500} />,
     )
     fireEvent.click(screen.getByLabelText('Reset naar 0'))
-    const input = screen.getByLabelText(
-      /Pensioenaangroei werkgever/i,
-    ) as HTMLInputElement
+    const input = screen.getByLabelText(/Factor A/i) as HTMLInputElement
     expect(input.value).toBe('0')
   })
 

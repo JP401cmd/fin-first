@@ -43,16 +43,16 @@ export function TweeToekomsten({
     delayMs: 200,
   })
 
-  // mini-grid "stop vandaag": eerst de al-vrijgekochte gouden jaren, rest leeg/grind
+  // mini-grid "stop vandaag": eerst de al-vrijgekochte GOUDEN jaren, rest leeg/grind
   const stopGold = Math.max(0, Math.round(lifeGrid.alreadyFundedYears))
-  // mini-grid "op koers": vrije jaren in horizon-paars
+  // mini-grid "op koers": geprojecteerde vrije jaren in toekomst-PAARS
   const stayFree = Math.max(0, twoFutures.stayFreeYears ?? 0)
 
   return (
-    <section id="s4" ref={ref}>
+    <section id="s3" ref={ref}>
       <div className="wrap">
         <div className="eyebrow">
-          <span className="num">4</span> Twee toekomsten{' '}
+          <span className="num">3</span> Twee toekomsten{' '}
           <span className="swatch" style={{ background: 'var(--horizon)' }} />
         </div>
         <h2>Het punt waarop werken een keuze wordt</h2>
@@ -93,7 +93,9 @@ export function TweeToekomsten({
             </div>
             <div className="future-big">{twoFutures.stopTodayLabel}</div>
             <div className="future-sub">
-              vrijheid, daarna weer afhankelijk van inkomen.
+              {twoFutures.stopToday.isDeficit
+                ? 'eerst aflossen of sparen voor je vrijheid opbouwt.'
+                : 'vrijheid, daarna weer afhankelijk van inkomen.'}
             </div>
           </div>
           <div className="future stay">
@@ -152,7 +154,9 @@ export function TweeToekomsten({
 
         {/* onttrekking */}
         <h3 className="sub">
-          {fireAge != null ? `Onttrekking na je ${fireAge}e` : 'Onttrekking na FIRE'}
+          {fireAge != null
+            ? `Onttrekking na je ${fireAge}e`
+            : 'Onttrekking als je vrij bent'}
         </h3>
         <table className="data">
           <thead>

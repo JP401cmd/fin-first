@@ -11,26 +11,27 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CheckIntake, HouseholdComposition, RiskProfile } from './types'
+import type { CheckIntake, CheckIntakeLifeEvent } from './types'
 
 const DRAFT_KEY = 'vrijheidscheck_draft'
 
 // Stap-enum — numeriek zodat vergelijken/vergelijken eenvoudig is
 export type CheckStep =
-  | 'jij'           // ① geboortedatum + huishouden + optioneel voornaam
-  | 'inkomen'       // ② netto maandinkomen + optioneel bruto jaar
-  | 'uitgaven'      // ③ wonen / vaste lasten / vrij + totaal
-  | 'buffer'        // ④ noodfonds/buffer-saldo
-  | 'bezittingen'   // ⑤ QuickAddWizard collect
-  | 'schulden'      // ⑥ schuldenlijst
-  | 'pensioen'      // ⑦ AOW + rendement/risico
-  | 'doel'          // ⑧ grootste doel (optioneel)
-  | 'email'         // e-mailpoort + AVG-consent + Turnstile
-  | 'verzenden'     // laad-/successtaat
+  | 'jij'             // ① geboortedatum + huishouden + optioneel voornaam
+  | 'inkomen'         // ② netto maandinkomen
+  | 'uitgaven'        // ③ wonen / vaste lasten / vrij + totaal
+  | 'buffer'          // ④ noodfonds/buffer-saldo
+  | 'bezittingen'     // ⑤ bezittingenlijst (+ optioneel rendement)
+  | 'schulden'        // ⑥ schuldenlijst
+  | 'pensioen'        // ⑦ AOW + rendement/risico + uitgaven na pensioen
+  | 'gebeurtenissen'  // ⑧ levensgebeurtenissen (optioneel)
+  | 'doel'            // ⑨ grootste doel (optioneel)
+  | 'email'           // e-mailpoort + AVG-consent + Turnstile
+  | 'verzenden'       // laad-/successtaat
 
 export const STEP_ORDER: CheckStep[] = [
   'jij', 'inkomen', 'uitgaven', 'buffer',
-  'bezittingen', 'schulden', 'pensioen', 'doel', 'email', 'verzenden',
+  'bezittingen', 'schulden', 'pensioen', 'gebeurtenissen', 'doel', 'email', 'verzenden',
 ]
 
 export function stepIndex(step: CheckStep): number {
@@ -40,7 +41,7 @@ export function stepIndex(step: CheckStep): number {
 /** Alleen de wizard-stappen (zonder email/verzenden) voor de voortgangsbalk. */
 export const INTAKE_STEPS: CheckStep[] = [
   'jij', 'inkomen', 'uitgaven', 'buffer',
-  'bezittingen', 'schulden', 'pensioen', 'doel',
+  'bezittingen', 'schulden', 'pensioen', 'gebeurtenissen', 'doel',
 ]
 
 /** Draft-omhulling — intake + e-mailpoort + huidige stap. */
@@ -49,6 +50,7 @@ export interface CheckDraft {
   intake: Partial<CheckIntake> & {
     assets: CheckIntake['assets']
     debts: CheckIntake['debts']
+    lifeEvents: CheckIntakeLifeEvent[]
   }
   /** E-mailpoort — apart bewaard, niet in CheckIntake. */
   email: string
@@ -62,6 +64,7 @@ function buildEmptyDraft(): CheckDraft {
     intake: {
       assets: [],
       debts: [],
+      lifeEvents: [],
       expenses: {
         wonen: 0,
         vasteLasten: 0,
@@ -85,6 +88,7 @@ function loadFromStorage(): CheckDraft | null {
     // Zorg dat arrays bestaan ook bij oudere opgeslagen versies
     if (!Array.isArray(parsed.intake?.assets)) parsed.intake.assets = []
     if (!Array.isArray(parsed.intake?.debts)) parsed.intake.debts = []
+    if (!Array.isArray(parsed.intake?.lifeEvents)) parsed.intake.lifeEvents = []
     if (!parsed.intake?.expenses) {
       parsed.intake.expenses = { wonen: 0, vasteLasten: 0, vrijBesteedbaar: 0, totaalMaand: 0 }
     }
@@ -261,7 +265,12 @@ export function isStepPensioenComplete(_intake: CheckDraft['intake']): boolean {
   return true
 }
 
-/** Stap ⑧ doel is altijd optioneel. */
+/** Stap ⑧ levensgebeurtenissen is altijd optioneel. */
+export function isStepGebeurtenissenComplete(_intake: CheckDraft['intake']): boolean {
+  return true
+}
+
+/** Stap ⑨ doel is altijd optioneel. */
 export function isStepDoelComplete(_intake: CheckDraft['intake']): boolean {
   return true
 }

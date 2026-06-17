@@ -2,7 +2,17 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { PiggyBank, Landmark, Plus, Trash2, ChevronLeft, Pencil } from 'lucide-react'
+import {
+  PiggyBank,
+  Landmark,
+  Plus,
+  Trash2,
+  ChevronLeft,
+  Pencil,
+  Calculator,
+  ChevronRight,
+  ChevronDown,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   annuitizePension,
@@ -11,7 +21,11 @@ import {
   type LifeEvent,
 } from '@/lib/horizon-data'
 import { formatCurrency, formatWithFreedom } from '@/lib/format'
+import { computeJaarruimte, estimateFactorAFromSalary } from '@/lib/jaarruimte'
 import { previewFireAge, type PreviewBaseline } from '@/lib/strategy-preview'
+import { PensionPdfUpload } from '@/components/app/horizon/pension-pdf-upload'
+import { applyPensionParseResult } from '@/lib/pension/apply-parse-result'
+import type { PensionParseResult } from '@/app/api/pension/parse/route'
 import { StrategieModalShell, StrategieFooter } from './strategie-modal-shell'
 import { LabeledNumber, TriggerButton } from './fields'
 
@@ -143,14 +157,6 @@ function eventFromPot(p: PotDraft): LifeEvent {
   }
 }
 
-function schatJaarruimte(brutoJaarinkomen: number): number {
-  const FRANCHISE = 17545
-  const PCT = 0.133
-  const MAX = 34950
-  const grondslag = Math.max(0, brutoJaarinkomen - FRANCHISE)
-  return Math.min(MAX, Math.round(grondslag * PCT))
-}
-
 interface Props {
   pensionEvents: LifeEvent[]
   allEvents: LifeEvent[]
@@ -160,6 +166,12 @@ interface Props {
   aowAge: number
   /** Bruto jaarinkomen voor de jaarruimte-schatting (0 = verbergen). */
   grossYearlyIncome: number
+  /** Factor A (jaarlijkse pensioenaangroei uit UPO), uit de loader-bundel via
+   *  de canonieke resolver. 0 = niet ingevuld → jaarruimte zonder factor-A-aftrek. */
+  pensioenFactorA: number
+  /** Woonsituatie voor de AOW-hoogte bij de JSON-import van mijnpensioen.nl
+   *  (samenwonend → lager AOW-bedrag, alleenstaand → hoger). Default: samenwonend. */
+  samenwonend?: boolean
   onClose: () => void
   readOnly?: boolean
 }
@@ -171,6 +183,8 @@ export function PensioenStrategieEditor({
   dailyExpenses,
   aowAge,
   grossYearlyIncome,
+  pensioenFactorA,
+  samenwonend = true,
   onClose,
   readOnly,
 }: Props) {
@@ -179,6 +193,97 @@ export function PensioenStrategieEditor({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showJaarruimte, setShowJaarruimte] = useState(false)
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null)
+
+  // Factor A-uitvraag (list-view). Beginwaarde = de prop; leeg veld = onbekend.
+  const [factorAInput, setFactorAInput] = useState<string>(
+    pensioenFactorA > 0 ? String(Math.round(pensioenFactorA)) : '',
+  )
+  // Bron volgt de invoerroute: directe invoer = 'upo', salaris-schatting = 'estimated'.
+  const [factorASource, setFactorASource] = useState<'upo' | 'estimated'>('upo')
+  const [salaryMode, setSalaryMode] = useState(false)
+  const [showJaarruimteUitleg, setShowJaarruimteUitleg] = useState(false)
+  const [salaryInput, setSalaryInput] = useState<string>('')
+  const [savingFactorA, setSavingFactorA] = useState(false)
+  const [factorAMsg, setFactorAMsg] = useState<string | null>(null)
+
+  // Geparste factor A uit het invoerveld (leeg → null = onbekend).
+  const factorAValue: number | null =
+    factorAInput.trim() === '' ? null : Math.max(0, Number(factorAInput) || 0)
+
+  function applySalaryEstimate() {
+    const salary = Number(salaryInput) || 0
+    if (salary <= 0) return
+    const est = estimateFactorAFromSalary(salary, { year: 2026 })
+    setFactorAInput(String(Math.round(est)))
+    setFactorASource('estimated')
+    setFactorAMsg(null)
+  }
+
+  async function saveFactorA() {
+    setSavingFactorA(true)
+    setError(null)
+    setFactorAMsg(null)
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setError('Niet ingelogd — kan factor A niet opslaan.')
+      setSavingFactorA(false)
+      return
+    }
+    // Leeg → terug naar onbekend (NULL ≠ 0).
+    const update =
+      factorAValue === null
+        ? { pension_factor_a: null, pension_factor_a_source: null }
+        : { pension_factor_a: factorAValue, pension_factor_a_source: factorASource }
+    const { error: e } = await supabase.from('profiles').update(update).eq('id', user.id)
+    if (e) {
+      setError(`Opslaan mislukt: ${e.message}`)
+      setSavingFactorA(false)
+      return
+    }
+    setSavingFactorA(false)
+    setFactorAMsg(factorAValue === null ? 'Factor A gewist.' : 'Factor A opgeslagen.')
+    router.refresh()
+  }
+
+  async function handleUploadParseResult(result: unknown) {
+    setError(null)
+    setUploadMsg(null)
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setError('Niet ingelogd — kan pensioenoverzicht niet verwerken.')
+      return
+    }
+    const outcome = await applyPensionParseResult({
+      supabase,
+      userId: user.id,
+      parseResult: result as PensionParseResult,
+      existingPensionCount: pensionEvents.length,
+    })
+    if (outcome.error) {
+      setError(`Verwerken mislukt: ${outcome.error}`)
+      return
+    }
+    if (outcome.insertedCount === 0 && !outcome.aowUpdated) {
+      setUploadMsg('Geen werknemerspensioen of AOW gevonden in dit overzicht.')
+      return
+    }
+    const delen: string[] = []
+    if (outcome.insertedCount > 0) {
+      delen.push(
+        `${outcome.insertedCount} pensioenpot${outcome.insertedCount === 1 ? '' : 'ten'} toegevoegd`,
+      )
+    }
+    if (outcome.aowUpdated) delen.push('AOW bijgewerkt')
+    setUploadMsg(`${delen.join(' · ')} uit je overzicht.`)
+    router.refresh()
+  }
 
   const totalBruto = useMemo(
     () => pensionEvents.reduce((s, ev) => s + Number(ev.monthly_income_change ?? 0), 0),
@@ -293,7 +398,12 @@ export function PensioenStrategieEditor({
 
   // ── LIST VIEW ──
   if (!draft) {
-    const jaarruimte = schatJaarruimte(grossYearlyIncome)
+    // Canonieke jaarruimte-engine (lib/jaarruimte.ts) — geen lokale duplicaat.
+    // Live met de waarde uit het invoerveld (factorAValue); leeg → 0 = zonder aftrek.
+    const effectiveFactorA = factorAValue ?? 0
+    const jaarruimte = computeJaarruimte(grossYearlyIncome, effectiveFactorA, 2026).jaarruimte
+    // Framing: niets ingevuld én factor A 0 → bovengrens; anders verlaagde ruimte.
+    const isUpperBound = effectiveFactorA === 0 && factorAValue === null
     return (
       <StrategieModalShell
         open
@@ -346,6 +456,27 @@ export function PensioenStrategieEditor({
           )}
 
           {!readOnly && (
+            <div className="rounded-2xl border border-[var(--border-ed)] bg-horizon-50/30 p-4">
+              <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Pensioenoverzicht uploaden
+              </div>
+              <p className="mb-3 mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+                Upload je overzicht van mijnpensioenoverzicht.nl — PDF of JSON-export — dan vullen
+                we je werknemerspensioen en AOW automatisch in.
+              </p>
+              <PensionPdfUpload
+                onParseResult={handleUploadParseResult}
+                samenwonend={samenwonend}
+              />
+              {uploadMsg && (
+                <p role="status" className="mt-2 text-xs font-medium text-[var(--ink-2)]">
+                  {uploadMsg}
+                </p>
+              )}
+            </div>
+          )}
+
+          {!readOnly && (
             <button
               type="button"
               onClick={openNew}
@@ -373,24 +504,200 @@ export function PensioenStrategieEditor({
           )}
 
           {grossYearlyIncome > 0 && (
-            <div className="rounded-xl border border-[var(--border-ed)] p-3 text-xs text-[var(--ink-2)]">
+            <div className="rounded-xl border border-[var(--border-ed)] text-xs text-[var(--ink-2)]">
               <button
                 type="button"
                 onClick={() => setShowJaarruimte((s) => !s)}
-                className="font-medium text-[var(--ink-2)] hover:underline"
+                aria-expanded={showJaarruimte}
+                aria-controls="jaarruimte-section"
+                className="flex w-full items-start gap-3 rounded-xl p-3 text-left transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)]"
               >
-                💡 Jaarruimte berekenen {showJaarruimte ? '−' : '→'}
+                <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)]">
+                  <Calculator className="h-4 w-4" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                    Jaarruimte
+                  </span>
+                  <span className="mt-0.5 block text-sm font-semibold text-[var(--ink)]">
+                    Bereken je fiscale ruimte
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-relaxed text-[var(--ink-3)]">
+                    Bereken hoeveel je fiscaal voordelig opzij mag zetten voor extra pensioen.
+                  </span>
+                </span>
+                {showJaarruimte ? (
+                  <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
+                ) : (
+                  <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
+                )}
               </button>
               {showJaarruimte && (
-                <p className="mt-2 leading-relaxed text-[var(--ink-3)]">
-                  Je mag dit jaar naar schatting{' '}
-                  <span className="font-mono tabular-nums text-[var(--ink-2)]">
-                    {formatCurrency(jaarruimte)}
-                  </span>{' '}
-                  fiscaalvriendelijk in lijfrente inleggen (13,3% van je premiegrondslag).
-                  Niet-benutte ruimte van eerdere jaren (reserveringsruimte) vind je op
-                  mijnpensioenoverzicht.nl.
-                </p>
+                <div id="jaarruimte-section" className="space-y-4 px-3 pb-3">
+                  {/* 0 — Inline uitleg "Wat is jaarruimte?" */}
+                  <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowJaarruimteUitleg((s) => !s)}
+                      aria-expanded={showJaarruimteUitleg}
+                      aria-controls="jaarruimte-uitleg-inline"
+                      className="flex w-full items-center justify-between gap-2 text-left font-medium text-[var(--ink-2)] hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)]"
+                    >
+                      <span>Wat is jaarruimte?</span>
+                      {showJaarruimteUitleg ? (
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--ink-3)]" aria-hidden />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--ink-3)]" aria-hidden />
+                      )}
+                    </button>
+                    {showJaarruimteUitleg && (
+                      <div id="jaarruimte-uitleg-inline" className="mt-2 space-y-2 leading-relaxed text-[var(--ink-3)]">
+                        <p>
+                          Het bedrag dat je dit jaar fiscaal voordelig opzij mag zetten voor
+                          extra pensioen via een lijfrente — je trekt de inleg af in Box 1.
+                          Bouw je al pensioen op via je werkgever (factor A), dan verlaagt
+                          dat je ruimte.
+                        </p>
+                        <p className="font-mono text-[11px] text-[var(--ink-2)]">
+                          30% × (inkomen − franchise) − 6,27 × factor A
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 1 — Jaarruimte tonen */}
+                  <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+                    <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                      {isUpperBound
+                        ? 'Bovengrens vóór aftrek werkgeverspensioen'
+                        : 'Jouw geschatte ruimte'}
+                    </div>
+                    <div className="mt-1 font-mono text-xl tabular-nums text-[var(--ink)]">
+                      {formatCurrency(jaarruimte)}
+                      <span className="ml-1 text-sm text-[var(--ink-3)]">/ jaar</span>
+                    </div>
+                    {dailyExpenses > 0 && jaarruimte > 0 && (
+                      <div className="mt-0.5 text-xs text-[var(--ink-3)]">
+                        {formatWithFreedom(jaarruimte, dailyExpenses)} per jaar
+                      </div>
+                    )}
+                    <p className="mt-1 leading-relaxed text-[var(--ink-3)]">
+                      Dit mag je dit jaar naar schatting fiscaalvriendelijk in lijfrente
+                      inleggen (30% van je premiegrondslag).{' '}
+                      {isUpperBound
+                        ? 'Vul je factor A in voor een nauwkeuriger getal.'
+                        : 'Verlaagd met je werkgeverspensioen (factor A).'}
+                    </p>
+                  </div>
+
+                  {/* 2 — Factor A-invoer */}
+                  <div>
+                    <label
+                      htmlFor="factor-a-input"
+                      className="block text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]"
+                    >
+                      Hoeveel pensioen bouwt je werkgever op? (factor A)
+                    </label>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <span className="text-sm text-[var(--ink-3)]">€</span>
+                      <input
+                        id="factor-a-input"
+                        type="number"
+                        min={0}
+                        step={50}
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={factorAInput}
+                        onChange={(e) => {
+                          setFactorAInput(e.target.value)
+                          setFactorASource('upo')
+                          setFactorAMsg(null)
+                        }}
+                        className="w-32 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] outline-none focus:border-[var(--ink)]"
+                      />
+                      <span className="text-xs text-[var(--ink-3)]">/ jaar</span>
+                    </div>
+                    {factorASource === 'estimated' && factorAValue !== null && (
+                      <p className="mt-1 text-xs font-medium text-[var(--ink-2)]">
+                        Indicatie op basis van je salaris — vul het echte getal van je UPO
+                        in als je het hebt.
+                      </p>
+                    )}
+                    <p className="mt-1.5 leading-relaxed text-[var(--ink-3)]">
+                      Factor A = hoeveel je toekomstige jáárlijkse pensioen er dit jaar bij
+                      kreeg. Staat op je UPO (Uniform Pensioenoverzicht) van je
+                      pensioenfonds. Geen werkgeverspensioen (zzp)? Vul 0 in.
+                    </p>
+                  </div>
+
+                  {/* 3 — Salaris-alternatief */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setSalaryMode((s) => !s)}
+                      aria-expanded={salaryMode}
+                      aria-controls="salary-mode-section"
+                      className="font-medium text-[var(--ink-2)] underline-offset-2 hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-3)]"
+                    >
+                      Weet je het niet? Schat &apos;m uit je salaris {salaryMode ? '−' : '→'}
+                    </button>
+                    {salaryMode && (
+                      <div id="salary-mode-section" className="mt-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+                        <label
+                          htmlFor="salary-input"
+                          className="block text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]"
+                        >
+                          Bruto jaarsalaris
+                        </label>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <span className="text-sm text-[var(--ink-3)]">€</span>
+                          <input
+                            id="salary-input"
+                            type="number"
+                            min={0}
+                            step={1000}
+                            inputMode="numeric"
+                            placeholder="bv. 45000"
+                            value={salaryInput}
+                            onChange={(e) => setSalaryInput(e.target.value)}
+                            className="w-32 rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] outline-none focus:border-[var(--ink)]"
+                          />
+                          <span className="text-xs text-[var(--ink-3)]">/ jaar</span>
+                        </div>
+                        <p className="mt-1.5 leading-relaxed text-[var(--ink-3)]">
+                          Schatting op basis van gemiddelde pensioenopbouw — niet bindend; je
+                          exacte factor A staat op je UPO.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={applySalaryEstimate}
+                          disabled={!(Number(salaryInput) > 0)}
+                          className="mt-2 inline-flex min-h-[44px] items-center rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2.5 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Schat factor A
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4 — Opslaan */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={saveFactorA}
+                      disabled={savingFactorA}
+                      className="rounded-lg bg-[var(--ink)] px-4 py-2 text-xs font-semibold text-[var(--paper)] transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {savingFactorA ? 'Opslaan…' : 'Factor A opslaan'}
+                    </button>
+                    {factorAMsg && (
+                      <span role="status" className="text-[11px] font-medium text-[var(--ink-2)]">
+                        {factorAMsg}
+                      </span>
+                    )}
+                  </div>
+
+                </div>
               )}
             </div>
           )}

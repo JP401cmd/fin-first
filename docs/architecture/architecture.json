@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-17T08:43:45.710Z",
+  "generatedAt": "2026-06-17T19:30:47.276Z",
   "generatedDate": "2026-06-17",
   "repo": {
     "name": "fin",
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 321,
+    "routes": 322,
     "routesProduction": 98,
-    "api": 379,
-    "tables": 55,
-    "migrations": 111,
+    "api": 381,
+    "tables": 56,
+    "migrations": 114,
     "integrations": 25,
-    "components": 724,
+    "components": 734,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -337,6 +337,12 @@
     {
       "url": "/beheer/horizon-tabellen-mij",
       "file": "app/(app)/beheer/horizon-tabellen-mij/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/integraties",
+      "file": "app/(app)/beheer/integraties/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -2270,6 +2276,12 @@
         "isTest": false
       },
       {
+        "url": "/beheer/integraties",
+        "file": "app/(app)/beheer/integraties/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
         "url": "/beheer/jobs",
         "file": "app/(app)/beheer/jobs/page.tsx",
         "group": "beheer",
@@ -4197,6 +4209,14 @@
       ]
     },
     {
+      "url": "/api/admin/integraties/health",
+      "file": "app/api/admin/integraties/health/route.ts",
+      "domain": "admin",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/admin/news-active-prompt",
       "file": "app/api/admin/news-active-prompt/route.ts",
       "domain": "admin",
@@ -5597,6 +5617,15 @@
       "domain": "overzicht",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/overzicht/page-status",
+      "file": "app/api/overzicht/page-status/route.ts",
+      "domain": "overzicht",
+      "methods": [
+        "GET",
+        "PUT"
       ]
     },
     {
@@ -7234,7 +7263,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 32,
+      "count": 33,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -7332,6 +7361,14 @@
           "methods": [
             "GET",
             "PATCH"
+          ]
+        },
+        {
+          "url": "/api/admin/integraties/health",
+          "file": "app/api/admin/integraties/health/route.ts",
+          "domain": "admin",
+          "methods": [
+            "POST"
           ]
         },
         {
@@ -8726,6 +8763,30 @@
       ]
     },
     {
+      "domain": "overzicht",
+      "label": "overzicht",
+      "count": 2,
+      "routes": [
+        {
+          "url": "/api/overzicht/cashflow-status",
+          "file": "app/api/overzicht/cashflow-status/route.ts",
+          "domain": "overzicht",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/overzicht/page-status",
+          "file": "app/api/overzicht/page-status/route.ts",
+          "domain": "overzicht",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "pension",
       "label": "pension",
       "count": 2,
@@ -9431,21 +9492,6 @@
           "methods": [
             "GET",
             "PUT"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "overzicht",
-      "label": "overzicht",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/overzicht/cashflow-status",
-          "file": "app/api/overzicht/cashflow-status/route.ts",
-          "domain": "overzicht",
-          "methods": [
-            "GET"
           ]
         }
       ]
@@ -12112,6 +12158,10 @@
         "migration": "supabase/migrations/20260213122235_add_category_corrections.sql"
       },
       {
+        "name": "contract_events",
+        "migration": "supabase/migrations/20260617190000_create_contract_events.sql"
+      },
+      {
         "name": "crypto_holding_prices",
         "migration": "supabase/migrations/20260502000003_split_holdings_tables.sql"
       },
@@ -12276,7 +12326,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 111
+    "migrationCount": 114
   },
   "tablesByDomain": [
     {
@@ -12338,6 +12388,10 @@
         {
           "name": "category_corrections",
           "migration": "supabase/migrations/20260213122235_add_category_corrections.sql"
+        },
+        {
+          "name": "contract_events",
+          "migration": "supabase/migrations/20260617190000_create_contract_events.sql"
         },
         {
           "name": "external_data_sources",
@@ -12602,11 +12656,11 @@
     }
   ],
   "components": {
-    "total": 724,
+    "total": 734,
     "groups": [
       {
         "group": "app",
-        "count": 305,
+        "count": 309,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12811,6 +12865,9 @@
           "ownership-toggle",
           "page-action-bar",
           "page-skeleton",
+          "page-status-banner",
+          "page-status-dot",
+          "page-status-provider",
           "pending-transfer-banner",
           "pension-pdf-upload",
           "persona-card",
@@ -12880,6 +12937,7 @@
           "sync-status-badge",
           "toast-provider",
           "toekomst-exit-notice",
+          "toekomst-exit-notice.test",
           "toekomst-overlay",
           "toekomst-overlay.test",
           "toekomst-welcome",
@@ -12917,7 +12975,7 @@
       },
       {
         "group": "overview",
-        "count": 117,
+        "count": 118,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -12990,6 +13048,7 @@
           "info-tooltip",
           "jaarruimte-card",
           "jaarruimte-card.test",
+          "jaarruimte-deeplink-scroll",
           "koppel-rekening-banner",
           "koppel-rekening-banner.test",
           "leverage-card",
@@ -13175,7 +13234,7 @@
       },
       {
         "group": "future",
-        "count": 50,
+        "count": 51,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
@@ -13204,6 +13263,7 @@
           "onttrekkingsvolgorde-body",
           "owner-stats-badge",
           "pensioen-strategie-editor",
+          "pensioen-strategie-editor.test",
           "pot-flow-diagram",
           "print-tijdas-button",
           "publish-curation-sheet",
@@ -13227,6 +13287,40 @@
           "voorkeuren-view",
           "voorkeuren-view.test",
           "werk-strategie-editor"
+        ]
+      },
+      {
+        "group": "check",
+        "count": 28,
+        "items": [
+          "BlikOpToekomst",
+          "CtaSection",
+          "DeKruising",
+          "DownloadButton",
+          "FotoVanNu",
+          "Gezondheidsgetal",
+          "LifeGrid",
+          "Masthead",
+          "NavIndex",
+          "RapportFooter",
+          "RapportNieuws",
+          "RapportView",
+          "ReadingProgress",
+          "Toekomst",
+          "TweeToekomsten",
+          "WillZetten",
+          "check-wizard",
+          "check-wizard-section",
+          "step-bezittingen",
+          "step-buffer",
+          "step-doel",
+          "step-email",
+          "step-gebeurtenissen",
+          "step-inkomen",
+          "step-jij",
+          "step-pensioen",
+          "step-schulden",
+          "step-uitgaven"
         ]
       },
       {
@@ -13259,36 +13353,6 @@
           "palette-picker.test",
           "privacy-overview",
           "privacy-overview.test"
-        ]
-      },
-      {
-        "group": "check",
-        "count": 24,
-        "items": [
-          "BlikOpToekomst",
-          "CtaSection",
-          "DeKruising",
-          "FotoVanNu",
-          "Gezondheidsgetal",
-          "LifeGrid",
-          "Masthead",
-          "NavIndex",
-          "RapportFooter",
-          "RapportView",
-          "ReadingProgress",
-          "TweeToekomsten",
-          "WillZetten",
-          "check-wizard",
-          "check-wizard-section",
-          "step-bezittingen",
-          "step-buffer",
-          "step-doel",
-          "step-email",
-          "step-inkomen",
-          "step-jij",
-          "step-pensioen",
-          "step-schulden",
-          "step-uitgaven"
         ]
       },
       {
@@ -14551,6 +14615,12 @@
           "write": true
         }
       ],
+      "overzicht": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "own-accounts": [
         {
           "name": "bank_accounts",
@@ -15052,6 +15122,14 @@
           "write": true,
           "routes": [
             "/api/onboarding-steps"
+          ]
+        },
+        {
+          "domain": "overzicht",
+          "label": "overzicht",
+          "write": true,
+          "routes": [
+            "/api/overzicht/page-status"
           ]
         },
         {
@@ -17738,6 +17816,11 @@
         "user": false,
         "household": false,
         "rls": true
+      },
+      "contract_events": {
+        "user": false,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -18021,6 +18104,32 @@
       ],
       "summary": "De publieke Vrijheidscheck-funnel (`/check`) laat een anonieme bezoeker een korte intake doen, krijgt server-side een Vrijheidsrapport berekend en converteert daarna naar een account. Omdat de bezoeker op dat moment nog niet in `auth.users` bestaat, loopt het schrijven via een se",
       "file": "docs/adr/0022-vrijheidscheck-publieke-intake.md"
+    },
+    {
+      "id": "0023-jaarruimte-wtp-30pct-correctie",
+      "title": "Jaarruimte-rekenmotor gecorrigeerd — 30% opbouw (WTP) + factor A × 6,27",
+      "status": "aanvaard",
+      "date": "2026-06-17",
+      "elements": [
+        "as-belasting"
+      ],
+      "summary": "De jaarruimte-rekenmotor (`lib/jaarruimte.ts`, art. 3.127 Wet IB 2001) rekende fiscaal onjuist: een verouderd opbouwpercentage van 13,3% (verkeerd benoemd als `JAARRUIMTE_FACTOR_A`), mislabelde 2025-constanten en een rauwe euro-aftrek voor werkgeverspensioen. Dit besluit legt de ",
+      "file": "docs/adr/0023-jaarruimte-wtp-30pct-correctie.md"
+    },
+    {
+      "id": "0024-integratie-contractbewaking",
+      "title": "Integratie-inventaris, liveness-probes en contractbewaking",
+      "status": "accepted",
+      "date": "2026-06-17",
+      "elements": [
+        "as-import",
+        "t-marktdata",
+        "t-bankimport",
+        "do-contract-events",
+        "app-comp"
+      ],
+      "summary": "De app ondersteunt 14 externe koppelingen en uploads (brokers, exchanges, PSD2, marktdata, bestandsformaten). Dit besluit verankert de zelfactualiserende beheer-laag die die koppelingen bewaakt: een gecureerde inventaris (`lib/architecture/integrations-model.ts`), publieke livene",
+      "file": "docs/adr/0024-integratie-contractbewaking.md"
     }
   ],
   "churn": {
@@ -18040,18 +18149,18 @@
       },
       {
         "path": "lib/fire-simulation.ts",
-        "commits": 20
+        "commits": 17
       },
       {
         "path": "app/api/ai",
         "commits": 13
       },
       {
-        "path": "lib/horizon-data.ts",
-        "commits": 10
+        "path": "app/api/household",
+        "commits": 9
       },
       {
-        "path": "app/api/household",
+        "path": "lib/horizon-data.ts",
         "commits": 9
       },
       {
@@ -18070,23 +18179,23 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 7042,
-        "commits": 99
+        "loc": 6928,
+        "commits": 91
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 4866,
-        "commits": 26
+        "commits": 25
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4135,
+        "loc": 4082,
         "commits": 41
       },
       {
         "file": "lib/release-notes.ts",
         "loc": 2763,
-        "commits": 4
+        "commits": 3
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -18101,7 +18210,7 @@
       {
         "file": "lib/horizon-data.ts",
         "loc": 2257,
-        "commits": 10
+        "commits": 9
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -18775,40 +18884,115 @@
       }
     ]
   },
+  "integrationClients": [
+    {
+      "file": "lib/integrations/bitvavo-client.ts",
+      "exists": true,
+      "baseUrl": "https://api.bitvavo.com/v2",
+      "hasAdapter": true,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/integrations/blockchair-client.ts",
+      "exists": true,
+      "baseUrl": "https://api.blockchair.com",
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/integrations/coinbase-client.ts",
+      "exists": true,
+      "baseUrl": "https://api.coinbase.com",
+      "hasAdapter": true,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/integrations/coingecko-client.ts",
+      "exists": true,
+      "baseUrl": "https://api.coingecko.com/api/v3",
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/integrations/fmp-client.ts",
+      "exists": true,
+      "baseUrl": "https://financialmodelingprep.com",
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/integrations/kraken-client.ts",
+      "exists": true,
+      "baseUrl": "https://api.kraken.com",
+      "hasAdapter": true,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/integrations/trading212-client.ts",
+      "exists": true,
+      "baseUrl": "https://live.trading212.com",
+      "hasAdapter": true,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/parsers/broker-csv.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": "csv"
+    },
+    {
+      "file": "lib/parsers/csv.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": "csv"
+    },
+    {
+      "file": "lib/parsers/mt940.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": "mt940"
+    },
+    {
+      "file": "lib/parsers/ofx.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": "ofx"
+    },
+    {
+      "file": "lib/truelayer/client.ts",
+      "exists": true,
+      "baseUrl": "https://auth.truelayer-sandbox.com",
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "lib/nibud/api-client.ts",
+      "exists": true,
+      "baseUrl": "https://api.nibud.nl/v6",
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
+      "file": "app/api/pension/parse/route.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    }
+  ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-16",
+    "previousDate": "2026-06-17",
     "hasChanges": true,
     "sections": [
       {
         "label": "Schermen",
         "added": [
-          "/check",
-          "/check/activeren",
-          "/check/rapport"
-        ],
-        "removed": []
-      },
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/check/activate",
-          "/api/check/submit"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Tabellen",
-        "added": [
-          "intake_rate_limit",
-          "lead_intakes"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+25"
+          "/beheer/integraties"
         ],
         "removed": []
       }
@@ -18866,9 +19050,9 @@
     },
     {
       "date": "2026-06-17",
-      "api": 379,
-      "components": 724,
-      "tables": 55,
+      "api": 381,
+      "components": 734,
+      "tables": 56,
       "routesProduction": 98
     }
   ]

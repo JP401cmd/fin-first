@@ -3,11 +3,11 @@
 import { useState, useId } from 'react'
 import Link from 'next/link'
 import type { CheckDraft } from '@/lib/check/use-check-draft'
+import { primaryBtn, backBtn, fieldLabel, inputBase, inputError, errorText, hintText } from '../intake-styles'
 
 interface Props {
   draft: CheckDraft
   onEmailChange: (email: string) => void
-  onFirstNameChange: (name: string) => void
   onConsentChange: (ts: string | null) => void
   onSubmit: () => void
   onBack: () => void
@@ -37,7 +37,6 @@ function TurnstilePlaceholder({ siteKey }: { siteKey: string | undefined }) {
 export function StepEmail({
   draft,
   onEmailChange,
-  onFirstNameChange,
   onConsentChange,
   onSubmit,
   onBack,
@@ -46,7 +45,6 @@ export function StepEmail({
 }: Props) {
   const [submitted, setSubmitted] = useState(false)
   const emailId = useId()
-  const nameId = useId()
   const consentId = useId()
 
   const siteKey = typeof process !== 'undefined'
@@ -76,28 +74,17 @@ export function StepEmail({
 
   return (
     <div className="space-y-6">
-      {/* Voornaam (optioneel — was ook in stap ①, hier herhalen als niet al ingevuld) */}
-      {!draft.firstName && (
-        <div>
-          <label htmlFor={nameId} className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
-            Voornaam{' '}
-            <span className="text-xs font-normal italic text-[var(--ink-3)]">(optioneel)</span>
-          </label>
-          <input
-            id={nameId}
-            type="text"
-            value={draft.firstName ?? ''}
-            onChange={(e) => onFirstNameChange(e.target.value)}
-            autoComplete="given-name"
-            placeholder="bijv. Sarah"
-            className="w-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5 font-serif text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
-          />
-        </div>
+      {/* Naam-bevestiging — de voornaam is al in stap ① opgehaald (geen her-vraag) */}
+      {draft.intake.firstName && (
+        <p className="font-serif text-sm italic text-[var(--ink-3)]">
+          We stellen je rapport op voor{' '}
+          <b className="font-medium not-italic text-[var(--ink)]">{draft.intake.firstName}</b>.
+        </p>
       )}
 
       {/* E-mail */}
       <div>
-        <label htmlFor={emailId} className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+        <label htmlFor={emailId} className={fieldLabel}>
           E-mailadres
         </label>
         <input
@@ -109,18 +96,14 @@ export function StepEmail({
           placeholder="jij@voorbeeld.nl"
           aria-invalid={!!emailError}
           aria-describedby={emailError ? `${emailId}-err` : `${emailId}-hint`}
-          className={`w-full border bg-[var(--subtle)] px-3 py-2.5 font-serif text-sm text-[var(--ink)] outline-none focus:ring-1 ${
-            emailError
-              ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-              : 'border-[var(--border-ed)] focus:border-kern-500 focus:ring-kern-500'
-          }`}
+          className={`${inputBase('kern')} px-3 py-2.5 font-serif text-sm ${emailError ? inputError : ''}`}
         />
         {emailError ? (
-          <p id={`${emailId}-err`} className="mt-1 text-xs text-red-500" role="alert">
+          <p id={`${emailId}-err`} className={errorText} role="alert">
             {emailError}
           </p>
         ) : (
-          <p id={`${emailId}-hint`} className="mt-1 font-serif text-xs italic text-[var(--ink-3)]">
+          <p id={`${emailId}-hint`} className={hintText}>
             Je rapport wordt naar dit adres gestuurd. We spammen niet.
           </p>
         )}
@@ -152,7 +135,7 @@ export function StepEmail({
         </label>
       </div>
       {consentError && (
-        <p id={`${consentId}-err`} className="text-xs text-red-500" role="alert">
+        <p id={`${consentId}-err`} className="font-serif text-xs text-negative" role="alert">
           {consentError}
         </p>
       )}
@@ -160,7 +143,7 @@ export function StepEmail({
       {/* Submit-fout */}
       {submitError && (
         <div
-          className="border border-red-200 bg-red-50 px-4 py-3 font-serif text-sm text-red-700"
+          className="border border-negative/40 bg-negative/5 px-4 py-3 font-serif text-sm text-negative"
           role="alert"
         >
           {submitError}
@@ -172,16 +155,11 @@ export function StepEmail({
           type="button"
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
+          className={primaryBtn('kern')}
         >
           {isSubmitting ? 'Rapport genereren…' : 'Mijn vrijheidsrapport ophalen'}
         </button>
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={isSubmitting}
-          className="w-full min-h-11 px-6 py-2 text-sm text-[var(--ink-3)] underline-offset-4 hover:text-[var(--ink)] hover:underline disabled:opacity-50"
-        >
+        <button type="button" onClick={onBack} disabled={isSubmitting} className={backBtn}>
           Terug
         </button>
       </div>

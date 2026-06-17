@@ -7,6 +7,7 @@ import {
   AlertOctagon,
   BarChart3,
   Bot,
+  Cable,
   CalendarClock,
   CalendarDays,
   ClipboardCheck,
@@ -97,6 +98,12 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/jobs',
         description: 'Laatste uitvoering, status en duur van de geplande crons.',
         icon: Activity,
+      },
+      {
+        label: 'Integraties',
+        href: '/beheer/integraties',
+        description: 'Externe koppelingen en uploads: inventaris, liveness en contractbewaking.',
+        icon: Cable,
       },
       {
         label: 'Platform-status',

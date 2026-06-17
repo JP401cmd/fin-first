@@ -18,6 +18,9 @@ export interface StrategieEditorsData {
   aowRows: AowLeeftijdRow[]
   dateOfBirth: string | null
   grossYearlyIncome: number
+  /** Factor A (jaarlijkse pensioenaangroei uit UPO) uit de loader-bundel —
+   *  voor de jaarruimte-schatting in de pensioen-editor. 0 = niet ingevuld. */
+  pensioenFactorA: number
   /** Huidige leeftijd uit DOB (null = onbekend) — basis voor de Werk-strategie. */
   currentAge: number | null
   /** Huidig netto maandinkomen (prefill Werk-strategie). */
@@ -64,6 +67,13 @@ export function StrategieEditors({
   if (open === 'pensioen') {
     const pensionEvents = events.filter((e) => e.event_type === 'pension')
     const aowAge = Math.ceil(lookupAowAge(data.aowRows, data.dateOfBirth).fractional)
+    // Woonsituatie voor de AOW-hoogte bij de JSON-import van mijnpensioen.nl.
+    // Bron = de canonieke AOW-as: metadata.leefsituatie op het bestaande
+    // aow-event (dezelfde as die de AOW-strategie-editor zet). Ontbreekt die,
+    // dan default samenwonend (verreweg de meest voorkomende situatie).
+    const aowEvent = events.find((e) => e.event_type === 'aow')
+    const aowLeefsituatie = aowEvent?.metadata?.leefsituatie
+    const samenwonend = aowLeefsituatie !== 'alleenstaand'
     return (
       <PensioenStrategieEditor
         pensionEvents={pensionEvents}
@@ -72,6 +82,8 @@ export function StrategieEditors({
         dailyExpenses={data.dailyExpenses}
         aowAge={aowAge}
         grossYearlyIncome={data.grossYearlyIncome}
+        pensioenFactorA={data.pensioenFactorA}
+        samenwonend={samenwonend}
         onClose={onClose}
         readOnly={readOnly}
       />

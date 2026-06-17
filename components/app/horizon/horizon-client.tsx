@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
+import { HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
 import { lifeEventsToCashflows, type SimCashflow, type SimRow } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
@@ -48,7 +49,7 @@ import {
   AlertTriangle, Calendar, BarChart3, FlaskConical, Landmark,
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw, GitBranch,
-  ChevronDown, ChevronUp, Compass, FileText, SlidersHorizontal,
+  ChevronDown, ChevronUp, Compass, SlidersHorizontal,
   Home, Lightbulb,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -298,14 +299,42 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     setOverlayVisible(val)
     try { localStorage.setItem('horizon_overlay_visible', String(val)) } catch { /* noop */ }
   }, [])
-  // Exit-notice: rustige, dismissible melding bij het verlaten van het tip-/
-  // bubbel-overlay-scherm. `exitNoticeKey` is een nonce die de notice opnieuw
-  // laat mounten (en de auto-dismiss-timer reset) bij elke echte exit; null =
-  // verborgen. Alleen de échte user-exits triggeren dit via handleOverlayExit().
-  const [exitNoticeKey, setExitNoticeKey] = useState<number | null>(null)
+  // Exit-melding: gecentreerde modal bij het verlaten van het tip-/bubbel-
+  // overlay-scherm. `exitNoticeOpen` stuurt de modal; hij verschijnt VÓÓRDAT de
+  // tips-overlay sluit, zodat de gebruiker eerst een keuze maakt. Heeft de
+  // gebruiker eerder "Niet meer weergeven" gekozen (`exitNoticeDismissed`, uit
+  // de server-marker), dan sluit de overlay direct zonder modal.
+  const [exitNoticeDismissed, setExitNoticeDismissed] = useState<boolean>(
+    initialData.exitNoticeDismissed,
+  )
+  const [exitNoticeOpen, setExitNoticeOpen] = useState(false)
   const handleOverlayExit = useCallback(() => {
+    if (exitNoticeDismissed) {
+      // Melding al permanent weggeklikt → overlay direct sluiten, geen modal.
+      persistOverlayVisible(false)
+      return
+    }
+    // Toon de modal; de overlay blijft nog open tot de gebruiker een knop kiest.
+    setExitNoticeOpen(true)
+  }, [exitNoticeDismissed, persistOverlayVisible])
+  // "Sluiten" (en Escape/achtergrond): modal dicht + overlay sluit. Niet-
+  // persistent — de melding komt bij een volgende exit terug.
+  const handleExitNoticeClose = useCallback(() => {
+    setExitNoticeOpen(false)
     persistOverlayVisible(false)
-    setExitNoticeKey(Date.now())
+  }, [persistOverlayVisible])
+  // "Niet meer weergeven": modal dicht + overlay sluit + persistent verbergen
+  // (cross-device via user_feature_visits, zelfde fire-and-forget-stijl als de
+  // welkomstkaart). De melding verschijnt nooit meer bij toekomstige exits.
+  const handleExitNoticeDismissForever = useCallback(() => {
+    setExitNoticeDismissed(true)
+    setExitNoticeOpen(false)
+    persistOverlayVisible(false)
+    fetch('/api/feature-visits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature_slug: HORIZON_EXIT_NOTICE_DISMISSED_SLUG }),
+    }).catch(() => {})
   }, [persistOverlayVisible])
   const persistNaturalMilestones = useCallback((val: boolean) => {
     setShowNaturalMilestones(val)
@@ -463,9 +492,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set())
   const [selectedRegelingIndex, setSelectedRegelingIndex] = useState(0)
   const pendingPensionFileRef = useRef<File | null>(null)
-
-  // UPO nudge: bottom sheet state for prominent pension upload on /horizon
-  const [upoNudgeSheetOpen, setUpoNudgeSheetOpen] = useState(false)
 
   // Compact life events UI state
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
@@ -1361,12 +1387,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         requiredPortfolio: effectiveFireTarget,
       })
     : (fire?.freedomPercentage ?? 0)
-
-  // ── UPO nudge: check of gebruiker pensioenevent heeft (excl. AOW) ──────
-  const hasPensionEvent = useMemo(
-    () => events.some((ev) => ev.event_type === 'pension'),
-    [events],
-  )
 
   // ── Pensioen-modus afgeleid ──────────────────────────────────────────────
   const isPensioenMode = simResult?.strategy === 'pensioen'
@@ -2643,13 +2663,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // voorkeuren zijn bereikbaar via de inline-editors (uitgaven-pane,
   // strategie-modal, event-pane) — geapunteerd door de ToekomstOverlay.
 
-  // ── STEP 4: ballon-definities — elke CTA verlaat de grafiekpagina ──
-  // Alle ballonnen navigeren naar de pagina waar de betreffende gegevens wonen
-  // (router.push). Waar het invoeren via een modal/pane gaat, opent die op de
-  // doelpagina via een URL-deeplink (zelfde patroon als ?strategie=).
+  // ── STEP 4: ballon-definities — puur informatieve uitleg bij de grafiek ──
+  // De ballonnen leggen uit wat elke lijn/elk punt op de grafiek betekent
+  // ("Geld is opgeslagen tijd"-geest); ze navigeren NIET (geen cta/onActivate).
+  // De onderliggende bewerk-pagina's blijven bereikbaar via de normale navigatie.
+  // Bedragen via formatMaskedCurrency zodat privacy-modus ze maskeert.
   const toekomstOverlayBalloons: OverlayBalloonDef[] = useMemo(() => {
-    // Huidige situatie van de gebruiker — voor de "nu geschat/ingevuld op €X"-copy.
-    // Bedragen via formatMaskedCurrency zodat privacy-modus ze maskeert.
     const yearlyIncome = (effectiveInput?.monthlyIncome ?? 0) * 12
     const totalAssets = effectiveInput?.totalAssets ?? 0
     const totalDebts = effectiveInput?.totalDebts ?? 0
@@ -2661,122 +2680,100 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         icon: OVERLAY_ICONS.income,
         kicker: 'Je inkomen',
         body: yearlyIncome > 0
-          ? `Je situatie rekent nu met ${formatMaskedCurrency(yearlyIncome, masked)} inkomen per jaar. Scherp 'm aan door je inkomen bij te werken.`
-          : 'Klopt je inkomen? Dat bepaalt mee hoe snel je vrijheid opbouwt.',
-        cta: 'Inkomen aanpassen',
+          ? `De opbouw start vanuit ${formatMaskedCurrency(yearlyIncome, masked)} inkomen per jaar: hoe meer daarvan je opzij zet, hoe sneller de lijn stijgt richting vrijheid.`
+          : 'Je inkomen voedt de opbouwfase: het deel dat je niet uitgeeft, wordt opgeslagen tijd die de lijn omhoog duwt.',
         row: 'top',
         emphasis: 'accumulation',
-        onActivate: () => router.push('/mijn/profiel'),
       },
       {
         id: 'inkomensstrategie',
         icon: OVERLAY_ICONS.incomeStrategy,
         kicker: 'Inkomensstrategie',
-        body: 'Salarisgroei, promotie of minder werken — bepaal hoe je inkomen meebeweegt over de jaren.',
-        cta: 'Inkomensstrategie instellen',
+        body: 'Salarisgroei, promotie of juist minder werken laat je inkomen — en daarmee de steilheid van de opbouwlijn — over de jaren meebewegen.',
         row: 'top',
         emphasis: 'accumulation',
-        onActivate: () => router.push('/toekomst/gebeurtenissen?strategie=werk'),
       },
       {
         id: 'bezittingen',
         icon: OVERLAY_ICONS.assets,
         kicker: 'Bezittingen',
         body: totalAssets > 0
-          ? `Je bezittingen staan nu op ${formatMaskedCurrency(totalAssets, masked)}. Werk ze bij voor een scherper startpunt.`
-          : 'Spaargeld, beleggingen en je huis vormen je startkapitaal — klopt het?',
-        cta: 'Bezittingen bijwerken',
+          ? `Je bezittingen (nu ${formatMaskedCurrency(totalAssets, masked)}) zijn het startpunt van de lijn — het kapitaal dat al voor je staat te werken.`
+          : 'Spaargeld, beleggingen en je huis vormen het startpunt van de lijn: het vermogen dat al voor je werkt.',
         row: 'top',
         emphasis: 'accumulation',
-        onActivate: () => router.push('/overzicht/bezittingen'),
       },
       {
         id: 'schulden',
         icon: OVERLAY_ICONS.debts,
         kicker: 'Schulden',
         body: totalDebts > 0
-          ? `Je schulden staan nu op ${formatMaskedCurrency(totalDebts, masked)} — elke aflossing koopt vrijheid terug.`
-          : 'Geen schulden ingevuld — klopt dat? Schulden remmen je vrijheid.',
-        cta: 'Schulden bijwerken',
+          ? `Je schulden (nu ${formatMaskedCurrency(totalDebts, masked)}) drukken het startpunt omlaag; elke aflossing koopt een stuk vrijheid terug en tilt de lijn op.`
+          : 'Schulden zouden het startpunt omlaag drukken; zonder schulden begint je vrijheidslijn hoger.',
         row: 'top',
         emphasis: 'accumulation',
-        onActivate: () => router.push('/overzicht/schulden'),
       },
       {
         id: 'gebeurtenis',
         icon: OVERLAY_ICONS.event,
         kicker: 'Levensgebeurtenis',
-        body: 'Een verbouwing, kind of wereldreis op komst? Reken ’m mee.',
-        cta: 'Gebeurtenis toevoegen',
+        body: 'Een verbouwing, kind of wereldreis verschijnt als knik in de lijn — een eenmalige uitgave of inkomst die je vrijheidsmoment verschuift.',
         row: 'top',
         emphasis: 'accumulation',
-        onActivate: () => router.push('/toekomst/gebeurtenissen?nieuw=1'),
       },
       // ── Onderste rij — je strategie LATER (de afbouw + einddoel) ──
       {
         id: 'aow',
         icon: OVERLAY_ICONS.aow,
         kicker: 'AOW-strategie',
-        body: 'Vanaf welke leeftijd, welke leefsituatie en opbouw — stel je AOW in.',
-        cta: 'AOW instellen',
+        body: 'Vanaf je AOW-leeftijd komt er een vaste uitkering bij; die verzacht de daling van de lijn in de jaren daarna.',
         row: 'bottom',
         emphasis: 'fire',
-        onActivate: () => router.push('/toekomst/gebeurtenissen?strategie=aow'),
       },
       {
         id: 'pensioen',
         icon: OVERLAY_ICONS.pension,
         kicker: 'Pensioenstrategie',
-        body: 'Stel in hoe je werknemerspensioen, lijfrente en banksparen meewegen.',
-        cta: 'Pensioen instellen',
+        body: 'Werknemerspensioen, lijfrente en banksparen tellen later als extra inkomen mee, waardoor je minder uit eigen vermogen hoeft te halen.',
         row: 'bottom',
         emphasis: 'fire',
-        onActivate: () => router.push('/toekomst/gebeurtenissen?strategie=pensioen'),
       },
       {
         id: 'eindstrategie',
         icon: OVERLAY_ICONS.end,
         kicker: 'Eindstrategie',
-        body: 'Vermogen behouden, opeten of nalaten? Dat bepaalt je einddoel.',
-        cta: 'Eindstrategie kiezen',
+        body: 'Of je je vermogen behoudt, opeet of nalaat bepaalt waar de lijn eindigt — en dus hoeveel vrijheid je moet opbouwen.',
         row: 'bottom',
         emphasis: 'fire',
-        onActivate: () => router.push('/toekomst/voorkeuren?regel=eindstrategie'),
       },
       {
         id: 'woning',
         icon: OVERLAY_ICONS.housing,
         kicker: 'Je woning',
-        body: 'Verkopen, kleiner wonen of opeten? Je huis kan vrijheid vrijspelen.',
-        cta: 'Woonstrategie kiezen',
+        body: 'Verkopen of kleiner wonen zet de waarde van je huis om in besteedbaar vermogen — zichtbaar als een sprong omhoog in de lijn.',
         row: 'bottom',
         emphasis: 'withdrawal',
-        onActivate: () => router.push('/toekomst/gebeurtenissen?strategie=huis'),
       },
       {
         id: 'uitgaven',
         icon: OVERLAY_ICONS.expenses,
         kicker: 'Uitgaven na pensioen',
         body: yearlyExpenses > 0
-          ? `Je rekent nu met ${formatMaskedCurrency(yearlyExpenses, masked)} uitgaven per jaar — dat zet je vrijheidsdoel. Klopt dat voor later?`
-          : 'Hoeveel heb je later per jaar nodig? Dit zet je vrijheidsdoel.',
-        cta: 'Uitgaven aanpassen',
+          ? `Met ${formatMaskedCurrency(yearlyExpenses, masked)} uitgaven per jaar ligt je vrijheidsdoel vast: dat is het bedrag dat je vermogen elk jaar moet kunnen dragen.`
+          : 'Wat je later per jaar uitgeeft, bepaalt je vrijheidsdoel — het bedrag dat je vermogen elk jaar moet kunnen dragen.',
         row: 'bottom',
         emphasis: 'withdrawal',
-        onActivate: () => router.push('/toekomst/uitgaven-na-pensioen'),
       },
       {
         id: 'onttrekking',
         icon: OVERLAY_ICONS.withdrawal,
         kicker: 'Onttrekkingsstrategie',
-        body: 'Hoe haal je later geld uit je vermogen? Dat bepaalt de daling.',
-        cta: 'Onttrekking instellen',
+        body: 'Hoeveel je later per jaar uit je vermogen haalt, bepaalt hoe snel de lijn daalt nadat werken een keuze is geworden.',
         row: 'bottom',
         emphasis: 'withdrawal',
-        onActivate: () => router.push('/toekomst/voorkeuren?regel=onttrekkingsstrategie'),
       },
     ]
-  }, [router, masked, effectiveInput])
+  }, [masked, effectiveInput])
 
   return (
     <div className="mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6">
@@ -2827,15 +2824,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         </h1>
       </header>
 
-      {/* Exit-notice: verschijnt bovenaan zodra de gebruiker de tip-overlay
-          verlaat (Tips-toggle uit, of ✕/Escape/achtergrond op de overlay).
-          `key` reset de mount + auto-dismiss-timer bij elke nieuwe exit. */}
-      {exitNoticeKey !== null && (
-        <ToekomstExitNotice
-          key={exitNoticeKey}
-          onClose={() => setExitNoticeKey(null)}
-        />
-      )}
+      {/* Exit-melding: gecentreerde modal die verschijnt zodra de gebruiker de
+          tip-overlay verlaat (Tips-toggle uit, of ✕/Escape/achtergrond op de
+          overlay) — vóórdat de overlay sluit. "Sluiten" sluit niet-persistent,
+          "Niet meer weergeven" verbergt 'm permanent (cross-device). Rendert via
+          een portal naar document.body (z-[70], boven de nav-pill). */}
+      <ToekomstExitNotice
+        visible={exitNoticeOpen}
+        onClose={handleExitNoticeClose}
+        onDismissForever={handleExitNoticeDismissForever}
+      />
 
       {/* === 1. Hero + Simulatie (één gecombineerd blok) === */}
       <section data-testid="horizon-hero" className={`card-editorial overflow-hidden ${overlayVisible && chartMode === 'vermogenspad' ? 'no-hover-lift' : ''}`}>
@@ -3559,6 +3557,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           isPensioen: isPensioenMode,
                         }}
                         onClose={handleOverlayExit}
+                        escapeSuspended={exitNoticeOpen}
                       >
                       <div className="relative">
                         {/* Vermogenspad (SimChart) */}
@@ -3917,119 +3916,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           unifiedRows={unifiedRows ?? undefined}
         />
       )}
-
-      {/* === UPO Nudge Card === */}
-      {!hasPensionEvent && !loading && (
-        <section className="mt-5 sm:mt-8">
-          <button
-            type="button"
-            onClick={() => setUpoNudgeSheetOpen(true)}
-            className="group w-full rounded-xl border border-dashed border-horizon-300 bg-gradient-to-r from-horizon-50/60 to-[var(--paper)] p-5 text-left transition-all hover:border-horizon-400 hover:shadow-sm"
-          >
-            <div className="flex items-start gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-horizon-100 text-horizon-600 transition-colors group-hover:bg-horizon-200">
-                <FileText className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[var(--ink)]">
-                  Pensioenoverzicht uploaden
-                </p>
-                <p
-                  className="mt-1 text-xs italic text-[var(--ink-3)] leading-relaxed"
-                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                >
-                  Upload je UPO van mijnpensioenoverzicht.nl voor een nauwkeuriger projectie.
-                  We vullen AOW-bedrag en werknemerspensioen automatisch in.
-                </p>
-                <span className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-horizon-600 group-hover:text-horizon-700">
-                  <Plus className="h-3.5 w-3.5" />
-                  UPO uploaden
-                </span>
-              </div>
-            </div>
-          </button>
-        </section>
-      )}
-
-      {/* UPO Nudge Bottom Sheet */}
-      <BottomSheet
-        open={upoNudgeSheetOpen}
-        onClose={() => setUpoNudgeSheetOpen(false)}
-        title="Pensioenoverzicht uploaden"
-      >
-        <div className="space-y-4 p-6">
-          <PensionInstructionPanel />
-          <PensionPdfUpload
-            onParseResult={async (result) => {
-              const data = result as {
-                aowBedrag: number | null
-                regelingen: Array<{ fondsNaam: string; brutoBedrag: number; ingangLeeftijd: number; isGeindexeerd: boolean; type: string }>
-                nabestaandenpensioen: number | null
-                samenvatting: string
-              }
-
-              // Create pension life events from parsed regelingen
-              const ouderdomsRegelingen = data.regelingen.filter(r => r.type === 'ouderdomspensioen')
-              const supabase = createClient()
-              const { data: { user } } = await supabase.auth.getUser()
-              if (!user) return
-
-              // Insert pension life events
-              for (const regeling of ouderdomsRegelingen) {
-                await supabase.from('life_events').insert({
-                  user_id: user.id,
-                  name: regeling.fondsNaam || 'Aanvullend pensioen',
-                  event_type: 'pension',
-                  target_age: regeling.ingangLeeftijd,
-                  monthly_income_change: regeling.brutoBedrag,
-                  monthly_cost_change: 0,
-                  one_time_cost: 0,
-                  duration_months: 0,
-                  is_indexed: regeling.isGeindexeerd,
-                  is_active: true,
-                  icon: 'Briefcase',
-                  sort_order: events.length + 1,
-                  metadata: { pensioenType: 'bedrijf', brutoBedrag: regeling.brutoBedrag, source: 'upo_upload' },
-                })
-              }
-
-              // Update AOW amount if parsed
-              if (data.aowBedrag && data.aowBedrag > 0) {
-                const aowEvent = events.find(ev => ev.event_type === 'aow')
-                if (aowEvent) {
-                  await supabase.from('life_events')
-                    .update({ monthly_income_change: data.aowBedrag })
-                    .eq('id', aowEvent.id)
-                }
-              }
-
-              // Refresh events list
-              const { data: refreshedEvents } = await supabase
-                .from('life_events')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('sort_order', { ascending: true })
-              if (refreshedEvents) {
-                setEvents(refreshedEvents as LifeEvent[])
-                if (input) {
-                  setImpacts(computeCumulativeImpacts(input, refreshedEvents as LifeEvent[]))
-                }
-              }
-
-              setUpoNudgeSheetOpen(false)
-            }}
-            onFileRemoved={() => {}}
-          />
-          {/* Summary after parse */}
-          <p
-            className="text-xs italic text-[var(--ink-3)]"
-            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-          >
-            Je pensioendata wordt direct verwerkt in je vrijheidsprojectie.
-          </p>
-        </div>
-      </BottomSheet>
-
 
       {/* === 5. Household FIRE Projections === */}
       <HouseholdFireSection personalProjection={personalHeroProjection} />

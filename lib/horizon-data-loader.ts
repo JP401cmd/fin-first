@@ -37,6 +37,7 @@ import { resolveHousingEventsForSim, type HousingTriggerSimBasis } from '@/lib/h
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
+import { resolvePensionFactorA } from '@/lib/jaarruimte'
 import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
 import { resolvePotRules, type PotRulesConfig } from '@/lib/pot-rules'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
@@ -85,6 +86,17 @@ export interface HorizonPageData {
   box3Method: 'forfaitair' | 'werkelijk'
   /** Of de gebruiker een fiscaal partner heeft (voor heffingsvrij vermogen berekening) */
   hasPartner: boolean
+  /** Factor A (jaarlijkse pensioenaangroei uit UPO) — geresolved uit
+   *  profiles.pension_factor_a via resolvePensionFactorA. Altijd ≥ 0 (0 wanneer
+   *  niet ingevuld); de jaarruimte-motor rekent hiermee zonder factor-A-aftrek. */
+  pensioenFactorA: number
+  /** Of factor A daadwerkelijk bekend is (`resolvePensionFactorA().isKnown`).
+   *  NULL ≠ 0: een leeg `pension_factor_a` levert `pensioenFactorA: 0` maar
+   *  `pensioenFactorAKnown: false`. Consumers die de jaarruimte-bovengrens
+   *  tonen (tips/aandachtspunten) gebruiken dit om bij ONBEKENDE factor A +
+   *  bedrijfspensioen een misleidende (te hoge) jaarruimte-tip te dempen. Een
+   *  expliciete 0 (zzp, geen werkgeverspensioen) is wél bekend → true. */
+  pensioenFactorAKnown: boolean
   /** Feature-flag: gebruik de grootboek-engine v2 op /toekomst (per-user opt-in). */
   horizonEngineV2: boolean
   /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde voor v2. */
@@ -102,6 +114,10 @@ export interface HorizonPageData {
   /** Of de eenmalige welkomsttekst bovenaan de /toekomst-grafiek al is getoond.
    *  False → toon de welkomstbanner (en markeer 'm bij eerste render). */
   hasSeenWelcome: boolean
+  /** Of de gebruiker "Niet meer weergeven" koos op de exit-melding van de
+   *  tips-overlay. True → toon de exit-melding niet meer; de overlay sluit dan
+   *  direct bij verlaten. */
+  exitNoticeDismissed: boolean
   /** Maandelijks spaar-override uit profiles.monthly_savings_override.
    *  NULL = gebruik asset-aggregaat (monthlyContributionFromAssets). */
   monthlySavingsOverride: number | null
@@ -181,6 +197,14 @@ export const HORIZON_SETUP_COMPLETED_SLUG = 'horizon_setup_completed'
  *  render zodat de welkomsttekst nooit terugkomt (los van de overlay-toggle). */
 export const HORIZON_WELCOME_SHOWN_SLUG = 'horizon_welcome_shown'
 
+/** Feature slug die bijhoudt of de gebruiker "Niet meer weergeven" heeft gekozen
+ *  op de exit-melding die verschijnt bij het verlaten van de tips-overlay op
+ *  /toekomst. Stored in user_feature_visits (zelfde patroon als
+ *  HORIZON_WELCOME_SHOWN_SLUG → cross-device, niet localStorage). Aanwezig →
+ *  de exit-melding verschijnt niet meer bij toekomstige exits; de overlay sluit
+ *  dan direct. */
+export const HORIZON_EXIT_NOTICE_DISMISSED_SLUG = 'horizon_exit_notice_dismissed'
+
 /** Default profile fallback values when profile query fails */
 const PROFILE_DEFAULTS = {
   date_of_birth: null as string | null,
@@ -239,6 +263,7 @@ export async function loadHorizonData(
     wsResult,
     horizonSetupVisitResult,
     horizonWelcomeVisitResult,
+    exitNoticeDismissedResult,
     savingsOverrideResult,
   ] = await Promise.all([
     supabase.from('transactions').select('amount, budget_id').gte('date', monthStart).lt('date', monthEnd),
@@ -248,7 +273,7 @@ export async function loadHorizonData(
     // duplicate pair on the same table.
     supabase.from('assets').select('*').eq('is_active', true).limit(500),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
@@ -296,6 +321,15 @@ export async function loadHorizonData(
       .select('feature_slug')
       .eq('feature_slug', HORIZON_WELCOME_SHOWN_SLUG)
       .maybeSingle(),
+    // Exit-melding-dismiss-marker ("Niet meer weergeven"). Zelfde patroon als
+    // de welkomst-marker hierboven; bepaalt of de exit-melding nog verschijnt
+    // bij het verlaten van de tips-overlay. .maybeSingle() + null-fallback zodat
+    // een ontbrekende tabel op legacy DBs niet de hele loader laat falen.
+    supabase
+      .from('user_feature_visits')
+      .select('feature_slug')
+      .eq('feature_slug', HORIZON_EXIT_NOTICE_DISMISSED_SLUG)
+      .maybeSingle(),
     // monthly_savings_override profile-kolom. Aparte .maybeSingle()-query
     // zodat een ontbrekende kolom op legacy DBs (migratie 20260513000001
     // nog niet gerund) graceful null returnt ipv het hele profile-query
@@ -342,6 +376,17 @@ export async function loadHorizonData(
     guardrail_cut_step: wsData.guardrail_cut_step ?? PROFILE_DEFAULTS.guardrail_cut_step,
     guardrail_raise_step: wsData.guardrail_raise_step ?? PROFILE_DEFAULTS.guardrail_raise_step,
   }
+
+  // Factor A (pensioenaangroei) uit de canonieke resolver — NULL ≠ 0. Niet in
+  // PROFILE_DEFAULTS opgenomen zodat een ontbrekend veld als undefined →
+  // "onbekend" (factorA 0) wordt behandeld i.p.v. een misleidende harde 0.
+  // `isKnown` wordt apart op de bundel gezet zodat consumers het verschil
+  // tussen "0 (zzp, bekend)" en "onbekend (leeg)" kunnen tonen/dempen.
+  const resolvedFactorA = resolvePensionFactorA(
+    profile as { pension_factor_a?: number | null; pension_factor_a_source?: string | null },
+  )
+  const pensioenFactorA = resolvedFactorA.factorA
+  const pensioenFactorAKnown = resolvedFactorA.isKnown
 
   // Monthly income/expenses from current month transactions
   let monthlyIncome = 0
@@ -740,6 +785,13 @@ export async function loadHorizonData(
   const hasSeenWelcome = !horizonWelcomeVisitResult.error
     && horizonWelcomeVisitResult.data?.feature_slug === HORIZON_WELCOME_SHOWN_SLUG
 
+  // exitNoticeDismissed: true zodra de "Niet meer weergeven"-marker bestaat. Bij
+  // een ontbrekende tabel (error) → behandel als "nog niet weggeklikt" zodat de
+  // exit-melding minstens kan verschijnen (graceful degrade, zelfde keuze als
+  // hasSeenWelcome).
+  const exitNoticeDismissed = !exitNoticeDismissedResult.error
+    && exitNoticeDismissedResult.data?.feature_slug === HORIZON_EXIT_NOTICE_DISMISSED_SLUG
+
   // monthlySavingsOverride: handmatige override uit profiles. Null = geen
   // override, simulator gebruikt monthlyContributionFromAssets.
   const overrideRaw = savingsOverrideResult.error
@@ -776,6 +828,8 @@ export async function loadHorizonData(
     assets,
     box3Method,
     hasPartner: hasPartnerFlag,
+    pensioenFactorA,
+    pensioenFactorAKnown,
     horizonEngineV2,
     potRules,
     profileError: profileResult.error
@@ -785,6 +839,7 @@ export async function loadHorizonData(
     numberOfChildren,
     hasCompletedHorizonSetup,
     hasSeenWelcome,
+    exitNoticeDismissed,
     monthlySavingsOverride,
     monthlyContributionFromAssets,
     monthlySurplusFromBudget,

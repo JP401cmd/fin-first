@@ -3,6 +3,7 @@
 import { useState, useId } from 'react'
 import type { HouseholdComposition } from '@/lib/check/types'
 import type { CheckDraft } from '@/lib/check/use-check-draft'
+import { primaryBtn, fieldLabel, inputBase, inputError, errorText, hintText } from '../intake-styles'
 
 interface Props {
   intake: CheckDraft['intake']
@@ -57,10 +58,7 @@ export function StepJij({ intake, onChange, onNext }: Props) {
     <div className="space-y-8">
       {/* Geboortedatum */}
       <div>
-        <label
-          htmlFor={dobId}
-          className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
-        >
+        <label htmlFor={dobId} className={fieldLabel}>
           Geboortedatum
         </label>
         <input
@@ -71,19 +69,15 @@ export function StepJij({ intake, onChange, onNext }: Props) {
           onChange={(e) => onChange({ dateOfBirth: e.target.value })}
           aria-invalid={!!dobError}
           aria-describedby={dobError ? `${dobId}-err` : undefined}
-          className={`w-full border bg-[var(--subtle)] px-3 py-2.5 font-mono text-sm tabular-nums text-[var(--ink)] outline-none focus:ring-1 ${
-            dobError
-              ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-              : 'border-[var(--border-ed)] focus:border-kern-500 focus:ring-kern-500'
-          }`}
+          className={`${inputBase('kern')} px-3 py-2.5 font-mono text-sm tabular-nums ${dobError ? inputError : ''}`}
         />
         {age !== null && !dobError && (
-          <p className="mt-1 font-serif text-xs italic text-[var(--ink-3)]">
+          <p className={hintText}>
             {age} jaar
           </p>
         )}
         {dobError && (
-          <p id={`${dobId}-err`} className="mt-1 text-xs text-red-500" role="alert">
+          <p id={`${dobId}-err`} className={errorText} role="alert">
             {dobError}
           </p>
         )}
@@ -91,7 +85,7 @@ export function StepJij({ intake, onChange, onNext }: Props) {
 
       {/* Huishoudtype */}
       <div>
-        <p className="mb-2 text-sm font-medium text-[var(--ink-2)]">
+        <p className="mb-2 font-serif text-sm font-medium text-[var(--ink-2)]">
           Hoe woon en leef je?
         </p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -120,7 +114,7 @@ export function StepJij({ intake, onChange, onNext }: Props) {
           })}
         </div>
         {householdError && (
-          <p className="mt-1 text-xs text-red-500" role="alert">
+          <p className={errorText} role="alert">
             {householdError}
           </p>
         )}
@@ -128,10 +122,7 @@ export function StepJij({ intake, onChange, onNext }: Props) {
 
       {/* Optioneel voornaam */}
       <div>
-        <label
-          htmlFor={nameId}
-          className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
-        >
+        <label htmlFor={nameId} className={fieldLabel}>
           Voornaam{' '}
           <span className="text-xs font-normal italic text-[var(--ink-3)]">
             (optioneel — voor de aanhef in je rapport)
@@ -144,16 +135,12 @@ export function StepJij({ intake, onChange, onNext }: Props) {
           autoComplete="given-name"
           placeholder="bijv. Sarah"
           onChange={(e) => onChange({ firstName: e.target.value || null })}
-          className="w-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5 font-serif text-sm text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+          className={`${inputBase('kern')} px-3 py-2.5 font-serif text-sm`}
         />
       </div>
 
       {/* Verder-knop */}
-      <button
-        type="button"
-        onClick={handleNext}
-        className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
-      >
+      <button type="button" onClick={handleNext} className={primaryBtn('kern')}>
         Verder
       </button>
     </div>

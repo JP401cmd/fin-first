@@ -16,7 +16,7 @@
  * produceren. Gemeld als gedeeld-bestand-behoefte (zie rapport onderaan).
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   useCheckDraft,
@@ -39,6 +39,7 @@ import { StepBuffer } from './steps/step-buffer'
 import { StepBezittingen } from './steps/step-bezittingen'
 import { StepSchulden } from './steps/step-schulden'
 import { StepPensioen } from './steps/step-pensioen'
+import { StepGebeurtenissen } from './steps/step-gebeurtenissen'
 import { StepDoel } from './steps/step-doel'
 import { StepEmail } from './steps/step-email'
 
@@ -48,15 +49,16 @@ const STEP_META: Record<
   Exclude<CheckStep, 'verzenden'>,
   { num: string; title: string; sub: string }
 > = {
-  jij:          { num: '①', title: 'Wie ben jij?', sub: 'leeftijd · gezin · naam' },
-  inkomen:      { num: '②', title: 'Inkomen', sub: 'netto maand · bruto jaar' },
-  uitgaven:     { num: '③', title: 'Uitgaven', sub: 'wonen · lasten · vrij' },
-  buffer:       { num: '④', title: 'Buffer', sub: 'noodfonds · dekking' },
-  bezittingen:  { num: '⑤', title: 'Bezittingen', sub: 'spaar · beleggen · woning' },
-  schulden:     { num: '⑥', title: 'Schulden', sub: 'hypotheek · leningen · rest' },
-  pensioen:     { num: '⑦', title: 'Pensioen & rendement', sub: 'AOW · risicoprofiel' },
-  doel:         { num: '⑧', title: 'Grootste doel', sub: 'optioneel · vrij tekstveld' },
-  email:        { num: '✉', title: 'Je rapport', sub: 'e-mail · AVG-consent' },
+  jij:            { num: '①', title: 'Wie ben jij?', sub: 'leeftijd · gezin · naam' },
+  inkomen:        { num: '②', title: 'Inkomen', sub: 'netto per maand' },
+  uitgaven:       { num: '③', title: 'Uitgaven', sub: 'wonen · lasten · vrij' },
+  buffer:         { num: '④', title: 'Buffer', sub: 'noodfonds · dekking' },
+  bezittingen:    { num: '⑤', title: 'Bezittingen', sub: 'spaar · beleggen · woning' },
+  schulden:       { num: '⑥', title: 'Schulden', sub: 'hypotheek · leningen · rest' },
+  pensioen:       { num: '⑦', title: 'Pensioen & rendement', sub: 'AOW · risicoprofiel' },
+  gebeurtenissen: { num: '⑧', title: 'Levensgebeurtenissen', sub: 'optioneel · huwelijk · sabbatical · erfenis' },
+  doel:           { num: '⑨', title: 'Grootste doel', sub: 'optioneel · vrij tekstveld' },
+  email:          { num: '✉', title: 'Je rapport', sub: 'e-mail · AVG-consent' },
 }
 
 // ── Live vrijheidstijd-teller ────────────────────────────────────────────────
@@ -106,7 +108,7 @@ function ProgressBar({ current }: { current: CheckStep }) {
           />
         ))}
       </div>
-      <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-[var(--ink-4)]">
+      <p className="label-editorial mt-2 font-mono text-[var(--ink-4)]">
         Stap {progress} van {total}
       </p>
     </div>
@@ -125,7 +127,6 @@ export function CheckWizard() {
     back,
     patchIntake,
     setEmail,
-    setFirstName,
     setConsentAt,
     isLoaded,
   } = useCheckDraft()
@@ -135,6 +136,16 @@ export function CheckWizard() {
 
   // Vrijheidstijd-teller
   const freedomTick = useFreedomTicker(draft.intake)
+
+  // Scroll-naar-boven + focus op de stap-kop bij elke stapwissel (voorkomt 'doorschieten'
+  // na een lange stap; raakt de sticky vrijheidsticker niet — die zit erbuiten).
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    }
+    headingRef.current?.focus()
+  }, [step])
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
@@ -220,10 +231,10 @@ export function CheckWizard() {
           aria-live="polite"
           aria-atomic="true"
         >
-          <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--ink-4)]">
+          <span className="label-editorial font-mono text-[var(--ink-4)]">
             Al vrijgekocht
           </span>
-          <span className="font-mono tabular-nums text-base font-medium text-kern-700">
+          <span className="font-mono tabular-nums text-base font-medium text-horizon-700">
             {freedomTick}
           </span>
         </div>
@@ -242,10 +253,14 @@ export function CheckWizard() {
         {/* Stap-kop */}
         {meta && (
           <header className="mb-8 border-b border-[var(--border-ed)] pb-6">
-            <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--ink-4)]">
+            <p className="label-editorial mb-2 font-mono text-[var(--ink-4)]">
               {meta.num} · {meta.sub}
             </p>
-            <h2 className="font-display text-2xl font-bold leading-tight tracking-tight text-[var(--ink)] md:text-3xl">
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              className="font-display text-2xl font-bold leading-tight tracking-tight text-[var(--ink)] outline-none md:text-3xl"
+            >
               {meta.title}
             </h2>
           </header>
@@ -308,6 +323,14 @@ export function CheckWizard() {
               onBack={back}
             />
           )}
+          {step === 'gebeurtenissen' && (
+            <StepGebeurtenissen
+              intake={draft.intake}
+              onChange={patchIntake}
+              onNext={next}
+              onBack={back}
+            />
+          )}
           {step === 'doel' && (
             <StepDoel
               intake={draft.intake}
@@ -320,7 +343,6 @@ export function CheckWizard() {
             <StepEmail
               draft={draft}
               onEmailChange={setEmail}
-              onFirstNameChange={setFirstName}
               onConsentChange={setConsentAt}
               onSubmit={handleSubmit}
               onBack={back}

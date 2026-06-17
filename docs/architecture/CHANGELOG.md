@@ -241,3 +241,42 @@
 - **API-routes** toegevoegd: /api/check/activate, /api/check/submit
 - **Tabellen** toegevoegd: intake_rate_limit, lead_intakes
 - **Componenten (aantal)** toegevoegd: +25
+
+## 2026-06-17
+
+- **Componenten (aantal)** toegevoegd: +4
+
+## 2026-06-17
+
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-06-17
+
+- **API-routes** toegevoegd: /api/overzicht/page-status
+- **Componenten (aantal)** toegevoegd: +4
+
+## 2026-06-17
+
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-06-17
+
+- Geen wijzigingen.
+
+## 2026-06-17
+
+- **API-routes** toegevoegd: /api/admin/integraties/health
+- **Tabellen** toegevoegd: contract_events
+- **Integratie-clients** toegevoegd: lib/integrations/bitvavo-client.ts, lib/integrations/blockchair-client.ts, lib/integrations/coinbase-client.ts, lib/integrations/coingecko-client.ts, lib/integrations/fmp-client.ts, lib/integrations/health-probe.ts, lib/integrations/kraken-client.ts, lib/integrations/trading212-client.ts, lib/integrations/version-registry.ts, lib/parsers/broker-csv.ts, lib/parsers/categorize.ts, lib/parsers/counterparty-normalize.ts, lib/parsers/csv.ts, lib/parsers/format-contracts.ts, lib/parsers/mt940.ts, lib/parsers/mt940js.d.ts, lib/parsers/ofx.ts, lib/truelayer/client.ts, lib/nibud/api-client.ts, app/api/pension/parse/route.ts
+
+## 2026-06-17
+
+- **Integratie-clients** verwijderd: lib/integrations/health-probe.ts, lib/integrations/version-registry.ts, lib/parsers/categorize.ts, lib/parsers/counterparty-normalize.ts, lib/parsers/format-contracts.ts
+
+## 2026-06-17
+
+- **Integratie-clients** verwijderd: lib/parsers/mt940js.d.ts
+
+## 2026-06-17
+
+- **Schermen** toegevoegd: /beheer/integraties

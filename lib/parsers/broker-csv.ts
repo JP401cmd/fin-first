@@ -287,13 +287,17 @@ function normaliseHeaders(headers: string[]): string[] {
 // Broker detection
 // ---------------------------------------------------------------------------
 
-/** Lowercase header fingerprints used to identify each broker format. */
-const DEGIRO_PORTFOLIO_MARKERS = ['product', 'isin', 'beurs', 'aantal', 'slotkoers']
-const DEGIRO_TRANSACTION_MARKERS = ['datum', 'product', 'isin', 'koers', 'transactiekosten']
-const SAXO_MARKERS = ['instrument', 'symbool', 'isin', 'gemiddelde openingsprijs']
-const ING_BELEGGEN_MARKERS = ['naam effect', 'isin-code', 'aantal', 'koers']
-const TRADING212_MARKERS = ['action', 'time', 'isin', 'ticker', 'no. of shares']
-const ETORO_MARKERS = ['date', 'type', 'details', 'amount', 'units']
+/**
+ * Lowercase header fingerprints used to identify each broker format.
+ * Exported so format-contracts.ts can reference them as the single source
+ * of truth instead of duplicating the marker lists.
+ */
+export const DEGIRO_PORTFOLIO_MARKERS = ['product', 'isin', 'beurs', 'aantal', 'slotkoers']
+export const DEGIRO_TRANSACTION_MARKERS = ['datum', 'product', 'isin', 'koers', 'transactiekosten']
+export const SAXO_MARKERS = ['instrument', 'symbool', 'isin', 'gemiddelde openingsprijs']
+export const ING_BELEGGEN_MARKERS = ['naam effect', 'isin-code', 'aantal', 'koers']
+export const TRADING212_MARKERS = ['action', 'time', 'isin', 'ticker', 'no. of shares']
+export const ETORO_MARKERS = ['date', 'type', 'details', 'amount', 'units']
 
 /**
  * Auto-detect the broker from the first (header) line of a CSV file.

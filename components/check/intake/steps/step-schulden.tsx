@@ -6,6 +6,7 @@ import type { CheckDraft } from '@/lib/check/use-check-draft'
 import type { CheckIntakeDebt } from '@/lib/check/types'
 import { formatCurrency } from '@/lib/format'
 import { parseBedrag } from '@/lib/check/use-check-draft'
+import { primaryBtn, backBtn, inlineAddBtn, inputBase } from '../intake-styles'
 
 interface Props {
   intake: CheckDraft['intake']
@@ -36,6 +37,7 @@ interface DebtRowFormProps {
 
 function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
   const [open, setOpen] = useState(false)
+  const [rawLabel, setRawLabel] = useState('')
   const [rawBalance, setRawBalance] = useState('')
   const [rawRate, setRawRate] = useState('')
   const [rawPayment, setRawPayment] = useState('')
@@ -48,11 +50,12 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
     const payment = parseBedrag(rawPayment)
     onAdd({
       debtType: preset.debtType,
-      name: preset.label,
+      name: rawLabel.trim() || preset.label,
       balance,
       interestRatePct: rate,
       monthlyPayment: payment,
     })
+    setRawLabel('')
     setRawBalance('')
     setRawRate('')
     setRawPayment('')
@@ -76,6 +79,15 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
   return (
     <div className="border border-wil-300 bg-wil-50/30 px-4 py-4 space-y-3">
       <p className="font-display text-sm font-semibold text-[var(--ink)]">{preset.label}</p>
+      {/* Label (optioneel — om duplicaten te onderscheiden) */}
+      <input
+        type="text"
+        value={rawLabel}
+        onChange={(e) => setRawLabel(e.target.value)}
+        placeholder={`Naam (optioneel) — bijv. ${preset.label} bij ABN`}
+        aria-label={`Naam voor ${preset.label}`}
+        className={`${inputBase('wil')} px-3 py-2 font-serif text-sm`}
+      />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {/* Saldo */}
         <div>
@@ -94,7 +106,7 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
               autoFocus
               onChange={(e) => setRawBalance(e.target.value.replace(/[^0-9.,]/g, ''))}
               placeholder="15.000"
-              className="w-full border border-[var(--border-ed)] bg-[var(--subtle)] py-2 pr-2 pl-6 font-mono text-sm tabular-nums text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+              className={`${inputBase('wil')} py-2 pr-2 pl-6 font-mono text-sm tabular-nums`}
             />
           </div>
         </div>
@@ -112,7 +124,7 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
               value={rawRate}
               onChange={(e) => setRawRate(e.target.value.replace(/[^0-9.,]/g, ''))}
               placeholder="3,5"
-              className="w-full border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 font-mono text-sm tabular-nums text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+              className={`${inputBase('wil')} px-3 py-2 font-mono text-sm tabular-nums`}
             />
             <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-4)]">
               %
@@ -136,17 +148,13 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
               value={rawPayment}
               onChange={(e) => setRawPayment(e.target.value.replace(/[^0-9.,]/g, ''))}
               placeholder="350"
-              className="w-full border border-[var(--border-ed)] bg-[var(--subtle)] py-2 pr-2 pl-6 font-mono text-sm tabular-nums text-[var(--ink)] outline-none focus:border-wil-500 focus:ring-1 focus:ring-wil-500"
+              className={`${inputBase('wil')} py-2 pr-2 pl-6 font-mono text-sm tabular-nums`}
             />
           </div>
         </div>
       </div>
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={handleAdd}
-          className="bg-[var(--ink)] px-5 py-2 text-xs font-medium text-[var(--paper)] transition-opacity hover:opacity-80"
-        >
+        <button type="button" onClick={handleAdd} className={inlineAddBtn('wil')}>
           Toevoegen
         </button>
         <button
@@ -213,7 +221,7 @@ export function StepSchulden({ intake, onChange, onNext, onBack }: Props) {
                   type="button"
                   onClick={() => handleRemove(idx)}
                   aria-label={`Verwijder ${d.name}`}
-                  className="text-[var(--ink-4)] transition-colors hover:text-red-500"
+                  className="text-[var(--ink-4)] transition-colors hover:text-negative"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -229,30 +237,18 @@ export function StepSchulden({ intake, onChange, onNext, onBack }: Props) {
         </ul>
       )}
 
-      {/* Voeg-toe rijen */}
+      {/* Voeg-toe rijen — elk type mag meerdere keren (onderscheid via naam) */}
       <div className="space-y-2">
-        {DEBT_PRESETS.map((preset) => {
-          const alreadyAdded =
-            preset.debtType !== 'other' &&
-            debts.some((d) => d.debtType === preset.debtType)
-          if (alreadyAdded) return null
-          return <DebtRowForm key={preset.debtType} preset={preset} onAdd={handleAdd} />
-        })}
+        {DEBT_PRESETS.map((preset) => (
+          <DebtRowForm key={preset.debtType} preset={preset} onAdd={handleAdd} />
+        ))}
       </div>
 
       <div className="flex flex-col gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onNext}
-          className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
-        >
+        <button type="button" onClick={onNext} className={primaryBtn('wil')}>
           {debts.length === 0 ? 'Overslaan (geen schulden)' : 'Verder'}
         </button>
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-full min-h-11 px-6 py-2 text-sm text-[var(--ink-3)] underline-offset-4 hover:text-[var(--ink)] hover:underline"
-        >
+        <button type="button" onClick={onBack} className={backBtn}>
           Terug
         </button>
       </div>

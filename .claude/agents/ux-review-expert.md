@@ -31,7 +31,7 @@ The app's philosophy is "Geld is opgeslagen tijd" (Money is stored time). Every 
 Always start by reading the reference template HTML file to refresh your understanding of the canonical design patterns.
 
 ### Step 2: Analyze the Code Under Review
-Read all relevant files the user points you to, or that were recently modified. Look at the full component tree — not just the file in isolation.
+Read all relevant files the user points you to, or that were recently modified. Look at the full component tree — not just the file in isolation. In a targeted diff review, also open any directly-rendered child component (`<ComponentName />`): it can carry its own colour/token inconsistencies that only become visible once a wrapper surfaces it more prominently.
 
 ### Step 3: Evaluate Against These Dimensions
 
@@ -67,6 +67,7 @@ For every piece of UI you review, systematically evaluate:
 **5. Toegankelijkheid (Accessibility)**
 - Sufficient color contrast (WCAG AA minimum, AAA preferred)?
   - Voor module-accentkleuren als tekst op `var(--paper)`: verifieer altijd de concrete hex/oklch-waarde van `--module-active-{700..900}` per module (kern/wil/horizon) tegen WCAG-contrast bij de doel-fontmaat. Horizons warm-goud palet is het bekende risicogeval (`--module-active-700` zakt onder AA bij ~16px tekst).
+  - Beoordeel fontgrootte en kleur altijd sámen, nooit de kleur in isolatie: AA vereist 4,5:1 bij tekst ≤18px normaal / ≤14px bold. Een kleur die op `text-sm` (14px) net slaagt, kan op een `text-[11px]`-label in hetzelfde bestand zakken — check de combinatie.
 - Proper semantic HTML (headings, landmarks, lists)?
 - Are interactive elements keyboard-accessible?
 - Do images/icons have appropriate alt text or aria-labels?
@@ -170,7 +171,7 @@ Structure every review as follows:
 
 **📐 Consistentie-score:** [X/10] — based on alignment with reference template and existing patterns
 
-Geef per ⚠️/❌-bevinding aan of de fix **direct delegeerbaar** is aan de `coder`-agent (eenregelige tekst/class-wijziging, geen oordeel nodig) of dat het eerst een **oordeel vereist** van de business-owner of architect (scoopwijziging, patroonbreuk, a11y-architectuur). Zo hoeft de hoofdthread het routeringsoordeel voor triviale fixes niet zelf te maken.
+Geef per ⚠️/❌-bevinding aan of de fix **direct delegeerbaar** is aan de `coder`-agent (eenregelige tekst/class-wijziging, geen oordeel nodig) of dat het eerst een **oordeel vereist** van de business-owner of architect (scoopwijziging, patroonbreuk, a11y-architectuur). Zo hoeft de hoofdthread het routeringsoordeel voor triviale fixes niet zelf te maken. Markeer per bevinding ook of die **door de huidige diff is geïntroduceerd** of **pre-existing** is (al aanwezig vóór de wijziging) — zodat de bouwer een onderbouwde scope-afweging maakt (in-scope meenemen vs. als los restpunt rapporteren) en niet ongerelateerde WIP aanraakt.
 
 ## Rules You Live By
 

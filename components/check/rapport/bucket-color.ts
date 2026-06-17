@@ -1,13 +1,15 @@
 /**
- * Logische bucket → kleur uit de rapport-palet. Spoort met het ontwerp:
- * beleggingen=groen, pensioen=horizon-paars, cash=blauw, huis=kern-bruin.
+ * Logische bucket → kleur (geen losse hexen):
+ * beleggingen = GOUD (`--vrijgekocht`, groei) — bewust níet het toekomst-accent
+ * (dat is nu paars en zou met pensioen botsen), pensioen = wil-paars,
+ * cash = positief-groen (liquide buffer), huis = kern-bruin (fundament).
  * Onbekende buckets vallen terug op ink-soft.
  */
 const BUCKET_COLORS: Record<string, string> = {
-  beleggingen: '#3E7A4E',
-  pensioen: '#5B3A8C',
-  cash: '#3A6B8C',
-  huis: '#6B4A2E',
+  beleggingen: 'var(--vrijgekocht)',
+  pensioen: 'var(--color-wil-500)',
+  cash: 'var(--green)',
+  huis: 'var(--kern)',
 }
 
 export function bucketColor(bucket: string): string {

@@ -23,6 +23,7 @@ import {
   type ParsedHoldingRow,
   type BrokerParseResult,
 } from '@/lib/parsers/broker-csv'
+import { normalizeHeadersForFingerprint } from '@/lib/parsers/format-contracts'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { computePositionFromTransactions } from '@/lib/holdings-aggregation'
@@ -128,6 +129,8 @@ export default function HoldingsImportPage() {
   // Step 2 state
   const [parseResult, setParseResult] = useState<BrokerParseResult | null>(null)
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([])
+  // Kolomnamen voor Laag A-runtime contract-bewaking — alleen NAMEN, nooit waarden.
+  const [parsedHeaderNames, setParsedHeaderNames] = useState<string[]>([])
   // Stored for reset cycle; the actual duplicate matching uses local variables in goToPreview
   const [, setExistingHoldings] = useState<ExistingHolding[]>([])
 
@@ -228,6 +231,20 @@ export default function HoldingsImportPage() {
     try {
       // Parse CSV
       const result = parseBrokerCSV(fileContent, selectedBroker)
+
+      // Extraheer kolomnamen voor Laag A-runtime contract-bewaking.
+      // Gebruik de eerste niet-lege regel van het bestand — dezelfde logica als
+      // parseBrokerCSV zelf. Normaliseer via dezelfde helper als de server
+      // (BOM-strip, trim, lowercase, gesorteerd) zodat fingerprints overeenkomen.
+      // Privacy: we sturen ALLEEN namen — nooit rij-data of financiële waarden.
+      const cleanedContent = fileContent.replace(/^﻿/, '')
+      const firstLine = cleanedContent.split(/\r?\n/).find((l) => l.trim().length > 0) ?? ''
+      // Detecteer delimiter: meest voorkomend ',' of ';'
+      const delimChar = firstLine.includes(';') ? ';' : ','
+      const rawHeaders = firstLine.split(delimChar).map((h) => h.replace(/^["']|["']$/g, ''))
+      // Sla genormaliseerde namen op (BOM-strip, trim, lowercase, gesorteerd)
+      // — gelijke normalisatie als fingerprintHeaders() in de server-route.
+      setParsedHeaderNames(normalizeHeadersForFingerprint(rawHeaders))
 
       if (result.rows.length === 0) {
         const msg =
@@ -435,6 +452,11 @@ export default function HoldingsImportPage() {
           ...(isSnapshot
             ? { mode: 'snapshot', targetAssetId }
             : {}),
+          // Laag A-runtime contract-bewaking: kolomnamen voor drift-detectie.
+          // Alleen genormaliseerde NAMEN — nooit rij-data of financiële waarden.
+          ...(parsedHeaderNames.length > 0
+            ? { headerNames: parsedHeaderNames }
+            : {}),
         }),
       })
 
@@ -466,6 +488,7 @@ export default function HoldingsImportPage() {
     setParseError('')
     setParseResult(null)
     setPreviewRows([])
+    setParsedHeaderNames([])
     setExistingHoldings([])
     setImportSummary(null)
     setError('')

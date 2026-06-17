@@ -14,6 +14,7 @@ import { loadCashflowSettingsData } from '@/lib/cashflow-settings-data'
 import { CashflowInstellingenBlok } from '@/components/overview/cashflow-instellingen-blok'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
+import { PageStatusDot } from '@/components/app/page-status-dot'
 import { Kicker, EditorialDeck } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
@@ -52,8 +53,9 @@ export default async function OverzichtCashflowPage() {
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <InsightToggleButton
           ids={[INFLATION_IMPACT_ID]}
-          className="absolute right-[52px] top-4 sm:right-[60px]"
+          className="absolute right-[84px] top-4 sm:right-[92px]"
         />
+        <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
           description={PAGE_INFO['/overzicht/cashflow'] ?? ''}
           className="absolute right-4 top-4 sm:right-6"

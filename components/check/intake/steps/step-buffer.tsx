@@ -4,6 +4,7 @@ import { useState, useId } from 'react'
 import { parseBedrag } from '@/lib/check/use-check-draft'
 import type { CheckDraft } from '@/lib/check/use-check-draft'
 import { formatCurrency } from '@/lib/format'
+import { primaryBtn, backBtn, ghostBtn, fieldLabel, inputBase, inputError, errorText, hintText } from '../intake-styles'
 
 interface Props {
   intake: CheckDraft['intake']
@@ -54,7 +55,7 @@ export function StepBuffer({ intake, onChange, onNext, onBack }: Props) {
       </p>
 
       <div>
-        <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]">
+        <label htmlFor={id} className={fieldLabel}>
           Saldo noodfonds / buffer
         </label>
         <div className="relative">
@@ -76,19 +77,15 @@ export function StepBuffer({ intake, onChange, onNext, onBack }: Props) {
             autoComplete="off"
             aria-invalid={!!error}
             aria-describedby={error ? `${id}-err` : `${id}-hint`}
-            className={`w-full border bg-[var(--subtle)] py-2.5 pr-3 pl-7 font-mono text-base tabular-nums text-[var(--ink)] outline-none focus:ring-1 sm:text-sm ${
-              error
-                ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-                : 'border-[var(--border-ed)] focus:border-kern-500 focus:ring-kern-500'
-            }`}
+            className={`${inputBase('kern')} py-2.5 pr-3 pl-7 font-mono text-base tabular-nums sm:text-sm ${error ? inputError : ''}`}
           />
         </div>
         {error ? (
-          <p id={`${id}-err`} className="mt-1 text-xs text-red-500" role="alert">
+          <p id={`${id}-err`} className={errorText} role="alert">
             {error}
           </p>
         ) : (
-          <p id={`${id}-hint`} className="mt-1 font-serif text-xs italic text-[var(--ink-3)]">
+          <p id={`${id}-hint`} className={hintText}>
             Schat gerust — dit kun je later aanpassen in de app.
           </p>
         )}
@@ -115,27 +112,15 @@ export function StepBuffer({ intake, onChange, onNext, onBack }: Props) {
       )}
 
       <div className="flex flex-col gap-2 pt-2">
-        <button
-          type="button"
-          onClick={handleNext}
-          className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
-        >
+        <button type="button" onClick={handleNext} className={primaryBtn('kern')}>
           Verder
         </button>
         {!isConfirmed && (
-          <button
-            type="button"
-            onClick={handleNoBuffer}
-            className="w-full min-h-11 border border-[var(--border-ed)] px-6 py-2.5 text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
-          >
+          <button type="button" onClick={handleNoBuffer} className={ghostBtn}>
             Geen noodfonds (ook nuttig om te weten)
           </button>
         )}
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-full min-h-11 px-6 py-2 text-sm text-[var(--ink-3)] underline-offset-4 hover:text-[var(--ink)] hover:underline"
-        >
+        <button type="button" onClick={onBack} className={backBtn}>
           Terug
         </button>
       </div>

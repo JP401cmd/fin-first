@@ -8,7 +8,7 @@ export function CtaSection({ cta }: { cta: ReportCta }) {
     <section className="cta-sec">
       <div className="wrap">
         <div className="eyebrow">
-          <span className="num">7</span> En nu?
+          <span className="num">→</span> En nu?
         </div>
         <h2>
           Wil je hier <em>grip</em> op?

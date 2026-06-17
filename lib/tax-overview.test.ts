@@ -105,7 +105,7 @@ describe('buildTaxOverview — opportunities', () => {
       box: 1,
       savings: 1_500,
       deadline: '31 dec',
-      href: '/overzicht/belasting/box1',
+      href: '/overzicht/belasting/box1#jaarruimte-uitleg',
       freedomDays: 15,
     })
     expect(byId.tegenbewijs).toMatchObject({

@@ -104,7 +104,7 @@ export function buildTaxOverview(input: TaxOverviewInput): TaxOverviewResult {
       savings,
       freedomDays: freedomDaysFor(savings, dailyExpenses),
       deadline: '31 dec',
-      href: '/overzicht/belasting/box1',
+      href: '/overzicht/belasting/box1#jaarruimte-uitleg',
     })
   }
 

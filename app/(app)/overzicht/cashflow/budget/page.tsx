@@ -6,6 +6,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { getAppSetupStatus } from '@/lib/app-setup-status'
 import { AppSetupGate } from '@/components/app/app-setup/app-setup-gate'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default async function OverzichtCashflowBudgetPage() {
     <>
       <NavStackMeta title="Budget" bottomBar={{ kind: 'tabs' }} />
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
           description={PAGE_INFO['/overzicht/cashflow/budget'] ?? ''}
           className="absolute right-4 top-4 sm:right-6"

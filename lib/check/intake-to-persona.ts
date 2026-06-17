@@ -158,13 +158,18 @@ export function intakeToPersona(intake: CheckIntake): PersonaData {
     const isEigenHuis = a.assetType === 'eigen_huis'
     const isInvestment = a.assetType === 'investment' || a.assetType === 'crypto'
 
+    // Per-asset rendement-override (stap ⑤): een eigen verwacht jaarrendement op
+    // dit specifieke bezit gaat vóór het globale (pensioenstap-)rendement. Zelfde
+    // ×100-guard als de globale waarde (intake = %, PersonaProfile = fraction).
+    const assetReturn = resolveExpectedReturn(a.expectedReturnPct) ?? expectedReturn ?? 0.06
+
     assets.push({
       name: a.name,
       asset_type: a.assetType,
       current_value: a.value,
       purchase_value: a.value,     // historisch onbekend → huidige waarde
       purchase_date: today(),       // historisch onbekend → vandaag
-      expected_return: isEigenHuis ? 0.03 : (expectedReturn ?? 0.06),
+      expected_return: isEigenHuis ? 0.03 : assetReturn,
       monthly_contribution: 0,
       institution: (!isInvestment && a.extra) ? a.extra : '',
       // eigen_huis is niet liquide → housing-strategy behandelt het correct

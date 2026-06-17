@@ -7,7 +7,6 @@ import {
   parseBrokerCSV,
   detectBroker,
   parseENNumber,
-  parseNLNumber,
   parseISODatePrefix,
   parseEtoroDate,
 } from './broker-csv'
@@ -238,13 +237,13 @@ describe('DEGIRO — Transaction export (echt formaat)', () => {
     expect(result.rows[0].units).toBe(5)
   })
 
-  it('total_amount comes from Waarde EUR (712.93), not Lokale waarde', () => {
-    expect(result.rows[0].total_amount).toBe(712.93)
+  it('total_amount comes from Waarde EUR (500.00), not Lokale waarde', () => {
+    expect(result.rows[0].total_amount).toBe(500.00)
   })
 
   it('price_per_unit is Waarde EUR / |Aantal| in EUR, not USD Koers', () => {
-    // 712.93 / 5 = 142.586
-    expect(result.rows[0].price_per_unit).toBeCloseTo(142.586, 3)
+    // 500.00 / 5 = 100.000
+    expect(result.rows[0].price_per_unit).toBeCloseTo(100.000, 3)
   })
 
   it('fees is absolute value of Transactiekosten EUR (2.00)', () => {
@@ -256,7 +255,7 @@ describe('DEGIRO — Transaction export (echt formaat)', () => {
   })
 
   it('date is parsed correctly', () => {
-    expect(result.rows[0].date).toBe('2026-06-12')
+    expect(result.rows[0].date).toBe('2025-01-01')
   })
 
   it('order-id (UUID) is stored in raw["Order ID"]', () => {
@@ -264,6 +263,6 @@ describe('DEGIRO — Transaction export (echt formaat)', () => {
     // (kolomverschuiving door lege laatste header). We lezen hem robuust uit
     // als het laatste niet-lege, UUID-achtige veld van de rij en slaan op in
     // raw["Order ID"] zodat de import-stap hem kan persisteren.
-    expect(result.rows[0].raw['Order ID']).toBe('44e0f390-58cf-466b-b229-0354863a8d4b')
+    expect(result.rows[0].raw['Order ID']).toBe('00000000-0000-0000-0000-000000000001')
   })
 })

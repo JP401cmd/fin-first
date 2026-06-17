@@ -33,13 +33,35 @@
 // Rate limits are per-endpoint and tight; the sync layer calls each at most
 // once per run, so we do not implement client-side throttling here.
 
+import { z } from 'zod'
 import type { BrokerAdapter, BrokerPosition, ValidationResult } from './broker-adapter'
 import { classifyBrokerError } from './broker-adapter'
+import { getServiceClient } from '@/lib/supabase/service'
+import { recordContractEvent } from '@/lib/contract-events'
+import { fingerprintKeys } from '@/lib/parsers/shared'
 
 const TRADING212_BASE = 'https://live.trading212.com'
 const ACCOUNT_INFO_PATH = '/api/v0/equity/account/info'
 const PORTFOLIO_PATH = '/api/v0/equity/portfolio'
 const INSTRUMENTS_PATH = '/api/v0/equity/metadata/instruments'
+
+// ── Contract monitoring helpers ────────────────────────────────────────────
+// keyprintOf is vervangen door de gedeelde SHA-256 fingerprintKeys uit
+// lib/parsers/shared.ts (zie emitContractViolation in fetchPositions).
+
+const T212PositionSchema = z.object({
+  ticker: z.string(),
+  quantity: z.number(),
+  averagePrice: z.number(),
+  currentPrice: z.number(),
+  ppl: z.number(),
+  fxPpl: z.number().nullable().optional(),
+  initialFillDate: z.string().optional(),
+  maxBuy: z.number().optional(),
+  maxSell: z.number().optional(),
+  pieQuantity: z.number().optional(),
+  frontend: z.string().optional(),
+})
 
 // ── API response shapes (legacy v0) ────────────────────────────────────────
 
@@ -140,6 +162,38 @@ export const trading212Adapter: BrokerAdapter = {
     const rows = await t212Get<T212Position[]>(PORTFOLIO_PATH, apiKey)
     if (!Array.isArray(rows) || rows.length === 0) return []
 
+    // ── Zod response canary (Laag B contract monitoring) ──────────────────
+    const parsed = z.array(T212PositionSchema).safeParse(rows)
+    if (!parsed.success) {
+      // fire-and-forget — must never break the sync
+      try {
+        const firstRow = Array.isArray(rows) && rows[0] ? rows[0] as unknown as Record<string, unknown> : null
+        const observedKeys = Object.keys(firstRow ?? {})
+        // Gedeelde SHA-256 helper (vervangt de voormalige DJB2 keyprintOf)
+        const fingerprint = await fingerprintKeys(observedKeys)
+        const knownKeys = new Set(['ticker','quantity','averageprice','currentprice','ppl','fxppl','initialfilldate','maxbuy','maxsell','piequantity','frontend'])
+        const added = observedKeys.filter(k => !knownKeys.has(k.toLowerCase()))
+        const removed = [...knownKeys].filter(k => !observedKeys.map(o => o.toLowerCase()).includes(k))
+        const service = getServiceClient()
+        await recordContractEvent(service, {
+          kind: 'contract_violation',
+          surface: 'trading212-positions',
+          severity: 'warn',
+          fingerprint,
+          diff: {
+            changed: parsed.error.issues.map(i => i.path.join('.')),
+            added,
+            removed,
+          },
+        })
+      } catch {
+        // logging must never break the sync
+      }
+      // fall through with permissive cast — sync continues
+    }
+    const rowsToProcess = (parsed.success ? parsed.data : rows) as T212Position[]
+    // ─────────────────────────────────────────────────────────────────────
+
     // Enrich with instrument metadata (isin/name/currency) when available.
     // Best-effort: a failure here must not lose the positions themselves.
     let instruments: Map<string, T212Instrument> = new Map()
@@ -149,7 +203,7 @@ export const trading212Adapter: BrokerAdapter = {
       // metadata unavailable — fall back to ticker-only positions
     }
 
-    return rows
+    return rowsToProcess
       .map((r): BrokerPosition => {
         const meta = instruments.get(r.ticker)
         return {

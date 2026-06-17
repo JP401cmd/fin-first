@@ -2,6 +2,10 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Upload, FileText, X, Check, Loader2, AlertCircle, Download } from 'lucide-react'
+import {
+  parseMijnpensioenJson,
+  mijnpensioenJsonToParseResult,
+} from '@/lib/pension/mijnpensioen-json'
 
 type UploadStatus = 'idle' | 'uploading' | 'success' | 'error'
 
@@ -13,9 +17,22 @@ interface PensionPdfUploadProps {
   lifeEventId?: string | null
   /** Whether a PDF is already stored for this life event */
   existingPdfPath?: string | null
+  /**
+   * Woonsituatie voor de JSON-import van mijnpensioen.nl: bepaalt of het
+   * AOW-bedrag samenwonend (true) of alleenstaand (false) wordt overgenomen.
+   * Niet relevant voor de PDF-route (AI leidt dat zelf af). Default: samenwonend.
+   */
+  samenwonend?: boolean
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
+const ACCEPT_ATTR = 'application/pdf,application/json,.pdf,.json'
+
+/** Of een bestand een mijnpensioen.nl JSON-export is (op naam óf MIME-type). */
+function isJsonFile(f: File): boolean {
+  return f.type === 'application/json' || f.name.toLowerCase().endsWith('.json')
+}
 
 export function PensionPdfUpload({
   onFileSelected,
@@ -23,6 +40,7 @@ export function PensionPdfUpload({
   onParseResult,
   lifeEventId,
   existingPdfPath,
+  samenwonend = true,
 }: PensionPdfUploadProps) {
   const [status, setStatus] = useState<UploadStatus>('idle')
   const [file, setFile] = useState<File | null>(null)
@@ -57,16 +75,59 @@ export function PensionPdfUpload({
     }
   }, [])
 
+  /**
+   * Deterministische JSON-import van mijnpensioen.nl: volledig client-side,
+   * ZONDER /api/pension/parse (geen AI). De mapper levert exact hetzelfde
+   * PensionParseResult-contract als de PDF-route, zodat de verwerking
+   * downstream identiek is. JSON-bestanden worden NIET in storage bewaard
+   * (dat pad is bewust alleen voor de PDF).
+   */
+  const handleJsonFile = useCallback(async (f: File) => {
+    setFile(f)
+    setStatus('uploading')
+    pendingFileRef.current = null
+    onFileSelected?.(f)
+    try {
+      const text = await f.text()
+      const parsed = parseMijnpensioenJson(text)
+      if (!parsed.ok) {
+        setStatus('error')
+        setError(parsed.error)
+        return
+      }
+      const result = mijnpensioenJsonToParseResult(parsed.data, { samenwonend })
+      setStatus('success')
+      onParseResult?.(result)
+    } catch (err) {
+      setStatus('error')
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Er ging iets mis bij het lezen van het JSON-bestand.',
+      )
+    }
+  }, [onFileSelected, onParseResult, samenwonend])
+
   const validateAndSet = useCallback((f: File) => {
     setError(null)
-    if (f.type !== 'application/pdf') {
-      setError('Alleen PDF-bestanden zijn toegestaan.')
+
+    const json = isJsonFile(f)
+    if (!json && f.type !== 'application/pdf') {
+      setError('Alleen PDF- of JSON-bestanden van mijnpensioen.nl zijn toegestaan.')
       return
     }
     if (f.size > MAX_FILE_SIZE) {
       setError('Bestand is te groot. Maximaal 10 MB.')
       return
     }
+
+    // ── JSON-route: deterministisch, client-side, geen AI ──
+    if (json) {
+      void handleJsonFile(f)
+      return
+    }
+
+    // ── PDF-route: ongewijzigd (AI-extractie via /api/pension/parse) ──
     setFile(f)
     setStatus('uploading')
     pendingFileRef.current = f
@@ -96,7 +157,7 @@ export function PensionPdfUpload({
         setStatus('error')
         setError(err.message || 'Er ging iets mis bij het verwerken van de PDF.')
       })
-  }, [onFileSelected, onParseResult, lifeEventId, uploadToStorage])
+  }, [onFileSelected, onParseResult, lifeEventId, uploadToStorage, handleJsonFile])
 
   /**
    * Called externally (via ref or effect) after a life event is saved,
@@ -206,7 +267,7 @@ export function PensionPdfUpload({
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf"
+          accept={ACCEPT_ATTR}
           onChange={handleFileChange}
           className="hidden"
         />
@@ -217,10 +278,10 @@ export function PensionPdfUpload({
   // ── Success state ──
   if (status === 'success' && file) {
     return (
-      <div className="rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 p-3">
+      <div className="rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 p-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-            <Check className="h-4 w-4 text-emerald-600" />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-horizon-100">
+            <Check className="h-4 w-4 text-horizon-600" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-[var(--ink)]">{file.name}</p>
@@ -308,7 +369,7 @@ export function PensionPdfUpload({
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf"
+          accept={ACCEPT_ATTR}
           onChange={handleFileChange}
           className="hidden"
         />
@@ -321,10 +382,10 @@ export function PensionPdfUpload({
           {/* Desktop: drag & drop text; Mobile: tap to select */}
           <div>
             <p className="text-sm font-medium text-[var(--ink-2)]">
-              <span className="hidden sm:inline">Sleep je PDF hierheen of </span>
+              <span className="hidden sm:inline">Sleep je PDF of JSON hierheen of </span>
               <span className="text-horizon-600 underline underline-offset-2">kies een bestand</span>
             </p>
-            <p className="mt-0.5 text-xs text-[var(--ink-4)]">Alleen PDF, max 10 MB</p>
+            <p className="mt-0.5 text-xs text-[var(--ink-4)]">PDF of JSON van mijnpensioen.nl, max 10 MB</p>
           </div>
         </div>
       </div>

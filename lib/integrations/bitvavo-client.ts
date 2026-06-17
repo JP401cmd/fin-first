@@ -15,8 +15,12 @@
 //   Bitvavo-Access-Window    — request-window in ms (default 10000)
 
 import { createHmac } from 'crypto'
+import { z } from 'zod'
 import type { ExchangeAdapter, ExchangeBalance, ValidationResult } from './exchange-adapter'
 import { classifyExchangeError } from './exchange-adapter'
+import { recordContractEvent } from '../contract-events'
+import { getServiceClient } from '../supabase/service'
+import { fingerprintKeys } from '../parsers/shared'
 
 const BITVAVO_BASE = 'https://api.bitvavo.com/v2'
 const REQUEST_WINDOW_MS = 10_000
@@ -26,6 +30,12 @@ interface BitvavoBalanceRow {
   available: string
   inOrder: string
 }
+
+const BitvavoBalanceRowSchema = z.object({
+  symbol: z.string(),
+  available: z.string(),
+  inOrder: z.string(),
+})
 
 interface BitvavoTradeRow {
   id: string
@@ -38,6 +48,18 @@ interface BitvavoTradeRow {
   fee: string
   feeCurrency: string
 }
+
+const BitvavoTradeRowSchema = z.object({
+  id: z.string(),
+  orderId: z.string().optional(),
+  timestamp: z.number(),
+  market: z.string(),
+  side: z.enum(['buy', 'sell']),
+  amount: z.string(),
+  price: z.string(),
+  fee: z.string(),
+  feeCurrency: z.string(),
+})
 
 export interface BitvavoTrade {
   id: string
@@ -109,6 +131,52 @@ interface BitvavoMarketRow {
   quote: string
 }
 
+const BitvavoMarketRowSchema = z.object({
+  market: z.string(),
+  status: z.string(),
+  base: z.string(),
+  quote: z.string(),
+})
+
+// ── Contract-canary helpers ────────────────────────────────────────────────
+
+/**
+ * Fire-and-forget contract-violation event.
+ * Wrapped in try/catch — logging must NEVER break the sync.
+ * Only key NAMES + hash reach the event store (no amounts, no values).
+ *
+ * Gebruikt de gedeelde SHA-256 fingerprintKeys uit lib/parsers/shared.ts
+ * (vervangt de voormalige lokale DJB2-implementatie).
+ */
+async function emitContractViolation(
+  surface: string,
+  observedKeys: string[],
+  knownKeys: string[],
+  error: z.ZodError,
+): Promise<void> {
+  try {
+    const sortedNames = [...observedKeys].sort()
+    const fingerprint = await fingerprintKeys(observedKeys)
+    const knownSet = new Set(knownKeys.map(k => k.toLowerCase()))
+    const added = sortedNames.filter(k => !knownSet.has(k.toLowerCase()))
+    const removed = knownKeys.filter(k => !sortedNames.map(s => s.toLowerCase()).includes(k))
+    const service = getServiceClient()
+    await recordContractEvent(service, {
+      kind: 'contract_violation',
+      surface,
+      severity: 'warn',
+      fingerprint,
+      diff: {
+        changed: error.issues.map((i: z.ZodIssue) => i.path.join('.')),
+        added,
+        removed,
+      },
+    })
+  } catch {
+    // Logging must never break the sync.
+  }
+}
+
 /**
  * Lijst van actieve markten op Bitvavo. Publieke endpoint — geen auth nodig.
  *
@@ -131,8 +199,18 @@ export async function fetchAvailableMarkets(): Promise<Set<string>> {
   }
 
   const rows = (await res.json()) as BitvavoMarketRow[]
+
+  // Zod response-canary — detect API drift without ever breaking the sync.
+  const parsed = z.array(BitvavoMarketRowSchema).safeParse(rows)
+  if (!parsed.success) {
+    const observedKeys = Object.keys(Array.isArray(rows) && rows[0] ? rows[0] as unknown as Record<string, unknown> : {})
+    void emitContractViolation('bitvavo-markets', observedKeys, ['market', 'status', 'base', 'quote'], parsed.error)
+    // Fall through with permissive cast — the sync must continue.
+  }
+
+  const safeRows = parsed.success ? parsed.data : (rows as BitvavoMarketRow[])
   const active = new Set<string>()
-  for (const r of rows) {
+  for (const r of safeRows) {
     if (typeof r.market !== 'string') continue
     // Trade history werkt alleen voor markten die actief verhandelbaar zijn.
     // Andere statussen ('halted', 'auction', …) overslaan we — daar krijgen
@@ -173,7 +251,16 @@ export async function fetchTrades(
     const rows = await bitvavoGet<BitvavoTradeRow[]>(`/trades?${qs.toString()}`, apiKey, apiSecret)
     if (!Array.isArray(rows) || rows.length === 0) break
 
-    for (const r of rows) {
+    // Zod response-canary — detect API drift without ever breaking the sync.
+    const parsedTrades = z.array(BitvavoTradeRowSchema).safeParse(rows)
+    if (!parsedTrades.success) {
+      const observedKeys = Object.keys(rows[0] ? rows[0] as unknown as Record<string, unknown> : {})
+      void emitContractViolation('bitvavo-trades', observedKeys, ['id', 'orderid', 'timestamp', 'market', 'side', 'amount', 'price', 'fee', 'feecurrency'], parsedTrades.error)
+      // Fall through with permissive cast — the sync must continue.
+    }
+    const safeRows = parsedTrades.success ? parsedTrades.data : (rows as BitvavoTradeRow[])
+
+    for (const r of safeRows) {
       collected.push({
         id: String(r.id),
         market: String(r.market),
@@ -212,7 +299,17 @@ export const bitvavoAdapter: ExchangeAdapter = {
 
   async fetchBalances(apiKey, apiSecret): Promise<ExchangeBalance[]> {
     const rows = await bitvavoGet<BitvavoBalanceRow[]>('/balance', apiKey, apiSecret)
-    return rows
+
+    // Zod response-canary — detect API drift without ever breaking the sync.
+    const parsed = z.array(BitvavoBalanceRowSchema).safeParse(rows)
+    if (!parsed.success) {
+      const observedKeys = Object.keys(Array.isArray(rows) && rows[0] ? rows[0] as unknown as Record<string, unknown> : {})
+      void emitContractViolation('bitvavo-balance', observedKeys, ['symbol', 'available', 'inorder'], parsed.error)
+      // Fall through with permissive cast — the sync must continue.
+    }
+
+    const safeRows = parsed.success ? parsed.data : (rows as BitvavoBalanceRow[])
+    return safeRows
       .map((r) => ({
         symbol: String(r.symbol).toUpperCase(),
         available: Number(r.available) || 0,

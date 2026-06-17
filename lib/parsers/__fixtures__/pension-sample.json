@@ -1,0 +1,21 @@
+{
+  "aowBedrag": 1250.50,
+  "regelingen": [
+    {
+      "fondsNaam": "Pensioenfonds Metaal en Techniek",
+      "brutoBedrag": 680.00,
+      "ingangLeeftijd": 67,
+      "isGeindexeerd": true,
+      "type": "ouderdomspensioen"
+    },
+    {
+      "fondsNaam": "Pensioenfonds Metaal en Techniek",
+      "brutoBedrag": 420.00,
+      "ingangLeeftijd": 67,
+      "isGeindexeerd": false,
+      "type": "nabestaandenpensioen"
+    }
+  ],
+  "nabestaandenpensioen": 420.00,
+  "samenvatting": "Gesimuleerd pensioenoverzicht met AOW, een geindexeerd ouderdomspensioen en nabestaandenpensioen via PMT. Alle bedragen zijn synthetisch."
+}

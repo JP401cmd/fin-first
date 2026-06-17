@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAssetValueFromInvestmentHoldings } from '@/lib/holdings-sync'
+import { fingerprintHeaders, diffHeaders, type FormatId } from '@/lib/parsers/format-contracts'
+import { recordContractEvent } from '@/lib/contract-events'
+import { getServiceClient } from '@/lib/supabase/service'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,7 +50,26 @@ interface ImportRequestBody {
   mode?: ImportMode
   // The asset a snapshot import reconciles against. Required for 'snapshot'.
   targetAssetId?: string
+  /**
+   * Kolomnamen uit de header-rij van het geüploade CSV-bestand (Laag A-runtime).
+   * Alleen NAMEN — nooit rij-data of financiële waarden.
+   * Optioneel voor backward-compatibility; ontbrekend veld slaat drift-check over.
+   */
+  headerNames?: string[]
 }
+
+// ---------------------------------------------------------------------------
+// Broker-id → FormatId mapping (Laag A-runtime contract-bewaking)
+// ---------------------------------------------------------------------------
+// Broker-id's in de import-route gebruiken underscores (legacy); FORMAT_CONTRACTS
+// gebruikt hyphens. Alleen broker-CSV-formaten — bank-CSV valt buiten scope (ADR).
+const BROKER_TO_FORMAT_ID: Partial<Record<string, FormatId>> = {
+  degiro:       'degiro-portfolio',   // portfolio-export is de meest gebruikte
+  saxo:         'saxo',
+  ing_beleggen: 'ing-beleggen',
+  trading212:   'trading212',
+  etoro:        'etoro',
+} as const
 
 const VALID_BROKERS = ['degiro', 'saxo', 'ing_beleggen', 'trading212', 'etoro']
 const VALID_TX_TYPES = ['buy', 'sell', 'dividend']
@@ -148,6 +170,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: `Broker moet een van de volgende zijn: ${VALID_BROKERS.join(', ')}`,
       }, { status: 400 })
+    }
+
+    // --- Laag A-runtime: header-drift detectie op broker-CSV-uploads ---
+    //
+    // Alleen kolomNAMEN + hash bereiken de DB — nooit rij-data of financiële
+    // waarden (privacy by construction). Bank-CSV-runtime-drift is bewust
+    // overgeslagen: die wordt gedekt door de statische contracttest (format-
+    // contracts.test.ts) en vereist extra plumbing in de cash-import-route.
+    //
+    // Defensief: mag de import NOOIT afbreken — try/catch slikt alle fouten.
+    if (Array.isArray(body.headerNames) && body.headerNames.length > 0) {
+      // Valideer dat headerNames alleen strings bevat (nooit waarden)
+      const safeHeaderNames = body.headerNames.filter(
+        (h): h is string => typeof h === 'string',
+      )
+      const formatId = BROKER_TO_FORMAT_ID[body.broker]
+      if (formatId && safeHeaderNames.length > 0) {
+        try {
+          const [fingerprint, diff] = await Promise.all([
+            fingerprintHeaders(safeHeaderNames),
+            Promise.resolve(diffHeaders(safeHeaderNames, formatId)),
+          ])
+          const hasDrift = diff.missing.length > 0 || diff.unexpected.length > 0
+          if (hasDrift) {
+            // Severity: 'error' als verplichte kolommen ontbreken (missing),
+            // anders 'warn' voor onverwachte extra kolommen (unexpected).
+            const severity = diff.missing.length > 0 ? 'error' : 'warn'
+            const service = getServiceClient()
+            await recordContractEvent(service, {
+              kind: 'format_drift',
+              surface: body.broker,
+              severity,
+              fingerprint,
+              // diff bevat uitsluitend kolomNAMEN — geen financiële waarden.
+              diff: {
+                missing:    diff.missing,
+                unexpected: diff.unexpected,
+              },
+            })
+          }
+        } catch {
+          // Logging mag de import NOOIT breken.
+        }
+      }
     }
 
     // --- Resolve import mode (default 'append' = backward-compatible) ---

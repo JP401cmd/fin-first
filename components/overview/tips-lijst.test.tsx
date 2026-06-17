@@ -14,11 +14,17 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: mockRefresh }),
 }))
 
+const mockOpenWithMessage = vi.fn()
+vi.mock('@/components/app/chat/chat-provider', () => ({
+  useChatContextOptional: () => ({ openWithMessage: mockOpenWithMessage }),
+}))
+
 const fetchMock = vi.fn()
 vi.stubGlobal('fetch', fetchMock)
 
 beforeEach(() => {
   mockRefresh.mockReset()
+  mockOpenWithMessage.mockReset()
   fetchMock.mockReset()
 })
 
@@ -47,12 +53,29 @@ const baseRec = (overrides: Partial<Recommendation>): Recommendation =>
   }) as Recommendation
 
 describe('TipsLijst', () => {
-  it('shows empty state CTA when no actionable tips', () => {
+  it('shows empty state CTA that opens the Will-chat in-place (geen navigatie)', () => {
     render(<TipsLijst recommendations={[]} />)
     expect(screen.getByText(/Geen tips wachten/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Vraag Will/i })).toHaveAttribute(
-      'href',
-      '/berichten?prompt=analyseer-mijn-financien',
+    // Mag GEEN navigerende link naar /berichten meer zijn — dat verliet de
+    // pagina onnodig en daar staan de tips niet.
+    expect(screen.queryByRole('link', { name: /Vraag Will/i })).not.toBeInTheDocument()
+    const cta = screen.getByRole('button', { name: /Vraag Will om tips/i })
+    fireEvent.click(cta)
+    expect(mockOpenWithMessage).toHaveBeenCalledTimes(1)
+    expect(mockOpenWithMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Doorlicht mijn financiën'),
+    )
+  })
+
+  it('header "Vraag meer" opent de chat in-place i.p.v. te navigeren', () => {
+    render(
+      <TipsLijst recommendations={[baseRec({ id: 'r1', title: 'Een tip' })]} />,
+    )
+    const meer = screen.getByRole('button', { name: /Vraag meer/i })
+    fireEvent.click(meer)
+    expect(mockOpenWithMessage).toHaveBeenCalledTimes(1)
+    expect(mockOpenWithMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Doorlicht mijn financiën'),
     )
   })
 

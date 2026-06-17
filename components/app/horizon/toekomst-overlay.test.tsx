@@ -1,17 +1,30 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ToekomstOverlay, type OverlayBalloonDef } from './toekomst-overlay'
 
-// `canHover` (hover-apparaat ja/nee) deterministisch sturen — anders hangt het
-// gedrag af van de jsdom-matchMedia-stub. Default = false (touch), per test te
-// overschrijven.
-vi.mock('@/lib/hooks/use-media-query', () => ({
-  useMediaQuery: vi.fn(() => false),
-}))
+// `canHover` (hover-apparaat ja/nee) en `inline` (ruim scherm ja/nee)
+// deterministisch sturen — anders hangt het gedrag af van de jsdom-matchMedia-
+// stub. Default = false (touch + smal), per test te overschrijven.
+// `useIsLgUp` delegeert naar de gemockte `useMediaQuery` met de lg-query, zodat
+// één mock beide stuurt (lg-up via een `mockImplementation` op de query).
+vi.mock('@/lib/hooks/use-media-query', () => {
+  const useMediaQuery = vi.fn((_query: string) => false)
+  return {
+    useMediaQuery,
+    useIsLgUp: () => useMediaQuery('(min-width: 1024px)'),
+  }
+})
 import { useMediaQuery } from '@/lib/hooks/use-media-query'
 
 beforeEach(() => {
+  vi.mocked(useMediaQuery).mockReset()
   vi.mocked(useMediaQuery).mockReturnValue(false)
+})
+
+afterEach(() => {
+  // Sommige tests gebruiken fake timers (hover-emphasis-debounce); altijd terug
+  // naar echte timers zodat een leak nooit een volgende test beïnvloedt.
+  vi.useRealTimers()
 })
 
 /**
@@ -223,7 +236,10 @@ describe('ToekomstOverlay — sluiten', () => {
 
   // Op hover-apparaten blijft toetsenbord-focus de popover openen (geen regressie).
   it('op hover-apparaten opent focus (toetsenbord) de popover wél', () => {
-    vi.mocked(useMediaQuery).mockReturnValue(true) // canHover = true (desktop)
+    // canHover = true (hover-apparaat), maar lg-up = false zodat we in
+    // popover-modus blijven (op ruim scherm zou de body inline staan en zou er
+    // geen marker-knop zijn om te focussen).
+    vi.mocked(useMediaQuery).mockImplementation((q: string) => !q.includes('min-width: 1024px'))
     render(
       <ToekomstOverlay
         visible
@@ -239,12 +255,31 @@ describe('ToekomstOverlay — sluiten', () => {
     expect(marker.getAttribute('aria-expanded')).toBe('true')
   })
 
-  // ── De link-knop in de popover MOET navigeren ──
-  // Gebruikersmelding: "de knoppen met de links naar de pagina werken niet."
-  // Dit pint dat een klik op de CTA in de popover daadwerkelijk `def.onActivate`
-  // (de router.push) afvuurt. De pointer-capture van de grafiek wordt al door de
-  // MarkerRow-stopPropagation afgevangen; deze test bewaakt dat de klik-wiring blijft.
-  it('CTA in de popover roept onActivate aan (de link-knop navigeert)', () => {
+  // ── Standaard tip-ballonnen tonen GEEN actie-knop (puur informatief) ──
+  // De tips leggen de grafiek uit en navigeren niet meer. Zonder cta/onActivate
+  // mag er geen knop in de popover staan; alleen de uitleg-body.
+  it('toont geen actie-knop in de popover als de ballon puur informatief is (geen cta)', () => {
+    vi.mocked(useMediaQuery).mockReturnValue(false) // touch: één klik opent de popover
+    render(
+      <ToekomstOverlay
+        visible
+        balloons={[{ id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'Uitleg.', row: 'top', emphasis: 'accumulation' }]}
+        onEmphasisChange={() => {}}
+        onClose={() => {}}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+    fireEvent.click(screen.getByLabelText('Tip: Je inkomen')) // open popover
+    expect(screen.getByText('Uitleg.')).toBeTruthy()
+    // Geen knoppen behalve het ✕ "Tip sluiten"-knopje op touch.
+    expect(screen.queryByRole('button', { name: /aanpassen|instellen|kiezen|toevoegen|bijwerken/i })).toBeNull()
+  })
+
+  // ── Optionele CTA blijft werken waar 'ie expliciet wordt meegegeven ──
+  // De component ondersteunt nog een actie-knop; die wordt alleen gerenderd als
+  // zowel cta als onActivate aanwezig zijn, en een klik vuurt onActivate af.
+  it('rendert de optionele CTA wél en roept onActivate aan als cta+onActivate gegeven zijn', () => {
     vi.mocked(useMediaQuery).mockReturnValue(false) // touch: één klik opent de popover
     const onActivate = vi.fn()
     render(
@@ -260,6 +295,99 @@ describe('ToekomstOverlay — sluiten', () => {
     fireEvent.click(screen.getByLabelText('Tip: Je inkomen')) // open popover
     fireEvent.click(screen.getByText('Inkomen aanpassen')) // klik de CTA
     expect(onActivate).toHaveBeenCalledTimes(1)
+  })
+
+  // ── Adaptieve weergave: op ruim scherm (≥1024px) tonen de markers hun volledige
+  // inhoud (kicker + body) DIRECT, niet uitklapbaar (geen popover-toggle). ──
+  it('toont de body direct (inline) op ruime schermen zonder uitklappen', () => {
+    // useIsLgUp() => true (ruim scherm). Andere queries (hover) blijven false.
+    vi.mocked(useMediaQuery).mockImplementation((q: string) =>
+      q.includes('min-width: 1024px'),
+    )
+    render(
+      <ToekomstOverlay
+        visible
+        balloons={[{ id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'Directe uitleg.', row: 'top', emphasis: 'accumulation' }]}
+        onEmphasisChange={() => {}}
+        onClose={() => {}}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+    // Body is meteen zichtbaar, zonder dat er een marker-knop aangeklikt hoeft.
+    expect(screen.getByText('Directe uitleg.')).toBeTruthy()
+    // Geen uitklap-marker-knop in inline-modus.
+    expect(screen.queryByLabelText('Tip: Je inkomen')).toBeNull()
+  })
+
+  // ── M1-regressie: Escape-eigenaarschap tussen overlay en exit-melding-modal ──
+  // De exit-melding-modal verschijnt VÓÓRDAT de overlay sluit en laat de overlay
+  // `visible`; beide luisteren op window-keydown. Zonder gate zouden twee
+  // Escape-handlers tegelijk vuren (correct-bij-toeval, afhankelijk van
+  // registratie-volgorde). `escapeSuspended` geeft Escape exclusief aan de modal:
+  // de overlay registreert dan geen listener.
+  it('Escape sluit de overlay als de exit-modal NIET open is (escapeSuspended=false)', () => {
+    const onClose = vi.fn()
+    render(
+      <ToekomstOverlay
+        visible
+        balloons={balloons}
+        onEmphasisChange={() => {}}
+        onClose={onClose}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('Escape laat de overlay met rust als de exit-modal open is (escapeSuspended) — de modal bezit Escape', () => {
+    const onClose = vi.fn()
+    render(
+      <ToekomstOverlay
+        visible
+        escapeSuspended
+        balloons={balloons}
+        onEmphasisChange={() => {}}
+        onClose={onClose}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  // ── Inline-kaarten accentueren bij hover de grafiekfase (emphasis-only) ──
+  // Op ruim scherm zijn de kaarten niet uitklapbaar, maar hover legt nog steeds
+  // de visuele koppeling kaart↔grafiek door de bijbehorende fase te accentueren.
+  // Emphasis-only: er wordt géén popover/openId geactiveerd.
+  it('accentueert de grafiekfase bij hover op een inline-kaart en reset bij leave', () => {
+    vi.useFakeTimers()
+    // useIsLgUp() => true (ruim scherm → inline-modus).
+    vi.mocked(useMediaQuery).mockImplementation((q: string) =>
+      q.includes('min-width: 1024px'),
+    )
+    const onEmphasisChange = vi.fn()
+    render(
+      <ToekomstOverlay
+        visible
+        balloons={[{ id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'Directe uitleg.', row: 'top', emphasis: 'accumulation' }]}
+        onEmphasisChange={onEmphasisChange}
+        onClose={() => {}}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+    const card = screen.getByText('Directe uitleg.').closest('div')!
+    fireEvent.mouseEnter(card)
+    // Hover accentueert meteen de fase van deze kaart.
+    expect(onEmphasisChange).toHaveBeenLastCalledWith('accumulation')
+    fireEvent.mouseLeave(card)
+    vi.advanceTimersByTime(160) // korte leave-debounce (140ms)
+    // Na het verlaten reset de emphasis weer.
+    expect(onEmphasisChange).toHaveBeenLastCalledWith(null)
   })
 
   it('toont de hint hoe je het Tips-scherm later terugvindt', () => {

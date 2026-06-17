@@ -27,9 +27,28 @@ const STATUS_DOT: Record<string, string> = {
   grey: 'sl-grey',
 }
 
+/**
+ * Publieke weergavenaam per pijler. We leiden in dit rapport bewust met
+ * "vrijheid" i.p.v. "FIRE" (#7) — de DTO blijft ongemoeid; alleen het label
+ * dat de lezer ziet wordt verzacht. Overige pijlers gebruiken hun DTO-naam.
+ */
+const PILLAR_DISPLAY_NAME: Record<string, string> = {
+  fire_progress: 'Vrijheidsvoortgang',
+}
+
+function pillarDisplayName(id: string, name: string): string {
+  if (PILLAR_DISPLAY_NAME[id]) return PILLAR_DISPLAY_NAME[id]
+  // Vangnet: ook als de id ooit wijzigt maar de naam nog "FIRE" bevat.
+  if (/\bFIRE\b/i.test(name)) return name.replace(/\bFIRE[- ]?voortgang\b/i, 'Vrijheidsvoortgang')
+  return name
+}
+
 const PILLAR_BAR_COLOR: Record<string, string> = {
   green: 'var(--green)',
-  amber: 'var(--wil-deep)',
+  // Amber-status = échte amber/oranje (box1-token), gelijk aan de stoplicht-dot
+  // (.sl-amber) — NOOIT paars. Paars is in dit rapport voorbehouden aan
+  // toekomst/projectie; een gezondheids-"aandacht"-balk hoort stoplicht-amber.
+  amber: 'var(--color-box1-500, #f59e0b)',
   red: 'var(--red)',
   grey: 'var(--rule)',
 }
@@ -37,7 +56,10 @@ const PILLAR_BAR_COLOR: Record<string, string> = {
 /** Gauge-kleur op de stoplicht-status van de totaalscore (>=70 groen etc.). */
 function gaugeLabelColor(score: number): string {
   if (score >= 70) return 'var(--green)'
-  if (score >= 50) return 'var(--wil-deep)'
+  // Midden-band = stoplicht-amber, consistent met de pijler-dots/-balken. De
+  // donkere box1-700-tint i.p.v. -500 omdat dit label WITTE tekst draagt
+  // (#fff op box1-500 zou ~2:1 contrast geven; box1-700 ≈ 4.9:1, AA-veilig).
+  if (score >= 50) return 'var(--color-box1-700, #b45309)'
   return 'var(--red)'
 }
 
@@ -83,7 +105,7 @@ export function Gezondheidsgetal({
             className="swatch"
             style={{
               background:
-                'linear-gradient(90deg,var(--kern),var(--wil),var(--horizon))',
+                'linear-gradient(90deg,var(--kern),var(--wil),var(--vrijgekocht))',
             }}
           />
         </div>
@@ -91,9 +113,9 @@ export function Gezondheidsgetal({
           {health.score} van de 100
         </h2>
         <p className="lede">
-          Eén getal dat vier vragen samenvat: kom je rond, heb je een buffer, druk
-          je schuld, en groei je richting vrijheid? Drie pijlers zijn gemeten —
-          budget meet je straks in de app.
+          Eén getal dat een paar vragen samenvat: kom je rond, heb je een buffer,
+          zit je niet te zwaar in schuld, en groei je richting vrijheid? Hieronder
+          zie je dezelfde pijlers als je gezondheidsgetal in de app.
         </p>
 
         {/* gauge */}
@@ -105,7 +127,7 @@ export function Gezondheidsgetal({
                 cy="95"
                 r="80"
                 fill="none"
-                stroke="#E2D8C6"
+                stroke="var(--paper-3)"
                 strokeWidth="18"
               />
               <circle
@@ -125,10 +147,11 @@ export function Gezondheidsgetal({
                 }}
               />
               <defs>
+                {/* Score-sweep: kern-bruin → goud → positief-groen. */}
                 <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#6B4A2E" />
-                  <stop offset=".5" stopColor="#C99416" />
-                  <stop offset="1" stopColor="#3E7A4E" />
+                  <stop offset="0" stopColor="var(--kern)" />
+                  <stop offset=".5" stopColor="var(--vrijgekocht)" />
+                  <stop offset="1" stopColor="var(--green)" />
                 </linearGradient>
               </defs>
             </svg>
@@ -155,7 +178,7 @@ export function Gezondheidsgetal({
           {health.pillars.map((p) => (
             <div className="pillar" key={p.id}>
               <div className="pillar-head">
-                <span className="pillar-name">{p.name}</span>
+                <span className="pillar-name">{pillarDisplayName(p.id, p.name)}</span>
                 <span className="pillar-score">
                   {p.score != null ? p.score : '—'}
                   <span
@@ -202,10 +225,10 @@ export function Gezondheidsgetal({
                 const baseY = 18 + i * rowH
                 const youBarY = baseY
                 const avgBarY = baseY + 18
-                const youColor = row.better ? '#3E7A4E' : '#A8392B'
+                const youColor = row.better ? 'var(--green)' : 'var(--red)'
                 return (
                   <g key={row.label}>
-                    <text x="0" y={baseY + 12} fill="#4A4339">
+                    <text x="0" y={baseY + 12} fill="var(--ink-soft)">
                       {row.label}
                     </text>
                     <rect
@@ -223,7 +246,7 @@ export function Gezondheidsgetal({
                     <text
                       x={BENCH_TRACK_X + row.youW + 14}
                       y={youBarY + 11}
-                      fill="#1E1A15"
+                      fill="var(--ink)"
                     >
                       {row.youDisplay}
                     </text>
@@ -232,12 +255,12 @@ export function Gezondheidsgetal({
                       y={avgBarY}
                       height="9"
                       width={row.avgW}
-                      fill="#C9BEAA"
+                      fill="var(--paper-3)"
                     />
                     <text
                       x={BENCH_TRACK_X + row.avgW + 8}
                       y={avgBarY + 8}
-                      fill="#4A4339"
+                      fill="var(--ink-soft)"
                       fontSize="10"
                     >
                       {row.averageDisplay}

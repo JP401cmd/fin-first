@@ -13,11 +13,11 @@ export function Masthead({ masthead }: { masthead: ReportMasthead }) {
         </div>
         <div className="kicker">Het Vrijheidsrapport</div>
         <h1>
-          Hoeveel van je leven heb je <em>al teruggekocht?</em>
+          Zie en voel de <em>vrijheid</em> om keuzes te maken
         </h1>
         <p className="dek">
           Vijf minuten invoer, één eerlijk dossier. Elke euro die je opbouwt is
-          geen saldo — het is tijd waarin je niet hoeft te werken.
+          geen saldo — het is vrijheid om je eigen keuzes te maken.
         </p>
         <div className="byline">
           <span>

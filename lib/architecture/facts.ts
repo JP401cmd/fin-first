@@ -177,6 +177,33 @@ export function selectClaudeTeam(raw: unknown): {
   return { agents, skills }
 }
 
+/** Gescande integratie-client-feiten (architecture.json.integrationClients). */
+export interface IntegrationClientFact {
+  file: string
+  exists: boolean
+  baseUrl: string | null
+  hasAdapter: boolean
+  parserFormat: string | null
+}
+
+/**
+ * Leest defensief de `integrationClients`-sleutel uit de gegenereerde snapshot.
+ * Geeft altijd een geldige (eventueel lege) array terug.
+ */
+export function selectIntegrations(raw: unknown): IntegrationClientFact[] {
+  const root = asRecord(raw)
+  return asArray(root.integrationClients).map((item) => {
+    const c = asRecord(item)
+    return {
+      file: asString(c.file),
+      exists: Boolean(c.exists),
+      baseUrl: c.baseUrl != null ? asString(c.baseUrl) : null,
+      hasAdapter: Boolean(c.hasAdapter),
+      parserFormat: c.parserFormat != null ? asString(c.parserFormat) : null,
+    }
+  }).filter((c) => c.file)
+}
+
 export function selectInsights(raw: unknown): ArchInsights {
   const root = asRecord(raw)
 

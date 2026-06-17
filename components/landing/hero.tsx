@@ -132,23 +132,30 @@ export function Hero() {
             vrijheid dichterbij brengen.
           </p>
 
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Link
               href="/signup"
-              className="inline-flex items-center justify-center rounded-[var(--r)] bg-[var(--ink)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--bg)] transition-all hover:bg-[var(--ink-2)] hover:shadow-[var(--s1)]"
+              className="inline-flex items-center justify-center rounded-[var(--r)] bg-[var(--ink)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--bg)] transition-all hover:bg-[var(--ink-2)] hover:shadow-[var(--s1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
               Begin gratis
             </Link>
             <Link
               href="/functies"
-              className="inline-flex items-center justify-center gap-2 rounded-[var(--r)] border border-[var(--border-md)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--ink-2)] transition-all hover:border-[var(--ink-3)] hover:shadow-[var(--s0)]"
+              className="inline-flex items-center justify-center gap-2 rounded-[var(--r)] border border-[var(--border-md)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--ink-2)] transition-all hover:border-[var(--ink-3)] hover:shadow-[var(--s0)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
               Ontdek hoe het werkt
               <span className="text-[var(--ink-4)]">→</span>
             </Link>
+            <Link
+              href="/check"
+              className="inline-flex items-center justify-center gap-2 rounded-[var(--r)] border border-kern-300 px-6 py-3.5 font-sans text-sm font-medium text-kern-700 transition-all hover:border-kern-400 hover:bg-kern-50 hover:shadow-[var(--s0)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kern-500"
+            >
+              Maak je eerste Vrijheidsrapport in 5 minuten
+              <span className="text-kern-500" aria-hidden="true">→</span>
+            </Link>
           </div>
 
-          <p className="mb-12 font-sans text-xs text-[var(--ink-3)]">Klaar in ±5 minuten · geen creditcard nodig</p>
+          <p className="mb-12 font-sans text-xs text-[var(--ink-3)]">Geen creditcard nodig</p>
 
           {/* Rol-tags — wie heeft hier wat aan? */}
           <div className="flex flex-wrap gap-2">

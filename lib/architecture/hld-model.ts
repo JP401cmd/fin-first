@@ -91,6 +91,7 @@ export function buildHldModel(): HldModel {
           { title: 'Je bezittingen en schulden bijhouden', desc: 'Van spaargeld tot huis en hypotheek — je netto vermogen in beeld.' },
           { title: 'Je broker koppelen of je portefeuille importeren', desc: 'Trading 212 koppelen of een bestand inladen — je aandelen en fondsen kloppen automatisch, net als bij je crypto.' },
           { title: 'Jezelf spiegelen aan Nederland en de wereld', desc: 'Zie hoe je gezondheid, spaarquote, vermogen en vrijheidsleeftijd zich verhouden tot een vergelijkbare doelgroep — en waar je staat wereldwijd.' },
+          { title: 'Meteen begrijpen waaróm iets je aandacht vraagt en wat je kunt doen', desc: 'Als een overzichtspagina oranje of rood kleurt, legt een banner in gewone taal uit wat er speelt en wat je concreet kunt aanpakken — met een directe link naar de juiste plek of een gesprek met Will.' },
         ],
       },
       {
@@ -112,7 +113,7 @@ export function buildHldModel(): HldModel {
         accent: 'wil',
         items: [
           { title: 'Begrijpen wat je betaalt', desc: 'Box 1, 2 en 3 in gewone taal, met je eigen cijfers.' },
-          { title: 'Zien hoeveel je mag inleggen voor je pensioen', desc: 'Je jaarruimte, automatisch berekend.' },
+          { title: 'Zien hoeveel je mag inleggen voor je pensioen', desc: 'Je jaarruimte, nauwkeurig berekend — inclusief je eigen UPO-factor A (werkgeverspensioen) als je dat invult.' },
           { title: 'Checken of de tegenbewijsregeling gunstiger is', desc: 'Werkelijk rendement versus het forfait in box 3.' },
         ],
       },

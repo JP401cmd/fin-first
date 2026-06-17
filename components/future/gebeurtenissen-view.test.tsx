@@ -33,6 +33,7 @@ const mockStrategieData: StrategieEditorsData = {
   aowRows: [],
   dateOfBirth: null,
   grossYearlyIncome: 0,
+  pensioenFactorA: 0,
   currentAge: null,
   currentNetMonthly: 0,
   housingPreview: null,

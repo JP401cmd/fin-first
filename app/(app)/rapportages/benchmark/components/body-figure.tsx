@@ -18,12 +18,29 @@
  * en respecteren `prefers-reduced-motion`.
  */
 
+import { useEffect, useRef, useState } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { BenchmarkMetric } from '@/lib/benchmark-report-data'
+import { WillDots } from '@/components/app/will-dots'
 import { VIZ } from './viz-palette'
 
 const RING_R = 60
 const RING_CIRC = 2 * Math.PI * RING_R // ≈ 376.99
+/** Verticale verschuiving (px) van de gezondheids-ring t.o.v. de oorspronkelijke
+ *  borstpositie (cy=300) — iets lager op de borst (richting hart) gezet. */
+const RING_DY = 30
+
+/**
+ * Will-als-gezicht: de drie-stippen-avatar (knipperende ogen + mond, in de
+ * module-accentkleuren) wordt als gezicht op het hoofd van de lijntekening
+ * gezet — een speelse knipoog in de Spiegel. Coördinaten liggen op het gezicht
+ * van de body-PNG (vierkant, beeld op x=28 y=42 560×560 → hoofd ≈ x 308, y 142).
+ */
+const FACE_CX = 308
+const FACE_CY = 172
+const FACE_SIZE = 78
+/** Horizontale uitslag (px) van de speelse "kijk naar links/rechts"-beweging. */
+const GLANCE_PX = 6
 
 export interface BodyFigureProps {
   /** Alle metrics, op key opgezocht. */
@@ -89,6 +106,62 @@ const BODY_SRC: Record<BodyBand, string> = {
 
 export function BodyFigure({ metrics, formatValue, onMetricClick }: BodyFigureProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 1200, threshold: 0.2 })
+
+  // --- Speelse "kijk naar links/rechts"-beweging van het Will-gezicht ---
+  // Naast het knipperen + mondbeweging (in WillDots zelf) glijdt de héle avatar
+  // af en toe een paar pixels opzij, zodat het lijkt of het hoofd rondkijkt.
+  // Bewust lokaal in de Spiegel: WillDots blijft app-breed ongewijzigd.
+  const [lookOffset, setLookOffset] = useState(0)
+  const glanceTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return
+    }
+
+    let cancelled = false
+    const timers = glanceTimers.current
+
+    function scheduleGlance() {
+      if (cancelled) return
+      // Rustige, willekeurige tussenpozen (4–9s) zodat het "af en toe" voelt.
+      const delay = 4000 + Math.random() * 5000
+      const t = setTimeout(() => {
+        if (cancelled) return
+        const dir = Math.random() < 0.5 ? -1 : 1
+        setLookOffset(dir * GLANCE_PX)
+        const t2 = setTimeout(() => {
+          if (cancelled) return
+          // ~40% kans: eerst de andere kant op kijken voordat het hoofd terugkomt.
+          if (Math.random() < 0.4) {
+            setLookOffset(-dir * GLANCE_PX)
+            const t3 = setTimeout(() => {
+              if (cancelled) return
+              setLookOffset(0)
+              scheduleGlance()
+            }, 800)
+            timers.push(t3)
+          } else {
+            setLookOffset(0)
+            scheduleGlance()
+          }
+        }, 900)
+        timers.push(t2)
+      }, delay)
+      timers.push(t)
+    }
+
+    scheduleGlance()
+
+    return () => {
+      cancelled = true
+      timers.forEach(clearTimeout)
+      timers.length = 0
+    }
+  }, [])
 
   const byKey = (k: BenchmarkMetric['key']) => metrics.find(m => m.key === k) ?? null
   const health = byKey('health')
@@ -188,7 +261,7 @@ export function BodyFigure({ metrics, formatValue, onMetricClick }: BodyFigurePr
         {/* connector lines (achter het lichaam) */}
         <g stroke={VIZ.line} strokeWidth="1" fill="none">
           <path d="M214 234 Q188 184 168 152" style={fadeStyle(0)} />
-          <path d="M246 300 L150 300" style={fadeStyle(1)} />
+          <path d={`M246 ${300 + RING_DY} L150 ${300 + RING_DY}`} style={fadeStyle(1)} />
           <path d="M402 234 Q468 184 540 152" style={fadeStyle(2)} />
           <path d="M402 344 L560 356" style={fadeStyle(3)} />
         </g>
@@ -205,7 +278,33 @@ export function BodyFigure({ metrics, formatValue, onMetricClick }: BodyFigurePr
           aria-hidden="true"
         />
 
-        {/* ===== borst-kern: financiële gezondheid ===== */}
+        {/* ===== Will-als-gezicht: drie-stippen-avatar op het hoofd ===== */}
+        {/* Live SVG-avatar (knipperen + mond) via foreignObject; de wrapper-div
+            schuift af en toe opzij (lookOffset) zodat het hoofd lijkt rond te
+            kijken. Decoratief → geen pointer-events. */}
+        <foreignObject
+          x={FACE_CX - FACE_SIZE / 2}
+          y={FACE_CY - FACE_SIZE / 2}
+          width={FACE_SIZE}
+          height={FACE_SIZE}
+          aria-hidden="true"
+          style={{ overflow: 'visible', pointerEvents: 'none' }}
+        >
+          <div
+            aria-hidden="true"
+            style={{
+              width: FACE_SIZE,
+              height: FACE_SIZE,
+              transform: `translateX(${lookOffset}px)`,
+              transition: 'transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          >
+            <WillDots size={FACE_SIZE} state="idle" />
+          </div>
+        </foreignObject>
+
+        {/* ===== borst-kern: financiële gezondheid (iets lager op de borst) ===== */}
+        <g transform={`translate(0 ${RING_DY})`}>
         <circle cx="308" cy="300" r="98" fill="url(#bfHealthGlow)" />
         <circle cx="308" cy="300" r={RING_R} fill={VIZ.card} stroke={VIZ.line} strokeWidth="1" />
         <circle cx="308" cy="300" r={RING_R} fill="none" stroke="#e7dec9" strokeWidth="6" />
@@ -260,6 +359,7 @@ export function BodyFigure({ metrics, formatValue, onMetricClick }: BodyFigurePr
               ● peer {peerScoreLabel}
             </text>
           )}
+        </g>
         </g>
 
         {/* ===== satelliet-cijfers ===== */}

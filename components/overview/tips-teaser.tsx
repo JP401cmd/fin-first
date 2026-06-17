@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { ArrowRight, Sparkles, ListChecks, MessageCircle } from 'lucide-react'
+import { useChatContextOptional } from '@/components/app/chat/chat-provider'
+import { ANALYSE_FINANCIEN_PROMPT } from '@/components/app/chat/chat-prompt-deeplink'
 
 /**
  * TipsTeaser — compacte strip op /overzicht die naar de Tips & acties
@@ -10,7 +12,7 @@ import { ArrowRight, Sparkles, ListChecks, MessageCircle } from 'lucide-react'
  * Drie tegels:
  *   - Toptips        → /overzicht/tips (lijst met pending recommendations)
  *   - Open acties    → /overzicht/tips (#acties anker voor scroll)
- *   - Vraag Will     → /berichten?prompt=analyseer-mijn-financien
+ *   - Vraag Will     → opent de Will-chat-overlay in-place (geen navigatie)
  */
 interface TipsTeaserProps {
   pendingTipCount: number
@@ -18,7 +20,18 @@ interface TipsTeaserProps {
 }
 
 export function TipsTeaser({ pendingTipCount, openActionCount }: TipsTeaserProps) {
-  const items = [
+  const chat = useChatContextOptional()
+  const items: {
+    href: string | null
+    onClick?: () => void
+    Icon: typeof Sparkles
+    label: string
+    count: number | null
+    sublabel: string
+    /** Toont de navigatie-pijl. Uit voor de chat-CTA: die navigeert niet maar
+     *  opent een overlay — een pijl zou misleidend "ga ergens heen" suggereren. */
+    showArrow?: boolean
+  }[] = [
     {
       href: '/overzicht/tips',
       Icon: Sparkles,
@@ -34,13 +47,18 @@ export function TipsTeaser({ pendingTipCount, openActionCount }: TipsTeaserProps
       sublabel: openActionCount === 1 ? 'op je lijst' : 'op je lijst',
     },
     {
-      href: '/berichten?prompt=analyseer-mijn-financien',
+      // Geen navigatie: opent de globale Will-chat-overlay in-place met de
+      // doorlicht-prompt. (Voorheen een Link naar /berichten — dat verliet de
+      // pagina onnodig en daar staan de tips niet.)
+      href: null,
+      onClick: () => chat?.openWithMessage(ANALYSE_FINANCIEN_PROMPT),
       Icon: MessageCircle,
       label: 'Vraag Will',
       count: null,
       sublabel: 'nieuwe analyse',
+      showArrow: false,
     },
-  ] as const
+  ]
 
   return (
     <section aria-label="Tips & acties" className="mt-4 px-4 sm:px-6">
@@ -63,34 +81,45 @@ export function TipsTeaser({ pendingTipCount, openActionCount }: TipsTeaserProps
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-        {items.map(({ href, Icon, label, count, sublabel }) => (
-          <Link
-            key={label}
-            href={href}
-            className="group flex items-center gap-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-colors hover:border-wil-300 hover:shadow-sm"
-          >
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-wil-50 text-wil-700">
-              <Icon className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-1.5">
-                {count !== null && (
-                  <span className="font-serif text-xl font-semibold text-[var(--ink)] tabular-nums">
-                    {count}
+        {items.map(({ href, onClick, Icon, label, count, sublabel, showArrow = true }) => {
+          const tileClass =
+            'group flex items-center gap-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 transition-colors hover:border-wil-300 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wil-600'
+          const inner = (
+            <>
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-wil-50 text-wil-700">
+                <Icon className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-1.5">
+                  {count !== null && (
+                    <span className="font-serif text-xl font-semibold text-[var(--ink)] tabular-nums">
+                      {count}
+                    </span>
+                  )}
+                  <span className={`text-sm font-medium text-[var(--ink-2)] ${count !== null ? '' : 'font-semibold'}`}>
+                    {label}
                   </span>
-                )}
-                <span className={`text-sm font-medium text-[var(--ink-2)] ${count !== null ? '' : 'font-semibold'}`}>
-                  {label}
-                </span>
+                </div>
+                <p className="text-[11px] text-[var(--ink-3)] leading-snug">{sublabel}</p>
               </div>
-              <p className="text-[11px] text-[var(--ink-3)] leading-snug">{sublabel}</p>
-            </div>
-            <ArrowRight
-              className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform group-hover:translate-x-0.5 group-hover:text-wil-700"
-              aria-hidden="true"
-            />
-          </Link>
-        ))}
+              {showArrow && (
+                <ArrowRight
+                  className="h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform group-hover:translate-x-0.5 group-hover:text-wil-700"
+                  aria-hidden="true"
+                />
+              )}
+            </>
+          )
+          return href ? (
+            <Link key={label} href={href} className={tileClass}>
+              {inner}
+            </Link>
+          ) : (
+            <button key={label} type="button" onClick={onClick} className={`${tileClass} w-full text-left`}>
+              {inner}
+            </button>
+          )
+        })}
       </div>
     </section>
   )

@@ -7,6 +7,7 @@ import type { CheckIntakeAsset } from '@/lib/check/types'
 import { formatCurrency } from '@/lib/format'
 import { parseBedrag } from '@/lib/check/use-check-draft'
 import { useId } from 'react'
+import { primaryBtn, backBtn, inlineAddBtn, inputBase } from '../intake-styles'
 
 interface Props {
   intake: CheckDraft['intake']
@@ -28,8 +29,12 @@ const ASSET_PRESETS: AssetPreset[] = [
   { assetType: 'eigen_huis', label: 'Eigen woning', hint: 'WOZ-waarde of geschatte marktwaarde', placeholder: '350.000' },
   { assetType: 'retirement', label: 'Pensioen', hint: 'Opgebouwde waarde bij pensioenfonds', placeholder: '80.000' },
   { assetType: 'crypto', label: "Crypto", hint: 'Bitcoin, Ethereum, etc.', placeholder: '5.000' },
+  { assetType: 'real_estate', label: 'Vastgoed', hint: 'Tweede woning, verhuurpand', placeholder: '200.000' },
   { assetType: 'other', label: 'Overig', hint: 'Bedrijfsaandelen, auto, kunst, …', placeholder: '10.000' },
 ]
+
+/** Groei-assets krijgen een optioneel verwacht-rendement-veld (analoog aan rente op schulden). */
+const GROWTH_ASSET_TYPES = new Set(['investment', 'crypto', 'retirement', 'real_estate'])
 
 interface AssetRowFormProps {
   preset: AssetPreset
@@ -38,14 +43,26 @@ interface AssetRowFormProps {
 
 function AssetRowForm({ preset, onAdd }: AssetRowFormProps) {
   const [raw, setRaw] = useState('')
+  const [rawLabel, setRawLabel] = useState('')
+  const [rawReturn, setRawReturn] = useState('')
   const [open, setOpen] = useState(false)
   const id = useId()
+  const isGrowth = GROWTH_ASSET_TYPES.has(preset.assetType)
 
   function handleAdd() {
     const val = parseBedrag(raw)
     if (val <= 0) return
-    onAdd({ assetType: preset.assetType, name: preset.label, value: val })
+    const ret = isGrowth ? parseBedrag(rawReturn) : 0
+    onAdd({
+      assetType: preset.assetType,
+      name: rawLabel.trim() || preset.label,
+      value: val,
+      extra: rawLabel.trim() || null,
+      expectedReturnPct: isGrowth && ret > 0 ? ret : null,
+    })
     setRaw('')
+    setRawLabel('')
+    setRawReturn('')
     setOpen(false)
   }
 
@@ -66,6 +83,19 @@ function AssetRowForm({ preset, onAdd }: AssetRowFormProps) {
   return (
     <div className="border border-kern-300 bg-kern-50/30 px-4 py-3 space-y-2">
       <p className="font-display text-sm font-semibold text-[var(--ink)]">{preset.label}</p>
+      {/* Label (optioneel — om duplicaten te onderscheiden, bv. ASN vs Bunq) */}
+      <input
+        type="text"
+        value={rawLabel}
+        onChange={(e) => setRawLabel(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleAdd()
+          if (e.key === 'Escape') setOpen(false)
+        }}
+        placeholder={`Naam (optioneel) — bijv. ${preset.label} bij ASN`}
+        aria-label={`Naam voor ${preset.label}`}
+        className={`${inputBase('kern')} px-3 py-2 font-serif text-sm`}
+      />
       <div className="flex gap-2">
         <div className="relative flex-1">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-4)]">
@@ -83,14 +113,32 @@ function AssetRowForm({ preset, onAdd }: AssetRowFormProps) {
               if (e.key === 'Escape') setOpen(false)
             }}
             placeholder={preset.placeholder}
-            className="w-full border border-[var(--border-ed)] bg-[var(--subtle)] py-2 pr-3 pl-7 font-mono text-sm tabular-nums text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500"
+            aria-label={`Waarde ${preset.label}`}
+            className={`${inputBase('kern')} py-2 pr-3 pl-7 font-mono text-sm tabular-nums`}
           />
         </div>
-        <button
-          type="button"
-          onClick={handleAdd}
-          className="shrink-0 bg-[var(--ink)] px-4 py-2 text-xs font-medium text-[var(--paper)] transition-opacity hover:opacity-80"
-        >
+        {/* Verwacht rendement — alleen voor groei-assets */}
+        {isGrowth && (
+          <div className="relative w-24 shrink-0">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={rawReturn}
+              onChange={(e) => setRawReturn(e.target.value.replace(/[^0-9.,]/g, ''))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAdd()
+                if (e.key === 'Escape') setOpen(false)
+              }}
+              placeholder="% rdmt."
+              aria-label={`Verwacht jaarrendement ${preset.label} in procent (optioneel)`}
+              className={`${inputBase('kern')} px-2 py-2 pr-6 font-mono text-sm tabular-nums`}
+            />
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-4)]">
+              %
+            </span>
+          </div>
+        )}
+        <button type="button" onClick={handleAdd} className={inlineAddBtn('kern')}>
           Toevoegen
         </button>
         <button
@@ -102,6 +150,11 @@ function AssetRowForm({ preset, onAdd }: AssetRowFormProps) {
           &times;
         </button>
       </div>
+      {isGrowth && (
+        <p className="font-serif text-xs italic text-[var(--ink-3)]">
+          Verwacht jaarrendement is optioneel — leeg laten gebruikt je algemene rendement uit de pensioenstap.
+        </p>
+      )}
     </div>
   )
 }
@@ -142,6 +195,11 @@ export function StepBezittingen({ intake, onChange, onNext, onBack }: Props) {
               <div className="flex items-center gap-2">
                 <Landmark className="h-4 w-4 shrink-0 text-kern-500" aria-hidden="true" />
                 <span className="font-serif text-sm text-[var(--ink)]">{a.name}</span>
+                {typeof a.expectedReturnPct === 'number' && a.expectedReturnPct > 0 && (
+                  <span className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
+                    {new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 1 }).format(a.expectedReturnPct)}%
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <span className="font-mono text-sm tabular-nums text-[var(--ink-2)]">
@@ -151,7 +209,7 @@ export function StepBezittingen({ intake, onChange, onNext, onBack }: Props) {
                   type="button"
                   onClick={() => handleRemove(idx)}
                   aria-label={`Verwijder ${a.name}`}
-                  className="text-[var(--ink-4)] transition-colors hover:text-red-500"
+                  className="text-[var(--ink-4)] transition-colors hover:text-negative"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -167,31 +225,18 @@ export function StepBezittingen({ intake, onChange, onNext, onBack }: Props) {
         </ul>
       )}
 
-      {/* Voeg-toe rijen */}
+      {/* Voeg-toe rijen — elk type mag meerdere keren (onderscheid via naam) */}
       <div className="space-y-2">
-        {ASSET_PRESETS.map((preset) => {
-          // Verberg type als het al toegevoegd is (maar sta meerdere toe voor 'other')
-          const alreadyAdded =
-            preset.assetType !== 'other' &&
-            assets.some((a) => a.assetType === preset.assetType)
-          if (alreadyAdded) return null
-          return <AssetRowForm key={preset.assetType} preset={preset} onAdd={handleAdd} />
-        })}
+        {ASSET_PRESETS.map((preset) => (
+          <AssetRowForm key={preset.assetType} preset={preset} onAdd={handleAdd} />
+        ))}
       </div>
 
       <div className="flex flex-col gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onNext}
-          className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
-        >
+        <button type="button" onClick={onNext} className={primaryBtn('kern')}>
           {assets.length === 0 ? 'Overslaan (geen bezittingen)' : 'Verder'}
         </button>
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-full min-h-11 px-6 py-2 text-sm text-[var(--ink-3)] underline-offset-4 hover:text-[var(--ink)] hover:underline"
-        >
+        <button type="button" onClick={onBack} className={backBtn}>
           Terug
         </button>
       </div>

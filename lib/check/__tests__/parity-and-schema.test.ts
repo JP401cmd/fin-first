@@ -58,23 +58,25 @@ function intakeMetHuis(): CheckIntake {
 // SECTIE 1 — Pariteit: buildReport ↔ intakeToPersona
 // ════════════════════════════════════════════════════════════════════════════════
 
-describe('Pariteit buildReport ↔ intakeToPersona — eigen woning niet-FIRE-eligible', () => {
+describe('Pariteit buildReport ↔ intakeToPersona — eigen woning deels-FIRE-eligible', () => {
   const intake = intakeMetHuis()
 
   /**
-   * Eigen woning in buildReport: countsForFire=false in dualBars,
-   * en alreadyFundedYears < vrijheidsjaren obv totaal netto vermogen.
-   * Eigen woning in intakeToPersona: is_liquid=false.
+   * Eigen woning in buildReport: countsForFire=false in dualBars (zodat het
+   * huis-bucket de cash-drag-som niet vervuilt), maar de 50%-weging staat in het
+   * freedomLabel. Eigen woning in intakeToPersona: is_liquid=false.
    *
-   * Dit borgt dat beide paden DEZELFDE regel hanteren: het huis is het dak,
-   * niet het rendement.
+   * Fix 1: de eigen woning telt voor 50% van haar overwaarde mee voor vrijheid
+   * (de helft die je realistisch kunt verzilveren) — niet meer volledig
+   * uitgesloten ("telt niet mee").
    */
-  it('buildReport: eigen woning in dualBars heeft countsForFire=false', () => {
+  it('buildReport: eigen woning in dualBars — countsForFire=false, 50%-label', () => {
     const report = buildReport(intake, NOW)
     const huis = report.dualBars.find((b) => b.bucket === 'huis')
     expect(huis).toBeDefined()
     expect(huis!.countsForFire).toBe(false)
-    expect(huis!.freedomLabel).toBe('telt niet mee')
+    expect(huis!.freedomLabel).toContain('telt voor 50% mee')
+    expect(huis!.freedomLabel).not.toBe('telt niet mee')
   })
 
   it('intakeToPersona: eigen_huis-asset heeft is_liquid=false', () => {
@@ -84,15 +86,16 @@ describe('Pariteit buildReport ↔ intakeToPersona — eigen woning niet-FIRE-el
     expect(huis!.is_liquid).toBe(false)
   })
 
-  it('buildReport: FIRE-eligible vermogen = netWorth minus huisoverwaarde', () => {
+  it('buildReport: FIRE-eligible vermogen = netWorth minus de NIET-meegerekende helft overwaarde', () => {
     const report = buildReport(intake, NOW)
     // assets: 400000 + 60000 + 40000 = 500000; schulden: 320000
     // netWorth = 180000; huisoverwaarde = 400000 − 320000 = 80000
-    // FIRE-eligible = 180000 − 80000 = 100000
+    // Fix 1 (50%-huis): FIRE-eligible = 180000 − 0,5×80000 = 140000
+    expect(report.snapshot.freedomBaseEur).toBe(140000)
 
-    // Proxy: de "stop vandaag"-vrijheidstijd is op de FIRE-eligible grondslag.
-    // Met 100000 FIRE-eligible en dagelijks tarief (2500×12/365 ≈ 82,19/dag) →
-    // ~1216 dagen ≈ 3 jaar + enkele maanden.
+    // Proxy: de "stop vandaag"-vrijheidstijd is op die FIRE-eligible grondslag.
+    // Met 140000 FIRE-eligible en dagelijks tarief (2500×12/365 ≈ 82,19/dag) →
+    // ~1703 dagen ≈ 4-5 jaar.
     const stopToday = report.twoFutures.stopToday
     // Is het meer dan 0 en minder dan de totale netWorth-jaren?
     expect(stopToday.isDeficit).toBeFalsy()

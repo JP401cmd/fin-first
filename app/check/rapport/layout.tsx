@@ -20,7 +20,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: 'Je Vrijheidsrapport — TriFinity',
   description:
-    'Vijf minuten invoer, één eerlijk dossier. Elke euro die je opbouwt is geen saldo — het is tijd waarin je niet hoeft te werken.',
+    'Vijf minuten invoer, één eerlijk dossier. Elke euro die je opbouwt is geen saldo — het is vrijheid om je eigen keuzes te maken.',
   robots: { index: false, follow: false },
 }
 

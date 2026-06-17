@@ -9,23 +9,47 @@
  */
 
 .rapport-root {
-  --paper: #f4efe6;
-  --paper-2: #ebe3d5;
-  --paper-3: #e2d8c6;
-  --ink: #1e1a15;
-  --ink-soft: #4a4339;
-  --ink-faint: #857b6b;
-  --rule: #c9beaa;
-  --kern: #6b4a2e;
-  --kern-deep: #4a2f1a;
-  --horizon: #5b3a8c;
-  --horizon-soft: #7e5fb0;
-  --horizon-pale: #d8cce8;
-  --wil: #e8b83a;
-  --wil-deep: #c99416;
-  --green: #3e7a4e;
-  --red: #a8392b;
-  --blue: #3a6b8c;
+  /* ── App-palet (Editorial Finance) ──────────────────────────────────────
+   * Aliassen naar de canonieke app-tokens uit globals.css (resolven op de
+   * publieke /check-route via :root). Zo erft het rapport exact de warme
+   * krant-look van de app i.p.v. een eigen, half-juiste set hexen.
+   * Hex-fallbacks staan ernaast voor print-engines die de var-keten niet
+   * volgen (zie @media print). */
+  /* --paper en --ink ERVEN bewust uit :root (globals.css) — niet opnieuw
+   * definiëren zou een self-reference-cyclus geven. De afgeleide tonen mappen
+   * we wél op de app-tokens met een eigen naam. */
+  --paper-2: var(--subtle, #f3ead9);
+  --paper-3: var(--border-ed, #e3dac8);
+  --ink-soft: var(--ink-2, #4a4840);
+  --ink-faint: var(--ink-3, #888070);
+  --rule: var(--border-ed, #e3dac8);
+
+  /* Semantisch kleursysteem van het rapport:
+   *  - GOUD = "vrijheid die al van jou is / vrijgekocht": het levensgrid-funded
+   *    + de vrijheidstijd-chips (.vt). Eigen token `--vrijgekocht`, ONTKOPPELD van
+   *    de toekomst-accent zodat een flip daarvan deze niet meesleurt.
+   *  - PAARS = toekomst/projectie: §4 Toekomst-identiteit + de levenslijn-OPBOUW,
+   *    de FIRE-marker, de ±2%-band en de vrijheidszone-wash. `--horizon` is nu
+   *    een in-stijl violet (wil-600), nét iets dieper dan de Will-sectie (wil-500)
+   *    zodat §4 Toekomst en §6 Will onderscheidbaar blijven.
+   *  - BRUIN (kern) = fundament/nu + de AFBOUW-lijn (decumulatie). */
+  --kern: var(--color-kern-500);
+  --kern-deep: var(--color-kern-700);
+
+  /* "Al van jou"-GOUD — losgekoppeld van het toekomst-accent. */
+  --vrijgekocht: var(--color-horizon-500);
+  --vrijgekocht-soft: var(--color-horizon-400);
+  --vrijgekocht-pale: var(--color-horizon-200);
+
+  /* Toekomst-accent = PAARS (wil-600, iets dieper dan §6 Will = wil-500). */
+  --horizon: var(--color-wil-600);
+  --horizon-soft: var(--color-wil-400);
+  --horizon-pale: var(--color-wil-200);
+  --wil: var(--color-wil-500);
+  --wil-deep: var(--color-wil-700);
+
+  --green: var(--positive, #3e7a4e);
+  --red: var(--negative, #a8392b);
 
   --serif: var(--font-source-serif, 'Source Serif 4'), Georgia, serif;
   --display: var(--font-playfair, 'Playfair Display'), serif;
@@ -38,7 +62,10 @@
   font-size: 18px;
   line-height: 1.62;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* `clip` i.p.v. `hidden`: voorkomt horizontale overflow ZONDER een verticale
+   * scroll-container te maken — anders pint de sticky `.index` aan deze container
+   * (die met de pagina meescrollt) i.p.v. aan de viewport. */
+  overflow-x: clip;
   min-height: 100vh;
 }
 
@@ -91,7 +118,7 @@
   left: 0;
   height: 3px;
   width: 0;
-  background: linear-gradient(90deg, var(--kern), var(--wil), var(--horizon));
+  background: linear-gradient(90deg, var(--kern), var(--horizon), var(--vrijgekocht));
   z-index: 50;
   transition: width 0.1s linear;
 }
@@ -170,36 +197,41 @@
   color: var(--ink);
 }
 
-/* ===== HERO: LIFE GRID ===== */
+/* ===== HERO: LIFE GRID =====
+ * GEEN zwart blok meer. Warme paper-aanzet (app-stijl): lichte achtergrond,
+ * hairline-regels, horizon-goud accent. De nadruk komt van de kop + accent,
+ * niet van een donkere slab. */
 .rapport-root .hero {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--paper-2);
+  color: var(--ink);
   margin: 0;
-  padding: 60px 0 64px;
+  padding: 56px 0 60px;
+  border-top: 1px solid var(--rule);
   border-bottom: 3px double var(--ink);
 }
 .rapport-root .hero .wrap {
   max-width: 880px;
 }
 .rapport-root .hero .eyebrow {
-  color: rgba(244, 239, 230, 0.5);
+  color: var(--vrijgekocht);
 }
 .rapport-root .hero .eyebrow .num {
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--vrijgekocht);
+  color: var(--paper);
 }
 .rapport-root .hero h2 {
-  color: var(--paper);
+  color: var(--ink);
   font-size: clamp(28px, 5.4vw, 44px);
   max-width: 18ch;
   margin-bottom: 12px;
 }
 .rapport-root .hero h2 .gold {
-  color: var(--wil);
+  /* "De gouden zijn al van jou" — GOUD. */
+  color: var(--vrijgekocht);
   font-style: italic;
 }
 .rapport-root .hero-lede {
-  color: rgba(244, 239, 230, 0.72);
+  color: var(--ink-soft);
   font-size: 18px;
   max-width: 54ch;
   margin-bottom: 34px;
@@ -213,7 +245,7 @@
 .rapport-root .yr {
   aspect-ratio: 1;
   border-radius: 2px;
-  background: rgba(244, 239, 230, 0.07);
+  background: var(--paper-3);
   transform: scale(0.4);
   opacity: 0;
   transition:
@@ -226,21 +258,27 @@
   opacity: 1;
 }
 .rapport-root .yr.lived {
-  background: #9a8e78;
+  background: var(--ink-faint);
 }
 .rapport-root .yr.funded {
-  background: var(--wil);
-  box-shadow: 0 0 0 1px rgba(232, 184, 58, 0.5);
+  /* "Al vrijgekocht" = GOUD (eigen token, niet het toekomst-accent). */
+  background: var(--vrijgekocht);
+  box-shadow: 0 0 0 1px var(--vrijgekocht-soft);
 }
 .rapport-root .yr.grind {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px rgba(244, 239, 230, 0.28);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1.5px var(--rule);
 }
 .rapport-root .yr.free {
+  /* "Vrijheid" = toekomst-PAARS (--horizon-soft). Freedom die vóór je ligt is
+   * projectie, geen "al van jou" — dus paars, niet goud. Ontkoppelt de
+   * legenda-categorie van "Al vrijgekocht" (GOUD) zodat ze onderscheidbaar
+   * zijn, en is consistent met §3 (.mg.free) waar geprojecteerde vrijheid al
+   * paars is. */
   background: var(--horizon-soft);
 }
 .rapport-root .yr.now {
-  box-shadow: 0 0 0 2px var(--paper);
+  box-shadow: 0 0 0 2px var(--ink);
   position: relative;
   z-index: 2;
 }
@@ -251,7 +289,7 @@
   font-family: var(--mono);
   font-size: 11.5px;
   letter-spacing: 0.03em;
-  color: rgba(244, 239, 230, 0.78);
+  color: var(--ink-soft);
 }
 .rapport-root .grid-legend span {
   display: inline-flex;
@@ -267,7 +305,7 @@
 }
 .rapport-root .hero-punch {
   margin-top: 34px;
-  border-top: 1px solid rgba(244, 239, 230, 0.2);
+  border-top: 1px solid var(--rule);
   padding-top: 26px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -279,11 +317,17 @@
   font-size: clamp(30px, 6vw, 46px);
   line-height: 1;
   letter-spacing: -0.02em;
+  color: var(--ink);
 }
 .rapport-root .punch .pn.gold {
-  color: var(--wil);
+  /* "al opgebouwd" = GOUD (vrijgekocht). */
+  color: var(--vrijgekocht);
 }
-.rapport-root .punch .pn.purp {
+.rapport-root .punch .pn.free {
+  /* "vrijheid ligt voor je" = toekomst-PAARS (--horizon-soft) — consistent met
+   * het levensgrid (.yr.free) en §3. GOUD (.pn.gold) blijft voorbehouden aan
+   * "al opgebouwd / al van jou". Contrast op paper-2 ≈ 6:1 (ruim AA voor dit
+   * display-cijfer). */
   color: var(--horizon-soft);
 }
 .rapport-root .punch .pl {
@@ -291,28 +335,47 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(244, 239, 230, 0.6);
+  color: var(--ink-faint);
   margin-top: 9px;
   line-height: 1.5;
 }
 
-/* nav index */
+/* nav index — STICKY sectiebalk: pint onder de leesvoortgang-balk en blijft
+ * bovenaan staan terwijl je scrollt. Een schaduw verschijnt zodra de pagina
+ * onder de balk doorscrolt (`.is-stuck`, gezet via IntersectionObserver). */
 .rapport-root .index {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 1px;
   background: var(--rule);
+  border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  transition: box-shadow 0.25s ease;
+}
+.rapport-root .index.is-stuck {
+  box-shadow: 0 6px 18px -8px rgba(26, 25, 22, 0.32);
+}
+/* Sentinel net boven de balk — als 'ie uit beeld is, plakt de balk. */
+.rapport-root .index-sentinel {
+  height: 1px;
+  width: 100%;
+  pointer-events: none;
 }
 .rapport-root .index a {
   background: var(--paper);
-  padding: 14px 12px;
+  padding: 12px 12px;
   text-decoration: none;
   font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: 0.06em;
   color: var(--ink-soft);
   transition: background 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .rapport-root .index a:hover {
   background: var(--paper-2);
@@ -321,13 +384,27 @@
   outline: 2px solid var(--ink);
   outline-offset: -2px;
 }
+.rapport-root .index-icon {
+  display: flex;
+  align-items: center;
+  color: var(--ink-faint);
+}
+.rapport-root .index-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.rapport-root .index-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
 .rapport-root .index a b {
   display: block;
   font-family: var(--display);
   font-size: 18px;
   color: var(--ink);
   font-weight: 700;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 /* ===== SECTIONS ===== */
@@ -393,21 +470,87 @@
   max-width: 60ch;
   margin-bottom: 24px;
 }
+/* Vrijheidstijd-chip — GOUD (vrijgekocht-token), ONTKOPPELD van het toekomst-
+ * accent: vrijheidstijd = "al van jou", dus blijft goud ook als toekomst paars is. */
 .rapport-root .vt {
   font-family: var(--mono);
   font-size: 0.74em;
-  color: var(--horizon);
-  background: rgba(91, 58, 140, 0.09);
-  border: 1px solid rgba(91, 58, 140, 0.24);
+  color: var(--color-horizon-700);
+  background: var(--vrijgekocht-pale);
+  border: 1px solid var(--vrijgekocht-soft);
   padding: 1px 7px;
   border-radius: 3px;
   white-space: nowrap;
   letter-spacing: 0.02em;
 }
 .rapport-root .vt.gold {
-  color: var(--wil-deep);
-  background: rgba(232, 184, 58, 0.14);
-  border-color: rgba(232, 184, 58, 0.35);
+  color: var(--kern-deep);
+  background: var(--color-kern-50);
+  border-color: var(--color-kern-200);
+}
+
+/* ===== SECTIE-TRIGGER =====
+ * Onopvallende "wat kan ik hiermee in de app"-nudge direct ná elke sectie.
+ * Leest visueel als afsluiter van de sectie erboven: dunne bovenregel, kleine
+ * "In de app"-eyebrow met pijl, dan de capability-tekst. Vol-breed, link naar
+ * de signup. Bewust licht — geen wil-knop/banner, om de afsluitende CTA-sectie
+ * niet te beconcurreren. */
+/* De sectie die direct door een trigger wordt gevolgd levert zélf geen
+   onderrand: zo valt de scheidslijn ONDER de app-tekst (de trigger), niet
+   erboven, en krijg je geen dubbele hairline. De trigger draagt de enige lijn. */
+.rapport-root section:has(+ .section-trigger) {
+  border-bottom: none;
+}
+.rapport-root .section-trigger {
+  display: block;
+  /* Uitgelijnd op dezelfde contentkolom als .wrap (de trigger is een sibling
+     van <section>, niet erin) — anders loopt de tekst tegen de viewport-rand. */
+  max-width: 840px;
+  margin: 0 auto;
+  text-decoration: none;
+  /* De app-tekst staat NET BOVEN het lijntje: de sectie erboven levert geen
+     border meer (de :has-regel hierboven), en de scheidslijn zit als
+     border-bottom ONDER de trigger — content → trigger → lijn → volgende sectie. */
+  padding: 18px 28px 18px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-soft);
+  transition: color 0.15s;
+}
+.rapport-root .section-trigger:hover {
+  color: var(--ink);
+}
+.rapport-root .section-trigger:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.rapport-root .section-trigger-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  /* Neutraal ink, geen module-accent: de trigger is een generieke
+     "doe-dit-in-de-app"-nudge, geen module-identiteit. --horizon (paars) is
+     in dit rapport voorbehouden aan toekomst/projectie (CLAUDE.md). */
+  color: var(--ink);
+  margin-bottom: 7px;
+}
+.rapport-root .section-trigger-arr {
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.rapport-root .section-trigger:hover .section-trigger-arr {
+  transform: translateX(4px);
+}
+.rapport-root .section-trigger-label {
+  display: block;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 60ch;
+  color: inherit;
 }
 
 /* snapshot */
@@ -656,9 +799,11 @@
   border: 1px solid rgba(62, 122, 78, 0.3);
 }
 .rapport-root .tag.a {
-  background: rgba(201, 148, 22, 0.14);
-  color: var(--wil-deep);
-  border: 1px solid rgba(201, 148, 22, 0.35);
+  /* Waarschuwing = echt amber (box1-token, géén module-accent), niet paars. */
+  background: color-mix(in srgb, var(--color-box1-500, #f59e0b) 16%, transparent);
+  color: var(--color-box1-700, #b45309);
+  border: 1px solid
+    color-mix(in srgb, var(--color-box1-500, #f59e0b) 38%, transparent);
 }
 .rapport-root .tag.r {
   background: rgba(168, 57, 43, 0.1);
@@ -671,14 +816,16 @@
   border: 1px solid var(--rule);
 }
 .rapport-root .tag.leven {
-  background: rgba(91, 58, 140, 0.1);
-  color: var(--horizon);
-  border: 1px solid rgba(91, 58, 140, 0.3);
+  /* "Leven"-gebeurtenis = wil-paars (Will & acties = wat je zelf kiest). */
+  background: var(--color-wil-50);
+  color: var(--wil);
+  border: 1px solid var(--color-wil-200);
 }
 .rapport-root .tag.leven-gold {
-  background: rgba(232, 184, 58, 0.16);
-  color: var(--wil-deep);
-  border: 1px solid rgba(201, 148, 22, 0.4);
+  /* FIRE-moment = toekomst-paars (was goud; verschoof mee met het accent). */
+  background: var(--horizon-pale);
+  color: var(--horizon);
+  border: 1px solid var(--horizon-soft);
 }
 
 /* gauge */
@@ -780,7 +927,8 @@
   background: var(--green);
 }
 .rapport-root .sl-amber {
-  background: var(--wil-deep);
+  /* Stoplicht-amber = echt oranje/amber (kleurenblind-veilig), nooit paars. */
+  background: var(--color-box1-500, #f59e0b);
 }
 .rapport-root .sl-red {
   background: var(--red);
@@ -880,10 +1028,12 @@
   background: var(--paper-3);
 }
 .rapport-root .mg.free {
+  /* "Op koers" = geprojecteerde vrijheid = toekomst-paars. */
   background: var(--horizon-soft);
 }
 .rapport-root .mg.gold {
-  background: var(--wil);
+  /* "Al vrijgekocht" = GOUD — consistent met het levensgrid ("al van jou"). */
+  background: var(--vrijgekocht);
 }
 .rapport-root .mg.grind {
   box-shadow: inset 0 0 0 1px var(--rule);
@@ -977,48 +1127,17 @@
   gap: 18px;
   align-items: flex-start;
   margin-bottom: 28px;
-  background: var(--paper-2);
-  border: 1px solid var(--rule);
+  background: var(--color-wil-50);
+  border: 1px solid var(--color-wil-200);
   padding: 20px 22px;
-  border-left: 4px solid var(--wil-deep);
+  border-left: 4px solid var(--wil);
 }
-.rapport-root .will-av {
-  width: 54px;
-  height: 54px;
+.rapport-root .will-av-dots {
+  /* Will-avatar = de gedeelde WillDots (3 module-stippen) i.p.v. de oude losse
+   * CSS-gradient-bol. flex:none zodat de 54px-SVG niet krimpt in de intro-flex;
+   * line-height:0 haalt de baseline-ruimte onder de inline-SVG weg. */
   flex: none;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 35% 30%,
-    #fff 0,
-    #e8b83a 38%,
-    #c99416 70%,
-    #8a6510 100%
-  );
-  box-shadow:
-    inset -3px -4px 8px rgba(0, 0, 0, 0.25),
-    0 2px 6px rgba(0, 0, 0, 0.15);
-  position: relative;
-}
-.rapport-root .will-av::before {
-  content: '';
-  position: absolute;
-  top: 18px;
-  left: 13px;
-  width: 8px;
-  height: 11px;
-  border-radius: 50%;
-  background: #2a1d05;
-  box-shadow: 18px 0 0 #2a1d05;
-}
-.rapport-root .will-av::after {
-  content: '';
-  position: absolute;
-  top: 33px;
-  left: 19px;
-  width: 16px;
-  height: 5px;
-  border-bottom: 2.5px solid #2a1d05;
-  border-radius: 0 0 8px 8px;
+  line-height: 0;
 }
 .rapport-root .will-intro .txt p {
   font-size: 16px;
@@ -1085,9 +1204,10 @@
   border-radius: 4px;
 }
 .rapport-root .gain-pill.fire {
-  background: rgba(91, 58, 140, 0.1);
+  /* FIRE-winst = toekomst-paars (verschoof mee met het accent). */
+  background: var(--horizon-pale);
   color: var(--horizon);
-  border-color: rgba(91, 58, 140, 0.3);
+  border-color: var(--horizon-soft);
 }
 .rapport-root .gain-dots {
   display: flex;
@@ -1101,23 +1221,134 @@
   opacity: 0.85;
 }
 
-/* cta */
-.rapport-root .cta-sec {
-  background: var(--ink);
-  color: var(--paper);
-  border-bottom: none;
-  margin: 0;
-  padding: 60px 0 66px;
+/* ===== NIEUWS (krant-kolommen) ===== */
+.rapport-root .news-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  margin-top: 8px;
 }
-.rapport-root .cta-sec .eyebrow {
-  color: rgba(244, 239, 230, 0.55);
+.rapport-root .news-card {
+  padding: 20px 22px 22px;
+  border-right: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.rapport-root .cta-sec .eyebrow .num {
-  background: var(--paper);
+.rapport-root .news-card:last-child {
+  border-right: none;
+}
+.rapport-root .news-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wil);
+  font-weight: 500;
+}
+.rapport-root .news-cat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wil);
+  flex: none;
+}
+.rapport-root .news-head {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
-.rapport-root .cta-sec h2 {
+.rapport-root .news-head a {
+  color: inherit;
+  text-decoration: none;
+  background-image: linear-gradient(var(--wil), var(--wil));
+  background-size: 0% 1.5px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.2s;
+}
+.rapport-root .news-head a:hover {
+  background-size: 100% 1.5px;
+}
+.rapport-root .news-head a:focus-visible {
+  outline: 2px solid var(--wil);
+  outline-offset: 2px;
+}
+.rapport-root .news-sum {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+/* "Impact voor jou" — algemene "waarom dit telt" per nieuwsitem (uit
+ * news_articles.potential_impact, gedeeld/niet-gepersonaliseerd). Wil-getint blok
+ * met linker-accent; spiegelt de in-app ImpactBlock
+ * (components/berichten/news-components.tsx) maar in de scoped rapport-tokens.
+ * Scherpe hoeken (krant-conventie). */
+.rapport-root .news-impact {
+  border-left: 3px solid var(--wil);
+  background: var(--color-wil-50);
+  padding: 9px 12px;
+}
+.rapport-root .news-impact-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--wil-deep);
+  margin-bottom: 4px;
+}
+.rapport-root .news-impact p {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.rapport-root .news-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  border-top: 1px solid var(--rule);
+  padding-top: 10px;
+  /* duwt de bron/datum-regel naar de kaartbodem zodat 'ie over de 3 kolommen
+   * uitlijnt — ongeacht of een kaart wel/geen impact-blok heeft (verving de
+   * `flex:1` die voorheen op .news-sum stond). */
+  margin-top: auto;
+}
+.rapport-root .news-source {
+  text-transform: uppercase;
+}
+
+/* cta — GEEN zwart blok meer. Warme paper-afsluiter in app-stijl: lichte
+ * subtle-achtergrond, dubbele bovenregel als krant-afscheiding, wil-paars als
+ * accent (de CTA hoort bij "in actie komen" → Will). Nadruk via kop + accent. */
+.rapport-root .cta-sec {
+  background: var(--paper-2);
+  color: var(--ink);
+  border-top: 3px double var(--ink);
+  border-bottom: none;
+  margin: 0;
+  padding: 56px 0 60px;
+}
+.rapport-root .cta-sec .eyebrow {
+  color: var(--wil);
+}
+.rapport-root .cta-sec .eyebrow .num {
+  background: var(--wil);
   color: var(--paper);
+}
+.rapport-root .cta-sec h2 {
+  color: var(--ink);
   font-size: clamp(30px, 6vw, 48px);
   margin-bottom: 14px;
 }
@@ -1126,20 +1357,26 @@
   color: var(--wil);
 }
 .rapport-root .cta-sec .lede {
-  color: rgba(244, 239, 230, 0.78);
+  color: var(--ink-soft);
   max-width: 50ch;
 }
 .rapport-root .perks {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: rgba(244, 239, 230, 0.18);
-  border: 1px solid rgba(244, 239, 230, 0.18);
+  gap: 0;
+  background: var(--paper);
+  border: 1px solid var(--rule);
   margin: 28px 0 32px;
 }
 .rapport-root .perk {
-  background: var(--ink);
+  background: var(--paper);
   padding: 22px 18px;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+/* Laatste kolom geen rechter-lijn (container-border sluit af). */
+.rapport-root .perk:nth-child(3n) {
+  border-right: none;
 }
 .rapport-root .perk .pi {
   font-family: var(--display);
@@ -1153,10 +1390,11 @@
   font-weight: 600;
   font-size: 16px;
   margin-bottom: 5px;
+  color: var(--ink);
 }
 .rapport-root .perk p {
   font-size: 14px;
-  color: rgba(244, 239, 230, 0.65);
+  color: var(--ink-soft);
   line-height: 1.45;
 }
 .rapport-root .btn {
@@ -1164,7 +1402,7 @@
   align-items: center;
   gap: 12px;
   background: var(--wil);
-  color: var(--ink-soft);
+  color: var(--paper);
   font-family: var(--mono);
   font-weight: 600;
   font-size: 14px;
@@ -1179,7 +1417,7 @@
 }
 .rapport-root .btn:hover {
   transform: translateY(-2px);
-  background: #f0c558;
+  background: var(--wil-deep);
 }
 .rapport-root .btn:focus-visible {
   outline: 2px solid var(--ink);
@@ -1195,7 +1433,7 @@
   margin-top: 18px;
   font-family: var(--mono);
   font-size: 11px;
-  color: rgba(244, 239, 230, 0.5);
+  color: var(--ink-faint);
   letter-spacing: 0.04em;
 }
 
@@ -1223,8 +1461,23 @@
   .rapport-root {
     font-size: 17px;
   }
+  /* Mobiel: houd de 6-koloms-balk, maar toon ALLEEN de iconen (label + getal
+   * + waarde verborgen) zodat de sticky-balk compact en leesbaar blijft. */
   .rapport-root .index {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .rapport-root .index a {
+    padding: 11px 4px;
+    align-items: center;
+    text-align: center;
+  }
+  .rapport-root .index-label,
+  .rapport-root .index a b {
+    display: none;
+  }
+  .rapport-root .index-icon svg {
+    width: 19px;
+    height: 19px;
   }
   .rapport-root .snapshot {
     grid-template-columns: 1fr;
@@ -1244,6 +1497,16 @@
   }
   .rapport-root .perks {
     grid-template-columns: 1fr;
+  }
+  .rapport-root .news-grid {
+    grid-template-columns: 1fr;
+  }
+  .rapport-root .news-card {
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+  }
+  .rapport-root .news-card:last-child {
+    border-bottom: none;
   }
   .rapport-root .hero-punch {
     grid-template-columns: 1fr;
@@ -1275,5 +1538,223 @@
   .rapport-root *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* ===== ACTIE-CHROME (download-knop + sticky CTA) ===== */
+/* Onopvallende download-actie rechtsboven in de masthead-strook. */
+.rapport-root .report-actions {
+  position: absolute;
+  top: 14px;
+  right: 28px;
+  z-index: 40;
+}
+.rapport-root .download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.rapport-root .download-btn:hover {
+  background: var(--paper-2);
+  border-color: var(--ink-soft);
+  color: var(--ink);
+}
+.rapport-root .download-btn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.rapport-root .download-btn svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* Meelopende CTA-balk onderaan — boven safe-area, hoog z, geen nav-pill hier
+   (publieke route buiten de (app)-layout). */
+.rapport-root .sticky-cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: center;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  /* Warme paper-fade i.p.v. donkere slab. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--paper) 0%, transparent) 0%,
+    color-mix(in srgb, var(--paper) 82%, transparent) 40%,
+    var(--paper) 100%
+  );
+  pointer-events: none;
+}
+.rapport-root .sticky-cta a {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--wil);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 14px 26px;
+  border-radius: 6px;
+  box-shadow: 0 6px 22px rgba(26, 25, 22, 0.22);
+  transition:
+    transform 0.15s,
+    background 0.15s;
+}
+.rapport-root .sticky-cta a:hover {
+  transform: translateY(-2px);
+  background: var(--wil-deep);
+}
+.rapport-root .sticky-cta a:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.rapport-root .sticky-cta a .arr {
+  transition: transform 0.15s;
+}
+.rapport-root .sticky-cta a:hover .arr {
+  transform: translateX(4px);
+}
+
+/* ===== PRINT / SAVE-AS-PDF ===== */
+@page {
+  size: A4;
+  margin: 14mm 12mm;
+}
+
+@media print {
+  /* Forceer de krant-achtergronden & kleuren in de PDF. */
+  .rapport-root,
+  .rapport-root * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Concrete hex-fallbacks: sommige print-engines volgen de oklch()-var-keten
+   * (uit globals.css) niet betrouwbaar. Pin de rapport-tokens hier op de sRGB-
+   * equivalenten van de app-tokens zodat de PDF dezelfde accenten houdt. */
+  .rapport-root {
+    --paper: #fbf7ec;
+    --paper-2: #f3ead9;
+    --paper-3: #e3dac8;
+    --ink: #1a1916;
+    --ink-soft: #4a4840;
+    --ink-faint: #888070;
+    --rule: #e3dac8;
+    --kern: #6b4339;
+    --kern-deep: #532e25;
+    /* Toekomst-accent = PAARS (wil-600/400/200) — niet langer goud. */
+    --horizon: #352a44;
+    --horizon-soft: #5c5470;
+    --horizon-pale: #a7a3ab;
+    --wil: #3d3048;
+    --wil-deep: #2f233a;
+    --green: #3e7a4e;
+    --red: #a8392b;
+    /* "Al van jou"-GOUD blijft goud in print (ontkoppeld van het paarse accent). */
+    --vrijgekocht: #ab8449;
+    --vrijgekocht-soft: #d3b68c;
+    --vrijgekocht-pale: #f1e6d6;
+    --color-kern-50: #e1dedd;
+    --color-kern-200: #bfb1ad;
+    /* kern-500/horizon-500: print-fallback voor de WillDots-avatar (§6), die deze
+     * -500-tokens rechtstreeks als dot-fill gebruikt. Op scherm resolven ze uit
+     * :root (oklch); deze sRGB-benaderingen vangen print-engines op die de
+     * var-keten niet volgen. */
+    --color-kern-500: #6b4339;
+    --color-horizon-50: #f7f1e6;
+    --color-horizon-200: #ece0cd;
+    --color-horizon-400: #d3b68c;
+    --color-horizon-500: #c4a06b;
+    --color-horizon-600: #ab8449;
+    --color-horizon-700: #8a6a39;
+    --color-wil-50: #d6d5d7;
+    --color-wil-200: #a7a3ab;
+    --color-wil-300: #8a84a0;
+    --color-wil-400: #5c5470;
+    --color-wil-500: #3d3048;
+    --color-wil-600: #352a44;
+    --color-wil-700: #2f233a;
+    /* Amber-waarschuwing (box1) — fallback voor print-engines zonder token. */
+    --color-box1-500: #f59e0b;
+    --color-box1-700: #b45309;
+  }
+
+  /* Zet animaties/overgangen uit zodat alles in eindstand print. */
+  .rapport-root *,
+  .rapport-root *::before,
+  .rapport-root *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Verberg interactieve chrome die niet in een statisch dossier hoort. */
+  .rapport-root .report-actions,
+  .rapport-root .sticky-cta,
+  .rapport-root .progress-bar,
+  .rapport-root .index,
+  .rapport-root .section-trigger,
+  .rapport-root .cta-sec {
+    display: none !important;
+  }
+
+  /* Geen paper-noise overlay in print (kost toner, voegt niets toe). */
+  .rapport-root::before {
+    display: none !important;
+  }
+
+  /* PDF ~50% kleiner: de overhaul-versie vulde te veel A4-ruimte. `zoom`
+   * schaalt de hele rapportboom robuust (Chromium-print) met behoud van layout
+   * en page-breaks; de kleinere font-size is de fallback voor engines die `zoom`
+   * negeren. Samen ≈ halve maat t.o.v. de vorige print. */
+  .rapport-root {
+    zoom: 0.5;
+    font-size: 9pt;
+    overflow: visible;
+    background: var(--paper);
+  }
+
+  /* Breek de krant-secties netjes af tussen pagina's. */
+  .rapport-root section,
+  .rapport-root header.masthead,
+  .rapport-root .chart-card,
+  .rapport-root .snapshot,
+  .rapport-root table.data,
+  .rapport-root .futures,
+  .rapport-root .fire-cards,
+  .rapport-root .pillars,
+  .rapport-root .move,
+  .rapport-root .news-card {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .rapport-root h2,
+  .rapport-root h3.sub {
+    page-break-after: avoid;
+    break-after: avoid;
   }
 }

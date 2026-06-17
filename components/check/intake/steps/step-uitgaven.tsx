@@ -4,6 +4,7 @@ import { useState, useId, useCallback } from 'react'
 import { parseBedrag } from '@/lib/check/use-check-draft'
 import type { CheckDraft } from '@/lib/check/use-check-draft'
 import { formatCurrency } from '@/lib/format'
+import { primaryBtn, backBtn, fieldLabel, inputBase, inputError, errorText, hintText } from '../intake-styles'
 
 interface Props {
   intake: CheckDraft['intake']
@@ -125,10 +126,7 @@ export function StepUitgaven({ intake, onChange, onNext, onBack }: Props) {
 
       {FIELDS.map((f) => (
         <div key={f.key}>
-          <label
-            htmlFor={`${id}-${f.key}`}
-            className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
-          >
+          <label htmlFor={`${id}-${f.key}`} className={fieldLabel}>
             {f.label}{' '}
             <span className="text-xs font-normal italic text-[var(--ink-3)]">(optioneel)</span>
           </label>
@@ -145,10 +143,10 @@ export function StepUitgaven({ intake, onChange, onNext, onBack }: Props) {
               onBlur={() => setTouched((t) => ({ ...t, [f.key]: true }))}
               placeholder={f.placeholder}
               autoComplete="off"
-              className="w-full border border-[var(--border-ed)] bg-[var(--subtle)] py-2.5 pr-3 pl-7 font-mono text-base tabular-nums text-[var(--ink)] outline-none focus:border-kern-500 focus:ring-1 focus:ring-kern-500 sm:text-sm"
+              className={`${inputBase('kern')} py-2.5 pr-3 pl-7 font-mono text-base tabular-nums sm:text-sm`}
             />
           </div>
-          <p className="mt-1 font-serif text-xs italic text-[var(--ink-3)]">{f.hint}</p>
+          <p className={hintText}>{f.hint}</p>
         </div>
       ))}
 
@@ -161,10 +159,7 @@ export function StepUitgaven({ intake, onChange, onNext, onBack }: Props) {
 
       {/* Totaal-override */}
       <div>
-        <label
-          htmlFor={`${id}-totaal`}
-          className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
-        >
+        <label htmlFor={`${id}-totaal`} className={fieldLabel}>
           Totale maanduitgaven
           {autoSum > 0 && (
             <span className="ml-2 font-mono text-xs font-normal tabular-nums text-[var(--ink-4)]">
@@ -187,37 +182,25 @@ export function StepUitgaven({ intake, onChange, onNext, onBack }: Props) {
             autoComplete="off"
             aria-invalid={!!totaalError}
             aria-describedby={totaalError ? `${id}-totaal-err` : `${id}-totaal-hint`}
-            className={`w-full border bg-[var(--subtle)] py-2.5 pr-3 pl-7 font-mono text-base tabular-nums text-[var(--ink)] outline-none focus:ring-1 sm:text-sm ${
-              totaalError
-                ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
-                : 'border-[var(--border-ed)] focus:border-kern-500 focus:ring-kern-500'
-            }`}
+            className={`${inputBase('kern')} py-2.5 pr-3 pl-7 font-mono text-base tabular-nums sm:text-sm ${totaalError ? inputError : ''}`}
           />
         </div>
         {totaalError ? (
-          <p id={`${id}-totaal-err`} className="mt-1 text-xs text-red-500" role="alert">
+          <p id={`${id}-totaal-err`} className={errorText} role="alert">
             {totaalError}
           </p>
         ) : (
-          <p id={`${id}-totaal-hint`} className="mt-1 font-serif text-xs italic text-[var(--ink-3)]">
+          <p id={`${id}-totaal-hint`} className={hintText}>
             Alles bij elkaar — wonen, eten, vrije tijd, alles.
           </p>
         )}
       </div>
 
       <div className="flex flex-col gap-2 pt-2">
-        <button
-          type="button"
-          onClick={handleNext}
-          className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
-        >
+        <button type="button" onClick={handleNext} className={primaryBtn('kern')}>
           Verder
         </button>
-        <button
-          type="button"
-          onClick={onBack}
-          className="w-full min-h-11 px-6 py-2 text-sm text-[var(--ink-3)] underline-offset-4 hover:text-[var(--ink)] hover:underline"
-        >
+        <button type="button" onClick={onBack} className={backBtn}>
           Terug
         </button>
       </div>

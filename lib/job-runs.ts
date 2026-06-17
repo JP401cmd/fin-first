@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export type JobStatus = 'success' | 'error'
 
 /** Canonieke job-keys — gespiegeld door JOB_CATALOG op /beheer/jobs. */
-export type JobKey = 'holdings-prices' | 'snapshots' | 'news-ingest'
+export type JobKey = 'holdings-prices' | 'snapshots' | 'news-ingest' | 'integraties-health'
 
 /**
  * Schrijf één uitvoering van een achtergrondtaak weg in `job_runs`.

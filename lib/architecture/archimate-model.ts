@@ -344,8 +344,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'as-vrijheidscheck', x: 934, y: 110, w: 215, h: 56, kind: 'appsvc',
       title: 'Vrijheidscheck-dienst',
-      lead: 'Bedient de publieke Vrijheidscheck-funnel: anonieme intake valid+ versleuteld wegschrijven, het Vrijheidsrapport server-side bouwen (consumeert de bestaande rekenmotoren, herberekent niets) en de conversie naar een echt account. Fundament-dienst, géén functionele module — het is een instroomproces, geen gebruiker-activeerbare capability.',
-      items: ['/api/check/submit', '/api/check/activate', 'lib/check/build-report', 'lib/check/intake-to-persona'],
+      lead: 'Bedient de publieke Vrijheidscheck-funnel: anonieme intake (incl. levensgebeurtenissen, per-asset rendement en pensioen-uitgaven) valide + versleuteld wegschrijven, het Vrijheidsrapport server-side bouwen (consumeert de bestaande rekenmotoren + nieuws-artikelen van dezelfde bron als /api/news; herberekent niets) en de conversie naar een echt account. Fundament-dienst, géén functionele module — het is een instroomproces, geen gebruiker-activeerbare capability.',
+      items: ['/api/check/submit', '/api/check/activate', 'lib/check/build-report', 'lib/check/intake-to-persona', 'lib/check/report-news', 'news_articles (read, service-role)'],
     },
 
     // ── Applicatiecomponent + functies (modules) ──
@@ -460,6 +460,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       lead: 'Anonieme pre-account Vrijheidscheck-intake (versleuteld) plus het server-berekende rapport-snapshot en de IP-rate-limit-tellers. Uitsluitend service-role-bereikbaar: RLS aan, géén policies (ADR 0022).',
       items: ['lead_intakes', 'intake_rate_limit'],
     },
+    {
+      id: 'do-contract-events', x: 904, y: 1252, w: 180, h: 56, kind: 'data',
+      title: 'Contract-events',
+      lead: 'Operator-telemetrie voor contractdrift van externe koppelingen en bestandsimports. Bevat uitsluitend structurele metadata (kolom-/header-namen + fingerprint-hash) — nooit financiële waarden. Superadmin-only SELECT; INSERT via RPC `increment_contract_event` (service-role, anti-spam dedup op `(kind, surface, fingerprint)`). Zichtbaar op /beheer/integraties — tab "Contracten" (ADR 0024).',
+      items: ['contract_events'],
+    },
 
     // ── Externe partijen ──
     {
@@ -534,7 +540,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'as-nieuws->sp-nieuws': { payload: 'Nieuwsfeed en meldingen', mechanism: 'rest', cadence: 'daily', contractDomains: ['news', 'notifications'] },
     'as-rapport->sp-delen': { payload: 'Rapporten, snapshots, export en freedom-card', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['report', 'snapshots', 'export', 'share'] },
     'as-huishouden->sp-delen': { payload: 'Partner-koppeling en perspectief-context', mechanism: 'rpc', cadence: 'on-demand', contractDomains: ['household', 'perspective'], note: 'Leest cross-user via RLS-veilige RPC’s; nooit directe tabel-selects over de huishoudgrens.' },
-    'as-vrijheidscheck->sp-vrijheidscheck': { payload: 'Anonieme intake, vrijheidsrapport en conversie-token', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['check'], note: 'Publiek service-role-schrijfpad (fail-closed: zod + payload-grens + IP-rate-limit + Turnstile). Het rapport consumeert de bestaande rekenmotoren — geen herberekening (ADR 0022).' },
+    'as-vrijheidscheck->sp-vrijheidscheck': { payload: 'Anonieme intake (incl. levensgebeurtenissen, per-asset rendement, pensioen-uitgaven), vrijheidsrapport (incl. krant-nieuws) en conversie-token', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['check'], note: 'Publiek service-role-schrijfpad (fail-closed: zod + payload-grens + IP-rate-limit + Turnstile). Het rapport consumeert de bestaande rekenmotoren en nieuwsartikelen (news_articles via service-role-read, dezelfde bron als /api/news) — geen herberekening (ADR 0022).' },
     // Externe partij → technologie
     'ext-supabase->t-supabase': { payload: 'Beheerde Postgres, Auth en Realtime', mechanism: 'realtime', cadence: 'realtime' },
     'ext-claude->t-aigateway': { payload: 'LLM-completions (primaire provider)', mechanism: 'compute', cadence: 'on-demand' },
@@ -543,6 +549,9 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     'ext-brokers->t-marktdata': { payload: 'Aandelenposities en saldi (Trading 212 read-only of CSV-snapshot per investment-asset)', mechanism: 'rest', cadence: 'daily', contractDomains: ['integrations'] },
     'ext-marktdata->t-marktdata': { payload: 'Koersen en fundamentals', mechanism: 'rest', cadence: 'daily' },
     'ext-vercel->t-platform': { payload: 'Hosting, edge en observability', mechanism: 'build', cadence: 'build' },
+    // Contractbewaking: import- en vermogens-/integratiedienst schrijven drift-events
+    'as-import->do-contract-events': { payload: 'Formaat-drift-events (header-namen + fingerprint-hash) bij CSV/MT940/OFX/JSON-uploads met afwijkend formaat', mechanism: 'rpc', cadence: 'on-demand', note: 'Via RPC increment_contract_event (service-role, SECURITY DEFINER). Nooit transactiewaarden — alleen structurele metadata. Fout-stil (try/catch) zodat een drift-log de upload niet breekt (ADR 0024).' },
+    'as-vermogen->do-contract-events': { payload: 'API-response-drift-events (zod-canary: veldnamen bij schema-schending) van exchange-/broker-/marktdata-clients', mechanism: 'rpc', cadence: 'daily', note: 'Zod safeParse na res.json(); bij falen recordContractEvent met issues-paden; dan permissieve cast zodat sync doorgaat. Prioriteit: Bitvavo > Trading 212 > TrueLayer (ADR 0024).' },
     // Applicatie ↔ data
     'app-comp->data-cont': { payload: 'Alle informatieobjecten — lezen en schrijven', mechanism: 'rpc', cadence: 'realtime', note: 'Elke query loopt server-side met Row Level Security op auth.uid().' },
     // Actor → proces
@@ -644,6 +653,10 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
 
   // De Vrijheidscheck-dienst leest en schrijft het lead-intake-object (service-role)
   addEdge({ from: 'as-vrijheidscheck', to: 'do-lead', type: 'access', fromSide: 'B', toSide: 'L', readWrite: true, via: [[806, 1280]] })
+
+  // Contractbewaking: import-dienst schrijft formaat-drift; vermogens-dienst schrijft API-response-drift
+  addEdge({ from: 'as-import', to: 'do-contract-events', type: 'access', fromSide: 'B', toSide: 'T', via: [[670, 1252]] })
+  addEdge({ from: 'as-vermogen', to: 'do-contract-events', type: 'access', fromSide: 'B', toSide: 'T', via: [[670, 1252]] })
 
   return { width: 1660, height: 1370, nodes, edges }
 }

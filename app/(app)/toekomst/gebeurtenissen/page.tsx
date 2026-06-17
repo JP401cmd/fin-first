@@ -88,6 +88,7 @@ export default async function ToekomstGebeurtenissenPage() {
     aowRows,
     dateOfBirth: dob,
     grossYearlyIncome: (ei.monthlyIncome ?? 0) * 12,
+    pensioenFactorA: horizonData.pensioenFactorA,
     currentAge,
     currentNetMonthly,
     // Live preview Huis-strategie: zelfde simBasis als waarmee de loader de

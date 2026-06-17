@@ -477,9 +477,22 @@ export function ChatPanel() {
     }
   }, [isOpen])
 
-  // Auto-send pending message from notification "Vraag AI"
+  // Auto-send pending message (notificatie "Vraag AI" + "Vraag Will"-knoppen).
+  // One-shot per bericht: zonder deze ref-guard verstuurt React's dubbele
+  // effect-invocatie (Strict Mode, of een re-render vóórdat clearPendingMessage
+  // doorkomt) hetzelfde bericht twee keer → twee identieke user-bubbles in de
+  // chat. De ref reset zodra pendingMessage weer leeg is, zodat een volgend
+  // (ook identiek) bericht later wél verstuurd wordt. Let op: deduplicatie is
+  // per identieke berichttekst — twee identieke prompts binnen één commit-cyclus
+  // tellen bewust als één.
+  const dispatchedPendingRef = useRef<string | null>(null)
   useEffect(() => {
-    if (isOpen && pendingMessage && !isStreaming) {
+    if (!pendingMessage) {
+      dispatchedPendingRef.current = null
+      return
+    }
+    if (isOpen && !isStreaming && dispatchedPendingRef.current !== pendingMessage) {
+      dispatchedPendingRef.current = pendingMessage
       sendMessage({ text: pendingMessage })
       clearPendingMessage()
     }

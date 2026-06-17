@@ -10,6 +10,7 @@
  */
 
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import { MarketingWideShell } from '@/components/landing/marketing-page-shell'
 import { CheckWizardSection } from '@/components/check/intake/check-wizard-section'
 
@@ -27,8 +28,25 @@ export const metadata: Metadata = {
 }
 
 export default function CheckPage() {
+  // Cloudflare Turnstile-client. Alleen laden wanneer de publieke site-key is
+  // gezet: zónder key blijft `window.turnstile` undefined, zodat de step-email
+  // container niets rendert én de server-side dev-bypass (reason 'not-configured'
+  // buiten productie) blijft werken. Mét key auto-rendert de bestaande
+  // `.cf-turnstile`-container (implicit rendering) en levert
+  // `window.turnstile.getResponse()` de token op.
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+
   return (
     <MarketingWideShell>
+      {turnstileSiteKey ? (
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          strategy="afterInteractive"
+          async
+          defer
+        />
+      ) : null}
+
       {/* Boven de wizard: editorial kop — zelfde stijl als /functies hero */}
       <section className="border-b border-[var(--border-ed)] px-6 pt-32 pb-12 md:px-12 md:pt-40">
         <div className="mx-auto max-w-xl">

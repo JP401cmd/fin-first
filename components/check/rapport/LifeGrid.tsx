@@ -114,15 +114,20 @@ export function LifeGrid({ data }: { data: ReportLifeGrid }) {
 
         <div className="grid-legend">
           <span>
-            <i style={{ background: '#9A8E78' }} />
+            <i style={{ background: 'var(--ink-faint)' }} />
             Geleefd · {livedYears} jaar
           </span>
           <span>
-            <i style={{ background: 'var(--wil)' }} />
+            <i style={{ background: 'var(--vrijgekocht)' }} />
             Al vrijgekocht · {fundedYears} jaar
           </span>
           <span>
-            <i style={{ boxShadow: 'inset 0 0 0 1.5px rgba(244,239,230,.4)' }} />
+            <i
+              style={{
+                background: 'var(--paper)',
+                boxShadow: 'inset 0 0 0 1.5px var(--rule)',
+              }}
+            />
             Nog te werken · {data.grindYears ?? '—'} jaar
           </span>
           {fireAge != null && (
@@ -151,7 +156,7 @@ export function LifeGrid({ data }: { data: ReportLifeGrid }) {
             </div>
           </div>
           <div className="punch">
-            <div className="pn purp">{data.freeYears != null ? punchC : '—'}</div>
+            <div className="pn free">{data.freeYears != null ? punchC : '—'}</div>
             <div className="pl">
               jaar vrijheid
               <br />

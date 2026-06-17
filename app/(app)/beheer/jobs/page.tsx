@@ -37,6 +37,13 @@ const JOB_CATALOG = [
     path: '/api/news-ingest/cron',
     description: 'RSS- en webbronnen ophalen, AI-categoriseren en opslaan.',
   },
+  {
+    key: 'integraties-health',
+    label: 'Integraties liveness',
+    schedule: 'Dagelijks 18:00 (meelift op prijs-refresh)',
+    path: '/api/holdings/refresh-prices/cron',
+    description: 'Publieke health-probes van externe koppelingen (Bitvavo, Kraken, Coinbase, CoinGecko, Blockchair, TrueLayer).',
+  },
 ] as const
 
 const dateTimeFmt = new Intl.DateTimeFormat('nl-NL', {

@@ -75,10 +75,27 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
     // Box 3-perspectief faalt → behoud de health-proxy-waarde.
   }
 
-  // Jaarruimte-besparing = onbenutte ruimte × marginaal tarief.
-  const jaarruimte = computeJaarruimte(grossYearly, 0)
+  // Jaarruimte-besparing = onbenutte ruimte × marginaal tarief. Factor A komt
+  // uit de loader-bundel (profiles.pension_factor_a via resolvePensionFactorA).
+  const jaarruimte = computeJaarruimte(grossYearly, horizonData.pensioenFactorA)
   const jaarruimteSavings =
     jaarruimte.hasData && marg > 0 ? Math.round(jaarruimte.jaarruimte * marg) : 0
+
+  // Demping: werknemer mét bedrijfspensioen + ONBEKENDE factor A.
+  // Bij onbekende factor A rekent de loader met 0 → de jaarruimte komt op de
+  // bovengrens (te hoog), wat een misleidende "benut je jaarruimte"-tip geeft
+  // voor iemand die al pensioen opbouwt. Bedrijfspensioen-signaal: een actief
+  // life_event met event_type 'pension' én metadata.pensioenType 'bedrijf'
+  // (de events-bundel is al op is_active=true gefilterd in de loader). Bij een
+  // EXPLICIETE factor A (incl. 0 voor zzp → isKnown=true) of geen
+  // bedrijfspensioen blijft de tip ongewijzigd. De box1-hub toont de kans wél
+  // (daar beheert de gebruiker 'm); deze demping zit bewust alléén hier.
+  const hasBedrijfspensioen = horizonData.events.some(
+    (ev) =>
+      ev.event_type === 'pension' &&
+      (ev.metadata as { pensioenType?: unknown } | undefined)?.pensioenType === 'bedrijf',
+  )
+  const dampenJaarruimte = !horizonData.pensioenFactorAKnown && hasBedrijfspensioen
 
   const overview = buildTaxOverview({
     box1Tax,
@@ -88,7 +105,7 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
     marginalRate: marg,
     dailyExpenses,
     jaarruimte:
-      jaarruimte.hasData && jaarruimte.jaarruimte > 0
+      !dampenJaarruimte && jaarruimte.hasData && jaarruimte.jaarruimte > 0
         ? { amount: jaarruimte.jaarruimte, savings: jaarruimteSavings }
         : null,
   })

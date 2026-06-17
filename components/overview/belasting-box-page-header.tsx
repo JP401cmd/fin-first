@@ -1,4 +1,5 @@
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { PageStatusDot } from '@/components/app/page-status-dot'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
@@ -36,6 +37,7 @@ export function BelastingBoxPageHeader({
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 pt-6 pb-3 sm:px-6 sm:pt-8">
+      <PageStatusDot className="absolute right-[52px] top-6 sm:right-[60px] sm:top-8" />
       <PageInfoButton
         description={PAGE_INFO[infoKey] ?? ''}
         className="absolute right-4 top-6 sm:right-6 sm:top-8"

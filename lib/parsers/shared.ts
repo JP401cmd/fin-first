@@ -50,3 +50,25 @@ export async function computeHash(date: string, amount: number, description: str
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
 }
+
+/**
+ * Compute een stabiele SHA-256 fingerprint van een reeks sleutelnamen (API-veld-
+ * namen, CSV-headers). Alleen NAMEN worden gehasht — nooit financiële waarden.
+ *
+ * Normalisatie: lowercase, gesorteerd, samengevoegd met '|'. Hierdoor is de
+ * fingerprint volgorde-onafhankelijk en case-insensitief.
+ *
+ * Vervangt de drie eerder los-staande DJB2-varianten (fingerprintKeys in
+ * bitvavo-client.ts, keyprintOf in trading212-client.ts en truelayer/client.ts).
+ * Door deze gedeelde helper te hergebruiken is de hash-ruimte consistent SHA-256
+ * en zijn collision-risico's van DJB2 (32-bit output) geëlimineerd.
+ */
+export async function fingerprintKeys(keys: string[]): Promise<string> {
+  const normalized = [...keys].map((k) => k.toLowerCase()).sort()
+  const input = normalized.join('|')
+  const encoder = new TextEncoder()
+  const data = encoder.encode(input)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+}

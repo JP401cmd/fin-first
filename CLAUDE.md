@@ -99,6 +99,22 @@ Regels:
 - **Gedeelde `BottomSheet` (`components/app/bottom-sheet.tsx`) doet dit al automatisch** (default `z-[70]`); gebruik die waar mogelijk. Alleen `NavMenuSheet` zet de opt-out-prop `belowFloatingNav`.
 - **Bouw je een custom overlay** (`fixed inset-0 … flex items-end/center`)? Gebruik `z-[70]` (niet `z-50`/`z-40`) en geef de bodem enkel iOS-safe-area-padding — **géén** `--mobile-nav-clearance` (die is alleen nodig als de pill er nog bovenop staat). `--mobile-nav-clearance` blijft wél voor pagina-content/scrollcontainers die tegen de viewport-onderrand lopen.
 
+## Meldingen-conventie — minimaliseerbare status-meldingen + pagina-header-controls (verplicht bij UI-werk)
+
+Status-meldingen die niet meteen op te lossen zijn (bv. de status-duiding-banner op `/overzicht/**`) zijn **minimaliseerbaar**: standaard staan ze uitgeklapt bovenaan de pagina; na een klik op **"Minimaliseren"** verdwijnt de melding en blijft alleen een **gekleurd statuspunt** (de stoplichtkleur, via `LEVERAGE_STATUS_DOT[status]`) zichtbaar **links naast de pagina-`i`** (`PageInfoButton`). Klik op het punt = melding heropenen. Hergebruik dit patroon, bouw geen tweede variant:
+
+- **Bron-architectuur**: `components/app/page-status-provider.tsx` (`PageStatusProvider` + `usePageStatusContext`) doet één fetch en deelt `{ info, display, minimize(), restore() }` met zowel de banner als het punt. `page-status-banner.tsx` (uitgeklapt) en `page-status-dot.tsx` (geminimaliseerd) zijn pure consumers; `lib/page-status/display.ts#resolveBannerDisplay` bepaalt expanded vs. minimized. Géén tweede fetch-pad, géén cross-account module-cache.
+- **Onthouden = server-side, cross-device** via een eigen-rij JSONB-pref op `profiles` (hier `status_banner_minimized`: route → niveau), geschreven met een **own-row read-modify-write** via de anon RLS-client (nooit service-role) — spiegel `app/api/appearance`. Géén localStorage voor een keuze die op élk apparaat moet gelden (localStorage = alleen voor per-apparaat "even niet zien", bv. `use-insight-visibility`).
+- **Escalatie heropent automatisch**: sla het *niveau* op waarop geminimaliseerd werd; wordt de status erger (oranje→rood) dan klapt de melding weer uit. Het punt verkleurt altijd mee met de huidige status.
+- **Toegankelijk**: het punt is een echte `<button>` met `aria-label`; de `aria-live`-regio van de banner blijft altijd gemount en kondigt minimaliseren (sr-only) en heropenen aan.
+
+**Pagina-header-controls** (de `i` + optionele toggles zoals het statuspunt of `InsightToggleButton`): de `PageInfoButton` staat **per pagina** rechtsboven als absolute child in een `relative`-wrapper (`right-4 sm:right-6`; hub-pagina's `top-6 sm:top-8`, overige `top-4`). Er is **bewust géén** gedeelde shell-/top-bar-home voor deze knoppen — nieuwe header-controls rijg je per pagina in (of via `BelastingBoxPageHeader` voor box1/2/3), als absolute siblings op vaste offsets links van de `i`:
+
+- statuspunt direct links van de `i`: `right-[52px] sm:right-[60px]`
+- `InsightToggleButton` daar weer links van (waar beide kunnen verschijnen): `right-[84px] sm:right-[92px]`
+
+Houd ~4–8px tussenruimte, gebruik dezelfde `h-7 w-7 rounded-full border-[var(--border-ed)] bg-[var(--paper)]` als de `i` zodat de controls één visuele familie vormen, en **stoplichtkleuren (geen module-accent)** voor de statussemantiek.
+
 ## Project Specification
 
 <project_specification>

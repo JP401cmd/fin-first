@@ -37,6 +37,31 @@ export interface CheckIntakeAsset {
   name: string
   value: number
   extra?: string | null
+  /**
+   * Stap ⑤ — optioneel verwacht jaarrendement in % voor dit specifieke bezit (alleen groei-assets).
+   * Overschrijft de globale `grossReturn` voor dit bezit; leeg = globaal rendement (pensioenstap).
+   */
+  expectedReturnPct?: number | null
+}
+
+/**
+ * Eén levensgebeurtenis uit stap ⑦b (lichte intake-subset; build-report mapt naar het
+ * volwaardige `LifeEvent`-model + `lifeEventsToCashflows`). `amount` < 0 = uitgave/kost,
+ * > 0 = meevaller/bijdrage. Optioneel terugkerend via `recurringYearly` × `durationYears`.
+ */
+export interface CheckIntakeLifeEvent {
+  /** Catalogus-sleutel, bv. 'huwelijk' | 'sabbatical' | 'kind' | 'erfenis' | 'woningverkoop' | 'grote_aankoop'. */
+  key: string
+  /** Weergave-label. */
+  label: string
+  /** Leeftijd waarop de gebeurtenis plaatsvindt. */
+  age: number
+  /** Eenmalig bedrag (positief = meevaller, negatief = kost). */
+  amount?: number | null
+  /** Terugkerend bedrag per jaar (positief = inkomen, negatief = extra uitgave). */
+  recurringYearly?: number | null
+  /** Duur in jaren voor `recurringYearly`. */
+  durationYears?: number | null
 }
 
 /** Eén schuld uit stap ⑥. `interestRatePct` voedt de duurste-schuld-tip; `monthlyPayment` de DSTI-pijler. */
@@ -48,7 +73,7 @@ export interface CheckIntakeDebt {
   monthlyPayment: number
 }
 
-/** De genormaliseerde intake — alle 8 wizard-stappen. */
+/** De genormaliseerde intake — alle wizard-stappen. */
 export interface CheckIntake {
   /** Stap ① — optionele voornaam (gevraagd bij de e-mailpoort of stap 1) voor de masthead-aanhef. */
   firstName?: string | null
@@ -78,7 +103,11 @@ export interface CheckIntake {
     aowExpectedMonthly?: number | null
     expectedReturnPct?: number | null
     riskProfile?: RiskProfile | null
+    /** Stap ⑦ — optioneel geschatte uitgaven na pensioen (per maand). Leeg = huidige uitgaven 1:1 (geen wijziging). */
+    retirementMonthlyExpenses?: number | null
   }
+  /** Stap ⑦b — optionele levensgebeurtenissen (huwelijk, sabbatical, kind, erfenis, woningverkoop, grote aankoop). */
+  lifeEvents?: CheckIntakeLifeEvent[]
   /** Stap ⑧ — grootste doel (vrij tekstveld, optioneel). */
   goal?: { label: string } | null
 }
@@ -152,6 +181,15 @@ export interface ReportSnapshot {
   netWorth: number
   netWorthFreedom: FreedomTime
   netWorthFreedomLabel: string
+  /**
+   * Het EURO-bedrag waaróp `netWorthFreedom` is berekend = het FIRE-eligible/
+   * vrijheidsvermogen (`getFireEligibleNetWorth`, huis voor 50% meegerekend).
+   * Maakt de snapshot intern legible: de render toont het volledige netto vermogen
+   * (`netWorth`) als headline én dit lagere vrijheidsvermogen waaruit de
+   * vrijheidstijd vloeit, i.p.v. te suggereren dat de tijd op `netWorth ÷ uitgaven`
+   * rust. Bij een tekort (negatief FIRE-eligible) is dit ≤ 0 → de tijd is deficit.
+   */
+  freedomBaseEur: number
   /** `resolveSavingsSource(...).savingsRate` (lib/savings-source.ts). */
   savingsRatePct: number
   savingsMonthly: number
@@ -178,9 +216,22 @@ export interface ReportMonthBalance {
   savingsRatePct: number
 }
 
-/** Eén pijler van het gezondheidsgetal. `score=null` + status='grey' voor Budget (niet gemeten in funnel). */
+/**
+ * Eén pijler van het gezondheidsgetal — de volledige v2-pijlerset (mirror /overzicht).
+ * `id` volgt de canonieke engine-indicator-ids van `computeHealthScoreFromInputs`
+ * (lib/financial-health.ts). Alleen de ACTIEVE pijlers worden gemapt — inactieve
+ * indicatoren (zoals `budget_discipline` zonder budgetten in de funnel) laat de
+ * engine vallen; we tonen géén grijze placeholder meer.
+ */
 export interface ReportHealthPillar {
-  id: 'rondkomen' | 'buffer' | 'schuld' | 'budget'
+  id:
+    | 'savings_rate'
+    | 'budget_discipline'
+    | 'emergency_fund'
+    | 'debt_service_ratio'
+    | 'debt_ratio'
+    | 'fire_progress'
+    | 'asset_concentration'
   name: string
   score: number | null
   status: StatusColor
@@ -189,7 +240,11 @@ export interface ReportHealthPillar {
 
 /**
  * Sectie 2 — gezondheidsgetal. Bron: `buildHealthScoreInput` → `computeHealthScoreFromInputs`
- * (lib/health-score-input.ts + lib/financial-health.ts). 4 pijlers; Budget altijd inactief.
+ * (lib/health-score-input.ts + lib/financial-health.ts). Toont de VOLLEDIGE actieve
+ * v2-pijlerset (zoals /overzicht): spaarquote, noodfonds, schuldenlast/schuldratio,
+ * FIRE-voortgang en vermogensspreiding — geen gestripte 3+grijze-budget-set. De engine
+ * laat inactieve indicatoren (geen data) zelf vallen; `budget_discipline` is in de funnel
+ * inactief (geen budgetten) en verschijnt dus niet als placeholder.
  */
 export interface ReportHealth {
   score: number
@@ -224,6 +279,22 @@ export interface ReportProjectionPoint {
 }
 
 /**
+ * Eén rendement-scenario voor de bandbreedte rond de opbouwcurve (sectie 3).
+ * `returnDeltaPct` is het verschil t.o.v. het basisrendement in procentpunten (bv. −2 / +2).
+ * Bron: her-run van `runHorizonLedger` met grossReturn ± delta (consume, don't recompute).
+ */
+export interface ReportKruisingScenario {
+  /** Label, bv. '−2% rendement' / '+2% rendement'. */
+  label: string
+  /** Verschil t.o.v. basisrendement in procentpunten. */
+  returnDeltaPct: number
+  /** V_op-reeks (opgebouwd vermogen) onder dit scenario. */
+  vOp: ReportProjectionPoint[]
+  /** Snijpunt met V_nodig onder dit scenario (null = onhaalbaar binnen horizon). */
+  crossing: { age: number; value: number } | null
+}
+
+/**
  * Sectie 3 — De kruising. V_op (opgebouwd) × V_nodig (benodigd) → snijpunt.
  * Bron: `runHorizonLedger` (lib/horizon-engine/engine.ts): rows[].liquideVermogen + vNodig[].
  */
@@ -236,6 +307,8 @@ export interface ReportKruising {
   endYear: number
   realReturnPct: number
   savingsRatePct: number
+  /** Optionele rendement-scenario's (−2% / +2%) als bandbreedte rond `vOp`. Leeg = geen band. */
+  scenarios?: ReportKruisingScenario[]
 }
 
 /** Sectie 3 — spaarquote-historie. In de funnel niet beschikbaar → placeholder met doellijn. */
@@ -294,6 +367,24 @@ export interface ReportLifeEvent {
 }
 
 /**
+ * Eén rendement-scenario rond de levenslange vermogenslijn (sectie Toekomst).
+ * `points` loopt over de HELE levenslijn (opbouw én afbouw), zodat de band beide
+ * fasen dekt. Bron: GEEN per-scenario engine-her-run — het basisplan wordt
+ * vastgehouden en alleen het rendement gevarieerd: de jaarlijkse kasstroom wordt
+ * uit het basis-grootboek (`rows[].nettoVermogen`) afgeleid en heropgerent op het
+ * verschoven rendement (zelfde grondslag als `ReportLifePath.points`, raakt de
+ * basislijn exact op t=0).
+ */
+export interface ReportLifePathScenario {
+  /** Label, bv. '−2% rendement' / '+2% rendement'. */
+  label: string
+  /** Verschil t.o.v. basisrendement in procentpunten. */
+  returnDeltaPct: number
+  /** Vermogensreeks (netto incl. huis) onder dit scenario, hele levenslijn. */
+  points: ReportProjectionPoint[]
+}
+
+/**
  * Sectie 5 — levenslang vermogenspad (tot endAge) + mijlpalen.
  * Bron: `runHorizonLedger` decumulatie (rows[].nettoVermogen). Let op de grondslag:
  * dit is NETTO vermogen (incl. huis), niet het FIRE-eligible/liquide vermogen — niet mengen.
@@ -304,6 +395,8 @@ export interface ReportLifePath {
   fireAge: number | null
   endAge: number
   peakNote?: string
+  /** Optionele −2% / +2% rendement-scenario's als band rond `points` (opbouw + afbouw). */
+  scenarios?: ReportLifePathScenario[]
 }
 
 /** Eén zet van Will. `kind` bepaalt de pill-stijl (groene dagen of paarse FIRE-maanden). */
@@ -327,6 +420,49 @@ export interface ReportCta {
   signupHref: string
 }
 
+/**
+ * Disclosure over hoe de eigen woning meetelt in de FIRE-/vrijheidsberekening.
+ * `null` wanneer de gebruiker geen eigen woning heeft. `weightPct` = het percentage
+ * van de netto overwaarde dat als vrijheidsvermogen meetelt (rapport-conventie 50%);
+ * `note` is de leek-uitleg (server-side bron, niet in een component hardcoden).
+ */
+export interface ReportHouseInclusion {
+  /** Percentage van de netto overwaarde dat als vrijheidsvermogen meetelt (50). */
+  weightPct: number
+  /** Leek-uitleg over de 50%-methodiek + dat het in de app fijnregelbaar is. */
+  note: string
+}
+
+/**
+ * Eén nieuwsitem in de publieke rapport-krant. Algemeen financieel nieuws uit de
+ * gedeelde `news_articles`-bron (cron-ingest). `impact` is de ALGEMENE potentiële
+ * impact van het artikel zelf (ingest-niveau, gedeeld door alle lezers) — GÉÉN
+ * gepersonaliseerde impact: die vereist AI + profiel, wat dit publieke, anonieme
+ * pad bewust mijdt (er gaat geen intake/profiel in deze sectie). `dateLabel` is
+ * server-side voorgemaakt; de render formatteert geen datums zelf.
+ */
+export interface ReportNewsItem {
+  category: 'fiscaal' | 'rente' | 'woningmarkt' | 'beleggingen' | 'pensioen' | 'macro' | null
+  headline: string
+  summary: string
+  sourceName: string
+  sourceUrl: string
+  dateLabel: string
+  /** Algemene "waarom dit telt"-impact uit `news_articles.potential_impact`; `null` als de bron leeg is. */
+  impact: string | null
+}
+
+/**
+ * Sectie — tot 3 actuele nieuwsitems in krant-stijl. Bron: `news_articles` →
+ * `selectSourceArticles({ limit: 3 })`. Optioneel/leeg → de sectie verbergt zichzelf
+ * (back-compat: oudere `report_snapshot`-rijen hebben dit veld niet).
+ */
+export interface ReportNews {
+  items: ReportNewsItem[]
+  /** Voorgemaakt, bv. 'Gebaseerd op de laatste bronnen · bijgewerkt 17 juni 2026'. */
+  sourceNote: string
+}
+
 /** Het volledige rapport — één veld per ontwerp-sectie. Pure DTO = `report_snapshot`. */
 export interface CheckReportData {
   /** ISO-timestamp. */
@@ -347,5 +483,17 @@ export interface CheckReportData {
   lifePath: ReportLifePath
   will: ReportWill
   cta: ReportCta
+  /**
+   * Disclosure over de eigen-woning-weging (50% van de overwaarde telt mee voor
+   * vrijheid). `null` wanneer geen eigen woning. Voedt de render zonder de uitleg
+   * in een component te hardcoden.
+   */
+  houseInclusion: ReportHouseInclusion | null
+  /**
+   * Optioneel — tot 3 actuele nieuwsitems (krant-sectie). Server-side aangehecht in
+   * `/api/check/submit` ná `buildReport` (houdt `buildReport` I/O-vrij). Afwezig op
+   * oudere snapshots → de render toont de sectie dan niet.
+   */
+  news?: ReportNews | null
   disclaimers: { wft: string; avg: string }
 }

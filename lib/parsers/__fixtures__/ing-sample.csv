@@ -1,0 +1,4 @@
+Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutatiesoort;Mededelingen
+20260301;Albert Heijn;NL91INGB0001234567;NL92ABNA0311015505;ba;Af;24,50;Betaalautomaat;Boodschappen wk 9
+20260303;Werkgever B.V.;NL91INGB0001234567;NL86SNSB0902000111;ig;Bij;3500,00;Overschrijving;Salaris maart 2026
+20260305;Ziggo;NL91INGB0001234567;NL57INGB0009999888;ba;Af;49,95;Incasso;Abonnement internet

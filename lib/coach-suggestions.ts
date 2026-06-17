@@ -366,6 +366,7 @@ export const PATH_SUGGESTIONS: PathRule[] = [
       message:
         'Je grootste Box 1-kans is je jaarruimte — benut hem vóór 31 december en koop vrijheid terug.',
       cta: 'Bekijk jaarruimte',
+      ctaHref: '/overzicht/belasting/box1#jaarruimte-uitleg',
     },
   },
   {

@@ -219,6 +219,39 @@ describe('intakeToPersona — overige bezittingen', () => {
     expect(spaar?.asset_type).toBe('cash')
     expect(spaar?.institution).toBe('ING')
   })
+
+  it('per-asset expectedReturnPct overschrijft het globale rendement (fraction)', () => {
+    const intake: CheckIntake = {
+      ...volledigeIntake,
+      assets: [
+        // Eigen rendement 9% op de belegging; globaal pensioenrendement is 7%.
+        { assetType: 'investment', name: 'Groei-ETF', value: 30000, expectedReturnPct: 9 },
+        // Geen eigen rendement → valt terug op het globale 7%.
+        { assetType: 'investment', name: 'Wereld-ETF', value: 20000 },
+      ],
+    }
+    const result = intakeToPersona(intake)
+    const groei = result.assets.find((a) => a.name === 'Groei-ETF')
+    const wereld = result.assets.find((a) => a.name === 'Wereld-ETF')
+    // 9 % → 0,09 (per-asset override).
+    expect(groei?.expected_return).toBeCloseTo(0.09)
+    // Geen override → globaal 7 % → 0,07.
+    expect(wereld?.expected_return).toBeCloseTo(0.07)
+  })
+
+  it('per-asset rendement 0/leeg valt terug op het globale rendement', () => {
+    const intake: CheckIntake = {
+      ...volledigeIntake,
+      assets: [
+        { assetType: 'investment', name: 'Nul-rendement', value: 10000, expectedReturnPct: 0 },
+        { assetType: 'investment', name: 'Null-rendement', value: 10000, expectedReturnPct: null },
+      ],
+    }
+    const result = intakeToPersona(intake)
+    for (const a of result.assets.filter((x) => x.asset_type === 'investment')) {
+      expect(a.expected_return).toBeCloseTo(0.07)
+    }
+  })
 })
 
 describe('intakeToPersona — schulden', () => {

@@ -31,13 +31,7 @@ import {
 } from '@/lib/category-app-nav'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
-import { computeLeverScores } from '@/components/app/shell/lever-scores'
-import type { LeverStatus } from '@/components/app/shell/lever-compass'
-import type { LeverageStatus } from '@/lib/leverage-status'
-import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
-import { resolveFireParams } from '@/lib/fire-params'
-import { box1JaarruimteStatus } from '@/lib/jaarruimte'
-import { computeBox3TaxableInput } from '@/lib/box3-taxable-input'
+import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { WillHome } from '@/components/app/will/will-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
@@ -97,12 +91,11 @@ export default async function AppLayout({
     coachConfigRes,
     platformStatusRes,
     recsCountRes,
-    monthIncomeTxRes,
   ] = await Promise.all([
     // profile-select bevat velden voor sidebar/feature-access/theming.
     // expected_return + inflation_rate voeden de coach-data-gap `hasFireParams`
     // — meegenomen in deze bestaande query i.p.v. een extra round-trip.
-    supabase.from('profiles').select('role, blocked_at, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, marginaal_tarief').eq('id', user.id).single(),
+    supabase.from('profiles').select('role, blocked_at, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type, expected_return, inflation_rate').eq('id', user.id).single(),
     // assets: `asset_type, net_worth_inclusion_pct` voor sidebar netWorth
     // (weighted). De tracking-flags voeden `getActiveAppKeys()` voor de
     // sidebar apps-strip: een app verschijnt alleen als minstens één
@@ -145,22 +138,9 @@ export default async function AppLayout({
     // actionsCountRes-query hierboven en de recommendations-query in
     // will-data-loader.ts). Head-only + count: 'exact' = geen rows-payload.
     supabase.from('recommendations').select('id', { count: 'exact', head: true }).in('status', ['pending', 'postponed']),
-    // Sidebar-dot "Box 1": huidige-maand transacties (amount) voor het
-    // effectieve maandinkomen. Maand-grenzen identiek aan de horizon-loader
-    // (UTC monthStart..monthEnd) zodat het afgeleide bruto jaarinkomen — en dus
-    // de jaarruimte-status — 1-op-1 matcht met de Belasting-kaart, die
-    // `effectiveInput.monthlyIncome` uit dezelfde maand-aggregatie leest.
-    (() => {
-      const now = new Date()
-      const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
-      const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
-      return supabase
-        .from('transactions')
-        .select('amount')
-        .eq('user_id', user.id)
-        .gte('date', monthStart)
-        .lt('date', monthEnd)
-    })(),
+    // (De Box 1-maandinkomen-query is verhuisd naar `loadLeverScores`, de
+    // gedeelde SSoT die zowel deze sidebar-dot als de status-duiding-banner
+    // voedt — geen aparte query meer in de shell.)
   ])
 
   const platformStatus = parsePlatformStatus(platformStatusRes.data?.value as string | undefined)
@@ -291,25 +271,10 @@ export default async function AppLayout({
     : sidebarCashOnlyAssets
   const sidebarActionCount = actionsCountRes.count ?? 0
 
-  // ── Vier-hefbomen-kompas scores ─────────────────────────
-  // Bereken uit reeds-geladen data — geen extra DB queries.
-  const assetTypeSet = new Set(assetRows.map(a => a.asset_type).filter(Boolean))
-  const txData = txRes.data ?? []
-  const txIncome = txData.filter(t => t.is_income).reduce((s, t) => s + Number(t.amount), 0)
-  const txExpense = txData.filter(t => !t.is_income).reduce((s, t) => s + Number(t.amount), 0)
-  const savingsRate3m = txIncome > 0 ? ((txIncome - txExpense) / txIncome) * 100 : null
-
-  // Box3-belast-vermogen-signaal via de gedeelde SSoT-helper
-  // (computeBox3TaxableInput): zelfde BOX3-typefilter + vrijstelling als de
-  // Belasting-kaart en box3TaxStatus. Geen inline kopie van de drempel/typeset
-  // meer — sidebar-dot en kaart kunnen zo nooit divergeren.
-  const { box3TaxableAboveThreshold, hasBox3Assets } = computeBox3TaxableInput(assetRows, debtRows)
-
-  const sidebarTotalOriginalDebts = debtRows.reduce((s, d) => s + Number(d.original_amount ?? d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
-  const householdType = (profile?.household_type as string | undefined) ?? undefined
-
   // ── Budget health (kompas cashflow-indicator #847) ───────
-  // Bereken per top-level expense/savings budget of het binnen de limiet zit.
+  // Per top-level expense/savings budget: binnen de limiet of niet. `budgetsOver`
+  // voedt het sidebar-`budgetOver`-signaal (los van de hefboom-scores), dus deze
+  // afleiding blijft hier — los van de gedeelde lever-scores-loader.
   type BudgetHealthRow = { id: string; default_limit: number; budget_type: string }
   type BudgetTxRow = { budget_id: string; amount: number }
   const healthBudgets = (budgetHealthRes.data ?? []) as BudgetHealthRow[]
@@ -319,63 +284,20 @@ export default async function AppLayout({
   for (const tx of budgetTxRows) {
     spendPerBudget.set(tx.budget_id, (spendPerBudget.get(tx.budget_id) ?? 0) + Math.abs(Number(tx.amount)))
   }
-  const budgetsTotal = healthBudgets.filter(b => b.default_limit > 0).length
   const budgetsOver = healthBudgets.filter(b => {
     if (b.default_limit <= 0) return false
     const spent = spendPerBudget.get(b.id) ?? 0
     return spent > b.default_limit
   }).length
-  const budgetsOnTrack = budgetsTotal - budgetsOver
 
-  const sidebarLeverScores = computeLeverScores({
-    totalAssets: sidebarTotalAssetsRaw,
-    totalDebts: sidebarTotalDebtsRaw,
-    totalOriginalDebts: sidebarTotalOriginalDebts,
-    debtCount: debtRows.length,
-    assetTypeCount: assetTypeSet.size,
-    savingsRate: savingsRate3m,
-    box3TaxableAboveThreshold,
-    hasBox3Assets,
-    householdType,
-    budgetsTotal,
-    budgetsOnTrack,
-    budgetsOver,
-  })
-
-  // ── Sidebar status-dots: belasting status-mirror (Box 1/2/3) ────────────
-  // Alle drie spiegelen nu EXACT de Belasting-landingskaart (zelfde gedeelde
-  // helpers, zelfde inputs):
-  //  - box1: gedeelde `box1JaarruimteStatus` o.b.v. effectief maandinkomen +
-  //    marginaal tarief — exact zoals de kaart het bruto jaarinkomen afleidt.
-  //  - box2: 'neutral' — matcht de kaart die Box 2 hardcodeert op 'neutral'.
-  //  - box3: gedeelde tax-lever-status (box3TaxStatus, intern hergebruikt door
-  //    computeLeverScores) — exact zoals de kaart. LeverStatus → LeverageStatus.
-  const leverToLeverageStatus = (s: LeverStatus): LeverageStatus =>
-    s === 'green' ? 'good' : s === 'amber' ? 'warn' : s === 'red' ? 'bad' : 'neutral'
-
-  // Box 1: effectief maandinkomen via dezelfde resolutie als de Belasting-kaart
-  // (resolveEffectiveIncomeExpenses op huidige-maand transactie-aggregaat +
-  // profiel-bronnen), marginaal tarief via resolveFireParams. Geen extra
-  // FIRE-engine of horizon-loader in de globale layout — alleen deze goedkope
-  // resolutie op één extra maand-aggregaat.
-  const monthTxRows = (monthIncomeTxRes.data ?? []) as Array<{ amount: number | string }>
-  let monthTxIncome = 0
-  let monthTxExpenses = 0
-  for (const t of monthTxRows) {
-    const amt = Number(t.amount)
-    if (amt > 0) monthTxIncome += amt
-    else monthTxExpenses += Math.abs(amt)
-  }
-  const { income: box1MonthlyIncome } = resolveEffectiveIncomeExpenses(
-    profile ?? {},
-    monthTxIncome,
-    monthTxExpenses,
-  )
-  const box1MarginaalTarief = resolveFireParams(profile ?? {}).marginaalTarief
-  const { status: sidebarBox1Status } = box1JaarruimteStatus({
-    netMonthly: box1MonthlyIncome,
-    marginaalTarief: box1MarginaalTarief,
-  })
+  // ── Vier-hefbomen-kompas scores + Box 1/3-statussen (gedeelde SSoT) ──────
+  // Voorheen stond hier de volledige inline assemblage (assets/debts/spaarquote/
+  // box3-input + computeLeverScores + box1JaarruimteStatus). Die logica is nu
+  // de ÉNE bron `loadLeverScores`, gedeeld met de status-duiding-banner
+  // (lib/page-status/*) zodat de sidebar-dots en de banner per definitie
+  // dezelfde status tonen. `cache()` dedupliceert binnen het request.
+  const { scores: sidebarLeverScores, box1Status: sidebarBox1Status, box3Status: sidebarBox3Status } =
+    await loadLeverScores(supabase)
 
   const sidebarSignals: SidebarSignals = {
     tipsActions: sidebarActionCount > 0 || (recsCountRes.count ?? 0) > 0,
@@ -387,7 +309,7 @@ export default async function AppLayout({
     belasting: {
       box1: sidebarBox1Status,
       box2: 'neutral',
-      box3: leverToLeverageStatus(sidebarLeverScores.tax.status),
+      box3: sidebarBox3Status,
     },
   }
 

@@ -1,9 +1,17 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { Clock, Users, EyeOff } from 'lucide-react'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
+import { JaarruimteDeeplinkScroll } from '@/components/overview/belasting/jaarruimte-deeplink-scroll'
+import {
+  JAARRUIMTE_OPBOUW_PCT,
+  JAARRUIMTE_FACTOR_A_IMPUTATIE,
+  JAARRUIMTE_FRANCHISE_2026,
+  JAARRUIMTE_MAX_2026,
+} from '@/lib/jaarruimte'
 import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page-header'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { computeBox1Tax, grossFromNet, type Box1Result } from '@/lib/box1-tax'
@@ -20,6 +28,7 @@ import { Kicker, SectionLabel, FiguresStrip, OrnamentColophon } from '@/componen
 import { Reveal } from '@/components/landing/reveal'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
+const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 
 export const metadata: Metadata = {
   title: 'Box 1 · Werk + woning — TriFinity',
@@ -69,6 +78,15 @@ export default async function BelastingBox1Page() {
     : { grossYearly: 0, estimateGross: 0, estimateNetYearly: 0, isManual: false }
   const grossYearly = income.grossYearly
   const marg = horizonData.fireParams?.marginaalTarief ?? 0.3697
+
+  // Factor A (jaarlijkse werkgeverspensioen-aangroei) — single source uit het
+  // profiel (profiles.pension_factor_a), geconsumeerd uit de loader-bundel via
+  // de canonieke resolver `resolvePensionFactorA` (clamp ≥ 0, NaN-guard,
+  // NULL≠0). Ingevuld via de pensioen-strategie (`/toekomst/gebeurtenissen?
+  // strategie=pensioen`). NULL = onbekend → jaarruimte toont de bovengrens
+  // (factor A 0); de uitleg framet dat expliciet. Partner-factor-A is privé en
+  // out-of-scope, dus de partner-kaart blijft op de bovengrens (0).
+  const pensionFactorA: number = horizonData.pensioenFactorA
 
   // Vrijheidstijd-equivalent ("Geld is opgeslagen tijd"). Dagelijkse uitgaven
   // uit dezelfde bron als de rest van de app; 0 → geen vertaling.
@@ -140,6 +158,7 @@ export default async function BelastingBox1Page() {
   return (
     <>
       <NavStackMeta title="Box 1" bottomBar={{ kind: 'tabs' }} />
+      <JaarruimteDeeplinkScroll />
       <BelastingBoxPageHeader
         number="1"
         title="Werk + woning"
@@ -200,12 +219,13 @@ export default async function BelastingBox1Page() {
                 <PerspectiveContextLabel className="normal-case tracking-normal" />
               </span>
             </SectionLabel>
+            <JaarruimteUitleg />
             <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Kicker className="mb-2">Jij</Kicker>
               <JaarruimteCard
                 grossYearlyIncome={grossYearly}
-                pensioenAangroei={0}
+                pensioenAangroei={pensionFactorA}
                 marginaalTarief={marg}
                 year={2026}
                 dailyExpenses={dailyExpenses}
@@ -214,6 +234,11 @@ export default async function BelastingBox1Page() {
             <div>
               <Kicker className="mb-2">{partnerName ?? 'Partner'}</Kicker>
               {partnerGrossYearly != null ? (
+                // PARTNER-PRIVACY GUARDRAIL: factor A blijft hier bewust 0.
+                // profiles.pension_factor_a is de EIGEN factor A van de ingelogde
+                // gebruiker en mag NOOIT als de factor A van de partner worden
+                // hergebruikt (privacylek + rekenfout). De partner heeft geen
+                // eigen factor-A-bron, dus we rekenen zonder factor-A-aftrek.
                 <JaarruimteCard
                   grossYearlyIncome={partnerGrossYearly}
                   pensioenAangroei={0}
@@ -239,9 +264,10 @@ export default async function BelastingBox1Page() {
         <Reveal>
           <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10">
             <SectionLabel num="IV">Je jaarruimte benutten</SectionLabel>
+            <JaarruimteUitleg />
             <JaarruimteCard
               grossYearlyIncome={grossYearly}
-              pensioenAangroei={0}
+              pensioenAangroei={pensionFactorA}
               marginaalTarief={marg}
               year={2026}
               dailyExpenses={dailyExpenses}
@@ -338,6 +364,84 @@ function Box1DrukHero({
         Indicatie, geen advies — berekend met de Box 1-schijven en
         heffingskortingen {result.year} over je geschatte bruto-inkomen.
       </p>
+    </div>
+  )
+}
+
+/**
+ * JaarruimteUitleg — uitlegblok bij sectie IV; tevens het deeplink-doel
+ * (`#jaarruimte-uitleg`). Legt in lekentaal uit wat jaarruimte is, de rekensom
+ * (getallen uit `lib/jaarruimte.ts` — niet hardcoded), het factor-A-effect en
+ * de eerlijke "bovengrens vóór werkgeverspensioen"-framing. Verwijst naar de
+ * pensioen-strategie (factor A invullen) en de officiële Belastingdienst-
+ * rekenhulp (Wft: indicatie, geen advies).
+ */
+function JaarruimteUitleg() {
+  const opbouwPct = Math.round(JAARRUIMTE_OPBOUW_PCT * 100)
+  const linkCls =
+    'underline decoration-[var(--border-md)] underline-offset-2 hover:text-[var(--ink)]'
+  return (
+    <div
+      id="jaarruimte-uitleg"
+      className="scroll-mt-24 mb-5 border border-[var(--border-ed)] border-l-[3px] border-l-kern-700 bg-[var(--paper)] p-5 sm:p-6"
+    >
+      <Kicker>Wat is jaarruimte?</Kicker>
+      <div
+        className="mt-2 space-y-3 text-sm leading-relaxed text-[var(--ink-2)]"
+        style={{ fontFamily: SOURCE_SERIF }}
+      >
+        <p>
+          Jaarruimte is het bedrag dat je dit jaar fiscaal voordelig opzij mag
+          zetten voor extra pensioen, via een <strong>lijfrente</strong>. Je
+          inleg trek je af in Box 1 — dat scheelt nu inkomstenbelasting; later
+          betaal je belasting over de uitkering, meestal tegen een lager tarief.
+          Slim belasting-uitstel dus.
+        </p>
+        <p>
+          De rekensom (2026):{' '}
+          <span className="font-mono not-italic tabular-nums text-[var(--ink)]">
+            {opbouwPct}% × (inkomen − {formatCurrency(JAARRUIMTE_FRANCHISE_2026)})
+            − {JAARRUIMTE_FACTOR_A_IMPUTATIE} × factor A
+          </span>
+          , afgetopt op {formatCurrency(JAARRUIMTE_MAX_2026)} per persoon.
+        </p>
+        <p>
+          <strong>De adder: factor A.</strong> Bouw je pensioen op via je
+          werkgever, dan verlaagt dat je jaarruimte fors — vaak tot bijna niets.
+          Factor A is je jaarlijkse pensioenaangroei; je vindt &apos;m op je UPO of{' '}
+          <a
+            href="https://www.mijnpensioenoverzicht.nl"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={linkCls}
+          >
+            mijnpensioenoverzicht.nl
+          </a>
+          . Zzp&apos;er zonder pensioenregeling? Dan heb je meestal (bijna) je
+          volle ruimte.
+        </p>
+        <p>
+          Wat we hieronder tonen is een{' '}
+          <strong>bovengrens vóór aftrek van je werkgeverspensioen</strong>. Vul
+          je factor A in — hieronder of bij je{' '}
+          <Link href="/toekomst/gebeurtenissen?strategie=pensioen" className={linkCls}>
+            pensioen-strategie
+          </Link>{' '}
+          — voor een scherpere schatting.
+        </p>
+        <p className="text-[12px] italic text-[var(--ink-3)]">
+          Indicatie, geen advies — het bindende bedrag bereken je met de{' '}
+          <a
+            href="https://www.belastingdienst.nl/wps/wcm/connect/nl/aftrek-en-kortingen/content/hoe-bereken-ik-mijn-jaarruimte"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={linkCls}
+          >
+            officiële rekenhulp van de Belastingdienst
+          </a>
+          .
+        </p>
+      </div>
     </div>
   )
 }

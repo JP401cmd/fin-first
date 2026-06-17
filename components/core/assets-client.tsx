@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import {
-  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Search, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon, ExternalLink, Users,
+  Plus, Trash2, Edit3, X, TrendingUp, RefreshCw, Loader2, BarChart3, ChevronDown, ChevronUp, Briefcase, AlertCircle, AlertTriangle, LinkIcon, ExternalLink, Users,
 } from 'lucide-react'
 import Link from 'next/link'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -2727,9 +2727,6 @@ export function AssetForm({
   const [activeDebts, setActiveDebts] = useState<{ id: string; name: string }[]>([])
   const [deelnemingOptions, setDeelnemingOptions] = useState<{ id: string; name: string }[]>([])
   const [dgaTotal, setDgaTotal] = useState(0)
-  const [wozLoading, setWozLoading] = useState(false)
-  const [wozResult, setWozResult] = useState<{ peildatum: string; waarde: number }[] | null>(null)
-  const [wozError, setWozError] = useState<string | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
   // Household ownership
   const [ownership, setOwnership] = useState<OwnershipType>(asset?.ownership ?? 'personal')
@@ -2806,42 +2803,6 @@ export function AssetForm({
         if (defaults.is_liquid !== undefined) setIsLiquid(defaults.is_liquid)
         if (defaults.tax_benefit !== undefined) setTaxBenefit(defaults.tax_benefit)
       }
-    }
-  }
-
-  async function handleWozLookup() {
-    if (!addressPostcode || !addressHouseNumber) return
-    setWozLoading(true)
-    setWozError(null)
-    setWozResult(null)
-
-    try {
-      const supabase = createClient()
-
-      const { data, error } = await supabase.functions.invoke('woz-lookup', {
-        body: { postcode: addressPostcode, house_number: addressHouseNumber },
-      })
-
-      if (error) {
-        // Extract actual error from response body if available
-        let msg = 'WOZ-waarde kon niet worden opgehaald'
-        try {
-          const body = await (error as { context?: Response }).context?.json()
-          if (body?.error) msg = body.error
-        } catch { /* ignore parse errors */ }
-        throw new Error(msg)
-      }
-      if (data.woz_values && data.woz_values.length > 0) {
-        setWozResult(data.woz_values)
-        // Auto-fill with most recent value
-        setWozValue(String(data.woz_values[0].waarde))
-      } else {
-        setWozError(data.error || 'Geen WOZ-waarden gevonden voor dit adres')
-      }
-    } catch (err) {
-      setWozError(err instanceof Error ? err.message : 'WOZ-waarde kon niet worden opgehaald')
-    } finally {
-      setWozLoading(false)
     }
   }
 
@@ -3250,6 +3211,21 @@ export function AssetForm({
                 </div>
               </div>
 
+              {visibleFields.includes('woz_value') && (
+                <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
+                  Weet je de actuele marktwaarde niet? Bekijk een schatting via de Hypotheker en vul &apos;m hier in.{' '}
+                  <a
+                    href="https://www.hypotheker.nl/zelf-berekenen/wat-is-deze-woning-waard/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-[var(--ink-2)] underline underline-offset-4 hover:text-[var(--ink)]"
+                  >
+                    Open de Hypotheker
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                  </a>
+                </p>
+              )}
+
               <div className={`grid ${assetType === 'eigen_huis' ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
                 {!(visibleFields.includes('depreciation_rate') && depreciationRate && Number(depreciationRate) > 0) && (
                 <div>
@@ -3570,41 +3546,12 @@ export function AssetForm({
                 {visibleFields.includes('address_house_number') && (
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huisnummer</label>
-                    <div className="flex gap-2">
-                      <input
-                        value={addressHouseNumber}
-                        onChange={(e) => setAddressHouseNumber(e.target.value)}
-                        className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
-                        placeholder="42"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleWozLookup}
-                        disabled={wozLoading || !addressPostcode || !addressHouseNumber}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-3 py-2 text-xs font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-                      >
-                        {wozLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
-                        WOZ
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {wozResult && (
-                  <div className="col-span-2 rounded-[var(--r)] border border-positive/30 bg-positive/5 p-3">
-                    <p className="mb-2 text-xs font-semibold text-positive">WOZ-waarden gevonden</p>
-                    <div className="space-y-1">
-                      {wozResult.map((w) => (
-                        <div key={w.peildatum} className="flex items-center justify-between text-xs">
-                          <span className="text-[var(--ink-2)]">{new Date(w.peildatum).toLocaleDateString('nl-NL', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                          <span className="font-medium text-[var(--ink)]">{fc(w.waarde)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {wozError && (
-                  <div className="col-span-2 rounded-[var(--r)] border border-negative/30 bg-negative/5 p-2">
-                    <p className="text-xs text-negative">{wozError}</p>
+                    <input
+                      value={addressHouseNumber}
+                      onChange={(e) => setAddressHouseNumber(e.target.value)}
+                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
+                      placeholder="42"
+                    />
                   </div>
                 )}
                 {visibleFields.includes('rental_income') && (
@@ -3628,7 +3575,7 @@ export function AssetForm({
                       className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm"
                     />
                     <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-3)]">
-                      Vraag de actuele WOZ-waarde gratis op bij het officiële waardeloket.{' '}
+                      Vraag je actuele WOZ-waarde gratis op bij het officiële waardeloket en vul &apos;m hier in.{' '}
                       <a
                         href="https://www.wozwaardeloket.nl/"
                         target="_blank"

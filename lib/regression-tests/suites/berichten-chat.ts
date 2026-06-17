@@ -233,6 +233,47 @@ const tests: TestCase[] = [
   },
 
   {
+    id: 'chat-pending-message-one-shot',
+    name: 'Pending message wordt exact één keer verstuurd',
+    category: CAT,
+    description:
+      'De auto-send van pendingMessage ("Vraag Will"/notificatie) gebruikt een ref-guard op de berichttekst, zodat React\'s dubbele effect-invocatie (Strict Mode / re-render vóór clear) niet twee identieke user-bubbles produceert.',
+    priority: 'high',
+    estimatedDurationMs: 10,
+    fn() {
+      // Reproduceer de guard-logica uit ChatPanel: een ref onthoudt welk
+      // bericht al gedispatcht is; een tweede invocatie met dezelfde tekst
+      // (vóór clearPendingMessage doorkomt) mag NIET nogmaals versturen.
+      const sent: string[] = []
+      const ref: { current: string | null } = { current: null }
+      const runEffect = (isOpen: boolean, pendingMessage: string | null, isStreaming: boolean) => {
+        if (!pendingMessage) {
+          ref.current = null
+          return
+        }
+        if (isOpen && !isStreaming && ref.current !== pendingMessage) {
+          ref.current = pendingMessage
+          sent.push(pendingMessage)
+          // clearPendingMessage() volgt async; binnen dezelfde commit is
+          // pendingMessage nog gezet — vandaar de dubbele invocatie hieronder.
+        }
+      }
+
+      const MSG = 'Doorlicht mijn financiën voor optimalisaties.'
+      // Strict Mode: het effect draait twee keer met dezelfde committed state.
+      runEffect(true, MSG, false)
+      runEffect(true, MSG, false)
+      assertEqual(sent.length, 1, 'zelfde pendingMessage exact één keer verstuurd')
+
+      // Nadat pendingMessage geleegd is, reset de ref en mag een volgend
+      // (ook identiek) bericht later wél opnieuw verstuurd worden.
+      runEffect(true, null, false)
+      runEffect(true, MSG, false)
+      assertEqual(sent.length, 2, 'na clear mag hetzelfde bericht opnieuw')
+    },
+  },
+
+  {
     id: 'chat-streaming-blocks-send',
     name: 'Versturen geblokkeerd tijdens streaming',
     category: CAT,

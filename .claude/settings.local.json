@@ -123,7 +123,12 @@
       "mcp__supabase__get_advisors",
       "PowerShell(npx vitest run lib/household-data.test.ts)",
       "PowerShell(npx tsc --noEmit)",
-      "PowerShell(npx tsc --noEmit 2>&1 | Select-String -Pattern 'transacties-feed|cashflow/transacties|cashflow-data-loader|cashflow-sankey|transacties-geldstroom' | ForEach-Object { $_.Line })"
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-String -Pattern 'transacties-feed|cashflow/transacties|cashflow-data-loader|cashflow-sankey|transacties-geldstroom' | ForEach-Object { $_.Line })",
+      "Read(//c/tmp/**)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --hide-scrollbars --window-size=900,8000 --screenshot=/tmp/rapport_full.png \"http://localhost:3000/check/rapport?preview=1\")",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --hide-scrollbars --force-prefers-reduced-motion --window-size=900,1400 --screenshot=/tmp/rapport_kruising.png \"http://localhost:3000/check/rapport?preview=1#s3\")",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --hide-scrollbars --force-prefers-reduced-motion --window-size=820,900 --default-background-color=FFFFFFFF --screenshot=/tmp/k1.png \"http://localhost:3000/check/rapport?preview=1\")",
+      "Bash(python -c \"print\\('ok'\\)\")"
     ]
   },
   "enableAllProjectMcpServers": true,

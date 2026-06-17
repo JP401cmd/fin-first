@@ -29,6 +29,7 @@ import type {
   CheckIntake,
   CheckIntakeAsset,
   CheckIntakeDebt,
+  CheckIntakeLifeEvent,
   CheckReportData,
   FreedomTime,
   ReportDualBar,
@@ -36,6 +37,7 @@ import type {
   ReportHealthPillar,
   ReportKruising,
   ReportLifeEvent,
+  ReportLifePathScenario,
   ReportMonthBalanceRow,
   ReportProjectionPoint,
   ReportSensitivityRow,
@@ -43,13 +45,17 @@ import type {
 } from './types'
 
 import type { Asset, AssetType } from '@/lib/asset-data'
+import { TYPICAL_RETURNS } from '@/lib/asset-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 
 import { resolveFireParams } from '@/lib/fire-params'
-import { computeFireProjection, computeAowMonthly, ageAtDate, type FinancialInput } from '@/lib/horizon-data'
+import { computeFireProjection, computeAowMonthly, ageAtDate, type FinancialInput, type LifeEvent } from '@/lib/horizon-data'
+import { lifeEventsToCashflows } from '@/lib/fire-simulation'
+import { computeRetirementExpenses } from '@/lib/budget-utils'
 import { runHorizonLedger } from '@/lib/horizon-engine/engine'
 import type { HorizonLedgerResult } from '@/lib/horizon-engine/types'
 import type { UnifiedProjectionInput } from '@/lib/unified-projection'
+import type { SimCashflow } from '@/lib/fire-simulation'
 import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { type FireStrategyConfig } from '@/lib/fire-strategy'
 import { NL_AOW_AGE } from '@/lib/constants'
@@ -80,14 +86,49 @@ const REPORT_END_AGE = 90
 const BENCHMARK_SOURCE_BADGE = 'Geraamd (CBS-basis)'
 
 /**
- * Housing-strategie van de Vrijheidscheck: de eigen woning telt NIET mee voor
- * FIRE — conform het rapport-ontwerp ("dat is je dak, niet je rendement"). De
- * woning + gekoppelde hypotheek worden via `filterAssetsForFire` uit de
- * engine-pot gehaald en `getFireEligibleNetWorth` trekt de overwaarde van het
- * netto vermogen af. Het volledige vermogen (incl. huis) blijft zichtbaar in
- * snapshot/dual-bars/levenspad.
+ * Vrijheidstijd-label bij een NEGATIEF (of nul) FIRE-eligible vermogen.
+ *
+ * `calculateFreedomTime` rekent op de ABSOLUTE waarde, dus een negatieve
+ * grondslag (huis-rijk / liquide-schuld-zwaar profiel — sinds de grondslag-fix
+ * vaker bereikbaar) zou anders als een POSITIEVE "X jaar vrijheid" renderen. Bij
+ * een tekort koopt het FIRE-inzetbare deel (nog) géén vrijheid; we tonen dat
+ * eerlijk als `isDeficit`.
+ */
+const NO_FREEDOM_DEFICIT_LABEL = 'nog geen vrijheid'
+
+/**
+ * Housing-strategie van de Vrijheidscheck: de eigen woning telt voor 50% mee in
+ * de vrijheids-/FIRE-berekening — de helft die je realistisch kunt verzilveren
+ * (verkopen, downsizen of een opeethypotheek) zónder dakloos te worden. Dit is een
+ * RAPPORT-conventie (geen app-brede housing-mode): we houden de échte woning +
+ * gekoppelde hypotheek BUITEN de engine-pot (via `filterAssetsForFire`, zodat de
+ * woonkost in het budget blijft en de hypotheek niet dubbel meetelt), en voegen
+ * i.p.v. dat ÉÉN synthetisch groei-bezit toe ter grootte van `HOUSE_FIRE_WEIGHT ×
+ * netto overwaarde`, dat meegroeit op het canonieke woning-rendement
+ * (`TYPICAL_RETURNS.eigen_huis`). De FIRE-eligible grondslag = netto vermogen MINUS
+ * de NIET-meegerekende helft van de overwaarde, dus precies 50% van de overwaarde
+ * landt in de vrijheids-base. Het volledige vermogen (incl. de volle huiswaarde)
+ * blijft zichtbaar in snapshot/dual-bars/levenspad. In de ingelogde app stelt de
+ * gebruiker dit nauwkeuriger in (verkopen / opeethypotheek / niet meerekenen).
+ *
+ * We houden `getFireEligibleNetWorth` met `exclude_from_fire` als basis voor het
+ * filteren van de engine-pot; de 50%-correctie passen we expliciet toe op de
+ * FIRE-eligible grondslag (zie buildContext) zodat de formule één duidelijke home
+ * heeft.
  */
 const CHECK_HOUSING_STRATEGY: HousingStrategyConfig = { mode: 'exclude_from_fire' }
+
+/**
+ * Gewicht waarmee de netto overwaarde van de eigen woning meetelt voor vrijheid:
+ * de helft die je realistisch kunt verzilveren of verkleinen. Rapport-conventie
+ * (ADR-waardig — zie rapport). Géén app-brede housing-mode; uitsluitend hier.
+ */
+const HOUSE_FIRE_WEIGHT = 0.5
+
+/** Leek-uitleg over de 50%-weging (DTO-veld `houseInclusion.note`; niet in een component hardcoden). */
+const HOUSE_INCLUSION_NOTE =
+  'We rekenen je eigen woning voor 50% mee in je vrijheid (de helft die je kunt verzilveren of verkleinen). '
+  + 'In de app stel je dit nauwkeuriger in — bijvoorbeeld verkopen, een opeethypotheek of helemaal niet meerekenen.'
 
 const NL_MONTHS = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
@@ -149,7 +190,17 @@ function intakeAssetToAsset(
   grossReturn: number,
 ): Asset {
   const assetType = normalizeAssetType(a.assetType)
-  const expectedReturnPct = GROWTH_ASSET_TYPES.has(assetType) ? grossReturn * 100 : 0
+  // Per-asset rendement-override (stap ⑤): als de gebruiker voor dít groei-bezit
+  // een eigen verwacht jaarrendement invulde (%), gebruik dat; anders het globale
+  // profiel-`grossReturn` (×100, want `expected_return` is een percentage). Cash/
+  // savings/eigen woning groeien niet mee op rendement → 0. De override geldt
+  // alleen voor groei-types; voor niet-groei-types blijft 0 (een ingevuld
+  // rendement op cash is betekenisloos in de FIRE-pot).
+  const expectedReturnPct = GROWTH_ASSET_TYPES.has(assetType)
+    ? (a.expectedReturnPct != null && a.expectedReturnPct > 0
+        ? a.expectedReturnPct
+        : grossReturn * 100)
+    : 0
   return {
     id: `check-asset-${index}`,
     user_id: 'check',
@@ -246,6 +297,72 @@ interface SyntheticPortfolio {
 }
 
 /**
+ * Bouw het synthetische "verzilverbare overwaarde"-bezit voor de FIRE-pot.
+ *
+ * De échte eigen woning + hypotheek blijven uit de engine-pot (zie
+ * `CHECK_HOUSING_STRATEGY`); in plaats daarvan voegen we 50% van de CURRENT netto
+ * overwaarde toe als één liquide groei-bezit. Keuze van het asset-type:
+ *  - `'investment'` zodat de engine het als een liquide groei-bucket behandelt
+ *    (grossReturn-pad + Box 3-forfait — verzilverde overwaarde is box-3 belegd
+ *    vermogen, dus die drag hoort erbij);
+ *  - maar `expected_return = TYPICAL_RETURNS.eigen_huis` (canonieke woning-
+ *    appreciatie in PERCENT), NIET het beleggingsrendement — de overwaarde groeit
+ *    mee met de woningmarkt, niet met de aandelenmarkt.
+ * Mirrort exact de minimale-Asset-vorm van `intakeAssetToAsset` (alle velden gezet)
+ * zodat tsc tevreden is. Alleen aanroepen wanneer er een eigen woning is én de
+ * (net) overwaarde > 0.
+ */
+function buildHouseEquityFireAsset(currentEquity: number): Asset {
+  return {
+    id: 'check-house-equity',
+    user_id: 'check',
+    name: 'Verzilverbare overwaarde (50%)',
+    asset_type: 'investment',
+    current_value: Math.max(0, HOUSE_FIRE_WEIGHT * currentEquity),
+    purchase_value: 0,
+    purchase_date: null,
+    // Canonieke woning-appreciatie (%), niet het beleggingsrendement.
+    expected_return: TYPICAL_RETURNS.eigen_huis,
+    monthly_contribution: 0,
+    institution: null,
+    account_number: null,
+    notes: null,
+    is_active: true,
+    sort_order: 9_999,
+    created_at: '',
+    updated_at: '',
+    subtype: null,
+    risk_profile: null,
+    tax_benefit: null,
+    is_liquid: null,
+    lock_end_date: null,
+    ticker_symbol: null,
+    rental_income: null,
+    woz_value: null,
+    retirement_provider_type: null,
+    depreciation_rate: null,
+    address_postcode: null,
+    address_house_number: null,
+    expiry_date: null,
+    beneficiary: null,
+    kvk_number: null,
+    ownership_percentage: null,
+    annual_dividend: null,
+    linked_asset_id: null,
+    ownership: 'personal',
+    household_id: null,
+    net_worth_inclusion_pct: 100,
+    sale_config: null,
+    has_budget_tracking: false,
+    has_woonbalans_tracking: false,
+    has_rental_tracking: false,
+    monthly_maintenance_cost: 0,
+    vva_fee: 0,
+    vacancy_log: [],
+  }
+}
+
+/**
  * Bouw de synthetische Asset[]/Debt[]. Koppelt de eerste hypotheek aan het
  * eerste eigen-huis-asset (linked_asset_id) zodat de housing-context en de
  * Box 1-classificatie kloppen.
@@ -261,6 +378,59 @@ function buildPortfolio(intake: CheckIntake, grossReturn: number): SyntheticPort
     return intakeDebtToDebt(d, i, link)
   })
   return { assets, debts }
+}
+
+// ── Levensgebeurtenissen → cashflows (consume lifeEventsToCashflows) ──────────
+//
+// De intake draagt een lichte `CheckIntakeLifeEvent[]`; de engine verwacht het
+// volwaardige `LifeEvent`-model. We mappen één-op-één naar de generieke
+// LifeEvent-velden (one_time_cost / monthly_*_change / duration_months) zónder
+// metadata, zodat `lifeEventsToCashflows` de GENERIEKE fallback gebruikt — geen
+// eigen cashflow-wiskunde hier (consume, don't recompute). Tekenconventie van
+// het LifeEvent-model: `one_time_cost` is POSITIEF voor een kost, NEGATIEF voor
+// een meevaller — het tegenovergestelde van de intuïtieve intake-`amount`
+// (positief = meevaller). Daarom keren we het teken om. `recurringYearly` (per
+// jaar) delen we naar een maandbedrag (`monthly_*_change`) met een looptijd
+// (`duration_months`); positief = inkomen, negatief = extra uitgave.
+
+/** Zet één intake-levensgebeurtenis om naar het volwaardige `LifeEvent`-model. */
+function intakeLifeEventToLifeEvent(ev: CheckIntakeLifeEvent, index: number): LifeEvent {
+  const oneOff = Number(ev.amount ?? 0)
+  const recurringYearly = Number(ev.recurringYearly ?? 0)
+  const durationYears = Number(ev.durationYears ?? 0)
+  // Maandbedrag (altijd via /12); generieke fallback splitst income/expense op teken.
+  const monthlyRecurring = recurringYearly !== 0 ? recurringYearly / 12 : 0
+  return {
+    id: `check-le-${index}`,
+    name: ev.label,
+    event_type: ev.key,
+    target_age: ev.age,
+    target_date: null,
+    // Intake `amount` positief = meevaller; LifeEvent `one_time_cost` positief = kost → omkeren.
+    one_time_cost: -oneOff,
+    // monthly_cost_change positief = extra uitgave; monthly_income_change positief = extra inkomen.
+    monthly_cost_change: monthlyRecurring < 0 ? Math.abs(monthlyRecurring) : 0,
+    monthly_income_change: monthlyRecurring > 0 ? monthlyRecurring : 0,
+    duration_months: durationYears > 0 ? Math.round(durationYears * 12) : 0,
+    icon: '',
+    is_active: true,
+    sort_order: index,
+    is_indexed: true,
+  }
+}
+
+/**
+ * Map de optionele intake-`lifeEvents` naar `SimCashflow[]` via de canonieke
+ * `lifeEventsToCashflows`. Lege/afwezige lijst → lege array. Events met een
+ * leeftijd in het verleden (< huidige leeftijd) negeert de engine al
+ * (fromAge < currentAge valt buiten het projectievenster) — we filteren ze
+ * hier niet extra zodat de mapping verliesvrij blijft.
+ */
+function buildLifeEventCashflows(intake: CheckIntake): SimCashflow[] {
+  const events = intake.lifeEvents ?? []
+  if (events.length === 0) return []
+  const mapped = events.map((ev, i) => intakeLifeEventToLifeEvent(ev, i))
+  return lifeEventsToCashflows(mapped)
 }
 
 // ── Engine-input-assemblage ──────────────────────────────────────────────────
@@ -286,15 +456,30 @@ interface EngineContext {
   yearlyExpenses: number
   monthlyExpenses: number
   netMonthlyIncome: number
+  /**
+   * Jaarlijkse uitgaven NÁ pensioen (AOW-leeftijd) — via `computeRetirementExpenses`
+   * (methode 'custom_amount') als de gebruiker een afwijkende post-pensioen-uitgave
+   * invulde, anders gelijk aan `yearlyExpenses` (huidige uitgaven 1:1, geen wijziging).
+   */
+  retirementYearlyExpenses: number
   /** Spaarquote (%) en jaarlijks spaarbedrag uit de canonieke bron. */
   savingsRatePct: number
   annualSavings: number
   /** AOW-leeftijd-event-cashflow (jaarlijks netto, geïndexeerd). */
   aowMonthly: number
-  /** FIRE-eligible netto vermogen (eigen woning gefilterd). */
+  /**
+   * FIRE-eligible netto vermogen. Met eigen woning: netto vermogen MINUS de
+   * NIET-meegerekende helft van de overwaarde (`(1−HOUSE_FIRE_WEIGHT) × equity`),
+   * zodat exact 50% van de overwaarde in de vrijheids-base zit (Fix 1). Zonder
+   * eigen woning identiek aan het netto vermogen.
+   */
   fireEligibleNetWorth: number
+  /** Netto overwaarde van de eigen woning (`eigenHuisValue − mortgageBalance`, ≥0). 0 zonder woning. */
+  houseNetEquity: number
   /** Housing-context (eigen woning + hypotheken) — voor de levenspad-reconstructie. */
   housingContext: HousingContext
+  /** Levensgebeurtenis-cashflows (intake → `lifeEventsToCashflows`). Leeg = geen events. */
+  lifeEventCashflows: SimCashflow[]
 }
 
 /**
@@ -308,7 +493,12 @@ function buildEngineInput(
   strategyConfig: FireStrategyConfig,
   overrides?: { returnDelta?: number; extraYearlyExpenses?: number; lumpSum?: number; annualSavings?: number },
 ): UnifiedProjectionInput {
-  const cashflows = buildAowCashflow(ctx)
+  // Eén cashflow-pot: AOW + post-pensioen-uitgave-delta + levensgebeurtenissen.
+  const cashflows = [
+    ...buildAowCashflow(ctx),
+    ...buildRetirementExpenseDeltaCashflow(ctx),
+    ...ctx.lifeEventCashflows,
+  ]
   // Eenmalige lumpsum als one_time inkomen op de huidige leeftijd (wordt belegd).
   if (overrides?.lumpSum && overrides.lumpSum > 0) {
     cashflows.push({
@@ -365,6 +555,39 @@ function buildAowCashflow(ctx: EngineContext): UnifiedProjectionInput['cashflows
   }]
 }
 
+/**
+ * Post-pensioen-uitgave-delta als recurring cashflow vanaf de AOW-leeftijd.
+ *
+ * De engine hanteert één `yearlyExpenses` voor zowel de opbouw- als de
+ * onttrekkingsfase. Wil de gebruiker ná pensioen ánders uitgeven, dan modelleren
+ * we het VERSCHIL (`retirementYearlyExpenses − yearlyExpenses`) als een
+ * geïndexeerde recurring cashflow vanaf `NL_AOW_AGE`:
+ *  - lagere post-pensioen-uitgave (delta < 0) → INKOMEN-cashflow (compenseert de
+ *    te hoog ingezette basis-uitgave) → FIRE eerder / lagere onttrekking;
+ *  - hogere post-pensioen-uitgave (delta > 0) → EXPENSE-cashflow.
+ *
+ * Geen dubbeltelling: AOW (income), lumpsum en levensgebeurtenissen zijn
+ * eigen, los gedragen cashflows met eigen id; deze delta corrigeert uitsluitend
+ * de uitgavenbasis en raakt die andere stromen niet. EMPTY (retirement = basis)
+ * → delta 0 → géén cashflow → exact het huidige gedrag.
+ */
+function buildRetirementExpenseDeltaCashflow(ctx: EngineContext): SimCashflow[] {
+  const deltaYearly = ctx.retirementYearlyExpenses - ctx.yearlyExpenses
+  if (Math.abs(deltaYearly) < 1) return []
+  if (ctx.age >= REPORT_END_AGE) return []
+  const monthly = Math.abs(deltaYearly) / 12
+  return [{
+    id: 'check-retirement-expense-delta',
+    name: 'Uitgaven na pensioen',
+    type: 'recurring',
+    direction: deltaYearly < 0 ? 'income' : 'expense',
+    amount: monthly,
+    fromAge: NL_AOW_AGE,
+    toAge: null,
+    indexed: true,
+  }]
+}
+
 // ── Vrijheidstijd-helpers (consume lib/format) ───────────────────────────────
 
 /** Maak een serialiseerbaar `FreedomTime` uit een bedrag + dagtarief. */
@@ -398,6 +621,32 @@ function freedomLabel(amount: number, dailyExpense: number): string {
   }
   if (parts.length === 1) return parts[0]
   return `${parts[0]} en ${parts[1]}`
+}
+
+/**
+ * Snapshot-vrijheidstijd op de FIRE-eligible grondslag, MÉT tekort-guard.
+ *
+ * Bij een positief vermogen: gewoon de vrijheidstijd + label (zoals voorheen).
+ * Bij een NEGATIEF (of nul) vermogen: een eerlijke tekort-uitkomst. De pot koopt
+ * (nog) geen vrijheid, dus we zetten de duur op nul met `isDeficit: true` (i.p.v.
+ * de op de ABSOLUTE waarde berekende positieve "X jaar" die `calculateFreedomTime`
+ * anders zou opleveren) en een tekort-label. Eén bron voor `netWorthFreedom` én
+ * `netWorthFreedomLabel` zodat ze nooit uiteenlopen.
+ */
+function buildNetWorthFreedom(
+  amount: number,
+  dailyExpense: number,
+): { time: FreedomTime; label: string } {
+  if (amount <= 0) {
+    return {
+      time: { years: 0, months: 0, totalDays: 0, isInfinite: false, isDeficit: true },
+      label: NO_FREEDOM_DEFICIT_LABEL,
+    }
+  }
+  return {
+    time: toFreedomTime(amount, dailyExpense),
+    label: freedomLabel(amount, dailyExpense),
+  }
 }
 
 /** Maand-vrijheidslabel "X,Y mnd" uit bedrag + dagtarief. */
@@ -489,16 +738,21 @@ export function buildReport(intake: CheckIntake, now: Date = new Date()): CheckR
       note: 'Spaarquote-historie verschijnt zodra je transacties koppelt in de app.',
     },
     twoFutures: buildTwoFutures(ctx, fireAge, fireReachable, dailyExpense),
-    fireCards: buildFireCards(ctx, fireAge, fireReachable, baseLedger, dailyExpense),
-    sensitivity: buildSensitivity(ctx, fireAge),
+    fireCards: buildFireCards(ctx, fireReachable, baseLedger, dailyExpense),
+    sensitivity: buildSensitivity(ctx),
     withdrawalStrategies: buildWithdrawalStrategies(ctx),
     lifePath: buildLifePath(ctx, baseLedger, fireAge),
     will: { intro: '', moves: buildWillMoves(ctx, dailyExpense) },
+    houseInclusion: ctx.housingContext.hasEigenHuis
+      ? { weightPct: Math.round(HOUSE_FIRE_WEIGHT * 100), note: HOUSE_INCLUSION_NOTE }
+      : null,
     cta: {
       perks: [
-        { title: 'Live volgen', body: 'Vermogen, buffer en vrijheids-% bewegen automatisch mee.' },
-        { title: "Scenario's", body: 'Schuif aan de knoppen en zie direct wat het doet met je FIRE-moment.' },
-        { title: 'Will als coach', body: 'Stel je vragen, krijg warme uitleg op het moment dat je het nodig hebt.' },
+        { title: 'Live volgen', body: 'Real-time inzicht in de bewegingen van je bezittingen en schulden.' },
+        { title: 'Grip op je geld', body: 'Inzichten en tips over je uitgaven (transacties), je vermogen en je belasting.' },
+        { title: 'Speel met je toekomst', body: "Spelen met je prognose: schuif aan scenario's en sleep levensgebeurtenissen op de tijdlijn." },
+        { title: 'Pensioen in beeld', body: 'Zie je pensioengat en mogelijke pensioenleeftijd — en wat je acties van nu doen met je prognose.' },
+        { title: 'Nieuws voor jou', body: 'Relevant financieel nieuws, voor jou geselecteerd op basis van de bron.' },
       ],
       signupHref: '/signup?check=',
     },
@@ -534,16 +788,40 @@ function buildContext(intake: CheckIntake, now: Date): EngineContext {
   )
   const netWorth = totalAssets - totalDebts
 
-  // FIRE-eligible vermogen (eigen woning gefilterd — rapport-conventie).
+  // FIRE-eligible vermogen — eigen woning telt voor 50% van haar overwaarde mee
+  // (rapport-conventie, Fix 1). `getFireEligibleNetWorth(exclude_from_fire)` zou de
+  // VOLLE overwaarde aftrekken; we tellen de meegerekende helft er weer bij op, zodat
+  // het netto-effect is: netWorth − (1−HOUSE_FIRE_WEIGHT) × overwaarde.
   const housingContext = deriveHousingContext(portfolio.assets, portfolio.debts)
-  const fireEligibleNetWorth = getFireEligibleNetWorth(netWorth, housingContext, CHECK_HOUSING_STRATEGY)
-  // FIRE-pot voor de engine: eigen woning + gekoppelde hypotheek gefilterd.
+  const houseNetEquity = housingContext.hasEigenHuis
+    ? Math.max(0, housingContext.eigenHuisValue - housingContext.mortgageBalance)
+    : 0
+  const fireEligibleNetWorth =
+    getFireEligibleNetWorth(netWorth, housingContext, CHECK_HOUSING_STRATEGY)
+    + HOUSE_FIRE_WEIGHT * houseNetEquity
+  // FIRE-pot voor de engine: échte eigen woning + gekoppelde hypotheek gefilterd
+  // (woonkost blijft in budget; hypotheek niet dubbel). De meegerekende 50% van de
+  // overwaarde voegen we toe als één synthetisch groei-bezit dat op het canonieke
+  // woning-rendement meegroeit (zodat het ook in het grootboek/de kruising bijdraagt).
   const fireFiltered = filterAssetsForFire(CHECK_HOUSING_STRATEGY, portfolio.assets, portfolio.debts)
-  const firePortfolio: SyntheticPortfolio = { assets: fireFiltered.assets, debts: fireFiltered.debts }
+  const fireAssets = [...fireFiltered.assets]
+  if (houseNetEquity > 0) {
+    fireAssets.push(buildHouseEquityFireAsset(houseNetEquity))
+  }
+  const firePortfolio: SyntheticPortfolio = { assets: fireAssets, debts: fireFiltered.debts }
 
   const monthlyExpenses = Math.max(0, Number(intake.expenses.totaalMaand) || 0)
   const yearlyExpenses = monthlyExpenses * 12
   const netMonthlyIncome = Math.max(0, Number(intake.monthlyIncomeNet) || 0)
+
+  // Post-pensioen-uitgaven: leeg/0 → 1:1 het huidige uitgavenpatroon (geen
+  // wijziging). Ingevuld → via de canonieke `computeRetirementExpenses` (methode
+  // 'custom_amount', jaarbedrag = maand × 12). Géén nieuwe wiskunde hier.
+  const retirementMonthly = intake.pension.retirementMonthlyExpenses
+  const retirementYearlyExpenses =
+    retirementMonthly != null && retirementMonthly > 0
+      ? computeRetirementExpenses('custom_amount', yearlyExpenses, netMonthlyIncome * 12, retirementMonthly * 12, yearlyExpenses)
+      : yearlyExpenses
 
   // Spaarquote via de canonieke bron (handmatige inkomen−uitgaven-pad).
   const savings = resolveSavingsSource({
@@ -581,11 +859,14 @@ function buildContext(intake: CheckIntake, now: Date): EngineContext {
     yearlyExpenses,
     monthlyExpenses,
     netMonthlyIncome,
+    retirementYearlyExpenses,
     savingsRatePct: savings.effectiveSavingsRatePct,
     annualSavings: Math.max(0, savings.baseAnnualSavings),
     aowMonthly,
     fireEligibleNetWorth,
+    houseNetEquity,
     housingContext,
+    lifeEventCashflows: buildLifeEventCashflows(intake),
   }
 }
 
@@ -635,10 +916,29 @@ function buildSnapshot(ctx: EngineContext, dailyExpense: number): CheckReportDat
     0,
     ctx.monthlyExpenses,
   )
+  // Vrijheidstijd op de FIRE-eligible/LIQUIDE grondslag (eigen woning gefilterd) —
+  // identiek aan lifeGrid.alreadyFundedYears + twoFutures.stopToday. Het getoonde
+  // €-saldo (`netWorth`) blijft incl. huis; alléén de vrijheidstijd rekent op de
+  // FIRE-inzetbare pot, want de eigen woning is geen FIRE-besteedbaar vermogen.
+  // (Bug-fix: voorheen rekende dit op netWorth incl. huis → huis blies de
+  // "vrijheid" op terwijl de LifeGrid-vakjes en "stop vandaag" de lagere,
+  // liquide vrijheid toonden — grondslag-vermenging, CLAUDE.md-regel.)
+  //
+  // Tekort-guard: bij een NEGATIEF (of nul) FIRE-eligible vermogen koopt de pot
+  // (nog) géén vrijheid. `calculateFreedomTime` rekent op de ABSOLUTE waarde, dus
+  // zonder guard zou een tekort als positieve "X jaar vrijheid" renderen. We
+  // tonen dat eerlijk als deficit (isInfinite/isDeficit-correct) met een
+  // tekort-label i.p.v. een positieve duur.
+  const freedom = buildNetWorthFreedom(ctx.fireEligibleNetWorth, dailyExpense)
   return {
     netWorth: round0(ctx.netWorth),
-    netWorthFreedom: toFreedomTime(ctx.netWorth, dailyExpense),
-    netWorthFreedomLabel: freedomLabel(ctx.netWorth, dailyExpense),
+    netWorthFreedom: freedom.time,
+    netWorthFreedomLabel: freedom.label,
+    // Het €-bedrag waaróp de vrijheidstijd rust (FIRE-eligible/vrijheidsvermogen,
+    // huis voor 50% meegerekend) — zodat de render BEIDE eerlijk kan labelen:
+    // headline netto vermogen (incl. huis) + "€Y vrijheidsvermogen = Z vrij".
+    // De vrijheid blijft op `fireEligibleNetWorth` (Fix 3 — basis ongewijzigd).
+    freedomBaseEur: round0(ctx.fireEligibleNetWorth),
     savingsRatePct: round1(ctx.savingsRatePct),
     savingsMonthly: round0(ctx.annualSavings / 12),
     bufferMonths: round1(bufferMonths),
@@ -690,14 +990,30 @@ function buildDualBars(ctx: EngineContext): ReportDualBar[] {
   return Array.from(byBucket.entries())
     .filter(([, v]) => v.eur > 0)
     .sort((a, b) => b[1].eur - a[1].eur)
-    .map(([bucket, v]) => ({
-      name: names[bucket] ?? bucket,
-      bucket,
-      eur: round0(v.eur),
-      pctOfTotal: total > 0 ? round0((v.eur / total) * 100) : 0,
-      freedomLabel: v.countsForFire ? monthsLabel(v.eur, dailyExpense) : 'telt niet mee',
-      countsForFire: v.countsForFire,
-    }))
+    .map(([bucket, v]) => {
+      // Eigen woning telt voor 50% van haar NETTO overwaarde mee voor vrijheid
+      // (Fix 1). De getoonde € blijft de VOLLE netto huiswaarde; alleen de
+      // vrijheidsbijdrage is gehalveerd. `countsForFire` blijft FALSE voor het
+      // huis-bucket: zo blijft het buiten `buildWillMoves`'s cash-drag-som
+      // (`bars.filter(b => b.countsForFire)`), die anders de volle huiswaarde als
+      // FIRE-cash zou tellen (de échte 50% zit al als synthetisch bezit in
+      // firePortfolio, niet in deze allocatie-buckets). De 50%-vrijheid tonen we
+      // wél in het label.
+      const isHouse = bucket === 'huis'
+      const freedomLabel = isHouse
+        ? `${monthsLabel(HOUSE_FIRE_WEIGHT * v.eur, dailyExpense)} · telt voor ${Math.round(HOUSE_FIRE_WEIGHT * 100)}% mee`
+        : v.countsForFire
+        ? monthsLabel(v.eur, dailyExpense)
+        : 'telt niet mee'
+      return {
+        name: names[bucket] ?? bucket,
+        bucket,
+        eur: round0(v.eur),
+        pctOfTotal: total > 0 ? round0((v.eur / total) * 100) : 0,
+        freedomLabel,
+        countsForFire: v.countsForFire,
+      }
+    })
 }
 
 function buildMonthBalance(ctx: EngineContext, dailyExpense: number): CheckReportData['monthBalance'] {
@@ -730,11 +1046,6 @@ function buildMonthBalance(ctx: EngineContext, dailyExpense: number): CheckRepor
 }
 
 function buildHealth(ctx: EngineContext): CheckReportData['health'] {
-  const bufferMonths = computeEmergencyFundMonths(
-    [...ctx.portfolio.assets, { asset_type: 'cash', current_value: ctx.intake.emergencyFund }],
-    0,
-    ctx.monthlyExpenses,
-  )
   const debtMonthly = ctx.portfolio.debts.reduce((s, d) => s + d.monthly_payment, 0)
 
   // freedomPct via de canonieke voortgang (FIRE-eligible ÷ benodigde portfolio).
@@ -766,15 +1077,19 @@ function buildHealth(ctx: EngineContext): CheckReportData['health'] {
   )
   const score = computeHealthScoreFromInputs(input, false)
 
-  // Pijler-mapping: Budget blijft inactief (geen budgetten in de funnel).
-  const pillarById = new Map(score.pillars.map((p) => [p.id, p]))
-  const pillars: ReportHealthPillar[] = [
-    mapPillar('rondkomen', 'Rondkomen', pillarById.get('savings_rate'), `${round0(ctx.savingsRatePct)}% spaarquote`),
-    mapPillar('buffer', 'Buffer', pillarById.get('emergency_fund'), `${round1(bufferMonths)} maanden gedekt`),
-    mapPillar('schuld', 'Schuld', pillarById.get('debt_service_ratio') ?? pillarById.get('debt_ratio'),
-      debtMonthly > 0 ? 'Schuldenlast meegewogen' : 'Geen dure schuld'),
-    { id: 'budget', name: 'Budget', score: null, status: 'grey', note: 'Nog niet gemeten — meet je in de app.' },
-  ]
+  // Toon de VOLLEDIGE actieve v2-pijlerset (mirror /overzicht) — de engine laat
+  // inactieve indicatoren (geen data, bv. budget_discipline zonder budgetten in de
+  // funnel) zelf vallen, dus mappen we precies `score.pillars` door. Geen grijze
+  // "Budget — nog niet gemeten"-placeholder meer (gebruiker OK'd budget vouwen in
+  // rondkomen/spaarquote). Elke engine-pijler draagt al `id`, `name`, `score` en een
+  // mensleesbare `rawValue` → we mappen 1:1 met de stoplicht-status uit de score.
+  const pillars: ReportHealthPillar[] = score.pillars.map((p) => ({
+    id: p.id as ReportHealthPillar['id'],
+    name: p.name,
+    score: p.score,
+    status: statusForScore(p.score),
+    note: p.rawValue,
+  }))
 
   return {
     score: score.total,
@@ -782,16 +1097,6 @@ function buildHealth(ctx: EngineContext): CheckReportData['health'] {
     copy: buildHealthCopy(score.total),
     pillars,
   }
-}
-
-function mapPillar(
-  id: ReportHealthPillar['id'],
-  name: string,
-  src: { score: number } | undefined,
-  note: string,
-): ReportHealthPillar {
-  const score = src?.score ?? null
-  return { id, name, score, status: statusForScore(score), note }
 }
 
 function statusForScore(score: number | null): ReportHealthPillar['status'] {
@@ -849,7 +1154,7 @@ function benchRow(
 }
 
 function buildKruising(ctx: EngineContext, ledger: HorizonLedgerResult | null): ReportKruising {
-  const realReturnPct = ((1 + ctx.grossReturn) / (1 + ctx.inflationRate) - 1) * 100
+  const realReturnPct = realReturnFrom(ctx.grossReturn, ctx.inflationRate) * 100
   const startYear = ctx.now.getFullYear()
   if (!ledger) {
     return {
@@ -869,8 +1174,17 @@ function buildKruising(ctx: EngineContext, ledger: HorizonLedgerResult | null): 
     startYear, endYear: startYear + (REPORT_END_AGE - ctx.age),
     realReturnPct: round1(realReturnPct),
     savingsRatePct: round1(ctx.savingsRatePct),
+    // `kruising.scenarios` (±2%-banden) wordt nergens gerenderd: de DeKruising-
+    // grafiek is uit het rapport verwijderd. Het veld is optioneel (`scenarios?`)
+    // op de DTO en wordt hier bewust NIET berekend — dat scheelde per rapport twee
+    // extra, dure `runHorizonLedger`-runs. De levenslange band (`lifePath.scenarios`)
+    // is de live waaier en blijft; die hergebruikt het BASIS-grootboek (geen extra
+    // runs). Zie ook `SCENARIO_RETURN_FLOOR`, gedeeld met `buildLifePathScenarios`.
   }
 }
+
+/** Minimaal positief effectief rendement waaronder we de −2%-band niet laten zakken. */
+const SCENARIO_RETURN_FLOOR = 0.005
 
 function buildTwoFutures(
   ctx: EngineContext,
@@ -880,25 +1194,30 @@ function buildTwoFutures(
 ): CheckReportData['twoFutures'] {
   const fireYear = fireAge != null ? ctx.now.getFullYear() + (fireAge - ctx.age) : null
   // "Stop vandaag": vrijheidstijd van het FIRE-eligible vermogen op huidige uitgaven.
-  const stopToday = toFreedomTime(ctx.fireEligibleNetWorth, dailyExpense)
+  // Zelfde grondslag (en zelfde tekort-guard) als snapshot.netWorthFreedom — bij een
+  // negatief FIRE-eligible vermogen koopt de pot (nog) géén vrijheid, dus tekort i.p.v.
+  // een op de ABSOLUTE waarde berekende positieve duur. Eén bron voorkomt dat snapshot
+  // en "stop vandaag" uiteenlopen (pariteit-pin in de tests).
+  const stopFreedom = buildNetWorthFreedom(ctx.fireEligibleNetWorth, dailyExpense)
   return {
     fireAge,
     fireYear,
     yearsUntilFire: fireReachable && fireAge != null ? Math.max(0, fireAge - ctx.age) : null,
-    stopToday,
-    stopTodayLabel: freedomLabel(ctx.fireEligibleNetWorth, dailyExpense),
+    stopToday: stopFreedom.time,
+    stopTodayLabel: stopFreedom.label,
     stayFreeYears: fireReachable && fireAge != null ? Math.max(0, REPORT_END_AGE - fireAge) : null,
   }
 }
 
 function buildFireCards(
   ctx: EngineContext,
-  fireAge: number | null,
   fireReachable: boolean,
   ledger: HorizonLedgerResult | null,
   dailyExpense: number,
 ): ReportFireCard[] {
-  const stopLabel = freedomLabel(ctx.fireEligibleNetWorth, dailyExpense)
+  // Zelfde grondslag + tekort-guard als snapshot/twoFutures: een negatief
+  // FIRE-eligible vermogen toont het tekort-label, niet een positieve duur.
+  const stopLabel = buildNetWorthFreedom(ctx.fireEligibleNetWorth, dailyExpense).label
   // Vrijheids-% op de canonieke grondslag.
   const fireTarget = ctx.effectiveSwr > 0 && ctx.yearlyExpenses > 0 ? ctx.yearlyExpenses / ctx.effectiveSwr : null
   const freedomPct = computeFreedomProgress({ fireEligibleNetWorth: ctx.fireEligibleNetWorth, requiredPortfolio: fireTarget })
@@ -915,12 +1234,21 @@ function buildFireCards(
   ]
 }
 
-function buildSensitivity(ctx: EngineContext, baseFireAge: number | null): ReportSensitivityRow[] {
+function buildSensitivity(ctx: EngineContext): ReportSensitivityRow[] {
   const baseStrategy: FireStrategyConfig = { strategy: 'deplete', endAge: REPORT_END_AGE, legacyAmount: 0 }
+  // FRACTIONELE FIRE-leeftijd (Fix 4): vergelijk basis én elke hefboom op het
+  // grootboek-`fireAgeFractional` (sub-jaars), niet op de afgeronde headline. Anders
+  // verdween elk effect < 1 jaar in de afronding → "geen verschil". Basis en hefbomen
+  // gebruiken DEZELFDE methode (beide fractional, val terug op de integer `fireAge`
+  // wanneer het grootboek geen breukleeftijd kent).
   const runFire = (overrides: Parameters<typeof buildEngineInput>[3]): number | null => {
     const r = safeLedger(buildEngineInput(ctx, WITHDRAWAL_DEFAULTS, baseStrategy, overrides))
-    return r?.fireReachable ? r.fireAge : null
+    if (!r?.fireReachable) return null
+    return r.fireAgeFractional ?? r.fireAge
   }
+  // Fractionele BASIS: zelfde ledger als de hefbomen, zonder overrides (NIET de
+  // afgeronde headline-fireAge — appels met appels).
+  const baseFireAge = runFire(undefined)
 
   // 1) Spaarquote +4pp: hogere annualSavings (inkomen × (quote+4)%).
   const higherSavings = Math.max(0, ctx.netMonthlyIncome * 12 * ((ctx.savingsRatePct + 4) / 100))
@@ -942,13 +1270,16 @@ function toSensitivityRow(lever: string, baseFireAge: number | null, newFireAge:
   const deltaYears = newFireAge - baseFireAge // negatief = eerder FIRE (beter)
   const better = deltaYears < 0
   const abs = Math.abs(deltaYears)
-  const years = Math.floor(abs)
-  const months = Math.round((abs - years) * 12)
+  const totalMonths = Math.round(abs * 12)
+  // Sub-maand-verschil (fractionele basis/hefboom — Fix 4) → "geen verschil".
+  if (totalMonths === 0) return { lever, effectLabel: 'geen verschil', better }
+  const years = Math.floor(totalMonths / 12)
+  const months = totalMonths % 12
   const parts: string[] = []
   if (years > 0) parts.push(`${years} jr`)
   parts.push(`${months} mnd`)
-  const sign = deltaYears === 0 ? '' : better ? '−' : '+'
-  return { lever, effectLabel: deltaYears === 0 ? 'geen verschil' : `${sign}${parts.join(' ')}`, better }
+  const sign = better ? '−' : '+'
+  return { lever, effectLabel: `${sign}${parts.join(' ')}`, better }
 }
 
 function buildWithdrawalStrategies(ctx: EngineContext): ReportWithdrawalRow[] {
@@ -981,25 +1312,34 @@ function buildWithdrawalStrategies(ctx: EngineContext): ReportWithdrawalRow[] {
   ]
 }
 
+/**
+ * Meegroeiende netto-overwaarde van de eigen woning op een gegeven leeftijd. De
+ * engine-pot heeft de eigen woning gefilterd; voor de NETTO-vermogen-lijn (incl.
+ * huis, conform DTO) tellen we de overwaarde er per jaar weer bij op — via de
+ * canonieke housing-helpers (geen eigen WOZ/groeiformule). Dit spiegelt
+ * `buildSimNetWorthRows` (calc 'sim-netto-vermogen-projectie'). Gedeeld door de
+ * basislijn (`buildLifePath`) én de scenariobanden, zodat beide exact dezelfde
+ * grondslag hanteren.
+ */
+function houseEquityAtAge(ctx: EngineContext, age: number): number {
+  if (!ctx.housingContext.hasEigenHuis) return 0
+  const monthsForward = Math.max(0, (age - ctx.age) * 12)
+  const house = projectEigenHuisValuesAt(ctx.housingContext.eigenHuisAssets, monthsForward)
+  const mortgage = projectMortgageStateAt(ctx.housingContext.eigenHuisMortgages, monthsForward)
+  return Math.max(0, house.currentValue - mortgage.balance)
+}
+
+/** Netto-vermogen-reeks (incl. huis) uit een grootboek-resultaat — zelfde grondslag overal. */
+function nettoVermogenPoints(ctx: EngineContext, ledger: HorizonLedgerResult): ReportProjectionPoint[] {
+  return ledger.rows.map((r) => ({ age: r.leeftijd, value: round0(r.nettoVermogen + houseEquityAtAge(ctx, r.leeftijd)) }))
+}
+
 function buildLifePath(
   ctx: EngineContext,
   ledger: HorizonLedgerResult | null,
   fireAge: number | null,
 ): CheckReportData['lifePath'] {
-  // De engine-pot heeft de eigen woning gefilterd; voor de NETTO-vermogen-lijn
-  // (incl. huis, conform DTO) tellen we de meegroeiende overwaarde er per jaar
-  // weer bij op — via de canonieke helpers (geen eigen WOZ/groeiformule). Dit
-  // spiegelt buildSimNetWorthRows (calc 'sim-netto-vermogen-projectie').
-  const houseEquityAt = (age: number): number => {
-    if (!ctx.housingContext.hasEigenHuis) return 0
-    const monthsForward = Math.max(0, (age - ctx.age) * 12)
-    const house = projectEigenHuisValuesAt(ctx.housingContext.eigenHuisAssets, monthsForward)
-    const mortgage = projectMortgageStateAt(ctx.housingContext.eigenHuisMortgages, monthsForward)
-    return Math.max(0, house.currentValue - mortgage.balance)
-  }
-  const points: ReportProjectionPoint[] = ledger
-    ? ledger.rows.map((r) => ({ age: r.leeftijd, value: round0(r.nettoVermogen + houseEquityAt(r.leeftijd)) }))
-    : []
+  const points: ReportProjectionPoint[] = ledger ? nettoVermogenPoints(ctx, ledger) : []
   const markers = buildLifeMarkers(ctx, fireAge)
   // Piek-notitie: leeftijd waarop netto vermogen het hoogst is.
   let peakNote: string | undefined
@@ -1007,7 +1347,99 @@ function buildLifePath(
     const peak = points.reduce((m, p) => (p.value > m.value ? p : m), points[0])
     peakNote = `Je vermogen piekt rond je ${peak.age}e.`
   }
-  return { points, markers, fireAge, endAge: REPORT_END_AGE, peakNote }
+  return { points, markers, fireAge, endAge: REPORT_END_AGE, peakNote, scenarios: buildLifePathScenarios(ctx, ledger) }
+}
+
+/** Reëel rendement uit een nominaal rendement + inflatie (engine-identiek). */
+function realReturnFrom(nominal: number, inflation: number): number {
+  return (1 + nominal) / (1 + inflation) - 1
+}
+
+/**
+ * Rendement-scenariobanden (−2% / +2%) rond de levenslange netto-vermogenslijn —
+ * een ONZEKERHEIDSBAND op het rendement, NIET een her-geplande FIRE-uitkomst.
+ *
+ * Semantiek (gefixt plan, alleen rendement varieert):
+ *  - Het PLAN ligt vast: zelfde inleg, zelfde FIRE-/onttrekkingstiming (de band
+ *    draait op de BASIS-FIRE-leeftijd, niet op een eigen herrekend snijpunt) en
+ *    zelfde onttrekkingsbedragen als de basislijn.
+ *  - Alleen het rendement schuift ±2%. Resultaat: de opbouw-waaier WORDT BREDER
+ *    tot de basis-FIRE-leeftijd; de afbouw-waaier blíjft breder worden (+2% put
+ *    trager uit → blijft hoger, −2% sneller → lager, met de huis-overwaarde als
+ *    natuurlijke vloer). Geen omkering, geen convergentie.
+ *
+ * Mechaniek (consume, don't recompute — GEEN extra ledger-runs):
+ *  1. Uit het BASIS-grootboek leiden we de jaarlijkse netto-kasstroom van de
+ *     belegbare pot af op DEZELFDE grondslag als de basislijn: `nettoVermogen`
+ *     (= belegbare assets − schulden, exact de reeks die `nettoVermogenPoints`
+ *     gebruikt vóór de huis-overwaarde erbij komt). cf[t] = base[t] − base[t−1] ·
+ *     (1 + r_base) codeert het basisplan: inleg in de opbouw, −onttrekking in de
+ *     afbouw, met de omslag precies OP de basis-FIRE-leeftijd (die in base[] zit).
+ *  2. Voor elk scenario s herbeleggen we diezelfde kasstroom op het verschoven
+ *     reële rendement: pot_s[0] = base[0]; pot_s[t] = pot_s[t−1]·(1 + r_s) + cf[t].
+ *  3. netto_s[t] = pot_s[t] + huis-overwaarde(leeftijd) — via de GEDEELDE
+ *     `houseEquityAtAge`, exact dezelfde grondslag/serie als `lifePath.points`.
+ *     De huis-overwaarde groeit op WOZ (niet op het beleggingsrendement) en is
+ *     daarom identiek over alle scenario's. Omdat we op `nettoVermogen` (niet
+ *     `liquideVermogen`) reconstrueren, raakt de band de basislijn op t=0 exact.
+ *
+ * Reëel-vs-nominaal: het grootboek rekent in REËLE termen. We leiden `r_base`
+ * (reëel) af uit het profiel-rendement/inflatie en passen ±2% op de NOMINALE
+ * schaal toe vóór de reële conversie — exact zoals de engine `returnDelta` op
+ * `grossReturn` optelt — zodat de band de basislijn op t=0 raakt (cf[0] absorbeert
+ * het residu) en de onzekerheid spiegelt die de engine modelleert. De −2%-band
+ * wordt geklemd op `SCENARIO_RETURN_FLOOR` (gedeeld met de kruising-banden).
+ */
+function buildLifePathScenarios(
+  ctx: EngineContext,
+  baseLedger: HorizonLedgerResult | null,
+): ReportLifePathScenario[] {
+  const deltas: { label: string; returnDeltaPct: number; raw: number }[] = [
+    { label: '−2% rendement', returnDeltaPct: -2, raw: -0.02 },
+    { label: '+2% rendement', returnDeltaPct: +2, raw: +0.02 },
+  ]
+  // Geen basislijn (lege/onbereikbare engine) → geen banden (consistent met
+  // lifePath.points, dat dan ook leeg is).
+  if (!baseLedger || baseLedger.rows.length === 0) {
+    return deltas.map(({ label, returnDeltaPct }) => ({ label, returnDeltaPct, points: [] }))
+  }
+
+  const rows = baseLedger.rows
+  // Belegbare-pot-grondslag = `nettoVermogen` (assets − schulden van de FIRE-pot,
+  // huis gefilterd) — exact de reeks die `nettoVermogenPoints` gebruikt vóór de
+  // huis-overwaarde. Reconstructie op deze reeks laat de band de basislijn op t=0
+  // raken en houdt de grondslag byte-identiek met lifePath.points.
+  const basePot = rows.map((r) => r.nettoVermogen)
+  // Basis-reëel rendement op de NOMINALE schaal van het profiel (zoals returnDelta).
+  const rBase = realReturnFrom(ctx.grossReturn, ctx.inflationRate)
+  // Jaarlijkse netto-kasstroom van het basisplan: inleg in opbouw, −onttrekking in
+  // afbouw (met de omslag op de basis-FIRE-leeftijd, die al in basePot zit).
+  // cf[0] = 0 (eerste punt is de start; geen kasstroom ervóór).
+  const cf: number[] = basePot.map((v, t) =>
+    t === 0 ? 0 : v - basePot[t - 1] * (1 + rBase),
+  )
+
+  return deltas.map(({ label, returnDeltaPct, raw }) => {
+    // Klem de neerwaartse band zodat grossReturn + delta ≥ vloer (kleine positief)
+    // — identiek aan de kruising-banden.
+    const nomDelta = raw < 0 && ctx.grossReturn + raw < SCENARIO_RETURN_FLOOR
+      ? SCENARIO_RETURN_FLOOR - ctx.grossReturn
+      : raw
+    const rS = realReturnFrom(ctx.grossReturn + nomDelta, ctx.inflationRate)
+    // Herbeleg dezelfde plan-kasstroom op het verschoven reële rendement. De
+    // belegbare pot mag in de afbouw richting €0 zakken (geen huis erin); klem op 0.
+    const potS: number[] = new Array(basePot.length)
+    potS[0] = basePot[0]
+    for (let t = 1; t < basePot.length; t++) {
+      potS[t] = Math.max(0, potS[t - 1] * (1 + rS) + cf[t])
+    }
+    // Netto vermogen (incl. huis) — zelfde grondslag/serie als lifePath.points.
+    const points: ReportProjectionPoint[] = rows.map((r, t) => ({
+      age: r.leeftijd,
+      value: round0(potS[t] + houseEquityAtAge(ctx, r.leeftijd)),
+    }))
+    return { label, returnDeltaPct, points }
+  })
 }
 
 function buildLifeMarkers(ctx: EngineContext, fireAge: number | null): ReportLifeEvent[] {
@@ -1043,7 +1475,35 @@ function buildLifeMarkers(ctx: EngineContext, fireAge: number | null): ReportLif
     })
   }
 
+  // Door de gebruiker ingevoerde levensgebeurtenissen (stap ⑦b) — dezelfde
+  // gebeurtenissen die via `lifeEventCashflows` daadwerkelijk in het grootboek
+  // doorwerken. Type 'leven', niet-illustratief. Alleen toekomstige events binnen
+  // de horizon worden als marker getoond.
+  for (const ev of ctx.intake.lifeEvents ?? []) {
+    if (ev.age <= ctx.age || ev.age > REPORT_END_AGE) continue
+    markers.push({
+      name: ev.label, type: 'leven', age: ev.age, year: yearFor(ev.age),
+      effect: lifeEventEffectLabel(ev), illustrative: false,
+    })
+  }
+
   return markers.sort((a, b) => a.age - b.age)
+}
+
+/**
+ * Effect-label voor een ingevoerde levensgebeurtenis-marker. Tekenconventie
+ * intake: `amount`/`recurringYearly` > 0 = meevaller/inkomen, < 0 = kost/uitgave.
+ */
+function lifeEventEffectLabel(ev: CheckIntakeLifeEvent): string {
+  const oneOff = Number(ev.amount ?? 0)
+  const recurring = Number(ev.recurringYearly ?? 0)
+  if (oneOff !== 0) {
+    return `${oneOff > 0 ? '+' : '−'}${formatEurShort(Math.abs(oneOff))} eenmalig`
+  }
+  if (recurring !== 0) {
+    return `${recurring > 0 ? '+' : '−'}${formatEurShort(Math.abs(recurring))}/jaar`
+  }
+  return 'levensgebeurtenis'
 }
 
 /** Schat de payoff-leeftijd van een annuïteit/lineaire hypotheek (maandbedrag-aflossing). */
@@ -1064,52 +1524,165 @@ function estimateMortgagePayoffAge(ctx: EngineContext, mortgage: Debt): number |
   return Math.round(ctx.age + months / 12)
 }
 
-function buildWillMoves(ctx: EngineContext, dailyExpense: number): CheckReportData['will']['moves'] {
-  const moves: CheckReportData['will']['moves'] = []
+/** Maximaal aantal Will-zetten op het rapport. */
+const MAX_WILL_MOVES = 4
+/** Bufferdrempel (maanden) waarboven het overschot beter belegd kan worden. */
+const WILL_BUFFER_TARGET_MONTHS = 4
 
-  // Zet 1 — bufferoverschot boven 4 maanden laten werken.
+/** Eén kandidaat-zet met impactscore (vrijheidsdagen/jaar) voor de ranking. */
+interface WillCandidate {
+  move: CheckReportData['will']['moves'][number]
+  /** Impact in vrijheidsdagen/jaar — sorteersleutel (hoog = eerst). */
+  score: number
+  /** Gegarandeerde basiszet (spaarquote) — altijd in de top, ongeacht score. */
+  guaranteed?: boolean
+}
+
+/**
+ * Bouw tot {@link MAX_WILL_MOVES} Will-zetten uit een gescoorde KANDIDATENPOOL.
+ *
+ * Alle impactlabels gaan via het canonieke dagtarief (`dailyExpense`, = €→tijd
+ * uit lib/format) en het profiel-`grossReturn` — geen lokale 0,04/forfait-
+ * constanten. De pool bevat:
+ *  - spaarquote +4pp (gegarandeerde basiszet, altijd aanwezig);
+ *  - bufferoverschot boven {@link WILL_BUFFER_TARGET_MONTHS} mnd beleggen;
+ *  - cash-drag: een groot cash/spaar-aandeel aan het werk zetten op rendement;
+ *  - dure schuld: ALLE schuld met rente > rendement (geaggregeerd, top-post benoemd);
+ *  - pensioengat: AOW laag t.o.v. de maanduitgaven.
+ * Kandidaten worden op `score` (vrijheidsdagen/jaar) gesorteerd; de top-N (incl.
+ * de gegarandeerde basiszet) wordt teruggegeven.
+ */
+function buildWillMoves(ctx: EngineContext, dailyExpense: number): CheckReportData['will']['moves'] {
+  const candidates: WillCandidate[] = []
+  const r = ctx.grossReturn
+  const daysFrom = (annualEur: number): number =>
+    dailyExpense > 0 ? Math.round(annualEur / dailyExpense) : 0
+
+  // ── (baseline) Spaarquote +4pp — altijd aanwezig. Impact = extra jaarlijkse
+  //    besparing (4pp van het netto-jaarinkomen) belegd op rendement → dagen/jr. ──
+  const extraAnnualSavings = Math.max(0, ctx.netMonthlyIncome * 12 * 0.04)
+  const savingsScore = daysFrom(extraAnnualSavings * r)
+  candidates.push({
+    guaranteed: true,
+    score: savingsScore,
+    move: {
+      title: `Til je spaarquote van ${round0(ctx.savingsRatePct)}% naar ${round0(ctx.savingsRatePct + 4)}%`,
+      body: 'Vier procentpunt klinkt klein, maar over de jaren schuift het je vrijheidsmoment merkbaar naar voren. Eén automatische verhoging bij je volgende salarisstap doet het meeste werk.',
+      gainLabel: 'Vrijheid eerder',
+      kind: 'fire-months',
+    },
+  })
+
+  // ── (a) Bufferoverschot boven 4 maanden laten werken. ──
   const bufferMonths = computeEmergencyFundMonths(
-    [{ asset_type: 'cash', current_value: ctx.intake.emergencyFund }],
+    // Buffer = noodfonds + liquide (cash/savings) bezittingen, niet alleen het noodfonds.
+    [...ctx.portfolio.assets, { asset_type: 'cash', current_value: ctx.intake.emergencyFund }],
     0,
     ctx.monthlyExpenses,
   )
-  if (bufferMonths > 4) {
-    const surplus = Math.max(0, ctx.intake.emergencyFund - ctx.monthlyExpenses * 4)
-    const gainDays = dailyExpense > 0 ? Math.round((surplus * ctx.grossReturn) / dailyExpense) : 0
-    moves.push({
-      title: 'Laat je bufferoverschot werken',
-      body: `Je buffer dekt ${round1(bufferMonths)} maanden. Het deel boven 4 maanden (±${formatEurShort(surplus)}) staat stil — breng het naar je beleggingsdeel.`,
-      gainLabel: `~${gainDays} dagen vrijheid / jaar`,
-      gainDays,
-      kind: 'freedom-days',
+  if (bufferMonths > WILL_BUFFER_TARGET_MONTHS && ctx.monthlyExpenses > 0) {
+    const surplus = Math.max(0, ctx.intake.emergencyFund - ctx.monthlyExpenses * WILL_BUFFER_TARGET_MONTHS)
+    if (surplus > 0) {
+      const gainDays = daysFrom(surplus * r)
+      candidates.push({
+        score: gainDays,
+        move: {
+          title: 'Laat je bufferoverschot werken',
+          body: `Je buffer dekt ${round1(bufferMonths)} maanden. Het deel boven ${WILL_BUFFER_TARGET_MONTHS} maanden (±${formatEurShort(surplus)}) staat stil — breng het naar je beleggingsdeel.`,
+          gainLabel: `~${gainDays} dagen vrijheid / jaar`,
+          gainDays,
+          kind: 'freedom-days',
+        },
+      })
+    }
+  }
+
+  // ── (b) Cash-drag: een grote cash/spaar-allocatie aan het werk zetten. Gebruik
+  //    de DUAL-BARS-buckets (zelfde groepering als de allocatie-sectie). Trek het
+  //    bufferdoel af (dat dekt de buffer-zet al) zodat we niet dubbeltellen. ──
+  const bars = buildDualBars(ctx)
+  const totalFireWealth = bars.filter((b) => b.countsForFire).reduce((s, b) => s + b.eur, 0)
+  const cashBar = bars.find((b) => b.bucket === 'cash')
+  if (cashBar && totalFireWealth > 0) {
+    const cashShare = cashBar.eur / totalFireWealth
+    // Het deel boven de aan te houden buffer (4 mnd uitgaven) is "drag".
+    const bufferTarget = ctx.monthlyExpenses * WILL_BUFFER_TARGET_MONTHS
+    const investableCash = Math.max(0, cashBar.eur - bufferTarget)
+    // Alleen relevant bij een fors cash-aandeel én daadwerkelijk te beleggen cash.
+    if (cashShare > 0.30 && investableCash > 0) {
+      const gainDays = daysFrom(investableCash * r)
+      candidates.push({
+        score: gainDays,
+        move: {
+          title: 'Zet je stilstaande cash aan het werk',
+          body: `~${round0(cashShare * 100)}% van je vrijheidsvermogen staat in cash/spaargeld. Boven je buffer (±${formatEurShort(investableCash)}) levert dat nauwelijks rendement — belegd groeit het mee met je vrijheid.`,
+          gainLabel: `~${gainDays} dagen vrijheid / jaar`,
+          gainDays,
+          kind: 'freedom-days',
+        },
+      })
+    }
+  }
+
+  // ── (c) Dure schuld: ALLE schuld met rente > rendement (geaggregeerd; benoem
+  //    de duurste post). Impact = totale jaarlijkse rente boven het rendement. ──
+  const expensiveDebts = ctx.portfolio.debts
+    .filter((d) => d.current_balance > 0 && d.interest_rate / 100 > r)
+    .sort((a, b) => b.interest_rate - a.interest_rate)
+  if (expensiveDebts.length > 0) {
+    const totalInterest = expensiveDebts.reduce(
+      (s, d) => s + d.current_balance * (d.interest_rate / 100), 0,
+    )
+    const gainDays = daysFrom(totalInterest)
+    const top = expensiveDebts[0]
+    const body = expensiveDebts.length === 1
+      ? `één post (${top.name}) heeft een rente hoger dan je verwachte rendement. Elke euro die je daar aflost levert gegarandeerd meer op dan beleggen.`
+      : `${expensiveDebts.length} schuldposten (o.a. ${top.name}) hebben een rente hoger dan je verwachte rendement. Aflossen levert daar gegarandeerd meer op dan beleggen.`
+    candidates.push({
+      score: gainDays,
+      move: {
+        title: 'Los je duurste schuldpost eerst af',
+        body,
+        gainLabel: `~${gainDays} dagen vrijheid / jaar`,
+        gainDays,
+        kind: 'freedom-days',
+      },
     })
   }
 
-  // Zet 2 — duurste schuldpost boven het verwachte rendement aflossen.
-  const expensiveDebt = ctx.portfolio.debts
-    .filter((d) => d.current_balance > 0 && d.interest_rate / 100 > ctx.grossReturn)
-    .sort((a, b) => b.interest_rate - a.interest_rate)[0]
-  if (expensiveDebt) {
-    const annualInterest = expensiveDebt.current_balance * (expensiveDebt.interest_rate / 100)
-    const gainDays = dailyExpense > 0 ? Math.round(annualInterest / dailyExpense) : 0
-    moves.push({
-      title: 'Los je duurste schuldpost eerst af',
-      body: `één post (${expensiveDebt.name}) heeft een rente hoger dan je verwachte rendement. Elke euro die je daar aflost levert gegarandeerd meer op dan beleggen.`,
-      gainLabel: `~${gainDays} dagen vrijheid / jaar`,
-      gainDays,
-      kind: 'freedom-days',
+  // ── (d) Pensioengat: AOW laag t.o.v. de uitgaven NÁ pensioen. Impact = jaarlijks
+  //    gat tussen de post-pensioen-uitgaven en AOW, uitgedrukt in dagen/jaar
+  //    (illustratief). (Fix 5: gebruik de ingevulde post-pensioen-uitgave —
+  //    `retirementYearlyExpenses/12` — niet de HUIDIGE uitgaven. De gebruiker kan
+  //    ná pensioen ánders uitgeven; het pensioengat hoort op díe maandlast te slaan.
+  //    Zonder eigen post-pensioen-invoer valt `retirementYearlyExpenses` 1:1 terug op
+  //    de huidige uitgaven, dus gedrag identiek in dat geval.) ──
+  const postPensionMonthlyExpenses = ctx.retirementYearlyExpenses / 12
+  if (ctx.aowMonthly > 0 && postPensionMonthlyExpenses > 0 && ctx.aowMonthly < postPensionMonthlyExpenses * 0.7) {
+    const monthlyGap = Math.max(0, postPensionMonthlyExpenses - ctx.aowMonthly)
+    const gainDays = daysFrom(monthlyGap * 12)
+    candidates.push({
+      score: gainDays,
+      move: {
+        title: 'Dicht je pensioengat',
+        body: `Je AOW (±${formatEurShort(ctx.aowMonthly)}/mnd) dekt straks maar een deel van je uitgaven na pensioen (${formatEurShort(postPensionMonthlyExpenses)}/mnd). Eigen opbouw — beleggen of extra pensioen — overbrugt dat gat.`,
+        gainLabel: `~${gainDays} dagen vrijheid / jaar`,
+        gainDays,
+        kind: 'freedom-days',
+      },
     })
   }
 
-  // Zet 3 — spaarquote +4pp.
-  moves.push({
-    title: `Til je spaarquote van ${round0(ctx.savingsRatePct)}% naar ${round0(ctx.savingsRatePct + 4)}%`,
-    body: 'Vier procentpunt klinkt klein, maar over de jaren schuift het je FIRE-moment merkbaar naar voren. Eén automatische verhoging bij je volgende salarisstap doet het meeste werk.',
-    gainLabel: 'FIRE eerder',
-    kind: 'fire-months',
-  })
-
-  return moves
+  // ── Ranking: de impact-gesorteerde zetten voorop, de gegarandeerde basiszet
+  //    (spaarquote) deterministisch als sluitstuk. Top-N met de baseline binnen
+  //    het budget: eerst de hoogst scorende niet-baseline-zetten (tot N−1), dan
+  //    de baseline — zodat het rapport altijd op de spaarquote-zet eindigt. ──
+  const guaranteed = candidates.filter((c) => c.guaranteed)
+  const ranked = candidates
+    .filter((c) => !c.guaranteed)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_WILL_MOVES - guaranteed.length)
+  return [...ranked, ...guaranteed].map((c) => c.move)
 }
 
 // ── Numerieke helpers ────────────────────────────────────────────────────────

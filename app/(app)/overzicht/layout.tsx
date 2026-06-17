@@ -1,4 +1,6 @@
 import { Breadcrumb } from '@/components/app/breadcrumb'
+import { PageStatusBanner } from '@/components/app/page-status-banner'
+import { PageStatusProvider } from '@/components/app/page-status-provider'
 
 /**
  * Kern module-route layout. Wraps all `/core/**` pages and sets the
@@ -9,6 +11,12 @@ import { Breadcrumb } from '@/components/app/breadcrumb'
  * Highlight-marker (`--module-active-200`) wordt Kern-200 op `/core/**`,
  * Wil-200 op `/will/**`, Horizon-200 op `/horizon/**`. Cross-module-routes
  * vallen terug op de defaults in `:root` (zie `app/globals.css`).
+ *
+ * De <PageStatusBanner> rendert bovenaan elke pagina (één slot dekt Overzicht,
+ * Cashflow en Belasting). De banner haalt zijn data LAZY + route-scoped op via
+ * `usePageStatus` (client) — de layout blijft bewust een lichte, niet-async
+ * server-component zodat niet-cashflow-routes nooit de zware dashboard-loader
+ * aanraken (egress).
  */
 export default function CoreLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -29,10 +37,13 @@ export default function CoreLayout({ children }: { children: React.ReactNode }) 
         } as React.CSSProperties
       }
     >
-      <div className="mx-auto max-w-6xl px-6">
-        <Breadcrumb color="amber" />
-      </div>
-      {children}
+      <PageStatusProvider>
+        <div className="mx-auto max-w-6xl px-6">
+          <Breadcrumb color="amber" />
+          <PageStatusBanner />
+        </div>
+        {children}
+      </PageStatusProvider>
     </div>
   )
 }

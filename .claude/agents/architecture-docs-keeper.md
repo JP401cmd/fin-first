@@ -47,6 +47,7 @@ The app's story in plain language so a layperson understands it **as capabilitie
 ## Non-negotiables
 
 - Never hand-edit scanned facts (counts, ERD, churn, trend) — regenerate.
+- Never write ADR/markdown files under `docs/` via PowerShell `Set-Content`/`Out-File`: it can prepend a UTF-8 BOM that the frontmatter scanner (`parseFrontmatter` in `generate.mjs`) chokes on silently — the ADR lands empty in `architecture.json` and `facts.test.ts` goes red. Use the Write tool or `node -e "fs.writeFileSync(p, content, 'utf8')"`.
 - Add concerns for new risks; **delete** them when resolved (stale concerns are a defect).
 - Every new module/domain/integration must be reflected in the ArchiMate model and (if user-visible) the HLD.
 - Keep annotations and the model telling the same story (soevereiniteit = motivation, per ADR 0001).

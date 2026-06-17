@@ -1,87 +1,163 @@
 'use client'
 
-import { useEffect } from 'react'
-import { X, Lightbulb } from 'lucide-react'
-
 /**
- * ToekomstExitNotice — rustige, dismissible notice die verschijnt zodra de
- * gebruiker het tip-/bubbel-overlay-scherm op /toekomst verlaat (Tips-toggle
- * uit, of de overlay sluit via ✕/Escape/achtergrond).
+ * ToekomstExitNotice — gecentreerde modal die verschijnt zodra de gebruiker het
+ * tip-/bubbel-overlay-scherm op /toekomst verlaat (Tips-toggle uit, of de
+ * overlay sluit via ✕/Escape/achtergrond).
  *
- * Bewust GEEN modal: dit is een kalme inline-banner bovenaan de pagina, geen
- * overlay over de zwevende nav-pill. Daarom een bescheiden z-index die niet
- * met de pill (`z-[60]`) botst en geen `--mobile-nav-clearance` nodig heeft —
- * de banner staat boven de content, niet onderaan het scherm.
+ * Verschijnt MIDDEN in beeld als echte modal — vóórdat de tips-overlay
+ * verdwijnt — en wacht op een expliciete keuze (GEEN auto-dismiss):
+ *   • "Sluiten"            → modal dicht + overlay sluit. Niet-persistent:
+ *                            de melding komt bij een volgende exit terug.
+ *   • "Niet meer weergeven" → modal dicht + overlay sluit + persistent verbergen
+ *                            (cross-device via user_feature_visits).
+ * Escape/achtergrond-klik gedragen zich als "Sluiten" (niet-persistent).
  *
- * Eén nette melding per exit:
- *  - auto-dismiss na ~9s (timer reset bij her-trigger via de `key`-reset in
- *    de parent, niet hier — deze component mount opnieuw per exit)
- *  - handmatige ✕-knop (toetsenbord-bereikbaar, aria-label)
- *  - Escape sluit ook
+ * Modal-conventie (CLAUDE.md): portal naar document.body, `fixed inset-0
+ * z-[70]` (boven de zwevende nav-pill), `role=dialog aria-modal`, backdrop-blur,
+ * focus-trap, Escape + body-scroll-lock. Blueprint = ToekomstWelcome.
  *
  * Horizon-accent via `--module-active-*` (op /toekomst = horizon). Geen losse
  * hexen of Tailwind-standaardkleuren.
  */
-export function ToekomstExitNotice({ onClose }: { onClose: () => void }) {
-  // Auto-dismiss na ~9s.
-  useEffect(() => {
-    const t = window.setTimeout(onClose, 9000)
-    return () => window.clearTimeout(t)
-  }, [onClose])
 
-  // Escape sluit de notice.
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { X, Lightbulb } from 'lucide-react'
+import { EditorialHeadline } from '@/components/editorial'
+import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
+
+export interface ToekomstExitNoticeProps {
+  /** Of de modal zichtbaar is (door de parent bepaald per exit). */
+  visible: boolean
+  /**
+   * Niet-persistent sluiten: modal dicht + tips-overlay sluit. Gebruikt door de
+   * "Sluiten"-knop, Escape en een klik op de achtergrond. De melding verschijnt
+   * bij een volgende exit weer.
+   */
+  onClose: () => void
+  /**
+   * Persistent sluiten ("Niet meer weergeven"): modal dicht + tips-overlay sluit
+   * + markeer de melding als blijvend verborgen (POST naar feature-visits in de
+   * parent). Verschijnt nooit meer bij toekomstige exits.
+   */
+  onDismissForever: () => void
+}
+
+export function ToekomstExitNotice({ visible, onClose, onDismissForever }: ToekomstExitNoticeProps) {
+  // Portal pas na mount (document bestaat niet tijdens SSR).
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  // Focus trap: bij openen focus op de primaire ("Sluiten")-knop, Tab blijft
+  // binnen de kaart, en bij sluiten keert focus terug naar de vorige owner.
+  const cardRef = useRef<HTMLDivElement>(null)
+  const primaryRef = useRef<HTMLButtonElement>(null)
+  useFocusTrap({ active: visible && mounted, containerRef: cardRef, initialFocusRef: primaryRef })
+
+  // Body-scroll-lock + Escape (= niet-persistent sluiten) zolang de modal open is.
   useEffect(() => {
+    if (!visible) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [visible, onClose])
 
-  return (
+  if (!visible || !mounted) return null
+
+  return createPortal(
     <div
-      role="status"
-      aria-live="polite"
-      className="relative z-[10] mb-5 flex items-start gap-3 rounded-[var(--r-lg)] border px-4 py-3"
-      style={{
-        borderColor: 'var(--module-active-200)',
-        background: 'var(--module-active-50, var(--color-horizon-50))',
-      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="exit-notice-title"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
     >
-      <span
-        aria-hidden="true"
-        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-        style={{ background: 'var(--module-active-100, var(--color-horizon-100))', color: 'var(--module-active-700)' }}
+      {/* Achtergrond: hele pagina vervaagt + dimt. Klik = niet-persistent sluiten. */}
+      <div
+        aria-hidden
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-[var(--ink)]/30 backdrop-blur-md"
+      />
+
+      {/* Melding-kaart — editorial, met horizon-accent. */}
+      <div
+        ref={cardRef}
+        className="relative w-full max-w-md bg-[var(--paper)] p-5 shadow-xl motion-safe:animate-sheet-enter sm:p-7"
+        style={{
+          border: '1px solid var(--ink)',
+          borderLeftWidth: '4px',
+          borderLeftColor: 'var(--module-active-500)',
+        }}
       >
-        <Lightbulb className="h-4 w-4" />
-      </span>
-      <div className="flex-1 min-w-0 pr-1">
-        <p className="text-[13px] font-semibold leading-tight text-[var(--ink)]">Tips verborgen</p>
-        <p className="mt-1 text-[13px] leading-snug text-[var(--ink-2)]">
+        {/* Kicker: 10px mono uppercase — -800 voor WCAG AA contrast. */}
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.20em] text-[var(--module-active-800)]">
+          <Lightbulb className="h-3.5 w-3.5" aria-hidden />
+          Tips verborgen
+        </div>
+
+        <div id="exit-notice-title">
+          <EditorialHeadline level="h2" size="sm" emphasis="tips" className="mt-3">
+            Je tips zijn nu verborgen
+          </EditorialHeadline>
+        </div>
+
+        <p
+          className="mt-3 max-w-[60ch] text-[15px] italic leading-relaxed text-[var(--ink-2)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
           Je vindt deze tips altijd terug: ga naar{' '}
-          <strong className="font-semibold" style={{ color: 'var(--module-active-800)' }}>
+          <span className="not-italic font-semibold text-[var(--module-active-800)]">
             Toekomst
-          </strong>{' '}
+          </span>{' '}
           en zet{' '}
-          <strong className="font-semibold" style={{ color: 'var(--module-active-800)' }}>
+          <span className="not-italic font-semibold text-[var(--module-active-800)]">
             Tips
-          </strong>{' '}
+          </span>{' '}
           weer aan. Wil je rustig op gang komen? Op{' '}
-          <strong className="font-semibold" style={{ color: 'var(--module-active-800)' }}>
+          <span className="not-italic font-semibold text-[var(--module-active-800)]">
             Overzicht
-          </strong>{' '}
+          </span>{' '}
           staat een kort stappenplan om met de app te starten.
         </p>
+
+        {/* Knoppen — GEEN auto-dismiss; de gebruiker kiest expliciet. */}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="button"
+            onClick={onDismissForever}
+            title="Verbergt deze melding voortaan op al je apparaten"
+            className="inline-flex min-h-[40px] items-center justify-center rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-1.5 font-sans text-[13px] font-medium text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)]"
+          >
+            Niet meer weergeven
+          </button>
+          <button
+            ref={primaryRef}
+            type="button"
+            onClick={onClose}
+            className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-[var(--r-sm)] border border-[var(--module-active-300)] bg-[var(--module-active-50)] px-4 py-1.5 font-sans text-[13px] font-medium text-[var(--module-active-800)] transition-colors hover:bg-[var(--module-active-100)]"
+          >
+            Sluiten
+          </button>
+        </div>
+
+        {/* Sluit-knop rechtsboven (= niet-persistent sluiten). */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
+          aria-label="Melding sluiten"
+        >
+          <X className="h-4 w-4" aria-hidden />
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Melding sluiten"
-        className="-mr-1 -mt-0.5 shrink-0 rounded-full p-1.5 text-[var(--ink-3)] transition-colors hover:text-[var(--ink-2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-        style={{ outlineColor: 'var(--module-active-400)' }}
-      >
-        <X className="h-4 w-4" aria-hidden />
-      </button>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -16,7 +16,7 @@ export async function GET() {
   let data: Record<string, unknown> | null = null
   const { data: d1, error: e1 } = await supabase
     .from('profiles')
-    .select('expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate, income_source, expenses_source')
+    .select('expected_return, inflation_rate, box3_method, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate, income_source, expenses_source')
     .eq('id', user.id)
     .single()
 
@@ -40,6 +40,8 @@ export async function GET() {
     inflation_rate: data?.inflation_rate ?? 0.02,
     box3_method: data?.box3_method ?? 'forfaitair',
     marginaal_tarief: data?.marginaal_tarief ?? null,
+    pension_factor_a: data?.pension_factor_a ?? null,
+    pension_factor_a_source: data?.pension_factor_a_source ?? null,
     net_monthly_income: data?.net_monthly_income ?? null,
     estimated_monthly_expenses: Number(data?.estimated_monthly_expenses ?? 0),
     retirement_expense_method: data?.retirement_expense_method ?? 'essential_budgets',
@@ -107,6 +109,33 @@ export async function PUT(request: NextRequest) {
     marginaalTarief = mt
   }
 
+  // Validate pension_factor_a if provided — null means "wissen / niet ingevuld".
+  // NULL ≠ 0: een lege waarde betekent "onbekend", een expliciete 0 betekent
+  // "geen pensioenaangroei". Beide zijn geldige opslagwaarden.
+  const rawFactorA = body.pension_factor_a
+  let pensionFactorA: number | null | undefined
+  if (rawFactorA === null) {
+    pensionFactorA = null // expliciet wissen
+  } else if (rawFactorA !== undefined) {
+    const n = Number(rawFactorA)
+    if (isNaN(n) || n < 0) {
+      return NextResponse.json({ error: 'Factor A moet 0 of hoger zijn' }, { status: 400 })
+    }
+    pensionFactorA = n
+  }
+
+  // Validate pension_factor_a_source if provided — null = onbekend/wissen.
+  const rawFactorASource = body.pension_factor_a_source
+  let pensionFactorASource: string | null | undefined
+  if (rawFactorASource === null) {
+    pensionFactorASource = null
+  } else if (rawFactorASource !== undefined) {
+    if (rawFactorASource !== 'upo' && rawFactorASource !== 'estimated') {
+      return NextResponse.json({ error: 'Factor A bron moet "upo" of "estimated" zijn' }, { status: 400 })
+    }
+    pensionFactorASource = rawFactorASource
+  }
+
   const updateData: Record<string, unknown> = {
     id: user.id,
     updated_at: new Date().toISOString(),
@@ -123,6 +152,12 @@ export async function PUT(request: NextRequest) {
   if (marginaalTarief !== undefined) {
     updateData.marginaal_tarief = marginaalTarief
   }
+  if (pensionFactorA !== undefined) {
+    updateData.pension_factor_a = pensionFactorA
+  }
+  if (pensionFactorASource !== undefined) {
+    updateData.pension_factor_a_source = pensionFactorASource
+  }
 
   const cashSettings = sanitizeCashSettingsInput(body)
   Object.assign(updateData, cashSettings)
@@ -131,9 +166,17 @@ export async function PUT(request: NextRequest) {
     .from('profiles')
     .upsert(updateData)
 
-  // If upsert fails (e.g. marginaal_tarief column doesn't exist yet), retry without it
-  if (error && marginaalTarief !== undefined) {
+  // If upsert fails (e.g. a newer column doesn't exist yet on a legacy DB),
+  // retry once without the optional columns (marginaal_tarief + the factor-A pair).
+  if (
+    error &&
+    (marginaalTarief !== undefined ||
+      pensionFactorA !== undefined ||
+      pensionFactorASource !== undefined)
+  ) {
     delete updateData.marginaal_tarief
+    delete updateData.pension_factor_a
+    delete updateData.pension_factor_a_source
     const retry = await supabase.from('profiles').upsert(updateData)
     error = retry.error
   }
@@ -148,6 +191,8 @@ export async function PUT(request: NextRequest) {
     inflation_rate: inflationRate ?? null,
     box3_method: box3Method ?? 'forfaitair',
     marginaal_tarief: marginaalTarief !== undefined ? marginaalTarief : null,
+    pension_factor_a: pensionFactorA !== undefined ? pensionFactorA : null,
+    pension_factor_a_source: pensionFactorASource !== undefined ? pensionFactorASource : null,
     ...cashSettings,
   })
 }

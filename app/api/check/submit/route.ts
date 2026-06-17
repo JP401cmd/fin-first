@@ -23,6 +23,7 @@ import {
 import { verifyTurnstileDetailed } from '@/lib/security/turnstile'
 import { checkIpRateLimit, getClientIp } from '@/lib/security/ip-rate-limit'
 import { buildReport } from '@/lib/check/build-report'
+import { buildCheckReportNews } from '@/lib/check/report-news'
 import type { CheckIntake } from '@/lib/check/types'
 
 // Node-runtime: field-encryption gebruikt node:crypto en we lezen de service-role-key.
@@ -50,6 +51,7 @@ const intakeSchema = z.object({
         name: z.string().min(1).max(120),
         value: z.number().min(0).max(1_000_000_000),
         extra: z.string().max(120).nullish(),
+        expectedReturnPct: z.number().min(-50).max(50).nullish(),
       }),
     )
     .max(60),
@@ -68,7 +70,21 @@ const intakeSchema = z.object({
     aowExpectedMonthly: z.number().min(0).max(100_000).nullish(),
     expectedReturnPct: z.number().min(-50).max(50).nullish(),
     riskProfile: z.enum(['defensief', 'neutraal', 'offensief']).nullish(),
+    retirementMonthlyExpenses: z.number().min(0).max(1_000_000).nullish(),
   }),
+  lifeEvents: z
+    .array(
+      z.object({
+        key: z.string().min(1).max(40),
+        label: z.string().min(1).max(120),
+        age: z.number().min(0).max(120),
+        amount: z.number().min(-1_000_000_000).max(1_000_000_000).nullish(),
+        recurringYearly: z.number().min(-100_000_000).max(100_000_000).nullish(),
+        durationYears: z.number().min(0).max(100).nullish(),
+      }),
+    )
+    .max(20)
+    .optional(),
   goal: z.object({ label: z.string().max(140) }).nullish(),
 })
 
@@ -122,7 +138,20 @@ export async function POST(request: Request) {
     const devBypass =
       ts.reason === 'not-configured' && process.env.NODE_ENV !== 'production'
     if (!devBypass) {
-      return fail(422, 'Verificatie mislukt. Probeer het opnieuw.')
+      // Log de reden server-side voor diagnose — nooit het secret of de token.
+      console.warn(`[check/submit] Turnstile geweigerd (reason=${ts.reason ?? 'onbekend'})`)
+      // Diagnoseerbaar zónder interne details te lekken:
+      //  - 'not-configured' (secret ontbreekt op de server) of 'empty-token'
+      //    (client kreeg geen token, bv. script niet geladen) wijzen op een
+      //    laad-/config-probleem → vraag de gebruiker te verversen.
+      //  - 'rejected'/'error' is een echte afwijzing → generieke fout.
+      const isLoadProblem = ts.reason === 'not-configured' || ts.reason === 'empty-token'
+      return fail(
+        422,
+        isLoadProblem
+          ? 'De beveiligingscheck kon niet laden — ververs de pagina en probeer opnieuw'
+          : 'Verificatie mislukt. Probeer het opnieuw.',
+      )
     }
   }
 
@@ -139,13 +168,26 @@ export async function POST(request: Request) {
     return fail(500, 'Het rapport kon niet worden opgesteld. Probeer het opnieuw.')
   }
 
+  // RLS op `lead_intakes` staat dicht — schrijven kan uitsluitend via de
+  // service-role. Dezelfde client voedt ook de nieuws-read hieronder (algemeen
+  // nieuws uit `news_articles`, geen gebruikersinput).
+  const supabase = getServiceClient()
+
+  // Algemeen financieel nieuws (tot 3 items) op submit-moment inbakken. Volledig
+  // fail-safe: een nieuws-hapering mag het opslaan van de lead NOOIT blokkeren —
+  // `buildCheckReportNews` werpt niet, maar de try/catch is de extra vangrail.
+  // Geen personalisatie/PII: alleen de gedeelde `news_articles`-bron.
+  try {
+    report.news = await buildCheckReportNews(supabase, new Date())
+  } catch {
+    // Stilzwijgend degraderen: rapport zonder nieuws-sectie.
+  }
+
   const intakeEncrypted = encryptField(JSON.stringify(intake))
   const emailIndex = blindIndex(email)
   // Toestemmingsmoment server-side: het tijdstip waarop de geldige aanvraag binnenkomt.
   const consentAt = new Date().toISOString()
   const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
-
-  const supabase = getServiceClient()
 
   // Dedupe op blind index: bestaat er al een (niet-geconverteerde) lead?
   const { data: existing, error: selErr } = await supabase

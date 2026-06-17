@@ -6,6 +6,8 @@ import { Sparkles, Check, Clock, ThumbsDown, Loader2, MessageCircle, ArrowRight,
 import Link from 'next/link'
 import type { Recommendation } from '@/lib/recommendation-data'
 import { deepLinkForRecommendation } from '@/lib/recommendation-deep-link'
+import { useChatContextOptional } from '@/components/app/chat/chat-provider'
+import { ANALYSE_FINANCIEN_PROMPT } from '@/components/app/chat/chat-prompt-deeplink'
 
 /**
  * TipsLijst — toptips bovenaan /overzicht/tips. Toont pending +
@@ -48,6 +50,7 @@ function sortTips(recs: Recommendation[]): Recommendation[] {
 
 export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstProps) {
   const router = useRouter()
+  const chat = useChatContextOptional()
   const [loadingId, setLoadingId] = useState<{ id: string; kind: DecisionKind } | null>(null)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
 
@@ -108,13 +111,14 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
         <p className="mt-1 text-sm text-[var(--ink-3)]">
           Vraag Will om een doorlichting voor een verse tip.
         </p>
-        <Link
-          href="/berichten?prompt=analyseer-mijn-financien"
+        <button
+          type="button"
+          onClick={() => chat?.openWithMessage(ANALYSE_FINANCIEN_PROMPT)}
           className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-wil-500 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-wil-600"
         >
           <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
           Vraag Will om tips
-        </Link>
+        </button>
       </section>
     )
   }
@@ -125,13 +129,14 @@ export function TipsLijst({ recommendations, onChanged, onAccepted }: TipsLijstP
         <h2 className="font-serif text-lg sm:text-xl text-[var(--ink)]">
           Toptips van Will
         </h2>
-        <Link
-          href="/berichten?prompt=analyseer-mijn-financien"
+        <button
+          type="button"
+          onClick={() => chat?.openWithMessage(ANALYSE_FINANCIEN_PROMPT)}
           className="inline-flex items-center gap-1 text-xs font-semibold text-wil-700 hover:text-wil-800"
         >
           <MessageCircle className="h-3 w-3" aria-hidden="true" />
           Vraag meer
-        </Link>
+        </button>
       </header>
 
       <ul className="space-y-2.5" role="list">
