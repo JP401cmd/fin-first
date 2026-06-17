@@ -53,7 +53,7 @@ Geen brede review-pass over alles: stappen 2–7 hebben statics, tests, security
 - Alleen bij een **architectuur-brede of risicovolle wijziging** (nieuwe datastroom, cross-domein refactor, rekenmotor-aanname) zet je de volledige `code-review`-agent of `senior-developer` op de complete diff — dat is de uitzondering, niet de standaard.
 
 ### 9. Ship
-Expliciete `git add` van de bedoelde bestanden (geen `add -A`), commit met heldere message, hooks laten draaien (geen `--no-verify`). Push + PR naar master met: wat het is, de migratie-status (al remote toegepast), en de bijgewerkte architectuurdocs. **Post-deploy**: de nieuwe flow één keer op productie doorlopen en `mcp__supabase__get_logs` checken op errors.
+Expliciete `git add` van de bedoelde bestanden (geen `add -A`), commit met heldere message, hooks laten draaien (geen `--no-verify`). **Na de commit, vóór de push: hercontroleer `git status`.** Verschijnen bestanden opnieuw als gewijzigd (een editor/IDE die buffered edits laat flushen, of een lint-/format-hook die de tree herschreef), dan ving de commit een verouderde of half-geschreven versie — inspecteer die diff, valideer (tsc + de geraakte test) en amendeer vóór de push. Push nooit in de aanname dat de commit de bedoelde tree ving; een schone tree ná de commit is het bewijs. Push + PR naar master met: wat het is, de migratie-status (al remote toegepast), en de bijgewerkte architectuurdocs. **Post-deploy**: de nieuwe flow één keer op productie doorlopen en `mcp__supabase__get_logs` checken op errors.
 
 ## Afronding
 Rapporteer per poort het bewijs (commando + uitkomst), de security-bevindingen en hun status, en wat er bewust is overgeslagen met reden. "Alles groen" zonder output is geen afronding.
