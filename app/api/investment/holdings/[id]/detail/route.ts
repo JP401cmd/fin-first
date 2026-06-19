@@ -4,8 +4,13 @@
  * Eén-call data-bundle voor de `InvestmentHoldingPane`-detail-modus. Levert
  * de holding-rij (incl. notes/ter/avg-purchase-price die de standaard
  * `loadInvestmentHoldingsForUser` loader weglaat omdat de holdings-tabel ze
- * niet in z'n minimale view-shape heeft) plus de laatste 200 transacties uit
- * `investment_transactions`.
+ * niet in z'n minimale view-shape heeft) plus de volledige transactiehistorie
+ * (tot HOLDINGS_TX_AGG_LIMIT) uit `investment_transactions`.
+ *
+ * De transacties voeden zowel de aggregatie-engine (computePositionFromTransactions)
+ * als de getoonde transactie-log in de pane. De cap is bewust ruim (5000) zodat
+ * pane, full-page én de batch-loader (loadHoldingsPnL) over dezelfde feitelijk
+ * volledige set aggregeren — bij een afwijkende cap wijkt "Totale opbrengst" af.
  *
  * Mirror van `app/api/crypto/holdings/[id]/detail/route.ts` met twee bewuste
  * verschillen:
@@ -31,11 +36,10 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { HOLDINGS_TX_AGG_LIMIT } from '@/lib/holdings-aggregation'
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-const TRANSACTIONS_LIMIT = 200
 
 export async function GET(
   _request: NextRequest,
@@ -103,6 +107,10 @@ export async function GET(
   // import zonder trade-detail); we vangen DB-fouten af zodat een falende
   // sub-call de holding-respons niet meeneemt. Schema mirror:
   // `supabase/migrations/20260502000003_split_holdings_tables.sql` regel 169-184.
+  //
+  // Cap = HOLDINGS_TX_AGG_LIMIT (5000) — dekt de volledige transactiehistorie
+  // van elke realistische positie zodat de engine dezelfde set ziet als de
+  // batch-loader (loadHoldingsPnL). Zie lib/holdings-aggregation.ts.
   const { data: txData } = await supabase
     .from('investment_transactions')
     .select(
@@ -110,7 +118,7 @@ export async function GET(
     )
     .eq('holding_id', id)
     .order('date', { ascending: false })
-    .limit(TRANSACTIONS_LIMIT)
+    .limit(HOLDINGS_TX_AGG_LIMIT)
 
   // Numerieke kolommen worden door PostgREST als string geleverd; we
   // normaliseren ze hier zodat de client geen `Number(...)`-roundtrip hoeft te

@@ -5,7 +5,8 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { createClient } from '@/lib/supabase/server'
 import { formatCurrency } from '@/lib/format'
 import { HoldingSourceBadge, type HoldingSourceForBadge } from '@/components/holdings/holding-source-badge'
-import { computePositionFromTransactions, valuePosition } from '@/lib/holdings-aggregation'
+import { computePositionFromTransactions, valuePosition, HOLDINGS_TX_AGG_LIMIT } from '@/lib/holdings-aggregation'
+import { OpbrengstUitsplitsing } from '@/components/core/holdings/opbrengst-uitsplitsing'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -101,7 +102,7 @@ export default async function InvestmentHoldingDetailPage({
     .select('id, type, units, price_per_unit, total_amount, currency, date, notes, external_source')
     .eq('holding_id', holdingId)
     .order('date', { ascending: false })
-    .limit(1000)
+    .limit(HOLDINGS_TX_AGG_LIMIT)
 
   const txs = (txData ?? []) as Array<{
     id: string
@@ -153,9 +154,9 @@ export default async function InvestmentHoldingDetailPage({
   const isClosed = hasTx && agg.isClosed
 
   // Totale winst/verlies = gerealiseerd + ongerealiseerd. Zonder transacties:
-  // simpele markt − kostbasis op de opgeslagen velden.
-  const realizedPnL = hasTx ? agg.realizedPnL : null
-  const unrealizedPnL = hasTx ? valued.unrealizedPnL : null
+  // simpele markt − kostbasis op de opgeslagen velden. De gerealiseerd/
+  // ongerealiseerd-split toont de gedeelde `OpbrengstUitsplitsing` (leest
+  // direct uit `valued`/`agg`); hier alleen het totaal + % voor de KPI-strip.
   const totalPnL = hasTx
     ? valued.totalPnL
     : currentPrice != null && fallbackCost != null
@@ -230,40 +231,39 @@ export default async function InvestmentHoldingDetailPage({
         />
         {totalPnL != null ? (
           <KpiBlock
-            label={isClosed ? 'Resultaat (gerealiseerd)' : 'Resultaat'}
+            label="Totale opbrengst"
             value={`${totalPnL >= 0 ? '+' : ''}${currency === 'EUR' ? formatCurrency(totalPnL) : formatCurrencyOf(totalPnL, currency)}`}
             sub={totalPnLPct != null ? `${totalPnLPct >= 0 ? '+' : ''}${totalPnLPct.toFixed(1)}% op inleg` : undefined}
             tone={totalPnL >= 0 ? 'positive' : 'negative'}
           />
         ) : (
-          <KpiBlock label="Resultaat" value="—" sub="geen transacties" />
+          <KpiBlock label="Totale opbrengst" value="—" sub="geen transacties" />
         )}
       </section>
 
-      {hasTx && realizedPnL != null && (
-        <p className="mt-4 text-[11px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
-          <span>
-            Gerealiseerd {realizedPnL >= 0 ? '+' : ''}
-            {currency === 'EUR' ? formatCurrency(realizedPnL) : formatCurrencyOf(realizedPnL, currency)}
-          </span>
-          {!isClosed && unrealizedPnL != null && (
-            <>
-              {' · '}
-              <span>
-                Ongerealiseerd {unrealizedPnL >= 0 ? '+' : ''}
-                {currency === 'EUR'
-                  ? formatCurrency(unrealizedPnL)
-                  : formatCurrencyOf(unrealizedPnL, currency)}
-              </span>
-            </>
-          )}
+      {/* ── Totale opbrengst + uitsplitsing ─────────────────────────
+          Gedeeld met de detail-pane (`OpbrengstUitsplitsing`) zodat beide
+          schermen identieke getallen én labels tonen. Alleen bij
+          transacties; een handmatige holding zonder transacties heeft geen
+          betrouwbare split. */}
+      {hasTx && (
+        <section className="mt-6 max-w-sm">
+          <OpbrengstUitsplitsing
+            totalPnL={valued.totalPnL}
+            unrealizedPnL={valued.unrealizedPnL}
+            realizedPnL={valued.realizedPnL}
+            dividends={agg.dividends}
+            totalFees={agg.totalFees}
+            totalInvested={agg.totalInvested}
+            isClosed={agg.isClosed}
+            formatAmount={(v) => (currency === 'EUR' ? formatCurrency(v) : formatCurrencyOf(v, currency))}
+          />
           {isClosed && (
-            <>
-              {' · '}
-              <span>Positie gesloten</span>
-            </>
+            <p className="mt-3 text-[11px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              Positie gesloten
+            </p>
           )}
-        </p>
+        </section>
       )}
 
       {(lastPriceFormatted || ter != null) && (

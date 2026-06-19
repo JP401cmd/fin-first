@@ -127,6 +127,44 @@ export const CALCULATIONS: Calculation[] = [
     functions: ['computePortfolioAllocation'],
     elementIds: ['as-vermogen', 'fn-aandelenregistratie'],
   },
+  {
+    id: 'holdings-positie-aggregatie',
+    title: 'Positie-opbrengst uit transactiehistorie',
+    domain: 'Vermogen',
+    summary:
+      'Leidt per belegging de huidige positie (aantal, gemiddelde kostprijs) en de opbrengst (gerealiseerd + ongerealiseerd = totaal) af uit de transactiehistorie via average-cost. Enige bron voor "winst/verlies per holding".',
+    inputs: [
+      'investment_transactions (buy/sell/dividend, units, price_per_unit, total_amount, date)',
+      'investment_holdings.current_price (waardering resterende positie)',
+    ],
+    outputs: [
+      'netUnits + avgCost',
+      'realizedPnL (incl. dividend, − kosten)',
+      'unrealizedPnL',
+      'totalPnL',
+      'totalPnLPct',
+      'isClosed (gesloten positie)',
+    ],
+    files: [
+      'lib/holdings-aggregation.ts',
+      'lib/holdings-pnl-enrichment.ts',
+      'lib/holdings-data-loader.ts',
+      'app/api/holdings/route.ts',
+      'app/(app)/core/assets/investment/[holdingId]/page.tsx',
+    ],
+    functions: [
+      'computePositionFromTransactions',
+      'valuePosition',
+      'loadHoldingsPnL',
+      'attachPnLToHoldings',
+    ],
+    constants: [
+      { label: 'Methode', value: 'gewogen gemiddelde kostprijs (average-cost)' },
+      { label: 'EPSILON gesloten-detectie', value: '1e-9 stuks' },
+    ],
+    elementIds: ['as-vermogen', 'fn-aandelenregistratie'],
+    note: 'Single source of truth: de transacties bepalen het bezit, niet andersom. computePositionFromTransactions + valuePosition (lib/holdings-aggregation.ts) is de ENIGE opbrengst-som; elke consument importeert ze (consume, don\'t recompute). De holdings-detailpagina (full-page + pane) gebruikt ze al per holding; de holdings-LIJST verrijkt sinds jun 2026 elke rij ermee via lib/holdings-pnl-enrichment.ts (loadHoldingsPnL = ÉÉN batch-query op investment_transactions.holding_id, geen N+1; attachPnLToHoldings hangt pnl_*-velden op de rij). Beide lijst-consumenten — de server-loader loadHoldingsData én GET /api/holdings — draaien dezelfde helper zodat initial-render en client-hydratie identieke getallen tonen. Nodig voor sorteren-op-opbrengst en het tonen van de gerealiseerde winst op gesloten posities (pnl_total === realizedPnL bij netUnits 0). investment_transactions heeft geen fees-kolom; de engine behandelt afwezige fees als 0.',
+  },
 
   // ── Belasting ──
   {
@@ -304,6 +342,35 @@ export const CALCULATIONS: Calculation[] = [
     files: ['lib/budget-utils.ts'],
     functions: ['computeRetirementExpenses'],
     elementIds: ['as-planning'],
+  },
+  {
+    id: 'pensioen-projectie',
+    title: 'Pensioen-projectie (verwacht jaarbedrag per leeftijd)',
+    domain: 'Toekomst (FIRE)',
+    summary:
+      'Zet de pensioenpotten (life_events met event_type=pension) om naar een rij-per-leeftijd projectie van het verwachte JAARBEDRAG: bruto nominaal (vlak, = TeBereiken van mijnpensioenoverzicht.nl), bruto bij volledige indexatie (illustratieve bovengrens) en netto na Box 1-belasting. Pure rekenfunctie (geen IO). Voedt de pensioen-projectiegrafiek in de pensioen-strategie-editor.',
+    inputs: [
+      'life_events (event_type=pension; monthly_income_change, target_age, duration_months)',
+      'huidige leeftijd (uit dateOfBirth via ageAtDate)',
+      'inflationRate (resolveFireParams)',
+      'Box 1-belastingjaar',
+    ],
+    outputs: [
+      'PensionProjectionRow[] per leeftijd',
+      'brutoNominaal (vlak, TeBereiken)',
+      'brutoGeindexeerd (bij volledige indexatie)',
+      'nettoGeindexeerd (na Box 1)',
+    ],
+    formula:
+      'per leeftijd: brutoNominaal = Σ actieve potten × 12; brutoGeindexeerd = brutoNominaal × (1+inflatie)^(leeftijd−nu); nettoGeindexeerd = brutoGeindexeerd − computeBox1Tax(…, aow:true)',
+    files: ['lib/pension/pension-projection.ts', 'components/future/strategie/pensioen-projectie-chart.tsx'],
+    functions: ['buildPensionProjection', 'potYearlyAtAge', 'computeBox1Tax'],
+    constants: [
+      { label: 'duration_months = 0', value: 'levenslang (geen einddatum)' },
+      { label: 'Belastingtarief', value: 'AOW-gerechtigd (pensioen loopt vanaf de pensioendatum)' },
+    ],
+    elementIds: ['as-planning', 'as-belasting', 'fn-toekomstplannen'],
+    note: 'Consume, don\'t recompute: inflatie komt van de aanroeper (resolveFireParams), belasting via computeBox1Tax (geen eigen tarieven). De geïndexeerde lijn is een ILLUSTRATIEVE bovengrens (bedrag bij volledige indexatie aan de inflatie), ongeacht of een pot daadwerkelijk geïndexeerd is — het VERSCHIL met de vlakke nominale lijn toont het koopkrachtverlies bij een niet-meegroeiend pensioen (dus NIET een reëel-naar-vandaag deflatie). Bewuste simplificaties: Box 1-bracket-creep niet gemodelleerd; AOW niet als lijn (aparte as); eerder stoppen met werken niet verwerkt (potten gaan uit van doorwerken tot de pensioendatum — als rode melding in de grafiek getoond).',
   },
   {
     id: 'benchmark-referentie-peer',

@@ -24,10 +24,17 @@ import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { computeJaarruimte, estimateFactorAFromSalary } from '@/lib/jaarruimte'
 import { previewFireAge, type PreviewBaseline } from '@/lib/strategy-preview'
 import { PensionPdfUpload } from '@/components/app/horizon/pension-pdf-upload'
-import { applyPensionParseResult } from '@/lib/pension/apply-parse-result'
+import { applyPensionPots, applyAowFromParseResult } from '@/lib/pension/apply-parse-result'
+import type { PensionPotApplyItem } from '@/lib/pension/apply-parse-result'
 import type { PensionParseResult } from '@/app/api/pension/parse/route'
+import {
+  reconcilePensionPots,
+  type PensionReconcileEntry,
+  type PensionReconcileAction,
+} from '@/lib/pension/reconcile'
 import { StrategieModalShell, StrategieFooter } from './strategie-modal-shell'
 import { LabeledNumber, TriggerButton } from './fields'
+import { PensioenProjectieChart } from './pensioen-projectie-chart'
 
 const TYPE_LABEL: Record<CanonicalPensionType, string> = {
   bedrijf: 'Bedrijfspensioen',
@@ -169,6 +176,12 @@ interface Props {
   /** Factor A (jaarlijkse pensioenaangroei uit UPO), uit de loader-bundel via
    *  de canonieke resolver. 0 = niet ingevuld → jaarruimte zonder factor-A-aftrek. */
   pensioenFactorA: number
+  /** Huidige leeftijd uit DOB (null = onbekend) — indexatie-anker van de
+   *  pensioen-projectiegrafiek. */
+  currentAge: number | null
+  /** Inflatievoet uit resolveFireParams (fractie) — indexatie van de
+   *  projectiegrafiek. Geen hardcoded percentage hier. */
+  inflationRate: number
   /** Woonsituatie voor de AOW-hoogte bij de JSON-import van mijnpensioen.nl
    *  (samenwonend → lager AOW-bedrag, alleenstaand → hoger). Default: samenwonend. */
   samenwonend?: boolean
@@ -184,6 +197,8 @@ export function PensioenStrategieEditor({
   aowAge,
   grossYearlyIncome,
   pensioenFactorA,
+  currentAge,
+  inflationRate,
   samenwonend = true,
   onClose,
   readOnly,
@@ -194,6 +209,20 @@ export function PensioenStrategieEditor({
   const [error, setError] = useState<string | null>(null)
   const [showJaarruimte, setShowJaarruimte] = useState(false)
   const [uploadMsg, setUploadMsg] = useState<string | null>(null)
+  // Review-paneel na een upload: bevat de reconciliatie-entries + AOW-info +
+  // per-pot gekozen acties. Geen auto-insert meer — de gebruiker beslist.
+  const [pendingReview, setPendingReview] = useState<{
+    entries: PensionReconcileEntry[]
+    parseResult: PensionParseResult
+    chosenActions: PensionReconcileAction[]
+    aowBedrag: number
+    aowLeeftijd: number | undefined
+    aowLeefsituatie: 'samenwonend' | 'alleenstaand' | undefined
+    aowBestaatAl: boolean
+    aowIncluded: boolean
+    kanAow: boolean
+  } | null>(null)
+  const [reviewApplying, setReviewApplying] = useState(false)
 
   // Factor A-uitvraag (list-view). Beginwaarde = de prop; leeg veld = onbekend.
   const [factorAInput, setFactorAInput] = useState<string>(
@@ -249,40 +278,115 @@ export function PensioenStrategieEditor({
     router.refresh()
   }
 
-  async function handleUploadParseResult(result: unknown) {
+  function handleUploadParseResult(result: unknown) {
     setError(null)
     setUploadMsg(null)
+    setPendingReview(null)
+    const parseResult = result as PensionParseResult
+
+    // 1. Reconcilieer inkomende potten tegen bestaande pension-events (geen IO).
+    const entries = reconcilePensionPots(parseResult.regelingen, pensionEvents)
+    const chosenActions: PensionReconcileAction[] = entries.map((e) => e.defaultAction)
+
+    // 2. AOW-beschikbaarheid bepalen (zelfde logica als voorheen).
+    const aowBedrag = parseResult.aowBedrag ?? 0
+    const aowBestaatAl = allEvents.some((e) => e.event_type === 'aow')
+    const kanAow = aowBedrag > 0 && (aowBestaatAl || parseResult.aowLeeftijd !== undefined)
+
+    // 3. Geen potten én geen toepasbare AOW → vroeg afkappen.
+    if (entries.length === 0 && !kanAow) {
+      setUploadMsg('Geen werknemerspensioen of AOW gevonden in dit overzicht.')
+      return
+    }
+
+    // 4. Sla alles op in pendingReview — het paneel laat de gebruiker beslissen.
+    setPendingReview({
+      entries,
+      parseResult,
+      chosenActions,
+      aowBedrag,
+      aowLeeftijd: parseResult.aowLeeftijd,
+      aowLeefsituatie: parseResult.aowLeefsituatie,
+      aowBestaatAl,
+      aowIncluded: kanAow,
+      kanAow,
+    })
+  }
+
+  async function applyPendingReview() {
+    if (!pendingReview) return
+    setReviewApplying(true)
+    setError(null)
+
     const supabase = createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) {
       setError('Niet ingelogd — kan pensioenoverzicht niet verwerken.')
+      setReviewApplying(false)
       return
     }
-    const outcome = await applyPensionParseResult({
+
+    // Bouw de items-lijst vanuit de gekozen acties.
+    const items: PensionPotApplyItem[] = pendingReview.entries.map((entry, idx) => ({
+      regeling: entry.regeling,
+      action: pendingReview.chosenActions[idx] ?? entry.defaultAction,
+      matchEventId: entry.match?.id ?? null,
+      existingMetadata: entry.match?.metadata as Record<string, unknown> | undefined,
+    }))
+
+    const potsOutcome = await applyPensionPots({
       supabase,
       userId: user.id,
-      parseResult: result as PensionParseResult,
+      items,
       existingPensionCount: pensionEvents.length,
     })
-    if (outcome.error) {
-      setError(`Verwerken mislukt: ${outcome.error}`)
+    if (potsOutcome.error) {
+      setError(`Verwerken mislukt: ${potsOutcome.error}`)
+      setReviewApplying(false)
       return
     }
-    if (outcome.insertedCount === 0 && !outcome.aowUpdated) {
-      setUploadMsg('Geen werknemerspensioen of AOW gevonden in dit overzicht.')
-      return
+
+    // AOW overnemen indien de gebruiker dat heeft aangevinkt.
+    let aowApplied: 'created' | 'updated' | 'none' = 'none'
+    if (pendingReview.aowIncluded && pendingReview.kanAow) {
+      const aowOutcome = await applyAowFromParseResult({
+        supabase,
+        userId: user.id,
+        parseResult: pendingReview.parseResult,
+      })
+      if (aowOutcome.error) {
+        setError(`AOW overnemen mislukt: ${aowOutcome.error}`)
+        setReviewApplying(false)
+        return
+      }
+      aowApplied = aowOutcome.aowApplied
     }
-    const delen: string[] = []
-    if (outcome.insertedCount > 0) {
-      delen.push(
-        `${outcome.insertedCount} pensioenpot${outcome.insertedCount === 1 ? '' : 'ten'} toegevoegd`,
-      )
-    }
-    if (outcome.aowUpdated) delen.push('AOW bijgewerkt')
-    setUploadMsg(`${delen.join(' · ')} uit je overzicht.`)
+
+    // Bouw een samenvattend berichtje.
+    const parts: string[] = []
+    if (potsOutcome.updated > 0)
+      parts.push(`${potsOutcome.updated} bijgewerkt`)
+    if (potsOutcome.inserted > 0)
+      parts.push(`${potsOutcome.inserted} toegevoegd`)
+    if (potsOutcome.skipped > 0)
+      parts.push(`${potsOutcome.skipped} overgeslagen`)
+    if (aowApplied === 'created') parts.push('AOW toegevoegd')
+    else if (aowApplied === 'updated') parts.push('AOW bijgewerkt')
+
+    setUploadMsg(
+      parts.length > 0
+        ? parts.join(', ') + '.'
+        : 'Niets gewijzigd.',
+    )
+    setReviewApplying(false)
+    setPendingReview(null)
     router.refresh()
+  }
+
+  function cancelPendingReview() {
+    setPendingReview(null)
   }
 
   const totalBruto = useMemo(
@@ -455,6 +559,38 @@ export function PensioenStrategieEditor({
             })
           )}
 
+          {/* Uitleg: huidige vs. verwachte ("te bereiken") waarde */}
+          {pensionEvents.length > 0 && (
+            <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+              <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Wat betekenen deze bedragen?
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-[var(--ink-2)]">
+                Dit is je{' '}
+                <span className="font-semibold text-[var(--ink)]">te bereiken</span>{' '}
+                pensioen: wat je verwacht te krijgen <em>als</em> je blijft opbouwen tot
+                je pensioendatum — niet wat je nú al hebt opgebouwd. De bedragen komen van
+                mijnpensioenoverzicht.nl en zijn nominaal (vóór inflatie en belasting).
+              </p>
+            </div>
+          )}
+
+          {/* Projectiegrafiek (leeftijd × verwacht jaarbedrag, 3 lijnen) + rode
+              melding + detail-tabel. Module-accent horizon. */}
+          {pensionEvents.length > 0 && (
+            <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+              <div className="mb-3 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                Verwacht pensioen per leeftijd
+              </div>
+              <PensioenProjectieChart
+                pensionEvents={pensionEvents}
+                currentAge={currentAge}
+                inflationRate={inflationRate}
+                year={2026}
+              />
+            </div>
+          )}
+
           {!readOnly && (
             <div className="rounded-2xl border border-[var(--border-ed)] bg-horizon-50/30 p-4">
               <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
@@ -473,6 +609,230 @@ export function PensioenStrategieEditor({
                   {uploadMsg}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Unified review-paneel — wordt getoond na een upload. */}
+          {!readOnly && pendingReview && (
+            <div className="rounded-2xl border border-horizon-200 bg-horizon-50/40 p-4 space-y-4">
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-horizon-700">
+                  Dit vonden we — wat wil je overnemen?
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
+                  Kies per pot of je 'm wilt toevoegen, bijwerken of overslaan.
+                </p>
+              </div>
+
+              {/* Pot-rijen */}
+              {pendingReview.entries.length > 0 && (
+                <div className="space-y-3">
+                  {pendingReview.entries.map((entry, idx) => {
+                    const canonicalType = normalizePensionType(entry.regeling.type)
+                    const Icon = canonicalType === 'bedrijf' ? Landmark : PiggyBank
+                    const bruto = entry.regeling.brutoBedrag ?? 0
+                    const chosenAction = pendingReview.chosenActions[idx] ?? entry.defaultAction
+                    const hasMatch = entry.match !== null
+                    const isManualSource =
+                      hasMatch &&
+                      (entry.match!.metadata as Record<string, unknown> | null | undefined)
+                        ?.source === 'pension-strategy'
+
+                    const setChosenAction = (action: PensionReconcileAction) => {
+                      setPendingReview((prev) => {
+                        if (!prev) return prev
+                        const next = [...prev.chosenActions]
+                        next[idx] = action
+                        return { ...prev, chosenActions: next }
+                      })
+                    }
+
+                    return (
+                      <div
+                        key={entry.regeling.fondsNaam || idx}
+                        className="flex w-full items-start gap-3 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--subtle)] text-[var(--ink-2)]">
+                          <Icon className="h-4 w-4" aria-hidden />
+                        </span>
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div>
+                            <div className="flex items-start gap-2">
+                              <span
+                                className={[
+                                  'mt-0.5 inline-block shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]',
+                                  hasMatch
+                                    ? 'bg-[var(--subtle)] text-[var(--ink-3)]'
+                                    : 'bg-horizon-100 text-horizon-700',
+                                ].join(' ')}
+                              >
+                                {hasMatch ? 'Bestaat al' : 'Nieuw'}
+                              </span>
+                              <div className="min-w-0 flex-1 break-words text-sm font-semibold text-[var(--ink)]">
+                                {entry.regeling.fondsNaam || 'Onbekend fonds'}
+                              </div>
+                            </div>
+                            <div className="mt-1 text-xs text-[var(--ink-3)]">
+                              <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
+                                {formatCurrency(bruto)}
+                              </span>
+                              /mnd bruto
+                            </div>
+                            {dailyExpenses > 0 && bruto > 0 && (
+                              <div className="text-xs text-[var(--ink-3)]">
+                                {formatWithFreedom(bruto * 12, dailyExpenses)} per jaar
+                              </div>
+                            )}
+                            {hasMatch ? (
+                              <div className="mt-1 text-[11px] text-[var(--ink-3)]">
+                                Bijwerken werkt je bestaande pot{' '}
+                                <span className="break-words font-medium text-[var(--ink-2)]">
+                                  &ldquo;{entry.match!.name}&rdquo;
+                                </span>{' '}
+                                bij
+                                {isManualSource && (
+                                  <span className="ml-1 text-[var(--ink-3)]">
+                                    (handmatige pot)
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="mt-1 text-[11px] text-[var(--ink-3)]">
+                                Nog niet in je overzicht
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Actie-kiezer: segmented buttons */}
+                          <div
+                            role="group"
+                            aria-label={`Actie voor ${entry.regeling.fondsNaam || 'pot'}`}
+                            className="flex flex-wrap items-center gap-1"
+                          >
+                            {hasMatch && (
+                              <button
+                                type="button"
+                                aria-pressed={chosenAction === 'update'}
+                                onClick={() => setChosenAction('update')}
+                                className={[
+                                  'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink-3)]',
+                                  chosenAction === 'update'
+                                    ? 'bg-[var(--ink)] text-[var(--paper)]'
+                                    : 'border border-[var(--border-md)] text-[var(--ink-2)] hover:border-[var(--ink-3)]',
+                                ].join(' ')}
+                              >
+                                Bijwerken
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              aria-pressed={chosenAction === 'add'}
+                              onClick={() => setChosenAction('add')}
+                              className={[
+                                'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink-3)]',
+                                chosenAction === 'add'
+                                  ? 'bg-[var(--ink)] text-[var(--paper)]'
+                                  : 'border border-[var(--border-md)] text-[var(--ink-2)] hover:border-[var(--ink-3)]',
+                              ].join(' ')}
+                            >
+                              Toevoegen
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={chosenAction === 'skip'}
+                              onClick={() => setChosenAction('skip')}
+                              title="Niet overnemen — je kunt deze pot later altijd handmatig toevoegen"
+                              className={[
+                                'rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink-3)]',
+                                chosenAction === 'skip'
+                                  ? 'bg-[var(--ink)] text-[var(--paper)]'
+                                  : 'border border-[var(--border-md)] text-[var(--ink-2)] hover:border-[var(--ink-3)]',
+                              ].join(' ')}
+                            >
+                              Overslaan
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* AOW-rij — geïntegreerd in hetzelfde paneel */}
+              {pendingReview.kanAow && (
+                <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+                  <label htmlFor="aow-overnemen-checkbox" className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      id="aow-overnemen-checkbox"
+                      type="checkbox"
+                      checked={pendingReview.aowIncluded}
+                      aria-describedby="aow-overnemen-hint"
+                      onChange={(e) =>
+                        setPendingReview((prev) =>
+                          prev ? { ...prev, aowIncluded: e.target.checked } : prev,
+                        )
+                      }
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-[var(--border-md)] accent-[var(--ink)]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-[var(--ink)]">AOW overnemen</div>
+                      <p id="aow-overnemen-hint" className="mt-0.5 text-xs leading-relaxed text-[var(--ink-2)]">
+                        {pendingReview.aowBestaatAl ? (
+                          <>
+                            Je AOW bijwerken naar{' '}
+                            <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
+                              {formatCurrency(pendingReview.aowBedrag)}
+                            </span>
+                            /mnd.
+                          </>
+                        ) : (
+                          <>
+                            AOW toevoegen:{' '}
+                            <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">
+                              {formatCurrency(pendingReview.aowBedrag)}
+                            </span>
+                            /mnd
+                            {pendingReview.aowLeeftijd !== undefined && (
+                              <> vanaf leeftijd {pendingReview.aowLeeftijd}</>
+                            )}
+                            {pendingReview.aowLeefsituatie !== undefined && (
+                              <> ({pendingReview.aowLeefsituatie})</>
+                            )}
+                            .
+                          </>
+                        )}
+                      </p>
+                      {dailyExpenses > 0 && pendingReview.aowBedrag > 0 && (
+                        <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                          {formatWithFreedom(pendingReview.aowBedrag * 12, dailyExpenses)} per jaar
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Actieknoppen */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={applyPendingReview}
+                  disabled={reviewApplying}
+                  aria-busy={reviewApplying}
+                  className="rounded-lg bg-[var(--ink)] px-4 py-2 text-xs font-semibold text-[var(--paper)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {reviewApplying ? 'Bezig…' : 'Toepassen'}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelPendingReview}
+                  disabled={reviewApplying}
+                  className="rounded-lg border border-[var(--border-md)] px-4 py-2 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] disabled:opacity-50"
+                >
+                  Annuleren
+                </button>
+              </div>
             </div>
           )}
 

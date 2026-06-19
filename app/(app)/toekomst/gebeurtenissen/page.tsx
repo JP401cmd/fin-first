@@ -90,6 +90,9 @@ export default async function ToekomstGebeurtenissenPage() {
     grossYearlyIncome: (ei.monthlyIncome ?? 0) * 12,
     pensioenFactorA: horizonData.pensioenFactorA,
     currentAge,
+    // Inflatievoet (single-sourced uit resolveFireParams) — indexatie-as van
+    // de pensioen-projectiegrafiek in de pensioen-editor.
+    inflationRate: horizonData.fireParams.inflationRate,
     currentNetMonthly,
     // Live preview Huis-strategie: zelfde simBasis als waarmee de loader de
     // virtuele housing-events resolvede — de modal rekent dan per definitie

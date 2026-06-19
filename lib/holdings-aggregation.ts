@@ -17,6 +17,15 @@
 // gerealiseerd en ongerealiseerd bij een deels-open positie.
 // ---------------------------------------------------------------------------
 
+/**
+ * Bovengrens op de transactie-fetch die de holdings-aggregatie voedt. Ruim
+ * boven elke realistische per-positie historie (zelfs jaren dagtrading /
+ * CSV-imports), zodat pane, full-page én lijst over dezelfde — feitelijk
+ * volledige — set aggregeren. Bewust een grote cap i.p.v. ongelimiteerd:
+ * één corrupte holding kan zo geen onbegrensde fetch triggeren.
+ */
+export const HOLDINGS_TX_AGG_LIMIT = 5000
+
 export interface PositionTransaction {
   /** 'buy' | 'sell' | 'dividend' | 'split' (case-insensitief). Onbekend = genegeerd. */
   type: string

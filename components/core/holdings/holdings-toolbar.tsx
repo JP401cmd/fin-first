@@ -16,12 +16,16 @@ import Link from 'next/link'
 import { Plus, RefreshCw, Upload } from 'lucide-react'
 import { Kicker } from '@/components/editorial'
 
-export type SortKey = 'weight' | 'return' | 'today' | 'alpha'
-export type AssetClassFilter = 'all' | 'investment' | 'crypto'
+export type SortKey = 'weight' | 'return' | 'today' | 'alpha' | 'opbrengst'
+// 'closed' is een aparte filter-dimensie (positie-status), geen asset-class,
+// maar deelt bewust de chip-rij naast Alles/Aandelen-ETF/Crypto — zoals
+// gevraagd. Chip verschijnt alleen als er ≥1 gesloten positie is.
+export type AssetClassFilter = 'all' | 'investment' | 'crypto' | 'closed'
 
 export const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
   { key: 'weight', label: 'Gewicht' },
-  { key: 'return', label: 'Rendement' },
+  { key: 'return', label: 'Rendement %' },  // stored-column %-metric (markt−kosten)/kosten
+  { key: 'opbrengst', label: 'Opbrengst €' }, // absolute € uit engine pnl_total
   { key: 'today', label: 'Vandaag' },
   { key: 'alpha', label: 'A–Z' },
 ]
@@ -136,6 +140,7 @@ export function HoldingsToolbar({
 function labelFor(c: AssetClassFilter): string {
   if (c === 'all') return 'Alles'
   if (c === 'investment') return 'Aandelen/ETF'
+  if (c === 'closed') return 'Gesloten'
   return 'Crypto'
 }
 

@@ -41,6 +41,11 @@ import {
   InvestmentHoldingPane,
   type InvestmentHoldingPaneInput,
 } from './holdings/investment-holding-pane'
+import {
+  isClosedHolding,
+  filterHoldingsByChip,
+  sortHoldings,
+} from './holdings/holdings-list-view'
 
 type Holding = {
   id: string
@@ -77,6 +82,18 @@ type Holding = {
   monthly_contribution?: number
   // Parent asset name (from joined assets table) for grouping
   asset_name?: string | null
+  // Opbrengst per rij — server-side afgeleid via de canonieke aggregatie-
+  // engine (lib/holdings-pnl-enrichment.ts → computePositionFromTransactions
+  // + valuePosition). Optioneel/nullable: holdings zonder transactiehistorie
+  // krijgen `null`. Voor een gesloten positie geldt pnl_total === pnl_realized.
+  pnl_total?: number | null
+  pnl_realized?: number | null
+  pnl_unrealized?: number | null
+  pnl_invested?: number | null
+  pnl_dividends?: number | null
+  pnl_fees?: number | null
+  pnl_total_pct?: number | null
+  pnl_is_closed?: boolean | null
 }
 
 // Per-holding price data from refresh API
@@ -85,6 +102,9 @@ type HoldingPriceUpdate = {
   dailyChangePercent: number | null
   previousClose: number | null
 }
+
+// isClosedHolding + de filter/sort-helpers leven in
+// `./holdings/holdings-list-view` (pure, getest); de page consumeert ze.
 
 export default function HoldingsPage({ initialData }: { initialData?: HoldingsPageData } = {}) {
   const router = useRouter()
@@ -96,7 +116,6 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   const [holdings, setHoldings] = useState<Holding[]>(initialData ? initialData.holdings as Holding[] : [])
   const [totalValue, setTotalValue] = useState(initialData?.totalValue ?? 0)
   const [totalCost, setTotalCost] = useState(initialData?.totalCost ?? 0)
-  const [source, setSource] = useState<string>(initialData?.source ?? '')
   const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -144,8 +163,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       setHoldings(data.holdings || [])
       setTotalValue(data.total_value || 0)
       setTotalCost(data.total_cost || 0)
-      setSource(data.source || '')
-    } catch (err) {
+    } catch {
       setError('Kon holdings niet laden. Probeer het opnieuw.')
     } finally {
       setLoading(false)
@@ -420,6 +438,8 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
 
   // Welke chips zijn zinvol — alleen tonen wat de gebruiker daadwerkelijk
   // heeft. Tip uit ui-ux skill: chip-rij niet vol gooien met lege opties.
+  // 'closed' is een aparte positie-status-dimensie (geen asset-class) maar
+  // deelt bewust de chip-rij; alleen tonen bij ≥1 gesloten positie.
   const availableClasses = useMemo<AssetClassFilter[]>(() => {
     const result: AssetClassFilter[] = ['all']
     const hasInvestment = urlFiltered.some((h) => {
@@ -430,56 +450,31 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       const bucket = (h as Holding & { bucket?: string }).bucket
       return bucket === 'crypto'
     })
+    const hasClosed = urlFiltered.some((h) => isClosedHolding(h))
     if (hasInvestment) result.push('investment')
     if (hasCrypto) result.push('crypto')
+    if (hasClosed) result.push('closed')
     return result
   }, [urlFiltered])
 
-  // Pas de filter-chip toe op de URL-gefilterde set.
-  const chipFiltered = useMemo(() => {
-    if (assetFilterChip === 'all') return urlFiltered
-    return urlFiltered.filter((h) => {
-      const bucket = (h as Holding & { bucket?: string }).bucket
-      if (assetFilterChip === 'crypto') return bucket === 'crypto'
-      return bucket === 'investment' || !bucket
-    })
-  }, [urlFiltered, assetFilterChip])
+  // Pas de filter-chip toe op de URL-gefilterde set (pure helper, getest).
+  const chipFiltered = useMemo(
+    () => filterHoldingsByChip(urlFiltered, assetFilterChip),
+    [urlFiltered, assetFilterChip],
+  )
 
   // Sortering — default 'weight' (gewicht aflopend, Sharesight/Empower-conventie).
-  const sortedHoldings = useMemo(() => {
-    const list = [...chipFiltered]
-    const valueOf = (h: Holding) =>
-      (h.current_price ?? h.avg_purchase_price) * Math.max(0, h.units)
-    const returnOf = (h: Holding) => {
-      const cost = h.avg_purchase_price * Math.max(0, h.units)
-      if (cost <= 0) return Number.NEGATIVE_INFINITY
-      return ((valueOf(h) - cost) / cost) * 100
-    }
-    if (sortKey === 'weight') list.sort((a, b) => valueOf(b) - valueOf(a))
-    else if (sortKey === 'return')
-      list.sort((a, b) => returnOf(b) - returnOf(a))
-    else if (sortKey === 'today')
-      list.sort(
-        (a, b) =>
-          (b.daily_change_percent ?? Number.NEGATIVE_INFINITY) -
-          (a.daily_change_percent ?? Number.NEGATIVE_INFINITY),
-      )
-    else if (sortKey === 'alpha') list.sort((a, b) => a.name.localeCompare(b.name))
-    return list
-  }, [chipFiltered, sortKey])
+  // 'opbrengst' sorteert op de server-afgeleide totale P&L (pnl_total, hoog→laag);
+  // zinvol binnen de 'Gesloten'-weergave waar pnl_total === gerealiseerde winst.
+  const sortedHoldings = useMemo(
+    () => sortHoldings(chipFiltered, sortKey),
+    [chipFiltered, sortKey],
+  )
 
-  // Open vs. gesloten posities. Volledig verkochte posities (0 stuks) horen niet
-  // in de actieve lijst — hun marktwaarde is 0 — maar blijven bereikbaar via een
-  // inklapbare sectie en hun detailpagina (waar de gerealiseerde winst staat).
-  const openHoldings = useMemo(
-    () => sortedHoldings.filter((h) => Math.abs(h.units) > 1e-9),
-    [sortedHoldings],
-  )
-  const closedHoldings = useMemo(
-    () => sortedHoldings.filter((h) => Math.abs(h.units) <= 1e-9),
-    [sortedHoldings],
-  )
-  const [showClosed, setShowClosed] = useState(false)
+  // De lijst rendert de gefilterde+gesorteerde set rechtstreeks. De vroegere
+  // open/dicht-split (met inklapbare "Gesloten posities"-sectie) is vervallen:
+  // gesloten posities verschijnen nu via de 'Gesloten'-chip, niet dubbel.
+  const visibleHoldings = sortedHoldings
 
   // Top-3 winnaars op return% — voor highlight-marker op marktwaarde-bedrag
   // in de mini-artikel-blueprint. Skill r94: max één marker per pagina-sectie,
@@ -958,7 +953,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
           </p>
         )}
 
-        {openHoldings.map((holding) => {
+        {visibleHoldings.map((holding) => {
           const price = holding.current_price ?? holding.avg_purchase_price
           const value = price * Math.max(0, holding.units)
           const stale = isPriceStale(holding)
@@ -973,6 +968,27 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
                   currency: holding.currency,
                 }).format(Math.max(0, value))
               : (fc(Math.max(0, value)) as string)
+
+          // Gesloten positie → toon de opbrengst (gerealiseerde winst/verlies)
+          // uit de server-afgeleide engine-P&L.
+          // - EUR: masking-aware via `fc()`, consistent met de rest van de lijst.
+          // - non-EUR: native valuta-formatting (Intl.NumberFormat), masking
+          //   bewust niet van toepassing — net als bij `formattedValue` hierboven.
+          //   Zo is de hele rij currency-consistent (symbool klopt).
+          // `null` als er geen transactiehistorie is (pnl_total ontbreekt).
+          const closedPnl =
+            isClosedHolding(holding) && typeof holding.pnl_total === 'number'
+              ? {
+                  amount: holding.pnl_total,
+                  formatted:
+                    holding.currency && holding.currency !== 'EUR'
+                      ? new Intl.NumberFormat('nl-NL', {
+                          style: 'currency',
+                          currency: holding.currency,
+                        }).format(holding.pnl_total)
+                      : (fc(holding.pnl_total) as string),
+                }
+              : null
 
           // Crypto-rijen openen geen investment-pane — die hebben hun eigen
           // pane-flow (`?crypto=<id>`) op de crypto-Holdings-app. Voor nu
@@ -997,6 +1013,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
                 lastPriceUpdate: holding.last_price_update,
                 isStale: stale,
                 isWinner: winnerIds.has(holding.id),
+                closedPnl,
               }}
               weightPct={weightPct}
               formattedValue={formattedValue}
@@ -1021,62 +1038,6 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
             />
           )
         })}
-
-        {/* Gesloten posities — volledig verkocht (0 stuks). Uit de actieve lijst
-            gehouden, maar bereikbaar via een inklapbare sectie; de detailpagina
-            toont hun gerealiseerde winst/verlies. */}
-        {closedHoldings.length > 0 && (
-          <div className="pt-3">
-            <button
-              type="button"
-              onClick={() => setShowClosed((v) => !v)}
-              className="flex w-full items-center justify-between border-t border-[var(--rule-soft)] pt-3 text-left"
-            >
-              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
-                Gesloten posities ({closedHoldings.length})
-              </span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
-                {showClosed ? 'Verberg' : 'Toon'}
-              </span>
-            </button>
-            {showClosed && (
-              <ul className="mt-2 space-y-1">
-                {closedHoldings.map((holding) => {
-                  const bucket = (holding as Holding & { bucket?: string }).bucket
-                  const href =
-                    bucket === 'crypto'
-                      ? `/core/assets/crypto/${holding.id}`
-                      : `/core/assets/investment/${holding.id}`
-                  return (
-                    <li key={holding.id}>
-                      <Link
-                        href={href}
-                        className="flex items-center justify-between gap-3 border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 transition-colors hover:bg-[var(--subtle)]/50"
-                      >
-                        <span className="flex min-w-0 items-baseline gap-2">
-                          <span className="font-mono text-[12px] tabular-nums text-[var(--ink)]">
-                            {holding.ticker?.toUpperCase() || holding.name}
-                          </span>
-                          {holding.ticker && (
-                            <span
-                              className="truncate font-serif text-[12px] italic text-[var(--ink-3)]"
-                              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                            >
-                              {holding.name}
-                            </span>
-                          )}
-                        </span>
-                        <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
-                          gesloten
-                        </span>
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-        )}
       </section>
 
       {/* New holding form modal */}

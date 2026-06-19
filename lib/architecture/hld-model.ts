@@ -90,6 +90,7 @@ export function buildHldModel(): HldModel {
           { title: 'Zien hoeveel je overhoudt', desc: 'Je spaarquote: welk deel van je inkomen je spaart.' },
           { title: 'Je bezittingen en schulden bijhouden', desc: 'Van spaargeld tot huis en hypotheek — je netto vermogen in beeld.' },
           { title: 'Je broker koppelen of je portefeuille importeren', desc: 'Trading 212 koppelen of een bestand inladen — je aandelen en fondsen kloppen automatisch, net als bij je crypto.' },
+          { title: 'Zien wat je beleggingen je hebben opgeleverd', desc: 'Per belegging je totale opbrengst — koerswinst, dividend én verkochte (gesloten) posities samen — afgeleid uit je eigen transacties.' },
           { title: 'Jezelf spiegelen aan Nederland en de wereld', desc: 'Zie hoe je gezondheid, spaarquote, vermogen en vrijheidsleeftijd zich verhouden tot een vergelijkbare doelgroep — en waar je staat wereldwijd.' },
           { title: 'Meteen begrijpen waaróm iets je aandacht vraagt en wat je kunt doen', desc: 'Als een overzichtspagina oranje of rood kleurt, legt een banner in gewone taal uit wat er speelt en wat je concreet kunt aanpakken — met een directe link naar de juiste plek of een gesprek met Will.' },
         ],

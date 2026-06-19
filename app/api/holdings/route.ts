@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
 import { getEURRateSync } from '@/lib/forex'
 import { resolveHolding } from '@/lib/holdings-table-resolver'
+import { loadHoldingsPnL, attachPnLToHoldings } from '@/lib/holdings-pnl-enrichment'
 
 /**
  * GET /api/holdings — List user's investment holdings.
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const holdings = (rawHoldings ?? [])
+    const baseHoldings = (rawHoldings ?? [])
       .filter((h: Record<string, unknown>) => h.asset != null)
       .map((h: Record<string, unknown>) => {
         const asset = h.asset as { id: string; name: string } | null
@@ -59,6 +60,23 @@ export async function GET(request: NextRequest) {
         const { asset: _nested, ...rest } = h
         return { ...rest, asset_name: asset?.name ?? null }
       })
+
+    // Verrijk met opbrengst per rij via de canonieke aggregatie-engine — zelfde
+    // helper als de server-loader (lib/holdings-data-loader.ts) zodat initial-
+    // render en client-hydratie identieke getallen tonen. Eén batch-query op
+    // investment_transactions.holding_id (geen N+1).
+    const pnlMap = await loadHoldingsPnL(
+      supabase,
+      baseHoldings.map((h: Record<string, unknown>) => ({
+        id: h.id as string,
+        current_price: h.current_price as number | string | null | undefined,
+      })),
+      user.id,
+    )
+    const holdings = attachPnLToHoldings(
+      baseHoldings as unknown as Array<Record<string, unknown> & { id: string }>,
+      pnlMap,
+    )
 
     const totalValue = holdings.reduce((sum: number, h: Record<string, unknown>) => {
       const price = (h.current_price as number | null) ?? (h.avg_purchase_price as number)

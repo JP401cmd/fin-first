@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-17T19:30:47.276Z",
-  "generatedDate": "2026-06-17",
+  "generatedAt": "2026-06-19T18:30:31.507Z",
+  "generatedDate": "2026-06-19",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -193,8 +193,8 @@
     "tables": 56,
     "migrations": 114,
     "integrations": 25,
-    "components": 734,
-    "providers": 11,
+    "components": 737,
+    "providers": 10,
     "contextBuilders": 9,
     "briefingTools": 0,
     "coachLayers": 4,
@@ -12619,10 +12619,6 @@
       "source": "@/components/command-palette/command-palette-provider"
     },
     {
-      "name": "DashboardTypeProvider",
-      "source": "@/components/app/dashboard-type-provider"
-    },
-    {
       "name": "FeatureAccessProvider",
       "source": "@/components/app/feature-access-provider"
     },
@@ -12656,11 +12652,11 @@
     }
   ],
   "components": {
-    "total": 734,
+    "total": 737,
     "groups": [
       {
         "group": "app",
-        "count": 309,
+        "count": 308,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12741,7 +12737,6 @@
           "cost-split-calculator",
           "counterparty-analysis-panel",
           "crypto-holdings.config",
-          "dashboard-type-provider",
           "debt-comparison-chart",
           "debt-detail-modal",
           "debt-form",
@@ -13099,7 +13094,7 @@
       },
       {
         "group": "core",
-        "count": 62,
+        "count": 64,
         "items": [
           "add-category-card",
           "amortisation-chart",
@@ -13151,6 +13146,8 @@
           "milestones-list",
           "module-tip-strip",
           "net-worth-projection-chart",
+          "opbrengst-uitsplitsing",
+          "opbrengst-uitsplitsing.test",
           "portfolio-summary",
           "rebalancing-settings-section",
           "rental-alternative-comparison",
@@ -13234,7 +13231,7 @@
       },
       {
         "group": "future",
-        "count": 51,
+        "count": 52,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
@@ -13262,6 +13259,7 @@
           "onttrekkingsstrategie-body",
           "onttrekkingsvolgorde-body",
           "owner-stats-badge",
+          "pensioen-projectie-chart",
           "pensioen-strategie-editor",
           "pensioen-strategie-editor.test",
           "pot-flow-diagram",
@@ -13291,7 +13289,7 @@
       },
       {
         "group": "check",
-        "count": 28,
+        "count": 29,
         "items": [
           "BlikOpToekomst",
           "CtaSection",
@@ -13306,6 +13304,7 @@
           "RapportNieuws",
           "RapportView",
           "ReadingProgress",
+          "SectionTrigger",
           "Toekomst",
           "TweeToekomsten",
           "WillZetten",
@@ -18130,6 +18129,18 @@
       ],
       "summary": "De app ondersteunt 14 externe koppelingen en uploads (brokers, exchanges, PSD2, marktdata, bestandsformaten). Dit besluit verankert de zelfactualiserende beheer-laag die die koppelingen bewaakt: een gecureerde inventaris (`lib/architecture/integrations-model.ts`), publieke livene",
       "file": "docs/adr/0024-integratie-contractbewaking.md"
+    },
+    {
+      "id": "0025-vrijheidscheck-eigen-woning-50pct-fire",
+      "title": "Vrijheidscheck — eigen woning telt voor 50% mee in de FIRE-grondslag",
+      "status": "aanvaard",
+      "date": "2026-06-17",
+      "elements": [
+        "as-vrijheidscheck",
+        "sp-vrijheidscheck"
+      ],
+      "summary": "In de Vrijheidscheck-funnel (`/check`) telt de eigen woning voortaan voor **50%** van haar netto overwaarde mee in de FIRE-/vrijheidsberekening — inclusief 50% van het verwachte woning-rendement — i.p.v. volledig uitgesloten te worden. De implementatie is bewust **gescoped tot he",
+      "file": "docs/adr/0025-vrijheidscheck-eigen-woning-50pct-fire.md"
     }
   ],
   "churn": {
@@ -18137,15 +18148,15 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 81
+        "commits": 82
       },
       {
         "path": "lib/ai",
-        "commits": 36
+        "commits": 37
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 28
+        "commits": 29
       },
       {
         "path": "lib/fire-simulation.ts",
@@ -18180,12 +18191,12 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 6928,
-        "commits": 91
+        "commits": 82
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 4866,
-        "commits": 25
+        "commits": 24
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -18205,7 +18216,7 @@
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 2614,
-        "commits": 14
+        "commits": 13
       },
       {
         "file": "lib/horizon-data.ts",
@@ -18986,13 +18997,13 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-17",
+    "previousDate": "2026-06-19",
     "hasChanges": true,
     "sections": [
       {
-        "label": "Schermen",
+        "label": "Componenten (aantal)",
         "added": [
-          "/beheer/integraties"
+          "+3"
         ],
         "removed": []
       }
@@ -19052,6 +19063,13 @@
       "date": "2026-06-17",
       "api": 381,
       "components": 734,
+      "tables": 56,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-06-19",
+      "api": 381,
+      "components": 737,
       "tables": 56,
       "routesProduction": 98
     }

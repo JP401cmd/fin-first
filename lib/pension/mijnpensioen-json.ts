@@ -19,8 +19,10 @@
  *
  * - Eén pensioenpot per pensioenuitvoerder (gegarandeerd + indicatief opgeteld);
  *   uitvoerders met een indicatief deel krijgen de naam-suffix " (deels indicatief)".
- * - AOW-leeftijd wordt NIET berekend: `PensionParseResult` heeft er geen veld voor
- *   en `applyPensionParseResult` werkt alleen bestaande AOW-events bij.
+ * - AOW: naast `aowBedrag` leveren we ook de optionele `aowLeeftijd` (uit het
+ *   AOW-blok, omhoog afgerond op hele jaren) en `aowLeefsituatie` (uit `opts`).
+ *   Daarmee kan de strategie-editor de gebruiker een expliciete keuze bieden om
+ *   de AOW over te nemen (aanmaken óf bijwerken) i.p.v. automatisch.
  * - Nabestaandenpensioen is best-effort en belandt alleen in het top-level
  *   `nabestaandenpensioen`-veld (niet als regeling in de array).
  */
@@ -134,11 +136,27 @@ export function mijnpensioenJsonToParseResult(
   const blokken = opDetails ? asArray(opDetails.OuderdomsPensioen) : []
 
   const regelingen = collectOuderdomspensioen(blokken)
-  const aowBedrag = collectAow(blokken, opts.samenwonend)
+  const { aowBedrag, aowLeeftijd } = collectAow(blokken, opts.samenwonend)
   const nabestaandenpensioen = collectNabestaandenpensioen(details)
   const samenvatting = buildSamenvatting(regelingen.length, aowBedrag)
 
-  return { aowBedrag, regelingen, nabestaandenpensioen, samenvatting }
+  // Woonsituatie volgt de aanroep; alleen relevant als er een AOW-bedrag is.
+  const aowLeefsituatie: PensionParseResult['aowLeefsituatie'] =
+    aowBedrag !== null
+      ? opts.samenwonend
+        ? 'samenwonend'
+        : 'alleenstaand'
+      : undefined
+
+  return {
+    aowBedrag,
+    regelingen,
+    nabestaandenpensioen,
+    samenvatting,
+    // undefined laten we bewust weg uit het PDF-pad; hier vullen we ze als bekend.
+    ...(aowLeeftijd !== null ? { aowLeeftijd } : {}),
+    ...(aowLeefsituatie !== undefined ? { aowLeefsituatie } : {}),
+  }
 }
 
 /**
@@ -254,13 +272,21 @@ function uitvoerderNamen(items: unknown[]): string[] {
 }
 
 /**
- * AOW-jaarbedrag → maandbedrag. De `AOW`-sectie hangt op een blok in
- * `OuderdomsPensioen[]` met een `AOW`-veld. We pakken het EERSTE blok waarin de
- * gevraagde woonvorm (`TeBereikenSamenwonend`/`TeBereikenAlleenstaand`) ook echt
- * gevuld is; een blok zonder die woonvorm wordt overgeslagen. Geen enkel blok met
- * een gevulde woonvorm → null.
+ * AOW-jaarbedrag → maandbedrag + de AOW-leeftijd. De `AOW`-sectie hangt op een
+ * blok in `OuderdomsPensioen[]` met een `AOW`-veld. We pakken het EERSTE blok
+ * waarin de gevraagde woonvorm (`TeBereikenSamenwonend`/`TeBereikenAlleenstaand`)
+ * ook echt gevuld is; een blok zonder die woonvorm wordt overgeslagen. Geen enkel
+ * blok met een gevulde woonvorm → bedrag null.
+ *
+ * De AOW-leeftijd komt uit `Van.Leeftijd` van datzelfde blok, omhoog afgerond op
+ * hele jaren (`Math.ceil(Jaren + Maanden/12)`) zodat 'ie als integer `target_age`
+ * bruikbaar is. Geen leeftijd in het blok → leeftijd null (bedrag kan dan toch
+ * gevuld zijn).
  */
-function collectAow(blokken: unknown[], samenwonend: boolean): number | null {
+function collectAow(
+  blokken: unknown[],
+  samenwonend: boolean,
+): { aowBedrag: number | null; aowLeeftijd: number | null } {
   for (const b of blokken) {
     const blok = asRecord(b)
     const aow = blok ? asRecord(blok.AOW) : null
@@ -273,9 +299,18 @@ function collectAow(blokken: unknown[], samenwonend: boolean): number | null {
     // Leeg gevraagd woonvorm-veld? Probeer het volgende AOW-blok i.p.v. te stoppen —
     // een later blok kan de gevraagde woonvorm wél bevatten.
     if (jaar === null) continue
-    return jaarNaarMaand(jaar)
+
+    // Leeftijd uit het Van-blok; ontbreekt 'ie, dan null (bedrag blijft geldig).
+    const van = blok ? asRecord(blok.Van) : null
+    const leeftijd = van ? asRecord(van.Leeftijd) : null
+    const jaren = leeftijd ? asNumber(leeftijd.Jaren) : null
+    const maanden = leeftijd ? asNumber(leeftijd.Maanden) : null
+    const aowLeeftijd =
+      jaren !== null ? Math.ceil(jaren + (maanden ?? 0) / 12) : null
+
+    return { aowBedrag: jaarNaarMaand(jaar), aowLeeftijd }
   }
-  return null
+  return { aowBedrag: null, aowLeeftijd: null }
 }
 
 /**

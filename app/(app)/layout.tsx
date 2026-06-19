@@ -35,7 +35,6 @@ import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { WillHome } from '@/components/app/will/will-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
-import { DashboardTypeProvider } from '@/components/app/dashboard-type-provider'
 import {
   generateAllColorVars,
   DEFAULT_MODULE_COLORS,
@@ -445,7 +444,6 @@ export default async function AppLayout({
               <NotificationProvider>
               <GlobalSyncProvider>
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
-                  <DashboardTypeProvider>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
                       {/* Skip-link — eerste tab-stop voor keyboard- en
                           screen-reader-gebruikers (WCAG 2.1 Bypass Blocks).
@@ -493,7 +491,6 @@ export default async function AppLayout({
                         />
                       </Suspense>
                     </div>
-                  </DashboardTypeProvider>
                 </ModuleColorProvider>
                 <NotificationModal />
               </GlobalSyncProvider>

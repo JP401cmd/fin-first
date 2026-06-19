@@ -37,6 +37,12 @@ const PensionParseResultSchema = z.object({
   regelingen: z.array(RegelingSchema).describe('Alle gevonden pensioenregelingen'),
   nabestaandenpensioen: z.number().nullable().describe('Totaal nabestaandenpensioen per maand in EUR, of null als niet vermeld'),
   samenvatting: z.string().describe('Korte samenvatting van het pensioenoverzicht in 1-2 zinnen'),
+  // Optioneel: alleen de deterministische JSON-mapper (mijnpensioen-json.ts) vult
+  // deze. De AI-PDF-extractie laat ze ongemoeid (undefined), zodat het PDF-pad
+  // onveranderd blijft en de AOW-keuze daar alleen "bijwerken" kan aanbieden.
+  aowLeeftijd: z.number().optional().describe('AOW-leeftijd (hele jaren) — alleen uit de JSON-export'),
+  aowLeefsituatie: z.enum(['samenwonend', 'alleenstaand']).optional()
+    .describe('Woonsituatie waarop het AOW-bedrag gebaseerd is — alleen uit de JSON-export'),
 })
 
 export type PensionParseResult = z.infer<typeof PensionParseResultSchema>

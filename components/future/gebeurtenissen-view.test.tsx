@@ -35,6 +35,7 @@ const mockStrategieData: StrategieEditorsData = {
   grossYearlyIncome: 0,
   pensioenFactorA: 0,
   currentAge: null,
+  inflationRate: 0,
   currentNetMonthly: 0,
   housingPreview: null,
 }

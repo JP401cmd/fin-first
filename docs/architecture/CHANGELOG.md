@@ -280,3 +280,15 @@
 ## 2026-06-17
 
 - **Schermen** toegevoegd: /beheer/integraties
+
+## 2026-06-19
+
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-06-19
+
+- **Componenten (aantal)** verwijderd: -1
+
+## 2026-06-19
+
+- **Componenten (aantal)** toegevoegd: +3

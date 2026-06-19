@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   computePositionFromTransactions,
   valuePosition,
+  HOLDINGS_TX_AGG_LIMIT,
   type PositionTransaction,
 } from './holdings-aggregation'
 
@@ -89,5 +90,46 @@ describe('computePositionFromTransactions', () => {
     expect(agg.netUnits).toBe(10)
     expect(agg.dividends).toBeCloseTo(5, 6)
     expect(agg.realizedPnL).toBeCloseTo(5, 6)
+  })
+})
+
+describe('HOLDINGS_TX_AGG_LIMIT — cap-correctheidscontract (H1)', () => {
+  /**
+   * Toont dat de volgorde-afkap (nieuwste-N-first) een ANDERE avgCost en
+   * realizedPnL oplevert dan de volledige set. Het detailpane-pad stuurde
+   * vroeger `.order('date', { ascending: false }).limit(200)` → de earliest
+   * aankopen worden dan weggelaten → gemiddelde kostprijs klopt niet.
+   *
+   * Zes transacties: initiële aankoop (datum 2020) + vijf latere. De initiële
+   * aankoop heeft de laagste prijs → weglaten verhoogt de avgCost, waardoor
+   * de gerealiseerde winst bij de verkoop daalt.
+   */
+  it('deelset (zonder vroegste aankoop) levert andere avgCost dan volledige set', () => {
+    // Volledige historische set (chronologisch: vroegste eerst)
+    const volledigSet: PositionTransaction[] = [
+      { type: 'buy', units: 100, price_per_unit: 10, date: '2020-01-01' }, // vroegste/goedkoopste
+      { type: 'buy', units: 50, price_per_unit: 20, date: '2021-01-01' },
+      { type: 'buy', units: 50, price_per_unit: 22, date: '2022-01-01' },
+      { type: 'buy', units: 50, price_per_unit: 24, date: '2023-01-01' },
+      { type: 'buy', units: 50, price_per_unit: 26, date: '2024-01-01' },
+      { type: 'sell', units: 100, price_per_unit: 30, date: '2025-01-01' },
+    ]
+
+    // Deelset: nieuwste 5 transacties (wat .order('date', DESC).limit(5) geeft)
+    // De vroegste aankoop (2020-01-01) valt weg.
+    const deelSet = volledigSet.slice(1) // zonder de eerste (2020) entry
+
+    const aggVolledig = computePositionFromTransactions(volledigSet)
+    const aggDeel = computePositionFromTransactions(deelSet)
+
+    // Verschillende avgCost: zonder de goedkope 2020-aankoop is de gem. kostprijs hoger.
+    expect(aggDeel.avgCost).toBeGreaterThan(aggVolledig.avgCost)
+
+    // Verschillende realizedPnL: lagere kostprijs op de volledige set = hogere winst.
+    expect(aggVolledig.realizedPnL).toBeGreaterThan(aggDeel.realizedPnL)
+  })
+
+  it('cap is minstens 5000 — per-ongeluk verlagen maakt deze test rood', () => {
+    expect(HOLDINGS_TX_AGG_LIMIT).toBeGreaterThanOrEqual(5000)
   })
 })

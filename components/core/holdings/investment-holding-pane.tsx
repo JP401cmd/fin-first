@@ -58,6 +58,11 @@ import {
 } from '@/components/app/shell/shell-overlay'
 import { useToast } from '@/components/app/toast-provider'
 import { formatCurrency } from '@/lib/format'
+import {
+  computePositionFromTransactions,
+  valuePosition,
+} from '@/lib/holdings-aggregation'
+import { OpbrengstUitsplitsing } from './opbrengst-uitsplitsing'
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -569,19 +574,45 @@ function InvestmentHoldingPaneView({
   const externalSource = holding.externalSource
   const tickerDisplay = holding.ticker?.toUpperCase() ?? ''
 
-  // Marktwaarde + rendement-tone in native currency (en wanneer non-EUR
-  // tonen we een currency-suffix). Mirror van de full-page detail
-  // `app/(app)/core/assets/investment/[holdingId]/page.tsx` regel 187-215.
+  // ── Positie + opbrengst uit de transactiehistorie (single source of truth) ──
+  // We consumeren de canonieke engine (lib/holdings-aggregation) i.p.v. zelf
+  // (value − kostbasis)/kostbasis te rekenen — die lokale som miste het
+  // gerealiseerde deel + dividend en was 0/null voor gesloten posities. De
+  // detail-fetch levert de transacties; zonder transacties (handmatige
+  // holding) vallen we terug op een eenvoudige markt − kostbasis-schatting.
   const value = currentPrice != null ? units * currentPrice : 0
-  const costBasis = avgPrice > 0 ? units * avgPrice : null
+  const txs = detail?.transactions ?? []
+  const hasTx = txs.length > 0
+  const agg = computePositionFromTransactions(
+    txs.map((t) => ({
+      type: t.type,
+      units: t.units,
+      // `price_per_unit` kan in het detail-payload `null` zijn (bv. dividend-
+      // rij); de engine verwacht number|string → 0 betekent geen koerseffect.
+      price_per_unit: t.price_per_unit ?? 0,
+      total_amount: t.total_amount,
+      date: t.date,
+    })),
+  )
+  const valued = valuePosition(agg, currentPrice)
+
+  // Fallback voor een holding zónder transacties: alleen markt − kostbasis op
+  // de opgeslagen velden (geen gerealiseerd/dividend bekend).
+  const fallbackCost = avgPrice > 0 ? units * avgPrice : null
+  const fallbackTotalPnL =
+    currentPrice != null && fallbackCost != null ? value - fallbackCost : null
+
+  // Totale opbrengst (bedrag) + % t.o.v. inleg — uit de engine wanneer er
+  // transacties zijn, anders de fallback-schatting.
+  const totalPnL = hasTx ? valued.totalPnL : fallbackTotalPnL
+  const pnlBase = hasTx ? agg.totalInvested : fallbackCost
   const returnPct =
-    costBasis != null && costBasis !== 0
-      ? ((value - costBasis) / costBasis) * 100
+    totalPnL != null && pnlBase != null && pnlBase > 0
+      ? (totalPnL / pnlBase) * 100
       : null
-  const returnVal = costBasis != null ? value - costBasis : null
 
   const valueTone =
-    returnPct == null ? 'neutral' : returnPct >= 0 ? 'positive' : 'negative'
+    totalPnL == null ? 'neutral' : totalPnL >= 0 ? 'positive' : 'negative'
   const valueToneClass =
     valueTone === 'positive'
       ? 'text-positive'
@@ -707,13 +738,38 @@ function InvestmentHoldingPaneView({
               : '—'
           }
           sub={
-            returnVal != null
-              ? `${returnVal >= 0 ? '+' : ''}${formatCurrencyOf(returnVal, currency)}`
+            totalPnL != null
+              ? `${totalPnL >= 0 ? '+' : ''}${formatCurrencyOf(totalPnL, currency)}`
               : 'kostenbasis onbekend'
           }
           tone={valueTone}
         />
       </section>
+
+      {/* 3b. Totale opbrengst + uitsplitsing — gedeeld met de full-page
+          detail (`OpbrengstUitsplitsing`) zodat beide schermen identiek
+          ogen. Alleen tonen wanneer er transacties zijn; een handmatige
+          holding zonder transacties heeft geen betrouwbare split. */}
+      {hasTx && (
+        <section>
+          <OpbrengstUitsplitsing
+            totalPnL={valued.totalPnL}
+            unrealizedPnL={valued.unrealizedPnL}
+            realizedPnL={valued.realizedPnL}
+            dividends={agg.dividends}
+            totalFees={agg.totalFees}
+            totalInvested={agg.totalInvested}
+            isClosed={agg.isClosed}
+            formatAmount={(v) => formatCurrencyOf(v, currency)}
+            size="compact"
+          />
+          {agg.isClosed && (
+            <p className="mt-2 text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              Positie gesloten
+            </p>
+          )}
+        </section>
+      )}
 
       {/* 4. Meta-rij — krant-meta in mono UPPERCASE.
           "Prijs bijgewerkt {datum}" + optionele TER + bron-tag.

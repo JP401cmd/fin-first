@@ -21,8 +21,12 @@ export interface StrategieEditorsData {
   /** Factor A (jaarlijkse pensioenaangroei uit UPO) uit de loader-bundel —
    *  voor de jaarruimte-schatting in de pensioen-editor. 0 = niet ingevuld. */
   pensioenFactorA: number
-  /** Huidige leeftijd uit DOB (null = onbekend) — basis voor de Werk-strategie. */
+  /** Huidige leeftijd uit DOB (null = onbekend) — basis voor de Werk-strategie
+   *  én het indexatie-anker van de pensioen-projectiegrafiek. */
   currentAge: number | null
+  /** Inflatievoet uit resolveFireParams (fractie, bv. 0.02) — indexatie van de
+   *  pensioen-projectiegrafiek. Geen hardcoded percentage in de UI. */
+  inflationRate: number
   /** Huidig netto maandinkomen (prefill Werk-strategie). */
   currentNetMonthly: number
   /** Basis voor de live preview in de Huis-strategie-modal (null = geen preview). */
@@ -83,6 +87,8 @@ export function StrategieEditors({
         aowAge={aowAge}
         grossYearlyIncome={data.grossYearlyIncome}
         pensioenFactorA={data.pensioenFactorA}
+        currentAge={data.currentAge}
+        inflationRate={data.inflationRate}
         samenwonend={samenwonend}
         onClose={onClose}
         readOnly={readOnly}

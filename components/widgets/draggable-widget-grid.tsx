@@ -23,7 +23,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, ChevronDown, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard, Compass, Trash2 } from 'lucide-react'
+import { GripVertical, X, Plus, Lock, Wand2, ChevronRight, Layers, CalendarClock, PieChart, Wallet, Flame, LayoutDashboard, Compass, Trash2 } from 'lucide-react'
 import { WidgetRenderer, type DashboardData } from './widget-renderer'
 import { CategoryAppNavBar } from './category-app-nav-bar'
 import {
@@ -45,7 +45,6 @@ import { WIDGET_CATALOG, WIDGET_FEATURE_MAP, BUDGET_WIDGETS, getWidgetDef } from
 import { WIDGET_PRESETS, type WidgetPreset } from '@/lib/widget-presets'
 import { isFeatureAccessible, type FeatureAccessMap } from '@/lib/compute-feature-access'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
-import { useDashboardType } from '@/components/app/dashboard-type-provider'
 
 /** Human-readable size label */
 function sizeLabel(size: WidgetSize): string {
@@ -215,17 +214,6 @@ interface DraggableWidgetGridProps {
    */
   suppressIntroSheet?: boolean
   /**
-   * Verberg de section-header met "Mijn Dashboard"-titel + Modify-knop.
-   * Bedoeld voor host-context waar de host zijn eigen Bewerken-toggle
-   * exposeert en de dashboard-titel visueel overbodig is.
-   *
-   * NB: dit raakt NIET de verberg-knoppen per widget — die hebben hun
-   * eigen `hideRemoveButton`-prop. Gebruikers moeten in edit-mode altijd
-   * widgets kunnen verwijderen, ook in host-context (user-feedback mei
-   * 2026: "widgets hebben geen verwijder knop bij bewerken").
-   */
-  hideHeader?: boolean
-  /**
    * Verberg de X-verwijder-knop per widget in edit-mode. Default `false` —
    * widgets blijven altijd verwijderbaar. Alleen op true zetten wanneer
    * de host een alternatieve verwijder-flow exposeert (geen huidige
@@ -241,8 +229,6 @@ interface DraggableWidgetGridProps {
   editMode?: boolean
   onEditModeChange?: (next: boolean) => void
 }
-
-type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 /** Check if a widget is accessible based on feature gating */
 function isWidgetAccessible(widgetId: string, features: FeatureAccessMap): boolean {
@@ -270,7 +256,7 @@ function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: Das
   return true
 }
 
-export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppLinks, suppressIntroSheet, hideHeader, hideRemoveButton, editMode: controlledEditMode, onEditModeChange }: DraggableWidgetGridProps) {
+export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppLinks, suppressIntroSheet, hideRemoveButton, editMode: controlledEditMode, onEditModeChange }: DraggableWidgetGridProps) {
   const router = useRouter()
   const { features } = useFeatureAccess()
 
@@ -294,15 +280,12 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     }
   }
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showAddPicker, setShowAddPicker] = useState(false)
   const [showAutoWizard, setShowAutoWizard] = useState(false)
   const [selectedPreset, setSelectedPreset] = useState<WidgetPreset | null>(null)
   // Bulk-actie wacht op bevestiging — `null` = geen dialoog open.
   const [bulkAction, setBulkAction] = useState<{ type: 'fill'; size: WidgetSize } | { type: 'clear' } | null>(null)
-  // Dashboard collapsed state from shared context
-  const { isCollapsed, setIsCollapsed: setCollapsedCtx } = useDashboardType()
 
   // ── API-loaded presets (fallback to hardcoded) ──────────────
   const [apiPresets, setApiPresets] = useState<WidgetPreset[]>(WIDGET_PRESETS)
@@ -342,7 +325,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Track pending debounced save for flush on unload/unmount
   const pendingWidgets = useRef<WidgetPref[] | null>(null)
-  const [pendingSave, setPendingSave] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -358,7 +340,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   )
 
   const performSave = useCallback(async (widgets: WidgetPref[]) => {
-    setSaveState('saving')
     setSaveError(null)
 
     // Merge updated active widgets with disabled widgets from allPrefs
@@ -376,23 +357,17 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
       })
       if (!res.ok) throw new Error('Opslaan mislukt')
       previousWidgets.current = widgets
-      setSaveState('saved')
-      setPendingSave(false)
-      setTimeout(() => setSaveState('idle'), 1500)
       // Invalidate server component cache so changes are visible after navigation/refresh
       router.refresh()
     } catch {
       // Rollback to previous state
       setActiveWidgets(previousWidgets.current)
-      setSaveState('error')
-      setPendingSave(false)
       setSaveError('Opslaan mislukt. Volgorde teruggezet.')
     }
   }, [allPrefs, router])
 
   const scheduleSave = useCallback((widgets: WidgetPref[]) => {
     pendingWidgets.current = widgets
-    setPendingSave(true)
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
       pendingWidgets.current = null
@@ -545,62 +520,12 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     })
   }, [scheduleSave])
 
-  const handleGereed = useCallback(async () => {
-    setIsEditMode(false)
-    setShowAddPicker(false)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    pendingWidgets.current = null
-    setPendingSave(false)
-    setSaveState('saving')
-    setSaveError(null)
-
-    const activeIds = new Set(activeWidgets.map(w => w.id))
-    const disabledPrefs = allPrefs
-      .filter(p => !activeIds.has(p.id))
-      .map(p => ({ ...p, enabled: false }))
-    const merged = [...activeWidgets.map(w => ({ ...w, enabled: true })), ...disabledPrefs]
-
-    try {
-      const res = await fetch('/api/widgets', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ widgets: merged }),
-      })
-      if (!res.ok) throw new Error('Opslaan mislukt')
-      previousWidgets.current = activeWidgets
-      setSaveState('saved')
-      setTimeout(() => setSaveState('idle'), 1500)
-      // Invalidate server component cache so changes are visible after navigation/refresh
-      router.refresh()
-    } catch {
-      setActiveWidgets(previousWidgets.current)
-      setSaveState('error')
-      setSaveError('Opslaan mislukt. Volgorde teruggezet.')
-    }
-  }, [activeWidgets, allPrefs, router])
-
-  const toggleEditMode = useCallback(async () => {
-    if (isEditMode) {
-      await handleGereed()
-    } else {
-      setIsEditMode(true)
-      setSaveError(null)
-      setSaveState('idle')
-    }
-  }, [isEditMode, handleGereed])
-
-  const toggleCollapsed = useCallback(() => {
-    setCollapsedCtx(!isCollapsed)
-  }, [isCollapsed, setCollapsedCtx])
-
   const activePref = activeId ? activeWidgets.find(p => p.id === activeId) ?? null : null
   const ids = activeWidgets.map(p => p.id)
 
-  // De balk verschijnt onder de "Mijn Dashboard"-titel zodra:
+  // De balk verschijnt bovenaan het grid zodra:
   //   • er data is (`categoryAppLinks` met >0 entries),
   //   • de gebruiker hem aan heeft staan.
-  // De `!isCollapsed`-check zit in de wrapper, waardoor de balk vanzelf
-  // weg valt wanneer de gebruiker het dashboard inklapt.
   const showCategoryNavBar =
     !!categoryAppLinks &&
     categoryAppLinks.length > 0 &&
@@ -608,52 +533,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
 
   const gridContent = (
     <div>
-      {/* Section header with edit mode toggle — verborgen in host-context
-          (hideHeader). De host levert dan zijn eigen Bewerken-knop en de
-          dashboard-titel is visueel overbodig. */}
-      {!hideHeader && (
-        <div className={`flex items-center justify-between border-b border-[var(--border-ed)] pb-2 ${isCollapsed ? 'mb-0' : 'mb-4'}`}>
-          <button type="button" onClick={toggleCollapsed} className="flex items-center gap-1.5">
-            <ChevronDown className={`h-3.5 w-3.5 text-[var(--ink-3)] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} />
-            <h2 className="label-editorial text-[var(--ink-2)]">Mijn Dashboard</h2>
-          </button>
-          {!isCollapsed && <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleEditMode}
-              aria-pressed={isEditMode}
-              disabled={saveState === 'saving'}
-              className={`flex items-center gap-1 rounded-[var(--r-sm)] border px-2 py-1 text-xs transition-colors disabled:opacity-50 ${
-                isEditMode
-                  ? 'border-kern-300 bg-kern-50 text-kern-700'
-                  : 'border-[var(--border-ed)] text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-              }`}
-            >
-              <GripVertical className="h-3.5 w-3.5" />
-              <span>
-                {saveState === 'saving' && isEditMode === false
-                  ? 'Opslaan…'
-                  : saveState === 'saved' && isEditMode === false
-                    ? 'Opgeslagen'
-                    : pendingSave && !isEditMode
-                      ? 'Opslaan…'
-                      : isEditMode
-                        ? 'Gereed'
-                        : 'Modify'}
-              </span>
-            </button>
-          </div>}
-        </div>
-      )}
-
-      {/* Collapse alleen honoreren wanneer de header (met de uitklap-toggle)
-          ook getoond wordt. In host-context (hideHeader, zoals de /overzicht
-          hero-rail) bestaat die toggle niet, dus een ingeklapte staat zou de
-          hele inhoud — widgets ÉN de bewerk-picker — permanent verbergen zonder
-          herstelmogelijkheid. Een stale `dashboard-collapsed=true` in
-          localStorage (uit een oudere build met header) maakte zo het hele
-          dashboard-blok onzichtbaar. */}
-      {(hideHeader || !isCollapsed) && (<>
       {/* Categorie-app-balk — direct onder de titel zodat de Kern-apps van
           de gebruiker (Bezittingen + Schulden) als snelkoppelingen zichtbaar
           zijn vóór de widget-grid. Conditioneel via `categoryNavVisible`
@@ -902,7 +781,6 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
         </div>
       )}
 
-      </>)}
       </>)}
 
       {/* Wizard rendered outside conditional/DndContext to avoid fixed-positioning issues from transforms.

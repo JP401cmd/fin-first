@@ -190,6 +190,69 @@ describe('mijnpensioenJsonToParseResult', () => {
       expect(alleen.aowBedrag).toBe(Math.round(24000 / 12)) // 2000
       expect(samen.aowBedrag).not.toBe(alleen.aowBedrag)
     })
+
+    it('aowLeefsituatie volgt opts.samenwonend', () => {
+      const samen = mijnpensioenJsonToParseResult(buildFixture(), { samenwonend: true })
+      const alleen = mijnpensioenJsonToParseResult(buildFixture(), { samenwonend: false })
+      expect(samen.aowLeefsituatie).toBe('samenwonend')
+      expect(alleen.aowLeefsituatie).toBe('alleenstaand')
+    })
+  })
+
+  describe('4b. AOW-leeftijd (Math.ceil van Jaren + Maanden/12)', () => {
+    it('Jaren 67 / Maanden 0 → aowLeeftijd 67', () => {
+      const result = mijnpensioenJsonToParseResult(buildFixture(), { samenwonend: true })
+      expect(result.aowLeeftijd).toBe(67)
+    })
+
+    it('Jaren 67 / Maanden 3 → omhoog afgerond naar 68', () => {
+      const json = {
+        StatusCode: '000',
+        Details: {
+          OuderdomsPensioenDetails: {
+            OuderdomsPensioen: [
+              {
+                Van: { Leeftijd: { Jaren: 67, Maanden: 3 } },
+                Tot: { Leeftijd: { Jaren: 67, Maanden: 6 } },
+                AOW: {
+                  AOWDetailsOpbouw: {
+                    TeBereikenSamenwonend: 16800,
+                    TeBereikenAlleenstaand: 24000,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      }
+      const result = mijnpensioenJsonToParseResult(json, { samenwonend: true })
+      // 67 + 3/12 = 67,25 → Math.ceil → 68
+      expect(result.aowLeeftijd).toBe(68)
+      expect(result.aowBedrag).toBe(Math.round(16800 / 12))
+    })
+
+    it('geen AOW-blok → aowBedrag/aowLeeftijd/aowLeefsituatie ongedefinieerd of null', () => {
+      const json = {
+        StatusCode: '000',
+        Details: {
+          OuderdomsPensioenDetails: {
+            OuderdomsPensioen: [
+              {
+                Van: { Leeftijd: { Jaren: 67, Maanden: 0 } },
+                Tot: { OuderdomsPensioenEvent: 'Overlijden' },
+                Pensioen: [
+                  { TeBereiken: 12000, PensioenUitvoerder: 'Fonds Solo', HerkenningsNummer: 'S-1' },
+                ],
+              },
+            ],
+          },
+        },
+      }
+      const result = mijnpensioenJsonToParseResult(json, { samenwonend: true })
+      expect(result.aowBedrag).toBeNull()
+      expect(result.aowLeeftijd).toBeUndefined()
+      expect(result.aowLeefsituatie).toBeUndefined()
+    })
   })
 
   describe('5. ontbrekende secties', () => {

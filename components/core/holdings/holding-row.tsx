@@ -44,6 +44,13 @@ export type HoldingRowData = {
   isStale: boolean
   /** Top-3 winnaar in portfolio → krijgt highlight-marker op marktwaarde. */
   isWinner: boolean
+  /**
+   * Opbrengst (totale P&L) van een GESLOTEN positie, server-afgeleid via de
+   * canonieke aggregatie-engine. Alleen gezet voor uitverkochte rijen; voor een
+   * gesloten positie geldt totale P&L === gerealiseerde winst. `null` → niet
+   * tonen (geen transactiehistorie). `formatted` is masking-aware uit de parent.
+   */
+  closedPnl?: { amount: number; formatted: string } | null
 }
 
 export type HoldingRowProps = {
@@ -198,6 +205,27 @@ export function HoldingRow({
               )}
             </p>
           </div>
+
+          {/* Gesloten positie → toon de opbrengst (gerealiseerde winst/verlies)
+              i.p.v. de dag-/rendement-strip. Teken via text-positive/negative
+              (semantisch, geen module-accent). Zonder dit getal is sorteren op
+              opbrengst betekenisloos. */}
+          {soldOut && holding.closedPnl && (
+            <div className="mt-1.5 flex items-center gap-2 text-[12px] tabular-nums">
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
+                Opbrengst
+              </span>
+              <span
+                className={`font-mono font-semibold ${
+                  holding.closedPnl.amount >= 0 ? 'text-positive' : 'text-negative'
+                }`}
+                data-testid={`holding-closed-pnl-${holding.id}`}
+              >
+                {holding.closedPnl.amount >= 0 ? '+' : ''}
+                {holding.closedPnl.formatted}
+              </span>
+            </div>
+          )}
 
           {/* KPI-strip: dag-Δ + totaal-rendement */}
           {!soldOut && (

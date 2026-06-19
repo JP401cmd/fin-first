@@ -14,6 +14,7 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
+import { loadHoldingsPnL, attachPnLToHoldings } from '@/lib/holdings-pnl-enrichment'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -115,8 +116,28 @@ export const loadHoldingsData = cache(async (supabase: SupabaseClient): Promise<
       }
     })
 
+  // Verrijk de investment-rijen met opbrengst per rij via de canonieke
+  // aggregatie-engine (één batch-query, geen N+1). Nodig voor de lijst-
+  // weergave: sorteren op opbrengst + het tonen van het opbrengst-bedrag op
+  // gesloten posities. Crypto-rijen blijven ongemoeid (eigen transactietabel,
+  // buiten scope). De helper levert per holding een Map; ontbrekende rijen
+  // (geen transacties) krijgen `null`-P&L en de UI valt terug op de
+  // holding-kolommen.
+  const flatInvestment = flatten(investmentRows, 'investment') as unknown as Array<
+    Record<string, unknown> & { id: string }
+  >
+  const pnlMap = await loadHoldingsPnL(
+    supabase,
+    flatInvestment.map((h) => ({
+      id: h.id,
+      current_price: h.current_price as number | string | null | undefined,
+    })),
+    user.id,
+  )
+  const enrichedInvestment = attachPnLToHoldings(flatInvestment, pnlMap)
+
   const holdings: Array<Record<string, unknown>> = [
-    ...flatten(investmentRows, 'investment'),
+    ...enrichedInvestment,
     ...flatten(cryptoRows, 'crypto'),
   ]
 

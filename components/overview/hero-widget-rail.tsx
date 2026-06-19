@@ -114,10 +114,8 @@ export function HeroWidgetRail({
       allPrefs={allPrefs}
       data={dashboardData}
       // Bewust niet:
-      //  - showDashboardTypeToggle (default false → geen briefing-toggle)
-      //  - categoryAppLinks       (undefined → geen categorie-balk)
+      //  - categoryAppLinks (undefined → geen categorie-balk)
       suppressIntroSheet
-      hideHeader
       // hideRemoveButton blijft default false — user wil widgets kunnen
       // verwijderen in edit-mode (mei 2026 bug-rapport: "widgets op het
       // overzicht hebben geen verwijder-knop bij bewerken").
