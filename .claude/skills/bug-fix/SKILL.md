@@ -43,7 +43,7 @@ De `senior-developer` routeert naar het juiste domein en integreert:
 - Prompt/categorisatie/DNA → `ai-specialist-prompt-dna`
 - UI/component/scherm → `frontend-ui-builder`
 - Overig/cross-cutting → `coder` of de `senior-developer` zelf
-Fix bij de **bron** (geen symptoombestrijding, geen duplicatie van een berekening).
+Fix bij de **bron** (geen symptoombestrijding, geen duplicatie van een berekening). **Bij een rekenmotor- of constante-correctie: grep niet alleen op de canonieke functienaam, maar óók op de rúwe constante-literalen van de oude/foute formule (bv. `0.133`, `17_545`) — een tweede surface die de metric volledig herimplementeert met magic numbers verschijnt nooit in een grep op de geëxporteerde functie, en blijft anders ongecorrigeerd achter.**
 
 ### 6. Verifiëren — `tester`
 De `tester` draait de test uit stap 4 (nu **groen**) plus de bredere relevante suites, en voegt een **regressiecase** toe zodat de bug niet terugkomt. Draai `npx tsc --noEmit` en relevante `npm run test:run`-paden. Geen groen-theater: rapporteer echte output. Draaien stap 6 en 7 parallel, dan wijzigt de tester geen productiecode: in-scope defecten meldt hij als bevinding aan de orchestrator, zodat de review geen bewegend doel beoordeelt.

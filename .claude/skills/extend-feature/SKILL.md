@@ -40,6 +40,8 @@ Zelfde routering als bij een nieuwe functie, maar met de opdracht **hergebruik b
 - AI-plumbing → `ai-specialist-general` · Prompts/DNA → `ai-specialist-prompt-dna`
 - UI → `frontend-ui-builder` · lijm/overig → `coder`
 
+Raakt de uitbreiding een **rekenmotor of een financiële constante**: grep niet alleen op de canonieke functienaam, maar óók op de rúwe constante-literalen van de oude/bestaande formule (bv. `0.133`, `17_545`) — een tweede surface die de metric volledig herimplementeert met magic numbers verschijnt nooit in een grep op de geëxporteerde functie, en drijft anders verder uit elkaar.
+
 ### 7. Testen — bestaand beschermen + nieuw dekken — `tester`
 De `tester` voegt tests toe voor het nieuwe gedrag **en** draait de bestaande suites om regressie uit te sluiten; voegt waar nodig een regressiecase toe die het oude gedrag vastpint. `tsc`/lint/tests groen, echte output. Gebruik NOOIT `git stash` om een "schone baseline" te meten wanneer er omvangrijke niet-gecommitte WIP in de working tree staat — dat bundelt vreemde wijzigingen met de jouwe en een mislukte `pop` kan werk in gevaar brengen; bepaal of een fout pre-existing is door het pad/bestand te inspecteren (is het een bestand dat jij aanraakte?).
 
