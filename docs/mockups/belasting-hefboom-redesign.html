@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TriFinity — Mockup: De hefboom Belasting (versimpelde redesign)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;0,900;1,400;1,500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f5efe2;
+    --paper: #fbf7ec;
+    --subtle: #f3ead9;
+    --border-ed: #e3dac8;
+    --border-md: #ccc1aa;
+    --rule-soft: rgba(26, 25, 22, 0.18);
+    --ink: #1a1916;
+    --ink-2: #4a4840;
+    --ink-3: #888070;
+    --ink-4: #bbb8b0;
+    --positive: oklch(0.50 0.09 162);
+    --negative: oklch(0.50 0.09 25);
+    /* box-kleuren (eigen systeem, geen module-identiteit) */
+    --box1-50:#fffbeb; --box1-100:#fef3c7; --box1-500:#f59e0b; --box1-700:#b45309;
+    --box2-50:#f5f3ff; --box2-100:#ede9fe; --box2-500:#8b5cf6; --box2-700:#6d28d9;
+    --box3-50:#f0fdfa; --box3-100:#ccfbf1; --box3-500:#14b8a6; --box3-700:#0f766e;
+    /* "wil/horizon"-accent voor de hefboom-context (uitkomst = vrijheid → horizon-goud-ish, hier ink-warm) */
+    --accent: #6d28d9;            /* belasting-hub neutraal-ink, accenten via box-kleuren */
+    --marker: rgba(196,160,107,.45); /* horizon-200-achtige highlight-marker (universele uitkomst) */
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-serif: 'Source Serif 4', Georgia, serif;
+    --font-mono: 'DM Mono', ui-monospace, monospace;
+    --font-sans: 'Inter', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Chrome / control bar ─────────────────────────────── */
+  .controlbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(251,247,236,.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border-ed);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    padding: 10px 18px;
+  }
+  .brand { font-family: var(--font-display); font-weight: 900; font-size: 17px; letter-spacing: -.02em; }
+  .brand .dot { color: var(--box2-500); }
+  .seg { display: inline-flex; border: 1px solid var(--ink); }
+  .seg button {
+    font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    background: transparent; color: var(--ink-3); border: none; padding: 7px 12px; cursor: pointer;
+    border-right: 1px solid var(--border-ed); min-height: 36px;
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.active { background: var(--ink); color: var(--paper); }
+  .spacer { flex: 1 1 auto; }
+  .toggle-wrap { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+    border: 1px solid var(--rule-soft); padding: 5px 11px; border-radius: 999px;
+    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-3);
+    min-height: 32px;
+  }
+  .pill.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  /* ── Page canvas ──────────────────────────────────────── */
+  .canvas { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+  .screen { display: none; }
+  .screen.active { display: block; animation: fadeUp .4s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* ── Editorial signatures ─────────────────────────────── */
+  .kicker {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--ink-3); margin-bottom: 18px;
+  }
+  .kicker::before { content: ""; display: inline-block; width: 28px; height: 1px; background: var(--accent); }
+  .kicker.box1::before { background: var(--box1-500); }
+  .kicker.box2::before { background: var(--box2-500); }
+  .kicker.box3::before { background: var(--box3-500); }
+
+  h1.headline {
+    font-family: var(--font-display); font-weight: 900; letter-spacing: -.02em; line-height: 1.05;
+    font-size: clamp(30px, 5vw, 52px); margin: 0 0 18px;
+  }
+  h1.headline em { font-style: italic; font-weight: 500; color: var(--accent); }
+  .headline.box1 em { color: var(--box1-700); }
+  .headline.box2 em { color: var(--box2-700); }
+  .headline.box3 em { color: var(--box3-700); }
+
+  .deck {
+    border-left: 2px solid var(--accent); padding-left: 14px; font-style: italic;
+    font-family: var(--font-serif); color: var(--ink-2); max-width: 62ch; font-size: 17px; line-height: 1.55;
+  }
+  .deck.box1 { border-color: var(--box1-500); }
+  .deck.box2 { border-color: var(--box2-500); }
+  .deck.box3 { border-color: var(--box3-500); }
+
+  .marker { background: linear-gradient(transparent 58%, var(--marker) 58%); padding: 0 2px; }
+
+  .double-rule { border-top: 4px double var(--ink); border-bottom: 1px solid var(--ink); height: 5px; margin: 38px 0; }
+  .rule { border: none; border-top: 1px solid var(--border-ed); margin: 28px 0; }
+
+  .section-label {
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 1px solid var(--rule-soft); padding-bottom: 8px; margin: 0 0 22px;
+  }
+  .section-label .lbl { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .18em; color: var(--ink-3); }
+  .section-label .num { font-family: var(--font-display); font-style: italic; font-size: 15px; color: var(--accent); }
+
+  /* ── HERO: het ene hoofdcijfer ───────────────────────── */
+  .hero {
+    border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink);
+    background: var(--paper); padding: 30px 28px; margin: 26px 0 34px;
+  }
+  .hero .label { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .2em; color: var(--ink-3); margin-bottom: 12px; }
+  .hero .bigtime {
+    font-family: var(--font-display); font-weight: 900; letter-spacing: -.02em; line-height: .98;
+    font-size: clamp(36px, 8vw, 72px); color: var(--ink);
+  }
+  .hero .euro { font-family: var(--font-mono); font-size: 17px; color: var(--ink-2); margin-top: 14px; }
+  .hero .euro b { color: var(--ink); font-weight: 500; }
+  .hero .sub { font-family: var(--font-serif); font-style: italic; color: var(--ink-3); margin-top: 6px; font-size: 14px; }
+
+  /* ── Box cards ────────────────────────────────────────── */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--ink); }
+  @media (max-width: 720px){ .cards { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--paper); padding: 22px 20px 18px; border-right: 1px solid var(--rule-soft); position: relative; cursor: pointer;
+    transition: background .15s ease, transform .15s ease;
+  }
+  .cards .card:last-child { border-right: none; }
+  @media (max-width: 720px){ .card { border-right: none; border-bottom: 1px solid var(--rule-soft); } .cards .card:last-child { border-bottom: none; } }
+  .card:hover { background: var(--subtle); }
+  .card .acc { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .card.b1 .acc { background: var(--box1-500); } .card.b2 .acc { background: var(--box2-500); } .card.b3 .acc { background: var(--box3-500); }
+  .card .chip { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 999px; font-size: 17px; margin-bottom: 12px; }
+  .card.b1 .chip { background: var(--box1-50); color: var(--box1-700); } .card.b2 .chip { background: var(--box2-50); color: var(--box2-700); } .card.b3 .chip { background: var(--box3-50); color: var(--box3-700); }
+  .card .ck { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-3); }
+  .card .name { font-family: var(--font-display); font-weight: 700; font-size: 18px; margin: 3px 0 12px; }
+  .card .amt { font-family: var(--font-mono); font-size: 20px; color: var(--ink); }
+  .card .amt small { font-size: 12px; color: var(--ink-3); }
+  .card .time { font-family: var(--font-serif); font-style: italic; font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+  .card .status { position: absolute; top: 18px; right: 18px; display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+  .statusdot { width: 8px; height: 8px; border-radius: 999px; }
+  .dot-good { background: var(--positive); } .dot-warn { background: var(--box1-500); } .dot-bad { background: var(--negative); } .dot-neutral { background: var(--ink-4); }
+  .txt-good { color: var(--positive); } .txt-warn { color: var(--box1-700); } .txt-bad { color: var(--negative); } .txt-neutral { color: var(--ink-3); }
+
+  /* ── Kans-callout (the one opportunity) ───────────────── */
+  .kans {
+    background: var(--paper); border: 1px solid var(--ink); border-left: 4px solid var(--accent);
+    padding: 18px 20px; margin: 22px 0; display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+  }
+  .kans.box1 { border-left-color: var(--box1-500); } .kans.box3 { border-left-color: var(--box3-500); }
+  .kans .ktext { flex: 1 1 280px; }
+  .kans .ck { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-3); margin-bottom: 6px; }
+  .kans .kh { font-family: var(--font-display); font-weight: 700; font-size: 19px; line-height: 1.25; }
+  .kans .kh b { color: var(--box1-700); } .kans.box3 .kh b { color: var(--box3-700); }
+  .kans .ks { font-family: var(--font-serif); font-style: italic; color: var(--ink-2); margin-top: 6px; font-size: 14px; }
+  .btn {
+    font-family: var(--font-sans); font-weight: 600; font-size: 14px; cursor: pointer;
+    background: var(--ink); color: var(--paper); border: 1px solid var(--ink); padding: 11px 18px; min-height: 44px; white-space: nowrap;
+  }
+  .btn.ghost { background: transparent; color: var(--ink); border: 2px solid var(--ink); }
+  .btn:hover { transform: translateY(-1px); box-shadow: 3px 3px 0 var(--rule-soft); }
+
+  /* ── Consistent disclosure (the ONE gesture for depth) ── */
+  .disclose { border: 1px solid var(--border-ed); margin: 14px 0; background: var(--paper); }
+  .disclose > summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-2);
+    min-height: 44px;
+  }
+  .disclose > summary::-webkit-details-marker { display: none; }
+  .disclose > summary .chev { margin-left: auto; transition: transform .2s ease; color: var(--ink-3); font-family: var(--font-sans); }
+  .disclose[open] > summary .chev { transform: rotate(90deg); }
+  .disclose > summary .preview { font-family: var(--font-serif); text-transform: none; letter-spacing: 0; font-style: italic; color: var(--ink-3); font-size: 13px; }
+  .disclose .body { padding: 4px 20px 22px; border-top: 1px dotted var(--rule-soft); }
+
+  /* ── Receipt / breakdown ──────────────────────────────── */
+  .receipt { font-family: var(--font-serif); }
+  .receipt .row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px dotted var(--rule-soft); }
+  .receipt .row .l { color: var(--ink-2); }
+  .receipt .row .r { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+  .receipt .row.total { border-bottom: 4px double var(--ink); border-top: 1px solid var(--ink); padding-top: 12px; margin-top: 6px; }
+  .receipt .row.total .l { font-family: var(--font-display); font-weight: 900; font-size: 18px; }
+  .receipt .row.total .r { font-weight: 500; font-size: 18px; }
+  .receipt .row .time { font-family: var(--font-serif); font-style: italic; color: var(--ink-3); font-size: 12px; }
+
+  /* figures strip */
+  .figs { display: grid; grid-template-columns: repeat(4,1fr); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); margin: 24px 0; }
+  @media (max-width: 640px){ .figs { grid-template-columns: 1fr 1fr; } }
+  .figs .f { padding: 18px 16px; border-right: 1px solid var(--rule-soft); }
+  .figs .f:last-child { border-right: none; }
+  .figs .f .k { font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .2em; color: var(--ink-3); margin-bottom: 6px; }
+  .figs .f .v { font-family: var(--font-display); font-weight: 900; font-size: clamp(20px, 4vw, 26px); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .figs .f .m { font-family: var(--font-serif); font-style: italic; font-size: 11px; color: var(--ink-3); margin-top: 5px; }
+
+  /* calendar list */
+  .cal .row { display: flex; gap: 14px; align-items: baseline; padding: 11px 0; border-bottom: 1px dotted var(--rule-soft); }
+  .cal .date { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); min-width: 64px; }
+  .cal .ev { font-family: var(--font-serif); color: var(--ink); }
+
+  /* empty / not-applicable state */
+  .empty { text-align: center; max-width: 520px; margin: 30px auto; padding: 40px 24px; }
+  .empty .icon { font-size: 34px; }
+  .empty h2 { font-family: var(--font-display); font-weight: 700; font-size: 22px; margin: 14px 0 8px; }
+  .empty h2 em { font-style: italic; color: var(--box2-700); font-weight: 500; }
+  .empty p { font-family: var(--font-serif); font-style: italic; color: var(--ink-2); max-width: 46ch; margin: 0 auto 20px; }
+
+  /* colophon */
+  .colophon { text-align: center; font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin-top: 46px; user-select: none; }
+
+  /* ── Ontwerpnotities (design annotations) ─────────────── */
+  body:not(.notes) .note { display: none; }
+  .note {
+    border-left: 3px solid var(--box2-500); background: var(--box2-50);
+    padding: 12px 16px; margin: 14px 0; font-family: var(--font-sans); font-size: 13px; line-height: 1.5; color: #3b2d5e;
+  }
+  .note b { color: var(--box2-700); }
+  .note .tag { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .14em; color: var(--box2-700); display: block; margin-bottom: 4px; }
+
+  /* "advanced only" sections — hidden in Eenvoudig mode */
+  body.eenvoudig .adv { display: none; }
+  .modehint { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-4); text-align: center; margin: 8px 0 0; }
+  body:not(.eenvoudig) .modehint.simple-only { display: none; }
+  body.eenvoudig .modehint.full-only { display: none; }
+</style>
+</head>
+<body class="eenvoudig notes">
+
+<div class="controlbar">
+  <span class="brand">tf<span class="dot">.</span> <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase;">Mockup · Hefboom Belasting</span></span>
+  <div class="seg" id="nav">
+    <button data-screen="hub" class="active">Hub</button>
+    <button data-screen="box1">Box 1</button>
+    <button data-screen="box2">Box 2</button>
+    <button data-screen="box3">Box 3</button>
+  </div>
+  <span class="spacer"></span>
+  <span class="pill on" id="modeToggle" title="Wissel tussen de rustige basislaag en de volledige laag">● Eenvoudig</span>
+  <span class="pill on" id="notesToggle" title="Toon/verberg de ontwerpnotities">✎ Ontwerpnotities</span>
+</div>
+
+<div class="canvas">
+
+  <!-- ════════════════ SCREEN: HUB ════════════════ -->
+  <section class="screen active" data-screen="hub">
+    <div class="kicker">De vierde hefboom · Belasting 2026</div>
+    <h1 class="headline">Drie boxen, één rekening — betaald in <em>vrijheid</em></h1>
+    <div class="deck">Wat de fiscus jaarlijks afroomt is óók levenstijd. Hieronder zie je in één oogopslag hoeveel vrijheid je belasting kost — en de éne plek waar nu ruimte ligt.</div>
+
+    <div class="note">
+      <span class="tag">Ontwerpbeslissing · het ene hoofdcijfer</span>
+      Moment van dit scherm = <b>oriënteren</b> ("hoe zwaar weegt belasting?"). Daarom één hoofdcijfer in <b>vrijheidstijd</b>, niet vier KPI's naast elkaar. De euro's staan eronder als ondersteuning. Tijd is één mentale eenheid i.p.v. euro's + procenten + jaren door elkaar.
+    </div>
+
+    <!-- ONE hoofdcijfer -->
+    <div class="hero">
+      <div class="label">Jouw belasting dit jaar, in vrijheid</div>
+      <div class="bigtime"><span class="marker">5 maanden &amp; 1 week</span></div>
+      <div class="euro">≈ <b>€17.550</b> belasting per jaar · <span style="color:var(--ink-3)">153 dagen van je vrijheid</span></div>
+      <div class="sub">Een schatting op basis van je gegevens — geen aangifte.</div>
+    </div>
+
+    <div class="note">
+      <span class="tag">Ontwerpbeslissing · rustige basislaag</span>
+      De huidige hub toont meteen 5 secties (De druk, De kansen, De kalender, Bruto→netto, De vooruitblik). Hier zien we in <b>Eenvoudig</b> alleen het hoofdcijfer, de 3 boxen en de <b>één</b> belangrijkste kans. De rest staat achter <b>één</b> consistent disclosure-gebaar. Zet de schakelaar op <b>Volledig</b> om het verschil te zien.
+    </div>
+
+    <!-- 3 box cards -->
+    <div class="cards">
+      <button class="card b1" data-goto="box1">
+        <div class="acc"></div>
+        <div class="status"><span class="statusdot dot-warn"></span><span class="txt-warn">Kans</span></div>
+        <div class="chip">💼</div>
+        <div class="ck">Box 1</div>
+        <div class="name">Werk + woning</div>
+        <div class="amt">€16.240<small>/jr</small></div>
+        <div class="time">141 dagen vrijheid</div>
+      </button>
+      <button class="card b2" data-goto="box2">
+        <div class="acc"></div>
+        <div class="status"><span class="statusdot dot-neutral"></span><span class="txt-neutral">N.v.t.</span></div>
+        <div class="chip">🏛️</div>
+        <div class="ck">Box 2</div>
+        <div class="name">Aanmerkelijk belang</div>
+        <div class="amt">—</div>
+        <div class="time">Niet van toepassing</div>
+      </button>
+      <button class="card b3" data-goto="box3">
+        <div class="acc"></div>
+        <div class="status"><span class="statusdot dot-good"></span><span class="txt-good">Op koers</span></div>
+        <div class="chip">🐷</div>
+        <div class="ck">Box 3</div>
+        <div class="name">Sparen + beleggen</div>
+        <div class="amt">€1.310<small>/jr</small></div>
+        <div class="time">11 dagen vrijheid</div>
+      </button>
+    </div>
+
+    <!-- THE one opportunity -->
+    <div class="kans box1">
+      <div class="ktext">
+        <div class="ck">De grootste kans nu · Box 1</div>
+        <div class="kh">Benut je jaarruimte en koop <b>26 dagen</b> vrijheid terug</div>
+        <div class="ks">Je hebt €8.200 onbenutte jaarruimte. Een lijfrente-inleg bespaart ±€3.034 belasting tegen je marginale tarief.</div>
+      </div>
+      <button class="btn" data-goto="box1">Bekijk je jaarruimte</button>
+    </div>
+
+    <div class="note">
+      <span class="tag">Ontwerpbeslissing · wat laat je zien</span>
+      Van álle kansen tonen we er in de basislaag <b>één</b> — de grootste, met een concrete voorwaartse CTA. De overige kansen leven onder "Meer over je belasting". Zo beslist het scherm vóór de gebruiker; hij hoeft niet te kiezen om iets te begrijpen.
+    </div>
+
+    <!-- THE one consistent disclosure for the whole second layer -->
+    <div class="modehint simple-only">▾ De diepte staat onder één gebaar — open hieronder of zet boven op "Volledig"</div>
+
+    <details class="disclose adv-anchor">
+      <summary><span>Meer over je belasting</span><span class="preview">verdeling · kalender · bruto→netto · vooruitblik</span><span class="chev">›</span></summary>
+      <div class="body">
+
+        <div class="section-label" style="margin-top:18px"><span class="lbl">De verdeling</span><span class="num">i.</span></div>
+        <div class="figs">
+          <div class="f"><div class="k">Box 1</div><div class="v">93%</div><div class="m">€16.240 · 141 dgn</div></div>
+          <div class="f"><div class="k">Box 2</div><div class="v">—</div><div class="m">n.v.t.</div></div>
+          <div class="f"><div class="k">Box 3</div><div class="v">7%</div><div class="m">€1.310 · 11 dgn</div></div>
+          <div class="f"><div class="k">Effectieve druk</div><div class="v">28%</div><div class="m">van je bruto</div></div>
+        </div>
+
+        <div class="section-label"><span class="lbl">De kalender</span><span class="num">ii.</span></div>
+        <div class="cal">
+          <div class="row"><span class="date">1 mrt</span><span class="ev">Aangifte inkomstenbelasting opent</span></div>
+          <div class="row"><span class="date">1 mei</span><span class="ev">Deadline aangifte 2025</span></div>
+          <div class="row"><span class="date">31 dec</span><span class="ev">Peildatum Box 3-vermogen</span></div>
+        </div>
+
+        <div class="section-label" style="margin-top:26px"><span class="lbl">Van bruto naar netto</span><span class="num">iii.</span></div>
+        <div class="receipt">
+          <div class="row"><span class="l">Bruto jaarinkomen</span><span class="r">€62.000</span></div>
+          <div class="row"><span class="l">Loonheffing (Box 1)</span><span class="r">− €16.240</span></div>
+          <div class="row total"><span class="l">Netto besteedbaar</span><span class="r">€45.760</span></div>
+        </div>
+
+        <div class="section-label" style="margin-top:26px"><span class="lbl">De vooruitblik</span><span class="num">iv.</span></div>
+        <p style="color:var(--ink-2);max-width:60ch;font-size:15px">Het Box 3-stelsel verandert richting heffing op werkelijk rendement. Zodra de wet vaststaat, rekent TriFinity je positie automatisch opnieuw door.</p>
+      </div>
+    </details>
+
+    <div class="modehint full-only">— Volledig: alle secties staan nu uitgevouwen; dit is de huidige standaardhoeveelheid —</div>
+
+    <div class="colophon">Trifinity ✦ Belasting ✦ Drie boxen, één rekening</div>
+  </section>
+
+  <!-- ════════════════ SCREEN: BOX 1 ════════════════ -->
+  <section class="screen" data-screen="box1">
+    <div class="kicker box1">Box 1 · Werk + woning</div>
+    <h1 class="headline box1">Wat je werk je kost aan <em>vrijheid</em></h1>
+    <div class="deck box1">Loon, ondernemerswinst en je eigen huis. Hier weegt de hefboom het zwaarst — en hier ligt ook je grootste knop om vrijheid terug te kopen.</div>
+
+    <div class="hero">
+      <div class="label">Box 1-heffing dit jaar, in vrijheid</div>
+      <div class="bigtime"><span class="marker">141 dagen</span></div>
+      <div class="euro">≈ <b>€16.240</b> per jaar · <span style="color:var(--ink-3)">28% effectieve druk</span></div>
+      <div class="sub">Schatting o.b.v. €62.000 bruto — geen aangifte.</div>
+    </div>
+
+    <div class="note">
+      <span class="tag">Ontwerpbeslissing · één moment, één actie</span>
+      Box 1 combineert <b>oriënteren</b> (hoofdcijfer) met <b>één doen-kans</b> (jaarruimte). De volledige bruto→netto-opbouw is tweede laag — relevant, maar niet nodig om de kans te snappen. Dezelfde disclosure-component als op de hub.
+    </div>
+
+    <div class="kans box1">
+      <div class="ktext">
+        <div class="ck">Jouw kans · jaarruimte 2026</div>
+        <div class="kh"><b>€3.034</b> minder belasting = <b>26 dagen</b> vrijheid terug</div>
+        <div class="ks">€8.200 onbenutte jaarruimte. Met een lijfrente-inleg verlaag je je belastbaar inkomen tegen 37% marginaal.</div>
+      </div>
+      <button class="btn">Bereken mijn inleg</button>
+    </div>
+
+    <details class="disclose">
+      <summary><span>Zo is je heffing opgebouwd</span><span class="preview">bruto → schijven → netto</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div class="receipt" style="margin-top:14px">
+          <div class="row"><span class="l">Bruto jaarinkomen</span><span class="r">€62.000</span></div>
+          <div class="row"><span class="l">Schijf 1 (36,97% tot €38.441)</span><span class="r">€14.212</span></div>
+          <div class="row"><span class="l">Schijf 2 (49,5% daarboven)</span><span class="r">€11.661</span></div>
+          <div class="row"><span class="l">Heffingskorting + arbeidskorting</span><span class="r">− €9.633</span></div>
+          <div class="row total"><span class="l">Box 1-heffing</span><span class="r">€16.240</span></div>
+        </div>
+      </div>
+    </details>
+
+    <div class="colophon">Trifinity ✦ Belasting · Box 1 ✦ Werk + woning</div>
+  </section>
+
+  <!-- ════════════════ SCREEN: BOX 2 ════════════════ -->
+  <section class="screen" data-screen="box2">
+    <div class="kicker box2">Box 2 · Aanmerkelijk belang</div>
+
+    <div class="note">
+      <span class="tag">Ontwerpbeslissing · niet tonen wat niet telt</span>
+      Voor ~99% van de gebruikers is Box 2 niet van toepassing. De huidige app toont alsnog een volledige DGA-calculator. De grootste versimpeling hier is <b>weglaten</b>: een rustige "niet van toepassing"-staat met één regel uitleg, en de hele machinerie achter één disclosure voor wie hem nodig heeft.
+    </div>
+
+    <div class="empty">
+      <div class="icon">🏛️</div>
+      <h2>Box 2 is voor jou <em>niet van toepassing</em></h2>
+      <p>Deze box geldt alleen voor wie een aanmerkelijk belang heeft (≥ 5% aandelen in een eigen bv, of een DGA-positie). We vonden dat niet terug in je gegevens.</p>
+      <button class="btn ghost" id="box2learn">Wat is aanmerkelijk belang?</button>
+    </div>
+
+    <details class="disclose" id="box2disclose" style="max-width:620px;margin:0 auto">
+      <summary><span>Ik heb wél een aanmerkelijk belang</span><span class="preview">open de DGA-berekening</span><span class="chev">›</span></summary>
+      <div class="body">
+        <p style="color:var(--ink-2);font-size:15px;max-width:56ch;margin-top:14px">Dan rekent TriFinity je Box 2-heffing uit over dividend en vervreemdingswinst (tarief 24,5% tot €67.804, daarboven 31%), inclusief de excessief-lenen-regeling. Voeg je deelneming toe bij je bezittingen om te starten.</p>
+        <button class="btn" style="margin-top:8px">Voeg een deelneming toe</button>
+      </div>
+    </details>
+
+    <div class="colophon">Trifinity ✦ Belasting · Box 2 ✦ Aanmerkelijk belang</div>
+  </section>
+
+  <!-- ════════════════ SCREEN: BOX 3 ════════════════ -->
+  <section class="screen" data-screen="box3">
+    <div class="kicker box3">Box 3 · Sparen + beleggen</div>
+    <h1 class="headline box3">Wat je vermogen kost aan <em>vrijheid</em></h1>
+    <div class="deck box3">Cash, beleggingen en crypto. De Belastingdienst rekent met een fictief (forfaitair) rendement boven je heffingsvrije vermogen.</div>
+
+    <div class="hero">
+      <div class="label">Box 3-heffing dit jaar, in vrijheid</div>
+      <div class="bigtime"><span class="marker">11 dagen</span></div>
+      <div class="euro">≈ <b>€1.310</b> per jaar · <span style="color:var(--ink-3)">over €92.500 belast vermogen</span></div>
+      <div class="sub">Forfaitaire berekening 2026 — geen aangifte.</div>
+    </div>
+
+    <div class="note">
+      <span class="tag">Ontwerpbeslissing · auto-eerst</span>
+      Box 3 opent met de <b>berekende</b> uitkomst, niet met een lege calculator. De forfait-opbouw (de "kassabon") staat onder de standaard disclosure. De partner-allocatie verschijnt alleen als er een fiscaal partner is — anders is hij ruis.
+    </div>
+
+    <div class="kans box3">
+      <div class="ktext">
+        <div class="ck">Jouw kans · slim verdelen</div>
+        <div class="kh">Verdeel Box 3 optimaal met je partner: <b>€420</b> minder</div>
+        <div class="ks">Door het belaste vermogen anders over jullie aangiftes te verdelen, daalt de heffing — ±4 dagen vrijheid.</div>
+      </div>
+      <button class="btn">Toon de verdeling</button>
+    </div>
+
+    <details class="disclose">
+      <summary><span>Zo is je heffing opgebouwd</span><span class="preview">vermogen → forfait → heffing</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div class="receipt" style="margin-top:14px">
+          <div class="row"><span class="l">Spaargeld (forfait 1,44%)</span><span class="r">€48.000</span></div>
+          <div class="row"><span class="l">Beleggingen + crypto (forfait 5,88%)</span><span class="r">€57.000</span></div>
+          <div class="row"><span class="l">Heffingsvrij vermogen</span><span class="r">− €57.684</span></div>
+          <div class="row"><span class="l">Belast rendement (fictief)</span><span class="r">€3.788</span></div>
+          <div class="row total"><span class="l">Box 3-heffing (36%)</span><span class="r">€1.310</span></div>
+        </div>
+      </div>
+    </details>
+
+    <div class="colophon">Trifinity ✦ Belasting · Box 3 ✦ Sparen + beleggen</div>
+  </section>
+
+</div>
+
+<script>
+  // ── screen switcher ──
+  function goto(screen){
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === screen));
+    document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.screen === screen));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  document.querySelectorAll('#nav button').forEach(b => b.addEventListener('click', () => goto(b.dataset.screen)));
+  document.querySelectorAll('[data-goto]').forEach(el => el.addEventListener('click', () => goto(el.dataset.goto)));
+
+  // ── Eenvoudig / Volledig ──
+  const modeToggle = document.getElementById('modeToggle');
+  function syncMode(){
+    const simple = document.body.classList.contains('eenvoudig');
+    modeToggle.classList.toggle('on', true);
+    modeToggle.textContent = simple ? '● Eenvoudig' : '● Volledig';
+    // In "Volledig" force-open the hub disclosure to reveal the second layer.
+    document.querySelectorAll('.disclose.adv-anchor').forEach(d => { d.open = !simple; });
+  }
+  modeToggle.addEventListener('click', () => { document.body.classList.toggle('eenvoudig'); syncMode(); });
+  syncMode();
+
+  // ── Ontwerpnotities ──
+  const notesToggle = document.getElementById('notesToggle');
+  notesToggle.addEventListener('click', () => {
+    document.body.classList.toggle('notes');
+    notesToggle.classList.toggle('on', document.body.classList.contains('notes'));
+  });
+
+  // Box 2 "learn" opens the disclosure
+  document.getElementById('box2learn').addEventListener('click', () => {
+    document.getElementById('box2disclose').open = true;
+    document.getElementById('box2disclose').scrollIntoView({ behavior:'smooth', block:'center' });
+  });
+</script>
+</body>
+</html>
