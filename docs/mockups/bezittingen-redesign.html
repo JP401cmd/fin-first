@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TriFinity — Mockup: Bezittingen (waar je vermogen woont)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f5efe2;--paper:#fbf7ec;--subtle:#f3ead9;--border-ed:#e3dac8;--border-md:#ccc1aa;
+    --rule-soft:rgba(26,25,22,.16);--hair:rgba(26,25,22,.10);
+    --ink:#1a1916;--ink-2:#4a4840;--ink-3:#888070;--ink-4:#bbb8b0;
+    --positive:oklch(0.50 0.09 162);--negative:oklch(0.50 0.09 25);--box2-500:#8b5cf6;--box1-700:#b45309;
+    --gold:#c4a06b;--gold-deep:#9a7a44;--marker:rgba(196,160,107,.42);
+    --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:64px;--s9:96px;
+    --display:'Playfair Display',Georgia,serif;--serif:'Source Serif 4',Georgia,serif;--mono:'DM Mono',ui-monospace,monospace;--measure:64ch;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;overflow-x:hidden}
+  body{position:relative;background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.62;-webkit-font-smoothing:antialiased;-webkit-overflow-scrolling:touch;min-height:100%}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:100;opacity:.035;mix-blend-mode:multiply;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  .controlbar{position:static;z-index:60;background:var(--paper);border-bottom:1px solid var(--rule-soft);display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);padding:var(--s2) var(--s4)}
+  @media(min-width:760px){.controlbar{position:sticky;top:0}}
+  .cb-tag{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+  .spacer{flex:1 1 auto}
+  .pill{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;border:1px solid var(--rule-soft);padding:6px 12px;border-radius:999px;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-3);min-height:34px;transition:all .15s}
+  .pill:hover{border-color:var(--border-md);color:var(--ink-2)}
+  .pill.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+  .canvas{max-width:1020px;margin:0 auto;padding:clamp(24px,5vw,52px) clamp(20px,5vw,44px) var(--s9)}
+  .masthead{margin-bottom:var(--s7)}
+  .masthead .toprule{border-top:1px solid var(--ink)}
+  .mast-row{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding-top:var(--s2)}
+  .mast-side{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap;flex:1 1 0}
+  .mast-side.right{text-align:right}
+  .mast-name{font-family:var(--display);font-weight:800;font-size:clamp(28px,6vw,46px);letter-spacing:-.02em;line-height:1;flex:0 0 auto;color:inherit;text-decoration:none}
+  .mast-name .pt{color:var(--gold-deep)}
+  .mast-tag{text-align:center;font-style:italic;color:var(--ink-3);font-size:14px;margin-top:var(--s2)}
+  .sections{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--s4);margin-top:var(--s4);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em}
+  .sections a{color:var(--ink-3);text-decoration:none;padding-bottom:3px;border-bottom:2px solid transparent;transition:color .15s}
+  .sections a:hover{color:var(--ink)}
+  .sections a.active{color:var(--ink);border-bottom-color:var(--gold)}
+  .masthead .botrule{border-top:4px double var(--ink);border-bottom:1px solid var(--ink);height:5px;margin-top:var(--s4)}
+  @media(max-width:560px){.mast-side{display:none}.mast-row{justify-content:center}}
+
+  .screen>*{animation:rise .6s cubic-bezier(.2,.7,.2,1) backwards}
+  .screen>*:nth-child(1){animation-delay:.04s}.screen>*:nth-child(2){animation-delay:.10s}.screen>*:nth-child(3){animation-delay:.16s}.screen>*:nth-child(4){animation-delay:.22s}.screen>*:nth-child(5){animation-delay:.28s}.screen>*:nth-child(6){animation-delay:.34s}.screen>*:nth-child(7){animation-delay:.40s}.screen>*:nth-child(n+8){animation-delay:.46s}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){.screen>*{animation:none}}
+
+  .kicker{display:flex;align-items:center;gap:var(--s3);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--ink-3);margin-bottom:var(--s5)}
+  .kicker::before{content:"";width:36px;height:2px;background:var(--gold)}
+  h1.headline{font-family:var(--display);font-weight:800;letter-spacing:-.018em;line-height:1.04;font-size:clamp(34px,6.2vw,64px);margin:0 0 var(--s4);max-width:18ch}
+  h1.headline em{font-style:italic;font-weight:500;color:var(--gold-deep)}
+  .deck{font-style:italic;color:var(--ink-2);max-width:var(--measure);font-size:19px;line-height:1.55;margin:0 0 var(--s6)}
+  .marker{background:linear-gradient(transparent 56%,var(--marker) 56%,var(--marker) 94%,transparent 94%);padding:0 .08em}
+
+  .hero{padding:var(--s6) 0 var(--s7);border-top:1px solid var(--ink);margin-bottom:var(--s6)}
+  .hero .eyebrow{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:var(--ink-3);margin-bottom:var(--s4)}
+  .hero .bigtime{font-family:var(--display);font-weight:900;letter-spacing:-.025em;line-height:.92;font-size:clamp(46px,11vw,104px);color:var(--ink)}
+  /* split-balk: liquide (goud) vs vast (ink) */
+  .split{margin-top:var(--s6);max-width:680px}
+  .split .track{display:flex;height:11px;border:1px solid var(--hair);overflow:hidden}
+  .split .liq{background:var(--gold)}.split .vast{background:var(--ink-4)}
+  .split .legend{display:flex;gap:var(--s5);margin-top:var(--s3);font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);flex-wrap:wrap}
+  .split .legend i{width:10px;height:10px;display:inline-block;margin-right:6px;vertical-align:-1px}
+  .split .legend .gi{background:var(--gold)}.split .legend .ii{background:var(--ink-4)}
+  .hero .euro{font-family:var(--mono);font-size:16px;color:var(--ink-2);margin-top:var(--s5);display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);align-items:baseline}
+  .hero .euro b{color:var(--ink);font-weight:500}.hero .euro .muted{color:var(--ink-3)}
+  .hero .sub{font-style:italic;color:var(--ink-3);margin-top:var(--s3);font-size:14px;max-width:60ch}
+
+  .sec{margin:var(--s7) 0 var(--s5)}
+  .sec-head{display:flex;align-items:baseline;gap:var(--s3);border-bottom:1px solid var(--ink);padding-bottom:var(--s2)}
+  .sec-head .n{font-family:var(--display);font-style:italic;font-size:17px;color:var(--gold-deep)}
+  .sec-head .t{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:var(--ink-2)}
+
+  /* holdings-lijst */
+  .hold{margin-top:var(--s4)}
+  .h-row{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s4);align-items:baseline;padding:var(--s4) 0;border-bottom:1px solid var(--hair)}
+  .h-key{width:6px;align-self:stretch;background:var(--ink-4)}
+  .h-row.liq .h-key{background:var(--gold)}
+  .h-main .nm{font-family:var(--display);font-weight:600;font-size:19px;line-height:1.1}
+  .h-main .fr{font-style:italic;font-size:13.5px;color:var(--ink-3);margin-top:2px}
+  .h-main .bar{height:4px;background:var(--subtle);border:1px solid var(--hair);margin-top:var(--s3);position:relative;max-width:340px}
+  .h-main .bar i{position:absolute;inset:0 auto 0 0;background:var(--ink-4)}
+  .h-row.liq .h-main .bar i{background:var(--gold)}
+  .h-amt{font-family:var(--mono);font-size:18px;color:var(--ink);text-align:right;white-space:nowrap}
+  .h-amt small{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+
+  .kans{display:grid;grid-template-columns:1fr auto;gap:var(--s5);align-items:center;margin:var(--s7) 0;padding-left:var(--s5);border-left:3px solid var(--gold)}
+  @media(max-width:640px){.kans{grid-template-columns:1fr}}
+  .kans .ck{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-3);margin-bottom:var(--s2)}
+  .kans .kh{font-family:var(--display);font-weight:600;font-size:clamp(22px,3.4vw,30px);line-height:1.18;letter-spacing:-.01em;max-width:24ch}
+  .kans .kh b{color:var(--gold-deep);font-weight:700}
+  .kans .ks{font-style:italic;color:var(--ink-2);margin-top:var(--s3);font-size:15px;max-width:50ch}
+  .btn{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;background:var(--ink);color:var(--paper);border:1px solid var(--ink);padding:13px 20px;min-height:46px;white-space:nowrap;transition:transform .15s,box-shadow .15s;align-self:start}
+  .btn:hover{transform:translateY(-2px);box-shadow:4px 4px 0 var(--rule-soft)}
+
+  .disclose{border-top:1px solid var(--ink);margin-top:var(--s6)}
+  .disclose>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:var(--s3);padding:var(--s4) 0;min-height:46px}
+  .disclose>summary::-webkit-details-marker{display:none}
+  .disclose>summary .lbl{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink)}
+  .disclose>summary .preview{font-style:italic;color:var(--ink-3);font-size:13px}
+  .disclose>summary .chev{margin-left:auto;transition:transform .25s ease;color:var(--ink-3);font-family:var(--mono);font-size:18px}
+  .disclose[open]>summary .chev{transform:rotate(90deg);color:var(--ink)}
+  .disclose .body{padding:0 0 var(--s6)}
+
+  .chart{margin-top:var(--s5)}
+  .chart svg{display:block;width:100%;height:auto}
+  .chart .cap{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-top:var(--s2)}
+  .chart .now{color:var(--gold-deep)}
+  .prose{max-width:var(--measure);color:var(--ink-2);font-size:16px}
+  .colophon{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-top:var(--s8);padding-top:var(--s5);border-top:1px solid var(--hair);user-select:none}
+  .colophon .star{color:var(--gold-deep)}
+
+  body:not(.notes) .note{display:none}
+  .note{border-left:2px solid var(--box2-500);padding:var(--s1) 0 var(--s1) var(--s4);margin:var(--s5) 0;font-size:14.5px;line-height:1.55;color:#4a3b6b;max-width:var(--measure)}
+  .note b{color:#6d28d9;font-weight:600}
+  .note .tag{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:#6d28d9;display:block;margin-bottom:var(--s2)}
+
+  body.eenvoudig .adv{display:none}
+  .modehint{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-4);margin-top:var(--s4)}
+  body:not(.eenvoudig) .modehint.simple-only{display:none}
+  body.eenvoudig .modehint.full-only{display:none}
+</style>
+</head>
+<body class="eenvoudig notes">
+
+<div class="controlbar">
+  <span class="cb-tag">Mockup · Bezittingen</span>
+  <span class="spacer"></span>
+  <span class="pill on" id="modeToggle" title="Wissel tussen de rustige basislaag en de volledige laag">● Eenvoudig</span>
+  <span class="pill on" id="notesToggle" title="Toon/verberg de ontwerpnotities">✎ Ontwerpnotities</span>
+</div>
+
+<div class="canvas">
+
+  <header class="masthead">
+    <div class="toprule"></div>
+    <div class="mast-row">
+      <span class="mast-side">Editie 2026 · Hefboom I</span>
+      <a class="mast-name" href="overzicht-redesign.html">TriFinity<span class="pt">.</span></a>
+      <span class="mast-side right" id="mastDate">— juni 2026</span>
+    </div>
+    <div class="mast-tag">De krant van je vrijheid — geld is opgeslagen tijd</div>
+    <nav class="sections" aria-label="Secties">
+      <a href="overzicht-redesign.html">Voorpagina</a>
+      <a href="bezittingen-redesign.html" class="active">Bezittingen</a>
+      <a href="belasting-hefboom-redesign.html">Belasting</a>
+      <a href="toekomst-redesign.html">Toekomst</a>
+    </nav>
+    <div class="botrule"></div>
+  </header>
+
+  <section class="screen">
+    <div class="kicker">De eerste hefboom · Bezittingen</div>
+    <h1 class="headline">Waar je vermogen <em>woont</em></h1>
+    <p class="deck">Alles wat je bezit, vertaald naar vrijheid. Niet elke euro is even vrij: je beleggingen werken nú voor je, je huis en pensioen pas later.</p>
+
+    <div class="note">
+      <span class="tag">Ontwerpbeslissing · de juiste grondslag als hoofdcijfer</span>
+      Het hoofdcijfer is bewust niet "€806.000 totaal" maar je <b>liquide vrijheidsmotor</b> in tijd. CLAUDE.md waarschuwt expliciet: meng nettoVermogen (incl. huis) en het FIRE-eligible liquide vermogen nooit op één as. Daarom: gouden balk + goud hoofdcijfer = wat je <b>nú</b> vrij kunt inzetten; vast vermogen (huis, pensioen) is ink. De kleur leert het verschil.
+    </div>
+
+    <div class="hero">
+      <div class="eyebrow">Wat je nú vrij kunt inzetten</div>
+      <div class="bigtime"><span class="marker">9 jaar &amp; 11 maanden</span></div>
+      <div class="split">
+        <div class="track"><div class="liq" style="width:41%"></div><div class="vast" style="width:59%"></div></div>
+        <div class="legend">
+          <span><i class="gi"></i>Liquide €328.000 · 41%</span>
+          <span><i class="ii"></i>Vast €478.000 · 59%</span>
+        </div>
+      </div>
+      <div class="euro">
+        <span>≈ <b>€806.000</b> totaal bezit</span>
+        <span class="muted">€328.000 liquide · €478.000 vast</span>
+      </div>
+      <div class="sub">Liquide = direct inzetbaar voor vrijheid. Vast (huis + pensioen) telt mee in je vermogen, maar niet in je vrijheidsbuffer.</div>
+    </div>
+
+    <div class="note">
+      <span class="tag">Ontwerpbeslissing · rustige basislaag</span>
+      In <b>Eenvoudig</b> zie je het hoofdcijfer, de zes categorieën waar je vermogen woont, en de <b>één</b> grootste kans. Het verloop, de grondslag-uitleg en alle losse rekeningen staan onder één gebaar. Zet boven op <b>Volledig</b>.
+    </div>
+
+    <!-- categorieën -->
+    <div class="sec"><div class="sec-head"><span class="n">§</span><span class="t">Waar je vermogen woont</span></div></div>
+    <div class="hold">
+      <div class="h-row">
+        <div class="h-key"></div>
+        <div class="h-main"><div class="nm">Eigen woning</div><div class="fr">Vast · je dak boven het hoofd</div><div class="bar"><i style="width:52%"></i></div></div>
+        <div class="h-amt">€420.000<small>52%</small></div>
+      </div>
+      <div class="h-row liq">
+        <div class="h-key"></div>
+        <div class="h-main"><div class="nm">Beleggingen</div><div class="fr">Liquide · werkt nú voor je vrijheid</div><div class="bar"><i style="width:28%"></i></div></div>
+        <div class="h-amt">€228.000<small>28%</small></div>
+      </div>
+      <div class="h-row liq">
+        <div class="h-key"></div>
+        <div class="h-main"><div class="nm">Spaargeld</div><div class="fr">Liquide · incl. je noodbuffer</div><div class="bar"><i style="width:10%"></i></div></div>
+        <div class="h-amt">€78.000<small>10%</small></div>
+      </div>
+      <div class="h-row">
+        <div class="h-key"></div>
+        <div class="h-main"><div class="nm">Pensioen</div><div class="fr">Vast · vrijheid ná je AOW</div><div class="bar"><i style="width:7%"></i></div></div>
+        <div class="h-amt">€54.000<small>7%</small></div>
+      </div>
+      <div class="h-row liq">
+        <div class="h-key"></div>
+        <div class="h-main"><div class="nm">Crypto</div><div class="fr">Liquide · volatiel, hou het klein</div><div class="bar"><i style="width:3%"></i></div></div>
+        <div class="h-amt">€22.000<small>3%</small></div>
+      </div>
+      <div class="h-row">
+        <div class="h-key"></div>
+        <div class="h-main"><div class="nm">Overig</div><div class="fr">Vast · voertuig &amp; inboedel</div><div class="bar"><i style="width:1%"></i></div></div>
+        <div class="h-amt">€4.000<small>0,5%</small></div>
+      </div>
+    </div>
+
+    <div class="note">
+      <span class="tag">Ontwerpbeslissing · consistentie</span>
+      Zelfde tijd-framing en gouden accent als de andere katernen. De smalle keyline links per rij codeert liquide (goud) vs. vast (ink) — hetzelfde betekenissysteem als de split-balk in de hero, niet een nieuw kleurtje.
+    </div>
+
+    <!-- éne kans -->
+    <div class="kans">
+      <div>
+        <div class="ck">Je grootste kans · stil geld</div>
+        <div class="kh">€48.000 spaargeld staat stil boven je noodbuffer — belegd ≈ <b>26 vrijheidsdagen</b> per jaar.</div>
+        <div class="ks">Tegen ~5% rendement werkt dat geld vóór je in plaats van stil te staan. Je noodbuffer (€12.000) blijft natuurlijk staan.</div>
+      </div>
+      <button class="btn" id="bekijkBeleggen">Bekijk beleggen</button>
+    </div>
+
+    <div class="modehint simple-only">▾ Verloop, grondslag en losse rekeningen staan onder één gebaar — open hieronder, of zet boven op "Volledig"</div>
+
+    <details class="disclose" id="meerDisclose">
+      <summary><span class="lbl">Meer over je bezittingen</span><span class="preview">verloop · liquide vs. vast · alle rekeningen</span><span class="chev">›</span></summary>
+      <div class="body">
+
+        <div class="sec"><div class="sec-head"><span class="n">i.</span><span class="t">Het verloop</span></div></div>
+        <div class="chart">
+          <svg viewBox="0 0 720 150" preserveAspectRatio="none" role="img" aria-label="Vermogensverloop, stijgend">
+            <line x1="0" y1="138" x2="720" y2="138" stroke="rgba(26,25,22,.10)" stroke-width="1"/>
+            <polyline points="0,122 80,116 160,118 240,100 320,92 400,78 480,70 560,54 640,44 720,32" fill="none" stroke="#1a1916" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            <circle cx="720" cy="32" r="5" fill="#c4a06b" stroke="#9a7a44" stroke-width="1.5"/>
+          </svg>
+          <div class="cap"><span>5 jaar geleden · €410.000</span><span class="now">Vandaag · €806.000</span></div>
+        </div>
+
+        <div class="sec"><div class="sec-head"><span class="n">ii.</span><span class="t">Liquide vs. vast — waarom het verschil telt</span></div></div>
+        <p class="prose">Je <b>liquide</b> vermogen (€328.000) kun je vandaag inzetten en bepaalt je vrijheidstijd. Je <b>vaste</b> vermogen (€478.000 — huis en pensioen) is echt van jou, maar pas later beschikbaar: het huis als je verkoopt of kleiner gaat wonen, het pensioen vanaf je AOW. Daarom rekenen we je vrijheidsmoment op het liquide deel; het vaste deel zie je terug op de tijdas in Toekomst.</p>
+
+        <div class="sec"><div class="sec-head"><span class="n">iii.</span><span class="t">Alle rekeningen</span></div></div>
+        <p class="prose">Beleggingen: 2 brokers (€181.000 + €47.000). Spaargeld: 3 rekeningen incl. noodbuffer. Crypto: 1 exchange. Pensioen: 2 polissen. Open een categorie om de losse rekeningen, ISIN-koppelingen en transacties te zien.</p>
+      </div>
+    </details>
+
+    <div class="modehint full-only">— Volledig: alle secties staan nu uitgevouwen; dit is ongeveer de huidige standaardhoeveelheid —</div>
+
+    <div class="colophon"><span class="star">✦</span> &nbsp;TriFinity · Bezittingen · De bron van je vrijheid&nbsp; <span class="star">✦</span></div>
+  </section>
+
+</div>
+
+<script>
+  try{const d=new Date();const s=d.toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});document.getElementById('mastDate').textContent=s.charAt(0).toUpperCase()+s.slice(1)}catch(e){}
+  const modeToggle=document.getElementById('modeToggle');
+  function syncMode(){const simple=document.body.classList.contains('eenvoudig');modeToggle.textContent=simple?'● Eenvoudig':'● Volledig';document.querySelectorAll('.disclose').forEach(d=>{d.open=!simple})}
+  modeToggle.addEventListener('click',()=>{document.body.classList.toggle('eenvoudig');syncMode()});syncMode();
+  const notesToggle=document.getElementById('notesToggle');
+  notesToggle.addEventListener('click',()=>{document.body.classList.toggle('notes');notesToggle.classList.toggle('on',document.body.classList.contains('notes'))});
+  document.getElementById('bekijkBeleggen').addEventListener('click',()=>{const d=document.getElementById('meerDisclose');d.open=true;d.scrollIntoView({behavior:'smooth',block:'start'})});
+</script>
+</body>
+</html>
