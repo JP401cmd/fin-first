@@ -610,7 +610,7 @@ export function MiniNetWorthChart({
             className="inline-flex items-center gap-1.5"
             title={
               fireReached
-                ? 'Toekomst-projectie tot eindleeftijd — vrijheid is bereikt'
+                ? `Toekomst-projectie tot eindleeftijd — ${endLabel.toLowerCase()} is bereikt`
                 : 'Toekomst-projectie tot vrijheidsmoment'
             }
           >

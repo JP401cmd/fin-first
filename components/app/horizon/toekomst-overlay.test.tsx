@@ -390,6 +390,91 @@ describe('ToekomstOverlay — sluiten', () => {
     expect(onEmphasisChange).toHaveBeenLastCalledWith(null)
   })
 
+  // ── Race-fix: auto-scroll mag NIET vuren op de pre-restore default ──
+  // Bug "Verkeerde view de toekomst": de pagina sprong bij elke load naar de
+  // grafiek omdat de overlay bij de eerste render `visible={true}` kreeg (default
+  // vóór de localStorage-restore) en daardoor `scrollIntoView` triggerde — ook
+  // als de gebruiker de tips eerder had uitgezet. `autoScrollIntoView` gate dat:
+  // de ouder zet 'm pas op true nadat de voorkeur ná hydratie is ingelezen.
+  describe('auto-scroll gate', () => {
+    const balloons2: OverlayBalloonDef[] = [
+      { id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'x', row: 'top', emphasis: 'accumulation' },
+    ]
+
+    // jsdom definieert `scrollIntoView` niet op de prototype (de component guard't
+    // daar al op met `typeof === 'function'`). We installeren een eigen mock vóór
+    // elke test en ruimen 'm daarna op, zodat we de aanroepen kunnen tellen.
+    let scrollMock: ReturnType<typeof vi.fn>
+    beforeEach(() => {
+      scrollMock = vi.fn()
+      // @ts-expect-error — scrollIntoView ontbreekt in de jsdom-prototype
+      HTMLElement.prototype.scrollIntoView = scrollMock
+    })
+    afterEach(() => {
+      // @ts-expect-error — terugzetten naar 'niet gedefinieerd' (jsdom-default)
+      delete HTMLElement.prototype.scrollIntoView
+    })
+
+    it('scrollt NIET bij visible + autoScrollIntoView=false (transiënte pre-restore default — geen sprong naar de grafiek)', () => {
+      render(
+        <ToekomstOverlay
+          visible
+          autoScrollIntoView={false}
+          balloons={balloons2}
+          onEmphasisChange={() => {}}
+          onClose={() => {}}
+        >
+          <div data-testid="chart">chart</div>
+        </ToekomstOverlay>,
+      )
+      expect(scrollMock).not.toHaveBeenCalled()
+    })
+
+    it('scrollt WEL bij een échte open (visible + autoScrollIntoView=true) — eerste bezoek / tips bewust aan', () => {
+      render(
+        <ToekomstOverlay
+          visible
+          autoScrollIntoView
+          balloons={balloons2}
+          onEmphasisChange={() => {}}
+          onClose={() => {}}
+        >
+          <div data-testid="chart">chart</div>
+        </ToekomstOverlay>,
+      )
+      expect(scrollMock).toHaveBeenCalled()
+    })
+
+    it('scrollt NIET als de overlay onzichtbaar is, ook met autoScrollIntoView=true (tips uit → geen sprong)', () => {
+      render(
+        <ToekomstOverlay
+          visible={false}
+          autoScrollIntoView
+          balloons={balloons2}
+          onEmphasisChange={() => {}}
+          onClose={() => {}}
+        >
+          <div data-testid="chart">chart</div>
+        </ToekomstOverlay>,
+      )
+      expect(scrollMock).not.toHaveBeenCalled()
+    })
+
+    it('default autoScrollIntoView=true behoudt bestaand gedrag (scrollt bij visible)', () => {
+      render(
+        <ToekomstOverlay
+          visible
+          balloons={balloons2}
+          onEmphasisChange={() => {}}
+          onClose={() => {}}
+        >
+          <div data-testid="chart">chart</div>
+        </ToekomstOverlay>,
+      )
+      expect(scrollMock).toHaveBeenCalled()
+    })
+  })
+
   it('toont de hint hoe je het Tips-scherm later terugvindt', () => {
     render(
       <ToekomstOverlay

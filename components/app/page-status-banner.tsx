@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Minus } from 'lucide-react'
+import { ArrowRight, Minus, Sparkles } from 'lucide-react'
 import {
   leverageStatusBgClass,
   leverageStatusTextClass,
@@ -31,7 +31,19 @@ export function PageStatusBanner() {
   const { info, display, minimize } = usePageStatusContext()
 
   const status = info?.status ?? 'neutral'
-  const kicker = status === 'bad' ? 'Actie nodig' : 'Aandacht'
+  const isFreedom = info?.kind === 'freedom'
+  // Freedom-banner is informatief (geen stoplicht): horizon-accent i.p.v. een
+  // amber/rode stoplichtstreep, en een mijlpaal-kicker uit de titel.
+  const kicker = isFreedom
+    ? info?.title ?? 'Mijlpaal'
+    : status === 'bad'
+      ? 'Actie nodig'
+      : 'Aandacht'
+  const bgClass = isFreedom
+    ? 'bg-gradient-to-r from-horizon-50 to-stone-50'
+    : leverageStatusBgClass(status)
+  const stripeClass = isFreedom ? 'bg-horizon-500' : LEVERAGE_STATUS_DOT[status]
+  const kickerTextClass = isFreedom ? 'text-horizon-700' : leverageStatusTextClass(status)
 
   // De aria-live-regio is ALTIJD gemount (ook op groene pagina's), zodat een
   // screenreader de regio al observeert vóórdat de banner lazy verschijnt. De
@@ -49,23 +61,21 @@ export function PageStatusBanner() {
       )}
       {info && display === 'expanded' && (
         <div
-          className={`mt-4 flex gap-3 rounded-[var(--r)] border border-[var(--border-md)] ${leverageStatusBgClass(
-            status,
-          )} p-4`}
+          className={`mt-4 flex gap-3 rounded-[var(--r)] border border-[var(--border-md)] ${bgClass} p-4`}
         >
-          {/* 3px verticale statusstreep (semantisch stoplicht). */}
+          {/* 3px verticale streep: stoplicht voor leverage, horizon-accent voor
+              de informatieve vrijheidsbanner. */}
           <div
-            className={`w-[3px] shrink-0 self-stretch rounded-full ${LEVERAGE_STATUS_DOT[status]}`}
+            className={`w-[3px] shrink-0 self-stretch rounded-full ${stripeClass}`}
             aria-hidden="true"
           />
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <p
-                className={`font-mono text-[10px] font-bold uppercase tracking-[0.12em] ${leverageStatusTextClass(
-                  status,
-                )}`}
+                className={`flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] ${kickerTextClass}`}
               >
+                {isFreedom && <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
                 {kicker}
               </p>
               {/* Minimaliseren — klap de banner in tot de dot naast de 'i'.

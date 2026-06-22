@@ -1,0 +1,53 @@
+---
+description: Draait de Trifinity Notion-queue leeg — verwerkt items één voor één via een geïsoleerde sub-agent (token-zuinig), tot er niets meer op te pakken is (gated)
+argument-hint: "(geen argumenten)"
+---
+
+Je werkt de **hele Trifinity Notion-werkqueue** af in één run. De hoofdchat is **orchestrator**: hij houdt de lus en de queue-stand licht, en **delegeert het zware werk per kaartje aan een sub-agent** zodat alle file-reads / onderzoek / implementatie buiten het hoofd-contextvenster blijven. Zo blijft de tokenkost laag, ook bij veel kaartjes. Dit is de "drain"-variant van `/trifinity-next`: dezelfde regels en gates per item, maar **zónder** de "één item per run / wacht op *ga door*"-stop. Het aanroepen van dit command ís het expliciete akkoord om door te blijven gaan.
+
+## Notion
+- Data source id: `d87e54c5-fb52-4607-a72a-52e4b58ee806`
+- Queue-view (op te pakken werk): https://app.notion.com/p/8efef29471384f17be6c96a78bcfe520?v=384f9e8d568a8195baef000c587d88ae
+- Wacht-op-akkoord-view: https://app.notion.com/p/8efef29471384f17be6c96a78bcfe520?v=384f9e8d568a81f59cce000cd65afeeb
+- Gebruik de **notion** MCP (zie `.mcp.json`). Property-namen exact gebruiken, incl. hoofdletters/spaties.
+
+## Harde regels (per item — identiek aan /trifinity-next)
+1. Pak **uitsluitend** items met CC-actie `1. Onderzoek gevraagd` of `3. Implementatie akkoord`. Leeg veld = backlog → **NIET** aanraken.
+2. Ga **nooit** voorbij een oranje gate (`2. Akkoord op analyse?` / `4. Akkoord op oplevering?`). Die blijven voor de gebruiker — elk item wordt ER geparkeerd, daarna door naar het **volgende**.
+3. Claim elk item meteen met CC-actie `Bezig (Claude Code)` vóórdat de sub-agent begint (voorkomt dubbel werk).
+4. **Stel in drain-modus NOOIT een vraag in de terminal voor een kaartje.** Vastgelopen of onduidelijk op een item (twijfel/keuze)? De sub-agent zet CC-actie op `Vraag aan gebruiker` en schrijft de **concrete vraag** in **Analyse & voorstel**; de orchestrator gaat **door naar het volgende item** (stop niet de hele drain). De gebruiker ziet alle openstaande vragen via een filter op CC-actie = `Vraag aan gebruiker` (of de Wacht-op-akkoord-view) en beantwoordt ze later in Notion.
+
+## De lus (orchestrator — houd dit licht)
+Herhaal tot de queue leeg is:
+
+1. **Lees de queue-view** (alleen de lijst — niet de hele pagina-inhoud).
+2. **Leeg?** Geen enkel item met CC-actie `1. Onderzoek gevraagd` of `3. Implementatie akkoord` → schrijf een korte **eindsamenvatting** (aantal verwerkt + per item de nieuwe gate-status) en **STOP**.
+3. **Anders:** neem het **bovenste** item (hoogste prioriteit). Lees alleen z'n page-ID/URL + CC-actie.
+   - **Anti-vastloper:** houd een set bij van reeds-verwerkte page-ID's deze run. Is het bovenste item er één die je deze run al verwerkte (CC-actie niet veranderd door een fout), **STOP** en meld dat — niet opnieuw oppakken.
+4. **Claim** het item: CC-actie → `Bezig (Claude Code)`.
+5. **Dispatch één sub-agent** (Agent-tool) die dat éne item volledig afhandelt en een **compacte** samenvatting teruggeeft. Kies het agent-type naar de aard van het werk: ONDERZOEK → `deep-dive` (of `bug-reporter` bij een bug); IMPLEMENTATIE → `senior-developer` (die mag zelf specialisten inzetten) of de best passende specialist (`frontend-ui-builder`/`calc-engine-specialist`/`supabase-db-specialist`/`ai-specialist-*`/`coder`). Geef de sub-agent mee:
+   - de **page-ID + URL** van het kaartje en de opdracht om via de **notion** MCP zélf de volledige pagina te lezen (titel, **AI voorstel prompt**, **Acceptatiecriteria**, en bij bugs **Steps to reproduce / Expected / Actual / Environment**, plus de body);
+   - de instructie om bij een **afbeelding in het kaartje** (screenshot in de body of een property) de gesigneerde Notion-afbeeldings-URL naar een tijdelijk bestand te downloaden (bv. `curl -sL "<signed-url>" -o /tmp/notion-img.png`) en dat bestand als beeld te lezen — werkt zolang de gesigneerde URL nog geldig is op het moment van verwerken; lukt het ophalen niet, val dan terug op een eventuele tekstuele beschrijving naast de afbeelding;
+   - de juiste tak op basis van CC-actie:
+     - **ONDERZOEK** (`1. Onderzoek gevraagd`) — wijzig geen productiecode: onderzoek de oorzaak (bug: reproduceer zo mogelijk met een falende test/repro) of maak een korte aanpak/spec (feature). Schrijf naar **Analyse & voorstel**: oorzaak, voorgestelde oplossing, te raken bestanden/modules, risico's, testplan. Zet CC-actie op `2. Akkoord op analyse?`.
+     - **IMPLEMENTATIE** (`3. Implementatie akkoord`) — **lees eerst de gekozen richting/optie**: kijk in **Notities** (en onderaan **Analyse & voorstel**) of de gebruiker een specifieke optie/richting koos (bv. "Optie B") en volg die dan exact; staat er niets, volg dan de oplossing zoals in **Analyse & voorstel** beschreven. Vraag hier **nooit** in de terminal naar (zie harde regel 4). Implementeer en verifieer (`npx tsc --noEmit` + relevante vitest, plus security-/UX-gate waar van toepassing — raakt het data/auth/routes/AI-context, dan een security-check). Noteer **PR / Branch**, en zet CC-actie op `4. Akkoord op oplevering?`. Niet committen/pushen (release = aparte stap).
+   - de instructie om **zelf de Notion-properties bij te werken** (Analyse & voorstel / Notities / PR-Branch + de nieuwe CC-actie) en **alleen een korte samenvatting** (≤ ~10 regels: wat, kernbevinding/diff, nieuwe gate-status) terug te geven — niet de gelezen bestanden of lange logs.
+6. **Verifieer** kort dat de sub-agent de CC-actie daadwerkelijk naar de juiste gate zette (queue-stand of property-check). Eindigde de sub-agent voortijdig/zonder gate-zetting, maak het in de hoofdthread af (zet de gate of `Vraag aan gebruiker`) — behandel een onvolledig rapport nooit als klaar.
+7. **Markeer** het page-ID als verwerkt, rapporteer 1–2 regels aan de gebruiker, en **ga terug naar stap 1**.
+
+## Belangrijk
+- **Token-zuinig door delegatie:** de orchestrator leest nooit zelf bronbestanden voor een kaartje — dat doet de sub-agent in z'n eigen context. De hoofdchat houdt alleen de queue-lus + compacte samenvattingen vast.
+- **Elk item eindigt op zijn oranje gate;** de gebruiker keurt later goed. De drain implementeert ONDERZOEK-items dus **niet** automatisch door — die wachten op een handmatige `3. Implementatie akkoord`. Eén run drain't vooral alle `1`-kaartjes naar `2. Akkoord op analyse?` (en implementeert reeds-goedgekeurde `3`-kaartjes naar `4`).
+- **Terminatie is gegarandeerd:** elk verwerkt item verlaat de `1`/`3`-status, dus de queue krimpt. De anti-vastloper-guard vangt het zeldzame geval af dat een item z'n status niet veranderde. (Voegt de gebruiker tijdens de run nieuwe kaartjes toe, dan groeit de queue tijdelijk — dat is normaal; de drain pakt ze mee.)
+- **`/clear` is veilig tússen runs (niet midden in een run):** de drain is stateless per run en leest de queue elke keer vers uit Notion. Na `/clear` start je gewoon `/trifinity-drain` opnieuw en pak je op waar de queue staat. Doe `/clear` echter **niet midden in een run** — dat wist de lopende lus-state.
+- **Eén item tegelijk**, in de prioriteitsvolgorde van de view — niet parallel (voorkomt dubbele claims en volgorde-ruis).
+- Voor het oppakken van precies één item (met de "wacht op *ga door*"-stop) blijft `/trifinity-next` beschikbaar.
+
+## Slotstap — Zelfverbetering (altijd in overleg met de gebruiker)
+Draai dit **éénmalig aan het einde van de hele run**, ná de eindsamenvatting (stap 2 van de lus) — **niet per kaartje** (dat zou per item tokens kosten en de lus vertragen). Schrijf het als kort retrospectief in de hoofdchat en voer **NIETS** automatisch door:
+
+1. **Verzamel** de "Verbetervoorstel"-secties uit de samenvattingen van de sub-agents die je deze run inzette, plus je eigen observaties over deze workflow: een onduidelijke gate-instructie, verkeerde agent-routering (ONDERZOEK vs IMPLEMENTATIE), een ontbrekende stap, of een command-instructie die tekortschoot. Kijk daarbij expliciet naar **token-efficiëntie**: had de hele run gekund met minder gelezen context / kortere sub-agent-runs / compactere samenvattingen — en welke instructie-aanpassing zou dat afdwingen?
+2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/commands/trifinity-*.md` (of een agent-/skill-definitie). Doe dit als **tekst in de hoofdchat-samenvatting**, **NIET** als een terminal-keuzevraag die de lus zou onderbreken (consistent met harde regel 4: in drain stel je geen terminal-vragen).
+3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan de command-/agent-/skill-definities sleutelen.
+
+Houd het schaars: max één scherp voorstel voor de hele run; geen voorstel is prima. De Slotstap blokkeert de queue nooit, commit nooit zelf en stelt in drain geen terminal-vraag.

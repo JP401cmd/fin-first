@@ -96,6 +96,34 @@ export function OnboardingBezittingen({
   )
 
   const [wizardIntent, setWizardIntent] = useState<QuickAddIntent | null>(null)
+  // Subtiele melding wanneer een huis met gekoppelde hypotheek verwijderd is:
+  // de hypotheek blijft bestaan als losse schuld (ontkoppeld). Blijft staan tot
+  // de volgende mutatie zodat de gebruiker de overgang opmerkt.
+  const [unlinkNotice, setUnlinkNotice] = useState<string | null>(null)
+
+  // Koppel-index: client_ref → de bijbehorende (gekoppelde) schuld + haar
+  // positie in `quickDebts`. Gevuld vanuit de wizard-`asset_with_debt`-flow.
+  const debtByRef = useMemo(() => {
+    const map = new Map<string, { debt: DebtQuickInput; index: number }>()
+    quickDebts.forEach((debt, index) => {
+      if (debt.linked_client_ref) map.set(debt.linked_client_ref, { debt, index })
+    })
+    return map
+  }, [quickDebts])
+
+  // Losse schulden = alles zonder koppeling. Gekoppelde hypotheken tonen we
+  // gegroepeerd ónder hun huis (niet dubbel in de schulden-sectie).
+  const standaloneDebts = useMemo(
+    () =>
+      quickDebts
+        .map((debt, index) => ({ debt, index }))
+        .filter(({ debt }) => !debt.linked_client_ref),
+    [quickDebts],
+  )
+  const standaloneDebtsTotal = useMemo(
+    () => standaloneDebts.reduce((s, { debt }) => s + (Number(debt.current_balance) || 0), 0),
+    [standaloneDebts],
+  )
 
   const totalAssets = useMemo(
     () => quickAssets.reduce((s, a) => s + (Number(a.current_value) || 0), 0),
@@ -118,18 +146,20 @@ export function OnboardingBezittingen({
   // (success-screen + "Nog een toevoegen"-knop) zodat de gebruiker meerdere
   // items na elkaar kan toevoegen zonder dat we 'm hier hoeven te re-openen.
   function handleWizardCollect(item: QuickAddInput) {
+    setUnlinkNotice(null)
     if (item.kind === 'asset') {
       onAssetsChange([...quickAssets, item.asset])
     } else if (item.kind === 'debt') {
       onDebtsChange([...quickDebts, item.debt])
     } else {
-      // 'asset_with_debt' wordt in collect-mode niet getriggerd (de wizard
-      // skipt de koppel-prompt). Defensief: voeg beide los toe als het ooit
-      // wel zou voorkomen, zodat onboarding-data niet stilzwijgend verdwijnt.
-      onAssetsChange([...quickAssets, item.asset])
+      // 'asset_with_debt' — huis + hypotheek als lokaal paar. Het huis heeft
+      // nog geen DB-id, dus we koppelen via een opaak client_ref-token: de
+      // server vertaalt dat na insert naar het echte debts.linked_asset_id.
+      const ref = `link-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+      onAssetsChange([...quickAssets, { ...item.asset, client_ref: ref }])
       onDebtsChange([
         ...quickDebts,
-        { ...item.debt, linked_asset_id: null },
+        { ...item.debt, linked_asset_id: null, linked_client_ref: ref },
       ])
     }
   }
@@ -137,9 +167,28 @@ export function OnboardingBezittingen({
   // Item-removal handlers — gewone splice-by-index, geen confirm-modal:
   // onboarding-input is transient en kan trivially opnieuw worden ingevoerd.
   function removeAsset(idx: number) {
+    const removed = quickAssets[idx]
     onAssetsChange(quickAssets.filter((_, i) => i !== idx))
+    // Verwijder je een huis met gekoppelde hypotheek, dan blijft de hypotheek
+    // bestaan als losse schuld — alleen de lokale koppeling vervalt (spiegelt
+    // het DB-gedrag ON DELETE SET NULL). Subtiele melding zodat de overgang
+    // niet verrast.
+    if (removed?.client_ref) {
+      const linked = quickDebts.find((d) => d.linked_client_ref === removed.client_ref)
+      if (linked) {
+        onDebtsChange(
+          quickDebts.map((d) =>
+            d.linked_client_ref === removed.client_ref ? { ...d, linked_client_ref: null } : d,
+          ),
+        )
+        setUnlinkNotice(linked.name)
+        return
+      }
+    }
+    setUnlinkNotice(null)
   }
   function removeDebt(idx: number) {
+    setUnlinkNotice(null)
     onDebtsChange(quickDebts.filter((_, i) => i !== idx))
   }
 
@@ -330,27 +379,43 @@ export function OnboardingBezittingen({
                     total={totalAssets}
                   />
                   <ul className="space-y-2">
-                    {quickAssets.map((item, idx) => (
-                      <li key={`asset-${idx}`}>
-                        <AssetRow item={item} onRemove={() => removeAsset(idx)} />
-                      </li>
-                    ))}
+                    {quickAssets.map((item, idx) => {
+                      const linked = item.client_ref
+                        ? debtByRef.get(item.client_ref)
+                        : undefined
+                      return (
+                        <li key={`asset-${idx}`} className="space-y-2">
+                          <AssetRow item={item} onRemove={() => removeAsset(idx)} />
+                          {linked && (
+                            <LinkedDebtRow
+                              item={linked.debt}
+                              onRemove={() => removeDebt(linked.index)}
+                            />
+                          )}
+                        </li>
+                      )
+                    })}
                   </ul>
                 </section>
               )}
 
-              {quickDebts.length > 0 && (
+              {standaloneDebts.length > 0 && (
                 <section>
                   <SectionLabel
                     kicker="Schulden"
-                    count={quickDebts.length}
-                    total={totalDebts}
+                    count={standaloneDebts.length}
+                    total={standaloneDebtsTotal}
                     negative
                   />
+                  {unlinkNotice && (
+                    <p className="mb-3 text-[11px] italic text-[var(--ink-3)]">
+                      {unlinkNotice} blijft als losse schuld staan na het verwijderen van de woning.
+                    </p>
+                  )}
                   <ul className="space-y-2">
-                    {quickDebts.map((item, idx) => (
-                      <li key={`debt-${idx}`}>
-                        <DebtRow item={item} onRemove={() => removeDebt(idx)} />
+                    {standaloneDebts.map(({ debt, index }) => (
+                      <li key={`debt-${index}`}>
+                        <DebtRow item={debt} onRemove={() => removeDebt(index)} />
                       </li>
                     ))}
                   </ul>
@@ -536,6 +601,56 @@ function DebtRow({
           style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
         >
           {typeLabel}
+        </p>
+      </div>
+      <span className="shrink-0 font-mono text-sm tabular-nums text-[var(--ink-2)]">
+        &minus;{formatCurrency(item.current_balance)}
+      </span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="ml-1 flex h-9 w-9 items-center justify-center text-[var(--ink-4)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink-2)]"
+        aria-label={`Verwijder ${item.name}`}
+      >
+        <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Gekoppelde-schuld-subrij — getoond ingesprongen ónder het huis waaraan de
+ * hypotheek hangt. Visueel ondergeschikt (insprong + verbindingsstreep +
+ * Link2-affordance) zodat de groepering "huis met hypotheek eronder" direct
+ * leesbaar is. Verwijderen haalt alleen de schuld weg; het huis blijft staan.
+ */
+function LinkedDebtRow({
+  item,
+  onRemove,
+}: {
+  item: DebtQuickInput
+  onRemove: () => void
+}) {
+  const iconName = DEBT_TYPE_ICONS[item.debt_type as DebtType] ?? 'CircleDot'
+  const typeLabel = DEBT_QUICK_ADD_LABELS[item.debt_type as DebtType] ?? 'Overig'
+  return (
+    <div className="ml-5 flex items-center gap-3 border-l-2 border-[var(--border-ed)] bg-[var(--subtle)]/30 py-2 pl-3 pr-3">
+      <span
+        aria-hidden
+        className="flex h-7 w-7 shrink-0 items-center justify-center bg-[var(--paper)] text-[var(--ink-2)]"
+      >
+        <TypeIcon name={iconName} className="h-3.5 w-3.5" strokeWidth={1.75} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1.5 truncate text-sm font-medium text-[var(--ink)]">
+          <Link2 className="h-3 w-3 shrink-0 text-[var(--ink-3)]" aria-hidden />
+          {item.name}
+        </p>
+        <p
+          className="text-[11px] italic text-[var(--ink-3)]"
+          style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+        >
+          {typeLabel} · gekoppeld
         </p>
       </div>
       <span className="shrink-0 font-mono text-sm tabular-nums text-[var(--ink-2)]">

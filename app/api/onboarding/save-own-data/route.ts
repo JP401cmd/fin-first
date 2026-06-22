@@ -93,6 +93,77 @@ async function applyModuleTrackingFlags(
 }
 
 /**
+ * Twee-fasen koppeling huis ↔ hypotheek na de onboarding-insert.
+ *
+ * Tijdens onboarding heeft een eigen woning nog geen DB-id, dus de client geeft
+ * een opaak koppel-token mee: `client_ref` op de asset en `linked_client_ref`
+ * op de bijbehorende hypotheek. Pas ná de insert bestaan de echte id's. Deze
+ * helper resolved beide id's uit de ZOJUIST-INGEVOEGDE rijen van DEZE gebruiker
+ * (RLS-scoped op `user_id`) en zet `debts.linked_asset_id`.
+ *
+ * Beveiliging: de client levert nooit een echt asset-id — alleen een opaak
+ * token. De huis-id wordt uitsluitend uit onze eigen (RLS-afgeschermde) rijen
+ * gehaald en de UPDATE filtert expliciet op `user_id`. Een gebruiker kan dus
+ * onmogelijk aan andermans asset koppelen.
+ *
+ * Idempotent: `sort_order` == array-index in beide insert-paden (RPC + fallback),
+ * dus een herhaalde run zet exact dezelfde koppeling. Non-blocking: een mislukte
+ * koppeling logt maar laat onboarding niet stranden (spiegelt DEBT_FAILED).
+ *
+ * Cruciaal voor correctheid: zonder deze koppeling filtert de eigen-woning-
+ * strategie (`filterAssetsForFire`) de hypotheek NIET uit de FIRE-pot mee met
+ * het huis → vertekend FIRE-doel.
+ */
+export async function linkOnboardingMortgages(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  quickAssets: AssetQuickInput[],
+  quickDebts: DebtQuickInput[],
+) {
+  // Bouw paren: debt-index → asset-index, via de client-refs. Alleen geldige
+  // huis↔hypotheek-combinaties (defensief dubbel-gecheckt op type).
+  const pairs: Array<{ assetIndex: number; debtIndex: number }> = []
+  quickDebts.forEach((debt, debtIndex) => {
+    const ref = debt.linked_client_ref
+    if (!ref || debt.debt_type !== 'mortgage') return
+    const assetIndex = quickAssets.findIndex((a) => a.client_ref === ref)
+    if (assetIndex < 0) return
+    const assetType = quickAssets[assetIndex].asset_type
+    if (assetType !== 'eigen_huis' && assetType !== 'real_estate') return
+    pairs.push({ assetIndex, debtIndex })
+  })
+  if (pairs.length === 0) return
+
+  // Resolve id's uit onze eigen rijen. `sort_order` == array-index in beide
+  // insert-paden, dus dat is de brug tussen client-input en DB-rij.
+  const [{ data: assetRows }, { data: debtRows }] = await Promise.all([
+    supabase.from('assets').select('id, sort_order, asset_type').eq('user_id', userId),
+    supabase.from('debts').select('id, sort_order, debt_type').eq('user_id', userId),
+  ])
+  const assetBySort = new Map<number, { id: string; asset_type: string }>()
+  for (const r of assetRows ?? []) assetBySort.set(Number(r.sort_order), { id: r.id, asset_type: r.asset_type })
+  const debtBySort = new Map<number, { id: string; debt_type: string }>()
+  for (const r of debtRows ?? []) debtBySort.set(Number(r.sort_order), { id: r.id, debt_type: r.debt_type })
+
+  for (const { assetIndex, debtIndex } of pairs) {
+    const house = assetBySort.get(assetIndex)
+    const mortgage = debtBySort.get(debtIndex)
+    if (!house || !mortgage) continue
+    // Defensieve type-guards tegen een verkeerde sort_order-match.
+    if (house.asset_type !== 'eigen_huis' && house.asset_type !== 'real_estate') continue
+    if (mortgage.debt_type !== 'mortgage') continue
+    const { error } = await supabase
+      .from('debts')
+      .update({ linked_asset_id: house.id })
+      .eq('id', mortgage.id)
+      .eq('user_id', userId)
+    if (error) {
+      console.error('[onboarding-save] hypotheek-koppeling mislukt (non-fatal):', error.message)
+    }
+  }
+}
+
+/**
  * Insert het onboarding-spaardoel als één rij in de `goals`-tabel. Wordt
  * aangeroepen in zowel het RPC-pad als het multi-step-fallback-pad nadat
  * de profile-write klaar is — onze RLS-policy vereist dat `user_id` (de
@@ -239,9 +310,12 @@ function buildRpcPayload(
       temporal_balance: horizonData?.temporal_balance ?? identity.temporal_balance ?? 3,
       news_description: newsDescription ?? null,
       onboarding_intent: intent ?? null,
-      // Housing: include_full is de DB-default maar we zetten het expliciet zodat
-      // de horizonmotor altijd een geldige config heeft, ook zonder migratie-default.
-      housing_strategy_config: { mode: 'include_full' },
+      // Housing: nieuwe accounts starten op 'exclude_from_fire' ("niet meerekenen")
+      // — de eigen woning telt standaard NIET mee in de FIRE-pot (raakt alleen de
+      // FIRE-eligible grondslag, niet nettoVermogen). We zetten dit expliciet zodat
+      // de horizonmotor altijd een geldige config heeft; de DB-default + resolver-
+      // fallback (DEFAULT_HOUSING_STRATEGY) blijven bewust include_full.
+      housing_strategy_config: { mode: 'exclude_from_fire' },
     },
     budget_amounts: budgetAmounts,
     budgettering_mode: budgetteringMode ?? 'manual',
@@ -719,8 +793,9 @@ export async function POST(req: Request) {
           // 80%-pensioenuitgave-default (overschrijft de RPC's 'current_income'-default)
           retirement_expense_method: retirementRpcDefaults.retirement_expense_method,
           retirement_expense_custom_amount: retirementRpcDefaults.retirement_expense_custom_amount,
-          // Housing: include_full expliciet (RPC kent dit veld niet)
-          housing_strategy_config: { mode: 'include_full' },
+          // Housing: nieuwe accounts starten op 'exclude_from_fire' ("niet
+          // meerekenen") — expliciet wegschrijven want de RPC kent dit veld niet.
+          housing_strategy_config: { mode: 'exclude_from_fire' },
         }
         // Onboarding-schattingen = handmatige bron ("eigen bedrag") voor het
         // blok "Instellingen & toekomst" op /overzicht/cashflow. Zo drijven
@@ -856,6 +931,12 @@ export async function POST(req: Request) {
         // apps direct een rekening hebben om mee te werken.
         await applyModuleTrackingFlags(supabase, user.id, activeModules)
 
+        // Huis ↔ hypotheek koppelen: zet debts.linked_asset_id op de zojuist-
+        // ingevoegde hypotheek-rijen die in onboarding aan een huis gekoppeld
+        // zijn. De RPC kent linked_asset_id niet — dit is de échte deliverable
+        // van de hypotheek-vervolgvraag. Non-blocking.
+        await linkOnboardingMortgages(supabase, user.id, quickAssets, quickDebts)
+
         // Onboarding-spaardoel (stap v.) — non-blocking insert. Faalt deze,
         // dan slaat de gebruiker hem later handmatig aan via /will.
         if (onboardingGoal) {
@@ -938,8 +1019,10 @@ export async function POST(req: Request) {
     )
     profileData.retirement_expense_method = retirementDefaults.retirement_expense_method
     profileData.retirement_expense_custom_amount = retirementDefaults.retirement_expense_custom_amount
-    // Housing: include_full is de DB-default maar we zetten het expliciet (robustness).
-    profileData.housing_strategy_config = { mode: 'include_full' }
+    // Housing: nieuwe accounts starten op 'exclude_from_fire' ("niet meerekenen")
+    // — expliciet wegschrijven (non-RPC fallback-pad). DB-default + resolver-
+    // fallback blijven bewust include_full.
+    profileData.housing_strategy_config = { mode: 'exclude_from_fire' }
     profileData.fire_end_strategy = horizonData?.fire_end_strategy ?? identity.fire_end_strategy ?? 'deplete'
     profileData.fire_legacy_amount = horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null
     profileData.fire_end_age = horizonData?.fire_end_age ?? identity.fire_end_age ?? 90
@@ -1128,6 +1211,11 @@ export async function POST(req: Request) {
       const { error: debtErr } = await supabase.from('debts').insert(rows)
       if (debtErr) throw new Error(`Schulden opslaan mislukt: ${debtErr.message}`)
     }
+
+    // 5. Huis ↔ hypotheek koppelen (fallback-pad). Zelfde twee-fasen-mapping
+    // als het RPC-pad: na de asset+debt-insert zetten we debts.linked_asset_id
+    // op de gekoppelde hypotheken. Non-blocking. Zie linkOnboardingMortgages.
+    await linkOnboardingMortgages(supabase, user.id, quickAssets, quickDebts)
 
     // 6. Seed default AOW life event (uses aowTargetAge resolved above)
     // Delete existing AOW event first to prevent duplicates on retry

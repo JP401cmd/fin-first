@@ -34,6 +34,17 @@ export type AssetDraftState = Partial<AssetQuickInput> & { asset_type: AssetType
 export type DebtDraftState = Partial<DebtQuickInput> & { debt_type: DebtType }
 
 /**
+ * Volledig ingevulde asset-input zoals de wizard die intern doorgeeft naar de
+ * linkDebt-stappen. Bewust NIET `Required<AssetQuickInput>`: het onboarding-
+ * only `client_ref` hoort niet bij de wizard-state (dat token wordt pas door de
+ * onboarding-parent toegevoegd), dus we eisen alleen de kernvelden.
+ */
+export type CompleteAssetDraft = Required<
+  Pick<AssetQuickInput, 'asset_type' | 'name' | 'current_value' | 'field3'>
+> &
+  Pick<AssetQuickInput, 'client_ref'>
+
+/**
  * Wizard-state als discriminated union. De invariant "je kunt geen
  * linkDebt-stap bereiken zonder volledige asset-input" wordt hier op
  * type-niveau afgedwongen via `Required<AssetQuickInput>`.
@@ -50,12 +61,12 @@ export type WizardState =
     }
   | {
       step: 'linkDebt'
-      assetDraft: Required<AssetQuickInput>
+      assetDraft: CompleteAssetDraft
       savedAssetId?: string
     }
   | {
       step: 'linkDebtForm'
-      assetDraft: Required<AssetQuickInput>
+      assetDraft: CompleteAssetDraft
       savedAssetId: string
       debtDraft: DebtDraftState
     }
@@ -83,6 +94,15 @@ export type WizardAction =
        */
       initialAssetType?: AssetType
       initialDebtType?: DebtType
+      /**
+       * Optioneel voor-ingevuld `linked_asset_id` op het debt-pad. Alleen
+       * toegepast bij `initialIntent='debt'` + `initialDebtType` — gebruikt door
+       * de "Heeft deze woning een hypotheek?"-vervolg-CTA in de volledige
+       * AssetForm (`assets-client.tsx`), zodat de zojuist-aangemaakte eigen
+       * woning meteen aan de hypotheek wordt gekoppeld. De Server Action
+       * controleert ownership van dit id vóór de insert.
+       */
+      initialLinkedAssetId?: string
     }
   | { type: 'SELECT_INTENT'; intent: QuickAddIntent }
   | { type: 'SELECT_TYPE_ASSET'; assetType: AssetType }
@@ -112,7 +132,7 @@ export const initialWizardState: WizardState = { step: 'choice' }
  */
 function isCompleteAssetDraft(
   draft: AssetDraftState,
-): draft is Required<AssetQuickInput> {
+): draft is CompleteAssetDraft {
   return (
     typeof draft.asset_type === 'string' &&
     typeof draft.name === 'string' &&
@@ -147,6 +167,10 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
             step: 'details',
             intent: 'debt',
             debtDraft: { debt_type: action.initialDebtType },
+            // Voor-ingevuld koppel-id (bv. zojuist-aangemaakte eigen woning).
+            ...(action.initialLinkedAssetId
+              ? { linkedAssetId: action.initialLinkedAssetId }
+              : {}),
           }
         }
         return { step: 'type', intent: action.initialIntent }

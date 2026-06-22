@@ -104,4 +104,37 @@ describe('VrijheidStrip — data-staat', () => {
     )
     expect(positions).toEqual(['25%', '50%', '75%'])
   })
+
+  it('default (geen framing) blijft de "% op weg"-staat', () => {
+    render(<VrijheidStrip freedomPct={60} />)
+    expect(screen.getByText('60%')).toBeTruthy()
+    expect(screen.getByText(/op weg naar het moment/i)).toBeTruthy()
+  })
+})
+
+describe('VrijheidStrip — vrij/pensioen-framing', () => {
+  it("framing 'free' toont 'Je bent vrij.' + onttrekkings-framing, geen %-op-weg", () => {
+    render(<VrijheidStrip freedomPct={100} framing="free" />)
+    expect(screen.getByText('Je bent vrij.')).toBeTruthy()
+    expect(screen.getByText('Financieel vrij')).toBeTruthy()
+    expect(screen.queryByText(/op weg naar het moment/i)).toBeNull()
+    // Geen voortgangsbalk meer in de vrij-staat.
+    expect(document.querySelector('[role="progressbar"]')).toBeNull()
+  })
+
+  it("framing 'pensioen' toont 'Je bent met pensioen.'", () => {
+    render(<VrijheidStrip freedomPct={100} framing="pensioen" />)
+    expect(screen.getByText('Je bent met pensioen.')).toBeTruthy()
+    expect(screen.getByText('Met pensioen')).toBeTruthy()
+  })
+
+  it("vrij/pensioen-staat linkt naar /toekomst", () => {
+    const { container } = render(<VrijheidStrip freedomPct={100} framing="free" />)
+    expect(container.querySelector('a[href="/toekomst"]')).toBeTruthy()
+  })
+
+  it('toont geen aftelling "Nog" in de vrij-staat', () => {
+    render(<VrijheidStrip freedomPct={100} currentAge={55} fireAge={50} framing="free" />)
+    expect(screen.queryByText('Nog')).toBeNull()
+  })
 })

@@ -7,11 +7,18 @@
     "features": {
       "type": "stdio",
       "command": "C:\\Users\\janpa\\.autoforge\\venv\\Scripts\\python.exe",
-      "args": ["-m", "mcp_server.feature_mcp"],
+      "args": [
+        "-m",
+        "mcp_server.feature_mcp"
+      ],
       "env": {
         "PROJECT_DIR": "C:\\Users\\janpa\\cd\\development\\fin",
         "PYTHONPATH": "C:\\Users\\janpa\\AppData\\Roaming\\npm\\node_modules\\autoforge-ai"
       }
+    },
+    "notion": {
+      "type": "http",
+      "url": "https://mcp.notion.com/mcp"
     }
   }
 }

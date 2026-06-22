@@ -154,6 +154,26 @@ describe('resolveBannerDisplay — volledige 4×3-matrix (4 statussen, 2 niveaus
   }
 })
 
+// ── Informatieve vrijheidsbanner: minimizedLevel 'info' ───────────────────────
+//
+// De freedom-banner heeft status 'neutral' (severity 0) en minimaliseert op
+// niveau 'info' (severity 0). Hij escaleert nooit: eenmaal ingeklapt blijft 'ie
+// ingeklapt tot de gebruiker 'm zelf weer opent.
+
+describe('resolveBannerDisplay — informatieve vrijheidsbanner (info)', () => {
+  it("'info' geminimaliseerd + huidige status 'neutral' → minimized (blijft ingeklapt)", () => {
+    expect(resolveBannerDisplay('neutral', 'info')).toBe('minimized')
+  })
+
+  it("null + 'neutral' → expanded (toont de vrijheidsbanner initieel)", () => {
+    expect(resolveBannerDisplay('neutral', null)).toBe('expanded')
+  })
+
+  it("'info' geminimaliseerd + 'good' → minimized", () => {
+    expect(resolveBannerDisplay('good', 'info')).toBe('minimized')
+  })
+})
+
 // ── Typeveiligheid: retourtype is exact BannerDisplay ─────────────────────────
 
 describe('resolveBannerDisplay — retourtype is BannerDisplay', () => {

@@ -32,6 +32,7 @@ import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { useGlobalSync } from '@/components/sync/global-sync-provider'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -101,6 +102,7 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
   const { activeModules } = useModuleAccess()
   const { open: openChat } = useChatContext()
   const { masked, toggle: togglePrivacy } = useMaskedAmounts()
+  const { mode: displayMode, toggle: toggleDisplayMode } = useDisplayMode()
   const { triggerGlobalSync } = useGlobalSync()
   const {
     perspective: currentPerspective,
@@ -116,6 +118,8 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
       openChat,
       togglePrivacy,
       privacyMasked: masked,
+      toggleDisplayMode,
+      displayMode,
       triggerPricesSync: async () => {
         await triggerGlobalSync({ exchanges: [], wallets: [], pricesOnly: true })
       },
@@ -129,6 +133,8 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
       openChat,
       togglePrivacy,
       masked,
+      toggleDisplayMode,
+      displayMode,
       triggerGlobalSync,
       currentPerspective,
       availablePerspectives,

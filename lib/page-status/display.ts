@@ -17,15 +17,21 @@ import type { LeverageStatus } from '@/lib/leverage-status'
 
 export type BannerDisplay = 'expanded' | 'minimized'
 
-/** Het niveau waarop de gebruiker een banner kan minimaliseren (warn of bad). */
-export type MinimizedLevel = 'warn' | 'bad'
+/**
+ * Het niveau waarop de gebruiker een banner kan minimaliseren:
+ *  - 'warn' / 'bad' — de stoplicht-niveaus van een leverage-banner (escaleert).
+ *  - 'info'         — de informatieve vrijheidsbanner (severity 0, escaleert nooit;
+ *    blijft ingeklapt tot de gebruiker 'm zelf weer opent).
+ */
+export type MinimizedLevel = 'warn' | 'bad' | 'info'
 
 /**
- * Ernst-rangschikking: good/neutral = 0 (geen banner), warn = 1, bad = 2.
- * Alleen warn/bad leveren een banner; good/neutral worden nooit getoond, maar
- * krijgen severity 0 voor een totale ordening.
+ * Ernst-rangschikking: good/neutral/info = 0 (informatief/geen alarm), warn = 1,
+ * bad = 2. Alleen warn/bad escaleren; good/neutral/info krijgen severity 0 voor
+ * een totale ordening, zodat een eenmaal geminimaliseerde info-banner ingeklapt
+ * blijft (severity(status:neutral)=0 ≤ severity('info')=0).
  */
-function severity(status: LeverageStatus): number {
+function severity(status: LeverageStatus | MinimizedLevel): number {
   return status === 'bad' ? 2 : status === 'warn' ? 1 : 0
 }
 

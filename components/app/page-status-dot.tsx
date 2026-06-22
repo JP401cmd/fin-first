@@ -28,8 +28,13 @@ export function PageStatusDot({ className = '' }: PageStatusDotProps) {
 
   if (!info || display !== 'minimized') return null
 
-  const statusLabel = LEVERAGE_STATUS_LABEL[info.status]
-  const label = `${statusLabel} — toon melding`
+  // Freedom-banner is informatief (geen stoplicht): horizon-accent dot + eigen
+  // label. Leverage-banner houdt de stoplichtkleur + status-label.
+  const isFreedom = info.kind === 'freedom'
+  const label = isFreedom
+    ? `${info.title} — toon melding`
+    : `${LEVERAGE_STATUS_LABEL[info.status]} — toon melding`
+  const dotClass = isFreedom ? 'bg-horizon-500' : LEVERAGE_STATUS_DOT[info.status]
 
   return (
     <div className={className}>
@@ -41,7 +46,7 @@ export function PageStatusDot({ className = '' }: PageStatusDotProps) {
         className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] transition-all hover:border-[var(--module-active-500)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
       >
         <span
-          className={`h-2.5 w-2.5 rounded-full ${LEVERAGE_STATUS_DOT[info.status]}`}
+          className={`h-2.5 w-2.5 rounded-full ${dotClass}`}
           aria-hidden="true"
         />
       </button>

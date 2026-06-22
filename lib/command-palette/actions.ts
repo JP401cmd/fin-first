@@ -4,7 +4,8 @@
 // route-gebaseerde "acties" leven in `navigation-index.ts` — geen duplicatie.
 
 import {
-  MessageSquare, Eye, EyeOff, RefreshCw, LogOut, User, Users, UserCheck, type LucideIcon,
+  MessageSquare, Eye, EyeOff, RefreshCw, LogOut, User, Users, UserCheck,
+  Layers, PanelTopClose, type LucideIcon,
 } from 'lucide-react'
 import type { ModuleId } from '@/lib/module-registry'
 import type { Perspective, PerspectiveOption } from '@/components/app/perspective-provider'
@@ -24,6 +25,10 @@ export type ActionRunContext = {
   togglePrivacy: () => void
   /** Huidige privacy-state — bepaalt label "Bedragen verbergen" vs "Bedragen tonen". */
   privacyMasked: boolean
+  /** Toggle de profiel-brede weergavemodus (Eenvoudig ⇄ Volledig). */
+  toggleDisplayMode: () => void
+  /** Huidige weergavemodus — bepaalt label "Volledige/Eenvoudige weergave tonen". */
+  displayMode: 'simple' | 'full'
   /** Trigger een prices-only sync (geen bank-/exchange-koppelingen vereist). */
   triggerPricesSync: () => Promise<void> | void
   /** Huidig actief perspectief (personal/household/partner). */
@@ -74,6 +79,18 @@ const ACTIONS: ActionDef[] = [
     module: 'globaal',
     build: (ctx) => () => {
       ctx.togglePrivacy()
+      ctx.closePalette()
+    },
+  },
+  {
+    id: 'action:toggle-display-mode',
+    getLabel: (ctx) =>
+      ctx.displayMode === 'simple' ? 'Volledige weergave tonen' : 'Eenvoudige weergave tonen',
+    getSublabel: () => 'Diepte-secties standaard tonen of inklappen',
+    getIcon: (ctx) => (ctx.displayMode === 'simple' ? Layers : PanelTopClose),
+    module: 'globaal',
+    build: (ctx) => () => {
+      ctx.toggleDisplayMode()
       ctx.closePalette()
     },
   },

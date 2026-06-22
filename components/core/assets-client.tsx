@@ -84,6 +84,7 @@ import {
   parseSaleConfig,
 } from '@/lib/sale-config'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
+import { StepLinkDebt } from '@/components/app/quick-add-wizard/steps/step-link-debt'
 import { EmptyState as QuickAddEmptyState } from '@/components/app/quick-add-wizard/empty-state'
 import { AangifteImportPane } from '@/components/onboarding/aangifte-import-pane'
 import { AssetEditConnectionSection } from './asset-edit-connection-section'
@@ -191,6 +192,12 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [aangifteImportOpen, setAangifteImportOpen] = useState(false)
   const [quickAddInitialType, setQuickAddInitialType] = useState<AssetType | null>(null)
+  // Hypotheek-vervolgvraag bij een NIEUW aangemaakte eigen woning (part B):
+  // `mortgageLinkPrompt` toont de "Heeft deze woning een hypotheek?"-CTA;
+  // bij "Ja" opent `mortgageWizardAssetId` de hypotheek-quick-add met het
+  // verse asset-id voor-ingevuld als linked_asset_id.
+  const [mortgageLinkPrompt, setMortgageLinkPrompt] = useState<{ assetId: string; assetName: string } | null>(null)
+  const [mortgageWizardAssetId, setMortgageWizardAssetId] = useState<string | null>(null)
   // Filter-state: lege Set = alles tonen, niet-leeg = alleen geselecteerde
   // types tonen in de cards-grid en in de projection-chart. Wordt aangestuurd
   // door klikken op rijen in de Verdeling-tabel onderaan.
@@ -931,10 +938,16 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           budgetingActive={budgetingActive}
           dailyExpenses={dailyExpenses}
           onClose={() => { setShowForm(false); setEditAsset(null); setNewAssetType(null) }}
-          onSaved={() => {
+          onSaved={(result) => {
             setShowForm(false)
             setEditAsset(null)
             setNewAssetType(null)
+            // Part B: na het AANMAKEN van een nieuwe eigen woning de hypotheek-
+            // vervolgvraag tonen. Niet bij bewerken (daar bestaat de koppel-
+            // sectie al in de detail-pane).
+            if (result?.isNew && result.assetType === 'eigen_huis' && result.assetId) {
+              setMortgageLinkPrompt({ assetId: result.assetId, assetName: result.assetName })
+            }
             loadAssets().then(async () => {
               const supabase = createClient()
               const { data } = await supabase.from('profiles').select('budgeting_active, net_monthly_income, estimated_monthly_expenses').single()
@@ -954,6 +967,39 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         initialIntent="asset"
         initialAssetType={quickAddInitialType ?? undefined}
         onSaved={() => router.refresh()}
+      />
+
+      {/* Part B: hypotheek-vervolgvraag bij een nieuw aangemaakte eigen woning.
+          Hergebruikt StepLinkDebt; bij "Ja" opent de hypotheek-quick-add met
+          het verse asset-id als linked_asset_id (ownership server-side geborgd). */}
+      <BottomSheet
+        open={mortgageLinkPrompt !== null}
+        onClose={() => setMortgageLinkPrompt(null)}
+        title="Gekoppelde schuld"
+        size="md"
+      >
+        {mortgageLinkPrompt && (
+          <div className="p-5 sm:p-6">
+            <StepLinkDebt
+              assetType="eigen_huis"
+              assetName={mortgageLinkPrompt.assetName}
+              onYes={() => {
+                setMortgageWizardAssetId(mortgageLinkPrompt.assetId)
+                setMortgageLinkPrompt(null)
+              }}
+              onNo={() => setMortgageLinkPrompt(null)}
+            />
+          </div>
+        )}
+      </BottomSheet>
+
+      <QuickAddWizard
+        open={mortgageWizardAssetId !== null}
+        onClose={() => setMortgageWizardAssetId(null)}
+        initialIntent="debt"
+        initialDebtType="mortgage"
+        initialLinkedAssetId={mortgageWizardAssetId ?? undefined}
+        onSaved={() => { setMortgageWizardAssetId(null); loadAssets(); router.refresh() }}
       />
 
       <AangifteImportPane
@@ -977,6 +1023,18 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
  * een ref-gebaseerde save-handler voorkomt dat we de callback-identity
  * elke render hoeven te ontkoppelen van een nieuwe closure.
  */
+/**
+ * Resultaat dat `AssetForm.onSaved` na een succesvolle save doorgeeft. Stelt de
+ * host in staat een vervolg-actie te tonen — m.n. de hypotheek-vervolg-CTA bij
+ * een nieuw aangemaakte eigen woning (alleen bij `isNew`, niet bij bewerken).
+ */
+export type AssetSavedResult = {
+  assetId?: string
+  isNew: boolean
+  assetType: AssetType
+  assetName: string
+}
+
 export type AssetEditActionsState = {
   canSave: boolean
   saving: boolean
@@ -2589,7 +2647,13 @@ export function AssetForm({
   defaultType?: AssetType
   linkedBankAccounts: Map<string, { id: string; linked_asset_id: string }>
   onClose: () => void
-  onSaved: () => void
+  /**
+   * Aangeroepen na een succesvolle save. De optionele `result` beschrijft de
+   * zojuist-opgeslagen asset zodat de host een vervolg-actie kan tonen — bv. de
+   * "Heeft deze woning een hypotheek?"-CTA bij een nieuw aangemaakte eigen
+   * woning. Bestaande callers die `() => void` doorgeven blijven geldig.
+   */
+  onSaved: (result?: AssetSavedResult) => void
   budgetingActive?: boolean
   /**
    * Initiële externe-koppeling voor de R2 "Externe koppeling"-sectie. Alleen
@@ -3014,7 +3078,7 @@ export function AssetForm({
     }
 
     setSaving(false)
-    onSaved()
+    onSaved({ assetId: assetId ?? undefined, isNew: !isEdit, assetType, assetName: name })
   }
 
   // Publiceer save-state naar pane-wrapper (zelfde patroon als

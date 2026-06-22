@@ -74,6 +74,13 @@ export interface QuickAddWizardProps {
   initialAssetType?: AssetType
   initialDebtType?: DebtType
   /**
+   * Voor-ingevuld `linked_asset_id` voor het debt-pad. Alleen zinvol samen met
+   * `initialIntent='debt'` + `initialDebtType` — gebruikt door de "Heeft deze
+   * woning een hypotheek?"-vervolg-CTA in de volledige AssetForm zodat de
+   * zojuist-aangemaakte eigen woning meteen aan de hypotheek wordt gekoppeld.
+   */
+  initialLinkedAssetId?: string
+  /**
    * Twee operatie-modi:
    *   · `commit` (default) — schrijft direct via de `quickAdd` Server Action
    *     en navigeert / verfrist na succes. Gebruikt op `/core` en de
@@ -101,12 +108,18 @@ type LinkDebtContext =
   | {
       phase: 'prompt'
       asset: AssetQuickInput
-      savedAssetId: string
+      /**
+       * Het zojuist-opgeslagen asset-id (commit-mode), of `null` in collect-mode
+       * (onboarding) waar de asset nog niet gepersisteerd is. In collect-mode
+       * dragen we het huis + de hypotheek als lokaal paar door via `onCollect`
+       * en koppelt de server ze na batch-insert (`linked_client_ref`).
+       */
+      savedAssetId: string | null
     }
   | {
       phase: 'form'
       asset: AssetQuickInput
-      savedAssetId: string
+      savedAssetId: string | null
       debtDraft: DebtDraftState
     }
 
@@ -116,6 +129,7 @@ export function QuickAddWizard({
   initialIntent,
   initialAssetType,
   initialDebtType,
+  initialLinkedAssetId,
   mode = 'commit',
   onCollect,
   onSaved,
@@ -146,6 +160,7 @@ export function QuickAddWizard({
         initialIntent,
         initialAssetType,
         initialDebtType,
+        initialLinkedAssetId,
       })
       setLinkDebtCtx(null)
       setIsSaving(false)
@@ -154,7 +169,7 @@ export function QuickAddWizard({
       setLinkDebtCtx(null)
       setIsSaving(false)
     }
-  }, [open, initialIntent, initialAssetType, initialDebtType])
+  }, [open, initialIntent, initialAssetType, initialDebtType, initialLinkedAssetId])
 
   // Stappen-totaal: choice + type + details + linkDebt = 4. Skip choice
   // bij `initialIntent` (-1), skip ook type bij type-prefill (-1).
@@ -260,17 +275,24 @@ export function QuickAddWizard({
         field3: draft.field3 ?? null,
       }
 
-      // Collect-mode skipt de gekoppelde-schuld-prompt: het asset is nog niet
-      // opgeslagen (dus geen linked_asset_id beschikbaar) en de onboarding-
-      // gebruiker voegt schuld apart toe als die er is.
-      const suggestsDebt = !isCollectMode && LINKED_DEBT_SUGGESTIONS[draft.asset_type]
+      // Beide modi tonen de gekoppelde-schuld-prompt voor asset-types met een
+      // suggestie (bv. "Heeft deze woning een hypotheek?" bij eigen_huis).
+      const suggestsDebt = LINKED_DEBT_SUGGESTIONS[draft.asset_type]
       if (!suggestsDebt) {
         await submitQuickAdd({ kind: 'asset', asset: complete })
         return
       }
 
-      // Asset vooraf opslaan zodat we in de debt-stap een `linked_asset_id`
-      // hebben. Bij een fail vallen we terug op het error-scherm.
+      // Collect-mode (onboarding): NIET opslaan. Het huis heeft nog geen DB-id;
+      // we tonen de prompt en dragen huis + hypotheek straks als lokaal paar
+      // door via `onCollect` (`asset_with_debt`). De server koppelt na insert.
+      if (isCollectMode) {
+        setLinkDebtCtx({ phase: 'prompt', asset: complete, savedAssetId: null })
+        return
+      }
+
+      // Commit-mode: asset vooraf opslaan zodat we in de debt-stap een
+      // `linked_asset_id` hebben. Bij een fail vallen we terug op het error-scherm.
       setIsSaving(true)
       dispatch({ type: 'SAVING' })
       try {
@@ -339,6 +361,15 @@ export function QuickAddWizard({
 
   const handleLinkDebtNo = useCallback(() => {
     if (!linkDebtCtx) return
+    // Collect-mode: het huis is nog NIET verzameld (we sloegen de submit over om
+    // de prompt te tonen). "Nee" betekent: alleen het huis doorgeven, zonder
+    // hypotheek. Huis zonder hypotheek blijft een geldige keuze.
+    if (linkDebtCtx.savedAssetId === null) {
+      void submitQuickAdd({ kind: 'asset', asset: linkDebtCtx.asset })
+      setLinkDebtCtx(null)
+      return
+    }
+    // Commit-mode: asset is al opgeslagen vóór de prompt — toon success.
     dispatch({
       type: 'SUCCESS',
       payload: {
@@ -348,7 +379,7 @@ export function QuickAddWizard({
       },
     })
     setLinkDebtCtx(null)
-  }, [linkDebtCtx])
+  }, [linkDebtCtx, submitQuickAdd])
 
   const handleLinkDebtFormUpdate = useCallback((patch: Partial<DebtQuickInput>) => {
     setLinkDebtCtx((prev) =>
@@ -360,9 +391,34 @@ export function QuickAddWizard({
 
   const handleLinkDebtFormSubmit = useCallback(() => {
     if (!linkDebtCtx || linkDebtCtx.phase !== 'form') return
-    proceedFromDebtDetails(linkDebtCtx.debtDraft, linkDebtCtx.savedAssetId)
+    const { debtDraft, savedAssetId, asset } = linkDebtCtx
+    // Commit-mode: asset is al opgeslagen → koppel de schuld via linked_asset_id.
+    if (savedAssetId) {
+      proceedFromDebtDetails(debtDraft, savedAssetId)
+      setLinkDebtCtx(null)
+      return
+    }
+    // Collect-mode: geef huis + hypotheek als één paar door. De onboarding-
+    // parent koppelt ze lokaal (client_ref) en de server zet na insert het
+    // echte linked_asset_id. We forwarden alleen geldige debt-input.
+    if (
+      typeof debtDraft.current_balance === 'number' &&
+      debtDraft.name &&
+      debtDraft.name.trim().length > 0
+    ) {
+      void submitQuickAdd({
+        kind: 'asset_with_debt',
+        asset,
+        debt: {
+          debt_type: debtDraft.debt_type,
+          name: debtDraft.name.trim(),
+          current_balance: debtDraft.current_balance,
+          field3: debtDraft.field3 ?? null,
+        },
+      })
+    }
     setLinkDebtCtx(null)
-  }, [linkDebtCtx, proceedFromDebtDetails])
+  }, [linkDebtCtx, proceedFromDebtDetails, submitQuickAdd])
 
   // ── Close / navigation ─────────────────────────────────────────
 
@@ -382,8 +438,14 @@ export function QuickAddWizard({
       return
     }
     if (linkDebtCtx?.phase === 'prompt') {
-      // Asset is al opgeslagen — teruggaan naar details zou verwarrend zijn;
-      // we sluiten de koppel-flow en tonen het success-scherm voor de asset.
+      // Collect-mode: asset is nog NIET opgeslagen → terug naar het details-
+      // formulier (reducer-state staat nog op 'details', draft intact).
+      if (linkDebtCtx.savedAssetId === null) {
+        setLinkDebtCtx(null)
+        return
+      }
+      // Commit-mode: asset is al opgeslagen — teruggaan naar details zou
+      // verwarrend zijn; we sluiten de koppel-flow en tonen het success-scherm.
       dispatch({
         type: 'SUCCESS',
         payload: {
@@ -465,7 +527,9 @@ export function QuickAddWizard({
           }}
           onProceedDebtDetails={() => {
             if (state.step === 'details' && state.intent === 'debt') {
-              proceedFromDebtDetails(state.debtDraft)
+              // `linkedAssetId` is gezet wanneer de wizard met een voor-ingevuld
+              // koppel-id is geopend (hypotheek-vervolg-CTA op een nieuwe woning).
+              proceedFromDebtDetails(state.debtDraft, state.linkedAssetId)
             }
           }}
           onLinkDebtYes={handleLinkDebtYes}

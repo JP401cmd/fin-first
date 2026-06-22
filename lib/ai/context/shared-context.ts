@@ -8,6 +8,7 @@ import {
   getFireEligibleNetWorth,
   parseHousingStrategy,
 } from '@/lib/housing-strategy'
+import { isFinanciallyFree } from '@/lib/fire-strategy'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
 
 const TEMPORAL_LABELS: Record<number, string> = {
@@ -120,6 +121,14 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Autonomiescore: ${core.autonomyScore}`,
     `Dagelijkse uitgaven: ${formatCurrency(Math.round(core.yearlyExpenses / 365))}`,
     `Budgettering: ${coreData.budgetingActive !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
+    // Levensfase-signaal (consume-only, ADR 0009): wanneer de gebruiker AL
+    // financieel vrij is (vrijheids-% ≥ 100 of leeftijd voorbij vrijheidsleeftijd)
+    // moet Will coachen op behoud/onttrekking i.p.v. "eerder vrij worden". Afgeleid
+    // via de canonieke `isFinanciallyFree`-vlag uit reeds-in-context getallen
+    // (freedomPercentage + currentAge); geen nieuwe data naar het model.
+    isFinanciallyFree({ freedomPct: freedomPercentage, currentAge: coreData.currentAge ?? null, fireAge: null })
+      ? 'Levensfase: gebruiker is AL financieel vrij / met pensioen — coach op behoud en onttrekking (hoe lang gaat het vermogen mee, kosten laag houden), NIET op "eerder vrij worden" of sneller sparen. De FIRE-datum en het vrijheids-% zijn bereikt.'
+      : null,
   ]
 
   // Add supplementary context from free-text financial description (news-only onboarding)

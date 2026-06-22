@@ -31,7 +31,7 @@ export interface PageStatusResult {
 }
 
 function asMinimizedLevel(value: unknown): MinimizedLevel | null {
-  return value === 'warn' || value === 'bad' ? value : null
+  return value === 'warn' || value === 'bad' || value === 'info' ? value : null
 }
 
 export function usePageStatus(route: string): PageStatusResult {

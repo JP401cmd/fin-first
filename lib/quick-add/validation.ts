@@ -55,6 +55,9 @@ export const AssetQuickInputSchema = z.object({
     .finite()
     .min(0, 'Bedrag mag niet negatief zijn'),
   field3: Field3Schema,
+  // Onboarding-only opaak koppel-token (zie AssetQuickInput.client_ref). Geen
+  // UUID-eis: het is een client-gegenereerde string, geen DB-id.
+  client_ref: z.string().max(64).optional(),
 })
 
 /**
@@ -75,6 +78,9 @@ export const DebtQuickInputSchema = z.object({
     .min(0, 'Bedrag mag niet negatief zijn'),
   field3: Field3Schema,
   linked_asset_id: z.string().uuid().nullable().optional(),
+  // Onboarding-only koppel-token (zie DebtQuickInput.linked_client_ref). Geen
+  // UUID — matcht met AssetQuickInput.client_ref, niet met een DB-id.
+  linked_client_ref: z.string().max(64).nullable().optional(),
 })
 
 /** Debt payload inside `asset_with_debt` — no `linked_asset_id` (server-set). */

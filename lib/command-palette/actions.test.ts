@@ -21,6 +21,8 @@ function makeCtx(overrides: Partial<ActionRunContext> = {}): ActionRunContext {
     openChat: vi.fn(),
     togglePrivacy: vi.fn(),
     privacyMasked: false,
+    toggleDisplayMode: vi.fn(),
+    displayMode: 'simple',
     triggerPricesSync: vi.fn(),
     currentPerspective: 'personal',
     availablePerspectives: PERSPECTIVES,

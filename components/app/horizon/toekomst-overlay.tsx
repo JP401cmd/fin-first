@@ -119,6 +119,16 @@ export interface ToekomstOverlayProps {
    * en doet de overlay niets.
    */
   escapeSuspended?: boolean
+  /**
+   * Of het scroll-in-beeld-effect (centreer/lijn de overlay uit bij openen) mag
+   * vuren. Default `true`. De ouder zet dit pas op `true` zodra de opgeslagen
+   * voorkeur (`horizon_overlay_visible`) ná hydratie is ingelezen, zodat de
+   * pre-restore default `visible={true}` op de eerste render NIET onterecht naar
+   * de grafiek scrolt wanneer de gebruiker de tips eerder had uitgezet. Voorkomt
+   * de race tussen de initiële state-waarde en de localStorage-restore — zonder
+   * de SSR/eerste-render DOM te veranderen (geen hydratie-mismatch).
+   */
+  autoScrollIntoView?: boolean
 }
 
 export function ToekomstOverlay({
@@ -129,6 +139,7 @@ export function ToekomstOverlay({
   children,
   onClose,
   escapeSuspended = false,
+  autoScrollIntoView = true,
 }: ToekomstOverlayProps) {
   // Apparaten met echte hover (desktop) openen de popover bij hover; touch
   // gebruikt tik-om-te-openen + tik-naast/✕ om te sluiten.
@@ -273,7 +284,9 @@ export function ToekomstOverlay({
       typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(max-width: 1023px)').matches
-    if (el && typeof el.scrollIntoView === 'function') {
+    // Alleen scrollen wanneer dit een échte (gebruikers-/voorkeur-bevestigde)
+    // open is — niet op de transiënte pre-restore default `visible={true}`.
+    if (autoScrollIntoView && el && typeof el.scrollIntoView === 'function') {
       el.scrollIntoView({ block: isCompact ? 'start' : 'center', behavior: 'auto' })
     }
 
@@ -328,7 +341,7 @@ export function ToekomstOverlay({
       window.removeEventListener('resize', applyLock)
       release()
     }
-  }, [visible])
+  }, [visible, autoScrollIntoView])
 
   const topBalloons = balloons.filter((b) => b.row === 'top')
   const bottomBalloons = balloons.filter((b) => b.row === 'bottom')

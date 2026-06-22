@@ -146,6 +146,37 @@ describe('HefbomenNav', () => {
   })
 })
 
+describe('HefbomenNav — Eenvoudige weergave (display_mode simple)', () => {
+  // De chevron-drilldown-toggle in LeverageCard is een <button> met aria-label
+  // "Toon detail {label}" / "Verberg detail {label}".
+  const CHEVRON_RE = /detail/i
+
+  it('toont chevron-toggles in Volledig (default) bij tegels met drilldown', () => {
+    const { container } = render(<HefbomenNav health={mockHealth()} />)
+    const toggles = Array.from(container.querySelectorAll('button')).filter((b) =>
+      CHEVRON_RE.test(b.getAttribute('aria-label') ?? ''),
+    )
+    // debt_ratio 60 (warn) + savings_rate 30 (bad) etc. → minstens één drilldown.
+    expect(toggles.length).toBeGreaterThan(0)
+  })
+
+  it('verbergt alle chevron-toggles in Eenvoudig', () => {
+    const { container } = render(<HefbomenNav health={mockHealth()} simple />)
+    const toggles = Array.from(container.querySelectorAll('button')).filter((b) =>
+      CHEVRON_RE.test(b.getAttribute('aria-label') ?? ''),
+    )
+    expect(toggles.length).toBe(0)
+  })
+
+  it('rendert in Eenvoudig nog steeds de 4 tegels (alleen rustiger)', () => {
+    render(<HefbomenNav health={mockHealth()} simple />)
+    expect(screen.getByText('Bezittingen')).toBeTruthy()
+    expect(screen.getByText('Schulden')).toBeTruthy()
+    expect(screen.getByText('Cashflow')).toBeTruthy()
+    expect(screen.getByText('Belasting')).toBeTruthy()
+  })
+})
+
 describe('HefbomenNav — privacy-masking voor saldi', () => {
   afterEach(() => {
     window.localStorage.clear()

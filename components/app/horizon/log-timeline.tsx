@@ -5,7 +5,7 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { Action } from '@/lib/recommendation-data'
 import {
   Calendar, Globe, Baby, Hammer, GraduationCap, Briefcase,
-  Clock, Sunset, Home, Heart, HeartHandshake, HeartCrack, Truck, Car, Gift, Zap, HandCoins,
+  Clock, Sunset, Home, Heart, HeartHandshake, HeartCrack, Truck, Car, Caravan, Tent, Gift, Zap, HandCoins,
   Landmark, PiggyBank, UserX, UserMinus, Flower2,
   CheckCircle2, PartyPopper, Mountain, Sparkles, AlertTriangle, Shield, Receipt, TrendingUp,
 } from 'lucide-react'
@@ -25,6 +25,8 @@ export const EVENT_ICONS: Record<string, React.ReactNode> = {
   HeartCrack: <HeartCrack className="h-4 w-4" />,
   Truck: <Truck className="h-4 w-4" />,
   Car: <Car className="h-4 w-4" />,
+  Caravan: <Caravan className="h-4 w-4" />,
+  Tent: <Tent className="h-4 w-4" />,
   Gift: <Gift className="h-4 w-4" />,
   Zap: <Zap className="h-4 w-4" />,
   HeartHandshake: <HeartHandshake className="h-4 w-4" />,

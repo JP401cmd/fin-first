@@ -133,7 +133,7 @@ import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-char
 import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
-import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming } from '@/lib/fire-strategy'
 import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
@@ -281,6 +281,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // Levensgebeurtenissen toggle — handmatig aangemaakte life events tonen/verbergen.
   // Default true. Persistent zoals natuurlijke mijlpalen.
   const [showLifeEvents, setShowLifeEvents] = useState(true)
+  // overlayPrefRestored: pas `true` nadat de localStorage-voorkeur ná hydratie is
+  // ingelezen. Gate voor het auto-scroll-effect van de overlay — zo scrolt de
+  // pre-restore default `overlayVisible={true}` op de eerste render NIET naar de
+  // grafiek wanneer de gebruiker de tips eerder had uitgezet (race-fix). De
+  // gerenderde DOM hangt NIET van deze flag af → geen hydratie-mismatch.
+  const [overlayPrefRestored, setOverlayPrefRestored] = useState(false)
   useEffect(() => {
     try {
       const storedNat = localStorage.getItem('horizon_show_natural_milestones')
@@ -293,6 +299,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       if (storedOverlay !== null) setOverlayVisible(storedOverlay === 'true')
     } catch {
       // ignore — localStorage kan disabled zijn (private mode)
+    } finally {
+      // Voorkeur is nu (al dan niet) toegepast → auto-scroll mag voortaan vuren
+      // op een échte open. Bij voorkeur `false` is `overlayVisible` hierboven al
+      // op false gezet, dus scrolt het effect niet.
+      setOverlayPrefRestored(true)
     }
   }, [])
   const persistOverlayVisible = useCallback((val: boolean) => {
@@ -2653,6 +2664,23 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const perspectiveHero = isHouseholdView ? householdHero : isPartnerView ? partnerHero : null
   const hasPerspectiveHero = perspectiveHero != null
 
+  // ── Reeds-vrij / met-pensioen framing voor de hero-leeftijdsstat ───────────
+  // Consume-only (ADR 0009): leest de reeds-berekende vrijheidsvoortgang +
+  // leeftijden, herberekent niets. Zodra de gebruiker financieel vrij is toont
+  // de "vrijheidsleeftijd"-stat anders het feitelijk huidige (FIRE≈huidige)
+  // leeftijd-getal — verwarrend. Dan tonen we i.p.v. een getal "Je bent vrij" /
+  // "Je bent met pensioen". Alleen voor de eigen view (niet huishouden/partner).
+  const heroFreedomFraming = resolveFreedomFraming({
+    freedomPct: effectiveFreedomPct,
+    currentAge,
+    fireAge: simResult?.fireAgeFractional ?? simResult?.fireAge ?? fire?.fireAge ?? null,
+    strategy: fireStrategy?.strategy,
+    aowAge: userAowAge.fractional,
+  })
+  const showFreeHero = !hasPerspectiveHero && heroFreedomFraming !== 'building'
+  const freeHeroPhrase = heroFreedomFraming === 'pensioen' ? 'Je bent met pensioen' : 'Je bent vrij'
+  const freeHeroLabel = heroFreedomFraming === 'pensioen' ? 'Pensioen' : 'Vrijheid'
+
   const hasNoDob = !effectiveInput?.dateOfBirth
   const fireNotReachable = effectiveCountdown.fireDate === 'Niet haalbaar'
   const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
@@ -2874,16 +2902,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           {/* Mobile: Primary number */}
           <div className="sm:hidden mb-3">
             <button type="button" onClick={() => setShowFireAgeReceipt(true)} className="text-left">
-              <span className="font-display text-[36px] font-bold tracking-tight text-[var(--ink)]">
-                {hasPerspectiveHero
-                  ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '-')
-                  : isPensioenMode
-                    ? aowAgeFormatted
-                    : simResult?.fireAgeFractional != null
-                      ? simResult.fireAgeFractional.toFixed(1)
-                      : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
-              </span>
-              <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">{isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd'}</span>
+              {showFreeHero ? (
+                <span className="font-serif text-[28px] font-bold tracking-tight text-[var(--ink)]">{freeHeroPhrase}.</span>
+              ) : (
+                <>
+                  <span className="font-display text-[36px] font-bold tracking-tight text-[var(--ink)]">
+                    {hasPerspectiveHero
+                      ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '-')
+                      : isPensioenMode
+                        ? aowAgeFormatted
+                        : simResult?.fireAgeFractional != null
+                          ? simResult.fireAgeFractional.toFixed(1)
+                          : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
+                  </span>
+                  <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">{isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd'}</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -2899,10 +2933,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             >
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
                 <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
+                <span>{showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
               </div>
               <div
-                className="text-[28px] sm:text-[32px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                className={`${showFreeHero ? 'text-[18px] sm:text-[20px] leading-tight' : 'text-[28px] sm:text-[32px] leading-none'} font-black tracking-[-0.02em] tabular-nums`}
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
                 <span
@@ -2912,20 +2946,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
                   }}
                 >
-                  {hasPerspectiveHero
-                    ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
-                    : isPensioenMode
-                      ? aowAgeFormatted
-                      : simResult?.fireAgeFractional != null
-                        ? simResult.fireAgeFractional.toFixed(1)
-                        : fire.fireAge !== null ? Math.round(fire.fireAge) : '–'}
+                  {showFreeHero
+                    ? freeHeroPhrase
+                    : hasPerspectiveHero
+                      ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
+                      : isPensioenMode
+                        ? aowAgeFormatted
+                        : simResult?.fireAgeFractional != null
+                          ? simResult.fireAgeFractional.toFixed(1)
+                          : fire.fireAge !== null ? Math.round(fire.fireAge) : '–'}
                 </span>
               </div>
               <div
                 className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                {hasPerspectiveHero ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)') : isPensioenMode ? 'AOW-leeftijd' : 'jaar'}
+                {showFreeHero ? '' : hasPerspectiveHero ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)') : isPensioenMode ? 'AOW-leeftijd' : 'jaar'}
               </div>
             </button>
 
@@ -3057,10 +3093,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             >
               <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
                 <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isPensioenMode ? 'Pensioenlft' : 'Vrijheidslft'}</span>
+                <span>{showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenlft' : 'Vrijheidslft'}</span>
               </div>
               <div
-                className="text-[22px] font-black leading-none tracking-[-0.02em] tabular-nums"
+                className={`${showFreeHero ? 'text-[15px] leading-tight' : 'text-[22px] leading-none'} font-black tracking-[-0.02em] tabular-nums`}
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
                 <span
@@ -3070,20 +3106,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
                   }}
                 >
-                  {hasPerspectiveHero
-                    ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
-                    : isPensioenMode
-                      ? aowAgeFormatted
-                      : simResult?.fireAgeFractional != null
-                        ? simResult.fireAgeFractional.toFixed(1)
-                        : fire.fireAge !== null ? Math.round(fire.fireAge) : '–'}
+                  {showFreeHero
+                    ? freeHeroPhrase
+                    : hasPerspectiveHero
+                      ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
+                      : isPensioenMode
+                        ? aowAgeFormatted
+                        : simResult?.fireAgeFractional != null
+                          ? simResult.fireAgeFractional.toFixed(1)
+                          : fire.fireAge !== null ? Math.round(fire.fireAge) : '–'}
                 </span>
               </div>
               <div
                 className="italic text-[10px] text-[var(--ink-3)] mt-1"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                jaar
+                {showFreeHero ? '' : 'jaar'}
               </div>
             </button>
 
@@ -3541,6 +3579,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           boven + onder; de grafiek vervaagt zolang de tips aan staan. */}
                       <ToekomstOverlay
                         visible={overlayVisible && chartMode === 'vermogenspad'}
+                        autoScrollIntoView={overlayPrefRestored}
                         onEmphasisChange={setOverlayEmphasis}
                         balloons={toekomstOverlayBalloons}
                         summary={{

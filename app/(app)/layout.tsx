@@ -10,6 +10,7 @@ import { MobilePreviewFrame } from '@/components/app/beheer/mobile-preview-frame
 import { ToastProvider } from '@/components/app/toast-provider'
 import { GlobalSyncProvider } from '@/components/sync/global-sync-provider'
 import { PrivacyProvider } from '@/lib/hooks/use-privacy'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { ErrorReporter } from '@/components/app/error-reporter'
 import { AutoSnapshotTrigger } from '@/components/app/auto-snapshot-trigger'
@@ -94,7 +95,7 @@ export default async function AppLayout({
     // profile-select bevat velden voor sidebar/feature-access/theming.
     // expected_return + inflation_rate voeden de coach-data-gap `hasFireParams`
     // — meegenomen in deze bestaande query i.p.v. een extra round-trip.
-    supabase.from('profiles').select('role, blocked_at, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type, expected_return, inflation_rate').eq('id', user.id).single(),
+    supabase.from('profiles').select('role, blocked_at, onboarding_completed, last_known_phase, module_colors, budget_colors, phase_colors, typography_theme, active_subscriptions, feature_preferences, active_modules, household_type, expected_return, inflation_rate, display_mode').eq('id', user.id).single(),
     // assets: `asset_type, net_worth_inclusion_pct` voor sidebar netWorth
     // (weighted). De tracking-flags voeden `getActiveAppKeys()` voor de
     // sidebar apps-strip: een app verschijnt alleen als minstens één
@@ -435,6 +436,7 @@ export default async function AppLayout({
     <MobilePreviewProvider>
       <MobilePreviewFrame>
         <PrivacyProvider>
+        <DisplayModeProvider initialMode={(profile?.display_mode as DisplayMode) ?? 'simple'}>
         <ToastProvider>
           <SessionMonitor />
           <ErrorReporter />
@@ -498,6 +500,7 @@ export default async function AppLayout({
             </ChatProvider>
           </PerspectiveProvider>
         </ToastProvider>
+        </DisplayModeProvider>
         </PrivacyProvider>
       </MobilePreviewFrame>
     </MobilePreviewProvider>

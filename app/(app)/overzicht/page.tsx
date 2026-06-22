@@ -22,6 +22,7 @@ import { loadTopMarketBriefing } from '@/lib/briefing/news-market'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { ageAtDate } from '@/lib/horizon-data'
+import { resolveFreedomFraming } from '@/lib/fire-strategy'
 
 export const metadata: Metadata = {
   title: 'Overzicht — TriFinity',
@@ -238,6 +239,18 @@ export default async function OverzichtPage() {
       : null
   const simNetWorthRows = dashboardData.simNetWorthRows ?? null
   const simRequiredPortfolio = dashboardData.simRequiredPortfolio ?? null
+
+  // Afgeleide vrijheids-/pensioenframing via de gedeelde, consume-only vlag
+  // (ADR 0009): geen herberekening — we lezen alleen freedomPct (canoniek),
+  // currentAge, fireAge en de gekozen strategie. Dezelfde vlag voedt de
+  // status-banner (server) en de AI-context, zodat hero, Will en banner nooit
+  // uiteenlopen ("UI zegt vrij, Will zegt nog jaren te gaan").
+  const freedomFraming = resolveFreedomFraming({
+    freedomPct,
+    currentAge,
+    fireAge,
+    strategy: horizonData?.fireStrategy?.strategy,
+  })
   // Geschat maandelijks spaarritme voor de back-cast van ontbrekende
   // historie-maanden (< 3 echte waarderingen): bewuste maandinleg als die
   // er is, anders inkomen − uitgaven. Zelfde fallback-volgorde als de
@@ -264,6 +277,7 @@ export default async function OverzichtPage() {
         currentAge={currentAge}
         endAge={endAge}
         isPensioenMode={isPensioenMode}
+        freedomFraming={freedomFraming}
         totals={totals}
         briefingEntries={briefingEntries}
         briefingRefreshedAt={briefingRefreshedAt}

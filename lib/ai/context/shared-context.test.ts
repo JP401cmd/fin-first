@@ -120,3 +120,31 @@ describe('buildSharedContext — Vrijheids-% (canonieke grondslag, ADR 0009)', (
     expect(extractFreedomPct(ctx)).toBe(Math.round(expected * 10) / 10)
   })
 })
+
+const FREE_LINE = 'gebruiker is AL financieel vrij / met pensioen'
+
+describe('buildSharedContext — levensfase-regel (al financieel vrij / met pensioen)', () => {
+  beforeEach(() => {
+    loadCoreDataMock.mockReset()
+  })
+
+  it('voegt de "al financieel vrij"-regel toe wanneer het vrijheids-% op 100 uitkomt', async () => {
+    // eligible netWorth = 600k - 200k = 400k; required = 400k → 100% → vrij.
+    loadCoreDataMock.mockResolvedValue(
+      makeCoreData({ fireTargetFromHorizon: 400_000 }),
+    )
+    const ctx = await buildSharedContext(makeSupabase({ housing_strategy_config: { mode: 'include_full' } }))
+
+    expect(extractFreedomPct(ctx)).toBe(100)
+    expect(ctx).toContain(FREE_LINE)
+  })
+
+  it('laat de "al financieel vrij"-regel WEG wanneer het vrijheids-% onder 100 ligt', async () => {
+    // eligible netWorth = 400k; required = 500k → 80% → nog op weg, geen regel.
+    loadCoreDataMock.mockResolvedValue(makeCoreData())
+    const ctx = await buildSharedContext(makeSupabase({ housing_strategy_config: { mode: 'include_full' } }))
+
+    expect(extractFreedomPct(ctx)).toBe(80)
+    expect(ctx).not.toContain(FREE_LINE)
+  })
+})

@@ -270,6 +270,44 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
   },
 }
 
+// ── Vrijheids-/pensioenbanner (informatief, niet-alarmerend) ─────────────────
+//
+// Aparte copy-set (géén onderdeel van PAGE_STATUS_COPY, dat is warn/bad-only):
+// de informatieve duiding op /overzicht wanneer de gebruiker al financieel vrij
+// of met pensioen is. Twee varianten op basis van de gedeelde framing-vlag.
+// Filosofie behouden ("Geld is opgeslagen tijd"): het beeld toont nu onttrekking,
+// geen opbouw — geen Wft-advies.
+
+export interface FreedomBannerCopy {
+  title: string
+  reason: string
+  remedy: string
+  will: PageStatusWill
+}
+
+export const FREEDOM_BANNER_COPY: Record<'free' | 'pensioen', FreedomBannerCopy> = {
+  free: {
+    title: 'Financieel vrij',
+    reason: 'Je bent financieel vrij — je hoeft niet meer te werken voor geld.',
+    remedy:
+      'Dit overzicht toont nu je onttrekking tot het einde van je leven, niet meer je opbouw. Je vrijheids-% en vrijheidsleeftijd zijn bereikt.',
+    will: {
+      onderwerp: 'Mijn vermogen behouden nu ik vrij ben',
+      detail: 'Ik wil weten hoe lang mijn vermogen meegaat en hoe ik het verstandig behoud.',
+    },
+  },
+  pensioen: {
+    title: 'Met pensioen',
+    reason: 'Je bent met pensioen — je leeft van je opgebouwde vermogen en je AOW.',
+    remedy:
+      'Dit overzicht toont nu je onttrekking tot het einde van je leven, niet meer je opbouw.',
+    will: {
+      onderwerp: 'Mijn pensioen-onttrekking',
+      detail: 'Ik wil weten hoe lang mijn vermogen meegaat en hoe ik verstandig onttrek.',
+    },
+  },
+}
+
 /** Helper: copy voor een route + status (warn/bad). null als route onbekend. */
 export function getRouteCopy(route: string): RouteCopy | null {
   return PAGE_STATUS_COPY[route] ?? null

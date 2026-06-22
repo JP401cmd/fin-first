@@ -138,6 +138,7 @@ export function BriefingPanel({
   freedomHero,
   headline,
   weekHistory,
+  simpleMode = false,
 }: {
   entries: BriefingEntry[]
   /** ISO-tijdstip waarop de briefing voor vandaag is vastgezet ("Bijgewerkt …"). */
@@ -153,6 +154,13 @@ export function BriefingPanel({
   headline?: string | null
   /** Afgesloten weken uit de snapshot-historie (nieuwste laatst). */
   weekHistory?: BriefingWeekHistoryItem[]
+  /**
+   * Eenvoudige weergave (display_mode === 'simple'): verberg de
+   * "Jouw vrijheid deze week"-hero en toon enkel het belangrijkste briefje
+   * (de eerste entry, door de engine al op prioriteit geordend) over de volle
+   * breedte. Default false → ongewijzigde, volledige briefing.
+   */
+  simpleMode?: boolean
 }) {
   // Override-state: alleen gezet ná een succesvolle handmatige ververs. Zonder
   // override blijven de server-props de bron van waarheid — remount-veilig.
@@ -175,7 +183,10 @@ export function BriefingPanel({
     ((d: FreedomCardData) => HTMLCanvasElement) | null
   >(null)
 
-  const shownEntries = (override?.entries ?? entries).slice(0, MAX_BRIEFING_ENTRIES)
+  // In Eenvoudig tonen we alleen het belangrijkste briefje (1, over de volle
+  // breedte); anders het volledige grid (max 6).
+  const entryLimit = simpleMode ? 1 : MAX_BRIEFING_ENTRIES
+  const shownEntries = (override?.entries ?? entries).slice(0, entryLimit)
   const shownRefreshedAt = override?.refreshedAt ?? refreshedAt ?? null
   const shownHeadline = override?.headline ?? headline ?? null
   const refreshable = canRefresh && !usedToday && !refreshing
@@ -232,7 +243,7 @@ export function BriefingPanel({
 
   return (
     <div id="briefing" className="mt-6 scroll-mt-20">
-      {freedomHero && <VrijheidsbriefingHero {...freedomHero} />}
+      {freedomHero && !simpleMode && <VrijheidsbriefingHero {...freedomHero} />}
       <BriefingHeader
         refreshedAt={shownRefreshedAt}
         headline={shownHeadline}
@@ -273,7 +284,13 @@ export function BriefingPanel({
           </article>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div
+          className={
+            simpleMode
+              ? 'grid grid-cols-1 gap-3 sm:gap-4'
+              : 'grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4'
+          }
+        >
           {shownEntries.map((entry, i) => (
             <BriefingCard key={entry.id} entry={entry} index={i} />
           ))}

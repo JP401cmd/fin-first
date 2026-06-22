@@ -166,4 +166,21 @@ describe('buildDebtDraft', () => {
     })
     expect(draft.linked_asset_id).toBe('00000000-0000-0000-0000-000000000001')
   })
+
+  it('gekoppelde hypotheek: debt_type=mortgage + fiscale/aflossing-vlaggen + linked_asset_id samen', () => {
+    // Borgt de FIRE-correctheid: alleen met debt_type='mortgage' ÉN
+    // linked_asset_id filtert filterAssetsForFire huis + hypotheek samen weg.
+    const draft = buildDebtDraft({
+      debt_type: 'mortgage',
+      name: 'Hypotheek — Woning',
+      current_balance: 320000,
+      field3: 3.2,
+      linked_asset_id: '00000000-0000-0000-0000-0000000000aa',
+    })
+    expect(draft.debt_type).toBe('mortgage')
+    expect(draft.linked_asset_id).toBe('00000000-0000-0000-0000-0000000000aa')
+    expect(draft.is_tax_deductible).toBe(true)
+    expect(draft.include_aflossing_in_savings).toBe(true)
+    expect(draft.interest_rate).toBe(3.2)
+  })
 })

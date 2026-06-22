@@ -58,6 +58,84 @@ export function parseFireStrategy(profile: {
   }
 }
 
+// ── Afgeleide vrijheids-/pensioentoestand (consume-only, ADR 0009) ──────────
+//
+// Eén canonieke, GEDEELDE bron die hero, status-banner én AI consumeren, zodat
+// er geen drift ontstaat ("UI zegt vrij, Will zegt nog 8 jaar te gaan"). Deze
+// helpers HERBEREKENEN niets: ze lezen reeds-berekende waarden (freedomPct uit
+// computeFreedomProgress, currentAge/fireAge/aowAge uit de loaders/unified
+// projection) en bevatten GEEN hardcoded leeftijden of forfaits — de AOW-leeftijd
+// komt via `lib/aow-leeftijd.ts`/de loaders binnen als parameter.
+
+export interface FreedomStateInput {
+  /** Canonieke vrijheidsvoortgang 0–100 (computeFreedomProgress). Null = onbekend. */
+  freedomPct: number | null
+  /** Huidige leeftijd in jaren. Null = geen geboortedatum bekend. */
+  currentAge: number | null
+  /** Vrijheids-/FIRE-leeftijd in jaren. Null = projectie kon niet draaien. */
+  fireAge: number | null
+  /** Gekozen eindstrategie — onderscheidt 'regulier pensioen' van 'vervroegde vrijheid'. */
+  strategy?: FireEndStrategy
+  /**
+   * AOW-leeftijd in jaren (uit lib/aow-leeftijd.ts) — optioneel. Alleen gebruikt
+   * voor precieze 'voorbij AOW'-detectie; ontbreekt 'ie, dan valt de logica terug
+   * op `fireAge` (in pensioen-modus is `fireAge` ≡ de AOW-leeftijd).
+   */
+  aowAge?: number | null
+}
+
+/**
+ * Reeds financieel vrij: de vrijheidsvoortgang staat op 100% OF de huidige
+ * leeftijd is voorbij de vrijheidsleeftijd. Vanaf dit punt is "% op weg naar
+ * vrijheid" niet meer de juiste framing — het beeld toont onttrekking, geen opbouw.
+ */
+export function isFinanciallyFree(input: FreedomStateInput): boolean {
+  const { freedomPct, currentAge, fireAge } = input
+  if (freedomPct != null && Number.isFinite(freedomPct) && freedomPct >= 100) return true
+  if (currentAge != null && fireAge != null && currentAge >= fireAge) return true
+  return false
+}
+
+/**
+ * Onttrekkings-/pensioenbeeld van toepassing: de gebruiker is al financieel vrij,
+ * OF heeft de pensioen-strategie gekozen en is voorbij de AOW-leeftijd (in
+ * pensioen-modus is `fireAge` ≡ AOW). Dit is de trigger voor de "dit beeld toont
+ * je onttrekking tot einde leven"-duiding.
+ */
+export function isRetiredView(input: FreedomStateInput): boolean {
+  if (isFinanciallyFree(input)) return true
+  if (input.strategy === 'pensioen') {
+    const threshold = input.aowAge ?? input.fireAge
+    if (input.currentAge != null && threshold != null && input.currentAge >= threshold) {
+      return true
+    }
+  }
+  return false
+}
+
+export type FreedomFraming = 'building' | 'free' | 'pensioen'
+
+/**
+ * Hero-/banner-woordkeuze in één afgeleide waarde:
+ *  - 'building' — nog op weg ("X% op weg naar vrijheid"); de bestaande framing.
+ *  - 'pensioen' — vrij rond de AOW-leeftijd: 'regulier pensioen' (strategy
+ *    'pensioen', óf leeftijd/vrijheidsleeftijd op of voorbij AOW).
+ *  - 'free'     — vrij vóór de AOW-leeftijd: 'vervroegde vrijheid'.
+ *
+ * Zonder `aowAge` (niet altijd geplumbd) leunt het pensioen-onderscheid op de
+ * expliciete 'pensioen'-strategie — het canonieke "ik stop rond AOW"-signaal dat
+ * ook de fasebalk al aanstuurt.
+ */
+export function resolveFreedomFraming(input: FreedomStateInput): FreedomFraming {
+  if (!isFinanciallyFree(input)) return 'building'
+  const atOrPastAow =
+    input.aowAge != null && input.currentAge != null && input.currentAge >= input.aowAge
+  const fireAtOrPastAow =
+    input.aowAge != null && input.fireAge != null && input.fireAge >= input.aowAge
+  if (input.strategy === 'pensioen' || atOrPastAow || fireAtOrPastAow) return 'pensioen'
+  return 'free'
+}
+
 /**
  * Resolve the fire strategy with feature_preferences fallback.
  * When the DB CHECK constraint doesn't yet include 'pensioen', the fire-settings API

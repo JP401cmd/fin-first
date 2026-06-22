@@ -244,3 +244,54 @@ describe('BriefingPanel — wekelijkse-briefing header + ververs', () => {
     expect(screen.queryByRole('button', { name: /ververs/i })).toBeNull()
   })
 })
+
+describe('BriefingPanel — Eenvoudige weergave (simpleMode)', () => {
+  const hero = {
+    totalFreedomDays: 1000,
+    totalLabel: '2 jaar en 9 maanden',
+    deltaDays: 12,
+    isFirstWeek: false,
+    sparkline: [],
+    isInfinite: false,
+    isDeficit: false,
+  }
+
+  const sixEntries: BriefingEntry[] = [
+    makeEntry('observation', 'Belangrijkste eerst', { id: 'top' }),
+    makeEntry('tip', 'Tweede briefje', { id: 'two' }),
+    makeEntry('upcoming', 'Derde briefje', { id: 'three' }),
+    makeEntry('heads_up', 'Vierde briefje', { id: 'four' }),
+    makeEntry('milestone', 'Vijfde briefje', { id: 'five' }),
+    makeEntry('market', 'Zesde briefje', { id: 'six' }),
+  ]
+
+  it('toont in Eenvoudig alleen het eerste (belangrijkste) briefje', () => {
+    const { container } = render(<BriefingPanel entries={sixEntries} simpleMode />)
+    expect(container.textContent).toContain('Belangrijkste eerst')
+    expect(container.textContent).not.toContain('Tweede briefje')
+    expect(container.textContent).not.toContain('Zesde briefje')
+  })
+
+  it('rendert het ene briefje over de volle breedte (grid-cols-1, geen sm:grid-cols-3)', () => {
+    const { container } = render(<BriefingPanel entries={sixEntries} simpleMode />)
+    const grid = container.querySelector('.grid')
+    expect(grid?.className).toContain('grid-cols-1')
+    expect(grid?.className.includes('sm:grid-cols-3')).toBe(false)
+  })
+
+  it('verbergt "Jouw vrijheid deze week" in Eenvoudig, ook als freedomHero gegeven is', () => {
+    render(<BriefingPanel entries={sixEntries} freedomHero={hero} simpleMode />)
+    expect(screen.queryByText(/Jouw vrijheid deze week/i)).toBeNull()
+  })
+
+  it('toont in Volledig (default) wél alle 6 briefjes + de vrijheid-hero (geen regressie)', () => {
+    const { container } = render(
+      <BriefingPanel entries={sixEntries} freedomHero={hero} />,
+    )
+    expect(container.textContent).toContain('Belangrijkste eerst')
+    expect(container.textContent).toContain('Zesde briefje')
+    expect(screen.getByText(/Jouw vrijheid deze week/i)).toBeTruthy()
+    const grid = container.querySelector('.grid')
+    expect(grid?.className).toContain('sm:grid-cols-3')
+  })
+})

@@ -5,6 +5,8 @@ import {
   NL_SWR,
   NL_AOW_MONTHLY,
   ageAtDate,
+  LIFE_EVENT_CATALOG,
+  type LifeEvent,
 } from '@/lib/horizon-data'
 import type { FinancialInput } from '@/lib/core-metrics'
 import {
@@ -356,5 +358,111 @@ describe('Edge case — al FIRE bereikt', () => {
       expect(Number.isFinite(row.endPortfolio)).toBe(true)
       expect(Number.isFinite(row.withdrawal)).toBe(true)
     }
+  })
+})
+
+// ── Step 13: Catalogus — camper & vakantiehuis (vermogen, catalog-only) ──────
+
+describe('Levensgebeurtenissen-catalogus — camper & vakantiehuis', () => {
+  it('camper_purchase staat in de catalogus onder Vermogen en is zichtbaar', () => {
+    const entry = LIFE_EVENT_CATALOG.camper_purchase
+    expect(entry).toBeDefined()
+    expect(entry.label).toBe('Camper kopen')
+    expect(entry.group).toBe('vermogen')
+    expect(entry.hiddenFromCatalog).toBeFalsy()
+  })
+
+  it('holiday_home_purchase staat onder Vermogen (vastgoed), NIET onder Wonen', () => {
+    const entry = LIFE_EVENT_CATALOG.holiday_home_purchase
+    expect(entry).toBeDefined()
+    expect(entry.label).toBe('Vakantiehuis kopen')
+    // Een tweede woning hoort bij vastgoed/vermogen — niet bij de eigen-woning (wonen).
+    expect(entry.group).toBe('vermogen')
+    expect(entry.group).not.toBe('wonen')
+    expect(entry.hiddenFromCatalog).toBeFalsy()
+  })
+})
+
+// ── Step 14: Cashflow-mapping camper & vakantiehuis (generieke fallback) ─────
+
+/** Bouw een snake_case LifeEvent (DB-representatie) voor lifeEventsToCashflows. */
+function makeLifeEvent(over: Partial<LifeEvent> & { id: string; event_type: string }): LifeEvent {
+  return {
+    name: over.name ?? over.id,
+    target_age: null,
+    target_date: null,
+    one_time_cost: 0,
+    monthly_cost_change: 0,
+    monthly_income_change: 0,
+    duration_months: 0,
+    icon: 'Calendar',
+    is_active: true,
+    sort_order: 0,
+    is_indexed: true,
+    ...over,
+  }
+}
+
+describe('Cashflow-mapping — camper & vakantiehuis (generieke fallback)', () => {
+  it('camper-event levert eenmalige + tijdelijke terugkerende uitgave', () => {
+    const cat = LIFE_EVENT_CATALOG.camper_purchase
+    const event = makeLifeEvent({
+      id: 'camper-1',
+      name: 'Camper kopen',
+      event_type: 'camper_purchase',
+      target_age: 45,
+      one_time_cost: cat.defaultCost,         // 40000 (uitgave)
+      monthly_cost_change: cat.defaultMonthlyCost, // 200/mnd
+      duration_months: cat.defaultDuration,   // 120 mnd = 10 jr bezit
+    })
+
+    const flows = lifeEventsToCashflows([event])
+
+    const oneTime = flows.find(f => f.type === 'one_time')
+    expect(oneTime).toBeDefined()
+    expect(oneTime!.direction).toBe('expense')
+    expect(oneTime!.amount).toBe(40_000)
+    expect(oneTime!.fromAge).toBe(45)
+    expect(oneTime!.toAge).toBe(45)
+    expect(oneTime!.indexed).toBe(false)
+
+    const recurring = flows.find(f => f.type === 'recurring')
+    expect(recurring).toBeDefined()
+    expect(recurring!.direction).toBe('expense')
+    expect(recurring!.amount).toBe(200)
+    expect(recurring!.fromAge).toBe(45)
+    expect(recurring!.toAge).toBe(45 + 120 / 12) // 55 — eindigt na 10 jaar
+    expect(recurring!.indexed).toBe(true)
+  })
+
+  it('vakantiehuis-event levert eenmalige + permanente terugkerende uitgave', () => {
+    const cat = LIFE_EVENT_CATALOG.holiday_home_purchase
+    const event = makeLifeEvent({
+      id: 'vakantiehuis-1',
+      name: 'Vakantiehuis kopen',
+      event_type: 'holiday_home_purchase',
+      target_age: 50,
+      one_time_cost: cat.defaultCost,         // 50000 (eigen inbreng + kk)
+      monthly_cost_change: cat.defaultMonthlyCost, // 600/mnd lasten
+      duration_months: cat.defaultDuration,   // 0 = permanent
+    })
+
+    const flows = lifeEventsToCashflows([event])
+
+    const oneTime = flows.find(f => f.type === 'one_time')
+    expect(oneTime).toBeDefined()
+    expect(oneTime!.direction).toBe('expense')
+    expect(oneTime!.amount).toBe(50_000)
+    expect(oneTime!.fromAge).toBe(50)
+    expect(oneTime!.toAge).toBe(50)
+    expect(oneTime!.indexed).toBe(false)
+
+    const recurring = flows.find(f => f.type === 'recurring')
+    expect(recurring).toBeDefined()
+    expect(recurring!.direction).toBe('expense')
+    expect(recurring!.amount).toBe(600)
+    expect(recurring!.fromAge).toBe(50)
+    expect(recurring!.toAge).toBeNull() // duration 0 → permanent
+    expect(recurring!.indexed).toBe(true)
   })
 })

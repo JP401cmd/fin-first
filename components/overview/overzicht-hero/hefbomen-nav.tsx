@@ -98,9 +98,16 @@ function statusSubText(key: HefboomKey, status: StatusCode, pillar?: HealthPilla
 export function HefbomenNav({
   health,
   totals,
+  simple = false,
 }: {
   health: HealthScore | null
   totals?: HefbomenTotals
+  /**
+   * Eenvoudige weergave (display_mode === 'simple'): verberg de chevron /
+   * uitklap-drill-down op de hefboomkaarten — de kaarten blijven dan rustige,
+   * klikbare tegels zonder collapse-affordance. Default false → ongewijzigd.
+   */
+  simple?: boolean
 }) {
   // Eén tegel-expand per keer — open/dicht via chevron. Mobile: tap, desktop:
   // tap of hover (we gebruiken alleen state-based toggle voor consistente UX).
@@ -149,7 +156,7 @@ export function HefbomenNav({
             subText={subText}
             href={href}
             tooltip={tooltip}
-            expandable={hasDrilldown}
+            expandable={hasDrilldown && !simple}
             expanded={expanded}
             onToggleExpand={() => setExpandedKey(expanded ? null : key)}
           >

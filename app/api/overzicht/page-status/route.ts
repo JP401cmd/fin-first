@@ -10,6 +10,7 @@ import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildCashflowCards } from '@/lib/cashflow-cards'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 import { resolvePageStatusMap } from '@/lib/page-status/resolve'
+import { resolveFreedomBanner } from '@/lib/page-status/freedom'
 import type { PageStatusInfo } from '@/lib/page-status/types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -45,13 +46,15 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * zoals de cashflow-status-route het perspectief doorgeeft.
  */
 
-/** Het niveau waarop een banner kan worden geminimaliseerd (warn of bad). */
-type MinimizedLevel = 'warn' | 'bad'
+/** Het niveau waarop een banner kan worden geminimaliseerd (warn/bad/info). */
+type MinimizedLevel = 'warn' | 'bad' | 'info'
 
 /** Welke databron(nen) een in-scope route nodig heeft. */
-type Family = 'lever' | 'cashflow' | 'box2'
+type Family = 'lever' | 'cashflow' | 'box2' | 'freedom'
 
 const ROUTE_FAMILY: Record<string, Family> = {
+  // Root /overzicht: de informatieve "je bent vrij / met pensioen"-duiding.
+  '/overzicht': 'freedom',
   '/overzicht/bezittingen': 'lever',
   '/overzicht/schulden': 'lever',
   '/overzicht/cashflow': 'lever',
@@ -79,7 +82,7 @@ function normalizeRoute(raw: string | null): string | null {
 
 /** Smalt een onbekende jsonb-waarde tot een geldig minimized-niveau (of null). */
 function asMinimizedLevel(value: unknown): MinimizedLevel | null {
-  return value === 'warn' || value === 'bad' ? value : null
+  return value === 'warn' || value === 'bad' || value === 'info' ? value : null
 }
 
 /**
@@ -122,6 +125,22 @@ export async function GET(request: NextRequest) {
     // — soms zware — statusberekening, zodat we geen extra seriële round-trip
     // toevoegen. computeInfo() kiest zelf de juiste, route-scoped databron.
     const computeInfo = async (): Promise<PageStatusInfo | null> => {
+      if (family === 'freedom') {
+        // Root /overzicht — informatieve vrijheids-/pensioenduiding. CONSUMEERT
+        // de reeds-berekende kerngetallen uit de dashboard-loader (geen eigen
+        // rekenmotor): freedomPct (canoniek), currentAge, fireAge en de gekozen
+        // strategie. resolveFreedomBanner geeft null wanneer nog niet vrij.
+        const { dashboardData } = await loadDashboardData(supabase)
+        return resolveFreedomBanner({
+          freedomPct: dashboardData.freedomPct ?? null,
+          currentAge: dashboardData.currentAge ?? null,
+          fireAge:
+            dashboardData.fireAgeFractional != null
+              ? Math.round(dashboardData.fireAgeFractional)
+              : null,
+          strategy: dashboardData.fireEndStrategy,
+        })
+      }
       if (family === 'lever') {
         // Hefbomen + Box 1/3 — één lichte set queries, GEEN dashboard-load.
         const perspective = await getServerPerspective()

@@ -352,6 +352,21 @@ export interface HousePurchaseMetadata {
   nhg?: boolean
 }
 
+export interface CamperPurchaseMetadata {
+  aankoopprijs?: number
+  nieuwOfTweedehands?: 'nieuw' | 'tweedehands'
+  stalling?: number
+  vervangtAuto?: boolean
+}
+
+export interface HolidayHomePurchaseMetadata {
+  aankoopprijs?: number
+  eigenInbreng?: number
+  maandlasten?: number
+  verhuurInkomsten?: number
+  inBox3?: boolean
+}
+
 export interface HouseSaleMetadata {
   verkoopprijs?: number
   resterendeHypotheek?: number
@@ -660,6 +675,8 @@ export type LifeEventMetadataMap = {
   pension: PensionMetadata
   car_purchase: CarPurchaseMetadata
   house_purchase: HousePurchaseMetadata
+  camper_purchase: CamperPurchaseMetadata
+  holiday_home_purchase: HolidayHomePurchaseMetadata
   house_sale: HouseSaleMetadata
   inheritance: InheritanceMetadata
   sabbatical: SabbaticalMetadata
@@ -1173,6 +1190,46 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
       { key: 'jaarlijkseKm', label: 'Geschatte jaarkilometers', fieldType: 'number', default: 15000, tip: 'NL gemiddelde: 12.000–15.000 km/jaar. Brandstofkosten benzine bij 15.000 km: ca. €1.800/jaar.' },
       { key: 'vervangtHuidigeAuto', label: 'Vervangt huidige auto?', fieldType: 'toggle', default: false, tip: 'Indien ja, wordt het verschil in maandkosten berekend ten opzichte van je huidige auto.' },
       { key: 'huidigeAutoKosten', label: 'Huidige maandkosten auto', fieldType: 'number', default: 300, tip: 'Huidige totale maandkosten (verzekering + wegenbelasting + onderhoud + brandstof). Gemiddeld €300–€500/mnd.' },
+    ],
+  },
+  camper_purchase: {
+    label: 'Camper kopen',
+    icon: 'Caravan',
+    group: 'vermogen',
+    impactRange: '€20K–€90K + €200/mnd',
+    defaultCost: 40000,
+    defaultMonthlyCost: 200,
+    defaultMonthlyIncome: 0,
+    defaultDuration: 120,
+    description: 'Camper of woonbus kopen',
+    tip: 'Aankoop nieuw: €60K–€90K, tweedehands: €20K–€50K. Vaste lasten ca. €150–€300/mnd: verzekering (€40–€80), motorrijtuigenbelasting (kwarttarief voor kampeerauto\'s), stalling (€50–€100) en onderhoud/APK.',
+    fields: [
+      { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: 40000, tip: 'Nieuw: €60.000–€90.000. Tweedehands: €20.000–€50.000 afhankelijk van leeftijd, merk en uitvoering.' },
+      { key: 'nieuwOfTweedehands', label: 'Staat', fieldType: 'select', default: 'tweedehands', options: [
+        { value: 'nieuw', label: 'Nieuw' },
+        { value: 'tweedehands', label: 'Tweedehands' },
+      ]},
+      { key: 'stalling', label: 'Stallingskosten', fieldType: 'number', default: 75, tip: 'Overdekte stalling €50–€100/mnd, buitenstalling €25–€50/mnd. Op eigen terrein €0.', suffix: '/mnd' },
+      { key: 'vervangtAuto', label: 'Vervangt huidige auto?', fieldType: 'toggle', default: false, tip: 'Indien de camper je dagelijkse auto vervangt, kun je de bestaande auto-post laten vervallen om dubbeltelling te voorkomen.' },
+    ],
+  },
+  holiday_home_purchase: {
+    label: 'Vakantiehuis kopen',
+    icon: 'Tent',
+    group: 'vermogen',
+    impactRange: 'Eigen inbreng + €600/mnd lasten',
+    defaultCost: 50000,
+    defaultMonthlyCost: 600,
+    defaultMonthlyIncome: 0,
+    defaultDuration: 0,
+    description: 'Tweede woning / vastgoed (geen eigen woning)',
+    tip: 'Let op: een tweede woning valt NIET in de eigen-woningregeling. Overdrachtsbelasting is 10,4% (2026, geen startersvrijstelling), er is géén hypotheekrenteaftrek en de woning valt in Box 3 (vermogensrendementsheffing). Verhuur kan een deel van de lasten dekken.',
+    fields: [
+      { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: 250000, tip: 'Vraagprijs van de tweede woning. Kosten koper ca. 8% (overdrachtsbelasting 10,4% telt het zwaarst — geen startersvrijstelling).' },
+      { key: 'eigenInbreng', label: 'Eigen inbreng + kosten koper', fieldType: 'number', default: 50000, tip: 'Eenmalige uitgave: eigen geld voor aanbetaling plus kosten koper (notaris, taxatie, overdrachtsbelasting 10,4%).' },
+      { key: 'maandlasten', label: 'Maandlasten', fieldType: 'number', default: 600, tip: 'Hypotheek/financiering + VvE, OZB, opstalverzekering en onderhoud. Indicatie €400–€900/mnd afhankelijk van financiering.', suffix: '/mnd' },
+      { key: 'verhuurInkomsten', label: 'Verhuurinkomsten', fieldType: 'number', default: 0, tip: 'Optioneel: netto huurinkomsten per maand bij (deel)verhuur. Houd rekening met leegstand, beheerkosten en Box 3-heffing.', suffix: '/mnd' },
+      { key: 'inBox3', label: 'Valt in Box 3', fieldType: 'toggle', default: true, tip: 'Een tweede woning is vermogen in Box 3 — geen eigen woning. Houd deze waarde gescheiden van je liquide FIRE-portefeuille.' },
     ],
   },
   inheritance: {

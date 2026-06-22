@@ -22,6 +22,14 @@ export interface AssetQuickInput {
   name: string
   current_value: number
   field3?: string | number | null
+  /**
+   * Onboarding-only koppel-token. Tijdens onboarding heeft een asset nog geen
+   * DB-id, dus een gekoppelde schuld (bv. hypotheek bij een huis) verwijst via
+   * dit opake client-token naar de asset. De server resolved het token na
+   * insert naar het echte `assets.id` en zet `debts.linked_asset_id`. Leeg in
+   * commit-mode (/core) waar het echte id direct beschikbaar is.
+   */
+  client_ref?: string
 }
 
 /**
@@ -36,6 +44,13 @@ export interface DebtQuickInput {
   current_balance: number
   field3?: number | string | null
   linked_asset_id?: string | null
+  /**
+   * Onboarding-only koppel-token dat matcht met `AssetQuickInput.client_ref`
+   * van de bijbehorende asset. Wordt door de onboarding-server na asset-insert
+   * naar het echte `linked_asset_id` vertaald. Los van `linked_asset_id` zodat
+   * de twee koppel-mechanismen (DB-id vs. client-token) elkaar niet bijten.
+   */
+  linked_client_ref?: string | null
 }
 
 export type QuickAddInput =

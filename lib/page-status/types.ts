@@ -22,10 +22,20 @@ export interface PageStatusWill {
   detail?: string
 }
 
+/**
+ * Soort melding:
+ *  - 'leverage' — de stoplicht-duiding (warn/bad) van een hefboom/kaart/box.
+ *  - 'freedom'  — de informatieve, niet-alarmerende "je bent vrij / met
+ *    pensioen"-duiding op /overzicht (status semantisch 'neutral', eigen styling).
+ */
+export type PageStatusKind = 'leverage' | 'freedom'
+
 /** De gecureerde status-duiding voor één pagina onder /overzicht. */
 export interface PageStatusInfo {
   /** Canonieke route-sleutel, bv. '/overzicht/schulden'. */
   route: string
+  /** Soort melding — bepaalt styling en minimaliseer-niveau. */
+  kind: PageStatusKind
   /** Status — identiek aan de nav-dot van deze pagina (geen herberekening). */
   status: LeverageStatus
   /** Kort gebieds-label, bv. 'Schulden'. */

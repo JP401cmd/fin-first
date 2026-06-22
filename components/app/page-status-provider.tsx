@@ -110,10 +110,16 @@ export function PageStatusProvider({ children }: { children: React.ReactNode }) 
   )
 
   const minimize = useCallback(() => {
-    // Minimaliseren op het HUIDIGE status-niveau; alleen warn/bad zijn geldig
-    // (good/neutral leveren geen banner, dus dan is er niets te minimaliseren).
-    if (info?.status !== 'warn' && info?.status !== 'bad') return
-    const level = info.status
+    if (!info) return
+    // Leverage-banner minimaliseert op z'n stoplicht-niveau (warn/bad, escaleert);
+    // de informatieve vrijheidsbanner op een vast 'info'-niveau (escaleert nooit).
+    const level: MinimizedLevel | null =
+      info.kind === 'freedom'
+        ? 'info'
+        : info.status === 'warn' || info.status === 'bad'
+          ? info.status
+          : null
+    if (level == null) return
     const prev = minimizedLevel
     // Pure updater + side-effect (persist) ERBUITEN, zodat een dubbele
     // StrictMode-invocatie van de updater niet leidt tot een dubbele PUT.

@@ -339,3 +339,43 @@ describe('HealthScoreCard — gesegmenteerde ring', () => {
     expect(screen.getByText('van 100')).toBeTruthy()
   })
 })
+
+// ── Eenvoudige weergave (display_mode simple): alleen getal + cirkel ───────
+
+describe('HealthScoreCard — Eenvoudige weergave', () => {
+  const SUBSCORES_SELECTOR = 'ul[aria-label="Subscores per pijler"]'
+
+  it('toont nog steeds het getal + "van 100" in Eenvoudig', () => {
+    const onOpen = vi.fn()
+    render(<HealthScoreCard health={makeHealthV2(69)} onOpenReceipt={onOpen} simple />)
+    expect(screen.getByText('69')).toBeTruthy()
+    expect(screen.getByText('van 100')).toBeTruthy()
+  })
+
+  it('verbergt de per-categorie mini-bar-lijst in Eenvoudig', () => {
+    const onOpen = vi.fn()
+    const { container } = render(
+      <HealthScoreCard health={makeHealthV2()} onOpenReceipt={onOpen} simple />,
+    )
+    expect(container.querySelector(SUBSCORES_SELECTOR)).toBeNull()
+  })
+
+  it('forceert de enkelvoudige ring in Eenvoudig (geen gesegmenteerde <g>-bogen)', () => {
+    const onOpen = vi.fn()
+    const { container } = render(
+      <HealthScoreCard health={makeHealthV2()} onOpenReceipt={onOpen} simple />,
+    )
+    // Geen segment-<g>'s; de fallback-ring zijn twee kale <circle>'s.
+    expect(container.querySelectorAll('svg g').length).toBe(0)
+    expect(container.querySelectorAll('svg circle').length).toBe(2)
+  })
+
+  it('toont in Volledig (default) WEL de gesegmenteerde ring + mini-bars (geen regressie)', () => {
+    const onOpen = vi.fn()
+    const { container } = render(
+      <HealthScoreCard health={makeHealthV2()} onOpenReceipt={onOpen} />,
+    )
+    expect(container.querySelectorAll('svg g').length).toBe(4)
+    expect(container.querySelector(SUBSCORES_SELECTOR)).toBeTruthy()
+  })
+})

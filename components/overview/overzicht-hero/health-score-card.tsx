@@ -147,9 +147,17 @@ function getTimeAnchor(
 export function HealthScoreCard({
   health,
   onOpenReceipt,
+  simple = false,
 }: {
   health: HealthScore
   onOpenReceipt: () => void
+  /**
+   * Eenvoudige weergave (display_mode === 'simple'): toon alleen het getal +
+   * de cirkel (enkelvoudige ring op de totaalscore), GEEN per-categorie
+   * (pijler) scores — dus geen gesegmenteerde ring en geen mini-bar-lijst.
+   * Default false → ongewijzigde, volledige weergave.
+   */
+  simple?: boolean
 }) {
   // Whitelist-cast: onbekende labels uit financial-health.ts vallen veilig
   // terug op 'redelijk' i.p.v. silent te crashen op undefined.
@@ -177,8 +185,10 @@ export function HealthScoreCard({
   const segments = buildRingSegments(subscores)
 
   // Gesegmenteerde ring alleen wanneer er groepen zijn (pillars mét pillarGroup);
-  // anders (legacy/test-data zonder groep) de bestaande enkelvoudige ring.
-  const useSegmentedRing = segments.length > 0
+  // anders (legacy/test-data zonder groep) de bestaande enkelvoudige ring. In
+  // Eenvoudig forceren we de enkelvoudige ring: die toont alléén de totaalscore
+  // (getal + cirkel), zonder de per-categorie subscore-bogen.
+  const useSegmentedRing = !simple && segments.length > 0
   const ringAriaLabel = useSegmentedRing
     ? subscores.map((s) => `${s.label} ${s.subtotal}`).join(', ') + ' van 100'
     : `Gezondheidsscore ${Math.round(health.total)} van 100`
@@ -302,8 +312,9 @@ export function HealthScoreCard({
         </div>
       )}
 
-      {/* Vier gedragspijler-subscores — ondergeschikt aan de samengestelde score */}
-      {subscores.length >= 2 && (
+      {/* Vier gedragspijler-subscores — ondergeschikt aan de samengestelde score.
+          In Eenvoudig verborgen: dan toont de kaart enkel getal + cirkel. */}
+      {!simple && subscores.length >= 2 && (
         <ul
           className="mt-3 w-full max-w-[220px] space-y-1.5"
           aria-label="Subscores per pijler"

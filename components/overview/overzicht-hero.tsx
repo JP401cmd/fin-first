@@ -26,6 +26,8 @@ import {
   type GoalProgress,
 } from './overzicht-hero/voortgang-doelen-card'
 import { VrijheidStrip } from './overzicht-hero/vrijheid-strip'
+import type { FreedomFraming } from '@/lib/fire-strategy'
+import { PageStatusDot } from '@/components/app/page-status-dot'
 import type { HefbomenTotals } from './overzicht-hero/hefbomen-nav'
 import {
   HeroEditToggle,
@@ -35,6 +37,7 @@ import {
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { CompoundInsightCard } from './compound-insight-card'
 import { PrintOverzichtButton } from './print-overzicht-button'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 
 type OverzichtHeroProps = {
   userName?: string
@@ -49,6 +52,12 @@ type OverzichtHeroProps = {
   endAge?: number | null
   /** Pensioen-modus uit fireStrategy.strategy === 'pensioen'. */
   isPensioenMode?: boolean
+  /**
+   * Afgeleide vrijheids-/pensioenframing uit de gedeelde, consume-only vlag
+   * (`resolveFreedomFraming`). Stuurt de Vrijheid-strip: 'building' (% op weg),
+   * 'free' (al vrij) of 'pensioen' (met pensioen). Default 'building'.
+   */
+  freedomFraming?: FreedomFraming
   /** Optionele totaalbedragen per hefboom (bezittingen, schulden, etc.). */
   totals?: HefbomenTotals
   /** Briefing-entries onder de hero (max 6, 3-koloms grid). Wanneer leeg
@@ -132,6 +141,7 @@ export function OverzichtHero({
   currentAge,
   endAge,
   isPensioenMode,
+  freedomFraming = 'building',
   totals,
   briefingEntries,
   briefingRefreshedAt,
@@ -153,6 +163,15 @@ export function OverzichtHero({
 }: OverzichtHeroProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
   const rail = useHeroRailState(activeWidgets ?? [])
+
+  // SINGLE SOURCE OF TRUTH voor de weergavemodus: één read van useDisplayMode().
+  // `simple` wordt als afgeleide boolean doorgegeven aan de sub-componenten —
+  // er is bewust géén tweede leespad (geen eigen state, geen localStorage). In
+  // Eenvoudig versobert /overzicht: geen widgets-bewerken, geen kaart-chevrons,
+  // health alleen getal+cirkel, geen voortgang-/vrijheidsblok, geen
+  // "vrijheid deze week", en één briefje over de volle breedte.
+  const { mode } = useDisplayMode()
+  const simple = mode === 'simple'
 
   // Memoize once per mount — datum + groet wisselen zelden tijdens een
   // sessie. Voorkomt onnodige Intl-formatter-instances bij elke re-render.
@@ -199,13 +218,17 @@ export function OverzichtHero({
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
       <div className="absolute right-4 top-6 sm:right-6 sm:top-8 flex items-center gap-2">
-        {dashboardData && (
+        {dashboardData && !simple && (
           <HeroEditToggle
             isEditing={rail.isEditing}
             onToggle={() => rail.setIsEditing(!rail.isEditing)}
           />
         )}
         <PrintOverzichtButton />
+        {/* Geminimaliseerde status-/vrijheidsmelding: gekleurd statuspunt direct
+            links van de 'i' (meldingen-conventie). Rendert alleen wanneer de
+            PageStatusProvider 'minimized' meldt. */}
+        <PageStatusDot />
         <PageInfoButton description={PAGE_INFO['/overzicht'] ?? ''} />
       </div>
 
@@ -226,7 +249,7 @@ export function OverzichtHero({
         </EditorialHeadline>
       </header>
 
-      <HefbomenNav health={health} totals={totals} />
+      <HefbomenNav health={health} totals={totals} simple={simple} />
 
       {/* Subtiele editorial scheiding tussen de hefbomen-rij en de
           health/chart-rij. `!my-5` tempert de standaard `my-8` van de
@@ -240,7 +263,7 @@ export function OverzichtHero({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 items-stretch">
         <div className="lg:col-span-1">
           {health ? (
-            <HealthScoreCard health={health} onOpenReceipt={() => setReceiptOpen(true)} />
+            <HealthScoreCard health={health} onOpenReceipt={() => setReceiptOpen(true)} simple={simple} />
           ) : (
             <HealthScoreEmptyState />
           )}
@@ -265,7 +288,10 @@ export function OverzichtHero({
       {/* Optionele power-user widget-rail OP DEZELFDE PLEK als Voortgang-
           doelen + Vrijheidsstrip. Default (geen edit-mode, geen config):
           render gewoon de defaults. Edit-mode of met config: 4-slot grid
-          met widgets uit WIDGET_CATALOG. State leeft in localStorage. */}
+          met widgets uit WIDGET_CATALOG. State leeft in localStorage.
+          In Eenvoudig verbergen we dit hele blok — of het nu de voortgang-/
+          vrijheidsdefaults toont of actieve widgets (user-keuze in Notities). */}
+      {!simple && (
       <div className="mt-3 sm:mt-4">
         {dashboardData && activeWidgets && allWidgetPrefs ? (
           <HeroWidgetRail
@@ -286,6 +312,7 @@ export function OverzichtHero({
                   freedomPct={freedomPct ?? null}
                   currentAge={currentAge ?? null}
                   fireAge={fireAge ?? null}
+                  framing={freedomFraming}
                 />
               </>
             }
@@ -301,10 +328,12 @@ export function OverzichtHero({
               freedomPct={freedomPct ?? null}
               currentAge={currentAge ?? null}
               fireAge={fireAge ?? null}
+              framing={freedomFraming}
             />
           </>
         )}
       </div>
+      )}
 
       {/* T-4 Dramatic Compound — alleen voor cash-zware users zodat
           we niet alle gebruikers met irrelevante content lastig vallen.
@@ -323,6 +352,7 @@ export function OverzichtHero({
         freedomHero={freedomHero ?? null}
         headline={briefingHeadline ?? null}
         weekHistory={briefingWeekHistory}
+        simpleMode={simple}
       />
 
       {/* Drie "alles bekijken"-ingangen onder de briefing: de tips & acties-

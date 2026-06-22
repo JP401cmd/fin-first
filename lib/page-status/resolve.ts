@@ -52,6 +52,7 @@ function buildInfo(
   const sc = status === 'warn' ? copy.warn : copy.bad
   return {
     route,
+    kind: 'leverage',
     status,
     title: copy.title,
     reason: fillFigure(sc.reason, figure),
