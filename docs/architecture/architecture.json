@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-19T18:30:31.507Z",
-  "generatedDate": "2026-06-19",
+  "generatedAt": "2026-06-22T21:43:40.620Z",
+  "generatedDate": "2026-06-22",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,12 +189,12 @@
   "stats": {
     "routes": 322,
     "routesProduction": 98,
-    "api": 381,
+    "api": 382,
     "tables": 56,
-    "migrations": 114,
+    "migrations": 115,
     "integrations": 25,
-    "components": 737,
-    "providers": 10,
+    "components": 752,
+    "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
     "coachLayers": 4,
@@ -4879,6 +4879,14 @@
       ]
     },
     {
+      "url": "/api/display-mode",
+      "file": "app/api/display-mode/route.ts",
+      "domain": "display-mode",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/dividends",
       "file": "app/api/dividends/route.ts",
       "domain": "dividends",
@@ -9215,6 +9223,21 @@
       ]
     },
     {
+      "domain": "display-mode",
+      "label": "display-mode",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/display-mode",
+          "file": "app/api/display-mode/route.ts",
+          "domain": "display-mode",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "dividends",
       "label": "dividends",
       "count": 1,
@@ -12326,7 +12349,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 114
+    "migrationCount": 115
   },
   "tablesByDomain": [
     {
@@ -12619,6 +12642,10 @@
       "source": "@/components/command-palette/command-palette-provider"
     },
     {
+      "name": "DisplayModeProvider",
+      "source": "@/lib/hooks/use-display-mode"
+    },
+    {
       "name": "FeatureAccessProvider",
       "source": "@/components/app/feature-access-provider"
     },
@@ -12652,11 +12679,11 @@
     }
   ],
   "components": {
-    "total": 737,
+    "total": 752,
     "groups": [
       {
         "group": "app",
-        "count": 308,
+        "count": 313,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12747,6 +12774,8 @@
           "debt-valuation-history",
           "debt-valuation-modal",
           "deeltijdwerk-impact",
+          "depth-section",
+          "depth-section.test",
           "desktop-sidebar-shell",
           "discover-carousel",
           "dividend-tracker",
@@ -12796,6 +12825,8 @@
           "head-scripts",
           "health-score-receipt",
           "health-score-receipt.test",
+          "hide-in-simple",
+          "hide-in-simple.test",
           "holding-alerts",
           "holding-transaction-log",
           "holdings-heatmap",
@@ -12887,6 +12918,7 @@
           "projections-modal",
           "quick-add-trigger",
           "quick-add-wizard",
+          "quick-add-wizard-collect.test",
           "receipt-row",
           "recommendation-card",
           "recurring-classify-sheet",
@@ -12970,7 +13002,7 @@
       },
       {
         "group": "overview",
-        "count": 118,
+        "count": 120,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -13016,6 +13048,7 @@
           "checkin-banner.test",
           "compound-insight-card",
           "compound-insight-card.test",
+          "eenvoudig-pill-list",
           "empty-states",
           "empty-states.test",
           "fee-impact-card",
@@ -13076,6 +13109,7 @@
           "transactie-tijdlijn",
           "transactie-tijdlijn.test",
           "transacties-analyse",
+          "transacties-analyse.test",
           "transacties-geldstroom",
           "transacties-geldstroom.test",
           "uitgaven-heatmap",
@@ -13356,7 +13390,7 @@
       },
       {
         "group": "onboarding",
-        "count": 17,
+        "count": 25,
         "items": [
           "aangifte-import-pane",
           "budget-amount-editor",
@@ -13366,11 +13400,19 @@
           "onboarding-horizon",
           "onboarding-identity",
           "onboarding-inkomen",
+          "onboarding-inkomen.test",
           "onboarding-klaar",
+          "onboarding-pensioen",
+          "onboarding-pensioen.test",
+          "onboarding-posten",
+          "onboarding-schulden",
+          "onboarding-schulden.test",
           "onboarding-shell",
           "onboarding-spaardoel",
           "onboarding-success",
           "onboarding-upo-section",
+          "onboarding-vraag",
+          "onboarding-vraag.test",
           "progress-bar",
           "speech-bubble",
           "step-progress",
@@ -14186,6 +14228,12 @@
         {
           "name": "transactions",
           "write": false
+        }
+      ],
+      "display-mode": [
+        {
+          "name": "profiles",
+          "write": true
         }
       ],
       "dividends": [
@@ -15057,6 +15105,14 @@
           "write": true,
           "routes": [
             "/api/crypto-holdings/setup"
+          ]
+        },
+        {
+          "domain": "display-mode",
+          "label": "display-mode",
+          "write": true,
+          "routes": [
+            "/api/display-mode"
           ]
         },
         {
@@ -18141,6 +18197,18 @@
       ],
       "summary": "In de Vrijheidscheck-funnel (`/check`) telt de eigen woning voortaan voor **50%** van haar netto overwaarde mee in de FIRE-/vrijheidsberekening — inclusief 50% van het verwachte woning-rendement — i.p.v. volledig uitgesloten te worden. De implementatie is bewust **gescoped tot he",
       "file": "docs/adr/0025-vrijheidscheck-eigen-woning-50pct-fire.md"
+    },
+    {
+      "id": "0026-weergavemodus-eenvoudig-volledig",
+      "title": "Weergavemodus \"Eenvoudig ⇄ Volledig\" — server-side scalar pref + palet-commando",
+      "status": "aanvaard",
+      "date": "2026-06-22",
+      "elements": [
+        "do-meta",
+        "app-comp"
+      ],
+      "summary": "TriFinity-pagina's hebben een \"diepte\"-laag (secundaire KPI's, detail-secties, uitleg) die voor beginners overweldigend is maar voor gevorderden waardevol. We willen één profiel-brede voorkeur die deze diepte-laag standaard inklapt (\"Eenvoudig\") of openzet (\"Volledig\"), cross-dev",
+      "file": "docs/adr/0026-weergavemodus-eenvoudig-volledig.md"
     }
   ],
   "churn": {
@@ -18148,23 +18216,23 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 82
+        "commits": 84
       },
       {
         "path": "lib/ai",
-        "commits": 37
+        "commits": 38
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 29
-      },
-      {
-        "path": "lib/fire-simulation.ts",
-        "commits": 17
+        "commits": 30
       },
       {
         "path": "app/api/ai",
         "commits": 13
+      },
+      {
+        "path": "lib/fire-simulation.ts",
+        "commits": 10
       },
       {
         "path": "app/api/household",
@@ -18172,7 +18240,7 @@
       },
       {
         "path": "lib/horizon-data.ts",
-        "commits": 9
+        "commits": 6
       },
       {
         "path": "components/horizon",
@@ -18190,18 +18258,18 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6928,
-        "commits": 82
+        "loc": 6974,
+        "commits": 66
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 4866,
-        "commits": 24
+        "loc": 4871,
+        "commits": 25
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4082,
-        "commits": 41
+        "loc": 4235,
+        "commits": 42
       },
       {
         "file": "lib/release-notes.ts",
@@ -18220,8 +18288,8 @@
       },
       {
         "file": "lib/horizon-data.ts",
-        "loc": 2257,
-        "commits": 9
+        "loc": 2314,
+        "commits": 6
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -19001,9 +19069,16 @@
     "hasChanges": true,
     "sections": [
       {
+        "label": "API-routes",
+        "added": [
+          "/api/display-mode"
+        ],
+        "removed": []
+      },
+      {
         "label": "Componenten (aantal)",
         "added": [
-          "+3"
+          "+15"
         ],
         "removed": []
       }
@@ -19070,6 +19145,13 @@
       "date": "2026-06-19",
       "api": 381,
       "components": 737,
+      "tables": 56,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-06-22",
+      "api": 382,
+      "components": 752,
       "tables": 56,
       "routesProduction": 98
     }

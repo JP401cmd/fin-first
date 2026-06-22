@@ -61,7 +61,6 @@ import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType
 import { usePerspective, usePerspectiveAbort, type Perspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
-import { HideInSimple } from '@/components/app/hide-in-simple'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import {
   type Asset,
@@ -460,6 +459,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         })
       }
     }
+    // Aandeel van elke post in het getoonde totaal (voor de balk in de pill).
+    const total = items.reduce((s, it) => s + it.amount, 0)
+    if (total > 0) for (const it of items) it.sharePct = (it.amount / total) * 100
     return items
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [byType, assetTypeFilter, perspective, assetSparklines, partnerAggregateAssets])
@@ -670,44 +672,62 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       </header>
 
       {/* Figures-strip (mini-hero) — Totale waarde krijgt highlight-marker */}
-      <FiguresStrip
-        cols={4}
-        figures={[
-          {
-            kicker: 'Totale waarde',
-            amount: fc(totalValue),
-            sub: dailyExpenses > 0 && totalValue > 0
-              ? `${formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid`
-              : `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
-            variant: 'winner',
-          },
-          {
-            kicker: 'Maandelijkse inleg',
-            amount: fc(totalMonthlyContrib),
-            sub: 'totale inleg per maand',
-          },
-          {
-            kicker: 'Rendement totaal',
-            amount: totalPurchase > 0
-              ? `${totalValue >= totalPurchase ? '+' : ''}${fc(totalValue - totalPurchase)}`
-              : '—',
-            sub: totalPurchase > 0
-              ? totalValue >= totalPurchase ? 'sinds aankoop' : 'verlies sinds aankoop'
-              : 'geen aankoopwaarde bekend',
-            variant: totalPurchase > 0
-              ? totalValue >= totalPurchase ? 'positive' : 'negative'
-              : 'neutral',
-          },
-          {
-            kicker: `Waarde over ${projectionYears} jaar`,
-            amount: fc(futureValue),
-            sub: dailyExpenses > 0 && futureValue > 0
-              ? `${formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid`
-              : `+${fc(projectedGrowth)} verwacht`,
-            variant: 'positive',
-          },
-        ]}
-      />
+      {/* In Eenvoudig alleen het hoofdcijfer "Totale waarde"; de projectie-
+          cijfers (inleg, rendement totaal, waarde over N jaar) zijn diepte → verborgen. */}
+      {simple ? (
+        <FiguresStrip
+          cols={2}
+          figures={[
+            {
+              kicker: 'Totale waarde',
+              amount: fc(totalValue),
+              sub: dailyExpenses > 0 && totalValue > 0
+                ? `${formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid`
+                : `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
+              variant: 'winner',
+            },
+          ]}
+        />
+      ) : (
+        <FiguresStrip
+          cols={4}
+          figures={[
+            {
+              kicker: 'Totale waarde',
+              amount: fc(totalValue),
+              sub: dailyExpenses > 0 && totalValue > 0
+                ? `${formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid`
+                : `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
+              variant: 'winner',
+            },
+            {
+              kicker: 'Maandelijkse inleg',
+              amount: fc(totalMonthlyContrib),
+              sub: 'totale inleg per maand',
+            },
+            {
+              kicker: 'Rendement totaal',
+              amount: totalPurchase > 0
+                ? `${totalValue >= totalPurchase ? '+' : ''}${fc(totalValue - totalPurchase)}`
+                : '—',
+              sub: totalPurchase > 0
+                ? totalValue >= totalPurchase ? 'sinds aankoop' : 'verlies sinds aankoop'
+                : 'geen aankoopwaarde bekend',
+              variant: totalPurchase > 0
+                ? totalValue >= totalPurchase ? 'positive' : 'negative'
+                : 'neutral',
+            },
+            {
+              kicker: `Waarde over ${projectionYears} jaar`,
+              amount: fc(futureValue),
+              sub: dailyExpenses > 0 && futureValue > 0
+                ? `${formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid`
+                : `+${fc(projectedGrowth)} verwacht`,
+              variant: 'positive',
+            },
+          ]}
+        />
+      )}
 
       {/* Toolbar — filter links (indien meegegeven), Herwaarderen + primaire
           CTA rechts. flex-wrap zorgt dat op smalle schermen de filter onder
@@ -740,8 +760,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         <div className="mb-5 space-y-4">{inspirationCards}</div>
       )}
 
-      {/* Allocation + projection — collapsible card */}
-      <HideInSimple>
+      {/* Allocation + projection — collapsible card. Bewust óók in Eenvoudig
+          zichtbaar (eigen dropdown), zodat /overzicht/bezittingen symmetrisch is
+          met de Aflosroute-dropdown op /overzicht/schulden. */}
       <div className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
         {/* ── Accent bar ── */}
         <div className="h-[3px] w-full bg-kern-500" />
@@ -843,7 +864,6 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           </div>
         )}
       </div>
-      </HideInSimple>
 
       {/* Grouped asset cards — grid per categorie, conform /core/assets/[type].
           Elke categorie krijgt een klikbare header die doorlinkt naar de

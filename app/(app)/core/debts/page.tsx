@@ -438,6 +438,9 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
         })
       }
     }
+    // Aandeel van elke post in het getoonde totaal (voor de balk in de pill).
+    const total = items.reduce((s, it) => s + it.amount, 0)
+    if (total > 0) for (const it of items) it.sharePct = (it.amount / total) * 100
     return items
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [byType, debtTypeFilter, shareOf, debtSparklines, aggregatedDebts])
@@ -546,32 +549,57 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
       </header>
 
       {/* Figures-strip (mini-hero) — Type 2 blueprint sectie 2 */}
-      <FiguresStrip
-        cols={4}
-        figures={[
-          {
-            kicker: 'Totale schuld',
-            amount: <MaskedAmount value={totalBalance} tone="kern" />,
-            sub: `${activeDebts.length} schuld${activeDebts.length !== 1 ? 'en' : ''}`,
-            variant: 'winner',
-          },
-          {
-            kicker: 'Maandlasten',
-            amount: <MaskedAmount value={totalMonthlyPayment} tone="kern" />,
-            sub: 'per maand aflossen',
-          },
-          {
-            kicker: 'Rente (gewogen)',
-            amount: `${weightedAvgInterest.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
-            sub: 'gemiddeld per jaar',
-          },
-          {
-            kicker: 'Categorieën',
-            amount: `${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length}`,
-            sub: `type${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length === 1 ? '' : 's'} schuld`,
-          },
-        ]}
-      />
+      {/* In Eenvoudig zonder de "Categorieën"-teller (cols 3). */}
+      {simple ? (
+        <FiguresStrip
+          cols={3}
+          figures={[
+            {
+              kicker: 'Totale schuld',
+              amount: <MaskedAmount value={totalBalance} tone="kern" />,
+              sub: `${activeDebts.length} schuld${activeDebts.length !== 1 ? 'en' : ''}`,
+              variant: 'winner',
+            },
+            {
+              kicker: 'Maandlasten',
+              amount: <MaskedAmount value={totalMonthlyPayment} tone="kern" />,
+              sub: 'per maand aflossen',
+            },
+            {
+              kicker: 'Rente (gewogen)',
+              amount: `${weightedAvgInterest.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+              sub: 'gemiddeld per jaar',
+            },
+          ]}
+        />
+      ) : (
+        <FiguresStrip
+          cols={4}
+          figures={[
+            {
+              kicker: 'Totale schuld',
+              amount: <MaskedAmount value={totalBalance} tone="kern" />,
+              sub: `${activeDebts.length} schuld${activeDebts.length !== 1 ? 'en' : ''}`,
+              variant: 'winner',
+            },
+            {
+              kicker: 'Maandlasten',
+              amount: <MaskedAmount value={totalMonthlyPayment} tone="kern" />,
+              sub: 'per maand aflossen',
+            },
+            {
+              kicker: 'Rente (gewogen)',
+              amount: `${weightedAvgInterest.toLocaleString('nl-NL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+              sub: 'gemiddeld per jaar',
+            },
+            {
+              kicker: 'Categorieën',
+              amount: `${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length}`,
+              sub: `type${(Object.keys(byType) as DebtType[]).filter((t) => byType[t]?.debts.length > 0).length === 1 ? '' : 's'} schuld`,
+            },
+          ]}
+        />
+      )}
 
       {/* Schuldenprofiel & Aflosroute — collapsible card.
           Spiegelbeeld van de "Verdeling & Projectie"-kaart op /core/assets
