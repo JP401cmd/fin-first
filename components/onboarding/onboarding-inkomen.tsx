@@ -97,13 +97,20 @@ export interface OnboardingInkomenProps {
   onNext: () => void
   onBack: () => void
   /**
-   * "Later invullen" — wist beide velden en gaat naar de volgende stap.
+   * "Later invullen" — wist beide velden en slaat de hele inkomen-groep over.
    * Explicit defer-pad zodat de gebruiker duidelijk ziet dat overslaan OK is.
    * Indien niet meegegeven, valt terug op `onNext()` (puur doorgaan zonder
    * clear — backward-compat).
    */
   onSkipIncome?: () => void
-  /** 1-indexed stap-nummer voor de voortgangsbalk (default 3). */
+  /**
+   * Welk veld dit scherm uitvraagt (begeleide flow — één vraag per scherm,
+   * jun 2026). `'inkomen'` toont alleen het maandinkomen, `'uitgaven'` alleen
+   * de uitgaven (met de spaarquote-preview die "onthult" zodra beide bekend
+   * zijn). Default (undefined) = beide velden op één scherm (backward-compat).
+   */
+  field?: 'inkomen' | 'uitgaven'
+  /** 1-indexed stap-nummer voor de voortgangsbalk (default 2). */
   currentStep?: number
   totalSteps?: number
 }
@@ -114,31 +121,47 @@ export function OnboardingInkomen({
   onNext,
   onBack,
   onSkipIncome,
+  field,
   currentStep = 2,
-  totalSteps = 5,
+  totalSteps = 7,
 }: OnboardingInkomenProps) {
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [submitted, setSubmitted] = useState(false)
 
-  const errors = useMemo(() => getFieldErrors(data), [data])
+  // Welke velden dit scherm toont/valideert.
+  const activeFields: FieldKey[] =
+    field === 'inkomen'
+      ? ['net_monthly_income']
+      : field === 'uitgaven'
+        ? ['estimated_monthly_expenses']
+        : ['net_monthly_income', 'estimated_monthly_expenses']
+  const showIncome = activeFields.includes('net_monthly_income')
+  const showExpenses = activeFields.includes('estimated_monthly_expenses')
+
+  const allErrors = useMemo(() => getFieldErrors(data), [data])
+  const errors = useMemo(() => {
+    const e: Partial<Record<FieldKey, string>> = {}
+    for (const f of activeFields) if (allErrors[f]) e[f] = allErrors[f]
+    return e
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allErrors, field])
   const isValid = Object.keys(errors).length === 0
   const disableNext = submitted && !isValid
 
-  const showError = (field: FieldKey) =>
-    touched[field] || submitted ? errors[field] : undefined
-  const markTouched = (field: FieldKey) =>
-    setTouched((prev) => ({ ...prev, [field]: true }))
+  const showError = (f: FieldKey) =>
+    touched[f] || submitted ? errors[f] : undefined
+  const markTouched = (f: FieldKey) =>
+    setTouched((prev) => ({ ...prev, [f]: true }))
 
-  const inputErrorClass = (field: FieldKey) =>
-    showError(field)
+  const inputErrorClass = (f: FieldKey) =>
+    showError(f)
       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
       : 'border-[var(--border-ed)] focus:border-[var(--module-active-500)] focus:ring-[var(--module-active-500)]'
 
   const scrollToFirstError = useCallback(() => {
-    const fieldOrder: FieldKey[] = ['net_monthly_income', 'estimated_monthly_expenses']
-    for (const field of fieldOrder) {
-      if (errors[field]) {
-        const el = document.getElementById(FIELD_IDS[field])
+    for (const f of activeFields) {
+      if (errors[f]) {
+        const el = document.getElementById(FIELD_IDS[f])
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' })
           el.focus()
@@ -146,7 +169,8 @@ export function OnboardingInkomen({
         break
       }
     }
-  }, [errors])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [errors, field])
 
   function handleNext() {
     setSubmitted(true)
@@ -159,37 +183,52 @@ export function OnboardingInkomen({
 
   // Live spaarquote-preview: zodra beide velden valide zijn ingevuld tonen
   // we wat de schattingen betekenen — directe feedback dat deze twee
-  // getallen samen het tempo naar vrijheid bepalen.
+  // getallen samen het tempo naar vrijheid bepalen. In de gesplitste flow
+  // "onthult" de preview op het uitgaven-scherm (beide waarden bekend).
   const previewRate = useMemo(() => {
     if (!data.net_monthly_income || !data.estimated_monthly_expenses) return null
-    if (Object.keys(errors).length > 0) return null
+    if (allErrors.net_monthly_income || allErrors.estimated_monthly_expenses) return null
     // Het inkomensveld is nu al een MAANDbedrag — geen /12 meer (anders zou
     // de spaarquote dubbel gedeeld en daardoor fout zijn).
     const monthlyIncome = parseBedragInput(data.net_monthly_income)
     const monthlyExpenses = parseBedragInput(data.estimated_monthly_expenses)
     if (!isFinite(monthlyIncome) || monthlyIncome <= 0 || !isFinite(monthlyExpenses)) return null
     return Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100)
-  }, [data.net_monthly_income, data.estimated_monthly_expenses, errors])
+  }, [data.net_monthly_income, data.estimated_monthly_expenses, allErrors])
+  // Preview tonen op het uitgaven-scherm én op het gecombineerde scherm.
+  const showPreview = previewRate !== null && field !== 'inkomen'
 
-  const headline = (
-    <>
-      Wat{' '}
-      <em
-        className="font-normal italic"
-        style={{ color: 'var(--module-active-700)' }}
-      >
-        verdien
-      </em>{' '}
-      je?
-    </>
-  )
+  const headline =
+    field === 'uitgaven' ? (
+      <>
+        Wat{' '}
+        <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
+          geef
+        </em>{' '}
+        je uit?
+      </>
+    ) : (
+      <>
+        Wat{' '}
+        <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
+          verdien
+        </em>{' '}
+        je?
+      </>
+    )
+  const deck =
+    field === 'inkomen'
+      ? 'Je netto maandinkomen is het startpunt — het tempo waarin je vrijheid kunt opbouwen. Schat gerust; je past het later aan.'
+      : field === 'uitgaven'
+        ? 'Je uitgaven bepalen samen met je inkomen je spaarquote. Zo zie je direct hoe snel je vrijheid groeit.'
+        : 'Je inkomen en uitgaven bepalen samen je spaarquote — het tempo waarin je vrijheid opbouwt. Schat gerust; je past het later aan.'
 
   return (
     <OnboardingShell
       kicker="Inkomen"
       romanNum="ii."
       title={headline}
-      deck="Je inkomen en uitgaven bepalen samen je spaarquote — het tempo waarin je vrijheid opbouwt. Schat gerust; je past het later aan."
+      deck={deck}
       factsPanel={
         <FactsPanel
           stat="€3.350"
@@ -224,6 +263,7 @@ export function OnboardingInkomen({
             Optioneel: gebruiker kan later invullen via /overzicht/cashflow.
             De orchestrator converteert dit maandbedrag bij save naar het
             canonieke jaarinkomen (×12). */}
+        {showIncome && (
         <div>
           <label
             htmlFor="ob-income"
@@ -275,10 +315,12 @@ export function OnboardingInkomen({
             </p>
           )}
         </div>
+        )}
 
         {/* Geschatte maandelijkse uitgaven — zelfde patroon. Samen met het
             jaarinkomen bepaalt dit de spaarquote op /overzicht/cashflow en
             in de toekomst-prognose. */}
+        {showExpenses && (
         <div>
           <label
             htmlFor="ob-expenses"
@@ -328,10 +370,11 @@ export function OnboardingInkomen({
             </p>
           )}
         </div>
+        )}
 
         {/* Spaarquote-preview — verschijnt zodra beide schattingen er staan.
-            Maakt direct zichtbaar waarom we deze twee getallen vragen. */}
-        {previewRate !== null && (
+            "Onthult" op het uitgaven-scherm in de gesplitste flow. */}
+        {showPreview && (
           <div className="border border-[var(--border-ed)] bg-[var(--module-active-50)]/40 px-4 py-3">
             <p className="text-sm text-[var(--ink-2)]">
               Je spaarquote komt hiermee op{' '}
@@ -347,7 +390,7 @@ export function OnboardingInkomen({
             optioneel zijn en dat overslaan volledig OK is. Alleen tonen als
             beide velden nog leeg zijn — zodra de gebruiker iets typt, is de
             primary "Verder"-knop de natuurlijke flow (feature #829). */}
-        {onSkipIncome && !data.net_monthly_income && !data.estimated_monthly_expenses && (
+        {onSkipIncome && field !== 'uitgaven' && !data.net_monthly_income && !data.estimated_monthly_expenses && (
           <button
             type="button"
             onClick={onSkipIncome}

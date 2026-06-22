@@ -12,8 +12,16 @@ import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 import { OnboardingIdentity } from '@/components/onboarding/onboarding-identity'
 import { OnboardingInkomen, parseBedragInput } from '@/components/onboarding/onboarding-inkomen'
 import { OnboardingBezittingen } from '@/components/onboarding/onboarding-bezittingen'
+import { OnboardingSchulden } from '@/components/onboarding/onboarding-schulden'
+import {
+  OnboardingPensioen,
+  INITIAL_PENSION_DRAFT,
+  type PensionDraft,
+} from '@/components/onboarding/onboarding-pensioen'
 import { OnboardingSpaardoel } from '@/components/onboarding/onboarding-spaardoel'
 import { OnboardingKlaar } from '@/components/onboarding/onboarding-klaar'
+import { applyPensionParseResult } from '@/lib/pension/apply-parse-result'
+import type { PensionParseResult } from '@/app/api/pension/parse/route'
 import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
@@ -44,22 +52,35 @@ const SAVING_MESSAGES = [
 // ── Types ────────────────────────────────────────────────────
 
 /**
- * Active step union sinds de onboarding-redesign (mei 2026, fase 3),
- * versimpeld in jun 2026: de doel-stap ("Waar help ik je mee?") en het
- * daaraan hangende news-only-pad zijn verwijderd. 5 content-stappen
- * (identity → inkomen → bezittingen → spaardoel → klaar) plus de twee
- * terminal-stappen `saving`/`success`. Alle modules staan default aan —
- * gating gebeurt buiten onboarding (abonnement + user-toggles).
+ * Active step union — begeleide één-vraag-tegelijk flow (Boldin-stijl, jun 2026).
  *
- * Legacy step-namen (`intro`, `goal`, `doel`, `nieuws_only`, `budgets`,
- * `horizon`) zijn uit de actieve flow verwijderd — ze leven nog in
- * `CANONICAL_STEP_ORDER` zodat self-healing restore werkt op oude
- * localStorage-drafts.
+ * De grove 5-staps-iteratie is vervangen door micro-stappen, gegroepeerd per
+ * onderwerp:
+ *   · Profiel    → `naam`, `geboortedatum`   (één veld per scherm)
+ *   · Inkomen    → `inkomen`, `uitgaven`     (spaarquote-preview op `uitgaven`)
+ *   · Bezittingen→ `bezittingen`             (begeleide ja/nee-enumeratie)
+ *   · Schulden   → `schulden`                (begeleide ja/nee + altijd-uitgang)
+ *   · Pensioen   → `pensioen`                (schatting / upload / overslaan)
+ *   · Spaardoel  → `spaardoel`
+ *   · Klaar      → `klaar`
+ * Plus de twee terminal-stappen `saving`/`success`.
+ *
+ * De ja/nee-loops binnen `bezittingen`/`schulden`/`pensioen` zijn zelf-bevattende
+ * sub-machines in hun eigen component; de orchestrator ziet ze als één stap.
+ * De voortgang loopt PER GROEP (zie `STEP_GROUP_INDEX`), niet per micro-vraag.
+ *
+ * Legacy step-namen (`identity`, `intro`, `goal`, `doel`, `nieuws_only`,
+ * `budgets`, `horizon`) leven nog in `CANONICAL_STEP_ORDER`/`LEGACY_STEP_MAP`
+ * zodat self-healing restore werkt op oude localStorage-drafts.
  */
 type Step =
-  | 'identity'
+  | 'naam'
+  | 'geboortedatum'
   | 'inkomen'
+  | 'uitgaven'
   | 'bezittingen'
+  | 'schulden'
+  | 'pensioen'
   | 'spaardoel'
   | 'klaar'
   | 'saving'
@@ -68,24 +89,50 @@ type Step =
 type Direction = 'forward' | 'back'
 
 /**
+ * Voortgang per GROEP (1-indexed) i.p.v. per micro-vraag. De ja/nee-loops maken
+ * het aantal vragen variabel, dus een "3/27" zou misleidend zijn — we tonen de
+ * groep-index ("BEZITTINGEN" = 3/7). Meerdere micro-stappen in dezelfde groep
+ * delen hetzelfde nummer.
+ */
+const STEP_GROUP_INDEX: Record<Step, number> = {
+  naam: 1,
+  geboortedatum: 1,
+  inkomen: 2,
+  uitgaven: 2,
+  bezittingen: 3,
+  schulden: 4,
+  pensioen: 5,
+  spaardoel: 6,
+  klaar: 7,
+  saving: 7,
+  success: 7,
+}
+const TOTAL_GROUPS = 7
+
+/**
  * Canonical order of every step that has ever existed in the flow, used as a
  * fallback anchor when a restored `lastStep` is no longer present in the
- * active step order. Bevat zowel de legacy step-namen (intro/goal/budgets/
- * horizon) als de nieuwe — drafts uit een oudere flow blijven herstelbaar.
+ * active step order. Bevat zowel de legacy step-namen als de nieuwe micro-
+ * stappen — drafts uit een oudere flow blijven herstelbaar.
  */
 const CANONICAL_STEP_ORDER: readonly string[] = [
   // legacy → nieuw vervangers
-  'intro',       // → identity (legacy)
-  'doel',        // → identity (verwijderd jun 2026)
-  'identity',
-  'goal',        // → identity (legacy)
+  'intro',         // → naam (legacy)
+  'doel',          // → naam (verwijderd jun 2026)
+  'identity',      // → naam (gesplitst jun 2026)
+  'goal',          // → naam (legacy)
+  'naam',
+  'geboortedatum',
   'inkomen',
+  'uitgaven',
   'bezittingen',
-  'spaardoel',   // toegevoegd mei 2026 — laagdrempelige spaardoel-keuze
-  'budgets',     // → klaar (legacy)
-  'horizon',     // → klaar (legacy)
+  'schulden',
+  'pensioen',
+  'spaardoel',     // toegevoegd mei 2026 — laagdrempelige spaardoel-keuze
+  'budgets',       // → klaar (legacy)
+  'horizon',       // → klaar (legacy)
   'klaar',
-  'nieuws_only', // → identity (verwijderd jun 2026, samen met de doel-stap)
+  'nieuws_only',   // → naam (verwijderd jun 2026, samen met de doel-stap)
   'saving',
   'success',
 ] as const
@@ -93,24 +140,28 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
 /**
  * Map a legacy lastStep name to the closest current equivalent. Wordt door
  * `_resolveRestoredStep` toegepast vóór de membership-check zodat een draft
- * die opgeslagen is met een verwijderde step-naam alsnog landt op een
- * bestaande stap zonder dat we 'm naar identity terug hoeven te zetten.
+ * die opgeslagen is met een verwijderde/hernoemde step-naam alsnog landt op
+ * een bestaande stap zonder dat we 'm naar het begin terug hoeven te zetten.
  */
 const LEGACY_STEP_MAP: Record<string, Step> = {
   // pre-mei 2026 step-namen
-  modules: 'identity',
-  persona: 'identity',
-  intent: 'identity',
+  modules: 'naam',
+  persona: 'naam',
+  intent: 'naam',
   extras: 'bezittingen',
   preferences: 'klaar',
   // fase 3 (mei 2026): intro/goal/budgets/horizon zijn niet meer actief
-  intro: 'identity',
-  goal: 'identity',
+  intro: 'naam',
+  goal: 'naam',
   budgets: 'klaar',
   horizon: 'klaar',
   // jun 2026: doel-stap ("Waar help ik je mee?") + news-only-pad verwijderd
-  doel: 'identity',
-  nieuws_only: 'identity',
+  doel: 'naam',
+  nieuws_only: 'naam',
+  // jun 2026 (deze wijziging): identity gesplitst in naam + geboortedatum,
+  // inkomen gesplitst in inkomen + uitgaven. Een draft op de oude
+  // gecombineerde stappen heelt naar de eerste micro-stap ervan.
+  identity: 'naam',
 }
 
 /**
@@ -131,9 +182,9 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
   const terminalSteps: Step[] = ['saving', 'success']
   const isSelectable = (s: Step): boolean => !terminalSteps.includes(s)
 
-  // No saved step at all → start at identity (de eerste content-stap).
+  // No saved step at all → start at naam (de eerste content-stap).
   if (!lastStep) {
-    return { step: 'identity', healed: false }
+    return { step: 'naam', healed: false }
   }
 
   // Map legacy step names to their current equivalents before checking
@@ -169,14 +220,14 @@ export function _resolveRestoredStep(lastStep: string | undefined, activeStepOrd
     }
   }
 
-  // Last resort: identity if it's in the active order, otherwise the first
-  // selectable step.
-  const identityFallback = activeStepOrder.find((s) => s === 'identity')
-  if (identityFallback) {
-    return { step: 'identity', healed: true }
+  // Last resort: `naam` (de eerste content-stap) if it's in the active order,
+  // otherwise the first selectable step.
+  const naamFallback = activeStepOrder.find((s) => s === 'naam')
+  if (naamFallback) {
+    return { step: 'naam', healed: true }
   }
   const firstSelectable = activeStepOrder.find(isSelectable)
-  return { step: firstSelectable ?? 'identity', healed: true }
+  return { step: firstSelectable ?? 'naam', healed: true }
 }
 
 /**
@@ -189,7 +240,7 @@ export function _firstNavigationRecoveryStep(activeStepOrder: Step[]): Step {
   const recovery = activeStepOrder.find(
     (s) => s !== 'saving' && s !== 'success'
   )
-  return recovery ?? activeStepOrder[0] ?? 'identity'
+  return recovery ?? activeStepOrder[0] ?? 'naam'
 }
 
 /**
@@ -199,7 +250,19 @@ export function _firstNavigationRecoveryStep(activeStepOrder: Step[]): Step {
  * /mijn) — alle modules staan na onboarding default aan.
  */
 function computeStepOrder(): Step[] {
-  return ['identity', 'inkomen', 'bezittingen', 'spaardoel', 'klaar', 'saving', 'success']
+  return [
+    'naam',
+    'geboortedatum',
+    'inkomen',
+    'uitgaven',
+    'bezittingen',
+    'schulden',
+    'pensioen',
+    'spaardoel',
+    'klaar',
+    'saving',
+    'success',
+  ]
 }
 
 /**
@@ -243,6 +306,12 @@ interface State {
   /** Stap v. — spaardoel-keuze. Skipped + presetKey=null = niet weggeschreven. */
   spaardoel: SpaardoelState
   /**
+   * Pensioen-keuze (schatting / upload / overslaan). De daadwerkelijke
+   * `life_events`-write gebeurt bij de eind-save via `applyPensionParseResult`,
+   * los van het save-own-data POST-contract.
+   */
+  pension: PensionDraft
+  /**
    * Velden die de gebruiker expliciet heeft overgeslagen via "Later invullen"
    * (feature #830). Na onboarding worden ze als suggesties aangeboden via de
    * coach-bubble of het next-step-mechanisme.
@@ -270,6 +339,8 @@ interface PersistedData {
   quickDebts: DebtQuickInput[]
   /** Spaardoel-keuze van stap v. — optioneel zodat oude drafts blijven werken. */
   spaardoel?: SpaardoelState
+  /** Pensioen-keuze — optioneel zodat oude drafts (zonder pensioen-stap) werken. */
+  pension?: PensionDraft
   /** Last step the user was on (to restore position) */
   lastStep?: Step
   /** Fields deferred via "Later invullen" — optioneel, oude drafts kennen dit veld niet. */
@@ -288,6 +359,8 @@ type Action =
    * partial-update-acties want de child levert telkens de volledige shape.
    */
   | { type: 'SET_SPAARDOEL'; data: SpaardoelState }
+  /** Vervang de complete pensioen-substate per dispatch (child levert de volledige shape). */
+  | { type: 'SET_PENSION'; data: PensionDraft }
   /**
    * Track een overgeslagen veld via "Later invullen" (feature #830).
    * Idempotent: voegt de key alleen toe als hij er nog niet in zit.
@@ -296,7 +369,7 @@ type Action =
   | { type: 'RESTORE_STATE'; data: PersistedData }
 
 export const _initialState: State = {
-  step: 'identity',
+  step: 'naam',
   direction: 'forward',
   selectedGoals: [],
   activeModules: [...ALL_MODULES],
@@ -320,6 +393,7 @@ export const _initialState: State = {
     target_date: '',
     skipped: false,
   },
+  pension: INITIAL_PENSION_DRAFT,
   deferredFields: [],
 }
 
@@ -368,6 +442,8 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, quickDebts: action.items }
     case 'SET_SPAARDOEL':
       return { ...state, spaardoel: action.data }
+    case 'SET_PENSION':
+      return { ...state, pension: action.data }
     case 'DEFER_FIELD': {
       // Idempotent: voeg alleen toe als de key er nog niet in zit.
       if (state.deferredFields.includes(action.key)) return state
@@ -416,6 +492,9 @@ export function _reducer(state: State, action: Action): State {
         // _initialState-shape. Geen migratie nodig — het is een nieuw veld
         // dat oude drafts gewoon niet kennen.
         spaardoel: action.data.spaardoel ?? _initialState.spaardoel,
+        // Pensioen — optioneel; oude drafts (vóór de pensioen-stap) kennen het
+        // veld niet en vallen terug op de initiële shape.
+        pension: action.data.pension ?? _initialState.pension,
         // Deferred fields — optioneel, oude drafts kennen dit veld niet.
         deferredFields: Array.isArray(action.data.deferredFields)
           ? action.data.deferredFields
@@ -453,6 +532,7 @@ function saveToLocalStorage(state: State) {
       quickAssets: state.quickAssets,
       quickDebts: state.quickDebts,
       spaardoel: state.spaardoel,
+      pension: state.pension,
       deferredFields: state.deferredFields,
       lastStep: state.step,
     }
@@ -571,6 +651,25 @@ function loadFromLocalStorage(): PersistedData | null {
       }
     }
 
+    // Pensioen: oude drafts kennen het veld niet. Lichte shape-guard — neem
+    // alleen over wat we herkennen; RESTORE_STATE valt anders terug op de
+    // initiële shape. `parseResult` wordt verbatim overgenomen (JSON uit de
+    // mijnpensioen-mapper of de AI-route) of genegeerd als 't geen object is.
+    let pension: PensionDraft | undefined = undefined
+    if (parsed.pension && typeof parsed.pension === 'object') {
+      const rawP = parsed.pension as Record<string, unknown>
+      const mode = rawP.mode === 'estimate' || rawP.mode === 'upload' ? rawP.mode : null
+      pension = {
+        mode,
+        grossMonthly: typeof rawP.grossMonthly === 'string' ? rawP.grossMonthly : '',
+        startAge: typeof rawP.startAge === 'string' ? rawP.startAge : '',
+        parseResult:
+          rawP.parseResult && typeof rawP.parseResult === 'object'
+            ? (rawP.parseResult as PensionParseResult)
+            : null,
+      }
+    }
+
     const data: PersistedData = {
       identity,
       selectedGoals,
@@ -584,6 +683,7 @@ function loadFromLocalStorage(): PersistedData | null {
       quickAssets: Array.isArray(parsed.quickAssets) ? parsed.quickAssets : [],
       quickDebts: Array.isArray(parsed.quickDebts) ? parsed.quickDebts : [],
       spaardoel,
+      pension,
       deferredFields: Array.isArray(parsed.deferredFields) ? parsed.deferredFields : [],
       lastStep: parsed.lastStep,
     }
@@ -621,6 +721,42 @@ function parseSpaardoelAmount(s: string): number {
   return isFinite(n) && n > 0 ? n : 0
 }
 
+/**
+ * Zet de pensioen-keuze van de pensioen-stap om naar een `PensionParseResult`
+ * — exact het contract dat `applyPensionParseResult` (life_events) consumeert,
+ * zodat schatting én upload via één deterministisch pad lopen.
+ *
+ * - `upload` → het reeds geparste resultaat (mijnpensioen JSON / AI-PDF).
+ * - `estimate` → één synthetische ouderdomspensioen-regeling uit het bruto
+ *   maandbedrag (+ optionele ingangsleeftijd, default 67, geklemd 50–75).
+ * - Niets ingevuld / overgeslagen → `null` (geen write).
+ */
+export function buildPensionParseResult(p: PensionDraft): PensionParseResult | null {
+  if (p.mode === 'upload' && p.parseResult) return p.parseResult
+  if (p.mode === 'estimate') {
+    const gross = parseBedragInput(p.grossMonthly)
+    if (!isFinite(gross) || gross <= 0) return null
+    const parsedAge = p.startAge ? parseInt(p.startAge, 10) : NaN
+    const ingangLeeftijd =
+      isFinite(parsedAge) && parsedAge >= 50 && parsedAge <= 75 ? parsedAge : 67
+    return {
+      aowBedrag: null,
+      regelingen: [
+        {
+          fondsNaam: 'Geschat pensioen',
+          brutoBedrag: Math.round(gross),
+          ingangLeeftijd,
+          isGeindexeerd: false,
+          type: 'ouderdomspensioen',
+        },
+      ],
+      nabestaandenpensioen: null,
+      samenvatting: 'Handmatige schatting in onboarding',
+    }
+  }
+  return null
+}
+
 // ── Module-tint wrapper-style ───────────────────────────────
 // Onboarding leeft buiten een specifieke module (de gebruiker is modules
 // aan het kiezen), maar de stappen-componenten consumeren --module-active-*
@@ -650,6 +786,9 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const idempotencyKeyRef = useRef<string | null>(null)
+  // User-id wordt in het check-effect gezet (na getUser) en bij de eind-save
+  // gebruikt voor de auth.uid()-gescopede pensioen-write (life_events).
+  const userIdRef = useRef<string | null>(null)
   const [saveProgress, setSaveProgress] = useState(0)
   const [saveMessageIdx, setSaveMessageIdx] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -667,19 +806,14 @@ export default function OnboardingPage() {
 
   const activeStepOrder = useMemo(() => computeStepOrder(), [])
 
-  // Content-stappen voor de voortgangsbalk (excl. saving/success).
-  // We typen het als `Step[]` zodat `indexOf` `state.step` (incl. terminal
-  // stappen) accepteert — de terminal-stappen zitten niet in de array en
-  // krijgen daardoor automatisch idx === -1 → fallback naar 1.
-  const contentSteps = useMemo<Step[]>(
-    () => activeStepOrder.filter((s) => s !== 'saving' && s !== 'success'),
-    [activeStepOrder],
+  // Voortgang PER GROEP (niet per micro-vraag): de ja/nee-loops in
+  // bezittingen/schulden/pensioen maken het aantal vragen variabel, dus we
+  // tonen de groep-index ("BEZITTINGEN" = 3/7) i.p.v. een misleidende "3/27".
+  const totalContentSteps = TOTAL_GROUPS
+  const currentContentStep = useMemo(
+    () => STEP_GROUP_INDEX[state.step] ?? 1,
+    [state.step],
   )
-  const totalContentSteps = contentSteps.length
-  const currentContentStep = useMemo(() => {
-    const idx = contentSteps.indexOf(state.step)
-    return idx === -1 ? 1 : idx + 1
-  }, [contentSteps, state.step])
 
   const goToBack = useCallback(() => {
     const idx = activeStepOrder.indexOf(state.step)
@@ -706,6 +840,7 @@ export default function OnboardingPage() {
         window.location.href = '/login'
         return
       }
+      userIdRef.current = user.id
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -965,6 +1100,29 @@ export default function OnboardingPage() {
         throw new Error(`${data.error || 'Opslaan mislukt'}${detail}`)
       }
 
+      // ── Pensioen-write (los van het save-own-data POST-contract) ──────────
+      // De pensioen-keuze (schatting of upload) rijdt op het bestaande
+      // `applyPensionParseResult`-pad → `life_events`, met de anon RLS-client
+      // .eq('user_id', auth.uid())-gescoped (geen service-role, geen nieuwe
+      // exposure). Best-effort: een mislukte pensioen-write mag de geslaagde
+      // onboarding-save niet terugdraaien — we loggen en gaan door.
+      try {
+        const pensionResult = buildPensionParseResult(state.pension)
+        if (pensionResult && userIdRef.current) {
+          const outcome = await applyPensionParseResult({
+            supabase,
+            userId: userIdRef.current,
+            parseResult: pensionResult,
+            existingPensionCount: 0,
+          })
+          if (outcome.error) {
+            console.warn(`[onboarding] pensioen opslaan mislukt: ${outcome.error}`)
+          }
+        }
+      } catch (pensionErr) {
+        console.warn('[onboarding] pensioen opslaan mislukt', pensionErr)
+      }
+
       // NB: geen AI pre-generatie meer hier. Dat endpoint
       // (/api/ai/recommendations/initial) zit achter de 'ai'-subscriptie, die
       // een net-geonboarde gebruiker (active_subscriptions = []) per definitie
@@ -1181,17 +1339,32 @@ export default function OnboardingPage() {
         )}
 
         <StepTransition key={state.step} direction={state.direction}>
-          {state.step === 'identity' && (
+          {/* ── Profiel-groep: naam + geboortedatum (één veld per scherm) ── */}
+          {state.step === 'naam' && (
             <OnboardingIdentity
               data={state.identity}
               onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
               onNext={goToNext}
+              field="naam"
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />
           )}
 
-          {state.step === 'inkomen' && (
+          {state.step === 'geboortedatum' && (
+            <OnboardingIdentity
+              data={state.identity}
+              onChange={(data) => dispatch({ type: 'SET_IDENTITY', data })}
+              onNext={goToNext}
+              onBack={goToBack}
+              field="dob"
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
+            />
+          )}
+
+          {/* ── Inkomen-groep: maandinkomen + uitgaven (preview op uitgaven) ── */}
+          {(state.step === 'inkomen' || state.step === 'uitgaven') && (
             <OnboardingInkomen
               data={{
                 net_monthly_income: state.identity.net_monthly_income,
@@ -1205,28 +1378,34 @@ export default function OnboardingPage() {
               }
               onNext={goToNext}
               onBack={goToBack}
-              onSkipIncome={() => {
-                // "Later invullen" defer-pad (feature #829): wis beide
-                // velden en ga door naar de volgende stap. De gebruiker
-                // vult dit later aan via /overzicht/cashflow.
-                dispatch({
-                  type: 'SET_IDENTITY',
-                  data: {
-                    ...state.identity,
-                    net_monthly_income: '',
-                    estimated_yearly_income: '',
-                    estimated_monthly_expenses: '',
-                  },
-                })
-                // Track deferral for post-onboarding suggestions (feature #830)
-                dispatch({ type: 'DEFER_FIELD', key: 'income' })
-                goToNext()
-              }}
+              field={state.step === 'inkomen' ? 'inkomen' : 'uitgaven'}
+              onSkipIncome={
+                state.step === 'inkomen'
+                  ? () => {
+                      // "Later invullen" defer-pad (feature #829): wis beide
+                      // velden en sla de hele inkomen-groep over (naar
+                      // bezittingen). De gebruiker vult dit later aan via
+                      // /overzicht/cashflow.
+                      dispatch({
+                        type: 'SET_IDENTITY',
+                        data: {
+                          ...state.identity,
+                          net_monthly_income: '',
+                          estimated_yearly_income: '',
+                          estimated_monthly_expenses: '',
+                        },
+                      })
+                      dispatch({ type: 'DEFER_FIELD', key: 'income' })
+                      dispatch({ type: 'SET_STEP', step: 'bezittingen' })
+                    }
+                  : undefined
+              }
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />
           )}
 
+          {/* ── Bezittingen — begeleide ja/nee-enumeratie ── */}
           {state.step === 'bezittingen' && (
             <OnboardingBezittingen
               quickAssets={state.quickAssets}
@@ -1234,10 +1413,9 @@ export default function OnboardingPage() {
               onAssetsChange={handleAssetsChange}
               onDebtsChange={handleDebtsChange}
               onNext={() => {
-                // Track deferral when user proceeds without adding any
-                // assets or debts (feature #830). The bezittingen step shows
-                // "Later invullen" as button text when the list is empty.
-                if (state.quickAssets.length === 0 && state.quickDebts.length === 0) {
+                // Track deferral when the user finishes the bezittingen section
+                // without having added any asset (feature #830).
+                if (state.quickAssets.length === 0) {
                   dispatch({ type: 'DEFER_FIELD', key: 'assets' })
                 }
                 goToNext()
@@ -1247,6 +1425,36 @@ export default function OnboardingPage() {
               totalSteps={totalContentSteps}
               bankConnected={bankConnected}
               bankError={bankError}
+            />
+          )}
+
+          {/* ── Schulden — begeleide ja/nee met altijd-uitgang ── */}
+          {state.step === 'schulden' && (
+            <OnboardingSchulden
+              quickDebts={state.quickDebts}
+              onDebtsChange={handleDebtsChange}
+              onNext={goToNext}
+              onBack={goToBack}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
+            />
+          )}
+
+          {/* ── Pensioen — schatting / upload / overslaan (optioneel) ── */}
+          {state.step === 'pensioen' && (
+            <OnboardingPensioen
+              data={state.pension}
+              onChange={(data) => dispatch({ type: 'SET_PENSION', data })}
+              samenwonend={state.identity.household_type !== 'solo'}
+              onNext={goToNext}
+              onBack={goToBack}
+              onSkip={() => {
+                // "Kan altijd later nog" — wis de keuze en ga door (deferred).
+                dispatch({ type: 'SET_PENSION', data: INITIAL_PENSION_DRAFT })
+                goToNext()
+              }}
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
             />
           )}
 

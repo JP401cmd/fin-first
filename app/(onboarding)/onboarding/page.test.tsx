@@ -4,23 +4,28 @@ import {
   _initialState,
   _resolveRestoredStep,
   _firstNavigationRecoveryStep,
+  buildPensionParseResult,
 } from './page'
 import { ALL_MODULES } from '@/lib/module-registry'
+import type { PensionDraft } from '@/components/onboarding/onboarding-pensioen'
 
 // The component module imports a CSS file and a chain of client components
 // (onboarding-identity, onboarding-inkomen, etc.) plus `@/lib/supabase/client`.
-// Vitest/Vite handle the CSS import natively. The component imports live at
-// the top of the module but they don't execute at import time — their
-// side-effect surface is limited to `createClient` being called inside the
-// component body, which we never invoke here. So importing `_reducer` and the
-// helpers should be safe in a jsdom environment.
+// Vitest/Vite handle the CSS import natively. The component imports live at the
+// top of the module but they don't execute at import time, so importing
+// `_reducer` and the helpers is safe in a jsdom environment.
 
-// Actieve volgorde sinds jun 2026: doel-stap ("Waar help ik je mee?") en het
-// news-only-pad zijn verwijderd — identity is de eerste content-stap.
+// Actieve volgorde sinds jun 2026 — begeleide één-vraag-tegelijk flow
+// (Boldin-stijl): identity gesplitst in naam+geboortedatum, inkomen gesplitst
+// in inkomen+uitgaven, en nieuwe stappen schulden + pensioen.
 const NEW_ACTIVE_ORDER = [
-  'identity',
+  'naam',
+  'geboortedatum',
   'inkomen',
+  'uitgaven',
   'bezittingen',
+  'schulden',
+  'pensioen',
   'spaardoel',
   'klaar',
   'saving',
@@ -33,10 +38,21 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     expect(result).toEqual({ step: 'bezittingen', healed: false })
   })
 
+  it('restores the new micro-steps verbatim (geboortedatum / uitgaven / schulden / pensioen)', () => {
+    for (const step of ['geboortedatum', 'uitgaven', 'schulden', 'pensioen'] as const) {
+      const result = _resolveRestoredStep(step, [...NEW_ACTIVE_ORDER])
+      expect(result).toEqual({ step, healed: false })
+    }
+  })
+
+  it('heals a legacy "identity" lastStep to the split "naam" step', () => {
+    // identity is jun 2026 gesplitst in naam + geboortedatum; een oude draft op
+    // identity heelt naar de eerste micro-stap ervan.
+    const result = _resolveRestoredStep('identity', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'naam', healed: true })
+  })
+
   it('heals a legacy "budgets" lastStep to the new "klaar" step', () => {
-    // Sinds fase 3 (mei 2026) is `budgets` geen actieve stap meer. Drafts
-    // van vóór de redesign hebben 'm wel als laatste positie. LEGACY_STEP_MAP
-    // mapt 'm naar de dichtstbijzijnde nieuwe stap — `klaar`.
     const result = _resolveRestoredStep('budgets', [...NEW_ACTIVE_ORDER])
     expect(result).toEqual({ step: 'klaar', healed: true })
   })
@@ -46,27 +62,24 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     expect(result).toEqual({ step: 'klaar', healed: true })
   })
 
-  it('heals a legacy "intro" lastStep to "identity"', () => {
+  it('heals a legacy "intro" lastStep to "naam"', () => {
     const result = _resolveRestoredStep('intro', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'identity', healed: true })
+    expect(result).toEqual({ step: 'naam', healed: true })
   })
 
-  it('heals a legacy "goal" lastStep to "identity"', () => {
+  it('heals a legacy "goal" lastStep to "naam"', () => {
     const result = _resolveRestoredStep('goal', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'identity', healed: true })
+    expect(result).toEqual({ step: 'naam', healed: true })
   })
 
-  it('heals the removed "doel" step to "identity"', () => {
-    // De doel-stap is in jun 2026 verwijderd — drafts die daar gepauzeerd
-    // waren landen op de nieuwe eerste stap.
+  it('heals the removed "doel" step to "naam"', () => {
     const result = _resolveRestoredStep('doel', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'identity', healed: true })
+    expect(result).toEqual({ step: 'naam', healed: true })
   })
 
-  it('heals the removed "nieuws_only" step to "identity"', () => {
-    // Het news-only-pad is samen met de doel-stap verwijderd.
+  it('heals the removed "nieuws_only" step to "naam"', () => {
     const result = _resolveRestoredStep('nieuws_only', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'identity', healed: true })
+    expect(result).toEqual({ step: 'naam', healed: true })
   })
 
   it('heals legacy "extras" step name directly to "bezittingen"', () => {
@@ -74,38 +87,38 @@ describe('onboarding _resolveRestoredStep (self-healing restore)', () => {
     expect(result).toEqual({ step: 'bezittingen', healed: true })
   })
 
-  it('falls back to identity when the saved step is not in the canonical union', () => {
+  it('falls back to naam when the saved step is not in the canonical union', () => {
     const result = _resolveRestoredStep('verzonnen_stap', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'identity', healed: true })
+    expect(result).toEqual({ step: 'naam', healed: true })
   })
 
-  it('lands on identity when there is no saved step', () => {
+  it('lands on naam when there is no saved step', () => {
     const result = _resolveRestoredStep(undefined, [...NEW_ACTIVE_ORDER])
-    expect(result.step).toBe('identity')
+    expect(result.step).toBe('naam')
   })
 
-  it('heals legacy "intent" step name directly to "identity"', () => {
+  it('heals legacy "intent" step name directly to "naam"', () => {
     const result = _resolveRestoredStep('intent', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'identity', healed: true })
+    expect(result).toEqual({ step: 'naam', healed: true })
   })
 
-  it('heals legacy "modules" step name directly to "identity"', () => {
+  it('heals legacy "modules" step name directly to "naam"', () => {
     const result = _resolveRestoredStep('modules', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'identity', healed: true })
+    expect(result).toEqual({ step: 'naam', healed: true })
   })
 
-  it('heals legacy "persona" step name directly to "identity"', () => {
+  it('heals legacy "persona" step name directly to "naam"', () => {
     const result = _resolveRestoredStep('persona', [...NEW_ACTIVE_ORDER])
-    expect(result).toEqual({ step: 'identity', healed: true })
+    expect(result).toEqual({ step: 'naam', healed: true })
   })
 })
 
 describe('onboarding _initialState — modules default aan', () => {
-  it('starts on identity with all modules active', () => {
-    // Sinds jun 2026 is er geen doel-/module-keuze meer in onboarding:
-    // alle modules staan default aan, gating gebeurt via abonnement +
-    // user-toggles buiten de onboarding.
-    expect(_initialState.step).toBe('identity')
+  it('starts on naam with all modules active', () => {
+    // Sinds jun 2026 is er geen doel-/module-keuze meer in onboarding: alle
+    // modules staan default aan, gating gebeurt via abonnement + user-toggles
+    // buiten de onboarding. Eerste micro-stap = `naam`.
+    expect(_initialState.step).toBe('naam')
     expect(_initialState.activeModules).toEqual([...ALL_MODULES])
     expect(_initialState.selectedGoals).toEqual([])
   })
@@ -122,7 +135,6 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     estimated_monthly_expenses: '2200',
   }
 
-  // HorizonData shape — pass-through only; we only care about restore behavior.
   const baseHorizon = _initialState.horizon
 
   let warnSpy: ReturnType<typeof vi.spyOn>
@@ -150,17 +162,35 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       },
     })
     expect(result.step).toBe('bezittingen')
-    // Module-keuze uit oude drafts wordt genegeerd — alles aan.
     expect(result.activeModules).toEqual([...ALL_MODULES])
     expect(result.selectedGoals).toEqual(['grip-uitgaven'])
     expect(warnSpy).not.toHaveBeenCalled()
   })
 
+  it('restores a draft saved mid-flow on the new schulden step without warning', () => {
+    // Mid-loop restore landt op groep-niveau met de reeds-toegevoegde posten
+    // intact (data-behoudend); de schulden-stap zelf is gewoon herstelbaar.
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: [],
+        activeModules: ['budgetteren'],
+        horizon: baseHorizon,
+        budgetAmounts: {},
+        quickAssets: [{ asset_type: 'cash', name: 'Betaalrekening', current_value: 1200 }],
+        quickDebts: [{ debt_type: 'student_loan', name: 'DUO', current_balance: 9000 }],
+        lastStep: 'schulden',
+      },
+    })
+    expect(result.step).toBe('schulden')
+    // Reeds toegevoegde posten blijven behouden bij restore.
+    expect(result.quickAssets).toHaveLength(1)
+    expect(result.quickDebts).toHaveLength(1)
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
   it('behoudt het maand-inkomensveld bij restore (jun 2026: inkomen per maand)', () => {
-    // Sinds jun 2026 is `net_monthly_income` het primaire inkomensveld in de
-    // onboarding (uitgevraagd per maand, net als de uitgaven). RESTORE_STATE
-    // merget over de _initialState-shape, dus het maandbedrag moet behouden
-    // blijven én het canonieke jaarveld (×12) consistent meekomen.
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
@@ -183,13 +213,10 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       },
     })
     expect(result.identity.net_monthly_income).toBe('3000')
-    // Jaarveld blijft de canonieke spiegel (3000 × 12).
     expect(result.identity.estimated_yearly_income).toBe('36000')
   })
 
   it('migrates a legacy single-goal draft to a selectedGoals array', () => {
-    // Een draft van vóór fase 3 had `goal: GoalSlug | null`. RESTORE_STATE
-    // wrapt single → array.
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
@@ -207,10 +234,28 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     expect(result.selectedGoals).toEqual(['grip-uitgaven'])
   })
 
+  it('migrates a legacy "identity" lastStep to "naam"', () => {
+    // Een draft van vóór de profiel-split. LEGACY_STEP_MAP mapt identity → naam.
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: [],
+        activeModules: ['budgetteren'],
+        horizon: baseHorizon,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        lastStep: 'identity' as (typeof _initialState)['step'],
+      },
+    })
+    expect(result.step).toBe('naam')
+    expect(warnSpy).toHaveBeenCalledOnce()
+    expect(warnSpy.mock.calls[0][0]).toContain('identity')
+    expect(warnSpy.mock.calls[0][0]).toContain('naam')
+  })
+
   it('migrates a legacy "budgets" lastStep to "klaar"', () => {
-    // Een draft die was opgeslagen op de oude `budgets`-stap. Sinds fase 3
-    // mapt die naar `klaar` — bewust een healed-fallback zodat de gebruiker
-    // niet terug naar het begin gestuurd wordt.
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
@@ -221,8 +266,6 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
-        // Cast omdat de persisted shape getypeerd is op de huidige union,
-        // maar we simuleren een draft van vóór de flow-change.
         lastStep: 'budgets' as (typeof _initialState)['step'],
       },
     })
@@ -232,9 +275,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     expect(warnSpy.mock.calls[0][0]).toContain('klaar')
   })
 
-  it('heals a news-only draft (lastStep nieuws_only) back to identity', () => {
-    // News-only-pad is verwijderd: een draft die daar gepauzeerd was gaat
-    // de normale flow in, met alle modules aan.
+  it('heals a news-only draft (lastStep nieuws_only) back to naam', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
@@ -248,12 +289,12 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         lastStep: 'nieuws_only' as unknown as (typeof _initialState)['step'],
       },
     })
-    expect(result.step).toBe('identity')
+    expect(result.step).toBe('naam')
     expect(result.activeModules).toEqual([...ALL_MODULES])
     expect(warnSpy).toHaveBeenCalledOnce()
   })
 
-  it('falls back to identity for an unknown lastStep', () => {
+  it('falls back to naam for an unknown lastStep', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
@@ -267,7 +308,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
         lastStep: 'verzonnen_stap' as unknown as (typeof _initialState)['step'],
       },
     })
-    expect(result.step).toBe('identity')
+    expect(result.step).toBe('naam')
     expect(warnSpy).toHaveBeenCalledOnce()
   })
 })
@@ -294,8 +335,6 @@ describe('onboarding _reducer — SET_SPAARDOEL', () => {
   })
 
   it('marks the spaardoel as skipped without persisting a partial entry', () => {
-    // Skip-flow dispatch — wis pre-fill velden zodat handleSaveOwnData
-    // niet alsnog een onboardingGoal-payload bouwt.
     const result = _reducer(_initialState, {
       type: 'SET_SPAARDOEL',
       data: {
@@ -328,12 +367,30 @@ describe('onboarding _reducer — SET_SPAARDOEL', () => {
   })
 })
 
+describe('onboarding _reducer — SET_PENSION', () => {
+  it('replaces the pension substate with the dispatched payload', () => {
+    const draft: PensionDraft = {
+      mode: 'estimate',
+      grossMonthly: '1500',
+      startAge: '67',
+      parseResult: null,
+    }
+    const result = _reducer(_initialState, { type: 'SET_PENSION', data: draft })
+    expect(result.pension).toEqual(draft)
+  })
+
+  it('does not affect other state fields', () => {
+    const result = _reducer(_initialState, {
+      type: 'SET_PENSION',
+      data: { mode: 'upload', grossMonthly: '', startAge: '', parseResult: null },
+    })
+    expect(result.identity).toEqual(_initialState.identity)
+    expect(result.quickAssets).toEqual(_initialState.quickAssets)
+  })
+})
+
 describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
   it('keeps a klaar lastStep on klaar without retroactively routing to spaardoel', () => {
-    // Belangrijke check: een gebruiker die de vorige flow op `klaar` had
-    // afgesloten moet daar landen, niet stilzwijgend terug naar de nieuwe
-    // tussenstap `spaardoel`. De membership-check in active-order matched
-    // direct op `klaar`, dus geen healing nodig.
     const result = _resolveRestoredStep('klaar', [...NEW_ACTIVE_ORDER])
     expect(result).toEqual({ step: 'klaar', healed: false })
   })
@@ -344,7 +401,7 @@ describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
   })
 })
 
-describe('onboarding _reducer — RESTORE_STATE met spaardoel', () => {
+describe('onboarding _reducer — RESTORE_STATE met spaardoel + pensioen', () => {
   const baseIdentity = {
     full_name: 'Jan Paul',
     date_of_birth: '1986-04-05',
@@ -390,9 +447,32 @@ describe('onboarding _reducer — RESTORE_STATE met spaardoel', () => {
     expect(result.spaardoel.name).toBe('Italië 2027')
   })
 
-  it('falls back to the initial spaardoel state when missing from a legacy draft', () => {
-    // Een draft van vóór de spaardoel-stap kent het veld niet. RESTORE_STATE
-    // moet dan terugvallen op `_initialState.spaardoel`.
+  it('restores a saved pension substate verbatim', () => {
+    const pension: PensionDraft = {
+      mode: 'estimate',
+      grossMonthly: '1400',
+      startAge: '68',
+      parseResult: null,
+    }
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: [],
+        activeModules: ['budgetteren'],
+        horizon: baseHorizon,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        pension,
+        lastStep: 'pensioen',
+      },
+    })
+    expect(result.step).toBe('pensioen')
+    expect(result.pension).toEqual(pension)
+  })
+
+  it('falls back to the initial pension state when missing from a legacy draft', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: {
@@ -403,7 +483,25 @@ describe('onboarding _reducer — RESTORE_STATE met spaardoel', () => {
         budgetAmounts: {},
         quickAssets: [],
         quickDebts: [],
-        // spaardoel ontbreekt bewust — legacy draft simulatie
+        // pension ontbreekt bewust — legacy draft simulatie
+        lastStep: 'klaar',
+      },
+    })
+    expect(result.step).toBe('klaar')
+    expect(result.pension).toEqual(_initialState.pension)
+  })
+
+  it('falls back to the initial spaardoel state when missing from a legacy draft', () => {
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: ['grip-uitgaven'],
+        activeModules: ['budgetteren'],
+        horizon: baseHorizon,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
         lastStep: 'klaar',
       },
     })
@@ -412,24 +510,75 @@ describe('onboarding _reducer — RESTORE_STATE met spaardoel', () => {
   })
 })
 
+describe('onboarding buildPensionParseResult', () => {
+  it('maps an estimate to a single ouderdomspensioen-regeling', () => {
+    const result = buildPensionParseResult({
+      mode: 'estimate',
+      grossMonthly: '1.500',
+      startAge: '68',
+      parseResult: null,
+    })
+    expect(result).not.toBeNull()
+    expect(result!.regelingen).toHaveLength(1)
+    expect(result!.regelingen[0]).toMatchObject({
+      brutoBedrag: 1500,
+      ingangLeeftijd: 68,
+      type: 'ouderdomspensioen',
+    })
+  })
+
+  it('defaults the ingangsleeftijd to 67 when out of range or missing', () => {
+    const result = buildPensionParseResult({
+      mode: 'estimate',
+      grossMonthly: '1200',
+      startAge: '',
+      parseResult: null,
+    })
+    expect(result!.regelingen[0].ingangLeeftijd).toBe(67)
+  })
+
+  it('returns null for an empty/zero estimate', () => {
+    expect(
+      buildPensionParseResult({ mode: 'estimate', grossMonthly: '', startAge: '', parseResult: null }),
+    ).toBeNull()
+    expect(
+      buildPensionParseResult({ mode: 'estimate', grossMonthly: '0', startAge: '', parseResult: null }),
+    ).toBeNull()
+  })
+
+  it('passes an uploaded parseResult through unchanged', () => {
+    const parseResult = {
+      aowBedrag: 1300,
+      regelingen: [
+        { fondsNaam: 'ABP', brutoBedrag: 900, ingangLeeftijd: 67, isGeindexeerd: true, type: 'ouderdomspensioen' as const },
+      ],
+      nabestaandenpensioen: null,
+      samenvatting: 'Test',
+    }
+    const result = buildPensionParseResult({
+      mode: 'upload',
+      grossMonthly: '',
+      startAge: '',
+      parseResult,
+    })
+    expect(result).toBe(parseResult)
+  })
+
+  it('returns null when the user skipped (mode null)', () => {
+    expect(
+      buildPensionParseResult({ mode: null, grossMonthly: '', startAge: '', parseResult: null }),
+    ).toBeNull()
+  })
+})
+
 describe('onboarding _firstNavigationRecoveryStep', () => {
-  it('returns the first content step for the new active order', () => {
+  it('returns the first content step (naam) for the new active order', () => {
     const result = _firstNavigationRecoveryStep([...NEW_ACTIVE_ORDER])
-    // Eerste niet-terminal step is `identity` — saving/success worden
-    // overgeslagen, doel bestaat niet meer.
-    expect(result).toBe('identity')
+    expect(result).toBe('naam')
   })
 
-  it('falls back to identity when the active order is empty', () => {
+  it('falls back to naam when the active order is empty', () => {
     const result = _firstNavigationRecoveryStep([])
-    expect(result).toBe('identity')
-  })
-
-  it('mirrors the behaviour goToNext/goToBack rely on for an orphaned step', () => {
-    // This covers the navigation spec requirement: when state.step is not
-    // in activeStepOrder (idx === -1), the recovery helper produces the
-    // first valid non-terminal step for SET_STEP to dispatch to.
-    const fallback = _firstNavigationRecoveryStep([...NEW_ACTIVE_ORDER])
-    expect(fallback).toBe('identity')
+    expect(result).toBe('naam')
   })
 })

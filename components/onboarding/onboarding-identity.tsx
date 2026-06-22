@@ -102,6 +102,12 @@ export interface OnboardingIdentityProps {
   onNext: () => void
   /** Optioneel sinds jun 2026 — identity is de eerste stap (geen terug). */
   onBack?: () => void
+  /**
+   * Welk veld dit scherm uitvraagt (begeleide flow — één vraag per scherm,
+   * jun 2026). `'naam'` toont alleen de naam, `'dob'` alleen de geboortedatum.
+   * Default (undefined) = beide velden op één scherm (backward-compat).
+   */
+  field?: 'naam' | 'dob'
   /** 1-indexed stap-nummer voor de voortgangsbalk (default 1). */
   currentStep?: number
   totalSteps?: number
@@ -112,31 +118,48 @@ export function OnboardingIdentity({
   onChange,
   onNext,
   onBack,
+  field,
   currentStep = 1,
-  totalSteps = 5,
+  totalSteps = 7,
 }: OnboardingIdentityProps) {
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [submitted, setSubmitted] = useState(false)
 
-  const errors = useMemo(() => getFieldErrors(data), [data])
+  // Welke velden dit scherm valideert/toont.
+  const activeFields: FieldKey[] =
+    field === 'naam'
+      ? ['full_name']
+      : field === 'dob'
+        ? ['date_of_birth']
+        : ['full_name', 'date_of_birth']
+  const showName = activeFields.includes('full_name')
+  const showDob = activeFields.includes('date_of_birth')
+
+  const allErrors = useMemo(() => getFieldErrors(data), [data])
+  // Alleen de actieve velden bepalen of we door mogen.
+  const errors = useMemo(() => {
+    const e: Partial<Record<FieldKey, string>> = {}
+    for (const f of activeFields) if (allErrors[f]) e[f] = allErrors[f]
+    return e
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allErrors, field])
   const isValid = Object.keys(errors).length === 0
   const disableNext = submitted && !isValid
 
-  const showError = (field: FieldKey) =>
-    touched[field] || submitted ? errors[field] : undefined
-  const markTouched = (field: FieldKey) =>
-    setTouched((prev) => ({ ...prev, [field]: true }))
+  const showError = (f: FieldKey) =>
+    touched[f] || submitted ? errors[f] : undefined
+  const markTouched = (f: FieldKey) =>
+    setTouched((prev) => ({ ...prev, [f]: true }))
 
-  const inputErrorClass = (field: FieldKey) =>
-    showError(field)
+  const inputErrorClass = (f: FieldKey) =>
+    showError(f)
       ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
       : 'border-[var(--border-ed)] focus:border-[var(--module-active-500)] focus:ring-[var(--module-active-500)]'
 
   const scrollToFirstError = useCallback(() => {
-    const fieldOrder: FieldKey[] = ['full_name', 'date_of_birth']
-    for (const field of fieldOrder) {
-      if (errors[field]) {
-        const el = document.getElementById(FIELD_IDS[field])
+    for (const f of activeFields) {
+      if (errors[f]) {
+        const el = document.getElementById(FIELD_IDS[f])
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' })
           el.focus()
@@ -144,7 +167,8 @@ export function OnboardingIdentity({
         break
       }
     }
-  }, [errors])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [errors, field])
 
   function handleNext() {
     setSubmitted(true)
@@ -155,34 +179,54 @@ export function OnboardingIdentity({
     }
   }
 
-  // Headline-em: italic Playfair op "voorstellen" in --module-active-700.
-  const headline = (
-    <>
-      Even{' '}
-      <em
-        className="font-normal italic"
-        style={{ color: 'var(--module-active-700)' }}
-      >
-        voorstellen
-      </em>
-    </>
-  )
+  // Headline + deck per veld (begeleide flow), met fallback voor het
+  // gecombineerde scherm.
+  const headline =
+    field === 'naam' ? (
+      <>
+        Hoe{' '}
+        <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
+          heet
+        </em>{' '}
+        je?
+      </>
+    ) : field === 'dob' ? (
+      <>
+        Wanneer ben je{' '}
+        <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
+          geboren
+        </em>
+        ?
+      </>
+    ) : (
+      <>
+        Even{' '}
+        <em className="font-normal italic" style={{ color: 'var(--module-active-700)' }}>
+          voorstellen
+        </em>
+      </>
+    )
+  const deck =
+    field === 'naam'
+      ? 'Zodat ik je persoonlijk kan aanspreken — verder niets verplichts.'
+      : field === 'dob'
+        ? 'Met je leeftijd vertaal ik je geld naar jouw vrijheid in tijd — op maat van je horizon.'
+        : 'Zo vertaal ik je bedragen naar jouw vrijheid in tijd — op maat van je situatie.'
 
   // Dynamic facts-copy: zodra DOB valide is, toon leeftijd-aware tekst.
-  // Anders fallback uit het plan (CBS Levensverwachting).
   const age = deriveAge(data.date_of_birth)
   const factsSub = age
     ? `Op je ${age}e staan de meeste mensen nog 25 tot 30 jaar voor hun pensioendoel.`
     : 'gemiddelde levensverwachting in Nederland'
   const factsStat = age ? `${age}` : '81'
-  const factsSource = age ? 'CBS Levensverwachting, 2024' : 'CBS Levensverwachting, 2024'
+  const factsSource = 'CBS Levensverwachting, 2024'
 
   return (
     <OnboardingShell
       kicker="Profiel"
       romanNum="i."
       title={headline}
-      deck="Zo vertaal ik je bedragen naar jouw vrijheid in tijd — op maat van je situatie."
+      deck={deck}
       factsPanel={
         <FactsPanel stat={factsStat} sub={factsSub} source={factsSource} />
       }
@@ -213,67 +257,71 @@ export function OnboardingIdentity({
         )}
 
         {/* Volledige naam */}
-        <div>
-          <label
-            htmlFor="ob-name"
-            className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
-          >
-            Volledige naam <span className="text-red-400">*</span>
-          </label>
-          <input
-            id="ob-name"
-            type="text"
-            value={data.full_name}
-            onChange={(e) => onChange({ ...data, full_name: e.target.value })}
-            onBlur={() => markTouched('full_name')}
-            placeholder="Je naam"
-            autoComplete="name"
-            aria-invalid={!!showError('full_name')}
-            aria-describedby={showError('full_name') ? 'ob-name-error' : undefined}
-            className={`w-full bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
-          />
-          {showError('full_name') && (
-            <p
-              id="ob-name-error"
-              className="mt-1 text-xs text-red-500"
-              role="alert"
+        {showName && (
+          <div>
+            <label
+              htmlFor="ob-name"
+              className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
             >
-              {showError('full_name')}
-            </p>
-          )}
-        </div>
+              Volledige naam <span className="text-red-400">*</span>
+            </label>
+            <input
+              id="ob-name"
+              type="text"
+              value={data.full_name}
+              onChange={(e) => onChange({ ...data, full_name: e.target.value })}
+              onBlur={() => markTouched('full_name')}
+              placeholder="Je naam"
+              autoComplete="name"
+              aria-invalid={!!showError('full_name')}
+              aria-describedby={showError('full_name') ? 'ob-name-error' : undefined}
+              className={`w-full bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('full_name')}`}
+            />
+            {showError('full_name') && (
+              <p
+                id="ob-name-error"
+                className="mt-1 text-xs text-red-500"
+                role="alert"
+              >
+                {showError('full_name')}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Geboortedatum */}
-        <div>
-          <label
-            htmlFor="ob-dob"
-            className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
-          >
-            Geboortedatum <span className="text-red-400">*</span>
-          </label>
-          <input
-            id="ob-dob"
-            type="date"
-            value={data.date_of_birth}
-            onChange={(e) =>
-              onChange({ ...data, date_of_birth: e.target.value })
-            }
-            onBlur={() => markTouched('date_of_birth')}
-            autoComplete="bday"
-            aria-invalid={!!showError('date_of_birth')}
-            aria-describedby={showError('date_of_birth') ? 'ob-dob-error' : undefined}
-            className={`w-full bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
-          />
-          {showError('date_of_birth') && (
-            <p
-              id="ob-dob-error"
-              className="mt-1 text-xs text-red-500"
-              role="alert"
+        {showDob && (
+          <div>
+            <label
+              htmlFor="ob-dob"
+              className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
             >
-              {showError('date_of_birth')}
-            </p>
-          )}
-        </div>
+              Geboortedatum <span className="text-red-400">*</span>
+            </label>
+            <input
+              id="ob-dob"
+              type="date"
+              value={data.date_of_birth}
+              onChange={(e) =>
+                onChange({ ...data, date_of_birth: e.target.value })
+              }
+              onBlur={() => markTouched('date_of_birth')}
+              autoComplete="bday"
+              aria-invalid={!!showError('date_of_birth')}
+              aria-describedby={showError('date_of_birth') ? 'ob-dob-error' : undefined}
+              className={`w-full bg-[var(--subtle)] px-3 py-2.5 text-base text-[var(--ink)] outline-none border focus:ring-1 sm:text-sm ${inputErrorClass('date_of_birth')}`}
+            />
+            {showError('date_of_birth') && (
+              <p
+                id="ob-dob-error"
+                className="mt-1 text-xs text-red-500"
+                role="alert"
+              >
+                {showError('date_of_birth')}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </OnboardingShell>
   )
