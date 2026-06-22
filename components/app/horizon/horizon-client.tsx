@@ -62,6 +62,7 @@ import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-hous
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { HorizonTrendGrid } from '@/components/app/horizon/horizon-trend-grid'
 import { HouseholdFireSection } from '@/components/app/household-fire-section'
 import {
@@ -3957,39 +3958,45 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       )}
 
       {/* === 5. Household FIRE Projections === */}
-      <HouseholdFireSection personalProjection={personalHeroProjection} />
+      <HideInSimple>
+        <HouseholdFireSection personalProjection={personalHeroProjection} />
+      </HideInSimple>
 
 
 
       {/* === 5b. Verloop-grid: Gezondheid + FIRE-leeftijd (Deep Dive) === */}
-      <HorizonTrendGrid
-        resilienceSnapshots={resilienceSnapshots}
-        healthScoreTotal={healthScore.total}
-        healthChartOpen={healthChartOpen}
-        onToggleHealth={() => setHealthChartOpen(v => !v)}
-        fireAgeChartOpen={fireAgeChartOpen}
-        onToggleFireAge={() => setFireAgeChartOpen(v => !v)}
-        onOpenResilienceReceipt={() => setShowResilienceReceipt(true)}
-      />
+      <HideInSimple>
+        <HorizonTrendGrid
+          resilienceSnapshots={resilienceSnapshots}
+          healthScoreTotal={healthScore.total}
+          healthChartOpen={healthChartOpen}
+          onToggleHealth={() => setHealthChartOpen(v => !v)}
+          fireAgeChartOpen={fireAgeChartOpen}
+          onToggleFireAge={() => setFireAgeChartOpen(v => !v)}
+          onOpenResilienceReceipt={() => setShowResilienceReceipt(true)}
+        />
+      </HideInSimple>
 
 
       {/* === 9. Acties (Primary Content) === */}
       {actions.length > 0 && (
-        <section className="mt-4 sm:mt-8">
-          <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
-            <Zap className="mr-1.5 inline h-3.5 w-3.5 text-horizon-600" />
-            Geplande acties (komend jaar)
-          </h2>
-          <div className="space-y-2">
-            {actions.map((action) => (
-              <ActionCard
-                key={action.id}
-                action={action}
-                onStatusChange={handleActionStatusChange}
-              />
-            ))}
-          </div>
-        </section>
+        <HideInSimple>
+          <section className="mt-4 sm:mt-8">
+            <h2 className="mb-3 label-editorial text-[var(--ink-2)]">
+              <Zap className="mr-1.5 inline h-3.5 w-3.5 text-horizon-600" />
+              Geplande acties (komend jaar)
+            </h2>
+            <div className="space-y-2">
+              {actions.map((action) => (
+                <ActionCard
+                  key={action.id}
+                  action={action}
+                  onStatusChange={handleActionStatusChange}
+                />
+              ))}
+            </div>
+          </section>
+        </HideInSimple>
       )}
 
 

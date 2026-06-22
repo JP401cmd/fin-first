@@ -9,6 +9,7 @@ import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
 import { AfbouwOverzichtCard } from './afbouw-overzicht-card'
 import { RegelBewerkenPane } from './regel-bewerken-pane'
@@ -225,6 +226,7 @@ export function VoorkeurenView({
       </div>
 
       {/* Markt-aannames */}
+      <HideInSimple>
       <div>
         <header className="mb-4">
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
@@ -296,6 +298,7 @@ export function VoorkeurenView({
           />
         </div>
       </div>
+      </HideInSimple>
 
       <p className="text-[11px] italic text-[var(--ink-3)]">
         Klik op een regel of markt-aanname om uitleg, instellingen en impact te
@@ -303,19 +306,23 @@ export function VoorkeurenView({
       </p>
 
       {/* Afbouw-overzicht — eindsaldo bij fireAge vs endAge. */}
-      {fireAge != null && simRows && simRows.length > 0 && (() => {
-        const fireRow = simRows.find((r) => r.age === fireAge) ?? simRows[0]
-        const endRow = simRows.find((r) => r.age === fireStrategy.endAge) ?? simRows[simRows.length - 1]
-        return (
-          <AfbouwOverzichtCard
-            fireAge={fireAge}
-            endAge={fireStrategy.endAge}
-            fireAgeBalance={fireRow?.endPortfolio ?? null}
-            endBalance={endRow?.endPortfolio ?? null}
-            strategy={fireStrategy.strategy}
-          />
-        )
-      })()}
+      {fireAge != null && simRows && simRows.length > 0 && (
+        <HideInSimple>
+          {(() => {
+            const fireRow = simRows.find((r) => r.age === fireAge) ?? simRows[0]
+            const endRow = simRows.find((r) => r.age === fireStrategy.endAge) ?? simRows[simRows.length - 1]
+            return (
+              <AfbouwOverzichtCard
+                fireAge={fireAge}
+                endAge={fireStrategy.endAge}
+                fireAgeBalance={fireRow?.endPortfolio ?? null}
+                endBalance={endRow?.endPortfolio ?? null}
+                strategy={fireStrategy.strategy}
+              />
+            )
+          })()}
+        </HideInSimple>
+      )}
 
       {/* Markt-aanname-editor (inflatie/rendement). */}
       {editing && (

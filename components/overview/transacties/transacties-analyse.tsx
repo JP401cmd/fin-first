@@ -23,6 +23,7 @@ import type { Perspective } from '@/lib/household-data'
 import type { Budget } from '@/lib/budget-data'
 import { TransactieTijdlijn, type AccountOption } from './transactie-tijdlijn'
 import { TransactionForm } from '@/components/app/transaction-form'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { PeriodeSelector } from './periode-selector'
@@ -481,7 +482,7 @@ export function TransactiesAnalyse() {
       ) : (
         <>
           <div className="grid gap-5 lg:grid-cols-3">
-            <Card className="lg:col-span-1">
+            <Card className="lg:col-span-1 [&:only-child]:lg:col-span-3">
               {hasPartnerTotals && (
                 <p className="mb-3 border-l-2 border-[var(--border-md)] pl-3 text-xs italic text-[var(--ink-3)]">
                   Je partner deelt alleen totalen. Diens persoonlijke transacties tellen niet mee in
@@ -493,40 +494,52 @@ export function TransactiesAnalyse() {
                 <p className="text-sm text-[var(--ink-3)]">Geen transacties in deze periode.</p>
               )}
             </Card>
-            <Card className="lg:col-span-2">
-              <UitgavenHeatmap
-                transactions={heatmapTxns}
-                start={heatmapWindow.start}
-                end={heatmapWindow.end}
-                onSelectDay={(date) => setListDetail({ kind: 'day', date })}
-              />
-            </Card>
+            <HideInSimple>
+              <Card className="lg:col-span-2">
+                <UitgavenHeatmap
+                  transactions={heatmapTxns}
+                  start={heatmapWindow.start}
+                  end={heatmapWindow.end}
+                  onSelectDay={(date) => setListDetail({ kind: 'day', date })}
+                />
+              </Card>
+            </HideInSimple>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
-            <Card>
-              <PeriodeTrend current={currentSummary} previous={prevSummary} />
-            </Card>
-            <Card>
-              <WeekdagPatroon
-                transactions={currentTxns}
-                onSelectWeekday={(index) => setListDetail({ kind: 'weekday', index })}
-              />
-            </Card>
+            <HideInSimple>
+              <Card>
+                <PeriodeTrend current={currentSummary} previous={prevSummary} />
+              </Card>
+            </HideInSimple>
+            <HideInSimple>
+              <Card>
+                <WeekdagPatroon
+                  transactions={currentTxns}
+                  onSelectWeekday={(index) => setListDetail({ kind: 'weekday', index })}
+                />
+              </Card>
+            </HideInSimple>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
-            <Card>
-              <TopTegenpartijen transactions={currentTxns} onSelect={setDrillCp} />
-            </Card>
-            <Card>
-              <GrootsteUitgaven transactions={currentTxns} onSelect={openEdit} />
-            </Card>
+            <HideInSimple>
+              <Card>
+                <TopTegenpartijen transactions={currentTxns} onSelect={setDrillCp} />
+              </Card>
+            </HideInSimple>
+            <HideInSimple>
+              <Card>
+                <GrootsteUitgaven transactions={currentTxns} onSelect={openEdit} />
+              </Card>
+            </HideInSimple>
           </div>
 
-          <Card>
-            <NieuweTegenpartijen items={newCps} onSelect={setDrillCp} />
-          </Card>
+          <HideInSimple>
+            <Card>
+              <NieuweTegenpartijen items={newCps} onSelect={setDrillCp} />
+            </Card>
+          </HideInSimple>
 
           <TransactieTijdlijn
             transactions={accountFiltered}

@@ -14,6 +14,7 @@ import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
@@ -1057,24 +1058,26 @@ export function CashOverview({
 
       {/* === 4. Snelle acties === */}
       {!hideQuickActions && (
-        <section className="mt-5 sm:mt-8">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/core/cash/import"
-              className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-            >
-              <Upload className="h-4 w-4" />
-              Importeer transacties
-            </Link>
-            <Link
-              href="/core/cash/connect"
-              className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-            >
-              <Link2 className="h-4 w-4" />
-              Bank koppelen
-            </Link>
-          </div>
-        </section>
+        <HideInSimple>
+          <section className="mt-5 sm:mt-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/core/cash/import"
+                className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              >
+                <Upload className="h-4 w-4" />
+                Importeer transacties
+              </Link>
+              <Link
+                href="/core/cash/connect"
+                className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              >
+                <Link2 className="h-4 w-4" />
+                Bank koppelen
+              </Link>
+            </div>
+          </section>
+        </HideInSimple>
       )}
 
       {/* === Kassabon: Inkomsten === */}

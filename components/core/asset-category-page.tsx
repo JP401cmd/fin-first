@@ -32,6 +32,7 @@ import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { CashOverview } from '@/components/app/cash-overview'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { AddCategoryCard } from './add-category-card'
 import { VermogenAssetCard } from './vermogen-asset-card'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
@@ -550,33 +551,39 @@ export function AssetCategoryPage({
               />
 
               {type !== 'cash' && historyData && (
-                <section className="mt-8">
-                  <CategoryHistoryChart
-                    variant="asset"
-                    subtype={type}
-                    initialData={historyData}
-                  />
-                </section>
+                <HideInSimple>
+                  <section className="mt-8">
+                    <CategoryHistoryChart
+                      variant="asset"
+                      subtype={type}
+                      initialData={historyData}
+                    />
+                  </section>
+                </HideInSimple>
               )}
 
               {type === 'cash' && (
-                <div className="mt-8 -mx-4 sm:-mx-6">
-                  <CashOverview embedded hideAccountsSection hideQuickActions />
-                </div>
+                <HideInSimple>
+                  <div className="mt-8 -mx-4 sm:-mx-6">
+                    <CashOverview embedded hideAccountsSection hideQuickActions />
+                  </div>
+                </HideInSimple>
               )}
 
               {type === 'cash' && initialCoreData && (
-                <div className="mt-10 -mx-4 sm:-mx-6">
-                  <CoreKengetallen
-                    yearlyIncome={initialCoreData.rawFinancials.extrapolatedIncome}
-                    incomeMonths={initialCoreData.incomeMonths}
-                    incomeByMonth={initialCoreData.incomeByMonth}
-                    yearlyMustExpenses={initialCoreData.rawFinancials.yearlyMustExpenses}
-                    mustExpenseItems={initialCoreData.mustExpenseItems}
-                    retirementMethod={initialCoreData.retirementMethodUsed}
-                    budgetingActive={initialCoreData.budgetingActive}
-                  />
-                </div>
+                <HideInSimple>
+                  <div className="mt-10 -mx-4 sm:-mx-6">
+                    <CoreKengetallen
+                      yearlyIncome={initialCoreData.rawFinancials.extrapolatedIncome}
+                      incomeMonths={initialCoreData.incomeMonths}
+                      incomeByMonth={initialCoreData.incomeByMonth}
+                      yearlyMustExpenses={initialCoreData.rawFinancials.yearlyMustExpenses}
+                      mustExpenseItems={initialCoreData.mustExpenseItems}
+                      retirementMethod={initialCoreData.retirementMethodUsed}
+                      budgetingActive={initialCoreData.budgetingActive}
+                    />
+                  </div>
+                </HideInSimple>
               )}
             </>
           ) : ActiveDeepeningComponent ? (

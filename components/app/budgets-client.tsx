@@ -77,6 +77,7 @@ import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { SPLIT_MODE_LABELS, type SplitMode, type PrivacySettings } from '@/lib/household-data'
 import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
@@ -2210,10 +2211,12 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 </div>
               )}
               {partnerBudgets.length > 0 && (
-                <div>
-                  {sectionHeader(`Potjes van ${partnerName ?? 'partner'}`)}
-                  <PartnerBudgetSection rows={partnerBudgets} />
-                </div>
+                <HideInSimple>
+                  <div>
+                    {sectionHeader(`Potjes van ${partnerName ?? 'partner'}`)}
+                    <PartnerBudgetSection rows={partnerBudgets} />
+                  </div>
+                </HideInSimple>
               )}
             </>
           ) : (
@@ -2478,9 +2481,11 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       )}
 
       {/* NIBUD Benchmark */}
-      <CollapsibleSection storageKey="nibud-benchmark" title="NIBUD Benchmark" defaultOpen={false}>
-        <NibudBenchmarkSection />
-      </CollapsibleSection>
+      <HideInSimple>
+        <CollapsibleSection storageKey="nibud-benchmark" title="NIBUD Benchmark" defaultOpen={false}>
+          <NibudBenchmarkSection />
+        </CollapsibleSection>
+      </HideInSimple>
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
 import { CashflowKalender } from '@/components/overview/cashflow-kalender'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -36,7 +37,12 @@ export default async function OverzichtCashflowVasteLastenPage() {
       </div>
       <div className="mx-auto max-w-6xl space-y-6 px-4 pt-4 sm:px-6">
         <VasteLastenLoader fullName={fullName} />
-        <CashflowKalender recurrings={recurrings} />
+        {/* Kalender = secundaire diepte ("wanneer komt het"): in Eenvoudig
+            verborgen, in Volledig zichtbaar. De primaire analyse + het
+            hoofdcijfer (VasteLastenLoader) blijven altijd staan. */}
+        <HideInSimple>
+          <CashflowKalender recurrings={recurrings} />
+        </HideInSimple>
       </div>
     </>
   )

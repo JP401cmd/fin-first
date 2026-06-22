@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { Box3Detail } from './box3-detail'
 import type { Box3Result } from '@/lib/box3-data'
 
@@ -56,7 +57,7 @@ afterEach(() => {
 describe('Box3Detail', () => {
   it('toont de Box 3-belasting na laden', async () => {
     mockFetch({ personal: mockResult() })
-    render(<Box3Detail year={2026} />)
+    render(<DisplayModeProvider initialMode="full"><Box3Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => {
       expect(screen.getByText(/Box 3 — vermogensbelasting 2026/i)).toBeTruthy()
     })
@@ -68,7 +69,7 @@ describe('Box3Detail', () => {
 
   it('berekeningsstappen zijn standaard ingeklapt en klappen uit', async () => {
     mockFetch({ personal: mockResult() })
-    render(<Box3Detail year={2026} />)
+    render(<DisplayModeProvider initialMode="full"><Box3Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => screen.getByText('Berekeningsstappen'))
     // Ingeklapt: "Rendementsgrondslag" nog niet zichtbaar
     expect(screen.queryByText('Rendementsgrondslag')).toBeNull()
@@ -88,7 +89,7 @@ describe('Box3Detail', () => {
         { isCurrentUser: false, result: mockResult({ tax: 8888 }) },
       ],
     })
-    render(<Box3Detail year={2026} />)
+    render(<DisplayModeProvider initialMode="full"><Box3Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => expect(screen.getAllByText(/321/).length).toBeGreaterThan(0))
     expect(screen.queryByText(/8\.888/)).toBeNull()
   })
@@ -100,7 +101,7 @@ describe('Box3Detail', () => {
       partners: [{ isCurrentUser: true, result: mockResult() }],
       optimalAllocation: { totalTax: 500, savingsVsEqual: 250 },
     })
-    render(<Box3Detail year={2026} />)
+    render(<DisplayModeProvider initialMode="full"><Box3Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => expect(screen.getByText(/Partner-optimalisatie/i)).toBeTruthy())
     expect(screen.getByText(/250/)).toBeTruthy()
   })
@@ -114,7 +115,7 @@ describe('Box3Detail', () => {
         ] as never,
       }),
     })
-    render(<Box3Detail year={2026} />)
+    render(<DisplayModeProvider initialMode="full"><Box3Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => screen.getByText('Hoe is je vermogen ingedeeld?'))
     expect(screen.queryByText('Spaarrekening')).toBeNull()
     fireEvent.click(screen.getByText('Hoe is je vermogen ingedeeld?'))

@@ -12,6 +12,7 @@ import {
 } from '@/lib/debt-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { AddCategoryCard } from './add-category-card'
 import { VermogenDebtCard } from './vermogen-debt-card'
 import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
@@ -462,13 +463,15 @@ export function DebtCategoryPage({
               />
 
               {initialHistoryData && (
-                <section className="mt-8">
-                  <CategoryHistoryChart
-                    variant="debt"
-                    subtype={type}
-                    initialData={initialHistoryData}
-                  />
-                </section>
+                <HideInSimple>
+                  <section className="mt-8">
+                    <CategoryHistoryChart
+                      variant="debt"
+                      subtype={type}
+                      initialData={initialHistoryData}
+                    />
+                  </section>
+                </HideInSimple>
               )}
             </>
           ) : ActiveDeepeningComponent ? (

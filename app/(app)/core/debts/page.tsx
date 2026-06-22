@@ -39,6 +39,8 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { VermogenDebtCard } from '@/components/core/vermogen-debt-card'
 import { AddCategoryCard } from '@/components/core/add-category-card'
 import { CategoryGroupHeader } from '@/components/core/category-group-header'
+import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { Kicker, EditorialHeadline, EditorialDeck, FiguresStrip, PageInfoButton, GlossaryTerm } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
@@ -142,6 +144,9 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
 
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
+  // Weergavemodus — in 'simple' rendert de schuldenlijst als compacte
+  // pill-lijst i.p.v. het kaart-grid. Zelfde host levert alle data/groepering.
+  const simple = useDisplayMode().mode === 'simple'
 
   // ── Data laden ─────────────────────────────────────────────
   //
@@ -391,6 +396,52 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
     {} as Record<DebtType, { debts: PerspectiveDebt[]; total: number }>,
   )
 
+  // ── Pill-items voor de Eenvoudig-weergave ────────────────────
+  // Eén PLATTE lijst over alle categorieën heen: géén CategoryGroupHeader-
+  // koppen meer; categorie loopt uitsluitend via het pill-icoon (type-naam +
+  // type-kleur). Spiegelt de icoon/kleur/klik-keuzes van het kaart-grid en de
+  // perspectief-correcte waarde (`shareOf`) + dezelfde sparkline-serie
+  // (`debtSparklines`). Géén nieuwe data-bron.
+  //
+  // Partner-aggregaatrijen (privacy='totalen', géén debt_type) lopen als
+  // gewone pills mee aan het eind — fallback-icoon/-kleur zoals de aggregaat-
+  // kaart ('other'), zonder sparkline (geen historie). Read-only (geen klik).
+  const debtPillItems = useMemo<PillItem[]>(() => {
+    const items = (Object.keys(DEBT_TYPE_LABELS) as DebtType[])
+      .filter((type) => !debtTypeFilter || type === debtTypeFilter)
+      .flatMap((type): PillItem[] => {
+        const group = byType[type]
+        if (!group || group.debts.length === 0) return []
+        const iconName = DEBT_TYPE_ICONS[type] ?? 'CircleDot'
+        const iconColor = DEBT_TYPE_COLORS[type]
+        return group.debts.map((debt) => ({
+          id: debt.id,
+          name: debt.name,
+          iconName,
+          iconColor,
+          amount: shareOf(debt, Number(debt.current_balance)),
+          sparklineValues: debtSparklines[debt.id],
+          onClick: () => openDebtModal(debt),
+        }))
+      })
+
+    // Partner-aggregaat als pills (optie A) — alleen buiten een type-filter,
+    // zelfde conditie als het kaart-grid (aggregatedDebts.length > 0).
+    if (!debtTypeFilter) {
+      for (const debt of aggregatedDebts) {
+        items.push({
+          id: debt.id,
+          name: debt.name,
+          iconName: DEBT_TYPE_ICONS.other ?? 'CircleDot',
+          iconColor: DEBT_TYPE_COLORS.other,
+          amount: Number(debt.current_balance),
+        })
+      }
+    }
+    return items
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byType, debtTypeFilter, shareOf, debtSparklines, aggregatedDebts])
+
   // "Partner schulden privé"-notice: in huishouden/partner-view met partner
   // maar geen enkele partner-schuld zichtbaar (privacy 'hidden' → loader laat
   // ze weg, geen aggregaatrij). We berekenen de privacy niet meer zelf; de
@@ -605,7 +656,22 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
           <QuickAddEmptyState intent="debt" onAdd={() => setQuickAddOpen(true)} />
         )}
 
-        {(Object.keys(DEBT_TYPE_LABELS) as DebtType[]).map((type) => {
+        {/* Eenvoudig — compacte pill-lijst i.p.v. het kaart-grid. Zelfde
+            redactionele kop "Vrijheid die je terugkoopt" (header) blijft staan;
+            hier alleen een korte italic deck + de pills. */}
+        {simple && activeDebts.length > 0 && debtPillItems.length > 0 && (
+          <>
+            <p
+              className="text-[13px] italic text-[var(--ink-3)] pl-4"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)', borderLeft: '2px solid var(--module-active-500)' }}
+            >
+              Schulden die je stap voor stap aflost.
+            </p>
+            <EenvoudigPillList items={debtPillItems} variant="debt" />
+          </>
+        )}
+
+        {!simple && (Object.keys(DEBT_TYPE_LABELS) as DebtType[]).map((type) => {
           // Client-side filter: verberg alle types behalve het geselecteerde.
           if (debtTypeFilter && type !== debtTypeFilter) return null
           const group = byType[type]
@@ -669,7 +735,7 @@ export default function DebtsPage({ toolbarFilter, debtTypeFilter }: DebtsPagePr
             categorie-grouping — losse read-only kaart, alleen in
             huishouden/partner-view. Respecteert de actieve type-filter niet
             (er is geen echte debt_type). */}
-        {!debtTypeFilter && aggregatedDebts.length > 0 && (
+        {!simple && !debtTypeFilter && aggregatedDebts.length > 0 && (
           <div id="debt-group-partner-aggregaat" className="scroll-mt-24">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {aggregatedDebts.map((debt, idx) => (

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { GebeurtenissenView, type EventPaneData } from './gebeurtenissen-view'
 import type { LifeEvent, FinancialInput } from '@/lib/horizon-data'
 import type { FireParams } from '@/lib/fire-params'
@@ -62,11 +63,13 @@ function renderView(props: {
   annualSavings?: number
 }) {
   return render(
-    <GebeurtenissenView
-      {...props}
-      strategieData={mockStrategieData}
-      eventPaneData={mockEventPaneData}
-    />,
+    <DisplayModeProvider initialMode="full">
+      <GebeurtenissenView
+        {...props}
+        strategieData={mockStrategieData}
+        eventPaneData={mockEventPaneData}
+      />
+    </DisplayModeProvider>,
   )
 }
 

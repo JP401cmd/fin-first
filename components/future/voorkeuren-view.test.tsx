@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { VoorkeurenView } from './voorkeuren-view'
 
 // VoorkeurenView mount nu VoorkeurBewerkenSheet (markt-aannames) + RegelBewerkenPane
@@ -75,7 +76,7 @@ const baseProps = {
 
 describe('VoorkeurenView — toekomst-regels', () => {
   it('rendert vijf toekomst-regel cards', () => {
-    render(<VoorkeurenView {...baseProps} />)
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     expect(screen.getByText('Eindstrategie')).toBeTruthy()
     expect(screen.getByText('Onttrekkingsstrategie')).toBeTruthy()
     expect(screen.getByText('Onttrekkingsvolgorde')).toBeTruthy()
@@ -84,31 +85,31 @@ describe('VoorkeurenView — toekomst-regels', () => {
   })
 
   it('toont eindstrategie-naam uit STRATEGY_LABELS', () => {
-    render(<VoorkeurenView {...baseProps} />)
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     // 'deplete' → "Vermogen opeten"
     expect(screen.getByText('Vermogen opeten')).toBeTruthy()
   })
 
   it('toont onttrekkingsstrategie-naam (guardrails)', () => {
-    render(<VoorkeurenView {...baseProps} />)
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     expect(screen.getAllByText('Guardrails').length).toBeGreaterThan(0)
   })
 
   it('toont guardrail floor/ceiling-badge bij guardrails-strategie', () => {
-    render(<VoorkeurenView {...baseProps} />)
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     expect(screen.getByText(/Floor 80\.0%/)).toBeTruthy()
     expect(screen.getByText(/Ceiling 120\.0%/)).toBeTruthy()
   })
 
   it('toont endAge-badge op eindstrategie-card', () => {
-    render(<VoorkeurenView {...baseProps} />)
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     expect(screen.getByText('Tot 90 jaar')).toBeTruthy()
   })
 })
 
 describe('VoorkeurenView — markt-aannames', () => {
   it('rendert drie markt-aanname cards', () => {
-    render(<VoorkeurenView {...baseProps} />)
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     expect(screen.getByText('Inflatie')).toBeTruthy()
     expect(screen.getByText('Bruto rendement')).toBeTruthy()
     expect(document.body.textContent).toMatch(/Effectief/)
@@ -116,7 +117,7 @@ describe('VoorkeurenView — markt-aannames', () => {
   })
 
   it('formatteert percentages met 1 decimaal', () => {
-    render(<VoorkeurenView {...baseProps} />)
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     expect(screen.getByText('2.5%')).toBeTruthy() // inflatie
     expect(screen.getByText('7.0%')).toBeTruthy() // grossReturn
     expect(screen.getByText('4.0%')).toBeTruthy() // effectiveSwr
@@ -125,7 +126,7 @@ describe('VoorkeurenView — markt-aannames', () => {
 
 describe('VoorkeurenView — pot-regels zijn nu instelbaar', () => {
   it('cards bevatten geen /identity/parameters-href', () => {
-    const { container } = render(<VoorkeurenView {...baseProps} />)
+    const { container } = render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     const hrefs = Array.from(container.querySelectorAll('a')).map((a) =>
       a.getAttribute('href') ?? '',
     )
@@ -133,18 +134,18 @@ describe('VoorkeurenView — pot-regels zijn nu instelbaar', () => {
   })
 
   it('linkt expliciet naar /overzicht/bezittingen voor per-groep rendement', () => {
-    const { container } = render(<VoorkeurenView {...baseProps} />)
+    const { container } = render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     const link = container.querySelector('a[href="/overzicht/bezittingen"]')
     expect(link).toBeTruthy()
   })
 
   it('toont geen "Binnenkort instelbaar"-placeholders meer', () => {
-    render(<VoorkeurenView {...baseProps} />)
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     expect(screen.queryByText('Binnenkort instelbaar')).toBeNull()
   })
 
   it('toont de live pot-regel-waarden (verdeling → beleggingen)', () => {
-    render(<VoorkeurenView {...baseProps} />)
+    render(<DisplayModeProvider initialMode="full"><VoorkeurenView {...baseProps} /></DisplayModeProvider>)
     // surplusGroup 'beleggingen' → "Naar beleggingen"
     expect(screen.getByText('Naar beleggingen')).toBeTruthy()
   })

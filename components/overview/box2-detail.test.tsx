@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { Box2Detail } from './box2-detail'
 import type { Box2Result } from '@/lib/box2-data'
 
@@ -41,7 +42,7 @@ afterEach(() => {
 describe('Box2Detail', () => {
   it('toont privé Box 2-belasting (single-modus)', async () => {
     mockFetch({ personal: mockResult() })
-    render(<Box2Detail year={2026} />)
+    render(<DisplayModeProvider initialMode="full"><Box2Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => expect(screen.getByText(/aanmerkelijk belang 2026 · privé/i)).toBeTruthy())
     expect(screen.getByText(/4\.900/)).toBeTruthy()
     expect(screen.getByText(/49 vrijheidsdagen/)).toBeTruthy()
@@ -55,7 +56,7 @@ describe('Box2Detail', () => {
         { isCurrentUser: false, result: mockResult({ totalTaxInclDga: 9999 }) },
       ],
     })
-    render(<Box2Detail year={2026} />)
+    render(<DisplayModeProvider initialMode="full"><Box2Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => expect(screen.getByText(/1\.234/)).toBeTruthy())
     // Partner-bedrag mag NIET getoond worden (privé-only)
     expect(screen.queryByText(/9\.999/)).toBeNull()
@@ -63,14 +64,14 @@ describe('Box2Detail', () => {
 
   it('toont DGA-waarschuwing bij excessief lenen', async () => {
     mockFetch({ personal: mockResult({ dgaLeningenExcess: 50000, dgaExcessTax: 12250 }) })
-    render(<Box2Detail year={2026} />)
+    render(<DisplayModeProvider initialMode="full"><Box2Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => expect(screen.getByText(/meer dan/i)).toBeTruthy())
     expect(screen.getByText(/excessief|bovenmatige/i)).toBeTruthy()
   })
 
   it('berekeningsstappen klappen uit', async () => {
     mockFetch({ personal: mockResult() })
-    render(<Box2Detail year={2026} />)
+    render(<DisplayModeProvider initialMode="full"><Box2Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => screen.getByText('Berekeningsstappen'))
     expect(screen.queryByText('Vervreemdingswinst')).toBeNull()
     fireEvent.click(screen.getByText('Berekeningsstappen'))

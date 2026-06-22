@@ -25,6 +25,7 @@ import { HubKansen } from '@/components/overview/belasting/hub-kansen'
 import { HubKalender } from '@/components/overview/belasting/hub-kalender'
 import { HubStroom } from '@/components/overview/belasting/hub-stroom'
 import { HubStelselradar } from '@/components/overview/belasting/hub-stelselradar'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { Reveal } from '@/components/landing/reveal'
 import {
   Kicker,
@@ -318,25 +319,31 @@ export default async function OverzichtBelastingPage() {
 
         {/* III · De kalender */}
         {deadlines.length > 0 && (
-          <Reveal className="pt-12 sm:pt-16">
-            <SectionLabel num="III">De kalender</SectionLabel>
-            <HubKalender deadlines={deadlines} />
-          </Reveal>
+          <HideInSimple>
+            <Reveal className="pt-12 sm:pt-16">
+              <SectionLabel num="III">De kalender</SectionLabel>
+              <HubKalender deadlines={deadlines} />
+            </Reveal>
+          </HideInSimple>
         )}
 
         {/* IV · Bruto → netto (alleen wanneer Box 1 bekend is) */}
         {box1Tax != null && grossYearly > 0 && (
-          <Reveal className="pt-12 sm:pt-16">
-            <SectionLabel num="IV">Van bruto naar netto</SectionLabel>
-            <HubStroom grossYearly={grossYearly} box1Tax={box1Tax} />
-          </Reveal>
+          <HideInSimple>
+            <Reveal className="pt-12 sm:pt-16">
+              <SectionLabel num="IV">Van bruto naar netto</SectionLabel>
+              <HubStroom grossYearly={grossYearly} box1Tax={box1Tax} />
+            </Reveal>
+          </HideInSimple>
         )}
 
         {/* V · De vooruitblik (stelselradar, statisch educatief) */}
-        <Reveal className="pt-12 sm:pt-16">
-          <SectionLabel num="V">De vooruitblik</SectionLabel>
-          <HubStelselradar />
-        </Reveal>
+        <HideInSimple>
+          <Reveal className="pt-12 sm:pt-16">
+            <SectionLabel num="V">De vooruitblik</SectionLabel>
+            <HubStelselradar />
+          </Reveal>
+        </HideInSimple>
 
         {/* Krant-stijl colophon als hub-afsluiter. */}
         <div className="pt-10 sm:pt-14">

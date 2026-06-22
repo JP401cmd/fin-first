@@ -7,6 +7,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
 import { usePerspective } from '@/components/app/perspective-provider'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { Kicker, HighlightMark, OrnamentColophon } from '@/components/editorial'
 import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
@@ -217,80 +218,90 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
         )}
 
         {/* Uitklapbare berekening — tap-target ≥44px */}
-        <button
-          type="button"
-          onClick={() => setShowDetails((s) => !s)}
-          aria-expanded={showDetails}
-          className="flex min-h-[52px] w-full items-center justify-between border-t border-[var(--ink)] px-5 py-3.5 sm:px-6 transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ink)]"
-        >
-          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-            <Calculator className="h-4 w-4" style={{ color: 'var(--module-active-700)' }} aria-hidden="true" />
-            Berekeningsstappen
-          </span>
-          {showDetails ? (
-            <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" aria-hidden="true" />
-          )}
-        </button>
-        {showDetails && (
-          <div className="border-t border-[var(--ink)] px-5 py-5 sm:px-6 space-y-2.5">
-            <Row label="Dividend" value={result.totalDividend} tooltip={BOX2_TOOLTIPS.dividend} fc={fc} />
-            <Row label="Vervreemdingswinst" value={result.totalDisposalGain} tooltip={BOX2_TOOLTIPS.vervreemdingswinst} fc={fc} />
-            <Row label="Totaal Box 2-inkomen" value={result.totalIncome} bold fc={fc} />
-            <div className="h-px bg-[var(--rule-soft)]" />
-            <Row
-              label={`Tarief laag (${formatPct(result.params.tariefLaag)}, tot ${fc(result.hasPartner ? result.params.grensPartner : result.params.grens)})`}
-              value={result.taxLow}
-              tooltip={BOX2_TOOLTIPS.tariefStaffel}
-              fc={fc}
-            />
-            <Row label={`Tarief hoog (${formatPct(result.params.tariefHoog)})`} value={result.taxHigh} fc={fc} />
-            <Row label="Box 2-belasting" value={result.totalTax} fc={fc} />
-            {hasDga && (
-              <Row label="Extra heffing excessief lenen" value={result.dgaExcessTax} tooltip={BOX2_TOOLTIPS.wetExcessiefLenen} fc={fc} />
+        <HideInSimple>
+          <button
+            type="button"
+            onClick={() => setShowDetails((s) => !s)}
+            aria-expanded={showDetails}
+            className="flex min-h-[52px] w-full items-center justify-between border-t border-[var(--ink)] px-5 py-3.5 sm:px-6 transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ink)]"
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+              <Calculator className="h-4 w-4" style={{ color: 'var(--module-active-700)' }} aria-hidden="true" />
+              Berekeningsstappen
+            </span>
+            {showDetails ? (
+              <ChevronUp className="h-4 w-4 text-[var(--ink-3)]" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-[var(--ink-3)]" aria-hidden="true" />
             )}
-            <div className="h-px bg-[var(--rule-soft)]" />
-            <Row label="Totaal Box 2 (incl. DGA)" value={result.totalTaxInclDga} bold highlight fc={fc} />
-          </div>
-        )}
+          </button>
+          {showDetails && (
+            <div className="border-t border-[var(--ink)] px-5 py-5 sm:px-6 space-y-2.5">
+              <Row label="Dividend" value={result.totalDividend} tooltip={BOX2_TOOLTIPS.dividend} fc={fc} />
+              <Row label="Vervreemdingswinst" value={result.totalDisposalGain} tooltip={BOX2_TOOLTIPS.vervreemdingswinst} fc={fc} />
+              <Row label="Totaal Box 2-inkomen" value={result.totalIncome} bold fc={fc} />
+              <div className="h-px bg-[var(--rule-soft)]" />
+              <Row
+                label={`Tarief laag (${formatPct(result.params.tariefLaag)}, tot ${fc(result.hasPartner ? result.params.grensPartner : result.params.grens)})`}
+                value={result.taxLow}
+                tooltip={BOX2_TOOLTIPS.tariefStaffel}
+                fc={fc}
+              />
+              <Row label={`Tarief hoog (${formatPct(result.params.tariefHoog)})`} value={result.taxHigh} fc={fc} />
+              <Row label="Box 2-belasting" value={result.totalTax} fc={fc} />
+              {hasDga && (
+                <Row label="Extra heffing excessief lenen" value={result.dgaExcessTax} tooltip={BOX2_TOOLTIPS.wetExcessiefLenen} fc={fc} />
+              )}
+              <div className="h-px bg-[var(--rule-soft)]" />
+              <Row label="Totaal Box 2 (incl. DGA)" value={result.totalTaxInclDga} bold highlight fc={fc} />
+            </div>
+          )}
+        </HideInSimple>
 
         {/* Per-deelneming */}
         {result.perDeelneming.length > 0 && (
-          <div className="border-t border-[var(--ink)] px-5 py-4 sm:px-6">
-            <Kicker className="mb-3" size="small">
-              <span className="inline-flex items-center gap-1.5">
-                <Building2 className="h-3 w-3" aria-hidden="true" />
-                Per deelneming
-              </span>
-            </Kicker>
-            <div className="space-y-2">
-              {result.perDeelneming.map((d, i) => (
-                <div key={i} className="flex items-center justify-between gap-3 text-xs">
-                  <span className="truncate text-[var(--ink-2)]">{d.name}</span>
-                  <span className="shrink-0 font-mono tabular-nums text-[var(--ink-2)]">
-                    {fc(d.totalIncome)}
-                  </span>
-                </div>
-              ))}
+          <HideInSimple>
+            <div className="border-t border-[var(--ink)] px-5 py-4 sm:px-6">
+              <Kicker className="mb-3" size="small">
+                <span className="inline-flex items-center gap-1.5">
+                  <Building2 className="h-3 w-3" aria-hidden="true" />
+                  Per deelneming
+                </span>
+              </Kicker>
+              <div className="space-y-2">
+                {result.perDeelneming.map((d, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3 text-xs">
+                    <span className="truncate text-[var(--ink-2)]">{d.name}</span>
+                    <span className="shrink-0 font-mono tabular-nums text-[var(--ink-2)]">
+                      {fc(d.totalIncome)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          </HideInSimple>
         )}
 
         {/* 2.4 — Excessief-lenen danger-gauge (alleen bij DGA-leningen) */}
         {result.dgaLeningenTotal > 0 && (
-          <Box2Leengrens result={result} fc={fc} />
+          <HideInSimple>
+            <Box2Leengrens result={result} fc={fc} />
+          </HideInSimple>
         )}
 
         {/* 2.2 — Dividend-schijf simulator */}
-        <Box2DividendSimulator
-          year={result.year}
-          hasPartner={result.hasPartner}
-          dailyExpenses={result.dailyExpenses}
-        />
+        <HideInSimple>
+          <Box2DividendSimulator
+            year={result.year}
+            hasPartner={result.hasPartner}
+            dailyExpenses={result.dailyExpenses}
+          />
+        </HideInSimple>
 
         {/* 2.1 — Gecombineerde druk Vpb + Box 2 (educatief) */}
-        <Box2GecombineerdeDruk />
+        <HideInSimple>
+          <Box2GecombineerdeDruk />
+        </HideInSimple>
       </div>
 
       {/* Krant-stijl colophon als pagina-afsluiter. */}

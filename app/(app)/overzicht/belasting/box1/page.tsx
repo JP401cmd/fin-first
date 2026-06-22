@@ -26,6 +26,7 @@ import { loadPerspectiveTransactions } from '@/lib/household/perspective-loader'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { Kicker, SectionLabel, FiguresStrip, OrnamentColophon } from '@/components/editorial'
 import { Reveal } from '@/components/landing/reveal'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
@@ -176,36 +177,42 @@ export default async function BelastingBox1Page() {
 
       {/* 1.2 + 1.4: waterfall + heffingskortingen naast elkaar op groot scherm */}
       {box1Result != null && (
-        <Reveal>
-          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
-            <SectionLabel num="I">De rekensom van je inkomen</SectionLabel>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Box1Waterfall result={box1Result} dailyExpenses={dailyExpenses} />
-              <Box1Heffingskortingen result={box1Result} />
-            </div>
-          </section>
-        </Reveal>
+        <HideInSimple>
+          <Reveal>
+            <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
+              <SectionLabel num="I">De rekensom van je inkomen</SectionLabel>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Box1Waterfall result={box1Result} dailyExpenses={dailyExpenses} />
+                <Box1Heffingskortingen result={box1Result} />
+              </div>
+            </section>
+          </Reveal>
+        </HideInSimple>
       )}
 
       {/* 1.3: marginale-druk-curve */}
-      <Reveal>
-        <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
-          <SectionLabel num="II">Wat je extra euro waard is</SectionLabel>
-          <Box1MarginaleCurveCard
-            year={2026}
-            grossYearlyIncome={grossYearly > 0 ? grossYearly : undefined}
-          />
-        </section>
-      </Reveal>
+      <HideInSimple>
+        <Reveal>
+          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
+            <SectionLabel num="II">Wat je extra euro waard is</SectionLabel>
+            <Box1MarginaleCurveCard
+              year={2026}
+              grossYearlyIncome={grossYearly > 0 ? grossYearly : undefined}
+            />
+          </section>
+        </Reveal>
+      </HideInSimple>
 
       {/* 1.6: eigen woning — alleen wanneer er een eigen woning is */}
       {box1Result != null && hasEigenWoning && (
-        <Reveal>
-          <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
-            <SectionLabel num="III">Je eigen woning</SectionLabel>
-            <Box1EigenWoning result={box1Result} dailyExpenses={dailyExpenses} />
-          </section>
-        </Reveal>
+        <HideInSimple>
+          <Reveal>
+            <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8">
+              <SectionLabel num="III">Je eigen woning</SectionLabel>
+              <Box1EigenWoning result={box1Result} dailyExpenses={dailyExpenses} />
+            </section>
+          </Reveal>
+        </HideInSimple>
       )}
 
       {/* 1.5: jaarruimte gauge + simulator (per persoon) */}

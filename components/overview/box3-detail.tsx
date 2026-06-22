@@ -25,6 +25,7 @@ import { Box3TegenbewijsCard } from '@/components/overview/belasting/box3-tegenb
 import { Box3PartnerSlider } from '@/components/overview/belasting/box3-partner-slider'
 import { Box3Peildatum } from '@/components/overview/belasting/box3-peildatum'
 import { Box3Stelsel2028 } from '@/components/overview/belasting/box3-stelsel2028'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 
 /**
  * Box3Detail — compacte, inklapbare Box 3-berekening op de Box 3-subpagina
@@ -363,6 +364,7 @@ export function Box3Detail({
         </div>
 
         {/* Uitklapbare berekeningsstappen */}
+        <HideInSimple>
         <button
           type="button"
           onClick={() => setShowDetails((s) => !s)}
@@ -431,8 +433,10 @@ export function Box3Detail({
             </div>
           </div>
         )}
+        </HideInSimple>
 
         {/* 3b — Hoe is je vermogen ingedeeld? (asset/schuld-classificatie) */}
+        <HideInSimple>
         <button
           type="button"
           onClick={() => setShowClassificatie((s) => !s)}
@@ -494,41 +498,53 @@ export function Box3Detail({
             )}
           </div>
         )}
+        </HideInSimple>
 
         {/* 3.1 — Forfaitaire opbouw als gestapelde staaf */}
         <Box3Opbouw result={result} fc={fc} />
 
         {/* 3.3 — Heffingsvrij-vermogen-gauge */}
-        <Box3Heffingsvrij result={result} fc={fc} />
+        <HideInSimple>
+          <Box3Heffingsvrij result={result} fc={fc} />
+        </HideInSimple>
 
         {/* 3.4 — Vermogensmix spaargeld vs. beleggingen */}
-        <Box3Mix result={result} />
+        <HideInSimple>
+          <Box3Mix result={result} />
+        </HideInSimple>
 
         {/* 3.2 ★ — Tegenbewijs-simulator (werkelijk vs. forfaitair) */}
         <Box3TegenbewijsCard result={result} />
 
         {/* 3.6 — Partner-verdeel-slider (alleen household, volledige data) */}
         {showPartnerSlider && optimal && combined && (
-          <Box3PartnerSlider
-            totaalSpaargeld={combined.totaalSpaargeld}
-            totaalBeleggingen={combined.totaalBeleggingen}
-            totaalBox3Schulden={combined.totaalBox3Schulden}
-            optimalAllocation={optimal}
-            year={view!.year}
-            dailyExpenses={dailyExpenses}
-            currentUserName={view?.currentUserName}
-            partnerName={view?.partnerName}
-          />
+          <HideInSimple>
+            <Box3PartnerSlider
+              totaalSpaargeld={combined.totaalSpaargeld}
+              totaalBeleggingen={combined.totaalBeleggingen}
+              totaalBox3Schulden={combined.totaalBox3Schulden}
+              optimalAllocation={optimal}
+              year={view!.year}
+              dailyExpenses={dailyExpenses}
+              currentUserName={view?.currentUserName}
+              partnerName={view?.partnerName}
+            />
+          </HideInSimple>
         )}
 
         {/* 3.5 — Peildatum & arbitragevenster */}
-        <Box3Peildatum year={result.year} />
+        <HideInSimple>
+          <Box3Peildatum year={result.year} />
+        </HideInSimple>
 
         {/* 3.10 — Het nieuwe stelsel (beoogd 2028) */}
-        <Box3Stelsel2028 />
+        <HideInSimple>
+          <Box3Stelsel2028 />
+        </HideInSimple>
 
         {/* Partner-optimalisatie (alleen household + besparing > 0) */}
         {showPartnerOptim && optimalSavings && (
+          <HideInSimple>
           <div
             className="border-t border-[var(--ink)] px-5 py-5 sm:px-7"
             style={{
@@ -565,6 +581,7 @@ export function Box3Detail({
               optimaal.
             </p>
           </div>
+          </HideInSimple>
         )}
       </div>
 

@@ -61,6 +61,7 @@ import { OwnershipToggle, OwnershipBadge, useHouseholdStatus, type OwnershipType
 import { usePerspective, usePerspectiveAbort, type Perspective } from '@/components/app/perspective-provider'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import {
   type Asset,
@@ -94,6 +95,8 @@ import { InvestmentHoldingCard } from '@/components/holdings/investment-holding-
 import { VermogenAssetCard } from './vermogen-asset-card'
 import { AddCategoryCard } from './add-category-card'
 import { CategoryGroupHeader } from './category-group-header'
+import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { buildKpiContext } from '@/lib/kpi-context'
 import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
@@ -262,6 +265,10 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   const [connectionsByAssetId, setConnectionsByAssetId] = useState<Record<string, AssetConnectionSummary>>({})
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
+  // Weergavemodus — in 'simple' rendert de bezittingenlijst als compacte
+  // pill-lijst i.p.v. het kaart-grid. Single source of truth (geen tweede
+  // leespad), zelfde host blijft alle data/groepering leveren.
+  const simple = useDisplayMode().mode === 'simple'
 
   const loadAssets = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -411,6 +418,51 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     () => activeAssets.filter((a) => a._aggregated === true && a._provenance === 'partner'),
     [activeAssets],
   )
+
+  // ── Pill-items voor de Eenvoudig-weergave ────────────────────
+  // Eén PLATTE lijst over alle categorieën heen: géén CategoryGroupHeader-
+  // koppen meer; categorie loopt uitsluitend via het pill-icoon (type-naam +
+  // type-kleur). Spiegelt de icoon/kleur/klik-keuzes van het kaart-grid en de
+  // perspectief-correcte waarde (`perspectiveAssetValue`) + dezelfde sparkline-
+  // serie (`assetSparklines`). Géén nieuwe data-bron.
+  //
+  // Partner-aggregaatrijen (privacy='totalen', géén asset_type) lopen als
+  // gewone pills mee aan het eind — fallback-icoon/-kleur zoals de aggregaat-
+  // kaart (Wallet / 'other'-kleur), zonder sparkline (geen historie).
+  const assetPillItems = useMemo<PillItem[]>(() => {
+    const items = (Object.keys(ASSET_TYPE_LABELS) as AssetType[])
+      .filter((type) => !assetTypeFilter || type === assetTypeFilter)
+      .flatMap((type): PillItem[] => {
+        const group = byType[type]
+        if (!group || group.assets.length === 0) return []
+        return group.assets.map((asset) => ({
+          id: asset.id,
+          name: asset.name,
+          iconName: ASSET_TYPE_ICONS[type],
+          iconColor: ASSET_TYPE_COLORS[type],
+          amount: perspectiveAssetValue(asset, perspective),
+          sparklineValues: assetSparklines[asset.id],
+          onClick: () => handleAssetClick(asset),
+        }))
+      })
+
+    // Partner-aggregaat als pills (optie A) — alleen buiten een type-filter,
+    // zelfde conditie als het kaart-grid (partnerAggregateAssets.length > 0).
+    if (!assetTypeFilter) {
+      for (const asset of partnerAggregateAssets) {
+        items.push({
+          id: asset.id,
+          name: asset.name,
+          iconName: ASSET_TYPE_ICONS.other,
+          iconColor: ASSET_TYPE_COLORS.other,
+          amount: perspectiveAssetValue(asset, perspective),
+          onClick: () => handleAssetClick(asset),
+        })
+      }
+    }
+    return items
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byType, assetTypeFilter, perspective, assetSparklines, partnerAggregateAssets])
 
   // ── KPI's per asset (zelfde patroon als asset-category-page) ──
   // Context-build uit lokale state: assets (huidige user) + mortgages
@@ -689,6 +741,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       )}
 
       {/* Allocation + projection — collapsible card */}
+      <HideInSimple>
       <div className="mt-3 sm:mt-6 rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s0)] overflow-hidden">
         {/* ── Accent bar ── */}
         <div className="h-[3px] w-full bg-kern-500" />
@@ -790,6 +843,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           </div>
         )}
       </div>
+      </HideInSimple>
 
       {/* Grouped asset cards — grid per categorie, conform /core/assets/[type].
           Elke categorie krijgt een klikbare header die doorlinkt naar de
@@ -803,7 +857,22 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
             onImport={() => setAangifteImportOpen(true)}
           />
         )}
-        {(Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
+
+        {/* Eenvoudig — compacte pill-lijst i.p.v. het kaart-grid. Zelfde
+            groepering/anker/href/totaal; alleen het lijst-blok wisselt. */}
+        {simple && activeAssets.length > 0 && assetPillItems.length > 0 && (
+          <>
+            <p
+              className="text-[13px] italic text-[var(--ink-3)] pl-4"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)', borderLeft: '2px solid var(--module-active-500)' }}
+            >
+              Je opgebouwde vrijheid, post voor post.
+            </p>
+            <EenvoudigPillList items={assetPillItems} variant="asset" />
+          </>
+        )}
+
+        {!simple && (Object.keys(ASSET_TYPE_LABELS) as AssetType[]).map((type) => {
           // Client-side filter: verberg alle types behalve het geselecteerde.
           if (assetTypeFilter && type !== assetTypeFilter) return null
           const group = byType[type]
@@ -863,7 +932,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         {/* Van je partner — privacy='totalen' levert één aggregaat-kaart per
             categorie (geen asset_type), die buiten de type-groepen valt. Apart
             tonen zodat het partner-aandeel zichtbaar is in huishouden/partner-view. */}
-        {!assetTypeFilter && partnerAggregateAssets.length > 0 && (
+        {!simple && !assetTypeFilter && partnerAggregateAssets.length > 0 && (
           <div id="asset-group-partner" className="scroll-mt-24">
             <div className="flex items-center gap-2 pt-2 pb-2.5">
               <span className="text-horizon-600"><Users className="h-4 w-4" /></span>

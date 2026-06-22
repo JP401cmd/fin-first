@@ -16,6 +16,7 @@ import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { Kicker, EditorialDeck } from '@/components/editorial'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { PAGE_INFO } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
@@ -75,20 +76,24 @@ export default async function OverzichtCashflowPage() {
       </section>
 
       {cashflow.baselineExpenses >= 500 && (
-        <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-          <Kicker size="small" className="mb-2">
-            Koopkracht
-          </Kicker>
-          <InflationImpactCard monthlyExpenses={cashflow.baselineExpenses} />
-        </section>
+        <HideInSimple>
+          <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+            <Kicker size="small" className="mb-2">
+              Koopkracht
+            </Kicker>
+            <InflationImpactCard monthlyExpenses={cashflow.baselineExpenses} />
+          </section>
+        </HideInSimple>
       )}
 
       <CashOverview embedded showAllCashAccounts showMonthLinks />
 
       {settings && (
-        <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
-          <CashflowInstellingenBlok data={settings} />
-        </section>
+        <HideInSimple>
+          <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
+            <CashflowInstellingenBlok data={settings} />
+          </section>
+        </HideInSimple>
       )}
     </>
   )
