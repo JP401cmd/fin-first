@@ -501,16 +501,35 @@ function loadFromLocalStorage(): PersistedData | null {
       identity = parsed.identity as IdentityData
     }
 
-    // Migratie: drafts van vóór de jaarinkomen-vraag (jun 2026) hebben alleen
-    // `net_monthly_income`. Leid het jaarinkomen daaruit af (×12) zodat de
-    // gebruiker zijn eerdere invoer terugziet in het nieuwe veld.
-    if (typeof identity.estimated_yearly_income !== 'string' || identity.estimated_yearly_income === '') {
-      const monthly = identity.net_monthly_income
-        ? Number(String(identity.net_monthly_income).replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.'))
-        : NaN
+    // Migratie inkomensveld. Sinds jun 2026 (deze wijziging) is het inkomen
+    // per MAAND uitgevraagd: `net_monthly_income` is het primaire invoerveld,
+    // `estimated_yearly_income` (×12) blijft de canonieke spiegel.
+    //
+    // Drie soorten drafts moeten correct herstellen:
+    //  (a) nieuw — `net_monthly_income` gevuld: leid jaar daaruit af (×12).
+    //  (b) tussenperiode — alleen `estimated_yearly_income` (jaar-vraag):
+    //      leid maand daaruit af (÷12) zodat de gebruiker zijn invoer terugziet
+    //      in het nu maand-gebonden veld.
+    //  (c) heel oud — alleen legacy `net_monthly_income`: valt onder (a).
+    const cleanNumber = (s: string) =>
+      Number(String(s).replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.'))
+    const monthlyVal = identity.net_monthly_income
+      ? cleanNumber(identity.net_monthly_income)
+      : NaN
+    const yearlyVal = identity.estimated_yearly_income
+      ? cleanNumber(identity.estimated_yearly_income)
+      : NaN
+    if (isFinite(monthlyVal) && monthlyVal > 0) {
+      // (a)/(c): maandbedrag aanwezig → spiegel het canonieke jaarinkomen.
       identity = {
         ...identity,
-        estimated_yearly_income: isFinite(monthly) && monthly > 0 ? String(Math.round(monthly * 12)) : '',
+        estimated_yearly_income: String(Math.round(monthlyVal * 12)),
+      }
+    } else if (isFinite(yearlyVal) && yearlyVal > 0) {
+      // (b): alleen jaarbedrag → leid het maandbedrag af voor het invoerveld.
+      identity = {
+        ...identity,
+        net_monthly_income: String(Math.round(yearlyVal / 12)),
       }
     }
 
@@ -806,15 +825,31 @@ export default function OnboardingPage() {
       }
       const idempotencyKey = idempotencyKeyRef.current
 
-      // Jaarinkomen (stap 3) → maandinkomen voor profiles.net_monthly_income.
-      // De server zet dit (mits > 0) als handmatige bron ('eigen bedrag') in
-      // het blok "Instellingen & toekomst" op /overzicht/cashflow.
-      const yearlyIncome = identity.estimated_yearly_income
-        ? parseBedragInput(identity.estimated_yearly_income)
+      // Maandinkomen (stap 3) is sinds jun 2026 het uitgevraagde veld
+      // (`net_monthly_income`). We sturen het maandbedrag naar
+      // profiles.net_monthly_income (de server zet dit, mits > 0, als
+      // handmatige bron 'eigen bedrag' in het blok "Instellingen & toekomst"
+      // op /overzicht/cashflow → drijft de spaarquote/FIRE-prognose via
+      // resolveSavingsSource, ook zonder transacties). Valt terug op een
+      // eventueel reeds gevuld canoniek jaarveld (÷12) voor herstelde oude
+      // drafts die alleen dat nog hadden.
+      const rawMonthly = identity.net_monthly_income
+        ? parseBedragInput(identity.net_monthly_income)
         : NaN
-      const monthlyIncome = isFinite(yearlyIncome) && yearlyIncome > 0
-        ? Math.round(yearlyIncome / 12)
-        : 0
+      const monthlyIncome = isFinite(rawMonthly) && rawMonthly > 0
+        ? Math.round(rawMonthly)
+        : (() => {
+            const yearly = identity.estimated_yearly_income
+              ? parseBedragInput(identity.estimated_yearly_income)
+              : NaN
+            return isFinite(yearly) && yearly > 0 ? Math.round(yearly / 12) : 0
+          })()
+      // Canonieke jaarwaarde (maand × 12) — historisch de "opgeslagen" client-
+      // grootheid waar downstream-afleidingen omheen geschreven zijn. De
+      // server-body consumeert het maandbedrag direct; we houden de jaarwaarde
+      // hier expliciet zodat de maand→jaar-relatie op één plek verankerd is.
+      const estimatedYearlyIncome = monthlyIncome > 0 ? monthlyIncome * 12 : 0
+      void estimatedYearlyIncome
       const monthlyExpenses = identity.estimated_monthly_expenses
         ? parseBedragInput(identity.estimated_monthly_expenses)
         : NaN
@@ -1016,19 +1051,20 @@ export default function OnboardingPage() {
     return totalAssets - totalDebts
   }, [state.quickAssets, state.quickDebts])
 
-  // Maandinkomen voor recap + spaardoel-suggesties: afgeleid uit het
-  // jaarinkomen van stap 3 (÷12); valt terug op het legacy maandveld voor
-  // herstelde oude drafts waarin alleen dat gevuld was.
+  // Maandinkomen voor recap + spaardoel-suggesties: sinds jun 2026 wordt het
+  // inkomen per MAAND uitgevraagd, dus `net_monthly_income` is de primaire
+  // bron. Valt terug op het canonieke jaarinkomen (÷12) voor herstelde oude
+  // drafts waarin alleen dat gevuld was.
   const netMonthlyIncomeForKlaar = useMemo(() => {
+    const monthly = state.identity.net_monthly_income
+      ? parseBedragInput(state.identity.net_monthly_income)
+      : NaN
+    if (isFinite(monthly) && monthly > 0) return Math.round(monthly)
     const yearly = state.identity.estimated_yearly_income
       ? parseBedragInput(state.identity.estimated_yearly_income)
       : NaN
-    if (isFinite(yearly) && yearly > 0) return Math.round(yearly / 12)
-    const legacy = state.identity.net_monthly_income
-      ? parseBedragInput(state.identity.net_monthly_income)
-      : NaN
-    return isFinite(legacy) && legacy > 0 ? legacy : 0
-  }, [state.identity.estimated_yearly_income, state.identity.net_monthly_income])
+    return isFinite(yearly) && yearly > 0 ? Math.round(yearly / 12) : 0
+  }, [state.identity.net_monthly_income, state.identity.estimated_yearly_income])
 
   // Maanduitgaven (stap 3) — zelfde NL-parse als de save-payload.
   const monthlyExpensesParsed = useMemo(() => {
@@ -1158,7 +1194,7 @@ export default function OnboardingPage() {
           {state.step === 'inkomen' && (
             <OnboardingInkomen
               data={{
-                estimated_yearly_income: state.identity.estimated_yearly_income,
+                net_monthly_income: state.identity.net_monthly_income,
                 estimated_monthly_expenses: state.identity.estimated_monthly_expenses,
               }}
               onChange={(income) =>
@@ -1177,6 +1213,7 @@ export default function OnboardingPage() {
                   type: 'SET_IDENTITY',
                   data: {
                     ...state.identity,
+                    net_monthly_income: '',
                     estimated_yearly_income: '',
                     estimated_monthly_expenses: '',
                   },

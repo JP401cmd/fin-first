@@ -156,6 +156,37 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     expect(warnSpy).not.toHaveBeenCalled()
   })
 
+  it('behoudt het maand-inkomensveld bij restore (jun 2026: inkomen per maand)', () => {
+    // Sinds jun 2026 is `net_monthly_income` het primaire inkomensveld in de
+    // onboarding (uitgevraagd per maand, net als de uitgaven). RESTORE_STATE
+    // merget over de _initialState-shape, dus het maandbedrag moet behouden
+    // blijven én het canonieke jaarveld (×12) consistent meekomen.
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: {
+          full_name: 'Jan Paul',
+          date_of_birth: '1986-04-05',
+          household_type: 'solo',
+          number_of_children: 0,
+          net_monthly_income: '3000',
+          estimated_yearly_income: '36000',
+          estimated_monthly_expenses: '2100',
+        } as (typeof _initialState)['identity'],
+        selectedGoals: [],
+        activeModules: ['budgetteren'],
+        horizon: baseHorizon,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        lastStep: 'inkomen',
+      },
+    })
+    expect(result.identity.net_monthly_income).toBe('3000')
+    // Jaarveld blijft de canonieke spiegel (3000 × 12).
+    expect(result.identity.estimated_yearly_income).toBe('36000')
+  })
+
   it('migrates a legacy single-goal draft to a selectedGoals array', () => {
     // Een draft van vóór fase 3 had `goal: GoalSlug | null`. RESTORE_STATE
     // wrapt single → array.

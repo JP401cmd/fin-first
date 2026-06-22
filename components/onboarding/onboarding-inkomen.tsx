@@ -8,36 +8,43 @@ import type { IdentityData } from './onboarding-identity'
 /**
  * Stap 3 — Inkomen & uitgaven.
  *
- * Vraagt twee schattingen uit die samen de spaarquote bepalen:
- * geschat netto-jaarinkomen en geschatte maandelijkse uitgaven. Beide
- * landen als handmatige bron ("eigen bedrag") in het blok
- * "Instellingen & toekomst" op /overzicht/cashflow en voeden via
- * `resolveSavingsSource` de FIRE-prognose — zo heeft een verse gebruiker
- * zonder transacties direct een werkende spaarquote in de toekomst-views.
+ * Vraagt twee schattingen uit die samen de spaarquote bepalen: geschat
+ * netto-MAANDinkomen en geschatte maandelijkse uitgaven. Beide velden zijn
+ * nu per maand uitgevraagd (jun 2026) zodat de gebruiker twee vergelijkbare
+ * grootheden invult. De orchestrator converteert het maandinkomen bij save
+ * naar `estimated_yearly_income` (×12) — dat blijft de canonieke opgeslagen
+ * waarde, zodat alle downstream (resolveSavingsSource / FIRE-prognose /
+ * check-intake) ongewijzigd op een jaarinkomen blijft rekenen. Beide landen
+ * als handmatige bron ("eigen bedrag") in het blok "Instellingen & toekomst"
+ * op /overzicht/cashflow en voeden via `resolveSavingsSource` de
+ * FIRE-prognose — zo heeft een verse gebruiker zonder transacties direct een
+ * werkende spaarquote in de toekomst-views.
  *
  * Huishoudens-type en pensioen-upload (UPO) zijn bewust uit deze stap
  * verwijderd (jun 2026): huishouden loopt via de partner-koppeling op
  * /mijn/profiel, pensioen via /toekomst.
  *
  * **Data-shape**: hergebruikt `IdentityData` via `Pick<>` zodat de
- * orchestrator één state-object blijft hanteren.
+ * orchestrator één state-object blijft hanteren. Het inkomensveld is
+ * `net_monthly_income` (maandbedrag); de orchestrator leidt het jaarinkomen
+ * daaruit af.
  *
  * **Validatie**: beide velden optioneel ("Later invullen" blijft een
  * expliciet defer-pad); wanneer ingevuld moet het bedrag geldig en
  * realistisch zijn.
  *
- * **Facts-paneel**: mediaan netto inkomen NL = €3.350/mnd ≈ €40.200/jaar
- * (CBS, 2024).
+ * **Facts-paneel**: mediaan netto inkomen NL = €3.350/mnd (CBS, 2024) —
+ * directe maand-vergelijking met het uitgevraagde maandinkomen.
  */
 type IncomeData = Pick<
   IdentityData,
-  'estimated_yearly_income' | 'estimated_monthly_expenses'
+  'net_monthly_income' | 'estimated_monthly_expenses'
 >
 
-type FieldKey = 'estimated_yearly_income' | 'estimated_monthly_expenses'
+type FieldKey = 'net_monthly_income' | 'estimated_monthly_expenses'
 
 const FIELD_IDS: Record<FieldKey, string> = {
-  estimated_yearly_income: 'ob-income',
+  net_monthly_income: 'ob-income',
   estimated_monthly_expenses: 'ob-expenses',
 }
 
@@ -57,14 +64,16 @@ function getFieldErrors(data: IncomeData): Partial<Record<FieldKey, string>> {
 
   // Beide velden zijn optioneel — de gebruiker mag ze later invullen via
   // /overzicht/cashflow. Wel valideren wanneer er iets is ingevuld.
-  if (data.estimated_yearly_income) {
-    const income = parseBedragInput(data.estimated_yearly_income)
+  // Drempel is een MAANDbedrag (~€170.000/mnd is ruim boven elk realistisch
+  // netto maandinkomen) sinds het inkomen per maand wordt uitgevraagd.
+  if (data.net_monthly_income) {
+    const income = parseBedragInput(data.net_monthly_income)
     if (isNaN(income)) {
-      errors.estimated_yearly_income = 'Voer een geldig bedrag in'
+      errors.net_monthly_income = 'Voer een geldig bedrag in'
     } else if (income < 0) {
-      errors.estimated_yearly_income = 'Inkomen kan niet negatief zijn'
-    } else if (income > 2000000) {
-      errors.estimated_yearly_income = 'Voer een realistisch jaarinkomen in'
+      errors.net_monthly_income = 'Inkomen kan niet negatief zijn'
+    } else if (income > 170000) {
+      errors.net_monthly_income = 'Voer een realistisch maandinkomen in'
     }
   }
 
@@ -126,7 +135,7 @@ export function OnboardingInkomen({
       : 'border-[var(--border-ed)] focus:border-[var(--module-active-500)] focus:ring-[var(--module-active-500)]'
 
   const scrollToFirstError = useCallback(() => {
-    const fieldOrder: FieldKey[] = ['estimated_yearly_income', 'estimated_monthly_expenses']
+    const fieldOrder: FieldKey[] = ['net_monthly_income', 'estimated_monthly_expenses']
     for (const field of fieldOrder) {
       if (errors[field]) {
         const el = document.getElementById(FIELD_IDS[field])
@@ -152,14 +161,15 @@ export function OnboardingInkomen({
   // we wat de schattingen betekenen — directe feedback dat deze twee
   // getallen samen het tempo naar vrijheid bepalen.
   const previewRate = useMemo(() => {
-    if (!data.estimated_yearly_income || !data.estimated_monthly_expenses) return null
+    if (!data.net_monthly_income || !data.estimated_monthly_expenses) return null
     if (Object.keys(errors).length > 0) return null
-    const yearly = parseBedragInput(data.estimated_yearly_income)
+    // Het inkomensveld is nu al een MAANDbedrag — geen /12 meer (anders zou
+    // de spaarquote dubbel gedeeld en daardoor fout zijn).
+    const monthlyIncome = parseBedragInput(data.net_monthly_income)
     const monthlyExpenses = parseBedragInput(data.estimated_monthly_expenses)
-    if (!isFinite(yearly) || yearly <= 0 || !isFinite(monthlyExpenses)) return null
-    const monthlyIncome = yearly / 12
+    if (!isFinite(monthlyIncome) || monthlyIncome <= 0 || !isFinite(monthlyExpenses)) return null
     return Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100)
-  }, [data.estimated_yearly_income, data.estimated_monthly_expenses, errors])
+  }, [data.net_monthly_income, data.estimated_monthly_expenses, errors])
 
   const headline = (
     <>
@@ -183,7 +193,7 @@ export function OnboardingInkomen({
       factsPanel={
         <FactsPanel
           stat="€3.350"
-          sub="mediaan netto-inkomen NL per maand (≈ €40.200 per jaar)"
+          sub="mediaan netto-inkomen NL per maand"
           source="CBS Inkomensstatistiek, 2024"
         />
       }
@@ -210,14 +220,16 @@ export function OnboardingInkomen({
           </div>
         )}
 
-        {/* Geschat jaarinkomen (netto) — DM Mono input met EUR-prefix.
-            Optioneel: gebruiker kan later invullen via /overzicht/cashflow. */}
+        {/* Geschat netto maandinkomen — DM Mono input met EUR-prefix.
+            Optioneel: gebruiker kan later invullen via /overzicht/cashflow.
+            De orchestrator converteert dit maandbedrag bij save naar het
+            canonieke jaarinkomen (×12). */}
         <div>
           <label
             htmlFor="ob-income"
             className="mb-1.5 block text-sm font-medium text-[var(--ink-2)]"
           >
-            Geschat jaarinkomen (netto){' '}
+            Geschat netto maandinkomen{' '}
             <span className="text-xs font-normal italic text-[var(--ink-3)]">(optioneel)</span>
           </label>
           <div className="relative">
@@ -228,30 +240,30 @@ export function OnboardingInkomen({
               id="ob-income"
               type="text"
               inputMode="decimal"
-              value={data.estimated_yearly_income}
+              value={data.net_monthly_income}
               onChange={(e) => {
                 // Sta alleen cijfers + scheidingstekens toe. We bewaren
                 // de raw string; validatie parse't bij submit.
                 const val = e.target.value.replace(/[^0-9.,]/g, '')
-                onChange({ ...data, estimated_yearly_income: val })
+                onChange({ ...data, net_monthly_income: val })
               }}
-              onBlur={() => markTouched('estimated_yearly_income')}
+              onBlur={() => markTouched('net_monthly_income')}
               placeholder="0"
               autoComplete="off"
-              aria-invalid={!!showError('estimated_yearly_income')}
+              aria-invalid={!!showError('net_monthly_income')}
               aria-describedby={
-                showError('estimated_yearly_income') ? 'ob-income-error' : 'ob-income-hint'
+                showError('net_monthly_income') ? 'ob-income-error' : 'ob-income-hint'
               }
-              className={`w-full bg-[var(--subtle)] py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border focus:ring-1 font-mono tabular-nums sm:text-sm ${inputErrorClass('estimated_yearly_income')}`}
+              className={`w-full bg-[var(--subtle)] py-2.5 pr-3 pl-7 text-base text-[var(--ink)] outline-none border focus:ring-1 font-mono tabular-nums sm:text-sm ${inputErrorClass('net_monthly_income')}`}
             />
           </div>
-          {showError('estimated_yearly_income') ? (
+          {showError('net_monthly_income') ? (
             <p
               id="ob-income-error"
               className="mt-1 text-xs text-red-500"
               role="alert"
             >
-              {showError('estimated_yearly_income')}
+              {showError('net_monthly_income')}
             </p>
           ) : (
             <p
@@ -259,7 +271,7 @@ export function OnboardingInkomen({
               className="mt-1 text-xs italic text-[var(--ink-3)]"
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
             >
-              Netto per jaar, inclusief vakantiegeld. Later aanpasbaar.
+              Netto per maand, inclusief vakantiegeld naar rato. Later aanpasbaar.
             </p>
           )}
         </div>
@@ -335,7 +347,7 @@ export function OnboardingInkomen({
             optioneel zijn en dat overslaan volledig OK is. Alleen tonen als
             beide velden nog leeg zijn — zodra de gebruiker iets typt, is de
             primary "Verder"-knop de natuurlijke flow (feature #829). */}
-        {onSkipIncome && !data.estimated_yearly_income && !data.estimated_monthly_expenses && (
+        {onSkipIncome && !data.net_monthly_income && !data.estimated_monthly_expenses && (
           <button
             type="button"
             onClick={onSkipIncome}

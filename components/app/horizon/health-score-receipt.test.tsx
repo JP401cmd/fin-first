@@ -195,6 +195,33 @@ describe('HealthScoreReceipt — totaalscore prominent', () => {
   })
 })
 
+// ── Radar-labels leesbaar (geen harde 9-tekens-truncatie) ────────────────
+
+describe('HealthScoreReceipt — radar-labels volledig leesbaar', () => {
+  it('toont volledige pijlernamen als SVG-tekst (niet afgekapt op 9 tekens)', () => {
+    const { container } = render(<HealthScoreReceipt health={makeHealthV2()} />)
+    // Verzamel alle <text>-labels in de radar (SVG).
+    const svgTextContent = Array.from(container.querySelectorAll('svg text'))
+      .map(t => t.textContent ?? '')
+      .join('|')
+
+    // Lange namen die vroeger op 9 tekens werden afgekapt, staan nu volledig.
+    expect(svgTextContent).toContain('Vermogensspreiding')
+    expect(svgTextContent).toContain('Budgetdiscipline')
+    expect(svgTextContent).toContain('Schuldenlast')
+    // Geen ellipsis-afkapping meer in de radar-labels.
+    expect(svgTextContent).not.toContain('…')
+  })
+
+  it('aria-label van de radar bevat de volledige pijlernamen (screenreader)', () => {
+    render(<HealthScoreReceipt health={makeHealthV2()} />)
+    const radar = screen.getByRole('img', { name: /Radar chart/i })
+    const label = radar.getAttribute('aria-label') ?? ''
+    expect(label).toContain('Vermogensspreiding')
+    expect(label).toContain('Budgetdiscipline')
+  })
+})
+
 // ── Belasting-kans-sectie (Wft-veilig) ───────────────────────────────────
 
 describe('HealthScoreReceipt — belasting-kans-sectie (ADR 0010, Wft)', () => {

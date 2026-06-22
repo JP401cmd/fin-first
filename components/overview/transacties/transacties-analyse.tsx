@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Plus, Upload, Link2, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePerspective } from '@/components/app/perspective-provider'
 import {
@@ -174,6 +174,11 @@ export function TransactiesAnalyse() {
   const [error, setError] = useState<string | null>(null)
 
   const [editTx, setEditTx] = useState<FullTransaction | null>(null)
+  // Toevoeg-modus: dezelfde TransactionForm zónder `transaction`-prop. De form
+  // vereist een `accountId`; bij >1 rekening kiezen we die eerst in een
+  // BottomSheet, bij precies 1 rekening openen we de form direct.
+  const [addAccountId, setAddAccountId] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [drillCp, setDrillCp] = useState<{ name: string; iban: string | null } | null>(null)
   const [listDetail, setListDetail] = useState<
     { kind: 'day'; date: string } | { kind: 'weekday'; index: number } | null
@@ -405,14 +410,53 @@ export function TransactiesAnalyse() {
 
   const refetch = useCallback(() => {
     setEditTx(null)
+    setAddAccountId(null)
+    setPickerOpen(false)
     setReloadKey((k) => k + 1) // her-trigger het laad-effect
   }, [])
+
+  // "Nieuwe transactie": 1 rekening → direct openen; >1 → eerst kiezen.
+  const openAdd = useCallback(() => {
+    if (accounts.length === 1) {
+      setAddAccountId(accounts[0].id)
+    } else if (accounts.length > 1) {
+      setPickerOpen(true)
+    }
+  }, [accounts])
 
   const initialLoading = loading && !hasLoadedOnce
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
+      {/* Actie-rij: transactie toevoegen + importeren + bank koppelen.
+          Spiegelt de "Snelle acties" van de cashflow-pagina (De Kern → kern-*). */}
+      <div className={`flex flex-wrap items-center gap-2${error ? ' opacity-60 pointer-events-none' : ''}`}>
+        {accounts.length > 0 && (
+          <button
+            onClick={openAdd}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-kern-700"
+          >
+            <Plus className="h-4 w-4" />
+            Nieuwe transactie
+          </button>
+        )}
+        <Link
+          href="/core/cash/import"
+          className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+        >
+          <Upload className="h-4 w-4" />
+          Importeer transacties
+        </Link>
+        <Link
+          href="/core/cash/connect"
+          className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+        >
+          <Link2 className="h-4 w-4" />
+          Bank koppelen
+        </Link>
+      </div>
+
       <Card>
         <PeriodeSelector
           period={period}
@@ -514,6 +558,47 @@ export function TransactiesAnalyse() {
           onClose={() => setEditTx(null)}
           onSaved={refetch}
         />
+      )}
+
+      {/* Toevoeg-paneel: dezelfde TransactionForm, zónder `transaction`-prop. */}
+      {addAccountId && (
+        <TransactionForm
+          accountId={addAccountId}
+          budgetGroups={budgetGroups}
+          onClose={() => setAddAccountId(null)}
+          onSaved={refetch}
+        />
+      )}
+
+      {/* Rekening-kiezer (alleen bij >1 rekening) vóór een nieuwe transactie. */}
+      {pickerOpen && (
+        <BottomSheet open onClose={() => setPickerOpen(false)} title="Kies een rekening" size="md">
+          <div className="space-y-2 py-1">
+            {accounts.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => {
+                  setPickerOpen(false)
+                  setAddAccountId(a.id)
+                }}
+                aria-label={`Kies rekening: ${a.name}${a.ibanTail ? ` (••${a.ibanTail})` : ''}`}
+                className="flex w-full items-center justify-between gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors duration-150 hover:bg-[var(--subtle)]"
+              >
+                <span className="text-sm font-medium text-[var(--ink)]">{a.name}</span>
+                <div className="flex items-center gap-2">
+                  {(a.bankName || a.ibanTail) && (
+                    <span className="text-xs text-[var(--ink-3)]">
+                      {a.bankName}
+                      {a.bankName && a.ibanTail ? ' · ' : ''}
+                      {a.ibanTail ? `••${a.ibanTail}` : ''}
+                    </span>
+                  )}
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ink-4)]" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
       )}
 
       {/* Tegenpartij-analyse */}

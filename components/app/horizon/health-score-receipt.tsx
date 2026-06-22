@@ -190,12 +190,36 @@ function TrendBadge({ trend }: { trend: number }) {
 // ── Radar Chart ──────────────────────────────────────────────
 
 /**
+ * Split a pillar name into at most two display lines (visual only — the full
+ * name stays intact in the SVG aria-label). Short names stay on one line;
+ * longer multi-word names break on the most balanced space.
+ */
+function wrapLabel(name: string): string[] {
+  if (name.length <= 12) return [name]
+  const words = name.trim().split(/\s+/)
+  if (words.length < 2) return [name]
+  // Find the split that best balances the two halves
+  let best = 1
+  let bestDiff = Infinity
+  for (let i = 1; i < words.length; i++) {
+    const left = words.slice(0, i).join(' ').length
+    const right = words.slice(i).join(' ').length
+    const diff = Math.abs(left - right)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = i
+    }
+  }
+  return [words.slice(0, best).join(' '), words.slice(best).join(' ')]
+}
+
+/**
  * Small radar/spider chart that visualises all pillar scores at a glance.
  * Each axis represents one pillar (0-100), with zones coloured per thresholds.
  */
 function PillarRadarChart({
   pillars,
-  size = 200,
+  size = 280,
 }: {
   pillars: HealthPillar[]
   size?: number
@@ -203,7 +227,7 @@ function PillarRadarChart({
   const uid = useId()
   const cx = size / 2
   const cy = size / 2
-  const maxR = size / 2 - 24 // leave room for labels
+  const maxR = size / 2 - 44 // leave room for full labels
 
   const n = pillars.length
   if (n < 3) return null
@@ -227,11 +251,16 @@ function PillarRadarChart({
   // Label positions (slightly outside the chart)
   const labelPositions = pillars.map((_, i) => {
     const angle = (Math.PI * 2 * i) / n - Math.PI / 2
-    const labelR = maxR + 16
+    const labelR = maxR + 18
+    const cos = Math.cos(angle)
+    const sin = Math.sin(angle)
+    // Small per-quadrant vertical nudge so top/bottom labels clear the polygon/grid
+    const dy = sin < -0.3 ? -4 : sin > 0.3 ? 4 : 0
     return {
-      x: cx + labelR * Math.cos(angle),
-      y: cy + labelR * Math.sin(angle),
-      anchor: Math.cos(angle) < -0.3 ? 'end' : Math.cos(angle) > 0.3 ? 'start' : 'middle',
+      x: cx + labelR * cos,
+      y: cy + labelR * sin,
+      dy,
+      anchor: cos < -0.3 ? 'end' : cos > 0.3 ? 'start' : 'middle',
     }
   })
 
@@ -240,7 +269,8 @@ function PillarRadarChart({
   return (
     <svg
       viewBox={`0 0 ${size} ${size}`}
-      className="w-full max-w-[200px] h-auto mx-auto"
+      className="w-full max-w-[280px] h-auto mx-auto"
+      style={{ overflow: 'visible' }}
       role="img"
       aria-label={`Radar chart van ${n} financiële gezondheids-pilaren. ${pillars.map(p => `${p.name}: ${p.score}`).join(', ')}`}
     >
@@ -328,21 +358,33 @@ function PillarRadarChart({
         )
       })}
 
-      {/* Labels */}
-      {pillars.map((pillar, i) => (
-        <text
-          key={pillar.id}
-          x={labelPositions[i].x}
-          y={labelPositions[i].y}
-          textAnchor={labelPositions[i].anchor as 'start' | 'middle' | 'end'}
-          dominantBaseline="central"
-          className="fill-[var(--ink-2)]"
-          fontSize="9"
-          fontFamily="var(--font-mono)"
-        >
-          {pillar.name.length > 10 ? pillar.name.slice(0, 9) + '…' : pillar.name}
-        </text>
-      ))}
+      {/* Labels — full pillar names, wrapped over two lines when long */}
+      {pillars.map((pillar, i) => {
+        const pos = labelPositions[i]
+        const lines = wrapLabel(pillar.name)
+        return (
+          <text
+            key={pillar.id}
+            x={pos.x}
+            y={pos.y + pos.dy}
+            textAnchor={pos.anchor as 'start' | 'middle' | 'end'}
+            dominantBaseline="central"
+            className="fill-[var(--ink-2)]"
+            fontSize="10"
+            fontFamily="var(--font-mono)"
+          >
+            {lines.map((line, li) => (
+              <tspan
+                key={li}
+                x={pos.x}
+                dy={li === 0 ? (lines.length > 1 ? '-0.55em' : 0) : '1.1em'}
+              >
+                {line}
+              </tspan>
+            ))}
+          </text>
+        )
+      })}
     </svg>
   )
 }

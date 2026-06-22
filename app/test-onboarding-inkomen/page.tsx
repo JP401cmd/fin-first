@@ -8,12 +8,14 @@ import type { IdentityData } from '@/components/onboarding/onboarding-identity'
  * Test page for OnboardingInkomen — verifies:
  * 1. Both fields are optional (marked "(optioneel)")
  * 2. User can proceed without filling anything ("Later invullen")
- * 3. Geschat jaarinkomen (netto) + geschatte maandelijkse uitgaven are asked
- * 4. Spaarquote-preview appears when both fields are valid
+ * 3. Geschat netto maandinkomen + geschatte maandelijkse uitgaven are asked
+ *    (both per maand — jun 2026)
+ * 4. Spaarquote-preview appears when both fields are valid (maandbedrag direct,
+ *    geen dubbele deling)
  */
 export default function TestOnboardingInkomen() {
-  const [data, setData] = useState<Pick<IdentityData, 'estimated_yearly_income' | 'estimated_monthly_expenses'>>({
-    estimated_yearly_income: '',
+  const [data, setData] = useState<Pick<IdentityData, 'net_monthly_income' | 'estimated_monthly_expenses'>>({
+    net_monthly_income: '',
     estimated_monthly_expenses: '',
   })
   const [proceeded, setProceeded] = useState(false)
@@ -29,7 +31,7 @@ export default function TestOnboardingInkomen() {
           {JSON.stringify(data, null, 2)}
         </pre>
         <button
-          onClick={() => { setProceeded(false); setData({ estimated_yearly_income: '', estimated_monthly_expenses: '' }) }}
+          onClick={() => { setProceeded(false); setData({ net_monthly_income: '', estimated_monthly_expenses: '' }) }}
           className="mt-4 bg-[var(--ink)] text-[var(--paper)] px-4 py-2 text-sm"
         >
           Opnieuw testen
@@ -54,7 +56,7 @@ export default function TestOnboardingInkomen() {
     } as React.CSSProperties}>
       <div className="mx-auto max-w-2xl px-4 pt-4">
         <p className="text-xs font-mono uppercase tracking-widest text-[var(--ink-3)] mb-2">
-          Test: Onboarding Inkomen (jaarinkomen + maanduitgaven → spaarquote)
+          Test: Onboarding Inkomen (maandinkomen + maanduitgaven → spaarquote)
         </p>
       </div>
       <OnboardingInkomen
@@ -63,7 +65,7 @@ export default function TestOnboardingInkomen() {
         onNext={() => setProceeded(true)}
         onBack={() => alert('Terug geklikt')}
         onSkipIncome={() => {
-          setData({ estimated_yearly_income: '', estimated_monthly_expenses: '' })
+          setData({ net_monthly_income: '', estimated_monthly_expenses: '' })
           setProceeded(true)
         }}
       />
