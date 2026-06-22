@@ -3,49 +3,9 @@
 import type { LifeEvent, LifeEventImpact } from '@/lib/horizon-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { Action } from '@/lib/recommendation-data'
-import {
-  Calendar, Globe, Baby, Hammer, GraduationCap, Briefcase,
-  Clock, Sunset, Home, Heart, HeartHandshake, HeartCrack, Truck, Car, Caravan, Tent, Gift, Zap, HandCoins,
-  Landmark, PiggyBank, UserX, UserMinus, Flower2,
-  CheckCircle2, PartyPopper, Mountain, Sparkles, AlertTriangle, Shield, Receipt, TrendingUp,
-} from 'lucide-react'
-
-export const EVENT_ICONS: Record<string, React.ReactNode> = {
-  Calendar: <Calendar className="h-4 w-4" />,
-  Palmtree: <Sunset className="h-4 w-4" />,
-  Globe: <Globe className="h-4 w-4" />,
-  Baby: <Baby className="h-4 w-4" />,
-  Hammer: <Hammer className="h-4 w-4" />,
-  GraduationCap: <GraduationCap className="h-4 w-4" />,
-  Briefcase: <Briefcase className="h-4 w-4" />,
-  Clock: <Clock className="h-4 w-4" />,
-  Sunset: <Sunset className="h-4 w-4" />,
-  Home: <Home className="h-4 w-4" />,
-  Heart: <Heart className="h-4 w-4" />,
-  HeartCrack: <HeartCrack className="h-4 w-4" />,
-  Truck: <Truck className="h-4 w-4" />,
-  Car: <Car className="h-4 w-4" />,
-  Caravan: <Caravan className="h-4 w-4" />,
-  Tent: <Tent className="h-4 w-4" />,
-  Gift: <Gift className="h-4 w-4" />,
-  Zap: <Zap className="h-4 w-4" />,
-  HeartHandshake: <HeartHandshake className="h-4 w-4" />,
-  HandCoins: <HandCoins className="h-4 w-4" />,
-  Landmark: <Landmark className="h-4 w-4" />,
-  PiggyBank: <PiggyBank className="h-4 w-4" />,
-  UserX: <UserX className="h-4 w-4" />,
-  UserMinus: <UserMinus className="h-4 w-4" />,
-  Flower2: <Flower2 className="h-4 w-4" />,
-  // ── Natuurlijke mijlpalen ──
-  CheckCircle2: <CheckCircle2 className="h-4 w-4" />,
-  PartyPopper: <PartyPopper className="h-4 w-4" />,
-  Mountain: <Mountain className="h-4 w-4" />,
-  Sparkles: <Sparkles className="h-4 w-4" />,
-  AlertTriangle: <AlertTriangle className="h-4 w-4" />,
-  Shield: <Shield className="h-4 w-4" />,
-  Receipt: <Receipt className="h-4 w-4" />,
-  TrendingUp: <TrendingUp className="h-4 w-4" />,
-}
+// Canonieke icoon-bron (single source of truth) — zie lib/event-icon.ts.
+// Her-export gehouden zodat bestaande imports van `EVENT_ICONS` blijven werken.
+export { EVENT_ICONS } from '@/lib/event-icon'
 
 // Logarithmic position: maps months-from-now to 0..1 range
 // Near future gets more space: log(1 + offset) / log(1 + total)

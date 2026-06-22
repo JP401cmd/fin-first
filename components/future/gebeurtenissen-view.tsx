@@ -4,10 +4,8 @@ import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
-  Baby,
   Briefcase,
   Home,
-  HeartHandshake,
   Wallet,
   Compass,
   ArrowRight,
@@ -18,6 +16,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import { resolveEventIcon } from '@/lib/event-icon'
 import type { LifeEvent, FinancialInput, FireProjection, WerkMetadata } from '@/lib/horizon-data'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -30,6 +29,7 @@ import {
   type ManagedStrategy,
 } from '@/lib/strategy-events'
 import { StrategieEditors, type StrategieEditorsData } from './strategie/strategie-editors'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 
 // EventPane = herstelde toevoeg/bewerk-flow uit /horizon (catalogus + Praat met
 // Will + 3-blokken-editor). Dynamisch geladen zodat de pagina-bundle licht blijft.
@@ -72,21 +72,12 @@ export interface EventPaneData {
  * bewerken komt in volgende iteratie.
  */
 
-const EVENT_ICONS: Record<string, typeof Compass> = {
-  child: Baby,
-  kind: Baby,
-  career: Briefcase,
-  zzp: Briefcase,
-  werk: Briefcase,
-  retirement: Compass,
-  housing: Home,
-  inheritance: HeartHandshake,
-  default: Wallet,
-}
-
+// Icoon-resolutie loopt nu via de canonieke bron (lib/event-icon.ts): eerst
+// op `event.icon` (de catalogus-Lucide-naam), dan een event_type→naam-fallback
+// voor legacy-rijen, anders een nette default. Vóórheen viel praktisch elk
+// event door naar Wallet omdat de lokale map alleen event-type-sleutels kende.
 function iconForEvent(eventType: string, icon?: string): typeof Compass {
-  const key = (icon ?? eventType ?? '').toLowerCase()
-  return EVENT_ICONS[key] ?? EVENT_ICONS.default ?? Compass
+  return resolveEventIcon(eventType, icon)
 }
 
 function formatEventDate(event: LifeEvent): string {
@@ -451,6 +442,7 @@ export function GebeurtenissenView({
       </div>
 
       {/* Levensstrategieën */}
+      <HideInSimple>
       <div>
         <header className="mb-4">
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
@@ -502,6 +494,7 @@ export function GebeurtenissenView({
           })}
         </div>
       </div>
+      </HideInSimple>
 
       <EventPane
         open={eventPaneOpen}
