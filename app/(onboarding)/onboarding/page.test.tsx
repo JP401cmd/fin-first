@@ -23,6 +23,7 @@ const NEW_ACTIVE_ORDER = [
   'geboortedatum',
   'inkomen',
   'uitgaven',
+  'uitgaven_pensioen',
   'bezittingen',
   'schulden',
   'pensioen',
@@ -389,6 +390,52 @@ describe('onboarding _reducer — SET_PENSION', () => {
   })
 })
 
+describe('onboarding _reducer — SET_RETIREMENT_EXPENSE', () => {
+  it('replaces the retirementExpense substate with the dispatched payload', () => {
+    const result = _reducer(_initialState, {
+      type: 'SET_RETIREMENT_EXPENSE',
+      data: { method: 'custom_amount', customAmount: '32.400', skipped: false },
+    })
+    expect(result.retirementExpense).toEqual({
+      method: 'custom_amount',
+      customAmount: '32.400',
+      skipped: false,
+    })
+  })
+
+  it('marks the step as skipped without persisting an amount', () => {
+    const result = _reducer(_initialState, {
+      type: 'SET_RETIREMENT_EXPENSE',
+      data: { method: 'custom_amount', customAmount: '', skipped: true },
+    })
+    expect(result.retirementExpense.skipped).toBe(true)
+    expect(result.retirementExpense.customAmount).toBe('')
+  })
+
+  it('does not affect other state fields', () => {
+    const result = _reducer(_initialState, {
+      type: 'SET_RETIREMENT_EXPENSE',
+      data: { method: 'current_income', customAmount: '', skipped: false },
+    })
+    expect(result.identity).toEqual(_initialState.identity)
+    expect(result.pension).toEqual(_initialState.pension)
+  })
+})
+
+describe('onboarding _resolveRestoredStep — uitgaven_pensioen', () => {
+  it('restores a draft saved on uitgaven_pensioen without healing', () => {
+    const result = _resolveRestoredStep('uitgaven_pensioen', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'uitgaven_pensioen', healed: false })
+  })
+
+  it('heals an old draft saved on uitgaven forward into the active order', () => {
+    // An old draft on `uitgaven` is still a valid active step, so it stays put
+    // — the new step sits AFTER it and the user simply continues into it.
+    const result = _resolveRestoredStep('uitgaven', [...NEW_ACTIVE_ORDER])
+    expect(result).toEqual({ step: 'uitgaven', healed: false })
+  })
+})
+
 describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
   it('keeps a klaar lastStep on klaar without retroactively routing to spaardoel', () => {
     const result = _resolveRestoredStep('klaar', [...NEW_ACTIVE_ORDER])
@@ -445,6 +492,51 @@ describe('onboarding _reducer — RESTORE_STATE met spaardoel + pensioen', () =>
     expect(result.step).toBe('spaardoel')
     expect(result.spaardoel.presetKey).toBe('vakantie')
     expect(result.spaardoel.name).toBe('Italië 2027')
+  })
+
+  it('restores a saved retirementExpense substate verbatim', () => {
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: [],
+        activeModules: ['toekomstplannen'],
+        horizon: baseHorizon,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        retirementExpense: {
+          method: 'custom_amount',
+          customAmount: '30.000',
+          skipped: false,
+        },
+        lastStep: 'uitgaven_pensioen',
+      },
+    })
+    expect(result.step).toBe('uitgaven_pensioen')
+    expect(result.retirementExpense).toEqual({
+      method: 'custom_amount',
+      customAmount: '30.000',
+      skipped: false,
+    })
+  })
+
+  it('falls back to the initial retirementExpense state for a legacy draft without it', () => {
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: {
+        identity: baseIdentity as (typeof _initialState)['identity'],
+        selectedGoals: [],
+        activeModules: ['toekomstplannen'],
+        horizon: baseHorizon,
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        // retirementExpense ontbreekt bewust — legacy draft simulatie
+        lastStep: 'klaar',
+      },
+    })
+    expect(result.retirementExpense).toEqual(_initialState.retirementExpense)
   })
 
   it('restores a saved pension substate verbatim', () => {

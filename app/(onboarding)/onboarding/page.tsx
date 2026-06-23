@@ -19,6 +19,11 @@ import {
   type PensionDraft,
 } from '@/components/onboarding/onboarding-pensioen'
 import { OnboardingSpaardoel } from '@/components/onboarding/onboarding-spaardoel'
+import {
+  OnboardingUitgavenPensioen,
+  INITIAL_RETIREMENT_EXPENSE,
+  type RetirementExpenseState,
+} from '@/components/onboarding/onboarding-uitgaven-pensioen'
 import { OnboardingKlaar } from '@/components/onboarding/onboarding-klaar'
 import { applyPensionParseResult } from '@/lib/pension/apply-parse-result'
 import type { PensionParseResult } from '@/app/api/pension/parse/route'
@@ -78,6 +83,7 @@ type Step =
   | 'geboortedatum'
   | 'inkomen'
   | 'uitgaven'
+  | 'uitgaven_pensioen'
   | 'bezittingen'
   | 'schulden'
   | 'pensioen'
@@ -99,6 +105,10 @@ const STEP_GROUP_INDEX: Record<Step, number> = {
   geboortedatum: 1,
   inkomen: 2,
   uitgaven: 2,
+  // Zelfde groep (2) als inkomen/uitgaven — geen extra groep-nummer, de
+  // voortgangsbalk blijft 7 groepen. De prefill is afgeleid van de net-
+  // ingevoerde maanduitgaven, dus onderwerpelijk hoort 'm hier.
+  uitgaven_pensioen: 2,
   bezittingen: 3,
   schulden: 4,
   pensioen: 5,
@@ -125,6 +135,7 @@ const CANONICAL_STEP_ORDER: readonly string[] = [
   'geboortedatum',
   'inkomen',
   'uitgaven',
+  'uitgaven_pensioen', // toegevoegd jun 2026 — expliciete pensioenuitgave-prefill
   'bezittingen',
   'schulden',
   'pensioen',
@@ -255,6 +266,7 @@ function computeStepOrder(): Step[] {
     'geboortedatum',
     'inkomen',
     'uitgaven',
+    'uitgaven_pensioen',
     'bezittingen',
     'schulden',
     'pensioen',
@@ -306,6 +318,11 @@ interface State {
   /** Stap v. — spaardoel-keuze. Skipped + presetKey=null = niet weggeschreven. */
   spaardoel: SpaardoelState
   /**
+   * Uitgaven-na-pensioen-keuze (groep 2, ná uitgaven). Maakt de impliciete
+   * 80%-server-default expliciet. Skipped → niets meesturen, server-default wint.
+   */
+  retirementExpense: RetirementExpenseState
+  /**
    * Pensioen-keuze (schatting / upload / overslaan). De daadwerkelijke
    * `life_events`-write gebeurt bij de eind-save via `applyPensionParseResult`,
    * los van het save-own-data POST-contract.
@@ -339,6 +356,8 @@ interface PersistedData {
   quickDebts: DebtQuickInput[]
   /** Spaardoel-keuze van stap v. — optioneel zodat oude drafts blijven werken. */
   spaardoel?: SpaardoelState
+  /** Uitgaven-na-pensioen-keuze — optioneel zodat oude drafts (zonder de stap) werken. */
+  retirementExpense?: RetirementExpenseState
   /** Pensioen-keuze — optioneel zodat oude drafts (zonder pensioen-stap) werken. */
   pension?: PensionDraft
   /** Last step the user was on (to restore position) */
@@ -359,6 +378,8 @@ type Action =
    * partial-update-acties want de child levert telkens de volledige shape.
    */
   | { type: 'SET_SPAARDOEL'; data: SpaardoelState }
+  /** Vervang de complete uitgaven-na-pensioen-substate per dispatch. */
+  | { type: 'SET_RETIREMENT_EXPENSE'; data: RetirementExpenseState }
   /** Vervang de complete pensioen-substate per dispatch (child levert de volledige shape). */
   | { type: 'SET_PENSION'; data: PensionDraft }
   /**
@@ -393,6 +414,7 @@ export const _initialState: State = {
     target_date: '',
     skipped: false,
   },
+  retirementExpense: INITIAL_RETIREMENT_EXPENSE,
   pension: INITIAL_PENSION_DRAFT,
   deferredFields: [],
 }
@@ -442,6 +464,8 @@ export function _reducer(state: State, action: Action): State {
       return { ...state, quickDebts: action.items }
     case 'SET_SPAARDOEL':
       return { ...state, spaardoel: action.data }
+    case 'SET_RETIREMENT_EXPENSE':
+      return { ...state, retirementExpense: action.data }
     case 'SET_PENSION':
       return { ...state, pension: action.data }
     case 'DEFER_FIELD': {
@@ -492,6 +516,11 @@ export function _reducer(state: State, action: Action): State {
         // _initialState-shape. Geen migratie nodig — het is een nieuw veld
         // dat oude drafts gewoon niet kennen.
         spaardoel: action.data.spaardoel ?? _initialState.spaardoel,
+        // Uitgaven-na-pensioen — optioneel; oude drafts (vóór deze stap) kennen
+        // het veld niet en vallen veilig terug op de initiële shape. Bij die
+        // default (skipped=false, leeg bedrag) stuurt de save niets expliciets
+        // mee → de impliciete 80%-server-default blijft werken.
+        retirementExpense: action.data.retirementExpense ?? _initialState.retirementExpense,
         // Pensioen — optioneel; oude drafts (vóór de pensioen-stap) kennen het
         // veld niet en vallen terug op de initiële shape.
         pension: action.data.pension ?? _initialState.pension,
@@ -532,6 +561,7 @@ function saveToLocalStorage(state: State) {
       quickAssets: state.quickAssets,
       quickDebts: state.quickDebts,
       spaardoel: state.spaardoel,
+      retirementExpense: state.retirementExpense,
       pension: state.pension,
       deferredFields: state.deferredFields,
       lastStep: state.step,
@@ -651,6 +681,24 @@ function loadFromLocalStorage(): PersistedData | null {
       }
     }
 
+    // Uitgaven-na-pensioen: oude drafts kennen het veld niet. Lichte shape-
+    // guard — alleen overnemen wat we exact verwachten; anders valt
+    // RESTORE_STATE terug op de initiële shape (skipped=false, leeg bedrag →
+    // impliciete server-default blijft werken).
+    let retirementExpense: RetirementExpenseState | undefined = undefined
+    if (parsed.retirementExpense && typeof parsed.retirementExpense === 'object') {
+      const rawR = parsed.retirementExpense as Record<string, unknown>
+      const method =
+        rawR.method === 'custom_amount' || rawR.method === 'current_income'
+          ? rawR.method
+          : 'custom_amount'
+      retirementExpense = {
+        method,
+        customAmount: typeof rawR.customAmount === 'string' ? rawR.customAmount : '',
+        skipped: rawR.skipped === true,
+      }
+    }
+
     // Pensioen: oude drafts kennen het veld niet. Lichte shape-guard — neem
     // alleen over wat we herkennen; RESTORE_STATE valt anders terug op de
     // initiële shape. `parseResult` wordt verbatim overgenomen (JSON uit de
@@ -683,6 +731,7 @@ function loadFromLocalStorage(): PersistedData | null {
       quickAssets: Array.isArray(parsed.quickAssets) ? parsed.quickAssets : [],
       quickDebts: Array.isArray(parsed.quickDebts) ? parsed.quickDebts : [],
       spaardoel,
+      retirementExpense,
       pension,
       deferredFields: Array.isArray(parsed.deferredFields) ? parsed.deferredFields : [],
       lastStep: parsed.lastStep,
@@ -1005,14 +1054,43 @@ export default function OnboardingPage() {
         activeModules: state.activeModules.length > 0 ? state.activeModules : undefined,
       }
 
-      // Add horizon data if toekomstplannen is active
+      // Add horizon data if toekomstplannen is active.
+      // (`toekomstplannen` zit in ALL_MODULES en RESTORE_STATE forceert
+      // activeModules=ALL_MODULES, dus dit blok draait altijd — horizonData
+      // valt nooit gated weg.)
       if (state.activeModules.includes('toekomstplannen')) {
+        // Uitgaven-na-pensioen-keuze (nieuwe onboarding-stap) bepaalt de
+        // retirement-velden. Consume-only: we leggen alleen de keuze vast — de
+        // horizon-engine + computeRetirementExpenses blijven de rekenbron.
+        //
+        // Bij SKIP sturen we de retirement-velden bewust NIET mee (undefined):
+        // dan vult de server via resolveRetirementExpenseDefaults de impliciete
+        // 80%-default in (op basis van de ingevoerde maanduitgaven). Zo is "later
+        // bepalen" geen current_income-keuze maar een zachte, realistische default.
+        const re = state.retirementExpense
+        let retirementMethod:
+          | 'essential_budgets'
+          | 'custom_amount'
+          | 'current_income'
+          | undefined = undefined
+        let retirementCustom: number | undefined = undefined
+        if (!re.skipped) {
+          retirementMethod = re.method
+          if (re.method === 'custom_amount') {
+            const parsed = re.customAmount ? parseBedragInput(re.customAmount) : NaN
+            // Leeg/ongeldig bedrag bij custom_amount → laat het expliciete
+            // bedrag weg; de server-default vult dan 80% in. Geen 0 wegschrijven.
+            retirementCustom = isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined
+          }
+          // 'current_income' ("zelfde als nu") → methode meesturen, geen bedrag.
+        }
+
         body.horizonData = {
           fire_end_strategy: state.horizon.fire_end_strategy,
           fire_end_age: state.horizon.fire_end_age,
           fire_legacy_amount: state.horizon.fire_legacy_amount ? Number(state.horizon.fire_legacy_amount) : undefined,
-          retirement_expense_method: state.horizon.retirement_expense_method,
-          retirement_custom_amount: state.horizon.retirement_custom_amount ? Number(state.horizon.retirement_custom_amount) : undefined,
+          retirement_expense_method: retirementMethod,
+          retirement_custom_amount: retirementCustom,
           temporal_balance: state.horizon.temporal_balance,
           life_events: state.horizon.life_events,
         }
@@ -1400,6 +1478,30 @@ export default function OnboardingPage() {
                     }
                   : undefined
               }
+              currentStep={currentContentStep}
+              totalSteps={totalContentSteps}
+            />
+          )}
+
+          {/* ── Uitgaven na pensioen — expliciete 80%-prefill (optioneel) ── */}
+          {state.step === 'uitgaven_pensioen' && (
+            <OnboardingUitgavenPensioen
+              data={state.retirementExpense}
+              onChange={(data) => dispatch({ type: 'SET_RETIREMENT_EXPENSE', data })}
+              monthlyExpenses={monthlyExpensesParsed}
+              monthlyIncome={netMonthlyIncomeForKlaar}
+              onNext={goToNext}
+              onBack={goToBack}
+              onSkip={() => {
+                // "Kan altijd later nog" — markeer skipped en wis een eventueel
+                // bewerkt bedrag, zodat de save niets expliciets meestuurt en de
+                // impliciete 80%-server-default het overneemt.
+                dispatch({
+                  type: 'SET_RETIREMENT_EXPENSE',
+                  data: { method: 'custom_amount', customAmount: '', skipped: true },
+                })
+                goToNext()
+              }}
               currentStep={currentContentStep}
               totalSteps={totalContentSteps}
             />
