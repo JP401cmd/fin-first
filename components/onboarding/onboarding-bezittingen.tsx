@@ -5,6 +5,7 @@ import { CheckCircle2 } from 'lucide-react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import { OnboardingVraag } from './onboarding-vraag'
+import { SectionReview } from './section-review'
 import { AssetRow, LinkedDebtRow, AssetTypePicker } from './onboarding-posten'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import {
@@ -85,6 +86,12 @@ type SectionPhase =
   | { kind: 'other-ask' }
   | { kind: 'other-pick' }
   | { kind: 'other-more' }
+  | { kind: 'review' }
+
+/** Stabiele key per interne fase — voedt de scherm-overgang per vraag. */
+function phaseKey(phase: SectionPhase): string {
+  return `${phase.kind}-${'qIndex' in phase ? phase.qIndex : ''}`
+}
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -177,6 +184,13 @@ export function OnboardingBezittingen({
     } else {
       setPhase({ kind: 'other-ask' })
     }
+  }
+
+  // Sectie afronden: bij gevulde lijst eerst een bevestigend overzicht,
+  // bij lege lijst (bezittingen overgeslagen) direct door.
+  function finishSection() {
+    if (quickAssets.length > 0) setPhase({ kind: 'review' })
+    else onNext()
   }
 
   // ── Lopend overzicht (children) ─────────────────────────────────────
@@ -298,7 +312,7 @@ export function OnboardingBezittingen({
           title={questionHeadline('Heb je nog andere bezittingen?')}
           deck="Denk aan een auto, pensioenpot, crypto, een eigen BV of waardevolle spullen."
           onYes={() => setPhase({ kind: 'other-pick' })}
-          onNo={onNext}
+          onNo={finishSection}
         >
           {runningList}
         </OnboardingVraag>
@@ -314,10 +328,29 @@ export function OnboardingBezittingen({
           yesLabel="Ja, nog een"
           noLabel="Nee, klaar"
           onYes={() => setPhase({ kind: 'other-pick' })}
-          onNo={onNext}
+          onNo={finishSection}
         >
           {runningList}
         </OnboardingVraag>
+      )
+    }
+
+    if (phase.kind === 'review') {
+      return (
+        <SectionReview
+          kicker="Bezit"
+          romanNum="iii."
+          title={questionHeadline('Dit zijn je bezittingen')}
+          deck="Een rustig overzicht van wat je tot nu toe hebt opgebouwd. Klopt het, of wil je nog iets toevoegen?"
+          factsPanel={factsPanel}
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          onBack={onBack}
+          onConfirm={onNext}
+          onAddMore={() => setPhase({ kind: 'other-pick' })}
+        >
+          {runningList}
+        </SectionReview>
       )
     }
 
@@ -356,7 +389,12 @@ export function OnboardingBezittingen({
 
   return (
     <>
-      {renderPhase()}
+      {/* Scherm-vernieuwing per interne vraag: re-key op de fase zodat de
+          bestaande `.step-enter-forward`-overgang óók tussen de ja/nee-
+          vervolgvragen bínnen deze sectie speelt (niet alleen tussen groepen). */}
+      <div key={phaseKey(phase)} className="step-enter-forward">
+        {renderPhase()}
+      </div>
 
       {/* QuickAddWizard — BottomSheet via portal, voorgeselecteerd op type. */}
       <QuickAddWizard

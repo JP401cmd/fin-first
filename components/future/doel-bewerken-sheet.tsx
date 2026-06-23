@@ -136,6 +136,7 @@ export function DoelBewerkenSheet({
   const deltaPct = pct - oldPct
 
   return (
+    <>
     <div
       role="dialog"
       aria-label={`Doel bewerken: ${goalName}`}
@@ -378,10 +379,15 @@ export function DoelBewerkenSheet({
           </div>
         </div>
       </form>
+    </div>
 
-      {/* GoalForm sheet — verschijnt boven de quick-update dialog. Bij
-          opslaan/verwijderen sluiten we eerst GoalForm, daarna de hele
-          sheet (verse data via router.refresh). */}
+      {/* GoalForm sheet — verschijnt boven de quick-update dialog. BEWUST
+          buiten de backdrop-<div onClick={onClose}> gerenderd: GoalForm is
+          geen kind van de quick-update <form> (die stopPropagation doet),
+          dus binnen de backdrop zou élke klik in GoalForm naar onClose
+          bubbelen en de hele sheet sluiten (React-events bubbelen langs de
+          component-tree, óók over createPortal). GoalForm/ShellOverlay
+          regelen hun eigen backdrop + Escape + focus-trap. */}
       {fullEditOpen && (
         <GoalForm
           goal={goal}
@@ -395,6 +401,6 @@ export function DoelBewerkenSheet({
           }}
         />
       )}
-    </div>
+    </>
   )
 }

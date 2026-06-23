@@ -45,6 +45,7 @@ import { buildActionItems, type ActionRunContext } from '@/lib/command-palette/a
 import { fuzzyScore } from '@/lib/command-palette/fuzzy'
 import { readRecents, pushRecent, recentsToCommandItems } from '@/lib/command-palette/recents'
 import type { CommandItem, EntitySearchResponse } from '@/lib/command-palette/types'
+import { SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -145,12 +146,18 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
   // ── Statische items (memoized) ─────────────────────────────────────────────
   const allPages = useMemo(() => {
     const pages = getAllPageItems()
-    const filtered = filterPagesByModules(pages, activeModules)
+    let filtered = filterPagesByModules(pages, activeModules)
+    // Eenvoudig-weergave: verberg de aangewezen routes (Rekenhulp/Wat-Als) ook
+    // in ⌘K, consistent met sidebar + nav-sheet. Pagina's blijven via deeplink +
+    // Volledig bereikbaar.
+    if (displayMode === 'simple') {
+      filtered = filtered.filter((p) => !(p.href && SIMPLE_HIDDEN_NAV_HREFS.includes(p.href)))
+    }
     if (role === 'superadmin') {
       return [...filtered, ...getAdminPageItems()]
     }
     return filtered
-  }, [activeModules, role])
+  }, [activeModules, role, displayMode])
 
   const allActions = useMemo(
     () => buildActionItems(actionCtx, activeModules),

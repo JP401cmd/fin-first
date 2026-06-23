@@ -60,37 +60,10 @@ function applyModuleSeeding(
   return result
 }
 
-/**
- * Activeer module-tracking-flags op zojuist-ingevoegde assets.
- *
- * - `budgetteren` actief → alle cash-assets krijgen `has_budget_tracking = true`
- * - `aandelenregistratie` actief → alle investment-assets krijgen
- *   `has_holdings_tracking = true`
- *
- * Deze post-insert UPDATE laat de bestaande RPC-SQL onveranderd (die kent de
- * tracking-kolommen niet). De fallback-pad doet de equivalente write inline.
- */
-async function applyModuleTrackingFlags(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  activeModules: ModuleId[] | undefined,
-) {
-  if (!activeModules) return
-  if (activeModules.includes('budgetteren')) {
-    await supabase
-      .from('assets')
-      .update({ has_budget_tracking: true })
-      .eq('user_id', userId)
-      .eq('asset_type', 'cash')
-  }
-  if (activeModules.includes('aandelenregistratie')) {
-    await supabase
-      .from('assets')
-      .update({ has_holdings_tracking: true })
-      .eq('user_id', userId)
-      .eq('asset_type', 'investment')
-  }
-}
+// `applyModuleTrackingFlags` is verwijderd samen met de gedeprecate RPC-success-
+// tak (probleem 4 / Keuze B). Het multi-step pad zet has_budget_tracking /
+// has_holdings_tracking al INLINE op de asset-insert (zie de map() in stap 3),
+// dus een aparte post-insert UPDATE is overbodig.
 
 /**
  * Twee-fasen koppeling huis ↔ hypotheek na de onboarding-insert.
@@ -528,7 +501,6 @@ export async function POST(req: Request) {
   const {
     identity,
     horizonData,
-    budgetAmounts,
     quickAssets: rawQuickAssets,
     quickDebts: rawQuickDebts,
     budgetteringMode,
@@ -753,227 +725,28 @@ export async function POST(req: Request) {
       if (activeModules?.includes('toekomstplannen')) completedSteps.push('horizon')
     }
 
-    // ── Strategy: Try atomic RPC first, fall back to multi-step approach ──
-    // The RPC wraps everything in a single PostgreSQL transaction — if ANY
-    // step fails, the entire save is rolled back. No partial data possible.
-    const rpcPayload = buildRpcPayload(
-      identity, budgetAmounts, budgetteringMode,
-      quickAssets, quickDebts,
-      aowTargetAge, idempotencyKey,
-      horizonData, newsDescription, intent,
-      pensionData,
-    )
+    // ── Strategy: multi-step save (the RPC is DEPRECATED) ──────────────────
+    // De atomische RPC `save_onboarding_data` is DEPRECATED en wordt bewust
+    // NIET meer aangeroepen. Twee bugs maakten 'm onbruikbaar:
+    //   1. Parameter-naam mismatch: de huidige DB-definitie verwacht
+    //      `p_payload`, de caller stuurde `payload` → PostgreSQL zag dit als
+    //      een aanroep zónder argumenten ("no-args signatuur"-fout).
+    //   2. Kolom-bug in de functie-body: `INSERT INTO budgets (..., is_parent)`
+    //      terwijl `budgets` geen `is_parent`-kolom heeft (wel `parent_id`).
+    // Het multi-step fallback-pad hieronder is functioneel compleet (profiel,
+    // assets, debts, hypotheek-koppeling, AOW/pensioen/eigen life-events,
+    // news-only-inserts, spaardoel, horizon-flag, completion) en is nu het
+    // primaire pad. Een DB-migratie om de RPC te herstellen is bewust vermeden
+    // (lagere blast-radius — geen prod-DB-wijziging). `buildRpcPayload` blijft
+    // staan als referentie voor de payload-vorm tot de RPC formeel verwijderd
+    // wordt. Zie Notion "Na deploy issues" / probleem 4 (Keuze B).
+    // De vroegere RPC-success-tak (applyModuleTrackingFlags, mortgage-linking,
+    // news-only-inserts, onboarding-goal, horizon-flag) is verwijderd: al die
+    // stappen bestaan al, een-op-een, in het multi-step pad hieronder. De
+    // `void` houdt buildRpcPayload als referentie voor de payload-vorm.
+    void buildRpcPayload
 
-    const { data: rpcResult, error: rpcError } = await supabase
-      .rpc('save_onboarding_data', { payload: rpcPayload })
-
-    if (!rpcError && rpcResult) {
-      // RPC succeeded — check for application-level errors in the response
-      const result = typeof rpcResult === 'string' ? JSON.parse(rpcResult) : rpcResult
-      if (result.error) {
-        throw new Error(result.error)
-      }
-      // Set initial phase
-      if (!result.already_completed) {
-        // Retirement defaults + housing strategy: de RPC-functie kent
-        // housing_strategy_config nog niet en heeft geen spreekwoord voor de
-        // 80%-pensioen-default — we zetten beide hier via een extra update.
-        const retirementRpcDefaults = resolveRetirementExpenseDefaults(
-          horizonData?.retirement_expense_method,
-          horizonData?.retirement_custom_amount ?? identity.retirement_custom_amount,
-          identity.retirement_expense_method,
-          identity.estimated_monthly_expenses,
-        )
-        const profileUpdates: Record<string, unknown> = {
-          last_known_phase: 'recovery',
-          completed_onboarding_steps: completedSteps,
-          onboarding_intent: intent ?? null,
-          primary_goal_slug: primaryGoalSlug ?? null,
-          selected_goal_slugs: selectedGoalSlugs.length > 0 ? selectedGoalSlugs : null,
-          // 80%-pensioenuitgave-default (overschrijft de RPC's 'current_income'-default)
-          retirement_expense_method: retirementRpcDefaults.retirement_expense_method,
-          retirement_expense_custom_amount: retirementRpcDefaults.retirement_expense_custom_amount,
-          // Housing: nieuwe accounts starten op 'exclude_from_fire' ("niet
-          // meerekenen") — expliciet wegschrijven want de RPC kent dit veld niet.
-          housing_strategy_config: { mode: 'exclude_from_fire' },
-        }
-        // Onboarding-schattingen = handmatige bron ("eigen bedrag") voor het
-        // blok "Instellingen & toekomst" op /overzicht/cashflow. Zo drijven
-        // jaarinkomen, spaarquote en geschatte uitgaven direct de FIRE-
-        // prognose via resolveSavingsSource — ook zonder transacties.
-        if (identity.net_monthly_income > 0) profileUpdates.income_source = 'manual'
-        if (identity.estimated_monthly_expenses != null && identity.estimated_monthly_expenses > 0) {
-          profileUpdates.expenses_source = 'manual'
-        }
-        // Feature #830: persist deferred onboarding fields for post-onboarding suggestions.
-        // Stored in feature_preferences.deferred_onboarding_fields (JSONB sub-key)
-        // so no DDL migration is needed — the column already exists.
-        if (deferredFields && deferredFields.length > 0) {
-          try {
-            const { data: currentPrefs } = await supabase
-              .from('profiles')
-              .select('feature_preferences')
-              .eq('id', user.id)
-              .single()
-            const prefs = (currentPrefs?.feature_preferences as Record<string, unknown>) ?? {}
-            prefs.deferred_onboarding_fields = deferredFields
-            profileUpdates.feature_preferences = prefs
-          } catch {
-            // Graceful: if read fails, write deferred fields into a fresh prefs object
-            profileUpdates.feature_preferences = { deferred_onboarding_fields: deferredFields }
-          }
-        }
-        // budgeting_active follows the intent's preset so onboarding-flow gating
-        // (e.g. "show budgets step") stays in sync. Tracking on individual
-        // assets governs sidebar visibility (see app/(app)/layout.tsx).
-        if (activeModules && activeModules.length > 0) {
-          profileUpdates.budgeting_active = (activeModules as ModuleId[]).includes('budgetteren')
-        }
-        // News-only: store financial context and AI-estimated income/expenses
-        if (isNewsOnly) {
-          if (financialContext) profileUpdates.financial_context = financialContext
-          if (aiIncomeEstimate != null) profileUpdates.net_monthly_income = aiIncomeEstimate
-          if (aiExpensesEstimate != null) profileUpdates.estimated_monthly_expenses = aiExpensesEstimate
-        }
-        const { error: profileUpdateError } = await supabase
-          .from('profiles')
-          .update(profileUpdates)
-          .eq('id', user.id)
-        // Graceful degradation: als `selected_goal_slugs` nog niet bestaat op
-        // de remote DB (migratie 20260513000001 niet toegepast), retry zonder
-        // dat veld. Anders zou de hele update silent falen — inclusief
-        // primary_goal_slug en intent. Zie ook isColumnMissing() in
-        // app/api/module-guide/progress/route.ts.
-        if (
-          profileUpdateError &&
-          (profileUpdateError.code === '42703' ||
-            profileUpdateError.message?.includes('selected_goal_slugs'))
-        ) {
-          const { selected_goal_slugs: _drop, ...retryUpdates } = profileUpdates
-          void _drop
-          const { error: retryError } = await supabase
-            .from('profiles')
-            .update(retryUpdates)
-            .eq('id', user.id)
-          if (retryError) {
-            console.error('Profile update retry failed:', retryError)
-          }
-        } else if (profileUpdateError) {
-          console.error('Profile update failed:', profileUpdateError)
-        }
-
-        // News-only: insert AI-extracted assets, debts, and life events
-        // These are persisted outside the RPC transaction since the RPC
-        // function does not know about the extraction results.
-        if (isNewsOnly) {
-          if (extractedAssets.length > 0) {
-            const rows = extractedAssets.map((a, i) => ({
-              user_id: user.id,
-              name: a.name,
-              asset_type: a.asset_type,
-              current_value: a.current_value,
-              purchase_value: a.current_value,
-              expected_return: a.expected_return / 100, // Convert % to decimal
-              monthly_contribution: a.monthly_contribution,
-              is_active: true,
-              is_liquid: a.is_liquid,
-              subtype: a.subtype,
-              sort_order: i,
-              source: 'ai_extracted',
-            }))
-            const { error } = await supabase.from('assets').insert(rows)
-            if (error) console.error('AI-extracted assets insert error:', error)
-          }
-
-          if (extractedDebts.length > 0) {
-            const rows = extractedDebts.map((d, i) => ({
-              user_id: user.id,
-              name: d.name,
-              debt_type: d.debt_type,
-              original_amount: d.current_balance,
-              current_balance: d.current_balance,
-              interest_rate: d.interest_rate / 100, // Convert % to decimal
-              monthly_payment: d.monthly_payment,
-              minimum_payment: d.monthly_payment,
-              start_date: new Date().toISOString().split('T')[0],
-              is_active: true,
-              is_tax_deductible: d.is_tax_deductible,
-              subtype: d.subtype,
-              sort_order: i,
-              source: 'ai_extracted',
-            }))
-            const { error } = await supabase.from('debts').insert(rows)
-            if (error) console.error('AI-extracted debts insert error:', error)
-          }
-
-          if (extractedLifeEvents.length > 0) {
-            const rows = extractedLifeEvents.map((e, i) => ({
-              user_id: user.id,
-              name: e.name,
-              event_type: e.event_type,
-              target_age: e.target_age,
-              monthly_income_change: e.monthly_income_change,
-              monthly_cost_change: e.monthly_cost_change,
-              one_time_cost: e.one_time_cost,
-              duration_months: e.duration_months,
-              is_active: true,
-              sort_order: i + 1, // 0 is reserved for AOW
-              icon: e.icon || 'Calendar',
-            }))
-            const { error } = await supabase.from('life_events').insert(rows)
-            if (error) console.error('AI-extracted life events insert error:', error)
-          }
-        }
-
-        // Module-tracking-flags activeren op de juiste assets. De RPC laat
-        // has_budget_tracking / has_holdings_tracking standaard false; we
-        // zetten ze hier expliciet aan zodat de Budgetteren- en Holdings-
-        // apps direct een rekening hebben om mee te werken.
-        await applyModuleTrackingFlags(supabase, user.id, activeModules)
-
-        // Huis ↔ hypotheek koppelen: zet debts.linked_asset_id op de zojuist-
-        // ingevoegde hypotheek-rijen die in onboarding aan een huis gekoppeld
-        // zijn. De RPC kent linked_asset_id niet — dit is de échte deliverable
-        // van de hypotheek-vervolgvraag. Non-blocking.
-        await linkOnboardingMortgages(supabase, user.id, quickAssets, quickDebts)
-
-        // Onboarding-spaardoel (stap v.) — non-blocking insert. Faalt deze,
-        // dan slaat de gebruiker hem later handmatig aan via /will.
-        if (onboardingGoal) {
-          await insertOnboardingGoal(supabase, user.id, onboardingGoal)
-        }
-
-        // Markeer horizon-setup als voltooid zodat /toekomst direct de FIRE-
-        // grafiek toont i.p.v. de setup-card. Non-blocking — een mislukte
-        // upsert mag onboarding niet stoppen; de gebruiker kan de setup-card
-        // dan alsnog via /toekomst doorlopen.
-        try {
-          await supabase
-            .from('user_feature_visits')
-            .upsert(
-              { user_id: user.id, feature_slug: HORIZON_SETUP_COMPLETED_SLUG },
-              { onConflict: 'user_id,feature_slug', ignoreDuplicates: true },
-            )
-        } catch (horizonFlagErr) {
-          console.warn('[onboarding-save] horizon-setup flag upsert failed (non-fatal):', horizonFlagErr)
-        }
-      }
-      // Invalideer de server-cache voor de eerste pagina's die de gebruiker
-      // na onboarding bezoekt — voorkomt dat een Next.js-cache de oude
-      // stappenplan-staat blijft tonen na een data-reset + her-onboarding.
-      revalidatePath('/will')
-      revalidatePath('/core')
-      revalidatePath('/dashboard')
-      return Response.json({ success: true, alreadyCompleted: result.already_completed ?? false })
-    }
-
-    // RPC not available (function doesn't exist yet) — fall back to multi-step approach
-    // This happens when the migration hasn't been applied yet
-    if (rpcError) {
-      console.warn('save_onboarding_data RPC not available, falling back to multi-step:', rpcError.message)
-    }
-
-    // ── Fallback: Multi-step approach (non-atomic) ──────────────────────
+    // ── Multi-step save (primair pad, non-atomic) ──────────────────────
 
     // 1. Update profile (onboarding_completed is set to false first; will be set to true at the end
     // after all data is saved successfully — this ensures retries work correctly)

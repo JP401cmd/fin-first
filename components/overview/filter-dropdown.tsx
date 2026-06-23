@@ -69,10 +69,11 @@ export function FilterDropdown<T extends string>({
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-label={`Filter: ${activeLabel}`}
         className="inline-flex items-center gap-2 min-h-[44px] rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-medium text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
       >
         <Filter className="w-4 h-4 text-[var(--ink-3)]" aria-hidden="true" />
-        <span>{activeLabel}</span>
+        <span className="hidden sm:inline">{activeLabel}</span>
         <ChevronDown
           className={`w-4 h-4 text-[var(--ink-3)] transition-transform ${
             open ? 'rotate-180' : ''

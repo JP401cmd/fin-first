@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getServiceClient } from '@/lib/supabase/service'
 import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
 import {
@@ -76,7 +76,13 @@ export async function GET(request: Request) {
     }, { status: 500 })
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey)
+  // Canonieke service-role client (lib/supabase/service.ts). De cron draait
+  // zonder gebruikerssessie: de balance_snapshots-INSERT via
+  // captureBalanceSnapshots() zou met een sessie-client door de
+  // WITH CHECK (auth.uid() = user_id)-policy worden geweigerd. Service-role
+  // (server-only, achter CRON_SECRET) passeert RLS bewust voor deze
+  // system-actor. De env-guard hierboven garandeert dat de key gezet is.
+  const supabase = getServiceClient()
   const startedAt = new Date().toISOString()
 
   const now = new Date()

@@ -33,6 +33,7 @@ import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { resolveFireParams } from '@/lib/fire-params'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { Perspective } from '@/lib/household-data'
+import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 
 /** Resultaat van de gedeelde lever-scores-loader. */
 export interface LeverScoresResult {
@@ -52,6 +53,15 @@ export interface LeverScoresResult {
    * landingskaart en de sidebar-dot.
    */
   box1Status: LeverageStatus
+  /**
+   * Canoniek netto vermogen (bezittingen − schulden), perspectief-correct en
+   * INCLUSIEF de niet-gekoppelde bankrekening-saldi (`bank_accounts` met
+   * `linked_asset_id IS NULL`). Dit is exact dezelfde grondslag als de
+   * /overzicht-hero/-grafiek (`healthScoreInput.totalAssets − totalDebts`,
+   * lib/horizon-data-loader.ts): de sidebar consumeert dit i.p.v. een eigen
+   * inline-som, zodat sidebar == hero == dashboard per definitie gelijk zijn.
+   */
+  netWorth: number
 }
 
 /** Minimale profiel-velden die de loader nodig heeft. */
@@ -89,18 +99,17 @@ type BudgetTxRow = { budget_id: string; amount: number | string }
  * (`computeLeverScores`, `box3TaxStatus`, `box1JaarruimteStatus`).
  *
  * @param supabase    Server-client (RLS-gescoped op de ingelogde gebruiker).
- * @param perspective Meegegeven voor signatuur-stabiliteit en `cache()`-dedup,
- *   maar de lever-scores zijn ALTIJD personal-perspectief: alle queries zijn
- *   user-scoped (eq('user_id')) — identiek aan de sidebar-dots, die óók geen
- *   huishoud-/partnerperspectief op de hefbomen toepassen. Een household/partner-
- *   view toont dus dezelfde (persoonlijke) hefboomstatus. Wil je dat veranderen,
- *   dan moet de aggregatie hiér perspectief-bewust worden (niet alleen de param
- *   doorgeven). Bewust niet gedaan: het matcht het bestaande sidebar-gedrag.
+ * @param perspective Stuurt UITSLUITEND `netWorth` (perspectief-correct, via
+ *   `loadPerspectiveDataServer` — privacy reeds server-side toegepast). De vier
+ *   LEVER-SCORES + Box 1/3-statussen blijven ALTIJD personal-perspectief: hun
+ *   queries zijn user-scoped (eq('user_id')) — identiek aan de sidebar-dots,
+ *   die óók geen huishoud-/partnerperspectief op de hefbomen-status toepassen.
+ *   Een household/partner-view toont dus dezelfde (persoonlijke) hefboomstatus,
+ *   maar wél het perspectief-correcte netto vermogen — gelijk aan de hero.
  */
 export const loadLeverScores = cache(async function loadLeverScores(
   supabase: SupabaseClient,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _perspective: Perspective = 'personal',
+  perspective: Perspective = 'personal',
 ): Promise<LeverScoresResult> {
   const user = await getCachedUser(supabase)
   if (!user) {
@@ -116,7 +125,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
       box3TaxableAboveThreshold: 0,
       hasBox3Assets: false,
     }
-    return { scores: empty, taxInput, box3Status: 'neutral', box1Status: 'neutral' }
+    return { scores: empty, taxInput, box3Status: 'neutral', box1Status: 'neutral', netWorth: 0 }
   }
 
   // 3-maands-venster voor de spaarquote (identiek aan de shell).
@@ -142,6 +151,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
     budgetHealthRes,
     budgetTxRes,
     monthIncomeTxRes,
+    bankAccountsRes,
   ] = await Promise.all([
     supabase
       .from('profiles')
@@ -185,6 +195,15 @@ export const loadLeverScores = cache(async function loadLeverScores(
       .eq('user_id', user.id)
       .gte('date', monthStart)
       .lt('date', monthEnd),
+    // Niet-gekoppelde bankrekeningen (linked_asset_id IS NULL) — RLS-gescoped op
+    // de gebruiker. Identiek aan lib/horizon-data-loader.ts:298 zodat de
+    // netto-vermogen-grondslag byte-gelijk is aan de hero. unlinkedCash is altijd
+    // de eigen liquiditeit (geen perspectief-split — net als in de horizon-loader).
+    supabase
+      .from('bank_accounts')
+      .select('balance')
+      .eq('is_active', true)
+      .is('linked_asset_id', null),
   ])
 
   const profile = (profileRes.data ?? {}) as LeverScoresProfile
@@ -210,6 +229,40 @@ export const loadLeverScores = cache(async function loadLeverScores(
   const assetTypeSet = new Set(
     assetRows.map((a) => a.asset_type).filter((t): t is string => Boolean(t)),
   )
+
+  // ── Canoniek netto vermogen (perspectief-correct, incl. unlinkedCash) ─────────
+  // Spiegelt lib/horizon-data-loader.ts (healthScoreInput.totalAssets−totalDebts):
+  // bezittingen + niet-gekoppelde bankrekeningen − schulden, in eigen weergave
+  // byte-gelijk aan de eigen aggregaten hierboven. Bij household/partner via de
+  // gedeelde, privacy-veilige `loadPerspectiveDataServer` (zelfde share()-regel).
+  // Dit voedt UITSLUITEND de sidebar-netWorth-metric — niet de lever-scores.
+  const unlinkedCash = ((bankAccountsRes.data ?? []) as Array<{ balance: number | string }>).reduce(
+    (s, a) => s + Number(a.balance),
+    0,
+  )
+  let perspectiveTotalAssets = totalAssets + unlinkedCash
+  let perspectiveTotalDebts = totalDebts
+  if (perspective !== 'personal') {
+    try {
+      const pd = await loadPerspectiveDataServer(supabase, perspective)
+      const share = (item: { ownership?: string; _myShareFraction?: number }, raw: number): number =>
+        item.ownership === 'shared' && perspective !== 'household'
+          ? raw * (item._myShareFraction ?? 1)
+          : raw
+      perspectiveTotalAssets =
+        pd.assets.reduce((s, a) => {
+          const raw = Number(a.current_value) * ((Number(a.net_worth_inclusion_pct) || 100) / 100)
+          return s + share(a, raw)
+        }, 0) + unlinkedCash
+      perspectiveTotalDebts = pd.debts.reduce((s, d) => {
+        const raw = Number(d.current_balance) * ((Number(d.net_worth_inclusion_pct) || 100) / 100)
+        return s + share(d, raw)
+      }, 0)
+    } catch {
+      // Perspectief-laden faalt (geen huishouden / RLS) → val terug op eigen data.
+    }
+  }
+  const netWorth = perspectiveTotalAssets - perspectiveTotalDebts
 
   // ── Spaarquote (3 maanden) ──
   const txData = (txRes.data ?? []) as Array<{ amount: number | string; is_income: boolean }>
@@ -281,5 +334,5 @@ export const loadLeverScores = cache(async function loadLeverScores(
     marginaalTarief: box1MarginaalTarief,
   })
 
-  return { scores, taxInput, box3Status, box1Status }
+  return { scores, taxInput, box3Status, box1Status, netWorth }
 })

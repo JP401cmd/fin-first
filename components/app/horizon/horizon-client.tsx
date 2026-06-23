@@ -153,7 +153,8 @@ import {
   getWealthCompositionTips,
   getIncomeExpenseTips,
 } from '@/lib/chart-tips'
-import { ToekomstOverlay, OVERLAY_ICONS, type OverlayBalloonDef } from '@/components/app/horizon/toekomst-overlay'
+import { ToekomstOverlay, type OverlayBalloonDef, type ToekomstOverlayGeometry } from '@/components/app/horizon/toekomst-overlay'
+import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
 import { ToekomstWelcome } from '@/components/app/horizon/toekomst-welcome'
 import { ToekomstExitNotice } from '@/components/app/horizon/toekomst-exit-notice'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
@@ -2693,116 +2694,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // strategie-modal, event-pane) — geapunteerd door de ToekomstOverlay.
 
   // ── STEP 4: ballon-definities — puur informatieve uitleg bij de grafiek ──
-  // De ballonnen leggen uit wat elke lijn/elk punt op de grafiek betekent
-  // ("Geld is opgeslagen tijd"-geest); ze navigeren NIET (geen cta/onActivate).
-  // De onderliggende bewerk-pagina's blijven bereikbaar via de normale navigatie.
-  // Bedragen via formatMaskedCurrency zodat privacy-modus ze maskeert.
-  const toekomstOverlayBalloons: OverlayBalloonDef[] = useMemo(() => {
-    const yearlyIncome = (effectiveInput?.monthlyIncome ?? 0) * 12
-    const totalAssets = effectiveInput?.totalAssets ?? 0
-    const totalDebts = effectiveInput?.totalDebts ?? 0
-    const yearlyExpenses = (effectiveInput?.monthlyExpenses ?? 0) * 12
-    return [
-      // ── Bovenste rij — je gegevens NU (waaruit de opbouw groeit) ──
-      {
-        id: 'inkomen',
-        icon: OVERLAY_ICONS.income,
-        kicker: 'Je inkomen',
-        body: yearlyIncome > 0
-          ? `De opbouw start vanuit ${formatMaskedCurrency(yearlyIncome, masked)} inkomen per jaar: hoe meer daarvan je opzij zet, hoe sneller de lijn stijgt richting vrijheid.`
-          : 'Je inkomen voedt de opbouwfase: het deel dat je niet uitgeeft, wordt opgeslagen tijd die de lijn omhoog duwt.',
-        row: 'top',
-        emphasis: 'accumulation',
-      },
-      {
-        id: 'inkomensstrategie',
-        icon: OVERLAY_ICONS.incomeStrategy,
-        kicker: 'Inkomensstrategie',
-        body: 'Salarisgroei, promotie of juist minder werken laat je inkomen — en daarmee de steilheid van de opbouwlijn — over de jaren meebewegen.',
-        row: 'top',
-        emphasis: 'accumulation',
-      },
-      {
-        id: 'bezittingen',
-        icon: OVERLAY_ICONS.assets,
-        kicker: 'Bezittingen',
-        body: totalAssets > 0
-          ? `Je bezittingen (nu ${formatMaskedCurrency(totalAssets, masked)}) zijn het startpunt van de lijn — het kapitaal dat al voor je staat te werken.`
-          : 'Spaargeld, beleggingen en je huis vormen het startpunt van de lijn: het vermogen dat al voor je werkt.',
-        row: 'top',
-        emphasis: 'accumulation',
-      },
-      {
-        id: 'schulden',
-        icon: OVERLAY_ICONS.debts,
-        kicker: 'Schulden',
-        body: totalDebts > 0
-          ? `Je schulden (nu ${formatMaskedCurrency(totalDebts, masked)}) drukken het startpunt omlaag; elke aflossing koopt een stuk vrijheid terug en tilt de lijn op.`
-          : 'Schulden zouden het startpunt omlaag drukken; zonder schulden begint je vrijheidslijn hoger.',
-        row: 'top',
-        emphasis: 'accumulation',
-      },
-      {
-        id: 'gebeurtenis',
-        icon: OVERLAY_ICONS.event,
-        kicker: 'Levensgebeurtenis',
-        body: 'Een verbouwing, kind of wereldreis verschijnt als knik in de lijn — een eenmalige uitgave of inkomst die je vrijheidsmoment verschuift.',
-        row: 'top',
-        emphasis: 'accumulation',
-      },
-      // ── Onderste rij — je strategie LATER (de afbouw + einddoel) ──
-      {
-        id: 'aow',
-        icon: OVERLAY_ICONS.aow,
-        kicker: 'AOW-strategie',
-        body: 'Vanaf je AOW-leeftijd komt er een vaste uitkering bij; die verzacht de daling van de lijn in de jaren daarna.',
-        row: 'bottom',
-        emphasis: 'fire',
-      },
-      {
-        id: 'pensioen',
-        icon: OVERLAY_ICONS.pension,
-        kicker: 'Pensioenstrategie',
-        body: 'Werknemerspensioen, lijfrente en banksparen tellen later als extra inkomen mee, waardoor je minder uit eigen vermogen hoeft te halen.',
-        row: 'bottom',
-        emphasis: 'fire',
-      },
-      {
-        id: 'eindstrategie',
-        icon: OVERLAY_ICONS.end,
-        kicker: 'Eindstrategie',
-        body: 'Of je je vermogen behoudt, opeet of nalaat bepaalt waar de lijn eindigt — en dus hoeveel vrijheid je moet opbouwen.',
-        row: 'bottom',
-        emphasis: 'fire',
-      },
-      {
-        id: 'woning',
-        icon: OVERLAY_ICONS.housing,
-        kicker: 'Je woning',
-        body: 'Verkopen of kleiner wonen zet de waarde van je huis om in besteedbaar vermogen — zichtbaar als een sprong omhoog in de lijn.',
-        row: 'bottom',
-        emphasis: 'withdrawal',
-      },
-      {
-        id: 'uitgaven',
-        icon: OVERLAY_ICONS.expenses,
-        kicker: 'Uitgaven na pensioen',
-        body: yearlyExpenses > 0
-          ? `Met ${formatMaskedCurrency(yearlyExpenses, masked)} uitgaven per jaar ligt je vrijheidsdoel vast: dat is het bedrag dat je vermogen elk jaar moet kunnen dragen.`
-          : 'Wat je later per jaar uitgeeft, bepaalt je vrijheidsdoel — het bedrag dat je vermogen elk jaar moet kunnen dragen.',
-        row: 'bottom',
-        emphasis: 'withdrawal',
-      },
-      {
-        id: 'onttrekking',
-        icon: OVERLAY_ICONS.withdrawal,
-        kicker: 'Onttrekkingsstrategie',
-        body: 'Hoeveel je later per jaar uit je vermogen haalt, bepaalt hoe snel de lijn daalt nadat werken een keuze is geworden.',
-        row: 'bottom',
-        emphasis: 'withdrawal',
-      },
-    ]
-  }, [masked, effectiveInput])
+  // De drie fase-bubbels (Opbouw / Financiële vrijheid / Afbouw) komen uit de
+  // module-level constante TOEKOMST_OVERLAY_BALLOONS (zie onder), zodat de
+  // regressietest ze kan vastpinnen. Geen eigen rekenlogica/bedragen — leke-
+  // uitleg in "Geld is opgeslagen tijd"-geest; de gewogen layout + emphasis-
+  // koppeling zit in ToekomstOverlay.
+  const toekomstOverlayBalloons: OverlayBalloonDef[] = TOEKOMST_OVERLAY_BALLOONS
 
   return (
     <div className="mx-auto max-w-6xl py-5 sm:py-8 px-4 sm:px-6">
@@ -2994,7 +2891,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
             </button>
 
-            {/* KPI 3: Opnamerate / Maandelijkse onttrekking */}
+            {/* KPI 3: Opnamerate / Maandelijkse onttrekking — secundaire diepte,
+                verborgen in Eenvoudig-modus (hard-hide). */}
+            <HideInSimple>
             <button
               type="button"
               onClick={() => setShowSwrReceipt(true)}
@@ -3022,6 +2921,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 {isPensioenMode ? 'per maand' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
               </div>
             </button>
+            </HideInSimple>
 
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
@@ -3152,7 +3052,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
             </button>
 
-            {/* KPI 3: Opnamerate */}
+            {/* KPI 3: Opnamerate — verborgen in Eenvoudig-modus (hard-hide). */}
+            <HideInSimple>
             <button
               type="button"
               onClick={() => setShowSwrReceipt(true)}
@@ -3179,6 +3080,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 {isPensioenMode ? 'per maand' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
               </div>
             </button>
+            </HideInSimple>
 
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
@@ -3350,7 +3252,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     barchart-mode i.p.v. uitgrijzen: minder visuele ruis,
                     en de gebruiker kan altijd terug-toggelen naar 'Pad'. */}
                 {chartMode === 'vermogenspad' && (
-                  <>
+                  <HideInSimple>
                     <button
                       type="button"
                       onClick={() => setScenariosExpanded(prev => !prev)}
@@ -3391,7 +3293,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         </span>
                       )}
                     </button>
-                  </>
+                  </HideInSimple>
                 )}
 
                 {/* ── Levensgebeurtenissen toggle ── */}
@@ -3452,28 +3354,35 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     Op mobiel: alleen icon. Op desktop: icon + label.
                     TrendingUp = pad/line; BarChart3 = opbouw/stack. */}
                 <div className="ml-auto flex items-center gap-1">
-                  {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setChartMode(mode)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none ${
-                        chartMode === mode
-                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                      }`}
-                      aria-pressed={chartMode === mode}
-                      aria-label={mode === 'vermogenspad' ? 'Pad-modus' : 'Opbouw-modus'}
-                      title={mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
-                    >
-                      {mode === 'vermogenspad'
-                        ? <TrendingUp className="h-3.5 w-3.5" />
-                        : <BarChart3 className="h-3.5 w-3.5" />}
-                      <span className="hidden sm:inline">
-                        {mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
-                      </span>
-                    </button>
-                  ))}
+                  {(['vermogenspad', 'vermogensopbouw'] as const).map((mode) => {
+                    const btn = (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setChartMode(mode)}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors select-none ${
+                          chartMode === mode
+                            ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                            : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                        }`}
+                        aria-pressed={chartMode === mode}
+                        aria-label={mode === 'vermogenspad' ? 'Pad-modus' : 'Opbouw-modus'}
+                        title={mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
+                      >
+                        {mode === 'vermogenspad'
+                          ? <TrendingUp className="h-3.5 w-3.5" />
+                          : <BarChart3 className="h-3.5 w-3.5" />}
+                        <span className="hidden sm:inline">
+                          {mode === 'vermogenspad' ? 'Pad' : 'Opbouw'}
+                        </span>
+                      </button>
+                    )
+                    // Opbouw-variant is secundaire diepte → verborgen in
+                    // Eenvoudig-modus (hard-hide). Pad-knop blijft altijd.
+                    return mode === 'vermogensopbouw'
+                      ? <HideInSimple key={mode}>{btn}</HideInSimple>
+                      : btn
+                  })}
                 </div>
 
                 {/* ── Inline ChartTips: kleine "i" met editorial popover ── */}
@@ -3583,6 +3492,33 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         autoScrollIntoView={overlayPrefRestored}
                         onEmphasisChange={setOverlayEmphasis}
                         balloons={toekomstOverlayBalloons}
+                        geometry={((): ToekomstOverlayGeometry => {
+                          // FIRE-fractie binnen het zichtbare leeftijdsbereik —
+                          // dezelfde bron + precedentie als de SimChart hieronder
+                          // (single-source, niet herberekend). De plot-insets
+                          // matchen CHART_PAD zodat de leader-lines/kaders precies
+                          // over het tekengebied vallen.
+                          const fireFrac = useHouseholdMainLine
+                            ? householdMainLine!.fireAgeFractional
+                            : usePartnerMainLine
+                              ? partnerLine!.fireAgeFractional
+                              : isAowStopActive
+                                ? userAowAge.fractional
+                                : simResult.fireAgeFractional
+                          const lo = visibleMin
+                          const span = visibleMax - lo
+                          const fraction =
+                            fireFrac != null && span > 0
+                              ? Math.min(Math.max((fireFrac - lo) / span, 0), 1)
+                              : null
+                          return {
+                            padLeft: CHART_PAD.left,
+                            padRight: CHART_PAD.right,
+                            padTop: CHART_PAD.top,
+                            padBottom: CHART_PAD.bottom,
+                            fireFraction: fraction,
+                          }
+                        })()}
                         summary={{
                           // Netto vermogen: zelfde canonieke afleiding als ToekomstWelcome.
                           netWorth: effectiveNetWorth,
@@ -3794,8 +3730,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         />
                       )}
 
-                      {/* ── Fase-balk (Opbouw / Overgang / Onttrekking) ── */}
+                      {/* ── Fase-balk (Opbouw / Overgang / Onttrekking) ──
+                          Secundaire diepte → verborgen in Eenvoudig-modus. */}
                       {simResult && currentAge != null && (
+                        <HideInSimple>
                         <div className="mt-2" style={{ marginLeft: CHART_PAD.left, marginRight: CHART_PAD.right }}>
                           <PhaseBar
                             currentAge={currentAge}
@@ -3810,6 +3748,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             visibleMaxAge={visibleMax}
                           />
                         </div>
+                        </HideInSimple>
                       )}
                     </>
                   )}
@@ -3886,7 +3825,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   : <>Berekend als FIRE-pad &middot; <span className="ml-0.5 underline underline-offset-2">Pensioen-modus beschikbaar &rarr;</span></>}
               </button>
 
-              {/* ── What-If inline sliders (feature #795) ── */}
+              {/* ── What-If inline sliders (feature #795) ──
+                  Secundaire diepte → verborgen in Eenvoudig-modus (hard-hide,
+                  button + panel samen). */}
+              <HideInSimple>
               <button
                 type="button"
                 onClick={() => setWhatIfInlineOpen(prev => !prev)}
@@ -3938,6 +3880,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   </div>
                 </div>
               )}
+              </HideInSimple>
             </>
           ) : null}
         </div>

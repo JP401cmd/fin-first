@@ -640,9 +640,19 @@ export function runHorizonLedger(
 
   // ── FIRE via forward doel-zoektocht (zelf-consistent) ──
   // FIRE = vroegste leeftijd waarop "stop met werken + onttrek volgens de
-  // strategie" het einddoel haalt: deplete → niet vroegtijdig leeg (eindigt ~€0),
-  // perpetual → koopkracht behouden, legacy → nalatenschap intact. De getoonde
-  // lijn ÍS die run, dus de grafiek en de FIRE-leeftijd kloppen per constructie.
+  // strategie" het einddoel haalt:
+  //  - deplete/pensioen → liquide ≥ V_nodig op de FIRE-leeftijd (ADR 0027): de
+  //    FIRE-detectie deelt nu ÉÉN grondslag met de doel-lijn (dezelfde backward-
+  //    annuïteit `vNodig`). Daardoor vallen de FIRE-stip en de doel-lijn intrinsiek
+  //    samen (binnen ~½ jaar vermogensopbouw) en klopt het getoonde 'benodigd
+  //    vermogen' met de stip. Dit vervangt de oude forward-deplete-feasibility-test
+  //    (een over-agressieve volledige-pot-spend-down liet FIRE ~4 jaar te laat
+  //    vuren — zie ADR 0027 / INV-3-herziening);
+  //  - perpetual → koopkracht behouden (eindvermogen ≥ vermogen op FIRE);
+  //  - legacy → nalatenschap intact (need-only, ADR 0014/0017).
+  // De getoonde lijn ÍS die run, dus de grafiek en de FIRE-leeftijd kloppen per
+  // constructie. NB: vNodig[i] is positie-geïndexeerd en runForward(f) levert
+  // dezelfde leeftijd-sequentie als pass1 → de index lijnt 1-op-1 uit.
   let fireAge: number | null = null
   let displayRows = pass1.rows
   // Legacy-signaal (ADR 0017): de vroegst mogelijke FIRE-leeftijd (stoppen = nu)
@@ -654,7 +664,9 @@ export function runHorizonLedger(
   } else {
     for (let f = startAge; f <= endAge; f++) {
       const run = runForward(f)
-      if (meetsStrategyTarget(run.rows, f, endAge, strategy, input.strategyConfig.legacyAmount)) {
+      const fIdx = run.rows.findIndex((r) => r.leeftijd === f)
+      const vNodigAtFire = fIdx >= 0 ? vNodig[fIdx] : Number.POSITIVE_INFINITY
+      if (meetsStrategyTarget(run.rows, f, strategy, input.strategyConfig.legacyAmount, vNodigAtFire)) {
         fireAge = f
         displayRows = run.rows
         // De vroegste passerende leeftijd is meteen de start → onvermijdelijke
@@ -693,13 +705,18 @@ export function runHorizonLedger(
 
 /**
  * Haalt een retire-at-FIRE-run het einddoel van de strategie?
- *  - niet vroegtijdig leeg (liquide > €1 vóór de eindleeftijd) voor álle strategieën;
- *  - perpetual: eindvermogen ≥ vermogen op FIRE (koopkracht behouden);
+ *  - deplete/pensioen: liquide vermogen op de FIRE-leeftijd ≥ V_nodig op die
+ *    leeftijd (ADR 0027). FIRE-detectie en doel-lijn delen één grondslag (dezelfde
+ *    backward-annuïteit `vNodig`), zodat de stip en de doel-lijn samenvallen en het
+ *    'benodigd vermogen' met de stip klopt. (Verving de forward-deplete-feasibility-
+ *    test die ~4 jaar te laat vuurde.)
+ *  - perpetual: niet vroegtijdig leeg + eindvermogen ≥ vermogen op FIRE (koopkracht);
  *  - legacy: eindvermogen ≥ nalatenschapsbedrag, de brug mág richting €0 dippen
- *    maar het liquide pad mag nóóit negatief worden (ADR 0017);
- *  - deplete/pensioen: niet vroegtijdig leeg volstaat (de annuïteit eindigt ~€0).
+ *    maar het liquide pad mag nóóit negatief worden (ADR 0017).
+ *
+ * `vNodigAtFire` is V_nodig op de FIRE-leeftijd (alleen gebruikt voor deplete/pensioen).
  */
-function meetsStrategyTarget(rows: LedgerRow[], fireAge: number, endAge: number, strategy: string, legacyAmount: number): boolean {
+function meetsStrategyTarget(rows: LedgerRow[], fireAge: number, strategy: string, legacyAmount: number, vNodigAtFire: number): boolean {
   const ret = rows.filter((r) => r.leeftijd >= fireAge)
   if (ret.length === 0) return false
   const endLiquide = ret[ret.length - 1].liquideVermogen
@@ -724,11 +741,13 @@ function meetsStrategyTarget(rows: LedgerRow[], fireAge: number, endAge: number,
     return endLiquide >= ret[0].liquideVermogen * 0.99
   }
 
-  // deplete / pensioen: niet vroegtijdig leeg vóór de terminale 2 jaar (de
-  // annuïteit-onttrekking in het laatste jaar trekt het restant in één keer leeg).
-  let minEarly = Number.POSITIVE_INFINITY
-  for (const r of ret) if (r.leeftijd <= endAge - 2) minEarly = Math.min(minEarly, r.liquideVermogen)
-  return minEarly > 1
+  // deplete / pensioen (ADR 0027): FIRE = liquide ≥ V_nodig op de FIRE-leeftijd.
+  // Eén grondslag met de doel-lijn (backward-annuïteit), zodat de stip op de doel-
+  // lijn ligt. De vroegste passerende leeftijd is per constructie de crossing van
+  // de stijgende opbouwcurve met de dalende V_nodig-referentielijn (overshoot ≈ ½
+  // jaar opbouw). De spend-down zelf eindigt nog steeds ~€0 (geborgd door de
+  // 'deplete eindigt op ~€0'-test); deze drempel bepaalt alléén wanneer FIRE vuurt.
+  return ret[0].liquideVermogen >= vNodigAtFire
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { Clock } from 'lucide-react'
 import { TaxGauge } from './tax-gauge'
 import { AandachtspuntActieButton } from './aandachtspunt-actie-button'
-import { Kicker, ScenarioCallout } from '@/components/editorial'
+import { Kicker, ScenarioCallout, FiguresStrip } from '@/components/editorial'
 import { formatCurrency } from '@/lib/format'
 import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
 
@@ -20,8 +20,6 @@ import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
  * (result.dgaLeningenTotal > 0). Presentationeel — geen data-fetching, geen
  * hooks; alle waarden komen uit het reeds berekende Box2Result.
  */
-
-const PLAYFAIR = 'var(--font-display, var(--font-playfair, Georgia, serif))'
 
 export function Box2Leengrens({
   result,
@@ -67,38 +65,27 @@ export function Box2Leengrens({
         <div className="min-w-0 flex-1 space-y-2.5">
           {isOver ? (
             <>
-              <div className="border border-[var(--ink)] border-l-4 border-l-[var(--negative)] bg-[color-mix(in_srgb,var(--negative)_6%,transparent)] px-3 py-2.5 text-xs leading-snug text-[var(--ink-2)]">
-                Je leent{' '}
-                <span className="font-mono tabular-nums font-semibold">{fc(dgaLeningenExcess)}</span>{' '}
-                méér dan de drempel van {fc(dgaLeningenDrempel)}. Over dat
-                bovenmatige deel betaal je Box 2-heffing als fictief regulier
-                voordeel.
-              </div>
-              {/* Highlight-paar: bovenmatig deel + extra heffing als hero-cijfers */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5">
-                  <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-[var(--ink-4)]">
-                    Bovenmatig deel
-                  </div>
-                  <div
-                    className="mt-1 text-[19px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
-                    style={{ fontFamily: PLAYFAIR }}
-                  >
-                    {fc(dgaLeningenExcess)}
-                  </div>
-                </div>
-                <div className="border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5">
-                  <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-[var(--ink-4)]">
-                    Extra Box 2-heffing
-                  </div>
-                  <div
-                    className="mt-1 text-[19px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--negative)]"
-                    style={{ fontFamily: PLAYFAIR }}
-                  >
-                    {fc(dgaExcessTax)}
-                  </div>
-                </div>
-              </div>
+              <ScenarioCallout className="text-xs">
+                <span className="inline-flex items-start gap-2 not-italic">
+                  <span className="mt-px h-3.5 w-1 shrink-0 bg-[var(--negative)]" aria-hidden="true" />
+                  <span>
+                    Je leent{' '}
+                    <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{fc(dgaLeningenExcess)}</span>{' '}
+                    méér dan de drempel van {fc(dgaLeningenDrempel)}. Over dat
+                    bovenmatige deel betaal je Box 2-heffing als fictief regulier
+                    voordeel.
+                  </span>
+                </span>
+              </ScenarioCallout>
+              {/* Highlight-paar: bovenmatig deel + extra heffing als FiguresStrip */}
+              <FiguresStrip
+                cols={2}
+                className="my-0"
+                figures={[
+                  { kicker: 'Bovenmatig deel', amount: fc(dgaLeningenExcess) },
+                  { kicker: 'Extra Box 2-heffing', amount: fc(dgaExcessTax), variant: 'negative' },
+                ]}
+              />
               {freedomDays > 0 && (
                 <div className="flex items-center gap-1.5 text-[11px] text-[var(--ink-3)]">
                   <Clock className="h-3 w-3" aria-hidden="true" />
@@ -125,10 +112,12 @@ export function Box2Leengrens({
             </>
           ) : (
             <>
-              <div className="border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5 text-xs leading-snug text-[var(--ink-2)]">
-                Je blijft onder de drempel — geen extra Box 2-heffing voor
-                excessief lenen.
-              </div>
+              <ScenarioCallout className="text-xs">
+                <span className="not-italic">
+                  Je blijft onder de drempel — geen extra Box 2-heffing voor
+                  excessief lenen.
+                </span>
+              </ScenarioCallout>
               <div className="flex items-center justify-between gap-3 text-xs">
                 <span className="text-[var(--ink-2)]">Ruimte tot de grens</span>
                 <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">

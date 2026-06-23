@@ -97,6 +97,10 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'Gereedschap voor browser-automatisering — navigeren, formulieren, screenshots, web-tests.',
   },
+  'ui-ux': {
+    kind: 'tooling',
+    tagline: 'De canonieke TriFinity-design-taal: kwaliteitstoets, patroon-catalogus en page-type-blueprints voor elke UI-bouw en -review.',
+  },
 }
 
 // ── Curatie: groepen + agents ───────────────────────────────────────────────-

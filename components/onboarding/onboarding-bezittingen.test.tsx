@@ -96,6 +96,62 @@ describe('OnboardingBezittingen — begeleide ja/nee-flow', () => {
   })
 })
 
+// ── Afsluitend overzicht (review-fase) ─────────────────────────────────
+
+describe('OnboardingBezittingen — afsluitend overzicht', () => {
+  /** Loopt de hele sectie af tot de catch-all "Heb je nog andere bezittingen?". */
+  function advanceToOtherAsk(container: HTMLElement) {
+    // betaalrekening → spaargeld → eigen huis → beleggingen → andere
+    for (let i = 0; i < 4; i++) fireEvent.click(footerButton('Nee'))
+    expect(container.textContent).toContain('Heb je nog andere bezittingen?')
+  }
+
+  it('toont na de laatste "nee" het review-scherm wanneer er bezittingen zijn', () => {
+    const onNext = vi.fn()
+    const { container } = render(<Host onNext={onNext} />)
+    // Voeg eerst een betaalrekening toe.
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    // Verlaat de "nog een?"-loop en loop de resterende gerichte vragen af.
+    fireEvent.click(footerButton('Nee')) // verlaat cash-more → spaargeld
+    fireEvent.click(footerButton('Nee')) // eigen huis
+    fireEvent.click(footerButton('Nee')) // beleggingen
+    fireEvent.click(footerButton('Nee')) // → andere bezittingen?
+    expect(container.textContent).toContain('Heb je nog andere bezittingen?')
+    // "Nee" op de catch-all → review-scherm (nog NIET onNext).
+    fireEvent.click(footerButton('Nee'))
+    expect(container.textContent).toContain('Dit zijn je bezittingen')
+    expect(onNext).not.toHaveBeenCalled()
+    // "Klopt het? → ga door" rondt de sectie af.
+    fireEvent.click(footerButton(/Klopt het/))
+    expect(onNext).toHaveBeenCalledOnce()
+  })
+
+  it('slaat het review-scherm over bij een lege lijst (direct door)', () => {
+    const onNext = vi.fn()
+    const { container } = render(<Host onNext={onNext} />)
+    advanceToOtherAsk(container)
+    // "Nee" op de catch-all met lege lijst → direct onNext, geen review.
+    fireEvent.click(footerButton('Nee'))
+    expect(onNext).toHaveBeenCalledOnce()
+    expect(container.textContent).not.toContain('Dit zijn je bezittingen')
+  })
+
+  it('"Voeg nog iets toe" vanuit review keert terug naar de picker', () => {
+    const { container } = render(<Host />)
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(footerButton('Nee')) // cash-more → spaargeld
+    fireEvent.click(footerButton('Nee')) // eigen huis
+    fireEvent.click(footerButton('Nee')) // beleggingen
+    fireEvent.click(footerButton('Nee')) // andere bezittingen?
+    fireEvent.click(footerButton('Nee')) // → review
+    expect(container.textContent).toContain('Dit zijn je bezittingen')
+    fireEvent.click(footerButton(/Voeg nog iets toe/))
+    expect(container.textContent).toContain('Wat voor bezitting?')
+  })
+})
+
 // ── Gekoppeld huis ↔ hypotheek (onboarding-paar, controlled props) ─────────
 
 const HOUSE: AssetQuickInput = {

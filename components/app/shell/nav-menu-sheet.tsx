@@ -8,9 +8,11 @@ import {
   navGroups,
   globalNav,
   OVERVIEW_APP_SUBROUTES,
+  SIMPLE_HIDDEN_NAV_HREFS,
   type NavColor,
   type NavItem,
 } from '@/lib/nav-config'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import {
   useLeverScores,
   useActiveAppKeys,
@@ -74,6 +76,7 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   const pathname = usePathname() ?? '/'
   const leverScores = useLeverScores()
   const activeAppKeys = useActiveAppKeys()
+  const { mode: displayMode } = useDisplayMode()
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
@@ -84,7 +87,13 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   // tracking-flag heeft staan).
   const subRoutesFor = (parentHref: string): NavItem[] => {
     const group = navGroups.find((g) => g.parent.href === parentHref)
-    const base = group?.items ?? []
+    let base = group?.items ?? []
+    // Eenvoudig-weergave: verberg de aangewezen menu-ingangen (Rekenhulp/Wat-Als).
+    // Filtert ALLEEN de sheet-ingang — de pagina's blijven via deeplink + Volledig
+    // bereikbaar, en navGroups/resolveRouteTitle blijven ongemoeid.
+    if (displayMode === 'simple') {
+      base = base.filter((item) => !SIMPLE_HIDDEN_NAV_HREFS.includes(item.href))
+    }
     if (parentHref === '/overzicht') {
       const activeApps = OVERVIEW_APP_SUBROUTES.filter((a) =>
         activeAppKeys.includes(a.appKey),

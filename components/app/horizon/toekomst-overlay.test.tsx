@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ToekomstOverlay, type OverlayBalloonDef } from './toekomst-overlay'
+import { ToekomstOverlay, type OverlayBalloonDef, type ToekomstOverlayGeometry } from './toekomst-overlay'
+import { TOEKOMST_OVERLAY_BALLOONS } from './toekomst-overlay-balloons'
 
 // `canHover` (hover-apparaat ja/nee) en `inline` (ruim scherm ja/nee)
 // deterministisch sturen — anders hangt het gedrag af van de jsdom-matchMedia-
@@ -40,6 +41,7 @@ describe('ToekomstOverlay — sluiten', () => {
       body: 'x',
       cta: 'y',
       row: 'top',
+      slot: 'bottom-left',
       emphasis: 'accumulation',
       onActivate: () => {},
     },
@@ -263,7 +265,7 @@ describe('ToekomstOverlay — sluiten', () => {
     render(
       <ToekomstOverlay
         visible
-        balloons={[{ id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'Uitleg.', row: 'top', emphasis: 'accumulation' }]}
+        balloons={[{ id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'Uitleg.', row: 'top', slot: 'bottom-left', emphasis: 'accumulation' }]}
         onEmphasisChange={() => {}}
         onClose={() => {}}
       >
@@ -307,7 +309,7 @@ describe('ToekomstOverlay — sluiten', () => {
     render(
       <ToekomstOverlay
         visible
-        balloons={[{ id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'Directe uitleg.', row: 'top', emphasis: 'accumulation' }]}
+        balloons={[{ id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'Directe uitleg.', row: 'top', slot: 'bottom-left', emphasis: 'accumulation' }]}
         onEmphasisChange={() => {}}
         onClose={() => {}}
       >
@@ -373,7 +375,7 @@ describe('ToekomstOverlay — sluiten', () => {
     render(
       <ToekomstOverlay
         visible
-        balloons={[{ id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'Directe uitleg.', row: 'top', emphasis: 'accumulation' }]}
+        balloons={[{ id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'Directe uitleg.', row: 'top', slot: 'bottom-left', emphasis: 'accumulation' }]}
         onEmphasisChange={onEmphasisChange}
         onClose={() => {}}
       >
@@ -398,7 +400,7 @@ describe('ToekomstOverlay — sluiten', () => {
   // de ouder zet 'm pas op true nadat de voorkeur ná hydratie is ingelezen.
   describe('auto-scroll gate', () => {
     const balloons2: OverlayBalloonDef[] = [
-      { id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'x', row: 'top', emphasis: 'accumulation' },
+      { id: 'inkomen', icon: null, kicker: 'Je inkomen', body: 'x', row: 'top', slot: 'bottom-left', emphasis: 'accumulation' },
     ]
 
     // jsdom definieert `scrollIntoView` niet op de prototype (de component guard't
@@ -487,5 +489,127 @@ describe('ToekomstOverlay — sluiten', () => {
       </ToekomstOverlay>,
     )
     expect(screen.getByText(/Je kan dit scherm weer vinden/)).toBeTruthy()
+  })
+})
+
+// ── Regressie: exact DRIE fase-bubbels met de juiste kickers + emphasis-mapping ──
+// De gebruiker verving 11 bubbels door precies drie (Opbouw / Financiële vrijheid
+// / Afbouw). Deze test pint dat aantal, de kickers, de slot-plaatsing en de
+// fase-mapping (accumulation/fire/withdrawal) vast tegen toekomstige drift.
+describe('TOEKOMST_OVERLAY_BALLOONS — drie fase-bubbels', () => {
+  it('bevat exact 3 bubbels', () => {
+    expect(TOEKOMST_OVERLAY_BALLOONS).toHaveLength(3)
+  })
+
+  it('mapt Opbouw → accumulation (links-onder), Vrijheid → fire (midden-boven), Afbouw → withdrawal (rechts-onder)', () => {
+    const byId = Object.fromEntries(TOEKOMST_OVERLAY_BALLOONS.map((b) => [b.id, b]))
+
+    expect(byId.opbouw.kicker).toBe('Opbouw')
+    expect(byId.opbouw.emphasis).toBe('accumulation')
+    expect(byId.opbouw.slot).toBe('bottom-left')
+
+    expect(byId.vrijheid.kicker).toBe('Financiële vrijheid')
+    expect(byId.vrijheid.emphasis).toBe('fire')
+    expect(byId.vrijheid.slot).toBe('top-center')
+
+    expect(byId.afbouw.kicker).toBe('Afbouw')
+    expect(byId.afbouw.emphasis).toBe('withdrawal')
+    expect(byId.afbouw.slot).toBe('bottom-right')
+  })
+
+  it('elke bubbel heeft een unieke slot en is puur informatief (geen cta/onActivate)', () => {
+    const slots = TOEKOMST_OVERLAY_BALLOONS.map((b) => b.slot)
+    expect(new Set(slots).size).toBe(3)
+    for (const b of TOEKOMST_OVERLAY_BALLOONS) {
+      expect(b.cta).toBeUndefined()
+      expect(b.onActivate).toBeUndefined()
+      expect(b.body.length).toBeGreaterThan(0)
+    }
+  })
+})
+
+// ── Gewogen layout (ruim scherm + geometrie): drie bubbels + leader-laag ──
+// Op ruime schermen met geometrie rendert de overlay de gewogen layout: de drie
+// bodies staan direct leesbaar (geen uitklap-markers) en de SVG-leader-laag
+// (fase-kaders + FIRE-cirkel + lijnen) verschijnt over de grafiek.
+describe('ToekomstOverlay — gewogen layout', () => {
+  const geometry: ToekomstOverlayGeometry = {
+    padLeft: 60,
+    padRight: 16,
+    padTop: 16,
+    padBottom: 28,
+    fireFraction: 0.45,
+  }
+
+  beforeEach(() => {
+    // useIsLgUp() => true (ruim scherm → weighted layout).
+    vi.mocked(useMediaQuery).mockImplementation((q: string) => q.includes('min-width: 1024px'))
+  })
+
+  it('toont de drie bodies direct (geen uitklap-markers) wanneer geometry gegeven is', () => {
+    render(
+      <ToekomstOverlay
+        visible
+        balloons={TOEKOMST_OVERLAY_BALLOONS}
+        geometry={geometry}
+        onEmphasisChange={() => {}}
+        onClose={() => {}}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+    // Alle drie de kickers zijn direct zichtbaar.
+    expect(screen.getByText('Opbouw')).toBeTruthy()
+    expect(screen.getByText('Financiële vrijheid')).toBeTruthy()
+    expect(screen.getByText('Afbouw')).toBeTruthy()
+    // Geen uitklap-marker-knoppen in de gewogen layout.
+    expect(screen.queryByLabelText(/^Tip: /)).toBeNull()
+  })
+
+  // ── Regressie: bubbels horen ALLEEN in de tips-overlay, niet standaard in de
+  // pagina ── Op ruim scherm + geometrie zou de gewogen layout de bubbels eerder
+  // ook tonen wanneer de tips UIT stonden (visible=false). De fase-bubbels mogen
+  // alleen verschijnen als de overlay zichtbaar is.
+  it('toont GEEN fase-bubbels als de tips uit staan (visible=false), ook op ruim scherm met geometrie', () => {
+    render(
+      <ToekomstOverlay
+        visible={false}
+        balloons={TOEKOMST_OVERLAY_BALLOONS}
+        geometry={geometry}
+        onEmphasisChange={() => {}}
+        onClose={() => {}}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+    // De grafiek staat er (in-flow), maar geen enkele bubbel-kicker.
+    expect(screen.getByTestId('chart')).toBeTruthy()
+    expect(screen.queryByText('Opbouw')).toBeNull()
+    expect(screen.queryByText('Financiële vrijheid')).toBeNull()
+    expect(screen.queryByText('Afbouw')).toBeNull()
+  })
+
+  it('accentueert de juiste grafiekfase bij hover op een gewogen bubbel', () => {
+    const onEmphasisChange = vi.fn()
+    render(
+      <ToekomstOverlay
+        visible
+        balloons={TOEKOMST_OVERLAY_BALLOONS}
+        geometry={geometry}
+        onEmphasisChange={onEmphasisChange}
+        onClose={() => {}}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+    // Target via de body-tekst (een <p> in de kaart) → `.closest('div')` levert
+    // de kaart-div met de hover-handler (zelfde patroon als de inline-kaart-test).
+    const opbouwCard = screen.getByText(TOEKOMST_OVERLAY_BALLOONS[0].body).closest('div')!
+    fireEvent.mouseEnter(opbouwCard)
+    expect(onEmphasisChange).toHaveBeenLastCalledWith('accumulation')
+
+    const vrijheidCard = screen.getByText(TOEKOMST_OVERLAY_BALLOONS[1].body).closest('div')!
+    fireEvent.mouseEnter(vrijheidCard)
+    expect(onEmphasisChange).toHaveBeenLastCalledWith('fire')
   })
 })

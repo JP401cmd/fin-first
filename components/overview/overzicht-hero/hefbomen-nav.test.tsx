@@ -6,6 +6,7 @@ import type { HealthScore } from '@/lib/financial-health'
 import type { HefbomenTotals } from './hefbomen-nav'
 import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import type { LeverScores } from '@/components/app/shell/lever-scores'
 
 /**
  * Tests voor HefbomenNav — 4-tegel-rij op /overzicht hero met
@@ -233,6 +234,134 @@ describe('HefbomenNav — privacy-masking voor saldi', () => {
       <HefbomenNav health={mockHealth()} totals={totals} />,
     )
     expect(container.textContent).toContain('42%')
+  })
+})
+
+describe('HefbomenNav — leverScores prop (gedeelde SSoT)', () => {
+  /**
+   * Bewijst dat de status-dot uit de leverScores-prop wordt afgeleid
+   * wanneer die prop aanwezig is, en NIET uit de health-pijlers.
+   *
+   * LeverageCard rendert de status-dot als:
+   *   <span class="absolute right-2.5 top-2.5 ... rounded-full {LEVERAGE_STATUS_DOT[status]}" />
+   */
+  function getDots(container: HTMLElement): HTMLElement[] {
+    return Array.from(container.querySelectorAll('span.absolute.rounded-full')) as HTMLElement[]
+  }
+
+  function makeAllGreenLeverScores(): LeverScores {
+    const entry = { score: 80, status: 'green' as const, detail: 'groen' }
+    return { assets: entry, debts: entry, cashflow: entry, tax: entry }
+  }
+
+  function makeAllRedLeverScores(): LeverScores {
+    const entry = { score: 10, status: 'red' as const, detail: 'rood' }
+    return { assets: entry, debts: entry, cashflow: entry, tax: entry }
+  }
+
+  it('alle dots zijn emerald (green→good) wanneer leverScores groen is', () => {
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} leverScores={makeAllGreenLeverScores()} />,
+    )
+    const dots = getDots(container)
+    expect(dots.length).toBe(4)
+    dots.forEach((dot) => {
+      expect(dot.className).toContain('bg-emerald-500')
+    })
+  })
+
+  it('alle dots zijn rood (red→bad) wanneer leverScores rood is', () => {
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} leverScores={makeAllRedLeverScores()} />,
+    )
+    const dots = getDots(container)
+    expect(dots.length).toBe(4)
+    dots.forEach((dot) => {
+      expect(dot.className).toContain('bg-red-500')
+    })
+  })
+
+  it('leverScores overschrijft de pillar-status: groen wins boven slechte pillar', () => {
+    // health heeft een slechte savings_rate (score=5 → bad), maar leverScores=groen
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} leverScores={makeAllGreenLeverScores()} />,
+    )
+    const dots = getDots(container)
+    // Geen rode dots (pillar-fallback) wanneer leverScores aanwezig
+    dots.forEach((dot) => {
+      expect(dot.className).not.toContain('bg-red-500')
+      expect(dot.className).toContain('bg-emerald-500')
+    })
+  })
+
+  it('valt terug op pillar-status wanneer leverScores ontbreekt (null)', () => {
+    // Met savings_rate score=30 → bad → bg-red-500 voor cashflow-dot.
+    // Zonder leverScores MOET de pillar-fallback actief zijn.
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} leverScores={null} />,
+    )
+    const dots = getDots(container)
+    expect(dots.length).toBe(4)
+    // Cashflow heeft score 30 → bad, dus er moet minstens één rode dot zijn
+    const redDots = dots.filter((d) => d.className.includes('bg-red-500'))
+    expect(redDots.length).toBeGreaterThan(0)
+  })
+
+  it('amber leverScores geeft bg-amber-500 op alle kaarten', () => {
+    const amberEntry = { score: 45, status: 'amber' as const, detail: 'amber' }
+    const amberScores: LeverScores = {
+      assets: amberEntry,
+      debts: amberEntry,
+      cashflow: amberEntry,
+      tax: amberEntry,
+    }
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} leverScores={amberScores} />,
+    )
+    const dots = getDots(container)
+    dots.forEach((dot) => {
+      expect(dot.className).toContain('bg-amber-500')
+    })
+  })
+
+  it('neutral leverScores geeft bg-stone-300 (geen emerald/amber/red)', () => {
+    const neutralEntry = { score: null, status: 'neutral' as const, detail: 'geen data' }
+    const neutralScores: LeverScores = {
+      assets: neutralEntry,
+      debts: neutralEntry,
+      cashflow: neutralEntry,
+      tax: neutralEntry,
+    }
+    const { container } = render(
+      <HefbomenNav health={null} leverScores={neutralScores} />,
+    )
+    const dots = getDots(container)
+    expect(dots.length).toBe(4)
+    dots.forEach((dot) => {
+      expect(dot.className).toContain('bg-stone-300')
+      expect(dot.className).not.toContain('bg-emerald-500')
+      expect(dot.className).not.toContain('bg-amber-500')
+      expect(dot.className).not.toContain('bg-red-500')
+    })
+  })
+
+  it('gemengde leverScores: elke hefboom krijgt zijn eigen status-dot', () => {
+    const mixedScores: LeverScores = {
+      assets: { score: 80, status: 'green', detail: '' },
+      debts: { score: 45, status: 'amber', detail: '' },
+      cashflow: { score: 10, status: 'red', detail: '' },
+      tax: { score: null, status: 'neutral', detail: '' },
+    }
+    const { container } = render(
+      <HefbomenNav health={null} leverScores={mixedScores} />,
+    )
+    const dots = getDots(container)
+    expect(dots.length).toBe(4)
+    // Volgorde: bezittingen, schulden, cashflow, belasting
+    expect(dots[0]?.className).toContain('bg-emerald-500') // assets: green
+    expect(dots[1]?.className).toContain('bg-amber-500')   // debts: amber
+    expect(dots[2]?.className).toContain('bg-red-500')     // cashflow: red
+    expect(dots[3]?.className).toContain('bg-stone-300')   // tax: neutral
   })
 })
 

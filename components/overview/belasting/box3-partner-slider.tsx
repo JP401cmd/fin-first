@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Clock, Users } from 'lucide-react'
 import { Box3SectionHeader } from './box3-section-header'
 import { AandachtspuntActieButton } from './aandachtspunt-actie-button'
-import { ScenarioCallout } from '@/components/editorial'
+import { ScenarioCallout, FiguresStrip } from '@/components/editorial'
 import {
   formatMaskedCurrency,
   calculateFreedomTime,
@@ -13,7 +13,6 @@ import {
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { calculatePartnerSplit, type PartnerAllocation, type TaxYear } from '@/lib/box3-data'
 
-const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 
 /**
@@ -133,34 +132,21 @@ export function Box3PartnerSlider({
         </div>
       </div>
 
-      {/* Live heffing vs. optimaal */}
-      <div className="grid grid-cols-2 border-t border-b border-[var(--ink)]">
-        <div className="border-r border-[var(--rule-soft)] px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink-3)]">
-            Bij deze verdeling
-          </div>
-          <div
-            className="mt-1.5 font-mono tabular-nums text-[26px] font-black leading-none tracking-[-0.02em] text-[var(--ink)]"
-            style={{ fontFamily: PLAYFAIR }}
-          >
-            {fc(split.totalTax)}
-          </div>
-        </div>
-        <div
-          className="px-4 py-3"
-          style={{ backgroundColor: 'color-mix(in srgb, var(--module-active-500) 6%, transparent)' }}
-        >
-          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--module-active-700)]">
-            Optimaal (≈ {optimalPctP1}/{100 - optimalPctP1})
-          </div>
-          <div
-            className="mt-1.5 font-mono tabular-nums text-[26px] font-black leading-none tracking-[-0.02em] text-[var(--ink)]"
-            style={{ fontFamily: PLAYFAIR }}
-          >
-            {fc(optimalTax)}
-          </div>
-        </div>
-      </div>
+      {/* Live heffing vs. optimaal — via FiguresStrip (top/bottom-rule) */}
+      <FiguresStrip
+        cols={2}
+        figures={[
+          {
+            kicker: 'Bij deze verdeling',
+            amount: fc(split.totalTax),
+          },
+          {
+            kicker: `Optimaal (≈ ${optimalPctP1}/${100 - optimalPctP1})`,
+            amount: fc(optimalTax),
+            variant: 'winner',
+          },
+        ]}
+      />
 
       {/* Verdict */}
       {isOptimal ? (

@@ -23,6 +23,33 @@ import {
   leverageStatusTextClass,
   type LeverageStatus,
 } from '@/lib/leverage-status'
+import type { LeverScores, LeverStatus } from '@/components/app/shell/lever-scores'
+
+/**
+ * Map de kompas-status (`LeverStatus`: green/amber/red/neutral) naar het
+ * `LeverageStatus`-vocabulaire (good/warn/bad/neutral) dat de hefboomkaarten
+ * renderen. Zo lezen de overzicht-kaarten EXACT dezelfde status als de
+ * sidebar-dots — beide komen uit `loadLeverScores` (gedeelde SSoT die ook de
+ * status-duiding-banner voedt). Geen tweede scoringssysteem meer (BUG: kaart
+ * groen, sidebar oranje voor dezelfde hefboom).
+ */
+function leverToLeverageStatus(status: LeverStatus): LeverageStatus {
+  return status === 'green'
+    ? 'good'
+    : status === 'amber'
+      ? 'warn'
+      : status === 'red'
+        ? 'bad'
+        : 'neutral'
+}
+
+/** Hefboom-key → de bijbehorende LeverScores-entry. */
+const LEVER_KEY_MAP: Record<Hefboom, keyof LeverScores> = {
+  bezittingen: 'assets',
+  schulden: 'debts',
+  cashflow: 'cashflow',
+  belasting: 'tax',
+}
 
 type HefboomKey = Hefboom
 type StatusCode = LeverageStatus
@@ -97,10 +124,19 @@ function statusSubText(key: HefboomKey, status: StatusCode, pillar?: HealthPilla
 
 export function HefbomenNav({
   health,
+  leverScores,
   totals,
   simple = false,
 }: {
   health: HealthScore | null
+  /**
+   * De vier-hefbomen-kompas-scores uit `loadLeverScores` — de gedeelde SSoT die
+   * óók de sidebar-dots en de status-duiding-banner voedt. De status-dot op
+   * elke kaart komt hieruit (niet meer uit de gezondheidsscore-pijlers), zodat
+   * kaart == sidebar-dot == banner per definitie gelijk zijn. Null → val terug
+   * op de pijler-/proxy-status (legacy gedrag, bv. wanneer nog niet geladen).
+   */
+  leverScores?: LeverScores | null
   totals?: HefbomenTotals
   /**
    * Eenvoudige weergave (display_mode === 'simple'): verberg de chevron /
@@ -128,8 +164,13 @@ export function HefbomenNav({
         const accent = cfg.tint
         const pillar =
           pillarKey && health ? health.pillars.find((p) => p.id === pillarKey) : undefined
+        // Status-bron: leverScores (gedeelde SSoT, == sidebar-dot). Fallback op
+        // de pijler-/proxy-status alleen wanneer leverScores (nog) ontbreekt.
+        const leverEntry = leverScores ? leverScores[LEVER_KEY_MAP[key]] : null
         const proxyScore = !pillarKey && health ? health.total : null
-        const status = pillarStatus(pillar?.score ?? proxyScore)
+        const status = leverEntry
+          ? leverToLeverageStatus(leverEntry.status)
+          : pillarStatus(pillar?.score ?? proxyScore)
 
         const totalValue = totals?.[key]
         const showTotal = typeof totalValue === 'number' && totalValue > 0

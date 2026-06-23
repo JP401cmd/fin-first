@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { CashflowInstellingenBlok } from './cashflow-instellingen-blok'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 import type { SavingsRateMethod } from '@/lib/core-metrics'
 
@@ -90,5 +92,37 @@ describe('CashflowInstellingenBlok — spaarquote-sheet methode-afhankelijk', ()
       within(sheet).getByText(/^Geschat uit de groei van je vermogen/i),
     ).toBeTruthy()
     expect(within(sheet).queryByText(/Σ Inkomen \(6 mnd\)/i)).toBeNull()
+  })
+})
+
+/**
+ * Eenvoudig-modus zichtbaarheid: de instellingen (inkomen, spaarquote,
+ * uitgaven) MOETEN óók in 'simple' zichtbaar blijven — het blok wordt op de
+ * pagina bewust NIET in <HideInSimple> gewrapt. Deze test borgt dat: zou iemand
+ * het blok per ongeluk opnieuw hard-hidden, dan vallen de drie kaarten weg en
+ * faalt deze assert. De controle-case toont dat HideInSimple in dezelfde
+ * 'simple'-context wél verbergt (zodat de test daadwerkelijk discrimineert).
+ */
+describe('CashflowInstellingenBlok — zichtbaar in Eenvoudig', () => {
+  it('toont inkomen/spaarquote/uitgaven in modus simple (geen HideInSimple)', () => {
+    render(
+      <DisplayModeProvider initialMode="simple">
+        <CashflowInstellingenBlok data={makeData('transaction')} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByText('Geschat jaarinkomen')).toBeTruthy()
+    expect(screen.getByText('Spaarquote')).toBeTruthy()
+    expect(screen.getByText('Geschatte uitgaven')).toBeTruthy()
+  })
+
+  it('controle: HideInSimple verbergt zijn inhoud wél in modus simple', () => {
+    render(
+      <DisplayModeProvider initialMode="simple">
+        <HideInSimple>
+          <CashflowInstellingenBlok data={makeData('transaction')} />
+        </HideInSimple>
+      </DisplayModeProvider>,
+    )
+    expect(screen.queryByText('Geschat jaarinkomen')).toBeNull()
   })
 })

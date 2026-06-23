@@ -115,14 +115,15 @@ UnifiedProjectionInput
 
 Recursie vanaf de eindleeftijd terug: `V_nodig[i] = (V_nodig[i+1] + netNeed[i]) / (1 + rOnttrek)`, met `rOnttrek = 0.6 × reëel gemiddeld rendement` (conservatieve onttrekkingsvoet). `V_nodig[laatste]` = einddoel per strategie (deplete → 0, perpetual → initieel liquide, legacy → nalatenschapsbedrag). VPW-variant gebruikt een annuïteitsfactor i.p.v. de recursie. **Per constructie dalend** — dit is de inspecteerbare V_nodig-curve (tabel E) die de scalar-binary-search van v1 vervangt.
 
-### 4.4 FIRE = forward doel-zoektocht (`meetsStrategyTarget`) — GEEN crossing
+### 4.4 FIRE = forward doel-zoektocht (`meetsStrategyTarget`)
 
-FIRE is de **vroegste leeftijd** waarop "stop met werken + onttrek volgens de strategie" het einddoel haalt:
-- **deplete/pensioen:** niet vroegtijdig leeg vóór de terminale 2 jaar (de annuïteit trekt het laatste jaar het restant in één keer leeg, eindigt ~€0);
+FIRE is de **vroegste leeftijd** waarop "stop met werken + onttrek volgens de strategie" het einddoel haalt. De detectie verschilt per eindstrategie:
+
+- **deplete/pensioen:** liquide vermogen op de kandidaat-FIRE-leeftijd **≥ V\_nodig** op diezelfde leeftijd — een crossing met de referentielijn (ADR 0027). Dit is de intrinsiek consistente maatstaf: V\_nodig is de grondslag van zowel de doel-lijn als de detector, zodat de FIRE-stip en de doel-lijn per constructie samenvallen (binnen ~½ jaar vermogensopbouw). De voorheen gebruikte forward-spend-down-feasibility-test (annuïteit mag niet vroegtijdig leeg) was een ander model dan de backward-annuïteit en veroorzaakte een systematisch verschil (~28% boven de doel-lijn); die test mag voor deplete/pensioen **niet worden geherintroduceerd**.
 - **perpetual:** mag tussendoor niet leeglopen én eindvermogen ≥ ~99% van het vermogen op FIRE (koopkracht behouden);
-- **legacy:** onttrekt **need-only** (alleen de leefbehoefte; géén spend-down-annuïteit) zodat het residu naar de nalatenschap groeit — mag tussendoor niet leeglopen én eindvermogen ≥ nalatenschapsbedrag (−2% marge). Zie §4.6 + ADR 0014.
+- **legacy:** onttrekt **need-only** (alleen de leefbehoefte; géén spend-down-annuïteit) zodat het residu naar de nalatenschap groeit — mag tussendoor niet leeglopen én eindvermogen ≥ nalatenschapsbedrag (geen tolerantie). Zie §4.6 + ADR 0014 + ADR 0017.
 
-De getoonde lijn ÍS die geslaagde run. Daarom kloppen grafiek en FIRE-leeftijd per constructie. **De oude crossing-gebaseerde FIRE (snijpunt V_op × V_nodig op een afwijkende decumulatie-aanname) mag NIET worden geherintroduceerd** — V_nodig is hier louter een dalende *referentielijn* (tabel E), niet de FIRE-bepaler. (NB: het plan/ADR spreken her en der nog van "snijpunt"; de geïmplementeerde en canonieke definitie is de forward doel-zoektocht — zie §10 over die woordkeuze-schuld.)
+De getoonde lijn ÍS die geslaagde run. Daarom kloppen grafiek en FIRE-leeftijd per constructie. **De oude crossing-gebaseerde FIRE op een afwijkende decumulatie-aanname** (v1-stijl, snijpunt op een aparte subsimulatie) **mag NIET worden geherintroduceerd voor perpetual/legacy** — V\_nodig is daar louter een referentielijn (tabel E), niet de FIRE-bepaler. Voor deplete/pensioen is de crossing met V\_nodig juist de correcte maatstaf (ADR 0027). (NB: het plan/ADR spreken her en der nog van "snijpunt"; de canonieke definitie per eindstrategie staat hierboven — zie §10 over de woordkeuze-schuld.)
 
 ### 4.5 Reëel intern; de adapter is het enige nominale punt
 
@@ -166,9 +167,9 @@ Alle views (A–G, grafiek) en de adapter zijn pure functies van `LedgerRow[]`; 
 `realReturn`/`liquidRealReturn` in de engine; `× (1+inflatie)^jaar` uitsluitend in `adapter.rowToUnified`. Geen `inflationFactor`-vermenigvuldiging in `engine.ts`/`views.ts`.
 *Bewaakt door:* `test/horizon-engine.test.ts` (reële kern + nominale adapter-output), code-review tegen deze invariant. (De oude `test/horizon-engine-compare.test.ts` parity-test is met de v1-engine verwijderd.) **Borgvoorstel (§11):** een grep-/unit-guard dat `engine.ts` en `views.ts` geen `Math.pow(1 + inflation` bevatten.
 
-**INV-3 — FIRE = forward doel-zoektocht (`meetsStrategyTarget`), geen crossing.**
-De getoonde lijn is de geslaagde retire-at-f run; V_nodig is referentie.
-*Bewaakt door:* `test/horizon-engine.test.ts` ("deplete: de getoonde lijn eindigt op ~€0"; "perpetual: eindigt NIET op 0"; legacy: "bereikbaar voor een gezonde spaarder", "eindvermogen haalt het nalatenschapsbedrag", "hoger bedrag → niet vroegere FIRE"), `test/horizon-persona.test.ts` ("bereikbaar FIRE-snijpunt op de voorbeelddata").
+**INV-3 — FIRE = forward doel-zoektocht (`meetsStrategyTarget`); deplete/pensioen via crossing met V\_nodig (ADR 0027).**
+De getoonde lijn is de geslaagde retire-at-f run. Detectie per eindstrategie: **perpetual/legacy** = forward doel-zoektocht (V\_nodig is referentielijn, niet de detector); **deplete/pensioen** = liquide ≥ V\_nodig op de FIRE-leeftijd (crossing met de referentielijn — ADR 0027). De forward-spend-down-feasibility-test voor deplete (annuïteit mag niet vroegtijdig leeg) is vervangen door de V\_nodig-crossing en mag niet worden geherintroduceerd.
+*Bewaakt door:* `test/horizon-engine.test.ts` ("deplete (ADR 0027): de FIRE-stip valt op de doel-lijn"; "perpetual: eindigt NIET op 0"; legacy: "bereikbaar voor een gezonde spaarder", "eindvermogen haalt het nalatenschapsbedrag", "hoger bedrag → niet vroegere FIRE"), `test/horizon-persona.test.ts` ("bereikbaar FIRE-snijpunt op de voorbeelddata").
 
 **INV-4 — Strategieën zijn pure plug-ins; nieuwe impact via plug-in of LedgerRow-kolom, nooit als special-case in de loop.**
 Verdeling/volgorde via `strategies.ts`; onttrekkingsbedrag via het hergebruikte `lib/withdrawal-strategy.ts` (`applyWithdrawalStrategy`).
@@ -196,7 +197,8 @@ Wanneer je hierna troubleshoot of een impact toevoegt, kies **altijd** één van
 3. **Nieuwe per-jaar grootheid (belasting, kostenpost, herkomst) → een KOLOM op `LedgerRow`** + vullen in de forward-pass + tonen via een view/adapter-veld. Niet als losse parallelle berekening buiten het grootboek.
 
 **Anti-patterns (verboden):**
-- ❌ Een crossing/snijpunt-FIRE herintroduceren naast `meetsStrategyTarget` (breekt INV-3).
+- ❌ Een crossing/snijpunt-FIRE op een **afwijkende decumulatie-aanname** herintroduceren voor perpetual/legacy naast `meetsStrategyTarget` (breekt INV-3). — De V\_nodig-crossing voor deplete/pensioen is daareentegen bewust correct (ADR 0027); de forward-spend-down-feasibility-test voor die tak is het verboden anti-pattern.
+- ❌ De forward-spend-down-feasibility-test (annuïteit mag niet vroegtijdig leeg) voor deplete/pensioen herintroduceren als FIRE-criterium — dat is het bug dat ADR 0027 corrigeert.
 - ❌ Een nominale `× (1+inflatie)^jaar` ergens anders dan in `adapter.ts` (breekt INV-2).
 - ❌ Een `if (event.type === 'X') …`-special-case in de jaar-loop i.p.v. een plug-in/kolom (breekt INV-4).
 - ❌ Een nieuwe hardgecodeerde financiële constante in `engine.ts` (zie §10 — er staat al schuld; niet vergroten). Tarieven horen in `lib/constants.ts`/`lib/box3-data.ts` of (Box 1) in `lib/box1-tax.ts`.

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import { OnboardingVraag } from './onboarding-vraag'
+import { SectionReview } from './section-review'
 import { DebtRow, DebtTypePicker } from './onboarding-posten'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
 import {
@@ -88,6 +89,12 @@ type SectionPhase =
   | { kind: 'other-ask' }
   | { kind: 'other-pick' }
   | { kind: 'other-more' }
+  | { kind: 'review' }
+
+/** Stabiele key per interne fase — voedt de scherm-overgang per vraag. */
+function phaseKey(phase: SectionPhase): string {
+  return `${phase.kind}-${'qIndex' in phase ? phase.qIndex : ''}`
+}
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -150,6 +157,14 @@ export function OnboardingSchulden({
     } else {
       setPhase({ kind: 'other-ask' })
     }
+  }
+
+  // Sectie afronden: bij gevulde lijst eerst een bevestigend overzicht,
+  // bij lege lijst direct door. De altijd-zichtbare drempelloze uitgang
+  // (`SECTION_EXIT_LABEL`) blijft bewust direct-naar-onNext.
+  function finishSection() {
+    if (standaloneDebts.length > 0) setPhase({ kind: 'review' })
+    else onNext()
   }
 
   // ── Lopend overzicht ────────────────────────────────────────────────
@@ -226,7 +241,7 @@ export function OnboardingSchulden({
           title={<span>Heb je nog een andere schuld?</span>}
           deck="Bijvoorbeeld een afbetalingsregeling, belastingschuld of familielening."
           onYes={() => setPhase({ kind: 'other-pick' })}
-          onNo={onNext}
+          onNo={finishSection}
         >
           {runningList}
         </OnboardingVraag>
@@ -242,10 +257,29 @@ export function OnboardingSchulden({
           yesLabel="Ja, nog een"
           noLabel="Nee, klaar"
           onYes={() => setPhase({ kind: 'other-pick' })}
-          onNo={onNext}
+          onNo={finishSection}
         >
           {runningList}
         </OnboardingVraag>
+      )
+    }
+
+    if (phase.kind === 'review') {
+      return (
+        <SectionReview
+          kicker="Schuld"
+          romanNum="iv."
+          title={<span>Dit zijn je schulden</span>}
+          deck="Samen de vrijheid die je stap voor stap terugkoopt. Klopt het, of wil je nog iets toevoegen?"
+          factsPanel={factsPanel}
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          onBack={onBack}
+          onConfirm={onNext}
+          onAddMore={() => setPhase({ kind: 'other-pick' })}
+        >
+          {runningList}
+        </SectionReview>
       )
     }
 
@@ -284,7 +318,12 @@ export function OnboardingSchulden({
 
   return (
     <>
-      {renderPhase()}
+      {/* Scherm-vernieuwing per interne vraag: re-key op de fase zodat de
+          bestaande `.step-enter-forward`-overgang óók tussen de ja/nee-
+          vervolgvragen bínnen deze sectie speelt. */}
+      <div key={phaseKey(phase)} className="step-enter-forward">
+        {renderPhase()}
+      </div>
 
       <QuickAddWizard
         open={wizardType !== null}

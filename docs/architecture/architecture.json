@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-22T21:43:40.620Z",
-  "generatedDate": "2026-06-22",
+  "generatedAt": "2026-06-23T12:35:35.422Z",
+  "generatedDate": "2026-06-23",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -193,7 +193,7 @@
     "tables": 56,
     "migrations": 115,
     "integrations": 25,
-    "components": 752,
+    "components": 758,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -12679,11 +12679,11 @@
     }
   ],
   "components": {
-    "total": 752,
+    "total": 758,
     "groups": [
       {
         "group": "app",
-        "count": 313,
+        "count": 316,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12729,6 +12729,8 @@
           "budget-hub.test",
           "budget-icon-picker",
           "budget-merge-wizard",
+          "budget-pill-tree",
+          "budget-pill-tree.test",
           "budget-plan-editor-sheet",
           "budget-sankey",
           "budget-shared",
@@ -12966,6 +12968,7 @@
           "toekomst-exit-notice",
           "toekomst-exit-notice.test",
           "toekomst-overlay",
+          "toekomst-overlay-balloons",
           "toekomst-overlay.test",
           "toekomst-welcome",
           "toekomst-welcome.test",
@@ -13002,7 +13005,7 @@
       },
       {
         "group": "overview",
-        "count": 120,
+        "count": 121,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -13042,6 +13045,7 @@
           "cashflow-kalender",
           "cashflow-kalender.test",
           "cashflow-landing-cards",
+          "cashflow-landing-cards.test",
           "cashflow-sankey",
           "cashflow-sankey.test",
           "checkin-banner",
@@ -13357,6 +13361,39 @@
         ]
       },
       {
+        "group": "onboarding",
+        "count": 27,
+        "items": [
+          "aangifte-import-pane",
+          "budget-amount-editor",
+          "facts-panel",
+          "onboarding-bezittingen",
+          "onboarding-bezittingen.test",
+          "onboarding-horizon",
+          "onboarding-identity",
+          "onboarding-inkomen",
+          "onboarding-inkomen.test",
+          "onboarding-klaar",
+          "onboarding-pensioen",
+          "onboarding-pensioen.test",
+          "onboarding-posten",
+          "onboarding-schulden",
+          "onboarding-schulden.test",
+          "onboarding-shell",
+          "onboarding-spaardoel",
+          "onboarding-success",
+          "onboarding-uitgaven-pensioen",
+          "onboarding-upo-section",
+          "onboarding-vraag",
+          "onboarding-vraag.test",
+          "progress-bar",
+          "section-review",
+          "speech-bubble",
+          "step-progress",
+          "welcome-popup"
+        ]
+      },
+      {
         "group": "mijn",
         "count": 26,
         "items": [
@@ -13386,37 +13423,6 @@
           "palette-picker.test",
           "privacy-overview",
           "privacy-overview.test"
-        ]
-      },
-      {
-        "group": "onboarding",
-        "count": 25,
-        "items": [
-          "aangifte-import-pane",
-          "budget-amount-editor",
-          "facts-panel",
-          "onboarding-bezittingen",
-          "onboarding-bezittingen.test",
-          "onboarding-horizon",
-          "onboarding-identity",
-          "onboarding-inkomen",
-          "onboarding-inkomen.test",
-          "onboarding-klaar",
-          "onboarding-pensioen",
-          "onboarding-pensioen.test",
-          "onboarding-posten",
-          "onboarding-schulden",
-          "onboarding-schulden.test",
-          "onboarding-shell",
-          "onboarding-spaardoel",
-          "onboarding-success",
-          "onboarding-upo-section",
-          "onboarding-vraag",
-          "onboarding-vraag.test",
-          "progress-bar",
-          "speech-bubble",
-          "step-progress",
-          "welcome-popup"
         ]
       },
       {
@@ -18228,19 +18234,19 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 13
-      },
-      {
-        "path": "lib/fire-simulation.ts",
-        "commits": 10
+        "commits": 12
       },
       {
         "path": "app/api/household",
         "commits": 9
       },
       {
+        "path": "lib/fire-simulation.ts",
+        "commits": 9
+      },
+      {
         "path": "lib/horizon-data.ts",
-        "commits": 6
+        "commits": 5
       },
       {
         "path": "components/horizon",
@@ -18258,17 +18264,17 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6974,
+        "loc": 6917,
         "commits": 66
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 4871,
+        "loc": 4891,
         "commits": 25
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4235,
+        "loc": 4236,
         "commits": 42
       },
       {
@@ -18289,7 +18295,7 @@
       {
         "file": "lib/horizon-data.ts",
         "loc": 2314,
-        "commits": 6
+        "commits": 5
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -18960,6 +18966,12 @@
             "agents": []
           }
         ]
+      },
+      {
+        "id": "ui-ux",
+        "name": "ui-ux",
+        "description": "Use when building, restyling or reviewing ANY TriFinity UI — pagina's, components, modals, charts, KPI-cards, formulieren, empty states. Bevat de canonieke krant/editorial design-taal, de kleur- & typografie-conventies, de kwaliteitstoets, de patroon-catalogus (kassabon, figures-strip, hero-band, ShellOverlay-driewegregel) en de elf page-type-blueprints. Raadpleeg vóór elke zichtbare UI-wijziging; dit is de single source of truth voor het ontwerp.",
+        "steps": []
       }
     ]
   },
@@ -19065,20 +19077,13 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-19",
+    "previousDate": "2026-06-22",
     "hasChanges": true,
     "sections": [
       {
-        "label": "API-routes",
-        "added": [
-          "/api/display-mode"
-        ],
-        "removed": []
-      },
-      {
         "label": "Componenten (aantal)",
         "added": [
-          "+15"
+          "+6"
         ],
         "removed": []
       }
@@ -19152,6 +19157,13 @@
       "date": "2026-06-22",
       "api": 382,
       "components": 752,
+      "tables": 56,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-06-23",
+      "api": 382,
+      "components": 758,
       "tables": 56,
       "routesProduction": 98
     }

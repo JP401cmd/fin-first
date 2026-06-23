@@ -29,6 +29,7 @@ import { VrijheidStrip } from './overzicht-hero/vrijheid-strip'
 import type { FreedomFraming } from '@/lib/fire-strategy'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import type { HefbomenTotals } from './overzicht-hero/hefbomen-nav'
+import type { LeverScores } from '@/components/app/shell/lever-scores'
 import {
   HeroEditToggle,
   HeroWidgetRail,
@@ -60,6 +61,12 @@ type OverzichtHeroProps = {
   freedomFraming?: FreedomFraming
   /** Optionele totaalbedragen per hefboom (bezittingen, schulden, etc.). */
   totals?: HefbomenTotals
+  /**
+   * Vier-hefbomen-kompas-scores uit `loadLeverScores` (gedeelde SSoT). Voedt de
+   * status-dots op de hefboomkaarten, identiek aan de sidebar-dots en de
+   * status-duiding-banner. Null → kaarten vallen terug op de pijler-status.
+   */
+  leverScores?: LeverScores | null
   /** Briefing-entries onder de hero (max 6, 3-koloms grid). Wanneer leeg
    *  toont het panel een placeholder-card. Categorieën: observation /
    *  tip / upcoming / heads_up / milestone / market. */
@@ -143,6 +150,7 @@ export function OverzichtHero({
   isPensioenMode,
   freedomFraming = 'building',
   totals,
+  leverScores,
   briefingEntries,
   briefingRefreshedAt,
   briefingDataChanged,
@@ -249,7 +257,7 @@ export function OverzichtHero({
         </EditorialHeadline>
       </header>
 
-      <HefbomenNav health={health} totals={totals} simple={simple} />
+      <HefbomenNav health={health} leverScores={leverScores} totals={totals} simple={simple} />
 
       {/* Subtiele editorial scheiding tussen de hefbomen-rij en de
           health/chart-rij. `!my-5` tempert de standaard `my-8` van de

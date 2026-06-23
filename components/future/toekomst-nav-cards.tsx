@@ -27,6 +27,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Target, CalendarClock, SlidersHorizontal, Calculator } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { LeverageCard } from '@/components/overview/leverage-card'
 import {
   leverageStatusBgClass,
@@ -324,7 +325,19 @@ export function ToekomstNavCards(props: {
   fireParams: FireParams
   calculatorCount: number
 }) {
-  const cards = buildNavCards(props)
+  const allCards = buildNavCards(props)
+
+  // In Eenvoudig-modus vervalt de drilldown-chevron: de extra diepte is dan
+  // niet gewenst (hard-hide via de `expandable`-prop op /toekomst-niveau —
+  // /overzicht regelt z'n eigen chevron-logica los hiervan).
+  const { mode } = useDisplayMode()
+  const simple = mode === 'simple'
+
+  // In Eenvoudig-modus verbergt de Rekenhulp-kaart volledig (hard-hide,
+  // dezelfde keuze als de overige Eenvoudig-vereenvoudigingen op /toekomst):
+  // de rekenhulp-diepte hoort niet bij de rustige basisweergave. In Volledig
+  // verschijnt de kaart gewoon weer.
+  const cards = simple ? allCards.filter((c) => c.key !== 'rekenhulp') : allCards
 
   // Eén kaart-expand per keer — open/dicht via chevron. Accordeon-state leeft
   // in de parent, exact zoals HefbomenNav LeverageCard aanstuurt.
@@ -348,7 +361,7 @@ export function ToekomstNavCards(props: {
             status={status}
             subText={subText}
             href={href}
-            expandable
+            expandable={!simple}
             expanded={expanded}
             onToggleExpand={() => setExpandedKey(expanded ? null : key)}
           >

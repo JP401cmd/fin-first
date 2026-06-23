@@ -33,6 +33,7 @@ import {
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
+import { getServerPerspective } from '@/lib/household/server-perspective'
 import { WillHome } from '@/components/app/will/will-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
@@ -176,11 +177,11 @@ export default async function AppLayout({
   const activeModules: ModuleId[] = [...ALL_MODULES]
 
   // ── Sidebar-metrics (Kern/Wil/Horizon kerncijfers) ─────
-  // Net-worth: spiegelt lib/dashboard-data-loader.ts:217-229 (weighted via
-  // `net_worth_inclusion_pct`, cash-only fallback bij inactieve
-  // `vermogensregistratie`). Houdt het cijfer in de sidebar consistent met
-  // dashboard-headers.
-  const sidebarHasVermogen = activeModules.includes('vermogensregistratie')
+  // Net-worth: NIET meer inline gesommeerd in de shell. Het cijfer komt
+  // canoniek + perspectief-correct (incl. niet-gekoppelde bankrekeningen) uit
+  // `loadLeverScores().netWorth` — dezelfde grondslag als de /overzicht-hero en
+  // -grafiek (healthScoreInput.totalAssets−totalDebts). Zo kan de sidebar nooit
+  // meer afwijken van de hero (BUG: 264k sidebar vs 338k grafiek).
   type AssetRow = { current_value: number | string; asset_type?: string | null; net_worth_inclusion_pct?: number | null; has_budget_tracking?: boolean; has_holdings_tracking?: boolean; has_woonbalans_tracking?: boolean; has_rental_tracking?: boolean; rental_income?: number | string | null }
   type DebtRow = { current_balance: number | string; original_amount?: number | string | null; debt_type?: string | null; net_worth_inclusion_pct?: number | null; has_hypotheekplanner_tracking?: boolean; fixed_rate_end_date?: string | null }
   const assetRows = (assetsRes.data ?? []) as AssetRow[]
@@ -261,14 +262,6 @@ export default async function AppLayout({
     (debtRows as unknown as Debt[]).map(projectDebtForCategoryNav),
     activeModules,
   )
-  const sidebarTotalAssetsRaw = assetRows.reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
-  const sidebarTotalDebtsRaw = debtRows.reduce((s, d) => s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
-  const sidebarCashOnlyAssets = assetRows
-    .filter((a) => a.asset_type === 'cash')
-    .reduce((s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
-  const sidebarNetWorth = sidebarHasVermogen
-    ? sidebarTotalAssetsRaw - sidebarTotalDebtsRaw
-    : sidebarCashOnlyAssets
   const sidebarActionCount = actionsCountRes.count ?? 0
 
   // ── Budget health (kompas cashflow-indicator #847) ───────
@@ -290,14 +283,22 @@ export default async function AppLayout({
     return spent > b.default_limit
   }).length
 
-  // ── Vier-hefbomen-kompas scores + Box 1/3-statussen (gedeelde SSoT) ──────
+  // ── Vier-hefbomen-kompas scores + Box 1/3-statussen + netto vermogen (SSoT) ──
   // Voorheen stond hier de volledige inline assemblage (assets/debts/spaarquote/
-  // box3-input + computeLeverScores + box1JaarruimteStatus). Die logica is nu
-  // de ÉNE bron `loadLeverScores`, gedeeld met de status-duiding-banner
-  // (lib/page-status/*) zodat de sidebar-dots en de banner per definitie
-  // dezelfde status tonen. `cache()` dedupliceert binnen het request.
-  const { scores: sidebarLeverScores, box1Status: sidebarBox1Status, box3Status: sidebarBox3Status } =
-    await loadLeverScores(supabase)
+  // box3-input + computeLeverScores + box1JaarruimteStatus) én een aparte
+  // netto-vermogen-som. Beide komen nu uit de ÉNE bron `loadLeverScores`,
+  // gedeeld met de status-duiding-banner (lib/page-status/*) zodat de sidebar-
+  // dots, de banner én het sidebar-netWorth per definitie kloppen met de hero.
+  // Perspectief stuurt uitsluitend `netWorth` (lever-status blijft persoonlijk).
+  // `cache()` dedupliceert binnen het request (zelfde perspective-arg als de
+  // page-status-route → één query-set).
+  const sidebarPerspective = await getServerPerspective()
+  const {
+    scores: sidebarLeverScores,
+    box1Status: sidebarBox1Status,
+    box3Status: sidebarBox3Status,
+    netWorth: sidebarNetWorth,
+  } = await loadLeverScores(supabase, sidebarPerspective)
 
   const sidebarSignals: SidebarSignals = {
     tipsActions: sidebarActionCount > 0 || (recsCountRes.count ?? 0) > 0,

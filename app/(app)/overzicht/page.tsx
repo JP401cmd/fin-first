@@ -23,6 +23,7 @@ import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { ageAtDate } from '@/lib/horizon-data'
 import { resolveFreedomFraming } from '@/lib/fire-strategy'
+import { loadLeverScores } from '@/lib/lever-scores-loader'
 
 export const metadata: Metadata = {
   title: 'Overzicht — TriFinity',
@@ -56,13 +57,19 @@ export default async function OverzichtPage() {
   // router.refresh() (PerspectiveProvider) met de nieuwe cookie.
   const perspective = await getServerPerspective()
 
-  const [dashboardResult, willData, horizonData, aandachtspunten] = await Promise.all([
+  const [dashboardResult, willData, horizonData, aandachtspunten, leverScoresResult] = await Promise.all([
     loadDashboardData(supabase),
     loadWillData(supabase),
     loadHorizonData(supabase, perspective),
     // Aandachtspunten-bus voedt de briefing (zwaarste punt als briefje).
     // Parallel met de loaders → nauwelijks extra wall-clock; faalt zacht.
     collectAandachtspunten(supabase).catch(() => [] as Aandachtspunt[]),
+    // Vier-hefbomen-kompas-scores: ZELFDE gedeelde SSoT als de sidebar-dots en
+    // de status-duiding-banner. De hefboomkaarten lezen hieruit hun status-dot,
+    // zodat kaart == sidebar-dot == banner per definitie gelijk zijn (geen
+    // tweede scoringssysteem). `cache()` dedupliceert binnen het request, dus dit
+    // hergebruikt de query-set die de shell-layout al uitvoert.
+    loadLeverScores(supabase, perspective),
   ])
 
   const {
@@ -279,6 +286,7 @@ export default async function OverzichtPage() {
         isPensioenMode={isPensioenMode}
         freedomFraming={freedomFraming}
         totals={totals}
+        leverScores={leverScoresResult.scores}
         briefingEntries={briefingEntries}
         briefingRefreshedAt={briefingRefreshedAt}
         briefingDataChanged={briefingDataChanged}

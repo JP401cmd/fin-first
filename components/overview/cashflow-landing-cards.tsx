@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { LeverageCard } from './leverage-card'
 import { leverageStatusBgClass, leverageStatusTextClass } from '@/lib/leverage-status'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import type { CashflowCard, CashflowCardKey } from '@/lib/cashflow-cards'
 
 const VISUAL: Record<CashflowCardKey, { Icon: LucideIcon; tint: string }> = {
@@ -35,6 +36,8 @@ const VISUAL: Record<CashflowCardKey, { Icon: LucideIcon; tint: string }> = {
 export function CashflowLandingCards({ cards }: { cards: CashflowCard[] }) {
   // Eén kaart open per keer — accordeon, identiek aan HefbomenNav.
   const [expandedKey, setExpandedKey] = useState<CashflowCardKey | null>(null)
+  // In Eenvoudig: geen uitklap-chevron — de drill-down is detail, niet kern.
+  const simple = useDisplayMode().mode === 'simple'
 
   return (
     <nav
@@ -55,7 +58,7 @@ export function CashflowLandingCards({ cards }: { cards: CashflowCard[] }) {
             subText={card.subText}
             href={card.href}
             tooltip={card.tooltip}
-            expandable
+            expandable={!simple}
             expanded={expanded}
             onToggleExpand={() => setExpandedKey(expanded ? null : card.key)}
           >

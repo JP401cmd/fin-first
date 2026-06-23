@@ -40,6 +40,7 @@ function makeLeverScores(
     taxInput: { box3TaxableAboveThreshold: 0, hasBox3Assets: false },
     box3Status: 'neutral' as LeverageStatus,
     box1Status: 'neutral' as LeverageStatus,
+    netWorth: 0,
   }
 }
 

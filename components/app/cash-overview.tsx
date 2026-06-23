@@ -15,6 +15,8 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { Kicker } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
@@ -37,7 +39,7 @@ type BudgetRow = {
   icon: string | null
   parent_id: string | null
   budget_type: string
-  monthly_amount: number | null
+  default_limit: number | null
   is_income: boolean
 }
 
@@ -132,6 +134,8 @@ export function CashOverview({
   }, [detailAccountId])
 
   const { perspective } = usePerspective()
+  // Eenvoudig-modus: rekeningen als pills + geldstroom-sectie verbergen.
+  const simple = useDisplayMode().mode === 'simple'
 
   // Tijdzone-veilige maandgrenzen (zie localMonthBounds): NIET via toISOString,
   // dat schuift in UTC+ tijdzones een dag terug en laat een 31-juli-salaris in
@@ -260,7 +264,7 @@ export function CashOverview({
     const supabase = createClient()
     const { data } = await supabase
       .from('budgets')
-      .select('id, name, icon, parent_id, budget_type, monthly_amount, is_income')
+      .select('id, name, icon, parent_id, budget_type, default_limit, is_income')
       .order('sort_order', { ascending: true })
     if (data) setBudgets(data as BudgetRow[])
   }, [])
@@ -436,6 +440,58 @@ export function CashOverview({
   // Aggregations
   const totalBalance = useMemo(() => accounts.reduce((s, a) => s + Number(a.balance), 0), [accounts])
 
+  // ── Eenvoudig-modus: rekening-kaarten als pills (zoals bezittingen) ──
+  // Presentatie-only: zelfde data en klik-flow als de kaart-grid hierboven,
+  // alleen compacter. Kies de bron die in deze modus zou renderen:
+  // showAllCashAccounts → cashAssets (mét sparklines), anders accounts.
+  // Icoon + accentkleur = cash (Wallet / kern-700), conform de kaart.
+  const CASH_ICON_COLOR = 'oklch(0.345 0.0571 34.7)' // kern-700, = ASSET_TYPE_COLORS.cash
+  const accountPillItems = useMemo<PillItem[]>(() => {
+    if (showAllCashAccounts) {
+      const total = cashAssets.reduce((s, a) => {
+        const raw = Number(a.current_value) || 0
+        const shared = a.ownership === 'shared' && perspective !== 'household'
+        return s + (shared ? raw * (a._myShareFraction ?? 1) : raw)
+      }, 0)
+      return cashAssets.map((a) => {
+        const raw = Number(a.current_value) || 0
+        const shared = a.ownership === 'shared' && perspective !== 'household'
+        const amount = shared ? raw * (a._myShareFraction ?? 1) : raw
+        return {
+          id: a.id,
+          name: a.name,
+          iconName: 'Wallet',
+          iconColor: CASH_ICON_COLOR,
+          amount,
+          sharePct: total > 0 ? (amount / total) * 100 : 0,
+          sparklineValues: cashSparklines[a.id],
+          onClick: () => {
+            const bankId = bankByAsset[a.id]
+            if (bankId) setDetailAccountId(bankId)
+            else setEditingAsset(a as Asset)
+          },
+        }
+      })
+    }
+    return accounts.map((acc) => ({
+      id: acc.id,
+      name: acc.name,
+      iconName: 'Wallet',
+      iconColor: CASH_ICON_COLOR,
+      amount: Number(acc.balance),
+      sharePct: totalBalance > 0 ? (Number(acc.balance) / totalBalance) * 100 : 0,
+      onClick:
+        embedded && onNavigateToAccount
+          ? () => onNavigateToAccount(acc.id)
+          : embedded
+            ? () => setDetailAccountId(acc.id)
+            : undefined,
+    }))
+  }, [
+    showAllCashAccounts, cashAssets, cashSparklines, bankByAsset, perspective,
+    accounts, totalBalance, embedded, onNavigateToAccount,
+  ])
+
   // Hash-focus: wanneer de URL een `#rekening-<assetId>`-anker bevat, scroll
   // de bijbehorende kaart in beeld en geef hem een tijdelijke ring-highlight.
   // Alleen actief in de brede (showAllCashAccounts) modus.
@@ -511,10 +567,10 @@ export function CashOverview({
     for (const [budgetId, amount] of aggMap) {
       const b = budgetMap.get(budgetId)
       if (!b) continue
-      let limit = b.monthly_amount ?? 0
+      let limit = b.default_limit ?? 0
       for (const child of budgets) {
         if (child.parent_id === budgetId) {
-          limit += (child.monthly_amount ?? 0)
+          limit += (child.default_limit ?? 0)
         }
       }
       result.push({ id: budgetId, name: b.name, icon: b.icon, amount, limit })
@@ -581,7 +637,7 @@ export function CashOverview({
       if (b.budget_type !== 'expense') continue
       // Skip parents die kinderen hebben (anders dubbeltellen).
       if (childIds.has(b.id)) continue
-      sum += Number(b.monthly_amount) || 0
+      sum += Number(b.default_limit) || 0
     }
     return sum
   }, [budgets])
@@ -724,7 +780,7 @@ export function CashOverview({
         name: c.name,
         icon: c.icon,
         amount: childMap.get(c.id) ?? 0,
-        limit: c.monthly_amount ?? 0,
+        limit: c.default_limit ?? 0,
       }))
       .filter((c) => c.amount > 0)
       .sort((a, b) => b.amount - a.amount)
@@ -750,6 +806,9 @@ export function CashOverview({
           <Kicker>Rekeningen</Kicker>
         </div>
 
+        {simple ? (
+          <EenvoudigPillList items={accountPillItems} variant="asset" />
+        ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           {showAllCashAccounts
             ? cashAssets.map((a) => (
@@ -835,10 +894,14 @@ export function CashOverview({
                 )
               })}
         </div>
+        )}
       </section>
       )}
 
       {/* === 2. Geldstroom — Sankey + banner-style figures-strip === */}
+      {/* Verborgen in Eenvoudig: maandselector + figures-strip + dag-grafiek
+          zijn detail. De KassabonSheets hieronder blijven buiten de wrap. */}
+      <HideInSimple>
       <section className="mt-5 sm:mt-8">
         {hasRecentActivity === false ? (
           // Geen transactie-activiteit in de laatste 90 dagen → vervang het
@@ -1055,6 +1118,7 @@ export function CashOverview({
           </>
         )}
       </section>
+      </HideInSimple>
 
       {/* === 4. Snelle acties === */}
       {!hideQuickActions && (

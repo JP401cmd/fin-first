@@ -15,7 +15,7 @@ import {
   type JaarruimteJaar,
 } from '@/lib/jaarruimte'
 import { TaxGauge } from '@/components/overview/belasting/tax-gauge'
-import { Kicker } from '@/components/editorial'
+import { Kicker, SectionLabel } from '@/components/editorial'
 import { AandachtspuntActieButton } from '@/components/overview/belasting/aandachtspunt-actie-button'
 
 const BOX1_COLOR = 'var(--color-kern-700)'
@@ -147,9 +147,12 @@ export function JaarruimteCard({
       )}
 
       {/* SIMULATOR: lijfrente-inleg-slider + benutting-gauge + besparing.
-          Alleen tonen wanneer er ruimte te benutten valt. */}
+          Alleen tonen wanneer er ruimte te benutten valt. Ontnest: sectie
+          binnen het ene kader, gescheiden met SectionLabel + rule. */}
       {result.jaarruimte > 0 && (
-        <div className="mb-4 grid gap-5 border border-[var(--border-ed)] bg-[var(--subtle)] p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div className="mt-5 border-t border-[var(--rule-soft)] pt-5">
+          <SectionLabel>Lijfrente-simulator</SectionLabel>
+          <div className="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-center">
           <div>
             <label
               htmlFor="jaarruimte-inleg"
@@ -176,7 +179,7 @@ export function JaarruimteCard({
               step={Math.max(50, Math.round(result.jaarruimte / 100))}
               value={clampedInleg}
               onChange={(e) => setInleg(Number(e.target.value) || 0)}
-              className="w-full accent-[#b45309]"
+              className="w-full accent-[var(--module-active-500)]"
               aria-label="Lijfrente-inleg dit jaar"
             />
             {besparing != null && (
@@ -237,18 +240,20 @@ export function JaarruimteCard({
               colorVar={BOX1_COLOR}
             />
           </div>
+          </div>
         </div>
       )}
 
       {/* Interactieve factor A input — user vult zijn factor A (jaarlijkse
           pensioenaangroei uit UPO, in €) in voor accurate jaarruimte. De motor
-          trekt dit × 6,27 af. Default 0. */}
-      <div className="mb-4 border border-[var(--border-ed)] bg-[var(--subtle)] p-4">
+          trekt dit × 6,27 af. Default 0. Ontnest: sectie binnen het ene kader. */}
+      <div className="mt-5 border-t border-[var(--rule-soft)] pt-5">
+        <SectionLabel>Factor A (werkgeverspensioen)</SectionLabel>
         <label
           htmlFor="jaarruimte-factor-a"
           className="block text-[10px] uppercase tracking-[0.12em] font-mono font-semibold text-[var(--ink-3)] mb-1.5"
         >
-          Factor A (jaarlijkse pensioenaangroei UPO)
+          Jaarlijkse pensioenaangroei (UPO)
         </label>
         <div className="flex items-center gap-2">
           <span className="text-sm text-[var(--ink-3)]">€</span>

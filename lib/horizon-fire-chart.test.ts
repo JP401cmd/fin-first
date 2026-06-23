@@ -217,10 +217,14 @@ describe('Life events — eenmalige onttrekking', () => {
     expect(row50).toBeDefined()
     expect(row50!.oneTimeNet).toBeLessThan(0)
 
-    // Visible dip: endPortfolio at 50 with expense < endPortfolio at 50 without
-    const baselineRow50 = baseline.rows.find(r => r.age === 50)
-    if (baselineRow50) {
-      expect(row50!.endPortfolio).toBeLessThan(baselineRow50.endPortfolio)
+    // ADR 0027: the expense pushes FIRE age later, so at age 50 the withExpense run may still be
+    // accumulating while the baseline run has already entered decumulation — making a cross-run
+    // comparison at age 50 unreliable (higher accumulation balance vs lower decumulation balance).
+    // Instead, verify the dip within the same run: endPortfolio at the event year (50) must be
+    // lower than endPortfolio at the year before the event (49), proving the €50k expense bit.
+    const row49 = withExpense.rows.find(r => r.age === 49)
+    if (row49 && row50) {
+      expect(row50.endPortfolio).toBeLessThan(row49.endPortfolio)
     }
   })
 })

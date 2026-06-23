@@ -114,20 +114,8 @@ export function Box3TegenbewijsCard({ result }: { result: Box3Result }) {
         format={fc}
       />
 
-      {/* Verdict */}
-      <div
-        className="mt-4 border px-4 py-3.5"
-        style={{
-          borderColor: werkelijkIsGunstig
-            ? 'color-mix(in srgb, var(--module-active-500) 45%, var(--ink))'
-            : 'var(--ink)',
-          borderLeftWidth: '4px',
-          borderLeftColor: werkelijkIsGunstig ? 'var(--module-active-500)' : 'var(--ink-3)',
-          backgroundColor: werkelijkIsGunstig
-            ? 'color-mix(in srgb, var(--module-active-500) 7%, transparent)'
-            : 'var(--subtle)',
-        }}
-      >
+      {/* Verdict — uniform ScenarioCallout (linker module-border) i.p.v. vol kader */}
+      <ScenarioCallout className="mt-4">
         {werkelijkIsGunstig ? (
           <p
             className="text-base italic leading-snug text-[var(--ink)]"
@@ -176,7 +164,7 @@ export function Box3TegenbewijsCard({ result }: { result: Box3Result }) {
             />
           </div>
         )}
-      </div>
+      </ScenarioCallout>
 
       <ScenarioCallout title="Indicatie, geen advies." className="mt-4 text-xs">
         Het werkelijke rendement omvat ook ongerealiseerde waardeontwikkeling;

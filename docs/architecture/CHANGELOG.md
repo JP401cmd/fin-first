@@ -297,3 +297,7 @@
 
 - **API-routes** toegevoegd: /api/display-mode
 - **Componenten (aantal)** toegevoegd: +15
+
+## 2026-06-23
+
+- **Componenten (aantal)** toegevoegd: +6

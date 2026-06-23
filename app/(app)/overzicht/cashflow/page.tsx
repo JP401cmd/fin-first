@@ -89,11 +89,12 @@ export default async function OverzichtCashflowPage() {
       <CashOverview embedded showAllCashAccounts showMonthLinks />
 
       {settings && (
-        <HideInSimple>
-          <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
-            <CashflowInstellingenBlok data={settings} />
-          </section>
-        </HideInSimple>
+        // Instellingen (inkomen, spaarquote, uitgaven) zijn óók in Eenvoudig
+        // zichtbaar — bewust géén HideInSimple. Het blok bevat alleen die drie
+        // kern-instellingen, die de gebruiker in beide modi wil kunnen zien.
+        <section className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
+          <CashflowInstellingenBlok data={settings} />
+        </section>
       )}
     </>
   )

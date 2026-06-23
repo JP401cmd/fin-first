@@ -87,59 +87,54 @@ export function Box2GecombineerdeDruk() {
         ]}
       />
 
-      {/* Formule — scherp haarlijn-kader */}
-      <div className="mb-4 border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2">
-        <span className="text-[11px] text-[var(--ink-2)]">
-          Gecombineerd ={' '}
-          <span className="font-mono tabular-nums text-[var(--ink)]">
-            Vpb + (1 − Vpb) × Box 2
-          </span>
+      {/* Formule — lichte inline-regel, geen apart kader */}
+      <p className="mb-4 text-[11px] text-[var(--ink-3)]">
+        Gecombineerd ={' '}
+        <span className="font-mono tabular-nums text-[var(--ink-2)]">
+          Vpb + (1 − Vpb) × Box 2
         </span>
-      </div>
+      </p>
 
-      {/* Scenario-tabel — scherpe hoeken, ink-haarlijnen */}
-      <div className="border border-[var(--ink)]">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-[var(--ink)] bg-[var(--subtle)] text-left">
-              <th className="px-3 py-2 text-[10px] font-mono uppercase tracking-[0.12em] font-medium text-[var(--ink-3)]">
-                Scenario
-              </th>
-              <th className="px-3 py-2 text-right text-[10px] font-mono uppercase tracking-[0.12em] font-medium text-[var(--ink-3)]">
-                Druk
-              </th>
+      {/* Scenario-tabel — rule-gescheiden rijen (top/bottom-rule), geen vol kader */}
+      <table className="w-full border-t border-b border-[var(--ink)] text-xs">
+        <thead>
+          <tr className="border-b border-[var(--rule-soft)] text-left">
+            <th className="px-1 py-2 text-[10px] font-mono uppercase tracking-[0.12em] font-medium text-[var(--ink-3)]">
+              Scenario
+            </th>
+            <th className="px-1 py-2 text-right text-[10px] font-mono uppercase tracking-[0.12em] font-medium text-[var(--ink-3)]">
+              Druk
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {SCENARIOS.map((s, i) => (
+            <tr key={i} className="border-b border-[var(--rule-soft)]">
+              <td className="px-1 py-2 text-[var(--ink-2)]">{s.label}</td>
+              <td className="px-1 py-2 text-right font-mono tabular-nums font-semibold text-[var(--ink)]">
+                {pct(combined(s.vpb, s.box2))}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {SCENARIOS.map((s, i) => (
-              <tr key={i} className="border-t border-[var(--rule-soft)] first:border-t-0">
-                <td className="px-3 py-2 text-[var(--ink-2)]">{s.label}</td>
-                <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-[var(--ink)]">
-                  {pct(combined(s.vpb, s.box2))}
-                </td>
-              </tr>
-            ))}
-            {/* ComparisonRow-highlight: de Box 1-referentie als geselecteerde rij
-                — box-getint via de actieve module-kleur (--module-active-*). */}
-            <tr
-              className="border-t border-[var(--ink)]"
-              style={{
-                background: 'color-mix(in srgb, var(--module-active-500) 8%, transparent)',
-              }}
+          ))}
+          {/* ComparisonRow-highlight: de Box 1-referentie als geselecteerde rij
+              — box-getint via de actieve module-kleur (--module-active-*). */}
+          <tr
+            style={{
+              background: 'color-mix(in srgb, var(--module-active-500) 8%, transparent)',
+            }}
+          >
+            <td
+              className="px-2 py-2 text-[var(--ink-2)]"
+              style={{ borderLeft: '3px solid var(--module-active-500)' }}
             >
-              <td
-                className="px-3 py-2 text-[var(--ink-2)]"
-                style={{ borderLeft: '3px solid var(--module-active-500)' }}
-              >
-                Referentie: loon in Box 1 (toptarief)
-              </td>
-              <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-[var(--ink)]">
-                {pct(BOX1_TOP)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              Referentie: loon in Box 1 (toptarief)
+            </td>
+            <td className="px-1 py-2 text-right font-mono tabular-nums font-semibold text-[var(--ink)]">
+              {pct(BOX1_TOP)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
       {/* Visuele bandbreedte t.o.v. Box 1 */}
       <div className="mt-4">

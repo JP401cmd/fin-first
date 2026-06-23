@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { BelastingBoxCards, type BelastingBoxCard } from './belasting-box-cards'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 
 /**
  * BelastingBoxCards hergebruikt nu de gedeelde LeverageCard-shell (zoals
@@ -9,7 +11,18 @@ import { BelastingBoxCards, type BelastingBoxCard } from './belasting-box-cards'
  * het uitklap-paneel verhuisd — die zijn dus PAS zichtbaar na een klik op de
  * chevron-<button> (aria-label "Toon detail {label}"). KPI (€…/jr of '—') en
  * de status-substext blijven op de voorkant.
+ *
+ * De chevron-drilldown is alleen zichtbaar in de Volledige weergave; in
+ * Eenvoudig (display_mode 'simple') verdwijnt de chevron (net als HefbomenNav).
+ * De fallback buiten een DisplayModeProvider is 'simple', dus de niet-modus-
+ * specifieke tests renderen expliciet binnen `DisplayModeProvider initialMode="full"`.
  */
+
+// Render binnen de Volledige modus zodat de chevron-drilldown beschikbaar is
+// (buiten een provider valt useDisplayMode terug op 'simple' → geen chevron).
+function renderFull(ui: ReactElement) {
+  return render(<DisplayModeProvider initialMode="full">{ui}</DisplayModeProvider>)
+}
 
 function makeCards(
   overrides: Partial<Record<'1' | '2' | '3', Partial<BelastingBoxCard>>> = {},
@@ -48,7 +61,7 @@ function makeCards(
 
 describe('BelastingBoxCards — render', () => {
   it('rendert drie box-kaarten met een chevron-toggle per kaart', () => {
-    render(<BelastingBoxCards cards={makeCards()} />)
+    renderFull(<BelastingBoxCards cards={makeCards()} />)
     // De "Box N"-kicker is naar de drilldown verhuisd en dus standaard NIET
     // op de voorkant zichtbaar — we herkennen de drie kaarten nu aan hun
     // chevron-toggle (LeverageCard geeft die aria-label "Toon detail {label}").
@@ -62,20 +75,20 @@ describe('BelastingBoxCards — render', () => {
   })
 
   it('toont label per box', () => {
-    render(<BelastingBoxCards cards={makeCards()} />)
+    renderFull(<BelastingBoxCards cards={makeCards()} />)
     expect(screen.getByText('Werk + woning')).toBeTruthy()
     expect(screen.getByText('Aanmerkelijk belang')).toBeTruthy()
     expect(screen.getByText('Sparen + beleggen')).toBeTruthy()
   })
 
   it('toont KPI-waarde wanneer beschikbaar', () => {
-    render(<BelastingBoxCards cards={makeCards()} />)
+    renderFull(<BelastingBoxCards cards={makeCards()} />)
     expect(screen.getAllByText(/€\s*12\.000.*\/jr/).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/€\s*3\.500.*\/jr/).length).toBeGreaterThan(0)
   })
 
   it('toont placeholder "—" bij null of 0', () => {
-    render(
+    renderFull(
       <BelastingBoxCards
         cards={makeCards({ '1': { tax: null }, '2': { tax: 0 }, '3': { tax: null } })}
       />,
@@ -84,7 +97,7 @@ describe('BelastingBoxCards — render', () => {
   })
 
   it('toont de kicker "De drie boxen" en géén dubbel jaartotaal in de kaart-header', () => {
-    render(<BelastingBoxCards cards={makeCards()} />)
+    renderFull(<BelastingBoxCards cards={makeCards()} />)
     expect(screen.getByText('De drie boxen')).toBeTruthy()
     // Het jaartotaal is bewust verplaatst naar Sectie I (HubTotaleDruk); de
     // kaart-header dupliceert het niet langer (was "Geschatte druk €15.500/jr").
@@ -93,14 +106,14 @@ describe('BelastingBoxCards — render', () => {
   })
 
   it('toont status-substext per box', () => {
-    render(<BelastingBoxCards cards={makeCards()} />)
+    renderFull(<BelastingBoxCards cards={makeCards()} />)
     expect(screen.getByText('Onbenutte jaarruimte')).toBeTruthy()
     expect(screen.getByText('Geen aanmerkelijk belang')).toBeTruthy()
     expect(screen.getByText('Geen actie nodig')).toBeTruthy()
   })
 
   it('linkt elke kaart naar de eigen box-subpagina', () => {
-    const { container } = render(<BelastingBoxCards cards={makeCards()} />)
+    const { container } = renderFull(<BelastingBoxCards cards={makeCards()} />)
     const hrefs = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'))
     expect(hrefs).toContain('/overzicht/belasting/box1')
     expect(hrefs).toContain('/overzicht/belasting/box2')
@@ -112,14 +125,14 @@ describe('BelastingBoxCards — render', () => {
 
 describe('BelastingBoxCards — chevron-drilldown', () => {
   it('rendert per kaart een chevron-<button> met aria-expanded=false', () => {
-    render(<BelastingBoxCards cards={makeCards()} />)
+    renderFull(<BelastingBoxCards cards={makeCards()} />)
     const buttons = screen.getAllByRole('button', { name: /^Toon detail / })
     expect(buttons.length).toBe(3)
     buttons.forEach((b) => expect(b.getAttribute('aria-expanded')).toBe('false'))
   })
 
   it('is standaard dichtgeklapt: subtitle + "Box N" + action-link nog niet zichtbaar', () => {
-    const { container } = render(<BelastingBoxCards cards={makeCards()} />)
+    const { container } = renderFull(<BelastingBoxCards cards={makeCards()} />)
     // De drilldown-inhoud (subtitle/beschrijving, "Box N"-kicker, action-link)
     // wordt pas gerenderd na uitklappen.
     expect(screen.queryByText('Loon, ondernemerswinst en eigen huis.')).toBeNull()
@@ -130,7 +143,7 @@ describe('BelastingBoxCards — chevron-drilldown', () => {
   })
 
   it('klikken op de chevron klapt het drilldown-paneel uit zonder te navigeren', () => {
-    const { container } = render(<BelastingBoxCards cards={makeCards()} />)
+    const { container } = renderFull(<BelastingBoxCards cards={makeCards()} />)
     const toggle = screen.getByRole('button', { name: 'Toon detail Werk + woning' })
     fireEvent.click(toggle)
 
@@ -148,7 +161,7 @@ describe('BelastingBoxCards — chevron-drilldown', () => {
   })
 
   it('opent maximaal één drilldown tegelijk (accordeon)', () => {
-    render(<BelastingBoxCards cards={makeCards()} />)
+    renderFull(<BelastingBoxCards cards={makeCards()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Toon detail Werk + woning' }))
     expect(screen.getByText('Bekijk Box 1')).toBeTruthy()
 
@@ -159,7 +172,7 @@ describe('BelastingBoxCards — chevron-drilldown', () => {
   })
 
   it('toont voor Box 2 (tax=null) een kale "—" als drilldown-waarde, niet de status-tekst', () => {
-    render(<BelastingBoxCards cards={makeCards()} />)
+    renderFull(<BelastingBoxCards cards={makeCards()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Toon detail Aanmerkelijk belang' }))
     // De drilldown is open (action-link zichtbaar)…
     expect(screen.getByText('Bekijk Box 2')).toBeTruthy()
@@ -167,5 +180,48 @@ describe('BelastingBoxCards — chevron-drilldown', () => {
     // "Geen aanmerkelijk belang" staat alléén op de kaartvoorkant (substext),
     // niet in het getallen-veld → precies 1 voorkomen.
     expect(screen.getAllByText('Geen aanmerkelijk belang').length).toBe(1)
+  })
+})
+
+// ── Eenvoudige weergave (display_mode simple) ─────────────────────────────
+
+describe('BelastingBoxCards — Eenvoudige weergave (display_mode simple)', () => {
+  // De chevron-drilldown-toggle in LeverageCard is een <button> met aria-label
+  // "Toon detail {label}" / "Verberg detail {label}".
+  const CHEVRON_RE = /detail/i
+
+  it('toont chevron-toggles in Volledig', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <BelastingBoxCards cards={makeCards()} />
+      </DisplayModeProvider>,
+    )
+    const toggles = Array.from(container.querySelectorAll('button')).filter((b) =>
+      CHEVRON_RE.test(b.getAttribute('aria-label') ?? ''),
+    )
+    expect(toggles.length).toBe(3)
+  })
+
+  it('verbergt alle chevron-toggles in Eenvoudig', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="simple">
+        <BelastingBoxCards cards={makeCards()} />
+      </DisplayModeProvider>,
+    )
+    const toggles = Array.from(container.querySelectorAll('button')).filter((b) =>
+      CHEVRON_RE.test(b.getAttribute('aria-label') ?? ''),
+    )
+    expect(toggles.length).toBe(0)
+  })
+
+  it('rendert in Eenvoudig nog steeds de drie box-kaarten (alleen rustiger)', () => {
+    render(
+      <DisplayModeProvider initialMode="simple">
+        <BelastingBoxCards cards={makeCards()} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByText('Werk + woning')).toBeTruthy()
+    expect(screen.getByText('Aanmerkelijk belang')).toBeTruthy()
+    expect(screen.getByText('Sparen + beleggen')).toBeTruthy()
   })
 })

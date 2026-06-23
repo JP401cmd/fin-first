@@ -6,10 +6,13 @@ import { describe, it, expect } from 'vitest'
  * Borgt de keuze (kaart "Wil je de standaard van de huis-strategie: niet
  * meerekenen maken na onboarding", Optie A): nieuwe accounts krijgen ná
  * onboarding expliciet `housing_strategy_config = { mode: 'exclude_from_fire' }`
- * weggeschreven — op ALLE DRIE de write-paden in de onboarding-route:
- *   1. de RPC-payload (`buildRpcPayload`),
- *   2. de post-RPC update,
- *   3. het non-RPC fallback-pad.
+ * weggeschreven — op BEIDE resterende write-plekken in de onboarding-route:
+ *   1. de `buildRpcPayload`-referentie (behouden als payload-vorm-documentatie
+ *      nadat de RPC is gedeprecate — zie "Na deploy issues" / probleem 4),
+ *   2. het multi-step save-pad (sinds Keuze B het primaire pad).
+ *
+ * De vroegere derde plek (de post-RPC update binnen de RPC-success-tak) is
+ * vervallen toen die tak werd verwijderd; de waarde-assertie blijft identiek.
  *
  * Deze test scant de bronregels (commentaar gestript) i.p.v. de hele
  * Next.js-handler te importeren — die trekt de AI-extractielaag mee. Zo is de
@@ -32,11 +35,12 @@ describe('onboarding save-own-data — housing strategy default', () => {
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
 
-  it('schrijft op alle drie de write-paden housing_strategy_config = exclude_from_fire', () => {
+  it('schrijft op beide write-plekken housing_strategy_config = exclude_from_fire', () => {
     const writes = codeOnly.match(/housing_strategy_config[^=:]*[=:]\s*\{\s*mode:\s*'([a-z_]+)'/g) ?? []
 
-    // Precies drie expliciete writes: RPC-payload, post-RPC update, non-RPC fallback.
-    expect(writes).toHaveLength(3)
+    // Precies twee expliciete writes: de buildRpcPayload-referentie en het
+    // multi-step pad. De post-RPC update verviel met de gedeprecate RPC-tak.
+    expect(writes).toHaveLength(2)
     for (const write of writes) {
       expect(write).toContain("mode: 'exclude_from_fire'")
     }

@@ -47,7 +47,10 @@ vi.mock('@/lib/supabase/client', () => ({
     from: () => ({
       update: vi.fn(() => ({ eq: mockEq(mockUpdate) })),
       delete: vi.fn(() => ({ eq: mockEq(mockDelete) })),
+      // Volledig-bewerken laadt lazy assets+debts via select().order().
+      select: vi.fn(() => ({ order: vi.fn(async () => ({ data: [] })) })),
     }),
+    auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'u1' } } })) },
   }),
 }))
 
@@ -235,5 +238,39 @@ describe('DoelBewerkenSheet — verwijderen', () => {
     expect(mockDelete).toHaveBeenCalled()
     expect(mockRefresh).toHaveBeenCalled()
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('DoelBewerkenSheet — volledig bewerken (GoalForm) sluit de sheet niet', () => {
+  it('GoalForm rendert buiten de backdrop: een interactie sluit de quick-update-sheet niet', async () => {
+    // Regressie voor de bug "scherm sluit elke keer bij een bewerking":
+    // GoalForm zat als sibling van de quick-update <form> BÍNNEN de backdrop
+    // <div onClick={onClose}>. React-events bubbelen langs de component-tree
+    // (óók over createPortal), dus élke klik/change in GoalForm bubbelde naar
+    // onClose → de hele sheet sloot. Fix (Optie A): GoalForm buiten de
+    // backdrop renderen, als sibling ná de <div>.
+    const onClose = vi.fn()
+    renderSheet(onClose)
+
+    // Open 'Volledig bewerken' → GoalForm verschijnt.
+    fireEvent.click(
+      screen.getByText(/Volledig bewerken/i),
+    )
+    // GoalForm-titel ('Doel bewerken') + Naam-veld renderen.
+    expect(await screen.findByText('Doel bewerken')).toBeTruthy()
+    const naamInput = screen.getByLabelText('Naam') as HTMLInputElement
+
+    // Interactie binnen GoalForm — vóór de fix bubbelde dit naar onClose.
+    fireEvent.change(naamInput, { target: { value: 'Nieuwe naam' } })
+    fireEvent.click(naamInput)
+
+    // Sheet blijft staan; onClose is NIET aangeroepen. (Beide dialogen zijn
+    // nu gemount — quick-update backdrop én GoalForm-BottomSheet — dus we
+    // selecteren de quick-update-dialog gericht op zijn aria-label.)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(
+      screen.getByRole('dialog', { name: /Doel bewerken: Spaargeld voor woning/i }),
+    ).toBeTruthy()
+    expect(screen.getByText('Doel bewerken')).toBeTruthy()
   })
 })

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Briefcase, Building2, PiggyBank, Receipt, type LucideIcon } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { Kicker } from '@/components/editorial'
 import { LeverageCard } from '@/components/overview/leverage-card'
 import {
@@ -87,6 +88,18 @@ export function BelastingBoxCards({ cards }: { cards: BelastingBoxCard[] }) {
   // aanstuurt. We sleutelen op `number` ('1' | '2' | '3').
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
 
+  // Eenvoudige weergave (display_mode === 'simple'): verberg de chevron /
+  // uitklap-drilldown op de box-kaarten — net als HefbomenNav op /overzicht.
+  // De kaarten blijven dan rustige, klikbare tegels zonder collapse-affordance.
+  const { mode } = useDisplayMode()
+  const simple = mode === 'simple'
+
+  // Bij wissel naar Eenvoudig: sluit een eventueel geopende drilldown zodat er
+  // geen uitgeklapt paneel blijft hangen zonder chevron om het te sluiten.
+  useEffect(() => {
+    if (simple) setExpandedKey(null)
+  }, [simple])
+
   // De editorial masthead op de hub-pagina is dé hero; deze rij hoeft alleen
   // nog een rustige kicker. Het jaartotaal is bewust verdwenen (het staat als
   // grote uitkomst in Sectie I, en "excl. Box 2" in de Sectie I-callout).
@@ -119,7 +132,7 @@ export function BelastingBoxCards({ cards }: { cards: BelastingBoxCard[] }) {
               status={status}
               subText={statusText}
               href={href}
-              expandable
+              expandable={!simple}
               expanded={expanded}
               onToggleExpand={() => setExpandedKey(expanded ? null : number)}
             >

@@ -12,6 +12,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 
 /**
  * Tests voor ToekomstNavCards — de vier navigatiekaarten bovenaan de
@@ -105,18 +106,24 @@ const mockWithdrawal: WithdrawalStrategyConfig = {
 
 type RenderProps = Partial<Parameters<typeof ToekomstNavCards>[0]>
 
-function renderCards(overrides: RenderProps = {}) {
+// De chevron-drilldown bestaat alleen in Volledig-modus: in Eenvoudig vervalt
+// de `expandable`-prop (hard-hide op /toekomst-niveau). Render daarom standaard
+// in 'full' zodat de bestaande chevron-assertions blijven gelden; geef
+// `mode: 'simple'` mee om de Eenvoudig-variant te testen.
+function renderCards(overrides: RenderProps = {}, mode: DisplayMode = 'full') {
   return render(
-    <ToekomstNavCards
-      goals={[mockGoal()]}
-      goalProgresses={[mockProgress()]}
-      events={[mockEvent()]}
-      fireStrategy={mockFireStrategy}
-      withdrawalStrategy={mockWithdrawal}
-      fireParams={mockFireParams}
-      calculatorCount={4}
-      {...overrides}
-    />,
+    <DisplayModeProvider initialMode={mode}>
+      <ToekomstNavCards
+        goals={[mockGoal()]}
+        goalProgresses={[mockProgress()]}
+        events={[mockEvent()]}
+        fireStrategy={mockFireStrategy}
+        withdrawalStrategy={mockWithdrawal}
+        fireParams={mockFireParams}
+        calculatorCount={4}
+        {...overrides}
+      />
+    </DisplayModeProvider>,
   )
 }
 
@@ -199,6 +206,35 @@ describe('ToekomstNavCards — chevron-drilldown', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Toon detail Gebeurtenissen' }))
     expect(screen.getByText('Bekijk tijdas')).toBeTruthy()
     expect(screen.queryByText('Beheer doelen')).toBeNull()
+  })
+})
+
+// ── Eenvoudig-modus: chevron-drilldown is hard-hidden ─────────────────────
+
+describe('ToekomstNavCards — Eenvoudig-modus (hard-hide chevron)', () => {
+  it('rendert geen chevron-toggles in Eenvoudig-modus', () => {
+    renderCards({}, 'simple')
+    expect(screen.queryAllByRole('button', { name: /^Toon detail / }).length).toBe(0)
+  })
+
+  it('houdt de overige heel-kaart-links intact in Eenvoudig-modus', () => {
+    const { container } = renderCards({}, 'simple')
+    // Rekenhulp-kaart is hard-hidden in Eenvoudig → drie kaarten resteren;
+    // die blijven navigeerbaar, alleen de drilldown-diepte vervalt.
+    expect(container.querySelectorAll('a').length).toBe(3)
+    expect(screen.getByText('Doelen')).toBeTruthy()
+    expect(screen.getByText('Gebeurtenissen')).toBeTruthy()
+    expect(screen.getByText('Voorkeuren')).toBeTruthy()
+  })
+
+  it('verbergt de Rekenhulp-kaart volledig in Eenvoudig-modus', () => {
+    renderCards({}, 'simple')
+    expect(screen.queryByText('Rekenhulp')).toBeNull()
+  })
+
+  it('toont de Rekenhulp-kaart wél in Volledig-modus', () => {
+    renderCards({}, 'full')
+    expect(screen.getByText('Rekenhulp')).toBeTruthy()
   })
 })
 

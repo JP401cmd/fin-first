@@ -95,3 +95,65 @@ describe('OnboardingSchulden — begeleide ja/nee met altijd-uitgang', () => {
     expect(container.textContent).not.toContain('Heb je een hypotheek?')
   })
 })
+
+// ── Afsluitend overzicht (review-fase) ─────────────────────────────────
+
+describe('OnboardingSchulden — afsluitend overzicht', () => {
+  /** Klikt "Nee" tot de catch-all "Heb je nog een andere schuld?" verschijnt. */
+  function advanceToOtherAsk(container: HTMLElement) {
+    for (let i = 0; i < 20 && !container.textContent?.includes('Heb je nog een andere schuld?'); i++) {
+      fireEvent.click(footerButton('Nee'))
+    }
+    expect(container.textContent).toContain('Heb je nog een andere schuld?')
+  }
+
+  it('toont na de laatste "nee" het review-scherm wanneer er schulden zijn', () => {
+    const onNext = vi.fn()
+    const { container } = render(<Host onNext={onNext} />)
+    // Voeg een hypotheek toe via de eerste vraag.
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(footerButton('Nee')) // verlaat hypotheek-more
+    advanceToOtherAsk(container)
+    // "Nee" op de catch-all → review-scherm (nog NIET onNext).
+    fireEvent.click(footerButton('Nee'))
+    expect(container.textContent).toContain('Dit zijn je schulden')
+    expect(onNext).not.toHaveBeenCalled()
+    fireEvent.click(footerButton(/Klopt het/))
+    expect(onNext).toHaveBeenCalledOnce()
+  })
+
+  it('slaat het review-scherm over bij een lege lijst (direct door)', () => {
+    const onNext = vi.fn()
+    const { container } = render(<Host onNext={onNext} />)
+    advanceToOtherAsk(container)
+    fireEvent.click(footerButton('Nee'))
+    expect(onNext).toHaveBeenCalledOnce()
+    expect(container.textContent).not.toContain('Dit zijn je schulden')
+  })
+
+  it('de drempelloze sectie-uitgang slaat het review-scherm bewust over', () => {
+    const onNext = vi.fn()
+    const { container } = render(<Host onNext={onNext} />)
+    // Voeg een schuld toe zodat de lijst gevuld is.
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(footerButton('Nee')) // verlaat more → volgende vraag
+    // De altijd-zichtbare uitgang gaat direct door (geen review).
+    fireEvent.click(footerText('Ik heb (verder) geen schulden'))
+    expect(onNext).toHaveBeenCalledOnce()
+    expect(container.textContent).not.toContain('Dit zijn je schulden')
+  })
+
+  it('"Voeg nog iets toe" vanuit review keert terug naar de picker', () => {
+    const { container } = render(<Host />)
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(footerButton('Nee')) // verlaat hypotheek-more
+    advanceToOtherAsk(container)
+    fireEvent.click(footerButton('Nee')) // → review
+    expect(container.textContent).toContain('Dit zijn je schulden')
+    fireEvent.click(footerButton(/Voeg nog iets toe/))
+    expect(container.textContent).toContain('Wat voor schuld?')
+  })
+})

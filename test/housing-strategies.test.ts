@@ -325,8 +325,10 @@ describe('exclude_from_fire (geen trigger)', () => {
       isV2: false,
     })
     // Geen verkoop ⇒ geen liquidatie-sprong; netto vermogen evolueert glad.
-    const startNet = NET(rows[0])
-    expect(maxNetJump(rows)).toBeLessThan(Math.abs(startNet) * 0.12)
+    // ADR 0027: latere FIRE (leeftijd 84) → grotere maar gladde jaarlijkse onttrekking
+    // (~€80k/jr nominaal). De klif-bewaking loopt via maxVastgoedDrop hieronder.
+    // Een echte liquidatie-klif (huisverkoop) zou de overwaarde (~€300k) naderen.
+    expect(maxNetJump(rows)).toBeLessThan(150_000)
   })
 
   it('FIRE-leeftijd reflecteert de uitsluiting: beide strategieën bereiken een eindige FIRE-leeftijd', () => {
@@ -604,8 +606,10 @@ describe('v2 — exclude_from_fire (geen trigger)', () => {
       isV2: true,
     })
     // Geen verkoop ⇒ geen liquidatie-sprong; netto vermogen evolueert glad.
-    const startNet = NET(rows[0])
-    expect(maxNetJump(rows)).toBeLessThan(Math.abs(startNet) * 0.12)
+    // ADR 0027: latere FIRE (leeftijd 84) → grotere maar gladde jaarlijkse onttrekking
+    // (~€80k/jr nominaal). De klif-bewaking loopt via maxVastgoedDrop hieronder.
+    // Een echte liquidatie-klif (huisverkoop) zou de overwaarde (~€300k) naderen.
+    expect(maxNetJump(rows)).toBeLessThan(150_000)
     // Vastgoed mag nooit in één jaar instorten (geen huis-dump).
     let maxVastgoedDrop = 0
     for (let i = 1; i < rows.length; i++) {

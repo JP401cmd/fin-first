@@ -420,4 +420,41 @@ describe('horizon-engine grootboek (Fase 1)', () => {
     // al-afgeloste referentie (die mist de lastActiveRente-vrijval).
     expect(instroom(r, 42) - instroom(ref, 42)).toBeCloseTo(LAST_ACTIVE_RENTE, 4)
   })
+
+  // ── ADR 0027: deplete-FIRE-detectie = liquide ≥ V_nodig (Optie B) ───────────
+  // De FIRE-stip (firePortfolioAtFire = liquide op FIRE) moet samenvallen met de
+  // doel-lijn (requiredFirePortfolioAtFire = V_nodig op FIRE) — binnen ~½ jaar
+  // vermogensopbouw — omdat ze nu dezelfde grondslag delen. Voorheen lagen ze
+  // ~28% / ~4 jaar uiteen (forward-deplete-feasibility vs backward-annuïteit).
+  it('deplete (ADR 0027): de FIRE-stip valt op de doel-lijn (binnen ~½ jaar opbouw)', () => {
+    const r = runHorizonLedger(mkInput({ yearlyExpenses: 36_000, annualSavings: 24_000, monthlySurplus: 24_000 / 12 }))
+    expect(r.fireReachable).toBe(true)
+    const idx = r.rows.findIndex((x) => x.leeftijd === r.fireAge)
+    expect(idx).toBeGreaterThan(1)
+    const stip = r.liquideAtFire // = firePortfolioAtFire (reëel)
+    const doel = r.requiredFirePortfolioAtFire // = V_nodig op FIRE (reëel)
+    // De stip ligt op/boven de doel-lijn (vroegste passerende leeftijd) …
+    expect(stip).toBeGreaterThanOrEqual(doel)
+    // … en de overshoot is hooguit ÉÉN jaar bruto-vermogensopbouw rond die leeftijd:
+    // jaarsparen + bruto rendement op de pot. Dit is de discrete stapgrootte waarmee
+    // de stijgende opbouwcurve de dalende V_nodig-lijn in één jaar passeert (de
+    // ~½-jaar-verwachting uit de bug-analyse, robuust uitgedrukt).
+    const brutoJaaropbouw = 24_000 + 0.07 * doel
+    expect(stip - doel).toBeLessThanOrEqual(brutoJaaropbouw)
+  })
+
+  it('deplete (ADR 0027): ook met spendable huis (include_full) valt de stip op de doel-lijn', () => {
+    const huis = { id: 'huis', name: 'Eigen huis', asset_type: 'real_estate', current_value: 400_000, expected_return: 2, is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: null } as unknown as Asset
+    const beleggen = { id: 'a1', name: 'Beleggingen', asset_type: 'investment', current_value: 200_000, expected_return: 7, is_active: true, net_worth_inclusion_pct: 100, depreciation_rate: null } as unknown as Asset
+    const r = runHorizonLedger(
+      mkInput({ assets: [beleggen, huis], yearlyExpenses: 36_000, annualSavings: 24_000, monthlySurplus: 24_000 / 12, spendableAssetIds: ['huis'] }),
+    )
+    expect(r.fireReachable).toBe(true)
+    const idx = r.rows.findIndex((x) => x.leeftijd === r.fireAge)
+    expect(idx).toBeGreaterThan(1)
+    const gap = r.liquideAtFire - r.requiredFirePortfolioAtFire
+    const brutoJaaropbouw = 24_000 + 0.07 * r.requiredFirePortfolioAtFire
+    expect(gap).toBeGreaterThanOrEqual(0)
+    expect(gap).toBeLessThanOrEqual(brutoJaaropbouw)
+  })
 })

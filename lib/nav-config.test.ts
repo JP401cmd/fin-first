@@ -4,6 +4,7 @@ import {
   navGroups,
   mainNav,
   EXTRA_ROUTE_TITLES,
+  SIMPLE_HIDDEN_NAV_HREFS,
 } from './nav-config'
 
 describe('resolveRouteTitle', () => {
@@ -76,5 +77,25 @@ describe('resolveRouteTitle', () => {
     for (const [href, label] of Object.entries(EXTRA_ROUTE_TITLES)) {
       expect(resolveRouteTitle(href)).toBe(label)
     }
+  })
+})
+
+describe('SIMPLE_HIDDEN_NAV_HREFS', () => {
+  it('bevat Rekenhulp en Wat-Als', () => {
+    expect(SIMPLE_HIDDEN_NAV_HREFS).toContain('/toekomst/rekenhulp')
+    expect(SIMPLE_HIDDEN_NAV_HREFS).toContain('/toekomst/whatif')
+  })
+
+  it('laat navGroups (bron-integriteit) ongemoeid — hrefs staan er nog steeds in', () => {
+    const horizon = navGroups.find((g) => g.parent.href === '/toekomst')
+    const hrefs = horizon!.items.map((i) => i.href)
+    for (const hidden of SIMPLE_HIDDEN_NAV_HREFS) {
+      expect(hrefs, `${hidden} moet in navGroups blijven`).toContain(hidden)
+    }
+  })
+
+  it('laat resolveRouteTitle (TopBar-titel-fallback) intact voor verborgen routes', () => {
+    expect(resolveRouteTitle('/toekomst/rekenhulp')).toBe('Rekenhulp')
+    expect(resolveRouteTitle('/toekomst/whatif')).toBe('Wat-Als')
   })
 })

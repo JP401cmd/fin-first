@@ -738,10 +738,11 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         )}
         <Link
           href="/core/assets/revalue"
+          aria-label="Herwaarderen"
           className="inline-flex min-h-[40px] items-center gap-2 border border-[var(--border-md)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         >
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          Herwaarderen
+          <span className="hidden sm:inline">Herwaarderen</span>
         </Link>
         <button
           type="button"
@@ -750,7 +751,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           className="inline-flex min-h-[40px] items-center gap-2 border border-[var(--ink)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--ink)] hover:text-[var(--paper)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         >
           <Plus className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          Bezitting toevoegen
+          <span className="hidden sm:inline">Bezitting toevoegen</span>
         </button>
       </div>
 

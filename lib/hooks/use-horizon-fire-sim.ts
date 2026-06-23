@@ -167,17 +167,21 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
 
         const today = new Date().toISOString().split('T')[0]
 
+        // Alleen BIJWERKEN, nooit inserten: deze hook stuurt enkel de FIRE-velden
+        // mee (fire_age / fire_portfolio_required). Een upsert zou bij een
+        // ontbrekende dagrij een INSERT triggeren zonder total_assets en de
+        // NOT NULL-constraint op net_worth_snapshots.total_assets schenden.
+        // Treft de update nul rijen (snapshot-cron heeft de dagrij nog niet
+        // geschreven), dan wordt de FIRE-data simpelweg niet voor vandaag
+        // opgeslagen — acceptabel; de cron schrijft later de volledige rij.
         await supabase
           .from('net_worth_snapshots')
-          .upsert(
-            {
-              user_id: user.id,
-              snapshot_date: today,
-              fire_age: fireAgeFractional,
-              fire_portfolio_required: requiredFirePortfolio,
-            },
-            { onConflict: 'user_id,snapshot_date' },
-          )
+          .update({
+            fire_age: fireAgeFractional,
+            fire_portfolio_required: requiredFirePortfolio,
+          })
+          .eq('user_id', user.id)
+          .eq('snapshot_date', today)
       } catch {
         // Non-critical — snapshot update mislukt laat de UI niet crashen
       }

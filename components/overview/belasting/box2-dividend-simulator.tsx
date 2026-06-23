@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Clock, AlertTriangle } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { Kicker, ScenarioCallout } from '@/components/editorial'
+import { Kicker, ScenarioCallout, FiguresStrip } from '@/components/editorial'
 import { BOX2_PARAMS, type Box2Params, type TaxYear } from '@/lib/box2-data'
 
 /**
@@ -171,70 +171,44 @@ export function Box2DividendSimulator({
         </div>
       </div>
 
-      {/* Verdict-regel — scherp kader; hoge schijf = semantisch negatief (meer heffing) */}
-      <div
-        className={`flex items-start gap-2 px-3 py-2.5 text-xs leading-snug ${
-          r.inHighBracket
-            ? 'border border-[var(--ink)] border-l-4 border-l-[var(--negative)] bg-[color-mix(in_srgb,var(--negative)_6%,transparent)] text-[var(--ink-2)]'
-            : 'border border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-2)]'
-        }`}
-      >
-        {r.inHighBracket && (
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[var(--negative)]" aria-hidden="true" />
-        )}
-        <span>
-          {r.inHighBracket ? (
-            <>
-              Je dividend valt voor{' '}
-              <span className="font-mono tabular-nums font-semibold">{formatCurrency(r.inHigh)}</span>{' '}
-              in de hoge schijf (31%). Onder {formatCurrency(grens)} blijf je
-              volledig in de lage schijf — uitsmeren over meerdere jaren of de
-              partner-ruimte benutten kan schelen.
-            </>
-          ) : (
-            <>
-              Je blijft volledig in de lage schijf (24,5%). Er is nog{' '}
-              <span className="font-mono tabular-nums font-semibold">{formatCurrency(grens - dividend)}</span>{' '}
-              ruimte tot de grens van {formatCurrency(grens)}.
-            </>
+      {/* Verdict-regel — uniform ScenarioCallout; hoge schijf = negatief (icoon + tekst) */}
+      <ScenarioCallout className="mt-1 text-xs">
+        <span className="inline-flex items-start gap-2 not-italic">
+          {r.inHighBracket && (
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[var(--negative)]" aria-hidden="true" />
           )}
+          <span>
+            {r.inHighBracket ? (
+              <>
+                Je dividend valt voor{' '}
+                <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{formatCurrency(r.inHigh)}</span>{' '}
+                in de hoge schijf (31%). Onder {formatCurrency(grens)} blijf je
+                volledig in de lage schijf — uitsmeren over meerdere jaren of de
+                partner-ruimte benutten kan schelen.
+              </>
+            ) : (
+              <>
+                Je blijft volledig in de lage schijf (24,5%). Er is nog{' '}
+                <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{formatCurrency(grens - dividend)}</span>{' '}
+                ruimte tot de grens van {formatCurrency(grens)}.
+              </>
+            )}
+          </span>
         </span>
-      </div>
+      </ScenarioCallout>
 
-      {/* Totalen — scherpe haarlijn-kaders, Playfair-cijfers */}
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-        <div className="border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-2.5">
-          <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-[var(--ink-4)]">Box 2-heffing</div>
-          {/* Hoofdresultaat van de simulator: box-accent (--module-active-*) i.p.v. neutraal ink. */}
-          <div
-            className="mt-1 text-[19px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--module-active-700)]"
-            style={{ fontFamily: PLAYFAIR }}
-          >
-            {formatCurrency(r.totalTax)}
-          </div>
-        </div>
-        <div className="border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-2.5">
-          <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-[var(--ink-4)]">Netto</div>
-          <div
-            className="mt-1 text-[19px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
-            style={{ fontFamily: PLAYFAIR }}
-          >
-            {formatCurrency(r.netto)}
-          </div>
-        </div>
-        <div className="border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-2.5">
-          <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-[var(--ink-4)]">Effectief</div>
-          <div
-            className="mt-1 text-[19px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
-            style={{ fontFamily: PLAYFAIR }}
-          >
-            {pct(r.effectiveRate)}
-          </div>
-        </div>
-      </div>
+      {/* Totalen — via FiguresStrip (top/bottom-rule), Box 2-heffing als hoofduitkomst */}
+      <FiguresStrip
+        cols={3}
+        figures={[
+          { kicker: 'Box 2-heffing', amount: formatCurrency(r.totalTax), variant: 'winner' },
+          { kicker: 'Netto', amount: formatCurrency(r.netto) },
+          { kicker: 'Effectief', amount: pct(r.effectiveRate) },
+        ]}
+      />
 
       {freedomDays > 0 && (
-        <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] text-[var(--ink-3)]">
+        <div className="-mt-1 flex items-center gap-1.5 text-[11px] text-[var(--ink-3)]">
           <Clock className="h-3 w-3" aria-hidden="true" />
           De heffing kost {freedomDays} vrijheidsdagen
         </div>

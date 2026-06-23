@@ -34,7 +34,7 @@ function Pijler({
   detail: string
 }) {
   return (
-    <div className="border border-[var(--ink)] bg-[var(--paper)] p-4">
+    <div className="border-t border-[var(--rule-soft)] pt-3.5 first:border-t-0 sm:border-t-0 sm:pt-0 sm:border-l sm:border-[var(--rule-soft)] sm:pl-4 sm:first:border-l-0 sm:first:pl-0">
       <div className="flex items-center gap-2 text-[var(--ink)]">
         <span style={{ color: ACCENT_700 }} aria-hidden="true">
           {icon}
@@ -98,25 +98,17 @@ export function Box3Stelsel2028() {
         />
       </div>
 
-      <div
-        className="mt-4 border px-4 py-3 text-xs leading-snug text-[var(--ink-2)]"
-        style={{
-          borderColor: 'var(--ink)',
-          borderLeftWidth: '4px',
-          borderLeftColor: 'var(--module-active-500)',
-          backgroundColor: 'color-mix(in srgb, var(--module-active-500) 6%, transparent)',
-        }}
-      >
-        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--ink)]">
+      <ScenarioCallout className="mt-4 text-xs">
+        <span className="inline-flex items-center gap-1.5 font-semibold not-italic text-[var(--ink)]">
           <Calculator className="h-3.5 w-3.5" style={{ color: ACCENT_700 }} aria-hidden="true" />
           Wat verandert er nog meer
         </span>
-        <ul className="mt-2 ml-4 list-disc space-y-1">
+        <ul className="mt-2 ml-4 list-disc space-y-1 not-italic">
           <li>Kosten worden aftrekbaar (nu niet onder het forfait).</li>
           <li>Eén vlak tarief van circa 36% over het werkelijke rendement.</li>
           <li>Verliezen kunnen (deels) verrekend worden.</li>
         </ul>
-      </div>
+      </ScenarioCallout>
 
       <div className="mt-4">
         <BesprekMetWillButton

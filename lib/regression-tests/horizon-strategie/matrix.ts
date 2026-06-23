@@ -120,25 +120,37 @@ export interface ComboExpectation {
  * engine (v2) op de complete persona; regenereer met
  * `npx vitest run …/_generate-golden` na een bewuste rekenmotor-wijziging.
  *
+ * GEREGENEREERD 2026-06-23 — ADR 0027 (deplete-FIRE = liquide ≥ V_nodig).
+ * De deplete/pensioen-FIRE-detectie deelt nu één grondslag met de doel-lijn
+ * (backward-annuïteit `vNodig`) i.p.v. de oude forward-deplete-feasibility-test.
+ * Daardoor verschuift de vrijheidsleeftijd voor álle deplete-combinaties (de
+ * persona is `include_full` met een groot, meegroeiend huis in de liquide pot:
+ * de oude over-agressieve volledige-pot-spend-down accepteerde FIRE té vroeg op
+ * ~45 — nu vuurt FIRE pas wanneer het liquide vermogen de werkelijke behoefte-PV
+ * `vNodig` raakt, ~51). Het getoonde doelbedrag = `vNodig[fireIdx]`; vNodig zélf
+ * is ongewijzigd — de waarde verschuift enkel doordat de dalende curve op een
+ * latere leeftijd wordt afgelezen. Legacy (46), perpetual (49) en pensioen (67)
+ * blijven byte-identiek: Optie B raakt hun doel-zoektocht niet.
+ *
  * GENERATED:GOLDEN:START
  */
 export const EXPECTED: Record<string, ComboExpectation> = {
-  'A-include_full': { fireAgeFractional: 45, doelbedrag: 1665830 },
-  'A-exclude': { fireAgeFractional: 46, doelbedrag: 1186411 },
-  'A-downsize': { fireAgeFractional: 51, doelbedrag: 2036804 },
-  'A-reverse': { fireAgeFractional: 50, doelbedrag: 1525903 },
-  'B-deplete': { fireAgeFractional: 45, doelbedrag: 1665830 },
+  'A-include_full': { fireAgeFractional: 51, doelbedrag: 1601972 },
+  'A-exclude': { fireAgeFractional: 53, doelbedrag: 1116811 },
+  'A-downsize': { fireAgeFractional: 63, doelbedrag: 2042600 },
+  'A-reverse': { fireAgeFractional: 56, doelbedrag: 1365307 },
+  'B-deplete': { fireAgeFractional: 51, doelbedrag: 1601972 },
   'B-legacy': { fireAgeFractional: 46, doelbedrag: 1704777 },
   'B-perpetual': { fireAgeFractional: 49, doelbedrag: 2171265 },
   'B-pensioen': { fireAgeFractional: 67, doelbedrag: 1049325 },
-  'C-static': { fireAgeFractional: 45, doelbedrag: 1665830 },
-  'C-guardrails': { fireAgeFractional: 44, doelbedrag: 1669340 },
-  'C-vpw': { fireAgeFractional: 42, doelbedrag: 2285091 },
-  'C-bucket': { fireAgeFractional: 45, doelbedrag: 1665830 },
-  'D-geen': { fireAgeFractional: 45, doelbedrag: 1665830 },
-  'D-groei': { fireAgeFractional: 45, doelbedrag: 1668727 },
-  'D-deeltijd': { fireAgeFractional: 46, doelbedrag: 1661676 },
-  'D-combi': { fireAgeFractional: 45, doelbedrag: 1668391 },
+  'C-static': { fireAgeFractional: 51, doelbedrag: 1601972 },
+  'C-guardrails': { fireAgeFractional: 51, doelbedrag: 1605944 },
+  'C-vpw': { fireAgeFractional: 55, doelbedrag: 2106287 },
+  'C-bucket': { fireAgeFractional: 51, doelbedrag: 1601972 },
+  'D-geen': { fireAgeFractional: 51, doelbedrag: 1601972 },
+  'D-groei': { fireAgeFractional: 50, doelbedrag: 1661483 },
+  'D-deeltijd': { fireAgeFractional: 52, doelbedrag: 1591027 },
+  'D-combi': { fireAgeFractional: 49, doelbedrag: 1661655 },
 }
 // GENERATED:GOLDEN:END
 

@@ -34,17 +34,9 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  Wallet,
   TrendingDown,
   TrendingUp,
-  Landmark,
-  Umbrella,
   Flag,
-  ArrowDownWideNarrow,
-  Home,
-  CalendarPlus,
-  PiggyBank,
-  CreditCard,
   X,
 } from 'lucide-react'
 import { useIsLgUp, useMediaQuery } from '@/lib/hooks/use-media-query'
@@ -55,6 +47,16 @@ type OverlayEmphasis = 'accumulation' | 'withdrawal' | 'fire' | null
 
 /** In welke rij (boven of onder de grafiek) de marker staat. */
 type BalloonRow = 'top' | 'bottom'
+
+/**
+ * Gewogen plaatsing van een ballon rond de gecentreerde grafiek:
+ *  • 'bottom-left'  — Opbouw, wijst naar het opbouw-segment;
+ *  • 'top-center'   — Financiële vrijheid, wijst naar de FIRE-stip;
+ *  • 'bottom-right' — Afbouw, wijst naar het afbouw-segment.
+ * Alleen actief op ruime schermen (weighted layout). Op smal scherm vallen we
+ * terug op de bestaande marker/popover-rijen via `row`.
+ */
+type BalloonSlot = 'bottom-left' | 'top-center' | 'bottom-right'
 
 export interface OverlayBalloonDef {
   id: string
@@ -70,12 +72,42 @@ export interface OverlayBalloonDef {
    * component een actie-knop blijft ondersteunen waar dat ooit nodig is.
    */
   cta?: string
-  /** Rij: 'top' (boven de grafiek) of 'bottom' (onder de grafiek). */
+  /** Rij: 'top' (boven de grafiek) of 'bottom' (onder de grafiek). Smal-scherm-fallback. */
   row: BalloonRow
+  /** Gewogen plaatsing rond de grafiek (ruim scherm). */
+  slot: BalloonSlot
   /** Grafiekfase die deze ballon accentueert bij openen. */
   emphasis: OverlayEmphasis
   /** Optioneel: opent een bijbehorende in-page editor (alleen samen met `cta`). */
   onActivate?: () => void
+}
+
+/**
+ * Horizontale geometrie van de grafiek, zodat de overlay leader-lines, fase-
+ * kaders en de FIRE-cirkel pixelnauwkeurig over de grafiek kan leggen ZONDER de
+ * SVG-interne coördinaten te kennen.
+ *
+ * Het tekengebied (plot) van SimChart loopt van `padLeft` px vanaf de linker-
+ * kaartrand tot `padRight` px vanaf de rechterrand (de as-goot). Een leeftijd
+ * `a` met fractie `f = (a − minAge)/(maxAge − minAge)` landt op CSS
+ * `left: calc(padLeft + (100% − padLeft − padRight) · f)`. We geven de fracties
+ * van het FIRE-punt + de begin/eind van het zichtbare bereik door; de overlay
+ * rekent de CSS-posities uit met `calc()` (responsive, geen breedte nodig).
+ *
+ * Consume-only: alle fracties worden door de parent uit de canonieke sim-data
+ * afgeleid — de overlay herberekent niets.
+ */
+export interface ToekomstOverlayGeometry {
+  /** Plot-inset links in px (as-goot). */
+  padLeft: number
+  /** Plot-inset rechts in px. */
+  padRight: number
+  /** Plot-inset boven in px (waar de lijn-top ongeveer begint). */
+  padTop: number
+  /** Plot-inset onder in px (x-as). */
+  padBottom: number
+  /** Horizontale fractie (0..1) van het FIRE-punt binnen het plot. null = niet in zicht. */
+  fireFraction: number | null
 }
 
 /**
@@ -99,6 +131,12 @@ export interface ToekomstOverlayProps {
   visible: boolean
   /** Ballon-definities (door horizon-client samengesteld + gewired). */
   balloons: OverlayBalloonDef[]
+  /**
+   * Horizontale grafiek-geometrie voor de gewogen layout (leader-lines, fase-
+   * kaders, FIRE-cirkel). Alleen op ruime schermen gebruikt. Ontbreekt 'ie, dan
+   * valt de overlay terug op de marker/popover-rijen (geen leader-lines).
+   */
+  geometry?: ToekomstOverlayGeometry
   /**
    * Optionele één-regel-samenvatting bovenin de overlay (netto vermogen +
    * vrijheidsleeftijd). Alleen gerenderd als `visible && summary`.
@@ -134,6 +172,7 @@ export interface ToekomstOverlayProps {
 export function ToekomstOverlay({
   visible,
   balloons,
+  geometry,
   summary,
   onEmphasisChange,
   children,
@@ -357,6 +396,12 @@ export function ToekomstOverlay({
     onReleaseEmphasis: releaseEmphasis,
   }
 
+  // Gewogen layout alleen op ruime schermen MÉT geometrie: daar is genoeg
+  // ruimte voor de bubbels rondom de grafiek + leader-lines. Op smal scherm
+  // (geen `inline`) of zonder geometrie vallen we terug op de marker/popover-
+  // rijen, zodat niets buiten beeld valt.
+  const weighted = inline && !!geometry
+
   return (
     // Tips UIT → grafiek gewoon in-flow. Tips AAN → spotlight: de grafiek blijft op
     // EXACT dezelfde plek (in-flow, z-[50] erboven), de pagina is scroll-locked en de
@@ -428,26 +473,45 @@ export function ToekomstOverlay({
           omlaag duwen, zodat de mobiele top-alignment hoog in beeld blijft. */}
       {visible && summary && <SummaryLine summary={summary} />}
 
-      {/* Bovenste rij — alleen als de tips aan staan. */}
-      {visible && topBalloons.length > 0 && (
-        <MarkerRow position="top" balloons={topBalloons} {...rowProps} />
-      )}
+      {weighted ? (
+        // ── Gewogen layout (ruim scherm) ──────────────────────────────────
+        // De grafiek staat gecentreerd; de 3 bubbels staan gewogen eromheen
+        // (Opbouw links-onder, Financiële vrijheid midden-boven, Afbouw
+        // rechts-onder) en wijzen elk met een leader-line + kader/cirkel naar
+        // hun deel van de grafiek.
+        <WeightedLayout
+          balloons={balloons}
+          geometry={geometry!}
+          onEmphasize={emphasize}
+          onReleaseEmphasis={releaseEmphasis}
+          visibleTips={visible}
+        >
+          {children}
+        </WeightedLayout>
+      ) : (
+        <>
+          {/* Bovenste rij — alleen als de tips aan staan (smal-scherm-fallback). */}
+          {visible && topBalloons.length > 0 && (
+            <MarkerRow position="top" balloons={topBalloons} {...rowProps} />
+          )}
 
-      {/* Witte kaart achter de grafiek (alleen in tips-modus) zodat de vervaagde
-          pagina niet door de grafiek heen schijnt. De grafiek blijft op z'n plek. */}
-      <div
-        className={
-          visible
-            ? 'overflow-hidden rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl'
-            : ''
-        }
-      >
-        {children}
-      </div>
+          {/* Witte kaart achter de grafiek (alleen in tips-modus) zodat de vervaagde
+              pagina niet door de grafiek heen schijnt. De grafiek blijft op z'n plek. */}
+          <div
+            className={
+              visible
+                ? 'overflow-hidden rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl'
+                : ''
+            }
+          >
+            {children}
+          </div>
 
-      {/* Onderste rij — alleen als de tips aan staan. */}
-      {visible && bottomBalloons.length > 0 && (
-        <MarkerRow position="bottom" balloons={bottomBalloons} {...rowProps} />
+          {/* Onderste rij — alleen als de tips aan staan (smal-scherm-fallback). */}
+          {visible && bottomBalloons.length > 0 && (
+            <MarkerRow position="bottom" balloons={bottomBalloons} {...rowProps} />
+          )}
+        </>
       )}
 
       {/* Subtiele hint: hoe je dit Tips-scherm later terugvindt. `onPointerDown`
@@ -510,6 +574,226 @@ function SummaryLine({ summary }: { summary: ToekomstOverlaySummary }) {
         </span>
         <span>{ageLabel}</span>
       </p>
+    </div>
+  )
+}
+
+/**
+ * Gewogen layout op ruime schermen: de grafiek staat gecentreerd, met de drie
+ * bubbels gewogen eromheen en leader-lines + fase-kaders + een FIRE-cirkel die
+ * elk naar het juiste deel van de grafiek wijzen.
+ *
+ * We meten de gerenderde grootte van de grafiek-kaart (ResizeObserver) en tekenen
+ * één SVG-leader-laag in échte pixels eroverheen — zo blijven de lijnen correct en
+ * de FIRE-cirkel rond, ongeacht de breedte. De bubbels zelf staan als absolute
+ * kinderen om de kaart; hun ankerpunt (waar de leader-line eindigt) ligt op de
+ * bubbel-rand richting de grafiek. Consume-only: alle x-fracties komen uit
+ * `geometry` (afgeleid uit de canonieke sim-data), niets wordt herberekend.
+ */
+function WeightedLayout({
+  balloons,
+  geometry,
+  onEmphasize,
+  onReleaseEmphasis,
+  visibleTips,
+  children,
+}: {
+  balloons: OverlayBalloonDef[]
+  geometry: ToekomstOverlayGeometry
+  onEmphasize: (def: OverlayBalloonDef) => void
+  onReleaseEmphasis: () => void
+  visibleTips: boolean
+  children: ReactNode
+}) {
+  const chartRef = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null)
+  useLayoutEffect(() => {
+    const el = chartRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      setBox({ w: el.clientWidth, h: el.clientHeight })
+    })
+    ro.observe(el)
+    setBox({ w: el.clientWidth, h: el.clientHeight })
+    return () => ro.disconnect()
+  }, [])
+
+  const bySlot = (slot: BalloonSlot) => balloons.find((b) => b.slot === slot)
+  const opbouw = bySlot('bottom-left')
+  const vrijheid = bySlot('top-center')
+  const afbouw = bySlot('bottom-right')
+
+  const { padLeft, padRight, padTop, padBottom, fireFraction } = geometry
+
+  // Pixel-x van een plot-fractie f (0..1) binnen de gerenderde kaartbreedte.
+  const xAt = (f: number) =>
+    box ? padLeft + (box.w - padLeft - padRight) * Math.min(Math.max(f, 0), 1) : 0
+  // Verticale ankerlijn voor de leader-lines: net binnen het plot, onder de
+  // x-as voor de onder-bubbels, boven de plot-top voor de FIRE-bubbel.
+  const plotBottomY = box ? box.h - padBottom : 0
+  const plotTopY = padTop
+
+  // Fracties (defensief: zonder FIRE-punt centreren we de cirkel ongeveer in het
+  // midden en laten de kaders het halve plot beslaan).
+  const fFire = fireFraction ?? 0.5
+  const accMidF = fFire / 2
+  const decMidF = (fFire + 1) / 2
+
+  return (
+    <div className="relative">
+      {/* Bovenste bubbel-zone (Financiële vrijheid, midden-boven). Alleen in de
+          tips-overlay; staan de tips uit, dan blijft alleen de grafiek staan
+          (geen stray-marge). */}
+      {visibleTips && vrijheid && (
+        <div className="relative mb-4 flex justify-center">
+          <WeightedBubble
+            def={vrijheid}
+            onEmphasize={() => onEmphasize(vrijheid)}
+            onReleaseEmphasis={onReleaseEmphasis}
+          />
+        </div>
+      )}
+
+      {/* Grafiek-kaart + leader-laag. */}
+      <div ref={chartRef} className="relative">
+        {/* Witte kaart achter de grafiek (alleen in tips-modus). */}
+        <div
+          className={
+            visibleTips
+              ? 'overflow-hidden rounded-[var(--r-lg)] bg-[var(--paper)] shadow-xl'
+              : ''
+          }
+        >
+          {children}
+        </div>
+
+        {/* Leader-laag: fase-kaders (opbouw/afbouw), FIRE-cirkel + lijnen naar de
+            bubbels. pointer-events none zodat de grafiek interactief blijft waar
+            nodig (de tips dimmen 'm toch). */}
+        {visibleTips && box && fireFraction != null && (
+          <svg
+            className="pointer-events-none absolute inset-0 z-[12] h-full w-full overflow-visible"
+            aria-hidden
+          >
+            {/* Kader over het OPBOUW-segment [0 .. fire]. */}
+            <rect
+              x={xAt(0)}
+              y={plotTopY}
+              width={Math.max(xAt(fFire) - xAt(0), 0)}
+              height={Math.max(plotBottomY - plotTopY, 0)}
+              rx={6}
+              fill="var(--module-active-500)"
+              fillOpacity={0.06}
+              stroke="var(--module-active-500)"
+              strokeOpacity={0.55}
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+            />
+            {/* Kader over het AFBOUW-segment [fire .. 1]. */}
+            <rect
+              x={xAt(fFire)}
+              y={plotTopY}
+              width={Math.max(xAt(1) - xAt(fFire), 0)}
+              height={Math.max(plotBottomY - plotTopY, 0)}
+              rx={6}
+              fill="var(--kern-t, #58362d)"
+              fillOpacity={0.05}
+              stroke="var(--kern-t, #58362d)"
+              strokeOpacity={0.5}
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+            />
+            {/* Leader-line: Opbouw-bubbel (links-onder) → midden opbouw-segment. */}
+            {opbouw && (
+              <line
+                x1={xAt(accMidF) * 0.5}
+                y1={box.h + 18}
+                x2={xAt(accMidF)}
+                y2={plotBottomY}
+                stroke="var(--module-active-500)"
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
+              />
+            )}
+            {/* Leader-line: Afbouw-bubbel (rechts-onder) → midden afbouw-segment. */}
+            {afbouw && (
+              <line
+                x1={xAt(decMidF) + (box.w - xAt(decMidF)) * 0.5}
+                y1={box.h + 18}
+                x2={xAt(decMidF)}
+                y2={plotBottomY}
+                stroke="var(--kern-t, #58362d)"
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
+              />
+            )}
+          </svg>
+        )}
+      </div>
+
+      {/* Onderste bubbel-zone: Opbouw links, Afbouw rechts. Alleen in de tips-
+          overlay; staan de tips uit, dan toont de pagina enkel de grafiek. */}
+      {visibleTips && (
+        <div className="relative mt-4 flex items-start justify-between gap-3">
+          <div className="flex justify-start">
+            {opbouw && (
+              <WeightedBubble
+                def={opbouw}
+                onEmphasize={() => onEmphasize(opbouw)}
+                onReleaseEmphasis={onReleaseEmphasis}
+              />
+            )}
+          </div>
+          <div className="flex justify-end">
+            {afbouw && (
+              <WeightedBubble
+                def={afbouw}
+                onEmphasize={() => onEmphasize(afbouw)}
+                onReleaseEmphasis={onReleaseEmphasis}
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Eén gewogen bubbel — editorial kaart (kicker + body) die bij hover de
+ * bijbehorende grafiekfase accentueert (emphasis-only, net als InlineBalloonCard).
+ * Niet-interactief van zichzelf (geen knop): de uitleg is altijd leesbaar; de
+ * highlight is progressieve verrijking voor muis/trackpad.
+ */
+function WeightedBubble({
+  def,
+  onEmphasize,
+  onReleaseEmphasis,
+}: {
+  def: OverlayBalloonDef
+  onEmphasize: () => void
+  onReleaseEmphasis: () => void
+}) {
+  return (
+    <div
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseEnter={onEmphasize}
+      onMouseLeave={onReleaseEmphasis}
+      className="relative z-20 w-[min(17rem,calc((100vw-8rem)/3))] shrink-0 bg-[var(--paper)]/97 p-3.5 text-left text-sm leading-snug text-[var(--ink-2)] shadow-md backdrop-blur-sm transition-shadow duration-200 hover:shadow-lg"
+      style={{
+        fontFamily: 'var(--font-source-serif, Georgia, serif)',
+        border: '1px solid var(--ink)',
+        borderLeftWidth: '4px',
+        borderLeftColor: 'var(--module-active-500)',
+      }}
+    >
+      <div className="mb-1.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--module-active-800)]">
+        <span aria-hidden className="inline-flex text-[var(--module-active-600)]">
+          {def.icon}
+        </span>
+        {def.kicker}
+      </div>
+      <p className="italic">{def.body}</p>
     </div>
   )
 }
@@ -792,19 +1076,16 @@ function MarkerWithPopover({
   )
 }
 
-// ── Iconen voor de standaard-ballonset ─────────────────────────────────────
+// ── Iconen voor de drie fase-ballonnen ─────────────────────────────────────
 // Geëxporteerd zodat horizon-client dezelfde iconen hergebruikt bij het
-// samenstellen van de ballon-definities (één bron, geen drift).
+// samenstellen van de ballon-definities (één bron, geen drift). Sinds de
+// gewogen 3-bubbel-layout (opbouw / vrijheid / afbouw) zijn alleen deze drie
+// nog nodig.
 export const OVERLAY_ICONS = {
-  income: <Wallet className="h-3.5 w-3.5" />,
-  incomeStrategy: <TrendingUp className="h-3.5 w-3.5" />,
-  aow: <Umbrella className="h-3.5 w-3.5" />,
-  assets: <PiggyBank className="h-3.5 w-3.5" />,
-  debts: <CreditCard className="h-3.5 w-3.5" />,
-  expenses: <TrendingDown className="h-3.5 w-3.5" />,
-  pension: <Landmark className="h-3.5 w-3.5" />,
-  end: <Flag className="h-3.5 w-3.5" />,
-  withdrawal: <ArrowDownWideNarrow className="h-3.5 w-3.5" />,
-  housing: <Home className="h-3.5 w-3.5" />,
-  event: <CalendarPlus className="h-3.5 w-3.5" />,
+  /** Opbouwfase — stijgende vermogenslijn. */
+  accumulation: <TrendingUp className="h-3.5 w-3.5" />,
+  /** Financiële vrijheid — de FIRE-mijlpaal. */
+  freedom: <Flag className="h-3.5 w-3.5" />,
+  /** Afbouwfase — dalende lijn nadat werken een keuze wordt. */
+  withdrawal: <TrendingDown className="h-3.5 w-3.5" />,
 } as const

@@ -27,6 +27,7 @@ import {
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Pencil, Save, Trash2,
   GitFork, CircleDot, AlertTriangle, CheckCircle2, Check, Heart, LayoutGrid, Link2,
   TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle, FileText, MoveRight, ArrowLeftRight,
+  Pill,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets, BUDGET_SLUGS, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -36,6 +37,7 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
 import { BudgetTree } from '@/components/app/budget-tree'
+import { BudgetPillTree } from '@/components/app/budget-pill-tree'
 import { BudgetDonut } from '@/components/app/budget-donut'
 import { BudgetHeatmap, type HeatmapSection } from '@/components/app/budget-heatmap'
 import { useDailyExpenseRate, eurToFreedomTime } from '@/components/app/freedom-time-label'
@@ -78,6 +80,7 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FeatureGate } from '@/components/app/feature-gate'
 import { CollapsibleSection } from '@/components/app/collapsible-section'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { NibudBenchmarkSection } from '@/components/app/will/nibud-benchmark'
 import { SPLIT_MODE_LABELS, type SplitMode, type PrivacySettings } from '@/lib/household-data'
 import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
@@ -92,8 +95,6 @@ import { Users } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
 
 
 type Goal = BudgetGoal
@@ -130,12 +131,15 @@ function localDateStr(d: Date): string {
 // Bovenaan de pagina, boven de bestaande maand-selector. Pure presentatie —
 // gebruikt alleen al bestaande state (monthLabel, teVerdelen, totalIncome).
 
-function BudgetEditorialHeader({
+// Exported voor unit-tests (budgets-client.test.tsx): test de Eenvoudig-modus
+// hide van het plan/werkelijk-cijferblok zonder de hele BudgetsPage te mounten.
+export function BudgetEditorialHeader({
   monthLabel,
   teVerdelen,
   totalIncome,
   totalIncomeActual,
   totalActualOutflow,
+  simple = false,
 }: {
   monthLabel: string
   teVerdelen: number
@@ -147,14 +151,15 @@ function BudgetEditorialHeader({
    * inkomen is feitelijk al uit het huishouden gestroomd.
    */
   totalActualOutflow: number
+  /**
+   * Eenvoudig-modus: verbergt het plan/werkelijk-cijferblok. Kicker + headline
+   * blijven staan zodat de pagina nog steeds een editorial aanhef houdt.
+   */
+  simple?: boolean
 }) {
   const periodKicker = monthLabel
     ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
     : ''
-
-  // /overzicht/cashflow toont nieuwe overzicht-tekst; legacy /core/budgets blijft fallback
-  const pathname = usePathname()
-  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/core/budgets']
 
   // Twee perspectieven op "ruimte":
   //  - Volgens plan: verwacht inkomen − toegewezen budgetten (`teVerdelen`).
@@ -174,10 +179,6 @@ function BudgetEditorialHeader({
 
   return (
     <header className="relative mb-6 space-y-3">
-      <PageInfoButton
-        description={pageInfoText}
-        className="absolute right-0 top-0"
-      />
       <div className="flex flex-wrap items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
         <span
           aria-hidden
@@ -204,7 +205,9 @@ function BudgetEditorialHeader({
 
       {/* Twee kolommen: plan vs. werkelijk. Plan gebruikt highlight-marker
           (Kern-200), werkelijk blijft sober — zo vormt het plan-cijfer het
-          anker en is werkelijk de aanvullende lezing. */}
+          anker en is werkelijk de aanvullende lezing. In Eenvoudig-modus
+          verbergen we dit cijferblok volledig (kicker + headline blijven). */}
+      {!simple && (
       <div className="mt-2 grid grid-cols-1 gap-4 border-t border-[var(--border-ed)] pt-3 sm:grid-cols-2 sm:divide-x sm:divide-[var(--border-ed)] sm:gap-0">
         <div className="sm:pr-6">
           <p className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)]">
@@ -255,6 +258,7 @@ function BudgetEditorialHeader({
           </p>
         </div>
       </div>
+      )}
     </header>
   )
 }
@@ -356,6 +360,160 @@ function BudgetKpiCell({
     )
   }
   return <div className={cellClass}>{inner}</div>
+}
+
+/**
+ * De figures-strip (KPI-balk) onder de maand-navigatie: Inkomen / Uitgaven /
+ * Sparen / Schulden. In Eenvoudig-modus (`simple`) tonen we alléén Inkomen-vs-
+ * budget en Uitgaven-vs-budget (grid → 2 koloms); Sparen + Schulden vervallen.
+ * Met 2 cellen geldt de nth-child(-n+2)-onder-border-logica van BudgetKpiCell
+ * niet meer (alles op één rij), dus die hoeven we niet te onderdrukken.
+ * Geëxporteerd voor unit-tests.
+ */
+export function BudgetFiguresStrip({
+  simple,
+  totalIncomeActual,
+  totalIncome,
+  totalExpenseSpent,
+  totalExpenseBudget,
+  totalSavingsActual,
+  totalSavingsBudget,
+  totalDebtActual,
+  totalDebtBudget,
+  hasIncome,
+  hasExpense,
+  hasSavings,
+  hasDebt,
+}: {
+  simple: boolean
+  totalIncomeActual: number
+  totalIncome: number
+  totalExpenseSpent: number
+  totalExpenseBudget: number
+  totalSavingsActual: number
+  totalSavingsBudget: number
+  totalDebtActual: number
+  totalDebtBudget: number
+  hasIncome: boolean
+  hasExpense: boolean
+  hasSavings: boolean
+  hasDebt: boolean
+}) {
+  return (
+    <div className={simple ? 'grid grid-cols-2' : 'grid grid-cols-2 sm:grid-cols-4'}>
+      <BudgetKpiCell
+        kicker="Inkomen"
+        kickerColor="var(--positive)"
+        actual={totalIncomeActual}
+        target={totalIncome}
+        actionLabel="ontvangen"
+        href={hasIncome ? '#inkomen' : undefined}
+      />
+      <BudgetKpiCell
+        kicker="Uitgaven"
+        kickerColor="var(--negative)"
+        actual={totalExpenseSpent}
+        target={totalExpenseBudget}
+        actionLabel="besteed"
+        href={hasExpense ? '#uitgaven' : undefined}
+      />
+      {!simple && (
+        <BudgetKpiCell
+          kicker="Sparen"
+          kickerColor="var(--color-wil-600)"
+          actual={totalSavingsActual}
+          target={totalSavingsBudget}
+          actionLabel="gespaard"
+          tagline="vrijheid opbouwen"
+          taglineColor="var(--color-wil-600)"
+          highlight
+          href={hasSavings ? '#sparen' : undefined}
+        />
+      )}
+      {!simple && (
+        <BudgetKpiCell
+          kicker="Schulden"
+          kickerColor="var(--negative)"
+          actual={totalDebtActual}
+          target={totalDebtBudget}
+          actionLabel="afgelost"
+          tagline="vrijheid terugkopen"
+          taglineColor="var(--negative)"
+          href={hasDebt ? '#schulden' : undefined}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * De weergave-toggle-pillgroep (Boom / Ring / Heatmap / Pillen). In Eenvoudig-
+ * modus (`simple`) is de pil-weergave de enige optie → deze group rendert dan
+ * niet (de caller forceert `effectiveViewMode='pill'`). Geëxporteerd voor
+ * unit-tests. `viewMode` blijft de gebruikers-keuze; in simple irrelevant.
+ */
+export function BudgetViewToggle({
+  simple,
+  viewMode,
+  onSelect,
+}: {
+  simple: boolean
+  viewMode: 'tree' | 'donut' | 'heatmap' | 'pill'
+  onSelect: (mode: 'tree' | 'donut' | 'heatmap' | 'pill') => void
+}) {
+  if (simple) return null
+  return (
+    <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
+      <button
+        onClick={() => onSelect('tree')}
+        aria-label="Boom"
+        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+          viewMode === 'tree'
+            ? 'bg-zinc-900 text-white'
+            : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+        }`}
+      >
+        <GitFork className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Boom</span>
+      </button>
+      <button
+        onClick={() => onSelect('donut')}
+        aria-label="Ring"
+        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+          viewMode === 'donut'
+            ? 'bg-zinc-900 text-white'
+            : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+        }`}
+      >
+        <CircleDot className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Ring</span>
+      </button>
+      <button
+        onClick={() => onSelect('heatmap')}
+        aria-label="Heatmap"
+        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+          viewMode === 'heatmap'
+            ? 'bg-zinc-900 text-white'
+            : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+        }`}
+      >
+        <LayoutGrid className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Heatmap</span>
+      </button>
+      <button
+        onClick={() => onSelect('pill')}
+        aria-label="Pillen"
+        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+          viewMode === 'pill'
+            ? 'bg-zinc-900 text-white'
+            : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+        }`}
+      >
+        <Pill className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Pillen</span>
+      </button>
+    </div>
+  )
 }
 
 type HubAlert = { id: string; name: string; spent: number; limit: number; pct: number; severity: 'over' | 'bijna' }
@@ -477,9 +635,13 @@ export function BudgetHub({
     opSchemaCount === parentBudgetsCount ? 'text-positive' : 'text-[var(--ink)]'
 
   return (
-    <div className="mt-4 overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)]">
-      {/* Kleur-accent bovenaan — editorial pattern */}
-      <div className="h-1 bg-wil-500" />
+    <div
+      className={`mt-4 overflow-hidden border border-[var(--border-ed)] bg-[var(--paper)] ${
+        expanded ? 'rounded-[var(--r-lg)]' : 'rounded-full'
+      }`}
+    >
+      {/* Kleur-accent bovenaan — editorial pattern, module-accent (Overzicht) */}
+      <div className="h-1" style={{ background: 'var(--module-active-500)' }} />
       {/* Header — clickable to toggle */}
       <button
         type="button"
@@ -815,11 +977,18 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   // toegepast. localStorage in de useState-initializer gaf een hydration-
   // mismatch: de server kent de voorkeur niet en rendert een andere view
   // (en andere toggle-classNames) dan de client.
-  const [viewMode, setViewMode] = useState<'tree' | 'donut' | 'heatmap'>('tree')
+  const [viewMode, setViewMode] = useState<'tree' | 'donut' | 'heatmap' | 'pill'>('tree')
   useEffect(() => {
     const stored = localStorage.getItem('budgets-view-mode')
-    if (stored === 'donut' || stored === 'heatmap') setViewMode(stored)
+    if (stored === 'donut' || stored === 'heatmap' || stored === 'pill') setViewMode(stored)
   }, [])
+  // Eenvoudig-modus (server-geseed via DisplayModeProvider, geen hydration-flash).
+  // In simple: hoofdgetallen-blok verbergen, figures-strip → alleen Inkomen +
+  // Uitgaven, en de weergave geforceerd op de pil-modus (view-toggle verborgen).
+  // `viewMode`/setViewMode/localStorage blijven intact zodat de eigen keuze
+  // terugkomt zodra de gebruiker weer naar Volledig schakelt.
+  const simple = useDisplayMode().mode === 'simple'
+  const effectiveViewMode: 'tree' | 'donut' | 'heatmap' | 'pill' = simple ? 'pill' : viewMode
   const [periodMode, setPeriodMode] = useState<'maand' | 'ytd' | '12m'>('maand')
   const [monthDate, setMonthDate] = useState(() => {
     // Deeplink vanaf de geldstroom-banner (/overzicht/cashflow) opent deze
@@ -1541,7 +1710,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
   }
 
-  function toggleViewMode(mode: 'tree' | 'donut' | 'heatmap') {
+  function toggleViewMode(mode: 'tree' | 'donut' | 'heatmap' | 'pill') {
     setViewMode(mode)
     localStorage.setItem('budgets-view-mode', mode)
   }
@@ -1787,6 +1956,12 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   // De vier type-trees voor een willekeurige subset budgetten. `withAnchors`
   // rendert de scroll-anchor-id's (#inkomen etc.) — alleen in de enkele-boom-
   // modus relevant; in de gesectioneerde modus zou dat dubbele id's geven.
+  // De boom- en pil-weergave delen exact dezelfde prop-signatuur, dus we
+  // kiezen hier één component op basis van de actieve viewMode. Zo blijft de
+  // pil-modus volledig additief (tree/donut/heatmap ongewijzigd) zonder de
+  // hele render-tak te dupliceren.
+  const TreeComp = effectiveViewMode === 'pill' ? BudgetPillTree : BudgetTree
+
   const renderTypeTrees = (subset: StampedBudgetWithChildren[], withAnchors: boolean) => {
     const inc = subset.filter((b) => b.budget_type === 'income')
     const exp = subset.filter((b) => b.budget_type === 'expense')
@@ -1797,25 +1972,25 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         {inc.length > 0 && (
           <div id={withAnchors ? 'inkomen' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
             <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
-            <BudgetTree groups={inc} spending={spending} budgetType="income" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+            <TreeComp groups={inc} spending={spending} budgetType="income" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
           </div>
         )}
         {exp.length > 0 && (
           <div id={withAnchors ? 'uitgaven' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
             <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Uitgaven</h3>
-            <BudgetTree groups={exp} spending={spending} budgetType="expense" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+            <TreeComp groups={exp} spending={spending} budgetType="expense" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
           </div>
         )}
         {sav.length > 0 && (
           <div id={withAnchors ? 'sparen' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
             <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-wil-400/70">— vrijheid opbouwen</span></h3>
-            <BudgetTree groups={sav} spending={spending} budgetType="savings" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+            <TreeComp groups={sav} spending={spending} budgetType="savings" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
           </div>
         )}
         {deb.length > 0 && (
           <div id={withAnchors ? 'schulden' : undefined} className="mt-4 sm:mt-8 scroll-mt-20">
             <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
-            <BudgetTree groups={deb} spending={spending} budgetType="debt" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
+            <TreeComp groups={deb} spending={spending} budgetType="debt" onNavigate={(id) => openBudgetModal(id)} beschikbaarMap={beschikbaarMap} />
           </div>
         )}
       </>
@@ -1929,6 +2104,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         totalIncome={totalIncome}
         totalIncomeActual={totalIncomeActual}
         totalActualOutflow={totalExpenseSpent + totalSavingsActual + totalDebtActual}
+        simple={simple}
       />
 
       {/* Month selector + KPI-strip — figures-strip-stijl met top+bottom borders.
@@ -1940,17 +2116,16 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3 border-b border-[var(--rule-soft)] flex-wrap">
           {/* Maand-nav links */}
           <div className="flex items-center gap-1">
-            {periodMode === 'maand' && (
-              <button
-                onClick={prevMonth}
-                aria-label="Vorige maand"
-                className="p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-            )}
+            <button
+              onClick={prevMonth}
+              disabled={periodMode !== 'maand'}
+              aria-label="Vorige maand"
+              className={`p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${periodMode !== 'maand' ? 'invisible pointer-events-none' : ''}`}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
             <h2
-              className="px-2 text-base font-bold capitalize text-[var(--ink)] sm:text-lg"
+              className="inline-block min-w-0 px-2 text-center text-base font-bold capitalize text-[var(--ink)] sm:min-w-[13rem] sm:text-lg"
               style={{ fontFamily: 'var(--font-playfair, serif)' }}
             >
               {periodMode === 'ytd'
@@ -1959,15 +2134,14 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                   ? 'Afgelopen 12 maanden'
                   : monthLabel}
             </h2>
-            {periodMode === 'maand' && (
-              <button
-                onClick={nextMonth}
-                aria-label="Volgende maand"
-                className="p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            )}
+            <button
+              onClick={nextMonth}
+              disabled={periodMode !== 'maand'}
+              aria-label="Volgende maand"
+              className={`p-1.5 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${periodMode !== 'maand' ? 'invisible pointer-events-none' : ''}`}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
 
             {/* Period toggle pill — donker actief, transparant rest */}
             <div className="ml-2 flex items-center gap-0.5 rounded-full border border-[var(--border-ed)] bg-[var(--bg)] p-0.5">
@@ -2017,49 +2191,22 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         </div>
 
         {/* 4-koloms KPI-strip: Inkomen / Uitgaven / Sparen / Schulden.
-            Format per cell: kicker-kleur (positive/negative/wil/red) UPPERCASE,
-            hoofd in Playfair 'x / y' (besteed / budget), italic sub-meta.
-            Sparen krijgt halve transparante streep (winner). Cellen met data
-            zijn klikbaar (deeplink naar #-anchor van detail-tree). */}
-        <div className="grid grid-cols-2 sm:grid-cols-4">
-          <BudgetKpiCell
-            kicker="Inkomen"
-            kickerColor="var(--positive)"
-            actual={totalIncomeActual}
-            target={totalIncome}
-            actionLabel="ontvangen"
-            href={incomeBudgets.length > 0 ? '#inkomen' : undefined}
-          />
-          <BudgetKpiCell
-            kicker="Uitgaven"
-            kickerColor="var(--negative)"
-            actual={totalExpenseSpent}
-            target={totalExpenseBudget}
-            actionLabel="besteed"
-            href={expenseBudgets.length > 0 ? '#uitgaven' : undefined}
-          />
-          <BudgetKpiCell
-            kicker="Sparen"
-            kickerColor="var(--color-wil-600)"
-            actual={totalSavingsActual}
-            target={totalSavingsBudget}
-            actionLabel="gespaard"
-            tagline="vrijheid opbouwen"
-            taglineColor="var(--color-wil-600)"
-            highlight
-            href={savingsBudgets.length > 0 ? '#sparen' : undefined}
-          />
-          <BudgetKpiCell
-            kicker="Schulden"
-            kickerColor="var(--negative)"
-            actual={totalDebtActual}
-            target={totalDebtBudget}
-            actionLabel="afgelost"
-            tagline="vrijheid terugkopen"
-            taglineColor="var(--negative)"
-            href={debtBudgets.length > 0 ? '#schulden' : undefined}
-          />
-        </div>
+            In Eenvoudig-modus alleen Inkomen + Uitgaven (zie BudgetFiguresStrip). */}
+        <BudgetFiguresStrip
+          simple={simple}
+          totalIncomeActual={totalIncomeActual}
+          totalIncome={totalIncome}
+          totalExpenseSpent={totalExpenseSpent}
+          totalExpenseBudget={totalExpenseBudget}
+          totalSavingsActual={totalSavingsActual}
+          totalSavingsBudget={totalSavingsBudget}
+          totalDebtActual={totalDebtActual}
+          totalDebtBudget={totalDebtBudget}
+          hasIncome={incomeBudgets.length > 0}
+          hasExpense={expenseBudgets.length > 0}
+          hasSavings={savingsBudgets.length > 0}
+          hasDebt={debtBudgets.length > 0}
+        />
 
         {/* Pro-rata onderschrift — alle bedragen hierboven tonen jouw aandeel
             van gedeelde budgetten (gedeeld geld × aandeel; eigen geld telt vol). */}
@@ -2094,46 +2241,12 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         />
       )}
 
-      {/* View toggle + New budget button */}
-      <div className="mt-2 sm:mt-6 flex items-center justify-between">
-        <div className="flex items-center gap-0.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-0.5">
-          <button
-            onClick={() => toggleViewMode('tree')}
-            aria-label="Boom"
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'tree'
-                ? 'bg-zinc-900 text-white'
-                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-            }`}
-          >
-            <GitFork className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Boom</span>
-          </button>
-          <button
-            onClick={() => toggleViewMode('donut')}
-            aria-label="Ring"
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'donut'
-                ? 'bg-zinc-900 text-white'
-                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-            }`}
-          >
-            <CircleDot className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Ring</span>
-          </button>
-          <button
-            onClick={() => toggleViewMode('heatmap')}
-            aria-label="Heatmap"
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === 'heatmap'
-                ? 'bg-zinc-900 text-white'
-                : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-            }`}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Heatmap</span>
-          </button>
-        </div>
+      {/* View toggle + New budget button.
+          In Eenvoudig-modus is de pil-weergave de enige optie → de
+          view-toggle-pill-group rendert niet; het container-justify schakelt
+          dan naar end zodat de actie-groep (koppelen / plan) rechts blijft. */}
+      <div className={`mt-2 sm:mt-6 flex items-center ${simple ? 'justify-end' : 'justify-between'}`}>
+        <BudgetViewToggle simple={simple} viewMode={viewMode} onSelect={toggleViewMode} />
 
         {/* Spiegelt de view-toggle pill-group: zelfde wrapper-shape
             (rounded-lg border bg-paper p-0.5) met daarbinnen één pill in
@@ -2192,7 +2305,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       </div>
 
       {/* Budget groups */}
-      {viewMode === 'tree' ? (
+      {effectiveViewMode === 'tree' || effectiveViewMode === 'pill' ? (
         <>
           {householdSectioned ? (
             // Drie secties op herkomst: Gezamenlijk (gedeeld, vol) / Mijn potjes
@@ -2224,7 +2337,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           {incomeBudgets.length > 0 && (
             <div id="inkomen" className="mt-4 sm:mt-8 scroll-mt-20">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Inkomen</h3>
-              <BudgetTree
+              <TreeComp
                 groups={incomeBudgets}
                 spending={spending}
                 budgetType="income"
@@ -2236,7 +2349,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           {expenseBudgets.length > 0 && (
             <div id="uitgaven" className="mt-4 sm:mt-8 scroll-mt-20">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Uitgaven</h3>
-              <BudgetTree
+              <TreeComp
                 groups={expenseBudgets}
                 spending={spending}
                 budgetType="expense"
@@ -2248,7 +2361,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           {savingsBudgets.length > 0 && (
             <div id="sparen" className="mt-4 sm:mt-8 scroll-mt-20">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Sparen <span className="ml-1 font-normal normal-case tracking-normal text-wil-400/70">— vrijheid opbouwen</span></h3>
-              <BudgetTree
+              <TreeComp
                 groups={savingsBudgets}
                 spending={spending}
                 budgetType="savings"
@@ -2260,7 +2373,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           {debtBudgets.length > 0 && (
             <div id="schulden" className="mt-4 sm:mt-8 scroll-mt-20">
               <h3 className="mb-4 label-editorial text-[var(--ink-2)]">Schulden <span className="ml-1 font-normal normal-case tracking-normal text-red-400/70">— vrijheid terugkopen</span></h3>
-              <BudgetTree
+              <TreeComp
                 groups={debtBudgets}
                 spending={spending}
                 budgetType="debt"
@@ -2276,7 +2389,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 <span className="ml-1 font-normal normal-case tracking-normal text-[var(--ink-4)]">— verschuivingen, tellen niet mee</span>
               </h3>
               {eigenRekeningExplainer}
-              <BudgetTree
+              <TreeComp
                 groups={eigenRekeningParent ? [eigenRekeningParent] : []}
                 spending={spending}
                 budgetType="archive"
@@ -2306,7 +2419,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
               {showArchive && (
                 <>
                   {!showEigenRekeningProminent && eigenRekeningParent && eigenRekeningExplainer}
-                  <BudgetTree
+                  <TreeComp
                     groups={verborgenBudgets}
                     spending={spending}
                     budgetType="archive"
@@ -2319,7 +2432,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
           </>
           )}
         </>
-      ) : viewMode === 'heatmap' ? (
+      ) : effectiveViewMode === 'heatmap' ? (
         <div className="mt-4 sm:mt-8">
           <BudgetHeatmap
             sections={[

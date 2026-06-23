@@ -6,7 +6,7 @@ import {
 } from '@/lib/format'
 import { BOX1_TOOLTIPS, type Box1Result } from '@/lib/box1-tax'
 import { GepaardeStaven } from './gepaarde-staven'
-import { Kicker } from '@/components/editorial'
+import { Kicker, ScenarioCallout } from '@/components/editorial'
 
 /**
  * Box1EigenWoning — eigenwoningforfait vs hypotheekrenteaftrek, plus de
@@ -80,24 +80,27 @@ export function Box1EigenWoning({
         ]}
       />
 
-      {/* Wet Hillen apart — alleen relevant wanneer forfait > rente. */}
+      {/* Wet Hillen apart — alleen relevant wanneer forfait > rente.
+          Uniform ScenarioCallout (linker module-border) i.p.v. card-in-card. */}
       {hillen > 0 && (
-        <div className="mt-5 border border-[var(--border-ed)] border-l-[3px] border-l-[var(--module-active-500)] bg-[var(--subtle)] p-3.5">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-[11px] uppercase tracking-[0.08em] font-mono font-semibold text-[var(--ink-2)]">
-              Wet Hillen-aftrek
+        <ScenarioCallout className="mt-5">
+          <span className="not-italic">
+            <span className="flex items-baseline justify-between gap-3">
+              <span className="text-[11px] uppercase tracking-[0.08em] font-mono font-semibold text-[var(--ink-2)]">
+                Wet Hillen-aftrek
+              </span>
+              <span
+                className="font-mono text-sm font-semibold tabular-nums"
+                style={{ color: 'var(--positive)' }}
+              >
+                −{formatCurrency(hillen)}
+              </span>
             </span>
-            <span
-              className="font-mono text-sm font-semibold tabular-nums"
-              style={{ color: 'var(--positive)' }}
-            >
-              −{formatCurrency(hillen)}
+            <span className="mt-1.5 block text-[11px] text-[var(--ink-3)] leading-snug">
+              {BOX1_TOOLTIPS.hillen}
             </span>
-          </div>
-          <p className="mt-1.5 text-[11px] text-[var(--ink-3)] leading-snug">
-            {BOX1_TOOLTIPS.hillen}
-          </p>
-        </div>
+          </span>
+        </ScenarioCallout>
       )}
 
       {/* Netto-effect op de Box 1-druk — Playfair saldo boven solid rule. */}

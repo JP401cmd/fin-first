@@ -677,8 +677,11 @@ describe('buildReport — levensgebeurtenissen', () => {
     }), NOW)
     const valueAt = (r: typeof zonder, age: number) =>
       r.kruising.vOp.find((p) => p.age === age)?.value ?? 0
-    // Een grote uitgave op leeftijd 45 drukt V_op daarna omlaag.
-    expect(valueAt(metKost, 50)).toBeLessThan(valueAt(zonder, 50))
+    // ADR 0027: de kost op 45 verplaatst FIRE naar later, zodat bij leeftijd 50 de zonder-run
+    // al in onttrekking is (dalend) en metKost nog opbouwt — cross-run vergelijking klopt dan
+    // niet meer. Vergelijk op leeftijd 46 (jaar ná de kost), waar beide runs nog in opbouw
+    // zitten: zonder.fireAge=47, metKost.fireAge=49 → op 46 zijn beide nog accumulating.
+    expect(valueAt(metKost, 46)).toBeLessThan(valueAt(zonder, 46))
     // Marker draagt een "−"-effect.
     const marker = metKost.lifePath.markers.find((m) => m.name === 'Grote aankoop')
     expect(marker?.effect).toContain('−')

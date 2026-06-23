@@ -35,6 +35,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
 import {
   getActiveNavModules,
   type NavModule,
@@ -589,6 +591,15 @@ function ModuleRow({
 }) {
   const Icon = module.Icon
   const styleVars = moduleVars(module.key)
+  const { mode: displayMode } = useDisplayMode()
+
+  // Eenvoudig-weergave: verberg de menu-ingang voor de aangewezen routes
+  // (Rekenhulp/Wat-Als). Filtert ALLEEN de sidebar-ingang — de pagina's
+  // blijven via deeplink + Volledig bereikbaar.
+  const visibleSubTags =
+    displayMode === 'simple'
+      ? module.subTags.filter((t) => !SIMPLE_HIDDEN_NAV_HREFS.includes(t.href))
+      : module.subTags
 
   // Drie visuele states in volgorde van prioriteit:
   //  1. !isEnabled (module uit) — gedimd, geen accent, hover toont activeer-CTA
@@ -717,8 +728,8 @@ function ModuleRow({
           §3.3: sub-pages verschijnen alleen bij de huidige module om de
           sidebar visueel rustig te houden. leverScores wordt doorgegeven
           zodat tags met `leverKey` een status-dot tonen. */}
-      {isActive && isEnabled && module.subTags.length > 0 && (
-        <SubTagStrip subTags={module.subTags} leverScores={leverScores} sidebarSignals={sidebarSignals} />
+      {isActive && isEnabled && visibleSubTags.length > 0 && (
+        <SubTagStrip subTags={visibleSubTags} leverScores={leverScores} sidebarSignals={sidebarSignals} />
       )}
 
       {/* Apps-strip — alleen op active+enabled module met apps die door

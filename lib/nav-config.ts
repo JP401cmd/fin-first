@@ -126,6 +126,19 @@ export const navGroups: NavGroup[] = [
 ]
 
 /**
+ * Nav-ingangen die in de Eenvoudig-weergave (`useDisplayMode().mode === 'simple'`)
+ * verborgen worden op de navigatie-oppervlakken (desktop-sidebar, mobiele
+ * nav-sheet, command-palette ⌘K). De pagina's blijven via deeplink én in de
+ * Volledig-weergave bereikbaar — dit filtert ALLEEN de menu-ingang, niet de
+ * route. `navGroups`/`EXTRA_ROUTE_TITLES` blijven ongewijzigd, zodat
+ * `resolveRouteTitle()` (mobiele TopBar-titel) deze routes blijft dekken.
+ */
+export const SIMPLE_HIDDEN_NAV_HREFS: readonly string[] = [
+  '/toekomst/rekenhulp',
+  '/toekomst/whatif',
+]
+
+/**
  * Overzicht-sub-tools (deep-app-tools) per appKey — dynamisch gefilterd op
  * de active-tracking-flag op assets/debts. Sidebar én NavMenuSheet lezen
  * deze lijst en tonen alleen items waarvan `appKey` voorkomt in de

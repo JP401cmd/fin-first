@@ -11,7 +11,7 @@ import {
   type PartnerAllocation,
 } from '@/lib/box3-data'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
-import { Kicker, HighlightMark, OrnamentColophon } from '@/components/editorial'
+import { Kicker, HighlightMark, OrnamentColophon, ScenarioCallout } from '@/components/editorial'
 import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -351,15 +351,17 @@ export function Box3Detail({
               tonen het eigen resultaat (single-person) + deze melding i.p.v.
               stilzwijgend een onjuist gecombineerd bedrag. */}
           {partnerDataHidden && (
-            <div className="mt-4 flex items-start gap-2 border border-[var(--ink)] border-l-4 border-l-[var(--ink-3)] bg-[var(--subtle)] px-3 py-2.5 text-xs text-[var(--ink-2)]">
-              <EyeOff className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--ink-3)]" aria-hidden="true" />
-              <span>
-                {view?.partnerName ?? 'Je partner'} deelt geen vermogen, dus dit
-                is alleen jouw Box 3. Vraag je partner om minimaal{' '}
-                <strong>totalen</strong> te delen voor een gezamenlijke
-                berekening en de optimale verdeling.
+            <ScenarioCallout className="mt-4 text-xs">
+              <span className="inline-flex items-start gap-2">
+                <EyeOff className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[var(--ink-3)]" aria-hidden="true" />
+                <span>
+                  {view?.partnerName ?? 'Je partner'} deelt geen vermogen, dus dit
+                  is alleen jouw Box 3. Vraag je partner om minimaal{' '}
+                  <strong className="not-italic font-semibold text-[var(--ink)]">totalen</strong> te delen voor een gezamenlijke
+                  berekening en de optimale verdeling.
+                </span>
               </span>
-            </div>
+            </ScenarioCallout>
           )}
         </div>
 
