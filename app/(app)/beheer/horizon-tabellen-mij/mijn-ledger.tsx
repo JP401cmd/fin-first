@@ -20,20 +20,11 @@ interface LedgerApiResponse {
   reason?: string
   strategy?: FireEndStrategy
   result?: HorizonLedgerResult
-  v1?: { fireAge: number | null; requiredFirePortfolio: number } | null
 }
 
 function strategyLabel(s?: FireEndStrategy): string {
   if (!s) return '—'
   return STRATEGY_LABELS[s]?.name ?? s
-}
-
-function deltaYears(a: number | null, b: number | null): string {
-  if (a == null || b == null) return '—'
-  const d = a - b
-  if (d === 0) return '±0 jr'
-  const sign = d > 0 ? '+' : '−'
-  return `${sign}${Math.abs(d)} jr`
 }
 
 function SummaryStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -130,32 +121,32 @@ export default function MijnLedger() {
 
       {state === 'ready' && data?.result && (
         <div className="space-y-6">
-          {/* v1 ↔ v2 samenvatting */}
+          {/* Samenvatting — grootboek-engine op jouw account */}
           <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] p-5">
             <div className="flex items-center gap-2">
               <GitCompareArrows className="h-4 w-4 text-[var(--color-horizon-600)]" />
-              <Kicker>v1 → v2 · jouw account</Kicker>
+              <Kicker>Grootboek-engine · jouw account</Kicker>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <SummaryStat
-                label="FIRE-leeftijd v1 → v2"
-                value={`${data.v1?.fireAge ?? '—'} → ${data.result.fireAge ?? '—'}`}
-                sub={`Δ ${deltaYears(data.result.fireAge, data.v1?.fireAge ?? null)}`}
+                label="FIRE-leeftijd"
+                value={`${data.result.fireAge ?? '—'}`}
+                sub={data.result.fireReachable ? 'FIRE haalbaar binnen horizon' : 'FIRE niet bereikt binnen horizon'}
               />
               <SummaryStat
-                label="Benodigd v1 / v2"
-                value={`${data.v1 ? eurShort(data.v1.requiredFirePortfolio) : '—'} / ${eurShort(data.result.requiredFirePortfolioAtFire)}`}
+                label="Benodigd vermogen"
+                value={eurShort(data.result.requiredFirePortfolioAtFire)}
                 sub="benodigd liquide vermogen op FIRE"
               />
               <SummaryStat
                 label="Actieve strategie"
                 value={strategyLabel(data.strategy)}
-                sub={data.result.fireReachable ? 'FIRE haalbaar binnen horizon' : 'FIRE niet bereikt binnen horizon'}
+                sub="koopkracht van nu (reëel)"
               />
             </div>
             <p className="mt-3 text-xs italic text-[var(--ink-3)]">
-              v1 = productie-engine (nominaal), v2 = grootboek-engine (reëel, koopkracht nu). De
-              modellen verschillen bewust — dit is rapportage, geen gelijkheid.
+              Grootboek-engine (reëel, koopkracht nu) — de enige FIRE-rekenmotor sinds de
+              v1-uitfasering. Alleen-lezen rapportage op je eigen ingevoerde gegevens.
             </p>
           </div>
 
