@@ -39,6 +39,8 @@ Per extractie dezelfde cyclus, met deze **harde regels**:
 ### 5. Eindverificatie — `tester`
 Volledige `npm run test:run` + lint + relevante regressiesuites. Handmatige click-through van alle geraakte oppervlakken incl. deeplinks/modals. Screenshot-vergelijking tegen de baseline. Grep op importers van het verbouwde bestand (geen export-wissels die elders breken).
 
+**Bij verwijderen van een route/module/bestand: grep óók op string-literal-consumenten** — `fetch('/api/...')`-paden, `href`-strings, route-/feature-strings — die tsc én de build NIET vangen. Een verwijderde API-route met een achtergebleven consument compileert en build't probleemloos, maar geeft pas een **runtime-404**. (Zo bleef `/beheer/horizon-tabellen-mij` na de v1-engine-uitfasering een verwijderde `/api/horizon-engine/ledger`-route fetchen → 404; pas een page↔route-contracttest ving het.)
+
 ### 6. Review — `code-review`
 Met als expliciete reviewvraag: is dit een pure move? Elke inhoudelijke wijziging in de diff is een bevinding, hoe goedbedoeld ook.
 
