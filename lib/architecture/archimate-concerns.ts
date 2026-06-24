@@ -86,6 +86,22 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     severity: 'risk',
     elementIds: ['t-supabase', 'data-cont'],
   },
+  {
+    id: 'deplete-doel-lijn-grondslag',
+    title: 'Doel-lijn (V_nodig) is liquide; getekende curve is netto vermogen',
+    detail:
+      'De horizontale doel-lijn op /toekomst is gebaseerd op het liquide vermogen (V_nodig via backwardVnodig), terwijl de getekende hoofdcurve het netto vermogen weergeeft (inclusief eigen woning). Voor accounts met een groot niet-liquide eigen huis (netto >> liquide) blijft een zichtbare afstand tussen de FIRE-stip en de doel-lijn bestaan: twee opties open (aparte liquide-curve tekenen, of een hellende V_nodig-lijn). Verwijder zodra dat besluit genomen en doorgevoerd is. NB: de reverse_mortgage-desync (display vs engine op leenruimte-grondslag) is beslist via ADR 0029 en is GEEN deel meer van dit aandachtspunt; de downsize-display-desync is een eigen concern — zie downsize-display-eligibility-desync.',
+    severity: 'info',
+    elementIds: ['as-planning', 'fn-toekomstplannen'],
+  },
+  {
+    id: 'downsize-display-eligibility-desync',
+    title: 'Downsize: engine-eligibility (liquidValue incl. huis) ≠ dashboard-display (getFireEligibleNetWorth excl. overwaarde)',
+    detail:
+      'De v2-engine telt de downsize-woning als FIRE-eligible (spendable, ADR 0028) waardoor engine-FIRE doorgaans vroeger valt. De DISPLAY-helper getFireEligibleNetWorth is engine-agnostisch en trekt voor downsize de overwaarde nog af (mode-switch exclude_from_fire/downsize → −equity). Daardoor tellen dashboard-"belegbaar vermogen", freedomPct (via computeFreedomProgress), de AI shared-context, de freedom-card en het rapport de downsize-gebruiker ÓNDER t.o.v. wat de engine als eligible ziet. Bewust open gelaten als cross-surface grondslag-besluit (ADR 0028 §Gevolgen + addendum). Verwijder zodra getFireEligibleNetWorth de spendable-grondslag meekrijgt en de ADR de consistentie bevestigt.',
+    severity: 'risk',
+    elementIds: ['as-planning', 'fn-toekomstplannen', 'as-vermogen'],
+  },
 ]
 
 /** Aandachtspunten die een specifiek element raken. */

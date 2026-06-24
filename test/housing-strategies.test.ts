@@ -33,6 +33,8 @@ import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import {
   deriveHousingContext,
   filterAssetsForFire,
+  reverseMortgageBorrowable,
+  resolveTriggerAge,
   type HousingStrategyConfig,
   type DownsizeConfig,
   type ReverseMortgageConfig,
@@ -161,6 +163,57 @@ function runV1(config: HousingStrategyConfig, b: HousingTriggerSimBasis) {
  */
 function runV2(config: HousingStrategyConfig, b: HousingTriggerSimBasis) {
   const ctx = deriveHousingContext(b.assets, b.debts)
+  // ADR 0029: reverse_mortgage onder v2 = opeethypotheek echt in het grootboek
+  // (mirror van build-input's useV2ReverseMortgage-tak + runHousingScenarioProjectionV2).
+  // Huis blijft in de pot (geen filter), GEEN payout-life-event; de engine opent een
+  // synthetische opeetschuld.
+  if (config.mode === 'reverse_mortgage' && ctx.hasEigenHuis) {
+    const rmCfg = config as ReverseMortgageConfig
+    const triggerAge = resolveTriggerAge(
+      rmCfg.trigger,
+      rmCfg.triggerAge,
+      rmCfg.depletionThresholdYears,
+      b.currentAge,
+      b.yearlyExpenses,
+      0,
+    )
+    const houseAsset = ctx.eigenHuisAssets[0]
+    const overwaardeNu = Math.max(0, ctx.eigenHuisValue - ctx.mortgageBalance)
+    const result = runSelectedProjection(
+      {
+        assets: b.assets,
+        debts: b.debts,
+        currentAge: b.currentAge,
+        endAge: b.endAge,
+        yearlyExpenses: b.yearlyExpenses,
+        annualSavings: b.annualSavings,
+        monthlySurplus: b.annualSavings / 12,
+        monthlyIncome: b.monthlyIncome,
+        incomeGrowthRate: 0,
+        grossReturn: b.grossReturn,
+        inflationRate: b.inflationRate,
+        box3Method: b.box3Method,
+        cashflows: b.cashflows,
+        strategyConfig: b.strategyConfig,
+        withdrawalStrategy: b.withdrawalStrategy,
+        hasPartner: b.hasPartner,
+        reverseMortgage: {
+          houseAssetId: houseAsset?.id ?? '',
+          triggerAge,
+          interestRate: rmCfg.interestRate,
+          maxLoanPct: rmCfg.maxLoanPct,
+          monthlyPayout: rmCfg.monthlyPayout,
+          mortgageDebtIds: ctx.eigenHuisMortgages.map((d) => d.id),
+        },
+        collateralBorrowableById: houseAsset
+          ? { [houseAsset.id]: reverseMortgageBorrowable(overwaardeNu, rmCfg.maxLoanPct) }
+          : {},
+      },
+      true,
+    )
+    // Geen housing-life-event meer (de opeetschuld zit in het grootboek).
+    return { ctx, events: [] as never[], depletion: null, result }
+  }
   const { events, depletion } = resolveHousingEventsForSim(config, ctx, b)
   const { assets, debts } = filterAssetsForFire(config, b.assets, b.debts)
   const spendableAssetIds =
@@ -380,7 +433,7 @@ describe('reverse_mortgage × fixed_age', () => {
     expect(baseRows[0].vastgoed).toBeGreaterThan(0)
   })
 
-  it('compositie: schaduwschuld VERSCHIJNT vanaf de leeftijd (en niet ervoor); huis blijft in vastgoed', () => {
+  it('compositie: GEEN display-only schaduwschuld meer (ADR 0029); huis blijft in vastgoed', () => {
     const b = makeBasis()
     const cfg = reverseFixed(67)
     const { ctx, events, result } = runV1(cfg, b)
@@ -396,14 +449,11 @@ describe('reverse_mortgage × fixed_age', () => {
     const baseAt = (age: number) => baseRows.find((r) => r.age === age)!
     const at = (age: number) => rows.find((r) => r.age === age)!
 
-    // Vóór de trigger: GEEN schaduwschuld-delta t.o.v. baseRows.
-    const preDelta = at(66).schulden - baseAt(66).schulden
-    expect(preDelta).toBe(0)
-
-    // Vanaf/na de trigger: schaduwschuld stapelt → schulden lager (negatiever).
-    const post = at(80)
-    const basePost = baseAt(80)
-    expect(post.schulden - basePost.schulden).toBeLessThan(0)
+    // ADR 0029: applyHousingToComposition injecteert GEEN parallelle schaduwschuld
+    // meer voor reverse_mortgage — de opeethypotheek is nu een echte grootboek-schuld
+    // (in v2 zit ze al in baseRows.schulden). Op ELKE rij dus géén schulden-delta.
+    expect(at(66).schulden - baseAt(66).schulden).toBe(0)
+    expect(at(80).schulden - baseAt(80).schulden).toBe(0)
 
     // Huis blijft permanent in vastgoed (reverse_mortgage verkoopt niet).
     expect(at(80).vastgoed).toBeGreaterThan(0)
@@ -488,10 +538,13 @@ describe('reverse_mortgage × on_depletion never-activates (no_sale) — GEEN fa
     expect(maxSchuldenDelta).toBe(0)
   })
 
-  it('REGRESSIE-DEMONSTRATIE: met een fallback naar config.triggerAge (oude bug) ZOU er wél een fantoomschuld zijn', () => {
-    // Dit toont waarom de fix nodig is: als we de helper een NEP-event meegeven
-    // op config.triggerAge (precies wat de oude fallback deed), verschijnt de
-    // fantoomschuld. De productie geeft GEEN event (vorige test) → geen schuld.
+  it('ADR 0029 — HARD LOCK óók mét event: reverse_mortgage injecteert NOOIT nog een schaduwschuld', () => {
+    // Vóór ADR 0029 injecteerde applyHousingToComposition een schaduwschuld zodra er
+    // een reverse_mortgage-event op de trigger lag (de bug: fallback naar
+    // config.triggerAge tekende 'm zelfs zónder echte tegenhanger). Nu is die hele
+    // tak verwijderd — de opeethypotheek is een echte grootboek-schuld. Zelfs MÉT een
+    // (nep-)event mag er dus geen schulden-delta meer ontstaan: de bescherming is
+    // structureel, niet meer event-afhankelijk.
     const b = richBasis()
     const cfg = reverseOnDepletion(70)
     const { ctx, result } = runV1(cfg, b)
@@ -505,7 +558,7 @@ describe('reverse_mortgage × on_depletion never-activates (no_sale) — GEEN fa
       sort_order: 1000,
       metadata: { source: 'housing-strategy', strategy: 'reverse_mortgage', monthlyPayout: 800 },
     } as never
-    const rowsWithPhantom = applyHousingToComposition(baseRows, {
+    const rowsWithEvent = applyHousingToComposition(baseRows, {
       housingCfg: cfg,
       ctx,
       displayEvents: [fakeEvent],
@@ -513,10 +566,8 @@ describe('reverse_mortgage × on_depletion never-activates (no_sale) — GEEN fa
       fireEndAge: FIRE_END_AGE,
       isV2: false,
     })
-    const phantom = Math.max(...rowsWithPhantom.map((r, i) => Math.abs(r.schulden - baseRows[i].schulden)))
-    // Bewijs dat het mechanisme een schuld ZOU injecteren met een event op 70 —
-    // en dus dat het ontbreken van het event (no_sale) de enige bescherming is.
-    expect(phantom).toBeGreaterThan(0)
+    const maxDelta = Math.max(...rowsWithEvent.map((r, i) => Math.abs(r.schulden - baseRows[i].schulden)))
+    expect(maxDelta).toBe(0)
   })
 })
 
@@ -669,20 +720,32 @@ describe('v2 — exclude_from_fire (geen trigger)', () => {
 // ── v2 / reverse_mortgage × fixed_age ────────────────────────
 
 describe('v2 — reverse_mortgage × fixed_age', () => {
-  it('engine houdt het huis IN de rijen (reverse filtert niet); vastgoed > 0', () => {
+  it('engine houdt het huis IN de rijen (reverse filtert niet); vastgoed > 0; GEEN payout-event (ADR 0029)', () => {
     const b = makeBasis()
     const cfg = reverseFixed(67)
     const { events, result } = runV2(cfg, b)
-    expect(events).toHaveLength(1)
-    expect(events[0].event_type).toBe('opeethypotheek')
-    expect(events[0].target_age).toBe(67)
+    // ADR 0029: geen V1-payout-life-event meer — de opeethypotheek zit in het grootboek.
+    expect(events).toHaveLength(0)
     const baseRows = unifiedRowsToStackedRows(result.rows)
     // reverse_mortgage filtert het huis NIET → v2 telt het al in vastgoed.
     expect(baseRows[0].vastgoed).toBeGreaterThan(0)
     expect(baseRows[0].vastgoed).toBeCloseTo(500_000, -3)
   })
 
-  it('compositie: huis NIET dubbel geteld (helper voegt geen 2e kopie toe); schaduwschuld vanaf de leeftijd', () => {
+  it('opeetschuld is een ECHTE grootboek-schuld: aparte debt-rij met groeiend saldo (ADR 0029)', () => {
+    const b = makeBasis()
+    const { result } = runV2(reverseFixed(67), b)
+    const at = (age: number) => result.rows.find((r) => r.age === age)!
+    // De synthetische opeethypotheek verschijnt als eigen debt-rij ('reverse-mortgage')
+    // in het grootboek; bij deze deplete-fixture leent ze pas laat (FIRE ~85) maar het
+    // saldo is op het eind > 0 → ECHT in het grootboek (geen display-only schaduwschuld).
+    const rmEnd = at(90).debtBalances['reverse-mortgage']?.endBalance ?? 0
+    expect(rmEnd).toBeGreaterThan(0)
+    // Nalatenschap blijft niet-negatief (huis − opeetschuld, gecapt op overwaarde).
+    expect(at(90).netWorth).toBeGreaterThan(0)
+  })
+
+  it('compositie-helper voegt NIETS toe voor reverse_mortgage (ADR 0029): rijen identiek aan engine-output', () => {
     const b = makeBasis()
     const cfg = reverseFixed(67)
     const { ctx, events, result } = runV2(cfg, b)
@@ -695,53 +758,32 @@ describe('v2 — reverse_mortgage × fixed_age', () => {
       fireEndAge: FIRE_END_AGE,
       isV2: true,
     })
-    const at = (age: number) => rows.find((r) => r.age === age)!
-    const baseAt = (age: number) => baseRows.find((r) => r.age === age)!
-
-    // GEEN DOUBLE-COUNT: reverse injecteert NOOIT vastgoed (alleen schaduwschuld),
-    // dus vastgoed in de compositie == engine-vastgoed op ELKE rij. Het huis
-    // (al in de v2-engine-rijen) krijgt geen tweede kopie.
-    for (const r of rows) {
-      const base = baseAt(r.age)
-      expect(r.vastgoed).toBe(base.vastgoed)
+    // De helper raakt reverse_mortgage niet meer aan: ELKE rij identiek aan engine-output
+    // (geen tweede huiskopie, geen schaduwschuld — die zit al in de engine-rijen).
+    for (let i = 0; i < rows.length; i++) {
+      expect(rows[i].vastgoed).toBe(baseRows[i].vastgoed)
+      expect(rows[i].schulden).toBe(baseRows[i].schulden)
     }
-    expect(rows[0].vastgoed).toBeCloseTo(500_000, -3) // eerste rij = startleeftijd
-
-    // Vóór de trigger: GEEN schaduwschuld-delta.
-    expect(at(66).schulden - baseAt(66).schulden).toBe(0)
-    // Vanaf/na de trigger: schaduwschuld stapelt → schulden negatiever.
-    expect(at(80).schulden - baseAt(80).schulden).toBeLessThan(0)
-    // Huis blijft permanent zichtbaar.
-    expect(at(80).vastgoed).toBeGreaterThan(0)
-  })
-
-  it('v1↔v2 structurele pariteit: beide houden het huis, beide krijgen één fixed_age-event', () => {
-    const b = makeBasis()
-    const cfg = reverseFixed(67)
-    const v1 = runV1(cfg, b)
-    const v2 = runV2(cfg, b)
-    expect(v1.events).toHaveLength(1)
-    expect(v2.events).toHaveLength(1)
-    expect(v1.events[0].target_age).toBe(67)
-    expect(v2.events[0].target_age).toBe(67)
-    // Beide engines houden het huis (geen filter) → vastgoed > 0 in de rijen.
-    expect(unifiedRowsToStackedRows(v1.result.rows)[0].vastgoed).toBeGreaterThan(0)
-    expect(unifiedRowsToStackedRows(v2.result.rows)[0].vastgoed).toBeGreaterThan(0)
+    expect(rows[0].vastgoed).toBeCloseTo(500_000, -3)
   })
 })
 
 // ── v2 / reverse_mortgage × on_depletion ─────────────────────
 
 describe('v2 — reverse_mortgage × on_depletion (activeert)', () => {
-  it('depletie binnen de horizon: één uitkering-event op het v2-bepaalde moment', () => {
+  it('ADR 0029: geen payout-event; de opeethypotheek leent on-demand in het grootboek', () => {
     const b = makeBasis()
-    const cfg = reverseOnDepletion(85)
-    const { events, depletion } = runV2(cfg, b)
-    expect(depletion).not.toBeNull()
-    expect(depletion!.reason).toBe('crossover')
-    expect(events).toHaveLength(1)
-    expect(events[0].event_type).toBe('opeethypotheek')
-    expect(events[0].target_age).toBe(depletion!.triggerAge)
+    const { events, depletion, result } = runV2(reverseOnDepletion(67), b)
+    // Geen V1-trigger-resolutie/payout-event meer: de engine leent intrinsiek tekort-
+    // gedreven (on_depletion ≈ "leen pas bij een echt tekort"). Géén event, geen depletion-panel.
+    expect(events).toHaveLength(0)
+    expect(depletion).toBeNull()
+    // De opeetschuld stapelt ECHT in het grootboek wanneer de liquide pot tekortschiet:
+    // méér eindschuld dan een baseline-run zónder opeethypotheek (zelfde fixture).
+    const baseline = runV2({ mode: 'include_full' }, b)
+    const atRm = (age: number) => result.rows.find((r) => r.age === age)!
+    const atBase = (age: number) => baseline.result.rows.find((r) => r.age === age)!
+    expect(atRm(90).totalDebts).toBeGreaterThan(atBase(90).totalDebts)
   })
 })
 
@@ -754,13 +796,18 @@ describe('v2 — reverse_mortgage × on_depletion never-activates (no_sale) — 
     })
   }
 
-  it('resolver levert reason=no_sale en GEEN event (zelfde trigger-bron als v1)', () => {
+  it('rijke pot: opeethypotheek leent nooit (geen tekort) — GEEN event, schuld identiek aan baseline', () => {
     const b = richBasis()
-    const cfg = reverseOnDepletion(70)
-    const { events, depletion } = runV2(cfg, b)
-    expect(depletion).not.toBeNull()
-    expect(depletion!.reason).toBe('no_sale')
+    const { events, depletion, result } = runV2(reverseOnDepletion(70), b)
+    // ADR 0029: geen depletion-resolutie/event meer; de engine leent gewoon nooit
+    // omdat de €2M-pot ruim toereikend is (perpetual). De opeetschuld blijft 0 →
+    // de schuld-curve is identiek aan een baseline-run zónder opeethypotheek.
     expect(events).toHaveLength(0)
+    expect(depletion).toBeNull()
+    const baseline = runV2({ mode: 'include_full' }, b)
+    const atRm = (age: number) => result.rows.find((r) => r.age === age)!
+    const atBase = (age: number) => baseline.result.rows.find((r) => r.age === age)!
+    expect(atRm(90).totalDebts).toBeCloseTo(atBase(90).totalDebts, -2)
   })
 
   it('HARD LOCK (isV2:true): GEEN schaduwschuld geïnjecteerd — schulden identiek aan baseRows op ELKE rij', () => {
@@ -791,13 +838,15 @@ describe('v2 — reverse_mortgage × on_depletion never-activates (no_sale) — 
     expect(rows[0].vastgoed).toBeGreaterThan(0)
   })
 
-  it('v1↔v2 structurele pariteit: beide reason=no_sale, beide GEEN event', () => {
+  it('v1↔v2: beide produceren GEEN event (v1 via no_sale-resolver, v2 via grootboek-model)', () => {
     const b = richBasis()
     const cfg = reverseOnDepletion(70)
     const v1 = runV1(cfg, b)
     const v2 = runV2(cfg, b)
+    // v1 (legacy resolver): no_sale → geen event. v2 (ADR 0029 grootboek): geen
+    // depletion-resolutie meer (de engine leent intrinsiek) → geen event, depletion null.
     expect(v1.depletion!.reason).toBe('no_sale')
-    expect(v2.depletion!.reason).toBe('no_sale')
+    expect(v2.depletion).toBeNull()
     expect(v1.events).toHaveLength(0)
     expect(v2.events).toHaveLength(0)
   })

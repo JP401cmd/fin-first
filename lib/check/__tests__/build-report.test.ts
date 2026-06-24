@@ -629,9 +629,13 @@ describe('buildReport — levensgebeurtenissen', () => {
     }), NOW)
 
     // V_op op of na de erfenis-leeftijd (45) ligt hoger dan zonder erfenis.
+    // Vergelijk op leeftijd 46 (jaar ná de erfenis): bij de huidige FIRE-leeftijd
+    // (~50) is de zonder-run op leeftijd 50 al in onttrekking (dalend) en is de
+    // cross-run vergelijking niet meer monotoon. Op 46 zitten beide runs nog in
+    // opbouw — identiek aan de KOST-test hieronder (ADR 0027).
     const valueAt = (r: typeof zonder, age: number) =>
       r.kruising.vOp.find((p) => p.age === age)?.value ?? 0
-    expect(valueAt(metErfenis, 50)).toBeGreaterThan(valueAt(zonder, 50))
+    expect(valueAt(metErfenis, 46)).toBeGreaterThan(valueAt(zonder, 46))
 
     // Marker aanwezig, type 'leven', niet-illustratief, met "+€" eenmalig-effect.
     const marker = metErfenis.lifePath.markers.find((m) => m.name === 'Erfenis')
@@ -697,8 +701,11 @@ describe('buildReport — levensgebeurtenissen', () => {
     }), NOW)
     const valueAt = (r: typeof zonder, age: number) =>
       r.kruising.vOp.find((p) => p.age === age)?.value ?? 0
-    // Vier jaar extra uitgave vanaf 45 → lager V_op op leeftijd 50.
-    expect(valueAt(metUitgave, 50)).toBeLessThan(valueAt(zonder, 50))
+    // Extra uitgave vanaf 45 → lager V_op zolang beide runs nog opbouwen. Vergelijk
+    // op leeftijd 46 (jaar ná de eerste uitgave): bij de huidige FIRE-leeftijd (~50)
+    // is de zonder-run op 50 al in onttrekking (dalend) en klopt de cross-run
+    // vergelijking daar niet meer — identiek aan de erfenis-/KOST-tests (ADR 0027).
+    expect(valueAt(metUitgave, 46)).toBeLessThan(valueAt(zonder, 46))
     const marker = metUitgave.lifePath.markers.find((m) => m.name === 'Studie kind')
     expect(marker?.effect).toContain('/jaar')
   })

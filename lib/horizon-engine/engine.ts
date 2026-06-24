@@ -42,29 +42,103 @@ import type {
 const NON_LIQUID: Set<AssetType> = new Set(['eigen_huis', 'vehicle', 'physical'])
 
 /**
- * Een asset is niet-liquide o.b.v. zijn type, TENZIJ het expliciet als besteedbaar
- * is gemarkeerd (`spendable`) — dat gebeurt bij housing-strategie `include_full`,
- * waar de woning volledig in de besteedbare FIRE-pot meetelt (ADR 0015). Zo loopt
- * een deplete/spend-down ook de woning af (laatst in de volgorde) i.p.v. dat 'ie
- * onbespeelbaar blijft groeien.
+ * DRIE ORTHOGONALE eigenschappen van een asset in het grootboek — bewust apart
+ * gehouden zodat ze niet per ongeluk weer samengevoegd worden (ADR 0028):
  *
- * `saleManaged` markeert een asset dat via een verkoop-config (`sale_config` →
- * `assetLiquidations`) als UNIT verkocht wordt (mét verkoopkosten + schuld-
- * aflossing). Zo'n asset telt tot het verkoopmoment NIET als besteedbare liquide
- * pot — ook als zijn type normaal liquide is (bv. `real_estate`/`deelneming`) —
- * en wordt nooit rauw onttrokken; het verlaat het grootboek uitsluitend via de
- * verkoop (ADR 0020). Daardoor werkt `payoffDebtIds` consistent voor álle
- * liquidatable types, zonder de globale `NON_LIQUID`/`INVESTABLE_TYPES`-classificatie
- * te wijzigen (kleinste blast radius: de reclassificatie is per-asset en alleen
- * actief wanneer er werkelijk een verkoop-config is).
+ *  (a) type-default-liquiditeit — een `eigen_huis`/`vehicle`/`physical` is van
+ *      nature niet-liquide (`NON_LIQUID`); alle andere types zijn liquide pot.
+ *  (b) `spendable` (= FIRE-eligible besteedbaar) — markeert dat een van nature
+ *      niet-liquide asset TÓCH als besteedbaar/liquide FIRE-vermogen MEETELT (op
+ *      zijn inclusion-gewogen engine-waarde, met zijn eigen reële return). Geldt
+ *      bij housing-strategie `include_full` ÉN — sinds Fase 2 (ADR 0028) — bij de
+ *      v2-`downsize` ("Verkopen"): het huis tilt dan de FIRE-eligibility op tijdens
+ *      de OPBOUW, waardoor de FIRE-leeftijd vervroegt.
+ *  (c) `saleManaged` — markeert dat een asset als UNIT verkocht wordt via een
+ *      verkoop-config (`sale_config`/downsize → `assetLiquidations`), mét
+ *      verkoopkosten + schuld-aflossing. Zo'n asset wordt NOOIT rauw onttrokken;
+ *      het verlaat het grootboek UITSLUITEND via de verkoop (engine-block 6b).
+ *
+ * `spendable` (b) en `saleManaged` (c) waren vóór Fase 2 wederzijds uitsluitend
+ * ("geen overlap in de praktijk"). Voor de v2-downsize-woning gelden ze nu BEIDE:
+ * de woning telt mee voor eligibility (b) maar mag niet rauw leeggetrokken worden
+ * en verlaat de pot enkel via de downsize-verkoop (c). Daarom splitsen we de twee
+ * vroeger-samenvallende vragen expliciet in twee predikaten:
+ *
+ *  • `countsAsEligibilityLiquid` — telt dit asset mee in het BESTEEDBARE/FIRE-
+ *    eligible liquide vermogen (liquidValue / liquidSumStart / blendedRealReturnStart
+ *    / de afbouw-annuïteit / de FIRE-gate)? Ja als het van nature liquide is, of als
+ *    het `spendable` is. `saleManaged` op zichzelf sluit hier NIET uit (de spendable
+ *    downsize-woning telt mee), maar een `saleManaged` asset dat NIET spendable is
+ *    (generieke voertuig/inboedel/deelneming-liquidatie, ADR 0021) blijft tot de
+ *    verkoop buiten de eligibility-pot.
+ *  • `mayBeRawWithdrawn` — mag dit asset rauw onttrokken worden in de onttrekkings-/
+ *    tekort-volgorde? Alléén als het van nature liquide is ÉN NIET `saleManaged`.
+ *    Een `saleManaged` asset is hier ALTIJD uitgesloten, ongeacht `spendable` — dus
+ *    de spendable downsize-woning telt wél mee voor eligibility maar wordt nóóit rauw
+ *    leeggetrokken; ze verlaat de pot enkel via de downsize-verkoop.
+ *
+ * DERDE perspectief op DEZELFDE drie predikaten — de DRAWDOWN-GRONDSLAG (de pot
+ * waarop de afbouw-annuïteit teert + de echte uitputtings-meting), ADR 0030/Optie B:
+ *  • `withdrawableLiquidValue` / `withdrawableRealReturn` — som (resp. waarde-gewogen
+ *    reële return) over EXACT de `mayBeRawWithdrawn`-set. Dit is de pot die de
+ *    annuïteit RAUW kàn opnemen. Cruciaal apart van `liquidValue` (de eligibility-
+ *    grondslag-som): bij de spendable+saleManaged downsize-woning telt het
+ *    huis WÉL in `liquidValue` (eligibility/FIRE-gate) maar NIET in
+ *    `withdrawableLiquidValue` (de annuïteit kan het huis immers niet rauw opnemen —
+ *    het verlaat de pot enkel via de verkoop). Lieten we de annuïteit op
+ *    `liquidValue` rekenen (huis-inclusief, ~€1M), dan spreidt ze de onttrekking over
+ *    een pot die ze niet kan aanspreken → ze onttrekt te wéinig uit de échte cash →
+ *    de cash loopt stil leeg vóór de verkoop terwijl de getoonde lijn (huis groeit
+ *    door) juist STIJGT, en de verkoop-trigger vuurt jaren te laat (ADR 0030-bug).
+ *    Daarom: eligibility = `liquidValue` (ongemoeid, voor de FIRE-gate/opbouw);
+ *    drawdown = `withdrawable*` (de decum-ctx-grondslag). Voor een spendable-ZONDER-
+ *    saleManaged woning (include_full) vallen beide samen (het huis zit dan óók in
+ *    `mayBeRawWithdrawn` → byte-identiek). reverse_mortgage: het huis zit in geen van
+ *    beide (de leen-ruimte is een apart kanaal, geen rauwe pot) → ongemoeid.
+ *
+ * De trigger-EX-huis-meting (`resolveDownsizeTriggerV2`, on_depletion) gebruikt een
+ * DERDE perspectief: het liquide vermogen ZÓNDER het te-verkopen huis. Dat valt
+ * automatisch samen met `countsAsEligibilityLiquid` op de TRIGGER-MEETRUN, waarin
+ * het huis NIET als spendable is gemarkeerd (de meetrun-`baseInput` zet
+ * `spendableAssetIds` niet) → het huis telt daar niet mee in `liquideVermogen`. Zo
+ * deelt de meetrun exact dezelfde liquide-definitie als de echte run, maar zonder de
+ * spendable-vlag → ex-huis. De gerapporteerde trigger-leeftijd is dáárdoor per
+ * constructie gelijk aan de leeftijd waarop de echte run het huis verkoopt
+ * (`fixed_age`-liquidatie op die leeftijd) — de SSoT-invariant.
+ *
+ * VIERDE liquiditeit-aspect — OPEETHYPOTHEEK-leen-ruimte (ADR 0029). Bij
+ * `reverse_mortgage` is de woning NÓCH spendable NÓCH saleManaged: ze blijft
+ * `eigen_huis`-asset (groeit, telt NIET mee in `countsAsEligibilityLiquid`, mag NOOIT
+ * rauw onttrokken — `mayBeRawWithdrawn` = false op de raw huiswaarde). Tóch is een
+ * FRACTIE van haar overwaarde FIRE-eligible besteedbaar: de leen-RUIMTE (overwaarde ×
+ * maxLoanPct). Die telt mee via een EXPLICIET eligibility-BEDRAG (`collateralBorrowableById`,
+ * Optie B) — opgeteld in `liquidSumStart`/`blendedRealReturnStart` (met de huis-return
+ * als voet) — NIET via de spendable-boolean (die zou de hele woning eligible maken).
+ * In het grootboek wordt die ruimte opgenomen als een synthetische, aflossingsvrije
+ * RunningDebt ("Opeethypotheek", `isReverseMortgage`) die bij een liquiditeitstekort
+ * NÁ de echte liquide pot leent, gecapt op overwaarde × maxLoanPct. Eligibility-meting
+ * en drawdown-cap delen dus één grondslag (`reverseMortgageBorrowable`).
  */
-function isNonLiquid(a: { type: AssetType; spendable?: boolean; saleManaged?: boolean }): boolean {
-  if (a.saleManaged) return true
-  return NON_LIQUID.has(a.type) && !a.spendable
+type AssetLiquidityFlags = { type: AssetType; spendable?: boolean; saleManaged?: boolean }
+
+/** (eligibility) telt dit asset mee in het besteedbare/FIRE-eligible liquide vermogen? */
+function countsAsEligibilityLiquid(a: AssetLiquidityFlags): boolean {
+  if (a.spendable) return true
+  if (a.saleManaged) return false
+  return !NON_LIQUID.has(a.type)
+}
+
+/** (raw withdrawal) mag dit asset rauw onttrokken worden in de volgorde? saleManaged → nooit. */
+function mayBeRawWithdrawn(a: AssetLiquidityFlags): boolean {
+  if (a.saleManaged) return false
+  return !NON_LIQUID.has(a.type) || a.spendable === true
 }
 
 const ONDERHOUD_PCT = NL_HOME_MAINTENANCE_PCT
 const BOX3_YEAR = 2026 as const
+
+/** Stabiele id van de synthetische opeethypotheek-schuld in het grootboek (ADR 0029). */
+export const REVERSE_MORTGAGE_DEBT_ID = 'reverse-mortgage' as const
 
 function realReturn(nominal: number, inflation: number): number {
   return (1 + nominal) / (1 + inflation) - 1
@@ -83,12 +157,20 @@ interface RunningAsset {
   value: number
   realRet: number
   box3Cat: Box3Category
-  /** True = tel als besteedbaar/liquide ondanks het type (include_full-woning). */
+  /**
+   * (b) True = tel als besteedbaar/FIRE-eligible liquide ondanks het niet-liquide
+   * type (include_full-woning ÉN v2-downsize-woning, ADR 0028). Tilt de eligibility
+   * tijdens de opbouw → vervroegt FIRE. Orthogonaal aan `saleManaged`: een asset kan
+   * BEIDE zijn (de downsize-woning telt mee maar verlaat de pot enkel via de verkoop).
+   */
   spendable: boolean
   /**
-   * True = dit asset wordt als UNIT verkocht via een verkoop-config
-   * (`assetLiquidations`), niet rauw onttrokken. Tot de verkoop telt het NIET als
-   * liquide pot (ook niet als zijn type normaal liquide is). Zie isNonLiquid.
+   * (c) True = dit asset wordt als UNIT verkocht via een verkoop-config
+   * (`assetLiquidations`), nooit rauw onttrokken; het verlaat het grootboek
+   * uitsluitend via de verkoop (block 6b, mét verkoopkosten + schuld-aflossing).
+   * `saleManaged` sluit RAUWE onttrekking altijd uit (zie mayBeRawWithdrawn), maar
+   * sluit eligibility NIET uit als het asset óók `spendable` is (downsize-woning).
+   * Zie de countsAsEligibilityLiquid/mayBeRawWithdrawn-doc.
    */
   saleManaged: boolean
 }
@@ -111,6 +193,13 @@ interface RunningDebt {
    * hersteld doordat flaggedAflossing → 0). Zie de schuld-loop.
    */
   lastActiveRente: number
+  /**
+   * True = synthetische opeethypotheek (ADR 0029). Deze schuld start op saldo 0,
+   * is aflossingsvrij, en groeit UITSLUITEND door (a) opnames bij liquiditeitstekort
+   * (gecapt op de leen-ruimte) en (b) gestapelde rente — niet via het reguliere
+   * schuldschema (blok 3). De normale schuld-loop slaat 'm daarom over.
+   */
+  isReverseMortgage: boolean
 }
 
 interface ForwardResult {
@@ -163,29 +252,40 @@ export function runHorizonLedger(
 
   const box3Params = BOX3_PARAMS[BOX3_YEAR]
   const box3Vrij = input.hasPartner ? box3Params.heffingsvrijPartner : box3Params.heffingsvrijSingle
-  const realRetAvg = realReturn(input.grossReturn, inflation)
   const annualSavings = Math.max(0, input.annualSavings)
   const grossAnnualIncome = Math.max(0, input.monthlyIncome) * 12
   // Assets die ondanks hun (niet-liquide) type tóch als besteedbaar meetellen —
-  // de include_full-woning (ADR 0015). Zie isNonLiquid.
+  // de include_full-woning (ADR 0015) ÉN de v2-downsize-woning (ADR 0028). Zie
+  // countsAsEligibilityLiquid/mayBeRawWithdrawn.
   const spendableIds = new Set(input.spendableAssetIds ?? [])
   // Assets die via een verkoop-config (`assetLiquidations`) als UNIT verkocht
-  // worden — tot de verkoop niet-liquide, nooit rauw onttrokken (ADR 0020). Geldt
-  // voor zowel fixed_age (huis-downsize / vast_moment) als on_demand. Niet voor
-  // assets die óók `spendable` zijn (include_full-woning blijft besteedbaar; de
-  // downsize-liquidatie op die woning is fixed_age en de woning is dan niet
-  // spendable — geen overlap in de praktijk).
-  const saleManagedIds = new Set(
-    (input.assetLiquidations ?? []).map((l) => l.assetId).filter((id) => !spendableIds.has(id)),
-  )
+  // worden — nooit rauw onttrokken (ADR 0020), verlaten het grootboek enkel via de
+  // verkoop. Geldt voor zowel fixed_age (huis-downsize / vast_moment) als on_demand.
+  //
+  // BEWUSTE OVERLAP (Fase 2, ADR 0028): de v2-downsize-woning is BÉIDE spendable
+  // (telt mee voor FIRE-eligibility, vervroegt FIRE) ÉN saleManaged (verlaat de pot
+  // enkel via de downsize-verkoop). Daarom mág `spendable` hier NIET uit
+  // `saleManagedIds` filteren — anders zou de spendable woning rauw onttrokken
+  // mogen worden (mayBeRawWithdrawn=true via spendable) i.p.v. uitsluitend via de
+  // verkoop. countsAsEligibilityLiquid laat de spendable-saleManaged-woning wél
+  // meetellen in het liquide vermogen; mayBeRawWithdrawn houdt 'm uit de
+  // onttrekkingsvolgorde. (Voorheen sloot dit filter `spendable` uit op de aanname
+  // "geen overlap" — die aanname is per Fase 2 vervallen.)
+  const saleManagedIds = new Set((input.assetLiquidations ?? []).map((l) => l.assetId))
 
   // ── Fresh running-state per pass (assets/debts worden gemuteerd) ──
   function buildAssets(): RunningAsset[] {
     const out: RunningAsset[] = []
     for (const a of input.assets) {
       if (a.is_active === false) continue
-      const incl = (a.net_worth_inclusion_pct ?? 100) / 100
-      const value = (a.current_value ?? 0) * incl
+      // FIRE-eligible engine-waarde = current_value × inclusion_pct (EIGENDOM,
+      // geldt altijd, voor elk asset). Identiek aan het elders getoonde netto
+      // vermogen — geen desync meer. `include_full` is een ORTHOGONALE as: die
+      // zet hieronder de `spendable`-vlag (FIRE-behandeling: het eigen deel telt
+      // volledig als liquide/besteedbaar met eigen reële return), maar raakt de
+      // grondslag NIET. Gedeeld met liquidSumStart/blendedRealReturnStart via
+      // assetEngineValue.
+      const value = assetEngineValue(a)
       let nom = (a.expected_return ?? 0) / 100
       if (a.depreciation_rate && a.depreciation_rate > 0) nom = -(a.depreciation_rate / 100)
       nom += input.returnDeltaByAssetType?.[a.asset_type] ?? input.returnDelta ?? 0
@@ -206,7 +306,7 @@ export function runHorizonLedger(
     return out
   }
   function buildDebts(): RunningDebt[] {
-    return input.debts
+    const debts: RunningDebt[] = input.debts
       .filter((d) => d.is_active !== false)
       .map((d) => ({
         id: d.id,
@@ -219,7 +319,27 @@ export function runHorizonLedger(
         deductible: d.is_tax_deductible === true,
         flagged: d.include_aflossing_in_savings === true,
         lastActiveRente: 0,
+        isReverseMortgage: false,
       }))
+    // ADR 0029: synthetische opeethypotheek-schuld (saldo 0, aflossingsvrij,
+    // onderpand-rente). Opent op de trigger-leeftijd; groeit via opnames + rente
+    // (zie de opeethypotheek-blok in de loop). De normale schuld-loop slaat 'm over.
+    if (input.reverseMortgage) {
+      debts.push({
+        id: REVERSE_MORTGAGE_DEBT_ID,
+        naam: 'Opeethypotheek',
+        balance: 0,
+        rate: input.reverseMortgage.interestRate,
+        annualPayment: 0,
+        repayment: 'aflossingsvrij',
+        isMortgage: true,
+        deductible: false,
+        flagged: false,
+        lastActiveRente: 0,
+        isReverseMortgage: true,
+      })
+    }
+    return debts
   }
 
   // ── Forward pass ──────────────────────────────────────────────────────────
@@ -228,7 +348,11 @@ export function runHorizonLedger(
     const debts = buildDebts()
 
     const investableIds = assets.filter((a) => INVESTABLE_TYPES.includes(a.type)).map((a) => a.id)
-    const liquidIds = assets.filter((a) => !isNonLiquid(a)).map((a) => a.id)
+    // RAW-bestemmingen voor surplus/verkoopopbrengst: alléén assets die rauw
+    // beschreven mogen worden — NOOIT een saleManaged asset (een opbrengst die in
+    // de zojuist-verkochte/spendable downsize-woning belandt zou die herleven en
+    // de verkooplus laten herhalen). Daarom `mayBeRawWithdrawn`, niet eligibility.
+    const liquidIds = assets.filter((a) => mayBeRawWithdrawn(a)).map((a) => a.id)
     // Surplus-doel (pot-regel "verdeling bij toename"): specifieke types indien gezet,
     // anders investable → liquide → eerste asset.
     let surplusTargets =
@@ -253,16 +377,18 @@ export function runHorizonLedger(
     const firstInvestId = investableIds[0] ?? surplusTargets[0]
     const firstCashId = assets.find((a) => a.type === 'cash')?.id ?? surplusTargets[0]
     // Volgorde-helper op type-niveau. `liquidOnly` (default true) beperkt de lijst
-    // tot LIQUIDE (besteedbare) assets: niet-liquide assets (eigen_huis/vehicle/
-    // physical, tenzij `spendable`) worden NIET rauw onttrokken — die verlaten het
-    // grootboek uitsluitend via een echte verkoop (fixed_age of on_demand, block 6b),
-    // mét verkoopkosten en schuld-aflossing. Zo blijft een `niet_verkopen`-bezitting
-    // staan i.p.v. ongemerkt leeggetrokken te worden. `liquidOnly:false` (volledige
-    // staart, niet-liquide laatst) blijft beschikbaar voor de on_demand-verkoop-
-    // volgorde, die juist de niet-liquide staart nodig heeft.
+    // tot assets die RAUW onttrokken mogen worden (`mayBeRawWithdrawn`): niet-liquide
+    // assets (eigen_huis/vehicle/physical) worden NIET rauw onttrokken, en een
+    // `saleManaged` asset NOOIT — óók niet als het `spendable` is (de spendable
+    // downsize-woning telt mee voor eligibility maar verlaat het grootboek uitsluitend
+    // via de verkoop, fixed_age/on_demand block 6b, mét verkoopkosten en schuld-
+    // aflossing). Zo blijft een `niet_verkopen`-bezitting én een downsize-woning staan
+    // i.p.v. ongemerkt leeggetrokken te worden. `liquidOnly:false` (volledige staart,
+    // niet-liquide laatst) blijft beschikbaar voor de on_demand-verkoopvolgorde, die
+    // juist de niet-liquide staart nodig heeft.
     const orderIdsFor = (types: AssetType[], liquidOnly = true): string[] => {
       const ids: string[] = []
-      const want = (a: RunningAsset) => (liquidOnly ? !isNonLiquid(a) : true)
+      const want = (a: RunningAsset) => (liquidOnly ? mayBeRawWithdrawn(a) : true)
       for (const t of types) for (const a of assets) if (a.type === t && want(a)) ids.push(a.id)
       for (const a of assets) if (want(a) && !ids.includes(a.id)) ids.push(a.id)
       return ids
@@ -284,7 +410,12 @@ export function runHorizonLedger(
     for (const liq of input.assetLiquidations ?? []) {
       if (liq.trigger !== 'on_demand') continue
       const a = assets.find((x) => x.id === liq.assetId)
-      if (a && isNonLiquid(a)) onDemandById.set(liq.assetId, liq)
+      // Alléén niet-direct-besteedbare assets (generieke voertuig/inboedel/
+      // deelneming-liquidatie): een asset dat NIET als eligibility-liquide telt en
+      // dus via een echte verkoop gemonetariseerd moet worden. De spendable
+      // downsize-woning telt wél als eligibility-liquide (en is bovendien fixed_age,
+      // niet on_demand) → valt hier nooit door, zoals bedoeld.
+      if (a && !countsAsEligibilityLiquid(a)) onDemandById.set(liq.assetId, liq)
     }
     // Verkoop-volgorde: niet-liquide on_demand-assets in de volledige onttrekkings-
     // volgorde (minst-liquide laatst, eigen_huis allerlaatst).
@@ -353,6 +484,11 @@ export function runHorizonLedger(
       // → valt nooit vrij (correct, woonlast verdwijnt immers niet).
       let freedHousingCost = 0
       for (const d of debts) {
+        // ADR 0029: de synthetische opeethypotheek volgt NIET het reguliere schema
+        // (geen vaste jaarlast/aflossing). Haar rente + opname + saldo worden in het
+        // dedicated opeethypotheek-blok hieronder afgehandeld (na de onttrekking) en
+        // daar als eigen schuldenRow-entry geschreven. Sla 'm hier over.
+        if (d.isReverseMortgage) continue
         const begin = d.balance
         const rente = begin * d.rate
         let aflossing = 0
@@ -492,13 +628,75 @@ export function runHorizonLedger(
       // (lumpy) → het overschot blijft als liquide pot staan voor latere jaren
       // (zelf-regulerend). Zonder on_demand-assets is dit byte-identiek aan een
       // kale `withdrawFrom` (de while-lus draait dan nul keer).
-      const withdrawWithOnDemand = (orderIds: string[], need: number): void => {
+      // Retourneert het ONBEDEKTE restant (shortfall) na de liquide pot + alle
+      // on_demand-verkopen. De opeethypotheek-draw (ADR 0029) gebruikt dit om te
+      // weten hoeveel er nog uit de woning-onderpand geleend moet worden — ná de
+      // echte liquide pot in de onttrekkingsvolgorde, precies zoals voorgeschreven.
+      const withdrawWithOnDemand = (orderIds: string[], need: number): number => {
         let tekort = withdrawFrom(assets, orderIds, opts.shortfall, need, uitstroomById)
         while (tekort > 0.01) {
           const opbrengst = sellNextOnDemand()
           if (opbrengst <= 0) break // niets meer te verkopen → tekort blijft (zoals voorheen)
           tekort = withdrawFrom(assets, orderIds, opts.shortfall, tekort, uitstroomById)
         }
+        return tekort
+      }
+
+      // ── Opeethypotheek-draw (ADR 0029) ────────────────────────────────────────
+      // Open op de trigger-leeftijd; neem `gevraagd` op (tekort-gedreven of vast
+      // monthlyPayout × 12) tegen de woning, GECAPT op de leen-ruimte:
+      //   cap = overwaarde(jaar) × maxLoanPct
+      //   ruimte = max(0, cap − (saldo + rente_dit_jaar))
+      // De opname (≤ ruimte) stroomt naar de LIQUIDE pot; het opeetschuld-saldo
+      // stijgt met diezelfde opname. De rente stapelt elk jaar op het (nieuwe) saldo
+      // (aflossingsvrij, blok-3-stijl). Géén rauwe onttrekking uit de woning; géén
+      // oneindig lenen (de cap groeit alleen mee met de woningwaarde). De rente is
+      // NOMINAAL genoteerd maar wordt — consistent met de reguliere schuldrente in
+      // blok 3 — direct op het reëel-gegroeide saldo toegepast zónder reëel-conversie.
+      // Retourneert het bedrag dat NIET door de opeethypotheek gedekt kon worden
+      // (onbedekt → bestaande shortfall-mechaniek → FIRE-later/lijn onder doel).
+      // Cap = overwaarde(jaar) × maxLoanPct op het LEEN-bedrag (loan-to-value-grens).
+      // Overwaarde = huiswaarde (engine-waarde dit jaar, na groei) − Σ saldo van de
+      // bestaande hypotheken op deze woning. De opeetschuld zelf telt NIET mee
+      // (we leggen er juist tegenaan). Gedeeld door de draw én de rente-accrual-clamp
+      // (blok 6d) zodat eligibility-meting en het werkelijke maximum één grondslag delen.
+      const reverseMortgageCap = (): number => {
+        const rm = input.reverseMortgage
+        if (!rm) return 0
+        const houseAsset = assets.find((a) => a.id === rm.houseAssetId)
+        const houseValue = houseAsset ? Math.max(0, houseAsset.value) : 0
+        const mortgageIds = new Set(rm.mortgageDebtIds)
+        const mortgageBalance = debts
+          .filter((d) => mortgageIds.has(d.id))
+          .reduce((s, d) => s + Math.max(0, d.balance), 0)
+        return Math.max(0, houseValue - mortgageBalance) * rm.maxLoanPct
+      }
+
+      const drawReverseMortgage = (gevraagd: number): number => {
+        const rm = input.reverseMortgage
+        if (!rm || gevraagd <= 0.01 || age < Math.round(rm.triggerAge)) return gevraagd
+        const debt = debts.find((d) => d.isReverseMortgage)
+        if (!debt) return gevraagd
+        const cap = reverseMortgageCap()
+        // Cap op het JAAR-EIND-saldo: na de opname stapelt de rente nog op het VOLLE
+        // (begin + opname)-saldo (blok 6d). Het eindsaldo = (begin + opname) × (1+rate)
+        // mag de cap niet overschrijden → opname ≤ cap/(1+rate) − begin. Zo blijft het
+        // gerapporteerde eindsaldo (incl. dit-jaar-rente) gegarandeerd ≤ overwaarde ×
+        // maxLoanPct — geen oneindig lenen, ook niet via de rente-accrual.
+        const maxBalanceNaOpname = cap / (1 + debt.rate)
+        const ruimte = Math.max(0, maxBalanceNaOpname - debt.balance)
+        const opname = Math.max(0, Math.min(gevraagd, ruimte))
+        if (opname > 0) {
+          // Naar de liquide pot (zelfde bestemming als verkoop-opbrengst).
+          const alloc = allocateProRata(snapshot(assets), liquidProceedsTargets, opname)
+          for (const [id, v] of Object.entries(alloc)) {
+            instroomById[id] = (instroomById[id] ?? 0) + v
+            const a = assets.find((x) => x.id === id)
+            if (a) a.value += v
+          }
+          debt.balance += opname
+        }
+        return Math.max(0, gevraagd - opname)
       }
 
       let leefuitgaven: number
@@ -536,50 +734,135 @@ export function runHorizonLedger(
             if (a) a.value += v
           }
         } else if (surplus < 0) {
-          withdrawWithOnDemand(deficitOrderIds, -surplus)
+          // Tekort in de opbouwfase: eerst de liquide pot + on_demand-verkopen, dan
+          // (ADR 0029) de opeethypotheek als er onderpand-ruimte is. Mocht het huis
+          // al vóór de werk-stop "nodig" zijn (zeldzaam), dan dekt de opeethypotheek
+          // het na de echte liquide pot — net als in de decumulatiefase.
+          const tekortNaLiquide = withdrawWithOnDemand(deficitOrderIds, -surplus)
+          drawReverseMortgage(tekortNaLiquide)
         }
       } else {
         // ── Decumulatie: onttrekking volgens strategie ──
+        // ADR 0029 — vaste maand-uitkering (monthlyPayout != null): de opeethypotheek
+        // keert PROACTIEF `monthlyPayout × 12` uit naar de liquide pot vóór de
+        // onttrekkingsberekening (gecapt op de leen-ruimte). Dat verlaagt de behoefte
+        // die uit de eigen pot onttrokken moet worden — net als een recurring
+        // inkomensstroom, maar nu als echte schuld-opname in het grootboek. De tekort-
+        // gedreven variant (monthlyPayout == null) leent juist REACTIEF, ná de
+        // onttrekking (zie hieronder), zodat alleen het werkelijke tekort wordt geleend.
+        if (input.reverseMortgage?.monthlyPayout != null && input.reverseMortgage.monthlyPayout > 0) {
+          drawReverseMortgage(input.reverseMortgage.monthlyPayout * 12)
+        }
         if (decumStartAge === null) {
           decumStartAge = age
-          decumStartLiquide = liquidValue(assets)
+          // DRAWDOWN-grondslag (ADR 0030): de guardrails-anchor (startPortfolio) is de
+          // pot die de annuïteit RAUW kan opnemen, niet de eligibility-pot incl. een
+          // nog-niet-verkocht huis. Voor include_full/geen-huis identiek aan vroeger.
+          decumStartLiquide = withdrawableLiquidValue(assets)
         }
         leefuitgaven = input.yearlyExpenses
         const baseExpenses = leefuitgaven + woonkosten + rec.expense + one.expense
         const ctx: WithdrawalContext = {
           baseExpenses,
           recurringIncome,
-          currentPortfolio: liquidValue(assets),
+          // DRAWDOWN-grondslag (ADR 0030 / Optie B): de annuïteit teert op de RAUW
+          // besteedbare pot (`withdrawableLiquidValue`), NIET op `liquidValue` (de
+          // eligibility-pot incl. de spendable downsize-woning). Zo onttrekt ze op
+          // precies de pot die ze kàn aanspreken → geen stille shortfall vóór de
+          // verkoop (de cash loopt niet leeg terwijl de getoonde lijn door de
+          // groeiende woning juist stijgt). include_full-woning: het huis zit óók in
+          // `mayBeRawWithdrawn` → byte-identiek aan vroeger.
+          currentPortfolio: withdrawableLiquidValue(assets),
           startPortfolio: decumStartLiquide,
           previousWithdrawal: prevWithdrawal,
-          // Werkelijk gewogen reëel rendement van de LIQUIDE portefeuille (cash/crypto
-          // drukken dit onder grossReturn) — zodat de deplete-annuïteit niet te veel
+          // Werkelijk gewogen reëel rendement van de RAUW besteedbare portefeuille
+          // (cash/crypto drukken dit onder grossReturn) — op exact dezelfde pot als
+          // currentPortfolio, zodat de deplete-annuïteit niet te veel/te weinig
           // onttrekt en de lijn correct op ~€0 eindigt i.p.v. vroegtijdig leeg.
-          yearReturn: liquidRealReturn(assets),
+          yearReturn: withdrawableRealReturn(assets),
           yearsIntoRetirement: age - decumStartAge,
           currentAge: age,
           endAge,
           endStrategy: strategy,
           legacyAmount: input.strategyConfig.legacyAmount,
-          // Grootboek-model: het surplus bóven de leefbehoefte wordt NIET
-          // geconsumeerd/herbelegd. Voor legacy daarom need-only onttrekken zodat
-          // het residu naar de nalatenschap groeit — de spend-down-annuïteit zou
-          // het surplus uit de assets laten verdampen → nalatenschap onhaalbaar.
-          // (v1 consumeert de annuïteit wél; vandaar deze opt-in i.p.v. een
-          // gedragswijziging in de gedeelde functie.) Zie ADR 0014.
-          legacyPreserveOnly: true,
+          // Verenigd eindstrategie-model (Fase 1, architect-beslissing): deplete ≡
+          // legacy(€0) via de GEFLOORDE schuivende annuïteit richting doelsaldo €0
+          // (opeten ≡ nalatenschap met doelsaldo €0). De annuïteit (`computeAnnuityBase`)
+          // wordt elk jaar herberekend op de resterende pot richting €0 op endAge, met
+          // een uitgaven-bodem `Math.max(annuïteit, netto leefbehoefte)`: een gepensio-
+          // neerde onttrekt minimaal zijn leefkosten. Die bodem is essentieel — zónder
+          // bodem (puur de annuïteit op de LIQUIDE pot) onttrek je bij een kleine liquide
+          // pot náást een groot niet-liquide on_demand-vermogen veel te weinig (~€2,5k/jr
+          // i.p.v. €30k), waardoor het tekort de on_demand-verkoop nóóit triggert en de
+          // estate (huis/caravan) ONverkocht op endAge blijft staan i.p.v. opgemaakt.
+          // De annuïteit + bodem laat de liquide pot leeglopen → de niet-liquide assets
+          // worden "wanneer nodig" verkocht (ADR 0020) en het GEHELE vermogen landt op
+          // ~€0 op endAge. Eén reële voet (yearReturn = blended reële return van de
+          // liquide pot) voor doel én afbouw, geen 0,6×.
+          //
+          // Legacy(€>0) blijft NEED-ONLY (ADR 0014/0017): onttrek de behoefte, het
+          // residu groeit naar de nalatenschap. Een annuïteit-naar-L undershoot het
+          // doel (jaar-op-jaar return-mismatch → afbouw landt ~€5k ónder L → de gate
+          // `endLiquide ≥ L` faalt voor élke FIRE-leeftijd → kunstmatig onbereikbaar).
+          // perpetual/pensioen: eigen tak (need-only).
+          floorlessAnnuityToTarget: false,
+          legacyPreserveOnly:
+            strategy === 'legacy' && input.strategyConfig.legacyAmount > 0,
           inflation: 0, // reëel: geen inflatie in de annuïteit
         }
         const withdrawal = applyWithdrawalStrategy(input.withdrawalStrategy, ctx)
         prevWithdrawal = withdrawal
-        withdrawWithOnDemand(withdrawalOrderIds, withdrawal)
+        const tekortNaLiquide = withdrawWithOnDemand(withdrawalOrderIds, withdrawal)
+        // Tekort-gedreven opeethypotheek (monthlyPayout == null): leen ná de echte
+        // liquide pot precies het onbedekte tekort, gecapt op de leen-ruimte. Bij een
+        // vaste payout is de RM-opname hierboven al gedaan; een resterend tekort blijft
+        // dan onbedekt (geen dubbele opname).
+        if (input.reverseMortgage && input.reverseMortgage.monthlyPayout == null) {
+          drawReverseMortgage(tekortNaLiquide)
+        }
         cashflowNetto = recurringIncome + eventsInkomen - withdrawal
+      }
+
+      // 6d. Opeethypotheek-rente-accrual + schuldenRow (ADR 0029). NA alle opnames
+      // dit jaar: het saldo (begin + opnames) stapelt zijn rente erbovenop
+      // (aflossingsvrij — geen aflossing, woonlast verdwijnt niet). De opname is de
+      // instroom-naar-liquide van dit jaar (begin → eind − rente). Zo verschijnt de
+      // opeethypotheek als ECHTE schuld in de nalatenschap (`nettoVermogen = assets −
+      // debts`) i.p.v. een display-only schaduwschuld.
+      {
+        const rm = debts.find((d) => d.isReverseMortgage)
+        if (rm) {
+          const beginRm = rm.balance
+          if (beginRm > 0) {
+            // Rente stapelt op het saldo (aflossingsvrij). De LTV-cap geldt óók op het
+            // EINDsaldo: zou de gestapelde rente de schuld bóven overwaarde × maxLoanPct
+            // tillen, dan klemt de bank op de cap (de LTV-grens wordt nooit overschreden).
+            // Zo blijft de nalatenschap (huis − opeetschuld) gegarandeerd niet-negatief:
+            // de opeetschuld kan het huis nooit méér dan maxLoanPct "opeten".
+            const cap = reverseMortgageCap()
+            const ongeklemd = beginRm * (1 + rm.rate)
+            const eindRm = cap > 0 ? Math.min(ongeklemd, cap) : ongeklemd
+            const renteRm = eindRm - beginRm
+            rm.balance = eindRm
+            // begin = saldo vóór de rente-accrual van dit jaar (= na de opnames);
+            // de opname zelf zit al in beginRm (geen aparte instroom-kolom op een
+            // schuld). aflossing/extraAflossing = 0 (aflossingsvrij). eind incl. (geklemde) rente.
+            schuldenRow.push({ id: rm.id, naam: rm.naam, begin: beginRm, rente: renteRm, aflossing: 0, extraAflossing: 0, eind: rm.balance })
+          } else {
+            // Nog niet geopend / geen opname dit jaar → 0-rij voor consistentie.
+            schuldenRow.push({ id: rm.id, naam: rm.naam, begin: 0, rente: 0, aflossing: 0, extraAflossing: 0, eind: 0 })
+          }
+        }
       }
 
       // 7. Totalen + bracketing
       const totaalAssets = assets.reduce((s, a) => s + a.value, 0)
       const totaalSchuld = debts.reduce((s, d) => s + d.balance, 0)
+      // Eligibility-pot (FIRE-gate/V_op) — ONGEMOEID, incl. spendable downsize-woning.
       const liquideVermogen = liquidValue(assets)
+      // RAUW besteedbare pot (ADR 0030) — wat de afbouw-annuïteit kàn opnemen + de
+      // grondslag voor de verkoop-trigger. Ex de spendable+saleManaged downsize-woning.
+      const besteedbaarVermogen = withdrawableLiquidValue(assets)
       const box3Grondslag = Math.max(0, box3Value - box3Vrij)
       const box3Total = Object.values(box3ById).reduce((s, v) => s + v, 0)
 
@@ -616,6 +899,7 @@ export function runHorizonLedger(
         totaalSchuld,
         nettoVermogen: totaalAssets - totaalSchuld,
         liquideVermogen,
+        besteedbaarVermogen,
         vNodig: 0,
         dekking: 0,
         events: collectEvents(input.cashflows, age),
@@ -635,17 +919,41 @@ export function runHorizonLedger(
   }
 
   // ── V_nodig (backward referentielijn) ──
+  // De backward-annuïteit discounteert op de WAARDE-GEWOGEN BLENDED REËLE VOET van de
+  // FIRE-eligible startpot (`blendedRealReturnStart`) — exact het rendement waarop de
+  // afbouw teert. Drie opmerkingen over samenvallen / precisie:
+  //
+  // (a) DOEL-LIJN ↔ DRAWDOWN INTRINSIEK: doel-lijn en drawdown-curve delen ÉÉN voet
+  //     (blendedReal) — dat valt intrinsiek samen.
+  // (b) GETEKENDE STIP OP DE LIJN: `fireAgeFractional` = crossingAge is het sub-jaar-
+  //     snijpunt waar de getekende nominale vermogenscurve de horizontale doel-lijn
+  //     kruist — de stip en de lijn vallen op de grafiek samen.
+  // (c) INTEGER-PRECISIE: de integer `liquideAtFire` kan tot één discrete jaarstap
+  //     boven `requiredFirePortfolioAtFire` liggen, omdat de stijgende opbouwcurve
+  //     de dalende V_nodig-lijn discreet (per jaar) passeert. Dit is geen mismatch,
+  //     maar de inherente granulariteit van een jaarlijks grootboek.
+  //
+  // De oude 0,6×-buffer is verwijderd (Fase 1). Bodem-eerlijkheid komt nu
+  // van de expliciete premature-collapse-guard in `meetsStrategyTarget` (criterium 7).
   const pass1 = runForward(null)
-  const vNodig = backwardVnodig(pass1.rows, pass1.netNeed, realRetAvg, strategy, input.strategyConfig.legacyAmount, liquidSumStart(input), withdrawalType)
+  const vNodig = backwardVnodig(
+    pass1.rows,
+    pass1.netNeed,
+    blendedRealReturnStart(input, inflation, spendableIds),
+    strategy,
+    input.strategyConfig.legacyAmount,
+    liquidSumStart(input),
+    withdrawalType,
+  )
 
   // ── FIRE via forward doel-zoektocht (zelf-consistent) ──
   // FIRE = vroegste leeftijd waarop "stop met werken + onttrek volgens de
   // strategie" het einddoel haalt:
   //  - deplete/pensioen → liquide ≥ V_nodig op de FIRE-leeftijd (ADR 0027): de
-  //    FIRE-detectie deelt nu ÉÉN grondslag met de doel-lijn (dezelfde backward-
-  //    annuïteit `vNodig`). Daardoor vallen de FIRE-stip en de doel-lijn intrinsiek
-  //    samen (binnen ~½ jaar vermogensopbouw) en klopt het getoonde 'benodigd
-  //    vermogen' met de stip. Dit vervangt de oude forward-deplete-feasibility-test
+  //    FIRE-detectie deelt ÉÉN grondslag met de doel-lijn (dezelfde backward-
+  //    annuïteit `vNodig`). De integer `liquideAtFire` kan tot één discrete
+  //    jaarstap boven `requiredFirePortfolioAtFire` liggen (zie V_nodig-comment
+  //    hierboven, punt c). Dit vervangt de oude forward-deplete-feasibility-test
   //    (een over-agressieve volledige-pot-spend-down liet FIRE ~4 jaar te laat
   //    vuren — zie ADR 0027 / INV-3-herziening);
   //  - perpetual → koopkracht behouden (eindvermogen ≥ vermogen op FIRE);
@@ -670,9 +978,13 @@ export function runHorizonLedger(
         fireAge = f
         displayRows = run.rows
         // De vroegste passerende leeftijd is meteen de start → onvermijdelijke
-        // overshoot (alléén betekenisvol voor legacy; need-only laat het residu
-        // boven het doel uitgroeien). Geen onbereikbaarheid: FIRE = nu.
-        if (strategy === 'legacy' && f === startAge) legacyTargetUnavoidablyExceeded = true
+        // overshoot (alléén betekenisvol voor legacy met een POSITIEF doel; need-only
+        // laat het residu boven het doel uitgroeien). Geen onbereikbaarheid: FIRE = nu.
+        // legacy(€0) ≡ deplete → geen overshoot-semantiek (signaal blijft false, gelijk
+        // aan deplete).
+        if (strategy === 'legacy' && f === startAge && input.strategyConfig.legacyAmount > 0) {
+          legacyTargetUnavoidablyExceeded = true
+        }
         break
       }
     }
@@ -688,11 +1000,47 @@ export function runHorizonLedger(
     r.fase = r.leeftijd < fa ? 'opbouw' : r.leeftijd < aowAge ? 'overbrugging' : 'onttrekking'
   }
 
+  // ── Fractionele FIRE-leeftijd: het ECHTE sub-jaar-snijpunt (ADR 0027) ────────
+  // De integer `fireAge` is het EERSTE jaar waarop de retire-at-f-run het strategie-
+  // doel haalt (meetsStrategyTarget / Optie B). De FIRE-stip op de grafiek wordt op
+  // `fireAgeFractional` op de (bij include_full netto≈liquide) vermogenscurve getekend.
+  // Stond die gelijk aan de integer `fireAge`, dan lag de stip een vól jaar vermogens-
+  // opbouw ná het visuele snijpunt — op groot vermogen €100–220k bóven de dalende
+  // V_nodig-doel-lijn.
+  //
+  // De stip moet liggen waar de GETOONDE liquide-curve (`displayRows`) de GETOONDE
+  // V_nodig-doel-lijn kruist: dat is het punt op de grafiek waar lijn en doel elkaar
+  // raken. We zoeken in `displayRows` de laatste sign-change van `dekking`
+  // (= liquide − V_nodig) van < 0 naar ≥ 0 op/vóór de FIRE-leeftijd, en interpoleren
+  // lineair binnen dat ene jaar-segment. (De integer-detectie kan een jaar later
+  // vuren dan de getoonde curve kruist, omdat ze op de retire-at-f-run i.p.v. de
+  // displayRows-run is geëvalueerd; de stip volgt bewust de GETOONDE curve.)
+  //
+  // De integer `fireAge` (freedomPct, snapshots, requiredFirePortfolioAtFire,
+  // liquideAtFire) blijft ONGEWIJZIGD — alléén de decimale stip-positie wordt
+  // preciezer. Forced-fire (gebruiker kiest expliciet de gehele leeftijd) en legacy/
+  // perpetual (geen liquide↑×V_nodig↓-crossing-semantiek) houden fireAgeFractional =
+  // fireAge.
+  let fireAgeFractional: number | null = fireAge
+  if (
+    fireAge != null &&
+    input.forcedFireAge == null &&
+    (strategy === 'deplete' || strategy === 'pensioen') &&
+    fireIdx >= 0
+  ) {
+    // Doel = de getekende horizontale deplete-doel-lijn = V_nodig op de FIRE-leeftijd,
+    // NOMINAAL (× inflatiefactor van het FIRE-jaar) — exact zoals de adapter `fireTarget`
+    // levert (requiredFirePortfolio = vNodig[fireIdx] × (1+i)^jaar_FIRE).
+    const fireFactor = Math.pow(1 + inflation, displayRows[fireIdx].jaar)
+    const targetNominal = vNodig[fireIdx] * fireFactor
+    fireAgeFractional = crossingAge(displayRows, targetNominal, fireIdx, inflation)
+  }
+
   return {
     rows: displayRows,
     vNodig,
     fireAge,
-    fireAgeFractional: fireAge,
+    fireAgeFractional,
     fireReachable: fireAge != null,
     requiredFirePortfolioAtFire: fireIdx >= 0 ? vNodig[fireIdx] : 0,
     liquideAtFire: fireIdx >= 0 ? displayRows[fireIdx].liquideVermogen : 0,
@@ -704,31 +1052,46 @@ export function runHorizonLedger(
 }
 
 /**
- * Haalt een retire-at-FIRE-run het einddoel van de strategie?
- *  - deplete/pensioen: liquide vermogen op de FIRE-leeftijd ≥ V_nodig op die
- *    leeftijd (ADR 0027). FIRE-detectie en doel-lijn delen één grondslag (dezelfde
- *    backward-annuïteit `vNodig`), zodat de stip en de doel-lijn samenvallen en het
- *    'benodigd vermogen' met de stip klopt. (Verving de forward-deplete-feasibility-
- *    test die ~4 jaar te laat vuurde.)
- *  - perpetual: niet vroegtijdig leeg + eindvermogen ≥ vermogen op FIRE (koopkracht);
- *  - legacy: eindvermogen ≥ nalatenschapsbedrag, de brug mág richting €0 dippen
- *    maar het liquide pad mag nóóit negatief worden (ADR 0017).
+ * Minimale decumulatie-horizon voor een geldige deplete/legacy(€0)-FIRE.
  *
- * `vNodigAtFire` is V_nodig op de FIRE-leeftijd (alleen gebruikt voor deplete/pensioen).
+ * De gate `liquide ≥ V_nodig` is TRIVIAAL waar op f = endAge: dan is er ~0 afbouw
+ * en V_nodig ≈ 0 (de backward-annuïteit landt op het doelsaldo op endAge). Zonder
+ * een minimum-horizon zou een onhoudbaar pad (uitgaven ≫ vermogen) "FIRE op endAge"
+ * claimen. We eisen daarom dat er minstens MIN_DECUM_YEARS afbouwjaren ná de FIRE-
+ * leeftijd liggen — een betekenisvol pensioen — én gebruiken dezelfde marge als de
+ * tail die we van de collapse-check uitsluiten (de annuïteit naar het doelsaldo brengt
+ * de pot uitsluitend in de LAATSTE ~MIN_DECUM_YEARS jaar onder één-jaar-behoefte; dat
+ * is de natuurlijke staart, geen ineenstorting). 3 jaar is ruim genoeg om de
+ * legitieme (ook late) afbouw niet te blokkeren, scherp genoeg om de triviale
+ * endAge-pass en een vroege leegloop te weren.
+ */
+const MIN_DECUM_YEARS = 3
+
+/**
+ * Haalt een retire-at-FIRE-run het einddoel van de strategie?
+ *  - deplete/pensioen/legacy(€0): liquide vermogen op de FIRE-leeftijd ≥ V_nodig op
+ *    die leeftijd (ADR 0027), MÉT een minimale-decumulatie-horizon en een premature-
+ *    collapse-guard (bodem-eerlijk, criterium 7). FIRE-detectie en doel-lijn delen
+ *    één grondslag (dezelfde backward-annuïteit `vNodig`). opeten ≡ nalatenschap(€0):
+ *    legacy(€0) routeert door EXACT dezelfde gate als deplete (verenigd model).
+ *  - perpetual: niet vroegtijdig leeg + eindvermogen ≥ vermogen op FIRE (koopkracht);
+ *  - legacy (positief doel): eindvermogen ≥ nalatenschapsbedrag, de brug mág richting
+ *    €0 dippen maar het liquide pad mag nóóit negatief worden (ADR 0017).
+ *
+ * `vNodigAtFire` is V_nodig op de FIRE-leeftijd (deplete/pensioen/legacy(€0)).
  */
 function meetsStrategyTarget(rows: LedgerRow[], fireAge: number, strategy: string, legacyAmount: number, vNodigAtFire: number): boolean {
   const ret = rows.filter((r) => r.leeftijd >= fireAge)
   if (ret.length === 0) return false
   const endLiquide = ret[ret.length - 1].liquideVermogen
 
-  if (strategy === 'legacy') {
-    // Doel-zoekende selectie (ADR 0017). De brug naar pensioen mág richting €0
-    // dippen — de buffer zit al in het door de gebruiker ingevoerde
-    // nalatenschapsbedrag — maar het liquide pad mag nóóit negatief worden.
-    // Geen −2%-tolerantie meer: eindvermogen ≥ legacyAmount (nooit ónder het doel).
-    // Omdat het eindvermogen monotoon stijgt in de FIRE-leeftijd, levert de
-    // vroegste passerende leeftijd (de break in de zoek-loop) automatisch de
-    // uitkomst die het dichtst bij — en ≥ — het doel eindigt.
+  // Positief nalatenschapsbedrag — doel-zoekende selectie (ADR 0017). De brug naar
+  // pensioen mág richting €0 dippen (de buffer zit al in het ingevoerde
+  // nalatenschapsbedrag); geen −2%-tolerantie: eindvermogen ≥ legacyAmount (nooit
+  // ónder het doel). Eindvermogen stijgt monotoon in de FIRE-leeftijd, dus de
+  // vroegste passerende leeftijd eindigt automatisch het dichtst bij — en ≥ — het doel.
+  if (strategy === 'legacy' && legacyAmount > 0) {
+    // Geen liquide-pad mag négatief worden vóór endAge.
     for (let i = 0; i < ret.length - 1; i++) if (ret[i].liquideVermogen < 0) return false
     return endLiquide >= legacyAmount
   }
@@ -741,13 +1104,40 @@ function meetsStrategyTarget(rows: LedgerRow[], fireAge: number, strategy: strin
     return endLiquide >= ret[0].liquideVermogen * 0.99
   }
 
-  // deplete / pensioen (ADR 0027): FIRE = liquide ≥ V_nodig op de FIRE-leeftijd.
-  // Eén grondslag met de doel-lijn (backward-annuïteit), zodat de stip op de doel-
-  // lijn ligt. De vroegste passerende leeftijd is per constructie de crossing van
-  // de stijgende opbouwcurve met de dalende V_nodig-referentielijn (overshoot ≈ ½
-  // jaar opbouw). De spend-down zelf eindigt nog steeds ~€0 (geborgd door de
-  // 'deplete eindigt op ~€0'-test); deze drempel bepaalt alléén wanneer FIRE vuurt.
+  // ── deplete / pensioen / legacy(€0) — verenigde annuity-to-doelsaldo-gate ──────
+  // (ADR 0027 + Fase 1). FIRE = liquide ≥ V_nodig op de FIRE-leeftijd; één grondslag
+  // met de doel-lijn (backward-annuïteit op de blended reële voet), zodat de stip op de
+  // doel-lijn ligt. legacy(€0) gebruikt endVal=legacyAmount(=0) in backwardVnodig →
+  // `vNodigAtFire` identiek aan deplete → identieke fireAge én eind-curve.
+  //
+  // CRITERIUM 7 — bodem-eerlijk (geen stille leegloop):
+  //  (a) De gate is triviaal waar op f = endAge (V_nodig ≈ 0, ~0 afbouwjaren). Eis
+  //      daarom een betekenisvol pensioen: endAge − fireAge ≥ MIN_DECUM_YEARS.
+  //  (b) Premature-collapse-guard. De floorless annuïteit-naar-doelsaldo laat een
+  //      LEGITIEME pot vloeiend dalen en pas in de LAATSTE ~MIN_DECUM_YEARS jaar onder
+  //      één-jaar-behoefte komen (dat is de natuurlijke staart). Een ONHOUDBAAR pad
+  //      (uitgaven ≫ vermogen) stort al in het EERSTE afbouwjaar in naar ~€0 en zou —
+  //      doordat de need-only/annuïteit het onbedekte tekort stil wegcapt (withdrawFrom
+  //      geeft de shortfall terug, de niet-on_demand-caller laat 'm vallen) — daarna
+  //      "opveren" en alsnog ≥ V_nodig uitkomen → valse FIRE. We eisen daarom dat het
+  //      liquide pad > één-jaar-behoefte blijft tot en met endAge − MIN_DECUM_YEARS
+  //      (de tail-jaren waarin de annuïteit de pot bewust naar het doelsaldo brengt
+  //      sluiten we uit). Zo passeert de legitieme (ook late) afbouw en valt een
+  //      ineenstorting door de mand.
+  if (endAgeOf(ret) - fireAge < MIN_DECUM_YEARS) return false
+  const need = ret[0].totaleUitgaven - ret[0].aowEnPensioen
+  const collapseFloor = Math.max(0, need)
+  const lastCheckedAge = endAgeOf(ret) - MIN_DECUM_YEARS
+  for (const r of ret) {
+    if (r.leeftijd > lastCheckedAge) break
+    if (r.liquideVermogen < collapseFloor) return false
+  }
   return ret[0].liquideVermogen >= vNodigAtFire
+}
+
+/** Eindleeftijd van een retire-segment (laatste rij). */
+function endAgeOf(ret: LedgerRow[]): number {
+  return ret[ret.length - 1].leeftijd
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -758,16 +1148,98 @@ function snapshot(assets: RunningAsset[]): Record<string, number> {
   return m
 }
 
+/**
+ * BESTEEDBAAR/FIRE-eligible liquide vermogen = som van alle assets die als
+ * eligibility-liquide tellen (`countsAsEligibilityLiquid`): van nature liquide
+ * types + `spendable`-gemarkeerde assets (include_full- én v2-downsize-woning). Een
+ * `saleManaged`-niet-spendable asset (generieke liquidatie) telt hier NIET mee tot
+ * de verkoop. Dit is de grondslag van de afbouw-annuïteit, de FIRE-gate en de
+ * getoonde `liquideVermogen`-rij. NB: op de trigger-MEETRUN is de downsize-woning
+ * niet als spendable gemarkeerd → daar is dit ex-huis (zie countsAsEligibilityLiquid-doc).
+ */
 function liquidValue(assets: RunningAsset[]): number {
-  return assets.filter((a) => !isNonLiquid(a)).reduce((s, a) => s + Math.max(0, a.value), 0)
+  return assets.filter((a) => countsAsEligibilityLiquid(a)).reduce((s, a) => s + Math.max(0, a.value), 0)
 }
 
-/** Waarde-gewogen reëel rendement van de liquide portefeuille (voor de annuïteit). */
-function liquidRealReturn(assets: RunningAsset[]): number {
+/**
+ * Sub-jaar FIRE-snijpunt: de fractionele leeftijd waar de GETEKENDE vermogenscurve de
+ * HORIZONTALE deplete-doel-lijn kruist BINNEN het ADR-0027-detectiejaar — exact zoals
+ * de grafiek beide tekent.
+ *
+ * De grafiek (`sim-chart.tsx`) tekent:
+ *  - de hoofdlijn als NOMINALE netto-vermogen-curve, gekeyd op leeftijd+1
+ *    (allPts: `[r.age + 1, endPortfolio]`, endPortfolio = nettoVermogen × (1+i)^jaar,
+ *    via de adapter; daarvóór het startpunt `[age0, startNetWorth]`). De chart-waarde
+ *    "op leeftijd L" = nettoVermogen van de rij met leeftijd L−1 (eind van dat jaar);
+ *    dus chart@fireAge = nominalAt(fireIdx−1), chart@(fireAge−1) = nominalAt(fireIdx−2).
+ *  - het deplete-doelbedrag als één VLAKKE dashed lijn op `fireTarget`
+ *    (= V_nodig op de integer FIRE-leeftijd × diens inflatiefactor, NOMINAAL).
+ *
+ * BELANGRIJK (ADR 0027-getrouwheid, beslissing architect): we interpoleren UITSLUITEND
+ * binnen het detectiejaar — het segment [fireAge−1, fireAge] op de chart-as. We zoeken
+ * NIET verder terug naar een eerdere curve-kruising. Reden: de doel-lijn is vlak op de
+ * LAGE V_nodig[fireAge]-waarde (V_nodig daalt), terwijl de getekende curve het NETTO
+ * vermogen is; bij een include_full-woning is netto veel steiler en kruist die lage
+ * vlakke lijn jaren eerder dan de integer-FIRE-detectie vuurt. Vrij terugzoeken zou de
+ * getoonde vrijheidsleeftijd jaren naar voren trekken en de bewuste ADR-0027-keuze
+ * (deplete-FIRE ~51 i.p.v. ~45 over-agressief) stilzwijgend ongedaan maken. Door binnen
+ * het detectiejaar te blijven wijkt `fireAgeFractional` nóóit > 1 jaar van de integer
+ * `fireAge` af (precies de "≤ één jaar vermogensopbouw"-marge uit ADR 0027), valt de
+ * stip op/vlakbij de doel-lijn én blijft de headline-leeftijd ~de integer FIRE.
+ *
+ * Is de curve aan het BEGIN van het segment (chart@(fireAge−1)) al ≥ doel, dan vond de
+ * echte kruising een jaar eerder plaats; we klemmen dan op het segment-begin (t = 0,
+ * leeftijd fireAge−1) — de laagste positie binnen het toegestane 1-jaars-venster, zodat
+ * de stip zo dicht mogelijk op de doel-lijn ligt zónder de ADR-0027-leeftijd naar voren
+ * te trekken (i.p.v. terug te vallen op fireAge, het HOOGSTE punt van het segment, dat
+ * de stip juist een vol jaar opbouw bóven de lijn zou leggen). Voor include_full-
+ * woningen blijft dan een kleine zichtbare stip↔lijn-afstand bestaan: dat is het
+ * structurele gevolg van een VLAKKE liquide-doel-lijn onder een NETTO-curve (aandachts-
+ * punt voor een eventuele ADR 0029 — niet hier stilzwijgend opgelost; ADR 0028 is
+ * vergeven aan de downsize-"Verkopen"-herdefinitie, Fase 2).
+ */
+function crossingAge(rows: LedgerRow[], target: number, fireIdx: number, inflation: number): number {
+  if (fireIdx < 1) return rows[fireIdx]?.leeftijd ?? 0
+  const nominalAt = (rowIdx: number) =>
+    rows[rowIdx].nettoVermogen * Math.pow(1 + inflation, rows[rowIdx].jaar)
+  // Chart-segment van het detectiejaar: chart@(fireAge−1) → chart@fireAge.
+  const prev = fireIdx >= 2 ? nominalAt(fireIdx - 2) : rows[0].nettoVermogen // chart@(fireAge−1)
+  const now = nominalAt(fireIdx - 1) // chart@fireAge
+  const denom = now - prev
+  // prev ≥ target → t = 0 (klem op segment-begin). prev < target ≤ now → in-segment-kruising.
+  const t = prev >= target ? 0 : denom > 0 ? Math.min(1, Math.max(0, (target - prev) / denom)) : 1
+  // Segment-eindpunten liggen op leeftijd (fireAge−1) en fireAge → leeftijd = fireAge−1+t.
+  return rows[fireIdx].leeftijd - 1 + t
+}
+
+/**
+ * DRAWDOWN-grondslag (ADR 0030 / Optie B) — het RAUW besteedbare liquide vermogen =
+ * som van alle assets die rauw onttrokken mogen worden (`mayBeRawWithdrawn`). Dit is
+ * de pot waarop de afbouw-annuïteit teert en die de uitputtings-/verkoop-trigger
+ * meet. Verschilt BEWUST van `liquidValue` (eligibility): de spendable+saleManaged
+ * downsize-woning telt WÉL in `liquidValue` (FIRE-gate/opbouw) maar NIET hier — de
+ * annuïteit kan het huis niet rauw opnemen, het verlaat de pot enkel via de verkoop.
+ * Zo onttrekt de annuïteit op precies de pot die ze kàn aanspreken → geen stille
+ * shortfall vóór de verkoop. Voor een include_full-woning (spendable, geen sale)
+ * valt dit per constructie samen met `liquidValue` (het huis zit dan óók in
+ * `mayBeRawWithdrawn`). Zie de orthogonale-eigenschappen-doc bovenaan.
+ */
+function withdrawableLiquidValue(assets: RunningAsset[]): number {
+  return assets.filter((a) => mayBeRawWithdrawn(a)).reduce((s, a) => s + Math.max(0, a.value), 0)
+}
+
+/**
+ * Waarde-gewogen reëel rendement van de RAUW besteedbare (`mayBeRawWithdrawn`)
+ * portefeuille — de voet waarop `computeAnnuityBase` de afbouw discounteert. Deelt
+ * exact de set van `withdrawableLiquidValue` zodat grondslag-bedrag én grondslag-
+ * return op dezelfde pot rekenen (geen huis-return die de afbouw-voet vertekent
+ * terwijl het huis niet rauw onttrokken kan worden).
+ */
+function withdrawableRealReturn(assets: RunningAsset[]): number {
   let val = 0
   let wr = 0
   for (const a of assets) {
-    if (isNonLiquid(a)) continue
+    if (!mayBeRawWithdrawn(a)) continue
     const v = Math.max(0, a.value)
     val += v
     wr += v * a.realRet
@@ -804,10 +1276,90 @@ function liquidSumStart(input: UnifiedProjectionInput): number {
   for (const a of input.assets) {
     if (a.is_active === false) continue
     if (NON_LIQUID.has(a.asset_type) && !spendable.has(a.id)) continue
-    s += (a.current_value ?? 0) * ((a.net_worth_inclusion_pct ?? 100) / 100)
+    s += assetEngineValue(a)
   }
   s += input.bankAccountCash ?? 0
+  // ADR 0029 (Optie B): de opeethypotheek-leen-ruimte telt als expliciete FIRE-
+  // eligibility-BIJDRAGE (een BEDRAG, niet de spendable-boolean — reverse_mortgage
+  // maakt slechts een FRACTIE van de woning eligible). De woning zelf is NIET
+  // spendable (valt hierboven uit via NON_LIQUID) — we tellen alléén de leen-ruimte.
+  for (const v of Object.values(input.collateralBorrowableById ?? {})) s += Math.max(0, v)
   return s
+}
+
+/**
+ * Engine-startwaarde van een asset (FIRE-eligible grondslag) = `current_value ×
+ * net_worth_inclusion_pct`. inclusion_pct is EIGENDOM (welk deel van het asset van
+ * de gebruiker is) en geldt ALTIJD, voor elk asset, in elke strategie — exact
+ * gelijk aan het elders getoonde netto vermogen. `include_full` is een
+ * ORTHOGONALE as: die bepaalt uitsluitend de FIRE-BEHANDELING (telt het eigen
+ * deel volledig als liquide/besteedbaar met zijn eigen reële return, zie de
+ * `spendable`-vlag in buildAssets), NIET de eigendoms-grondslag. Een huis @
+ * inclusion 50% krijgt dus engine-waarde `current_value × 50%`, óók onder
+ * include_full. Gedeeld door buildAssets, liquidSumStart en
+ * blendedRealReturnStart zodat alle drie op exact dezelfde grondslag rekenen.
+ */
+function assetEngineValue(
+  a: { current_value?: number | null; net_worth_inclusion_pct?: number | null },
+): number {
+  return (a.current_value ?? 0) * ((a.net_worth_inclusion_pct ?? 100) / 100)
+}
+
+/**
+ * Waarde-gewogen blended REËLE return van de FIRE-eligible/liquide startpot — exact
+ * de set die `liquidSumStart` optelt (incl. een include_full-woning op haar
+ * inclusion-gewogen engine-waarde met haar EIGEN return, en losse bankrekening-cash
+ * @ 0%). Elk asset draagt zijn eigen reële
+ * return (uit zijn eigen `expected_return`/`depreciation_rate`, + returnDelta),
+ * gewogen op zijn besteedbare engine-waarde. Dit is de ENE voet die `backwardVnodig`
+ * gebruikt (geen 0,6×). Mirrort de nominale-return-afleiding van `buildAssets` zodat
+ * doel-lijn en drawdown byte-voor-byte hetzelfde rendement zien. Lege pot → 0.
+ */
+function blendedRealReturnStart(
+  input: UnifiedProjectionInput,
+  inflation: number,
+  spendableIds: Set<string>,
+): number {
+  let val = 0
+  let weighted = 0
+  // Per-asset reële return — gedeeld door de asset-loop én de opeethypotheek-leen-
+  // ruimte-bijdrage (die de HUIS-return als voet krijgt; ADR 0029).
+  const assetRealReturn = (a: typeof input.assets[number]): number => {
+    let nom = (a.expected_return ?? 0) / 100
+    if (a.depreciation_rate && a.depreciation_rate > 0) nom = -(a.depreciation_rate / 100)
+    nom += input.returnDeltaByAssetType?.[a.asset_type] ?? input.returnDelta ?? 0
+    return realReturn(nom, inflation)
+  }
+  for (const a of input.assets) {
+    if (a.is_active === false) continue
+    if (NON_LIQUID.has(a.asset_type) && !spendableIds.has(a.id)) continue
+    const v = assetEngineValue(a)
+    if (v <= 0) continue
+    // Nominale return — identiek aan buildAssets: depreciation overrulet, dan returnDelta.
+    val += v
+    weighted += v * assetRealReturn(a)
+  }
+  // Losse bankrekening-cash teert op 0% nominaal → reëel = realReturn(0, inflation).
+  const cash = input.bankAccountCash ?? 0
+  if (cash > 0) {
+    val += cash
+    weighted += cash * realReturn(0, inflation)
+  }
+  // ADR 0029: de opeethypotheek-leen-ruimte draagt bij met de HUIS-return als voet
+  // (de leen-ruimte = overwaarde × maxLoanPct groeit met de woning). Zo delen
+  // eligibility-meting en de woning-onderpand-grondslag één rendement.
+  const borrowable = input.collateralBorrowableById
+  if (borrowable) {
+    const assetById = new Map(input.assets.map((a) => [a.id, a]))
+    for (const [id, amt] of Object.entries(borrowable)) {
+      if (amt <= 0) continue
+      const a = assetById.get(id)
+      const r = a ? assetRealReturn(a) : realReturn(0, inflation)
+      val += amt
+      weighted += amt * r
+    }
+  }
+  return val > 0 ? weighted / val : 0
 }
 
 function allocateSurplus(
@@ -894,10 +1446,20 @@ function collectEvents(cashflows: SimCashflow[], age: number): LedgerEvent[] {
   return out
 }
 
+/**
+ * Backward V_nodig (benodigd vermogen, dalend vanaf de eindleeftijd terug).
+ *
+ * Zuiver (Fase 1): de annuïteit-disconto `rOnttrek` is de WERKELIJKE waarde-gewogen
+ * blended reële return van de FIRE-eligible startpot (doorgegeven door de caller via
+ * `blendedRealReturnStart`) — exact het rendement waarop de onttrekking teert. Geen
+ * 0,6×-factor meer: die introduceerde een verborgen buffer en een grondslag-mismatch
+ * tussen doel-lijn en drawdown. Doel-lijn en drawdown delen nu één voet. De VPW-tak
+ * gebruikt dezelfde voet.
+ */
 function backwardVnodig(
   rows: LedgerRow[],
   netNeed: number[],
-  realRetAvg: number,
+  rOnttrek: number,
   strategy: string,
   legacyAmount: number,
   initialLiquide: number,
@@ -905,7 +1467,6 @@ function backwardVnodig(
 ): number[] {
   const n = rows.length
   const v = new Array<number>(n).fill(0)
-  const rOnttrek = 0.6 * realRetAvg
 
   if (withdrawalType === 'vpw') {
     for (let i = 0; i < n; i++) {

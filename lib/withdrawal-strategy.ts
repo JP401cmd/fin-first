@@ -57,12 +57,40 @@ export interface WithdrawalContext {
   /** Inflatiepercentage als decimaal (bijv. 0.02 voor 2%) — nodig voor reëel rendement in annuïteit */
   inflation?: number
   /**
-   * Legacy alléén: onttrek de netto behoefte (need-only) en laat het residu naar
-   * de nalatenschap groeien, i.p.v. de spend-down-annuïteit die het surplus bóven
-   * het doel opspendt. Nodig voor grootboek-modellen (horizon-engine v2) waar het
-   * over-onttrokken surplus NIET geconsumeerd/herbelegd wordt en dus zou verdampen
-   * (waardoor de nalatenschap nooit gehaald wordt). Default false/undefined =
-   * spend-down-annuïteit (v1, consumptie-interpretatie). Zie ADR 0014.
+   * Grootboek-modus (horizon-engine v2): gebruik de FLOORLESS schuivende annuïteit
+   * naar het doelsaldo voor zowel deplete (doelsaldo €0) ALS legacy (doelsaldo L).
+   * De annuïteit wordt elk jaar herberekend op de resterende liquide pot richting
+   * doelsaldo op endAge en CONSUMEERT zo de FIRE-overshoot → de afbouw landt per
+   * constructie EXACT op het doelsaldo op endAge. Géén `Math.max(annuïteit,
+   * netBaseExpenses)`-bodem (die bindt de uitgaven-vloer op een lage-rendement-pot
+   * en leegt 'm vroegtijdig) en géén need-only-residu (dat laat de overshoot
+   * compounden ver bóven het doel). Eén reële voet (ctx.yearReturn) voor doel én
+   * afbouw — geen 0,6×.
+   *
+   * SUPERSEDES het oude need-only legacy-model (ADR 0014): de architect heeft Fase 1
+   * gestandaardiseerd op het verenigde annuity-to-doelsaldo-model (opeten ≡
+   * nalatenschap met doelsaldo €0; €1 ≈ €0 per constructie). Default false/undefined
+   * = klassieke GEFLOORDE annuïteit (scalar-/unit-test-contract; de engine zet de
+   * vlag altijd). Zie withdrawal-strategy.ts applyStatic + engine.ts decumulation-ctx.
+   *
+   * NB: voor legacy met een POSITIEF nalatenschapsbedrag zet de engine deze vlag
+   * NIET maar `legacyPreserveOnly` (need-only) — zie hieronder.
+   */
+  floorlessAnnuityToTarget?: boolean
+  /**
+   * Legacy met een POSITIEF doel (need-only, ADR 0014/0017): onttrek alléén de netto
+   * leefbehoefte en laat het residu naar de nalatenschap groeien — NIET de annuïteit,
+   * die het surplus uit de assets zou trekken zonder het te consumeren (in een
+   * grootboek-model verdampt dat → nalatenschap onhaalbaar; de afbouw landt ónder L).
+   *
+   * Het verenigde annuity-to-doelsaldo-model (floorlessAnnuityToTarget) geldt voor
+   * deplete ÉN legacy(€0) (opeten ≡ nalatenschap met doelsaldo €0). Voor legacy(€>0)
+   * is need-only de juiste decumulatie: het door de gebruiker ingevoerde bedrag IS de
+   * bewust nagelaten buffer, dus wat je niet nodig hebt groeit ernaartoe — een
+   * annuïteit-naar-L undershoot het doel door de jaar-op-jaar return-mismatch. Eén
+   * van beide vlaggen is gezet, nooit allebei. Zie engine.ts decumulation-ctx +
+   * meetsStrategyTarget (legacy(€0) routeert door de deplete-gate; legacy(€>0) door
+   * de eigen tak).
    */
   legacyPreserveOnly?: boolean
 }
@@ -151,58 +179,41 @@ export function applyWithdrawalStrategy(
 /**
  * Static withdrawal: base logic = max(0, baseExpenses - recurringIncome).
  *
- * When endStrategy === 'deplete', uses growing annuity formula to ensure the
- * portfolio depletes to ≈€0 at endAge while matching inflation-indexed expenses:
- *   PMT = P × (r − g) / (1 − ((1+g)/(1+r))^n)
- * where r = nominal return, g = inflation, n = remaining years.
+ * deplete & legacy — VERENIGD annuity-to-doelsaldo (Fase 1, architect-beslissing):
+ * gebruik de schuivende groeiende annuïteit `computeAnnuityBase` met doelsaldo =
+ * legacyAmount (0 voor deplete, L voor legacy). In de grootboek-modus
+ * (`floorlessAnnuityToTarget`, door de engine gezet) is dit FLOORLESS — de
+ * onttrekking = de annuïteit (geclampt ≥0), ZONDER `Math.max(annuïteit,
+ * netBaseExpenses)`-bodem. De annuïteit herberekent elk jaar op de resterende
+ * liquide pot richting doelsaldo op endAge en consumeert zo de FIRE-overshoot →
+ * de afbouw landt per constructie EXACT op het doelsaldo op endAge. (De oude
+ * uitgaven-bodem bond op een lage-rendement-pot en leegde 'm vroegtijdig; het
+ * oude need-only-residu liet de overshoot juist compounden ver bóven het doel —
+ * beide weg.) Eén reële voet (ctx.yearReturn) voor doel én afbouw, geen 0,6×.
+ * SUPERSEDES het need-only legacy-model (ADR 0014).
  *
- * This is self-consistent with the simulation: portfolio grows at nominal rate r,
- * withdrawals grow at inflation rate g, and the portfolio depletes to exactly €0
- * at endAge by construction.
+ * Zonder `floorlessAnnuityToTarget` (scalar-/unit-test-contract): de klassieke
+ * GEFLOORDE annuïteit `Math.max(computeAnnuityBase, netBaseExpenses)` — onveranderd
+ * gedrag voor callers buiten het grootboek. De engine zet de vlag altijd.
  *
- * The final withdrawal is max(annuityWithdrawal, baseExpenses - recurringIncome)
- * so that at minimum the living expenses are covered.
- *
- * For perpetual, legacy, pensioen, or when endStrategy is not set,
- * the classic static withdrawal is used (backwards compatible).
+ * Voor perpetual, pensioen, of een niet-gezette endStrategy: klassieke static
+ * (need-only, backwards compatible).
  */
 function applyStatic(ctx: WithdrawalContext): number {
   const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
 
-  if (ctx.endStrategy === 'deplete') {
-    const n = Math.max(1, ctx.endAge - ctx.currentAge)
-    const r = ctx.yearReturn
-    const g = ctx.inflation ?? 0
-    const rg = r - g
+  // Legacy(€>0) need-only (ADR 0014/0017): onttrek alléén de behoefte; het residu
+  // groeit naar de nalatenschap. De annuïteit zou het surplus opspenden → afbouw
+  // ónder L. (Komt vóór de annuïteit-tak omdat het strategy === 'legacy' is.)
+  if (ctx.legacyPreserveOnly) return netBaseExpenses
 
-    let annuityWithdrawal: number
-    if (n <= 1) {
-      // Last year: withdraw everything. When inflation is set (grow-then-withdraw
-      // order), include this year's growth: P × (1+r). Without inflation
-      // (withdraw-then-grow order), just withdraw P.
-      annuityWithdrawal = g > 0
-        ? ctx.currentPortfolio * (1 + r)
-        : ctx.currentPortfolio
-    } else if (Math.abs(rg) < 1e-10) {
-      // r ≈ g: growing annuity degenerates to equal division
-      annuityWithdrawal = ctx.currentPortfolio / n
-    } else {
-      // Growing annuity (exact): P × (r−g) / (1 − ((1+g)/(1+r))^n)
-      annuityWithdrawal = ctx.currentPortfolio * rg / (1 - Math.pow((1 + g) / (1 + r), n))
-    }
-
-    // Ensure at least the living expenses are covered (net of recurring income)
-    return Math.max(annuityWithdrawal, netBaseExpenses)
-  }
-
-  // Legacy: deplete the surplus above the indexed legacy target via annuity formula.
-  // computeAnnuityBase already subtracts legacyAmount from availablePortfolio,
-  // so the annuity depletes only the excess to ≈€0 by endAge while preserving the legacy.
-  if (ctx.endStrategy === 'legacy') {
-    // Need-only modus (grootboek): onttrek alleen de behoefte; het residu groeit
-    // naar de nalatenschap (ADR 0014). De annuïteit zou het surplus opspenden.
-    if (ctx.legacyPreserveOnly) return netBaseExpenses
+  if (ctx.endStrategy === 'deplete' || ctx.endStrategy === 'legacy') {
+    // computeAnnuityBase trekt voor legacy de PV van het doelsaldo af (op dezelfde
+    // ctx.yearReturn-voet) → de afbouw landt op L; voor deplete is doelsaldo 0 → ~€0.
     const annuity = computeAnnuityBase(ctx)
+    // Grootboek-modus: FLOORLESS (consumeert de overshoot, landt exact op doelsaldo).
+    if (ctx.floorlessAnnuityToTarget) return Math.max(0, annuity)
+    // Scalar-/unit-test-contract: geflooorde annuïteit (nooit minder dan leefkosten).
     return Math.max(annuity, netBaseExpenses)
   }
 
@@ -295,14 +306,23 @@ function applyGuardrails(
   const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
 
   // Determine the base withdrawal:
-  // For deplete/legacy: annuity recalculated each year (schuivende basis)
-  // For perpetual/pensioen/undefined: classic netBaseExpenses
-  // Legacy in need-only modus (grootboek): geen spend-down-annuïteit als basis,
-  // maar de netto behoefte — het residu groeit naar de nalatenschap (ADR 0014).
-  const useAnnuityBase = ctx.endStrategy === 'deplete' || (ctx.endStrategy === 'legacy' && !ctx.legacyPreserveOnly)
+  // For deplete/legacy: the schuivende annuity-to-doelsaldo (computeAnnuityBase),
+  // recalculated each year. In de grootboek-modus (floorlessAnnuityToTarget) is de
+  // effectieve basis FLOORLESS (= de annuïteit zelf, geclampt ≥0) zodat de afbouw de
+  // FIRE-overshoot consumeert en exact op het doelsaldo landt; daarbuiten (scalar/
+  // unit-test) blijft de geflooorde basis (≥ netBaseExpenses). SUPERSEDES need-only
+  // legacy (ADR 0014); zie applyStatic.
+  // For perpetual/pensioen/undefined: classic netBaseExpenses.
+  // Legacy(€>0) need-only (legacyPreserveOnly): geen annuïteit-basis — onttrek de
+  // behoefte, het residu groeit naar de nalatenschap (ADR 0014/0017).
+  const useAnnuityBase = !ctx.legacyPreserveOnly && (ctx.endStrategy === 'deplete' || ctx.endStrategy === 'legacy')
   const annuityBase = useAnnuityBase ? computeAnnuityBase(ctx) : netBaseExpenses
-  // The effective base is at least netBaseExpenses (never withdraw less than living costs)
-  const effectiveBase = useAnnuityBase ? Math.max(annuityBase, netBaseExpenses) : netBaseExpenses
+  // Floorless in grootboek-modus; anders nooit minder dan de leefkosten.
+  const effectiveBase = useAnnuityBase
+    ? ctx.floorlessAnnuityToTarget
+      ? Math.max(0, annuityBase)
+      : Math.max(annuityBase, netBaseExpenses)
+    : netBaseExpenses
 
   // First year of retirement: use the effective base directly
   if (ctx.yearsIntoRetirement === 0 || ctx.previousWithdrawal <= 0) {
@@ -417,9 +437,11 @@ export function initBucketState(
  * If no bucketState provided, initializes from currentPortfolio.
  * NOTE: this function mutates nothing — caller must track BucketState externally.
  *
- * End-strategy aware:
- * - deplete: uses annuity formula to ensure portfolio depletes to ≈€0 at endAge
- * - legacy:  uses annuity on surplus above legacyAmount to preserve the target
+ * End-strategy aware (verenigd annuity-to-doelsaldo, gespiegeld aan applyStatic):
+ * - deplete/legacy in grootboek-modus (floorlessAnnuityToTarget): FLOORLESS annuïteit
+ *   richting doelsaldo (consumeert de overshoot, landt exact op het doelsaldo op
+ *   endAge). SUPERSEDES need-only legacy (ADR 0014).
+ * - deplete/legacy daarbuiten (scalar-callers): geflooorde annuïteit.
  * - perpetual/pensioen/undefined: withdraws only net living expenses (classic)
  */
 function applyBucket(
@@ -430,14 +452,15 @@ function applyBucket(
   const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
   void bucketState // bucket allocation tracked externally via waterfallWithdraw
 
-  // Legacy need-only modus (grootboek): onttrek alleen de behoefte, residu groeit
-  // naar de nalatenschap (ADR 0014).
-  if (ctx.endStrategy === 'legacy' && ctx.legacyPreserveOnly) return netBaseExpenses
+  // Legacy(€>0) need-only: onttrek de behoefte; residu groeit naar de nalatenschap.
+  if (ctx.legacyPreserveOnly) return netBaseExpenses
 
-  // For deplete/legacy, compute annuity-based withdrawal to force depletion
-  // on the same sliding basis as applyStatic and applyGuardrails
+  // deplete/legacy: schuivende annuïteit richting doelsaldo op dezelfde basis als
+  // applyStatic/applyGuardrails. Grootboek-modus = floorless (consumeert de
+  // overshoot); daarbuiten geflooorde annuïteit (≥ leefkosten).
   if (ctx.endStrategy === 'deplete' || ctx.endStrategy === 'legacy') {
     const annuity = computeAnnuityBase(ctx)
+    if (ctx.floorlessAnnuityToTarget) return Math.max(0, annuity)
     return Math.max(annuity, netBaseExpenses)
   }
 

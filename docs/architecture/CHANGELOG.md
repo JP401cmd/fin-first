@@ -301,3 +301,20 @@
 ## 2026-06-23
 
 - **Componenten (aantal)** toegevoegd: +6
+
+## 2026-06-24
+
+- **API-routes** toegevoegd: /api/horizon-engine/ledger
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-06-24
+
+- Geen wijzigingen.
+
+## 2026-06-24
+
+- Geen wijzigingen.
+
+## 2026-06-24
+
+- Geen wijzigingen.

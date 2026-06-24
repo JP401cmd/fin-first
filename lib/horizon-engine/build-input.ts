@@ -14,7 +14,7 @@ import { NL_AOW_AGE, SALES_COSTS_BY_TYPE, DEFAULT_SALES_COSTS_PCT } from '@/lib/
 import { lifeEventsToCashflows, type SimCashflow } from '@/lib/fire-simulation'
 import { type FireStrategyConfig, DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
-import type { UnifiedProjectionInput, AssetLiquidation } from '@/lib/unified-projection'
+import type { UnifiedProjectionInput, AssetLiquidation, ReverseMortgagePlan } from '@/lib/unified-projection'
 import type { Asset, AssetType } from '@/lib/asset-data'
 import { parseSaleConfig } from '@/lib/sale-config'
 import type { Debt } from '@/lib/debt-data'
@@ -24,10 +24,13 @@ import {
   deriveHousingContext,
   isHousingStrategyEvent,
   buildHousingLifeEventsAtAge,
+  reverseMortgageBorrowable,
+  resolveTriggerAge,
   DEFAULT_HOUSING_STRATEGY,
   type HousingStrategyConfig,
   type HousingContext,
   type DownsizeConfig,
+  type ReverseMortgageConfig,
 } from '@/lib/housing-strategy'
 import {
   resolveHousingEventsForSim,
@@ -119,10 +122,22 @@ function potRulesToStrategyOptions(config: PotRulesConfig | undefined): Partial<
 
 /**
  * Bepaal het downsize-verkoopmoment op het LIQUIDE-pad van de v2-grootboek-engine
- * (ADR 0015) — niet op de v1-meetrun. Meetrun = v2 met het huis IN de ledger en
- * ZONDER liquidatie; het eerste jaar waarin het liquide (niet-huis) vermogen de
- * verkoopkosten-buffer (+ optionele veiligheidsmarge) raakt, is het moment waarop
- * verkoop nodig is. Geen kruising vóór de config-cap → fallback op die cap.
+ * (ADR 0015/0030) — niet op de v1-meetrun. Meetrun = v2 met het huis IN de ledger,
+ * ZONDER liquidatie maar MÉT de woning als spendable (Optie B): zo beleeft de meetrun
+ * EXACT dezelfde FIRE-leeftijd, stop-werk-leeftijd en afbouw-dynamiek als de getoonde
+ * grafiek. Het eerste jaar waarin de RAUW besteedbare pot (`besteedbaarVermogen` =
+ * `withdrawableLiquidValue`, ex de spendable+saleManaged woning) de verkoopkosten-
+ * buffer (+ optionele veiligheidsmarge) raakt, is het moment waarop verkoop nodig is.
+ * Geen kruising vóór de config-cap → fallback op die cap.
+ *
+ * ADR 0030 (Optie B): vóór deze fix scande de meetrun `liquideVermogen` ZÓNDER
+ * spendable (ex-huis-eligibility op een ándere run dan de getoonde) → de trigger
+ * vuurde jaren te laat omdat de getoonde run (mét spendable) de annuïteit op de hele
+ * woning-inclusieve pot spreidde en de cash stil leeg liet lopen. Nu draait de meetrun
+ * op exact dezelfde grondslag als de grafiek en meet hij de pot die de afbouw werkelijk
+ * opneemt → de verkoop vuurt op de leeftijd waarop de getoonde besteedbare daling de
+ * buffer raakt. De woning telt mee voor eligibility (spendable) maar verlaat de pot
+ * enkel via de verkoop, dus zit per definitie niet in `besteedbaarVermogen` (ex-huis).
  *
  * Retourneert óók een `SimulatedDepletionResult`-vormige uitleg (zelfde shape als
  * `lib/housing-trigger.ts`) zodat het v2-rent-event de "Waarom dit moment?"-panel
@@ -176,9 +191,43 @@ function resolveDownsizeTriggerV2(
     return { triggerAge: fallbackAge, depletion: baseDepletion({ triggerAge: fallbackAge, reason: 'no_sale' }) }
   }
 
+  // ADR 0030 (Optie B): de meetrun markeert het huis als saleManaged via een
+  // synthetische verkoop op `endAge + 1` — STRIKT BUITEN de scan-horizon (die tot
+  // endAge loopt) — zodat de verkoop binnen de scan NOOIT werkelijk vuurt, maar het
+  // huis over de HELE horizon als saleManaged geldt. Bewust NIET op `fallbackAge`
+  // (= config.triggerAge, [50,95], default 67): die ligt ONDER endAge, dus dan zou de
+  // synthetische verkoop wél binnen de horizon vuren, de opbrengst in
+  // `besteedbaarVermogen` injecteren en de scan de echte ex-huis-depletie missen
+  // (trigger jaren te laat → dip→crash terug). Effect van endAge+1: het huis is
+  // wél spendable (telt mee in de FIRE-eligibility/opbouw, baseInput.spendableAssetIds)
+  // maar NIET rauw onttrekbaar (saleManaged → `mayBeRawWithdrawn` = false) → het zit
+  // de hele horizon NIET in `besteedbaarVermogen` en de afbouw-annuïteit teert op de
+  // ex-huis cash — EXACT de pre-sale dynamiek van de getoonde run. Zo meet de scan de
+  // leeftijd waarop de ECHTE besteedbare (ex-huis) pot de verkoopkosten-buffer raakt,
+  // ongeacht de door de gebruiker gekozen `config.triggerAge`/`fallbackAge`. Zónder
+  // deze saleManaged-markering zou het huis (spendable, niet-saleManaged) wél rauw
+  // onttrekbaar zijn → besteedbaarVermogen incl. huis → de scan kruist pas op endAge.
+  const soldHouse = context.eigenHuisAssets[0]
+  const measureLiquidations = soldHouse
+    ? [
+        ...(baseInput.assetLiquidations ?? []),
+        {
+          assetId: soldHouse.id,
+          // STRIKT buiten de scan-horizon (endAge) — zie docstring/ADR 0030: deze
+          // synthetische verkoop mag binnen de scan NOOIT werkelijk vuren, ze markeert
+          // het huis enkel over de hele horizon als saleManaged (→ ex `besteedbaarVermogen`).
+          age: baseInput.endAge + 1,
+          trigger: 'fixed_age' as const,
+          salePricePct: config.salePricePct,
+          salesCostsPct: config.salesCostsPct,
+          payoffDebtIds: context.eigenHuisMortgages.map((d) => d.id),
+        },
+      ]
+    : baseInput.assetLiquidations
+
   let measure
   try {
-    measure = runHorizonLedger(baseInput)
+    measure = runHorizonLedger({ ...baseInput, assetLiquidations: measureLiquidations })
   } catch {
     return { triggerAge: fallbackAge, depletion: baseDepletion({}) }
   }
@@ -203,17 +252,25 @@ function resolveDownsizeTriggerV2(
     const buffer = houseValue * config.salePricePct * config.salesCostsPct
     // Reële marge (vlak, géén nominale indexering — de engine is volledig reëel).
     const margin = margeJaren > 0 ? margeJaren * baseInput.yearlyExpenses : 0
-    liquidPath.push({ age: row.leeftijd, liquid: row.liquideVermogen, buffer: buffer + margin })
-    if (crossing === null && row.liquideVermogen - (buffer + margin) <= 1) {
+    // ADR 0030 (Optie B): scan de RAUW besteedbare pot (`besteedbaarVermogen`) — de
+    // pot die de afbouw werkelijk opneemt, ex de spendable+saleManaged woning. De
+    // meetrun draait mét spendable (zelfde FIRE-leeftijd/afbouw als de getoonde run),
+    // dus deze pot is exact de getoonde besteedbare daling. Vóór ADR 0030 scande dit
+    // `liquideVermogen` op een ex-huis-meetrun (geen spendable) → een ándere afbouw-
+    // dynamiek dan de getoonde run → de trigger vuurde jaren te laat. Nu vuurt hij op
+    // de leeftijd waarop de getoonde besteedbare pot de verkoopkosten-buffer raakt.
+    const besteedbaar = row.besteedbaarVermogen
+    liquidPath.push({ age: row.leeftijd, liquid: besteedbaar, buffer: buffer + margin })
+    if (crossing === null && besteedbaar - (buffer + margin) <= 1) {
       crossing = {
         age: row.leeftijd,
-        prevLiquid: prevLiquid ?? row.liquideVermogen,
+        prevLiquid: prevLiquid ?? besteedbaar,
         buffer,
         margin,
         houseValue,
       }
     }
-    prevLiquid = row.liquideVermogen
+    prevLiquid = besteedbaar
   }
 
   if (crossing) {
@@ -328,6 +385,59 @@ function buildV2DownsizeHousing(
       }]
     : undefined
   return { rentEvents, assetLiquidations, depletion, triggerAge }
+}
+
+/**
+ * Bouw de v2-opeethypotheek-delta (ADR 0029): het `ReverseMortgagePlan` voor de engine
+ * + de FIRE-eligibility-bijdrage (`collateralBorrowableById`). GEEN life-event en GEEN
+ * `assetLiquidations` — het huis blijft `eigen_huis`-asset in de ledger, de engine
+ * opent op de trigger een synthetische opeetschuld.
+ *
+ * Trigger-leeftijd: fixed_age → config-leeftijd; on_depletion → het versimpelde
+ * 1D-resolverpad (`resolveTriggerAge`) als fallback-plafond. Het on_depletion-gedrag
+ * is in het grootboek bovendien intrinsiek tekort-gedreven (de engine leent pas bij
+ * een echt liquiditeitstekort ná de trigger), dus de exacte trigger-leeftijd doet er
+ * voor on_depletion minder toe dan bij downsize.
+ *
+ * Eligibility-bijdrage = leen-RUIMTE op de huidige overwaarde = overwaarde_nu ×
+ * maxLoanPct (consume: `reverseMortgageBorrowable`). Dit is een START-pot-grootheid
+ * (zoals `liquidSumStart` de current asset-waarden gebruikt) die de FIRE-gate-V_nodig
+ * voedt; de engine berekent de cap per jaar zélf op de meegroeiende overwaarde.
+ */
+function buildV2ReverseMortgageHousing(
+  config: ReverseMortgageConfig,
+  context: HousingContext,
+  currentAge: number,
+  currentLiquidPortfolio: number,
+  yearlyExpenses: number,
+): { reverseMortgage: ReverseMortgagePlan; collateralBorrowableById: Record<string, number> } {
+  const triggerAge = resolveTriggerAge(
+    config.trigger,
+    config.triggerAge,
+    config.depletionThresholdYears,
+    currentAge,
+    yearlyExpenses,
+    currentLiquidPortfolio,
+  )
+  const houseAsset = context.eigenHuisAssets[0]
+  const mortgageDebtIds = context.eigenHuisMortgages.map((d) => d.id)
+
+  // FIRE-eligibility-bijdrage op de huidige overwaarde (start-pot grondslag). De
+  // engine herberekent de jaar-cap zelf op de meegroeiende overwaarde.
+  const overwaardeNu = Math.max(0, context.eigenHuisValue - context.mortgageBalance)
+  const borrowableNu = reverseMortgageBorrowable(overwaardeNu, config.maxLoanPct)
+
+  return {
+    reverseMortgage: {
+      houseAssetId: houseAsset?.id ?? '',
+      triggerAge,
+      interestRate: config.interestRate,
+      maxLoanPct: config.maxLoanPct,
+      monthlyPayout: config.monthlyPayout,
+      mortgageDebtIds,
+    },
+    collateralBorrowableById: houseAsset ? { [houseAsset.id]: borrowableNu } : {},
+  }
 }
 
 /**
@@ -539,6 +649,11 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
   const housingContext = deriveHousingContext(p.assets ?? [], p.debts ?? [])
   const useV2 = p.horizonEngineV2 === true
   const useV2Downsize = useV2 && housingCfg.mode === 'downsize' && housingContext.hasEigenHuis
+  // ADR 0029: reverse_mortgage echt in het grootboek (alleen onder v2 met een eigen
+  // huis). Het huis blijft `eigen_huis`-asset (niet gefilterd, niet spendable); de
+  // engine opent op de trigger een synthetische opeetschuld. Geen V1-payout-life-event.
+  const useV2ReverseMortgage =
+    useV2 && housingCfg.mode === 'reverse_mortgage' && housingContext.hasEigenHuis
   // Pot-regels → engine-opties: één keer afleiden zodat de housing-meetrun
   // (v1-tak hieronder, voor reverse_mortgage onder v2) op DEZELFDE verdeling-/
   // onttrekkingsvolgorde rekent als de getoonde grafiekrun. undefined = defaults.
@@ -549,6 +664,10 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
   let effectiveDebts: Debt[]
   let effectiveLifeEvents: LifeEvent[] = p.lifeEvents ?? []
   let assetLiquidations: AssetLiquidation[] | undefined
+  // Opeethypotheek-plan + eligibility-bijdrage (ADR 0029) — alleen gezet in de
+  // useV2ReverseMortgage-tak.
+  let reverseMortgage: ReverseMortgagePlan | undefined
+  let collateralBorrowableById: Record<string, number> | undefined
   // Wordt true wanneer downsize + on_depletion nooit triggert (huis blijft staan).
   let housingHeldToEnd = false
 
@@ -595,6 +714,18 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
       // lijst (dat is juist wat de meetrun bepaalt). Verandert alleen trigger-
       // timing-accuratesse, niet het huis-model zelf.
       assetLiquidations: genericLiq.liquidations.length > 0 ? genericLiq.liquidations : undefined,
+      // ADR 0030 (Optie B): de trigger-meetrun draait nu mét de woning als spendable —
+      // EXACT de FIRE-eligibility-grondslag van de getoonde grafiek — zodat de meetrun
+      // dezelfde FIRE-leeftijd, dezelfde stop-werk-leeftijd en dezelfde afbouw-dynamiek
+      // beleeft. De trigger scant vervolgens `besteedbaarVermogen` (de RAUW besteedbare
+      // pot, ex de spendable+saleManaged woning), zodat hij vuurt op de leeftijd waarop
+      // de ECHTE besteedbare daling van de getoonde run de verkoopkosten-buffer raakt —
+      // niet jaren later op een ex-huis-meetrun die de getoonde run niet beleeft. De
+      // woning telt mee voor eligibility maar verlaat de pot enkel via de verkoop, dus
+      // ze zit per definitie NIET in `besteedbaarVermogen` (ex-huis blijft ex-huis).
+      spendableAssetIds: housingContext.hasEigenHuis
+        ? housingContext.eigenHuisAssets.map((a) => a.id)
+        : undefined,
     }
     const downsizeCfg = housingCfg as DownsizeConfig
     const v2Housing = buildV2DownsizeHousing(downsizeCfg, housingContext, baseSimInput, currentAge, simEndAge)
@@ -607,6 +738,27 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
       downsizeCfg.trigger === 'on_depletion' &&
       v2Housing.depletion.reason === 'no_sale' &&
       v2Housing.assetLiquidations === undefined
+  } else if (useV2ReverseMortgage) {
+    // ADR 0029: opeethypotheek echt in het grootboek. Huis + hypotheek blijven in de
+    // pot (geen filter, geen V1-payout-life-event); de engine opent op de trigger een
+    // synthetische opeetschuld en leent tegen de overwaarde (gecapt op maxLoanPct).
+    effectiveAssets = p.assets ?? []
+    effectiveDebts = p.debts ?? []
+    effectiveLifeEvents = realEvents
+    const rmCfg = housingCfg as ReverseMortgageConfig
+    const v2Rm = buildV2ReverseMortgageHousing(
+      rmCfg,
+      housingContext,
+      currentAge,
+      // Liquide-portfolio-benadering voor de on_depletion-fallback-trigger: alleen
+      // gebruikt door resolveTriggerAge bij on_depletion (fixed_age negeert het).
+      Math.max(0, (p.bankAccountCash ?? 0)),
+      yearlyExpenses,
+    )
+    reverseMortgage = v2Rm.reverseMortgage
+    collateralBorrowableById = v2Rm.collateralBorrowableById
+    // Generieke verkoop-liquidaties (bv. stacaravan) gelden ook hier.
+    assetLiquidations = mergeLiquidations(undefined, genericLiq.liquidations)
   } else {
     // v1 / niet-downsize: bestaand filter + inkomen-model (byte-identiek).
     const filtered = filterAssetsForFire(housingCfg, p.assets ?? [], p.debts ?? [])
@@ -644,12 +796,18 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
 
   const cashflows = lifeEventsToCashflows(effectiveLifeEvents, skipIds)
 
-  // include_full: de woning telt volledig mee als besteedbaar FIRE-vermogen
-  // (ADR 0015, Optie A) — zodat een deplete/spend-down 'm óók afbouwt (laatst in de
-  // volgorde) en de lijn richting €0 loopt, i.p.v. dat de niet-liquide woning
-  // onbespeelbaar blijft groeien. v1 negeert dit veld (eigen huis-handling daar).
+  // De woning telt mee als besteedbaar FIRE-vermogen (`spendable`) in TWEE modi:
+  //  • include_full (ADR 0015, Optie A): de woning telt volledig mee zodat een
+  //    deplete/spend-down 'm óók afbouwt (laatst in de volgorde) en de lijn richting
+  //    €0 loopt, i.p.v. dat de niet-liquide woning onbespeelbaar blijft groeien.
+  //  • v2-downsize "Verkopen" (ADR 0028, Fase 2): de woning telt mee tijdens de
+  //    OPBOUW (tilt FIRE-eligibility → vervroegt FIRE) maar verlaat de pot UITSLUITEND
+  //    via de downsize-verkoop (de assetLiquidations-entry maakt 'm óók saleManaged;
+  //    spendable + saleManaged samen — nooit rauw onttrokken). Zie engine.ts
+  //    countsAsEligibilityLiquid/mayBeRawWithdrawn.
+  // v1 negeert dit veld (eigen huis-handling daar).
   const spendableAssetIds =
-    housingCfg.mode === 'include_full' && housingContext.hasEigenHuis
+    (housingCfg.mode === 'include_full' || useV2Downsize) && housingContext.hasEigenHuis
       ? housingContext.eigenHuisAssets.map((a) => a.id)
       : undefined
 
@@ -674,6 +832,8 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
     bankAccountCash: p.bankAccountCash ?? 0,
     assetLiquidations,
     spendableAssetIds,
+    reverseMortgage,
+    collateralBorrowableById,
   }
 
   return {
@@ -697,9 +857,12 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
  *  • downsize: het v2-asset-liquidatiemodel (ADR 0015) — huis blijft in het
  *    grootboek, verkoop = `assetLiquidations` op v2's eigen liquide-pad — via de
  *    gedeelde helper `buildV2DownsizeHousing`, daarna `runSelectedProjection(.., true)`.
- *  • include_full / exclude_from_fire / reverse_mortgage: v2 houdt (voorlopig) het
- *    v1-huisvestingsmodel; we bouwen de events via de gedeelde v1-resolver en
- *    draaien alléén de uiteindelijke projectie door de v2-engine.
+ *  • reverse_mortgage (ADR 0029): het v2-opeethypotheek-grootboekmodel — huis blijft
+ *    in de pot, synthetische opeetschuld via `buildV2ReverseMortgageHousing`, geen
+ *    V1-payout-life-event.
+ *  • include_full / exclude_from_fire: v2 houdt het v1-huisvestingsmodel; we bouwen
+ *    de events via de gedeelde v1-resolver en draaien alléén de uiteindelijke
+ *    projectie door de v2-engine.
  *
  * Geen import-cyclus: dit bestand importeert housing-trigger al; housing-trigger
  * importeert dit bestand niet. De keuze v1↔v2 valt in de component (UI-concern),
@@ -711,6 +874,43 @@ export function runHousingScenarioProjectionV2(
   sim: HousingTriggerSimBasis,
 ): HousingScenarioResult {
   const useV2Downsize = config.mode === 'downsize' && context.hasEigenHuis
+  const useV2ReverseMortgage = config.mode === 'reverse_mortgage' && context.hasEigenHuis
+
+  if (useV2ReverseMortgage) {
+    // ADR 0029: opeethypotheek in het grootboek — exact zoals de grafiek (build-input).
+    const v2Rm = buildV2ReverseMortgageHousing(
+      config as ReverseMortgageConfig,
+      context,
+      sim.currentAge,
+      Math.max(0, sim.bankAccountCash ?? 0),
+      sim.yearlyExpenses,
+    )
+    const input: UnifiedProjectionInput = {
+      assets: sim.assets,
+      debts: sim.debts,
+      currentAge: sim.currentAge,
+      endAge: sim.endAge,
+      yearlyExpenses: sim.yearlyExpenses,
+      annualSavings: sim.annualSavings,
+      monthlySurplus: sim.annualSavings / 12,
+      monthlyIncome: sim.monthlyIncome,
+      incomeGrowthRate: 0,
+      grossReturn: sim.grossReturn,
+      inflationRate: sim.inflationRate,
+      box3Method: sim.box3Method,
+      cashflows: sim.cashflows,
+      strategyConfig: sim.strategyConfig,
+      withdrawalStrategy: sim.withdrawalStrategy,
+      forcedFireAge: sim.forcedFireAge,
+      hasPartner: sim.hasPartner,
+      bankAccountCash: sim.bankAccountCash,
+      reverseMortgage: v2Rm.reverseMortgage,
+      collateralBorrowableById: v2Rm.collateralBorrowableById,
+    }
+    const result = runSelectedProjection(input, true)
+    // Geen housing-life-event (de opeetschuld zit in het grootboek) en geen depletion-panel.
+    return { events: [], depletion: null, fireAgeFractional: result.fireAgeFractional, fireReachable: result.fireReachable }
+  }
 
   if (!useV2Downsize) {
     // Niet-downsize (incl. reverse_mortgage onder v2): bouw de events met het
@@ -769,12 +969,24 @@ export function runHousingScenarioProjectionV2(
     forcedFireAge: sim.forcedFireAge,
     hasPartner: sim.hasPartner,
     bankAccountCash: sim.bankAccountCash,
+    // ADR 0030 (Optie B): de trigger-meetrun draait mét de woning als spendable —
+    // EXACT de FIRE-eligibility-grondslag van de grafiek — zodat de modal-preview
+    // hetzelfde verkoopmoment toont (trigger scant `besteedbaarVermogen`, ex-huis).
+    // Spiegelt build-input's `baseSimInput`.
+    spendableAssetIds: context.hasEigenHuis ? context.eigenHuisAssets.map((a) => a.id) : undefined,
   }
   const v2Housing = buildV2DownsizeHousing(config as DownsizeConfig, context, baseSimInput, sim.currentAge, sim.endAge)
   const input: UnifiedProjectionInput = {
     ...baseSimInput,
     cashflows: [...sim.cashflows, ...lifeEventsToCashflows(v2Housing.rentEvents)],
     assetLiquidations: v2Housing.assetLiquidations,
+    // v2-downsize "Verkopen" (ADR 0028): de woning is besteedbaar (spendable) zodat
+    // de modal-preview EXACT dezelfde FIRE-eligibility-grondslag rekent als de
+    // grafiek (build-input zet hetzelfde). De trigger-meetrun in buildV2DownsizeHousing
+    // draait op `baseSimInput` ZÓNDER spendable → ex-huis exhaustion, identiek aan de
+    // grafiek-keten. spendable + saleManaged → telt mee maar verlaat de pot enkel
+    // via de verkoop.
+    spendableAssetIds: context.hasEigenHuis ? context.eigenHuisAssets.map((a) => a.id) : undefined,
   }
   const result = runSelectedProjection(input, true)
   return {

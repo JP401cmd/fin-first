@@ -236,6 +236,59 @@ export interface UnifiedProjectionInput {
    * leest dit veld niet. Zie ADR 0015.
    */
   spendableAssetIds?: string[]
+
+  /**
+   * Opeethypotheek (reverse mortgage) — v2-grootboek (ADR 0029). Wanneer gezet opent
+   * de engine op `triggerAge` een synthetische, aflossingsvrije schuld "Opeethypotheek"
+   * tegen de woning (saldo start 0). Het maand-/jaar-tekort (ná de echte liquide pot
+   * in de onttrekkingsvolgorde) wordt opgenomen als instroom naar liquide MÉT gelijke
+   * verhoging van het opeetschuld-saldo; de rente stapelt op het saldo (blok-3-stijl
+   * aflossingsvrij). De opname is per jaar gecapt op de LEEN-RUIMTE = overwaarde(jaar)
+   * × maxLoanPct (geen oneindig lenen → resterend tekort onbedekt via de bestaande
+   * shortfall-mechaniek). De woning blijft `eigen_huis`-asset in de ledger (groeit,
+   * NIET spendable, NOOIT rauw onttrokken); de leen-ruimte telt apart mee als FIRE-
+   * eligibility-bijdrage via `collateralBorrowableById`. v1 leest dit veld niet.
+   */
+  reverseMortgage?: ReverseMortgagePlan
+
+  /**
+   * Per-asset expliciete FIRE-eligibility-BIJDRAGE in euro's (ADR 0029, Optie B).
+   * Optelling bovenop `liquidSumStart`/`blendedRealReturnStart`: het BEDRAG dat een
+   * van nature niet-liquide, niet-spendable asset tóch als FIRE-eligible besteedbaar
+   * laat meetellen ZÓNDER het asset rauw onttrekbaar of (volledig) spendable te maken.
+   *
+   * Gebruikt door de opeethypotheek: de woning zelf telt NIET als spendable (telt dus
+   * niet voor zijn volle inclusion-waarde mee), maar de leen-RUIMTE (overwaarde ×
+   * maxLoanPct, met de huis-return als voet) telt wél als eligibility-bijdrage —
+   * eligibility-meting (`liquidSumStart`/`blendedRealReturnStart`/de FIRE-gate) en
+   * drawdown (de opeetschuld-cap) delen daardoor één grondslag (`reverseMortgageBorrowable`).
+   * v1 leest dit veld niet.
+   */
+  collateralBorrowableById?: Record<string, number>
+}
+
+/**
+ * Opeethypotheek-plan voor de v2-grootboek-engine (ADR 0029). Pure-getal-vorm van
+ * `ReverseMortgageConfig`, samengesteld in build-input zodat de engine geen
+ * housing-strategy hoeft te importeren.
+ */
+export interface ReverseMortgagePlan {
+  /** Asset-id van de woning waartegen geleend wordt (blijft `eigen_huis` in de ledger). */
+  houseAssetId: string
+  /** Leeftijd waarop de opeethypotheek opent (saldo 0). */
+  triggerAge: number
+  /** Jaarlijkse (nominale) rente op het opeetschuld-saldo (decimaal, bv. 0.055). */
+  interestRate: number
+  /** Max % van de overwaarde dat als lening kan worden opgenomen (cap-fractie, bv. 0.50). */
+  maxLoanPct: number
+  /**
+   * Vaste maand-uitkering (euro). null = tekort-gedreven: de engine neemt jaarlijks
+   * precies het liquiditeitstekort op (gecapt op de leen-ruimte). Bij een vast bedrag
+   * stroomt jaarlijks `monthlyPayout × 12` in (eveneens gecapt op de leen-ruimte).
+   */
+  monthlyPayout: number | null
+  /** Debt-id's van bestaande hypotheken op deze woning — voor de overwaarde-berekening (overwaarde = huiswaarde − Σ saldo). */
+  mortgageDebtIds: string[]
 }
 
 /**

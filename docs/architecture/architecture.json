@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-23T12:35:35.422Z",
-  "generatedDate": "2026-06-23",
+  "generatedAt": "2026-06-24T21:12:27.394Z",
+  "generatedDate": "2026-06-24",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 322,
     "routesProduction": 98,
-    "api": 382,
+    "api": 383,
     "tables": 56,
     "migrations": 115,
     "integrations": 25,
-    "components": 758,
+    "components": 761,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -5101,6 +5101,14 @@
       ]
     },
     {
+      "url": "/api/horizon-engine/ledger",
+      "file": "app/api/horizon-engine/ledger/route.ts",
+      "domain": "horizon-engine",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/household/accept",
       "file": "app/api/household/accept/route.ts",
       "domain": "household",
@@ -9379,6 +9387,21 @@
       ]
     },
     {
+      "domain": "horizon-engine",
+      "label": "horizon-engine",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/horizon-engine/ledger",
+          "file": "app/api/horizon-engine/ledger/route.ts",
+          "domain": "horizon-engine",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "housing-strategy",
       "label": "housing-strategy",
       "count": 1,
@@ -12679,11 +12702,11 @@
     }
   ],
   "components": {
-    "total": 758,
+    "total": 761,
     "groups": [
       {
         "group": "app",
-        "count": 316,
+        "count": 318,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -12737,6 +12760,7 @@
           "budget-sparkline",
           "budget-tree",
           "budgets-client",
+          "budgets-client.test",
           "budgetteren.config",
           "cash-account-view",
           "cash-overview",
@@ -12880,6 +12904,7 @@
           "monte-carlo-overgang",
           "natural-milestone-sheet",
           "nav-menu-sheet",
+          "nav-menu-sheet.test",
           "nav-stack-meta",
           "nav-stack-provider",
           "net-worth-projection-chart",
@@ -13005,7 +13030,7 @@
       },
       {
         "group": "overview",
-        "count": 121,
+        "count": 122,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -13066,6 +13091,7 @@
           "health-score-card",
           "health-score-card.test",
           "hefbomen-nav",
+          "hefbomen-nav.lever-parity.test",
           "hefbomen-nav.test",
           "hero-widget-rail",
           "hero-widget-rail.test",
@@ -18215,6 +18241,56 @@
       ],
       "summary": "TriFinity-pagina's hebben een \"diepte\"-laag (secundaire KPI's, detail-secties, uitleg) die voor beginners overweldigend is maar voor gevorderden waardevol. We willen één profiel-brede voorkeur die deze diepte-laag standaard inklapt (\"Eenvoudig\") of openzet (\"Volledig\"), cross-dev",
       "file": "docs/adr/0026-weergavemodus-eenvoudig-volledig.md"
+    },
+    {
+      "id": "0027-deplete-fire-detectie-liquide-ge-vnodig",
+      "title": "Deplete/pensioen-FIRE-detectie: liquide ≥ V_nodig (crossing met de referentielijn)",
+      "status": "aanvaard",
+      "date": "2026-06-23",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "De v2-grootboek-engine (`lib/horizon-engine/engine.ts`) bepaalt het FIRE-moment via `meetsStrategyTarget`. Voor de eindstrategie **deplete** (vermogen opeten) werd FIRE tot dit besluit gedetecteerd via een **forward feasibility-test**: de annuïteit-spend-down moest het volledige ",
+      "file": "docs/adr/0027-deplete-fire-detectie-liquide-ge-vnodig.md"
+    },
+    {
+      "id": "0028-downsize-verkopen-spendable-salemanaged-verenigd",
+      "title": "Downsize \"Verkopen\": de woning is BÉIDE spendable (FIRE-eligible in de opbouw) ÉN saleManaged (verlaat de pot enkel via de verkoop)",
+      "status": "aanvaard",
+      "date": "2026-06-24",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De v2-grootboek-engine behandelde de woning bij housing-strategie **downsize** (\"Verkopen\") tot dit besluit als niet-liquide tot het verkoopmoment: ze telde NIET mee in het besteedbare/FIRE-eligible vermogen tijdens de opbouw. Dit besluit **herdefinieert** de bestaande `downsize`",
+      "file": "docs/adr/0028-downsize-verkopen-spendable-salemanaged-verenigd.md"
+    },
+    {
+      "id": "0029-opeethypotheek-reverse-mortgage-grootboek",
+      "title": "Opeethypotheek (reverse mortgage) als echte grootboek-schuld in de V2-engine",
+      "status": "aanvaard",
+      "date": "2026-06-24",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De `reverse_mortgage` woningstrategie was in de V2-engine niet gemodelleerd: de engine kende enkel een recurring-payout-life-event (fictieve maanduitkering) en een display-only schaduwschuld buiten het grootboek. Dit besluit **modelleert de opeethypotheek volledig in het V2-groot",
+      "file": "docs/adr/0029-opeethypotheek-reverse-mortgage-grootboek.md"
+    },
+    {
+      "id": "0030-drawdown-grondslag-besteedbaar-vermogen-splitst-rauwe-opname-van-fire-eligibility",
+      "title": "Drawdown-grondslag: besteedbaarVermogen splitst rauwe opname van FIRE-eligibility (Optie B)",
+      "status": "aanvaard",
+      "date": "2026-06-24",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "ADR 0028 verenigde `spendable` en `saleManaged` op de downsize-woning zodat ze al tijdens de opbouw als FIRE-eligible telde. Daarna trad een nieuw defect op bij `downsize` + `on_depletion`: de getoonde afbouwlijn dipte (~leeftijd 71), steeg vervolgens (~87) en crashte op endAge (",
+      "file": "docs/adr/0030-drawdown-grondslag-besteedbaar-vermogen-splitst-rauwe-opname-van-fire-eligibility.md"
     }
   ],
   "churn": {
@@ -18222,7 +18298,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 84
+        "commits": 85
       },
       {
         "path": "lib/ai",
@@ -18242,7 +18318,7 @@
       },
       {
         "path": "lib/fire-simulation.ts",
-        "commits": 9
+        "commits": 8
       },
       {
         "path": "lib/horizon-data.ts",
@@ -18265,17 +18341,17 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 6917,
-        "commits": 66
+        "commits": 63
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 4891,
-        "commits": 25
+        "loc": 4984,
+        "commits": 26
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4236,
-        "commits": 42
+        "commits": 43
       },
       {
         "file": "lib/release-notes.ts",
@@ -18290,7 +18366,7 @@
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 2614,
-        "commits": 13
+        "commits": 12
       },
       {
         "file": "lib/horizon-data.ts",
@@ -19077,17 +19153,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-22",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+6"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-06-24",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -19164,6 +19232,13 @@
       "date": "2026-06-23",
       "api": 382,
       "components": 758,
+      "tables": 56,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-06-24",
+      "api": 383,
+      "components": 761,
       "tables": 56,
       "routesProduction": 98
     }

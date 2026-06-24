@@ -1163,10 +1163,21 @@ function buildKruising(ctx: EngineContext, ledger: HorizonLedgerResult | null): 
       realReturnPct: round1(realReturnPct), savingsRatePct: round1(ctx.savingsRatePct),
     }
   }
-  const vOp: ReportProjectionPoint[] = ledger.rows.map((r) => ({ age: r.leeftijd, value: round0(r.liquideVermogen) }))
+  // V_op (getoonde "liquide, vrij besteedbare"-lijn) leest `besteedbaarVermogen`
+  // (ADR 0030): de RAUW besteedbare pot. In de opbouw en voor include_full/geen-huis
+  // identiek aan de eligibility-pot; ná FIRE bij een nog-niet-verkochte downsize-
+  // woning toont dit de ECHTE besteedbare daling i.p.v. de eligibility-pot die door
+  // de groeiende woning misleidend zou stijgen.
+  const vOp: ReportProjectionPoint[] = ledger.rows.map((r) => ({ age: r.leeftijd, value: round0(r.besteedbaarVermogen) }))
   const vNodig: ReportProjectionPoint[] = ledger.rows.map((r, i) => ({ age: r.leeftijd, value: round0(ledger.vNodig[i] ?? 0) }))
+  // De FIRE-kruising-stip ligt op de getoonde V_op-lijn → lees `besteedbaarVermogen`
+  // op de FIRE-rij (op de FIRE-leeftijd is de downsize-woning nog niet verkocht; ze
+  // telt wél voor de FIRE-gate maar staat niet in de besteedbare pot — de stip volgt
+  // de getekende lijn, niet de eligibility-pot). Voor non-downsize gelijk aan
+  // `liquideAtFire`.
+  const fireRow = ledger.fireAge != null ? ledger.rows.find((r) => r.leeftijd === ledger.fireAge) : undefined
   const crossing = ledger.fireReachable && ledger.fireAge != null
-    ? { age: ledger.fireAge, value: round0(ledger.liquideAtFire) }
+    ? { age: ledger.fireAge, value: round0(fireRow?.besteedbaarVermogen ?? ledger.liquideAtFire) }
     : null
   return {
     vOp, vNodig, crossing,

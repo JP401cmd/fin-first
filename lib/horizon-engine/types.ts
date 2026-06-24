@@ -86,8 +86,22 @@ export interface LedgerRow {
   totaalAssets: number
   totaalSchuld: number
   nettoVermogen: number
-  /** Liquide (niet-eigen-huis/voertuig/fysiek) vermogen — de V_op-lijn. */
+  /**
+   * Besteedbaar/FIRE-eligible liquide vermogen (incl. een spendable downsize-/
+   * include_full-woning) — de V_op-lijn én de FIRE-gate-grondslag. Tijdens de OPBOUW
+   * gelijk aan `besteedbaarVermogen`; ná FIRE bij een nog-niet-verkochte spendable
+   * downsize-woning HOGER (het huis groeit door in deze pot tot de verkoop).
+   */
   liquideVermogen: number
+  /**
+   * RAUW besteedbare pot (ADR 0030 / Optie B) = `withdrawableLiquidValue` — exact de
+   * pot die de afbouw-annuïteit kàn opnemen (de spendable+saleManaged downsize-woning
+   * telt hier NIET mee, ze verlaat de pot enkel via de verkoop). Dit is de grootheid
+   * die de getoonde afbouw-/liquide-lijn moet tonen zodat de werkelijke besteedbare
+   * daling zichtbaar is i.p.v. de eligibility-pot incl. het nog-niet-verkochte huis.
+   * In de OPBOUW en voor include_full/geen-huis identiek aan `liquideVermogen`.
+   */
+  besteedbaarVermogen: number
   vNodig: number
   /** dekking = liquideVermogen − vNodig (≥ 0 betekent: FIRE haalbaar dit jaar). */
   dekking: number

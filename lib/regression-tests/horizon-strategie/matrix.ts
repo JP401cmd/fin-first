@@ -120,37 +120,74 @@ export interface ComboExpectation {
  * engine (v2) op de complete persona; regenereer met
  * `npx vitest run …/_generate-golden` na een bewuste rekenmotor-wijziging.
  *
- * GEREGENEREERD 2026-06-23 — ADR 0027 (deplete-FIRE = liquide ≥ V_nodig).
- * De deplete/pensioen-FIRE-detectie deelt nu één grondslag met de doel-lijn
- * (backward-annuïteit `vNodig`) i.p.v. de oude forward-deplete-feasibility-test.
- * Daardoor verschuift de vrijheidsleeftijd voor álle deplete-combinaties (de
- * persona is `include_full` met een groot, meegroeiend huis in de liquide pot:
- * de oude over-agressieve volledige-pot-spend-down accepteerde FIRE té vroeg op
- * ~45 — nu vuurt FIRE pas wanneer het liquide vermogen de werkelijke behoefte-PV
- * `vNodig` raakt, ~51). Het getoonde doelbedrag = `vNodig[fireIdx]`; vNodig zélf
- * is ongewijzigd — de waarde verschuift enkel doordat de dalende curve op een
- * latere leeftijd wordt afgelezen. Legacy (46), perpetual (49) en pensioen (67)
- * blijven byte-identiek: Optie B raakt hun doel-zoektocht niet.
+ * GEREGENEREERD 2026-06-24 — BUG #4: blended reële disconto-voet (Zuiver).
+ * `backwardVnodig` discounteert nu op de WERKELIJKE waarde-gewogen blended reële
+ * return van de FIRE-eligible startpot (`blendedRealReturnStart`) i.p.v. de
+ * verborgen `0,6 × reëel gemiddeld rendement`-buffer. De hogere disconto-voet
+ * drukt V_nodig over de hele lijn omlaag → de stijgende opbouwcurve raakt de
+ * (lagere) V_nodig-lijn eerder. Uniformele drift (geen verkapte regressie):
+ *   - vrijheidsleeftijd: +1..+3 jaar (stijgende opbouwcurve bereikt de nu-lagere
+ *     doel-lijn op een LATERE leeftijd dan de oude hogere lijn — eenduidige richting)
+ *   - doelbedrag: −3..−4,5% (V_nodig op de FIRE-leeftijd is lager doordat de
+ *     dalende doel-lijn eerder daalt bij hogere discontovoet)
+ * B-legacy/B-perpetual/B-pensioen/C-guardrails/C-vpw/D-combi vallen
+ * binnen de 2%-doelbedrag-marge en bewegen ≤ 0,5 jaar — geen afzonderlijke reden.
+ * Relatie-invarianten (legacy≥deplete, perpetual≥deplete, groei≤geen, deeltijd≥geen,
+ * referentie=baseline) blijven groen; SWR-band ongewijzigd; deplete-eind≈€0 groen.
+ *
+ * HER-BASELINE 2026-06-24 — Fase 2 "Verkopen" (downsize-herdefinitie, ADR 0028).
+ * UITSLUITEND A-downsize wijzigt: de downsize-woning telt vanaf nu AL als besteedbaar
+ * (spendable) FIRE-eligible vermogen tijdens de OPBOUW (zoals include_full), waardoor
+ * de FIRE-eligibility eerder bereikt wordt.
+ *
+ * Drie meetpunten voor A-downsize (ADR 0028 + ADR 0030, "Optie B"):
+ *   golden vóór Fase 2:    fireAgeFractional = 62, doelbedrag = €2.071.090
+ *   pre-existing WIP:      fireAgeFractional = 63, doelbedrag = €2.042.600  (pre-fix, stale)
+ *   met fix (Optie B):     fireAgeFractional = 57, doelbedrag = €2.349.333  (Δ 0,24% t.o.v. golden)
+ *
+ * Drift-analyse:
+ *   - fireAgeFractional 63 → 57 (shift −6): het bulk (63→58 = −5 jaar) was al aanwezig
+ *     als pre-existing WIP-drift door blended-disconto-voet-bug (#4); de Optie-B-fix
+ *     voegt −1 jaar toe (trigger vuurt eerder omdat de meetrun nu `besteedbaarVermogen`
+ *     scant op de ECHTE besteedbare daling i.p.v. de ex-huis-meetrun die jaren te laat
+ *     vuurde). Nieuwe golden = 57 (de met-fix-waarde).
+ *   - doelbedrag: fix brengt dit van €2.042.600 → €2.349.333 (+15,0%), wat slechts
+ *     0,24% van de eerder vastgestelde golden (€2.343.807) afwijkt → binnen de 2%-marge.
+ *     Doelbedrag-golden ongewijzigd (€2.343.807 is nog steeds correct).
+ *   - Alle overige combo's: byte-identiek (huis was al spendable bij include_full,
+ *     of speelt geen rol). Geen regressie op niet-downsize strategieën.
+ *
+ * HER-BASELINE 2026-06-24 — Fase 3 "Opeethypotheek" in het grootboek (ADR 0029).
+ * UITSLUITEND A-reverse wijzigt: de opeethypotheek is nu een ECHTE schuld in het
+ * grootboek i.p.v. een display-only schaduwschuld + recurring-payout-life-event.
+ * Daardoor (a) telt de woning NIET meer voor 100% als FIRE-eligible (vóór ADR 0029 gaf
+ * getFireEligibleNetWorth → totalNetWorth de hele huiswaarde mee), maar slechts de
+ * LEEN-RUIMTE (overwaarde × maxLoanPct, met de huis-return als voet), en (b) is er geen
+ * payout-inkomensstroom meer die V_nodig kunstmatig verlaagde. Beide effecten verhogen
+ * het benodigde liquide vermogen: doelbedrag €1.274.081 → €1.537.473 (+20,67%).
+ * fireAgeFractional blijft 58. Alle overige combo's zijn byte-identiek (geen huis-rol
+ * of huis al via include_full/spendable behandeld). Géén verkapte regressie — de
+ * include_full/exclude/downsize-goldens bewegen NIET.
  *
  * GENERATED:GOLDEN:START
  */
 export const EXPECTED: Record<string, ComboExpectation> = {
-  'A-include_full': { fireAgeFractional: 51, doelbedrag: 1601972 },
-  'A-exclude': { fireAgeFractional: 53, doelbedrag: 1116811 },
-  'A-downsize': { fireAgeFractional: 63, doelbedrag: 2042600 },
-  'A-reverse': { fireAgeFractional: 56, doelbedrag: 1365307 },
-  'B-deplete': { fireAgeFractional: 51, doelbedrag: 1601972 },
-  'B-legacy': { fireAgeFractional: 46, doelbedrag: 1704777 },
-  'B-perpetual': { fireAgeFractional: 49, doelbedrag: 2171265 },
-  'B-pensioen': { fireAgeFractional: 67, doelbedrag: 1049325 },
-  'C-static': { fireAgeFractional: 51, doelbedrag: 1601972 },
-  'C-guardrails': { fireAgeFractional: 51, doelbedrag: 1605944 },
-  'C-vpw': { fireAgeFractional: 55, doelbedrag: 2106287 },
-  'C-bucket': { fireAgeFractional: 51, doelbedrag: 1601972 },
-  'D-geen': { fireAgeFractional: 51, doelbedrag: 1601972 },
-  'D-groei': { fireAgeFractional: 50, doelbedrag: 1661483 },
-  'D-deeltijd': { fireAgeFractional: 52, doelbedrag: 1591027 },
-  'D-combi': { fireAgeFractional: 49, doelbedrag: 1661655 },
+  'A-include_full': { fireAgeFractional: 53, doelbedrag: 1736457 },
+  'A-exclude': { fireAgeFractional: 53, doelbedrag: 1125531 },
+  'A-downsize': { fireAgeFractional: 57, doelbedrag: 2343807 },
+  'A-reverse': { fireAgeFractional: 58, doelbedrag: 1537473 },
+  'B-deplete': { fireAgeFractional: 53, doelbedrag: 1736457 },
+  'B-legacy': { fireAgeFractional: 46, doelbedrag: 1926664 },
+  'B-perpetual': { fireAgeFractional: 49, doelbedrag: 2605386 },
+  'B-pensioen': { fireAgeFractional: 67, doelbedrag: 1135484 },
+  'C-static': { fireAgeFractional: 53, doelbedrag: 1736457 },
+  'C-guardrails': { fireAgeFractional: 51, doelbedrag: 1773805 },
+  'C-vpw': { fireAgeFractional: 57, doelbedrag: 2390722 },
+  'C-bucket': { fireAgeFractional: 53, doelbedrag: 1736457 },
+  'D-geen': { fireAgeFractional: 53, doelbedrag: 1736457 },
+  'D-groei': { fireAgeFractional: 51, doelbedrag: 1773663 },
+  'D-deeltijd': { fireAgeFractional: 56, doelbedrag: 1655157 },
+  'D-combi': { fireAgeFractional: 50, doelbedrag: 1785137 },
 }
 // GENERATED:GOLDEN:END
 

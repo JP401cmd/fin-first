@@ -10,7 +10,13 @@ import type { HorizonLedgerResult, LedgerRow, TypeRollup } from './types'
 
 export interface ChartSeries {
   ages: number[]
-  /** V_op: liquide (besteedbaar) vermogen — de stijgende lijn. */
+  /**
+   * V_op: RAUW besteedbaar (liquide) vermogen — de getoonde lijn. Leest
+   * `besteedbaarVermogen` (ADR 0030): in de OPBOUW en voor include_full/geen-huis
+   * gelijk aan de eligibility-pot, maar ná FIRE bij een nog-niet-verkochte downsize-
+   * woning toont dit de ECHTE besteedbare daling (ex het nog-niet-verkochte huis)
+   * i.p.v. de eligibility-pot die door de groeiende woning misleidend zou stijgen.
+   */
   vOp: number[]
   /** Netto vermogen incl. eigen huis. */
   netto: number[]
@@ -23,7 +29,7 @@ export interface ChartSeries {
 export function buildChartSeries(r: HorizonLedgerResult): ChartSeries {
   return {
     ages: r.rows.map((row) => row.leeftijd),
-    vOp: r.rows.map((row) => Math.round(row.liquideVermogen)),
+    vOp: r.rows.map((row) => Math.round(row.besteedbaarVermogen)),
     netto: r.rows.map((row) => Math.round(row.nettoVermogen)),
     vNodig: r.vNodig.map((v) => Math.round(v)),
     fireAge: r.fireAge,

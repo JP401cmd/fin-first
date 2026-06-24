@@ -87,3 +87,96 @@ grootheid als de referentielijn. De herziening luidt:
 
 Bewaakt door `test/horizon-engine.test.ts` ("deplete (ADR 0027): de FIRE-stip valt op de
 doel-lijn").
+
+---
+
+## Addendum — 2026-06-24: fractionele FIRE-stip (`fireAgeFractional`)
+
+`fireAge` is en blijft een integer (het detectiejaar). De grafische stip op de curve wordt
+geplaatst via `fireAgeFractional`, dat met een nieuwe hulpfunctie `crossingAge()` wordt
+geïnterpoleerd naar het sub-jaar-snijpunt van de getekende (nominale netto) curve met de
+horizontale doel-lijn. De berekening is **geclamped binnen [fireAge − 1, fireAge]**, zodat
+`|fireAgeFractional − fireAge| ≤ 1` altijd geldt.
+
+Dit herintroduceert de vroege FIRE-leeftijd uit v1 (die dit ADR bewust verbiedt) **niet**:
+de fractionele verschuiving is subintervallisch en verandert de integer detectie, de
+`requiredFirePortfolioAtFire` en `liquideAtFire` niet. Het effect is uitsluitend visueel:
+de stip komt op/vlakbij de horizontale doel-lijn te liggen in plaats van er meetbaar boven.
+Van toepassing op de deplete/pensioen-tak; forced-fire, legacy en perpetual zijn ongewijzigd.
+
+---
+
+## Addendum — 2026-06-24: "Zuiver" — 0,6×-buffer verwijderd, blended reële voet (beslist openstaand productbesluit)
+
+Het in §Gevolgen genoemde **openstaande productbesluit** ("het 0,6×-disconto … is bewust
+**niet gewijzigd** … een apart ADR vereist") is met deze Fase-1-wijziging **beslecht**.
+
+**Besluit:** `backwardVnodig` disconteert niet langer op `0,6 × gemiddeld reëel rendement`,
+maar op de **werkelijke waarde-gewogen blended reële voet van de FIRE-eligible startpot**
+(`blendedRealReturnStart` — exact de set die `liquidSumStart` optelt, incl. include_full-
+woning op 100% met haar eigen return en losse bankrekening-cash @ 0%). Doel-lijn (V_nodig)
+en drawdown delen daarmee **één grondslag**; de verborgen buffer en de grondslag-mismatch
+zijn weg.
+
+**Gevolgen:**
+
+- **V_nodig daalt** over de hele lijn (hogere disconto-voet) → FIRE schuift ~1–3 jaar, het
+  getoonde doelbedrag (`requiredFirePortfolio`) beweegt −0,7..−4,35% op de strategie-matrix.
+  De goldens zijn herijkt; geen verkapte regressie (KERN-acceptatie groen).
+- **Bodem-eerlijkheid** (criterium 7: onhoudbare uitgaven → `fireReachable=false`) komt nu
+  van de expliciete premature-collapse-guard in `meetsStrategyTarget`, niet meer van de
+  buffer die V_nodig kunstmatig verhoogde. Een onhoudbaar pad (bv. €500k/jr op een ~€100k-pot)
+  haalt `liquide ≥ V_nodig` op géén enkele leeftijd → onbereikbaar.
+- **Belangrijke nuance — geen intrinsieke samenval van de INTEGER-grootheden.** De grafische
+  stip valt via `crossingAge`/`fireAgeFractional` op de doel-lijn, maar `liquideAtFire` (integer)
+  kan tot **één discrete jaarstap** boven `requiredFirePortfolioAtFire` liggen: de stijgende
+  opbouwcurve passeert de dalende V_nodig-lijn per jaar (jaarlijks grootboek). De eerdere
+  formulering "FIRE-stip en doel-lijn vallen intrinsiek samen (binnen ~½ jaar opbouw)" gold
+  voor de gebufferde V_nodig en is na Zuiver een overclaim voor de integer-grootheden; ze is
+  in de engine-comments gecorrigeerd. Géén apart ADR nodig voor deze Fase-1-correctie
+  (architect-oordeel): het beschermde gedrag — één voet voor doel-lijn én drawdown, getekende
+  stip op de lijn — blijft intact en bewaakt door de "Grafiek lijn"-tests. (ADR 0028 dekt een
+  ánder onderwerp: de downsize-"Verkopen"-herdefinitie, Fase 2.)
+
+Bewaakt door `test/horizon-eindstrategie.test.ts` (#4 blended voet, #7 bodem-eerlijk) en de
+herijkte invariant-tests in `test/horizon-engine.test.ts` (re-anchored op de werkelijke
+discrete curve-/dekking-stap i.p.v. de achterhaalde spaar-proxy).
+
+---
+
+## Addendum — 2026-06-24: `inclusion_pct` ⟂ FIRE-behandeling (eigendoms-grondslag-correctie)
+
+Het vorige addendum (en de oorspronkelijke Fase-1-implementatie) formuleerde de FIRE-eligible
+engine-waarde van een **include_full-woning op 100%** — d.w.z. `net_worth_inclusion_pct` werd
+voor het besteedbare huis genegeerd. **Dat was een fout** (firsthand gediagnosticeerd) en wordt
+hierbij gecorrigeerd.
+
+**Kern:** `net_worth_inclusion_pct` en `include_full` zijn **twee orthogonale assen**:
+
+- **`net_worth_inclusion_pct` = EIGENDOM** — welk deel van het asset van de gebruiker is. Dit
+  is een grootheid die **altijd** geldt, voor élk asset, in élke strategie — exact zoals het
+  elders getoonde netto vermogen (`lib/dashboard-data-loader.ts`) inclusion_pct al toepast.
+- **`include_full` = FIRE-BEHANDELING** — bepaalt uitsluitend dat het **eigen deel** (ná
+  inclusion_pct) volledig als liquide/FIRE-eligible/besteedbaar telt, mét zijn eigen reële
+  return. Het raakt de eigendoms-grondslag **niet**.
+
+**Besluit:** `assetEngineValue` past inclusion_pct **altijd** toe; de eerdere `forceFull`-
+override (inclusion → 100% voor het besteedbare huis) is verwijderd. De FIRE-eligible engine-
+waarde van élk asset = `current_value × net_worth_inclusion_pct`. De `spendable`-vlag /
+`isNonLiquid`-classificatie (= de FIRE-behandeling) blijft ongewijzigd: het eigen deel van een
+include_full-huis blijft liquide/besteedbaar met zijn eigen reële return.
+
+**Gevolg (echt account, huis €1.000.500 @ inclusion 50%, deplete, include_full):**
+
+- Netto **start**-vermogen: van **boven €1M** → **€583.154** (huis €500.250 i.p.v. €1.000.500
+  + cash/inv/crypto − schuld). Dit sluit nu byte-voor-byte aan op het elders getoonde netto
+  vermogen — **geen desync meer** tussen het dashboard-netto-vermogen en de FIRE/afbouw-grondslag.
+- Minder FIRE-eligible vermogen → FIRE schuift **52 → 59**; `requiredFirePortfolioAtFire`
+  **€1.431.390 → €1.089.101**; `liquideAtFire` **€1.488.016 → €1.117.643**.
+
+**Reikwijdte:** de strategie-matrix-persona (`lib/regression-tests/horizon-strategie/persona-fixture.ts`)
+zet alle assets op inclusion_pct 100 → die goldens zijn **byte-identiek** vóór/na de fix
+(geverifieerd, niet geregenereerd). Alleen de real-account-goldens (huis @ 50%) schoven.
+
+Bewaakt door `test/horizon-eindstrategie.test.ts` (#5 huis-engine-waarde = current_value ×
+inclusion_pct) en `test/horizon-engine.test.ts` (herijkte golden + netto-start-anker €583.154).

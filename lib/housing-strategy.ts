@@ -42,6 +42,12 @@ import type { Asset } from '@/lib/asset-data'
 import { type Debt, amortizationSchedule } from '@/lib/debt-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { LifeEvent, UserDefinedCashflow } from '@/lib/horizon-data'
+import {
+  DOWNSIZE_DEFAULT_SALES_COSTS_PCT,
+  HOUSING_COST_AFTER_SALE_PCT,
+  REVERSE_MORTGAGE_DEFAULT_MAX_LOAN_PCT,
+  REVERSE_MORTGAGE_DEFAULT_RATE,
+} from '@/lib/constants'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -132,7 +138,7 @@ export const DEFAULT_DOWNSIZE_CONFIG: DownsizeConfig = {
   triggerAge: 67,
   depletionThresholdYears: 0,
   salePricePct: 1.0,
-  salesCostsPct: 0.04,
+  salesCostsPct: DOWNSIZE_DEFAULT_SALES_COSTS_PCT,
   newMonthlyHousingCost: null,
 }
 
@@ -141,8 +147,8 @@ export const DEFAULT_REVERSE_MORTGAGE_CONFIG: ReverseMortgageConfig = {
   trigger: 'fixed_age',
   triggerAge: 67,
   depletionThresholdYears: 0,
-  maxLoanPct: 0.5,
-  interestRate: 0.055,
+  maxLoanPct: REVERSE_MORTGAGE_DEFAULT_MAX_LOAN_PCT,
+  interestRate: REVERSE_MORTGAGE_DEFAULT_RATE,
   monthlyPayout: null,
 }
 
@@ -483,13 +489,32 @@ export function projectMortgageStateAt(
  */
 export function estimateMonthlyHousingCostAfterSale(wozValue: number): number {
   if (!Number.isFinite(wozValue) || wozValue <= 0) return 0
-  return Math.round((wozValue * 0.04) / 12)
+  return Math.round((wozValue * HOUSING_COST_AFTER_SALE_PCT) / 12)
+}
+
+/**
+ * Leen-RUIMTE van een opeethypotheek = overwaarde × maxLoanPct. **De ENE home voor
+ * deze formule** (ADR 0029): zowel `getFireEligibleNetWorth` (display: hoeveel van
+ * het vermogen telt als FIRE-eligible onder reverse_mortgage) als de v2-grootboek-
+ * engine (de max-LTV-cap op de opeetschuld + de FIRE-eligibility-bijdrage van de
+ * woning) consumeren UITSLUITEND deze functie. Geen tweede `× maxLoanPct` elders.
+ *
+ * Bij reverse_mortgage telt dus NIET de volle overwaarde als besteedbaar FIRE-
+ * vermogen (zoals vóór ADR 0029 ten onrechte, via `getFireEligibleNetWorth` →
+ * totalNetWorth), maar slechts de FRACTIE die je tegen de woning kunt lenen.
+ */
+export function reverseMortgageBorrowable(equity: number, maxLoanPct: number): number {
+  if (!Number.isFinite(equity) || equity <= 0) return 0
+  const pct = Number.isFinite(maxLoanPct) ? Math.max(0, Math.min(1, maxLoanPct)) : 0
+  return equity * pct
 }
 
 /**
  * Schatting maandelijkse opeethypotheek-uitkering.
- * Lineair: (overwaarde × maxLoanPct) / resterende verwachte levensjaren / 12.
+ * Lineair: leen-ruimte (overwaarde × maxLoanPct) / resterende verwachte levensjaren / 12.
  * Bij €300K overwaarde, 50% loan, 20 jaar uitkering ≈ €625/mnd.
+ *
+ * Consumeert `reverseMortgageBorrowable` voor de leen-ruimte (één home).
  */
 export function estimateReverseMortgagePayout(
   equity: number,
@@ -498,7 +523,7 @@ export function estimateReverseMortgagePayout(
 ): number {
   if (!Number.isFinite(equity) || equity <= 0) return 0
   const years = Math.max(1, remainingYears)
-  return Math.round((equity * maxLoanPct) / years / 12)
+  return Math.round(reverseMortgageBorrowable(equity, maxLoanPct) / years / 12)
 }
 
 // ── Downsize-trigger: crossover liquide vs overwaarde ────────
@@ -749,7 +774,14 @@ export interface HousingAdjustment {
   cashflows: SimCashflow[]
   /** Geresolveerde trigger-leeftijd (null voor include_full / exclude_from_fire). */
   resolvedTriggerAge: number | null
-  /** Schaduw-schuld bij endAge (alleen reverse_mortgage; display-only). */
+  /**
+   * @deprecated ADR 0029 — de opeethypotheek is nu een ECHTE schuld in het v2-
+   * grootboek (`runHorizonLedger`); de nalatenschap (`nettoVermogen = assets −
+   * debts`) drukt automatisch elke rij. Deze display-only schaduwschuld is
+   * dáármee een tweede (afwijkende) waarheid en is uitgefaseerd: `applyHousingStrategy`
+   * geeft voor reverse_mortgage nu 0 terug. Veld blijft (= 0) voor backwards-compat
+   * van bestaande callers/tests; verwijderen in een vervolg-PR.
+   */
   shadowDebtAtEndAge: number
 }
 
@@ -856,24 +888,16 @@ export function applyHousingStrategy(input: ApplyHousingStrategyInput): HousingA
         yearlyExpenses,
         currentLiquidPortfolio,
       )
-      // Project hypotheek-saldo naar trigger; equity = woning − geprojecteerd saldo.
-      const monthsToTrigger = Math.max(0, (triggerAge - currentAge) * 12)
-      const projected = projectMortgageStateAt(context.eigenHuisMortgages, monthsToTrigger)
-      const equity = Math.max(0, context.eigenHuisValue - projected.balance)
-      const remainingYears = Math.max(1, endAge - triggerAge)
-      const monthlyPayout =
-        config.monthlyPayout ??
-        estimateReverseMortgagePayout(equity, config.maxLoanPct, remainingYears)
-
-      const principal = monthlyPayout * 12 * remainingYears
-      const shadowDebtAtEndAge =
-        principal * Math.pow(1 + config.interestRate, remainingYears) - principal
-
+      // ADR 0029: GEEN display-only schaduwschuld meer. De opeethypotheek is nu een
+      // echte schuld in het v2-grootboek (engine.ts) — de nalatenschap volgt uit
+      // `nettoVermogen = assets − debts`, één waarheid. We geven 0 terug; de oude
+      // parallelle principal × (1+rente)^jaren-berekening is verwijderd om drift te
+      // voorkomen. De woning blijft in de pot (initialPortfolioDelta = 0).
       return {
         initialPortfolioDelta: 0,
         cashflows: [],
         resolvedTriggerAge: triggerAge,
-        shadowDebtAtEndAge,
+        shadowDebtAtEndAge: 0,
       }
     }
   }
@@ -1247,8 +1271,18 @@ export function getFireEligibleNetWorth(
   const equity = context.eigenHuisValue - context.mortgageBalance
   switch (config.mode) {
     case 'include_full':
-    case 'reverse_mortgage':
       return totalNetWorth
+    case 'reverse_mortgage': {
+      // ADR 0029: onder een opeethypotheek telt NIET de volle overwaarde mee, maar
+      // alléén de leen-RUIMTE (overwaarde × maxLoanPct) — dat is het deel dat je
+      // werkelijk tegen de woning kunt lenen en dus besteedbaar FIRE-vermogen is.
+      // Eén home voor de formule: `reverseMortgageBorrowable` (gedeeld met de engine).
+      // Vóór ADR 0029 gaf deze tak `totalNetWorth` (huis 100% mee) — fout, want het
+      // huiseigen geld is niet liquide zonder de lening; de rest van het vermogen blijft
+      // wél volledig meetellen.
+      const borrowable = reverseMortgageBorrowable(Math.max(0, equity), config.maxLoanPct)
+      return totalNetWorth - equity + borrowable
+    }
     case 'exclude_from_fire':
     case 'downsize':
       return totalNetWorth - equity

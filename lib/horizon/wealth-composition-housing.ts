@@ -31,7 +31,6 @@ import {
   isHousingStrategyEvent,
   projectEigenHuisValuesAt,
   projectMortgageStateAt,
-  estimateReverseMortgagePayout,
   type HousingStrategyConfig,
   type HousingContext,
 } from '@/lib/housing-strategy'
@@ -64,7 +63,9 @@ export function applyHousingToComposition(
   baseRows: StackedRow[],
   opts: ApplyHousingCompositionOpts,
 ): StackedRow[] {
-  const { housingCfg, ctx, displayEvents, currentAgeFloor, fireEndAge, isV2 } = opts
+  // `fireEndAge` blijft in de opts-interface (callers geven 'm), maar wordt sinds
+  // ADR 0029 niet meer gebruikt (de reverse_mortgage-schaduwschuld is vervallen).
+  const { housingCfg, ctx, displayEvents, currentAgeFloor, isV2 } = opts
 
   const eigenHuisAssets = ctx.eigenHuisAssets ?? []
   const mortgages = ctx.eigenHuisMortgages
@@ -127,39 +128,14 @@ export function applyHousingToComposition(
     }
 
     if (housingCfg.mode === 'reverse_mortgage') {
-      // Huis blijft zichtbaar via baseRows (geen filter — reverse_mortgage
-      // houdt eigen_huis in de assets). Vóór trigger: niets extra.
-      if (triggerAge === null || row.age < triggerAge) return row
-      // Vanaf trigger: stapelende schaduwschuld vanwege opeethypotheek.
-      // monthlyPayout uit config of auto-schatting op basis van equity bij
-      // trigger. Schuld groeit als principal + rente over de looptijd.
-      // Uitkering uit het event-metadata (zelfde bron als de sim-cashflow);
-      // fallback: zelfde schatting als buildHousingLifeEventsAtAge.
-      const housingEvent = displayEvents.find(isHousingStrategyEvent)
-      const metaPayout = Number(
-        (housingEvent?.metadata as Record<string, unknown> | null | undefined)?.monthlyPayout,
-      )
-      const equityAtTrigger = Math.max(
-        0,
-        projectEigenHuisValuesAt(eigenHuisAssets, Math.max(0, (triggerAge - currentAgeFloor) * 12))
-          .currentValue -
-          projectMortgageStateAt(mortgages, Math.max(0, (triggerAge - currentAgeFloor) * 12))
-            .balance,
-      )
-      const monthlyPayout = Number.isFinite(metaPayout) && metaPayout > 0
-        ? metaPayout
-        : housingCfg.monthlyPayout ??
-          estimateReverseMortgagePayout(
-            equityAtTrigger,
-            housingCfg.maxLoanPct,
-            Math.max(1, fireEndAge - triggerAge),
-          )
-      const yearsAfterTrigger = row.age - triggerAge
-      const principal = monthlyPayout * 12 * yearsAfterTrigger
-      const shadowDebt =
-        principal * Math.pow(1 + housingCfg.interestRate, yearsAfterTrigger) - principal
-      if (shadowDebt <= 0) return row
-      return { ...row, schulden: row.schulden - Math.round(shadowDebt) }
+      // ADR 0029: GEEN display-only schaduwschuld meer. De opeethypotheek is nu een
+      // ECHTE schuld in het v2-grootboek (engine.ts: synthetische "Opeethypotheek"-
+      // RunningDebt) en zit dus AL in `baseRows.schulden` (via unifiedRowsToStackedRows).
+      // De woning blijft `eigen_huis`-asset in de pot (geen filter), óók al in baseRows.
+      // Een tweede, parallel berekende schaduwschuld zou dubbeltellen én van de
+      // grootboek-waarheid afwijken (die was de bron van drift). Engine-output is hier
+      // dus al continu en correct — niets injecteren.
+      return row
     }
 
     return row

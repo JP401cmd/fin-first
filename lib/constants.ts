@@ -102,3 +102,38 @@ export const SALES_COSTS_BY_TYPE: Partial<Record<AssetType, number>> = {
 
 /** Fallback-verkoopkosten voor een asset-type dat niet in SALES_COSTS_BY_TYPE staat — roerend 2%. */
 export const DEFAULT_SALES_COSTS_PCT = 0.02
+
+/**
+ * Verkoopkosten eigen-woning-downsize (makelaar + notaris + verhuizen) als fractie
+ * van de verkoopprijs — 4%. Door de gebruiker overschrijfbaar via de downsize-config;
+ * dit is de default. Hoger dan SALES_COSTS_BY_TYPE.real_estate (3%, beleggingspand)
+ * omdat een eigen-woning-verkoop verhuiskosten meeneemt.
+ */
+export const DOWNSIZE_DEFAULT_SALES_COSTS_PCT = 0.04
+
+/**
+ * Geschatte maandelijkse woonlast ná verkoop (huur of kleinere hypotheek) als fractie
+ * van de WOZ-waarde, op jaarbasis — 4%/jaar ≈ NL-gemiddelde middenhuur-niveau
+ * (bij €400K WOZ ≈ €1.333/mnd). Door de gebruiker overschrijfbaar via de downsize-config.
+ */
+export const HOUSING_COST_AFTER_SALE_PCT = 0.04
+
+// ── Opeethypotheek (reverse mortgage) ───────────────────────────
+
+/**
+ * Max % van de overwaarde dat als opeethypotheek (verzilverhypotheek) kan worden
+ * opgenomen — 50%. NL-marktstandaard ligt tussen 35–65% afhankelijk van leeftijd;
+ * 50% is een conservatieve middenwaarde. Dit is de leen-RUIMTE-cap én de FIRE-
+ * eligibility-fractie van de overwaarde (één grondslag, zie reverseMortgageBorrowable).
+ */
+export const REVERSE_MORTGAGE_DEFAULT_MAX_LOAN_PCT = 0.5
+
+/**
+ * Jaarlijkse rente op een opeethypotheek (decimaal) — 5,5% (NL marktrate 2026).
+ * Bewust LAGER dan een ongedekte lening: de woning dient als onderpand
+ * (onderpand-korting). Genoteerd als NOMINALE rente; de v2-grootboek-engine accrued
+ * 'm — net als élke andere schuldrente in blok 3 — direct op het (reëel gegroeide)
+ * saldo zónder reëel-conversie, zodat opeethypotheek-rente en gewone hypotheekrente
+ * op dezelfde grondslag stapelen (zie engine.ts comment bij de opeetschuld).
+ */
+export const REVERSE_MORTGAGE_DEFAULT_RATE = 0.055

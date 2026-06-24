@@ -333,6 +333,18 @@ export function resolveHousingTriggerFromProjection(
   let converged = false
   let fireAgeUsed: number | null = sim.forcedFireAge ?? null
 
+  // Elke meting bewaren onder zijn EIGEN gemeten trigger-leeftijd, zodat de
+  // niet-geconvergeerd-correctie het ZELFCONSISTENTE bundel kan teruggeven dat
+  // bij de uiteindelijk gekozen leeftijd D hoort. Zonder dit beschrijft het
+  // teruggegeven `liquidPath` een naburig jaar (de laatste meting) terwijl
+  // triggerAge op een eerdere meting (de min()-tie-break) staat — dan kruist
+  // het pad op 88 maar staat de trigger op 87 (interne inconsistentie).
+  const scanByTrigger = new Map<number, ScanResult>()
+  const recordScan = (s: ScanResult) => {
+    scanByTrigger.set(Math.round(s.triggerAge), s)
+  }
+  recordScan(scan)
+
   // Never-deplete: het liquide pad raakt de drempel nergens in de horizon →
   // verkoop is niet nodig. Sla de vaste-punt-iteratie over: er is geen event
   // om de fireAge op te pinnen, en een geforceerd event op het plafond zou
@@ -373,6 +385,7 @@ export function resolveHousingTriggerFromProjection(
     const pin = sim.forcedFireAge ?? full.fireAge ?? undefined
     fireAgeUsed = pin ?? null
     const next = measure(pin)
+    recordScan(next)
     if (agesEqual(next.triggerAge, D)) {
       scan = next
       converged = true
@@ -382,18 +395,30 @@ export function resolveHousingTriggerFromProjection(
     scan = next
   }
 
-  // Niet-geconvergeerd + min()-tie-break: lijn de uitleg-bundel uit op de
-  // uiteindelijk gekozen leeftijd D, anders beschrijven liquide/buffer/marge
-  // een naburig jaar terwijl het event op D staat. Puur cosmetisch voor de
-  // "Waarom dit moment?"-breakdown; het event-moment zelf is altijd D.
+  // Niet-geconvergeerd + min()-tie-break: de iteratie oscilleert (bv. 86↔87↔88
+  // door de één-jaar-shift) en `Math.min(D, next.triggerAge)` kiest een EERDER
+  // gemeten jaar dan de laatste meting `scan`. Geef dan het ZELFCONSISTENTE
+  // bundel terug: de meting wiens EIGEN `triggerAge === D` is — diens
+  // `liquidPath` kruist per constructie op D, zodat het teruggegeven bundel één
+  // samenhangend scenario beschrijft (`firstCross(liquidPath) === triggerAge`).
+  // De conservatieve `min()`-keuze (verkoop niet later dan nodig) blijft
+  // ongemoeid; we herstellen enkel de interne consistentie van de bundel.
   if (!converged && !agesEqual(scan.triggerAge, D)) {
-    const idx = scan.liquidPath.findIndex((p) => agesEqual(p.age, D))
-    scan = {
-      ...scan,
-      triggerAge: D,
-      liquidAtTrigger: idx > 0 ? scan.liquidPath[idx - 1].liquid : scan.liquidAtTrigger,
-      bufferAtTrigger: bufferAt(config, context, D - sim.currentAge),
-      marginAtTrigger: marginAt(config, sim, D - sim.currentAge),
+    const consistent = scanByTrigger.get(Math.round(D))
+    if (consistent) {
+      scan = consistent
+    } else {
+      // Vangnet: geen opgeslagen meting met triggerAge===D (zou niet mogen —
+      // D is altijd een eerder gemeten waarde). Lijn dan ten minste de
+      // breakdown-velden uit zodat triggerAge en de bedragen op D kloppen.
+      const idx = scan.liquidPath.findIndex((p) => agesEqual(p.age, D))
+      scan = {
+        ...scan,
+        triggerAge: D,
+        liquidAtTrigger: idx > 0 ? scan.liquidPath[idx - 1].liquid : scan.liquidAtTrigger,
+        bufferAtTrigger: bufferAt(config, context, D - sim.currentAge),
+        marginAtTrigger: marginAt(config, sim, D - sim.currentAge),
+      }
     }
   }
 

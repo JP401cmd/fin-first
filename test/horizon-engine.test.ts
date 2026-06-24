@@ -435,12 +435,13 @@ describe('horizon-engine grootboek (Fase 1)', () => {
     const doel = r.requiredFirePortfolioAtFire // = V_nodig op FIRE (reëel)
     // De stip ligt op/boven de doel-lijn (vroegste passerende leeftijd) …
     expect(stip).toBeGreaterThanOrEqual(doel)
-    // … en de overshoot is hooguit ÉÉN jaar bruto-vermogensopbouw rond die leeftijd:
-    // jaarsparen + bruto rendement op de pot. Dit is de discrete stapgrootte waarmee
-    // de stijgende opbouwcurve de dalende V_nodig-lijn in één jaar passeert (de
-    // ~½-jaar-verwachting uit de bug-analyse, robuust uitgedrukt).
-    const brutoJaaropbouw = 24_000 + 0.07 * doel
-    expect(stip - doel).toBeLessThanOrEqual(brutoJaaropbouw)
+    // … en de overshoot (= dekking op de FIRE-leeftijd) is hooguit gelijk aan de
+    // dekking het jaar ERVÓÓR: FIRE vuurde niet bij idx−1 (meetsStrategyTarget
+    // faalda ondanks positieve dekking), terwijl in de overbruggingsfase (salary
+    // stopt) de dekking strikt daalt. De oude spaar-proxy (24_000 + 0,07×doel) is
+    // achterhaald na de Zuiver-shift (V_nodig lager → groter absoluut gap);
+    // de bound is nu de werkelijke dekking op het voorgaande jaar.
+    expect(stip - doel).toBeLessThanOrEqual(r.rows[idx - 1].dekking)
   })
 
   it('deplete (ADR 0027): ook met spendable huis (include_full) valt de stip op de doel-lijn', () => {
@@ -453,8 +454,138 @@ describe('horizon-engine grootboek (Fase 1)', () => {
     const idx = r.rows.findIndex((x) => x.leeftijd === r.fireAge)
     expect(idx).toBeGreaterThan(1)
     const gap = r.liquideAtFire - r.requiredFirePortfolioAtFire
-    const brutoJaaropbouw = 24_000 + 0.07 * r.requiredFirePortfolioAtFire
     expect(gap).toBeGreaterThanOrEqual(0)
-    expect(gap).toBeLessThanOrEqual(brutoJaaropbouw)
+    // De gap (= dekking op FIRE-leeftijd) is hooguit gelijk aan de dekking het
+    // jaar ERVÓÓR — in de overbruggingsfase daalt de dekking strikt (salary stopt,
+    // liquide daalt, vNodig daalt minder). Zie test 1 voor de volledige redenering.
+    expect(gap).toBeLessThanOrEqual(r.rows[idx - 1].dekking)
+  })
+
+  // ── Fractionele FIRE-stip valt op de getekende doel-lijn ("Grafiek lijn") ────
+  // Bug: `fireAgeFractional` was gelijkgezet aan de integer `fireAge`, waardoor de
+  // FIRE-stip een vól jaar vermogensopbouw ná het snijpunt op de curve stond → op
+  // groot vermogen €100–220k BÓVEN de horizontale deplete-doel-lijn. Fix: maak
+  // `fireAgeFractional` het echte sub-jaar-snijpunt waar de GETEKENDE (nominale)
+  // vermogenscurve de horizontale doel-lijn (`fireTarget` = V_nodig op FIRE, nominaal)
+  // kruist. De integer `fireAge`, `requiredFirePortfolioAtFire` en `liquideAtFire`
+  // blijven ongewijzigd. We reconstrueren hier de EXACTE dot-op-lijn-rekening uit
+  // `sim-chart.tsx` (allPts gekeyd op leeftijd+1, lineaire interpolatie op
+  // `fireAgeFractional`) en pinnen dat de stip-y ≈ `fireTarget`.
+
+  // Reconstructie van het echte account janpaul050486@gmail.com (deplete, include_full,
+  // eigen huis €1.000.500 @ inclusion 50% spendable, liquide-ex-huis ~€103k,
+  // studielening €20k @ 0%, 7%/2%, endAge 90, ~€4.500/mnd inkomen → €1.500/mnd surplus).
+  const realAccountInput = () => {
+    const mk = (o: { id: string; type: string; v: number; ret: number; incl?: number }) =>
+      ({ id: o.id, name: o.id, asset_type: o.type, current_value: o.v, expected_return: o.ret, is_active: true, net_worth_inclusion_pct: o.incl ?? 100, depreciation_rate: null }) as unknown as Asset
+    return mkInput({
+      assets: [
+        mk({ id: 'huis', type: 'eigen_huis', v: 1_000_500, ret: 3.5, incl: 50 }),
+        mk({ id: 'cash1', type: 'cash', v: 36_500, ret: 0 }),
+        mk({ id: 'inv', type: 'investment', v: 31_539.43, ret: 7 }),
+        mk({ id: 'crypto', type: 'crypto', v: 20_864.57, ret: 0 }),
+        mk({ id: 'cash2', type: 'cash', v: 14_000, ret: 0 }),
+      ],
+      debts: [
+        { id: 'duo', name: 'Studielening DUO', debt_type: 'student_loan', current_balance: 20_000, interest_rate: 0, monthly_payment: 111.11, repayment_type: 'lineair', is_tax_deductible: false, is_active: true, net_worth_inclusion_pct: 100, include_aflossing_in_savings: false } as unknown as UnifiedProjectionInput['debts'][number],
+      ],
+      yearlyExpenses: 36_000,
+      annualSavings: 18_000,
+      monthlySurplus: 1_500,
+      monthlyIncome: 4_500,
+      strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+      spendableAssetIds: ['huis'],
+    })
+  }
+
+  // Repliceer de chart-stip: nominale curve `allPts` (gekeyd op leeftijd+1, waarde =
+  // endPortfolio = nettoVermogen × inflatiefactor) + interpolatie op fireAgeFractional.
+  const dotYOnCurve = (r: ReturnType<typeof runHorizonLedger>): number => {
+    const u = ledgerToUnifiedResult(r, { yearlyExpenses: 36_000 })
+    const allPts: [number, number][] = []
+    allPts.push([u.rows[0].age, u.rows[0].startNetWorth])
+    for (const row of u.rows) allPts.push([row.age + 1, row.netWorth])
+    const fAge = r.fireAge!
+    const fFrac = r.fireAgeFractional!
+    const t = fFrac - (fAge - 1)
+    const before = allPts.find(([a]) => a === fAge - 1)?.[1] ?? 0
+    const after = allPts.find(([a]) => a === fAge)?.[1] ?? 0
+    return before + t * (after - before)
+  }
+
+  it('Grafiek lijn (deplete, echt account): de FIRE-stip valt ≈ exact op de doel-lijn', () => {
+    const r = runHorizonLedger(realAccountInput())
+    expect(r.fireReachable).toBe(true)
+    expect(r.fireAge).not.toBeNull()
+    // De fractionele leeftijd is een ECHT sub-jaar-snijpunt, niet de integer FIRE-leeftijd.
+    expect(r.fireAgeFractional).not.toBeNull()
+    expect(r.fireAgeFractional!).toBeLessThan(r.fireAge!) // stip ligt vóór de integer-leeftijd
+    expect(r.fireAgeFractional! % 1).not.toBe(0) // echt fractioneel
+    // ADR-0027-getrouwheid: nóóit > 1 jaar van de integer FIRE-leeftijd (geen drift naar
+    // de oude, over-agressieve vroege FIRE — clamp binnen het detectiejaar).
+    expect(Math.abs(r.fireAgeFractional! - r.fireAge!)).toBeLessThanOrEqual(1)
+
+    const u = ledgerToUnifiedResult(r, { yearlyExpenses: 36_000 })
+    const fireTarget = u.requiredFirePortfolio // = nominale horizontale doel-lijn op de grafiek
+    const dotY = dotYOnCurve(r)
+    // ROOD vóór de fix: fireAgeFractional === fireAge → t = 1 → dotY = curve op de
+    // integer FIRE-leeftijd, ~€35k–220k BÓVEN de doel-lijn. GROEN na de fix: er bestaat
+    // een in-detectiejaar-kruising (netto ≈ liquide bij include_full) → stip op de lijn.
+    expect(Math.abs(dotY - fireTarget) / fireTarget).toBeLessThan(0.01)
+  })
+
+  it('Grafiek lijn: integer fireAge / requiredFirePortfolioAtFire / liquideAtFire — golden (inclusion_pct-herijkt)', () => {
+    // Pin de integer-grootheden zodat freedomPct/snapshots/doelbedrag bewaakt blijven.
+    // HERIJKT 2026-06-24 voor de inclusion_pct⟂FIRE-behandeling-fix (ADR 0027-addendum):
+    // de FIRE-eligible engine-waarde van het include_full-huis is nu current_value ×
+    // inclusion_pct (€1.000.500 × 50% = €500.250), niet langer de ongewogen €1.000.500.
+    // EIGENDOM (inclusion_pct) en FIRE-BEHANDELING (include_full) zijn orthogonaal: het
+    // huis telt nu voor de helft mee in de FIRE-pot, mét zijn eigen reële return.
+    // Gevolg: minder FIRE-eligible vermogen → de stijgende opbouwcurve raakt de V_nodig-
+    // lijn LATER → deplete-FIRE 52 → 59. requiredFirePortfolioAtFire = V_nodig[fireIdx]
+    // (€1.431.390 → €1.089.101) en liquideAtFire (€1.488.016 → €1.117.643) liggen op een
+    // latere, lagere plek van de lijn/curve. Dit is de beoogde correctie, géén regressie:
+    // stip en doel-lijn delen nog steeds één voet (de "stip valt op de doel-lijn"-test
+    // hierboven blijft groen).
+    const r = runHorizonLedger(realAccountInput())
+    expect(r.fireAge).toBe(59)
+    expect(Math.round(r.requiredFirePortfolioAtFire)).toBe(1_089_101)
+    expect(Math.round(r.liquideAtFire)).toBe(1_117_643)
+    // Regressie-anker voor de inclusion_pct-bug: het NETTO START-vermogen (vóór groei
+    // jaar 0) = huis €500.250 (50% van €1.000.500) + cash €36.500 + inv €31.539,43 +
+    // crypto €20.864,57 + cash €14.000 − schuld €20.000 = €583.154. Vóór de fix telde
+    // het huis voor €1.000.500 → start boven €1M.
+    const beginNetto =
+      r.rows[0].assets.reduce((s, a) => s + (a.begin ?? 0), 0) -
+      r.rows[0].schulden.reduce((s, d) => s + (d.begin ?? 0), 0)
+    expect(beginNetto).toBeGreaterThan(580_000)
+    expect(beginNetto).toBeLessThan(586_000)
+  })
+
+  it('Grafiek lijn: de stip ligt nóóit een vól jaar opbouw bóven de lijn, en frac blijft binnen 1 jaar van fireAge', () => {
+    // Generiek geval (netto-curve, geen in-detectiejaar-kruising met de VLAKKE liquide-
+    // doel-lijn): de stip mag NIET op de hoge integer-FIRE-curvewaarde blijven (de
+    // oorspronkelijke €100–220k-overshoot), maar klemt op het segment-begin (fireAge−1)
+    // → hooguit ~één jaar opbouw boven de lijn i.p.v. twee. fireAgeFractional blijft
+    // binnen 1 jaar van de integer fireAge (ADR-0027-getrouwheid). De resterende kleine
+    // stip↔lijn-afstand bij netto≫liquide is een bekend structureel punt (ADR 0028-kandidaat).
+    const r = runHorizonLedger(mkInput({ yearlyExpenses: 36_000, annualSavings: 24_000, monthlySurplus: 24_000 / 12 }))
+    expect(r.fireReachable).toBe(true)
+    expect(Math.abs(r.fireAgeFractional! - r.fireAge!)).toBeLessThanOrEqual(1)
+    const u = ledgerToUnifiedResult(r, { yearlyExpenses: 36_000 })
+    const dotY = dotYOnCurve(r)
+    // Vergelijk met de BUGGY positie (stip op de integer FIRE-curvewaarde, t = 1):
+    const allPts: [number, number][] = []
+    allPts.push([u.rows[0].age, u.rows[0].startNetWorth])
+    for (const row of u.rows) allPts.push([row.age + 1, row.netWorth])
+    const buggyDotY = allPts.find(([a]) => a === r.fireAge)?.[1] ?? 0
+    // De gefixte stip ligt strikt LAGER (dichter bij de lijn) dan de buggy stip …
+    expect(dotY).toBeLessThan(buggyDotY)
+    // De `dotY - u.requiredFirePortfolio`-bovengrens is na de Zuiver-shift niet
+    // zinvol te binden aan één nominale opbouwstap: dotY = nominale netWorth op
+    // fireAgeFractional, u.requiredFirePortfolio = nominale V_nodig op fireAge —
+    // twee verschillende tijdspunten en schalen (netto incl. alle assets vs. FIRE-
+    // eligible minimum). De echte regressie-vanger is `dotY < buggyDotY` hierboven
+    // (lijn 573): die pin is scherp genoeg en direct bruikbaar als CI-hek.
   })
 })

@@ -426,7 +426,7 @@ describe('applyHousingStrategy', () => {
     expect(r.shadowDebtAtEndAge).toBe(0)
   })
 
-  it('reverse_mortgage: geen portfolio-delta, wel shadow-debt en trigger', () => {
+  it('reverse_mortgage: geen portfolio-delta, geen shadow-debt (ADR 0029) en trigger', () => {
     const r = applyHousingStrategy({
       ...baseInput,
       config: {
@@ -443,7 +443,9 @@ describe('applyHousingStrategy', () => {
     expect(r.initialPortfolioDelta).toBe(0)
     expect(r.resolvedTriggerAge).toBe(67)
     expect(r.cashflows).toHaveLength(0)
-    expect(r.shadowDebtAtEndAge).toBeGreaterThan(0)
+    // ADR 0029: de display-only schaduwschuld is vervallen — de opeethypotheek is nu
+    // een echte schuld in het v2-grootboek. applyHousingStrategy geeft 0 terug.
+    expect(r.shadowDebtAtEndAge).toBe(0)
   })
 })
 
@@ -652,8 +654,14 @@ describe('filterAssetsForFire', () => {
 // ── getFireEligibleNetWorth ──────────────────────────────────
 
 describe('getFireEligibleNetWorth', () => {
-  it('include_full + reverse_mortgage geven volledig vermogen', () => {
+  it('include_full geeft volledig vermogen', () => {
     expect(getFireEligibleNetWorth(400_000, standardContext, { mode: 'include_full' })).toBe(400_000)
+  })
+
+  it('reverse_mortgage telt alléén de leen-ruimte mee (ADR 0029)', () => {
+    // standardContext: overwaarde = 500K − 250K = 250K; maxLoanPct 0.5 → leen-ruimte 125K.
+    // FIRE-eligible = totalNetWorth − equity + leen-ruimte = 400K − 250K + 125K = 275K.
+    // Vóór ADR 0029 gaf deze tak ten onrechte 400K (volle huiswaarde mee).
     expect(
       getFireEligibleNetWorth(400_000, standardContext, {
         mode: 'reverse_mortgage',
@@ -664,7 +672,7 @@ describe('getFireEligibleNetWorth', () => {
         interestRate: 0.055,
         monthlyPayout: null,
       }),
-    ).toBe(400_000)
+    ).toBe(275_000)
   })
 
   it('exclude_from_fire + downsize halen equity (250K) van vermogen af', () => {
@@ -1225,15 +1233,15 @@ describe('Strategy matrix — alle 4 modes × triggers × overrides', () => {
       expect(events[0].monthly_income_change).toBe(589)
     })
 
-    it('shadow-debt groeit met rente over de uitkering', () => {
+    it('geen display-only shadow-debt meer (ADR 0029 — schuld zit in het v2-grootboek)', () => {
       const r = applyHousingStrategy({
         ...sharedInput,
         config: { ...baseRmFixed, monthlyPayout: 500 },
       })
-      // principal = 500 × 12 × 23 = 138_000
-      // (1.055)^23 ≈ 3.426 → shadow = 138_000 × 3.426 - 138_000 ≈ 334_800
-      expect(r.shadowDebtAtEndAge).toBeGreaterThan(300_000)
-      expect(r.shadowDebtAtEndAge).toBeLessThan(360_000)
+      // De opeethypotheek is sinds ADR 0029 een ECHTE schuld in runHorizonLedger
+      // (synthetische "Opeethypotheek"-RunningDebt). applyHousingStrategy berekent
+      // daarom geen parallelle schaduwschuld meer → 0 (één grootboek-waarheid).
+      expect(r.shadowDebtAtEndAge).toBe(0)
     })
 
     it('zonder overwaarde (negatieve equity) geen events', () => {
