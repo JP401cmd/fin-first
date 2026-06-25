@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-24T21:12:27.394Z",
-  "generatedDate": "2026-06-24",
+  "generatedAt": "2026-06-25T19:40:27.625Z",
+  "generatedDate": "2026-06-25",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -18291,6 +18291,18 @@
       ],
       "summary": "ADR 0028 verenigde `spendable` en `saleManaged` op de downsize-woning zodat ze al tijdens de opbouw als FIRE-eligible telde. Daarna trad een nieuw defect op bij `downsize` + `on_depletion`: de getoonde afbouwlijn dipte (~leeftijd 71), steeg vervolgens (~87) en crashte op endAge (",
       "file": "docs/adr/0030-drawdown-grondslag-besteedbaar-vermogen-splitst-rauwe-opname-van-fire-eligibility.md"
+    },
+    {
+      "id": "0031-downsize-verkooptrigger-hold-fire-anker-en-valuatie-basis",
+      "title": "Downsize-verkooptrigger: hold-FIRE-anker (geen vaste-punt-iteratie) + valuatie-basis",
+      "status": "aanvaard",
+      "date": "2026-06-25",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Na ADR 0028 (de downsize-woning is `spendable` + `saleManaged`) en ADR 0030 (de FIRE-eligibility-pot `liquideVermogen` en de rauw-besteedbare pot `besteedbaarVermogen` zijn gesplitst) bleven twee defecten en één ontbrekende planningskeuze rond de eigen-huis-downsize over. Dit bes",
+      "file": "docs/adr/0031-downsize-verkooptrigger-hold-fire-anker-en-valuatie-basis.md"
     }
   ],
   "churn": {
@@ -18310,7 +18322,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 12
+        "commits": 11
       },
       {
         "path": "app/api/household",
@@ -18318,7 +18330,7 @@
       },
       {
         "path": "lib/fire-simulation.ts",
-        "commits": 8
+        "commits": 7
       },
       {
         "path": "lib/horizon-data.ts",
@@ -18356,7 +18368,7 @@
       {
         "file": "lib/release-notes.ts",
         "loc": 2763,
-        "commits": 3
+        "commits": 2
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -19237,6 +19249,13 @@
     },
     {
       "date": "2026-06-24",
+      "api": 383,
+      "components": 761,
+      "tables": 56,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-06-25",
       "api": 383,
       "components": 761,
       "tables": 56,

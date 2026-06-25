@@ -84,6 +84,22 @@ export interface DownsizeConfig {
   salesCostsPct: number
   /** Nieuwe maandlast na verkoop (huur of kleinere hypotheek). null = auto-schatting. */
   newMonthlyHousingCost: number | null
+  /**
+   * Grondslag voor de verkoopwaarde van de woning in de projectie. 'market' =
+   * `current_value` (= het elders getoonde netto vermogen/dashboard); 'woz' =
+   * `woz_value` (conservatiever, kan lager liggen). Default 'market'. Bepaalt de
+   * ENGINE-basiswaarde van het huis — consistent voor netto vermogen, FIRE-pot,
+   * verkoopopbrengst én de getoonde preview (zie `applyDownsizeValuationBasis` +
+   * `buildHorizonInput`/`runHousingScenarioProjectionV2`). Geen DB-migratie nodig
+   * (`housing_strategy_config` is JSONB).
+   *
+   * Optioneel in het TYPE (afwezig = 'market') zodat oudere JSONB-rijen en bestaande
+   * config-literals zónder dit veld geldig blijven; `parseHousingStrategy` en
+   * `DEFAULT_DOWNSIZE_CONFIG` zetten het echter ALTIJD expliciet, dus elke runtime-config
+   * die via de bron-laag komt heeft een concrete waarde. `applyDownsizeValuationBasis`
+   * behandelt elke niet-'woz'-waarde (incl. undefined) als 'market'.
+   */
+  saleValuationBasis?: 'market' | 'woz'
 }
 
 export interface ReverseMortgageConfig {
@@ -140,6 +156,7 @@ export const DEFAULT_DOWNSIZE_CONFIG: DownsizeConfig = {
   salePricePct: 1.0,
   salesCostsPct: DOWNSIZE_DEFAULT_SALES_COSTS_PCT,
   newMonthlyHousingCost: null,
+  saleValuationBasis: 'market',
 }
 
 export const DEFAULT_REVERSE_MORTGAGE_CONFIG: ReverseMortgageConfig = {
@@ -181,6 +198,9 @@ export function parseHousingStrategy(raw: unknown): HousingStrategyConfig {
         obj.newMonthlyHousingCost === null || obj.newMonthlyHousingCost === undefined
           ? null
           : toFiniteNumber(obj.newMonthlyHousingCost, 0),
+      // Alleen de expliciete 'woz'-keuze wijkt af; alles anders (ontbrekend /
+      // malformed / 'market') valt terug op de continuïteit-bewarende default 'market'.
+      saleValuationBasis: obj.saleValuationBasis === 'woz' ? 'woz' : 'market',
     }
   }
 
@@ -1232,6 +1252,33 @@ export function getHousingLifeEvents(input: ApplyHousingStrategyInput): LifeEven
  */
 export function shouldFilterEigenHuisForFire(config: HousingStrategyConfig): boolean {
   return config.mode === 'exclude_from_fire' || config.mode === 'downsize'
+}
+
+/**
+ * Substitueer de `current_value` van élk eigen-huis-asset door zijn `woz_value`
+ * wanneer een downsize-strategie `saleValuationBasis === 'woz'` kiest. Dé ENE bron
+ * voor die substitutie (ADR 0031): zowel de getoonde grafiek-run, de trigger-meetrun
+ * als de modal-preview (`runHousingScenarioProjectionV2`) draaien op exact dezelfde
+ * gesubstitueerde asset-lijst, zodat preview en grafiek per constructie dezelfde,
+ * basis-bewuste huiswaarde zien.
+ *
+ * Omdat de engine de huiswaarde overal via `assetEngineValue` (= `current_value ×
+ * inclusion_pct`) leest, raakt deze ene substitutie automatisch het netto vermogen,
+ * de FIRE-pot, de verkoopopbrengst én de display — consistent. Bij 'market' (default)
+ * verandert er NIETS (de input wordt onveranderd teruggegeven). Retourneert een nieuwe
+ * lijst (kopie per gewijzigd asset); de input wordt niet gemuteerd.
+ *
+ * `woz_value` valt terug op `current_value` wanneer afwezig/0 (zoals
+ * `deriveHousingContext`/`projectEigenHuisValuesAt`), zodat de keuze nooit een
+ * huiswaarde naar 0 forceert.
+ */
+export function applyDownsizeValuationBasis(assets: Asset[], config: HousingStrategyConfig): Asset[] {
+  if (config.mode !== 'downsize' || config.saleValuationBasis !== 'woz') return assets
+  return assets.map((a) =>
+    a.is_active && a.asset_type === 'eigen_huis'
+      ? ({ ...a, current_value: Number(a.woz_value) || Number(a.current_value) || 0 } as Asset)
+      : a,
+  )
 }
 
 /**

@@ -318,3 +318,7 @@
 ## 2026-06-24
 
 - Geen wijzigingen.
+
+## 2026-06-25
+
+- Geen wijzigingen.

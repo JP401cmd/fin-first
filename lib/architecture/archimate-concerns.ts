@@ -102,6 +102,14 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     severity: 'risk',
     elementIds: ['as-planning', 'fn-toekomstplannen', 'as-vermogen'],
   },
+  {
+    id: 'downsize-fire-gate-eligibility-vs-besteedbaar',
+    title: 'Downsize-trigger leunt op een hold-FIRE-omweg omdat de FIRE-gate op liquideVermogen (incl. spendable huis) detecteert',
+    detail:
+      'De v2 FIRE-detectie (meetsStrategyTarget/liquideAtFire) draait op de eligibility-pot liquideVermogen — incl. de spendable saleManaged downsize-woning (ADR 0028) — terwijl die woning niet rauw besteedbaar is (besteedbaarVermogen, ADR 0030). Een zelf-berekende downsize-graaf-FIRE claimt daardoor bij een late verkoop een onmogelijk-vroege FIRE; een vaste-punt-iteratie op die FIRE divergeert (41→79→83→41). resolveDownsizeTriggerV2 omzeilt dit met een hold-FIRE-anker (FIRE van de run waarin de woning óók rauw besteedbaar is → besteedbaarVermogen == liquideVermogen → eerlijke, sale-timing-onafhankelijke gate) + één income-gated verfijning (ADR 0031). De omweg is correct en getest, maar de trigger-correctheid blijft gekoppeld aan dit gate-grondslag-artefact: een toekomstige wijziging aan de FIRE-detectie moet hiermee rekenen. Principiële richting: detecteer de downsize-FIRE op de rauw-besteedbare pot (of de overwaarde-bijdrage) i.p.v. de volle spendable-waarde — raakt ADR 0028, de matrix-goldens en de display-grondslag, dus eigen besluit. Onderscheiden van downsize-display-eligibility-desync (dat is display vs engine; dit is gate-grondslag vs trigger-stabiliteit binnen de engine). Verwijder zodra de downsize-FIRE-gate op de besteedbare grondslag rust en het hold-FIRE-anker overbodig is.',
+    severity: 'debt',
+    elementIds: ['as-planning', 'fn-toekomstplannen'],
+  },
 ]
 
 /** Aandachtspunten die een specifiek element raken. */

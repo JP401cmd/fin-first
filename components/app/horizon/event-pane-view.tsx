@@ -290,6 +290,12 @@ interface HousingMetadata {
   formula?: 'downsize' | 'reverse-payout'
   saleProceeds?: number
   wozValue?: number
+  /** Basis-keuze voor de verkoopwaarde ('market' = marktwaarde/dashboard, 'woz' = WOZ). */
+  saleValuationBasis?: 'market' | 'woz'
+  /** Engine-huiswaarde op trigger, vóór salePricePct/kosten (basis-bewust, reëel, inclusion-gewogen). */
+  grondslagValueAtTrigger?: number
+  /** Afgeloste eigen-huis-hypotheek op trigger (engine, reëel). */
+  mortgagePayoffAtTrigger?: number
   salePricePct?: number
   salesCostsPct?: number
   mortgageBalance?: number
@@ -481,15 +487,30 @@ function DepletionReasoning({
 }
 
 function DownsizeBreakdown({ meta }: { meta: HousingMetadata }) {
-  const woz = meta.wozValue ?? 0
   const salePct = meta.salePricePct ?? 1
   const costsPct = meta.salesCostsPct ?? 0
-  const grossSale = woz * salePct
-  const netSale = grossSale * (1 - costsPct)
+  // ── Verkoopopbrengst: consumeer de engine-cijfers (consume-don't-recompute).
+  // De v2-downsize-engine zet grondslagValueAtTrigger (basis-bewust: markt óf WOZ,
+  // reëel, inclusion-gewogen), mortgagePayoffAtTrigger en de netto saleProceeds die
+  // de grafiek injecteert. Met die velden tellen de bon-regels per constructie op naar
+  // saleProceeds (invariant: grondslag × salePct × (1−costsPct) − payoff). Oudere /
+  // niet-v2 events missen ze → graceful fallback op de oude WOZ-grondslag.
+  const hasEngineGrondslag = meta.grondslagValueAtTrigger != null && meta.saleProceeds != null
+  const basisLabel = meta.saleValuationBasis === 'woz' ? 'WOZ-waarde' : 'Marktwaarde'
+
+  const woz = meta.wozValue ?? 0
   const mortgageBalanceNow = meta.mortgageBalance ?? 0
   const mortgageBalanceAtTrigger = meta.mortgageBalanceAtTrigger ?? mortgageBalanceNow
   const yearsToTrigger = meta.yearsToTrigger ?? 0
-  const proceeds = meta.saleProceeds ?? netSale - mortgageBalanceAtTrigger
+
+  // Engine-grondslag wanneer beschikbaar; anders de legacy-WOZ-waarde.
+  const grondslag = meta.grondslagValueAtTrigger ?? woz
+  const grossSale = grondslag * salePct
+  const verkoopkosten = grossSale * costsPct
+  const netSale = grossSale - verkoopkosten
+  const mortgagePayoff = meta.mortgagePayoffAtTrigger ?? mortgageBalanceAtTrigger
+  const proceeds = meta.saleProceeds ?? netSale - mortgagePayoff
+
   const mortgagePaymentNow = meta.mortgageMonthlyPayment ?? 0
   const mortgagePaymentAtTrigger = meta.mortgagePaymentAtTrigger ?? mortgagePaymentNow
   const newMonthly = meta.newMonthly ?? 0
@@ -510,31 +531,50 @@ function DownsizeBreakdown({ meta }: { meta: HousingMetadata }) {
 
       <div className="mt-4 border-t border-[var(--border-ed)] pt-4">
         <SubFormula label="1. Eenmalige verkoopopbrengst">
-          <CalcRow label="WOZ-waarde" value={formatCurrency(woz)} />
-          <CalcRow
-            label={`Verkoopprijs (${(salePct * 100).toFixed(0)}% van WOZ)`}
-            value={formatCurrency(grossSale)}
-          />
-          <CalcRow
-            label={`Verkoopkosten (${(costsPct * 100).toFixed(1)}%) — makelaar, notaris, verhuizen`}
-            value={`− ${formatCurrency(grossSale * costsPct)}`}
-          />
-          <CalcRow label="Netto verkoopopbrengst" value={formatCurrency(netSale)} />
-          {mortgageBalanceNow > 0 && (
+          {hasEngineGrondslag ? (
             <>
+              <CalcRow label={`${basisLabel} bij verkoop`} value={formatCurrency(grondslag)} />
               <CalcRow
-                label="Huidig hypotheek-saldo"
-                value={formatCurrency(mortgageBalanceNow)}
+                label={`Verkoopprijs (${(salePct * 100).toFixed(0)}% van ${basisLabel})`}
+                value={formatCurrency(grossSale)}
               />
-              {yearsToTrigger > 0 && (
-                <CalcRow
-                  label={
-                    hypotheekAfgelostBijTrigger
-                      ? `Geheel afgelost in ${yearsToTrigger} jaar (afhankelijk van aflossingsschema)`
-                      : `Geprojecteerd saldo na ${yearsToTrigger} jaar amortisatie`
-                  }
-                  value={`− ${formatCurrency(mortgageBalanceAtTrigger)}`}
-                />
+              <CalcRow
+                label={`Verkoopkosten (${(costsPct * 100).toFixed(1)}%) — makelaar, notaris, verhuizen`}
+                value={`− ${formatCurrency(verkoopkosten)}`}
+              />
+              {mortgagePayoff > 0 && (
+                <CalcRow label="Hypotheek afgelost" value={`− ${formatCurrency(mortgagePayoff)}`} />
+              )}
+            </>
+          ) : (
+            <>
+              <CalcRow label="WOZ-waarde" value={formatCurrency(woz)} />
+              <CalcRow
+                label={`Verkoopprijs (${(salePct * 100).toFixed(0)}% van WOZ)`}
+                value={formatCurrency(grossSale)}
+              />
+              <CalcRow
+                label={`Verkoopkosten (${(costsPct * 100).toFixed(1)}%) — makelaar, notaris, verhuizen`}
+                value={`− ${formatCurrency(verkoopkosten)}`}
+              />
+              <CalcRow label="Netto verkoopopbrengst" value={formatCurrency(netSale)} />
+              {mortgageBalanceNow > 0 && (
+                <>
+                  <CalcRow
+                    label="Huidig hypotheek-saldo"
+                    value={formatCurrency(mortgageBalanceNow)}
+                  />
+                  {yearsToTrigger > 0 && (
+                    <CalcRow
+                      label={
+                        hypotheekAfgelostBijTrigger
+                          ? `Geheel afgelost in ${yearsToTrigger} jaar (afhankelijk van aflossingsschema)`
+                          : `Geprojecteerd saldo na ${yearsToTrigger} jaar amortisatie`
+                      }
+                      value={`− ${formatCurrency(mortgageBalanceAtTrigger)}`}
+                    />
+                  )}
+                </>
               )}
             </>
           )}

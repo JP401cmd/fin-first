@@ -505,9 +505,34 @@ function StrategyDetailsPanel({
 
       {config.mode === 'downsize' && (
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+              Grondslag verkoopwaarde
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <TriggerButton
+                selected={(config.saleValuationBasis ?? 'market') === 'market'}
+                onClick={() => onChange({ ...config, saleValuationBasis: 'market' })}
+                title="Marktwaarde"
+                subtitle="Rekent met de huidige marktwaarde van je woning (zoals op je dashboard), met waardegroei."
+              />
+              <TriggerButton
+                selected={config.saleValuationBasis === 'woz'}
+                onClick={() => onChange({ ...config, saleValuationBasis: 'woz' })}
+                title="WOZ-waarde"
+                subtitle="Conservatiever: rekent met de WOZ-waarde (vaak lager), met waardegroei."
+              />
+            </div>
+            {config.saleValuationBasis === 'woz' && (
+              <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">
+                De huiswaarde in deze projectie ligt dan lager dan op je dashboard (dat blijft
+                marktwaarde tonen) — een bewuste, conservatieve planningskeuze.
+              </p>
+            )}
+          </div>
           <LabeledNumber
             label="Verkoopprijs"
-            unit="% van WOZ"
+            unit="% van verkoopwaarde"
             value={config.salePricePct * 100}
             min={50}
             max={150}

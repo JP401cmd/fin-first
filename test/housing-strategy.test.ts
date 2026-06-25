@@ -169,7 +169,30 @@ describe('parseHousingStrategy', () => {
       salePricePct: 0.95,
       salesCostsPct: 0.05,
       newMonthlyHousingCost: 1800,
+      // ADR 0031: parser zet altijd de valuatie-basis; ontbrekend veld → default 'market'.
+      saleValuationBasis: 'market',
     })
+  })
+
+  it('parseert downsize met expliciete saleValuationBasis woz', () => {
+    const result = parseHousingStrategy({
+      mode: 'downsize',
+      trigger: 'fixed_age',
+      triggerAge: 67,
+      salePricePct: 1,
+      salesCostsPct: 0.04,
+      newMonthlyHousingCost: null,
+      saleValuationBasis: 'woz',
+    }) as { saleValuationBasis: string }
+    expect(result.saleValuationBasis).toBe('woz')
+  })
+
+  it('valt terug op market bij malformed saleValuationBasis', () => {
+    const result = parseHousingStrategy({
+      mode: 'downsize', trigger: 'fixed_age', triggerAge: 67, salePricePct: 1, salesCostsPct: 0.04,
+      newMonthlyHousingCost: null, saleValuationBasis: 'onzin',
+    }) as { saleValuationBasis: string }
+    expect(result.saleValuationBasis).toBe('market')
   })
 
   it('parseert reverse_mortgage met defaults', () => {

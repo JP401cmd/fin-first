@@ -21,6 +21,7 @@ import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import {
   filterAssetsForFire,
+  applyDownsizeValuationBasis,
   deriveHousingContext,
   isHousingStrategyEvent,
   buildHousingLifeEventsAtAge,
@@ -120,53 +121,124 @@ function potRulesToStrategyOptions(config: PotRulesConfig | undefined): Partial<
   return opts
 }
 
+/** Huiswaarde in het grootboek bij een rij = som van de eind-waarden van de
+ * eigen_huis-assets (reëel, current_value-gegroeid; bij saleValuationBasis='woz'
+ * woz_value-gegroeid, want de input-assets zijn dan al gesubstitueerd). */
+function ledgerHouseValueAt(row: { assets: { type: string; eind: number }[] }): number {
+  return row.assets.filter((a) => a.type === 'eigen_huis').reduce((s, a) => s + Math.max(0, a.eind), 0)
+}
+
+/**
+ * Bouw de huur-life-events + de huis-`AssetLiquidation` op een GEGEVEN trigger-
+ * leeftijd. Dé ENE bron voor zowel de getoonde grafiek-run (`buildV2DownsizeHousing`)
+ * als de interne convergentie-runs in `resolveDownsizeTriggerV2` (de "getoonde FIRE"-
+ * meting) — zodat de meetrun exact dezelfde sale+rent-delta beleeft als de grafiek.
+ *
+ * Alleen de nieuwe-woonkosten (huur) blijven als cashflow; de verkoopopbrengst én de
+ * afgeloste hypotheek handelt de engine via de liquidatie af (anders dubbeltelling).
+ * Hypotheek-keuze: bij één huis alle eigen-huis-hypotheken, bij meerdere huizen strikt
+ * op `linked_asset_id` (anders zou een hypotheek van een ánder huis op €0 gezet worden
+ * zonder dat dat asset het grootboek verlaat).
+ */
+function buildDownsizeRentAndLiquidation(
+  config: DownsizeConfig,
+  context: HousingContext,
+  triggerAge: number,
+  currentAge: number,
+  endAge: number,
+  extraMetadata: Record<string, unknown>,
+): { rentEvents: LifeEvent[]; houseLiquidation: AssetLiquidation | undefined } {
+  const rentEvents = buildHousingLifeEventsAtAge(config, context, triggerAge, currentAge, endAge, extraMetadata)
+    .map((ev) => ({
+      ...ev,
+      metadata: {
+        ...((ev.metadata as Record<string, unknown> | null) ?? {}),
+        cashflows: (((ev.metadata as { cashflows?: { id: string }[] } | null)?.cashflows) ?? []).filter((c) => c.id === 'new-rent'),
+      },
+    }))
+    .filter((ev) => (((ev.metadata as { cashflows?: unknown[] }).cashflows)?.length ?? 0) > 0)
+  const soldHouse = context.eigenHuisAssets[0]
+  const payoffMortgages = soldHouse == null
+    ? []
+    : context.eigenHuisAssets.length <= 1
+      ? context.eigenHuisMortgages
+      : context.eigenHuisMortgages.filter(
+          (d) => (d as unknown as { linked_asset_id?: string | null }).linked_asset_id === soldHouse.id,
+        )
+  const houseLiquidation: AssetLiquidation | undefined = soldHouse
+    ? {
+        assetId: soldHouse.id,
+        age: triggerAge,
+        salePricePct: config.salePricePct,
+        salesCostsPct: config.salesCostsPct,
+        payoffDebtIds: payoffMortgages.map((d) => d.id),
+      }
+    : undefined
+  return { rentEvents, houseLiquidation }
+}
+
 /**
  * Bepaal het downsize-verkoopmoment op het LIQUIDE-pad van de v2-grootboek-engine
- * (ADR 0015/0030) — niet op de v1-meetrun. Meetrun = v2 met het huis IN de ledger,
- * ZONDER liquidatie maar MÉT de woning als spendable (Optie B): zo beleeft de meetrun
- * EXACT dezelfde FIRE-leeftijd, stop-werk-leeftijd en afbouw-dynamiek als de getoonde
- * grafiek. Het eerste jaar waarin de RAUW besteedbare pot (`besteedbaarVermogen` =
- * `withdrawableLiquidValue`, ex de spendable+saleManaged woning) de verkoopkosten-
- * buffer (+ optionele veiligheidsmarge) raakt, is het moment waarop verkoop nodig is.
- * Geen kruising vóór de config-cap → fallback op die cap.
+ * (ADR 0015/0030/0031) — niet op de v1-meetrun. Meetrun = v2 met het huis IN de
+ * ledger, ZONDER liquidatie maar MÉT de woning als spendable (Optie B) ÉN gepind op een
+ * stabiele FIRE-leeftijd in de onttrekkingsfase: zo teert het RAUW besteedbare pad
+ * (`besteedbaarVermogen` = `withdrawableLiquidValue`, ex de spendable+saleManaged woning)
+ * pas ná de stop-werk-leeftijd af. Het eerste jaar waarin dat pad de verkoopkosten-buffer
+ * (+ optionele veiligheidsmarge) raakt, is het verkoopmoment. Geen kruising binnen de
+ * horizon → 'no_sale' (huis blijft staan).
  *
- * ADR 0030 (Optie B): vóór deze fix scande de meetrun `liquideVermogen` ZÓNDER
- * spendable (ex-huis-eligibility op een ándere run dan de getoonde) → de trigger
- * vuurde jaren te laat omdat de getoonde run (mét spendable) de annuïteit op de hele
- * woning-inclusieve pot spreidde en de cash stil leeg liet lopen. Nu draait de meetrun
- * op exact dezelfde grondslag als de grafiek en meet hij de pot die de afbouw werkelijk
- * opneemt → de verkoop vuurt op de leeftijd waarop de getoonde besteedbare daling de
- * buffer raakt. De woning telt mee voor eligibility (spendable) maar verlaat de pot
- * enkel via de verkoop, dus zit per definitie niet in `besteedbaarVermogen` (ex-huis).
+ * ADR 0031 (bugfix accumulatie-trigger): vóór deze fix berekende de meetrun zijn EIGEN
+ * FIRE-leeftijd (geen `forcedFireAge`). Omdat de spendable woning de FIRE-eligibility-pot
+ * (`liquideVermogen`) al op currentAge bevredigt maar de besteedbare ex-huis pot dat NIET
+ * kan dragen, "pensioneerde" de meetrun een nog-werkende/accumulerende gebruiker direct,
+ * teerde op de kleine ex-huis cash en kruiste de buffer al in de OPBOUWFASE (bv. trigger
+ * 41 terwijl de getoonde run pas op ~59-60 FIRE bereikt). Fix = pin de meetrun op een
+ * STABIELE FIRE-leeftijd in 2 stappen (GEEN vaste-punt-iteratie — die divergeert door
+ * datzelfde spendable-woning-FIRE-gate-artefact, want bij een verkoop ver in de toekomst
+ * houdt de woning `liquideVermogen` kunstmatig positief → de engine claimt een onmogelijk-
+ * vroege FIRE → terugkoppeling oscilleert 41→79→83→41):
+ *   1. HOLD-FIRE-anker = `runHorizonLedger(baseInput).fireAge` — de woning is daar spendable
+ *      ÉN rauw besteedbaar (geen saleManaged-markering, geen huur) → `besteedbaarVermogen
+ *      == liquideVermogen` → de FIRE-gate is EERLIJK → de leeftijd is sale-timing-
+ *      ONAFHANKELIJK (≈ include_full-FIRE) en dus stabiel.
+ *   2. één VERFIJNING: de echte getoonde downsize-run (huur + verkoopkosten) heeft een
+ *      latere FIRE dan het hold-anker; pin de meetrun daarop (geklemd ≥ hold-FIRE tegen
+ *      het artefact). De afbouw — en dus de trigger — valt zo gegarandeerd ≥ FIRE (of
+ *      nooit → no_sale). Pensioen-modus (exogene `baseInput.forcedFireAge`) wint altijd.
  *
- * Retourneert óók een `SimulatedDepletionResult`-vormige uitleg (zelfde shape als
- * `lib/housing-trigger.ts`) zodat het v2-rent-event de "Waarom dit moment?"-panel
- * kan tonen (M1) — op v2's eigen liquide-pad, geen v1-meetrun.
- *
- * VALUATIE-BASIS (M4): zowel de verkoopopbrengst (in `engine.ts`) als de
- * verkoopkosten-buffer hier worden op DEZELFDE basis gemeten: de **engine-asset-
- * waarde** van het huis in het grootboek (`current_value × inclusion`, jaarlijks
- * gegroeid op het reële `expected_return`). Dat is precies wat de ledger werkelijk
- * aanhoudt en verkoopt — niet `projectEigenHuisValuesAt(...).wozValue` (dat groeit
- * NOMINAAL en valt terug op `woz_value`, dat van `current_value` kan afwijken).
- * Door de huiswaarde uit de meetrun-rij te lezen zijn buffer en opbrengst per
- * constructie consistent én beide reëel (de engine rekent volledig reëel; de
- * marge mag dus géén nominale `(1+inflatie)^jaar`-indexering krijgen).
+ * VALUATIE-BASIS: zowel de verkoopkosten-buffer als de getoonde verkoopopbrengst worden
+ * op DEZELFDE basis gemeten — de **engine-asset-waarde** van het huis in het grootboek
+ * (`ledgerHouseValueAt`, reëel gegroeid). Bij saleValuationBasis='woz' zijn de input-
+ * assets al via `applyDownsizeValuationBasis` gesubstitueerd, dus alles erna is per
+ * constructie basis-bewust. De `sale`-breakdown (engine-grondslag + afgeloste hypotheek +
+ * netto opbrengst, alles basis-bewust uit de meetrun-rij) gaat mee terug zodat preview,
+ * markers én de uitleg-bon exact het door de grafiek geïnjecteerde bedrag tonen (Bug B/H2).
  */
+/**
+ * Engine-grondslag van een huis-verkoop op de trigger-leeftijd (basis-bewust). Alle
+ * velden uit DEZELFDE meetrun-rij zodat de "uitleg-bon"-breakdown per constructie optelt
+ * naar `saleProceeds` (consume-don't-recompute, H2):
+ *   saleProceeds = grondslag × salePricePct × (1−salesCostsPct) − mortgagePayoff.
+ */
+interface DownsizeSaleBreakdown {
+  /** Engine-huiswaarde op de trigger-leeftijd vóór salePricePct/kosten (= current_value of woz_value, reëel gegroeid, inclusion-gewogen). */
+  grondslagValueAtTrigger: number
+  /** Afgelost eigen-huis-hypotheeksaldo op de trigger (engine, reëel gegroeid). */
+  mortgagePayoffAtTrigger: number
+  /** Engine-NETTO-opbrengst (wat de ledger werkelijk naar liquide injecteert). */
+  saleProceeds: number
+}
+
 function resolveDownsizeTriggerV2(
   config: DownsizeConfig,
   context: HousingContext,
   baseInput: UnifiedProjectionInput,
   currentAge: number,
-): { triggerAge: number; depletion: SimulatedDepletionResult } {
+): { triggerAge: number; depletion: SimulatedDepletionResult; sale: DownsizeSaleBreakdown | null } {
   const fallbackAge = Math.max(currentAge, config.triggerAge)
   const margeJaren = Number(config.depletionThresholdYears) || 0
-
-  // Huiswaarde in het grootboek bij een gegeven rij = de som van de eind-waarden
-  // van de eigen_huis-assets (reëel, current_value-gegroeid). Dit is de basis voor
-  // zowel de verkoopkosten-buffer als de daadwerkelijke verkoopopbrengst.
-  const ledgerHouseValueAt = (row: { assets: { type: string; eind: number }[] }): number =>
-    row.assets.filter((a) => a.type === 'eigen_huis').reduce((s, a) => s + Math.max(0, a.eind), 0)
+  const soldHouse = context.eigenHuisAssets[0]
+  const mortgageIds = new Set(context.eigenHuisMortgages.map((d) => d.id))
 
   const baseDepletion = (over: Partial<SimulatedDepletionResult>): SimulatedDepletionResult => ({
     method: 'simulation',
@@ -183,39 +255,37 @@ function resolveDownsizeTriggerV2(
     ...over,
   })
 
-  // fixed_age: het huis wordt sowieso verkocht op de gekozen leeftijd — dit is
-  // GEEN depletie-trigger. `reason: 'no_sale'` is hier louter een placeholder
-  // (het rent-event krijgt bij fixed_age geen depletion-uitleg; zie
-  // `buildV2DownsizeHousing`). De verkoop zelf gebeurt onvoorwaardelijk.
-  if (config.trigger === 'fixed_age') {
-    return { triggerAge: fallbackAge, depletion: baseDepletion({ triggerAge: fallbackAge, reason: 'no_sale' }) }
+  // Engine-net verkoopopbrengst op een gegeven leeftijd, gelezen uit de meetrun-rij
+  // (huis nog niet verkocht): `huiswaarde × salePricePct × (1−salesCostsPct) −
+  // afgelost hypotheeksaldo`. Basis-bewust (de assets zijn al gesubstitueerd bij 'woz').
+  type Row = { leeftijd: number; assets: { type: string; eind: number }[]; schulden: { id: string; eind: number }[]; besteedbaarVermogen: number }
+  const mortgageBalanceAt = (rows: Row[], age: number): number => {
+    const row = rows.find((r) => r.leeftijd === Math.round(age))
+    return row ? row.schulden.filter((s) => mortgageIds.has(s.id)).reduce((sum, s) => sum + Math.max(0, s.eind), 0) : 0
+  }
+  const engineSaleAt = (rows: Row[], age: number): DownsizeSaleBreakdown | null => {
+    const row = rows.find((r) => r.leeftijd === Math.round(age))
+    if (!row) return null
+    const grondslag = ledgerHouseValueAt(row)
+    const mortgagePayoff = mortgageBalanceAt(rows, age)
+    return {
+      grondslagValueAtTrigger: grondslag,
+      mortgagePayoffAtTrigger: mortgagePayoff,
+      saleProceeds: grondslag * config.salePricePct * (1 - config.salesCostsPct) - mortgagePayoff,
+    }
   }
 
-  // ADR 0030 (Optie B): de meetrun markeert het huis als saleManaged via een
-  // synthetische verkoop op `endAge + 1` — STRIKT BUITEN de scan-horizon (die tot
-  // endAge loopt) — zodat de verkoop binnen de scan NOOIT werkelijk vuurt, maar het
-  // huis over de HELE horizon als saleManaged geldt. Bewust NIET op `fallbackAge`
-  // (= config.triggerAge, [50,95], default 67): die ligt ONDER endAge, dus dan zou de
-  // synthetische verkoop wél binnen de horizon vuren, de opbrengst in
-  // `besteedbaarVermogen` injecteren en de scan de echte ex-huis-depletie missen
-  // (trigger jaren te laat → dip→crash terug). Effect van endAge+1: het huis is
-  // wél spendable (telt mee in de FIRE-eligibility/opbouw, baseInput.spendableAssetIds)
-  // maar NIET rauw onttrekbaar (saleManaged → `mayBeRawWithdrawn` = false) → het zit
-  // de hele horizon NIET in `besteedbaarVermogen` en de afbouw-annuïteit teert op de
-  // ex-huis cash — EXACT de pre-sale dynamiek van de getoonde run. Zo meet de scan de
-  // leeftijd waarop de ECHTE besteedbare (ex-huis) pot de verkoopkosten-buffer raakt,
-  // ongeacht de door de gebruiker gekozen `config.triggerAge`/`fallbackAge`. Zónder
-  // deze saleManaged-markering zou het huis (spendable, niet-saleManaged) wél rauw
-  // onttrekbaar zijn → besteedbaarVermogen incl. huis → de scan kruist pas op endAge.
-  const soldHouse = context.eigenHuisAssets[0]
+  // De meetrun markeert het huis als saleManaged via een synthetische verkoop op
+  // `endAge + 1` — STRIKT BUITEN de scan-horizon (tot endAge) — zodat ze binnen de scan
+  // NOOIT werkelijk vuurt maar het huis over de HELE horizon als saleManaged geldt:
+  // wél spendable (telt mee in `liquideVermogen`/eligibility) maar NIET rauw onttrekbaar
+  // (→ niet in `besteedbaarVermogen`). Zo teert de afbouw-annuïteit op de ex-huis cash —
+  // exact de pre-sale dynamiek van de getoonde run.
   const measureLiquidations = soldHouse
     ? [
         ...(baseInput.assetLiquidations ?? []),
         {
           assetId: soldHouse.id,
-          // STRIKT buiten de scan-horizon (endAge) — zie docstring/ADR 0030: deze
-          // synthetische verkoop mag binnen de scan NOOIT werkelijk vuren, ze markeert
-          // het huis enkel over de hele horizon als saleManaged (→ ex `besteedbaarVermogen`).
           age: baseInput.endAge + 1,
           trigger: 'fixed_age' as const,
           salePricePct: config.salePricePct,
@@ -225,93 +295,186 @@ function resolveDownsizeTriggerV2(
       ]
     : baseInput.assetLiquidations
 
-  let measure
-  try {
-    measure = runHorizonLedger({ ...baseInput, assetLiquidations: measureLiquidations })
-  } catch {
-    return { triggerAge: fallbackAge, depletion: baseDepletion({}) }
-  }
-
-  // Liquide-pad voor de UI-uitleg (einde-jaar-waarden + drempel per jaar).
-  const liquidPath: { age: number; liquid: number; buffer: number }[] = []
-  let prevLiquid: number | null = null
-  let crossing: {
-    age: number
-    prevLiquid: number
-    buffer: number
-    margin: number
-    houseValue: number
-  } | null = null
-
-  // Scan de VOLLEDIGE horizon (alle measure-rows tot endAge) — NIET tot
-  // `fallbackAge` (= config.triggerAge). De eerste kruising, waar hij ook valt,
-  // is het verkoopmoment (ADR 0012/0015). `config.triggerAge` is uitsluitend
-  // het plafond voor het never-deplete-geval en mag de scan niet afkappen.
-  for (const row of measure.rows) {
-    const houseValue = ledgerHouseValueAt(row)
-    const buffer = houseValue * config.salePricePct * config.salesCostsPct
-    // Reële marge (vlak, géén nominale indexering — de engine is volledig reëel).
-    const margin = margeJaren > 0 ? margeJaren * baseInput.yearlyExpenses : 0
-    // ADR 0030 (Optie B): scan de RAUW besteedbare pot (`besteedbaarVermogen`) — de
-    // pot die de afbouw werkelijk opneemt, ex de spendable+saleManaged woning. De
-    // meetrun draait mét spendable (zelfde FIRE-leeftijd/afbouw als de getoonde run),
-    // dus deze pot is exact de getoonde besteedbare daling. Vóór ADR 0030 scande dit
-    // `liquideVermogen` op een ex-huis-meetrun (geen spendable) → een ándere afbouw-
-    // dynamiek dan de getoonde run → de trigger vuurde jaren te laat. Nu vuurt hij op
-    // de leeftijd waarop de getoonde besteedbare pot de verkoopkosten-buffer raakt.
-    const besteedbaar = row.besteedbaarVermogen
-    liquidPath.push({ age: row.leeftijd, liquid: besteedbaar, buffer: buffer + margin })
-    if (crossing === null && besteedbaar - (buffer + margin) <= 1) {
-      crossing = {
-        age: row.leeftijd,
-        prevLiquid: prevLiquid ?? besteedbaar,
-        buffer,
-        margin,
-        houseValue,
-      }
+  // Eén meetrun, gepind op `forced` (pensioen-modus wint via baseInput.forcedFireAge).
+  const runMeasure = (forced: number | undefined): { rows: Row[] } | null => {
+    try {
+      return runHorizonLedger({
+        ...baseInput,
+        assetLiquidations: measureLiquidations,
+        forcedFireAge: baseInput.forcedFireAge ?? forced,
+      }) as unknown as { rows: Row[] }
+    } catch {
+      return null
     }
-    prevLiquid = besteedbaar
   }
 
-  if (crossing) {
-    const isImmediate = measure.rows.length > 0 && Math.abs(crossing.age - measure.rows[0].leeftijd) < 1e-6
-    // Overwaarde = geprojecteerde huiswaarde (engine-basis) − afgelost hypotheeksaldo
-    // op het verkoopjaar. Lees beide uit de meetrun-rij zodat ze op dezelfde basis liggen.
-    const crossRow = measure.rows.find((r) => r.leeftijd === crossing!.age)
-    const mortgageIds = new Set(context.eigenHuisMortgages.map((d) => d.id))
-    const mortgageBalance = crossRow
-      ? crossRow.schulden.filter((s) => mortgageIds.has(s.id)).reduce((sum, s) => sum + Math.max(0, s.eind), 0)
-      : 0
-    const equityAtTrigger = Math.max(0, crossing.houseValue - mortgageBalance)
-    return {
-      triggerAge: crossing.age,
-      depletion: baseDepletion({
+  // ── Scan: eerste kruising van `besteedbaarVermogen` met de verkoopkosten-buffer ──
+  interface MeasureScan {
+    triggerAge: number
+    reason: 'immediate' | 'crossover' | 'no_sale'
+    crossing: { age: number; prevLiquid: number; buffer: number; margin: number; houseValue: number } | null
+    liquidPath: { age: number; liquid: number; buffer: number }[]
+    prevLiquidEnd: number
+  }
+  const scanRows = (rows: Row[]): MeasureScan => {
+    const liquidPath: { age: number; liquid: number; buffer: number }[] = []
+    let prevLiquid: number | null = null
+    let crossing: MeasureScan['crossing'] = null
+    for (const row of rows) {
+      const houseValue = ledgerHouseValueAt(row)
+      const buffer = houseValue * config.salePricePct * config.salesCostsPct
+      const margin = margeJaren > 0 ? margeJaren * baseInput.yearlyExpenses : 0
+      const besteedbaar = row.besteedbaarVermogen
+      liquidPath.push({ age: row.leeftijd, liquid: besteedbaar, buffer: buffer + margin })
+      if (crossing === null && besteedbaar - (buffer + margin) <= 1) {
+        crossing = { age: row.leeftijd, prevLiquid: prevLiquid ?? besteedbaar, buffer, margin, houseValue }
+      }
+      prevLiquid = besteedbaar
+    }
+    if (crossing) {
+      const isImmediate = rows.length > 0 && Math.abs(crossing.age - rows[0].leeftijd) < 1e-6
+      return {
         triggerAge: crossing.age,
         reason: isImmediate ? 'immediate' : 'crossover',
-        liquidAtTrigger: crossing.prevLiquid,
-        bufferAtTrigger: crossing.buffer,
-        marginAtTrigger: crossing.margin,
-        equityAtTrigger,
+        crossing,
         liquidPath,
-      }),
+        prevLiquidEnd: prevLiquid ?? 0,
+      }
+    }
+    return { triggerAge: fallbackAge, reason: 'no_sale', crossing: null, liquidPath, prevLiquidEnd: prevLiquid ?? 0 }
+  }
+
+  // FIRE-leeftijd van de ECHTE getoonde downsize-run (sale+rent op kandidaat D) — de
+  // verfijnings-pin. Identieke delta-constructie als de grafiek
+  // (`buildDownsizeRentAndLiquidation`), huis spendable (baseInput.spendableAssetIds),
+  // engine zelf-berekent FIRE → `full.fireAge` == de getoonde downsize-FIRE. (Niet als
+  // vaste-punt geïtereerd: bij een verkoop ver in de toekomst houdt de spendable woning
+  // `liquideVermogen` positief en claimt de FIRE-gate een onmogelijk-vroege FIRE — zie
+  // ADR 0031 — dus we gebruiken dit voor ÉÉN verfijning vanaf de stabiele hold-FIRE.)
+  const displayedDownsizeFireAge = (D: number): number | null => {
+    const { rentEvents, houseLiquidation } = buildDownsizeRentAndLiquidation(
+      config, context, D, currentAge, baseInput.endAge, { depletion: null, triggerMode: config.trigger },
+    )
+    try {
+      return runHorizonLedger({
+        ...baseInput,
+        cashflows: [...baseInput.cashflows, ...lifeEventsToCashflows(rentEvents)],
+        assetLiquidations: [...(baseInput.assetLiquidations ?? []), ...(houseLiquidation ? [houseLiquidation] : [])],
+        forcedFireAge: baseInput.forcedFireAge,
+      }).fireAge
+    } catch {
+      return null
     }
   }
 
-  // Geen kruising binnen de VOLLEDIGE horizon → verkoop is niet nodig
-  // ('no_sale'). Geen force-sale op het plafond: het huis blijft in het
-  // grootboek en groeit door tot endAge (groter eindvermogen). De
-  // orkestratie (`buildV2DownsizeHousing`) emit hierop GEEN liquidatie en
-  // GEEN huur-event. We rapporteren het plafond als `triggerAge` louter voor
-  // evt. UI-uitleg.
-  const atFallback = liquidPath.find((p) => p.age >= fallbackAge - 1e-6)
-  return {
-    triggerAge: fallbackAge,
-    depletion: baseDepletion({
+  // fixed_age: het huis wordt onvoorwaardelijk verkocht op de gekozen leeftijd — GEEN
+  // depletie-trigger (placeholder 'no_sale'; het rent-event krijgt bij fixed_age geen
+  // depletion-uitleg, zie buildV2DownsizeHousing). De huiswaarde (en dus de opbrengst)
+  // is FIRE-leeftijd-onafhankelijk (een saleManaged huis wordt nooit rauw onttrokken),
+  // dus één meetrun volstaat om de basis-bewuste engine-grondslag af te lezen.
+  if (config.trigger === 'fixed_age') {
+    const m = runMeasure(undefined)
+    const sale = m ? engineSaleAt(m.rows, fallbackAge) : null
+    return { triggerAge: fallbackAge, depletion: baseDepletion({ triggerAge: fallbackAge, reason: 'no_sale', iterations: 1 }), sale }
+  }
+
+  // ── on_depletion: stabiele pin via hold-FIRE-anker + verfijning (ADR 0031, GEEN iteratie) ──
+  const buildNoSale = (scan: MeasureScan, runs: number): { triggerAge: number; depletion: SimulatedDepletionResult; sale: DownsizeSaleBreakdown | null } => {
+    const atFallback = scan.liquidPath.find((p) => p.age >= fallbackAge - 1e-6)
+    return {
       triggerAge: fallbackAge,
-      reason: 'no_sale',
-      liquidAtTrigger: atFallback?.liquid ?? prevLiquid ?? 0,
-      liquidPath,
+      depletion: baseDepletion({
+        triggerAge: fallbackAge,
+        reason: 'no_sale',
+        liquidAtTrigger: atFallback?.liquid ?? scan.prevLiquidEnd ?? 0,
+        liquidPath: scan.liquidPath,
+        iterations: runs,
+      }),
+      sale: null,
+    }
+  }
+
+  // STAP 1 — HONEST "hold-the-house" FIRE-anker: de FIRE-leeftijd van de run waarin de
+  // woning spendable ÉN rauw besteedbaar is (geen saleManaged-markering, geen huur) =
+  // `runHorizonLedger(baseInput)`. Daar geldt `besteedbaarVermogen == liquideVermogen`
+  // (de woning zit in BEIDE potten), dus de FIRE-gate is EERLIJK en de leeftijd is de
+  // echte "wanneer kan ik stoppen als het huis meetelt"-leeftijd (≈ include_full-FIRE).
+  // Stabiel: sale-timing-onafhankelijk. NULL = FIRE onbereikbaar (bv. onderwater-hypotheek/
+  // zeer hoge uitgaven): dán NIET op currentAge pinnen — dat zou de meetrun "nu laten
+  // stoppen" terwijl de GETOONDE run zelf-zoekt en tot AOW doorwerkt → trigger weer te
+  // vroeg (Bug A-variant, H1). We pinnen dan op `undefined` zodat de meetrun exact de
+  // zelf-zoekende getoonde run volgt (= roughScan hieronder).
+  let holdFireAge: number | null = baseInput.forcedFireAge ?? null
+  if (holdFireAge == null) {
+    try {
+      holdFireAge = runHorizonLedger(baseInput).fireAge
+    } catch {
+      holdFireAge = null
+    }
+  }
+
+  // STAP 2 — ruwe verkoop-leeftijd: meetrun gepind op het anker (of zelf-zoekend bij
+  // onbereikbare FIRE, identiek aan de getoonde run).
+  const pin0 = baseInput.forcedFireAge ?? holdFireAge ?? undefined
+  const rough = runMeasure(pin0)
+  if (!rough) return { triggerAge: fallbackAge, depletion: baseDepletion({}), sale: null }
+  let triggerRuns = 1
+  const roughScan = scanRows(rough.rows)
+  if (roughScan.reason === 'no_sale' || !roughScan.crossing) return buildNoSale(roughScan, triggerRuns)
+
+  // STAP 3 — verfijn ALLEEN voor een ACCUMULERENDE gebruiker (salaris-inkomen ÉN hold-FIRE
+  // in de toekomst): dan werkt de gebruiker door tot ná het hold-anker en accumuleert
+  // verder, waardoor de getoonde downsize-FIRE (huur + verkoopkosten) LATER valt — pin
+  // daarop zodat de verkoop ná de stop-werk-leeftijd komt (geklemd ≥ hold-FIRE tegen het
+  // spendable-woning-FIRE-gate-artefact bij een verkoop ver in de toekomst, ≤ endAge tegen
+  // een onbereikbaar-hoge waarde). Een AL-GESTOPTE gebruiker (geen salaris) zit al in de
+  // afbouw — diens hold-FIRE kan wél > currentAge zijn (brugfase), maar doorwerken voegt
+  // geen vermogen toe → de ruwe trigger is al juist; de (instabiele) getoonde-downsize-FIRE
+  // zou 'm enkel kunstmatig vertragen. GEEN vaste-punt-iteratie (die divergeert door het
+  // artefact). Pensioen-modus (exogene forcedFireAge) slaat de verfijning over.
+  let m = rough
+  let scan = roughScan
+  let pin = pin0
+  const isAccumulating =
+    baseInput.forcedFireAge == null &&
+    (baseInput.monthlyIncome ?? 0) > 0 &&
+    holdFireAge != null &&
+    holdFireAge > currentAge + 1
+  if (isAccumulating) {
+    const refined = displayedDownsizeFireAge(roughScan.crossing.age)
+    if (refined != null && refined > (holdFireAge as number) && refined <= baseInput.endAge) {
+      const m2 = runMeasure(refined)
+      if (m2) {
+        triggerRuns = 2
+        const scan2 = scanRows(m2.rows)
+        if (scan2.reason === 'no_sale' || !scan2.crossing) return buildNoSale(scan2, triggerRuns)
+        m = m2
+        scan = scan2
+        pin = refined
+      }
+    }
+  }
+
+  const chosenAge = scan.crossing!.age
+  const equityAtTrigger = Math.max(0, scan.crossing!.houseValue - mortgageBalanceAt(m.rows, chosenAge))
+  return {
+    triggerAge: chosenAge,
+    depletion: baseDepletion({
+      triggerAge: chosenAge,
+      reason: scan.reason,
+      liquidAtTrigger: scan.crossing!.prevLiquid,
+      bufferAtTrigger: scan.crossing!.buffer,
+      marginAtTrigger: scan.crossing!.margin,
+      equityAtTrigger,
+      fireAgeUsed: pin ?? null,
+      // Honest (M1): de v2-resolve is DETERMINISTISCH, geen vaste-punt-iteratie. `iterations`
+      // = aantal trigger-meetruns (1 zonder verfijning, 2 met); `converged` = true betekent
+      // hier louter "een definitieve trigger is bepaald", geen geslaagde convergentietest.
+      iterations: triggerRuns,
+      converged: true,
+      liquidPath: scan.liquidPath,
     }),
+    sale: engineSaleAt(m.rows, chosenAge),
   }
 }
 
@@ -321,6 +484,15 @@ function resolveDownsizeTriggerV2(
  * gebruikt door zowel `buildHorizonInput` (grafiek) als de modal-preview
  * (`runHousingScenarioProjectionV2`) — zodat preview en grafiek per constructie
  * hetzelfde verkoopmoment, dezelfde opbrengst en dezelfde uitleg tonen (M1/M2).
+ *
+ * Bug B (ADR 0031): de getoonde `metadata.saleProceeds` was WOZ-nominaal (via
+ * `buildHousingLifeEventsAtAge` → `projectEigenHuisValuesAt`) en week daarmee af van de
+ * markt-, reële verkoop in de engine (~€171k voor een 50%-inclusion-huis). We overschrijven
+ * 'm met de ECHTE engine-net-opbrengst op de trigger-leeftijd (`resolveDownsizeTriggerV2.
+ * sale`), basis-bewust, en VERRIJKEN het event-metadata met de engine-GRONDSLAG (H2) zodat
+ * de uitleg-bon (event-pane-view.tsx) zijn regels consume-don't-recompute kan tonen die per
+ * constructie optellen naar `saleProceeds`:
+ *   saleProceeds = grondslagValueAtTrigger × salePricePct × (1 − salesCostsPct) − mortgagePayoffAtTrigger.
  */
 function buildV2DownsizeHousing(
   downsizeCfg: DownsizeConfig,
@@ -329,61 +501,45 @@ function buildV2DownsizeHousing(
   currentAge: number,
   simEndAge: number,
 ): { rentEvents: LifeEvent[]; assetLiquidations: AssetLiquidation[] | undefined; depletion: SimulatedDepletionResult; triggerAge: number } {
-  const { triggerAge, depletion } = resolveDownsizeTriggerV2(downsizeCfg, housingContext, baseSimInput, currentAge)
+  const { triggerAge, depletion, sale } = resolveDownsizeTriggerV2(downsizeCfg, housingContext, baseSimInput, currentAge)
 
   // Never-deplete (alleen relevant bij on_depletion): het liquide pad raakt de
   // verkoopkosten-buffer nooit binnen de horizon → verkoop is NIET nodig. Geen
   // liquidatie en geen huur-event: het huis blijft als niet-liquide asset in
-  // het grootboek en groeit door tot endAge. Geen marker, geen "Waarom dit
-  // moment?"-panel (er is immers geen event). Bij fixed_age wordt het huis wél
+  // het grootboek en groeit door tot endAge. Bij fixed_age wordt het huis wél
   // onvoorwaardelijk verkocht — die tak valt hier dus nooit door.
   if (downsizeCfg.trigger === 'on_depletion' && depletion.reason === 'no_sale') {
     return { rentEvents: [], assetLiquidations: undefined, depletion, triggerAge }
   }
 
-  // Alleen de nieuwe-woonkosten (huur) als cashflow; de verkoopopbrengst én de
-  // afgeloste hypotheek worden door de liquidatie in de engine afgehandeld
-  // (anders dubbeltelling). Hergebruik `buildHousingLifeEventsAtAge` zodat de
-  // huur-schatting + eenheid identiek zijn aan het v1-model. `extraMetadata`
-  // draagt de `depletion`-uitleg + `triggerMode` zodat het rent-event de
-  // "Waarom dit moment?"-panel toont (M1) — net als het v1-pad, maar op v2's
-  // eigen liquide-pad (geen v1-meetrun).
-  const rentEvents = buildHousingLifeEventsAtAge(downsizeCfg, housingContext, triggerAge, currentAge, simEndAge, {
-    // Bij fixed_age géén depletion (net als v1): de panel-gate vereist
-    // on_depletion. Bij on_depletion draagt depletion de volledige uitleg.
-    depletion: downsizeCfg.trigger === 'on_depletion' ? depletion : null,
-    triggerMode: downsizeCfg.trigger,
-  })
-    .map((ev) => ({
-      ...ev,
+  const { rentEvents, houseLiquidation } = buildDownsizeRentAndLiquidation(
+    downsizeCfg, housingContext, triggerAge, currentAge, simEndAge,
+    {
+      // Bij fixed_age géén depletion (net als v1): de panel-gate vereist on_depletion.
+      depletion: downsizeCfg.trigger === 'on_depletion' ? depletion : null,
+      triggerMode: downsizeCfg.trigger,
+    },
+  )
+
+  // Bug B + H2: overschrijf de WOZ-nominale `saleProceeds` met de ECHTE engine-net-opbrengst
+  // en verrijk met de basis-bewuste engine-GRONDSLAG zodat preview/markers EN de uitleg-bon
+  // het door de grafiek geïnjecteerde bedrag tonen (de bon telt per constructie op naar
+  // `saleProceeds`). De oude WOZ-velden (`wozValueAtTrigger`/`mortgageBalanceAtTrigger`)
+  // blijven informatief staan maar zijn voor de breakdown vervangen door de engine-velden.
+  if (rentEvents.length > 0 && sale != null && Number.isFinite(sale.saleProceeds)) {
+    rentEvents[0] = {
+      ...rentEvents[0],
       metadata: {
-        ...((ev.metadata as Record<string, unknown> | null) ?? {}),
-        cashflows: (((ev.metadata as { cashflows?: { id: string }[] } | null)?.cashflows) ?? []).filter((c) => c.id === 'new-rent'),
+        ...((rentEvents[0].metadata as Record<string, unknown> | null) ?? {}),
+        saleProceeds: sale.saleProceeds,
+        saleValuationBasis: downsizeCfg.saleValuationBasis ?? 'market',
+        grondslagValueAtTrigger: sale.grondslagValueAtTrigger,
+        mortgagePayoffAtTrigger: sale.mortgagePayoffAtTrigger,
       },
-    }))
-    .filter((ev) => (((ev.metadata as { cashflows?: unknown[] }).cashflows)?.length ?? 0) > 0)
-  // We verkopen het eerste eigen huis. Los alléén de hypotheken af die aan DÍT
-  // huis gekoppeld zijn — bij één huis alle eigen-huis-hypotheken (sommige
-  // hebben geen linked_asset_id), bij meerdere huizen strikt op linked_asset_id
-  // (anders zou een hypotheek van een ánder, niet-verkocht huis op €0 gezet
-  // worden zonder dat dat asset het grootboek verlaat → waarde uit het niets).
-  const soldHouse = housingContext.eigenHuisAssets[0]
-  const payoffMortgages = soldHouse == null
-    ? []
-    : housingContext.eigenHuisAssets.length <= 1
-      ? housingContext.eigenHuisMortgages
-      : housingContext.eigenHuisMortgages.filter(
-          (d) => (d as unknown as { linked_asset_id?: string | null }).linked_asset_id === soldHouse.id,
-        )
-  const assetLiquidations: AssetLiquidation[] | undefined = soldHouse
-    ? [{
-        assetId: soldHouse.id,
-        age: triggerAge,
-        salePricePct: downsizeCfg.salePricePct,
-        salesCostsPct: downsizeCfg.salesCostsPct,
-        payoffDebtIds: payoffMortgages.map((d) => d.id),
-      }]
-    : undefined
+    }
+  }
+
+  const assetLiquidations: AssetLiquidation[] | undefined = houseLiquidation ? [houseLiquidation] : undefined
   return { rentEvents, assetLiquidations, depletion, triggerAge }
 }
 
@@ -685,7 +841,14 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
 
   if (useV2Downsize) {
     // Huis + hypotheek blijven in het grootboek; verkoop = asset-liquidatie.
-    effectiveAssets = p.assets ?? []
+    // ADR 0031: bij saleValuationBasis='woz' vervangt `applyDownsizeValuationBasis` de
+    // current_value van het eigen huis door woz_value — DÉ ENE bron die de getoonde run,
+    // de trigger-meetrun ÉN de modal-preview (`runHousingScenarioProjectionV2`) van
+    // dezelfde basis-bewuste huiswaarde voorziet. Omdat de engine de huiswaarde overal
+    // via `assetEngineValue` leest, raakt deze ene substitutie automatisch netto vermogen,
+    // FIRE-pot, verkoopopbrengst én display. Bij 'market' (default) verandert er niets.
+    const downsizeCfg = housingCfg as DownsizeConfig
+    effectiveAssets = applyDownsizeValuationBasis(p.assets ?? [], downsizeCfg)
     effectiveDebts = p.debts ?? []
     const baseSimInput: UnifiedProjectionInput = {
       assets: effectiveAssets,
@@ -727,7 +890,6 @@ export function buildHorizonInput(p: BuildHorizonInputParams): BuiltHorizonInput
         ? housingContext.eigenHuisAssets.map((a) => a.id)
         : undefined,
     }
-    const downsizeCfg = housingCfg as DownsizeConfig
     const v2Housing = buildV2DownsizeHousing(downsizeCfg, housingContext, baseSimInput, currentAge, simEndAge)
     effectiveLifeEvents = [...realEvents, ...v2Housing.rentEvents]
     // Merge huis-downsize-liquidatie + generieke verkoop-liquidaties (één array).
@@ -950,8 +1112,12 @@ export function runHousingScenarioProjectionV2(
   }
 
   // downsize → v2-asset-liquidatiemodel, exact zoals de grafiek (build-input).
+  // ADR 0031: dezelfde basis-bewuste substitutie als build-input (één bron) zodat de
+  // modal-preview met identieke huiswaarde rekent als de grafiek.
+  const downsizeCfg = config as DownsizeConfig
+  const basisAssets = applyDownsizeValuationBasis(sim.assets, downsizeCfg)
   const baseSimInput: UnifiedProjectionInput = {
-    assets: sim.assets,
+    assets: basisAssets,
     debts: sim.debts,
     currentAge: sim.currentAge,
     endAge: sim.endAge,
@@ -975,7 +1141,7 @@ export function runHousingScenarioProjectionV2(
     // Spiegelt build-input's `baseSimInput`.
     spendableAssetIds: context.hasEigenHuis ? context.eigenHuisAssets.map((a) => a.id) : undefined,
   }
-  const v2Housing = buildV2DownsizeHousing(config as DownsizeConfig, context, baseSimInput, sim.currentAge, sim.endAge)
+  const v2Housing = buildV2DownsizeHousing(downsizeCfg, context, baseSimInput, sim.currentAge, sim.endAge)
   const input: UnifiedProjectionInput = {
     ...baseSimInput,
     cashflows: [...sim.cashflows, ...lifeEventsToCashflows(v2Housing.rentEvents)],
