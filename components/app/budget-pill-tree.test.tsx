@@ -272,6 +272,52 @@ describe('BudgetPillTree', () => {
     ).toBe('true')
   })
 
+  it('toont een waarschuwing op een INGEKLAPTE parent met een over-budget deelbudget', () => {
+    // Parent-totaal blijft binnen budget (170 / 200), maar één kind is over (170 / 100).
+    const groups = [
+      makeGroup({ id: 'p1', name: 'Dagelijkse uitgaven' }, [
+        { id: 'c1', name: 'Kinderen' },
+        { id: 'c2', name: 'Boodschappen' },
+      ]),
+    ]
+    const spending = { c1: 170, c2: 0 }
+    const beschikbaarMap = { c1: -70, c2: 100 } // c1 limit 100 (over), c2 limit 100 (ok)
+
+    const { getByRole, queryByText, container } = render(
+      <BudgetPillTree
+        groups={groups}
+        spending={spending}
+        budgetType="expense"
+        onNavigate={vi.fn()}
+        beschikbaarMap={beschikbaarMap}
+      />,
+    )
+
+    // Children verborgen (ingeklapt). De waarschuwing zit in de toggle-knop
+    // (aria-label, ook hoorbaar voor Tab-gebruikers) én er staat een decoratief
+    // waarschuwings-icoon (aria-hidden).
+    expect(queryByText('Kinderen')).toBeNull()
+    expect(getByRole('button', { name: /over budget/i })).toBeTruthy()
+    expect(container.querySelector('svg[aria-hidden="true"]')).toBeTruthy()
+  })
+
+  it('toont GEEN waarschuwing wanneer over-budget semantisch positief is (bv. sparen)', () => {
+    const groups = [makeGroup({ id: 'p1', name: 'Sparen' }, [{ id: 'c1', name: 'Noodfonds' }])]
+    const spending = { c1: 170 }
+    const beschikbaarMap = { c1: -70 } // 170 / 100 — bij sparen is 'over' juist goed
+
+    const { queryByRole } = render(
+      <BudgetPillTree
+        groups={groups}
+        spending={spending}
+        budgetType="savings"
+        onNavigate={vi.fn()}
+        beschikbaarMap={beschikbaarMap}
+      />,
+    )
+    expect(queryByRole('button', { name: /over budget/i })).toBeNull()
+  })
+
   it('rendert niets bij lege groups', () => {
     const { container } = render(
       <BudgetPillTree groups={[]} spending={{}} budgetType="expense" onNavigate={vi.fn()} />,

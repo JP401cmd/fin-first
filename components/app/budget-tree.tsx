@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { BudgetIcon, getTypeColors, isOverPositive, computeBarSegments, type BudgetType } from '@/components/app/budget-shared'
+import { BudgetIcon, getTypeColors, isOverPositive, computeBarSegments, anyChildOverBudget, BudgetOverWarningIcon, type BudgetType } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -175,6 +175,9 @@ function TreeGroup({
 
   const pct = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0
   const overBudget = totalSpent > totalLimit && totalLimit > 0
+  // Waarschuwing voor een (mogelijk ingeklapte) parent waarvan een deelbudget
+  // over budget is, terwijl het totaal zelf nog binnen budget kan vallen.
+  const childOverBudget = anyChildOverBudget(parent.children, spending, beschikbaarMap, budgetType)
   const overPositive = isOverPositive(budgetType)
   const seg = computeBarSegments(totalSpent, totalLimit, 80, colors, overPositive)
 
@@ -275,6 +278,8 @@ function TreeGroup({
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink)]">
           {parent.name}
         </span>
+        {/* Waarschuwing: een deelbudget is over budget (ook zichtbaar bij inklappen) */}
+        {childOverBudget && <BudgetOverWarningIcon />}
         {/* Percentage badge */}
         <span className={`shrink-0 rounded-full bg-[var(--subtle)] px-2 py-0.5 text-xs font-medium ${
           overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : pct >= 80 ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'

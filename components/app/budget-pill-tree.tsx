@@ -30,6 +30,8 @@ import {
   getTypeColors,
   isOverPositive,
   computeBarSegments,
+  anyChildOverBudget,
+  BudgetOverWarningIcon,
   type BudgetType,
 } from '@/components/app/budget-shared'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
@@ -140,6 +142,7 @@ function BudgetPill({
   expanded,
   onToggle,
   onNavigate,
+  warnChildOverBudget,
 }: {
   budget: Budget
   spent: number
@@ -152,6 +155,8 @@ function BudgetPill({
   expanded?: boolean
   onToggle?: () => void
   onNavigate: (id: string) => void
+  /** Waarschuwing tonen: één of meer deelbudgetten zijn over budget (alleen parents). */
+  warnChildOverBudget?: boolean
 }) {
   const limit = beschikbaar !== undefined ? beschikbaar + spent : Number(budget.default_limit)
   const overBudget = spent > limit && limit > 0
@@ -170,9 +175,14 @@ function BudgetPill({
 
   // Parent met kinderen → toggle in/uitklappen; anders → detail openen.
   const handleBodyClick = expandable && onToggle ? onToggle : () => onNavigate(budget.id)
-  const bodyAriaLabel = expandable && onToggle
-    ? `${budget.name} ${expanded ? 'inklappen' : 'uitklappen'}`
-    : `${budget.name} openen`
+  // De waarschuwing zit in deze knop; de expliciete aria-label overschrijft de
+  // naam van child-elementen, dus voeg de waarschuwing aan het label toe (en
+  // markeer het icoon zelf als decoratief) zodat ook Tab-gebruikers het horen.
+  const bodyAriaLabel =
+    (expandable && onToggle
+      ? `${budget.name} ${expanded ? 'inklappen' : 'uitklappen'}`
+      : `${budget.name} openen`) +
+    (warnChildOverBudget ? '. Waarschuwing: één of meer deelbudgetten zijn over budget' : '')
 
   // Icoon-knop opent ALTIJD het detailscherm — ook (juist) voor parents.
   const handleIconClick = (e: MouseEvent) => {
@@ -220,6 +230,10 @@ function BudgetPill({
       >
         {/* Naam */}
         <span className={`min-w-0 flex-1 truncate ${nameClass}`}>{budget.name}</span>
+
+        {/* Waarschuwing: een deelbudget is over budget (ook zichtbaar bij ingeklapte parent).
+            Decoratief: de tekst zit al in de knop-aria-label (bodyAriaLabel). */}
+        {warnChildOverBudget && <BudgetOverWarningIcon decorative />}
 
         {/* Bedrag: besteed / begroot. Over-budget kleurt semantisch. */}
         <span className="shrink-0 font-mono text-xs tabular-nums">
@@ -288,6 +302,10 @@ function PillGroup({
   // `parent.alert_threshold` / `parent.limit_type` / `parent.icon` / `name`.
   const parentBeschikbaar = totalLimit - totalSpent
 
+  // Waarschuwing voor de (mogelijk ingeklapte) parent: een deelbudget is over
+  // budget terwijl het totaal zelf nog binnen budget kan vallen.
+  const childOverBudget = anyChildOverBudget(parent.children, spending, beschikbaarMap, budgetType)
+
   return (
     <div className="space-y-1.5">
       <BudgetPill
@@ -300,6 +318,7 @@ function PillGroup({
         expanded={expanded}
         onToggle={hasChildren ? () => setExpanded((v) => !v) : undefined}
         onNavigate={onNavigate}
+        warnChildOverBudget={childOverBudget}
       />
 
       {hasChildren && expanded && (

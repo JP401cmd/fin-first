@@ -13,6 +13,9 @@ import {
   Gem, Bitcoin, LineChart, Building, Briefcase,
   SlidersHorizontal, ArrowRightLeft, ArrowLeftRight,
   Heart,
+  // Waarschuwings-icoon: een ingeklapt hoofdbudget dat zelf niet over budget is,
+  // maar wel één of meer over-budget deelbudgetten heeft.
+  AlertTriangle,
   // Toegevoegd voor de nieuwe asset/debt icon-set
   Hourglass, Warehouse, Coins, Clock, MoreHorizontal, FileText, Users,
   // Toegevoegd voor de uitgebreide budget-templates (telefoon/internet,
@@ -46,12 +49,58 @@ export function BudgetIcon({ name, className }: { name: string; className?: stri
 
 import { formatCurrency as _formatCurrency, formatCurrencyDecimals as _formatCurrencyDecimals } from '@/lib/format'
 export { _formatCurrency as formatCurrency, _formatCurrencyDecimals as formatCurrencyDecimals }
+import type { Budget } from '@/lib/budget-data'
 
 export type BudgetType = 'income' | 'expense' | 'savings' | 'debt' | 'archive'
 
 /** Over budget is semantically positive for income, savings, and debt (earned/saved/repaid more than planned) */
 export function isOverPositive(budgetType: BudgetType): boolean {
   return budgetType === 'income' || budgetType === 'savings' || budgetType === 'debt'
+}
+
+/**
+ * True wanneer minstens één deelbudget zijn limiet overschrijdt. Alleen
+ * relevant wanneer een overschrijding semantisch slecht is (uitgaven): bij
+ * income/savings/debt is 'over' juist positief en dus géén waarschuwing.
+ *
+ * Gebruikt dezelfde limit-afleiding als de boom-/pill-weergave
+ * (`beschikbaar + spent` indien bekend, anders `default_limit`), zodat het
+ * waarschuwingssignaal exact samenvalt met de rood-kleuring van een deelbudget.
+ */
+export function anyChildOverBudget(
+  children: Budget[],
+  spending: Record<string, number>,
+  beschikbaarMap: Record<string, number> | undefined,
+  budgetType: BudgetType,
+): boolean {
+  if (isOverPositive(budgetType)) return false
+  return children.some((c) => {
+    const spent = spending[c.id] ?? 0
+    const limit =
+      beschikbaarMap?.[c.id] !== undefined ? beschikbaarMap[c.id] + spent : Number(c.default_limit)
+    return limit > 0 && spent > limit
+  })
+}
+
+/**
+ * Stoplicht-rood waarschuwings-icoon op een hoofdbudget waarvan één of meer
+ * deelbudgetten over budget zijn — zichtbaar óók als de parent is ingeklapt en
+ * het totaal zelf binnen budget blijft. Bewust semantisch rood (géén
+ * module-accent). Combineer met `anyChildOverBudget`.
+ */
+export function BudgetOverWarningIcon({ className, decorative }: { className?: string; decorative?: boolean }) {
+  const label = 'Eén of meer deelbudgetten zijn over budget'
+  // `decorative`: het icoon zit in een control die de waarschuwing al in zijn
+  // eigen aria-label draagt (een expliciete aria-label op een knop overschrijft
+  // de naam van child-elementen). Dan markeren we het icoon als puur visueel.
+  if (decorative) {
+    return <AlertTriangle aria-hidden="true" className={`h-4 w-4 shrink-0 text-red-600 ${className ?? ''}`} />
+  }
+  return (
+    <AlertTriangle role="img" aria-label={label} className={`h-4 w-4 shrink-0 text-red-600 ${className ?? ''}`}>
+      <title>{label}</title>
+    </AlertTriangle>
+  )
 }
 
 export function formatRollover(amount: number, type: string): string {
