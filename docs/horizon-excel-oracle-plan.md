@@ -1,0 +1,265 @@
+# Horizon-rekenmotor → Excel-rekenwijze (oracle-getest) — FASE 0: mapping, faseplan & gaps
+
+> Status: FASE 0 (analyse & plan). Dit document is het mapping-document uit de missie-opdracht
+> en groeit mee per fase. Gap-besluiten van de eigenaar worden hier vastgelegd (→ §7).
+> Koersbesluit: **ADR 0032** (Excel-oracle, maandbasis, nominaal, parity ≤ €0,01, kernel naast
+> v2 tijdens flag-periode — zie ook concern `horizon-kernel-flag-periode` op de plaat).
+> Architect-fit-review uitgevoerd 2026-07-02: richting past (C5-patroon); flag-herbouw,
+> convergentie-set-invariant en reëel/nominaal-omkering expliciet opgenomen.
+
+## 1. Bron van waarheid (oracle)
+
+| | |
+|---|---|
+| Bestand | `Core calc v5.xlsm` (map: `C:\Users\janpa\OneDrive\Prive\Archief\`) |
+| Vastgesteld door eigenaar | 2026-07-02 — **v5 is definitief**; F+I+J compleet; v4-fixprompt verwerkt |
+| Geanalyseerde staat | LastWriteTime 2026-07-02 12:24:53 · 13.024.370 bytes (bestand is ná het versiebesluit nogmaals opgeslagen; snapshot = deze staat) |
+| SHA256 (snapshot) | `3E905809B5CC594C98CBC60DD898135E482B7A9D05D7BCD96E16A225D42BA80D` |
+| Versielijn | Core calc.xlsx → .xlsm → v2 → v3 → v4 (gevalideerd juli 2026) → **v5** |
+
+Het Excel is bewust "proof of working", niet feature-compleet. Volledigheid hoort in de
+code-implementatie; parity geldt binnen het Excel-domein, daarbuiten gelden eigenschaps-tests
+(behoud van totalen, geen negatieve potten, waterval sluit).
+
+## 2. Huidige stand in de repo (juli 2026)
+
+**Er bestaat nog géén Excel-oracle-werk in de repo** — geen extractor, geen fixtures, geen
+parity-tests. De bouwblokken A–J zijn ín het Excel gebouwd (via Claude-in-Excel-prompts), niet
+in code. FASE 1 en 2 zijn dus nieuwbouw.
+
+De huidige engine is de **v2-grootboek-engine** (`lib/horizon-engine/`, v1 is fysiek verwijderd,
+C5-traject). Kernverschillen met de Excel-rekenwijze:
+
+| Aspect | v2-engine (huidig) | Excel-kern (doel) |
+|---|---|---|
+| Tijdsbasis | **jaarbasis** (leeftijd-loop) | **maandbasis**, index 0..~1200 |
+| Volgorde binnen periode | binnen-jaar sequentieel (schok→rendement→Box3→schuld→cashflow→surplus/onttrekking) | **één-maand-lag exact**: belasting(m)=heffing over saldi(m−1); capaciteit/pot-share = saldo(m−1); rendement(m) = saldo(m−1)×rente/12 |
+| Box 3 | drag op het vermogen per asset | **via de cashflow** (vóór FIRE minder sparen, ná FIRE extra onttrekking); netto = bruto |
+| Verdeling toename/afname | allocatie-plug-ins (pro-rata/vast/alles-beleggen/aflossen-eerst) + sequentiële waterval op `withdrawalOrder` | **capaciteit-waterval**: prio-gewichten ½^(prio−1) genormaliseerd, cap op saldo(m−1), doorstroom-passes, reserve = prio 5, restant → tekort-lening |
+| Tekort-dekking | liquide leegtrekken, collapse-guard | **tekort-lening** (rente instelbaar, prio 1 bij aflossen) |
+| FIRE-bepaling | forward doel-zoektocht (`meetsStrategyTarget`, MIN_DECUM_YEARS=3, crossing-interpolatie) | **maand-bisectie** op gap (netto-liquide op eindleeftijd − doelbedrag → 0); "pensioen" kortsluit naar AOW |
+| Solver-uitkomst | `fireReachable` boolean (+ enkele flags) | expliciete statussen: `reached_now` / `reached_at` / `unreachable` (+ €/mnd-extra-hint) / `pension_shortfall` |
+| Reëel/nominaal | intern reëel; adapter → nominaal (×(1+infl)^jaar), ADR 0016 | volgt Excel (verificatie in §3); indexatie expliciet in de stromen |
+| Onttrekking | static/guardrails/vpw/bucket (`WithdrawalStrategyType`) | **behoefte-gebaseerd** × onttrekkingsprofiel Vast/Afnemend/Oplopend (3-fasen-curve) /Guardrails |
+| Granulariteit | per individueel asset + schuld | per-pot grootboek (Excel-slots; in code onbeperkt) |
+
+Relevante bestaande modules: `engine.ts` (runHorizonLedger), `build-input.ts` (buildHorizonInput,
+incl. downsize-trigger, opeethypotheek, generieke liquidaties), `adapter.ts` (reëel→nominaal),
+`select.ts` (runSelectedProjection), `scalar-bridge.ts`, `views.ts`, `networth-projection.ts`.
+Architectuurdoc: `docs/architecture/horizon-engine-v2.md` (invarianten INV-1..7). ADR's: 0012–0021,
+0027–0031.
+
+**Tweede rekenpad (los van de engine):** `computeFireProjection`/`computeFireRange` in
+`lib/horizon-data.ts` — scalar-helper zonder life events, gebruikt door dashboard-fallback,
+`lib/check/build-report.ts`, benchmark, `lib/cashflow-settings.ts`, `lib/freedom-milestones.ts`,
+year-in-review en EventPane-baseline. Scope-besluit nodig (→ gap V10).
+
+## 3. Excel v5 — structuur & verificatie (diepteanalyse 2026-07-02)
+
+Volledige dumps in scratchpad `excel-v5/` (`structuur.md`, `inputs.json`, `named-ranges.txt`,
+`rekenflow.md`, `verificatie.md`, `vba.txt`, raw-dumps + byte-identieke snapshot). Verhuist in
+FASE 1 naar de repo (`docs/horizon-oracle/`).
+
+**23 tabs:** P (invoer + solver-status) · Geb (gebeurtenissen: rij 4-13 handmatig, 14-30 auto,
+32-37 werk-info) · Werk-strategie (J: reële ladder → nominale delta → FIRE-gegate → CF!D) ·
+Auto-gebeurtenissen (AOW / multi-pot pensioen / kinderen-NIBUD / erfenis → Geb 14-30) · bens
+(potten-invoer: 10 bezit-slots + 7 schuld-slots) · Toelichting model (16-secties zelfdocumentatie)
+· Prognose (maandvermogen; I = netto, J = netto-liquide) · Rapport (dashboard + assertions;
+perspectief-schakelaar F2 = weergave-only) · Controle (maand-reconciliatie: 5 identiteiten +
+invarianten K8-K11) · ES (eindstrategie-spiegel) · TS (prio's / niet-liquide) · Bez
+(bezittingen/maand + woningblok AY:BE) · S (schulden/maand; slot 4 = opeethypotheek, slot 7 =
+tekort-lening) · CF (cashflow) · Bel (Box 3: forfaitair D-K, werkelijk L/M, canoniek N) · Af
+(gebeurtenis-kosten) · Ont (onttrekkingsbehoefte + profielfactoren) · Toename en afname
+(categorie-gewichten/€) · Verdeling (capaciteit-waterval, 3 onderwerpen, 219 kolommen) ·
+MC / Hist / Sim (onzekerheid) · PT (partner-parameterlaag).
+
+**Bevestigde principes:** maandbasis 0-1199 (tot leeftijd 100); volledig formule-gedreven; VBA
+alleen `BepaalFIRE` / `RunScenarioBand` / `RunMonteCarlo` (Module1, geëxtraheerd naar `vba.txt`);
+één-maand-lag structureel (o.a. CF!K2 = Bel!N(m−1); shares/caps/triggers op m−1); Box 3 via de
+cashflow (vóór FIRE CF!I, ná FIRE Ont!D); netto = bruto (Prognose!I = H, Box 3 niet cumulatief
+van vermogen afgetrokken); FIRE-grondslag Prognose!J = I − niet-liquide (TS!H5:H10/H16:H20);
+waterval ½^(prio−1) genormaliseerd + reserve prio 5 + tekort-lening; **nominaal model** — reële
+invoer wordt vooraf geïndexeerd met (1+P!B14)^(m/12) (incl. heffingsvrij vermogen en
+schuldendrempel), niet-geïndexeerde posten vooraf gede-indexeerd, nergens deflatie. Nuance
+t.o.v. het eerdere v2-beeld: Bel leest grondslagen rechtstreeks uit Bez/S (niet via CF!K).
+
+**F/I/J aanwezig (v5-nieuw):**
+- **F onttrekkingsprofiel**: P!B69-B82 → Ont!F/H/I; de profielfactor grijpt alleen op de
+  uitgave-term (Ont!J1); guardrails toestandloos met m−1-anker (referentie P!B82); invariant
+  Controle!K10.
+- **I solver-statussen**: P!B93-B100 — `reached_now` / `reached_at` / `unreachable_within_horizon`
+  (+ €/mnd-extra-hint B96) / `pension_shortfall`; stale-detector B95; VBA-status B100.
+- **J werk-strategie**: eigen tab; lek-invariant Controle!K11 (delta's lekken niet buiten de
+  werkfase).
+
+**v4-fixes geverifieerd:** solver herdraait altijd vers over de volle range; slot-hardcoding is nu
+een **bewaakt contract** (Controle!K8/K9: huis = bens rij 6, hypotheek = rij 17; opeethypotheek =
+rij 20, tekort-lening = rij 23) — in code worden dit getypte rollen i.p.v. posities; AY-guard in
+S!E én S!F + D-nulzetting + Rapport!D80-assert (cached: "OK — verkoop op leeftijd 64");
+Box3-gate symmetrisch; P!B54 bedraad via ES!C13 → P!B37 en MC!B8. Cached foutcellen: 0.
+
+**⚠ Vlaggen in de geanalyseerde save (2026-07-02 12:24):**
+1. **Stale solver-staat**: P!B38 (gap) = +€23.276 bij B16 = 52,167; de eigen stale-detector
+   P!B95 staat aan; Sim!B7 ("Verwacht", vastgelegd 2026-07-02) zegt FIRE = 55,583 — onder gelijke
+   inputs onverenigbaar met 52,167. Vóór fixture-extractie MOETEN `BepaalFIRE` +
+   `RunScenarioBand` (+ `RunMonteCarlo`) opnieuw draaien (→ gap V2).
+2. **TS!A23 config-fout**: "FOUT: 2 gevulde categorieën zonder prioriteit" (→ gap V2).
+3. **Hist-backtest zonder data** (Hist!B2 = 0) — de backtest-tak is leeg in het model (→ gap V11).
+4. MC uit-stand: 200 bevroren runs (slaagkans 0,535), per-pot idiosyncratische ruis 0,3σ
+   (MC!C12:L12) — deterministisch (sin-hash), oracle-veilig na herdraaien.
+
+Controle!K1 (reconciliatie): "OK — alles sluit".
+
+## 4. Consumenten-inventaris (alles wat straks op de nieuwe kern moet)
+
+Centrale paden: `lib/hooks/use-horizon-fire-sim.ts` (client-hook), `lib/dashboard-data-loader.ts`
+(server, één run → widget-props), `lib/fire-target-shared.ts` (canoniek FIRE-doel),
+`lib/horizon-engine/build-input.ts` (enige input-assemblage, gedeeld client/server).
+
+| Oppervlak | Consument | Neemt af |
+|---|---|---|
+| /toekomst grafiek | `horizon-client.tsx` → `sim-chart.tsx` (+widget, markers, grafiek-uitleg) | SimResult, unifiedRows, effectiveLifeEvents |
+| /toekomst events | `event-pane{,-view,-edit}.tsx`, `whatif-beslishulp` | delta-FIRE-previews (scalar-bridge) |
+| Strategie-modals | `strategie-modal.tsx` (eind), `withdrawal-modal.tsx`, 4 strategie-editors | previews (`lib/strategy-preview.ts`, `runScalarProjectionV2`, `runHousingScenarioProjectionV2`) |
+| Dashboard | 14+ widgets via `DashboardData` (fire-prognose, vrijheidsvoortgang, mijlpalen, scenario's, pensioen-aow, swr-monitor, surplus-gap, sim-vermogenspad, backtesting, monte-carlo, gezondheid, jouw-pad, inflatie-impact, vrijheidsdagen) | freedomPct, fireAgeFractional, requiredFirePortfolio, simRows, … |
+| Eigen engine-calls | `fee-analyzer-widget` (`lib/fee-analysis.ts`), `hypotheek-vs-beleggen-widget` (`lib/hypotheek-vs-beleggen.ts`) | eigen runs met varianten |
+| /overzicht | hero + mini-timeline + vrijheid-strip via `core-data-loader.ts`/`fire-target-shared.ts`; `networth-projection.ts` (mini-grafiek totaal vermogen) | fireAge, freedomPct, netto-vermogen-pad |
+| What-if | `whatif-page-client.tsx`, `whatif-beslishulp.model.ts` | meerdere runs met gewijzigde input |
+| Huishouden | `lib/household-projection.ts`, `app/api/household/fire-projections/`, vergelijking-widget, retirement-pane | per-partner + gecombineerde runs |
+| AI | `lib/ai/context/shared-context.ts` e.a. | loader-FIRE-velden (geen directe engine-call) |
+| Rapportages | `lib/report-data.ts`, `lib/check/build-report.ts` (scalar), year-in-review | kerngetallen |
+| Beheer | `/beheer/horizon-tabellen(-mij)` (`app/api/horizon-engine/ledger`), `/beheer/horizon-strategie` (regressiematrix), `/beheer/grafiek-werking` | ledger-tabellen A–H, matrix |
+| Regressie | `lib/regression-tests/suites/{fire-simulatie, horizon-grafiek, horizon-parameters, onttrekkingsstrategie, huis-strategie-trigger, horizon-asset-liquidatie, horizon-whatif, whatif-scenarios, berekening-performance, inkomen-uitgaven-analyse}` + horizon-strategie-matrix | golden-uitkomsten |
+| Toekomst-regels | `lib/future/regel-sim.ts` | scenario-runs |
+
+## 5. Mapping app-input → kern-input (adapter, FASE 3)
+
+| App-bron | Veld/mechanisme | → Kern-input |
+|---|---|---|
+| Inkomen | `profiles.net_monthly_income` / 6m-gemiddelde | maandinkomen in cashflow |
+| Uitgaven nu | budget/cashflow-bronnen (`resolveSavingsSource`-familie) | maanduitgaven vóór FIRE |
+| Uitgaven ná FIRE | `computeRetirementExpenses`: `essential_budgets` \| `custom_amount` \| `current_income` (`profiles.retirement_expense_method`) | onttrekkingsbehoefte-basis (geïndexeerd) |
+| Sparen/inleg | `monthly_savings_override` → cashflow-spaarquote → `monthly_contribution`×12 | toename-capaciteit |
+| Bezittingen | `assets`: `asset_type`→categorie, `current_value`, `expected_return`→pot-rente, `is_liquid`/`eigen_huis`→niet-liquide-vlag, `net_worth_inclusion_pct` (→gap V6), `sale_config`→liquidatie-event | potten in het grootboek |
+| Schulden | `debts`: `current_balance`, `interest_rate`, `monthly_payment`, `repayment_type`, `include_aflossing_in_savings`, `linked_asset_id` | schuld-potten + aflossingsschema |
+| Life events | `life_events` → `lifeEventsToCashflows` (met `skipEventIds`); dedicated expanders: `aow`, `pension` (annuitizePension), `werk` (`lib/werk-strategie.ts`), housing (virtueel, `housing-strategy:`-prefix) | generieke kasstromen/afnames + liquidatie-events |
+| Eindstrategie | `profiles.fire_end_strategy` / `fire_end_age` (default 90) / `fire_legacy_amount` | eindstrategie + solver-doelbedrag |
+| Onttrekking | `profiles.withdrawal_strategy` (`static\|guardrails\|vpw\|bucket`) + `guardrail_*` | onttrekkingsprofiel (migratie: vpw/bucket→Vast; →gap V4) |
+| Woning | `profiles.housing_strategy_config` (4 modi, triggerAge/salePricePct/salesCostsPct/saleValuationBasis/depletionThresholdYears; reverse_mortgage: maxLoanPct/interestRate/monthlyPayout) | woning-strategie-parameters (→gap V8 voor "wanneer nodig"-fallback) |
+| Pot-voorkeuren | `profiles.pot_rules` (3 orde-regels op 5 groepen) | waterval-prio's (→gap V5) |
+| Parameters | `resolveFireParams`: `expected_return`, `inflation_rate` | pot-rentes-default + indexatie |
+| Box 3 | `box3Method` forfaitair/werkelijk + `lib/box3-data.ts`-constanten | Box3-tak-selector + tarieven |
+| AOW | `aow_leeftijd`-tabel (`lookupAowAge`) + `computeAowMonthly` | AOW-kasstroom + pensioen-kortsluiting |
+| Partner | huishouden-data (`household-projection.ts`) | partner-stromen (→gap V3) |
+
+## 6. Feature-classificatie: kern / wrapper / gap
+
+**KERN (Excel-gedekt, parity-getest):** maandgrootboek per pot; cashflow; Box 3 forfaitair +
+werkelijk via cashflow; capaciteit-waterval + tekort-lening; onttrekkingsbehoefte × profiel
+(Vast/Afnemend/Oplopend/Guardrails); eindstrategieën deplete/legacy/perpetual/pensioen; woning
+4 modi incl. opeethypotheek en "wanneer nodig"-trigger; solver + statussen; werk-stromen;
+partner-stromen; auto-gebeurtenissen; scenarioband + deterministische MC + hist.
+
+**WRAPPER (app-rijkdom → kern-input, of kern-uitvoer → oppervlak):** de 4 strategie-expanders;
+event-catalogus → generieke stromen (children/NIBUD, inheritance, begrafenis, sabbatical, …);
+`sale_config`-liquidaties; previews (strategy-preview); alle widgets/kerngetallen (freedomPct,
+mijlpalen, countdown); what-if-varianten; household-runs; backtest op app-reeksen;
+networth-projection (/overzicht); beheer-tabellen.
+
+**GAP (vragen aan eigenaar):** zie §7.
+
+## 7. Gap-besluitenregister
+
+_Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2026-07-02._
+
+| # | Onderwerp | Besluit (eigenaar, 2026-07-02) |
+|---|---|---|
+| V1 | Regressie-goldens | **Optie 1** — dubbele goldens tijdens flag-periode; bij de flip v2-goldens vervangen mét verklaring per afwijking in het technisch rapport. |
+| V2 | Fixtures & refresh | **Akkoord** — extractor via Excel-COM (kopie; inputs zetten → macro's draaien → tabellen naar JSON) + de voorgestelde scenario-set. TS!A23: de extractor zet de ontbrekende prioriteiten als gelogde override (interpretatie van "akkoord"; base-fixture krijgt de prio-fix expliciet in meta). |
+| V3 | Huishouden/partner | **Optie 1** — kernel = huishouden-run (parity op PT-fixture); per-partner-weergaven = aparte kernel-runs met deel-invoer, eigenschaps-getest. |
+| V4 | Onttrekkingsprofiel | **Optie 1** — enum-migratie `vast\|afnemend\|oplopend\|guardrails` (static→vast; vpw/bucket→vast), 3-fasen-curve in nieuwe JSONB-kolom met Excel-defaults; bestaande withdrawal-modal wordt de profiel-UI. |
+| V5 | Waterval-prio's | **Optie 2** — UI uitbreiden naar échte prio's per categorie (Excel-gelijk, 1..5), mét de afwijkende reserve-semantiek: **prio 5 = reserve, pas aanspreken bij depletie van de overige opties** (Excel-reserve-pass). pot_rules-migratie hoort erbij. |
+| V6 | `net_worth_inclusion_pct` | **Optie 1** — adapter schaalt de pot bij instap (waarde × pct); eigenschaps-getest (buiten Excel-domein). |
+| V7 | Tekort-lening | **Volledig** — rente gebruikers-instelbaar (FIRE-instellingen, default uit Excel) én **zodra de projectie de lening aanspreekt wordt hij zichtbaar** (meelopen in curve/schulden op /toekomst + volledige rij in beheer-tabellen). |
+| V8 | Wanneer-nodig-verkoop | **Optie 1** — Excel-semantiek: trigger op liquide(m−1) onder drempel + `fallbackAge` in de huis-strategie-config met Excel-default. |
+| V9 | market_shock | **Optie 1** — kernel krijgt generiek pot-mutatie-event (%, maand) als gedocumenteerde uitbreiding buiten het Excel-domein; eigenschaps-getest. |
+| V10 | Scalar-helpers | **Optie 1** — in FASE 5 óók op de kernel via een lichte scalar-modus in de adapter; heft de drie-engines-divergentie definitief op. |
+| V11 | Band/MC/backtest | **Optie 1** — scenarioband + MC via de Excel-methode als kernel-wrapper (parity dankzij determinisme); backtest houdt de app-reeksen = bewuste, geaccordeerde afwijking (Excel-Hist is leeg). |
+| V12 | Solver-statussen | **Optie 1** — vier statussen + €/mnd-hint in de bestaande status-regel bij de /toekomst-grafiek. |
+| V13 | Flag-mechanisme | **Optie 1** — per-user pref in `profiles.feature_preferences`: één vlag voor de convergentie-set + aparte vlaggen voor what-if/household/scalar; beheer-toggle. |
+| V14 | Reëel-weergave | **Optie 1** — kernel-adapter blijft de inflatiefactor per rij meegeven (deflatie-wrapper); contract intact. |
+| V15 | Snapshot-trend | **Optie 1** — knik accepteren + annoteren ("rekenwijze gewijzigd op …") in de trend-weergave. |
+
+## 8. Faseplan
+
+- **FASE 0 — Analyse & plan** (dit document): mapping, faseplan, gap-vragen. ✔ na oplevering.
+- **FASE 1 — Oracle-harnas — ✔ AFGEROND 2026-07-02**: extractor `scripts/horizon-oracle/
+  extract_fixtures.py` (Excel-COM op een kopie, eigen onzichtbare instantie, MsgBox-watchdog,
+  zombie-kill-fallback) + `scenarios.py` + refresh-README; **12 fixtures** in
+  `test/fixtures/horizon-oracle/` (409–458 KB, alle `Controle!K1 = "OK — alles sluit"`, bron-hash
+  identiek aan de analyse-snapshot); analyse-docs naar `docs/horizon-oracle/`; framework
+  `lib/horizon-kernel/oracle/` (fixture-types, Node-loader, `compareGrid` ≤ €0,01,
+  `summarizeComparisons`) + integriteitssuite; 131 tests groen, tsc schoon. **Nuances voor
+  FASE 2:** (1) macro-protocol = `BepaalFIRE → RunScenarioBand → BepaalFIRE → RunMonteCarlo`
+  (Band herstelt B16 uit Sim!B7); (2) stale-detector P!B95 geeft **vals alarm** op
+  maand-granulariteits-restanten (5%-van-doel-drempel) — versheid = idempotentie-bewijs
+  (herdraaien laat B16/B38 exact ongewijzigd), zo verankerd in integriteitscheck (d);
+  (3) **B93 `reached_now`-quirk** bij doel = 0 (J(0)≥B36 degenereert) — de kern reproduceert dit
+  Excel-gedrag (parity); de UI-status (V12) kan hier later bewust van afwijken → dan gap-besluit;
+  (4) basis-scenario ís legacy €100k@90 + profiel Afnemend + huis wanneer-nodig + werk actief,
+  dus `eind-legacy`/`profiel-afnemend`/`huis-verkoop-wanneer-nodig` zijn door basis gedekt en
+  `profiel-vast`/`werk-strategie-uit` toegevoegd; (5) TS!A23-fix als gelogde override
+  (TS!D41/D42 = 5, gewicht 0). **Nog toevoegen tijdens FASE 2** (via de refresh-procedure):
+  fixtures voor woning-modi **Meerekenen** en **Uitsluiten** (niet-liquide-mechanisme) en een
+  **unreachable/pension_shortfall**-scenario (solver-status-parity; nu hebben alle 12 een
+  bereikte FIRE).
+- **FASE 2 — De kern**: nieuw pure-TS-pakket **`lib/horizon-kernel/`** (architect-besluit:
+  "core" botst met De Kern-module; oracle-artefacten apart onder `docs/horizon-oracle/` +
+  `test/fixtures/horizon-oracle/`), tabel-voor-tabel in Excel-volgorde, elk blok pas verder als
+  parity groen: cashflow → Box 3 (beide takken) → onttrekkingsbehoefte+profiel →
+  gebeurtenis-afnames → capaciteit-waterval → grootboek per pot → schulden+tekort-lening →
+  prognose/netto-liquide → solver+statussen → wrappers (scenarioband, MC, hist). Geen Supabase,
+  constanten op de canonieke plek. Excel-slot-rollen (huis=bens rij 6, hypotheek=17, opeet=20,
+  tekort=23) worden getypte rollen, geen posities.
+- **FASE 3 — Adapter**: app-data → kern-input (§5); hergebruik bestaande expanders; dubbeltelling-
+  guard op source-markers; eigenschaps-tests buiten het Excel-domein (N potten, totalen sluiten,
+  geen negatieve potten). De domein-expanders (AOW, pensioen-annuïtisering, kinderen-NIBUD,
+  erfenis, werk) worden zélf parity-getest tegen de Geb/Auto-gebeurtenissen-tabel (fixture bevat
+  Geb rij 14-30): reproduceert de expander uit P/PT-inputs exact de Geb-rijen? Bij afwijking wint
+  het Excel (oracle), tenzij de eigenaar per geval anders besluit.
+- **FASE 4 — Beheer-transparantie + strategie-impact**: beheerpagina met de 5 onderdelen
+  (uitgangspunten TriFinity → resolved input → alle maandtabellen mét uitleg per stap → technisch
+  rapport → parity/verificatie-status); previews in alle 4 strategie-modals gelijkgetrokken
+  (strategy-preview-patroon); AOW- en Werk-afgeleide events zichtbaar op /toekomst/gebeurtenissen
+  (bestaand ManagedStrategy-badge-patroon); onttrekkingsprofiel-UI in bestaande instellingen
+  (V4). Extra UI-scope uit de gap-besluiten: **prio's per categorie** als echte instelling
+  (V5-optie 2: 1..5 per onderwerp toename/afname/onttrekking, prio 5 = reserve "pas bij depletie";
+  vervangt de drie pot_rules-orde-regels, incl. migratie) en **tekort-lening zichtbaar** zodra de
+  projectie hem aanspreekt (V7: meelopen in curve/schulden op /toekomst; rente-veld in
+  FIRE-instellingen).
+- **FASE 5 — Cutover achter flag per oppervlak**: LET OP (architect): de flag-infrastructuur is
+  in C5 fysiek verwijderd (`isHorizonV2Enabled` → altijd true; toggle-UI en API weg) — de
+  per-oppervlak-selector moet **herbouwd** worden (mechanisme = gap V13). Harde invariant: de
+  **convergentie-set** (/overzicht-hero, /toekomst-grafiek, dashboard-loader/freedomPct via
+  `fire-target-shared`, AI-context) flipt als geheel — nooit gedeeltelijk (anti-divergentie).
+  Overige oppervlakken (what-if, household, beheer, scalar-helpers gap V10) mogen apart.
+  Vergelijk-weergave oud↔nieuw in beheer. Default-flip + verwijderen v2-paden ALLEEN na
+  expliciet akkoord (C5-precedent).
+- **FASE 6 — Nazorg**: vpw/bucket-DB-migratie; regressie-goldens herijken (gap V1);
+  Berekeningen-view + ADR's (0013/0016 → `vervangen`; gerichte addenda op 0014/0015/0027/0028/
+  0030/0031 waar de kern die besluiten materieel wijzigt); concern `horizon-kernel-flag-periode`
+  verwijderen + de drie v2-grondslag-concerns (`deplete-doel-lijn-grondslag`,
+  `downsize-display-eligibility-desync`, `downsize-fire-gate-eligibility-vs-besteedbaar`) per
+  stuk beoordelen: lost de kernel ze op of erft hij ze — geen stale concerns achterlaten;
+  calc-engine-specialist herschrijven (parity als review-regel); agents/skills-scan op oude
+  engine-begrippen; /beheer/development-curatie + `arch:diagram`.
+
+Elke fase sluit met `npx tsc --noEmit` + relevante vitest groen + korte statusmelding.
+
+## 9. Dubbeltelling-guard (harde eis, FASE 3/4)
+
+Eén uniform mechanisme voor alle vier strategieën: afgeleide events dragen een source-marker
+(patroon: `housing-strategy:`-prefix + `metadata.source`); de adapter filtert visuele events die
+al via de strategie/expander in de engine-input zitten (`skipEventIds`-mechanisme bestaat).
+Verplichte test: met strategie actief bevat de kern-input de afgeleide stroom precies één keer,
+en de uitkomst is identiek mét en zónder de visuele events in de weergavelijst.

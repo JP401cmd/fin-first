@@ -87,6 +87,14 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['t-supabase', 'data-cont'],
   },
   {
+    id: 'horizon-kernel-flag-periode',
+    title: 'Twee Horizon-rekenmotoren tijdens de kernel-cutover (Excel-oracle-traject)',
+    detail:
+      'Besloten koers (ADR 0032): een nieuwe maandbasis-rekenkern (lib/horizon-kernel, nominaal, Excel-parity ≤ €0,01) vervangt de v2-grootboek-engine. Tijdens de flag-periode bestaan beide motoren naast elkaar met omgekeerde modelkeuzes (jaarbasis/reëel vs maandbasis/nominaal) — divergentie-risico als oppervlakken op verschillende momenten flippen. Invariant: de convergentie-set (/overzicht, /toekomst, dashboard-loader/freedomPct via fire-target-shared, AI-context) flipt als geheel. Plan: docs/horizon-excel-oracle-plan.md. Verwijder dit punt zodra de default-flip rond is en de v2-paden fysiek weg zijn (FASE 6).',
+    severity: 'risk',
+    elementIds: ['as-planning', 'fn-toekomstplannen', 'as-vermogen'],
+  },
+  {
     id: 'deplete-doel-lijn-grondslag',
     title: 'Doel-lijn (V_nodig) is liquide; getekende curve is netto vermogen',
     detail:

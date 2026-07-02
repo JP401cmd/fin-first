@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-25T19:40:27.625Z",
-  "generatedDate": "2026-06-25",
+  "generatedAt": "2026-07-02T10:57:05.105Z",
+  "generatedDate": "2026-07-02",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -18303,6 +18303,19 @@
       ],
       "summary": "Na ADR 0028 (de downsize-woning is `spendable` + `saleManaged`) en ADR 0030 (de FIRE-eligibility-pot `liquideVermogen` en de rauw-besteedbare pot `besteedbaarVermogen` zijn gesplitst) bleven twee defecten en één ontbrekende planningskeuze rond de eigen-huis-downsize over. Dit bes",
       "file": "docs/adr/0031-downsize-verkooptrigger-hold-fire-anker-en-valuatie-basis.md"
+    },
+    {
+      "id": "0032-horizon-kernel-excel-oracle-maandbasis",
+      "title": "Horizon-rekenkern volgt het eigen Excel-oracle: maandbasis, nominaal, parity ≤ €0,01",
+      "status": "aanvaard",
+      "date": "2026-07-02",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "as-vermogen"
+      ],
+      "summary": "De eigenaar vervangt de rekenwijze achter de Horizon/Toekomst-grafiek door die van zijn eigen, gevalideerde Excel-model (**`Core calc v5.xlsm`**, vastgesteld 2026-07-02; snapshot SHA256 `3E905809B5CC…A80D`). De app-interactie blijft ongewijzigd; alleen de motor eronder gaat reken",
+      "file": "docs/adr/0032-horizon-kernel-excel-oracle-maandbasis.md"
     }
   ],
   "churn": {
@@ -18314,7 +18327,7 @@
       },
       {
         "path": "lib/ai",
-        "commits": 38
+        "commits": 33
       },
       {
         "path": "app/(app)/toekomst",
@@ -18358,12 +18371,12 @@
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 4984,
-        "commits": 26
+        "commits": 25
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4236,
-        "commits": 43
+        "commits": 39
       },
       {
         "file": "lib/release-notes.ts",
@@ -18378,7 +18391,7 @@
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 2614,
-        "commits": 12
+        "commits": 11
       },
       {
         "file": "lib/horizon-data.ts",
@@ -19165,7 +19178,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-24",
+    "previousDate": "2026-06-25",
     "hasChanges": false,
     "sections": []
   },
@@ -19256,6 +19269,13 @@
     },
     {
       "date": "2026-06-25",
+      "api": 383,
+      "components": 761,
+      "tables": 56,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-07-02",
       "api": 383,
       "components": 761,
       "tables": 56,

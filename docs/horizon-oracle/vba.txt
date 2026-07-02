@@ -1,0 +1,248 @@
+olevba 0.60.2 on Python 3.14.3 - http://decalage.info/python/oletools
+===============================================================================
+FILE: core-calc-v5-snapshot.xlsm
+Type: OpenXML
+WARNING  For now, VBA stomping cannot be detected for files in memory
+-------------------------------------------------------------------------------
+VBA MACRO ThisWorkbook.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/ThisWorkbook'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad1.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad1'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad2.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad2'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad3.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad3'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad4.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad4'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad5.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad5'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad6.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad6'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad7.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad7'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad8.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad8'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad9.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad9'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad10.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad10'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad11.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad11'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad12.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad12'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad13.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad13'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad14.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad14'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad15.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad15'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Module1.bas 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Module1'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+Option Explicit
+
+Sub BepaalFIRE()
+    Dim wsP As Worksheet, wsES As Worksheet
+    Set wsP = ThisWorkbook.Worksheets("P")
+    Set wsES = ThisWorkbook.Worksheets("ES")
+    Dim leeftijd As Double
+    leeftijd = wsP.Range("B7").Value
+
+    Dim prevCalc As XlCalculation
+    prevCalc = Application.Calculation
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    On Error GoTo Herstel
+
+    ' Pensioenleeftijd: FIRE = AOW-leeftijd, geen insluiting
+    If wsES.Range("C7").Value = "pensioen" Then
+        wsP.Range("B16").Value = wsES.Range("C15").Value
+        Application.Calculate
+        GoTo ToonStatus
+    End If
+
+    ' Opeten / Nalaten / Eeuwigdurend: bisectie op de gap (P!B38 -> 0)
+    Dim loM As Long, hiM As Long, midM As Long
+    loM = 0
+    hiM = CLng((100 - leeftijd) * 12)
+    wsP.Range("B16").Value = leeftijd + hiM / 12
+    Application.Calculate
+    If wsP.Range("B38").Value < 0 Then
+        ' Niet haalbaar: B16 blijft op de horizon staan -> B38 < 0
+        ' -> B93 = unreachable_within_horizon, B94 bevat de extra-sparen-hint (B96)
+        GoTo ToonStatus
+    End If
+    Do While hiM - loM > 1
+        midM = (loM + hiM) \ 2
+        wsP.Range("B16").Value = leeftijd + midM / 12
+        Application.Calculate
+        If wsP.Range("B38").Value >= 0 Then hiM = midM Else loM = midM
+    Loop
+    wsP.Range("B16").Value = leeftijd + hiM / 12
+    Application.Calculate
+
+ToonStatus:
+    ' === Statuscellen uitsluitend NA de bisectie uitlezen ===
+    Dim solverStatus As String, melding As String
+    solverStatus = CStr(wsP.Range("B93").Value)
+    melding = CStr(wsP.Range("B94").Value)
+    wsP.Range("B100").Value = solverStatus   ' laatste solver-status
+
+    Application.Calculation = prevCalc
+    Application.ScreenUpdating = True
+
+    If solverStatus = "unreachable_within_horizon" _
+       Or solverStatus = "pension_shortfall" Then
+        MsgBox melding, vbExclamation, "FIRE-solver"
+    Else
+        MsgBox melding, vbInformation, "FIRE-solver"
+    End If
+    Exit Sub
+
+Herstel:
+    Application.Calculation = prevCalc
+    Application.ScreenUpdating = True
+    MsgBox "BepaalFIRE is gestopt met een fout: " & Err.Description, _
+           vbCritical, "FIRE-solver"
+End Sub
+
+Sub RunScenarioBand()
+    Dim wsP As Worksheet, wsSim As Worksheet
+    Set wsP = ThisWorkbook.Worksheets("P")
+    Set wsSim = ThisWorkbook.Worksheets("Sim")
+    Dim sc As Variant: sc = Array("Pessimistisch", "Verwacht", "Optimistisch")
+    Dim leeftijd As Double: leeftijd = wsP.Range("B7").Value
+    Dim maxM As Long: maxM = CLng((100 - leeftijd) * 12)
+    Dim i As Long, loM As Long, hiM As Long, midM As Long
+    For i = 0 To 2
+        wsP.Range("B42").Value = sc(i)
+        wsP.Range("B16").Value = leeftijd + maxM / 12
+        Application.Calculate
+        If wsP.Range("B38").Value < 0 Then
+            wsSim.Range("B6").Offset(i, 0).Value = CVErr(xlErrNA)  ' niet haalbaar
+            wsSim.Range("C6").Offset(i, 0).Value = CVErr(xlErrNA)
+            wsSim.Range("D6").Offset(i, 0).Value = CVErr(xlErrNA)
+        Else
+            loM = 0: hiM = maxM
+            Do While hiM - loM > 1
+                midM = (loM + hiM) \ 2
+                wsP.Range("B16").Value = leeftijd + midM / 12
+                Application.Calculate
+                If wsP.Range("B38").Value >= 0 Then hiM = midM Else loM = midM
+            Loop
+            wsP.Range("B16").Value = leeftijd + hiM / 12
+            Application.Calculate
+            wsSim.Range("B6").Offset(i, 0).Value = wsP.Range("B16").Value
+            wsSim.Range("C6").Offset(i, 0).Value = ThisWorkbook.Worksheets("Rapport").Range("L6").Value
+            wsSim.Range("D6").Offset(i, 0).Value = wsSim.Range("B3").Value
+        End If
+    Next i
+    ' herstel basisstand: Verwacht + bijbehorende FIRE-leeftijd
+    wsP.Range("B42").Value = "Verwacht"
+    If IsNumeric(wsSim.Range("B7").Value) Then wsP.Range("B16").Value = wsSim.Range("B7").Value
+    Application.Calculate
+End Sub
+
+Sub RunMonteCarlo()
+    Dim n As Long, i As Long
+    n = Sheets("MC").Range("B1").Value
+    Sheets("MC").Range("B5").Value = 1
+    Sheets("MC").Range("B14:B1013").ClearContents
+    For i = 1 To n
+        Sheets("MC").Range("B11").Value = i
+        Application.Calculate
+        Sheets("MC").Cells(13 + i, 2).Value = Sheets("MC").Range("B8").Value
+    Next i
+    Sheets("MC").Range("B5").Value = 0
+    Sheets("MC").Range("B11").Value = 1
+End Sub
+
+-------------------------------------------------------------------------------
+VBA MACRO Blad16.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad16'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad17.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad17'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad18.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad18'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad19.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad19'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad20.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad20'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad21.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad21'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad22.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad22'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+-------------------------------------------------------------------------------
+VBA MACRO Blad23.cls 
+in file: xl/vbaProject.bin - OLE stream: 'VBA/Blad23'
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+(empty macro)
+

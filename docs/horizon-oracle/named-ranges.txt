@@ -1,0 +1,40 @@
+# Defined names in core-calc-v5-snapshot.xlsm
+# NB: alle _xlpm.*-namen zijn interne LET/LAMBDA-parameternamen (geen echte named ranges)
+
+_xlpm.aantal -> #NAME?
+_xlpm.afn -> #NAME?
+_xlpm.aj -> #NAME?
+_xlpm.aprior -> #NAME?
+_xlpm.ar -> #NAME?
+_xlpm.basis -> #NAME?
+_xlpm.bovenCap -> #NAME?
+_xlpm.cap -> #NAME?
+_xlpm.cat -> #NAME?
+_xlpm.cidx -> #NAME?
+_xlpm.code -> #NAME?
+_xlpm.cprior -> #NAME?
+_xlpm.d -> #NAME?
+_xlpm.eff -> #NAME?
+_xlpm.extraps -> #NAME?
+_xlpm.hist -> #NAME?
+_xlpm.i -> #NAME?
+_xlpm.iEind -> #NAME?
+_xlpm.j -> #NAME?
+_xlpm.jEind -> #NAME?
+_xlpm.jFire -> #NAME?
+_xlpm.lft -> #NAME?
+_xlpm.nal -> #NAME?
+_xlpm.ok -> #NAME?
+_xlpm.okp -> #NAME?
+_xlpm.ont -> #NAME?
+_xlpm.opg -> #NAME?
+_xlpm.p -> #NAME?
+_xlpm.rij -> #NAME?
+_xlpm.share -> #NAME?
+_xlpm.thdr -> #NAME?
+_xlpm.toeps -> #NAME?
+_xlpm.trow -> #NAME?
+_xlpm.voorStart -> #NAME?
+_xlpm.vrow -> #NAME?
+
+# totaal: 35
