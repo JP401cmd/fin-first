@@ -37,12 +37,14 @@ import {
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
 import type { HorizonStrategyOptions } from '@/lib/horizon-engine/strategies'
 import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
 import { type LifeEvent } from '@/lib/horizon-data'
 import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
+import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
+import { computeWhatifProjection, type WhatifEngine } from '@/lib/whatif-engine-router'
+import { detectV2OnlyMachinery, type WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { type Asset, ASSET_TYPE_LABELS } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -133,6 +135,16 @@ export default function WhatIfPage() {
   /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde. Zelfde bron
    *  als /toekomst zodat de baseline-surplus-/opbrengstbestemming identiek is. */
   const [potRules, setPotRules] = useState<PotRulesConfig>(POT_RULES_DEFAULTS)
+
+  // ── Kernel-what-if-vlag (FASE 5, stap 2a) ──
+  /** horizon_kernel_whatif — draait de baseline + scenario-run door de horizon-kernel
+   *  (adapter→solveFire→bridge) wanneer aan. Default uit → byte-identiek aan v2. */
+  const [kernelWhatifEnabled, setKernelWhatifEnabled] = useState(false)
+  /** Rauwe profiel-rij (incl. pot_rules) — kern-invoerbron voor de router; alleen
+   *  geconsumeerd wanneer de kernel-vlag aan is. */
+  const [rawProfile, setRawProfile] = useState<WhatifRawProfileRow | null>(null)
+  /** Rauwe AOW-tabel — voor de kern-tijdas (lookupAowAge) in de adapter. */
+  const [aowRows, setAowRows] = useState<AowLeeftijdRow[]>([])
 
   // ── Per-asset-type return-deltas (decimaal, bv. { investment: 0.02 }). ──
   const [returnDeltas, setReturnDeltas] = useState<Record<string, number>>({})
@@ -262,6 +274,7 @@ export default function WhatIfPage() {
           .order('birth_date_from', { ascending: true })
         if (aowRes.data && aowRes.data.length > 0) {
           setUserAowAge(lookupAowAge(aowRes.data as AowLeeftijdRow[], dob))
+          setAowRows(aowRes.data as AowLeeftijdRow[])
         }
       } catch {
         // Non-critical — fallback to 67
@@ -326,16 +339,30 @@ export default function WhatIfPage() {
       // door v2 lopen zodat de baseline gelijk blijft aan /toekomst.
       setHorizonEngineV2(isHorizonV2Enabled(profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null))
 
+      // Kernel-what-if-vlag (FASE 5, stap 2a) — zelfde profielbron als de v2-vlag.
+      setKernelWhatifEnabled(isKernelFlagEnabled(profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null, 'whatif'))
+
       // Pot-regels (B): defensieve aparte fetch (zelfde patroon als
       // dashboard-data-loader) zodat een ontbrekende kolom de what-if-load niet
       // laat falen. Geeft de baseline dezelfde surplus-/opbrengstbestemming als
       // /toekomst. resolvePotRules valt terug op defaults bij missing/lege waarde.
+      let rawPotRules: unknown = null
       try {
         const { data: potData } = await supabase.from('profiles').select('pot_rules').single()
-        if (potData) setPotRules(resolvePotRules(potData))
+        if (potData) {
+          setPotRules(resolvePotRules(potData))
+          rawPotRules = potData.pot_rules
+        }
       } catch {
         // Non-critical — val terug op POT_RULES_DEFAULTS.
       }
+
+      // Rauwe profiel-rij (incl. pot_rules) — kern-invoerbron voor de router
+      // (FASE 5, stap 2a). Alleen geconsumeerd wanneer de kernel-vlag aan is.
+      setRawProfile({
+        ...(profileResult.data as WhatifRawProfileRow),
+        pot_rules: rawPotRules,
+      })
 
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
@@ -543,6 +570,26 @@ export default function WhatIfPage() {
     return { ...whatIfBuilt.input, returnDeltaByAssetType: returnDeltas }
   }, [whatIfBuilt, returnDeltas])
 
+  // ── Page-level motor-beslissing (FASE 5, stap 2a — engine-coherentie) ──────
+  // Één beslissing voor de HÉLE pagina i.p.v. per losse run: draait alles op de
+  // kernel, óf de hele pagina valt terug op v2. Zo lopen de headline-lijnen,
+  // de pinned overlays én de per-event impact-chips NOOIT op verschillende
+  // motoren (geen stille engine-mix). Woningmachinerie (assetLiquidations /
+  // opeethypotheek / leen-ruimte) is asset-/woning-config-gedreven en dus GEDEELD
+  // over alle runs; de baseline- én scenario-input checken dekt 'm volledig.
+  // Residueel toekomstig risico (stap 2b): een EVENT-gedreven machinerie-bron
+  // (bv. een scenario-only 'verkoop huis'-event dat assetLiquidations zet) zou de
+  // motoren in theorie kunnen splitsen — vandaag is alle machinerie asset-gedreven,
+  // dus baseline + scenario zijn het altijd eens. De router doet zelf óók nog een
+  // per-call-detect als vangnet.
+  const machineryReason = useMemo<string | null>(() => {
+    return (
+      (baseBuilt ? detectV2OnlyMachinery(baseBuilt.input) : null) ??
+      (whatIfBuilt ? detectV2OnlyMachinery(whatIfBuilt.input) : null)
+    )
+  }, [baseBuilt, whatIfBuilt])
+  const pageKernelEnabled = kernelWhatifEnabled && !machineryReason
+
   // ── Legacy what-if FinancialInput (for dailyExpenses display only) ──────
   const { adjustedInput: whatIfInput, annualSavings: whatIfAnnualSavings_sim } = useMemo(() => {
     if (!input || !overrides || !baseline) return { adjustedInput: null as FinancialInput | null, annualSavings: 0 }
@@ -553,18 +600,54 @@ export default function WhatIfPage() {
   // De baseline draait door buildHorizonInput → assetLiquidations + skipIds +
   // housing-model identiek aan de hoofd-grafiek. cashflows komen uit built.input
   // (NIET losse lifeEventsToCashflows) zodat skipIds-onderdrukking meeloopt.
-  const baselineSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
+  const baselineSim = useMemo<{ result: SimResult; cashflows: SimCashflow[]; engine: WhatifEngine; fallbackReason?: string } | null>(() => {
     if (!baseBuilt) return null
-    const unifiedResult = runSelectedProjection(baseBuilt.input, horizonEngineV2, baseBuilt.strategyOptions)
-    return { result: toSimResult(unifiedResult), cashflows: baseBuilt.input.cashflows }
-  }, [baseBuilt, horizonEngineV2])
+    // FASE 5, stap 2a: route via de motorschakelaar. Vlag uit → byte-identiek aan v2
+    // (runSelectedProjection). Vlag aan + geen v2-only-woningmachinerie → kernel.
+    const outcome = computeWhatifProjection({
+      builtInput: baseBuilt.input,
+      strategyOptions: baseBuilt.strategyOptions,
+      v2FlagArg: horizonEngineV2,
+      kernelEnabled: pageKernelEnabled,
+      rawContext: rawProfile
+        ? {
+            profile: rawProfile,
+            assets: fullAssets,
+            debts: fullDebts,
+            lifeEvents: baselineDbEvents,
+            aowRows,
+            // Baseline: geen rendement-delta.
+            yearlyExpenses: baseBuilt.input.yearlyExpenses,
+          }
+        : undefined,
+    })
+    return { result: toSimResult(outcome.result), cashflows: baseBuilt.input.cashflows, engine: outcome.engine, fallbackReason: outcome.fallbackReason }
+  }, [baseBuilt, horizonEngineV2, pageKernelEnabled, rawProfile, fullAssets, fullDebts, baselineDbEvents, aowRows])
 
   // ── Run what-if simulation (DB + scenario events; return override applied) ──
-  const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
+  const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[]; engine: WhatifEngine; fallbackReason?: string } | null>(() => {
     if (!whatIfBuilt || !whatIfUnifiedInput) return null
-    const unifiedResult = runSelectedProjection(whatIfUnifiedInput, horizonEngineV2, whatIfBuilt.strategyOptions)
-    return { result: toSimResult(unifiedResult), cashflows: whatIfBuilt.input.cashflows }
-  }, [whatIfBuilt, whatIfUnifiedInput, horizonEngineV2])
+    // whatIfUnifiedInput draagt returnDeltaByAssetType voor de v2-tak (byte-identiek);
+    // de kernel-tak past dezelfde delta's ZELF toe op de assets (rawContext).
+    const outcome = computeWhatifProjection({
+      builtInput: whatIfUnifiedInput,
+      strategyOptions: whatIfBuilt.strategyOptions,
+      v2FlagArg: horizonEngineV2,
+      kernelEnabled: pageKernelEnabled,
+      rawContext: rawProfile
+        ? {
+            profile: rawProfile,
+            assets: fullAssets,
+            debts: fullDebts,
+            lifeEvents: scenarioActiveEvents,
+            aowRows,
+            returnDeltaByAssetType: returnDeltas,
+            yearlyExpenses: whatIfBuilt.input.yearlyExpenses,
+          }
+        : undefined,
+    })
+    return { result: toSimResult(outcome.result), cashflows: whatIfBuilt.input.cashflows, engine: outcome.engine, fallbackReason: outcome.fallbackReason }
+  }, [whatIfBuilt, whatIfUnifiedInput, horizonEngineV2, pageKernelEnabled, rawProfile, fullAssets, fullDebts, scenarioActiveEvents, returnDeltas, aowRows])
 
   // ── Pinned scenario overlays — re-run sim per pinned saved scenario ──
   const pinnedOverlays = useMemo<ScenarioOverlay[]>(() => {
@@ -600,8 +683,27 @@ export default function WhatIfPage() {
       const pinReturnDelta = (baseline && scenario.overrides?.expectedReturn != null)
         ? (scenario.overrides.expectedReturn - baseline.expectedReturn) / 100
         : 0
-      const sim = runSelectedProjection({ ...pinBuilt.input, returnDelta: pinReturnDelta }, horizonEngineV2, pinBuilt.strategyOptions)
-      const rows = toSimResult(sim).rows
+      // Route via de motorschakelaar met dezelfde page-level-beslissing: de pinned
+      // overlay draait op DEZELFDE motor als de headline-lijnen (geen engine-mix).
+      // De uniforme return-shift van het scenario → `uniformReturnDelta` (kernel-tak).
+      const outcome = computeWhatifProjection({
+        builtInput: { ...pinBuilt.input, returnDelta: pinReturnDelta },
+        strategyOptions: pinBuilt.strategyOptions,
+        v2FlagArg: horizonEngineV2,
+        kernelEnabled: pageKernelEnabled,
+        rawContext: rawProfile
+          ? {
+              profile: rawProfile,
+              assets: fullAssets,
+              debts: fullDebts,
+              lifeEvents: scenarioEvents,
+              aowRows,
+              uniformReturnDelta: pinReturnDelta,
+              yearlyExpenses: pinBuilt.input.yearlyExpenses,
+            }
+          : undefined,
+      })
+      const rows = toSimResult(outcome.result).rows
       const points: [number, number][] = []
       if (rows.length > 0) {
         points.push([rows[0].age, rows[0].startPortfolio])
@@ -616,7 +718,7 @@ export default function WhatIfPage() {
       })
     }
     return result
-  }, [pinnedScenarioIds, savedScenariosMirror, input, buildInputForEvents, baseline, horizonEngineV2])
+  }, [pinnedScenarioIds, savedScenariosMirror, input, buildInputForEvents, baseline, horizonEngineV2, pageKernelEnabled, rawProfile, fullAssets, fullDebts, aowRows])
 
   // ── Monte Carlo overlay (when toggled on) ─────────────
   const mcResult = useMemo<MonteCarloResult | null>(() => {
@@ -646,13 +748,41 @@ export default function WhatIfPage() {
       : [...scenarioActiveEvents, event]
     const builtWith = buildInputForEvents(eventsWithThis)
     if (!builtWith) return null
-    const simWith = toSimResult(runSelectedProjection({ ...builtWith.input, returnDeltaByAssetType: returnDeltas }, horizonEngineV2, builtWith.strategyOptions))
+    // Route via de motorschakelaar (page-level-beslissing) zodat de impact-chip op
+    // DEZELFDE motor rekent als de headline-lijnen; elke run met zijn eigen event-set.
+    const simWith = toSimResult(computeWhatifProjection({
+      builtInput: { ...builtWith.input, returnDeltaByAssetType: returnDeltas },
+      strategyOptions: builtWith.strategyOptions,
+      v2FlagArg: horizonEngineV2,
+      kernelEnabled: pageKernelEnabled,
+      rawContext: rawProfile
+        ? {
+            profile: rawProfile, assets: fullAssets, debts: fullDebts,
+            lifeEvents: eventsWithThis, aowRows,
+            returnDeltaByAssetType: returnDeltas,
+            yearlyExpenses: builtWith.input.yearlyExpenses,
+          }
+        : undefined,
+    }).result)
 
     // Simulate WITHOUT this event
     const eventsWithout = scenarioActiveEvents.filter(e => e.id !== eventId)
     const builtWithout = buildInputForEvents(eventsWithout)
     if (!builtWithout) return null
-    const simWithout = toSimResult(runSelectedProjection({ ...builtWithout.input, returnDeltaByAssetType: returnDeltas }, horizonEngineV2, builtWithout.strategyOptions))
+    const simWithout = toSimResult(computeWhatifProjection({
+      builtInput: { ...builtWithout.input, returnDeltaByAssetType: returnDeltas },
+      strategyOptions: builtWithout.strategyOptions,
+      v2FlagArg: horizonEngineV2,
+      kernelEnabled: pageKernelEnabled,
+      rawContext: rawProfile
+        ? {
+            profile: rawProfile, assets: fullAssets, debts: fullDebts,
+            lifeEvents: eventsWithout, aowRows,
+            returnDeltaByAssetType: returnDeltas,
+            yearlyExpenses: builtWithout.input.yearlyExpenses,
+          }
+        : undefined,
+    }).result)
 
     // Calculate total cost of the event
     const oneTimeCost = Number(event.one_time_cost ?? 0)
@@ -670,7 +800,7 @@ export default function WhatIfPage() {
     }
 
     return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
-  }, [input, buildInputForEvents, events, scenarioActiveEvents, returnDeltas, horizonEngineV2])
+  }, [input, buildInputForEvents, events, scenarioActiveEvents, returnDeltas, horizonEngineV2, pageKernelEnabled, rawProfile, fullAssets, fullDebts, aowRows])
 
   // ── Derived values for display ───────────────────────────
   // (currentAge declared earlier at line ~288 for use in handleLoadScenario.)
@@ -877,6 +1007,27 @@ export default function WhatIfPage() {
         <section className="card-editorial overflow-hidden mt-4">
           <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
           <div className="p-4 sm:p-6 md:p-8">
+
+        {/* ── Motor-indicator (FASE 5, stap 2a) — alleen zichtbaar met de kernel-vlag aan;
+            beheer-transparantie, bewust token-neutraal (geen module-accent). Gedreven door
+            de PAGE-LEVEL-beslissing: de hele pagina rekent op één motor. De reden-tekst
+            = de page-level woningmachinerie-reden, of anders een per-call kernel-fout. ── */}
+        {kernelWhatifEnabled && whatIfSim && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-2 py-0.5 text-[11px] font-mono text-[var(--ink-3)]">
+              <Activity className="h-3 w-3 shrink-0" aria-hidden />
+              rekent via: {whatIfSim.engine === 'kernel' ? 'kernel' : 'v2'}
+            </span>
+            {(machineryReason ?? whatIfSim.fallbackReason) && (
+              <span
+                className="text-[11px] italic text-[var(--ink-3)]"
+                title={machineryReason ?? whatIfSim.fallbackReason}
+              >
+                teruggevallen — {machineryReason ?? whatIfSim.fallbackReason}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* ── KPI strip — 4-koloms figures-strip (klikt naar comparison-modal) ── */}
         {simResult && baselineSim && (() => {
