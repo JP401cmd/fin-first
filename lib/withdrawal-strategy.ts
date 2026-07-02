@@ -144,6 +144,93 @@ export function resolveWithdrawalStrategy(profile: {
   }
 }
 
+// ── Onttrekkingsprofiel-curve (V4, horizon-kernel) ───────────────────
+//
+// De 3-fasen-curve (go-go / slow-go / no-go) uit `profiles.withdrawal_profile_config`
+// (JSONB). ADDITIEF op de bestaande enum/`WithdrawalStrategyConfig` — die blijft de
+// v2-engine voeden tot FASE 6. Deze curve wordt ALLEEN door de horizon-kernel-adapter
+// (`lib/horizon-kernel/adapter/params.ts`) geconsumeerd.
+//
+// PURE VALIDATIE, GEEN DEFAULTS: een ontbrekend/ongeldig veld blijft `null` in het
+// resultaat; de adapter vult het per veld met de Excel-default (P!B71-75, single source
+// in `adapter/defaults.ts#EXCEL_FASE_CURVE`). Zo wonen de default-getallen op één plek
+// en blijft de solo-run byte-identiek wanneer de kolom NULL is (→ `parse` geeft `null`).
+
+/**
+ * V4 (F4) — het expliciet gekozen onttrekkingsPROFIEL. Woont additief in
+ * `withdrawal_profile_config.profiel` naast de 3-fasen-curve. De oude enum
+ * (`WithdrawalStrategyType`) blijft tot FASE 6 het veld waarop de draaiende v2-engine
+ * leunt; dit profiel is de nieuwe, rijkere taal die (voorlopig alléén) de horizon-kernel
+ * consumeert. Mapping profiel→enum bij opslaan: vast/afnemend/oplopend → 'static',
+ * guardrails → 'guardrails' (zie de onttrekkings-UI; F6-opruimpunt).
+ */
+export type WithdrawalProfiel = 'vast' | 'afnemend' | 'oplopend' | 'guardrails'
+
+export const WITHDRAWAL_PROFIELEN: readonly WithdrawalProfiel[] = [
+  'vast',
+  'afnemend',
+  'oplopend',
+  'guardrails',
+] as const
+
+/** Geparste onttrekkingsprofiel-curve; elk veld `null` = ontbrekend/ongeldig → adapter valt terug op Excel-default. */
+export interface WithdrawalProfileConfig {
+  /**
+   * V4 — expliciet gekozen profiel. `null` = niet gezet → de kernel-adapter valt terug
+   * op de bestaande enum→profiel-mapping (byte-identiek aan vóór F4).
+   */
+  profiel: WithdrawalProfiel | null
+  /** P!B71 — go-go fase t/m leeftijd. */
+  gogoTotLeeftijd: number | null
+  /** P!B72 — go-go factor (%). */
+  gogoPct: number | null
+  /** P!B73 — slow-go fase t/m leeftijd. */
+  slowgoTotLeeftijd: number | null
+  /** P!B74 — slow-go factor (%). */
+  slowgoPct: number | null
+  /** P!B75 — no-go factor (%) daarna. */
+  nogoPct: number | null
+}
+
+function finiteOrNull(raw: unknown): number | null {
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+function profielOrNull(raw: unknown): WithdrawalProfiel | null {
+  return typeof raw === 'string' && (WITHDRAWAL_PROFIELEN as readonly string[]).includes(raw)
+    ? (raw as WithdrawalProfiel)
+    : null
+}
+
+/**
+ * Lees de onttrekkingsprofiel-curve uit een profielobject.
+ * NULL/ontbrekend/niet-object → `null` (adapter gebruikt volledig de Excel-defaults).
+ * Aanwezig → per-veld gevalideerd (finite → waarde, anders `null` → adapter vult per veld).
+ */
+export function parseWithdrawalProfileConfig(profile: {
+  withdrawal_profile_config?: unknown
+} | null | undefined): WithdrawalProfileConfig | null {
+  let raw = profile?.withdrawal_profile_config
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  return {
+    profiel: profielOrNull(o.profiel),
+    gogoTotLeeftijd: finiteOrNull(o.gogo_tot_leeftijd),
+    gogoPct: finiteOrNull(o.gogo_pct),
+    slowgoTotLeeftijd: finiteOrNull(o.slowgo_tot_leeftijd),
+    slowgoPct: finiteOrNull(o.slowgo_pct),
+    nogoPct: finiteOrNull(o.nogo_pct),
+  }
+}
+
 // ── Engine ───────────────────────────────────────────────────────────
 
 /**

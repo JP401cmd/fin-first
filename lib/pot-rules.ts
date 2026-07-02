@@ -53,6 +53,19 @@ export const DEFAULT_GROUP_ORDER: WealthGroup[] = [
 
 export type SurplusGroup = WealthGroup | 'schuld_aflossen'
 
+/** Onderwerp waarvoor per-categorie-prio's gelden (V5, horizon-kernel). */
+export type PrioSubject = 'toename' | 'afname' | 'onttrekking'
+
+/**
+ * V5 (horizon-kernel) — échte per-categorie-prio's 1..5 per onderwerp, met de
+ * afwijkende reserve-semantiek: **prio 5 = reserve** (pas aanspreken bij depletie
+ * van de overige categorieën, de Excel-reserve-pass). Categorie-sleutels zijn de
+ * kernel-categorie-labels (bezit: Spaargeld/Beleggingen/Pensioen/Vastgoed/Eigen huis/
+ * Overig; schuld: Woning/Consumptief/…). ADDITIEF: ontbrekend → de drie orde-regels
+ * bepalen de prio's zoals voorheen (byte-identiek).
+ */
+export type CategoriePrios = Partial<Record<PrioSubject, Record<string, number>>>
+
 export interface PotRulesConfig {
   /** Rule 3 — onttrekkingsvolgorde tijdens decumulatie (geordende groepen). */
   withdrawalOrderGroups: WealthGroup[]
@@ -60,6 +73,12 @@ export interface PotRulesConfig {
   surplusGroup: SurplusGroup
   /** Rule 5 — onttrekkingsvolgorde bij een negatieve gebeurtenis (geordende groepen). */
   deficitOrderGroups: WealthGroup[]
+  /**
+   * V5 (optioneel) — échte per-categorie-prio's per onderwerp. Alleen aanwezig
+   * wanneer de gebruiker ze expliciet heeft gezet; anders `undefined` → de kernel-
+   * adapter gebruikt de bestaande orde-groep-afleiding (byte-identiek).
+   */
+  categoriePrios?: CategoriePrios
 }
 
 export const POT_RULES_DEFAULTS: PotRulesConfig = {
@@ -73,6 +92,36 @@ interface PotRulesRaw {
   withdrawal_order_groups?: unknown
   surplus_group?: unknown
   deficit_order_groups?: unknown
+  /** V5 — per-categorie-prio's per onderwerp (zie CategoriePrios). */
+  categorie_prios?: unknown
+}
+
+const PRIO_SUBJECTS: readonly PrioSubject[] = ['toename', 'afname', 'onttrekking']
+
+/**
+ * Valideer `categorie_prios` uit de jsonb-kolom (V5). Per onderwerp een map
+ * categorie→prio; alleen integer-prio's 1..5 worden overgenomen (ongeldige prio's
+ * weggelaten). BEWUST categorie-vocabulaire-AGNOSTISCH: pot-rules.ts kent de kernel-
+ * categorie-labels niet (dat zou de laag-afhankelijkheid omdraaien), dus categorie-
+ * SLEUTELS worden hier niet gefilterd — dat doet de kernel-adapter (prio-overgang.ts,
+ * `BEZIT_LABELS`) op het consumptiepunt. Levert `undefined` wanneer er geen enkele
+ * geldige prio is (→ adapter gebruikt de orde-groep-afleiding; gedrag byte-identiek).
+ */
+export function sanitizeCategoriePrios(value: unknown): CategoriePrios | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const src = value as Record<string, unknown>
+  const result: CategoriePrios = {}
+  for (const subject of PRIO_SUBJECTS) {
+    const rawMap = src[subject]
+    if (!rawMap || typeof rawMap !== 'object') continue
+    const cleaned: Record<string, number> = {}
+    for (const [cat, prio] of Object.entries(rawMap as Record<string, unknown>)) {
+      const n = typeof prio === 'number' ? prio : Number(prio)
+      if (Number.isInteger(n) && n >= 1 && n <= 5) cleaned[cat] = n
+    }
+    if (Object.keys(cleaned).length > 0) result[subject] = cleaned
+  }
+  return Object.keys(result).length > 0 ? result : undefined
 }
 
 /** Valideer dat `value` een permutatie is van de 5 WealthGroups; anders default. */
@@ -119,19 +168,22 @@ export function resolvePotRules(
       raw = {}
     }
   }
+  const categoriePrios = sanitizeCategoriePrios(raw.categorie_prios)
   return {
     withdrawalOrderGroups: sanitizeGroupOrder(raw.withdrawal_order_groups, DEFAULT_GROUP_ORDER),
     surplusGroup: sanitizeSurplusGroup(raw.surplus_group),
     deficitOrderGroups: sanitizeGroupOrder(raw.deficit_order_groups, DEFAULT_GROUP_ORDER),
+    ...(categoriePrios ? { categoriePrios } : {}),
   }
 }
 
 /** Serialiseer config → jsonb-shape voor opslag. */
-export function potRulesToRaw(config: PotRulesConfig): Required<PotRulesRaw> {
+export function potRulesToRaw(config: PotRulesConfig): PotRulesRaw {
   return {
     withdrawal_order_groups: config.withdrawalOrderGroups,
     surplus_group: config.surplusGroup,
     deficit_order_groups: config.deficitOrderGroups,
+    ...(config.categoriePrios ? { categorie_prios: config.categoriePrios } : {}),
   }
 }
 

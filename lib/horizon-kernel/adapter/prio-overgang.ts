@@ -30,7 +30,7 @@
  */
 
 import type { WealthGroup } from '@/lib/wealth-composition'
-import type { PotRulesConfig, SurplusGroup } from '@/lib/pot-rules'
+import type { CategoriePrios, PotRulesConfig, SurplusGroup } from '@/lib/pot-rules'
 import type {
   AssetCategorie,
   AssetPot,
@@ -128,10 +128,37 @@ function schuldGevuld(potten: readonly DebtPot[]): Partial<Record<TsSchuldCatego
   return gevuld
 }
 
+/** Set met alle geldige bezit-categorie-labels (voor de V5-overlay-validatie). */
+const BEZIT_LABELS = new Set<AssetCategorie>(BEZIT_ORDER)
+
+/**
+ * V5-overlay: leg expliciete per-categorie-prio's (uit `categorie_prios[subject]`) OVER
+ * de afgeleide prio-map. Alleen geldige bezit-categorie-sleutels worden toegepast; de
+ * prio's zijn in `pot-rules.ts` al gevalideerd op 1..5 (5 = reserve). Afwezig subject →
+ * de afgeleide map ongewijzigd (byte-identiek). Retourneert een NIEUWE map.
+ */
+function overlayBezitPrio(
+  base: Record<AssetCategorie, number>,
+  explicit: Record<string, number> | undefined,
+): Record<AssetCategorie, number> {
+  if (!explicit) return base
+  const next = { ...base }
+  for (const [cat, prio] of Object.entries(explicit)) {
+    if (BEZIT_LABELS.has(cat as AssetCategorie)) next[cat as AssetCategorie] = prio
+  }
+  return next
+}
+
 /**
  * Bouw `TsParams` uit de pot-regels en de reeds-gebouwde potten. `woningMeerekenen`
  * = de woning-strategie-selector is 'Meerekenen' (P!B57) → stuurt de niet-liquide-vlag
  * van eigen huis (bezit) en woning (schuld), conform het Excel-contract.
+ *
+ * V5: wanneer `potRules.categoriePrios` aanwezig is, worden de expliciete per-categorie-
+ * prio's (incl. reserve-5) OVER de orde-groep-afleiding gelegd (per bezit-categorie).
+ * Afwezig → uitsluitend de orde-groep-afleiding (bestaand gedrag byte-identiek). NB: de
+ * schuld-prio's blijven vooralsnog uit de bestaande mapping — schuld-per-categorie-prio's
+ * uit `categorie_prios` worden nog niet geconsumeerd (open punt; wacht op oracle-fixture).
  */
 export function buildTsParams(
   potRules: PotRulesConfig,
@@ -139,9 +166,11 @@ export function buildTsParams(
   schuldPotten: readonly DebtPot[],
   woningMeerekenen: boolean,
 ): TsParams {
-  const onttrekking = orderedGroupsToPrio(potRules.withdrawalOrderGroups)
-  const afname = orderedGroupsToPrio(potRules.deficitOrderGroups)
-  const { bezit: toename, schuldAflossen } = toenamePrio(potRules.surplusGroup)
+  const cp: CategoriePrios | undefined = potRules.categoriePrios
+  const onttrekking = overlayBezitPrio(orderedGroupsToPrio(potRules.withdrawalOrderGroups), cp?.onttrekking)
+  const afname = overlayBezitPrio(orderedGroupsToPrio(potRules.deficitOrderGroups), cp?.afname)
+  const { bezit: toenameBase, schuldAflossen } = toenamePrio(potRules.surplusGroup)
+  const toename = overlayBezitPrio(toenameBase, cp?.toename)
 
   const gevuldBezit = bezitGevuld(assetPotten)
   const bezitCategorien: TsBezitCategorie[] = BEZIT_ORDER.map((categorie) => ({

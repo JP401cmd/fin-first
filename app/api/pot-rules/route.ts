@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   resolvePotRules,
   potRulesToRaw,
+  sanitizeCategoriePrios,
   ALL_WEALTH_GROUPS,
   POT_RULES_DEFAULTS,
   type PotRulesConfig,
@@ -94,6 +95,9 @@ export async function PUT(request: NextRequest) {
     )
   }
 
+  // ── V5: per-categorie-prio's (optioneel) — gesaneerd (prio 1..5, onbekende genegeerd) ─
+  const categoriePrios = sanitizeCategoriePrios(body.categoriePrios)
+
   // ── Build config, vallend terug op defaults voor ontbrekende velden ─
   const config: PotRulesConfig = {
     withdrawalOrderGroups: isValidGroupOrder(withdrawalOrderGroups)
@@ -105,6 +109,7 @@ export async function PUT(request: NextRequest) {
     deficitOrderGroups: isValidGroupOrder(deficitOrderGroups)
       ? deficitOrderGroups
       : POT_RULES_DEFAULTS.deficitOrderGroups,
+    ...(categoriePrios ? { categoriePrios } : {}),
   }
 
   const { error } = await supabase

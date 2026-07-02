@@ -85,6 +85,14 @@ export interface DownsizeConfig {
   /** Nieuwe maandlast na verkoop (huur of kleinere hypotheek). null = auto-schatting. */
   newMonthlyHousingCost: number | null
   /**
+   * V8 (horizon-kernel, optioneel) — uiterste verkoopleeftijd voor de "wanneer nodig"-
+   * trigger (`on_depletion`): valt de projectie niet vóór deze leeftijd onder de drempel,
+   * dan verkoopt de kernel op deze leeftijd. Afwezig → de adapter gebruikt de Excel-
+   * default (P!B59 = 75). Alléén de horizon-kernel-adapter leest dit; de bestaande v2-
+   * engine gebruikt `triggerAge` als fallback en negeert dit veld.
+   */
+  fallbackAge?: number
+  /**
    * Grondslag voor de verkoopwaarde van de woning in de projectie. 'market' =
    * `current_value` (= het elders getoonde netto vermogen/dashboard); 'woz' =
    * `woz_value` (conservatiever, kan lager liggen). Default 'market'. Bepaalt de
@@ -114,6 +122,12 @@ export interface ReverseMortgageConfig {
   interestRate: number
   /** Maandelijkse uitkering. null = lineair berekend uit maxLoanPct over resterende verwachte levensduur. */
   monthlyPayout: number | null
+  /**
+   * V8 (horizon-kernel, optioneel) — uiterste opeet-startleeftijd voor de "wanneer nodig"-
+   * trigger (`on_depletion`). Afwezig → adapter-default (Excel P!B64 = 67). Alléén de
+   * horizon-kernel-adapter leest dit; de bestaande v2-engine negeert het.
+   */
+  fallbackAge?: number
 }
 
 export type HousingStrategyConfig =
@@ -201,6 +215,7 @@ export function parseHousingStrategy(raw: unknown): HousingStrategyConfig {
       // Alleen de expliciete 'woz'-keuze wijkt af; alles anders (ontbrekend /
       // malformed / 'market') valt terug op de continuïteit-bewarende default 'market'.
       saleValuationBasis: obj.saleValuationBasis === 'woz' ? 'woz' : 'market',
+      ...parseFallbackAge(obj),
     }
   }
 
@@ -219,6 +234,7 @@ export function parseHousingStrategy(raw: unknown): HousingStrategyConfig {
         obj.monthlyPayout === null || obj.monthlyPayout === undefined
           ? null
           : toFiniteNumber(obj.monthlyPayout, 0),
+      ...parseFallbackAge(obj),
     }
   }
 
@@ -227,6 +243,19 @@ export function parseHousingStrategy(raw: unknown): HousingStrategyConfig {
 
 function parseTrigger(raw: unknown): HousingStrategyTrigger {
   return raw === 'on_depletion' ? 'on_depletion' : 'fixed_age'
+}
+
+/**
+ * V8 — lees de optionele `fallbackAge` uit de JSONB-config. Canoniek is de camelCase-
+ * sleutel `fallbackAge` (consistent met `triggerAge`/`salePricePct`); `fallback_age`
+ * (snake_case) wordt tolerant geaccepteerd. Afwezig/ongeldig → veld weggelaten zodat de
+ * adapter zijn Excel-default gebruikt en bestaande configs byte-identiek blijven.
+ */
+function parseFallbackAge(obj: Record<string, unknown>): { fallbackAge?: number } {
+  const raw = obj.fallbackAge ?? obj.fallback_age
+  if (raw === null || raw === undefined) return {}
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  return Number.isFinite(n) ? { fallbackAge: n } : {}
 }
 
 function toFiniteNumber(raw: unknown, fallback: number): number {

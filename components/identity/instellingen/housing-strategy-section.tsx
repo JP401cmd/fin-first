@@ -491,14 +491,26 @@ function StrategyDetailsPanel({
             hint="Extra buffer bovenop de verkoopkosten: activeer zoveel jaar uitgaven vóór je vermogen op is. 0 = pas wanneer het echt nodig is."
           />
           <LabeledNumber
-            label="Fallback-leeftijd"
+            label={
+              config.mode === 'downsize'
+                ? 'Verkoop uiterlijk op leeftijd'
+                : 'Opeethypotheek uiterlijk op leeftijd'
+            }
             unit="jaar"
-            value={config.triggerAge}
+            // V8 — schrijft zowel `triggerAge` (waarop de huidige v2-engine + preview
+            // terugvallen) als het nieuwe kernel-veld `fallbackAge`, zodat beide
+            // rekenkernen dezelfde uiterste leeftijd gebruiken. Eén veld i.p.v. twee
+            // (triggerAge/fallbackAge convergeren) — F6 verwijdert de dubbeling.
+            value={config.fallbackAge ?? config.triggerAge}
             min={50}
             max={95}
             step={1}
-            onChange={(triggerAge) => onChange({ ...config, triggerAge })}
-            hint="Uiterste leeftijd waarop strategie sowieso wordt geactiveerd."
+            onChange={(age) => onChange({ ...config, triggerAge: age, fallbackAge: age })}
+            hint={
+              config.mode === 'downsize'
+                ? 'Blijft je vermogen op koers, dan verkoop je uiterlijk op deze leeftijd. Standaard 75.'
+                : 'Blijft je vermogen op koers, dan start de opeethypotheek uiterlijk op deze leeftijd. Standaard 75.'
+            }
           />
         </div>
       )}

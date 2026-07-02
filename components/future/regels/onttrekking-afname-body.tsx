@@ -5,6 +5,7 @@ import type { WealthGroup } from '@/lib/wealth-composition'
 import { POT_RULES_DEFAULTS } from '@/lib/pot-rules'
 import { RegelIntro, RegelSectionLabel } from './shared'
 import { GroupOrderEditor, PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
+import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
 import type { RegelBodyProps } from './types'
 
 const EMPTY_BALANCES: Record<WealthGroup, number> = {
@@ -23,18 +24,25 @@ export function OnttrekkingAfnameBody({
   const rules = potRules ?? POT_RULES_DEFAULTS
   const balances = potBalances ?? EMPTY_BALANCES
   const [order, setOrder] = useState<WealthGroup[]>(rules.deficitOrderGroups)
+  const prio = useCategoriePrioState(rules, 'afname')
   const { saving, error, save } = usePotRulesSave(onClose, onSaved)
   // Illustreer met een typische eenmalige tegenvaller (~3 maanden uitgaven).
   const yearly = simSnapshot?.unifiedInput.yearlyExpenses
   const shockAmount = yearly ? Math.round(yearly / 4) : undefined
 
-  const changed = order.join('|') !== rules.deficitOrderGroups.join('|')
+  const changed =
+    order.join('|') !== rules.deficitOrderGroups.join('|') || prio.changed
   const canSave = !saving && changed
 
   const saveRef = useRef(() => {})
   useEffect(() => {
-    saveRef.current = () => save({ ...rules, deficitOrderGroups: order })
-  }, [save, rules, order])
+    saveRef.current = () =>
+      save({
+        ...rules,
+        deficitOrderGroups: order,
+        categoriePrios: prio.mergeCategoriePrios(),
+      })
+  }, [save, rules, order, prio])
   useEffect(() => {
     onActionsChange({ canSave, saving, save: () => saveRef.current() })
   }, [onActionsChange, canSave, saving])
@@ -51,6 +59,13 @@ export function OnttrekkingAfnameBody({
 
       <RegelSectionLabel>Volgorde bij een tegenvaller</RegelSectionLabel>
       <GroupOrderEditor groups={order} balances={balances} onChange={setOrder} />
+
+      <CategoriePrioEditor
+        enabled={prio.enabled}
+        prios={prio.prios}
+        onToggle={prio.setEnabled}
+        onChange={prio.setPrios}
+      />
 
       <div className="mt-6">
         <RegelSectionLabel>Zo werkt het bij een eenmalige uitgave</RegelSectionLabel>

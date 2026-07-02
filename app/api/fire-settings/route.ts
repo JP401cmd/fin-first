@@ -19,7 +19,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, feature_preferences')
+    .select('retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, feature_preferences, deficit_loan_rate')
     .eq('id', user.id)
     .single()
 
@@ -56,6 +56,8 @@ export async function GET() {
     fire_end_age: data?.fire_end_age ?? 90,
     fire_legacy_amount: data?.fire_legacy_amount ?? null,
     monthly_savings_override: monthlySavingsOverride,
+    // V7 — tekort-lening-jaarrente (0..1). NULL = adapter gebruikt Excel-default 0,05.
+    deficit_loan_rate: data?.deficit_loan_rate ?? null,
   })
 }
 
@@ -84,6 +86,21 @@ export async function PUT(request: NextRequest) {
   }
   const legacyAmount = body.fire_legacy_amount != null ? Number(body.fire_legacy_amount) : null
 
+  // V7 — tekort-lening-jaarrente (optioneel). null = wis (adapter → Excel-default 0,05).
+  // Alleen meenemen wanneer expliciet in de body; gevalideerd op 0..1 (= DB-CHECK).
+  let deficitLoanRate: number | null | undefined
+  if ('deficit_loan_rate' in body) {
+    if (body.deficit_loan_rate == null) {
+      deficitLoanRate = null
+    } else {
+      const dlr = Number(body.deficit_loan_rate)
+      if (!Number.isFinite(dlr) || dlr < 0 || dlr > 1) {
+        return NextResponse.json({ error: 'deficit_loan_rate moet tussen 0 en 1 liggen' }, { status: 400 })
+      }
+      deficitLoanRate = dlr
+    }
+  }
+
   // Build update payload — only include retirement fields when explicitly provided
   const updatePayload: Record<string, unknown> = {
     fire_end_strategy: strategy,
@@ -91,6 +108,7 @@ export async function PUT(request: NextRequest) {
     fire_legacy_amount: legacyAmount,
     updated_at: new Date().toISOString(),
   }
+  if (deficitLoanRate !== undefined) updatePayload.deficit_loan_rate = deficitLoanRate
 
   if ('retirement_expense_method' in body) {
     const retirementMethod = String(body.retirement_expense_method ?? 'essential_budgets')

@@ -1,6 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
+import {
+  WITHDRAWAL_DEFAULTS,
+  WITHDRAWAL_PROFIELEN,
+  type WithdrawalStrategyType,
+} from '@/lib/withdrawal-strategy'
 
 const VALID_STRATEGIES: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
 
@@ -16,7 +20,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step')
+    .select('withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config')
     .eq('id', user.id)
     .single()
 
@@ -30,7 +34,54 @@ export async function GET() {
     guardrail_ceiling: data?.guardrail_ceiling ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
     guardrail_cut_step: data?.guardrail_cut_step ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
     guardrail_raise_step: data?.guardrail_raise_step ?? WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
+    // V4 — onttrekkingsprofiel-curve (JSONB). NULL = frontend/adapter gebruikt Excel-defaults.
+    withdrawal_profile_config: data?.withdrawal_profile_config ?? null,
   })
+}
+
+/**
+ * Valideer + normaliseer `withdrawal_profile_config` (V4). Accepteert:
+ *  - `null` → wis de curve (adapter valt terug op Excel-defaults),
+ *  - object met (optionele) snake_case-velden → per veld gevalideerd,
+ * en retourneert de te bewaren waarde óf een foutmelding. Ontbrekende velden worden
+ * weggelaten (adapter vult ze per veld met de Excel-default).
+ */
+function validateProfileConfig(
+  raw: unknown,
+): { value: Record<string, number | string> | null } | { error: string } {
+  if (raw === null) return { value: null }
+  if (typeof raw !== 'object') return { error: 'withdrawal_profile_config moet een object of null zijn' }
+  const o = raw as Record<string, unknown>
+  const out: Record<string, number | string> = {}
+  // V4 — expliciet gekozen profiel (optioneel). Alleen de vier geldige waarden.
+  if (o.profiel != null) {
+    if (
+      typeof o.profiel !== 'string' ||
+      !(WITHDRAWAL_PROFIELEN as readonly string[]).includes(o.profiel)
+    ) {
+      return { error: `profiel moet een van ${WITHDRAWAL_PROFIELEN.join(', ')} zijn` }
+    }
+    out.profiel = o.profiel
+  }
+  const ageFields = ['gogo_tot_leeftijd', 'slowgo_tot_leeftijd'] as const
+  const pctFields = ['gogo_pct', 'slowgo_pct', 'nogo_pct'] as const
+  for (const f of ageFields) {
+    if (o[f] == null) continue
+    const n = Number(o[f])
+    if (!Number.isFinite(n) || n < 40 || n > 120) {
+      return { error: `${f} moet tussen 40 en 120 liggen` }
+    }
+    out[f] = n
+  }
+  for (const f of pctFields) {
+    if (o[f] == null) continue
+    const n = Number(o[f])
+    if (!Number.isFinite(n) || n < 0 || n > 200) {
+      return { error: `${f} moet tussen 0 en 200 liggen` }
+    }
+    out[f] = n
+  }
+  return { value: out }
 }
 
 // ── PUT — Sla withdrawal strategy instellingen op in profiles ────────
@@ -94,6 +145,16 @@ export async function PUT(request: NextRequest) {
     }
   }
 
+  // ── Validate onttrekkingsprofiel-curve (V4, optioneel) ─────────────
+  let profileConfig: Record<string, number | string> | null | undefined
+  if ('withdrawal_profile_config' in body) {
+    const validated = validateProfileConfig(body.withdrawal_profile_config)
+    if ('error' in validated) {
+      return NextResponse.json({ error: validated.error }, { status: 400 })
+    }
+    profileConfig = validated.value
+  }
+
   // ── Build update object ───────────────────────────────────────────
   const updateData: Record<string, unknown> = {
     id: user.id,
@@ -105,6 +166,7 @@ export async function PUT(request: NextRequest) {
   if (ceiling !== undefined) updateData.guardrail_ceiling = ceiling
   if (cutStep !== undefined) updateData.guardrail_cut_step = cutStep
   if (raiseStep !== undefined) updateData.guardrail_raise_step = raiseStep
+  if (profileConfig !== undefined) updateData.withdrawal_profile_config = profileConfig
 
   const { error } = await supabase
     .from('profiles')
@@ -121,5 +183,6 @@ export async function PUT(request: NextRequest) {
     guardrail_ceiling: ceiling ?? WITHDRAWAL_DEFAULTS.guardrailCeiling,
     guardrail_cut_step: cutStep ?? WITHDRAWAL_DEFAULTS.guardrailCutStep,
     guardrail_raise_step: raiseStep ?? WITHDRAWAL_DEFAULTS.guardrailRaiseStep,
+    ...(profileConfig !== undefined ? { withdrawal_profile_config: profileConfig } : {}),
   })
 }

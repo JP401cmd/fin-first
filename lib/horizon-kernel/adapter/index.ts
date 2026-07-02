@@ -50,11 +50,11 @@ import {
   buildPersoonTijdas,
   buildStrategieSelectors,
   buildWoning,
+  resolveDeficitLoanRate,
   type KernelAdapterProfile,
 } from './params'
 import { buildEventInputs, type EventMappingNotice } from './events'
 import { buildPartnerParams, type KernelAdapterPartner } from './household'
-import { EXCEL_TEKORT_LENING_RENTE } from './defaults'
 
 /** Volledige adapter-invoer: profiel + app-bezittingen/-schulden + optionele context. */
 export interface KernelAdapterInput {
@@ -107,8 +107,10 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
   const eigenHuisIds = new Set(
     assets.filter((a) => a.is_active !== false && a.asset_type === 'eigen_huis').map((a) => a.id),
   )
+  // V7: tekort-lening-rente uit het profiel (deficit_loan_rate) of Excel-default.
+  const deficitLoanRate = resolveDeficitLoanRate(profile)
   const assetPotten = buildAssetPotten(assets)
-  const schuldPotten = buildSchuldPotten(debts, eigenHuisIds, EXCEL_TEKORT_LENING_RENTE)
+  const schuldPotten = buildSchuldPotten(debts, eigenHuisIds, deficitLoanRate)
 
   const woningMeerekenen = parseHousingStrategy(profile.housing_strategy_config).mode === 'include_full'
   const ts = buildTsParams(resolvePotRules(profile), assetPotten, schuldPotten, woningMeerekenen)
@@ -138,7 +140,7 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     // P-parameterblokken
     persoon,
     inkomenUitgaven: buildInkomenUitgaven(profile),
-    tekortLeningRente: EXCEL_TEKORT_LENING_RENTE,
+    tekortLeningRente: deficitLoanRate,
     strategie: buildStrategieSelectors(),
     eindstrategie: buildEindstrategie(profile),
     woning: buildWoning(profile.housing_strategy_config),
@@ -194,6 +196,7 @@ export {
   buildOnttrekkingsprofiel,
   buildPersoonTijdas,
   buildWoning,
+  resolveDeficitLoanRate,
 } from './params'
 export {
   buildEventInputs,

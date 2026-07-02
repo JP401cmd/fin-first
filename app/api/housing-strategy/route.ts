@@ -89,6 +89,15 @@ function validateConfig(raw: unknown): HousingStrategyConfig | { error: string }
     if (!Number.isFinite(dt) || dt < 0 || dt > 20) {
       return { error: 'depletionThresholdYears moet tussen 0 en 20 liggen' }
     }
+    // V8: optionele fallbackAge (camelCase; snake tolerant) — uiterste leeftijd voor
+    // de "wanneer nodig"-trigger. Alleen valideren wanneer aanwezig.
+    const rawFallback = obj.fallbackAge ?? obj.fallback_age
+    if (rawFallback != null) {
+      const fa = Number(rawFallback)
+      if (!Number.isFinite(fa) || fa < 18 || fa > 110) {
+        return { error: 'fallbackAge moet tussen 18 en 110 liggen' }
+      }
+    }
   }
 
   if (obj.mode === 'downsize') {

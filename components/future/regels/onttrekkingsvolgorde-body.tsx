@@ -5,6 +5,7 @@ import type { WealthGroup } from '@/lib/wealth-composition'
 import { POT_RULES_DEFAULTS } from '@/lib/pot-rules'
 import { RegelIntro, RegelSectionLabel } from './shared'
 import { GroupOrderEditor, PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
+import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
 import type { RegelBodyProps } from './types'
 
 const EMPTY_BALANCES: Record<WealthGroup, number> = {
@@ -23,16 +24,23 @@ export function OnttrekkingsvolgordeBody({
   const rules = potRules ?? POT_RULES_DEFAULTS
   const balances = potBalances ?? EMPTY_BALANCES
   const [order, setOrder] = useState<WealthGroup[]>(rules.withdrawalOrderGroups)
+  const prio = useCategoriePrioState(rules, 'onttrekking')
   const { saving, error, save } = usePotRulesSave(onClose, onSaved)
   const oneYearExpense = simSnapshot?.unifiedInput.yearlyExpenses
 
-  const changed = order.join('|') !== rules.withdrawalOrderGroups.join('|')
+  const changed =
+    order.join('|') !== rules.withdrawalOrderGroups.join('|') || prio.changed
   const canSave = !saving && changed
 
   const saveRef = useRef(() => {})
   useEffect(() => {
-    saveRef.current = () => save({ ...rules, withdrawalOrderGroups: order })
-  }, [save, rules, order])
+    saveRef.current = () =>
+      save({
+        ...rules,
+        withdrawalOrderGroups: order,
+        categoriePrios: prio.mergeCategoriePrios(),
+      })
+  }, [save, rules, order, prio])
   useEffect(() => {
     onActionsChange({ canSave, saving, save: () => saveRef.current() })
   }, [onActionsChange, canSave, saving])
@@ -49,6 +57,13 @@ export function OnttrekkingsvolgordeBody({
 
       <RegelSectionLabel>Volgorde van leegtrekken</RegelSectionLabel>
       <GroupOrderEditor groups={order} balances={balances} onChange={setOrder} />
+
+      <CategoriePrioEditor
+        enabled={prio.enabled}
+        prios={prio.prios}
+        onToggle={prio.setEnabled}
+        onChange={prio.setPrios}
+      />
 
       <div className="mt-6">
         <RegelSectionLabel>Zo werkt het op je potten</RegelSectionLabel>

@@ -5,6 +5,7 @@ import type { WealthGroup } from '@/lib/wealth-composition'
 import { POT_RULES_DEFAULTS, type SurplusGroup } from '@/lib/pot-rules'
 import { RegelIntro, RegelSectionLabel, RegelOptionCard } from './shared'
 import { PotFlowDiagram, usePotRulesSave } from './pot-flow-diagram'
+import { CategoriePrioEditor, useCategoriePrioState } from './categorie-prio-editor'
 import type { RegelBodyProps } from './types'
 
 const EMPTY_BALANCES: Record<WealthGroup, number> = {
@@ -31,15 +32,21 @@ export function VerdelingToenameBody({
   const rules = potRules ?? POT_RULES_DEFAULTS
   const balances = potBalances ?? EMPTY_BALANCES
   const [target, setTarget] = useState<SurplusGroup>(rules.surplusGroup)
+  const prio = useCategoriePrioState(rules, 'toename')
   const { saving, error, save } = usePotRulesSave(onClose, onSaved)
 
-  const changed = target !== rules.surplusGroup
+  const changed = target !== rules.surplusGroup || prio.changed
   const canSave = !saving && changed
 
   const saveRef = useRef(() => {})
   useEffect(() => {
-    saveRef.current = () => save({ ...rules, surplusGroup: target })
-  }, [save, rules, target])
+    saveRef.current = () =>
+      save({
+        ...rules,
+        surplusGroup: target,
+        categoriePrios: prio.mergeCategoriePrios(),
+      })
+  }, [save, rules, target, prio])
   useEffect(() => {
     onActionsChange({ canSave, saving, save: () => saveRef.current() })
   }, [onActionsChange, canSave, saving])
@@ -73,6 +80,13 @@ export function VerdelingToenameBody({
           <PotFlowDiagram balances={balances} mode="target" targetGroup={target} />
         </div>
       )}
+
+      <CategoriePrioEditor
+        enabled={prio.enabled}
+        prios={prio.prios}
+        onToggle={prio.setEnabled}
+        onChange={prio.setPrios}
+      />
 
       <p className="mt-5 text-[11px] text-[var(--ink-3)] italic leading-snug">
         Naar beleggingen maximaliseert je groei op lange termijn. Een cash-buffer geeft rust en

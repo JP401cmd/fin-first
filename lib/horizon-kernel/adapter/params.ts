@@ -22,7 +22,9 @@ import { resolveFireParams } from '@/lib/fire-params'
 import { resolveFireStrategyWithOverride, type FireEndStrategy } from '@/lib/fire-strategy'
 import {
   resolveWithdrawalStrategy,
+  parseWithdrawalProfileConfig,
   type WithdrawalStrategyType,
+  type WithdrawalProfiel,
 } from '@/lib/withdrawal-strategy'
 import { parseHousingStrategy } from '@/lib/housing-strategy'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
@@ -50,6 +52,7 @@ import {
   EXCEL_GUARDRAIL_DEFAULTS,
   EXCEL_HEFFINGVRIJ_INKOMEN_PP,
   EXCEL_ONZEKERHEID_DEFAULTS,
+  EXCEL_TEKORT_LENING_RENTE,
   EXCEL_WONING_DEFAULTS,
 } from './defaults'
 
@@ -77,6 +80,10 @@ export interface KernelAdapterProfile {
   guardrail_ceiling?: number | null
   guardrail_cut_step?: number | null
   guardrail_raise_step?: number | null
+  /** V4 — onttrekkingsprofiel 3-fasen-curve (JSONB); NULL → Excel-defaults. */
+  withdrawal_profile_config?: unknown
+  /** V7 — tekort-lening-jaarrente (0..1); NULL → Excel-default P!B25 = 0,05. */
+  deficit_loan_rate?: number | null
   housing_strategy_config?: unknown
   pot_rules?: unknown
   retirement_expense_method?: string | null
@@ -217,10 +224,14 @@ export function buildWoning(housingConfigRaw: unknown): WoningStrategieParams {
   }
 
   if (cfg.mode === 'downsize') {
+    // V8: bij "wanneer nodig" is de verkoopleeftijd de UITERSTE fallback. `fallbackAge`
+    // (indien gezet) wint van de app-`triggerAge`; afwezig → triggerAge (byte-identiek).
+    const verkoopleeftijd =
+      cfg.trigger === 'on_depletion' ? cfg.fallbackAge ?? cfg.triggerAge : cfg.triggerAge
     return {
       ...base,
       trigger: cfg.trigger === 'on_depletion' ? 'Wanneer nodig' : 'Vaste leeftijd',
-      verkoopleeftijd: cfg.triggerAge,
+      verkoopleeftijd,
       drempelMaandenUitgave: Math.round(cfg.depletionThresholdYears * 12),
       verkoopprijsPctWoz: cfg.salePricePct,
       verkoopkostenPct: cfg.salesCostsPct,
@@ -228,10 +239,13 @@ export function buildWoning(housingConfigRaw: unknown): WoningStrategieParams {
   }
 
   if (cfg.mode === 'reverse_mortgage') {
+    // V8: idem voor de opeet-startleeftijd bij "wanneer nodig".
+    const opeetStart =
+      cfg.trigger === 'on_depletion' ? cfg.fallbackAge ?? cfg.triggerAge : cfg.triggerAge
     return {
       ...base,
       trigger: cfg.trigger === 'on_depletion' ? 'Wanneer nodig' : 'Vaste leeftijd',
-      opeetStartleeftijdOpname: cfg.triggerAge,
+      opeetStartleeftijdOpname: opeetStart,
       opeetMaxLeningPctOverwaarde: cfg.maxLoanPct,
       opeetRentePerJaar: cfg.interestRate,
       opeetMaandopname: cfg.monthlyPayout,
@@ -249,6 +263,19 @@ const WITHDRAWAL_TO_PROFIEL: Record<WithdrawalStrategyType, Onttrekkingsprofiel>
 }
 
 /**
+ * V4/F4 — expliciet profiel (`withdrawal_profile_config.profiel`) → kern-selector.
+ * Wint van de enum-mapping zodra de gebruiker een profiel heeft gekozen (de enum
+ * kent 'Afnemend'/'Oplopend' niet, dus zonder dit veld zou go-go/slow-go/no-go
+ * onbereikbaar zijn).
+ */
+const PROFIEL_TO_KERNEL: Record<WithdrawalProfiel, Onttrekkingsprofiel> = {
+  vast: 'Vast',
+  afnemend: 'Afnemend',
+  oplopend: 'Oplopend',
+  guardrails: 'Guardrails',
+}
+
+/**
  * Onttrekkingsprofiel (P!B69-B81). V4-mapping: `withdrawal_strategy` → profiel
  * (static→Vast, guardrails→Guardrails, vpw/bucket→Vast). De 3-fasen-curve is Excel-
  * default tot de eigen JSONB-kolom er is (F4). Guardrail-parameters: floor/ceiling
@@ -259,19 +286,39 @@ const WITHDRAWAL_TO_PROFIEL: Record<WithdrawalStrategyType, Onttrekkingsprofiel>
  */
 export function buildOnttrekkingsprofiel(profile: KernelAdapterProfile): OnttrekkingsprofielParams {
   const cfg = resolveWithdrawalStrategy(profile)
+  // V4: de 3-fasen-curve komt uit `withdrawal_profile_config` als die er is; elk
+  // ontbrekend/ongeldig veld valt PER VELD terug op de Excel-default (EXCEL_FASE_CURVE,
+  // single source). `curve === null` (kolom NULL) → alles Excel → byte-identiek aan snede 1/2.
+  const curve = parseWithdrawalProfileConfig(profile)
   return {
-    profiel: WITHDRAWAL_TO_PROFIEL[cfg.strategy],
-    fase1TotLeeftijd: EXCEL_FASE_CURVE.fase1TotLeeftijd,
-    factor1Pct: EXCEL_FASE_CURVE.factor1Pct,
-    fase2TotLeeftijd: EXCEL_FASE_CURVE.fase2TotLeeftijd,
-    factor2Pct: EXCEL_FASE_CURVE.factor2Pct,
-    factor3Pct: EXCEL_FASE_CURVE.factor3Pct,
+    // Voorrang: expliciet gekozen profiel > enum-mapping (byte-identiek wanneer
+    // `curve.profiel` niet gezet is → `null`).
+    profiel: curve?.profiel ? PROFIEL_TO_KERNEL[curve.profiel] : WITHDRAWAL_TO_PROFIEL[cfg.strategy],
+    fase1TotLeeftijd: curve?.gogoTotLeeftijd ?? EXCEL_FASE_CURVE.fase1TotLeeftijd,
+    factor1Pct: curve?.gogoPct ?? EXCEL_FASE_CURVE.factor1Pct,
+    fase2TotLeeftijd: curve?.slowgoTotLeeftijd ?? EXCEL_FASE_CURVE.fase2TotLeeftijd,
+    factor2Pct: curve?.slowgoPct ?? EXCEL_FASE_CURVE.factor2Pct,
+    factor3Pct: curve?.nogoPct ?? EXCEL_FASE_CURVE.factor3Pct,
     guardrailFloor: cfg.guardrailFloor,
     guardrailCeiling: cfg.guardrailCeiling,
     guardrailOnderdrempelRatio: cfg.guardrailFloor || EXCEL_GUARDRAIL_DEFAULTS.onderdrempelRatio,
     guardrailBovendrempelRatio: cfg.guardrailCeiling || EXCEL_GUARDRAIL_DEFAULTS.bovendrempelRatio,
     guardrailStap: cfg.guardrailCutStep || EXCEL_GUARDRAIL_DEFAULTS.stap,
   }
+}
+
+/**
+ * Tekort-lening-jaarrente (V7, P!B25). Uit `deficit_loan_rate` wanneer aanwezig én
+ * geldig (finite, 0..1 — dezelfde band als de DB-CHECK); anders de Excel-default
+ * (`EXCEL_TEKORT_LENING_RENTE` = 0,05). NULL/ontbrekend → default → byte-identiek aan
+ * snede 1/2. Geconsumeerd door zowel `buildSchuldPotten` (rente op de tekort-lening-pot)
+ * als het `tekortLeningRente`-blok van de `KernelInput`.
+ */
+export function resolveDeficitLoanRate(profile: KernelAdapterProfile): number {
+  const raw = profile.deficit_loan_rate
+  if (raw == null) return EXCEL_TEKORT_LENING_RENTE
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : EXCEL_TEKORT_LENING_RENTE
 }
 
 /**

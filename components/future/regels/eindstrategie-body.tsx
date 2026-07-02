@@ -30,6 +30,9 @@ interface Draft {
   legacyAmount: number
 }
 
+/** V7 — Excel-default tekort-lening-rente (P!B25 = 0,05 → 5%). */
+const DEFAULT_DEFICIT_PCT = 5
+
 /**
  * Regel 1 — Eindstrategie. Diepe instelling (strategie + eindleeftijd + nalatenschap)
  * met live impact-grafiek (baseline vs. kandidaat via runRegelProjection).
@@ -52,8 +55,41 @@ export function EindstrategieBody({
   const [error, setError] = useState<string | null>(null)
   const debounced = useDebouncedValue(draft, 200)
 
-  // VPW is alleen combineerbaar met 'deplete' (engine geeft anders een leeg pad).
-  const vpwConflict = withdrawalStrategy?.strategy === 'vpw'
+  // V7 — tekort-lening-rente (percentage). De pane levert dit veld niet mee, dus
+  // lezen we het zelf uit /api/fire-settings; NULL = Excel-default (5%). Opslaan
+  // gaat via dezelfde PUT als de eindstrategie (deficit_loan_rate als fractie 0..1).
+  const [deficitPct, setDeficitPct] = useState(DEFAULT_DEFICIT_PCT)
+  const [savedDeficitPct, setSavedDeficitPct] = useState(DEFAULT_DEFICIT_PCT)
+  // False tot de zelf-GET klaar is: de rente-sectie fade't dan in i.p.v. dat de
+  // waarde van de default naar de opgeslagen rente springt.
+  const [deficitLoaded, setDeficitLoaded] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/fire-settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return
+        const raw = d.deficit_loan_rate
+        if (raw != null && Number.isFinite(Number(raw))) {
+          const pct = Number(raw) * 100
+          setDeficitPct(pct)
+          setSavedDeficitPct(pct)
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setDeficitLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  const deficitValid = Number.isFinite(deficitPct) && deficitPct >= 0 && deficitPct <= 100
+
+  // Een oud opgeslagen onttrekkingsprofiel (enum-waarde 'vpw' in de DB) is alleen met
+  // 'deplete' combineerbaar — de engine geeft anders een leeg pad. De profiel-UI biedt
+  // deze keuze niet meer aan; dit vangt bestaande gebruikers met die legacy-waarde af.
+  const legacyProfielConflict = withdrawalStrategy?.strategy === 'vpw'
 
   const { baseline, draftProj } = useMemo(() => {
     if (!simSnapshot) return { baseline: EMPTY_PROJ, draftProj: EMPTY_PROJ }
@@ -73,8 +109,9 @@ export function EindstrategieBody({
   const changed =
     draft.strategy !== fs.strategy ||
     draft.endAge !== fs.endAge ||
-    draft.legacyAmount !== fs.legacyAmount
-  const canSave = !saving && endAgeValid && legacyValid && changed
+    draft.legacyAmount !== fs.legacyAmount ||
+    deficitPct !== savedDeficitPct
+  const canSave = !saving && endAgeValid && legacyValid && deficitValid && changed
 
   // Save-handler via ref tegen stale closures (zelfde patroon als event-pane-edit).
   const saveRef = useRef(async () => {})
@@ -90,6 +127,8 @@ export function EindstrategieBody({
             fire_end_strategy: draft.strategy,
             fire_end_age: draft.endAge,
             fire_legacy_amount: draft.strategy === 'legacy' ? draft.legacyAmount : null,
+            // V7 — tekort-lening-rente als fractie 0..1.
+            deficit_loan_rate: deficitPct / 100,
           }),
         })
         if (!res.ok) {
@@ -106,7 +145,7 @@ export function EindstrategieBody({
         setSaving(false)
       }
     }
-  }, [draft, onClose, onSaved])
+  }, [draft, deficitPct, onClose, onSaved])
 
   const deltaMonths = fireDeltaMonths(baseline, draftProj)
   useEffect(() => {
@@ -134,7 +173,7 @@ export function EindstrategieBody({
       <div className="space-y-2">
         {STRATEGY_ORDER.map((key) => {
           const meta = STRATEGY_LABELS[key]
-          const disabled = vpwConflict && key !== 'deplete'
+          const disabled = legacyProfielConflict && key !== 'deplete'
           return (
             <RegelOptionCard
               key={key}
@@ -145,7 +184,7 @@ export function EindstrategieBody({
               disabled={disabled}
               note={
                 disabled
-                  ? 'Niet combineerbaar met je huidige onttrekkingsstrategie (VPW).'
+                  ? 'Past niet bij je huidige onttrekkingskeuze. Kies eerst het profiel ‘Vast’ in het onttrekkingsprofiel-scherm om deze eindstrategie te gebruiken.'
                   : undefined
               }
             />
@@ -201,6 +240,36 @@ export function EindstrategieBody({
           )}
         </div>
       )}
+
+      {/* V7 — tekort-lening-rente (FIRE-instelling, opgeslagen via dezelfde PUT). */}
+      <div
+        aria-busy={!deficitLoaded}
+        className={`mt-5 transition-opacity duration-300 ${deficitLoaded ? 'opacity-100' : 'opacity-60'}`}
+      >
+        <RegelSectionLabel>Rente tekort-lening</RegelSectionLabel>
+        <label className="block">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={0.25}
+              value={deficitPct}
+              onChange={(e) => setDeficitPct(Number(e.target.value))}
+              aria-label="Rente tekort-lening in procent per jaar"
+              className="w-24 px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
+            />
+            <span className="text-sm text-[var(--ink-3)]">% per jaar</span>
+          </div>
+          {!deficitValid && (
+            <p className="mt-1 text-[11px] text-amber-700">Tussen 0% en 100%.</p>
+          )}
+          <p className="mt-1 text-[11px] text-[var(--ink-3)] italic leading-snug">
+            Zijn je uitgaven in een jaar niet gedekt door vermogen of inkomen, dan leent de
+            projectie het tekort tegen deze rente. Standaard 5%.
+          </p>
+        </label>
+      </div>
 
       {/* Live impact */}
       <div className="mt-6">
