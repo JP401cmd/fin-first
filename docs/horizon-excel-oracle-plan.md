@@ -275,7 +275,38 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
   **FASE 2 AFGEROND — 847 tests, tsc schoon.**
 - **FASE 3 — Adapter**: app-data → kern-input (§5); hergebruik bestaande expanders; dubbeltelling-
   guard op source-markers; eigenschaps-tests buiten het Excel-domein (N potten, totalen sluiten,
-  geen negatieve potten). De domein-expanders (AOW, pensioen-annuïtisering, kinderen-NIBUD,
+  geen negatieve potten).
+  **Voortgang:** ✔ **Snede 1 — fundament** (2026-07-02, `lib/horizon-kernel/adapter/`:
+  potten/params/prio-overgang/defaults; 868 tests): categorie- en rol-mapping compleet
+  (crypto→Beleggingen, levensverzekering→Pensioen; classificatie via canonieke classifyAsset —
+  geen tweede pad); V6-schaling; V4-profielmapping + Excel-curve-defaults (P!B71-75);
+  V8-woning-defaults (P!B59-66); tekort-rente P!B25=5% (V7-default). **bens!H = INVERSE van
+  `include_aflossing_in_savings`** (dubbeltel-preventie: kern-CF!G laat de hele maandlast
+  vrijvallen; app-ADR-0020-rente-vrijval bestaat in de kern bewust niet — gedocumenteerde
+  afwijking). ⚠ **Vondst: schulden zijn in de kern fysiek gecapt op 7 slots** (S_PHYSICAL_SLOTS;
+  bezittingen wél onbeperkt) — kern-uitbreiding of categorie-aggregatie nodig; open punt samen
+  met market_shock (V9), generieke `sale_config`-liquidaties en huur-€→%WOZ-conversie
+  (→ snede 2b "kern-uitbreidingen buiten oracle-domein"). ✔ **Snede 2 — event-laag + guard**
+  (893 tests): per-type-mapping (aow→auto-params; pension→multipot-slots mét PMT-in-kern, geen
+  dubbele annuïtisering; children/inheritance→auto-params; werk→ladder-params; huis geblokkeerd
+  via config-route; overige→Geb-rijen met postconventie; market_shock=skip+notice V9);
+  `guard.ts` = uniform source-marker-filter (superset isStrategyManagedEvent) + partitionEvents;
+  **missie-test bewezen: afgeleide stroom precies één keer + solveFire byte-identiek mét/zónder
+  visuele events**; capaciteits-notices (pensioen>6, kind>3, Geb 10×3) via EventMappingNotice.
+  ✔ **Snede 2b — kern-uitbreidingen buiten oracle-domein** (904 tests, byte-inertie-bewijs):
+  `potMutaties` (V9: schok op saldo m−1 vóór rendement, eigen-huis uitgesloten; adapter mapt
+  market_shock, skip-notice vervallen); schulden-slot-cap ontgrensd (`debtSlotCount` = vloer 7;
+  tekort-lening via getypte rol i.p.v. hardcoded slot 6, ook in solver-B99); `potLiquidaties`
+  (sale_config `vast_moment` → netto naar Spaargeld ná rendement; wanneer-nodig/datum/
+  payoffDebtIds/prijs-fractie = notice, FASE 4/5). ✔ **Snede 3 — household/partner (V3)**
+  (919 tests): `household.ts` (buildPartnerParams → PT!B2-B9 met notices voor onbekend
+  partner-pensioen/opbouw; B9 = 993 spiegelt de kern-constante), koppelingen personen=2 +
+  leefsituatie='Samenwonend' (kern verdubbelt heffingvrij zelf — niet gedupliceerd),
+  `buildPerspectiefInputs` (per-partner solo-runs via eigenaar/splitsings-pct, Σ = huishouden,
+  geen dubbeltelling; combined = de huishouden-run). Zonder partner byte-inert (diff-test).
+  **FASE 3 (ADAPTER) COMPLEET — 919 tests, tsc schoon.** Open naar F4/F5: partner-pensioen-/
+  opbouw-bronnen in het profiel, huishoud-uitgaven-methode, privacy-degrade, wanneer-nodig-
+  liquidaties, UI voor shocks/liquidaties. De domein-expanders (AOW, pensioen-annuïtisering, kinderen-NIBUD,
   erfenis, werk) worden zélf parity-getest tegen de Geb/Auto-gebeurtenissen-tabel (fixture bevat
   Geb rij 14-30): reproduceert de expander uit P/PT-inputs exact de Geb-rijen? Bij afwijking wint
   het Excel (oracle), tenzij de eigenaar per geval anders besluit.

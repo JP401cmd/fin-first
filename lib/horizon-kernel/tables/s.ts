@@ -52,8 +52,26 @@
 import type { DebtCategorie, DebtPot, KernelInput, MonthIndex } from '../types'
 import { isBeyondHorizon, leeftijdJaren, maandInJaar } from '../scaffold'
 
-/** Aantal fysieke schuld-slots (bens rij 17-23). */
+/**
+ * Aantal fysieke schuld-slots in het Excel-oracle (bens rij 17-23). Dient sinds
+ * snede 2b als **ondergrens** (Excel-layout): `computeS` loopt over
+ * `debtSlotCount(potten)` zodat een app-scenario met méér dan 7 schulden extra
+ * slots krijgt, terwijl elke oracle-fixture (max slot 6) exact op 7 uitkomt en dus
+ * byte-identiek blijft.
+ */
 export const S_PHYSICAL_SLOTS = 7
+
+/**
+ * Aantal te evolueren schuld-slots: de hoogste bezette slot-index + 1, met
+ * `S_PHYSICAL_SLOTS` als vloer (Excel-tabellayout). Voor alle 19 fixtures (hoogste
+ * slot = 6, de tekort-lening) → 7 → byte-identiek aan het oude vaste `S_PHYSICAL_SLOTS`.
+ * Alleen app-scenario's met schulden op slot ≥ 7 (adapter, cap ontgrensd) verhogen dit.
+ */
+export function debtSlotCount(potten: readonly DebtPot[]): number {
+  let maxSlot = -1
+  for (const p of potten) if (p.slot > maxSlot) maxSlot = p.slot
+  return Math.max(S_PHYSICAL_SLOTS, maxSlot + 1)
+}
 
 /**
  * Schuld-categorieën die een extra-aflossing-kolom in de Verdeling-waterval hebben
@@ -245,8 +263,12 @@ export function computeS(input: KernelInput, dep: SDep, m: MonthIndex): SRow {
 
   const opeetMode = input.woning.selector === 'Opeethypotheek'
 
+  // Dynamisch aantal slots (snede 2b): ≥ S_PHYSICAL_SLOTS; alleen groter bij
+  // app-schulden op slot ≥ 7. Voor elke fixture exact 7 → byte-identiek.
+  const slotCount = debtSlotCount(input.schuldPotten)
+
   const slots: SSlot[] = []
-  for (let i = 0; i < S_PHYSICAL_SLOTS; i++) {
+  for (let i = 0; i < slotCount; i++) {
     const pot = potBySlot(input.schuldPotten, i)
     const saldoPrev = dep.saldoVorige[i] ?? 0
     if (pot?.rol === 'tekortLening') {
@@ -289,7 +311,7 @@ export function computeS(input: KernelInput, dep: SDep, m: MonthIndex): SRow {
       stu = 0,
       zak = 0,
       ov = 0
-    for (let i = 0; i < S_PHYSICAL_SLOTS; i++) {
+    for (let i = 0; i < slotCount; i++) {
       const pot = potBySlot(input.schuldPotten, i)
       const s = slots[i]
       const saldo = n(s.saldo)

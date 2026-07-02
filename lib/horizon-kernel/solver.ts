@@ -113,11 +113,18 @@ function computeStatusBlok(
   // float-ruis een vals `pension_shortfall` geven (eind-pensioen-fixture).
   const TEKORT_RUIS_DREMPEL = 0.005
   let tekortLening = 0
-  for (const rij of proj.s) {
-    const leeftijd = rij.helperLeeftijd
-    if (typeof leeftijd !== 'number' || leeftijd > eindleeftijd) continue
-    const saldo = rij.slots[6]?.saldo
-    if (typeof saldo === 'number' && saldo > tekortLening) tekortLening = saldo
+  // De tekort-lening wordt via de getypte rol gelokaliseerd (snede 2b), niet via de
+  // positie-aanname slot 6. Voor de fixtures staat de rol op slot 6 (input-from-
+  // fixture) → byte-identiek; 18/19 fixtures hebben geen tekort-pot → rol ontbreekt
+  // → tekortLening blijft 0 (gelijk aan het oude lezen van de lege slot 6).
+  const tekortSlot = input.schuldPotten.find((p) => p.rol === 'tekortLening')?.slot
+  if (tekortSlot !== undefined) {
+    for (const rij of proj.s) {
+      const leeftijd = rij.helperLeeftijd
+      if (typeof leeftijd !== 'number' || leeftijd > eindleeftijd) continue
+      const saldo = rij.slots[tekortSlot]?.saldo
+      if (typeof saldo === 'number' && saldo > tekortLening) tekortLening = saldo
+    }
   }
   if (tekortLening <= TEKORT_RUIS_DREMPEL) tekortLening = 0
 

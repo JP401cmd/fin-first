@@ -165,6 +165,47 @@ export interface DebtPot {
   readonly rol: DebtRol | null
 }
 
+// ── Kern-uitbreidingen buiten het oracle-domein (FASE 3, snede 2b) ───────────
+
+/**
+ * **Buiten oracle-domein (gap-besluit V9).** Generieke pot-mutatie ("market
+ * shock"): een eenmalige schaling van het bezitting-pot-saldo van maand `maand−1`
+ * VOORDAT rendement en inleg die maand rekenen — spiegelt de v2-engine-conventie
+ * "schok vóór rendement". Het Excel-model kent dit event niet; zonder `potMutaties`
+ * is elke projectie byte-identiek (inert-by-default, ADR 0032 §4).
+ */
+export interface PotMutatie {
+  /** Maandindex waarop de schok inslaat (schaalt het pot-saldo van m−1). */
+  readonly maand: MonthIndex
+  /** Signed schaal-fractie: −0,37 = 37% daling, +0,20 = 20% winst. */
+  readonly pct: number
+  /**
+   * `true` → alleen investeringspotten (`AssetPot.investering`, d.w.z.
+   * Beleggingen/Vastgoed); `false` → alle bezittingspotten BEHALVE de eigen woning
+   * (die volgt het aparte woningblok, niet een generieke marktschok).
+   */
+  readonly alleenInvestering: boolean
+}
+
+/**
+ * **Buiten oracle-domein (Excel kent alleen de woning-verkoop-flow).** Generieke
+ * liquidatie van een niet-woning-bezitting: op `maand` gaat de netto-opbrengst
+ * `waarde(maand−1) × (1 − kostenPct)` naar de liquide bestemming (`doelCategorie`,
+ * default `'Spaargeld'`) als inleg — spiegel van de woningverkoop-conventie
+ * (opbrengst arriveert als nieuw liquide geld, ná rendement) — en de bronpot gaat
+ * op 0. Zonder `potLiquidaties` is elke projectie byte-identiek (inert-by-default).
+ */
+export interface PotLiquidatie {
+  /** Fysieke bezitting-slot van de te liquideren pot (bens rij 4-13 → 0..). */
+  readonly slot: number
+  /** Maandindex van de verkoop (leest de pot-waarde van m−1). */
+  readonly maand: MonthIndex
+  /** Verkoopkosten als fractie van de opbrengst (0..1). */
+  readonly kostenPct: number
+  /** Liquide bestemmingscategorie voor de netto-opbrengst; default `'Spaargeld'`. */
+  readonly doelCategorie?: AssetCategorie
+}
+
 // ── P-parameterblokken ───────────────────────────────────────────────────────
 
 /** Persoon & tijdas (P-blok "Persoon & spaargedrag" + AOW-leeftijd). */
@@ -607,4 +648,16 @@ export interface KernelInput {
   readonly autoGebeurtenissen: AutoGebeurtenisParams
   readonly partner: PartnerParams
   readonly werkStrategie: WerkStrategieParams
+
+  // ── kern-uitbreidingen buiten het oracle-domein (snede 2b; optioneel/inert) ──
+  /**
+   * Generieke pot-mutaties ("market shock", V9). Weggelaten/leeg → geen effect;
+   * elke bestaande parity-run blijft byte-identiek (ADR 0032 §4).
+   */
+  readonly potMutaties?: readonly PotMutatie[]
+  /**
+   * Generieke pot-liquidaties (niet-woning-verkoop). Weggelaten/leeg → geen effect;
+   * elke bestaande parity-run blijft byte-identiek.
+   */
+  readonly potLiquidaties?: readonly PotLiquidatie[]
 }

@@ -62,7 +62,7 @@ import {
 } from './tables/toename-afname'
 import { computeVerdeling, type VerdelingDep, type VerdelingRow } from './tables/verdeling'
 import { computeBez, type BezDep, type BezRow, type BezWoningblok, type CategorieBedrag } from './tables/bez'
-import { computeS, S_EXTRA_CATEGORIEEN, S_PHYSICAL_SLOTS, type SDep, type SRow } from './tables/s'
+import { computeS, S_EXTRA_CATEGORIEEN, debtSlotCount, type SDep, type SRow } from './tables/s'
 import { computePrognose, type PrognoseDep, type PrognoseRow } from './tables/prognose'
 import { computeWerkStrategie, type WerkStrategieRow } from './tables/werk-strategie'
 import { computePT, type PTRow, computePartnerHead, type PartnerHead } from './tables/pt'
@@ -86,6 +86,8 @@ const ASSET_ORDER: readonly AssetCategorie[] = [
 ]
 
 // Gereserveerde schuld-slots (contract, `input-from-fixture`): hypotheek=0, opeet=3, tekort=6.
+// De tekort-lening wordt sinds snede 2b via de getypte rol 'tekortLening' gelokaliseerd
+// (dynamische slots); `TEKORT_SLOT` blijft enkel als fallback wanneer die rol ontbreekt.
 const HYPOTHEEK_SLOT = 0
 const OPEET_SLOT = 3
 const TEKORT_SLOT = 6
@@ -278,6 +280,83 @@ function catMap(values: readonly number[]): CategorieBedrag {
   return out
 }
 
+/** Tel twee categorie-bedragen op (voor het injecteren van liquidatie-opbrengst als toename). */
+function addCat(a: CategorieBedrag, b: CategorieBedrag): CategorieBedrag {
+  const out = { ...a } as Record<AssetCategorie, number>
+  for (const c of ASSET_ORDER) out[c] += b[c]
+  return out
+}
+
+/**
+ * Uitkomst van de buiten-oracle pot-aanpassingen op maand m (snede 2b).
+ * `slotWaardeVorig`/`categoriesaldoVorig` zijn de (mogelijk aangepaste) m−1-waarden
+ * die Bez consumeert; `liquidatieToename` is de netto-verkoopopbrengst per categorie
+ * die als inleg (ná rendement) in de volle Bez-call wordt geïnjecteerd (`null` = geen).
+ */
+interface PotAanpassing {
+  readonly slotWaardeVorig: number[]
+  readonly categoriesaldoVorig: Record<AssetCategorie, number>
+  readonly liquidatieToename: Record<AssetCategorie, number> | null
+}
+
+/**
+ * **Buiten oracle-domein (snede 2b, ADR 0032 §4).** Pas de generieke pot-mutaties
+ * (V9 market_shock) en pot-liquidaties toe op de m−1-toestand die Bez op maand m
+ * consumeert. Puur additief en **inert-by-default**: deze functie wordt alléén
+ * aangeroepen wanneer `input.potMutaties`/`potLiquidaties` niet-leeg zijn, en werkt
+ * op KLONEN van de base-arrays via delta's — het reguliere pad (geen invoer) raakt
+ * `slotWaardeVorig`/`categoriesaldoVorig` nooit aan en blijft byte-identiek.
+ *
+ * Volgorde per maand: eerst de schok (schaalt saldo m−1 vóór rendement), dan de
+ * liquidatie (leest de eventueel geschokte waarde, zet de bronpot op 0, routeert
+ * de netto-opbrengst naar de liquide bestemming). Meerdere mutaties dezelfde maand
+ * compounden (elke leest de tot dan geschaalde waarde).
+ */
+function applyPotAanpassingen(
+  input: KernelInput,
+  m: MonthIndex,
+  baseSlotWaardeVorig: readonly number[],
+  baseCategoriesaldoVorig: CategorieBedrag,
+): PotAanpassing {
+  const slotWaardeVorig = baseSlotWaardeVorig.slice()
+  const categoriesaldoVorig = { ...baseCategoriesaldoVorig } as Record<AssetCategorie, number>
+  let liquidatieToename: Record<AssetCategorie, number> | null = null
+
+  // (1) market_shock — schaal het saldo m−1 vóór rendement/inleg.
+  for (const mut of input.potMutaties ?? []) {
+    if (mut.maand !== m) continue
+    const f = 1 + mut.pct
+    for (let i = 0; i < input.assetPotten.length; i++) {
+      const p = input.assetPotten[i]
+      // Investeringen (Beleggingen/Vastgoed), of — bij een brede schok — alles
+      // behalve de eigen woning (die volgt het aparte woningblok, geen marktschok).
+      const affected = mut.alleenInvestering ? p.investering : p.rol !== 'eigenHuis'
+      if (!affected) continue
+      const v = slotWaardeVorig[i]
+      slotWaardeVorig[i] = v * f
+      categoriesaldoVorig[p.categorie] += v * (f - 1)
+    }
+  }
+
+  // (2) generieke liquidaties — bronpot → 0, netto-opbrengst → liquide bestemming.
+  for (const liq of input.potLiquidaties ?? []) {
+    if (liq.maand !== m) continue
+    for (let i = 0; i < input.assetPotten.length; i++) {
+      const p = input.assetPotten[i]
+      if (p.slot !== liq.slot) continue
+      if (p.rol === 'eigenHuis') continue // huis heeft z'n eigen verkoop-flow (woningblok)
+      const v = slotWaardeVorig[i] // effectieve waarde m−1 (ná een eventuele schok)
+      slotWaardeVorig[i] = 0
+      categoriesaldoVorig[p.categorie] -= v
+      const doel: AssetCategorie = liq.doelCategorie ?? 'Spaargeld'
+      if (liquidatieToename === null) liquidatieToename = { ...ZERO_CAT } as Record<AssetCategorie, number>
+      liquidatieToename[doel] += v * (1 - liq.kostenPct)
+    }
+  }
+
+  return { slotWaardeVorig, categoriesaldoVorig, liquidatieToename }
+}
+
 // ── Geb-helperposten (rij 4-30) — voeden CF!H (baten) en Af!D (kosten) ──────────
 
 /** Eén machine-leesbare gebeurtenis-post (Geb W:AE): start-/eind-maandindex + koopkracht-nu bedrag. */
@@ -340,6 +419,14 @@ export function runKernelProjection(
   const { fireAge } = opts
   const fireMonth = Math.round((fireAge - input.startLeeftijd) * 12)
 
+  // Getypte tekort-lokalisatie + dynamisch schuld-slot-aantal (snede 2b). Voor de
+  // fixtures: tekort-rol op slot 6, `nDebtSlots` = 7 → byte-identiek aan het oude pad.
+  const tekortSlot = input.schuldPotten.find((p) => p.rol === 'tekortLening')?.slot ?? TEKORT_SLOT
+  const nDebtSlots = debtSlotCount(input.schuldPotten)
+  // Zijn er buiten-oracle pot-aanpassingen (V9-schok / generieke liquidatie)?
+  const heeftPotAanpassingen =
+    (input.potMutaties?.length ?? 0) > 0 || (input.potLiquidaties?.length ?? 0) > 0
+
   // Statische blokken (één keer).
   const es = computeEs(input)
   const autoGebeurtenissen = computeAutoGebeurtenissen(input)
@@ -387,9 +474,21 @@ export function runKernelProjection(
   for (let m: MonthIndex = 0; m < HORIZON_MONTHS; m++) {
     // ── m−1-afhankelijke Bez-deps (gedeeld door de vroege woning- en de volle Bez-call) ──
     const prevWon = prevWoning(prevBez)
+    // Base m−1-waarden (ongewijzigd pad = byte-identiek). Alleen wanneer er
+    // buiten-oracle pot-aanpassingen zijn (V9-schok / liquidatie) worden ze op een
+    // KLOON via delta's aangepast (snede 2b, ADR 0032 §4 — inert-by-default).
+    let slotWaardeVorig: readonly number[] = input.assetPotten.map((p) => bezSlotWaarde(prevBez, p.slot))
+    let categoriesaldoVorig: CategorieBedrag = catMap(bezCatTotals(prevBez))
+    let liquidatieToename: Record<AssetCategorie, number> | null = null
+    if (heeftPotAanpassingen) {
+      const adj = applyPotAanpassingen(input, m, slotWaardeVorig, categoriesaldoVorig)
+      slotWaardeVorig = adj.slotWaardeVorig
+      categoriesaldoVorig = adj.categoriesaldoVorig
+      liquidatieToename = adj.liquidatieToename
+    }
     const bezM1 = {
-      slotWaardeVorig: input.assetPotten.map((p) => bezSlotWaarde(prevBez, p.slot)),
-      categoriesaldoVorig: catMap(bezCatTotals(prevBez)),
+      slotWaardeVorig,
+      categoriesaldoVorig,
       ayVorig: prevWon.verkocht,
       baVorig: prevWon.huurPerMaand,
       bbVorig: prevWon.vervallenHypotheeklast,
@@ -466,15 +565,20 @@ export function runKernelProjection(
       aflossingBudget,
       bezSaldiPrev: bezCatTotals(prevBez),
       schuldSaldiPrev: sCatTotals(prevS),
-      // S!AB(m−1): het tekort-lening-saldo (slot 6), buiten sCatTotals (= S!AJ:AN).
-      tekortSaldoPrev: sSlotSaldo(prevS, TEKORT_SLOT),
+      // S!AB(m−1): het tekort-lening-saldo, buiten sCatTotals (= S!AJ:AN). Via de
+      // getypte rol gelokaliseerd (snede 2b); voor de fixtures = slot 6 → byte-identiek.
+      tekortSaldoPrev: sSlotSaldo(prevS, tekortSlot),
     }
     const verdelingRow = computeVerdeling(input, verdelingDep, m)
 
     // (8) Bez-waardekolommen(m) — volle Bez-call met de echte m-deps.
+    // Liquidatie-opbrengst (snede 2b) telt hier — ná rendement — als inleg in de
+    // doelcategorie mee (spiegel woningverkoop → nieuw liquide geld). `null` bij
+    // geen liquidatie deze maand, dus het reguliere pad blijft byte-identiek.
+    const toenameEurBase = catMap(taBezitField(taRow, (c) => c.toenameEur))
     const bezDep: BezDep = {
       ...bezM1,
-      toenameEur: catMap(taBezitField(taRow, (c) => c.toenameEur)),
+      toenameEur: liquidatieToename === null ? toenameEurBase : addCat(toenameEurBase, liquidatieToename),
       aantalPotten: catMap(taBezitField(taRow, (c) => c.aantal)),
       verdelingAfname: catMap(verdelingRow.afname.eind),
       verdelingOnttrekking: catMap(verdelingRow.onttrekking.eind),
@@ -485,7 +589,7 @@ export function runKernelProjection(
 
     // (9) S(m).
     const sDep: SDep = {
-      saldoVorige: Array.from({ length: S_PHYSICAL_SLOTS }, (_, slot) => sSlotSaldo(prevS, slot)),
+      saldoVorige: Array.from({ length: nDebtSlots }, (_, slot) => sSlotSaldo(prevS, slot)),
       verkocht: bezWoningRow.verkocht,
       opeetCap: bezWoningRow.opeetCap,
       opeetOpname: bezWoningRow.opeetOpname,

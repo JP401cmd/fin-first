@@ -1,0 +1,355 @@
+/**
+ * Horizon-kernel adapter — app-profiel/-instellingen → kern-P-parameterblokken.
+ *
+ * FASE 3, snede 1. Vertaalt het gebruikersprofiel + de strategie-configs naar de
+ * P-blokken van `KernelInput` (persoon, inkomen/uitgaven, Box 3, eindstrategie,
+ * woning, onttrekkingsprofiel, onzekerheid) + neutrale defaults voor de blokken die
+ * de gebeurtenis-/partner-/werk-expanders in latere snedes vullen.
+ *
+ * Consumeert bestaande app-resolvers (geen tweede bron):
+ *  - `resolveFireParams` (rendement/inflatie/Box 3-methode),
+ *  - `resolveFireStrategyWithOverride` (eindstrategie),
+ *  - `resolveWithdrawalStrategy` (onttrekkingsprofiel, V4),
+ *  - `parseHousingStrategy` (woning, V8),
+ *  - `computeRetirementExpenses` (uitgave na pensioen),
+ *  - `lookupAowAge` (AOW-leeftijd),
+ *  - `BOX3_PARAMS` (fiscale kern-constanten — CLAUDE.md-conventie).
+ */
+
+import { ageAtDate } from '@/lib/horizon-data'
+import { BOX3_PARAMS, type TaxYear } from '@/lib/box3-data'
+import { resolveFireParams } from '@/lib/fire-params'
+import { resolveFireStrategyWithOverride, type FireEndStrategy } from '@/lib/fire-strategy'
+import {
+  resolveWithdrawalStrategy,
+  type WithdrawalStrategyType,
+} from '@/lib/withdrawal-strategy'
+import { parseHousingStrategy } from '@/lib/housing-strategy'
+import { computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import type {
+  AutoGebeurtenisParams,
+  Box3Params,
+  Eindstrategie,
+  EindstrategieParams,
+  GebeurtenisRij,
+  InkomenUitgavenParams,
+  OnttrekkingsprofielParams,
+  Onttrekkingsprofiel,
+  OnzekerheidParams,
+  PartnerParams,
+  PersoonParams,
+  StrategieSelectors,
+  WerkStrategieParams,
+  WoningStrategie,
+  WoningStrategieParams,
+} from '../types'
+import {
+  DEFAULT_TAX_YEAR,
+  EXCEL_FASE_CURVE,
+  EXCEL_GUARDRAIL_DEFAULTS,
+  EXCEL_HEFFINGVRIJ_INKOMEN_PP,
+  EXCEL_ONZEKERHEID_DEFAULTS,
+  EXCEL_WONING_DEFAULTS,
+} from './defaults'
+
+/**
+ * Profiel-velden die de adapter leest. Superset van de losse app-resolver-inputs;
+ * alle velden optioneel behalve `date_of_birth` (zonder geboortedatum kan de kern
+ * geen tijdas bouwen — de barrel gooit dan een duidelijke fout).
+ */
+export interface KernelAdapterProfile {
+  date_of_birth: string | null
+  net_monthly_income?: number | null
+  estimated_monthly_expenses?: number | null
+  /** Jaarlijkse essentiële uitgaven (uit budgetten) — bron voor `essential_budgets`-methode. */
+  yearly_essential_expenses?: number | null
+  expected_return?: number | null
+  inflation_rate?: number | null
+  box3_method?: string | null
+  marginaal_tarief?: number | null
+  fire_end_strategy?: string | null
+  fire_end_age?: number | null
+  fire_legacy_amount?: number | string | null
+  feature_preferences?: Record<string, unknown> | null
+  withdrawal_strategy?: string | null
+  guardrail_floor?: number | null
+  guardrail_ceiling?: number | null
+  guardrail_cut_step?: number | null
+  guardrail_raise_step?: number | null
+  housing_strategy_config?: unknown
+  pot_rules?: unknown
+  retirement_expense_method?: string | null
+  retirement_custom_amount?: number | null
+}
+
+/** Afgeleide tijdas-waarden (gedeeld door `startLeeftijd` en het persoon-blok). */
+export interface PersoonTijdas {
+  /** P!B7 — startleeftijd in hele jaren (maand 0). */
+  readonly startLeeftijd: number
+  readonly persoon: PersoonParams
+}
+
+/**
+ * Persoon + tijdas. `startLeeftijd` = hele-jaren-leeftijd vandaag (`ageAtDate`);
+ * `geboortejaar` uit de geboortedatum; `startjaar = geboortejaar + startLeeftijd`
+ * (deterministisch en intern consistent: startjaar − geboortejaar = startLeeftijd).
+ * AOW-leeftijd via de canonieke `lookupAowAge`-tabel (fallback 67).
+ */
+export function buildPersoonTijdas(dateOfBirth: string, aowRows: readonly AowLeeftijdRow[]): PersoonTijdas {
+  const startLeeftijd = ageAtDate(dateOfBirth)
+  const geboortejaar = new Date(dateOfBirth).getFullYear()
+  const startjaar = geboortejaar + startLeeftijd
+  const aow = lookupAowAge([...aowRows], dateOfBirth)
+  return {
+    startLeeftijd,
+    persoon: { geboortejaar, startjaar, aowLeeftijd: aow.fractional },
+  }
+}
+
+/**
+ * Inkomen & uitgaven. `nettoJaaruitgaven` = huidige leefuitgaven; `uitgaveNaPensioen`
+ * via de canonieke `computeRetirementExpenses` (methode + custom-bedrag), met de
+ * huidige uitgaven als schatting-fallback.
+ */
+export function buildInkomenUitgaven(profile: KernelAdapterProfile): InkomenUitgavenParams {
+  const nettoJaarinkomen = Number(profile.net_monthly_income ?? 0) * 12
+  const nettoJaaruitgaven = Number(profile.estimated_monthly_expenses ?? 0) * 12
+  const yearlyEssential = Number(profile.yearly_essential_expenses ?? nettoJaaruitgaven)
+  const uitgaveNaPensioenPerJaar = computeRetirementExpenses(
+    profile.retirement_expense_method as RetirementExpenseMethod | null | undefined,
+    yearlyEssential,
+    nettoJaarinkomen,
+    profile.retirement_custom_amount ?? null,
+    nettoJaaruitgaven,
+  )
+  return { nettoJaarinkomen, nettoJaaruitgaven, uitgaveNaPensioenPerJaar }
+}
+
+/**
+ * Box 3-parameters. Fiscale constanten (tarief/forfaits/vrijstellingen) uit de
+ * canonieke `BOX3_PARAMS[jaar]`; methode uit `resolveFireParams`. `personen`
+ * (P!B19 `=1+PT!B2`) is standaard **1** (alleenstaand); de huishouden-laag (V3,
+ * snede 3) geeft **2** door zodra er een fiscaal partner is. De kern verdubbelt dan
+ * zelf het heffingvrije vermogen en de schuldendrempel (`bel.ts`: `×personen`), dus
+ * die worden hier NIET voor-verdubbeld — alleen `heffingvrijInkomenTotaal` (P!B92 =
+ * P!B91 × personen, werkelijk-tak) wordt hier geschaald omdat de kern die al als
+ * totaal verwacht. `personen = 1` (default) → byte-identiek aan snede 1/2.
+ */
+export function buildBox3(profile: KernelAdapterProfile, taxYear: TaxYear, personen = 1): Box3Params {
+  const p = BOX3_PARAMS[taxYear]
+  return {
+    method: resolveFireParams(profile).box3Method,
+    tarief: p.tarief,
+    forfaitSpaar: p.forfaitSpaargeld,
+    forfaitOverig: p.forfaitBeleggingen,
+    forfaitSchuld: p.forfaitSchulden,
+    heffingvrijVermogenPP: p.heffingsvrijSingle,
+    personen,
+    schuldendrempelPP: p.schuldendrempelSingle,
+    heffingvrijInkomenTotaal: EXCEL_HEFFINGVRIJ_INKOMEN_PP * personen,
+  }
+}
+
+/**
+ * Strategie-selectors (P!B28/29/30). De kern-engine consumeert deze NIET — hij leest
+ * de reeds-geresolveerde prio's uit `input.ts` (die de adapter direct via
+ * `prio-overgang` levert). We zetten alle drie op 'Eigen indeling', het eerlijke
+ * label voor "prio's rechtstreeks aangeleverd".
+ */
+export function buildStrategieSelectors(): StrategieSelectors {
+  return { toename: 'Eigen indeling', afname: 'Eigen indeling', onttrekking: 'Eigen indeling' }
+}
+
+const FIRE_END_TO_SELECTOR: Record<FireEndStrategy, Eindstrategie> = {
+  deplete: 'Vermogen opeten',
+  legacy: 'Nalatenschap',
+  perpetual: 'Eeuwigdurend',
+  pensioen: 'Pensioenleeftijd',
+}
+
+/**
+ * Eindstrategie (P!B48-B54). Uit `resolveFireStrategyWithOverride` (incl. de
+ * feature_preferences-fallback voor 'pensioen'). `nietLiquideMeetellen = 'Nee'`
+ * (geen app-veld — open punt); de app kent geen aparte eind-leeftijden per modus,
+ * dus B51/B52 delen `endAge` en B53 = `legacyAmount`.
+ */
+export function buildEindstrategie(profile: KernelAdapterProfile): EindstrategieParams {
+  const cfg = resolveFireStrategyWithOverride(profile)
+  return {
+    selector: FIRE_END_TO_SELECTOR[cfg.strategy],
+    eindleeftijdOpeten: cfg.endAge,
+    eindleeftijdNalatenschap: cfg.endAge,
+    nalatenschapBedrag: cfg.legacyAmount,
+    nietLiquideMeetellen: 'Nee',
+  }
+}
+
+const HOUSING_MODE_TO_SELECTOR: Record<string, WoningStrategie> = {
+  include_full: 'Meerekenen',
+  exclude_from_fire: 'Uitsluiten',
+  downsize: 'Verkopen',
+  reverse_mortgage: 'Opeethypotheek',
+}
+
+/**
+ * Woning-strategie (P!B57-B67). Uit `parseHousingStrategy`. Velden zonder app-
+ * tegenhanger (verkoopleeftijd-fallback, huur %/WOZ, opeet-parameters) vallen terug
+ * op de Excel-defaults (V8). De app-`depletionThresholdYears` (JAREN) → drempel in
+ * MAANDEN (× 12); de app-`triggerAge` is bij "wanneer nodig" de fallback-leeftijd.
+ */
+export function buildWoning(housingConfigRaw: unknown): WoningStrategieParams {
+  const cfg = parseHousingStrategy(housingConfigRaw)
+
+  // Defaults (Meerekenen/Uitsluiten dragen geen verkoop-/opeet-parameters).
+  const base: WoningStrategieParams = {
+    selector: HOUSING_MODE_TO_SELECTOR[cfg.mode] ?? 'Meerekenen',
+    trigger: 'Vaste leeftijd',
+    verkoopleeftijd: EXCEL_WONING_DEFAULTS.verkoopleeftijd,
+    drempelMaandenUitgave: EXCEL_WONING_DEFAULTS.drempelMaandenUitgave,
+    verkoopprijsPctWoz: EXCEL_WONING_DEFAULTS.verkoopprijsPctWoz,
+    verkoopkostenPct: EXCEL_WONING_DEFAULTS.verkoopkostenPct,
+    huurNaVerkoopPctWozPerJaar: EXCEL_WONING_DEFAULTS.huurNaVerkoopPctWozPerJaar,
+    opeetStartleeftijdOpname: EXCEL_WONING_DEFAULTS.opeetStartleeftijdOpname,
+    opeetMaxLeningPctOverwaarde: EXCEL_WONING_DEFAULTS.opeetMaxLeningPctOverwaarde,
+    opeetRentePerJaar: EXCEL_WONING_DEFAULTS.opeetRentePerJaar,
+    opeetMaandopname: null,
+  }
+
+  if (cfg.mode === 'downsize') {
+    return {
+      ...base,
+      trigger: cfg.trigger === 'on_depletion' ? 'Wanneer nodig' : 'Vaste leeftijd',
+      verkoopleeftijd: cfg.triggerAge,
+      drempelMaandenUitgave: Math.round(cfg.depletionThresholdYears * 12),
+      verkoopprijsPctWoz: cfg.salePricePct,
+      verkoopkostenPct: cfg.salesCostsPct,
+    }
+  }
+
+  if (cfg.mode === 'reverse_mortgage') {
+    return {
+      ...base,
+      trigger: cfg.trigger === 'on_depletion' ? 'Wanneer nodig' : 'Vaste leeftijd',
+      opeetStartleeftijdOpname: cfg.triggerAge,
+      opeetMaxLeningPctOverwaarde: cfg.maxLoanPct,
+      opeetRentePerJaar: cfg.interestRate,
+      opeetMaandopname: cfg.monthlyPayout,
+    }
+  }
+
+  return base
+}
+
+const WITHDRAWAL_TO_PROFIEL: Record<WithdrawalStrategyType, Onttrekkingsprofiel> = {
+  static: 'Vast',
+  guardrails: 'Guardrails',
+  vpw: 'Vast', // V4: vpw/bucket zijn gemigreerd naar 'Vast'
+  bucket: 'Vast',
+}
+
+/**
+ * Onttrekkingsprofiel (P!B69-B81). V4-mapping: `withdrawal_strategy` → profiel
+ * (static→Vast, guardrails→Guardrails, vpw/bucket→Vast). De 3-fasen-curve is Excel-
+ * default tot de eigen JSONB-kolom er is (F4). Guardrail-parameters: floor/ceiling
+ * (P!B77/B78) uit de app-config; de portfolio-drempel-ratio's (P!B79/B80) hergebruiken
+ * dezelfde floor/ceiling (zoals de app-`applyGuardrails` doet); stap (P!B81) uit de
+ * app-cut-step. Wanneer de app-config ze niet zet, vallen ratio's/stap terug op de
+ * Excel-defaults.
+ */
+export function buildOnttrekkingsprofiel(profile: KernelAdapterProfile): OnttrekkingsprofielParams {
+  const cfg = resolveWithdrawalStrategy(profile)
+  return {
+    profiel: WITHDRAWAL_TO_PROFIEL[cfg.strategy],
+    fase1TotLeeftijd: EXCEL_FASE_CURVE.fase1TotLeeftijd,
+    factor1Pct: EXCEL_FASE_CURVE.factor1Pct,
+    fase2TotLeeftijd: EXCEL_FASE_CURVE.fase2TotLeeftijd,
+    factor2Pct: EXCEL_FASE_CURVE.factor2Pct,
+    factor3Pct: EXCEL_FASE_CURVE.factor3Pct,
+    guardrailFloor: cfg.guardrailFloor,
+    guardrailCeiling: cfg.guardrailCeiling,
+    guardrailOnderdrempelRatio: cfg.guardrailFloor || EXCEL_GUARDRAIL_DEFAULTS.onderdrempelRatio,
+    guardrailBovendrempelRatio: cfg.guardrailCeiling || EXCEL_GUARDRAIL_DEFAULTS.bovendrempelRatio,
+    guardrailStap: cfg.guardrailCutStep || EXCEL_GUARDRAIL_DEFAULTS.stap,
+  }
+}
+
+/**
+ * Onzekerheidslaag (scenarioband + MC + Hist). Voor snede 1 inert: scenario
+ * "Verwacht" (shift 0), shift alleen op investeringspotten (Excel P!B44 = 1),
+ * MC/Hist uit. `solveFire` gebruikt dit blok niet; alleen de band-/MC-wrappers.
+ */
+export function buildOnzekerheid(startjaar: number): OnzekerheidParams {
+  return {
+    scenario: 'Verwacht',
+    shift: 0,
+    shiftAlleenInvestering: true,
+    mc: {
+      aantalRuns: EXCEL_ONZEKERHEID_DEFAULTS.mcAantalRuns,
+      sigma: EXCEL_ONZEKERHEID_DEFAULTS.mcSigma,
+      actief: false,
+    },
+    hist: {
+      startjaar,
+      actief: false,
+      // Hist!B4:B99 = 96 lege jaarcellen (backtest blijft app-zijdig, V11).
+      rendementReeks: Array.from({ length: 96 }, () => null),
+    },
+  }
+}
+
+// ── Neutrale blokken voor de nog-niet-gebouwde expanders (snede 2/3) ─────────────
+//
+// De gebeurtenis-/partner-/werk-expanders (AOW-opbouw, pensioen-annuïtisering,
+// kinderen-NIBUD, erfenis, werk-strategie, partner-stromen) worden in latere snedes
+// uit app-data afgeleid. Tot dan levert de adapter neutrale, inerte defaults zodat de
+// kern draait zonder fantoom-stromen te injecteren. OPEN PUNT (snede 2/3).
+
+/** Geen handmatige gebeurtenissen (snede 2). */
+export const NEUTRAL_GEBEURTENISSEN: readonly GebeurtenisRij[] = []
+
+/**
+ * Inerte auto-gebeurtenissen: geen AOW-opbouw (aowOpbouwjaren 0), geen kinderen, geen
+ * erfenis, geen pensioen-multipot. BEWUST 0 AOW-opbouwjaren: de AOW-/pensioen-expander
+ * (afgeleid uit het echte profiel/UPO) is snede 2/3 — tot dan injecteert de adapter
+ * geen (ongemapte) AOW-stroom.
+ */
+export const NEUTRAL_AUTO_GEBEURTENISSEN: AutoGebeurtenisParams = {
+  leefsituatie: 'Alleenstaand',
+  aowOpbouwjaren: 0,
+  aantalKinderen: 0,
+  kindGeboorteLeeftijden: [0, 0, 0],
+  nibudBasisPerMaand: 0,
+  kinderopvangNettoPerMaand: 0,
+  kinderbijslagPerMaand: 0,
+  babyuitzetEenmalig: 0,
+  erfenisBruto: 0,
+  erfenisRelatie: 'Kind',
+  erfenisLeeftijd: 0,
+  pensioenPotten: [],
+}
+
+/** Geen partner (household/partner V3 = snede 3). Inerte waarden. */
+export const NEUTRAL_PARTNER: PartnerParams = {
+  aanwezig: false,
+  geboortejaar: 1970,
+  nettoJaarinkomen: 0,
+  aowLeeftijd: 67,
+  pensioenBrutoPerJaar: 0,
+  pensioenStartleeftijd: 67,
+  pensioenGeindexeerd: false,
+  aowBedragPpPerJaar: 0,
+}
+
+/** Werk-strategie uit (reeleGroei 0 = effectief uit; geen sprongen/deeltijd). Snede 2. */
+export const NEUTRAL_WERK_STRATEGIE: WerkStrategieParams = {
+  basisNettoPerMaand: 0,
+  reeleGroei: 0,
+  groeiTotLeeftijd: null,
+  plafondNettoPerMaand: 0,
+  sprongen: [],
+  deeltijd: [],
+}
+
+/** Default belastingjaar-herexport voor de barrel. */
+export { DEFAULT_TAX_YEAR }
