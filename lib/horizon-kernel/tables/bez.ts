@@ -10,8 +10,9 @@
  * Per slot i staan `waarde` (kolom 3+3i), `rendement` (4+3i) en `inleg` (5+3i):
  *   - **rendement(m)** `= waarde(m−1) · eff/12`, met `eff = investering ? bens!C +
  *     P!B43 : bens!C`. De scenarioband-shift (P!B43) en de MC/Hist-overrides raken
- *     alléén investeringspotten; in alle 16 fixtures staan die op 0/uit, dus
- *     `eff = bens!C` — de shift-tak is faithful geïmplementeerd maar onbeproefd.
+ *     alléén investeringspotten; in de deterministische kern van alle 19 fixtures
+ *     staan die op 0/uit (`eff = bens!C`). De shift-/ruis-tak wordt inmiddels wél
+ *     uitkomst-bewezen via de band-/MC-wrapper-parity (input-transform, Sim/MC-tabs).
  *   - **inleg(m)** `= (toename€[cat] + overloop[cat])/aantal[cat] −
  *     (afname[cat] + onttrekking[cat]) · share`. De **toename** (positief) komt uit
  *     `Toename en afname` (gewicht × budget) en wordt gelijk over de potten van de

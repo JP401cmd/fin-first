@@ -12,8 +12,8 @@
  *   - `saldo(m)   = MAX(0, saldo(m−1) − aflossing − extra)`; `saldo(0)=startwaarde`.
  *   - `aflossing  = MIN(saldo(m−1), planned/12)`, `planned = D>0 ? D€ : C%·B` (bens).
  *   - `extra      = IFERROR(Verdeling-categoriebedrag · saldo(m−1)/categorie-cap, 0)`
- *     (pot-share m−1; in álle 16 fixtures 0 — de waterval routeert nooit extra
- *     schuld-aflossing, dus het split-mechanisme wordt 0-waardig bewezen).
+ *     (pot-share m−1; > 0 zodra de schuld-waterval extra aflossing routeert — bv.
+ *     `schuld-prio` slot 2, m=53: 599,82. In de 18 fixtures zonder prio-aflossing 0).
  *   - `rente      = saldo(m−1) · rente%/12`.
  * - **Hypotheek** (slot 0): reguliere annuïteit **plus de AY-guard** — in de
  *   verkoopmaand (`Bez!AY(m)=1`) worden **saldo (D), aflossing (E) en extra (F)**
@@ -25,10 +25,14 @@
  *   gecapt op de leenruimte; aflossing/extra/rente-kolommen zijn 0. Buiten
  *   opeet-modus is slot 3 een gewone (lege) reguliere slot.
  * - **Tekort-lening** (slot 6): gevoed uit het Verdeling-restant `BV+EO`, groeit met
- *   rente `AE = saldo(m−1)·P!B25/12`: `saldo(m)=MAX(0, saldo(m−1)+AE+(BV+EO))`.
- *   Aflossing (AC, waterval-toename) en extra (AD) zijn in álle fixtures 0. Voorbij
- *   de horizon **bevroren** (saldo blijft staan, rente 0) — anders dan de reguliere
- *   slots die dan leeg ("") zijn.
+ *   rente `AE = saldo(m−1)·P!B25/12` en wordt afgelost met de prio-1-toewijzing
+ *   `AC` uit de schuld-waterval: `saldo(m)=MAX(0, saldo(m−1)+AE+(BV+EO)−AC)` (structuur.md
+ *   S-tab; AD extra = 0). `AC` (`dep.tekortAflossing`) wordt teacher-forced/engine-zijdig
+ *   aangeleverd — het is gecapt op het **pre-existente** tekort (`MIN(ruwBudget, saldo(m−1)+AE)`,
+ *   berekend in Verdeling, zie `verdeling/index.ts`). In 18 van de 19 fixtures is er geen
+ *   tekort-slot en dus `AC=0`; alleen `schuld-prio` (m≥699) beproeft `AC>0`. Extra (AD)
+ *   blijft 0. Voorbij de horizon **bevroren** (saldo blijft staan, AC/rente 0) — anders
+ *   dan de reguliere slots die dan leeg ("") zijn.
  *
  * ## Horizon-guard (per kolom verschillend — empirisch geverifieerd)
  * - **saldo / rente**: `IF($B="","",…)` buitenste → "" voorbij de horizon.
@@ -91,6 +95,13 @@ export interface SDep {
   readonly opeetOpname: number
   /** Verdeling!BV(m) + Verdeling!EO(m) — tekort-voeding (onbenut afname + onttrekking). */
   readonly tekortBudget: number
+  /**
+   * S!AC(m) — tekort-aflossing (prio-1-toewijzing uit de schuld-waterval). Wordt
+   * in Verdeling berekend (`MIN(ruwBudget, saldo(m−1)+AE)`, zie `verdeling/index.ts`)
+   * en hier geconsumeerd; 0 als er geen tekort-slot/aflossing is. Op m=0 en voorbij
+   * de horizon ongebruikt (de tekort-slot leegt/bevriest dan onafhankelijk).
+   */
+  readonly tekortAflossing: number
   /** Verdeling GT:GX — extra-aflossing-budget per categorie (volgorde `S_EXTRA_CATEGORIEEN`). */
   readonly extraAflossingBudget: readonly number[]
   /** Verdeling ER:EV — schuld-categorie-cap m−1 per categorie (zelfde volgorde). */
@@ -131,8 +142,9 @@ function plannedMonthly(pot: DebtPot | null): number {
 
 /**
  * Extra aflossen (S!F-familie): categorie-bedrag × pot-share(m−1), met pot-share =
- * saldo(m−1) / categorie-cap. `IFERROR(…,0)` vangt de cap=0-deling. In alle fixtures
- * is het categorie-bedrag 0 (de waterval routeert nooit extra schuld-aflossing).
+ * saldo(m−1) / categorie-cap. `IFERROR(…,0)` vangt de cap=0-deling. Het categorie-bedrag
+ * is > 0 zodra de schuld-waterval extra aflossing routeert (bv. `schuld-prio`); in de 18
+ * fixtures zonder prio-aflossing blijft het 0 en valt deze split terug op 0.
  */
 function extraSplit(pot: DebtPot | null, saldoPrev: number, dep: SDep): number {
   if (pot === null) return 0
@@ -198,7 +210,7 @@ function opeetSlot(
   return { saldo, aflossing: beyond ? '' : 0, extra: 0, rente: beyond ? '' : 0 }
 }
 
-/** Tekort-lening-slot: gevoed uit BV+EO, groeit met rente; voorbij horizon bevroren. */
+/** Tekort-lening-slot: gevoed uit BV+EO, afgelost met AC, groeit met rente; voorbij horizon bevroren. */
 function tekortSlot(
   saldoPrev: number,
   m: MonthIndex,
@@ -206,13 +218,14 @@ function tekortSlot(
   startwaarde: number,
   tekortBudget: number,
   tekortRentePerJaar: number,
+  tekortAflossing: number,
 ): SSlot {
   if (m === 0) return { saldo: startwaarde, aflossing: 0, extra: 0, rente: 0 }
-  if (beyond) return { saldo: saldoPrev, aflossing: 0, extra: 0, rente: 0 } // bevroren
+  if (beyond) return { saldo: saldoPrev, aflossing: 0, extra: 0, rente: 0 } // bevroren (AC/rente 0)
   const rente = (saldoPrev * tekortRentePerJaar) / 12 // AE — rente-bijschrijving in het saldo
-  // AC (aflossing uit waterval-toename) en AD (extra) zijn in álle fixtures 0.
-  const saldo = Math.max(0, saldoPrev + rente + tekortBudget)
-  return { saldo, aflossing: 0, extra: 0, rente }
+  // AB = MAX(0, AB(m−1) + AE + (BV+EO) − AC − AD); AC = tekortAflossing (Verdeling), AD (extra) = 0.
+  const saldo = Math.max(0, saldoPrev + rente + tekortBudget - tekortAflossing)
+  return { saldo, aflossing: tekortAflossing, extra: 0, rente }
 }
 
 /** Numerieke celwaarde voor een totaal-som (leeg/"" telt als 0). */
@@ -237,7 +250,17 @@ export function computeS(input: KernelInput, dep: SDep, m: MonthIndex): SRow {
     const pot = potBySlot(input.schuldPotten, i)
     const saldoPrev = dep.saldoVorige[i] ?? 0
     if (pot?.rol === 'tekortLening') {
-      slots.push(tekortSlot(saldoPrev, m, beyond, pot.startwaarde, dep.tekortBudget, input.tekortLeningRente))
+      slots.push(
+        tekortSlot(
+          saldoPrev,
+          m,
+          beyond,
+          pot.startwaarde,
+          dep.tekortBudget,
+          input.tekortLeningRente,
+          dep.tekortAflossing,
+        ),
+      )
     } else if (pot?.rol === 'opeethypotheek' && opeetMode) {
       slots.push(opeetSlot(saldoPrev, m, beyond, pot.startwaarde, dep, input.woning.opeetRentePerJaar))
     } else {

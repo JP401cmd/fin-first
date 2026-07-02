@@ -37,6 +37,15 @@ const OVERRIDE_CHECKS: Record<string, (i: KernelInput) => CellValue> = {
   'P!B75': (i) => i.onttrekkingsprofiel.factor3Pct,
   'PT!B2': (i) => (i.partner.aanwezig ? 1 : 0),
   'Werk-strategie!B2': (i) => i.werkStrategie.reeleGroei,
+  // Scenario-identiteit-ankers voor de 3 ronde-3-fixtures (schuld-prio, gezin,
+  // reserve-depletie). Elke check fireert alleen in de fixture die de cel
+  // overschrijft, dus geen kruisbesmetting met de overige scenario's.
+  'P!B28': (i) => i.strategie.toename, // schuld-prio: "Eerst schulden aflossen (hoge rente eerst)"
+  'P!B29': (i) => i.strategie.afname, // reserve-depletie: "Spaargeld eerst"
+  'PT!B6': (i) => i.partner.pensioenBrutoPerJaar, // gezin: partner-pensioen 12.000/jr
+  'Auto-gebeurtenissen!B4': (i) => i.autoGebeurtenissen.leefsituatie, // gezin: "Samen"
+  'Auto-gebeurtenissen!B8': (i) => i.autoGebeurtenissen.aantalKinderen, // gezin: 1 kind
+  'Auto-gebeurtenissen!B16': (i) => i.autoGebeurtenissen.erfenisBruto, // gezin: erfenis 150.000
 }
 
 if (!hasFixtures) {
@@ -50,8 +59,10 @@ if (!hasFixtures) {
   const fixtures: OracleFixture[] = files.map(loadFixture)
 
   describe('horizon-kernel · input-from-fixture (volledige invoer-oppervlakte)', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(fixtures.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste teller-tripwire op de fixture-set-grootte (ronde 3: +gezin,
+      // +schuld-prio, +reserve-depletie); een ronde-4-fixture valt hier op.
+      expect(fixtures.length).toBe(19)
     })
 
     // ── 1. bouwt zonder fouten + basale vorm ──────────────────────────────────
@@ -100,13 +111,21 @@ if (!hasFixtures) {
         expect(input.startLeeftijd).toBe(36)
         expect(input.inflatie).toBe(getCell(fx, 'P!B14'))
 
-        // 6 bezitting-potten (bens rij 4-9), 5 schuld-potten (rij 17-20 + 23);
-        // bens is in geen enkele fixture overschreven.
-        expect(input.assetPotten.length).toBe(6)
+        // 6 bezitting-potten (bens rij 4-9) in de meeste fixtures; 'reserve-depletie'
+        // voegt een 7e pot toe (Pensioenbeleggingen, bens rij 10 → slot 6). Schuld-
+        // potten: 5 overal (rij 17-20 + 23) — geen fixture voegt een schuld-pot toe.
+        const verwachteAssetPotten = fx.meta.scenario === 'reserve-depletie' ? 7 : 6
+        expect(input.assetPotten.length).toBe(verwachteAssetPotten)
         expect(input.schuldPotten.length).toBe(5)
         for (const p of input.assetPotten) expect(p.slot).toBeGreaterThanOrEqual(0)
         for (const p of input.assetPotten) expect(p.slot).toBeLessThan(10)
         for (const p of input.schuldPotten) expect(p.slot).toBeLessThan(7)
+
+        // 'reserve-depletie': de 7e pot is de grote reserve (slot 6, categorie Pensioen).
+        if (fx.meta.scenario === 'reserve-depletie') {
+          const reservePot = input.assetPotten.find((p) => p.slot === 6)
+          expect(reservePot?.categorie).toBe('Pensioen')
+        }
 
         // Getypte slot-rollen op de contract-rijen (Controle!K8/K9 + reserved).
         const huis = input.assetPotten.filter((p) => p.rol === 'eigenHuis')
@@ -127,12 +146,19 @@ if (!hasFixtures) {
         // P!B19 (personen) ↔ PT!B2 (partner): consistent per fixture.
         expect(input.box3.personen).toBe(input.partner.aanwezig ? 2 : 1)
 
-        // TS-fix (override TS!D41/D42=5) landt geresolveerd op de schuld-prio's:
-        // Consumptief + Studie hebben aflos-prio 5 in élke fixture.
+        // Schuld-aflos-prio's (TS!B17/B18). In de meeste fixtures houdt de TS-fix
+        // (override TS!D41/D42=5) Consumptief + Studie op aflos-prio 5. In
+        // 'schuld-prio' zet P!B28="Eerst schulden aflossen (hoge rente eerst)" de
+        // schuld-categorieën juist óp prio: Consumptief→3, Studie→2.
         const consumptief = input.ts.schuldCategorien.find((c) => c.categorie === 'Consumptief')
         const studie = input.ts.schuldCategorien.find((c) => c.categorie === 'Studie')
-        expect(consumptief?.prioAflossing).toBe(5)
-        expect(studie?.prioAflossing).toBe(5)
+        if (fx.meta.scenario === 'schuld-prio') {
+          expect(consumptief?.prioAflossing).toBe(3)
+          expect(studie?.prioAflossing).toBe(2)
+        } else {
+          expect(consumptief?.prioAflossing).toBe(5)
+          expect(studie?.prioAflossing).toBe(5)
+        }
       })
     }
 

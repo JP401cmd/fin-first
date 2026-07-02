@@ -80,3 +80,6 @@ signin2.yaml
 # ad-hoc root debug/probe scripts (login/signup probes, port killers, one-off
 # migration runners) — never commit; these have leaked service-role keys before.
 /.*.mjs
+
+# python bytecode (horizon-oracle extractor)
+__pycache__/

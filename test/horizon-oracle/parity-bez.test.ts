@@ -260,8 +260,9 @@ if (!hasFixtures) {
   const COLUMN_COUNT = buildColumns().length // 53: A,B,C + 10×(w/r/inleg) + AH…AR + AV,AW + AY…BE
 
   describe('horizon-kernel · parity Bez (bezittingen + woningblok) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste tripwire: een nieuwe fixture-ronde moet hier zichtbaar afketsen.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -284,8 +285,8 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(COLUMN_COUNT)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 maanden × 53 kolommen.
-      expect(totalCells).toBe(16 * 1200 * COLUMN_COUNT)
+      // Dynamisch (ronde-4-proof): fixtures × 1200 maanden × 53 kolommen.
+      expect(totalCells).toBe(results.length * 1200 * COLUMN_COUNT)
     })
   })
 }

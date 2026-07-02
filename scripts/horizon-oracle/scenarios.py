@@ -36,6 +36,19 @@ reconciliatie van het model (Controle!K1 FOUT — potten onder de MAX(0;..)-vloe
 gedrukt door een negatief toename-budget), dus 'onhaalbaar' draait aan het doel
 en 'pensioen-tekort' aan de post-FIRE-uitgaven (het onttrekking-onbenut-pad naar
 de tekort-lening is wel gereconcilieerd). Zie de reasons/warnings per scenario.
+
+Fixture-ronde 3 (19 scenario's): 'gezin', 'schuld-prio' en 'reserve-depletie'
+activeren de model-paden die in alle eerdere 16 fixtures slapend waren:
+de partner-maandlaag mét pensioen-term (PT!J), leefsituatie 'Samen' (AOW 993 —
+exacte keuzelijst-waarde uitgelezen uit de data-validation van
+Auto-gebeurtenissen!B4: "Alleenstaand,Samen"), actieve kinderen (J-N-kolommen),
+erfenis > 0, de pensioen-multipot-annuïtisering (Auto-geb rij 26-31, kolommen
+J-M zijn formule-gedreven: J = SWITCH(type; lijfrente_bancair -> MAX(G;5))),
+schulden in de toename-waterval (combined-noemer, Verdeling EQ/ER:EV/GT:GX,
+S-extra-aflossing, HC:HH-overloop) en de prio-5-reservepass met echte capaciteit
+(afname-kant BI:BO; categorie Pensioen was nog nergens gevuld). NB: de
+onttrekking-eindtoewijzing op een prio-5-categorie (Verdeling!EJ, Beleggingen)
+stroomde al wél in basis — het afname-reservepad en de Pensioen-kolom niet.
 """
 
 # Overrides: lijst van dicts {cell, value, reason}. De extractor schrijft ze in
@@ -281,6 +294,183 @@ SCENARIOS = [
             "eindstrategie zien en een bisectie draaien; de tweede BepaalFIRE (na RunScenarioBand) zet B16 "
             "definitief op de AOW-leeftijd 67 — precies waarvoor het dubbele-BepaalFIRE-protocol bestaat.",
         ],
+    },
+    {
+        "name": "gezin",
+        "description": (
+            "Gezinsscenario — alle slapende gezins-paden tegelijk actief: fiscaal partner (PT!B2=1, "
+            "P!B19->2) met partner-pensioen 12.000/jr geindexeerd vanaf 68, leefsituatie 'Samen' "
+            "(AOW-tarief 993 p.p. i.p.v. 1452), 1 kind geboren op ouder-leeftijd 38 (NIBUD-fasen "
+            "maand 24-240, volledig binnen de projectie), erfenis bruto 150.000 (relatie kind, "
+            "ontvangst op 60) en een gevulde pensioen-multipot-rij (slot 1: lijfrente_bancair, "
+            "pot 200.000, ingang 68, duur 20 jr -> PMT ~ 1.011,75/mnd t/m 88); verder gelijk aan basis."
+        ),
+        "overrides": [
+            {
+                "cell": "PT!B2",
+                "value": 1,
+                "reason": "scenario: partner aanwezig — activeert de PT-maandlaag (I werkinkomen, J AOW+pensioen, K totaal -> CF!D en Ont!D) en P!B19=2 (dubbel heffingvrij vermogen/schuldendrempel)",
+            },
+            {
+                "cell": "Auto-gebeurtenissen!B4",
+                "value": "Samen",
+                "reason": (
+                    "scenario: leefsituatie niet-alleenstaand -> eigen AOW (B21) op het samenwonend-tarief 993 "
+                    "i.p.v. 1452; de exacte keuzelijst-waarde is uit de data-validation van B4 uitgelezen "
+                    "(list: \"Alleenstaand,Samen\") — de open vraag uit de partner-aan-ronde, nu vastgesteld i.p.v. gegokt"
+                ),
+            },
+            {
+                "cell": "PT!B6",
+                "value": 12000,
+                "reason": (
+                    "scenario: partner-pensioen bruto 12.000/jr -> activeert de pensioen-term in PT!J vanaf "
+                    "startmaand PT!B12 (=408; startleeftijd PT!B7=68 en geindexeerd PT!B8=1 blijven default)"
+                ),
+            },
+            {
+                "cell": "Auto-gebeurtenissen!B8",
+                "value": 1,
+                "reason": "scenario: 1 actief kind -> kinderrijen 35-40 krijgen J-N-waarden en Geb rij 21-22 stromen (NIBUD-fasen 1-3, opvang, kinderbijslag, babyuitzet)",
+            },
+            {
+                "cell": "Auto-gebeurtenissen!B9",
+                "value": 38,
+                "reason": (
+                    "scenario: kind geboren op ouder-leeftijd 38 (m0=+24) zodat alle NIBUD-fasen (0-18 jr = "
+                    "maand 24-240) binnen de projectie vallen; met de default 30 zou het kind al 6 jr zijn en "
+                    "zouden verstreken fasen op maand 0 geklemd worden"
+                ),
+            },
+            {
+                "cell": "Auto-gebeurtenissen!B16",
+                "value": 150000,
+                "reason": (
+                    "scenario: erfenis bruto 150.000 -> B56-B59-tak actief (vrijstelling 25.490 / vlaktarief 15% "
+                    "bij relatie 'kind' = default B17; ontvangst-leeftijd 60 = default B18) en Geb rij 30 stroomt; "
+                    "NB de bron-formule B58 = MAX(0;bruto-vrijstelling)*(1-tarief) — de vrijgestelde voet keert "
+                    "NIET terug in het netto-bedrag"
+                ),
+            },
+            {
+                "cell": "Auto-gebeurtenissen!A26",
+                "value": "Pensioenpot 1",
+                "reason": "scenario: pensioen-multipot slot 1 activeren (A26 is de gate van de J-M-formules en van Geb rij 15)",
+            },
+            {
+                "cell": "Auto-gebeurtenissen!B26",
+                "value": "lijfrente_bancair",
+                "reason": (
+                    "type met duur-model J26 = MAX(G;5) zodat 'duur 20 jr' letterlijk het modelgedrag is "
+                    "('bedrijf'/'lijfrente_levenslang' geven 100-C); J26:J31 blijken formule-cellen (ArrayFormula), "
+                    "geen invoer — kolom G is de invoer"
+                ),
+            },
+            {"cell": "Auto-gebeurtenissen!C26", "value": 68, "reason": "ingangs-leeftijd 68 -> uitkering t/m eind-leeftijd L26 = C26+J26 = 88"},
+            {"cell": "Auto-gebeurtenissen!D26", "value": "pot", "reason": "invoermodus 'pot': maandbedrag K26 via PMT(inflatie/12; duur*12; -inleg) i.p.v. direct bruto EUR/mnd"},
+            {"cell": "Auto-gebeurtenissen!F26", "value": 200000, "reason": "pot-inleg 200.000 -> K26 = PMT(0,02/12; 240; -200000) ~ EUR 1.011,75/mnd"},
+            {"cell": "Auto-gebeurtenissen!G26", "value": 20, "reason": "duur (jr, invoer) 20 -> duur-model J26 = MAX(20;5) = 20"},
+            {"cell": "Auto-gebeurtenissen!H26", "value": "Ja", "reason": "geindexeerd 'Ja' -> Geb-bedrag M26 = K26 (geen voor-de-indexatie)"},
+        ],
+        "warnings": [],
+    },
+    {
+        "name": "schuld-prio",
+        "description": (
+            "Schulden in de toename-waterval: toename-strategie 'Eerst schulden aflossen (hoge rente "
+            "eerst)' — de kolom-E-mapping geeft de gevulde schuld-categorieen echte prio's (RANK op "
+            "categoriesaldo: Woning 1 [niet-liquide onder woning-strategie Verkopen, gewicht 0], Studie 2, "
+            "Consumptief 3) en de bezittingen een niet-uniform profiel (Spaargeld 1, Beleggingen 2, "
+            "Pensioen 3, Vastgoed 5, Eigen huis 1, Overig 3). Daarmee stromen de combined-noemer "
+            "bezittingen+schulden, het aflos-deel van CF!I (Verdeling EQ + caps ER:EV), de eindtoewijzing "
+            "GT:GX, de S-extra-aflossing (kolommen J/N van de slots Consumptief/Studie) en na payoff de "
+            "HC:HH-overloop terug naar bezitting-toename; verder gelijk aan basis."
+        ),
+        "overrides": [
+            {
+                "cell": "P!B28",
+                "value": "Eerst schulden aflossen (hoge rente eerst)",
+                "reason": (
+                    "scenario: schuld-categorieen op toename-prio 1-4 via de natuurlijke route uit de instructie: "
+                    "de actieve mapping-kolom wordt TS kolom E, waarin RANK-formules Woning/Studie/Consumptief "
+                    "prio 1/2/3 geven — een handmatige prio-override in kolom D kon ook, maar deze ene input "
+                    "gebruikt de prioriteiten die het model zelf documenteert. TS!A23 blijft OK (alle gevulde "
+                    "categorieen hebben in kolom E een prio); de TS!A23-fix in kolom D wordt door de kolomwissel "
+                    "inert maar blijft gelogd"
+                ),
+            },
+        ],
+        "warnings": [],
+    },
+    {
+        "name": "reserve-depletie",
+        "description": (
+            "Prio-5-reservepass met echte capaciteit: grote reserve-pot 'Pensioenbeleggingen' 200.000 "
+            "(categorie Pensioen = prio 5 in de basis-onttrekking 'Rendement laten doorgroeien' EN in de "
+            "afname-strategie 'Spaargeld eerst'; de categorie was in geen enkele fixture gevuld), alle "
+            "niet-reserve-potten klein, afname-strategie P!B29 -> 'Spaargeld eerst' (de basis-afname heeft "
+            "alleen het niet-liquide Eigen huis op prio 5 -> reserve-cap 0) en een eenmalige uitgave "
+            "-100.000 (koopkracht-nu) op leeftijd 63, ruim na FIRE, die de prio-1-4-afnamecapaciteit "
+            "overstijgt -> de afname-reservepass (eindtoewijzing BP:BU op de Pensioen-kolom) en de "
+            "onttrekking-reserve (EK) stromen. Leeftijd 63 is empirisch gekozen binnen het venster na "
+            "uitputting van de kleine potten (~53) en voor de 'wanneer nodig'-woningverkoop (~66) die de "
+            "potten weer hervult — een eerdere extractie op leeftijd 70 werd volledig door de hervulde "
+            "prio-1-4-potten geabsorbeerd. Ingreep volledig aan de afname/onttrekking-kant: CF!I blijft "
+            ">= 0, Controle!K1 OK (les uit het onhaalbaar-experiment)."
+        ),
+        "overrides": [
+            {"cell": "bens!A10", "value": "Pensioenbeleggingen", "reason": "scenario: grote reserve-pot in leeg bezitting-slot rij 10 (naam = gate)"},
+            {"cell": "bens!B10", "value": 200000, "reason": "startwaarde grote reserve-pot"},
+            {"cell": "bens!C10", "value": 0.04, "reason": "rendement 4%/jr"},
+            {"cell": "bens!D10", "value": "Geen Box 3", "reason": "pensioenvermogen buiten Box 3 (zelfde type-string als het huis-slot rij 6); Box 3-druk verandert dus niet mee met de pot"},
+            {
+                "cell": "bens!E10",
+                "value": "Pensioen",
+                "reason": (
+                    "categorie Pensioen: prio 5 (reserve) in de actieve onttrekking-mapping 'Rendement laten "
+                    "doorgroeien' en in de afname-mapping 'Spaargeld eerst'; toename-prio onder 'gelijk verdelen' "
+                    "is 1 -> prioriteiten-controle TS!A23 blijft OK"
+                ),
+            },
+            {
+                "cell": "P!B29",
+                "value": "Spaargeld eerst",
+                "reason": (
+                    "scenario: afname-strategie met Pensioen op prio 5 -> de afname-reservepass (Verdeling!BI:BO) "
+                    "krijgt echte capaciteit; onder de basis-strategie 'gewogen onttrekken uit bezittingen behalve "
+                    "eigen huis' is de enige prio-5-categorie het niet-liquide Eigen huis (cap 0) en kan de pass "
+                    "nooit toewijzen"
+                ),
+            },
+            {"cell": "bens!B4", "value": 4000, "reason": "kleine niet-reserve-pot (Spaargeld; afname- en onttrekking-prio 1)"},
+            {"cell": "bens!B5", "value": 10000, "reason": "kleine niet-reserve-pot (Beleggingen) zodat de reserve-tap niet door grote Beleggingen-restcapaciteit wordt gemaskeerd"},
+            {"cell": "bens!B7", "value": 1000, "reason": "kleine niet-reserve-pot (crypto/Overig)"},
+            {"cell": "bens!B8", "value": 1000, "reason": "kleine niet-reserve-pot (contant; categorie Spaargeld)"},
+            {"cell": "bens!B9", "value": 5000, "reason": "kleine niet-reserve-pot (tweede Beleggingen-pot)"},
+            {"cell": "Geb!A6", "value": "Grote uitgave (fixture)", "reason": "eenmalige gebeurtenis die de prio-1-4-afnamecapaciteit na FIRE uitput (Geb rij 6 = leeg handmatig slot)"},
+            {"cell": "Geb!B6", "value": "Eenmalig", "reason": "post-type (keuzelijst Eenmalig/Periodiek)"},
+            {
+                "cell": "Geb!C6",
+                "value": -100000,
+                "reason": (
+                    "-100.000 koopkracht-nu (~171k nominaal op 63) >> restcapaciteit van de kleine prio-1-4-potten "
+                    "(~72k op 63) en < Pensioen-reservecap (~190k) -> restant naar de reservepass zonder onbenut; "
+                    "eventueel onbenut zou via het gereconcilieerde tekort-lening-pad lopen (Verdeling!BV -> S!AB), "
+                    "geen CF!I-ingreep"
+                ),
+            },
+            {
+                "cell": "Geb!E6",
+                "value": 63,
+                "reason": (
+                    "startleeftijd 63 = in het venster na uitputting van de prio-1-4-potten (onttrekking-reserve "
+                    "start ~53) en voor de 'wanneer nodig'-woningverkoop (~66) — een event op 70 bleek volledig "
+                    "door de verkoop-hervulde potten geabsorbeerd te worden (afname-reservepass bleef 0)"
+                ),
+            },
+            {"cell": "Geb!F6", "value": 1, "reason": "startmaand 1"},
+        ],
+        "warnings": [],
     },
 ]
 

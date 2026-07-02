@@ -27,7 +27,7 @@
  * **Horizon-guard (afwijkend van Bel).** Voorbij leeftijd 100 leegt Excel de
  * "leefbaarheids"-kolommen B/C/D/E/F/G (→ ""), maar de geldstroom-kolommen
  * H/I/J/K blijven **numeriek 0** (zodat downstream-sommen niet breken). Empirisch
- * geverifieerd tegen alle 16 fixtures (o.a. een open-einde pensioenpost met
+ * geverifieerd tegen alle 19 fixtures (o.a. een open-einde pensioenpost met
  * eIdx=1199 die zónder guard baten voorbij de horizon zou geven, maar H=0 toont).
  * Kolom A (maandindex) blijft altijd numeriek.
  *

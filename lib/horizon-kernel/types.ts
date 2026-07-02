@@ -446,8 +446,9 @@ export interface GebeurtenisRij {
 /**
  * Eén pensioen-pot-slot (Auto-gebeurtenissen rij 26-31). Kolom-mapping uit de
  * waargenomen kopregel (rij 25); J/K/L/M (duur model / maandbedrag / eind /
- * Geb-bedrag) zijn AFGELEID en horen niet in de input. In alle 16 fixtures zijn
- * deze slots leeg — de waarde-semantiek is dus onbeproefd (zie rapport).
+ * Geb-bedrag) zijn AFGELEID en horen niet in de input. Sinds fixture-ronde 3
+ * vult `gezin` een slot: de waarde-semantiek (PMT-annuïtisering + duur-SWITCH
+ * per type) is oracle-bewezen in `tables/auto-gebeurtenissen.ts`.
  */
 export interface PensioenPot {
   /** Slot 0..5 (rij 26..31). */

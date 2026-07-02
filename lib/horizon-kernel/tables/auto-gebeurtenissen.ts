@@ -18,23 +18,24 @@
  *   (I) en — alleen bij een actief kind — bedrag/mnd + start/eind-leeftijd (J-N).
  * - **Erfenis B56-B59** — vrijstelling/vlaktarief per relatie (2025-benadering),
  *   netto na heffing en het (gede-indexeerde) Geb-bedrag.
- * - **Pensioen rij 26-31 (J-M)** — annuïtisering per pot (duur/maandbedrag/eind/
- *   Geb-bedrag). In alle 16 fixtures zijn de pot-slots leeg → deze kolommen leveren
- *   "" (zie parity + rapport: de waarde-tak is onbeproefd).
+ * - **Pensioen rij 26-31 (J-M)** — annuïtisering per pot: duur-model J (SWITCH op
+ *   type), maandbedrag K (`PMT(inflatie/12, duur·12, −inleg)` bij modus "pot"),
+ *   eind-leeftijd L=C+J en Geb-bedrag M. Naamloze/lege slots leveren "".
  *
- * ## Beproevings-beperking (alle 16 fixtures identiek)
- * Elke fixture heeft dezelfde Auto-gebeurtenissen-invoer: **Alleenstaand, 50
- * opbouwjaren, 0 kinderen, erfenis €0, geen pensioen-potten**. Daardoor zijn de
- * AOW-samenwonend-tak (993), de actieve-kind-tak (J-N-waarden), de erfenis>0-tak
- * (B58/B59) en de pensioen-annuïtisering onbeproefd. De formules zijn conform
- * `docs/horizon-oracle/structuur.md` geïmplementeerd en als zodanig gemarkeerd;
- * de parity bewijst de wél-geëxerceerde tak (AOW=1452, kinder-index-structuur,
- * erfenis-vrijstelling/tarief=25490/0,15, netto=0) cel-voor-cel.
+ * ## Beproevings-dekking
+ * De 16 basis-fixtures delen dezelfde Auto-gebeurtenissen-invoer (**Alleenstaand,
+ * 50 opbouwjaren, 0 kinderen, erfenis €0, geen pensioen-potten**); zij bewijzen de
+ * AOW-alleenstaand-tak (1452), de inactieve-kind-index-structuur en de erfenis=0-
+ * tak (B58=0). Fixture **`gezin`** (17e) exerceert de resterende takken cel-voor-
+ * cel: AOW-samenwonend (993), actieve-kind J-N-waarden, erfenis>0 (B58=105.833,50
+ * / B59 gede-indexeerd) en de pensioen-annuïtisering (lijfrente_bancair-slot).
+ * Nog onbeproefd (conform de structuur geïmplementeerd, geen fixture): de niet-
+ * bancaire pensioen-typen, modus "direct bruto" en geïndexeerd="Nee".
  *
  * Pure functie — geen fs/Supabase/Date.now/Math.random.
  */
 
-import type { KernelInput } from '../types'
+import { MAX_AGE, type KernelInput, type PensioenPot } from '../types'
 
 /** Excel-formuleresultaat "" (leeg tekstresultaat) — te onderscheiden van een echt lege cel. */
 export const EMPTY: '' = ''
@@ -241,8 +242,14 @@ function computeErfenis(input: KernelInput): ErfenisResult {
   const auto = input.autoGebeurtenissen
   const vrijstelling = erfVrijstelling(auto.erfenisRelatie)
   const tarief = erfTarief(auto.erfenisRelatie)
-  const heffing = Math.max(0, auto.erfenisBruto - vrijstelling) * tarief
-  const netto = auto.erfenisBruto - heffing
+  // B58 EXCEL-EXACT: netto = MAX(0, bruto − vrijstelling) × (1 − tarief).
+  // NB — modeleigenaardigheid: de vrijstelling keert NIET terug in het netto-
+  // bedrag; het (1 − tarief) valt óók op de al-vrijgestelde voet i.p.v. alleen op
+  // het belaste deel. Dit wijkt af van de intuïtieve "bruto − heffing" (die de
+  // vrijstelling wél zou uitkeren). Bewust 1-op-1 het oracle gevolgd — geen eigen
+  // correctie; voorgelegd aan de model-eigenaar en op 2026-07-02 AKKOORD bevonden
+  // (bewuste modelkeuze, geen bug — zie plan-doc §7, besluit V16).
+  const netto = Math.max(0, auto.erfenisBruto - vrijstelling) * (1 - tarief)
   // Eénmalig, niet-geïndexeerd → vooraf gede-indexeerd zodat CF!H's centrale
   // indexatie de post nominaal-constant maakt. Leeg als er niets te erven valt.
   const jarenTotErfenis = auto.erfenisLeeftijd - input.startLeeftijd
@@ -251,25 +258,97 @@ function computeErfenis(input: KernelInput): ErfenisResult {
   return { vrijstelling, tarief, netto, gebBedrag }
 }
 
+/** Excel `PMT(rate, nper, pv)` met fv=0, type=0 (annuïteit-betaling per periode). */
+function pmt(rate: number, nper: number, pv: number): number {
+  if (nper <= 0) return 0
+  if (rate === 0) return -pv / nper
+  const growth = Math.pow(1 + rate, nper)
+  return -(pv * rate * growth) / (growth - 1)
+}
+
+/**
+ * Duur-model J (Auto-geb rij 26-31, kolom J) — een verborgen ArrayFormula:
+ * `SWITCH(type; lijfrente_bancair→MAX(G;5); bedrijf|levenslang→100−C; tijdelijk→
+ * MIN(MAX(G;5);10))`, met G = duur-invoer (kolom G) en C = ingangsleeftijd. Alleen
+ * `lijfrente_bancair` is beproefd (fixture `gezin`, J=MAX(20;5)=20); de overige
+ * takken zijn conform de structuur geïmplementeerd maar onbeproefd.
+ */
+function pensioenDuurModel(type: string | null, duurInvoer: number, ingang: number): number {
+  const gMin5 = Math.max(duurInvoer, 5)
+  switch (type) {
+    case 'lijfrente_bancair':
+      return gMin5
+    case 'lijfrente_levenslang':
+    case 'bedrijf':
+      return MAX_AGE - ingang // 100 − C → eind-leeftijd 100 (onbeproefd)
+    case 'lijfrente_tijdelijk':
+      return Math.min(gMin5, 10) // onbeproefd
+    default:
+      return gMin5 // onbeproefd
+  }
+}
+
+/** Afgeleide J/K/L/M van één ACTIEVE pensioen-pot (+ ingang/geïndexeerd voor Geb). */
+interface PensioenDerived {
+  /** C — ingangsleeftijd (Geb-startleeftijd). */
+  readonly ingang: number
+  /** J — duur (jr, model). */
+  readonly duurModel: number
+  /** K — maandbedrag. */
+  readonly maandbedrag: number
+  /** L — eind-leeftijd = C + J. */
+  readonly eindLeeftijd: number
+  /** M — Geb-bedrag. */
+  readonly gebBedrag: number
+  /** H = "Ja" → geïndexeerd. */
+  readonly geindexeerd: boolean
+}
+
+/**
+ * Leid J/K/L/M af voor één pensioen-pot. `null` = inactief slot (geen naam):
+ * A26 is de gate van zowel de J-M-formules als de Geb-rij (structuur.md).
+ */
+function derivePensioenPot(input: KernelInput, pot: PensioenPot): PensioenDerived | null {
+  if (pot.naam === null) return null // A26-gate
+  const ingang = pot.ingangsLeeftijd ?? 0
+  const duurModel = pensioenDuurModel(pot.type, pot.duurJaarInvoer ?? 0, ingang)
+  // K — modus "pot" annuïtiseert de inleg via PMT(inflatie/12, duur·12, −inleg);
+  // een direct-bruto-modus (onbeproefd) neemt kolom E rechtstreeks.
+  const maandbedrag =
+    pot.invoermodus === 'pot'
+      ? pmt(input.inflatie / 12, duurModel * 12, -(pot.inlegPot ?? 0))
+      : (pot.brutoPerMaand ?? 0)
+  const geindexeerd = pot.geindexeerd === 'Ja'
+  // M — geïndexeerd ⇒ = K; niet-geïndexeerd (onbeproefd) ⇒ vooraf gede-indexeerd
+  // naar de ingangsleeftijd zodat CF!H centraal terug-indexeert.
+  const gebBedrag = geindexeerd
+    ? maandbedrag
+    : maandbedrag / Math.pow(1 + input.inflatie, ingang - input.startLeeftijd)
+  return { ingang, duurModel, maandbedrag, eindLeeftijd: ingang + duurModel, gebBedrag, geindexeerd }
+}
+
 /**
  * Pensioen-annuïtisering per pot (rij 26-31, kolommen J-M). Modus "pot" →
- * maandbedrag via `PMT(inflatie/12, duur·12, −inleg)`. In alle 16 fixtures zijn
- * de pot-slots leeg → deze functie levert 6× het lege-cel-resultaat en de
- * waarde-tak is onbeproefd (zie module-doc + rapport).
+ * maandbedrag via `PMT(inflatie/12, duur·12, −inleg)`; lege/naamloze slots leveren
+ * het lege-cel-resultaat (""). Beproefd door fixture `gezin` (slot 0); de overige
+ * type-/geïndexeerd-takken zijn conform de structuur maar onbeproefd.
  */
 function computePensioenRows(input: KernelInput): PensioenAnnuiteitRow[] {
   const potten = input.autoGebeurtenissen.pensioenPotten
   const rows: PensioenAnnuiteitRow[] = []
   for (let slot = 0; slot < 6; slot++) {
     const pot = potten.find((p) => p.slot === slot)
-    if (pot === undefined) {
+    const derived = pot === undefined ? null : derivePensioenPot(input, pot)
+    if (derived === null) {
       rows.push({ duurModel: EMPTY, maandbedrag: EMPTY, eindLeeftijd: EMPTY, gebBedrag: EMPTY })
       continue
     }
-    // ONBEPROEFD: geen enkele fixture vult een pensioen-pot. Bewust conservatief
-    // gelaten op "" i.p.v. een niet-toetsbare annuïtiserings-formule te raden;
-    // meld aan de orchestrator zodra een fixture dit exerceert.
-    rows.push({ duurModel: EMPTY, maandbedrag: EMPTY, eindLeeftijd: EMPTY, gebBedrag: EMPTY })
+    rows.push({
+      duurModel: derived.duurModel,
+      maandbedrag: derived.maandbedrag,
+      eindLeeftijd: derived.eindLeeftijd,
+      gebBedrag: derived.gebBedrag,
+    })
   }
   return rows
 }
@@ -314,10 +393,55 @@ export interface AutoEvent {
 }
 
 /**
+ * De Geb-events per ACTIEF kind (Geb rij 21-26). Elk kind vult twee Geb-rijen:
+ * de fasen-rij (NIBUD-fasen 1/2/3 als post 1/2/3) en de opvang/bijslag/uitzet-rij
+ * (opvang/bijslag/babyuitzet als post 1/2/3). Alléén post 1 draagt de rij-naam;
+ * `geb.ts` bouwt enkel voor post 1 de event-cellen A-H. De helper-kolommen W:AE
+ * (sIdx/eIdx/bn per post) leidt `geb.ts` af uit start/eind + bedrag.
+ */
+function computeKinderEvents(input: KernelInput): AutoEvent[] {
+  const rows = computeKinderRows(input)
+  const postenPerKind = KINDER_POSTEN.length // 6 posten per kind
+  const events: AutoEvent[] = []
+  rows.forEach((row, i) => {
+    if (row.actief !== 1) return // inactief kind → geen event (rij blijft inactief)
+    const kind0 = Math.floor(i / postenPerKind) // 0-gebaseerd kindnummer
+    const postInKind = i % postenPerKind // 0..5
+    const isFasenRow = postInKind < 3 // posten 0-2 → fasen-rij, 3-5 → opvang-rij
+    const gebRow = (isFasenRow ? 21 : 22) + kind0 * 2
+    const post = ((isFasenRow ? postInKind : postInKind - 3) + 1) as 1 | 2 | 3
+    const isEenmalig = row.type === 'Eenmalig'
+    // Leeftijd/maand uit de (altijd numerieke) sIdx/eIdx; eenmalig heeft geen eind.
+    const startLeeftijd = input.startLeeftijd + Math.floor(row.sIdx / 12)
+    const startMaand = (row.sIdx % 12) + 1
+    const eindLeeftijd = isEenmalig ? null : input.startLeeftijd + Math.floor(row.eIdx / 12)
+    const eindMaand = isEenmalig ? null : (row.eIdx % 12) + 1
+    events.push({
+      gebRow,
+      post,
+      naam:
+        post === 1
+          ? isFasenRow
+            ? `Kind ${row.kind} – NIBUD fasen (auto)`
+            : `Kind ${row.kind} – opvang/bijslag/uitzet (auto)`
+          : '', // post 2/3: naam ongebruikt (geen event-cellen)
+      type: row.type,
+      bedrag: kinderBedragPerMaand(postInKind, input),
+      geindexeerd: true, // koopkracht-nu; CF!H indexeert centraal
+      startLeeftijd,
+      startMaand,
+      eindLeeftijd,
+      eindMaand,
+    })
+  })
+  return events
+}
+
+/**
  * De automatische gebeurtenissen die uit de domein-invoer volgen en op Geb rij
- * 14-30 geplaatst worden. In alle 16 fixtures levert dit alléén de AOW-post
- * (rij 14); pensioen/kinderen/erfenis zijn inactief. De inactieve takken zijn
- * geïmplementeerd conform de structuur maar onbeproefd (zie module-doc).
+ * 14-30 geplaatst worden: AOW (rij 14), pensioen-multipot (rij 15-20), kinderen
+ * (rij 21-26) en erfenis (rij 30). In de 16 basis-fixtures levert dit alléén de
+ * AOW-post; fixture `gezin` (17e) exerceert álle overige takken cel-voor-cel.
  */
 export function computeAutoEvents(input: KernelInput): AutoEvent[] {
   const events: AutoEvent[] = []
@@ -333,13 +457,34 @@ export function computeAutoEvents(input: KernelInput): AutoEvent[] {
     geindexeerd: true,
     startLeeftijd: input.persoon.aowLeeftijd,
     startMaand: 1,
-    eindLeeftijd: 100,
+    eindLeeftijd: MAX_AGE,
     eindMaand: 1,
   })
 
+  // ── Pensioen-multipot → Geb rij 15-20 (post 1, Periodiek, +uitkering C-tot-L). ──
+  // Gate op A26 (naam); maandbedrag = M (geïndexeerd ⇒ K, anders gede-indexeerd).
+  for (const pot of auto.pensioenPotten) {
+    const derived = derivePensioenPot(input, pot)
+    if (derived === null) continue // naamloos slot → inactief
+    events.push({
+      gebRow: 15 + pot.slot,
+      post: 1,
+      naam: `${pot.naam} (pensioen)`,
+      type: 'Periodiek',
+      bedrag: derived.gebBedrag,
+      geindexeerd: derived.geindexeerd,
+      startLeeftijd: derived.ingang,
+      startMaand: 1,
+      eindLeeftijd: derived.eindLeeftijd,
+      eindMaand: 1,
+    })
+  }
+
+  // ── Kinderen → Geb rij 21-26 (2 rijen p. kind, 3 posten p. rij). ──
+  events.push(...computeKinderEvents(input))
+
   // ── Erfenis → Geb rij 30 (Eenmalig, +netto, op leeftijd B18 mnd 1). ──
-  // ONBEPROEFD (bruto=0 in alle fixtures → geen event). Geïmplementeerd conform
-  // Auto-geb!B60; de motor plaatst 'm pas bij netto>0.
+  // De motor plaatst 'm pas bij netto>0 (bruto=0 in de 16 basis-fixtures → geen event).
   const erfenis = computeErfenis(input)
   if (typeof erfenis.gebBedrag === 'number') {
     events.push({
@@ -356,8 +501,5 @@ export function computeAutoEvents(input: KernelInput): AutoEvent[] {
     })
   }
 
-  // Pensioen (rij 15-20) en kinderen (rij 21-26) zijn in alle fixtures inactief;
-  // hun Geb-rijen leveren daardoor uitsluitend de inactieve helper-markers. De
-  // actieve expansie is onbeproefd en bewust niet gespeculeerd.
   return events
 }

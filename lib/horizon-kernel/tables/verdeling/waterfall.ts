@@ -16,7 +16,7 @@
  *    budget − Σ eindtoewijzing. Onbenut afname/onttrekking wordt elders (S!AB)
  *    tot tekort-lening; onbenut aflossing stroomt terug naar bezitting-toename.
  *
- * **Twee empirisch bewezen fijnpunten (Excel-oracle, ADR 0032):**
+ * **Drie empirisch bewezen fijnpunten (Excel-oracle, ADR 0032):**
  * - **Σw-poort (`sumW`).** De gewichtensom van een pass is 0 zodra de *actieve*
  *   categorieën samen géén restcapaciteit meer hebben (`Σ(cap−alloc) ≈ 0`). Dit
  *   onderscheidt "budget 0 maar capaciteit aanwezig" (Σw = som van de gewichten,
@@ -27,6 +27,16 @@
  *   als een POSITIEVE toewijzing tegen de cap geknepen wordt (`raw > cap`), niet
  *   bij `raw = cap`. Zo blijft een categorie met cap 0 én budget 0 (geen echte
  *   toewijzing) in latere passes gewoon meetellen, exact zoals Excel.
+ * - **Geërfde `capped`-status (`initialCapped`).** Afname en onttrekking delen
+ *   één bezit-'pot': de ONTTREKKING-waterval gaat verder waar AFNAME stopte. Een
+ *   categorie die afname vól trok (raw > cap, dus `capped`) heeft géén ruimte meer
+ *   voor onttrekking en valt uit de onttrekking-Σw — ook al is haar cap 0 (Excel:
+ *   `gezin` onttrekking maand 24, Σw 0,667). Een categorie die afname NIET raakte
+ *   (bv. afname-budget 0) blijft, óók met cap 0, gewoon meetellen tot budget haar
+ *   tegen de cap knijpt (`partner-aan` onttrekking maand 27, Σw 1,0). De
+ *   onttrekking-waterval krijgt daarom afname's eind-`capped` als startstatus
+ *   binnen (caps al verminderd met de afname-toewijzing); de gerapporteerde
+ *   toewijzing blijft incrementeel (vanaf 0), exact zoals de Excel-kolommen.
  *
  * Pure functie; geen fs/Supabase/Date.now/Math.random.
  */
@@ -59,25 +69,31 @@ export interface WaterfallResult {
   readonly eind: readonly number[]
   /** Onbenut budget = budget − Σ eindtoewijzing. */
   readonly onbenut: number
+  /** Eind-`capped`-status per categorie (volgelopen); voedt de onttrekking-waterval. */
+  readonly capped: readonly boolean[]
 }
 
 /**
  * Voer de capaciteit-waterval uit voor één onderwerp.
  *
- * @param budget      Te verdelen maandbudget (Af!D / Ont!D / aflos-deel CF!I).
- * @param caps        Restcapaciteit per categorie (categoriesaldo m−1, 0 bij niet-liquide).
- * @param weights     Genormaliseerde ½^(prio−1)-gewichten per categorie (prio 1–4).
- * @param reserveMask Per categorie: is dit een prio-5-reservecategorie?
+ * @param budget        Te verdelen maandbudget (Af!D / Ont!D / aflos-deel CF!I).
+ * @param caps          Restcapaciteit per categorie (categoriesaldo m−1, 0 bij niet-liquide).
+ * @param weights       Genormaliseerde ½^(prio−1)-gewichten per categorie (prio 1–4).
+ * @param reserveMask   Per categorie: is dit een prio-5-reservecategorie?
+ * @param initialCapped Optioneel: startstatus "volgelopen" per categorie. De
+ *                      onttrekking-waterval erft hiermee afname's eind-`capped`
+ *                      (afname en onttrekking delen één bezit-pot); default niets.
  */
 export function runWaterfall(
   budget: number,
   caps: readonly number[],
   weights: readonly number[],
   reserveMask: readonly boolean[],
+  initialCapped?: readonly boolean[],
 ): WaterfallResult {
   const n = caps.length
   const alloc = new Array<number>(n).fill(0)
-  const capped = new Array<boolean>(n).fill(false)
+  const capped = initialCapped ? initialCapped.slice() : new Array<boolean>(n).fill(false)
   const passRest: number[] = []
   const passSumW: number[] = []
   const passAlloc: number[][] = []
@@ -86,7 +102,7 @@ export function runWaterfall(
     let rest = budget
     for (let c = 0; c < n; c++) rest -= alloc[c]
 
-    // Actieve set: gewogen categorieën die nog niet zijn volgelopen.
+    // Actieve set: gewogen categorieën die nog niet zijn volgelopen (`capped`).
     let remainingCap = 0
     let activeW = 0
     for (let c = 0; c < n; c++) {
@@ -95,7 +111,7 @@ export function runWaterfall(
         activeW += weights[c]
       }
     }
-    // Σw-poort: geen restcapaciteit → 0 (niets te verdelen deze pass).
+    // Σw-poort: geen restcapaciteit in de actieve set → 0 (niets te verdelen).
     const sumW = remainingCap > CAP_EPS ? activeW : 0
 
     if (sumW > 0) {
@@ -154,5 +170,6 @@ export function runWaterfall(
     reserveAlloc,
     eind,
     onbenut,
+    capped,
   }
 }

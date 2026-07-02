@@ -23,7 +23,7 @@
  *     pensioen→E15), anders "" (leeg — de IF-formule levert een lege string).
  *
  * De rest van ES (kolommen A/B/D/F, de sectiekoppen en het "3 · Toelichting"-blok)
- * is **statische documentatie**: in alle 16 fixtures identiek, niet uit de P-invoer
+ * is **statische documentatie**: in alle 19 fixtures identiek, niet uit de P-invoer
  * afgeleid. Die valt bewust buiten de parity (zie parity-es.test.ts).
  *
  * Pure functie, geen fs/Supabase/Date.now/Math.random.

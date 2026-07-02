@@ -17,7 +17,7 @@ import type { KernelInput, MonthIndex } from '@/lib/horizon-kernel/types'
  *
  * Teacher-forced: alle upstream-grondslagen + per-pot rendement/rente komen uit
  * de fixture (`buildDep`), zodat `computeBel` geïsoleerd formule-getrouw bewezen
- * wordt over **alle 16 fixtures × alle 1200 maanden × de kolommen A–N**, met
+ * wordt over **alle fixtures × alle 1200 maanden × de kolommen A–N**, met
  * tolerantie €0,01. Kolommen O (permanente spacer, altijd leeg) en P
  * (toelichtingstekst — statische documentatie, geen per-maand-berekening)
  * blijven bewust buiten de vergelijking.
@@ -110,8 +110,10 @@ if (!hasFixtures) {
   const results = runTableParityAllFixtures(FIXTURE_DIR, belSpec)
 
   describe('horizon-kernel · parity Bel (Box 3) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste teller-tripwire: hardcoded op de fixture-set-grootte zodat een
+      // toegevoegde/verdwenen fixture (bv. ronde 4) hier zichtbaar wordt.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -135,8 +137,8 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(14)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 14 = 268.800 vergeleken cellen.
-      expect(totalCells).toBe(268800)
+      // Per fixture 1200 × 14 = 16.800 cellen; totaal schaalt mee met het aantal fixtures.
+      expect(totalCells).toBe(results.length * 1200 * 14)
     })
   })
 }

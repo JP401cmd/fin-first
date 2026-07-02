@@ -27,7 +27,7 @@ import type {
  *
  * Teacher-forced: alle upstream-totalen (Bez / S / Bel) én het intra-tabel-anker
  * Prognose!G(m−1) komen uit de fixture (`buildDep`), zodat `computePrognose`
- * geïsoleerd formule-getrouw bewezen wordt over **alle 16 fixtures × alle 1200
+ * geïsoleerd formule-getrouw bewezen wordt over **alle fixtures × alle 1200
  * maanden × de kolommen A–M**, met tolerantie €0,01.
  *
  * Bewust BUITEN de vergelijking (statische documentatie/opmaak, geen per-maand-
@@ -161,8 +161,10 @@ if (!hasFixtures) {
   const results = runTableParityAllFixtures(FIXTURE_DIR, prognoseSpec)
 
   describe('horizon-kernel · parity Prognose (maandvermogen) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste teller-tripwire: hardcoded op de fixture-set-grootte zodat een
+      // toegevoegde/verdwenen fixture (bv. ronde 4) hier zichtbaar wordt.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -186,8 +188,8 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(13)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 13 = 249.600 vergeleken cellen.
-      expect(totalCells).toBe(249600)
+      // Per fixture 1200 × 13 = 15.600 cellen; totaal schaalt mee met het aantal fixtures.
+      expect(totalCells).toBe(results.length * 1200 * 13)
     })
   })
 }

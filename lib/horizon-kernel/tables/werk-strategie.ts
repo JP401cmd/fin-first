@@ -88,7 +88,7 @@ export interface WerkStrategieRow {
  * groei stopt na `groeiTotLeeftijd` (null = doorlopend). Buiten het ladderbereik
  * levert de exact-match-lookup het basisinkomen B1 (salaris-reset voorbij 71).
  *
- * Let op: sprongen (D3:E8) en `groeiTotLeeftijd` (B3) zijn in alle 16 fixtures
+ * Let op: sprongen (D3:E8) en `groeiTotLeeftijd` (B3) zijn in alle 19 fixtures
  * leeg; die takken zijn geïmplementeerd conform structuur.md maar onbeproefd.
  */
 function reeelSalarisLadder(ws: WerkStrategieParams, startLeeftijd: number, intLeeftijd: number): number {
@@ -123,7 +123,7 @@ function sprongDeltaBijLeeftijd(ws: WerkStrategieParams, leeftijd: number): numb
 /**
  * Deeltijd-factor (Excel-kolom H via LOOKUP): de pct van de hoogste `vanafLeeftijd`
  * die ≤ de (fractionele) leeftijd is; onder de eerste drempel → 1 (voltijd). In
- * alle 16 fixtures leeg (factor altijd 1) — conform structuur.md geïmplementeerd,
+ * alle 19 fixtures leeg (factor altijd 1) — conform structuur.md geïmplementeerd,
  * onbeproefd.
  */
 function deeltijdFactor(ws: WerkStrategieParams, leeftijd: number): number {

@@ -24,7 +24,7 @@ import type { KernelInput, MonthIndex } from '@/lib/horizon-kernel/types'
  * gelezen uit de fixture-sheets. De categorie-gewichten (½^(prio−1) genormaliseerd,
  * reserve prio 5 → 0%) en pot-aantallen zijn AFGELEID uit `KernelInput` (TS +
  * bens). Zo wordt `computeToenameAfname` geïsoleerd formule-getrouw bewezen over
- * **alle 16 fixtures × alle 1200 maanden × 88 kolommen** (A–CH + CL/CM),
+ * **alle fixtures × alle 1200 maanden × 88 kolommen** (A–CH + CL/CM),
  * tolerantie €0,01.
  *
  * Bewust buiten de vergelijking: **CI** en **CK** (permanente spacers, altijd
@@ -163,8 +163,10 @@ if (!hasFixtures) {
   const results = runTableParityAllFixtures(FIXTURE_DIR, taSpec)
 
   describe('horizon-kernel · parity Toename en afname tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste teller-tripwire: hardcoded op de fixture-set-grootte zodat een
+      // toegevoegde/verdwenen fixture (bv. ronde 4) hier zichtbaar wordt.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -188,8 +190,8 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(88)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 88 = 1.689.600 vergeleken cellen.
-      expect(totalCells).toBe(1689600)
+      // Per fixture 1200 × 88 = 105.600 cellen; totaal schaalt mee met het aantal fixtures.
+      expect(totalCells).toBe(results.length * 1200 * 88)
     })
   })
 }

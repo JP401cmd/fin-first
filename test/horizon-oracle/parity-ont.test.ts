@@ -17,14 +17,14 @@ import type { KernelInput, MonthIndex } from '@/lib/horizon-kernel/types'
  * tegen het Excel-oracle (ADR 0032).
  *
  * Teacher-forced: alle upstream-vensters komen uit de fixture (`buildDep`), zodat
- * `computeOnt` geïsoleerd formule-getrouw bewezen wordt over **alle 16 fixtures ×
+ * `computeOnt` geïsoleerd formule-getrouw bewezen wordt over **alle fixtures ×
  * alle 1200 maanden × de kolommen A/B/C/D/F/G/H/I**, met tolerantie €0,01. De
  * vier profiel-scenario's (basis=Afnemend, profiel-vast/-oplopend/-guardrails)
  * bewijzen de fasecurve- en guardrails-mechaniek; onhaalbaar (B16 op 100) en
  * pensioen-tekort bewijzen de FIRE-gate-randgevallen.
  *
  * Bewust buiten de vergelijking (statische documentatie/opmaak, geen per-maand-
- * berekening — empirisch leeg in alle 1200 data-rijen × 16 fixtures):
+ * berekening — empirisch leeg in alle 1200 data-rijen × alle fixtures):
  *   - **E** (permanente spacer-kolom, altijd leeg).
  *   - **J** (toelichtingstekst — alleen de kopregel bevat tekst).
  *
@@ -125,8 +125,10 @@ if (!hasFixtures) {
   const results = runTableParityAllFixtures(FIXTURE_DIR, ontSpec)
 
   describe('horizon-kernel · parity Ont (onttrekkingsbehoefte) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste teller-tripwire: hardcoded op de fixture-set-grootte zodat een
+      // toegevoegde/verdwenen fixture (bv. ronde 4) hier zichtbaar wordt.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -150,8 +152,8 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(8)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 8 = 153.600 vergeleken cellen.
-      expect(totalCells).toBe(153600)
+      // Per fixture 1200 × 8 = 9.600 cellen; totaal schaalt mee met het aantal fixtures.
+      expect(totalCells).toBe(results.length * 1200 * 8)
     })
   })
 }

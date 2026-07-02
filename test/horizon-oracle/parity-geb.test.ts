@@ -117,8 +117,9 @@ if (!hasFixtures) {
   const results = listFixtures(FIXTURE_DIR).map((f) => runFixture(loadFixture(f)))
 
   describe('horizon-kernel · parity Geb auto-rijen (14-30) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste tripwire: een nieuwe fixture-ronde moet hier zichtbaar afketsen.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -132,10 +133,13 @@ if (!hasFixtures) {
       })
     }
 
-    it('vergelijkt per fixture de helpers 14-30 + de AOW-event-cellen', () => {
+    it('vergelijkt per fixture de helpers 14-30 + de actieve event-cellen', () => {
       for (const result of results) {
-        // 17 rijen × 9 helper-cellen + 8 event-cellen (rij 14).
-        expect(result.cellCount).toBe(17 * 9 + 8)
+        // Basis: 17 rijen × 9 helper-cellen + 8 event-cellen (AOW, rij 14).
+        // `gezin` activeert 4 extra event-rijen (pensioenpot 15, kind 21/22,
+        // erfenis 30) → 8 extra cellen per rij = 193 (ronde-3-vondst).
+        const verwacht = result.scenario === 'gezin' ? 17 * 9 + 8 + 4 * 8 : 17 * 9 + 8
+        expect(result.cellCount, result.scenario).toBe(verwacht)
       }
     })
   })

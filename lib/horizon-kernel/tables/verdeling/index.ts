@@ -6,7 +6,9 @@
  *   1. **AFNAME** (gebeurtenis-kosten, Af!D) over de 6 bezitting-categorieën;
  *   2. **ONTTREKKING** (pensioenuitgave, Ont!D) over dezelfde 6, met capaciteit =
  *      afname-cap − afname-toewijzing (wat afname al pakte kan onttrekking niet meer);
- *   3. **SCHULD-AFLOSSING** (aflos-deel van CF!I) over de 5 schuld-categorieën.
+ *   3. **SCHULD-AFLOSSING** (aflos-deel van CF!I = ruwBudget) over de 5 schuld-
+ *      categorieën — nadat de **tekort-lening** haar prio-1-aflossing (S!AC) heeft
+ *      afgeroomd: `EQ = ruwBudget − tekortAflossing` (zie de compute-body).
  * Elk onderwerp draait dezelfde waterval (`runWaterfall`): 6 doorstroom-passes op
  * prio 1–4, een reserve-pass op prio 5, eindtoewijzing en onbenut.
  *
@@ -34,7 +36,7 @@
 
 import type { KernelInput, MonthIndex } from '../../types'
 import { isBeyondHorizon, leeftijdJaren, maandInJaar } from '../../scaffold'
-import { halveningWeights, reserveMask } from './weights'
+import { aflossingWeightsCombined, halveningWeights, reserveMask } from './weights'
 import { runWaterfall, type WaterfallResult } from './waterfall'
 
 /** Aantal bezitting-categorieën (Spaargeld, Beleggingen, Pensioen, Vastgoed, Eigen huis, Overig). */
@@ -58,6 +60,13 @@ export interface VerdelingDep {
   readonly bezSaldiPrev: readonly number[]
   /** S categoriesaldi m−1 in schuld-volgorde [Woning, Consumptief, Studie, Zakelijk, Overig]. */
   readonly schuldSaldiPrev: readonly number[]
+  /**
+   * S!AB(m−1) — tekort-lening-saldo van de vorige maand. Zit NIET in
+   * `schuldSaldiPrev` (= S!AJ:AN, de vijf reguliere categorie-totalen zonder het
+   * tekort-slot). Voedt de prio-1-aflossing van het tekort (S!AC); 0 als er geen
+   * tekort-slot is (18 van de 19 fixtures).
+   */
+  readonly tekortSaldoPrev: number
 }
 
 /** Verdeling-rij: de drie onderwerp-resultaten + scaffold + overloop. */
@@ -69,6 +78,12 @@ export interface VerdelingRow {
   readonly afname: WaterfallResult // D + E:J + K…BV
   readonly onttrekking: WaterfallResult // BX + BY:CD + …EO
   readonly aflossing: WaterfallResult // EQ + ER:EV + …GY
+  /**
+   * S!AC — tekort-lening-aflossing (prio-1-toewijzing die het ruwe schuld-aflos-
+   * budget absorbeert vóór de vijf categorieën; `EQ = ruwBudget − tekortAflossing`).
+   * Wordt door S geconsumeerd (`SDep.tekortAflossing`); 0 zonder tekort.
+   */
+  readonly tekortAflossing: number
   /** HC:HH — niet-plaatsbaar aflos-budget terug naar bezitting-toename (6 categorieën). */
   readonly overflow: readonly number[]
 }
@@ -97,6 +112,7 @@ export function computeVerdeling(
   )
 
   // ── Gewichten (½^(prio−1), volle precisie uit TS) + reserve-maskers. ───────────
+  // Afname/onttrekking: genormaliseerd over de bezit-categorieën (eigen noemer).
   const wAfname = halveningWeights(
     bezit.map((c) => c.prioAfname),
     bezit.map((c) => c.gevuld),
@@ -107,7 +123,19 @@ export function computeVerdeling(
     bezit.map((c) => c.gevuld),
     bezit.map((c) => c.nietLiquide),
   )
-  const wAflossing = halveningWeights(
+  // Toename-gewicht bezit (voor de HC:HH-overloop): bezit-toename over bezit-noemer.
+  const wBezitToename = halveningWeights(
+    bezit.map((c) => c.prioToename),
+    bezit.map((c) => c.gevuld),
+    bezit.map((c) => c.nietLiquide),
+  )
+  // Schuld-aflossing: genormaliseerd over de GECOMBINEERDE toename-noemer
+  // (bezit-toename + schuld-aflossing), zodat Σw de aflos-fractie is (bv. 0,3),
+  // conform Excel. Scale-invariant in de waterval → eind-toewijzing onveranderd.
+  const wAflossing = aflossingWeightsCombined(
+    bezit.map((c) => c.prioToename),
+    bezit.map((c) => c.gevuld),
+    bezit.map((c) => c.nietLiquide),
     schuld.map((c) => c.prioAflossing),
     schuld.map((c) => c.gevuld),
     schuld.map((c) => c.nietLiquide),
@@ -119,24 +147,46 @@ export function computeVerdeling(
   // ── 1. AFNAME ─────────────────────────────────────────────────────────────────
   const afname = runWaterfall(dep.afnameBudget, bezCaps, wAfname, resAfname)
 
-  // ── 2. ONTTREKKING: capaciteit = afname-cap − afname-toewijzing (wat afname pakte). ─
+  // ── 2. ONTTREKKING: gaat verder waar afname stopte (één gedeelde bezit-pot). ─────
+  // Capaciteit = afname-cap − afname-toewijzing; en de categorieën die afname vól
+  // trok (`afname.capped`) erven die status, zodat een door afname geleegde
+  // categorie uit de onttrekking-Σw valt (Excel: `gezin` maand 24), terwijl een
+  // door afname onaangeraakte cap-0-categorie blijft meetellen (`partner-aan`).
   const onttrekkingCaps = bezCaps.map((cap, i) => cap - afname.eind[i])
   const onttrekking = runWaterfall(
     dep.onttrekkingBudget,
     onttrekkingCaps,
     wOnttrekking,
     resOnttrekking,
+    afname.capped,
   )
 
   // ── 3. SCHULD-AFLOSSING ─────────────────────────────────────────────────────────
-  const aflossing = runWaterfall(dep.aflossingBudget, schuldCaps, wAflossing, resAflossing)
+  // De tekort-lening heeft **prio 1 bij aflossen**: ze absorbeert het ruwe schuld-
+  // aflos-budget (`ruwBudget = Σ Toename-schuld-toename€`) VÓÓR de vijf categorieën.
+  // De aflossing (S!AC) is gecapt op het **pre-existente** tekort — het saldo van m−1
+  // plus de rente-bijschrijving van deze maand (`AE = saldo(m−1)·P!B25/12`). De
+  // same-month voeding (BV+EO) telt hier NIET mee: je kunt alleen een schuld aflossen
+  // die al bestond (één-maand-lag, precies zoals de overige waterval-caps = saldo m−1).
+  // Empirisch (schuld-prio): AC=0 zolang saldo(m−1)=0 (m≤698), daarna MIN(ruwBudget, …)
+  // (m≥699). Het restant `EQ = ruwBudget − AC` voedt de 5-categorie-waterval hieronder;
+  // is EQ 0 dan is ook de overloop naar bezit 0.
+  const tekortRente = (dep.tekortSaldoPrev * input.tekortLeningRente) / 12
+  const tekortAflossing = Math.min(dep.aflossingBudget, dep.tekortSaldoPrev + tekortRente)
+  const schuldAflossingBudget = dep.aflossingBudget - tekortAflossing
+  const aflossing = runWaterfall(schuldAflossingBudget, schuldCaps, wAflossing, resAflossing)
 
   // HC:HH — de niet-plaatsbare aflossing (aflossing.onbenut) stroomt terug naar
-  // bezitting-toename. In alle 16 fixtures is het aflossing-budget 0 (geen "Eerst
-  // schulden aflossen"-strategie), dus onbenut = 0 en de overloop = 0. De exacte
-  // herverdelingsformule is daardoor onbeproefd; we leveren 0 en laten de parity de
-  // dag flaggen dat een fixture dit pad wél raakt (i.p.v. een ongetoetste formule).
-  const overflow = ZERO_OVERFLOW
+  // bezitting-toename, verdeeld naar rato van de **bezit-toename-gewichten**
+  // (genormaliseerd over de bezit-noemer, dus Σ = 1). Empirisch (schuld-prio):
+  // waar de schuld-categorieën vol zitten (caps 0, alle debt afgelost) én er nog
+  // aflos-budget over is (EQ > 0, geen tekort), herverdeelt dat zich als toename
+  // over de bezittingen. Zodra het tekort het budget absorbeert (EQ 0, m≥699) is de
+  // overloop weer 0. In de 18 fixtures zonder prio-aflossing is het budget 0 → 0.
+  const overflow =
+    aflossing.onbenut !== 0
+      ? wBezitToename.map((w) => aflossing.onbenut * w)
+      : ZERO_OVERFLOW
 
   return {
     maand: m,
@@ -146,6 +196,7 @@ export function computeVerdeling(
     afname,
     onttrekking,
     aflossing,
+    tekortAflossing,
     overflow,
   }
 }

@@ -12,7 +12,7 @@ import { computeEs, type EsRow } from '@/lib/horizon-kernel/tables/es'
  *
  * ES is GEEN maandtabel maar een klein afgeleid blok. De parity-vorm is daarop
  * aangepast: i.p.v. 1200 maanden × kolommen vergelijken we de **berekende cellen**
- * (kolom C + de actief-markers E10:E15) cel-voor-cel over **alle 16 fixtures**, met
+ * (kolom C + de actief-markers E10:E15) cel-voor-cel over **alle fixtures**, met
  * tolerantie €0,01.
  *
  * **Berekende cellen** (afgeleid van de P-eindstrategie-parameters):
@@ -23,7 +23,7 @@ import { computeEs, type EsRow } from '@/lib/horizon-kernel/tables/es'
  *   C11 eindleeftijd nalatenschap (= P!B52)
  *   C12 nalatenschapbedrag (= P!B53)
  *
- * **Bewust BUITEN de vergelijking = documentatie/opmaak** (in alle 16 fixtures
+ * **Bewust BUITEN de vergelijking = documentatie/opmaak** (in alle fixtures
  * identiek, niet uit de P-invoer afgeleid): kolommen A (labels/sectiekoppen),
  * B (parameterbeschrijvingen), D (eenheden), F (toelichtingen), de headers
  * (rij 9), en het "3 · Toelichting per eindstrategie"-blok (rij 17-21). Dit is
@@ -86,8 +86,10 @@ if (!hasFixtures) {
   })
 
   describe('horizon-kernel · parity ES (eindstrategie-spiegel) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste teller-tripwire: hardcoded op de fixture-set-grootte zodat een
+      // toegevoegde/verdwenen fixture (bv. ronde 4) hier zichtbaar wordt.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -108,8 +110,8 @@ if (!hasFixtures) {
         expect(result.comparison.cellCount).toBe(ES_CELLS.length)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 15 berekende cellen = 240 vergeleken cellen.
-      expect(totalCells).toBe(240)
+      // Per fixture 15 berekende cellen; totaal schaalt mee met het aantal fixtures.
+      expect(totalCells).toBe(results.length * ES_CELLS.length)
       expect(ES_CELLS.length).toBe(15)
     })
   })

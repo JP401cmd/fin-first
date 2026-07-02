@@ -23,7 +23,7 @@ import type { KernelInput } from '@/lib/horizon-kernel/types'
  * (ADR 0032, tolerantie €0,01).
  *
  * Twee vergelijkingen:
- *  1. **Maandtabel G:K** over alle 16 fixtures × alle 1200 maanden, via de
+ *  1. **Maandtabel G:K** over alle fixtures × alle 1200 maanden, via de
  *     teacher-forced monthly-runner. PT heeft **geen upstream-tabel-afhankelijkheid**
  *     (`PTDep` is leeg): elke cel volgt uit `KernelInput`, dus de DepView is `{}`.
  *  2. **Afgeleide head-cellen B10-B12** (DOB-verschil + de twee AOW-/pensioen-
@@ -136,9 +136,11 @@ if (!hasFixtures) {
   const headResults = listFixtures(FIXTURE_DIR).map((f) => runHeadFixture(loadFixture(f)))
 
   describe('horizon-kernel · parity PT (partner-parameterlaag) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
-      expect(headResults.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste teller-tripwire: hardcoded op de fixture-set-grootte zodat een
+      // toegevoegde/verdwenen fixture (bv. ronde 4) hier zichtbaar wordt.
+      expect(results.length).toBe(19)
+      expect(headResults.length).toBe(19)
     })
 
     for (const result of results) {
@@ -173,9 +175,9 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(5)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 5 = 96.000 vergeleken maandcellen.
-      expect(totalCells).toBe(96000)
-      // 16 fixtures × 3 head-cellen (B10-B12) = 48 vergeleken head-cellen.
+      // Per fixture 1200 × 5 = 6.000 maandcellen; totaal schaalt mee met het aantal fixtures.
+      expect(totalCells).toBe(results.length * 1200 * 5)
+      // Per fixture 3 head-cellen (B10-B12).
       for (const result of headResults) expect(result.cellCount).toBe(3)
     })
   })

@@ -22,14 +22,15 @@
  *   - bn   = koopkracht-nu bedrag (CF!H indexeert per maand) · leeg → **0**
  * De sentinel 99999>99998 maakt een lege post structureel inactief (sIdx>eIdx).
  *
- * ## Beproevings-beperking
- * In alle 16 fixtures is uitsluitend de **AOW-post (rij 14)** actief; pensioen/
- * kinderen/erfenis zijn leeg, dus rij 15-30 leveren enkel de inactieve helper-
- * markers (99999/99998/0). De event-cel-reproductie is daarom cel-voor-cel
- * bewezen op rij 14; de lege-tekst-artefacten van de inactieve event-rijen
- * (Excel-""-vs-blanco-patroon) vallen bewust buiten de vergelijking — het
- * deterministische, downstream-geconsumeerde resultaat van elke rij zit volledig
- * in W:AE. Zie parity-test + rapport.
+ * ## Beproevings-dekking
+ * In de 16 basis-fixtures is uitsluitend de **AOW-post (rij 14)** actief; rij
+ * 15-30 leveren dan enkel de inactieve helper-markers (99999/99998/0). Fixture
+ * **`gezin`** activeert daarbovenop de pensioen-pot (rij 15), de kinderen-rijen
+ * (rij 21-22, drie posten elk) en de erfenis (rij 30) — event-cellen A-H én
+ * helpers W:AE cel-voor-cel bewezen. De lege-tekst-artefacten (Excel-""-vs-blanco)
+ * van de inactieve event-rijen vallen bewust buiten de vergelijking; het
+ * deterministische, downstream-geconsumeerde resultaat van elke rij zit in W:AE.
+ * Zie parity-test + rapport.
  *
  * Pure functie — geen fs/Supabase/Date.now/Math.random.
  */
@@ -61,13 +62,9 @@ export interface GebEventCells {
   readonly geindStart: number // D — geïndexeerd bedrag op de startmaand
   readonly startLeeftijd: number // E
   readonly startMaand: number // F
-  readonly eindLeeftijd: number | Empty // G — leeg bij eenmalig
-  readonly eindMaand: number | Empty // H
+  readonly eindLeeftijd: number | null // G — Excel-blank (null) bij eenmalig
+  readonly eindMaand: number | null // H
 }
-
-/** Excel-""-resultaat (leeg tekstresultaat), voor niet-ingevulde eind-cellen. */
-type Empty = ''
-const EMPTY: Empty = ''
 
 /** Eén auto-rij (14-30) van de Geb-tab: helpers per post + evt. post-1 event-cellen. */
 export interface GebAutoRow {
@@ -111,8 +108,9 @@ function eventCells(input: KernelInput, ev: AutoEvent): GebEventCells {
     geindStart: ev.bedrag * Math.pow(1 + input.inflatie, sIdx / 12),
     startLeeftijd: ev.startLeeftijd,
     startMaand: ev.startMaand,
-    eindLeeftijd: ev.eindLeeftijd ?? EMPTY,
-    eindMaand: ev.eindMaand ?? EMPTY,
+    // Excel laat de eind-cellen van een eenmalige gebeurtenis blanco (null), niet "".
+    eindLeeftijd: ev.eindLeeftijd,
+    eindMaand: ev.eindMaand,
   }
 }
 

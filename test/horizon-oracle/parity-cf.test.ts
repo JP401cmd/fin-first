@@ -17,7 +17,7 @@ import type { KernelInput, MonthIndex } from '@/lib/horizon-kernel/types'
  *
  * Teacher-forced: alle upstream-waarden die CF consumeert komen uit de fixture
  * (`buildDep`), zodat `computeCF` geïsoleerd formule-getrouw bewezen wordt over
- * **alle 16 fixtures × alle 1200 maanden × de kolommen A–K**, met tolerantie
+ * **alle fixtures × alle 1200 maanden × de kolommen A–K**, met tolerantie
  * €0,01. CF heeft géén spacer-/toelichtingskolommen (bereik A1:K1201) — alle 11
  * kolommen A–K worden vergeleken.
  *
@@ -118,7 +118,7 @@ function readGebPosten(fx: OracleFixture): GebPostHelper[] {
 /**
  * FIRE-maand = ROUND((FIRE-leeftijd − P!B7)·12). FIRE-leeftijd = P!B16 (solver-
  * output); als die leeg is valt Excel terug op P!B35 (spiegel van 'Werk-strategie'!S).
- * In alle 16 fixtures is P!B16 numeriek; de B35-fallback is defensief.
+ * In alle fixtures is P!B16 numeriek; de B35-fallback is defensief.
  */
 function resolveFireMonth(fx: OracleFixture, input: KernelInput): number {
   const b16 = getCell(fx, 'P!B16')
@@ -186,8 +186,10 @@ if (!hasFixtures) {
   const results = runTableParityAllFixtures(FIXTURE_DIR, cfSpec)
 
   describe('horizon-kernel · parity CF (cashflow) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste teller-tripwire: hardcoded op de fixture-set-grootte zodat een
+      // toegevoegde/verdwenen fixture (bv. ronde 4) hier zichtbaar wordt.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -211,8 +213,8 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(11)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 11 = 211.200 vergeleken cellen.
-      expect(totalCells).toBe(211200)
+      // Per fixture 1200 × 11 = 13.200 cellen; totaal schaalt mee met het aantal fixtures.
+      expect(totalCells).toBe(results.length * 1200 * 11)
     })
   })
 }

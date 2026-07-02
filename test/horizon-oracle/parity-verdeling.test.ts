@@ -52,6 +52,8 @@ const TA_ROW = 2
 const BEZ_CAT_COLS = ['AM', 'AN', 'AO', 'AP', 'AR', 'AQ'].map(colIndex)
 // S categorietotalen AJ:AN in schuld-volgorde [Woning, Consumptief, Studie, Zakelijk, Overig].
 const S_CAT_COLS = ['AJ', 'AK', 'AL', 'AM', 'AN'].map(colIndex)
+// S!AB = tekort-lening-saldo (slot 6 saldo = grid-index 3+4·6 = 27); m−1 = CAP_PREV_ROW.
+const S_TEKORT_SALDO_COL = colIndex('AB')
 // 'Toename en afname' schuld-toename€ (aflos-deel per schuld-categorie): BK,BP,BU,BZ,CE.
 const TA_AFLOS_EUR_COLS = ['BK', 'BP', 'BU', 'BZ', 'CE'].map(colIndex)
 const AF_ONT_BUDGET_COL = colIndex('D') // Af!D / Ont!D
@@ -235,6 +237,7 @@ const verdelingSpec: TableParitySpec<KernelInput, VerdelingCtx, VerdelingDep, Ve
       aflossingBudget,
       bezSaldiPrev: BEZ_CAT_COLS.map((c) => cellNum(bezPrev, c)),
       schuldSaldiPrev: S_CAT_COLS.map((c) => cellNum(sPrev, c)),
+      tekortSaldoPrev: cellNum(sPrev, S_TEKORT_SALDO_COL),
     }
   },
   compute: computeVerdeling,
@@ -256,8 +259,9 @@ if (!hasFixtures) {
   const results = runTableParityAllFixtures(FIXTURE_DIR, verdelingSpec)
 
   describe('horizon-kernel · parity Verdeling (capaciteit-waterval) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste tripwire: een nieuwe fixture-ronde moet hier zichtbaar afketsen.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -280,8 +284,8 @@ if (!hasFixtures) {
         expect(result.comparison.cellCount).toBe(result.months * result.columnCount)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 218 = 4.185.600 vergeleken cellen.
-      expect(totalCells).toBe(4185600)
+      // Dynamisch (ronde-4-proof): fixtures × 1200 × 218 kolommen.
+      expect(totalCells).toBe(results.length * 1200 * 218)
     })
   })
 }

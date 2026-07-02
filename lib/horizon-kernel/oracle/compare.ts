@@ -22,7 +22,16 @@
 
 import type { CellValue } from './fixture-types'
 
-/** Standaard parity-tolerantie (euro's) conform ADR 0032. */
+/**
+ * Standaard parity-tolerantie (euro's) conform ADR 0032.
+ *
+ * LET OP (calc-review): dit is een **absolute** marge. Zij is bewezen passend
+ * voor het fixture-domein (nominale standen tot ~tientallen miljoenen; grootste
+ * waargenomen |Δ| ≈ 5·10⁻⁵). Bij extreme horizon×inflatie-combinaties groeien
+ * nominale bedragen zó ver dat relatieve fp-fout de €0,01 structureel kan
+ * overschrijden — overweeg dan een relatieve tolerantie-vloer (bv.
+ * max(0,01, |verwacht|·1e-12)) i.p.v. de marge blind te verruimen.
+ */
 export const DEFAULT_TOLERANCE = 0.01
 
 /** Eén afwijkende cel. */

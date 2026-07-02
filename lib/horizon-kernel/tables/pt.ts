@@ -31,10 +31,10 @@
  * waarde opgenomen, dus er is geen teacher-forced DepView nodig (`PTDep` is leeg). Dat
  * onderscheidt PT van bv. Werk-strategie (solver-FIRE-gate) en CF (Bel!N(m−1) e.a.).
  *
- * **Onbeproefde tak (partnerpensioen).** In alle 16 fixtures is `PT!B6 = 0` (geen
- * partnerpensioen), dus de pensioen-term van J en de indexatie-schakelaar (B8) zijn
- * geïmplementeerd conform structuur.md maar door de fixtures niet uitgeoefend. De
- * AOW-term én de werkinkomen-tak zijn wél bewezen door de `partner-aan`-fixture.
+ * **Partnerpensioen-tak bewezen (fixture-ronde 3).** De `gezin`-fixture heeft
+ * `PT!B6 = 12000` met indexatie (B8) en de B12-drempel — de pensioen-term van J
+ * is daarmee oracle-bewezen; AOW-term en werkinkomen-tak waren al bewezen via
+ * `partner-aan`.
  *
  * Pure functie, geen fs/Supabase/Date.now/Math.random.
  */

@@ -34,7 +34,7 @@ import type { KernelInput, MonthIndex } from '@/lib/horizon-kernel/types'
  * intermediaire jaarladder die alléén ages 36–71 vult, M = spacer) — statische
  * invoer/opmaak, geen per-maand-berekening van de maandtabel.
  *
- * Sprongen (D3:E8) en deeltijd (G3:H8) zijn in alle 16 fixtures leeg; die takken
+ * Sprongen (D3:E8) en deeltijd (G3:H8) zijn in alle fixtures leeg; die takken
  * van `computeWerkStrategie` zijn geïmplementeerd conform structuur.md maar door
  * de fixtures niet uitgeoefend.
  */
@@ -101,8 +101,10 @@ if (!hasFixtures) {
   const results = runTableParityAllFixtures(FIXTURE_DIR, werkSpec)
 
   describe('horizon-kernel · parity Werk-strategie (inkomenslijn) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste teller-tripwire: hardcoded op de fixture-set-grootte zodat een
+      // toegevoegde/verdwenen fixture (bv. ronde 4) hier zichtbaar wordt.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -126,8 +128,8 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(6)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 6 = 115.200 vergeleken cellen.
-      expect(totalCells).toBe(115200)
+      // Per fixture 1200 × 6 = 7.200 cellen; totaal schaalt mee met het aantal fixtures.
+      expect(totalCells).toBe(results.length * 1200 * 6)
     })
   })
 }

@@ -189,6 +189,7 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
 | V13 | Flag-mechanisme | **Optie 1** — per-user pref in `profiles.feature_preferences`: één vlag voor de convergentie-set + aparte vlaggen voor what-if/household/scalar; beheer-toggle. |
 | V14 | Reëel-weergave | **Optie 1** — kernel-adapter blijft de inflatiefactor per rij meegeven (deflatie-wrapper); contract intact. |
 | V15 | Snapshot-trend | **Optie 1** — knik accepteren + annoteren ("rekenwijze gewijzigd op …") in de trend-weergave. |
+| V16 | Erfenis-formule (FASE 2-vondst) | **Akkoord: bewuste modelkeuze** — Excel keert de vrijstelling zelf niet uit (netto = MAX(0, bruto − vrijstelling) × (1 − tarief)); kernel volgt het oracle exact (NB-comment in `tables/auto-gebeurtenissen.ts`). |
 
 ## 8. Faseplan
 
@@ -242,9 +243,36 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
   en kolom-thuisbasis zijn tabel-specifiek; PT bleek een echte maandtabel (naloper-port);
   verdeelgewichten op volle precisie herrekenen (fixture is 6-decimalen); reserve prio 5
   krijgt 0% gewicht en wordt alléén door de Verdeling-reserve-pass bediend; Verdeling-
-  eindtoewijzing (niet de behoefte) voedt de Bez-inleg. ⏳ **Integrale engine** (`engine.ts`,
-  forward-recursie met FIRE-leeftijd als parameter + integrale parity over alle tabellen) in
-  aanbouw; daarna solver+statussen en band/MC/hist-wrappers.
+  eindtoewijzing (niet de behoefte) voedt de Bez-inleg. ✔ **Integrale engine** (`engine.ts`:
+  eigen-toestand-recursie, guardrails-anker self-capture, integrale parity 0 mismatches over
+  alle tabellen × 16 fixtures; ving een echte conventie-bug: Periodiek-zonder-eind → horizon).
+  ✔ **Solver** (`solver.ts`: VBA-BepaalFIRE-bisectie + statusblok; 16/16 solver-parity vanuit
+  alleen de input — na spend-limiet-uitval van de agent in de hoofdthread afgebouwd; vondst:
+  messcherpe drempels op afgeleide euro-waarden vereisen een halve-cent-ruisclamp, zie B99).
+  ✔ **Wrappers** (`wrappers/band.ts`+`mc.ts`+`hist.ts`-stub): band = 3× bisectie — LET OP:
+  RunScenarioBand doet géén pensioen-kortsluiting (oracle-bewezen, eind-pensioen
+  Sim!B7=52,92≠67); Sim!C=Prognose!I@FIRE, Sim!D=Prognose!J@eindleeftijd; MC =
+  deterministische sin-hash (u=0,0001+0,9998·MOD(SIN(arg)·43758,5453;1) → NORM.INV,
+  gedeelde schok i·12,9898+π σ=0,15; per-pot i·78,233+(slot+1)·37,719 σ=0,3·0,15), n=10
+  bevroren runs, slaagkans=MC!B4; hist inert (V11). Doelblok B35-B38 gedeeld in `gap.ts`.
+  ✔ **Fixture-ronde 3 + alle slapende takken geïmplementeerd (2026-07-02): 19 fixtures,
+  847 tests groen, tsc schoon — de rekenlaag is compleet.** Geactiveerd + bewezen:
+  pensioen-multipot-annuïtisering (PMT; duur-SWITCH incl. verborgen ArrayFormula),
+  kinderen-NIBUD-events, erfenis (⚠ Excel keert de vrijstelling zelf niet uit:
+  netto = MAX(0,bruto−vrijstelling)×(1−tarief) — mogelijk model-eigenaardigheid,
+  voorgelegd aan eigenaar; kernel volgt oracle), AOW-993/"Samen"-tak, partner-pensioen,
+  capped-overerving afname→onttrekking in de waterval, combined-noemer in de schuld-pass,
+  HC:HH-overloop, en tekort-lening-aflossing S!AC = MIN(ruwBudget, saldo(m−1)+rente)
+  (correctie op eerste recept: same-month-voeding hoort NIET in de cap).
+  ✔ **Calc-engine-specialist-review (2026-07-02): geen 🔴 — kern adapter-klaar.** Verwerkt:
+  strikte gap-sign-toetsen gedocumenteerd (EPS zou Excel-semantiek veranderen; maand-sprongen ≫
+  ruis), absolute-tolerantie-caveat in de comparator (relatieve vloer overwegen bij extreme
+  horizon×inflatie), publieke barrel `lib/horizon-kernel/index.ts` (tabellen intern),
+  clng-dedupe naar gap.ts, maandHint-guard, stale "16 fixtures"-docs → 19. **Geparkeerd naar
+  FASE 5 (perf):** `skipOntDisplayRecompute`-optie (Ont!H/I-herrekening is display-only maar
+  draait per engine-run) + dubbele computeBez per maand; advies: solveFire client-side met
+  debounce haalbaar (~50-150 ms), band+MC naar worker/server + cache op input-hash.
+  **FASE 2 AFGEROND — 847 tests, tsc schoon.**
 - **FASE 3 — Adapter**: app-data → kern-input (§5); hergebruik bestaande expanders; dubbeltelling-
   guard op source-markers; eigenschaps-tests buiten het Excel-domein (N potten, totalen sluiten,
   geen negatieve potten). De domein-expanders (AOW, pensioen-annuïtisering, kinderen-NIBUD,

@@ -127,8 +127,9 @@ if (!hasFixtures) {
   const results = listFixtures(FIXTURE_DIR).map((f) => runFixture(loadFixture(f)))
 
   describe('horizon-kernel · parity Auto-gebeurtenissen (expander) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste tripwire: een nieuwe fixture-ronde moet hier zichtbaar afketsen.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {

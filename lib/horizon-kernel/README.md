@@ -5,13 +5,21 @@ zoals het eigen Excel-model** `Core calc v5.xlsm` (ADR 0032,
 `docs/horizon-excel-oracle-plan.md`). Maandbasis (index 0..1199, tot leeftijd
 100), forward-recursie, **nominaal** (reële invoer vooraf geïndexeerd met
 `(1+inflatie)^(m/12)`), structurele één-maand-lag. Het Excel is de **oracle**:
-elke tabel wordt cel-voor-cel tegen 16 fixtures bewezen, tolerantie **€0,01**.
+elke tabel wordt cel-voor-cel tegen 19 fixtures bewezen, tolerantie **€0,01**.
 
-> Status: FASE 2 — **alle 14 tabellen geport** onder teacher-forced parity
-> (~8,9 mln cellen over 16 fixtures, 0 mismatches; zie Parity-stand onderaan).
-> De integrale forward-recursie-engine (`engine.ts`) die de DepViews uit eigen
-> berekende toestand voedt is in aanbouw; daarna volgen de bisectie-solver met
-> statussen en de band/MC/hist-wrappers.
+> Status: FASE 2 — **alle 14 tabellen geport** (teacher-forced parity, ~8,9 mln
+> cellen, 0 mismatches), **integrale engine ✔** (`engine.ts`: forward-recursie
+> voedt DepViews uit eigen toestand; integrale parity over alle tabellen ×
+> 19 fixtures, 0 mismatches — geen foutophoping over 1200 maanden) en
+> **solver ✔** (`solver.ts`: VBA-getrouwe `BepaalFIRE`-bisectie + statusblok
+> P!B93-B100; 19/19 fixtures exact vanuit alleen de input, incl. parkeerstand,
+> AOW-kortsluiting, doel=0-quirk en pensioengat). Let op: kernel-floats dragen
+> sub-cent-ruis — messcherpe drempel-condities op afgeleide euro-waarden (zoals
+> B99 > 0) clampen ruis onder een halve cent naar 0 (zie solver.ts).
+> Fixture-ronde 3 (+gezin, +schuld-prio, +reserve-depletie) landde de dormante
+> takken; **wrappers ✔** (band zonder pensioen-kortsluiting; MC sin-hash exact;
+> hist inert) en **alle ronde-3-takken geïmplementeerd** — de rekenlaag is
+> compleet: **847 tests groen over 19 fixtures**. Volgende: FASE 3 (adapter).
 
 ## Architectuur
 
@@ -45,7 +53,7 @@ Elke tabel-module is een **pure functie die maand `m` berekent** uit:
 
 In de **parity-test** komen die DepView-waarden uit de **fixture** (het oracle),
 niet uit een eigen berekening. Zo wordt elke tabel *geïsoleerd* formule-getrouw
-bewezen over **alle 1200 maanden × alle 16 fixtures**: een fout in tabel X kan
+bewezen over **alle 1200 maanden × alle 19 fixtures**: een fout in tabel X kan
 tabel Y niet besmetten, en de tabellen zijn daardoor **parallel te porten**. De
 integrale forward-recursie (die de DepViews echt uit andere tabellen voedt)
 volgt als aparte stap ná de tabel-ports.
@@ -54,6 +62,15 @@ De gedeelde runner (`parity/teacher.ts`) bouwt twee parallelle grids —
 *verwacht* (uit de fixture-sheet) en *actueel* (uit `compute`) — en vergelijkt
 ze met `compareGrid` (€0,01). Mismatches worden vertaald naar leesbare regels
 (kolomletter · Excel-rij · maand · verwacht/actueel/Δ).
+
+### Geb-postconventie (handmatige rijen 4-13) — einddatum
+
+Een **Periodiek**-post zónder einddatum loopt tot de horizon (`eIdx = 1199`);
+alleen **Eenmalig**-posten krijgen `eIdx = sIdx`. `geb.ts#helpersFromEvent`
+codeert de Eenmalig-conventie voor de auto-rijen; de engine-builder voor de
+handmatige rijen gebruikt de horizon-conventie — tijdens de engine-integratie
+euro-exact bewezen (een open-einde "Pensionering"-post lekte anders vanaf
+maand 349). Verwar de twee niet.
 
 ### Belangrijk formule-detail uit de Bel-port (één-maand-lag)
 
@@ -118,29 +135,36 @@ heeft dus géén m−1-afhankelijkheid. (De ADR/opdracht formuleert de lag als
   buiten de vergelijking — statische documentatie/opmaak, geen per-maand-
   berekening. Motiveer zulke uitsluitingen altijd in het testcommentaar.
 
-## Parity-stand (teacher-forced, alle 16 fixtures, tolerantie €0,01)
+## Parity-stand (teacher-forced, alle 19 fixtures, tolerantie €0,01)
 
 | Tabel | Kolommen | Cellen | Max \|Δ\| |
 |---|---|---|---|
-| **Bel** (Box 3) | A–N | 268.800 | ~2·10⁻⁶ € |
-| **CF** (cashflow) | A–K | 211.200 | 0 (exact) |
-| **Ont** (behoefte+profiel) | A–D, F–I | 153.600 | ~1,7·10⁻⁶ € |
-| **Af** (gebeurtenis-kosten) | A–D, F, G | 115.200 | ~3,2·10⁻⁷ € |
-| **Toename en afname** | 88 kol. | 1.689.600 | ≪ €0,01 |
-| **Verdeling** (waterval) | 218 kol. | 4.185.600 | ~2·10⁻⁶ € |
-| **Bez** (potten + woningblok) | 53 kol. incl. AY:BE | 1.017.600 | ~2·10⁻⁶ € |
-| **S** (schulden) | 42 kol. | 806.400 | ~1,4·10⁻⁶ € |
-| **Prognose** | A–M | 249.600 | ~5·10⁻⁵ € |
-| **ES** (eindstrategie-spiegel) | 15 cellen | 240 | 0 (exact) |
-| **Auto-gebeurtenissen** | 255 cellen/fixture | 4.080 | 0 (exact) |
-| **Geb** (auto-rijen + W:AE) | 161 cellen/fixture | 2.576 | ~4,8·10⁻⁷ € |
-| **PT** (partner) | G–K + B10-B12 | 96.048 | ~5·10⁻⁷ € |
-| **Werk-strategie** | N–S | 115.200 | ~5·10⁻⁷ € |
-| **Totaal** | | **≈ 8,92 mln** | **0 mismatches** |
+| **Bel** (Box 3) | A–N | 319.200 | ~2·10⁻⁶ € |
+| **CF** (cashflow) | A–K | 250.800 | 0 (exact) |
+| **Ont** (behoefte+profiel) | A–D, F–I | 182.400 | ~1,7·10⁻⁶ € |
+| **Af** (gebeurtenis-kosten) | A–D, F, G | 136.800 | ~3,2·10⁻⁷ € |
+| **Toename en afname** | 88 kol. | 2.006.400 | ≪ €0,01 |
+| **Verdeling** (waterval) | 218 kol. | 4.970.400 | ~2·10⁻⁶ € |
+| **Bez** (potten + woningblok) | 53 kol. incl. AY:BE | 1.208.400 | ~2·10⁻⁶ € |
+| **S** (schulden) | 42 kol. | 957.600 | ~1,4·10⁻⁶ € |
+| **Prognose** | A–M | 296.400 | ~5·10⁻⁵ € |
+| **ES** (eindstrategie-spiegel) | 15 cellen | 285 | 0 (exact) |
+| **Auto-gebeurtenissen** | 255 cellen/fixture | 4.845 | 0 (exact) |
+| **Geb** (auto-rijen + W:AE) | 161 cellen/fixture | 3.059 | ~4,8·10⁻⁷ € |
+| **PT** (partner) | G–K + B10-B12 | 114.057 | ~5·10⁻⁷ € |
+| **Werk-strategie** | N–S | 136.800 | ~5·10⁻⁷ € |
+| **Totaal (teacher-forced)** | | **≈ 10,59 mln** | **0 mismatches** |
+| **Integrale engine** | alle tabellen, eigen-toestand-recursie | 19 fixtures × 11 grids | 0 mismatches |
+| **Solver** (BepaalFIRE + B93-B100) | fireAge/B35-B38/status/hint/B99 | 19/19 | exact (leeftijd 6-dec; € ≤ 0,01) |
+| **Band** (RunScenarioBand) | Sim!B6:D8 (géén pensioen-kortsluiting!) | 19/19 | exact; #N/A-semantiek gedekt |
+| **MC** (RunMonteCarlo, sin-hash) | MC!B14…-reeks (n=10) + slaagkans B4 | 19/19 | cel-exact; kans 1e-6 |
 
-Bekende slapende paden (in alle 16 fixtures 0/leeg — geïmplementeerd conform
-bron of bewust conservatief gelaten, wachten op fixture-ronde 3): schuld-
-aflossing-toewijzingsblok + HC:HH-overloop (Verdeling), S-extra-aflossing,
-pensioen-multipot-annuïtisering (Auto-gebeurtenissen, bewust ""), partner-
-pensioen (PT!B6/B8/B12), scenarioshift P!B43 / MC / Hist (wrapper-fase),
-AOW-993-tak, kinderen/erfenis-takken, Bez!BB-aflossingscomponent.
+In fixture-ronde 3 geactiveerd (waren daarvóór 0/leeg in alle fixtures): pensioen-
+multipot-annuïtisering (Auto-gebeurtenissen), de kinderen- en erfenis-takken, de
+AOW-993/"Samen"-tak, schuld-toename + S-extra-aflossing, het HC:HH-overloopblok
+en de tekort-aflossing (Verdeling). Partner-pensioen (PT!B6/B8/B12) en de
+reserve-passes bleken al groen vóórdat een ronde-3-fixture ze raakte. Nog slapend
+(in alle 19 fixtures 0/leeg — geïmplementeerd conform bron of bewust conservatief
+gelaten): de scenarioshift-kern P!B43≠0 (de band-wrapper dekt de gebruikte
+variant), de Bez!BB-aflossingscomponent en Hist (backtest blijft app-zijdig,
+gap-besluit V11).

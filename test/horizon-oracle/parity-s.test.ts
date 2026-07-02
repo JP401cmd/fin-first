@@ -118,6 +118,7 @@ const sSpec: TableParitySpec<KernelInput, SCtx, SDep, SRow> = {
   buildDep: (ctx: SCtx, _input: KernelInput, m: MonthIndex): SDep => {
     const bezRow = ctx.bez[DATA_ROW_START + m]
     const verdRow = ctx.verd[DATA_ROW_START + m]
+    const curRow = ctx.s[DATA_ROW_START + m]
     const prevRow = m > 0 ? ctx.s[DATA_ROW_START + m - 1] : undefined
     // Eigen S-saldi van maand m−1 per fysieke slot (teacher-forced).
     const saldoVorige: number[] = []
@@ -139,6 +140,8 @@ const sSpec: TableParitySpec<KernelInput, SCtx, SDep, SRow> = {
       tekortBudget: cellNum(verdRow, VERD_COL_BV) + cellNum(verdRow, VERD_COL_EO),
       extraAflossingBudget,
       categorieCap,
+      // S!AC(m) — tekort-aflossing (slot 6 aflossing = saldo-kol + 1), teacher-forced.
+      tekortAflossing: cellNum(curRow, sSaldoCol(S_PHYSICAL_SLOTS - 1) + 1),
     }
   },
   compute: computeS,
@@ -160,8 +163,9 @@ if (!hasFixtures) {
   const results = runTableParityAllFixtures(FIXTURE_DIR, sSpec)
 
   describe('horizon-kernel · parity S (schulden) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste tripwire: een nieuwe fixture-ronde moet hier zichtbaar afketsen.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -186,8 +190,8 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(columnCount)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 42 = 806.400 vergeleken cellen.
-      expect(totalCells).toBe(16 * 1200 * columnCount)
+      // Dynamisch (ronde-4-proof): fixtures × 1200 × 42 kolommen.
+      expect(totalCells).toBe(results.length * 1200 * columnCount)
     })
   })
 }

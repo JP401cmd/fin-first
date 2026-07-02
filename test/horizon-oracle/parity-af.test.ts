@@ -105,8 +105,9 @@ if (!hasFixtures) {
   const results = runTableParityAllFixtures(FIXTURE_DIR, afSpec)
 
   describe('horizon-kernel · parity Af (afname) tegen Excel-oracle', () => {
-    it('draait over alle 16 fixtures', () => {
-      expect(results.length).toBe(16)
+    it('draait over alle 19 fixtures', () => {
+      // Bewuste tripwire: een nieuwe fixture-ronde moet hier zichtbaar afketsen.
+      expect(results.length).toBe(19)
     })
 
     for (const result of results) {
@@ -130,8 +131,8 @@ if (!hasFixtures) {
         expect(result.columnCount).toBe(6)
       }
       const totalCells = results.reduce((sum, r) => sum + r.comparison.cellCount, 0)
-      // 16 fixtures × 1200 × 6 = 115.200 vergeleken cellen.
-      expect(totalCells).toBe(115200)
+      // Dynamisch (ronde-4-proof): fixtures × 1200 maanden × 6 kolommen.
+      expect(totalCells).toBe(results.length * 1200 * 6)
     })
   })
 }
