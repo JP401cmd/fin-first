@@ -82,6 +82,21 @@ toegevoegd) en `huis-verkoop-wanneer-nodig` (basis ís Verkopen + Wanneer nodig)
 `werk-strategie-uit` vervangt "werk-strategie-aan" omdat de basis de
 werk-strategie al actief heeft (2% reële groei).
 
+Uitbreiding naar 16: `huis-meerekenen` en `huis-uitsluiten` completeren het
+P!B57-kwadrant; `onhaalbaar` (status `unreachable_within_horizon`, fireAge null,
+P!B16 geparkeerd op 100, €/mnd-hint in P!B96) en `pensioen-tekort` (eindstrategie
+'Pensioenleeftijd' + uitgave na pensioen 200k → tekort-lening → status
+`pension_shortfall`) dekken de twee solver-statussen die de eerste 12 fixtures
+niet raakten. Let op: een pre-FIRE-tekortdraai (uitgaven > inkomen, bv.
+P!B11 fors omhoog) is **niet extraheerbaar** — een negatief toename-budget
+(CF!I < 0) drukt potten door de MAX(0;..)-vloer en breekt Controle!K1 (de
+tekort-lening voedt alleen uit afname/onttrekking-onbenut). Daarom draait
+`onhaalbaar` aan het doel (P!B53) mét woning-strategie 'Uitsluiten' (onder
+'Verkopen' maakt de Box 3-heffing op het naar ~13,5M doorgroeiende vermogen
+CF!I alsnog negatief in de laatste ~20 maanden vóór de horizon). De
+stale-detector P!B95 blijft bij beide statussen leeg (gebonden aan de
+reached_at-toestand).
+
 ## Fixture-schema (per `<scenario>.json.gz`)
 
 ```json

@@ -141,7 +141,7 @@ Centrale paden: `lib/hooks/use-horizon-fire-sim.ts` (client-hook), `lib/dashboar
 | Uitgaven ná FIRE | `computeRetirementExpenses`: `essential_budgets` \| `custom_amount` \| `current_income` (`profiles.retirement_expense_method`) | onttrekkingsbehoefte-basis (geïndexeerd) |
 | Sparen/inleg | `monthly_savings_override` → cashflow-spaarquote → `monthly_contribution`×12 | toename-capaciteit |
 | Bezittingen | `assets`: `asset_type`→categorie, `current_value`, `expected_return`→pot-rente, `is_liquid`/`eigen_huis`→niet-liquide-vlag, `net_worth_inclusion_pct` (→gap V6), `sale_config`→liquidatie-event | potten in het grootboek |
-| Schulden | `debts`: `current_balance`, `interest_rate`, `monthly_payment`, `repayment_type`, `include_aflossing_in_savings`, `linked_asset_id` | schuld-potten + aflossingsschema |
+| Schulden | `debts`: `current_balance`, `interest_rate`, `monthly_payment`, `repayment_type`, `include_aflossing_in_savings`, `linked_asset_id` | schuld-potten + aflossingsschema. **Adapter-aandachtspunt (CF-port-vondst):** Excel-CF!G laat bij payoff de **hele geplande maandlast** vrijvallen (gate `bens!H="Ja"` ≈ `include_aflossing_in_savings`), terwijl app-v2 per ADR 0020 alléén het rente-deel vrijgeeft (aflossing zat al in sparen). De adapter moet de sparen-invoer + H-vlag zó zetten dat er geen dubbeltelling ontstaat — expliciet testen in FASE 3. |
 | Life events | `life_events` → `lifeEventsToCashflows` (met `skipEventIds`); dedicated expanders: `aow`, `pension` (annuitizePension), `werk` (`lib/werk-strategie.ts`), housing (virtueel, `housing-strategy:`-prefix) | generieke kasstromen/afnames + liquidatie-events |
 | Eindstrategie | `profiles.fire_end_strategy` / `fire_end_age` (default 90) / `fire_legacy_amount` | eindstrategie + solver-doelbedrag |
 | Onttrekking | `profiles.withdrawal_strategy` (`static\|guardrails\|vpw\|bucket`) + `guardrail_*` | onttrekkingsprofiel (migratie: vpw/bucket→Vast; →gap V4) |
@@ -210,9 +210,19 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
   dus `eind-legacy`/`profiel-afnemend`/`huis-verkoop-wanneer-nodig` zijn door basis gedekt en
   `profiel-vast`/`werk-strategie-uit` toegevoegd; (5) TS!A23-fix als gelogde override
   (TS!D41/D42 = 5, gewicht 0). **Nog toevoegen tijdens FASE 2** (via de refresh-procedure):
-  fixtures voor woning-modi **Meerekenen** en **Uitsluiten** (niet-liquide-mechanisme) en een
-  **unreachable/pension_shortfall**-scenario (solver-status-parity; nu hebben alle 12 een
-  bereikte FIRE).
+  ✔ fixtures woning-modi **Meerekenen**/**Uitsluiten** + **onhaalbaar** + **pensioen-tekort**
+  (toegevoegd 2026-07-02 → 16 fixtures). **Nog open — fixture-ronde 3** (vóór FASE 3, want de
+  expander-takken zijn nu onbeproefd doordat alle 16 fixtures dezelfde Auto-geb-invoer delen):
+  een `gezin`-achtig scenario met partner-leefsituatie ≠ Alleenstaand (AOW-993-tak), actieve
+  kinderen (NIBUD J-N-waarden), erfenis > 0 én gevulde **pensioen-multipot** (rij 26-31 —
+  annuïtisering is bewust nog "" in de kernel tot een fixture dit exerceert); evt. gesplitst in
+  2 scenario's als één combinatie het model-gedrag vertroebelt. Plus (Toename-en-afname-vondst):
+  een scenario met een **schuld-categorie op toename-prio 1-4** (combined-noemer-tak nu alleen
+  in 0-vorm bewezen; bewijst óók de S-extra-aflossing-kolommen F/J/N/… en de GT:GX/ER:EV-
+  mapping die nu overal 0 zijn) en één waarin de **reserve (prio 5) daadwerkelijk wordt
+  aangesproken** (depletie van de overige categorieën) + een periodiek negatief event
+  (Af-multi-post) + **partner-pensioen > 0** (PT!B6/B8/B12-takken zijn in alle 16 fixtures
+  onbeproefd).
 - **FASE 2 — De kern**: nieuw pure-TS-pakket **`lib/horizon-kernel/`** (architect-besluit:
   "core" botst met De Kern-module; oracle-artefacten apart onder `docs/horizon-oracle/` +
   `test/fixtures/horizon-oracle/`), tabel-voor-tabel in Excel-volgorde, elk blok pas verder als
@@ -221,6 +231,20 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
   prognose/netto-liquide → solver+statussen → wrappers (scenarioband, MC, hist). Geen Supabase,
   constanten op de canonieke plek. Excel-slot-rollen (huis=bens rij 6, hypotheek=17, opeet=20,
   tekort=23) worden getypte rollen, geen posities.
+  **Voortgang (2026-07-02):** aanpak = teacher-forced parity per tabel (deps uit de fixture →
+  tabellen parallel geport), daarna integrale forward-recursie. ✔ **Input-model compleet**
+  (alle P/TS/bens/Geb/Auto-gebeurtenissen/PT/Werk/onzekerheid-blokken + getypte slot-rollen;
+  P!B82-anker bewust DepView; bens kent géén maandinleg — inleg loopt via de waterval).
+  ✔ **Alle 14 tabellen geport in één parallelle golf (10 agents): ~8,92 mln cellen over
+  16 fixtures, 0 mismatches** — zie `lib/horizon-kernel/README.md` §Parity-stand voor de
+  tabel-voor-tabel-cijfers én de lijst slapende paden die op fixture-ronde 3 wachten.
+  Kern-vondsten van de golf: tax-lag zit bij de consument (CF!K(m)=Bel!N(m−1)); horizon-guard
+  en kolom-thuisbasis zijn tabel-specifiek; PT bleek een echte maandtabel (naloper-port);
+  verdeelgewichten op volle precisie herrekenen (fixture is 6-decimalen); reserve prio 5
+  krijgt 0% gewicht en wordt alléén door de Verdeling-reserve-pass bediend; Verdeling-
+  eindtoewijzing (niet de behoefte) voedt de Bez-inleg. ⏳ **Integrale engine** (`engine.ts`,
+  forward-recursie met FIRE-leeftijd als parameter + integrale parity over alle tabellen) in
+  aanbouw; daarna solver+statussen en band/MC/hist-wrappers.
 - **FASE 3 — Adapter**: app-data → kern-input (§5); hergebruik bestaande expanders; dubbeltelling-
   guard op source-markers; eigenschaps-tests buiten het Excel-domein (N potten, totalen sluiten,
   geen negatieve potten). De domein-expanders (AOW, pensioen-annuïtisering, kinderen-NIBUD,

@@ -2,7 +2,7 @@
 
 Bron: `core-calc-v5-snapshot.xlsm` (SHA256 `3E905809…BA80D`, zie identiteit.txt).
 23 zichtbare sheets, maandbasis maand 0 t/m 1199 (leeftijd P!B7=36 → 100). Volledig formule-gedreven; VBA alleen `BepaalFIRE`, `RunScenarioBand`, `RunMonteCarlo` (Module1, zie vba.txt). 0 cached fout-cellen (#REF!/#VALUE! enz.) in het hele werkboek.
-Rij-conventie maandtabellen: CF/Bel/Prognose/Ont/Werk-strategie/PT starten data op **rij 2** (maand 0 = rij 2); Bez/S/Af/Controle/Verdeling op **rij 4**; Toename en afname op **rij 3**. Kolommen A/B/C = maand-index / leeftijd(jaar) / maand-in-jaar met overal `IF(P!$B$7+$A/12>100,"",…)` als horizon-guard.
+Rij-conventie maandtabellen: CF/Bel/Prognose/Ont/Werk-strategie/PT/**Af** starten data op **rij 2** (maand 0 = rij 2; Af empirisch geverifieerd tijdens de CF-port — stond hier eerder onterecht in de rij-4-groep); Bez/S/Controle/Verdeling op **rij 4**; Toename en afname op **rij 3**. Kolommen A/B/C = maand-index / leeftijd(jaar) / maand-in-jaar met `IF(P!$B$7+$A/12>100,"",…)` als horizon-guard — maar het guard-gedrag op réken-kolommen is tabel-specifiek (Bel leegt; Ont zet neutrale waarden; CF hybride B–G leeg/H–K nul; Werk-strategie N:S rekent door) en de kolom-thuisbasis verschilt per tab: verifieer beide altijd tegen de fixtures.
 
 ---
 
@@ -92,7 +92,7 @@ B1 startjaar 1990, B2 actief=0, A4:A99 jaren 1928-2023, **B4:B99 rendementreeks 
 B1/B2/B3 live (FIRE, netto@FIRE, Prognose!J@eindleeftijd). B6:D8 = **vastgelegde uitkomsten scenariorun 2-7-2026** (blauw; per scenario maand-precieze FIRE via VBA): pessimistisch 58,17/1.242.122/344.223 · verwacht 55,58/1.200.446/769.364 · optimistisch 51,17/1.003.975/321.674. Instructies voor handmatige Data Table (kolominvoercel P!B43).
 
 ## PT (1201×11) — partner-parameterlaag (B)
-B2 aanwezig(0/1)=0, B3 geboortejaar, B4 netto jaarinkomen, B5 AOW-leeftijd `=ES!C15`, B6 pensioen bruto/jr, B7 pensioen-startleeftijd, B8 geïndexeerd, B9 AOW-bedrag p.p./jr, B10 DOB-verschil, B11 partner-AOW-startmaand (head-tijdas). Maandkolommen G:K: I werkinkomen (tot partner-AOW), J AOW+pensioen (vanaf drempels), **K totaal → CF!D en Ont!D**. Controles D2:E4 (cashflow stroomt, P!B19-koppeling, FORMULATEXT-check op Bel!J2/G2 ×B19).
+B2 aanwezig(0/1)=0, B3 geboortejaar, B4 netto jaarinkomen, B5 AOW-leeftijd `=ES!C15`, B6 pensioen bruto/jr, B7 pensioen-startleeftijd, B8 geïndexeerd, B9 AOW-bedrag p.p./jr, B10 DOB-verschil, B11 partner-AOW-startmaand, **B12 partner-pensioen-startmaand** (head-tijdas; drempel voor de pensioen-term in J — tijdens de PT-port empirisch vastgesteld, ontbrak hier eerder). Maandkolommen G:K: I werkinkomen (tot partner-AOW), J AOW+pensioen (vanaf drempels), **K totaal → CF!D en Ont!D**. Controles D2:E4 (cashflow stroomt, P!B19-koppeling, FORMULATEXT-check op Bel!J2/G2 ×B19).
 
 ## Toelichting model (120×3) — zelf-documentatie
 16 secties: opbouw/afbouw, invoer, 3 strategieën, prioriteiten, Box 3 (incl. werkelijk-methode + betaling via cashflow), eindstrategieën, tabbladen-overzicht, spelregels (iteratief UIT; alles via m−1-lag), partner, auto-gebeurtenissen, woning-strategie, onttrekkingsprofiel, werk-strategie, solver-status.
