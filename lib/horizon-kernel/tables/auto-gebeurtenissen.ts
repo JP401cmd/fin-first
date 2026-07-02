@@ -38,7 +38,7 @@
 import { MAX_AGE, type KernelInput, type PensioenPot } from '../types'
 
 /** Excel-formuleresultaat "" (leeg tekstresultaat) — te onderscheiden van een echt lege cel. */
-export const EMPTY: '' = ''
+export const EMPTY = '' as const
 export type Empty = typeof EMPTY
 
 // ── AOW (Auto-geb B21) ───────────────────────────────────────────────────────

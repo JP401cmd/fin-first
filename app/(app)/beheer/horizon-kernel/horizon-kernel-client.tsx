@@ -19,6 +19,7 @@ import TabGeselecteerd from './tab-geselecteerd'
 import TabStappen from './tab-stappen'
 import TabTechnisch from './tab-technisch'
 import TabVerificatie from './tab-verificatie'
+import KernelFlagsCard from './kernel-flags-card'
 
 type TabId = 'uitgangspunten' | 'geselecteerd' | 'stappen' | 'technisch' | 'verificatie'
 
@@ -110,6 +111,10 @@ export default function HorizonKernelClient() {
           Echte data · jouw account
         </span>
       </div>
+
+      {/* Cutover-vlaggen — altijd onder de header, in élke staat: de vlaggen staan
+          los van of de kern op je eigen data kan draaien. */}
+      <KernelFlagsCard />
 
       {state === 'loading' && <Spinner label="Rekenkern wordt gedraaid op je data…" />}
 

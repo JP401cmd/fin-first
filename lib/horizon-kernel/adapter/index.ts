@@ -182,10 +182,12 @@ export function buildKernelInputFromApp(input: KernelAdapterInput): KernelInput 
 export type { KernelAdapterProfile } from './params'
 export {
   assignAssetSlots,
+  assignDebtSlots,
   buildAssetPotten,
   buildPotLiquidaties,
   buildSchuldPotten,
   mapInSparenNaAflossing,
+  type DebtSlot,
   type LiquidatieContext,
 } from './potten'
 export { buildTsParams } from './prio-overgang'

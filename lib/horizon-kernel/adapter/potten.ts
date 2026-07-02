@@ -287,6 +287,39 @@ function debtBox3Type(inBox3: boolean): DebtBox3Type {
   return inBox3 ? 'Box 3 schuld' : 'Geen Box 3 schuld'
 }
 
+/** Eén actieve schuld met haar toegewezen fysieke slot. */
+export interface DebtSlot {
+  readonly debt: Debt
+  readonly slot: number
+  readonly isHypotheek: boolean
+}
+
+/**
+ * Deterministische fysieke slot-toewijzing per actieve schuld: de eerste
+ * eigen-huis-gekoppelde hypotheek → slot 0 (contract), overige → de vrije slots
+ * (overslaan van 0/3/6 = hypotheek/opeet/tekort) in `sort_order`-dan-`id`-volgorde.
+ * Eén bron voor zowel `buildSchuldPotten` als de kernel-bridge (`debtSlotMeta`),
+ * zodat een consument de pot-`slot` niet zelf hoeft te herleiden (drift-risico).
+ * De altijd-aanwezige tekort-lening (slot 6) hoort NIET bij deze app-schulden en
+ * wordt door `buildSchuldPotten` apart toegevoegd.
+ */
+export function assignDebtSlots(
+  debts: readonly Debt[],
+  eigenHuisIds: ReadonlySet<string>,
+): DebtSlot[] {
+  const active = debts.filter((d) => d.is_active !== false).sort(bySortOrderThenId)
+  const firstMortgageId =
+    active.find(
+      (d) => d.debt_type === 'mortgage' && d.linked_asset_id != null && eigenHuisIds.has(d.linked_asset_id),
+    )?.id ?? null
+  // Reguliere schulden vermijden 0 (hypotheek), 3 (opeet) en 6 (tekort).
+  const slotGen = freeSlots(new Set([HYPOTHEEK_SLOT, OPEET_SLOT, TEKORT_SLOT]))
+  return active.map((d) => {
+    const isHypotheek = d.id === firstMortgageId
+    return { debt: d, slot: isHypotheek ? HYPOTHEEK_SLOT : slotGen.next().value, isHypotheek }
+  })
+}
+
 /**
  * Schulden → `DebtPot[]` + de altijd-aanwezige tekort-lening. De eerste actieve
  * hypotheek die aan een eigen huis is gekoppeld (`linked_asset_id`) krijgt slot 0 +
@@ -300,19 +333,8 @@ export function buildSchuldPotten(
   eigenHuisIds: ReadonlySet<string>,
   tekortLeningRente: number,
 ): DebtPot[] {
-  const active = debts.filter((d) => d.is_active !== false).sort(bySortOrderThenId)
-  const firstMortgageId =
-    active.find(
-      (d) => d.debt_type === 'mortgage' && d.linked_asset_id != null && eigenHuisIds.has(d.linked_asset_id),
-    )?.id ?? null
-
-  // Reguliere schulden vermijden 0 (hypotheek), 3 (opeet) en 6 (tekort).
-  const slotGen = freeSlots(new Set([HYPOTHEEK_SLOT, OPEET_SLOT, TEKORT_SLOT]))
-
   const pots: DebtPot[] = []
-  for (const d of active) {
-    const isHypotheek = d.id === firstMortgageId
-    const slot = isHypotheek ? HYPOTHEEK_SLOT : slotGen.next().value
+  for (const { debt: d, slot, isHypotheek } of assignDebtSlots(debts, eigenHuisIds)) {
     const rol: DebtRol | null = isHypotheek ? 'hypotheek' : null
     const factor = inclusionFactor(d.net_worth_inclusion_pct)
     const rente = Number(d.interest_rate ?? 0) / 100
