@@ -8,6 +8,7 @@
  * they remain client-side fetches in horizon-landing.tsx.
  */
 
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   ageAtDate,
@@ -236,17 +237,9 @@ const PROFILE_DEFAULTS = {
   monthly_savings_override: null as number | null,
 }
 
-export async function loadHorizonData(
+const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   supabase: SupabaseClient,
-  /**
-   * Perspectief (eigen / huishouden / partner). Optioneel + default 'personal'
-   * zodat bestaande callers byte-identiek blijven. Alleen wanneer 'household'
-   * of 'partner' worden de FIRE-vermogensaggregaten (totalAssets/totalDebts/
-   * monthlyContributions) + de assets/debts-arrays via loadPerspectiveData
-   * herberekend op het gevraagde aandeel. Health-score, housing-context en
-   * Box 3 blijven op de eigen ruwe data — die zijn persoonlijk van aard.
-   */
-  perspective: Perspective = 'personal',
+  perspective: Perspective,
 ): Promise<HorizonPageData> {
   const now = new Date()
   const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
@@ -867,4 +860,28 @@ export async function loadHorizonData(
     housingStrategyDismissedAt,
     housingSimBasis,
   }
+})
+
+/**
+ * Server-side loader voor de Horizon-bundel, request-gededuped via React
+ * `cache()` — meerdere aanroepen binnen één RSC-render (page + aandachtspunten-
+ * producenten + briefing) draaien de 18 queries maar één keer per
+ * (client, perspective)-combinatie.
+ *
+ * Perspectief (eigen / huishouden / partner). Optioneel + default 'personal'
+ * zodat bestaande callers byte-identiek blijven. Alleen wanneer 'household'
+ * of 'partner' worden de FIRE-vermogensaggregaten (totalAssets/totalDebts/
+ * monthlyContributions) + de assets/debts-arrays via loadPerspectiveData
+ * herberekend op het gevraagde aandeel. Health-score, housing-context en
+ * Box 3 blijven op de eigen ruwe data — die zijn persoonlijk van aard.
+ *
+ * De default wordt hiér genormaliseerd (niet in de gecachte functie): cache()
+ * keyt op de argumentenlijst, dus `loadHorizonData(sb)` en
+ * `loadHorizonData(sb, 'personal')` moeten dezelfde entry raken.
+ */
+export async function loadHorizonData(
+  supabase: SupabaseClient,
+  perspective: Perspective = 'personal',
+): Promise<HorizonPageData> {
+  return loadHorizonDataCached(supabase, perspective)
 }
