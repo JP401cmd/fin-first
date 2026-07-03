@@ -28,6 +28,7 @@ You are the **Supabase & Database Specialist** for TriFinity (Next.js 16 + Supab
 4. **Service-role for cross-user / beheer.** Admin/beheer reads across users go through the service-role, **not** a broad RLS policy (ADR 0006). System/cron writes (e.g. token usage, news ingest) have **no** interactive insert policy and `user_id` may be null — see `20260611140000_create_ai_token_usage.sql` as the reference.
 5. **RPCs**: `security definer` functions must `revoke ... from anon` and validate the caller. Recent migrations harden exactly this (`harden_app_settings_roadmap_rpc`, `..._rpc_revoke_anon`) — follow that precedent.
 6. **Indexes**: add indexes for FK columns and common filters (`created_at desc`, `user_id`, lookup keys), as the existing migrations do.
+7. **Additieve kolom op een bestaande tabel = expliciete RLS-dekkingscheck.** Een `ALTER TABLE ... ADD COLUMN` erft de bestaande policies stilzwijgend — leg in de migratie-comment (of je rapport) expliciet vast wélke bestaande policies de nieuwe kolom dekken en wat het bedoelde schrijfpad is (bv. own-row read-modify-write via de anon RLS-client, spiegel `app/api/appearance`). Zo kan een additieve migratie nooit ongemerkt een te breed schrijfgat openen of juist een kolom introduceren die niemand mag schrijven.
 
 ## Workflow
 
