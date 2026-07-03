@@ -405,6 +405,9 @@ export interface HeatmapBudgetGroup {
 }
 
 export interface DashboardData {
+  // Vrijheidsmijlpalen (scalar-router; de loader levert dit al — de widget-sessie
+  // maakt dit veld verplicht zodra de consumerende widget landt).
+  freedomMilestones?: import('@/lib/freedom-milestones').FreedomMilestoneResult | null
   // Core financial
   netWorth: number
   totalAssets: number
