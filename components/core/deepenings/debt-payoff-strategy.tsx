@@ -30,7 +30,7 @@
  * `hover:bg-[var(--subtle)]`.
  */
 
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react'
 import type { Debt } from '@/lib/debt-data'
 import { simulatePayoff, payoffSummary, type PayoffStrategy } from '@/lib/debt-data'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -590,6 +590,14 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
   const [localStrategy, setLocalStrategy] = useState<PayoffStrategy>(initialStrategy)
   const strategy = isControlled ? initialStrategy : localStrategy
   const [extraPayment, setExtraPayment] = useState<number>(initialExtraPayment)
+  // Slider-defer (alléén scheduling; geen formule/parameter-wijziging). De zware sim (4×
+  // simulatePayoff, tot 600 mnd elk) + chart + vergelijking keyen op de DEFERRED extra-
+  // aflossing, zodat de slider-thumb en het live €-label (`extraPayment`) responsief blijven
+  // terwijl chart/tabel/vergelijking de settelde waarde volgen. Elke sim-beschrijvende
+  // consument (chart-subtitel, vergelijkings-tekst, impact-label-poorten) leest óók de
+  // deferred waarde, zodat er geen "€X extra → €0-traject"-transient ontstaat. Op de initiële
+  // render is de deferred waarde gelijk aan de huidige.
+  const deferredExtraPayment = useDeferredValue(extraPayment)
   const { masked } = useMaskedAmounts()
 
   // Toggle-callback: in controlled-modus delegeren aan parent, in
@@ -639,14 +647,14 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
   const strategyTrajectories = useMemo(
     () =>
       PAYOFF_STRATEGIES.map((id) => {
-        const months = simulatePayoff(activeDebts, id, extraPayment)
+        const months = simulatePayoff(activeDebts, id, deferredExtraPayment)
         return {
           id,
           months,
           summary: payoffSummary(months),
         }
       }),
-    [activeDebts, extraPayment, PAYOFF_STRATEGIES],
+    [activeDebts, deferredExtraPayment, PAYOFF_STRATEGIES],
   )
 
   const baselineSummariesByStrategy = useMemo(() => {
@@ -683,14 +691,14 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
   const interestSaved = Math.max(0, baselineSummary.totalInterest - selectedSummary.totalInterest)
 
   const betterMonthsLabel: string | null =
-    extraPayment > 0 && selectedSummary.payoffDate
+    deferredExtraPayment > 0 && selectedSummary.payoffDate
       ? `schuldvrij in ${formatPayoffDate(selectedSummary.payoffDate)}${
           monthsSaved > 0 ? ` (${formatMonthSpan(monthsSaved)} eerder)` : ''
         }`
       : null
 
   const betterInterestLabel: string | null =
-    extraPayment > 0 && interestSaved > 0
+    deferredExtraPayment > 0 && interestSaved > 0
       ? formatMaskedCurrency(interestSaved, masked)
       : null
 
@@ -759,7 +767,7 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
       <DebtPayoffTrajectoryChart
         strategies={strategyTrajectories}
         activeStrategyId={strategy}
-        extraPayment={extraPayment}
+        extraPayment={deferredExtraPayment}
       />
 
       {/* ── Strategie-vergelijking ─────────────────────────── */}
@@ -769,7 +777,7 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
         baselineSummaries={baselineSummariesByStrategy}
         activeStrategyId={strategy}
         activeWithExtraSummary={selectedSummary}
-        extraPayment={extraPayment}
+        extraPayment={deferredExtraPayment}
         dailyExpenses={0}
       />
 
