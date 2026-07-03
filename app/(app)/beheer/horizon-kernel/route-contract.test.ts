@@ -13,7 +13,6 @@ describe('horizon-kernel beheer-pagina ↔ API route contract', () => {
     'horizon-kernel-client.tsx',
     'tab-stappen.tsx',
     'tab-verificatie.tsx',
-    'tab-vergelijk.tsx',
   ]
   const fetched = new Set<string>()
   for (const f of files) {
@@ -28,7 +27,6 @@ describe('horizon-kernel beheer-pagina ↔ API route contract', () => {
     expect(paths).toContain('/api/horizon-kernel')
     expect(paths).toContain('/api/horizon-kernel/tabel')
     expect(paths).toContain('/api/horizon-kernel/verificatie')
-    expect(paths).toContain('/api/horizon-kernel/vergelijk')
   })
 
   it.each(paths)('route-handler bestaat voor %s', (apiPath) => {

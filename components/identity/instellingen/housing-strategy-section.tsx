@@ -132,10 +132,9 @@ export function HousingStrategySection({
   // houdt het typen in de invoervelden vloeiend (de engine-runs volgen).
   const deferredConfig = useDeferredValue(config)
   const canPreview = preview != null && preview.context.hasEigenHuis && !loading
-  // Dezelfde motor als de grafiek via `runHousingScenarioPreview`: op de
-  // convergentie-vlag de horizon-kernel (M6), anders byte-identiek v2-grootboek (M2)
-  // of v1. Eén vlag-beslissing per preview-bundel — beide scenario-kaarten (concept +
-  // opgeslagen) draaien door dezelfde helper, dus nooit een engine-mix.
+  // Dezelfde motor als de grafiek via `runHousingScenarioPreview`: de horizon-kernel
+  // (de enige motor). Beide scenario-kaarten (concept + opgeslagen) draaien door dezelfde
+  // helper op dezelfde bundel, dus nooit een engine-mix.
   const draftScenario = useMemo<HousingScenarioResult | null>(() => {
     if (!canPreview || !preview) return null
     try {

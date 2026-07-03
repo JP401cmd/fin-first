@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/client'
  * deeplink naar /identity/parameters.
  *
  * Persist via supabase.from('profiles').update({ [column]: value }).
- * router.refresh() trigt de horizon-engine om te herrekenen — de
+ * router.refresh() trigt de horizon-kernel om te herrekenen — de
  * VoorkeurenView toont meteen de nieuwe waarde, en de tijdas-grafiek
  * + briefing reflecteren de wijziging.
  */

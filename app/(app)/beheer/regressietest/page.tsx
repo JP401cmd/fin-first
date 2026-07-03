@@ -584,7 +584,9 @@ export default function RegressietestPage() {
       {report && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <SummaryCard label="Totaal" value={report.summary.total} color="var(--ink)" />
+          {/* eslint-disable-next-line no-restricted-syntax -- geslaagd/gefaald-status van testruns, geen winst/verlies */}
           <SummaryCard label="Geslaagd" value={report.summary.passed} color="#10b981" />
+          {/* eslint-disable-next-line no-restricted-syntax -- geslaagd/gefaald-status van testruns, geen winst/verlies */}
           <SummaryCard label="Gefaald" value={report.summary.failed} color="#ef4444" />
           <SummaryCard label="Fouten" value={report.summary.errored} color="#f59e0b" />
           <SummaryCard label="Duur" value={formatDuration(report.totalDurationMs)} color="var(--ink-2)" />

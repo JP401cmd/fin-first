@@ -8,8 +8,8 @@ import type { CheckReportData, ReportProjectionPoint } from '@/lib/check/types'
  */
 
 // ── Projectie-reeksen ───────────────────────────────────────────────────────
-// V_op: opgebouwd liquide vermogen 34→64, stijgend tot het de V_nodig-lijn
-// kruist rond 52 (€640k). Daarna loopt het door tot ~58.
+// V_op: opgebouwd besteedbaar vermogen 34→58, stijgend tot het rond 52 het
+// scalaire vrijheidsniveau (€640k) raakt. Daarna loopt het door tot ~58.
 const vOp: ReportProjectionPoint[] = (() => {
   const pts: ReportProjectionPoint[] = []
   let v = 70_240
@@ -33,16 +33,6 @@ function vOpAtReturn(annualGrowth: number): ReportProjectionPoint[] {
 }
 const vOpLow = vOpAtReturn(1.038)
 const vOpHigh = vOpAtReturn(1.078)
-
-// V_nodig: benodigd vermogen — vrijwel vlak (stabiele uitgaven), ~€640k.
-const vNodig: ReportProjectionPoint[] = (() => {
-  const pts: ReportProjectionPoint[] = []
-  for (let age = 34; age <= 58; age++) {
-    // licht oplopend door inflatie-indexatie van de benodigde uitgaven
-    pts.push({ age, value: Math.round(600_000 + (age - 34) * 1700) })
-  }
-  return pts
-})()
 
 // Levenspad: netto vermogen 34→90, inclusief decumulatie na FIRE (52),
 // piek rond 58, lichte daling, AOW+pensioen vlakt af op 68. `returnDelta` (in
@@ -142,7 +132,6 @@ export const SAMPLE_REPORT: CheckReportData = {
   },
   kruising: {
     vOp,
-    vNodig,
     crossing: { age: 52, value: 640_000 },
     fireReachable: true,
     startYear: 2026,

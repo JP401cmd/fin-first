@@ -6,13 +6,25 @@ import {
   type WithdrawalStrategyConfig, type WithdrawalContext,
 } from '@/lib/withdrawal-strategy'
 import { type SimCashflow } from '@/lib/fire-simulation'
-import { runScalarProjectionV2 as runSimulation } from '@/lib/horizon-engine/scalar-bridge'
+import { runScalarProjectionV2 as runSimulation } from './_kernel-sim'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 
 const CAT = 'horizon.onttrekkingsstrategie'
 
 function makeConfig(o?: Partial<WithdrawalStrategyConfig>): WithdrawalStrategyConfig {
   return { ...WITHDRAWAL_DEFAULTS, ...o }
+}
+
+/**
+ * 'vpw'/'bucket' bestaan niet meer in `WithdrawalStrategyType` (remote-migratie
+ * 20260703115225 voegde ze samen tot 'static') — beide functies vallen voor een
+ * onbekende strategie-string terug op static-gedrag (`applyWithdrawalStrategy`'s
+ * `default`-tak resp. `resolveWithdrawalStrategy`'s validStrategies-guard). Deze
+ * cast simuleert een STALE profiel/config-waarde van vóór die migratie zodat de
+ * fallback-regressie gedekt blijft (geen crash, gedraagt zich als static).
+ */
+function legacyConfig(strategy: string, o?: Partial<WithdrawalStrategyConfig>): WithdrawalStrategyConfig {
+  return { ...WITHDRAWAL_DEFAULTS, ...o, strategy: strategy as WithdrawalStrategyConfig['strategy'] }
 }
 function makeCtx(o?: Partial<WithdrawalContext>): WithdrawalContext {
   return {
@@ -75,24 +87,27 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'withdrawal-vpw', name: 'VPW strategie', category: CAT,
-    description: 'VPW past aan op basis van portfolio en resterende jaren',
+    id: 'withdrawal-vpw', name: 'VPW strategie (legacy-string valt terug op static)', category: CAT,
+    description: 'Stale profiel-waarde "vpw" (vóór de static/guardrails-migratie) crasht niet en gedraagt zich als static: portfolio-onafhankelijk zonder endStrategy',
     priority: 'high', estimatedDurationMs: 10,
     fn() {
-      const w = applyWithdrawalStrategy(makeConfig({ strategy: 'vpw' }), makeCtx())
+      const w = applyWithdrawalStrategy(legacyConfig('vpw'), makeCtx())
       assertGreaterThan(w, 0, 'positief')
-      // VPW should vary with portfolio
-      const w2 = applyWithdrawalStrategy(makeConfig({ strategy: 'vpw' }), makeCtx({ currentPortfolio: 2_000_000 }))
-      assertGreaterThan(w2, w, 'hoger portfolio = hogere onttrekking')
+      // 'vpw' bestaat niet meer → default-tak van applyWithdrawalStrategy = applyStatic;
+      // zonder ctx.endStrategy is dat netBaseExpenses, dus portfolio-ONAFHANKELIJK
+      // (was vóór de migratie portfolio-afhankelijk — dat gedrag is verdwenen).
+      const w2 = applyWithdrawalStrategy(legacyConfig('vpw'), makeCtx({ currentPortfolio: 2_000_000 }))
+      assertEqual(w2, w, 'legacy "vpw" is nu portfolio-onafhankelijk (= static-gedrag)')
     },
   },
   {
-    id: 'withdrawal-bucket', name: 'Bucket strategie', category: CAT,
-    description: 'Bucket combineert korte/lange termijn allocaties',
+    id: 'withdrawal-bucket', name: 'Bucket strategie (legacy-string valt terug op static)', category: CAT,
+    description: 'Stale profiel-waarde "bucket" crasht niet en levert een positieve, static-gelijke onttrekking',
     priority: 'medium', estimatedDurationMs: 10,
     fn() {
-      const w = applyWithdrawalStrategy(makeConfig({ strategy: 'bucket' }), makeCtx())
+      const w = applyWithdrawalStrategy(legacyConfig('bucket'), makeCtx())
       assertGreaterThan(w, 0, 'positief')
+      assertEqual(w, applyWithdrawalStrategy(makeConfig({ strategy: 'static' }), makeCtx()), 'legacy "bucket" == static')
     },
   },
   {
@@ -122,13 +137,13 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'withdrawal-fire-age-vpw-valid', name: 'VPW FIRE-leeftijd geldig', category: CAT,
-    description: 'VPW+deplete convergeert en levert geldige resultaten',
+    id: 'withdrawal-fire-age-vpw-valid', name: 'Legacy "vpw"-string FIRE-leeftijd geldig', category: CAT,
+    description: 'Stale profiel-waarde "vpw"+deplete valt terug op static-onttrekking en convergeert alsnog naar een geldig resultaat',
     priority: 'high', estimatedDurationMs: 200,
     fn() {
       const deplete: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
-      const r = runSimulation(35, 90, 150_000, 36_000, 18_000, 0.07, 'nl_box3', 0.02, [], deplete, { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' })
-      assert(r.fireReachable, 'VPW+deplete bereikbaar')
+      const r = runSimulation(35, 90, 150_000, 36_000, 18_000, 0.07, 'nl_box3', 0.02, [], deplete, legacyConfig('vpw'))
+      assert(r.fireReachable, 'legacy "vpw"+deplete bereikbaar')
       assertNotNull(r.fireAge, 'fireAge niet null')
       for (const row of r.rows) {
         assertFinite(row.withdrawal, `row ${row.age} withdrawal`)
@@ -137,16 +152,16 @@ const tests: TestCase[] = [
     },
   },
   {
-    id: 'withdrawal-fire-age-all-strategies', name: 'Alle strategieën convergeren', category: CAT,
-    description: 'static/guardrails/vpw/bucket × deplete leveren allemaal een geldig resultaat',
+    id: 'withdrawal-fire-age-all-strategies', name: 'Alle strategieën (+ legacy vpw/bucket-strings) convergeren', category: CAT,
+    description: 'static/guardrails × deplete leveren een geldig resultaat; stale "vpw"/"bucket"-strings vallen terug op static en convergeren evengoed',
     priority: 'high', estimatedDurationMs: 400,
     fn() {
       const deplete: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
       const strategies: WithdrawalStrategyConfig[] = [
         { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
         { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
-        { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' },
-        { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
+        legacyConfig('vpw'),
+        legacyConfig('bucket'),
       ]
       for (const ws of strategies) {
         const r = runSimulation(35, 90, 150_000, 36_000, 18_000, 0.07, 'nl_box3', 0.02, [], deplete, ws)

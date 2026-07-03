@@ -16,9 +16,6 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
-import type { FinancialInput } from '@/lib/core-metrics'
-import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import type { UnifiedProjectionResult } from '@/lib/unified-projection'
 import { solveFire } from './solver'
 import type { KernelProjection } from './engine'
@@ -184,60 +181,49 @@ describe('bridge — synthetisch profiel: continuïteit, sommen, inflatie', () =
   })
 })
 
-// ── 4: vorm-rooktest kernel-bridge vs v2 (GEEN waarde-gelijkheid) ────────────
+// ── 4: vorm-integriteit — verplichte velden + geen NaN/undefined ─────────────
+//
+// FASE 6 stap 5A: de vroegere v2-engine-vergelijking (`buildHorizonInput` +
+// `runSelectedProjection` uit `lib/horizon-engine`) is vervallen — die module is
+// fysiek verwijderd. De "zelfde velden aanwezig in kernel én v2"-helft van deze
+// test had per constructie geen betekenis meer zonder een tweede motor; de
+// "geen NaN/undefined in load-bearing rij-velden"-helft blijft waardevol (ving
+// eerder al reële bridge-regressies af) en draait hier verder — nu kernel-only.
 
 const UNIFIED_FIELDS: (keyof UnifiedProjectionResult)[] = [
   'rows', 'fireAge', 'fireAgeFractional', 'fireReachable', 'firePortfolioAtFire',
   'requiredFirePortfolio', 'implicitWithdrawalRate', 'strategy', 'targetEndPortfolio', 'displayEndAge',
 ]
 
-describe('bridge — vorm-pariteit met de v2-engine (alleen velden/typen)', () => {
-  it('zelfde velden aanwezig, geen NaN/undefined in load-bearing rij-velden', () => {
-    // Kernel-bridge.
+describe('bridge — vorm-integriteit (kernel-only, alleen velden/typen)', () => {
+  it('alle verplichte velden aanwezig, geen NaN/undefined in load-bearing rij-velden', () => {
     const { ctx, solve } = synthContext()
     const kernel = kernelToUnifiedResult(solve, ctx)
 
-    // v2-engine op dezelfde app-data.
-    const horizonInput: FinancialInput = {
-      totalAssets: 560_000, totalDebts: 208_000, monthlyIncome: 4500, monthlyExpenses: 2600,
-      yearlyMustExpenses: 2600 * 12, monthlyContributions: 800, dateOfBirth: synthProfile().date_of_birth,
-    }
-    const built = buildHorizonInput({
-      horizonInput, lifeEvents: [], assets: SYNTH_ASSETS, debts: SYNTH_DEBTS,
-      grossReturn: 0.06, inflation: 0.02, box3Method: 'forfaitair',
-    })
-    expect(built).not.toBeNull()
-    const v2 = runSelectedProjection(built!.input, true)
-
-    // Zelfde top-level velden aanwezig in beide.
+    // Alle verplichte top-level velden aanwezig.
     for (const f of UNIFIED_FIELDS) {
       expect(kernel[f]).not.toBeUndefined()
-      expect(v2[f]).not.toBeUndefined()
     }
     // Kernel-extra doorvoer.
     expect(typeof kernel.kernelStatus).toBe('string')
     expect(Number.isFinite(kernel.kernelMaandHint)).toBe(true)
 
-    // fireAgeFractional typen: number of null in beide.
-    for (const r of [kernel, v2]) {
-      expect(r.fireAgeFractional === null || typeof r.fireAgeFractional === 'number').toBe(true)
-      expect(r.fireAge === null || typeof r.fireAge === 'number').toBe(true)
-    }
+    // fireAgeFractional/fireAge: number of null.
+    expect(kernel.fireAgeFractional === null || typeof kernel.fireAgeFractional === 'number').toBe(true)
+    expect(kernel.fireAge === null || typeof kernel.fireAge === 'number').toBe(true)
 
     // Rows niet leeg + geen NaN/undefined in load-bearing velden.
-    for (const result of [kernel as UnifiedProjectionResult, v2]) {
-      expect(result.rows.length).toBeGreaterThan(0)
-      for (const row of result.rows) {
-        for (const v of [row.netWorth, row.totalAssets, row.totalDebts, row.startNetWorth,
-          row.savings, row.withdrawal, row.totalGrowth, row.totalBox3, row.grossIncome,
-          row.cashflowNet, row.oneTimeNet, row.cumulativeBox3, row.inflationFactor]) {
+    expect(kernel.rows.length).toBeGreaterThan(0)
+    for (const row of kernel.rows) {
+      for (const v of [row.netWorth, row.totalAssets, row.totalDebts, row.startNetWorth,
+        row.savings, row.withdrawal, row.totalGrowth, row.totalBox3, row.grossIncome,
+        row.cashflowNet, row.oneTimeNet, row.cumulativeBox3, row.inflationFactor]) {
+        expect(Number.isFinite(v)).toBe(true)
+      }
+      for (const b of Object.values(row.assetBuckets)) {
+        if (!b) continue
+        for (const v of [b.startValue, b.growth, b.contributions, b.box3Drag, b.endValue]) {
           expect(Number.isFinite(v)).toBe(true)
-        }
-        for (const b of Object.values(row.assetBuckets)) {
-          if (!b) continue
-          for (const v of [b.startValue, b.growth, b.contributions, b.box3Drag, b.endValue]) {
-            expect(Number.isFinite(v)).toBe(true)
-          }
         }
       }
     }

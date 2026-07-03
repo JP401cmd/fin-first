@@ -18,7 +18,7 @@ const VB_W = 800
 const VB_H = 320
 const PLOT = { x0: 64, y0: 40, x1: 784, y1: 280 }
 
-// App-chart-signatuur (SimChart): opbouw = horizon-goud, afbouw/benodigd = kern-bruin.
+// App-chart-signatuur (SimChart): opbouw/op-doel = horizon-goud, onder-doel = kern-bruin.
 // IBM Plex Mono is in deze route de mono-stijl (zie rapport/layout.tsx).
 const COLOR_OPBOUW = 'var(--horizon)'
 const COLOR_NODIG = 'var(--kern)'
@@ -26,8 +26,16 @@ const MONO = 'var(--font-ibm-plex-mono), monospace'
 
 /**
  * "De kruising" als INNER body (geen eigen <section>/eyebrow/<h2> — die bezit
- * de gedeelde `Toekomst`-sectie). Plot het LIQUIDE/FIRE-eligible vermogen:
- * V_op (opbouw) tegen V_nodig (benodigd). Eigen Y-as.
+ * de gedeelde `Toekomst`-sectie). Plot de opbouwlijn (`kruising.vOp`, besteedbaar
+ * vermogen) en markeert het vrijheidspunt (`kruising.crossing`) tegen de euro-as.
+ *
+ * KERNEL-MIGRATIE (stap 5A): de per-jaar `V_nodig`-reeks is vervallen (de kernel-
+ * bridge levert enkel een scalair vrijheidsdoel). We tekenen daarom geen tweede
+ * benodigd-lijn meer; het scalaire doel = `kruising.crossing.value`, getekend als
+ * horizontale referentie naar de as. Het gemarkeerde punt gebruikt uitsluitend
+ * `kruising.crossing.age` — dezelfde afgeronde headline-FIRE-leeftijd die
+ * build-report ook aan `lifeGrid`/`twoFutures`/`lifePath` voedt — zodat marker en
+ * headline nooit twee verschillende leeftijden claimen. Eigen Y-as.
  */
 export function DeKruising({
   kruising,
@@ -41,22 +49,24 @@ export function DeKruising({
   const active = reduce || inView
 
   // ── dynamische assen ──
-  const { min: ageMin, max: ageMax } = ageExtent(kruising.vOp, kruising.vNodig)
-  const rawMax = seriesMax(kruising.vOp, kruising.vNodig)
+  // KERNEL-MIGRATIE (stap 5A): de per-jaar `V_nodig`-reeks bestaat niet meer. We
+  // schalen dus enkel op de opbouwreeks; het scalaire vrijheidsdoel
+  // (`kruising.crossing.value`) ligt per constructie ≤ de opbouw-max en past dus
+  // binnen deze Y-as.
+  const { min: ageMin, max: ageMax } = ageExtent(kruising.vOp)
+  const rawMax = seriesMax(kruising.vOp)
   const yMax = niceMax(rawMax)
 
   const sx = makeScale(ageMin, ageMax, PLOT.x0, PLOT.x1)
   const sy = makeScale(0, yMax, PLOT.y1, PLOT.y0)
 
   const vOpPts = kruising.vOp.map((p) => ({ x: sx(p.age), y: sy(p.value) }))
-  const vNodigPts = kruising.vNodig.map((p) => ({ x: sx(p.age), y: sy(p.value) }))
 
   const vOpLine = smoothPath(vOpPts)
   const vOpArea =
     vOpPts.length > 0
       ? `${vOpLine} L${vOpPts[vOpPts.length - 1].x},${PLOT.y1} L${vOpPts[0].x},${PLOT.y1} Z`
       : ''
-  const vNodigLine = smoothPath(vNodigPts)
   const vOpDash = pathLength(vOpPts)
 
   // ── rendement-scenario's (−2% / +2%) als bandbreedte rond vOp ──
@@ -104,10 +114,10 @@ export function DeKruising({
         De kruising — wanneer je opbouw je doel raakt
       </h3>
       <p className="lede">
-        Geen vaste 4%-regel. We laten twee lijnen lopen: het vermogen dat je{' '}
-        <em>opbouwt</em> en het vermogen dat je <em>nodig hebt</em>. Waar ze
-        elkaar kruisen — dáár wordt werken een keuze. Deze grafiek toont je{' '}
-        <span className="vt">liquide, vrij besteedbare</span> vermogen.
+        Geen vaste 4%-regel. We laten je vermogen groeien en markeren het punt
+        waarop het je <em>vrijheidsniveau</em> raakt — dáár wordt werken een
+        keuze. De grafiek toont je{' '}
+        <span className="vt">besteedbare, vrij inzetbare</span> vermogen.
       </p>
 
       <div className="chart-card" ref={ref}>
@@ -117,7 +127,7 @@ export function DeKruising({
               Projectie {kruising.startYear} — {kruising.endYear}
             </div>
             <div className="chart-sub">
-              liquide vermogen · reëel rendement {kruising.realReturnPct}% ·
+              besteedbaar vermogen · reëel rendement {kruising.realReturnPct}% ·
               spaarquote {kruising.savingsRatePct}% · jaarlijks geïndexeerd
             </div>
           </div>
@@ -126,10 +136,12 @@ export function DeKruising({
               <i style={{ background: COLOR_OPBOUW }} />
               Opgebouwd
             </span>
-            <span>
-              <i style={{ background: COLOR_NODIG }} />
-              Benodigd
-            </span>
+            {cross && (
+              <span>
+                <i style={{ background: 'var(--ink-soft)' }} />
+                Vrijheidsniveau
+              </span>
+            )}
             {hasBand && (
               <span>
                 <i style={{ background: COLOR_OPBOUW, opacity: 0.35 }} />
@@ -143,7 +155,7 @@ export function DeKruising({
           className="chart"
           viewBox={`0 0 ${VB_W} ${VB_H}`}
           role="img"
-          aria-label="Lijngrafiek opgebouwd versus benodigd liquide vermogen"
+          aria-label="Lijngrafiek opgebouwd besteedbaar vermogen met vrijheidspunt"
         >
           <g className="axis-lbl">
             {yTicks.map((t) => (
@@ -259,19 +271,25 @@ export function DeKruising({
               transition: reduce ? undefined : 'stroke-dashoffset 1.8s .2s ease',
             }}
           />
-          {/* V_nodig stippellijn (benodigd = bruin) */}
-          <path
-            d={vNodigLine}
-            fill="none"
-            stroke={COLOR_NODIG}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeDasharray="6 5"
-          />
-
-          {/* kruispunt = verticale lijn + dot + label (SimChart-FIRE-signatuur, goud) */}
+          {/* kruispunt = verticale lijn + horizontale niveau-referentie + dot + label
+              (SimChart-FIRE-signatuur, goud). De horizontale stippellijn vervangt de
+              vervallen per-jaar benodigd-lijn: ze markeert het scalaire vrijheidsniveau
+              (`crossing.value`) tegen de euro-as en raakt de dot per constructie exact. */}
           {cross && crossX != null && crossY != null && (
             <>
+              <line
+                x1={PLOT.x0}
+                y1={crossY}
+                x2={crossX}
+                y2={crossY}
+                stroke="var(--ink-soft)"
+                strokeWidth="1.5"
+                strokeDasharray="4 4"
+                style={{
+                  opacity: active ? 0.5 : 0,
+                  transition: reduce ? undefined : 'opacity .5s 1.8s',
+                }}
+              />
               <line
                 x1={crossX}
                 y1={PLOT.y0}
@@ -329,23 +347,23 @@ export function DeKruising({
         <p style={{ fontSize: 14, color: 'var(--ink-soft)', marginTop: 12 }}>
           {cross ? (
             <>
-              Op je {cross.age}e snijdt je opgebouwde vermogen (
-              {euroAxisLabel(cross.value)}) de lijn van wat je nodig hebt. De
-              benodigde lijn ligt vlak omdat je uitgaven stabiel zijn — het is je
-              opbouw die het werk doet.
+              Op je {cross.age}e raakt je opgebouwde vermogen (
+              {euroAxisLabel(cross.value)}) het niveau waarop werken een keuze
+              wordt — je vrijheidsniveau. De stippellijn markeert dat bedrag tegen
+              de as; het is je opbouw die het werk doet.
               {hasBand && (
                 <>
                   {' '}
                   De band eromheen toont de marge: bij 2% lager rendement schuift
-                  je kruispunt naar achteren, bij 2% hoger naar voren.
+                  je vrijheidspunt naar achteren, bij 2% hoger naar voren.
                 </>
               )}
             </>
           ) : (
             <>
-              Binnen deze projectie raken de lijnen elkaar nog niet — je opbouw
-              blijft onder de benodigde lijn. In de app schuif je aan de knoppen
-              om te zien wat het kruispunt naar voren haalt.
+              Binnen deze projectie raakt je opbouw je vrijheidsniveau nog niet.
+              In de app schuif je aan de knoppen om te zien wat dat punt naar
+              voren haalt.
             </>
           )}
         </p>

@@ -643,6 +643,7 @@ export default function GuideHorizonUitleg() {
               <strong>Spaargeld</strong> — je spaar- en betaalrekeningen (cash, savings)
             </p>
             <p>
+              {/* eslint-disable-next-line no-restricted-syntax -- legenda spiegelt de categorie-/schuldlaagkleuren van de vermogensgrafiek (lib/wealth-composition.ts), geen winst/verlies */}
               <span className="inline-block h-2.5 w-2.5 rounded-sm mr-1.5 align-middle" style={{ backgroundColor: '#10b981' }} />
               <strong>Beleggingen</strong> — aandelen, obligaties, fondsen en ETF's
             </p>
@@ -662,6 +663,7 @@ export default function GuideHorizonUitleg() {
           </div>
           <p>
             <strong>Schulden</strong> verschijnen als{' '}
+            {/* eslint-disable-next-line no-restricted-syntax -- legenda spiegelt de categorie-/schuldlaagkleuren van de vermogensgrafiek (lib/wealth-composition.ts), geen winst/verlies */}
             <span className="inline-block h-2.5 w-2.5 rounded-sm mr-0.5 align-middle" style={{ backgroundColor: '#ef4444' }} />{' '}
             <strong>negatieve laag</strong> onder de nullijn. Zo zie je in één oogopslag hoe je
             schulden zich verhouden tot je bezittingen en hoe beide zich ontwikkelen.

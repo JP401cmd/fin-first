@@ -9,6 +9,7 @@
 import {
   berekenErfbelasting,
   berekenSchenkbelasting,
+  resolveSchenkErfParams,
   NL_AOW_MONTHLY,
 } from '@/lib/horizon-data'
 import { BOX3_DRAG } from '@/lib/constants'
@@ -18,14 +19,21 @@ import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 
 // ── Schenking Constants ─────────────────────────────────────────────────────
 
-/** Nederlandse schenkingsvrijstellingen 2025/2026 (Belastingdienst). */
+/**
+ * Nederlandse schenkingsvrijstellingen voor het lopende jaar, afgeleid uit de
+ * gecentraliseerde SCHENK_ERF_PARAMS (single source of truth in horizon-data.ts).
+ * Géén eigen literals meer — zo lopen deze waarden niet uit de pas met de
+ * jaargelaagde bron bij een jaarwisseling.
+ */
+const SCHENK_HUIDIG = resolveSchenkErfParams().schenking
+
 export const NL_SCHENKING_VRIJSTELLING = {
   /** Jaarlijkse vrijstelling per kind */
-  jaarlijksKind: 6_633,
+  jaarlijksKind: SCHENK_HUIDIG.vrijstelling.kind,
   /** Jaarlijkse vrijstelling overige ontvangers */
-  jaarlijksOverig: 2_658,
-  /** Eenmalig verhoogde vrijstelling kind 18-40 (eigen woning afgeschaft per 2024) */
-  eenmaligVerhoogd: 31_813,
+  jaarlijksOverig: SCHENK_HUIDIG.vrijstelling.overig,
+  /** Eenmalig verhoogde vrijstelling kind 18-40 (vrij besteedbaar) */
+  eenmaligVerhoogd: SCHENK_HUIDIG.eenmaligVerhoogdKind,
 } as const
 
 // ── 1. Giften / Schenking Calculator (Phase 1 — Opbouw) ────────────────────

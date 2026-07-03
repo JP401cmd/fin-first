@@ -1,14 +1,11 @@
 /**
  * Withdrawal Strategy types, resolver, and engine — single source of truth.
  *
- * Vier strategieën:
+ * Twee strategieën (DB genormaliseerd, remote-migratie 20260703115225 — de vroegere
+ * 'vpw'/'bucket' zijn samengevoegd tot 'static'):
  * 1. static  — Vaste onttrekking (klassieke SWR, bijv. 4% regel)
  * 2. guardrails — Guyton-Klinger guardrails: verlaag/verhoog onttrekking
  *    op basis van portfolioprestatie, begrensd door floor en ceiling
- * 3. vpw  — Variable Percentage Withdrawal: jaarlijks herberekend %
- *    op basis van resterende levensverwachting en portfoliowaarde
- * 4. bucket — Bucket-strategie: 3 emmers (cash/bonds/equity) met
- *    hervulling vanuit groei-emmer
  *
  * applyWithdrawalStrategy() is een PURE functie — geen side effects,
  * geen database calls, geen UI.
@@ -16,7 +13,7 @@
 
 // ── Types ────────────────────────────────────────────────────────────
 
-export type WithdrawalStrategyType = 'static' | 'guardrails' | 'vpw' | 'bucket'
+export type WithdrawalStrategyType = 'static' | 'guardrails'
 
 export interface WithdrawalStrategyConfig {
   strategy: WithdrawalStrategyType
@@ -128,7 +125,7 @@ export function resolveWithdrawalStrategy(profile: {
   guardrail_cut_step?: number | null
   guardrail_raise_step?: number | null
 }): WithdrawalStrategyConfig {
-  const validStrategies: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
+  const validStrategies: WithdrawalStrategyType[] = ['static', 'guardrails']
 
   const strategy: WithdrawalStrategyType =
     validStrategies.includes(profile.withdrawal_strategy as WithdrawalStrategyType)
@@ -245,17 +242,12 @@ export function parseWithdrawalProfileConfig(profile: {
 export function applyWithdrawalStrategy(
   config: WithdrawalStrategyConfig,
   ctx: WithdrawalContext,
-  bucketState?: BucketState,
 ): number {
   switch (config.strategy) {
     case 'static':
       return applyStatic(ctx)
     case 'guardrails':
       return applyGuardrails(config, ctx)
-    case 'vpw':
-      return applyVpw(config, ctx)
-    case 'bucket':
-      return applyBucket(config, ctx, bucketState)
     default:
       return applyStatic(ctx)
   }
@@ -446,54 +438,13 @@ function applyGuardrails(
   return Math.max(0, withdrawal)
 }
 
-// ── VPW (Variable Percentage Withdrawal) ─────────────────────────────
-
-/**
- * Variable Percentage Withdrawal:
- *
- * Each year, withdraw a percentage of portfolio based on remaining years.
- * Formula: withdrawal% = 1 / (1 + [(1 - (1+r)^(-(n-1))) / r])
- * where r = effective real return and n = years remaining to endAge.
- *
- * Minimum withdrawal = floor * baseExpenses (bestaansminimum).
- */
-function applyVpw(
-  config: WithdrawalStrategyConfig,
-  ctx: WithdrawalContext,
-): number {
-  const yearsRemaining = Math.max(1, ctx.endAge - ctx.currentAge)
-
-  // Effective real return (already net of inflation in simulation context)
-  // Use yearReturn as proxy; minimum 0.001 to avoid division by zero
-  const r = Math.max(0.001, ctx.yearReturn)
-
-  let vpwRate: number
-  if (yearsRemaining <= 1) {
-    // Last year: withdraw everything remaining
-    vpwRate = 1.0
-  } else {
-    // VPW formula: 1 / (1 + annuity factor)
-    // annuity factor = (1 - (1+r)^(-(n-1))) / r
-    const n = yearsRemaining
-    const annuityFactor = (1 - Math.pow(1 + r, -(n - 1))) / r
-    vpwRate = 1 / (1 + annuityFactor)
-  }
-
-  // Apply VPW rate to current portfolio
-  let withdrawal = vpwRate * ctx.currentPortfolio
-
-  // Subtract recurring income (same as static — don't double-count pensions)
-  withdrawal = Math.max(0, withdrawal - ctx.recurringIncome)
-
-  // Minimum floor: never go below floor * net base expenses
-  const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
-  const minWithdrawal = config.guardrailFloor * netBaseExpenses
-  withdrawal = Math.max(minWithdrawal, withdrawal)
-
-  return withdrawal
-}
-
-// ── Bucket ───────────────────────────────────────────────────────────
+// ── Bucket-allocatie (losstaande wiskunde) ───────────────────────────
+//
+// De 'vpw'/'bucket'-ONTTREKKINGSstrategieën zijn met migratie 20260703115225
+// samengevoegd tot 'static'; hun engine-functies zijn verwijderd. De pure
+// bucket-ALLOCATIE-helpers hieronder (initBucketState/rebalanceBuckets) staan
+// los van de onttrekkingskeuze en blijven als getest hulpstuk bestaan; ze
+// hebben momenteel geen productie-consument (opruimkandidaat — zie stap 5C).
 
 /** Default bucket allocation ratios */
 const BUCKET_CASH_YEARS = 2
@@ -512,46 +463,6 @@ export function initBucketState(
   const bonds = Math.min(bondsTarget, Math.max(0, portfolio - cash))
   const stocks = Math.max(0, portfolio - cash - bonds)
   return { cash, bonds, stocks }
-}
-
-/**
- * Bucket strategy (simplified 3-bucket model):
- *
- * 1. Withdraw from cash bucket first
- * 2. Annual rebalancing: replenish cash from bonds, bonds from stocks
- * 3. Cash = 2 years expenses, Bonds = 5 years expenses, Stocks = remainder
- *
- * If no bucketState provided, initializes from currentPortfolio.
- * NOTE: this function mutates nothing — caller must track BucketState externally.
- *
- * End-strategy aware (verenigd annuity-to-doelsaldo, gespiegeld aan applyStatic):
- * - deplete/legacy in grootboek-modus (floorlessAnnuityToTarget): FLOORLESS annuïteit
- *   richting doelsaldo (consumeert de overshoot, landt exact op het doelsaldo op
- *   endAge). SUPERSEDES need-only legacy (ADR 0014).
- * - deplete/legacy daarbuiten (scalar-callers): geflooorde annuïteit.
- * - perpetual/pensioen/undefined: withdraws only net living expenses (classic)
- */
-function applyBucket(
-  config: WithdrawalStrategyConfig,
-  ctx: WithdrawalContext,
-  bucketState?: BucketState,
-): number {
-  const netBaseExpenses = Math.max(0, ctx.baseExpenses - ctx.recurringIncome)
-  void bucketState // bucket allocation tracked externally via waterfallWithdraw
-
-  // Legacy(€>0) need-only: onttrek de behoefte; residu groeit naar de nalatenschap.
-  if (ctx.legacyPreserveOnly) return netBaseExpenses
-
-  // deplete/legacy: schuivende annuïteit richting doelsaldo op dezelfde basis als
-  // applyStatic/applyGuardrails. Grootboek-modus = floorless (consumeert de
-  // overshoot); daarbuiten geflooorde annuïteit (≥ leefkosten).
-  if (ctx.endStrategy === 'deplete' || ctx.endStrategy === 'legacy') {
-    const annuity = computeAnnuityBase(ctx)
-    if (ctx.floorlessAnnuityToTarget) return Math.max(0, annuity)
-    return Math.max(annuity, netBaseExpenses)
-  }
-
-  return Math.max(0, netBaseExpenses)
 }
 
 /**

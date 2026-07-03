@@ -39,12 +39,10 @@ import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy } from '@/lib/withdrawal-strategy'
 import { toSimResult } from '@/lib/unified-projection'
-import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
-import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
 import { computeConvergentieProjection, type ConvergentieRawProfileRow, type ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
 import { computeScalarFireProjection, computeScalarFireRange, computeScalarFreedomMilestones, type ScalarFireParams } from '@/lib/horizon-kernel/scalar-router'
-import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
-import { buildSimNetWorthRows } from '@/lib/horizon-engine/networth-projection'
+import { buildHorizonInput } from '@/lib/horizon/build-input'
+import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
@@ -355,21 +353,27 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Favorite budgets: compute limit + spent for each
   const favBudgetsRaw = favBudgetsData as { id: string; name: string; icon: string; budget_type: string; default_limit: number; interval: string; parent_id: string | null; is_favorite: boolean }[]
   const txData = txResult.data ?? []
-  const favoriteBudgets = favBudgetsRaw.map(fb => {
-    // Determine effective limit
+
+  // Gedeelde limit-afleiding (parent rolt kinderen op, genormaliseerd naar maand).
+  // Zowel de favorieten-loop als het topBudgets-veld gebruiken dit — één bron.
+  const monthlyLimitFor = (b: { id: string; default_limit: number; interval: string; parent_id: string | null }): number => {
     let limit: number
-    if (fb.parent_id === null) {
-      // Parent: sum children limits (or own if no children)
-      const children = allChildren.filter(c => c.parent_id === fb.id)
+    if (b.parent_id === null) {
+      const children = allChildren.filter(c => c.parent_id === b.id)
       limit = children.length > 0
         ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
-        : Number(fb.default_limit)
+        : Number(b.default_limit)
     } else {
-      limit = Number(fb.default_limit)
+      limit = Number(b.default_limit)
     }
-    // Normalize to monthly
-    if (fb.interval === 'quarterly') limit = limit / 3
-    else if (fb.interval === 'yearly') limit = limit / 12
+    if (b.interval === 'quarterly') limit = limit / 3
+    else if (b.interval === 'yearly') limit = limit / 12
+    return limit
+  }
+
+  const favoriteBudgets = favBudgetsRaw.map(fb => {
+    // Determine effective limit (gedeelde helper)
+    const limit = monthlyLimitFor(fb)
 
     // Determine spent: sum transaction amounts for this budget + its children
     const relevantIds = new Set<string>([fb.id])
@@ -393,6 +397,36 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       spent,
     }
   })
+
+  // ── Top-budgetten (per parent-budget, ongesorteerd) ─────────
+  // Afgeleid bundel-veld voor de Budgetten-widget: per hoofdbudget {limit, spent}
+  // — dezelfde vorm als favoriteBudgets, maar over ALLE (niet-archief) budgetten,
+  // zodat de widget zelf de top-N kan ranken zónder te herberekenen.
+  // Besteding komt uit één pass over dezelfde current-month-tx als budgetTotals:
+  // per transactie rollen kind-budgetten naar hun parent (spentByParent).
+  const parentOfBudget = new Map<string, string>()
+  for (const b of allParentBudgets) parentOfBudget.set(b.id, b.id)
+  for (const c of allChildren) {
+    if (c.parent_id) parentOfBudget.set(c.id, c.parent_id)
+  }
+  const spentByParent = new Map<string, number>()
+  for (const tx of txData) {
+    const bid = (tx as { budget_id?: string | null }).budget_id
+    if (!bid) continue
+    const pid = parentOfBudget.get(bid)
+    if (!pid) continue
+    spentByParent.set(pid, (spentByParent.get(pid) ?? 0) + Math.abs(Number(tx.amount)))
+  }
+  const topBudgets = allParentBudgets
+    .filter(b => BUDGET_TYPES.includes(b.budget_type as typeof BUDGET_TYPES[number]))
+    .map(b => ({
+      id: b.id,
+      name: b.name,
+      icon: b.icon || '',
+      budgetType: b.budget_type as 'income' | 'expense' | 'savings' | 'debt',
+      limit: monthlyLimitFor({ id: b.id, default_limit: b.default_limit, interval: b.interval, parent_id: null }),
+      spent: spentByParent.get(b.id) ?? 0,
+    }))
 
   // Favorite holdings: compute derived metrics for each
   const favHoldingsRaw = (favHoldingsResult.data ?? []) as {
@@ -608,21 +642,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // zichtbaar als de unified-sim niet kan draaien (geen dob, netWorth ≤ 0,
   // of een sim-error). Niet als primaire KPI-bron gebruiken.
   //
-  // Scalar-router (FASE 5, stap 2e): achter de per-gebruiker-vlag
-  // `horizon_kernel_scalar` rekent dit pad via de kernel; vlag UIT (default) is
-  // byte-identiek aan de directe computeFireProjection/computeFireRange-aanroep.
-  const kernelScalar = isKernelFlagEnabled(
-    profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null,
-    'scalar',
-  )
-  // Convergentie-router-vlag (`horizon_kernel_convergentie`) — één keer opgelost en
-  // gedeeld door de hoofdprojectie, de regel-sim-snapshot (/toekomst-editors) én de
-  // fee-/HvB-FIRE-impact, zodat al die convergentie-oppervlakken dezelfde motor als
-  // de hoofdgrafiek spreken. Default UIT = byte-identiek aan vandaag (v2).
-  const kernelConvergentie = isKernelFlagEnabled(
-    profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null,
-    'convergentie',
-  )
+  // Scalar-router (FASE 6 stap 5A — kernel-only): de tijd-velden komen uit de horizon-kernel,
+  // de statische weergavevelden blijven de scalar-formules (met scalar-fallback bij een gate/
+  // kern-fout — zie lib/horizon-kernel/scalar-router.ts).
   const scalarParams: ScalarFireParams = {
     input: horizonInput,
     annualReturn: fireParams.grossReturn,
@@ -630,10 +652,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     inflationOverride: undefined,
     strategyOptions: { ...strategyOpts, legacyAmount: fireStrategy.legacyAmount },
   }
-  const fireProjResult = computeScalarFireProjection(scalarParams, { kernelEnabled: kernelScalar }).result
+  const fireProjResult = computeScalarFireProjection(scalarParams).result
 
   // Horizon extra: scenario range (optimistic / expected / pessimistic)
-  const fireRange = computeScalarFireRange(scalarParams, { kernelEnabled: kernelScalar }).result
+  const fireRange = computeScalarFireRange(scalarParams).result
 
   // Vrijheidsmijlpalen (25/50/75/100%) — de canonieke motor
   // (lib/freedom-milestones.ts, via de scalar-router zodat de kernel-vlag
@@ -657,7 +679,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     swrRate: fireSwr,
     yearlyMustExpenses: yearlyRetirementExpenses,
     dateOfBirth: dob,
-  }, { kernelEnabled: kernelScalar }).result
+  }).result
 
   // Horizon extra: sim rows for vermogenspad chart
   // Uses runUnifiedProjection() — the same engine as the horizon page — for per-asset-type
@@ -683,13 +705,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const hasPartnerFlag = hasPartner(householdType)
       const withdrawalStrategy = resolveWithdrawalStrategy(profileResult.data as Record<string, unknown> ?? {})
       const dashboardYearlyExpenses = yearlyRetirementExpenses > 0 ? yearlyRetirementExpenses : effectiveMonthlyExpenses * 12
-      // Cutover (C1, ADR 0016): /overzicht gebruikt nu DEZELFDE gedeelde input-
-      // assemblage als de /toekomst-hook (`buildHorizonInput`) i.p.v. een eigen
-      // inline-opbouw. Daardoor lopen /overzicht en /toekomst per constructie
-      // gelijk — bij v2 inclusief het huis-als-niet-liquide-asset + liquidatie-
-      // model (ADR 0015), niet het oude filter+inkomen-model dat een te vroege
-      // vrijheidsleeftijd gaf. Flag UIT = build-input's v1-tak (byte-identiek).
-      const horizonEngineV2 = isHorizonV2Enabled(profileResult.data as { feature_preferences?: Record<string, unknown> | null })
+      // /overzicht gebruikt DEZELFDE gedeelde metadata-assemblage als de /toekomst-hook
+      // (`buildHorizonInput`) + de horizon-kernel, zodat /overzicht en /toekomst per
+      // constructie gelijklopen.
       const built = buildHorizonInput({
         horizonInput: { ...horizonInput, yearlyMustExpenses: dashboardYearlyExpenses },
         lifeEvents: (eventsResult.data ?? []) as LifeEvent[],
@@ -706,7 +724,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         monthlySavingsOverride: dashboardSavingsOverride,
         baseAnnualSavingsFromCashflow: dashboardBaseAnnualSavings,
         housingStrategy: housingStrategyCfg,
-        horizonEngineV2,
       })
       if (built) {
         // Rauwe convergentie-context — één keer gebouwd en gedeeld door de
@@ -729,95 +746,45 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         }
         // Snapshot voor de /toekomst Voorkeuren-editors (baseline = Tijdas-curve).
         regelSimSnapshot = {
-          unifiedInput: built.input,
+          rawContext: convergentieRawContext,
           fireStrategy,
           withdrawalStrategy,
           aowAgeInt: built.aowAgeInt,
           aowFractional: userAowAge.fractional,
-          // Editor-baseline draait door de build-input-engine (v1/v2) via `useV2`, OF —
-          // met de convergentie-vlag aan — door de horizon-kernel (FASE 6 item 5): dan
-          // krijgen de editors dezelfde motor als de Tijdas-grafiek (voorheen C4: v2 tot
-          // deze stap). rawContext alleen meesturen als de vlag aan is (anders overbodige
-          // serialisatie); vlag uit = kernelEnabled false → runRegelProjection blijft v2.
-          useV2: horizonEngineV2,
-          strategyOptions: built.strategyOptions,
-          kernelEnabled: kernelConvergentie,
-          rawContext: kernelConvergentie ? convergentieRawContext : undefined,
         }
-        // Convergentie-router (FASE 5, stap 2b, ADR 0032 §6): kies per gebruiker
-        // tussen de horizon-kernel (achter de vlag `horizon_kernel_convergentie`)
-        // en de bestaande v2-grootboek-engine. Vlag UIT (default) is byte-identiek
-        // aan vandaag: de router draait dan letterlijk
-        // `runSelectedProjection(built.input, horizonEngineV2, built.strategyOptions)`.
-        const outcome = computeConvergentieProjection({
-          builtInput: built.input,
-          strategyOptions: built.strategyOptions,
-          v2FlagArg: horizonEngineV2,
-          kernelEnabled: kernelConvergentie,
-          rawContext: convergentieRawContext,
-        })
-        const unifiedResult = outcome.result
-        const simResult = toSimResult(unifiedResult)
-        simRows = simResult.rows.map(r => ({
-          age: r.age,
-          endPortfolio: r.endPortfolio,
-          phase: r.phase,
-          flowIn: r.flowIn,
-          flowOut: r.flowOut,
-          oneTimeNet: r.oneTimeNet,
-        }))
-        // Geprojecteerd VOLLEDIG netto vermogen per jaar (incl. niet-liquide
-        // assets). Voor filterende housing-modi (exclude_from_fire, v1-downsize)
-        // telt de meegroeiende huis-overwaarde bij endPortfolio; voor de overige
-        // modi (huis al in de pot) is het ≡ endPortfolio. Verankerd op netWorth
-        // (zelfde "vandaag"-grondslag als het Vandaag-punt). Eén bron: de
-        // canonieke huiswaarde-/hypotheek-projectie (geen tweede engine-run).
-        // v1DownsizeSaleAge is een v1-specifieke verkoopleeftijd (v1 spuit de
-        // opbrengst als inkomen in). De kernel houdt het huis in het grootboek en
-        // modelleert downsize als in-ledger-liquidatie (net als v2, ADR 0015) →
-        // geen aparte verkoopleeftijd. `outcome.engine === 'kernel'` sluit die tak
-        // uit, ook al staat de v2-vlag (`horizonEngineV2`) uit.
-        const v1DownsizeSaleAge =
-          outcome.engine !== 'kernel' && !horizonEngineV2 && housingStrategyCfg.mode === 'downsize'
-            ? built.effectiveLifeEvents.find(
-                (e) => e.event_type === 'verkoop_eigen_woning' && e.target_age != null,
-              )?.target_age ?? null
-            : null
-        simNetWorthRows = buildSimNetWorthRows({
-          simRows,
-          currentNetWorth: netWorth,
-          housingStrategy: housingStrategyCfg,
-          // `useV2` beïnvloedt binnen buildSimNetWorthRows UITSLUITEND de downsize-
-          // modus (`v2DownsizeKeepsHouse = useV2 && mode === 'downsize'`): bij true
-          // zit het huis al in endPortfolio → geen overwaarde bijtellen. Vlag-uit
-          // blijft byte-identiek (`horizonEngineV2`).
-          useV2: horizonEngineV2,
-          // Kernel-tak (convergentie-router): de horizon-kernel houdt het huis voor
-          // ÉLKE modus in het grootboek (ook exclude_from_fire, dat v2 juist WÉL uit
-          // de pot filtert). `useV2` dekte alleen downsize af; deze aparte vlag zorgt
-          // dat de kernel-tak nooit overwaarde dubbeltelt — spiegelt de /toekomst-
-          // vermogenssamenstelling (`applyHousingToComposition` met `houseInLedger`).
-          houseInLedger: outcome.engine === 'kernel',
-          assets: dashboardAssetsArr,
-          debts: dashboardDebtsArr,
-          dateOfBirth: dob,
-          v1DownsizeSaleAge,
-        })
-        // Pensioen post-processing.
-        if (outcome.engine === 'kernel') {
-          // Kernel-tak: de kernel verankert de pensioen-eindstrategie ZÉLF op AOW
-          // (solver-ES), en de bridge levert per constructie firePortfolioAtFire ===
-          // requiredFirePortfolio (bisectie stopt op de eerste toereikende maand).
-          // Daarom geen aparte AOW-post-processing nodig — lees requiredFirePortfolio
-          // en fireAgeFractional direct uit simResult (óók correct voor niet-pensioen).
-          simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
-          simFireAgeFractional = simResult.fireAgeFractional
-        } else if (built.isPensioen) {
-          // v2-tak, pensioen: gebruik de werkelijk geprojecteerde portefeuille op
-          // AOW-leeftijd i.p.v. het binary-search-minimum (consistent met useHorizonFireSim).
-          simRequiredPortfolio = simResult.firePortfolioAtFire > 0 ? simResult.firePortfolioAtFire : null
-          simFireAgeFractional = userAowAge.fractional
-        } else {
+        // Convergentie-router (FASE 6 stap 5A — kernel-only): de horizon-kernel is de enige
+        // motor. Bij een kern-fout blijven de sim-velden null (de widgets vallen terug op de
+        // scalar-projectie / snapshot).
+        const outcome = computeConvergentieProjection({ rawContext: convergentieRawContext })
+        if (outcome.ok) {
+          const unifiedResult = outcome.result
+          const simResult = toSimResult(unifiedResult)
+          simRows = simResult.rows.map(r => ({
+            age: r.age,
+            endPortfolio: r.endPortfolio,
+            phase: r.phase,
+            flowIn: r.flowIn,
+            flowOut: r.flowOut,
+            oneTimeNet: r.oneTimeNet,
+          }))
+          // Geprojecteerd VOLLEDIG netto vermogen per jaar (incl. niet-liquide assets). De
+          // horizon-kernel houdt het eigen huis voor ÉLKE housing-modus in het grootboek
+          // (ADR 0015/0032) → `houseInLedger: true`: nooit overwaarde dubbeltellen. Verankerd
+          // op netWorth (zelfde "vandaag"-grondslag als het Vandaag-punt). Eén bron: de
+          // canonieke huiswaarde-/hypotheek-projectie (geen tweede engine-run).
+          simNetWorthRows = buildSimNetWorthRows({
+            simRows,
+            currentNetWorth: netWorth,
+            housingStrategy: housingStrategyCfg,
+            houseInLedger: true,
+            assets: dashboardAssetsArr,
+            debts: dashboardDebtsArr,
+            dateOfBirth: dob,
+          })
+          // De kernel verankert de pensioen-eindstrategie ZÉLF op AOW (solver-ES), en de bridge
+          // levert per constructie firePortfolioAtFire === requiredFirePortfolio (bisectie stopt
+          // op de eerste toereikende maand). Lees requiredFirePortfolio + fireAgeFractional
+          // direct uit simResult (óók correct voor niet-pensioen).
           simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
           simFireAgeFractional = simResult.fireAgeFractional
         }
@@ -1838,12 +1805,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         inflation: fireParams.inflationRate,
         cashflows: lifeEventsToCashflows(((eventsResult.data ?? []) as LifeEvent[])),
       }
-      // Kernel-routing (FASE 6 item 5): met de convergentie-vlag aan draait de
-      // fee-A/B op de horizon-kernel — dezelfde motor als de hoofdgrafiek. Vlag UIT
-      // (default) = byte-identiek aan de v2-fee-drag. De dob is voorhanden (hier al
-      // `dob`), dus de rauwe-context-eis is gedekt zonder extra fetch.
+      // Kernel-only (FASE 6 stap 5A): de fee-A/B draait op de horizon-kernel. De dob is
+      // voorhanden (hier al `dob`), dus de rauwe-context-eis is gedekt zonder extra fetch.
       const impact = computeFeeImpactOnFire(feeSimParams, feeAnalysis.weightedTER, {
-        kernelEnabled: kernelConvergentie,
         dateOfBirth: dob,
       })
       feeImpactMonths = impact.feeImpactMonths
@@ -1871,12 +1835,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       const remainingTermMonths = Number((mortgageDebt as { remaining_term_months?: number | null }).remaining_term_months ?? 360)
 
       if (rente > 0) {
-        // Kernel-routing (FASE 6 item 5): consistent met de FIRE-engine die de
-        // gebruiker overal ziet. NB: dit summary-blok geeft géén FIRE-impact-params
-        // mee, dus `computeFireImpact` retourneert hier sowieso `null` en de engine-
-        // arm wordt niet bereikt — `hvbSummary` leest enkel breakeven + aanbeveling
-        // (deterministische schema's, routing-onafhankelijk). De routing wordt
-        // doorgegeven voor consistentie zodra een caller wél FIRE-params meegeeft.
+        // Kernel-only (FASE 6 stap 5A). NB: dit summary-blok geeft géén FIRE-impact-params
+        // mee, dus `computeFireImpact` retourneert hier sowieso `null` — `hvbSummary` leest
+        // enkel breakeven + aanbeveling (deterministische schema's). De routing (dob) reist
+        // mee voor consistentie zodra een caller wél FIRE-params meegeeft.
         const hvbResult = compareMortgageVsInvest({
           extraBedrag: 200, // standaard €200/maand extra
           hypotheekBalance: balance,
@@ -1889,7 +1851,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           inflatie: fireParams.inflationRate,
           hasPartner: false,
           horizonJaren: 10,
-        }, { kernelEnabled: kernelConvergentie, dateOfBirth: dob })
+        }, { dateOfBirth: dob })
         hvbSummary = {
           restschuld: balance,
           rente,
@@ -2010,6 +1972,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     prevMonthExpenses,
     netWorthDelta: netWorthDeltaComputed,
     favoriteBudgets,
+    topBudgets,
     favoriteHoldings,
     allBudgets,
     // Real widget data from queries and computations

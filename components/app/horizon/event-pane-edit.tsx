@@ -9,11 +9,9 @@ import {
   type FireProjection,
 } from '@/lib/horizon-data'
 import {
-  lifeEventsToCashflows,
   type SimResult,
 } from '@/lib/fire-simulation'
-import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
-import { previewSimResult } from './event-preview-sim'
+import { previewSimResult, EMPTY_SIM_RESULT } from './event-preview-sim'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -270,11 +268,11 @@ interface Props {
   withdrawalStrategy: WithdrawalStrategyConfig
   endAge: number
   /**
-   * Flag-bewuste, per-asset projectie-input (zelfde assemblage als de Tijdas-
-   * grafiek) incl. optionele kernel-context. Wanneer gezet, draait de live
-   * impact-preview via `previewSimResult` (→ computeConvergentieProjection) op
-   * DEZELFDE motor als de grafiek: kernel bij convergentie-vlag aan, anders
-   * byte-identiek v2. Null → scalar-portefeuille via de v2-bridge.
+   * Per-asset kernel-context (rauwe convergentie-context, zelfde assemblage als de
+   * Tijdas-grafiek). Wanneer gezet, draait de live impact-preview via `previewSimResult`
+   * (→ computeConvergentieProjection) op DEZELFDE motor als de grafiek (de horizon-
+   * kernel). Zonder context is er geen doorrekening — de preview toont dan zijn lege
+   * staat (geen tweede motor sinds de v2-verwijdering).
    */
   previewBaseline?: PreviewBaseline | null
   saving: boolean
@@ -295,9 +293,6 @@ export function EventPaneEdit({
   existingEvent,
   baselineEvents,
   baselineInput,
-  fireParams,
-  fireStrategy,
-  withdrawalStrategy,
   endAge,
   previewBaseline,
   saving,
@@ -321,63 +316,21 @@ export function EventPaneEdit({
       ? baselineEvents.filter(e => e.id !== existingEvent.id)
       : baselineEvents
 
-    // Met een per-asset baseline draaien beide runs door DEZELFDE motorschakelaar
-    // als de grafiek (`previewSimResult` → computeConvergentieProjection) →
-    // consistente live FIRE-impact-delta: kernel wanneer de convergentie-vlag aan
-    // is (FASE 6, stap 1), anders byte-identiek v2. Zonder baseline →
-    // scalar-portefeuille via de v2-bridge (C5-c: v2 is de enige engine; geen legacy
-    // `runSimulation`-fallback meer).
-    if (previewBaseline) {
-      return {
-        baselineSim: previewSimResult(previewBaseline, eventsWithoutEditing),
-        draftSim: previewSimResult(previewBaseline, [...eventsWithoutEditing, draftEvent]),
-      }
+    // Kernel-only: beide runs draaien door DEZELFDE motor als de Tijdas-grafiek
+    // (`previewSimResult` → computeConvergentieProjection). Zonder kernel-context
+    // (`previewBaseline`) is er geen doorrekening — lege resultaten tonen de lege
+    // staat i.p.v. een eigen (verwijderde) tweede motor.
+    if (!previewBaseline) {
+      return { baselineSim: EMPTY_SIM_RESULT, draftSim: EMPTY_SIM_RESULT }
     }
-
-    const baselineCashflows = lifeEventsToCashflows(eventsWithoutEditing)
-    const draftCashflows = lifeEventsToCashflows([...eventsWithoutEditing, draftEvent])
-    const yearlyExp =
-      baselineInput.yearlyMustExpenses > 0 ? baselineInput.yearlyMustExpenses : 0
-    const annualSavings = (baselineInput.monthlyContributions ?? 0) * 12
-    const portfolio = baselineInput.totalAssets - baselineInput.totalDebts
-    const baseline = runScalarProjectionV2(
-      currentAge,
-      endAge,
-      portfolio,
-      yearlyExp,
-      annualSavings,
-      fireParams.grossReturn,
-      'nl_box3',
-      fireParams.inflationRate,
-      baselineCashflows,
-      fireStrategy,
-      withdrawalStrategy,
-    )
-    const draft = runScalarProjectionV2(
-      currentAge,
-      endAge,
-      portfolio,
-      yearlyExp,
-      annualSavings,
-      fireParams.grossReturn,
-      'nl_box3',
-      fireParams.inflationRate,
-      draftCashflows,
-      fireStrategy,
-      withdrawalStrategy,
-    )
-    return { baselineSim: baseline, draftSim: draft }
+    return {
+      baselineSim: previewSimResult(previewBaseline, eventsWithoutEditing),
+      draftSim: previewSimResult(previewBaseline, [...eventsWithoutEditing, draftEvent]),
+    }
   }, [
-    debouncedState,
     draftEvent,
     existingEvent,
     baselineEvents,
-    baselineInput,
-    fireParams,
-    fireStrategy,
-    withdrawalStrategy,
-    endAge,
-    currentAge,
     previewBaseline,
   ])
 

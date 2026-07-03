@@ -281,7 +281,8 @@ export interface ReportProjectionPoint {
 /**
  * Eén rendement-scenario voor de bandbreedte rond de opbouwcurve (sectie 3).
  * `returnDeltaPct` is het verschil t.o.v. het basisrendement in procentpunten (bv. −2 / +2).
- * Bron: her-run van `runHorizonLedger` met grossReturn ± delta (consume, don't recompute).
+ * LEGACY: `kruising.scenarios` wordt niet meer berekend/gerenderd; de live rendement-band
+ * leeft op `ReportLifePathScenario`. Type blijft voor back-compat van oude snapshots.
  */
 export interface ReportKruisingScenario {
   /** Label, bv. '−2% rendement' / '+2% rendement'. */
@@ -295,19 +296,25 @@ export interface ReportKruisingScenario {
 }
 
 /**
- * Sectie 3 — De kruising. V_op (opgebouwd) × V_nodig (benodigd) → snijpunt.
- * Bron: `runHorizonLedger` (lib/horizon-engine/engine.ts): rows[].liquideVermogen + vNodig[].
+ * Sectie 3 — De kruising (V_op = opgebouwd vermogen × FIRE-punt). NB: NIET meer live
+ * gerenderd (de `DeKruising`-grafiek is verwijderd); blijft in de DTO voor back-compat
+ * van bestaande `report_snapshot`-rijen.
+ *
+ * KERNEL-MIGRATIE (stap 5A): `vOp` benadert de besteedbare/liquide lijn met de horizon-
+ * kernel-`rows[].netWorth` (bovengrens bij een eigen huis). De per-jaar `V_nodig`-lijn is
+ * VERVALLEN — de kernel-bridge levert alleen een scalair `requiredFirePortfolio`, geen
+ * per-jaar benodigd-vermogen-reeks (die was LedgerRow-only in de verwijderde v2-grootboek-
+ * engine). Het `vNodig`-veld is daarom uit deze DTO verwijderd.
  */
 export interface ReportKruising {
   vOp: ReportProjectionPoint[]
-  vNodig: ReportProjectionPoint[]
   crossing: { age: number; value: number } | null
   fireReachable: boolean
   startYear: number
   endYear: number
   realReturnPct: number
   savingsRatePct: number
-  /** Optionele rendement-scenario's (−2% / +2%) als bandbreedte rond `vOp`. Leeg = geen band. */
+  /** Optionele rendement-scenario's (−2% / +2%) rond `vOp`. Afwezig = geen band (niet meer berekend). */
   scenarios?: ReportKruisingScenario[]
 }
 
@@ -371,7 +378,7 @@ export interface ReportLifeEvent {
  * `points` loopt over de HELE levenslijn (opbouw én afbouw), zodat de band beide
  * fasen dekt. Bron: GEEN per-scenario engine-her-run — het basisplan wordt
  * vastgehouden en alleen het rendement gevarieerd: de jaarlijkse kasstroom wordt
- * uit het basis-grootboek (`rows[].nettoVermogen`) afgeleid en heropgerent op het
+ * uit de basis-kernel-run (`rows[].netWorth`) afgeleid en heropgerent op het
  * verschoven rendement (zelfde grondslag als `ReportLifePath.points`, raakt de
  * basislijn exact op t=0).
  */
@@ -386,8 +393,10 @@ export interface ReportLifePathScenario {
 
 /**
  * Sectie 5 — levenslang vermogenspad (tot endAge) + mijlpalen.
- * Bron: `runHorizonLedger` decumulatie (rows[].nettoVermogen). Let op de grondslag:
- * dit is NETTO vermogen (incl. huis), niet het FIRE-eligible/liquide vermogen — niet mengen.
+ * Bron: horizon-kernel-run (`runKernelUnified` → `rows[].netWorth`). Grondslag: NETTO
+ * vermogen (incl. huis; op de kernel-scalar-pot groeit het huis mee met het portefeuille-
+ * rendement), niet het FIRE-eligible/liquide vermogen — niet mengen. Zie de route-keuze +
+ * benaderingen in `lib/check/build-report.ts` (`safeKernelRun`).
  */
 export interface ReportLifePath {
   points: ReportProjectionPoint[]

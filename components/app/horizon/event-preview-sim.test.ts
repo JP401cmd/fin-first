@@ -1,30 +1,20 @@
 import { describe, it, expect } from 'vitest'
 import type { Asset } from '@/lib/asset-data'
-import type { FinancialInput, LifeEvent } from '@/lib/horizon-data'
-import type { FireStrategyConfig } from '@/lib/fire-strategy'
-import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
-import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
-import { lifeEventsToCashflows } from '@/lib/fire-simulation'
-import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
-import type {
-  ConvergentieRawProfileRow,
-} from '@/lib/horizon-kernel/convergentie-router'
-import type { PreviewBaseline, PreviewKernelRawContext } from '@/lib/strategy-preview'
+import type { LifeEvent } from '@/lib/horizon-data'
+import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { previewSimResult } from './event-preview-sim'
 
 /**
- * FASE 6, stap 1 — `previewSimResult`-tests. Harde eis: met de kernel-vlag AFWEZIG
- * of `false` levert `previewSimResult` EXACT hetzelfde `SimResult` als de directe
- * `runSelectedProjection`-aanroep die de EventPane-previews vóór de kernel-threading
- * deden. We mocken niets — de referentie ís de letterlijke pre-wijziging-logica
- * (`legacyPreviewSim`), en de kernel-context is bewust aanwezig om te bewijzen dat
- * een uitgeschakelde vlag de context negeert (byte-identiek).
+ * `previewSimResult`-tests (FASE 6 stap 5A — kernel-only). Sinds de v2-verwijdering
+ * draait de EventPane-preview onvoorwaardelijk via de horizon-kernel
+ * (`computeConvergentieProjection`). Deze rooktest bewijst dat de preview op een geldige
+ * rauwe kernel-context een bruikbaar `SimResult` levert en dat een extra inkomens-event
+ * de vrijheidsdatum niet naar achteren schuift (monotone richting) — geen exacte
+ * golden-getallen (die bewaakt de kernel-parity-suite).
  */
 
 const DOB = '1986-01-01'
-
-const FIRE_STRATEGY: FireStrategyConfig = { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }
 
 const PROFILE: ConvergentieRawProfileRow = {
   date_of_birth: DOB,
@@ -60,53 +50,17 @@ function makeAssets(): Asset[] {
   ] as unknown as Asset[]
 }
 
-/** Bouw een `PreviewBaseline` via dezelfde `buildHorizonInput`-assemblage als de client. */
-function makeBaseline(kernel?: {
-  enabled: boolean
-  context?: PreviewKernelRawContext
-}): PreviewBaseline {
-  const financial: FinancialInput = {
-    totalAssets: 150_000,
-    totalDebts: 0,
-    monthlyIncome: 4000,
-    monthlyExpenses: 2500,
-    yearlyMustExpenses: 30_000,
-    monthlyContributions: 800,
-    dateOfBirth: DOB,
-  }
-  const built = buildHorizonInput({
-    horizonInput: financial,
-    lifeEvents: [],
-    fireStrategy: FIRE_STRATEGY,
-    withdrawalStrategy: WITHDRAWAL_DEFAULTS,
-    grossReturn: 0.07,
-    inflation: 0.02,
-    assets: makeAssets(),
-    debts: [],
-    box3Method: 'forfaitair',
-    hasPartner: false,
-    housingStrategy: { mode: 'include_full' },
-    horizonEngineV2: true,
-  })
-  if (!built) throw new Error('buildHorizonInput gaf null')
+/** Rauwe kernel-context (mínus lifeEvents) waarmee de EventPane de preview voedt. */
+function makeBaseline(): PreviewBaseline {
   return {
-    input: built.input,
-    useV2: true,
-    strategyOptions: built.strategyOptions,
-    pensioenFireAgeFractional: null,
-    ...(kernel ? { kernelEnabled: kernel.enabled, kernelRawContext: kernel.context } : {}),
+    rawContext: {
+      profile: PROFILE,
+      assets: makeAssets(),
+      debts: [],
+      aowRows: [],
+      yearlyExpenses: 30_000,
+    },
   }
-}
-
-/** Referentie: de LETTERLIJKE pre-wijziging-logica van de EventPane-previews. */
-function legacyPreviewSim(baseline: PreviewBaseline, events: LifeEvent[]) {
-  const input: UnifiedProjectionInput = {
-    ...baseline.input,
-    cashflows: lifeEventsToCashflows(events),
-  }
-  return toSimResult(
-    runSelectedProjection(input, baseline.useV2, baseline.strategyOptions),
-  )
 }
 
 function makeEvent(id: string, targetAge: number, monthlyIncomeChange: number): LifeEvent {
@@ -134,41 +88,21 @@ const EVENT_SETS: Record<string, LifeEvent[]> = {
   'meerdere events': [makeEvent('a', 50, 500), makeEvent('b', 60, -200)],
 }
 
-describe('previewSimResult — byte-identiteit bij vlag afwezig/false', () => {
+describe('previewSimResult — kernel-doorrekening', () => {
   it.each(Object.keys(EVENT_SETS))(
-    'kernel-velden AFWEZIG → identiek SimResult aan de legacy runSelectedProjection-aanroep (%s)',
+    'levert een niet-lege SimResult voor de kernel-context (%s)',
     (label) => {
-      const baseline = makeBaseline()
-      const events = EVENT_SETS[label]!
-      expect(previewSimResult(baseline, events)).toEqual(legacyPreviewSim(baseline, events))
+      const result = previewSimResult(makeBaseline(), EVENT_SETS[label]!)
+      expect(result.rows.length).toBeGreaterThan(0)
     },
   )
 
-  it.each(Object.keys(EVENT_SETS))(
-    'kernelEnabled=false (mét aanwezige context) → context genegeerd, identiek aan legacy (%s)',
-    (label) => {
-      const context: PreviewKernelRawContext = {
-        profile: PROFILE,
-        assets: makeAssets(),
-        debts: [],
-      }
-      const baseline = makeBaseline({ enabled: false, context })
-      const events = EVENT_SETS[label]!
-      expect(previewSimResult(baseline, events)).toEqual(legacyPreviewSim(baseline, events))
-    },
-  )
-
-  it('de FIRE-impact-delta (baseline vs. mét event) blijft byte-identiek bij vlag uit', () => {
+  it('extra maandinkomen brengt de vrijheidsdatum niet later (monotone richting)', () => {
     const baseline = makeBaseline()
-    const without = EVENT_SETS['geen events']!
-    const withEvent = EVENT_SETS['één inkomens-event']!
-
-    const baselineSim = previewSimResult(baseline, without)
-    const withSim = previewSimResult(baseline, withEvent)
-    const legacyBaseline = legacyPreviewSim(baseline, without)
-    const legacyWith = legacyPreviewSim(baseline, withEvent)
-
-    expect(baselineSim.fireAgeFractional).toBe(legacyBaseline.fireAgeFractional)
-    expect(withSim.fireAgeFractional).toBe(legacyWith.fireAgeFractional)
+    const zonder = previewSimResult(baseline, EVENT_SETS['geen events']!)
+    const met = previewSimResult(baseline, [makeEvent('extra', 45, 1000)])
+    if (zonder.fireAgeFractional !== null && met.fireAgeFractional !== null) {
+      expect(met.fireAgeFractional).toBeLessThanOrEqual(zonder.fireAgeFractional + 1e-6)
+    }
   })
 })

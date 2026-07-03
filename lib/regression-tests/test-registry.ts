@@ -104,7 +104,6 @@ export async function loadAllTests(): Promise<void> {
   const results = await Promise.allSettled([
     import('@/lib/regression-tests/suites/fire-simulatie').then(m => m.register()).catch(e => { console.warn('[test-registry] fire-simulatie failed:', e) }),
     import('@/lib/regression-tests/suites/horizon-grafiek').then(m => m.register()).catch(e => { console.warn('[test-registry] horizon-grafiek failed:', e) }),
-    import('@/lib/regression-tests/suites/huis-strategie-trigger').then(m => m.register()).catch(e => { console.warn('[test-registry] huis-strategie-trigger failed:', e) }),
     import('@/lib/regression-tests/suites/onttrekkingsstrategie').then(m => m.register()).catch(e => { console.warn('[test-registry] onttrekkingsstrategie failed:', e) }),
     import('@/lib/regression-tests/suites/kern-metrics').then(m => m.register()).catch(e => { console.warn('[test-registry] kern-metrics failed:', e) }),
     import('@/lib/regression-tests/suites/widget-systeem').then(m => m.register()).catch(e => { console.warn('[test-registry] widget-systeem failed:', e) }),
@@ -185,7 +184,6 @@ export async function loadAllTests(): Promise<void> {
     import('@/lib/regression-tests/suites/module-access').then(m => m.register()).catch(e => { console.warn('[test-registry] module-access failed:', e) }),
     import('@/lib/regression-tests/suites/coach-suggestions').then(m => m.register()).catch(e => { console.warn('[test-registry] coach-suggestions failed:', e) }),
     import('@/lib/regression-tests/suites/module-activation').then(m => m.register()).catch(e => { console.warn('[test-registry] module-activation failed:', e) }),
-    import('@/lib/regression-tests/suites/horizon-asset-liquidatie').then(m => m.register()).catch(e => { console.warn('[test-registry] horizon-asset-liquidatie failed:', e) }),
   ])
 
   // Log any rejected promises (shouldn't happen due to .catch, but just in case)

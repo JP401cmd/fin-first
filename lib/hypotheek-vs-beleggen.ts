@@ -14,7 +14,7 @@ import {
   linearAmortization,
   interestOnlySchedule,
 } from '@/lib/debt-data'
-import { type SimCashflow } from '@/lib/fire-simulation'
+import { type SimCashflow, type SimResult } from '@/lib/fire-simulation'
 import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
 import {
   computeConvergentieProjection,
@@ -376,21 +376,12 @@ export function buildHvBSimInput(
 }
 
 /**
- * Kernel-routing voor de HvB-FIRE-impact (FASE 6, item 5). Achter de per-gebruiker-
- * vlag `horizon_kernel_convergentie` draaien de twee FIRE-scenario's via de
- * horizon-kernel i.p.v. de v2-grootboek-engine. Default (afwezig / `kernelEnabled`
- * false) = byte-identiek aan de directe v2-aanroep.
- *
- * NB: geen in-scope caller vuurt dit pad momenteel af. De dashboard-loader-samenvatting
- * geeft géén FIRE-velden mee (→ `computeFireImpact` retourneert `null` vóór de
- * engine-arm); de overige callers (schuld-modal, fase-analyse) geven geen `routing`
- * mee → v2. Het pad bestaat zodat HvB — net als de andere convergentie-oppervlakken —
- * een kernel-route heeft zodra een caller met rauwe context 'm aanzet.
+ * Kernel-routing voor de HvB-FIRE-impact (FASE 6 stap 5A — kernel-only). De twee
+ * FIRE-scenario's draaien via de horizon-kernel. Zonder `dateOfBirth` kan de kernel geen
+ * tijdas bouwen → de impact is niet te bepalen (null).
  */
 export interface HvBKernelRouting {
-  /** Is de vlag `horizon_kernel_convergentie` aan voor deze gebruiker? Default false. */
-  kernelEnabled?: boolean
-  /** Geboortedatum voor de kernel-tijdas; afwezig → geen kernel-context → v2. */
+  /** Geboortedatum voor de kernel-tijdas; afwezig → geen kernel-run → geen impact. */
   dateOfBirth?: string | null
 }
 
@@ -434,13 +425,10 @@ function buildHvBKernelContext(
  * Bereken FIRE-impact: verschil in fireAge tussen aflossen- en beleggen-scenario.
  * Positief = beleggen brengt FIRE eerder.
  *
- * Engine-selectie (FASE 6, item 5): standaard draaien beide scenario's op de
- * v2-grootboek-engine (de enige engine sinds C5-c) via de convergentie-router. Zet
- * `routing.kernelEnabled` (vlag `horizon_kernel_convergentie`) + een `dateOfBirth`,
- * dan draaien BEIDE scenario's op de horizon-kernel. De twee scenario's verschillen
- * enkel in `annualSavings`; de absolute FIRE-leeftijden verschuiven per motor, maar
- * de DELTA (aflossen − beleggen, in maanden) blijft betekenisvol: bij rendement boven
- * de hypotheekrente wint beleggen op beide engines. Vlag uit = byte-identiek.
+ * Engine (FASE 6 stap 5A — kernel-only): beide scenario's draaien op de horizon-kernel via
+ * de convergentie-router. De twee scenario's verschillen enkel in `annualSavings`; de DELTA
+ * (aflossen − beleggen, in maanden) blijft betekenisvol. Zonder `routing.dateOfBirth` kan de
+ * kernel geen tijdas bouwen → geen impact (null).
  */
 function computeFireImpact(params: HvBParams, routing?: HvBKernelRouting): number | null {
   const { currentAge, currentPortfolio, yearlyExpenses, annualSavings,
@@ -454,32 +442,26 @@ function computeFireImpact(params: HvBParams, routing?: HvBKernelRouting): numbe
 
   const baseCashflows = cashflows ?? []
   const extraJaarlijks = extraBedrag * 12
-  const kernelEnabled = routing?.kernelEnabled === true
   const dob = routing?.dateOfBirth ?? null
 
-  // Eén scenario-run via de convergentie-router: aflossen houdt de spaarruimte
-  // gelijk; beleggen verhoogt `annualSavings` met de jaarinleg.
-  const runScenario = (savings: number) => {
+  // Eén scenario-run via de convergentie-router (kernel-only): aflossen houdt de spaarruimte
+  // gelijk; beleggen verhoogt `annualSavings` met de jaarinleg. Zonder geboortedatum → null.
+  const runScenario = (savings: number): SimResult | null => {
+    if (!dob) return null
     const builtInput = buildHvBSimInput(
       currentAge, currentPortfolio, yearlyExpenses, savings,
       verwachtRendement, inflatie, baseCashflows,
     )
-    return toSimResult(
-      computeConvergentieProjection({
-        builtInput,
-        v2FlagArg: true,
-        kernelEnabled,
-        rawContext: kernelEnabled && dob
-          ? buildHvBKernelContext(builtInput, yearlyExpenses, savings, verwachtRendement, inflatie, dob)
-          : undefined,
-      }).result,
-    )
+    const outcome = computeConvergentieProjection({
+      rawContext: buildHvBKernelContext(builtInput, yearlyExpenses, savings, verwachtRendement, inflatie, dob),
+    })
+    return outcome.ok ? toSimResult(outcome.result) : null
   }
 
   const simAflossen = runScenario(annualSavings)
   const simBeleggen = runScenario(annualSavings + extraJaarlijks)
-  const ageA: number | null = simAflossen.fireAgeFractional
-  const ageB: number | null = simBeleggen.fireAgeFractional
+  const ageA: number | null = simAflossen?.fireAgeFractional ?? null
+  const ageB: number | null = simBeleggen?.fireAgeFractional ?? null
 
   if (ageA == null && ageB == null) return null
   if (ageA == null) return 120 // aflossen bereikt FIRE niet → groot voordeel beleggen

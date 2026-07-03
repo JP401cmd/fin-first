@@ -6,7 +6,7 @@ import {
   type WithdrawalStrategyType,
 } from '@/lib/withdrawal-strategy'
 
-const VALID_STRATEGIES: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
+const VALID_STRATEGIES: WithdrawalStrategyType[] = ['static', 'guardrails']
 
 // ── GET — Lees withdrawal strategy instellingen uit profiles ─────────
 

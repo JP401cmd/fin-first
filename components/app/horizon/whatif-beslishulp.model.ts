@@ -14,9 +14,9 @@
  *                                      groeit
  *
  * ── Eén motor voor BEIDE opties (consume, don't recompute) ───────────────────
- * Zowel Beleggen als Aflossen worden tegen DEZELFDE motor (`runSelectedProjection`
- * → v2-grootboek) gemeten, zodat ze allebei het motor-basispad reproduceren bij
- * €0 extra en alléén in de toegepaste groeivoet verschillen:
+ * Zowel Beleggen als Aflossen worden tegen DEZELFDE motor (de horizon-kernel)
+ * gemeten, zodat ze allebei het motor-basispad reproduceren bij €0 extra en
+ * alléén in de toegepaste groeivoet verschillen:
  *
  *   • BELEGGEN  — een extra `extra_inleg`-cashflow in de ECHTE motor. De extra
  *                 inleg compoundt op het VERWACHTE rendement, mét Box 3-drag (de

@@ -1,64 +1,38 @@
 /**
- * Convergentie-router (FASE 5, stap 2b) — de dunne motorschakelaar voor de
+ * Convergentie-projectie (FASE 6 stap 5A — kernel-only) — de gedeelde ingang voor de
  * **convergentie-set** (ADR 0032 §6): /toekomst (`use-horizon-fire-sim`), de
  * dashboard-loader (/overzicht, `dashboard-data-loader`), het canonieke FIRE-doel
- * (`fire-target-shared`) en — via dat doel — de AI-context. Kiest per run tussen de
- * nieuwe **horizon-kernel** (achter de per-gebruiker-vlag `horizon_kernel_convergentie`)
- * en de bestaande **v2-grootboek-engine**.
+ * (`fire-target-shared`) en — via dat doel — de AI-context. Sinds de v2-verwijdering
+ * is er nog maar één motor: de **horizon-kernel**.
  *
- * ## Anti-drie-engines-invariant
- * Eén vlag stuurt ALLE vier de oppervlakken; deze router is de enige plek waar de
- * keuze wordt gemaakt. Server- én client-bruikbaar (isomorf: geen `'use client'`,
- * geen fs/Supabase/Date.now) zodat de hook (client) en de loaders (server) letterlijk
- * dezelfde beslislogica draaien — nooit gedeeltelijk om (geen pagina-drift).
+ * ## Geen tweede motor meer
+ * De vroegere `builtInput`/`v2FlagArg`/`kernelEnabled`-schakelaar en de
+ * `detectV2OnlyMachinery`-terugval zijn vervallen — de grootboek-engine (v2) bestaat
+ * niet meer. `rawContext` is nu verplicht; de kernel is de enige uitkomst.
  *
- * ## Byte-identiteit (harde eis)
- * Bij `kernelEnabled === false` (default) is de uitvoer LETTERLIJK
- * `runSelectedProjection(builtInput, v2FlagArg, strategyOptions)` — dezelfde v2-run
- * als vandaag. Geef `v2FlagArg` exact door wat het oppervlak vandaag doorgeeft.
+ * ## Expliciete fout i.p.v. stille terugval
+ * De kern kan om legitieme redenen niet rekenen (bv. ontbrekende geboortedatum). In
+ * plaats van stil op een andere motor terug te vallen (die er niet meer is) levert de
+ * router dan een expliciet `{ ok: false, reason }`; de aanroepende surface toont zijn
+ * bestaande lege/fout-staat. Bij succes: `{ ok: true, result, ... }`.
  *
- * ## Geen stille engine-mix + defensieve terugval
- * Woning-strategieën (incl. downsize/opeethypotheek) zijn kernel-native (de adapter
- * mapt `housing_strategy_config` → kernel-woning-params) en vallen dus NIET terug.
- * Alleen generieke (niet-huis) liquidaties die de kernel-mapping niet aankan
- * (wanneer_nodig / datum-trigger / payoffDebtIds / prijs-fractie) → schone
- * v2-terugval met reden (`detectV2OnlyMachinery`, gedeeld met de what-if-router).
- * Ontbrekende rauwe context of een kernel-fout → idem; de vlag mag een oppervlak
- * nooit laten crashen.
- *
+ * Server- én client-bruikbaar (isomorf): geen `'use client'`, geen fs/Supabase/Date.now.
  * Deze module logt NOOIT (`console.*`).
  */
 
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
-import type { HorizonStrategyOptions } from '@/lib/horizon-engine/strategies'
-import type {
-  UnifiedProjectionInput,
-  UnifiedProjectionResult,
-} from '@/lib/unified-projection'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { TaxYear } from '@/lib/box3-data'
-import { solveFire, type SolverStatus } from '@/lib/horizon-kernel/solver'
-import {
-  buildKernelInputFromApp,
-  deriveEigenHuisIds,
-  type KernelAdapterInput,
-  type KernelAdapterProfile,
-} from '@/lib/horizon-kernel/adapter'
-import {
-  kernelToUnifiedResult,
-  buildKernelSlotMeta,
-  type KernelHousingSale,
+import { runKernelUnified } from '@/lib/horizon-kernel/run-unified'
+import type { KernelAdapterInput, KernelAdapterProfile } from '@/lib/horizon-kernel/adapter'
+import type {
+  KernelHousingSale,
+  KernelUnifiedResult,
 } from '@/lib/horizon-kernel/bridge'
-import {
-  detectV2OnlyMachinery,
-  type WhatifRawProfileRow,
-} from '@/lib/horizon-kernel/adapter/whatif-varianten'
-
-/** Welke motor de run daadwerkelijk berekende. */
-export type ConvergentieEngine = 'kernel' | 'v2'
+import type { SolverStatus } from '@/lib/horizon-kernel/solver'
+import type { WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 
 /**
  * Rauwe profiel-rij voor de convergentie-set — superset van de what-if-rij: de
@@ -77,7 +51,7 @@ export interface ConvergentieRawProfileRow extends WhatifRawProfileRow {
    * Jaarlijkse essentiële uitgaven (berekend uit de budgetten, `computeYearlyMustExpenses`)
    * — GEEN profiel-kolom; het aanroepende oppervlak injecteert de al-berekende waarde
    * zodat de `essential_budgets`-pensioenuitgave-methode in de kernel dezelfde
-   * grondslag gebruikt als v2.
+   * grondslag gebruikt.
    */
   yearly_essential_expenses?: number | null
 }
@@ -134,61 +108,41 @@ export interface ConvergentieRawContext {
   readonly yearlyExpenses: number
 }
 
-/** Uitkomst van één convergentie-run: resultaat + motor + solver-doorvoer (V12). */
-export interface ConvergentieProjectionOutcome {
-  readonly result: UnifiedProjectionResult
-  readonly engine: ConvergentieEngine
-  /** Alleen gezet bij een terugval op v2 terwijl de vlag aan stond. */
-  readonly fallbackReason?: string
-  /** P!B93/B100 — solver-status; alleen aanwezig op de kernel-tak (V12). */
-  readonly kernelStatus?: SolverStatus
-  /** P!B96 — €/mnd-extra-sparen-hint; alleen aanwezig op de kernel-tak (V12). */
-  readonly kernelMaandHint?: number
-  /** Verkoopmoment eigen woning (marker-contract); alleen op de kernel-tak, `null` = geen verkoop. */
-  readonly kernelHousingSale?: KernelHousingSale | null
-}
+/**
+ * Uitkomst van één convergentie-run: het kernel-resultaat óf een expliciete fout.
+ * Bij succes zijn de solver-doorvoer-velden (V12) + het verkoopmoment (marker-
+ * contract) aanwezig; bij een kern-fout draagt `reason` de nette Nederlandse toelichting.
+ */
+export type ConvergentieProjectionOutcome =
+  | {
+      readonly ok: true
+      readonly result: KernelUnifiedResult
+      /** P!B93/B100 — solver-status (V12). */
+      readonly kernelStatus: SolverStatus
+      /** P!B96 — €/mnd-extra-sparen-hint (V12). */
+      readonly kernelMaandHint: number
+      /** Verkoopmoment eigen woning (marker-contract), `null` = geen verkoop. */
+      readonly kernelHousingSale: KernelHousingSale | null
+    }
+  | {
+      readonly ok: false
+      readonly reason: string
+    }
 
 /** Parameters voor `computeConvergentieProjection`. */
 export interface ComputeConvergentieProjectionParams {
-  /** De gebouwde v2-input (`buildHorizonInput`) — de v2-tak draait hier byte-identiek op. */
-  readonly builtInput: UnifiedProjectionInput
-  readonly strategyOptions?: Partial<HorizonStrategyOptions>
-  /** Exact wat het oppervlak vandaag doorgeeft (`horizonEngineV2`) — houdt de v2-tak byte-identiek. */
-  readonly v2FlagArg: boolean
-  /** Is de kernel-vlag (`horizon_kernel_convergentie`) aan voor deze gebruiker? */
-  readonly kernelEnabled: boolean
-  /** Rauwe context voor de kernel-tak; afwezig → v2-terugval met reden. */
-  readonly rawContext?: ConvergentieRawContext
+  /** Rauwe context waaruit de kernel-invoer wordt samengesteld (verplicht). */
+  readonly rawContext: ConvergentieRawContext
 }
 
 /**
- * Bereken één convergentie-projectie via de kernel (vlag aan) of via v2 (vlag uit /
- * terugval). Zie de module-doc voor de byte-identiteit- en terugval-garanties.
+ * Bereken één convergentie-projectie via de horizon-kernel. Zie de module-doc voor
+ * het fout-contract (kern-fout → `{ ok: false, reason }`).
  */
 export function computeConvergentieProjection(
   params: ComputeConvergentieProjectionParams,
 ): ConvergentieProjectionOutcome {
-  const { builtInput, strategyOptions, v2FlagArg, kernelEnabled, rawContext } = params
-  const runV2 = (): UnifiedProjectionResult =>
-    runSelectedProjection(builtInput, v2FlagArg, strategyOptions)
-
-  // Vlag uit → byte-identiek aan vandaag.
-  if (!kernelEnabled) {
-    return { result: runV2(), engine: 'v2' }
-  }
-
-  // Kernel-onondersteunde generieke liquidatie → schone v2-terugval (geen stille
-  // engine-mix); woning-strategieën zijn kernel-native en passeren deze check.
-  const machineryReason = detectV2OnlyMachinery(builtInput)
-  if (machineryReason) {
-    return { result: runV2(), engine: 'v2', fallbackReason: machineryReason }
-  }
-
-  // Zonder rauwe context kan de kernel-invoer niet worden samengesteld → v2.
-  if (!rawContext) {
-    return { result: runV2(), engine: 'v2', fallbackReason: 'geen rauwe kernel-context beschikbaar' }
-  }
-
+  const { rawContext } = params
   try {
     const adapterInput: KernelAdapterInput = {
       profile: buildConvergentieAdapterProfile(rawContext.profile),
@@ -198,34 +152,21 @@ export function computeConvergentieProjection(
       aowRows: rawContext.aowRows,
       taxYear: rawContext.taxYear,
     }
-    const kernelInput = buildKernelInputFromApp(adapterInput)
-    const solve = solveFire(kernelInput)
-    const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
-      rawContext.assets,
-      rawContext.debts,
-      deriveEigenHuisIds(rawContext.assets),
-    )
-    const kernelResult = kernelToUnifiedResult(solve, {
-      input: kernelInput,
+    const { result } = runKernelUnified({
+      adapterInput,
       yearlyExpenses: rawContext.yearlyExpenses,
-      assetSlotMeta,
-      debtSlotMeta,
     })
     return {
-      result: kernelResult,
-      engine: 'kernel',
-      kernelStatus: kernelResult.kernelStatus,
-      kernelMaandHint: kernelResult.kernelMaandHint,
-      kernelHousingSale: kernelResult.kernelHousingSale,
+      ok: true,
+      result,
+      kernelStatus: result.kernelStatus,
+      kernelMaandHint: result.kernelMaandHint,
+      kernelHousingSale: result.kernelHousingSale,
     }
   } catch (err) {
-    // Defensief: een kernel-fout (bv. ontbrekende geboortedatum) mag het oppervlak
-    // nooit laten crashen achter de vlag → schone v2-terugval met reden.
+    // Een kern-fout (bv. ontbrekende geboortedatum) mag het oppervlak nooit laten
+    // crashen → expliciete fout met reden; de surface toont zijn lege/fout-staat.
     const message = err instanceof Error ? err.message : 'onbekende kernel-fout'
-    return {
-      result: runV2(),
-      engine: 'v2',
-      fallbackReason: `kernel-fout, teruggevallen op v2: ${message}`,
-    }
+    return { ok: false, reason: message }
   }
 }

@@ -90,9 +90,9 @@ export function buildBenchmarkReport(args: BuildBenchmarkArgs): BenchmarkReportD
   // ── Cohort-vergelijkingen (alleen met bekende leeftijd) ──
   if (cohort.ageBand) {
     const ref = getCohortReference(cohort.ageBand, cohort.household)
-    const peer = computeReferencePeer(ref, bandMidAge(cohort.ageBand), now, {
-      kernelScalarEnabled: args.kernelScalarEnabled === true,
-    })
+    // FASE 6 stap 5A — kernel-only: de peer rekent onvoorwaardelijk op de horizon-kernel
+    // (via de scalar-router); de `kernelScalarEnabled`-doorvoer is daarmee inert geworden.
+    const peer = computeReferencePeer(ref, bandMidAge(cohort.ageBand), now)
     if (ref.householdAdjusted) addSource(SOURCE_HOUSEHOLD_ADJUST)
 
     // 1. Gezondheidsscore (gemodelleerde peer)

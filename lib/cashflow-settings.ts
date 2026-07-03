@@ -121,19 +121,16 @@ export function recomputeFireFromSettings(
     yearlyMustExpenses: yearlyRetirement,
   }
 
-  // Via de scalar-router (stap 2e); vlag uit = letterlijk computeFireProjection.
-  return computeScalarFireProjection(
-    {
-      input,
-      annualReturn: params.grossReturn,
-      swrOverride: params.effectiveSwr,
-      inflationOverride: params.inflationRate,
-      strategyOptions: {
-        strategy: params.fireStrategy.strategy,
-        endAge: params.fireStrategy.endAge,
-        legacyAmount: params.fireStrategy.legacyAmount,
-      },
+  // Via de scalar-router (kernel-only; de tijd-velden komen uit de horizon-kernel).
+  return computeScalarFireProjection({
+    input,
+    annualReturn: params.grossReturn,
+    swrOverride: params.effectiveSwr,
+    inflationOverride: params.inflationRate,
+    strategyOptions: {
+      strategy: params.fireStrategy.strategy,
+      endAge: params.fireStrategy.endAge,
+      legacyAmount: params.fireStrategy.legacyAmount,
     },
-    { kernelEnabled: params.kernelScalarEnabled === true },
-  ).result
+  }).result
 }

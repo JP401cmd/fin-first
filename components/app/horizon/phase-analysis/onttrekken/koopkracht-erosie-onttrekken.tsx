@@ -263,6 +263,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
                 className="h-full rounded-full transition-all duration-700 ease-out"
                 style={{
                   width: `${Math.max(100 - state.totalErosiePct, 0)}%`,
+                  // eslint-disable-next-line no-restricted-syntax -- stoplicht-verloop (groen→amber/rood naar ernst), geen winst/verlies
                   background: `linear-gradient(90deg, #10b981, ${state.totalErosiePct > 30 ? '#ef4444' : '#f59e0b'})`,
                 }}
               />

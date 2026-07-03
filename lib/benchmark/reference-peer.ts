@@ -46,17 +46,11 @@ export interface ReferencePeerResult {
  * @param ref       cohort-referentiewaarden (mediaan vermogen/inkomen, spaarquote)
  * @param midAge    midden-leeftijd van de cohort-band (voor synthetische geboortedatum)
  * @param now       injecteerbaar "vandaag" voor deterministische tests
- * @param opts      scalar-router-doorvoer (FASE 5, stap 2e): zet `kernelScalarEnabled`
- *                  wanneer de aanroepende (ingelogde) surface de per-gebruiker-vlag
- *                  `horizon_kernel_scalar` aan heeft — de peer rekent dan op dezelfde
- *                  motor als de gebruiker zelf (appels-met-appels). Default false =
- *                  byte-identiek aan de directe computeFireProjection-aanroep.
  */
 export function computeReferencePeer(
   ref: CohortReference,
   midAge: number,
   now: Date = new Date(),
-  opts?: { kernelScalarEnabled?: boolean },
 ): ReferencePeerResult {
   const monthlyIncome = ref.incomeMedian / 12
   const monthlySavings = monthlyIncome * (ref.savingsRatePct / 100)
@@ -78,14 +72,11 @@ export function computeReferencePeer(
 
   // Canonieke FIRE-projectie met de app-default-aannames (rendement/SWR/inflatie),
   // mét spend-down tot eind-leeftijd (deplete) i.p.v. eeuwigdurend — zie PEER_FIRE_END_AGE.
-  // Via de scalar-router (stap 2e); vlag uit = letterlijk computeFireProjection.
-  const proj = computeScalarFireProjection(
-    {
-      input: fin,
-      strategyOptions: { strategy: 'deplete', endAge: PEER_FIRE_END_AGE },
-    },
-    { kernelEnabled: opts?.kernelScalarEnabled === true },
-  ).result
+  // Via de scalar-router (kernel-only; de tijd-velden komen uit de horizon-kernel).
+  const proj = computeScalarFireProjection({
+    input: fin,
+    strategyOptions: { strategy: 'deplete', endAge: PEER_FIRE_END_AGE },
+  }).result
 
   // Canonieke gezondheidsscore op dezelfde peer-invoer.
   const hsInput: HealthScoreInput = {

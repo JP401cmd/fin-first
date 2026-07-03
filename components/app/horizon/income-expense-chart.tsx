@@ -517,7 +517,7 @@ function BreakdownView({
             y={PAD.top}
             width={barWidth + 2}
             height={innerH}
-            fill="var(--negative, #ef4444)"
+            fill="var(--negative)"
             opacity={hasEntered ? 0.05 : 0}
             style={{ transition: hasEntered ? 'opacity 0.6s ease 0.5s' : 'none' }}
           />
@@ -530,7 +530,7 @@ function BreakdownView({
             y={PAD.top + 10}
             textAnchor="middle"
             fontSize={7}
-            fill="var(--negative, #ef4444)"
+            fill="var(--negative)"
             fontFamily="var(--font-inter, sans-serif)"
             fontWeight={600}
             opacity={0.7}

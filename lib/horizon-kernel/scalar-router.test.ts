@@ -1,13 +1,16 @@
 /**
- * Scalar-router (FASE 5, stap 2e) — tests.
+ * Scalar-router (FASE 6 stap 5A — kernel-onvoorwaardelijk) — tests.
  *
- * Dekt de vier verplichte lagen:
+ * Dekt de drie resterende lagen (de vroegere vlag-uit-byte-identiteitstests tegen de
+ * rauwe scalar-helper zijn vervallen — er is geen schakelaar meer; die dekking wordt
+ * volledig overgenomen door de "scalar-fallback == de helper direct"-assertie die elke
+ * gate-test hieronder al deed):
  *  1. mapping-unit-tests: scalar-params → verwachte synthetische adapter-invoer;
- *  2. vlag-uit-byte-identiteit per router-functie (letterlijk de bestaande helper);
- *  3. terugval-gates + crash-vangnet (vlag aan, geen crash, reden gezet);
- *  4. indicatieve vergelijkings-rooktest op drie profielen — waarden MOGEN
- *     verschillen van v2; we asserteren vorm + monotonie (meer sparen ⇒
- *     niet-latere FIRE; hoger rendement ⇒ niet-latere FIRE).
+ *  2. gates + crash-vangnet (kern kan geen tijdas bouwen ⇒ `engine: 'scalar-fallback'`,
+ *     resultaat = de rauwe scalar-formule);
+ *  3. indicatieve vergelijkings-rooktest op drie profielen — waarden MOGEN
+ *     verschillen van de vroegere v2-engine; we asserteren vorm + monotonie (meer
+ *     sparen ⇒ niet-latere FIRE; hoger rendement ⇒ niet-latere FIRE).
  */
 
 import { describe, expect, it } from 'vitest'
@@ -122,84 +125,10 @@ describe('buildScalarAdapterInput — mapping', () => {
   })
 })
 
-// ── 2. Vlag uit → byte-identiek aan de bestaande helpers ────────────────────
+// ── 2. Gates + crash-vangnet: scalar-fallback ────────────────────────────────
 
-describe('vlag uit — byte-identiteit', () => {
-  it('computeScalarFireProjection == computeFireProjection (zelfde argumenten)', () => {
-    const params = makeParams()
-    const direct = computeFireProjection(
-      params.input,
-      params.annualReturn,
-      params.swrOverride,
-      params.inflationOverride,
-      params.strategyOptions,
-    )
-    const outcome = computeScalarFireProjection(params, { kernelEnabled: false })
-    expect(outcome.result).toEqual(direct)
-    expect(outcome.engine).toBe('v2')
-    expect(outcome.fallbackReason).toBeUndefined()
-    expect(outcome.kernelStatus).toBeUndefined()
-  })
-
-  it('weggelaten annualReturn/inflationOverride → dezelfde helper-defaults', () => {
-    const params = makeParams({ annualReturn: undefined, inflationOverride: undefined })
-    const direct = computeFireProjection(
-      params.input,
-      undefined,
-      params.swrOverride,
-      undefined,
-      params.strategyOptions,
-    )
-    expect(computeScalarFireProjection(params, { kernelEnabled: false }).result).toEqual(direct)
-  })
-
-  it('computeScalarFireRange == computeFireRange (let op de afwijkende argument-volgorde)', () => {
-    const params = makeParams()
-    const direct = computeFireRange(
-      params.input,
-      params.swrOverride,
-      params.inflationOverride,
-      params.annualReturn,
-      params.strategyOptions,
-    )
-    const outcome = computeScalarFireRange(params, { kernelEnabled: false })
-    expect(outcome.result).toEqual(direct)
-    expect(outcome.engine).toBe('v2')
-  })
-
-  it('computeScalarFreedomMilestones == computeFreedomMilestones', () => {
-    const direct = computeFreedomMilestones(50_000, 2_500, 1_500, 0.07, 0.02, 0.035, 0)
-    const outcome = computeScalarFreedomMilestones(
-      {
-        netWorth: 50_000,
-        monthlyExpenses: 2_500,
-        monthlySavings: 1_500,
-        annualReturn: 0.07,
-        inflationRate: 0.02,
-        swrRate: 0.035,
-        yearlyMustExpenses: 0,
-        dateOfBirth: DOB_40,
-      },
-      { kernelEnabled: false },
-    )
-    expect(outcome.result).toEqual(direct)
-    expect(outcome.engine).toBe('v2')
-  })
-
-  it('milestones met helper-defaults (weggelaten optionele params) blijven identiek', () => {
-    const direct = computeFreedomMilestones(50_000, 2_500, 1_500)
-    const outcome = computeScalarFreedomMilestones(
-      { netWorth: 50_000, monthlyExpenses: 2_500, monthlySavings: 1_500 },
-      { kernelEnabled: false },
-    )
-    expect(outcome.result).toEqual(direct)
-  })
-})
-
-// ── 3. Terugval-gates + crash-vangnet (vlag aan) ─────────────────────────────
-
-describe('vlag aan — terugval-gates', () => {
-  it('geen geboortedatum → schone v2-terugval met reden (resultaat = de helper)', () => {
+describe('gates — scalar-fallback (resultaat = de rauwe helper)', () => {
+  it('geen geboortedatum → schone scalar-fallback met reden (resultaat = de helper)', () => {
     const params = makeParams({ input: makeInput({ dateOfBirth: null }) })
     const direct = computeFireProjection(
       params.input,
@@ -208,16 +137,16 @@ describe('vlag aan — terugval-gates', () => {
       params.inflationOverride,
       params.strategyOptions,
     )
-    const outcome = computeScalarFireProjection(params, { kernelEnabled: true })
-    expect(outcome.engine).toBe('v2')
+    const outcome = computeScalarFireProjection(params)
+    expect(outcome.engine).toBe('scalar-fallback')
     expect(outcome.fallbackReason).toMatch(/geboortedatum/)
     expect(outcome.result).toEqual(direct)
   })
 
-  it('negatief netto vermogen → v2-terugval met reden', () => {
+  it('negatief netto vermogen → scalar-fallback met reden', () => {
     const params = makeParams({ input: makeInput({ totalAssets: 10_000, totalDebts: 50_000 }) })
-    const outcome = computeScalarFireProjection(params, { kernelEnabled: true })
-    expect(outcome.engine).toBe('v2')
+    const outcome = computeScalarFireProjection(params)
+    expect(outcome.engine).toBe('scalar-fallback')
     expect(outcome.fallbackReason).toMatch(/negatief netto vermogen/)
   })
 
@@ -230,31 +159,36 @@ describe('vlag aan — terugval-gates', () => {
       params.annualReturn,
       params.strategyOptions,
     )
-    const outcome = computeScalarFireRange(params, { kernelEnabled: true })
-    expect(outcome.engine).toBe('v2')
+    const outcome = computeScalarFireRange(params)
+    expect(outcome.engine).toBe('scalar-fallback')
     expect(outcome.fallbackReason).toMatch(/geboortedatum/)
     expect(outcome.result).toEqual(direct)
   })
 
-  it('mijlpalen: geen geboortedatum → v2-terugval met reden', () => {
-    const outcome = computeScalarFreedomMilestones(
-      { netWorth: 50_000, monthlyExpenses: 2_500, monthlySavings: 1_500 },
-      { kernelEnabled: true },
-    )
-    expect(outcome.engine).toBe('v2')
+  it('mijlpalen: geen geboortedatum → scalar-fallback met reden', () => {
+    const outcome = computeScalarFreedomMilestones({
+      netWorth: 50_000, monthlyExpenses: 2_500, monthlySavings: 1_500,
+    })
+    expect(outcome.engine).toBe('scalar-fallback')
     expect(outcome.fallbackReason).toMatch(/geboortedatum/)
     expect(outcome.result).toEqual(computeFreedomMilestones(50_000, 2_500, 1_500))
   })
+
+  it('milestones met helper-defaults (weggelaten optionele params) blijven identiek op de fallback', () => {
+    const direct = computeFreedomMilestones(50_000, 2_500, 1_500)
+    const outcome = computeScalarFreedomMilestones({ netWorth: 50_000, monthlyExpenses: 2_500, monthlySavings: 1_500 })
+    expect(outcome.result).toEqual(direct)
+  })
 })
 
-// ── 4. Kernel-tak: vorm + statische velden + monotonie-rooktest ──────────────
+// ── 3. Kernel-tak: vorm + statische velden + monotonie-rooktest ──────────────
 
 const SOLVER_STATUSES = ['reached_now', 'reached_at', 'unreachable_within_horizon', 'pension_shortfall']
 
-describe('vlag aan — kernel-tak', () => {
+describe('kernel-tak', () => {
   it('draait op de kernel met een solver-status; statische weergavevelden blijven de scalar-formules', () => {
     const params = makeParams()
-    const outcome = computeScalarFireProjection(params, { kernelEnabled: true })
+    const outcome = computeScalarFireProjection(params)
     expect(outcome.engine).toBe('kernel')
     expect(outcome.fallbackReason).toBeUndefined()
     expect(SOLVER_STATUSES).toContain(outcome.kernelStatus)
@@ -301,7 +235,7 @@ describe('vlag aan — kernel-tak', () => {
       }),
       strategyOptions: { strategy: 'legacy', endAge: 90, legacyAmount: 100_000_000 },
     })
-    const outcome = computeScalarFireProjection(params, { kernelEnabled: true })
+    const outcome = computeScalarFireProjection(params)
     expect(outcome.engine).toBe('kernel')
     expect(outcome.kernelStatus).toBe('unreachable_within_horizon')
     expect(outcome.result.fireAge).toBeNull()
@@ -318,7 +252,7 @@ describe('vlag aan — kernel-tak', () => {
     const krap = makeParams({ input: makeInput({ monthlyIncome: 3_100 }) })   // €600/mnd sparen
 
     const ages = [zuinig, midden, krap].map((p) => {
-      const o = computeScalarFireProjection(p, { kernelEnabled: true })
+      const o = computeScalarFireProjection(p)
       expect(o.engine).toBe('kernel')
       return o.result.fireAge
     })
@@ -336,7 +270,7 @@ describe('vlag aan — kernel-tak', () => {
   })
 
   it('band: hoger rendement ⇒ niet-latere FIRE-leeftijd (optimistisch ≤ verwacht ≤ pessimistisch)', () => {
-    const outcome = computeScalarFireRange(makeParams(), { kernelEnabled: true })
+    const outcome = computeScalarFireRange(makeParams())
     expect(outcome.engine).toBe('kernel')
     const asOrd = (a: number | null) => (a === null ? Number.POSITIVE_INFINITY : a)
     expect(asOrd(outcome.result.optimistic.fireAge)).toBeLessThanOrEqual(
@@ -356,7 +290,7 @@ describe('vlag aan — kernel-tak', () => {
       inflationRate: INFLATION,
       dateOfBirth: DOB_40,
     }
-    const outcome = computeScalarFreedomMilestones(params, { kernelEnabled: true })
+    const outcome = computeScalarFreedomMilestones(params)
     expect(outcome.engine).toBe('kernel')
 
     const v2 = computeFreedomMilestones(

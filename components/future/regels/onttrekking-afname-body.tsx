@@ -27,7 +27,7 @@ export function OnttrekkingAfnameBody({
   const prio = useCategoriePrioState(rules, 'afname')
   const { saving, error, save } = usePotRulesSave(onClose, onSaved)
   // Illustreer met een typische eenmalige tegenvaller (~3 maanden uitgaven).
-  const yearly = simSnapshot?.unifiedInput.yearlyExpenses
+  const yearly = simSnapshot?.rawContext.yearlyExpenses
   const shockAmount = yearly ? Math.round(yearly / 4) : undefined
 
   const changed =

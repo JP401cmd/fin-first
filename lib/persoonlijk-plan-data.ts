@@ -218,12 +218,4 @@ export const WITHDRAWAL_LABELS: Record<WithdrawalStrategyType, { name: string; s
     name: 'Guyton-Klinger guardrails',
     subtitle: 'Onttrekking past zich aan bij marktomstandigheden — meer bij beurswind mee, minder bij beurswind tegen.',
   },
-  vpw: {
-    name: 'Variable Percentage Withdrawal',
-    subtitle: 'Jaarlijks herberekend percentage op basis van resterende horizon en portfolio-waarde.',
-  },
-  bucket: {
-    name: 'Bucket-strategie',
-    subtitle: 'Drie buckets — cash, obligaties en aandelen — die jaarlijks worden bijgevuld.',
-  },
 }

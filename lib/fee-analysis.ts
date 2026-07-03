@@ -7,7 +7,7 @@
  * TER = Total Expense Ratio, stored as decimal (e.g. 0.0022 = 0.22%).
  */
 
-import { type SimCashflow, type ReturnModel } from '@/lib/fire-simulation'
+import { type SimCashflow, type ReturnModel, type SimResult } from '@/lib/fire-simulation'
 import { DEFAULT_FIRE_STRATEGY, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
@@ -273,17 +273,14 @@ export function buildFeeSimInput(
 }
 
 /**
- * Kernel-routing voor de fee-FIRE-impact (FASE 6, item 5). Achter de per-gebruiker-
- * vlag `horizon_kernel_convergentie` rekent de fee-A/B via de horizon-kernel i.p.v.
- * de v2-grootboek-engine, zodat de fee-vertraging dezelfde motor spreekt als de
- * hoofdgrafiek. Default (afwezig / `kernelEnabled` false) = byte-identiek aan de
- * directe `computeConvergentieProjection`-v2-tak (zelf byte-identiek aan de oude
- * `runSelectedProjection(input, true)`-aanroep).
+ * Kernel-routing voor de fee-FIRE-impact (FASE 6 stap 5A — kernel-only). De fee-A/B rekent
+ * via de horizon-kernel; de fee is een return-reductie die schoon in het pot-rendement zit.
+ * De absolute FIRE-leeftijden komen uit de kernel; de gerapporteerde DELTA (de fee-impact)
+ * blijft betekenisvol en monotoon stijgend met de TER. Zonder geboortedatum kan de kernel
+ * geen tijdas bouwen → de impact valt terug op "onbereikbaar" (nulls).
  */
 export interface FeeKernelRouting {
-  /** Is de vlag `horizon_kernel_convergentie` aan voor deze gebruiker? Default false. */
-  kernelEnabled?: boolean
-  /** Geboortedatum voor de kernel-tijdas; afwezig → geen kernel-context → v2. */
+  /** Geboortedatum voor de kernel-tijdas; afwezig → geen kernel-run → onbereikbaar. */
   dateOfBirth?: string | null
 }
 
@@ -332,14 +329,10 @@ function buildFeeKernelContext(
  * 1. With the original grossReturn (no fee drag)
  * 2. With effectiveReturn = grossReturn - weightedTER
  *
- * Engine-selectie (FASE 6, item 5): standaard draaien beide scenario's op de
- * v2-grootboek-engine (de enige engine sinds C5-c) via de convergentie-router. De
- * fee is een return-reductie, die schoon in `grossReturn` van de synthetische
- * input zit. Zet `routing.kernelEnabled` (vlag `horizon_kernel_convergentie`) +
- * een `dateOfBirth`, dan draaien BEIDE scenario's op de horizon-kernel — dezelfde
- * motor als de hoofdgrafiek. De absolute FIRE-leeftijden verschuiven dan, maar de
- * gerapporteerde DELTA (de fee-impact) blijft betekenisvol en monotoon stijgend met
- * de TER. Vlag uit (default) = byte-identiek aan de directe v2-aanroep.
+ * Engine (FASE 6 stap 5A — kernel-only): beide scenario's draaien op de horizon-kernel via
+ * de convergentie-router. De fee is een return-reductie die schoon in het pot-rendement van
+ * de synthetische context zit. Zonder `routing.dateOfBirth` kan de kernel geen tijdas bouwen
+ * → beide scenario's zijn "onbereikbaar" (nulls).
  *
  * Returns the difference in FIRE age (months) and the total missed returns.
  */
@@ -349,28 +342,24 @@ export function computeFeeImpactOnFire(
   routing?: FeeKernelRouting,
 ): FeeImpact {
   const effectiveReturn = simParams.grossReturn - weightedTER
-  const kernelEnabled = routing?.kernelEnabled === true
   const dob = routing?.dateOfBirth ?? null
 
-  // Eén scenario-run via de convergentie-router: vlag uit → letterlijk
-  // runSelectedProjection(builtInput, true); vlag aan (+ dob) → horizon-kernel.
-  const runScenario = (ret: number) => {
+  // Eén scenario-run via de convergentie-router (kernel-only). Zonder geboortedatum kan de
+  // kernel geen tijdas bouwen → null (onbereikbaar).
+  const runScenario = (ret: number): SimResult | null => {
+    if (!dob) return null
     const builtInput = buildFeeSimInput(simParams, ret)
-    return toSimResult(
-      computeConvergentieProjection({
-        builtInput,
-        v2FlagArg: true,
-        kernelEnabled,
-        rawContext: kernelEnabled && dob ? buildFeeKernelContext(simParams, builtInput, dob) : undefined,
-      }).result,
-    )
+    const outcome = computeConvergentieProjection({
+      rawContext: buildFeeKernelContext(simParams, builtInput, dob),
+    })
+    return outcome.ok ? toSimResult(outcome.result) : null
   }
 
   const simWithout = runScenario(simParams.grossReturn)
   const simWith = runScenario(effectiveReturn)
-  const fireAgeWithoutFees: number | null = simWithout.fireAgeFractional
-  const fireAgeWithFees: number | null = simWith.fireAgeFractional
-  const bothReachable: boolean = simWithout.fireReachable && simWith.fireReachable
+  const fireAgeWithoutFees: number | null = simWithout?.fireAgeFractional ?? null
+  const fireAgeWithFees: number | null = simWith?.fireAgeFractional ?? null
+  const bothReachable: boolean = (simWithout?.fireReachable ?? false) && (simWith?.fireReachable ?? false)
 
   // Calculate impact in months
   let feeImpactMonths = 0

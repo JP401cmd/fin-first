@@ -419,7 +419,7 @@ function PeriodKassabon({ path, onClose }: { path: BacktestPath; onClose: () => 
                   <span className="tabular-nums text-[var(--ink)]">
                     {<MaskedAmount value={val} tone="horizon" />}
                     {pctChange !== null && (
-                      <span className={`ml-1 text-[10px] ${pctChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      <span className={`ml-1 text-[10px] ${pctChange >= 0 ? 'text-positive' : 'text-negative'}`}>
                         {pctChange >= 0 ? '+' : ''}{pctChange.toFixed(0)}%
                       </span>
                     )}

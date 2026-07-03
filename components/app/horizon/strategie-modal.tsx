@@ -10,29 +10,26 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
-import { type FinancialInput, type LifeEvent, ageAtDate, DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
+import { type FinancialInput, type LifeEvent, ageAtDate } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'
-import { resolveFireParams } from '@/lib/fire-params'
 import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import {
   type WithdrawalStrategyConfig,
-  type WithdrawalStrategyType,
   type WithdrawalProfiel,
   WITHDRAWAL_DEFAULTS,
   resolveWithdrawalStrategy,
+  parseWithdrawalProfileConfig,
 } from '@/lib/withdrawal-strategy'
 import {
-  lifeEventsToCashflows,
   type SimResult,
   type SimRow,
-  type SimCashflow,
 } from '@/lib/fire-simulation'
-import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
 import { toSimResult } from '@/lib/unified-projection'
-import { buildConvergentieAdapterProfile, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
-import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
-import { solveFire } from '@/lib/horizon-kernel/solver'
-import { kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
+import {
+  computeConvergentieProjection,
+  type ConvergentieRawContext,
+  type ConvergentieRawProfileRow,
+} from '@/lib/horizon-kernel/convergentie-router'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -48,14 +45,20 @@ import {
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { ArrowLeft, Shield, TrendingUp, Landmark, Settings, Info, Check, CircleDot, Loader2, AlertTriangle, Banknote, Heart, Infinity as InfinityIcon } from 'lucide-react'
+import { ArrowLeft, Shield, TrendingUp, TrendingDown, Activity, Landmark, Settings, Info, Loader2, Banknote, Heart, Infinity as InfinityIcon } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
-// ── Strategy metadata (Dutch) ──────────────────────────────────────────────
+// ── Onttrekkingsprofiel-metadata (Dutch) ────────────────────────────────────
+//
+// De onttrekking-tab vergelijkt de VIER onttrekkingsPROFIELEN (Vast/Afnemend/
+// Oplopend/Guardrails) via de horizon-kernel. Elk profiel krijgt een eigen
+// categorie-herkenningskleur/icoon/stroke (géén module-identiteit): vast =
+// neutraal/ink, afnemend = groen, oplopend = amber, guardrails = blauw.
 
-interface StrategyInfo {
+interface ProfielInfo {
   label: string
   description: string
+  /** Categorie-herkenningskleur (CSS value) */
   color: string
   /** Tailwind classes for card highlight */
   cardBg: string
@@ -64,395 +67,49 @@ interface StrategyInfo {
   stroke: string
 }
 
-const STRATEGY_INFO: Record<WithdrawalStrategyType, StrategyInfo> = {
-  static: {
-    label: 'Vast (SWR)',
-    description: 'Vaste onttrekking gebaseerd op de 4%-regel, jaarlijks gecorrigeerd voor inflatie.',
+const PROFIEL_INFO: Record<WithdrawalProfiel, ProfielInfo> = {
+  vast: {
+    label: 'Vast',
+    description: 'Elk jaar hetzelfde bedrag, inflatie-geïndexeerd (de klassieke 4%-regel). Voorspelbaar; reageert niet op de markt.',
     color: 'var(--ink-3)',
     cardBg: 'bg-[var(--subtle)]',
     cardBorder: 'border-[var(--border-ed)]',
     stroke: 'var(--ink-3)',
   },
-  guardrails: {
-    label: 'Guardrails',
-    description: 'Guyton-Klinger methode: pas je onttrekking aan op basis van portfolioprestaties, binnen een bandbreedte.',
-    color: '#3b82f6',
-    cardBg: 'bg-blue-50',
-    cardBorder: 'border-blue-300',
-    stroke: '#3b82f6',
-  },
-  vpw: {
-    label: 'VPW',
-    description: 'Variable Percentage Withdrawal: elk jaar een dynamisch percentage op basis van resterende levensverwachting.',
+  afnemend: {
+    label: 'Afnemend',
+    description: 'Je geeft in je actieve jaren méér uit en bouwt af: go-go (fit, veel reizen) → slow-go (rustiger aan) → no-go (vooral thuis, lagere uitgaven).',
     color: '#22c55e',
     cardBg: 'bg-green-50',
     cardBorder: 'border-green-300',
     stroke: '#22c55e',
   },
-  bucket: {
-    label: 'Bucket',
-    description: 'Drie emmers (cash, obligaties, aandelen) met automatische hervulling vanuit groei-emmer.',
+  oplopend: {
+    label: 'Oplopend',
+    description: 'Je begint bescheiden en geeft later méér uit — denk aan zorgkosten op hoge leeftijd. Het spiegelbeeld van afnemend.',
     color: '#f59e0b',
     cardBg: 'bg-amber-50',
     cardBorder: 'border-amber-300',
     stroke: '#f59e0b',
   },
-}
-
-const STRATEGY_ICONS: Record<WithdrawalStrategyType, React.ReactNode> = {
-  static: <Shield className="h-4 w-4" />,
-  guardrails: <TrendingUp className="h-4 w-4" />,
-  vpw: <TrendingUp className="h-4 w-4" />,
-  bucket: <Landmark className="h-4 w-4" />,
-}
-
-const ALL_STRATEGIES: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
-
-// ── OnttrekkingsPROFIELEN (FASE 6, stap 2 — kernel-vergelijk) ────────────────
-// Wanneer /toekomst op de horizon-kernel rekent, vergelijkt deze modal de VIER
-// onttrekkingsPROFIELEN (Vast/Afnemend/Oplopend/Guardrails) i.p.v. de v2-enum
-// (static/guardrails/vpw/bucket). Reden: de kernel-adapter mapt vpw én bucket → 'Vast'
-// (params.ts `WITHDRAWAL_TO_PROFIEL`), dus static/vpw/bucket zouden op de kernel drie
-// identieke curves worden. De vier profielen krijgen één BESTAAND slot elk zodat de
-// chart/secties (die op `WithdrawalStrategyType`-slots leunen) ONGEWIJZIGD blijven —
-// alleen de simulatiebron + labelset wisselen. Vlag uit → de enum + v2-runs blijven
-// het pad (byte-identiek). Dit vergelijk is read-only informatief: de "opslaan"-flow
-// (activeer-knop, enum) draait alleen op de v2-tak; het `profiel`-veld heeft een eigen
-// opslagpad op /toekomst?tab=voorkeuren (onttrekkingsstrategie-regel).
-const SLOT_TO_PROFIEL: Record<WithdrawalStrategyType, WithdrawalProfiel> = {
-  static: 'vast',
-  vpw: 'afnemend',
-  bucket: 'oplopend',
-  guardrails: 'guardrails',
-}
-
-/** Profiel-labelset — gespiegeld aan `onttrekkingsstrategie-body.tsx` (zelfde teksten). */
-const PROFIEL_INFO: Record<WithdrawalProfiel, { label: string; description: string }> = {
-  vast: {
-    label: 'Vast',
-    description: 'Elk jaar hetzelfde bedrag, inflatie-geïndexeerd (de klassieke 4%-regel). Voorspelbaar; reageert niet op de markt.',
-  },
-  afnemend: {
-    label: 'Afnemend',
-    description: 'Je geeft in je actieve jaren méér uit en bouwt af: go-go (fit, veel reizen) → slow-go (rustiger aan) → no-go (vooral thuis, lagere uitgaven).',
-  },
-  oplopend: {
-    label: 'Oplopend',
-    description: 'Je begint bescheiden en geeft later méér uit — denk aan zorgkosten op hoge leeftijd. Het spiegelbeeld van afnemend.',
-  },
   guardrails: {
     label: 'Guardrails',
     description: 'Dynamische bandbreedte: verlaagt je opname na een slecht beursjaar, verhoogt na een goed jaar. Robuust tegen sequence-risk.',
+    color: '#3b82f6',
+    cardBg: 'bg-blue-50',
+    cardBorder: 'border-blue-300',
+    stroke: '#3b82f6',
   },
 }
 
-// ── Detailed strategy explanations (Dutch) ─────────────────────────────────
-
-interface StrategyExplanation {
-  howItWorks: string
-  suitableFor: string
-  pros: string[]
-  cons: string[]
+const PROFIEL_ICONS: Record<WithdrawalProfiel, React.ReactNode> = {
+  vast: <Shield className="h-4 w-4" />,
+  afnemend: <TrendingDown className="h-4 w-4" />,
+  oplopend: <TrendingUp className="h-4 w-4" />,
+  guardrails: <Activity className="h-4 w-4" />,
 }
 
-const STRATEGY_EXPLANATIONS: Record<WithdrawalStrategyType, StrategyExplanation> = {
-  static: {
-    howItWorks: 'Je onttrekt een vast percentage (bijv. 4%) van je startportfolio, jaarlijks gecorrigeerd voor inflatie.',
-    suitableFor: 'Mensen die voorspelbaarheid en eenvoud waarderen.',
-    pros: ['Voorspelbaar maandelijks bedrag', 'Eenvoudig te plannen', 'Beproefde methode (Trinity Study)'],
-    cons: ['Geen aanpassing bij slechte markten', 'Risico op voortijdige uitputting', 'Mist kansen bij goede rendementen'],
-  },
-  guardrails: {
-    howItWorks: 'Start met een basisonttrekking, maar pas aan op basis van portfolioprestaties. Bij sterke groei verhoog je de onttrekking, bij daling verlaag je.',
-    suitableFor: 'Flexibele pensioengangers die hun bestedingen kunnen aanpassen.',
-    pros: ['Beschermt tegen marktdalingen', 'Profiteert van goede jaren', 'Vermindert risico op uitputting'],
-    cons: ['Inkomen varieert per jaar', 'Complexere planning', 'Vereist discipline bij verlagingen'],
-  },
-  vpw: {
-    howItWorks: 'Elk jaar bereken je een nieuw onttrekkingspercentage op basis van je resterende levensverwachting en portfoliowaarde.',
-    suitableFor: 'Mathematisch ingestelde beleggers die optimaal rendement willen.',
-    pros: ['Wiskundig optimaal', 'Past zich continu aan', 'Vermogen wordt efficiënt benut'],
-    cons: ['Grote inkomensvariatie mogelijk', 'Moeilijk te budgetteren', 'Lager inkomen bij slechte markten'],
-  },
-  bucket: {
-    howItWorks: 'Verdeel je vermogen in drie emmers: cash (2 jaar), obligaties (5 jaar) en aandelen (rest). Ontrek uit cash, hervul jaarlijks vanuit groei-emmers.',
-    suitableFor: 'Gepensioneerden die mentale rust willen bij marktvolatiliteit.',
-    pros: ['Beschermt tegen sequence-of-returns risk', 'Emotioneel rustgevend', 'Duidelijke structuur'],
-    cons: ['Lagere totale rendementen door cash-allocatie', 'Hervulling vereist aandacht', 'Cash verliest waarde door inflatie'],
-  },
-}
-
-// ── Compatibility matrix data ─────────────────────────────────────────────
-
-type CompatibilityStatus = 'compatible' | 'warning' | 'incompatible'
-
-interface CompatibilityEntry {
-  status: CompatibilityStatus
-  explanation: string
-  suggestion?: string
-}
-
-const END_STRATEGIES: FireEndStrategy[] = ['deplete', 'legacy', 'perpetual', 'pensioen']
-
-const END_STRATEGY_SHORT: Record<FireEndStrategy, string> = {
-  deplete: 'Opteren',
-  legacy: 'Erfenis',
-  perpetual: 'Behouden',
-  pensioen: 'Pensioen',
-}
-
-/**
- * Compatibility matrix: withdrawal strategy × end strategy
- * Rows = withdrawal strategies (static, guardrails, vpw, bucket)
- * Cols = end strategies (deplete, legacy, perpetual)
- */
-const COMPATIBILITY_MATRIX: Record<WithdrawalStrategyType, Record<FireEndStrategy, CompatibilityEntry>> = {
-  static: {
-    deplete: {
-      status: 'compatible',
-      explanation: 'Klassieke 4%-regel is ontworpen voor portfolio-optering over 30 jaar.',
-    },
-    legacy: {
-      status: 'warning',
-      explanation: 'Vaste onttrekking houdt geen rekening met erfenisdoelbedrag — je kunt te veel of te weinig onttrekken.',
-      suggestion: 'Overweeg Guardrails voor betere afstemming op je erfenisdoel.',
-    },
-    perpetual: {
-      status: 'warning',
-      explanation: 'Bij een vast onttrekkingspercentage boven het reëel rendement daalt de koopkracht geleidelijk.',
-      suggestion: 'Stel het percentage lager in dan je verwachte reëel rendement.',
-    },
-    pensioen: {
-      status: 'compatible',
-      explanation: 'Vaste onttrekking na AOW-leeftijd is eenvoudig en voorspelbaar.',
-    },
-  },
-  guardrails: {
-    deplete: {
-      status: 'compatible',
-      explanation: 'Guardrails passen onttrekking dynamisch aan, ideaal bij een einddoel van €0.',
-    },
-    legacy: {
-      status: 'compatible',
-      explanation: 'Door de dynamische aanpassing kun je sturen richting je erfenisdoelbedrag.',
-    },
-    perpetual: {
-      status: 'warning',
-      explanation: 'Guardrails kunnen soms boven het duurzame niveau onttrekken in goede jaren.',
-      suggestion: 'Stel een conservatief plafond in om vermogensbehoud te waarborgen.',
-    },
-    pensioen: {
-      status: 'compatible',
-      explanation: 'Guardrails passen onttrekking dynamisch aan na AOW-leeftijd, ideaal voor pensioeninkomen.',
-    },
-  },
-  vpw: {
-    deplete: {
-      status: 'compatible',
-      explanation: 'VPW is wiskundig geoptimaliseerd voor volledige benutting van je vermogen.',
-    },
-    legacy: {
-      status: 'warning',
-      explanation: 'VPW streeft naar volledige optering — een erfenisdoel vereist extra reservering.',
-      suggestion: 'Houd je erfenisdoel apart als "niet-opneembaar" vermogen.',
-    },
-    perpetual: {
-      status: 'incompatible',
-      explanation: 'VPW is ontworpen om vermogen op te maken. Vermogensbehoud is tegenstrijdig met VPW.',
-      suggestion: 'Kies Guardrails of Vast (SWR) met een laag percentage voor vermogensbehoud.',
-    },
-    pensioen: {
-      status: 'compatible',
-      explanation: 'VPW berekent optimale onttrekking na AOW-leeftijd op basis van resterende levensverwachting.',
-    },
-  },
-  bucket: {
-    deplete: {
-      status: 'compatible',
-      explanation: 'De emmer-strategie beschermt je onttrekking met een cash-buffer tot de einddatum.',
-    },
-    legacy: {
-      status: 'compatible',
-      explanation: 'De groei-emmer kan strategisch worden ingezet om een erfenisdoel te beschermen.',
-    },
-    perpetual: {
-      status: 'warning',
-      explanation: 'Cash-emmer verliest waarde door inflatie, wat op lange termijn je koopkracht aantast.',
-      suggestion: 'Minimaliseer de cash-allocatie en hervul vaker vanuit de groei-emmer.',
-    },
-    pensioen: {
-      status: 'compatible',
-      explanation: 'Emmer-strategie biedt een stabiele cash-buffer voor de eerste pensioenjaren na AOW.',
-    },
-  },
-}
-
-const STATUS_ICONS: Record<CompatibilityStatus, string> = {
-  compatible: '✅',
-  warning: '⚠️',
-  incompatible: '❌',
-}
-
-const STATUS_COLORS: Record<CompatibilityStatus, { bg: string; border: string; text: string }> = {
-  compatible: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
-  warning: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
-  incompatible: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
-}
-
-// ── Compatibility Matrix Component ──────────────────────────────────────────
-
-interface CompatibilityMatrixProps {
-  selectedWithdrawal: WithdrawalStrategyType
-  activeWithdrawal: WithdrawalStrategyType
-  activeEnd: FireEndStrategy
-}
-
-function CompatibilityMatrix({ selectedWithdrawal, activeWithdrawal, activeEnd }: CompatibilityMatrixProps) {
-  return (
-    <div className="card-editorial overflow-hidden">
-      <div className="h-[3px] bg-horizon-500" />
-      <div className="px-4 py-3">
-        <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-          Compatibiliteit
-        </p>
-
-        {/* Desktop table: hidden on mobile, shown md+ */}
-        <div className="hidden md:block">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="pb-2 text-left font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-4)]">
-                  Onttrekking
-                </th>
-                {END_STRATEGIES.map(end => (
-                  <th
-                    key={end}
-                    className="pb-2 text-center font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-4)]"
-                  >
-                    {END_STRATEGY_SHORT[end]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {ALL_STRATEGIES.map(ws => {
-                const info = STRATEGY_INFO[ws]
-                return (
-                  <tr key={ws} className="border-t border-[var(--border-ed)]">
-                    <td className="py-2 pr-3">
-                      <div className="flex items-center gap-1.5">
-                        <span style={{ color: info.color }}>{STRATEGY_ICONS[ws]}</span>
-                        <span className="font-sans text-xs font-medium text-[var(--ink)]">
-                          {info.label}
-                        </span>
-                      </div>
-                    </td>
-                    {END_STRATEGIES.map(end => {
-                      const entry = COMPATIBILITY_MATRIX[ws][end]
-                      const isActive = ws === activeWithdrawal && end === activeEnd
-                      const isSelected = ws === selectedWithdrawal && end === activeEnd
-                      const colors = STATUS_COLORS[entry.status]
-
-                      return (
-                        <td key={end} className="py-2 text-center">
-                          <div className="group relative inline-block">
-                            <span
-                              className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-sm transition-all ${
-                                isActive
-                                  ? 'ring-2 ring-horizon-400 ring-offset-1'
-                                  : isSelected
-                                    ? 'ring-2 ring-horizon-300 ring-offset-1 ring-opacity-60'
-                                    : ''
-                              } ${colors.bg} ${colors.border} border`}
-                            >
-                              {STATUS_ICONS[entry.status]}
-                            </span>
-                            {/* Hover tooltip */}
-                            <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-52 -translate-x-1/2 rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--paper)] p-2.5 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                              <p className={`mb-1 font-sans text-[10px] font-bold uppercase tracking-wider ${colors.text}`}>
-                                {entry.status === 'compatible' ? 'Goed' : entry.status === 'warning' ? 'Let op' : 'Onverenigbaar'}
-                              </p>
-                              <p className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
-                                {entry.explanation}
-                              </p>
-                              {entry.suggestion && (
-                                <p className="mt-1 font-sans text-[11px] leading-snug font-medium text-[var(--ink-3)]">
-                                  💡 {entry.suggestion}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile: cards per withdrawal strategy with mini badges */}
-        <div className="space-y-3 md:hidden">
-          {ALL_STRATEGIES.map(ws => {
-            const info = STRATEGY_INFO[ws]
-            const isSelectedRow = ws === selectedWithdrawal
-
-            return (
-              <div
-                key={ws}
-                className={`rounded-[var(--r)] border p-3 transition-all ${
-                  isSelectedRow
-                    ? `${info.cardBorder} ${info.cardBg}`
-                    : 'border-[var(--border-ed)] bg-[var(--paper)]'
-                }`}
-              >
-                <div className="mb-2 flex items-center gap-1.5">
-                  <span style={{ color: info.color }}>{STRATEGY_ICONS[ws]}</span>
-                  <span className="font-sans text-xs font-semibold text-[var(--ink)]">
-                    {info.label}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {END_STRATEGIES.map(end => {
-                    const entry = COMPATIBILITY_MATRIX[ws][end]
-                    const isActive = ws === activeWithdrawal && end === activeEnd
-                    const colors = STATUS_COLORS[entry.status]
-
-                    return (
-                      <div
-                        key={end}
-                        className={`flex flex-1 flex-col items-center gap-1 rounded-md border px-2 py-1.5 ${colors.bg} ${colors.border} ${
-                          isActive ? 'ring-2 ring-horizon-400 ring-offset-1' : ''
-                        }`}
-                      >
-                        <span className="text-xs">{STATUS_ICONS[entry.status]}</span>
-                        <span className="font-sans text-[9px] font-medium text-[var(--ink-3)]">
-                          {END_STRATEGY_SHORT[end]}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-                {/* Show explanation for the active end strategy combination */}
-                {(() => {
-                  const entry = COMPATIBILITY_MATRIX[ws][activeEnd]
-                  if (entry.status === 'compatible') return null
-                  const colors = STATUS_COLORS[entry.status]
-                  return (
-                    <p className={`mt-2 font-sans text-[10px] leading-snug ${colors.text}`}>
-                      {entry.explanation}
-                    </p>
-                  )
-                })()}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
+const ALL_PROFIELEN: WithdrawalProfiel[] = ['vast', 'afnemend', 'oplopend', 'guardrails']
 
 // ── Modal component ────────────────────────────────────────────────────────
 
@@ -468,12 +125,11 @@ interface StrategieModalProps {
    *  de "huis wordt nooit verkocht"-melding). Default 'eind'. */
   initialTab?: StrategyTab | null
   /**
-   * FASE 6, stap 2 — kernel-convergentie-context vanuit horizon-client. Wanneer de
-   * vlag aan staat én er een rauwe kernel-context is, vergelijkt de onttrekking-tab
-   * de vier onttrekkingsPROFIELEN via de horizon-kernel i.p.v. de v2-enum-strategieën.
-   * Afwezig / vlag uit → byte-identiek aan het bestaande v2-vergelijk.
+   * Rauwe kernel-convergentie-context vanuit horizon-client. De onttrekking-tab
+   * vergelijkt de vier onttrekkingsPROFIELEN (Vast/Afnemend/Oplopend/Guardrails)
+   * onvoorwaardelijk via de horizon-kernel. Ontbreekt de context of de
+   * basisgegevens (geboortedatum/vermogen/uitgaven) → nette degradatie in de tab.
    */
-  kernelEnabled?: boolean
   kernelRawProfile?: ConvergentieRawProfileRow | null
   kernelAssets?: Asset[]
   kernelDebts?: Debt[]
@@ -481,7 +137,7 @@ interface StrategieModalProps {
   kernelAowRows?: AowLeeftijdRow[]
 }
 
-export function StrategieModal({ open, onClose, housingStrategy, initialTab, kernelEnabled, kernelRawProfile, kernelAssets, kernelDebts, kernelLifeEvents, kernelAowRows }: StrategieModalProps) {
+export function StrategieModal({ open, onClose, housingStrategy, initialTab, kernelRawProfile, kernelAssets, kernelDebts, kernelLifeEvents, kernelAowRows }: StrategieModalProps) {
   const [activeTab, setActiveTab] = useState<StrategyTab>(initialTab ?? 'eind')
 
   // Synchroniseer de actieve tab wanneer de modal opent met een expliciete
@@ -495,15 +151,12 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
 
   // Data from Supabase
   const [input, setInput] = useState<FinancialInput | null>(null)
-  const [lifeEvents, setLifeEvents] = useState<SimCashflow[]>([])
   const [lifeEventsRaw, setLifeEventsRaw] = useState<Array<{ name: string; target_age: number | null; event_type: string }>>([])
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(undefined)
   const [withdrawalConfig, setWithdrawalConfig] = useState<WithdrawalStrategyConfig>(WITHDRAWAL_DEFAULTS)
-  const [userGrossReturn, setUserGrossReturn] = useState(DEFAULT_RETURN)
-  const [userInflation, setUserInflation] = useState(INFLATION)
 
-  // Selected strategy for detail view
-  const [selectedStrategy, setSelectedStrategy] = useState<WithdrawalStrategyType>('static')
+  // Geselecteerd onttrekkingsprofiel voor de detail-weergave (chart/samenvatting).
+  const [selectedProfiel, setSelectedProfiel] = useState<WithdrawalProfiel>('vast')
 
   // Warning when withdrawal columns couldn't be loaded
   const [strategyWarning, setStrategyWarning] = useState<string | null>(null)
@@ -514,10 +167,6 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
   const [localLegacyAmount, setLocalLegacyAmount] = useState<string>('')
   const [endStrategySaving, setEndStrategySaving] = useState(false)
   const [endStrategyMessage, setEndStrategyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // Activation state for switching strategies
-  const [activating, setActivating] = useState(false)
-  const [activateError, setActivateError] = useState<string | null>(null)
 
   // ── Load data ──────────────────────────────────────────────────────────
 
@@ -628,15 +277,11 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
       setLocalEndAge(String(parsedFireStrategy.endAge))
       setLocalLegacyAmount(parsedFireStrategy.legacyAmount > 0 ? String(parsedFireStrategy.legacyAmount) : '')
 
-      // Resolve user's FIRE parameters
-      const fireParams = resolveFireParams(profileResult.data ?? {})
-      setUserGrossReturn(fireParams.grossReturn)
-      setUserInflation(fireParams.inflationRate)
-
-      // Resolve withdrawal strategy from separate wsData (defensive)
+      // Resolve withdrawal strategy from separate wsData (defensive) — levert de
+      // guardrail floor/ceiling voor de bandbreedte-kaart. Het gekozen PROFIEL
+      // (Vast/Afnemend/Oplopend/Guardrails) leest de tab uit `kernelRawProfile`.
       const wsConfig = resolveWithdrawalStrategy(wsData)
       setWithdrawalConfig(wsConfig)
-      setSelectedStrategy(wsConfig.strategy)
 
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,
@@ -645,9 +290,8 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
 
       setInput(horizonInput)
 
-      // Convert life events to cashflows for simulation
+      // Life events → tijdlijn-markers (namen + doelleeftijden voor de grafiek).
       const eventData = eventsResult.data ?? []
-      setLifeEvents(lifeEventsToCashflows(eventData))
       setLifeEventsRaw(eventData.map(e => ({
         name: e.name,
         target_age: e.target_age,
@@ -662,34 +306,6 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
-
-  // ── Activate a different strategy via API ──────────────────────────────
-
-  const activateStrategy = useCallback(async (strategy: WithdrawalStrategyType) => {
-    setActivating(true)
-    setActivateError(null)
-
-    try {
-      const res = await fetch('/api/withdrawal-strategy', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ withdrawal_strategy: strategy }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Onbekende fout' }))
-        throw new Error(data.error ?? 'Fout bij opslaan')
-      }
-
-      // Update local state to reflect the newly active strategy
-      setWithdrawalConfig(prev => ({ ...prev, strategy }))
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Kon strategie niet activeren'
-      setActivateError(message)
-    } finally {
-      setActivating(false)
-    }
-  }, [])
 
   // ── Save end strategy changes ────────────────────────────────────────────
 
@@ -755,135 +371,94 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
   // ── Derived values ──────────────────────────────────────────────────────
 
   const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
-  const currentPortfolio = input ? Math.max(0, input.totalAssets - input.totalDebts) : 0
   const yearlyExpenses = input?.yearlyMustExpenses ?? 0
-  const annualSavings = (input?.monthlyContributions ?? 0) * 12
   const strategyForSim = useMemo<FireStrategyConfig>(
     () => fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 },
     [fireStrategy],
   )
 
-  // FASE 6, stap 2 — draait de pagina op de horizon-kernel? Dan vergelijkt de
-  // onttrekking-tab de vier PROFIELEN (via de kernel) i.p.v. de v2-enum-strategieën.
-  // Vereist een rauwe kernel-context (vlag + profielrij + bezittingen) én geldige
-  // basisgegevens; anders valt alles terug op het bestaande v2-vergelijk.
-  const profielVergelijk =
-    kernelEnabled === true &&
-    !!kernelRawProfile &&
-    currentAge !== null &&
-    yearlyExpenses > 0 &&
-    (kernelAssets?.length ?? 0) > 0
+  // Het huidig opgeslagen onttrekkingsPROFIEL (read-only): uit
+  // `withdrawal_profile_config.profiel`; valt anders terug op de guardrails-enum
+  // → 'guardrails', anders 'vast'. Bepaalt de "Actief"-markering en de header-badge.
+  const activeProfiel = useMemo<WithdrawalProfiel>(() => {
+    const parsed = parseWithdrawalProfileConfig(kernelRawProfile ?? undefined)
+    if (parsed?.profiel) return parsed.profiel
+    return withdrawalConfig.strategy === 'guardrails' ? 'guardrails' : 'vast'
+  }, [kernelRawProfile, withdrawalConfig.strategy])
 
-  // Labelset per SLOT: in profiel-modus het onttrekkingsPROFIEL (Vast/Afnemend/
-  // Oplopend/Guardrails); anders de klassieke enum-strategie-info. Kleuren/iconen
-  // (visuele identiteit per slot) blijven ongewijzigd — alleen label + beschrijving
-  // wisselen zodat de bestaande chart/legenda/kaarten hetzelfde blijven ogen.
-  const infoFor = (strat: WithdrawalStrategyType): StrategyInfo => {
-    const base = STRATEGY_INFO[strat]
-    if (!profielVergelijk) return base
-    const p = PROFIEL_INFO[SLOT_TO_PROFIEL[strat]]
-    return { ...base, label: p.label, description: p.description }
-  }
+  // Kernel-only: de onttrekking-tab vergelijkt de vier PROFIELEN via de horizon-kernel.
+  // Zonder rauwe kernel-context of geldige basisgegevens tonen we een nette degradatie
+  // (nooit een eigen herberekening).
+  const degradedReason = useMemo<string | null>(() => {
+    if (!kernelRawProfile) return 'Vul je geboortedatum en vermogen in Overzicht in zodat we je onttrekking kunnen doorrekenen.'
+    if (currentAge === null) return 'Vul je geboortedatum in Overzicht in zodat we je horizon kunnen berekenen.'
+    if ((kernelAssets?.length ?? 0) === 0) return 'Voeg vermogen toe in Overzicht om onttrekkingsprofielen te vergelijken.'
+    if (yearlyExpenses <= 0) return 'Stel je essentiële uitgaven in zodat we je onttrekking kunnen doorrekenen.'
+    return null
+  }, [kernelRawProfile, currentAge, kernelAssets, yearlyExpenses])
 
-  // ── Run simulations for all 4 strategies (v2-enum) of 4 profielen (kernel) ──
+  const kernelReady = degradedReason === null
 
-  const simulations = useMemo<Record<WithdrawalStrategyType, SimResult | null>>(() => {
-    if (currentAge === null || yearlyExpenses <= 0) {
-      return { static: null, guardrails: null, vpw: null, bucket: null }
+  // Synchroniseer de selectie met het actieve profiel zodra dat bekend is.
+  useEffect(() => { setSelectedProfiel(activeProfiel) }, [activeProfiel])
+
+  // ── Run kernel-projectie per onttrekkingsprofiel ─────────────────────────
+  // Eén rauwe convergentie-context; per profiel één run met een
+  // `withdrawal_profile_config.profiel`-override (ZELFDE injectie-patroon als
+  // lib/future/regel-sim.ts). GEEN tweede motor / geen eigen herberekening.
+  const simulations = useMemo<Record<WithdrawalProfiel, SimResult | null>>(() => {
+    const empty: Record<WithdrawalProfiel, SimResult | null> = {
+      vast: null, afnemend: null, oplopend: null, guardrails: null,
+    }
+    if (!kernelReady || !kernelRawProfile) return empty
+
+    const rawCfg =
+      kernelRawProfile.withdrawal_profile_config &&
+      typeof kernelRawProfile.withdrawal_profile_config === 'object'
+        ? (kernelRawProfile.withdrawal_profile_config as Record<string, unknown>)
+        : {}
+
+    const baseContext: ConvergentieRawContext = {
+      profile: kernelRawProfile,
+      assets: kernelAssets ?? [],
+      debts: kernelDebts ?? [],
+      lifeEvents: kernelLifeEvents ?? [],
+      aowRows: kernelAowRows,
+      yearlyExpenses,
     }
 
     const results: Record<string, SimResult | null> = {}
-
-    // ── Kernel-tak (FASE 6, stap 2): per SLOT één profiel-kernel-run met een
-    // `withdrawal_profile_config.profiel`-override. De vier profielen mappen op de
-    // vier bestaande slots (SLOT_TO_PROFIEL) zodat de chart/secties ongewijzigd
-    // blijven. Fout → schone terugval op de v2-enum-runs hieronder (nooit crashen).
-    if (profielVergelijk && kernelRawProfile) {
-      try {
-        const rawCfg =
-          kernelRawProfile.withdrawal_profile_config &&
-          typeof kernelRawProfile.withdrawal_profile_config === 'object'
-            ? (kernelRawProfile.withdrawal_profile_config as Record<string, unknown>)
-            : {}
-        const kernelAssetList = kernelAssets ?? []
-        const kernelDebtList = kernelDebts ?? []
-        const eigenHuisIds = deriveEigenHuisIds(kernelAssetList)
-        for (const strat of ALL_STRATEGIES) {
-          const profiel = SLOT_TO_PROFIEL[strat]
-          const adapterInput: KernelAdapterInput = {
-            profile: {
-              ...buildConvergentieAdapterProfile(kernelRawProfile),
-              // Override alléén het profiel; de 3-fasen-curve (go-go/slow-go/no-go)
-              // blijft de door de gebruiker ingestelde curve of de Excel-defaults.
-              withdrawal_profile_config: { ...rawCfg, profiel },
-            },
-            assets: kernelAssetList,
-            debts: kernelDebtList,
-            lifeEvents: kernelLifeEvents ?? [],
-            aowRows: kernelAowRows,
-          }
-          const kernelInput = buildKernelInputFromApp(adapterInput)
-          const solve = solveFire(kernelInput)
-          const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
-            kernelAssetList,
-            kernelDebtList,
-            eigenHuisIds,
-          )
-          results[strat] = toSimResult(
-            kernelToUnifiedResult(solve, {
-              input: kernelInput,
-              yearlyExpenses,
-              assetSlotMeta,
-              debtSlotMeta,
-            }),
-          )
-        }
-        return results as Record<WithdrawalStrategyType, SimResult | null>
-      } catch {
-        // Val defensief terug op de v2-enum-runs hieronder.
-      }
+    for (const profiel of ALL_PROFIELEN) {
+      const outcome = computeConvergentieProjection({
+        rawContext: {
+          ...baseContext,
+          profile: {
+            ...baseContext.profile,
+            // Override alléén het profiel; de 3-fasen-curve (go-go/slow-go/no-go)
+            // blijft de door de gebruiker ingestelde curve of de Excel-defaults.
+            withdrawal_profile_config: { ...rawCfg, profiel },
+          },
+        },
+      })
+      results[profiel] = outcome.ok ? toSimResult(outcome.result) : null
     }
-
-    for (const strat of ALL_STRATEGIES) {
-      const wsOverride: WithdrawalStrategyConfig = {
-        ...withdrawalConfig,
-        strategy: strat,
-      }
-
-      // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c). Draait
-      // wanneer de convergentie-vlag uit staat (default) → byte-identiek aan voorheen.
-      results[strat] = runScalarProjectionV2(
-        currentAge,
-        strategyForSim.endAge,
-        currentPortfolio,
-        yearlyExpenses,
-        annualSavings,
-        userGrossReturn,
-        'nl_box3',
-        userInflation,
-        lifeEvents,
-        strategyForSim,
-        wsOverride,
-      )
-    }
-
-    return results as Record<WithdrawalStrategyType, SimResult | null>
-  }, [currentAge, yearlyExpenses, currentPortfolio, annualSavings, userGrossReturn, userInflation, lifeEvents, strategyForSim, withdrawalConfig, profielVergelijk, kernelRawProfile, kernelAssets, kernelDebts, kernelLifeEvents, kernelAowRows])
+    return results as Record<WithdrawalProfiel, SimResult | null>
+  }, [kernelReady, kernelRawProfile, kernelAssets, kernelDebts, kernelLifeEvents, kernelAowRows, yearlyExpenses])
 
   // ── Extract retirement rows for chart ───────────────────────────────────
 
   const retirementData = useMemo(() => {
-    const data: Record<WithdrawalStrategyType, SimRow[]> = {
-      static: [],
+    const data: Record<WithdrawalProfiel, SimRow[]> = {
+      vast: [],
+      afnemend: [],
+      oplopend: [],
       guardrails: [],
-      vpw: [],
-      bucket: [],
     }
 
-    for (const strat of ALL_STRATEGIES) {
-      const sim = simulations[strat]
+    for (const profiel of ALL_PROFIELEN) {
+      const sim = simulations[profiel]
       if (!sim) continue
-      data[strat] = sim.rows.filter(r => r.phase === 'retirement')
+      data[profiel] = sim.rows.filter(r => r.phase === 'retirement')
     }
 
     return data
@@ -896,8 +471,8 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
     let maxAge = -Infinity
     let maxPortfolio = 0
 
-    for (const strat of ALL_STRATEGIES) {
-      const rows = retirementData[strat]
+    for (const profiel of ALL_PROFIELEN) {
+      const rows = retirementData[profiel]
       if (rows.length === 0) continue
       minAge = Math.min(minAge, rows[0].age)
       maxAge = Math.max(maxAge, rows[rows.length - 1].age)
@@ -908,7 +483,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
 
     // If no retirement data, use accumulation data to find FIRE age
     if (minAge === Infinity) {
-      const anySim = simulations.static
+      const anySim = simulations.vast
       if (anySim && anySim.rows.length > 0) {
         minAge = anySim.rows[0].age
         maxAge = anySim.rows[anySim.rows.length - 1].age
@@ -923,13 +498,13 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
     return { minAge, maxAge, maxPortfolio }
   }, [retirementData, simulations, currentAge, strategyForSim.endAge])
 
-  // ── Spending flexibility for selected strategy ──────────────────────────
+  // ── Spending flexibility for selected profiel ──────────────────────────
 
   const spendingRange = useMemo(() => {
-    const sim = simulations[selectedStrategy]
+    const sim = simulations[selectedProfiel]
     if (!sim) return null
 
-    const retRows = retirementData[selectedStrategy]
+    const retRows = retirementData[selectedProfiel]
     if (retRows.length === 0) return null
 
     let minWithdrawal = Infinity
@@ -948,12 +523,12 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
       minMonthly: Math.round(minWithdrawal / 12),
       maxMonthly: Math.round(maxWithdrawal / 12),
     }
-  }, [simulations, retirementData, selectedStrategy])
+  }, [simulations, retirementData, selectedProfiel])
 
   // ── Guardrails corridor data (for shaded area) ─────────────────────────
 
   const guardrailsCorridor = useMemo(() => {
-    if (selectedStrategy !== 'guardrails') return null
+    if (selectedProfiel !== 'guardrails') return null
 
     const sim = simulations.guardrails
     if (!sim) return null
@@ -972,7 +547,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
         portfolio: row.endPortfolio,
       }
     })
-  }, [selectedStrategy, simulations, retirementData, withdrawalConfig])
+  }, [selectedProfiel, simulations, retirementData, withdrawalConfig])
 
   // ── Life event markers with ages ────────────────────────────────────────
 
@@ -1048,8 +623,8 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
     )
   }
 
-  const selectedSim = simulations[selectedStrategy]
-  const selectedInfo = infoFor(selectedStrategy)
+  const selectedSim = simulations[selectedProfiel]
+  const selectedInfo = PROFIEL_INFO[selectedProfiel]
   const fireAge = selectedSim?.fireAge ?? null
 
   return (
@@ -1072,7 +647,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
             <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
               <span className="font-sans text-[10px] font-medium uppercase tracking-wider text-horizon-500">Onttrekking</span>
               <span className="font-sans text-xs font-semibold text-horizon-700">
-                {STRATEGY_INFO[withdrawalConfig.strategy].label}
+                {PROFIEL_INFO[activeProfiel].label}
               </span>
             </div>
             {housingStrategy && (
@@ -1242,70 +817,58 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
 
         {activeTab === 'onttrekking' && (
         <>
-        {/* FASE 6, stap 2 — profiel-modus (kernel): read-only informatief vergelijk. */}
-        {profielVergelijk && (
-          <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/60 px-4 py-2.5">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-500" />
-            <p className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
-              Deze berekening gebruikt de nieuwe manier van doorrekenen. Hieronder vergelijk je de vier
-              onttrekkings<strong>profielen</strong> — Vast, Afnemend, Oplopend en Guardrails.
-              Dit vergelijk is informatief; je kiest en bewaart je profiel bij{' '}
-              <Link href="/toekomst?tab=voorkeuren" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Voorkeuren</Link>.
-            </p>
-          </div>
-        )}
-        {/* ── Incompatibility warning (alleen v2-tak; enum × eindstrategie) ── */}
-        {!profielVergelijk && (() => {
-          const endStrat = localEndStrategy
-          const wsStrat = withdrawalConfig.strategy
-          const entry = COMPATIBILITY_MATRIX[wsStrat]?.[endStrat]
-          if (!entry || entry.status === 'compatible') return null
-          const colors = STATUS_COLORS[entry.status]
-          return (
-            <div className={`mb-4 flex items-start gap-2.5 rounded-[var(--r)] border ${colors.border} ${colors.bg} px-4 py-2.5`}>
-              <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${entry.status === 'incompatible' ? 'text-red-500' : 'text-amber-500'}`} />
+        {degradedReason ? (
+          /* Kernel-only: zonder rauwe context of basisgegevens geen doorrekening. */
+          <div className="card-editorial overflow-hidden">
+            <div className="h-[3px] bg-horizon-500" />
+            <div className="flex items-start gap-2.5 px-4 py-4">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-500" />
               <div>
-                <p className={`font-sans text-xs font-semibold ${colors.text}`}>
-                  {entry.status === 'incompatible' ? 'Onverenigbare combinatie' : 'Let op'}
+                <p className="font-sans text-sm font-semibold text-[var(--ink)]">
+                  Doorrekening niet beschikbaar
                 </p>
-                <p className={`mt-0.5 font-sans text-[11px] leading-snug ${colors.text}`}>
-                  Je actieve onttrekkingsstrategie ({STRATEGY_INFO[wsStrat].label}) is{' '}
-                  {entry.status === 'incompatible' ? 'niet compatibel' : 'beperkt compatibel'} met de gekozen eindstrategie ({END_STRATEGY_SHORT[endStrat]}).{' '}
-                  {entry.suggestion ?? 'Overweeg een andere onttrekkingsstrategie.'}
+                <p className="mt-1 font-sans text-[13px] leading-snug text-[var(--ink-2)]">
+                  {degradedReason}
                 </p>
               </div>
             </div>
-          )
-        })()}
+          </div>
+        ) : (
+        <>
+        {/* Kernel-only: read-only informatief profiel-vergelijk. */}
+        <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/60 px-4 py-2.5">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-500" />
+          <p className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
+            Deze vergelijking gebruikt de horizon-kernel. Hieronder vergelijk je de vier
+            onttrekkings<strong>profielen</strong> — Vast, Afnemend, Oplopend en Guardrails.
+            Dit vergelijk is informatief; je kiest en bewaart je profiel bij{' '}
+            <Link href="/toekomst?tab=voorkeuren" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Voorkeuren</Link>.
+          </p>
+        </div>
 
-        {/* ── Withdrawal strategy/profiel label ────────────────────── */}
+        {/* ── Onttrekkingsprofiel-label ────────────────────────────── */}
         <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-          {profielVergelijk ? 'Onttrekkingsprofiel' : 'Onttrekkingsstrategie'}
+          Onttrekkingsprofiel
         </p>
 
-        {/* ── Strategy selector cards ─────────────────────────────── */}
+        {/* ── Profiel selector cards ──────────────────────────────── */}
         <div className="mb-6 grid grid-cols-2 gap-3">
-          {ALL_STRATEGIES.map(strat => {
-            const info = infoFor(strat)
-            const sim = simulations[strat]
-            const isActive = strat === selectedStrategy
-            // Enum-concepten (actieve strategie, compatibiliteit) gelden alleen op de
-            // v2-tak; in profiel-modus is dit vergelijk read-only informatief.
-            const isCurrent = !profielVergelijk && strat === withdrawalConfig.strategy
-            const compat = profielVergelijk ? undefined : COMPATIBILITY_MATRIX[strat]?.[localEndStrategy]
-            const isIncompatible = compat?.status === 'incompatible'
+          {ALL_PROFIELEN.map(profiel => {
+            const info = PROFIEL_INFO[profiel]
+            const sim = simulations[profiel]
+            const isSelected = profiel === selectedProfiel
+            // Read-only: markeer het huidig opgeslagen profiel (op /toekomst gekozen).
+            const isCurrent = profiel === activeProfiel
 
             return (
               <button
-                key={strat}
+                key={profiel}
                 type="button"
-                onClick={() => setSelectedStrategy(strat)}
+                onClick={() => setSelectedProfiel(profiel)}
                 className={`relative rounded-[var(--r)] border-2 p-3 text-left transition-all ${
-                  isIncompatible
-                    ? 'border-red-200 bg-red-50/40 opacity-60 cursor-not-allowed'
-                    : isActive
-                      ? `${info.cardBg} ${info.cardBorder} shadow-sm`
-                      : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
+                  isSelected
+                    ? `${info.cardBg} ${info.cardBorder} shadow-sm`
+                    : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
                 }`}
               >
                 {isCurrent && (
@@ -1313,82 +876,24 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
                     Actief
                   </span>
                 )}
-                {isIncompatible && (
-                  <span className="absolute -top-2 left-2 rounded-full bg-red-500 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-wider text-white">
-                    ❌ Incompatibel
-                  </span>
-                )}
                 <div className="mb-1 flex items-center gap-1.5">
-                  <span style={{ color: isIncompatible ? 'var(--ink-4)' : info.color }}>{STRATEGY_ICONS[strat]}</span>
-                  <span className={`font-sans text-sm font-semibold ${isIncompatible ? 'text-[var(--ink-4)]' : 'text-[var(--ink)]'}`}>
+                  <span style={{ color: info.color }}>{PROFIEL_ICONS[profiel]}</span>
+                  <span className="font-sans text-sm font-semibold text-[var(--ink)]">
                     {info.label}
                   </span>
                 </div>
-                <p className={`font-sans text-[11px] leading-snug ${isIncompatible ? 'text-[var(--ink-4)]' : 'text-[var(--ink-3)]'}`}>
-                  {isIncompatible ? compat.explanation : info.description}
+                <p className="font-sans text-[11px] leading-snug text-[var(--ink-3)]">
+                  {info.description}
                 </p>
-                {!isIncompatible && sim && sim.fireReachable && (
+                {sim && sim.fireReachable && (
                   <p className="mt-2 font-mono text-xs tabular-nums text-[var(--ink-2)]">
                     {localEndStrategy === 'pensioen' ? `AOW: ${NL_AOW_AGE} jr` : `FIRE: ${sim.fireAge} jr`}
-                  </p>
-                )}
-                {compat?.status === 'warning' && (
-                  <p className="mt-1 font-sans text-[10px] text-amber-600">
-                    ⚠️ {compat.suggestion ?? 'Let op bij deze combinatie'}
                   </p>
                 )}
               </button>
             )
           })}
         </div>
-
-        {/* ── Activate strategy button (when selection differs from active) ── */}
-        {/* Alleen v2-tak: de "activeer"-flow slaat de enum-strategie op. In
-            profiel-modus is dit vergelijk read-only (het profiel-veld heeft een
-            eigen opslagpad op /toekomst?tab=voorkeuren). */}
-        {!profielVergelijk && selectedStrategy !== withdrawalConfig.strategy && (
-          <div className="mb-6 flex items-center gap-3">
-            <button
-              type="button"
-              disabled={activating}
-              onClick={() => activateStrategy(selectedStrategy)}
-              className="inline-flex items-center gap-2 rounded-[var(--r)] bg-horizon-600 px-4 py-2 font-sans text-sm font-semibold text-white transition-colors hover:bg-horizon-700 disabled:opacity-60"
-            >
-              {activating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4" />
-              )}
-              Activeer {STRATEGY_INFO[selectedStrategy].label}
-            </button>
-            <span className="font-sans text-xs text-[var(--ink-4)]">
-              Huidige strategie: {STRATEGY_INFO[withdrawalConfig.strategy].label}
-            </span>
-          </div>
-        )}
-
-        {/* ── Inline incompatibility warning under activate button ─── */}
-        {!profielVergelijk && selectedStrategy !== withdrawalConfig.strategy && (() => {
-          const entry = COMPATIBILITY_MATRIX[selectedStrategy]?.[localEndStrategy]
-          if (!entry || entry.status === 'compatible') return null
-          const colors = STATUS_COLORS[entry.status]
-          return (
-            <div className={`mb-4 -mt-3 flex items-start gap-2 rounded-[var(--r)] border ${colors.border} ${colors.bg} px-3 py-2`}>
-              <span className="mt-0.5 text-sm">{STATUS_ICONS[entry.status]}</span>
-              <p className={`font-sans text-xs ${colors.text}`}>
-                {entry.explanation}
-                {entry.suggestion && <> — {entry.suggestion}</>}
-              </p>
-            </div>
-          )
-        })()}
-
-        {/* ── Activation error message ───────────────────────────── */}
-        {!profielVergelijk && activateError && (
-          <div className="mb-6 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2">
-            <p className="font-sans text-sm text-red-700">{activateError}</p>
-          </div>
-        )}
 
         {/* ── Comparison SVG chart ────────────────────────────────── */}
         <section className="mb-6">
@@ -1401,14 +906,14 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
 
               {/* Legend */}
               <div className="mb-3 flex flex-wrap items-center gap-3">
-                {ALL_STRATEGIES.map(strat => {
-                  const info = infoFor(strat)
-                  const isSelected = strat === selectedStrategy
+                {ALL_PROFIELEN.map(profiel => {
+                  const info = PROFIEL_INFO[profiel]
+                  const isSelected = profiel === selectedProfiel
                   return (
                     <button
-                      key={strat}
+                      key={profiel}
                       type="button"
-                      onClick={() => setSelectedStrategy(strat)}
+                      onClick={() => setSelectedProfiel(profiel)}
                       className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 font-sans text-[10px] transition-colors ${
                         isSelected
                           ? 'bg-[var(--subtle)] font-semibold text-[var(--ink)]'
@@ -1428,7 +933,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
               <ComparisonChart
                 retirementData={retirementData}
                 chartBounds={chartBounds}
-                selectedStrategy={selectedStrategy}
+                selectedProfiel={selectedProfiel}
                 eventMarkers={eventMarkers}
                 guardrailsCorridor={guardrailsCorridor}
               />
@@ -1458,35 +963,9 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
                       </span>
                       {' '}per maand
                     </p>
-                    {/* Profiel-modus: de profiel-beschrijving; anders de enum-specifieke duiding. */}
-                    {profielVergelijk ? (
-                      <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                        {selectedInfo.description}
-                      </p>
-                    ) : (
-                      <>
-                        {selectedStrategy === 'static' && (
-                          <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                            Bij de vaste strategie is je onttrekking constant (gecorrigeerd voor inflatie).
-                          </p>
-                        )}
-                        {selectedStrategy === 'guardrails' && (
-                          <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                            De Guardrails-strategie past je onttrekking aan bij goede en slechte beursjaren.
-                          </p>
-                        )}
-                        {selectedStrategy === 'vpw' && (
-                          <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                            VPW berekent elk jaar een nieuw percentage op basis van je resterende horizon.
-                          </p>
-                        )}
-                        {selectedStrategy === 'bucket' && (
-                          <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                            De bucket-strategie beschermt je onttrekking door verschillende emmers voor korte en lange termijn.
-                          </p>
-                        )}
-                      </>
-                    )}
+                    <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
+                      {selectedInfo.description}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1495,7 +974,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
         )}
 
         {/* ── Guardrails bandwidth card (conditional) ────────────── */}
-        {selectedStrategy === 'guardrails' && guardrailsCorridor && guardrailsCorridor.length > 0 && (
+        {selectedProfiel === 'guardrails' && guardrailsCorridor && guardrailsCorridor.length > 0 && (
           <section className="mb-6">
             <div className="card-editorial overflow-hidden">
               <div className="h-[3px] bg-blue-400" />
@@ -1569,31 +1048,19 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
           </section>
         )}
 
-        {/* ── Compatibility matrix (alleen v2-tak: enum × eindstrategie) ── */}
-        {!profielVergelijk && (
-        <section className="mb-6">
-          <CompatibilityMatrix
-            selectedWithdrawal={selectedStrategy}
-            activeWithdrawal={withdrawalConfig.strategy}
-            activeEnd={localEndStrategy}
-          />
-        </section>
-        )}
-
-        {/* ── Strategy/profiel explanation cards ──────────────── */}
+        {/* ── Profielen uitgelegd ──────────────────────────────── */}
         <section className="mb-6">
           <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-            {profielVergelijk ? 'Profielen uitgelegd' : 'Strategieën uitgelegd'}
+            Profielen uitgelegd
           </p>
           <div className="space-y-3">
-            {ALL_STRATEGIES.map(strat => {
-              const info = infoFor(strat)
-              const explanation = STRATEGY_EXPLANATIONS[strat]
-              const isCurrent = !profielVergelijk && strat === withdrawalConfig.strategy
+            {ALL_PROFIELEN.map(profiel => {
+              const info = PROFIEL_INFO[profiel]
+              const isCurrent = profiel === activeProfiel
 
               return (
                 <div
-                  key={strat}
+                  key={profiel}
                   className={`card-editorial overflow-hidden transition-all ${
                     isCurrent ? 'ring-2 ring-horizon-400 ring-offset-1' : ''
                   }`}
@@ -1608,7 +1075,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
                         className="flex h-7 w-7 items-center justify-center rounded-md"
                         style={{ backgroundColor: info.color + '18', color: info.color }}
                       >
-                        {STRATEGY_ICONS[strat]}
+                        {PROFIEL_ICONS[profiel]}
                       </span>
                       <span className="font-sans text-sm font-bold text-[var(--ink)]">
                         {info.label}
@@ -1620,75 +1087,17 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
                       )}
                     </div>
 
-                    {/* Profiel-modus: alleen de profiel-beschrijving (de enum-specifieke
-                        hoe/geschikt/voor-nadelen gelden voor de klassieke strategieën). */}
-                    {profielVergelijk ? (
-                      <p className="font-sans text-xs leading-relaxed text-[var(--ink-2)]">
-                        {info.description}
-                      </p>
-                    ) : (
-                    <>
-                    {/* How it works */}
-                    <div className="mb-2">
-                      <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-3)]">
-                        Hoe het werkt
-                      </p>
-                      <p className="mt-0.5 font-sans text-xs leading-relaxed text-[var(--ink-2)]">
-                        {explanation.howItWorks}
-                      </p>
-                    </div>
-
-                    {/* Suitable for */}
-                    <div className="mb-2">
-                      <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-3)]">
-                        Geschikt voor
-                      </p>
-                      <p className="mt-0.5 font-sans text-xs leading-relaxed text-[var(--ink-2)]">
-                        {explanation.suitableFor}
-                      </p>
-                    </div>
-
-                    {/* Pros and cons side by side */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-green-600">
-                          Voordelen
-                        </p>
-                        <ul className="space-y-0.5">
-                          {explanation.pros.map((pro, idx) => (
-                            <li key={idx} className="flex items-start gap-1.5">
-                              <Check className="mt-0.5 h-3 w-3 shrink-0 text-green-500" />
-                              <span className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
-                                {pro}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <p className="mb-1 font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-red-500">
-                          Nadelen
-                        </p>
-                        <ul className="space-y-0.5">
-                          {explanation.cons.map((con, idx) => (
-                            <li key={idx} className="flex items-start gap-1.5">
-                              <CircleDot className="mt-0.5 h-3 w-3 shrink-0 text-red-400" />
-                              <span className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
-                                {con}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                    </>
-                    )}
+                    <p className="font-sans text-xs leading-relaxed text-[var(--ink-2)]">
+                      {info.description}
+                    </p>
                   </div>
                 </div>
               )
             })}
           </div>
         </section>
+        </>
+        )}
         </>
         )}
 
@@ -1746,9 +1155,9 @@ function SummaryRow({ label, value }: { label: string; value: React.ReactNode })
 // ── Comparison Chart (SVG) ──────────────────────────────────────────────────
 
 interface ComparisonChartProps {
-  retirementData: Record<WithdrawalStrategyType, SimRow[]>
+  retirementData: Record<WithdrawalProfiel, SimRow[]>
   chartBounds: { minAge: number; maxAge: number; maxPortfolio: number }
-  selectedStrategy: WithdrawalStrategyType
+  selectedProfiel: WithdrawalProfiel
   eventMarkers: Array<{ name: string; age: number; type: string }>
   guardrailsCorridor: Array<{ age: number; floor: number; target: number; ceiling: number; portfolio: number }> | null
 }
@@ -1761,7 +1170,7 @@ const PAD_R = 16
 const PAD_T = 16
 const PAD_B = 32
 
-function ComparisonChart({ retirementData, chartBounds, selectedStrategy, eventMarkers, guardrailsCorridor }: ComparisonChartProps) {
+function ComparisonChart({ retirementData, chartBounds, selectedProfiel, eventMarkers, guardrailsCorridor }: ComparisonChartProps) {
   const { minAge, maxAge, maxPortfolio } = chartBounds
 
   if (maxAge <= minAge || maxPortfolio <= 0) {
@@ -1806,15 +1215,15 @@ function ComparisonChart({ retirementData, chartBounds, selectedStrategy, eventM
     xLabels.push(age)
   }
 
-  // Draw order: non-selected strategies first, then selected on top
-  const drawOrder = ALL_STRATEGIES.filter(s => s !== selectedStrategy)
-  drawOrder.push(selectedStrategy)
+  // Draw order: non-selected profielen first, then selected on top
+  const drawOrder = ALL_PROFIELEN.filter(s => s !== selectedProfiel)
+  drawOrder.push(selectedProfiel)
 
   return (
     <svg
       viewBox={`0 0 ${CHART_W} ${CHART_H}`}
       className="w-full"
-      aria-label="Vergelijking onttrekkingsstrategieën"
+      aria-label="Vergelijking onttrekkingsprofielen"
     >
       {/* Y-axis grid lines */}
       {yGridLines.map((line, i) => (
@@ -1884,7 +1293,7 @@ function ComparisonChart({ retirementData, chartBounds, selectedStrategy, eventM
       })}
 
       {/* Guardrails shaded corridor (when selected) */}
-      {selectedStrategy === 'guardrails' && guardrailsCorridor && guardrailsCorridor.length > 1 && (
+      {selectedProfiel === 'guardrails' && guardrailsCorridor && guardrailsCorridor.length > 1 && (
         <path
           d={buildGuardrailsArea(guardrailsCorridor, toX, toY)}
           fill="#3b82f6"
@@ -1892,16 +1301,16 @@ function ComparisonChart({ retirementData, chartBounds, selectedStrategy, eventM
         />
       )}
 
-      {/* Strategy lines */}
-      {drawOrder.map(strat => {
-        const rows = retirementData[strat]
+      {/* Profiel lines */}
+      {drawOrder.map(profiel => {
+        const rows = retirementData[profiel]
         if (rows.length === 0) return null
-        const info = STRATEGY_INFO[strat]
-        const isSelected = strat === selectedStrategy
+        const info = PROFIEL_INFO[profiel]
+        const isSelected = profiel === selectedProfiel
 
         return (
           <path
-            key={strat}
+            key={profiel}
             d={buildPath(rows)}
             fill="none"
             stroke={info.stroke}

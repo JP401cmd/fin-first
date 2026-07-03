@@ -1,23 +1,19 @@
 /**
  * Regressietest: horizon-grafiek × strategie-combinaties op de complete persona,
- * gemeten op de **horizon-kernel** (FASE 6, stap 2).
+ * gemeten op de **horizon-kernel** (FASE 6, stap 5A — kernel-only).
  *
- * Dit is de "verwachting vanuit de testsuite": draait per combinatie de horizon-kernel
- * (primair, via `computeConvergentieProjection({ kernelEnabled: true })`) én — voor de
- * v2-uitdrukbare combinaties — de v2-grootboek-engine (vergelijk, drift-bewaking). Elke
- * combinatie moet binnen de kernel-golden-marges (vrijheidsleeftijd ±0,5 jr, doelbedrag
- * ±2%) blijven, alle structurele/relationele invarianten halen, DAADWERKELIJK op de
- * kernel draaien (geen stille v2-terugval) én — waar van toepassing — de v2-goldens
- * halen. Drift in een rekenmotor → rood.
+ * Draait per combinatie de horizon-kernel (`computeConvergentieProjection`). Elke
+ * combinatie moet binnen de golden-marges (vrijheidsleeftijd ±0,5 jr, doelbedrag ±2%)
+ * blijven en alle structurele/relationele invarianten halen. Drift in de rekenmotor → rood.
  *
- * Golden-waarden staan in matrix.ts (EXPECTED = kernel, EXPECTED_V2 = v2). Regenereer ze
- * bewust na een gewenste rekenmotor-wijziging (zie de GENERATED:GOLDEN-blok-instructie daar).
+ * Golden-waarden staan in matrix.ts (EXPECTED). Regenereer ze bewust na een gewenste
+ * rekenmotor-wijziging (zie de GENERATED:GOLDEN-blok-instructie daar). De vroegere
+ * v2-vergelijkarm (EXPECTED_V2) is met de v2-engine-deletie vervallen.
  */
 import { describe, it, expect } from 'vitest'
 import {
   runHorizonStrategyMatrix,
   COMBOS,
-  isV2Expressible,
   type ComboResult,
   type MatrixResult,
 } from './matrix'
@@ -29,7 +25,7 @@ function failedChecks(c: ComboResult): string[] {
   return c.checks.filter((ch) => !ch.pass).map((ch) => `${ch.name} — ${ch.detail}`)
 }
 
-describe('horizon-strategie regressiematrix (kernel-primair)', () => {
+describe('horizon-strategie regressiematrix (kernel)', () => {
   const result = runHorizonStrategyMatrix()
 
   it('draait alle combinaties', () => {
@@ -37,18 +33,12 @@ describe('horizon-strategie regressiematrix (kernel-primair)', () => {
     expect(result.summary.total).toBe(COMBOS.length)
   })
 
-  it('elke combinatie slaagt (kernel-golden + invarianten + v2-drift)', () => {
+  it('elke combinatie slaagt (kernel-golden + invarianten)', () => {
     const failing = allCombos(result).filter((c) => c.status === 'fail')
     const detail = failing.map((c) => `${c.id}:\n  ${failedChecks(c).join('\n  ')}`).join('\n')
     expect(detail).toBe('')
     expect(result.summary.passed).toBe(COMBOS.length)
     expect(result.summary.failed).toBe(0)
-  })
-
-  it('elke combinatie draait op de kernel (geen stille v2-terugval)', () => {
-    const fellBack = allCombos(result).filter((c) => c.engine !== 'kernel' || c.fallbackReason)
-    const detail = fellBack.map((c) => `${c.id}: engine=${c.engine} — ${c.fallbackReason ?? '—'}`).join('\n')
-    expect(detail).toBe('')
   })
 
   // Per-combinatie test voor granulaire rapportage in CI.
@@ -60,20 +50,6 @@ describe('horizon-strategie regressiematrix (kernel-primair)', () => {
     })
   }
 
-  it('kernel-only combinaties (afnemend/oplopend) dragen géén v2-vergelijkarm', () => {
-    const kernelOnly = allCombos(result).filter((c) => c.kernelOnly)
-    expect(kernelOnly.map((c) => c.id).sort()).toEqual(['C-afnemend', 'C-oplopend'])
-    for (const c of kernelOnly) {
-      expect(c.v2Actual).toBeNull()
-      expect(c.v2Expected).toBeNull()
-    }
-    // Spiegelbeeld: elke v2-uitdrukbare combinatie draagt wél een v2-arm.
-    for (const c of allCombos(result).filter((c) => !c.kernelOnly)) {
-      expect(isV2Expressible(COMBOS.find((x) => x.id === c.id)!)).toBe(true)
-      expect(c.v2Actual).not.toBeNull()
-    }
-  })
-
   // NB: één verse run tegen de reeds-berekende describe-`result` (i.p.v. twee nieuwe
   // runs) — de kernel-bisectie (16× solveFire × ~1200 maanden) is duur; twee extra
   // volledige matrices overschreden de 5s-default. Ruime testTimeout voor de zekerheid.
@@ -82,16 +58,15 @@ describe('horizon-strategie regressiematrix (kernel-primair)', () => {
     const pick = (m: MatrixResult) =>
       allCombos(m).map((c) => ({
         id: c.id,
-        engine: c.engine,
-        fire: c.kernelActual.fireAgeFractional,
-        doel: c.kernelActual.requiredFirePortfolio,
-        target: c.kernelActual.targetEndPortfolio,
+        fire: c.actual.fireAgeFractional,
+        doel: c.actual.requiredFirePortfolio,
+        target: c.actual.targetEndPortfolio,
       }))
     expect(pick(b)).toEqual(pick(result))
   }, 20000)
 
-  it('alle combinaties zijn FIRE-bereikbaar op de complete persona (kernel-arm)', () => {
-    const unreachable = allCombos(result).filter((c) => !c.kernelActual.fireReachable)
+  it('alle combinaties zijn FIRE-bereikbaar op de complete persona', () => {
+    const unreachable = allCombos(result).filter((c) => !c.actual.fireReachable)
     expect(unreachable.map((c) => c.id)).toEqual([])
   })
 })

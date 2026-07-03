@@ -6,7 +6,7 @@ import { useDreamTransition } from '@/components/app/horizon/dream-transition-co
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
-import { lifeEventsToCashflows, type SimCashflow, type SimRow, type SimResult } from '@/lib/fire-simulation'
+import { type SimCashflow, type SimRow, type SimResult } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
@@ -29,9 +29,8 @@ import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress } f
 import { computeEmergencyFundMonths } from '@/lib/health-score-input'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
-import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
 import { isKernelReachedNowDisplay, kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
-import { buildConvergentieAdapterProfile, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { buildConvergentieAdapterProfile, computeConvergentieProjection, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
 import { evaluateFireAt } from '@/lib/horizon-kernel/solver'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
@@ -55,7 +54,7 @@ import {
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw, GitBranch,
   ChevronDown, ChevronUp, Compass, SlidersHorizontal,
-  Home, Lightbulb, Activity,
+  Home, Lightbulb,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
@@ -141,10 +140,8 @@ import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming } from '@/lib/fire-strategy'
-import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
-import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
-import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
+import { toSimResult } from '@/lib/unified-projection'
+import { buildHorizonInput } from '@/lib/horizon/build-input'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
@@ -258,14 +255,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [estimatedYearlyIncome, setEstimatedYearlyIncome] = useState(0)
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(initialData?.fireStrategy ?? undefined)
   const [userAowAge, setUserAowAge] = useState<AowAge>({ years: 67, months: 0, fractional: 67, isDefinitive: false })
-  // ── Kernel-convergentie (FASE 5, stap 2b) ──
-  /** horizon_kernel_convergentie — draait de /toekomst-projectie via de horizon-kernel
-   *  (adapter→solveFire→bridge). Default uit → byte-identiek aan v2. */
-  const [kernelConvergentie, setKernelConvergentie] = useState(false)
+  // ── Kernel-context (horizon-kernel = de enige motor) ──
   /** Rauwe profiel-rij (incl. kernel-instellingen-kolommen + geïnjecteerde
-   *  yearly_essential_expenses) — kern-invoerbron voor de convergentie-router; alleen
-   *  geconsumeerd wanneer de vlag aan is. Los van `profileRaw` (doorrekening-inline). */
-  const [kernelRawProfile, setKernelRawProfile] = useState<ConvergentieRawProfileRow | null>(null)
+   *  yearly_essential_expenses) — kern-invoerbron voor de convergentie-router. Server-
+   *  side voorgeladen via `initialData.rawProfile` (bevat al `yearly_essential_expenses`),
+   *  zodat de EERSTE render meteen de kernel-projectie heeft i.p.v. een null-flits; de
+   *  mount-fetch (loadKernelContext) + loadData verversen 'm daarna. Los van `profileRaw`
+   *  (doorrekening-inline). */
+  const [kernelRawProfile, setKernelRawProfile] = useState<ConvergentieRawProfileRow | null>(
+    initialData.rawProfile ?? null,
+  )
   /** Rauwe AOW-tabel — voor de kern-tijdas (lookupAowAge) in de adapter. */
   const [aowRows, setAowRows] = useState<AowLeeftijdRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -532,7 +531,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
-  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows, effectiveLifeEvents, housingHeldToEnd, engine, kernelStatus, kernelMaandHint, kernelFallbackReason } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -551,10 +550,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           monthlySavingsOverride,
           baseAnnualSavingsFromCashflow: initialData.baseAnnualSavingsFromCashflow,
           housingStrategy: initialData.housingStrategy,
-          horizonEngineV2: initialData.horizonEngineV2,
-          potRules: initialData.potRules,
-          // FASE 5, stap 2b — kernel-convergentie (vlag + rauwe context).
-          kernelConvergentieEnabled: kernelConvergentie,
           kernelRawProfile,
           aowRows,
         }
@@ -573,17 +568,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     [effectiveLifeEvents, events],
   )
 
-  // ── EventPane preview-baseline (C5-pre) ──────────────────────────────────
-  // Bouw DEZELFDE flag-bewuste, per-asset projectie-input als de Tijdas-grafiek
-  // (via de gedeelde `buildHorizonInput` met dezelfde parameters als de hook),
-  // zodat de EventPane-delta-previews op deze /horizon-route ook via
-  // `runSelectedProjection` lopen — v2-consistent voor v2-gebruikers i.p.v. de
-  // oude scalar-portfolio runSimulation. De `cashflows` worden per preview-aanroep
-  // door de pane vervangen. Pensioen-leeftijd matcht de hook (grafiek).
+  // ── EventPane preview-baseline (kernel-only) ─────────────────────────────
+  // De EventPane-delta-previews draaien op DEZELFDE motor als de Tijdas-grafiek:
+  // de horizon-kernel via `computeConvergentieProjection` (zie event-preview-sim →
+  // strategy-preview). De baseline draagt de rauwe kernel-context mínus lifeEvents;
+  // de preview-run injecteert de events per aanroep. Zonder rauwe kernel-context
+  // (bv. vóór de mount-fetch of zonder geboortedatum) is er geen doorrekening →
+  // geen baseline (de pane toont dan z'n lege staat, geen tweede motor).
   const eventPanePreviewBaseline = useMemo<PreviewBaseline | null>(() => {
+    if (!kernelRawProfile) return null
+    // buildHorizonInput levert de reële jaaruitgave (grondslag voor de bridge-
+    // implicitWithdrawalRate) + de null-guards; de events komen per preview-aanroep.
     const built = buildHorizonInput({
       horizonInput: input,
-      lifeEvents: [], // events worden per preview-aanroep geïnjecteerd
+      lifeEvents: [],
       fireStrategy,
       withdrawalStrategy: withdrawalStrategyConfig,
       grossReturn: fireParams.grossReturn,
@@ -597,27 +595,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       monthlySavingsOverride,
       baseAnnualSavingsFromCashflow: initialData.baseAnnualSavingsFromCashflow,
       housingStrategy: initialData.housingStrategy,
-      potRules: initialData.potRules,
-      horizonEngineV2: initialData.horizonEngineV2,
     })
     if (!built) return null
     return {
-      input: built.input,
-      useV2: initialData.horizonEngineV2,
-      strategyOptions: built.strategyOptions,
-      pensioenFireAgeFractional: built.isPensioen ? built.aowAge : null,
-      // FASE 6, stap 1 — dezelfde vlag-beslissing + rauwe kernel-context als de
-      // hoofdgrafiek-hook (use-horizon-fire-sim). Zo lopen de EventPane-delta-
-      // previews per constructie op DEZELFDE motor als de Tijdas-grafiek:
-      // kernelConvergentie aan + kernelRawProfile aanwezig → kernel, anders v2
-      // (byte-identiek aan vandaag). De preview-baseline draagt de context mínus
-      // lifeEvents/yearlyExpenses; die injecteert de preview-run per aanroep.
-      kernelEnabled: kernelConvergentie,
-      kernelRawContext: kernelRawProfile
-        ? { profile: kernelRawProfile, assets: initialData.assets ?? [], debts, aowRows }
-        : undefined,
+      rawContext: {
+        profile: kernelRawProfile,
+        assets: initialData.assets ?? [],
+        debts,
+        aowRows,
+        yearlyExpenses: built.input.yearlyExpenses,
+      },
     }
-  }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, monthlySavingsOverride, initialData, kernelConvergentie, kernelRawProfile, aowRows])
+  }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, monthlySavingsOverride, initialData, kernelRawProfile, aowRows])
 
   // Fetch dividend income client-side (not available from server loader)
   useEffect(() => {
@@ -643,13 +632,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       .catch(() => {})
   }, [])
 
-  // ── Kernel-convergentie-context laden op mount (FASE 5, stap 2b) ──────────
+  // ── Kernel-context laden op mount ─────────────────────────────────────────
   // `loadData` draait op deze route alléén na CRUD/pane-close, niet op mount.
-  // Zonder deze aparte mount-fetch zou /toekomst pas ná een interactie naar de
-  // kernel flippen. Daarom laden we de kern-context hier ook op de eerste render
-  // — zelfde patroon als de dividend-/scenario-mount-fetches hierboven. De vlag
-  // wordt eerst (goedkoop, één rij) gelezen; staat 'm uit, dan blijft
-  // kernelRawProfile null → de hook rekent byte-identiek v2 (geen gedragswijziging).
+  // Zonder deze aparte mount-fetch zou de kernel-projectie pas ná een interactie
+  // beschikbaar zijn. Daarom laden we de kern-context hier ook op de eerste render
+  // — zelfde patroon als de dividend-/scenario-mount-fetches hierboven. Tot deze
+  // fetch klaar is, blijft kernelRawProfile null → de hook levert null (laadstaat).
   useEffect(() => {
     let cancelled = false
     async function loadKernelContext() {
@@ -660,13 +648,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           .select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules')
           .single()
         if (cancelled || !profileData) return
-        const enabled = isKernelFlagEnabled(
-          profileData as { feature_preferences?: Record<string, unknown> | null },
-          'convergentie',
-        )
-        setKernelConvergentie(enabled)
-        // Vlag uit → geen kern-context nodig; de hook blijft op v2 (byte-identiek).
-        if (!enabled) return
         // Jaarlijkse essentiële uitgaven — zelfde grondslag (echte essentiële
         // budgetten, NIET de retirement-expenses) als v2/loadData, zodat de
         // 'essential_budgets'-pensioenuitgave-methode in de kernel klopt.
@@ -813,16 +794,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       setProfileRaw((profileResult.data as Record<string, unknown>) ?? null)
       setEstimatedYearlyIncome(extrapolatedIncome)
 
-      // FASE 5, stap 2b — kernel-convergentie-context ná elke loadData verversen
-      // (los van profileRaw hierboven). yearly_essential_expenses = de al-berekende
-      // essentiële jaaruitgaven (NIET de retirement-expenses) zodat de kernel
-      // dezelfde grondslag gebruikt als v2.
-      setKernelConvergentie(
-        isKernelFlagEnabled(
-          profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null,
-          'convergentie',
-        ),
-      )
+      // Kernel-context ná elke loadData verversen (los van profileRaw hierboven).
+      // yearly_essential_expenses = de al-berekende essentiële jaaruitgaven (NIET de
+      // retirement-expenses) zodat de kernel dezelfde grondslag gebruikt.
       setKernelRawProfile({
         ...(profileResult.data as ConvergentieRawProfileRow),
         yearly_essential_expenses: yearlyMustExpenses,
@@ -1618,6 +1592,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // domineert het getoonde eindvermogen. Alle bedragen consume-only uit de
   // laatste unifiedRow + de strategie-config — geen eigen scommen.
   const housingHeldNotice = useMemo(() => {
+    // "Huis wordt nooit verkocht": alleen bij een downsize-strategie met de
+    // "wanneer nodig"-trigger (on_depletion) waar de kernel binnen de horizon géén
+    // verkoop deed (`kernelHousingSale === null`). Bij een verkoop levert de kernel
+    // een verkoop-event; andere modi/triggers passen niet bij de melding-tekst.
+    const hs = initialData.housingStrategy
+    const housingHeldToEnd =
+      hs?.mode === 'downsize' && hs.trigger === 'on_depletion' && kernelHousingSale === null
     if (!housingHeldToEnd) return null
     const rows = unifiedRows ?? []
     if (rows.length === 0) return null
@@ -1641,25 +1622,19 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       endAge: lastRow.age,
       realLegacyTarget,
     }
-  }, [housingHeldToEnd, unifiedRows, fireStrategy, simResult])
+  }, [initialData.housingStrategy, kernelHousingSale, unifiedRows, fireStrategy, simResult])
 
   // ── AOW-stop simulatie (lokale wat-als bij shortfall) ───────────────────
-  // Gebruikt DEZELFDE flag-bewuste engine-selector als de hoofdsimulatie
-  // (runSelectedProjection met initialData.horizonEngineV2), maar met forcedFireAge
-  // op AOW-leeftijd (identiek aan pensioen-modus). Zo zien v2-gebruikers ook in
-  // deze lokale AOW-stop-wat-als v2-consistente cijfers (single source of truth
-  // met de grafiek); flag-uit blijft v1.
-  //
-  // FASE 6, stap 2 — kernel-tak (was stap 1: bewust op v2). Deze wat-als forceert een
-  // FIRE-moment op de AOW-leeftijd met een deplete-eindstrategie. De convergentie-router
-  // SOLVET de FIRE-leeftijd zelf en kan geen forced-fireAge-deplete-run uitdrukken;
-  // `evaluateFireAt(input, fireAge)` (solver.ts) draait daarom ÉÉN geforceerde
-  // kernel-run (adapter→engine→bridge, geen bisectie) met dezelfde deplete-op-AOW-vorm
-  // als de v2-arm. Zelfde vlag-beslissing als de hoofd-hook (`kernelConvergentie &&
-  // kernelRawProfile`); een fout valt defensief terug op de v2-arm hieronder. Vlag uit
-  // (default) → de v2-arm draait byte-identiek als voorheen.
+  // Kernel-only. Deze wat-als forceert een FIRE-moment op de AOW-leeftijd met een
+  // deplete-eindstrategie. De convergentie-router SOLVET de FIRE-leeftijd zelf en kan
+  // geen forced-fireAge-deplete-run uitdrukken; `evaluateFireAt(input, fireAge)`
+  // (solver.ts) draait daarom ÉÉN geforceerde kernel-run via de bestaande lib-helpers
+  // (adapter → solver → bridge, geen bisectie) met de deplete-op-AOW-vorm. Zonder
+  // rauwe kernel-context of bij een kern-fout: `null` → de AOW-stop-wat-als degradeert
+  // zichtbaar (de toggle valt terug op de gewone grafiek, zie `effectiveSimRows`).
   const aowStopSimResult = useMemo(() => {
     if (!isShortfallScenario || !effectiveInput || currentAge == null) return null
+    if (!kernelRawProfile) return null
     const aowAgeInt = Math.ceil(userAowAge.fractional)
     const yearlyExp = effectiveInput.yearlyMustExpenses > 0 ? effectiveInput.yearlyMustExpenses : 0
     if (yearlyExp <= 0) return null
@@ -1676,67 +1651,41 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       requiredFirePortfolio: result.firePortfolioAtFire,
     })
 
-    // ── Kernel-arm (FASE 6, stap 2) ────────────────────────────────────────────
-    // Bouw de adapter-invoer zoals de hook/convergentie-router (rauwe context van
-    // de pagina) MET de deplete-op-AOW-overrides, en forceer FIRE op de fractionele
+    // Bouw de adapter-invoer zoals de convergentie-router (rauwe context van de
+    // pagina) MET de deplete-op-AOW-overrides, en forceer FIRE op de fractionele
     // AOW-leeftijd (maandnauwkeurig — de kernel rekent op maanden). De weergave-
-    // velden (fireAge = ceil) blijven gelijk aan de v2-arm via `wrapPensioen`.
-    if (kernelConvergentie && kernelRawProfile) {
-      try {
-        const adapterInput: KernelAdapterInput = {
-          profile: {
-            ...buildConvergentieAdapterProfile(kernelRawProfile),
-            fire_end_strategy: 'deplete',
-            fire_end_age: pensioenEndAge,
-          },
-          assets: initialData.assets ?? [],
-          debts,
-          lifeEvents: events,
-          aowRows,
-        }
-        const kernelInput = buildKernelInputFromApp(adapterInput)
-        const solve = evaluateFireAt(kernelInput, userAowAge.fractional)
-        const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
-          initialData.assets ?? [],
-          debts,
-          deriveEigenHuisIds(initialData.assets ?? []),
-        )
-        const kernelUnified = kernelToUnifiedResult(solve, {
-          input: kernelInput,
-          yearlyExpenses: yearlyExp,
-          assetSlotMeta,
-          debtSlotMeta,
-        })
-        return wrapPensioen(toSimResult(kernelUnified))
-      } catch {
-        // Defensief: val terug op de v2-arm hieronder (zelfde regel als de router).
+    // velden (fireAge = ceil) worden via `wrapPensioen` gezet. Een kern-fout → null.
+    try {
+      const adapterInput: KernelAdapterInput = {
+        profile: {
+          ...buildConvergentieAdapterProfile(kernelRawProfile),
+          fire_end_strategy: 'deplete',
+          fire_end_age: pensioenEndAge,
+        },
+        assets: initialData.assets ?? [],
+        debts,
+        lifeEvents: events,
+        aowRows,
       }
+      const kernelInput = buildKernelInputFromApp(adapterInput)
+      const solve = evaluateFireAt(kernelInput, userAowAge.fractional)
+      const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
+        initialData.assets ?? [],
+        debts,
+        deriveEigenHuisIds(initialData.assets ?? []),
+      )
+      const kernelUnified = kernelToUnifiedResult(solve, {
+        input: kernelInput,
+        yearlyExpenses: yearlyExp,
+        assetSlotMeta,
+        debtSlotMeta,
+      })
+      return wrapPensioen(toSimResult(kernelUnified))
+    } catch {
+      // Kern-fout → geen AOW-stop-wat-als (zichtbare degradatie, geen tweede motor).
+      return null
     }
-
-    // ── v2-arm (vlag uit / terugval): EXACT het bestaande gedrag ────────────────
-    const unifiedInput: UnifiedProjectionInput = {
-      assets: initialData.assets ?? [],
-      debts,
-      currentAge,
-      endAge: pensioenEndAge,
-      yearlyExpenses: yearlyExp,
-      annualSavings: (effectiveInput.monthlyContributions ?? 0) * 12,
-      monthlySurplus: effectiveInput.monthlyContributions ?? 0,
-      monthlyIncome: effectiveInput.monthlyIncome ?? 0,
-      incomeGrowthRate: 0,
-      grossReturn: fireParams.grossReturn,
-      inflationRate: fireParams.inflationRate,
-      box3Method: initialData.box3Method ?? 'forfaitair',
-      cashflows: simCashflows,
-      strategyConfig: { ...strat, strategy: 'deplete', endAge: pensioenEndAge },
-      withdrawalStrategy: withdrawalStrategyConfig,
-      forcedFireAge: aowAgeInt,
-      hasPartner: initialData.hasPartner ?? false,
-      bankAccountCash: initialData.unlinkedCash ?? 0,
-    }
-    const unifiedResult = runSelectedProjection(unifiedInput, initialData.horizonEngineV2)
-    return wrapPensioen(toSimResult(unifiedResult))
-  }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireParams.grossReturn, fireParams.inflationRate, simCashflows, fireStrategy, withdrawalStrategyConfig, debts, events, aowRows, initialData.assets, initialData.box3Method, initialData.hasPartner, initialData.unlinkedCash, initialData.horizonEngineV2, kernelConvergentie, kernelRawProfile])
+  }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireStrategy, debts, events, aowRows, initialData.assets, kernelRawProfile])
 
   const effectiveSimRows = isAowStopActive && aowStopSimResult ? aowStopSimResult.rows : (simResult?.rows ?? [])
   // Partner-view: vervang de hoofdlijn door het PARTNER-pad (eigen as + FIRE-
@@ -1792,7 +1741,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // zijn (bv. 83%) — dat is geen SWR maar een artefact van de deplete-strategie.
   // De Opnamerate-KPI toont dan een teer-op-vermogen-duiding i.p.v. een %.
   const isKernelDepleteRate =
-    engine === 'kernel' && fireStrategy?.strategy === 'deplete' && !isPensioenMode
+    fireStrategy?.strategy === 'deplete' && !isPensioenMode
 
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
   const effectiveCountdown = simResult?.fireAgeFractional != null && currentAge != null
@@ -1848,22 +1797,20 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       : null
     if (currentAgeFloor === null) return baseRows
 
-    // Woonstrategie-injectie (pure helper): v1 injecteert huis/hypotheek terug,
-    // v2-downsize skipt (huis zit al in de engine-rijen — zie ADR 0015 / Issue 2).
+    // Woonstrategie-injectie (pure helper). De kernel houdt huis + hypotheek (én de
+    // verkoop-/opeet-kasstromen) voor ELKE woonstrategie al in het grootboek →
+    // `houseInLedger: true` voorkomt dubbeltellen. Dat kort-sluit vóór `isV2` (die
+    // daardoor een no-op is; de param blijft alleen omdat de lib-helper 'm nog vereist).
     return applyHousingToComposition(baseRows, {
       housingCfg: initialData.housingStrategy,
       ctx: initialData.housingContext,
       displayEvents,
       currentAgeFloor,
       fireEndAge: initialData.fireStrategy.endAge,
-      isV2: initialData.horizonEngineV2,
-      // FIX 2 — de kernel houdt huis + hypotheek (én de verkoop-/opeet-kasstromen)
-      // voor ELKE woonstrategie al in het grootboek. Zónder deze vlag valt een
-      // kernel-gebruiker met horizonEngineV2=false in het v1-injectie-pad en telt het
-      // huis dubbel in de Opbouw-balken.
-      houseInLedger: engine === 'kernel',
+      isV2: true,
+      houseInLedger: true,
     })
-  }, [chartMode, unifiedRows, initialData, displayEvents, engine])
+  }, [chartMode, unifiedRows, initialData, displayEvents])
 
   // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode
   const ieBreakdownResult = useMemo(() => {
@@ -1876,9 +1823,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const scenarioOverlayDataList = useMemo(() => {
     if (selectedScenarioIds.size === 0) return []
 
-    const { effectiveInput: initialEffectiveInput, fireParams: initialFireParams, fireStrategy: initialFireStrategy } = initialData
+    const { effectiveInput: initialEffectiveInput, fireParams: initialFireParams } = initialData
     const currentAgeVal = initialEffectiveInput.dateOfBirth ? ageAtDate(initialEffectiveInput.dateOfBirth) : null
     if (currentAgeVal === null) return []
+    // Kernel-only: zonder rauwe kernel-context is er geen doorrekening → geen ghosts
+    // (ze verschijnen zodra de mount-fetch de kern-context heeft geladen).
+    if (!kernelRawProfile) return []
 
     const results: Array<{
       overlay: ScenarioOverlay
@@ -1895,8 +1845,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       const baselineOvr = buildBaselineOverrides(initialEffectiveInput, initialFireParams.grossReturn, initialData.healthScoreInput.savingsRate6m)
       const { adjustedInput, annualSavings } = applyWhatIfOverrides(initialEffectiveInput, scenario.overrides, baselineOvr)
 
-      // Build cashflows from scenario events, normalising numeric fields that may be stored as strings.
-      const scenarioEvents = (scenario.events ?? [])
+      // Scenario-events → LifeEvent-vorm (numerieke velden normaliseren; sommige kunnen
+      // als string zijn opgeslagen). Deze gaan als rauwe events de kernel-context in.
+      const scenarioEvents: LifeEvent[] = (scenario.events ?? [])
         .filter(e => !e.whatIfDisabled)
         .map(e => ({
           id: e.id,
@@ -1915,40 +1866,37 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           metadata: e.metadata,
         }))
 
-      const cashflows = lifeEventsToCashflows(scenarioEvents)
-      const currentPortfolio = Math.max(0, adjustedInput.totalAssets - adjustedInput.totalDebts)
       const yearlyExpenses = adjustedInput.yearlyMustExpenses > 0 ? adjustedInput.yearlyMustExpenses : 0
       if (yearlyExpenses <= 0) continue
 
-      const grossReturn = adjustedInput.expectedReturn ?? initialFireParams.grossReturn
-      const endStrategy = initialFireStrategy ?? DEFAULT_FIRE_STRATEGY
-
-      // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c).
-      //
-      // FASE 6, stap 2 — bewust GEPARKEERD op v2 (v2 tot stap 5). Reden: deze
-      // ghost-overlays draaien via de SCALAR-engine (`runScalarProjectionV2`, één
-      // portefeuille-getal), terwijl de opgeslagen what-if-scenario's via
-      // `applyWhatIfOverrides` een SCALAIR spaarbedrag (`annualSavings`, uit inkomen-/
-      // spaarquote-sliders) muteren. De kernel leidt sparen af uit (inkomen − uitgaven)
-      // op de RAUWE per-asset-context; dat scalaire spaarbedrag laat zich niet verliesloos
-      // op die context mappen (de bekende spaargrondslag-divergentie, whatif-varianten.ts
-      // §1) — een ghost ZONDER overrides zou daardoor NIET op de kernel-hoofdlijn vallen
-      // (die rekent op profiel-inkomen/-uitgaven, niet op `annualSavings`). Een misleidende
-      // ghost is erger dan een eerlijke v2-ghost; convergentie van dit oppervlak wacht op
-      // de v2-uitfasering (stap 5). Het vlag-uit-pad is hier al triviaal byte-identiek
-      // (altijd v2, geen vlag-tak).
-      const result = runScalarProjectionV2(
-        currentAgeVal,
-        endStrategy.endAge ?? 90,
-        currentPortfolio,
-        yearlyExpenses,
-        annualSavings,
-        grossReturn,
-        'nl_box3',
-        initialFireParams.inflationRate,
-        cashflows,
-        endStrategy,
-      )
+      // Kernel-pad (geen tweede motor): het opgeslagen what-if-scenario muteert een
+      // SCALAIR spaarbedrag (`annualSavings`, uit de inkomen-/spaarquote-sliders) plus
+      // rendement en uitgaven. We drukken dat uit als een profiel-override op de RAUWE
+      // kernel-context (inkomen − uitgaven = spaarbedrag; scenario-rendement; scenario-
+      // uitgavengrondslag) en draaien via de convergentie-router — dezelfde per-asset-
+      // context/motor als de hoofdlijn, zodat de ghost consistent is met de kernel-
+      // grafiek. Bekende beperking: de scenario-overrides op het AGGREGAAT-vermogen mappen
+      // niet per-asset; het startvermogen blijft de echte per-asset-context (zoals de hoofdlijn).
+      const monthlyExpenses = adjustedInput.monthlyExpenses
+      const overriddenProfile: ConvergentieRawProfileRow = {
+        ...kernelRawProfile,
+        estimated_monthly_expenses: monthlyExpenses,
+        net_monthly_income: monthlyExpenses + annualSavings / 12,
+        yearly_essential_expenses: yearlyExpenses,
+        expected_return: adjustedInput.expectedReturn ?? kernelRawProfile.expected_return ?? null,
+      }
+      const outcome = computeConvergentieProjection({
+        rawContext: {
+          profile: overriddenProfile,
+          assets: initialData.assets ?? [],
+          debts,
+          lifeEvents: scenarioEvents,
+          aowRows,
+          yearlyExpenses,
+        },
+      })
+      if (!outcome.ok) continue
+      const result = toSimResult(outcome.result)
 
       const color = WHATIF_SCENARIO_COLORS[scenario.colorIndex ?? 0]
 
@@ -1967,7 +1915,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
 
     return results
-  }, [selectedScenarioIds, savedScenarios, initialData])
+  }, [selectedScenarioIds, savedScenarios, initialData, kernelRawProfile, debts, aowRows])
 
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
@@ -3359,9 +3307,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                   <p className="font-sans text-[12px] text-orange-700">
-                    {withdrawalStrategyConfig.strategy === 'vpw' && simResult.strategy !== 'deplete' ? (
-                      <>De onttrekkingsstrategie <strong>Variabel percentage (VPW)</strong> trekt je vermogen tegen je einddatum volledig leeg — die combineert daarom alléén met &quot;Vermogen opeten&quot;, niet met {simResult.strategy === 'legacy' ? 'Nalatenschap' : simResult.strategy === 'perpetual' ? 'Vermogen behouden' : 'deze eindstrategie'}. Kies &quot;Vermogen opeten&quot; als eindstrategie, of een andere onttrekkingsstrategie (bijv. vast percentage).</>
-                    ) : simResult.strategy === 'legacy' ? (
+                    {simResult.strategy === 'legacy' ? (
                       <>Je haalt je nalatenschapsdoel{fireStrategy?.legacyAmount ? ` van ${formatMaskedCurrency(fireStrategy.legacyAmount, masked)}` : ''} niet binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verlaag het nalatenschapsbedrag, verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>
                     ) : simResult.strategy === 'perpetual' ? (
                       <>Je vermogen is niet groot genoeg om er blijvend van te leven binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>
@@ -3369,7 +3315,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       <>FIRE niet haalbaar binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>
                     )}
                     {/* V12 — kernel-hint: hoeveel €/mnd extra sparen het wél haalbaar maakt. */}
-                    {engine === 'kernel' && kernelStatus === 'unreachable_within_horizon' && kernelMaandHint != null && kernelMaandHint > 0 && (
+                    {kernelStatus === 'unreachable_within_horizon' && kernelMaandHint != null && kernelMaandHint > 0 && (
                       <> Zo&apos;n {formatMaskedCurrency(Math.ceil(kernelMaandHint), masked)}/mnd extra opzij zetten maakt het wél haalbaar binnen je projectie.</>
                     )}
                   </p>
@@ -3379,7 +3325,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               {/* V12 — kernel pensioen-tekort: vóór AOW komt het vermogen tekort, ná AOW
                   dekt het inkomen het wél. Beschrijvend (Wft-veilig); eigen oranje regel
                   omdat de banner hierboven pensioen-modus overslaat. */}
-              {engine === 'kernel' && kernelStatus === 'pension_shortfall' && (
+              {kernelStatus === 'pension_shortfall' && (
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                   <p className="font-sans text-[12px] text-orange-700">
@@ -3394,7 +3340,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   een echte latere FIRE-maand — toon deze "nu al stoppen"-banner daarom alleen
                   als de gevonden FIRE-leeftijd (echte solver-waarde) ~ je huidige leeftijd is;
                   anders krijgt /toekomst gewoon de normale grafiek/countdown (reached_at). */}
-              {engine === 'kernel' && kernelStatus === 'reached_now' && isKernelReachedNowDisplay(simResult.fireAgeFractional, currentAge) && (
+              {kernelStatus === 'reached_now' && isKernelReachedNowDisplay(simResult.fireAgeFractional, currentAge) && (
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 px-3 py-2.5">
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                   <p className="font-sans text-[12px] text-[var(--ink-2)]">
@@ -3475,28 +3421,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   </div>
                 )
               })()}
-
-              {/* ── Motor-indicator (FIX 4) — alleen met de convergentie-vlag aan;
-                  beheer-transparantie, bewust token-neutraal (geen module-accent/stoplicht).
-                  Toont welke motor deze projectie rekende; bij een per-run-terugval op de
-                  v2-motor volgt de reden (bv. een verkoop-instelling die de kernel niet kan
-                  uitdrukken). Spiegelt het what-if-patroon. ── */}
-              {kernelConvergentie && (
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-2 py-0.5 text-[11px] font-mono text-[var(--ink-3)]">
-                    <Activity className="h-3 w-3 shrink-0" aria-hidden />
-                    rekent via: {engine}
-                  </span>
-                  {kernelFallbackReason && (
-                    <span
-                      className="text-[11px] italic text-[var(--ink-3)]"
-                      title={kernelFallbackReason}
-                    >
-                      teruggevallen — {kernelFallbackReason}
-                    </span>
-                  )}
-                </div>
-              )}
 
               {/* ── Overlay toggles boven de grafiek ── */}
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -6486,7 +6410,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           fireTarget={fire?.fireTarget}
           hasPartner={initialData.hasPartner}
           marginaalTarief={fireParams.marginaalTarief}
-          kernelEnabled={kernelConvergentie}
           dateOfBirth={kernelRawProfile?.date_of_birth ?? null}
         />
       )}
@@ -6645,14 +6568,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
             )}
 
-            {isPensioenMode && originalFireAgeFractional != null && (
-              <div className="mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-                <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">FIRE-leeftijd (referentie)</span>
-                  <span className="tabular-nums text-[var(--ink)]">{originalFireAgeFractional.toFixed(1)} jaar</span>
-                </div>
-              </div>
-            )}
 
             <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
               <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> {isPensioenMode
@@ -7103,9 +7018,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData(); router.refresh() }}
         housingStrategy={initialData.housingStrategy}
         initialTab={strategieInitialTab}
-        // FASE 6, stap 2 — kernel-convergentie-context: vlag aan + rauwe context →
-        // de onttrekking-tab vergelijkt de vier PROFIELEN via de kernel; anders v2.
-        kernelEnabled={kernelConvergentie}
+        // Kernel-context: de onttrekking-tab vergelijkt de vier PROFIELEN via de kernel.
         kernelRawProfile={kernelRawProfile}
         kernelAssets={initialData.assets}
         kernelDebts={debts}

@@ -361,7 +361,15 @@ export async function loadPerspectiveTransactions(
   for (let from = 0; ; from += 1000) {
     let query = supabase
       .from('transactions')
-      .select('*')
+      // Expliciete kolomlijst i.p.v. select('*'): alleen de velden die de
+      // consumers (cashflow-data-loader, transacties-analyse, box1) én stamp()
+      // (ownership/user_id/partner_split_pct/is_split) gebruiken. Scheelt op het
+      // drukste egress-pad (13 mnd transacties) alle ongebruikte kolommen
+      // (metadata, import_hash, running_balance, fx_*, notes, …). RLS/ownership
+      // blijft ongewijzigd — kolomselectie raakt de row-filtering niet.
+      .select(
+        'id, date, amount, description, counterparty_name, counterparty_iban, budget_id, account_id, is_income, transaction_type, ownership, user_id, partner_split_pct, is_split',
+      )
       .order('date', { ascending: false })
       .range(from, from + 999)
     if (opts?.since) query = query.gte('date', opts.since)

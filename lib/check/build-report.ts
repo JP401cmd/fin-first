@@ -8,8 +8,12 @@
  *
  * HARDE REGEL — consume, don't recompute. Elk kerngetal komt uit de bestaande
  * canonieke motoren; deze module mapt alléén, herberekent geen formules:
- *  - FIRE-pad/decumulatie/onttrekking → `runHorizonLedger` (lib/horizon-engine)
- *  - snapshot-FIRE (hero/twee toekomsten) → `computeFireProjection` (lib/horizon-data)
+ *  - FIRE-uitkomst (hero/twee toekomsten/gevoeligheid) → `computeScalarFireProjection`
+ *    (lib/horizon-kernel/scalar-router) — de horizon-kernel via de synthetische scalar-pot.
+ *  - Levenslang vermogenspad/onttrekking → `runKernelUnified` op diezelfde scalar-pot
+ *    (lib/horizon-kernel/run-unified) — levert een `UnifiedProjectionResult` met per-jaar
+ *    `rows[].netWorth`. Zie het "KERNEL-MIGRATIE (stap 5A)"-blok bij `safeKernelRun` voor
+ *    de routekeuze + expliciete benaderingen (de v2-grootboek-engine is verwijderd).
  *  - vrijheids-% → `computeFreedomProgress` (lib/core-metrics)
  *  - gezondheidsgetal → `buildHealthScoreInput` → `computeHealthScoreFromInputs`
  *  - spaarquote → `resolveSavingsSource` (lib/savings-source)
@@ -45,28 +49,24 @@ import type {
 } from './types'
 
 import type { Asset, AssetType } from '@/lib/asset-data'
-import { TYPICAL_RETURNS } from '@/lib/asset-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 
 import { resolveFireParams } from '@/lib/fire-params'
-import { computeAowMonthly, ageAtDate, type FinancialInput, type LifeEvent } from '@/lib/horizon-data'
-import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
-import { lifeEventsToCashflows } from '@/lib/fire-simulation'
+import { computeAowMonthly, ageAtDate, type FinancialInput } from '@/lib/horizon-data'
+import {
+  computeScalarFireProjection,
+  buildScalarAdapterInput,
+  type ScalarFireParams,
+  type ScalarStrategyOptions,
+} from '@/lib/horizon-kernel/scalar-router'
+import { runKernelUnified } from '@/lib/horizon-kernel/run-unified'
+import type { UnifiedProjectionResult } from '@/lib/unified-projection'
 import { computeRetirementExpenses } from '@/lib/budget-utils'
-import { runHorizonLedger } from '@/lib/horizon-engine/engine'
-import type { HorizonLedgerResult } from '@/lib/horizon-engine/types'
-import type { UnifiedProjectionInput } from '@/lib/unified-projection'
-import type { SimCashflow } from '@/lib/fire-simulation'
-import { type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
-import { type FireStrategyConfig } from '@/lib/fire-strategy'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { computeFreedomProgress } from '@/lib/core-metrics'
 import {
   deriveHousingContext,
   getFireEligibleNetWorth,
-  filterAssetsForFire,
-  projectEigenHuisValuesAt,
-  projectMortgageStateAt,
   type HousingContext,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
@@ -101,21 +101,13 @@ const NO_FREEDOM_DEFICIT_LABEL = 'nog geen vrijheid'
  * Housing-strategie van de Vrijheidscheck: de eigen woning telt voor 50% mee in
  * de vrijheids-/FIRE-berekening — de helft die je realistisch kunt verzilveren
  * (verkopen, downsizen of een opeethypotheek) zónder dakloos te worden. Dit is een
- * RAPPORT-conventie (geen app-brede housing-mode): we houden de échte woning +
- * gekoppelde hypotheek BUITEN de engine-pot (via `filterAssetsForFire`, zodat de
- * woonkost in het budget blijft en de hypotheek niet dubbel meetelt), en voegen
- * i.p.v. dat ÉÉN synthetisch groei-bezit toe ter grootte van `HOUSE_FIRE_WEIGHT ×
- * netto overwaarde`, dat meegroeit op het canonieke woning-rendement
- * (`TYPICAL_RETURNS.eigen_huis`). De FIRE-eligible grondslag = netto vermogen MINUS
- * de NIET-meegerekende helft van de overwaarde, dus precies 50% van de overwaarde
- * landt in de vrijheids-base. Het volledige vermogen (incl. de volle huiswaarde)
+ * RAPPORT-conventie (geen app-brede housing-mode): de FIRE-eligible grondslag =
+ * netto vermogen MINUS de NIET-meegerekende helft van de overwaarde, dus precies
+ * 50% van de overwaarde landt in de vrijheids-base (via `getFireEligibleNetWorth`
+ * met `exclude_from_fire` + de 50%-correctie in `buildContext`, zodat de formule
+ * één duidelijke home heeft). Het volledige vermogen (incl. de volle huiswaarde)
  * blijft zichtbaar in snapshot/dual-bars/levenspad. In de ingelogde app stelt de
  * gebruiker dit nauwkeuriger in (verkopen / opeethypotheek / niet meerekenen).
- *
- * We houden `getFireEligibleNetWorth` met `exclude_from_fire` als basis voor het
- * filteren van de engine-pot; de 50%-correctie passen we expliciet toe op de
- * FIRE-eligible grondslag (zie buildContext) zodat de formule één duidelijke home
- * heeft.
  */
 const CHECK_HOUSING_STRATEGY: HousingStrategyConfig = { mode: 'exclude_from_fire' }
 
@@ -298,72 +290,6 @@ interface SyntheticPortfolio {
 }
 
 /**
- * Bouw het synthetische "verzilverbare overwaarde"-bezit voor de FIRE-pot.
- *
- * De échte eigen woning + hypotheek blijven uit de engine-pot (zie
- * `CHECK_HOUSING_STRATEGY`); in plaats daarvan voegen we 50% van de CURRENT netto
- * overwaarde toe als één liquide groei-bezit. Keuze van het asset-type:
- *  - `'investment'` zodat de engine het als een liquide groei-bucket behandelt
- *    (grossReturn-pad + Box 3-forfait — verzilverde overwaarde is box-3 belegd
- *    vermogen, dus die drag hoort erbij);
- *  - maar `expected_return = TYPICAL_RETURNS.eigen_huis` (canonieke woning-
- *    appreciatie in PERCENT), NIET het beleggingsrendement — de overwaarde groeit
- *    mee met de woningmarkt, niet met de aandelenmarkt.
- * Mirrort exact de minimale-Asset-vorm van `intakeAssetToAsset` (alle velden gezet)
- * zodat tsc tevreden is. Alleen aanroepen wanneer er een eigen woning is én de
- * (net) overwaarde > 0.
- */
-function buildHouseEquityFireAsset(currentEquity: number): Asset {
-  return {
-    id: 'check-house-equity',
-    user_id: 'check',
-    name: 'Verzilverbare overwaarde (50%)',
-    asset_type: 'investment',
-    current_value: Math.max(0, HOUSE_FIRE_WEIGHT * currentEquity),
-    purchase_value: 0,
-    purchase_date: null,
-    // Canonieke woning-appreciatie (%), niet het beleggingsrendement.
-    expected_return: TYPICAL_RETURNS.eigen_huis,
-    monthly_contribution: 0,
-    institution: null,
-    account_number: null,
-    notes: null,
-    is_active: true,
-    sort_order: 9_999,
-    created_at: '',
-    updated_at: '',
-    subtype: null,
-    risk_profile: null,
-    tax_benefit: null,
-    is_liquid: null,
-    lock_end_date: null,
-    ticker_symbol: null,
-    rental_income: null,
-    woz_value: null,
-    retirement_provider_type: null,
-    depreciation_rate: null,
-    address_postcode: null,
-    address_house_number: null,
-    expiry_date: null,
-    beneficiary: null,
-    kvk_number: null,
-    ownership_percentage: null,
-    annual_dividend: null,
-    linked_asset_id: null,
-    ownership: 'personal',
-    household_id: null,
-    net_worth_inclusion_pct: 100,
-    sale_config: null,
-    has_budget_tracking: false,
-    has_woonbalans_tracking: false,
-    has_rental_tracking: false,
-    monthly_maintenance_cost: 0,
-    vva_fee: 0,
-    vacancy_log: [],
-  }
-}
-
-/**
  * Bouw de synthetische Asset[]/Debt[]. Koppelt de eerste hypotheek aan het
  * eerste eigen-huis-asset (linked_asset_id) zodat de housing-context en de
  * Box 1-classificatie kloppen.
@@ -381,60 +307,7 @@ function buildPortfolio(intake: CheckIntake, grossReturn: number): SyntheticPort
   return { assets, debts }
 }
 
-// ── Levensgebeurtenissen → cashflows (consume lifeEventsToCashflows) ──────────
-//
-// De intake draagt een lichte `CheckIntakeLifeEvent[]`; de engine verwacht het
-// volwaardige `LifeEvent`-model. We mappen één-op-één naar de generieke
-// LifeEvent-velden (one_time_cost / monthly_*_change / duration_months) zónder
-// metadata, zodat `lifeEventsToCashflows` de GENERIEKE fallback gebruikt — geen
-// eigen cashflow-wiskunde hier (consume, don't recompute). Tekenconventie van
-// het LifeEvent-model: `one_time_cost` is POSITIEF voor een kost, NEGATIEF voor
-// een meevaller — het tegenovergestelde van de intuïtieve intake-`amount`
-// (positief = meevaller). Daarom keren we het teken om. `recurringYearly` (per
-// jaar) delen we naar een maandbedrag (`monthly_*_change`) met een looptijd
-// (`duration_months`); positief = inkomen, negatief = extra uitgave.
-
-/** Zet één intake-levensgebeurtenis om naar het volwaardige `LifeEvent`-model. */
-function intakeLifeEventToLifeEvent(ev: CheckIntakeLifeEvent, index: number): LifeEvent {
-  const oneOff = Number(ev.amount ?? 0)
-  const recurringYearly = Number(ev.recurringYearly ?? 0)
-  const durationYears = Number(ev.durationYears ?? 0)
-  // Maandbedrag (altijd via /12); generieke fallback splitst income/expense op teken.
-  const monthlyRecurring = recurringYearly !== 0 ? recurringYearly / 12 : 0
-  return {
-    id: `check-le-${index}`,
-    name: ev.label,
-    event_type: ev.key,
-    target_age: ev.age,
-    target_date: null,
-    // Intake `amount` positief = meevaller; LifeEvent `one_time_cost` positief = kost → omkeren.
-    one_time_cost: -oneOff,
-    // monthly_cost_change positief = extra uitgave; monthly_income_change positief = extra inkomen.
-    monthly_cost_change: monthlyRecurring < 0 ? Math.abs(monthlyRecurring) : 0,
-    monthly_income_change: monthlyRecurring > 0 ? monthlyRecurring : 0,
-    duration_months: durationYears > 0 ? Math.round(durationYears * 12) : 0,
-    icon: '',
-    is_active: true,
-    sort_order: index,
-    is_indexed: true,
-  }
-}
-
-/**
- * Map de optionele intake-`lifeEvents` naar `SimCashflow[]` via de canonieke
- * `lifeEventsToCashflows`. Lege/afwezige lijst → lege array. Events met een
- * leeftijd in het verleden (< huidige leeftijd) negeert de engine al
- * (fromAge < currentAge valt buiten het projectievenster) — we filteren ze
- * hier niet extra zodat de mapping verliesvrij blijft.
- */
-function buildLifeEventCashflows(intake: CheckIntake): SimCashflow[] {
-  const events = intake.lifeEvents ?? []
-  if (events.length === 0) return []
-  const mapped = events.map((ev, i) => intakeLifeEventToLifeEvent(ev, i))
-  return lifeEventsToCashflows(mapped)
-}
-
-// ── Engine-input-assemblage ──────────────────────────────────────────────────
+// ── Engine-context ───────────────────────────────────────────────────────────
 
 interface EngineContext {
   intake: CheckIntake
@@ -445,10 +318,8 @@ interface EngineContext {
   effectiveSwr: number
   box3Method: 'forfaitair' | 'werkelijk'
   hasPartner: boolean
-  /** Volledig portfolio (incl. eigen woning) — voor snapshot/dual-bars/levenspad. */
+  /** Volledig portfolio (incl. eigen woning) — voor snapshot/dual-bars/levenspad/health. */
   portfolio: SyntheticPortfolio
-  /** FIRE-pot: eigen woning + gekoppelde hypotheek gefilterd — voedt de engine. */
-  firePortfolio: SyntheticPortfolio
   /** Σ asset-waarden × incl% (incl. eigen woning). */
   totalAssets: number
   /** Σ schuld-saldi × incl%. */
@@ -477,135 +348,140 @@ interface EngineContext {
   fireEligibleNetWorth: number
   /** Netto overwaarde van de eigen woning (`eigenHuisValue − mortgageBalance`, ≥0). 0 zonder woning. */
   houseNetEquity: number
-  /** Housing-context (eigen woning + hypotheken) — voor de levenspad-reconstructie. */
+  /** Housing-context (eigen woning + hypotheken) — voor markers (hypotheek-payoff). */
   housingContext: HousingContext
-  /** Levensgebeurtenis-cashflows (intake → `lifeEventsToCashflows`). Leeg = geen events. */
-  lifeEventCashflows: SimCashflow[]
 }
 
-// ── FASE 6, stap 2 — networth/grootboek bewust op v2 tot stap 5 (gedocumenteerde uitzondering) ──
+// ── KERNEL-MIGRATIE (FASE 6, stap 5A) — routekeuze + benaderingen ────────────
 //
-// De horizon-kernel-migratie flipt de convergentie-set (/toekomst, /overzicht,
-// fire-target-shared, AI-context) via de per-gebruiker-vlag `horizon_kernel_convergentie`.
-// Het networth-/grootboek-deel van DIT rapport blijft bewust op de v2-grootboek-engine
-// (`buildEngineInput` → `runHorizonLedger`/`safeLedger`) tot de fysieke v2-deletie in
-// stap 5. Redenen:
-//  (a) De vrijheidscheck is een PUBLIEKE intake (ADR 0022) zónder ingelogd profiel en
-//      dus zonder de per-gebruiker-vlag — er is hier niets om op te flippen.
-//  (b) De her-runs consumeren `HorizonLedgerResult`-RIJvelden (`werkt`, `aowEnPensioen`,
-//      `cashflowNetto`, `liquideVermogen`, `vNodig`) — gevoeligheid (±rendement),
-//      onttrekkingsstrategie-vergelijk en decumulatie/levenspad — plus een
-//      `SimCashflow`-samenstelling (AOW-cashflow, post-pensioen-uitgave-delta, lumpsum)
-//      die de LifeEvent-gebaseerde kernel-adapter niet uitdrukt. Een synthetische
-//      kernel-run zou ruim boven de ~50-regels-drempel uitkomen en álle sectie-consumenten
-//      (kruising, sensitivity, withdrawalStrategies, lifePath) raken.
-//  (c) De FIRE-SOM van dit rapport loopt al via `computeScalarFireProjection`
-//      (scalar-router, zie de BEWUSTE UITZONDERING bij die aanroep in `buildReport`) en
-//      flipt bij de default-flip (stap 3) vanzelf mee — het grootboek-deel volgt in stap 5.
+// De v2-grootboek-engine (`lib/horizon-engine`, `runHorizonLedger`/`HorizonLedgerResult`)
+// is fysiek VERWIJDERD; de horizon-kernel is de enige rekenmotor. De vrijheidscheck is
+// een PUBLIEKE intake (ADR 0022) zónder ingelogd profiel/kernel-vlag, dus er is niets om
+// op te flippen — deze module consumeert de kernel rechtstreeks via de **scalar-router**.
+//
+// GEKOZEN ROUTE — de synthetische SCALAR-POT (`buildScalarAdapterInput` + `runKernelUnified`),
+// NIET een itemized `KernelAdapterInput`. Reden: de intake draagt inputs die de itemized
+// kernel-adapter niet zonder diepe (parity-gelockte) kern-uitbreiding uitdrukt — een door
+// de gebruiker ingevuld AOW-maandbedrag (de adapter leidt AOW af uit opbouwjaren), een
+// post-pensioen-uitgave-delta, een lump-sum en een onttrekkingsstrategie-keuze. De scalar-
+// pot (één Beleggingen-pot = vermogen, essentiële uitgaven geïnjecteerd) is dezelfde brug
+// die de FIRE-uitkomst (`computeScalarFireProjection`) al gebruikte → één motor, één antwoord.
+//
+// BEWUSTE BENADERINGEN (vervallen fidelity t.o.v. het oude grootboek — hier expliciet):
+//  1. Eén pot, één rendement: per-asset verwachte rendementen collapsen naar het profiel-
+//     `grossReturn`; de itemized asset-mix voedt de projectie niet meer (wél nog dualBars/
+//     health/markers, die de portefeuille los lezen).
+//  2. AOW/pensioen, post-pensioen-uitgave-delta en levensgebeurtenissen vormen de projectie-
+//     LIJN NIET meer (de scalar-pot kent geen kasstromen naast inkomen−uitgaven). Ze blijven
+//     wél als LEVENSPAD-MARKERS zichtbaar (`buildLifeMarkers`) en voeden de Will-tips.
+//  3. "Besteedbaar/liquide vermogen" (oud LedgerRow-veld) benaderen we met `rows[].netWorth`
+//     — voor een intake zónder eigen huis ≈ gelijk; mét eigen huis is netWorth een BOVENGRENS
+//     (het huis is niet vrij besteedbaar). Het levenspad groeit het huis mee met het
+//     portefeuille-rendement i.p.v. de WOZ-appreciatie apart te modelleren.
+//  4. De per-jaar `V_nodig`-KRUISINGSLIJN is VERVALLEN: de kernel-bridge levert alleen een
+//     scalair `requiredFirePortfolio`, geen per-jaar benodigd-vermogen-reeks (die was
+//     LedgerRow-only en de bridge/solver mogen niet uitgebreid worden). Zie `ReportKruising`
+//     in types.ts — het `vNodig`-veld is uit de DTO verwijderd.
+
 /**
- * Bouw een `UnifiedProjectionInput` voor `runHorizonLedger` met een gegeven
- * withdrawal-strategie. Eén bron; de gevoeligheids- en strategie-her-runs
- * variëren alleen de meegegeven overrides.
+ * Bouw de scalar-parameters voor een kernel-run uit de context.
+ *
+ * `netWorthBasis` kiest de grondslag: `ctx.netWorth` (volle netto vermogen incl. huis) voor
+ * de vermogenslijn/kruising, of `ctx.fireEligibleNetWorth` (50%-huismethodiek) voor de
+ * FIRE-uitkomst/gevoeligheid. De scalar-brug spaart exact inkomen−uitgaven; een `annualSavings`-
+ * override reconstrueren we daarom als inkomen (`uitgaven + sparen`). `returnDelta`/`lumpSum`/
+ * `extraYearlyExpenses` mappen op rendement / beginvermogen / uitgaven-grondslag.
  */
-function buildEngineInput(
+function scalarParamsFor(
   ctx: EngineContext,
-  withdrawalStrategy: WithdrawalStrategyConfig,
-  strategyConfig: FireStrategyConfig,
+  netWorthBasis: number,
+  strategyOptions: ScalarStrategyOptions,
   overrides?: { returnDelta?: number; extraYearlyExpenses?: number; lumpSum?: number; annualSavings?: number },
-): UnifiedProjectionInput {
-  // Eén cashflow-pot: AOW + post-pensioen-uitgave-delta + levensgebeurtenissen.
-  const cashflows = [
-    ...buildAowCashflow(ctx),
-    ...buildRetirementExpenseDeltaCashflow(ctx),
-    ...ctx.lifeEventCashflows,
-  ]
-  // Eenmalige lumpsum als one_time inkomen op de huidige leeftijd (wordt belegd).
-  if (overrides?.lumpSum && overrides.lumpSum > 0) {
-    cashflows.push({
-      id: 'check-lumpsum',
-      name: 'Eenmalige inleg',
-      type: 'one_time',
-      direction: 'income',
-      amount: overrides.lumpSum,
-      fromAge: ctx.age,
-      toAge: null,
-      indexed: false,
-    })
-  }
+): ScalarFireParams {
+  const extraExpensesYearly = overrides?.extraYearlyExpenses ?? 0
+  const monthlyExpenses = ctx.monthlyExpenses + extraExpensesYearly / 12
+  const yearlyExpenses = ctx.yearlyExpenses + extraExpensesYearly
+  const annualSavings = overrides?.annualSavings ?? ctx.annualSavings
+  // Inkomen := uitgaven + sparen zodat de kernel-CF-tabel exact `annualSavings` spaart.
+  const monthlyIncome = monthlyExpenses + annualSavings / 12
+  const netWorth = netWorthBasis + (overrides?.lumpSum ?? 0)
   return {
-    assets: ctx.firePortfolio.assets,
-    debts: ctx.firePortfolio.debts,
-    currentAge: ctx.age,
-    endAge: REPORT_END_AGE,
-    yearlyExpenses: ctx.yearlyExpenses + (overrides?.extraYearlyExpenses ?? 0),
-    annualSavings: overrides?.annualSavings ?? ctx.annualSavings,
-    monthlySurplus: (overrides?.annualSavings ?? ctx.annualSavings) / 12,
-    monthlyIncome: ctx.netMonthlyIncome,
-    incomeGrowthRate: 0,
-    grossReturn: ctx.grossReturn,
-    inflationRate: ctx.inflationRate,
-    returnDelta: overrides?.returnDelta,
-    box3Method: ctx.box3Method,
-    cashflows,
-    strategyConfig,
-    withdrawalStrategy,
-    hasPartner: ctx.hasPartner,
-    bankAccountCash: 0,
+    input: {
+      totalAssets: netWorth + ctx.totalDebts, // netWorth = totalAssets − totalDebts
+      totalDebts: ctx.totalDebts,
+      monthlyIncome,
+      monthlyExpenses,
+      monthlyContributions: annualSavings / 12,
+      yearlyMustExpenses: yearlyExpenses,
+      dateOfBirth: ctx.intake.dateOfBirth,
+    } satisfies FinancialInput,
+    annualReturn: ctx.grossReturn + (overrides?.returnDelta ?? 0),
+    swrOverride: ctx.effectiveSwr,
+    inflationOverride: ctx.inflationRate,
+    strategyOptions,
   }
 }
 
 /**
- * AOW als recurring inkomens-cashflow vanaf de AOW-leeftijd (constante uit de
- * AOW-helper). Geïndexeerd (koopkracht). Pensioen-pot zit al in de assets
- * (asset_type 'retirement'), dus we tellen het niet apart als inkomen.
+ * Draai één kernel-accumulatie/decumulatie-run (volle netto-vermogen-pot, `deplete` tot
+ * de eindleeftijd) en lever het `UnifiedProjectionResult` — de vervanger van het oude
+ * `safeLedger(runHorizonLedger)`. Crash-/gate-vangnet: zonder geboortedatum of bij een
+ * negatief (na lump-sum) netto vermogen kan de kernel-adapter geen zinnige pot bouwen →
+ * `null` (spiegelt de scalar-router-gates). Leeg resultaat → `null`.
+ *
+ * De kernel projecteert tot zijn eigen horizon (leeftijd ~100); de rapport-conventie is
+ * `REPORT_END_AGE` (90, gelijk aan de oude `endAge`). We KAPPEN de rijen daarom op ≤ 90 —
+ * anders zou het levenspad ver voorbij de deplete-leeftijd doorlopen met een diep-negatieve
+ * tekort-lening-staart (kernel-shortfall na uitputting) die de grafiek onbruikbaar maakt.
  */
-function buildAowCashflow(ctx: EngineContext): UnifiedProjectionInput['cashflows'] {
-  if (ctx.aowMonthly <= 0) return []
-  const aowAge = NL_AOW_AGE
-  if (ctx.age >= REPORT_END_AGE) return []
-  return [{
-    id: 'check-aow',
-    name: 'AOW',
-    type: 'recurring',
-    direction: 'income',
-    amount: ctx.aowMonthly,
-    fromAge: aowAge,
-    toAge: null,
-    indexed: true,
-  }]
+function safeKernelRun(
+  ctx: EngineContext,
+  overrides?: { returnDelta?: number; extraYearlyExpenses?: number; lumpSum?: number; annualSavings?: number },
+): UnifiedProjectionResult | null {
+  if (!ctx.intake.dateOfBirth) return null
+  if (ctx.netWorth + (overrides?.lumpSum ?? 0) < 0) return null
+  try {
+    const params = scalarParamsFor(
+      ctx,
+      ctx.netWorth,
+      { strategy: 'deplete', endAge: REPORT_END_AGE },
+      overrides,
+    )
+    const { result } = runKernelUnified({
+      adapterInput: buildScalarAdapterInput(params),
+      yearlyExpenses: ctx.yearlyExpenses + (overrides?.extraYearlyExpenses ?? 0),
+    })
+    const rows = result.rows.filter((r) => r.age <= REPORT_END_AGE)
+    return rows.length > 0 ? { ...result, rows } : null
+  } catch {
+    return null
+  }
 }
 
 /**
- * Post-pensioen-uitgave-delta als recurring cashflow vanaf de AOW-leeftijd.
- *
- * De engine hanteert één `yearlyExpenses` voor zowel de opbouw- als de
- * onttrekkingsfase. Wil de gebruiker ná pensioen ánders uitgeven, dan modelleren
- * we het VERSCHIL (`retirementYearlyExpenses − yearlyExpenses`) als een
- * geïndexeerde recurring cashflow vanaf `NL_AOW_AGE`:
- *  - lagere post-pensioen-uitgave (delta < 0) → INKOMEN-cashflow (compenseert de
- *    te hoog ingezette basis-uitgave) → FIRE eerder / lagere onttrekking;
- *  - hogere post-pensioen-uitgave (delta > 0) → EXPENSE-cashflow.
- *
- * Geen dubbeltelling: AOW (income), lumpsum en levensgebeurtenissen zijn
- * eigen, los gedragen cashflows met eigen id; deze delta corrigeert uitsluitend
- * de uitgavenbasis en raakt die andere stromen niet. EMPTY (retirement = basis)
- * → delta 0 → géén cashflow → exact het huidige gedrag.
+ * Fractionele FIRE-leeftijd (sub-jaar) via de scalar-router op de FIRE-eligible grondslag —
+ * dezelfde motor als de hoofd-`fireProj`, perpetueel (uitgaven/SWR). Gebruikt door de
+ * gevoeligheids-hefbomen: basis én elke hefboom lopen door DEZELFDE methode zodat de
+ * maand-delta's appels-met-appels zijn. `null` = onbereikbaar.
  */
-function buildRetirementExpenseDeltaCashflow(ctx: EngineContext): SimCashflow[] {
-  const deltaYearly = ctx.retirementYearlyExpenses - ctx.yearlyExpenses
-  if (Math.abs(deltaYearly) < 1) return []
-  if (ctx.age >= REPORT_END_AGE) return []
-  const monthly = Math.abs(deltaYearly) / 12
-  return [{
-    id: 'check-retirement-expense-delta',
-    name: 'Uitgaven na pensioen',
-    type: 'recurring',
-    direction: deltaYearly < 0 ? 'income' : 'expense',
-    amount: monthly,
-    fromAge: NL_AOW_AGE,
-    toAge: null,
-    indexed: true,
-  }]
+function fireAgeFractionalFor(
+  ctx: EngineContext,
+  overrides?: { returnDelta?: number; extraYearlyExpenses?: number; lumpSum?: number; annualSavings?: number },
+): number | null {
+  const params = scalarParamsFor(ctx, ctx.fireEligibleNetWorth, { strategy: 'perpetual' }, overrides)
+  return computeScalarFireProjection(params).result.fireAge
+}
+
+/**
+ * Jaar-1-onttrekking uit een kernel-run: de eerste onttrekkingsfase-rij (`phase ===
+ * 'withdrawal'`) draagt de werkelijke jaarlijkse `withdrawal` (capaciteits-begrensde
+ * onttrekking die de potten muteert). Op de behoefte-gedreven scalar-pot ≈ de jaaruitgaven.
+ * Vervangt de oude `firstWithdrawalFromLedger` (die `aowEnPensioen − cashflowNetto` uit de
+ * LedgerRow afleidde).
+ */
+function firstWithdrawalFromRun(result: UnifiedProjectionResult): number {
+  const firstRetire = result.rows.find((r) => r.phase === 'withdrawal' && r.withdrawal > 0)
+  return firstRetire ? Math.max(0, firstRetire.withdrawal) : 0
 }
 
 // ── Vrijheidstijd-helpers (consume lib/format) ───────────────────────────────
@@ -676,76 +552,42 @@ function monthsLabel(amount: number, dailyExpense: number): string {
   return `${months.toFixed(1).replace('.', ',')} mnd`
 }
 
-// ── Jaar-1-onttrekking uit het grootboek ─────────────────────────────────────
-//
-// Keuze (gerapporteerd): de LedgerRow bevat geen expliciet withdrawal-veld. Het
-// jaar-1-passief-inkomen leiden we af uit de eerste onttrekkings-fase-rij als
-// het netto rendement dat in dat jaar besteedbaar is: het verschil tussen de
-// totale uitgaven en de eigen onttrekking is niet los beschikbaar, dus we
-// nemen de TOTALE UITGAVEN van de eerste onttrekkings-rij minus het recurring
-// inkomen (AOW/pensioen) van dat jaar als de uit het vermogen onttrokken
-// behoefte. Dit is per constructie de "withdrawal" die `applyWithdrawalStrategy`
-// in dat jaar produceerde (zie engine: cashflowNetto = recurringIncome − withdrawal).
-function firstWithdrawalFromLedger(result: HorizonLedgerResult): number {
-  const firstRetire = result.rows.find((r) => !r.werkt)
-  if (!firstRetire) return 0
-  // withdrawal = recurringIncome − cashflowNetto (engine-identiteit in onttrekkingsfase).
-  const withdrawal = firstRetire.aowEnPensioen - firstRetire.cashflowNetto
-  return Math.max(0, withdrawal)
-}
-
 // ── Hoofdfunctie ─────────────────────────────────────────────────────────────
 
 export function buildReport(intake: CheckIntake, now: Date = new Date()): CheckReportData {
   const ctx = buildContext(intake, now)
 
-  // ── Engines één keer draaien voor de hoofd-DTO ──
-  const baseStrategy: FireStrategyConfig = { strategy: 'deplete', endAge: REPORT_END_AGE, legacyAmount: 0 }
-  const baseLedger = safeLedger(buildEngineInput(ctx, WITHDRAWAL_DEFAULTS, baseStrategy))
-
-  // Snapshot-FIRE (hero / twee toekomsten / fireCards) — perpetuele formule.
+  // ── Motoren één keer draaien voor de hoofd-DTO (horizon-kernel via scalar-pot) ──
   //
-  // Scalar-router (FASE 5, stap 2e) — BEWUSTE UITZONDERING: de vrijheidscheck is
-  // een publieke intake (ADR 0022) zónder ingelogd profiel, dus de per-gebruiker-
-  // vlag `horizon_kernel_scalar` bestaat hier niet. `kernelEnabled: false` is
-  // byte-identiek aan de directe computeFireProjection-aanroep van vandaag; bij
-  // de default-flip (F6) wisselt deze site mee via de router.
-  const fireProj = computeScalarFireProjection(
-    {
-      input: {
-        totalAssets: ctx.fireEligibleNetWorth + ctx.totalDebts, // netWorth-grondslag (assets − debts) op FIRE-eligible
-        totalDebts: ctx.totalDebts,
-        monthlyIncome: ctx.netMonthlyIncome,
-        monthlyExpenses: ctx.monthlyExpenses,
-        monthlyContributions: ctx.annualSavings / 12,
-        yearlyMustExpenses: ctx.yearlyExpenses,
-        dateOfBirth: intake.dateOfBirth,
-      } satisfies FinancialInput,
-      annualReturn: ctx.grossReturn,
-      swrOverride: ctx.effectiveSwr,
-      inflationOverride: ctx.inflationRate,
-    },
-    { kernelEnabled: false },
-  ).result
+  // Eén kernel-accumulatie/decumulatie-run op de VOLLE netto-vermogen-pot (deplete tot 90)
+  // voedt de vermogenslijn (`lifePath`), de kruising-`vOp` en de jaar-1-onttrekking. Zie het
+  // "KERNEL-MIGRATIE"-blok bij `safeKernelRun` voor de grondslag + benaderingen.
+  const baseRun = safeKernelRun(ctx)
+
+  // Snapshot-FIRE (hero / twee toekomsten / fireCards) — de scalar-router (kernel-
+  // onvoorwaardelijk, perpetueel: uitgaven/SWR) op de FIRE-eligible grondslag. Dit is de
+  // canonieke FIRE-uitkomst van het rapport.
+  const fireProj = computeScalarFireProjection({
+    input: {
+      totalAssets: ctx.fireEligibleNetWorth + ctx.totalDebts, // netWorth-grondslag (assets − debts) op FIRE-eligible
+      totalDebts: ctx.totalDebts,
+      monthlyIncome: ctx.netMonthlyIncome,
+      monthlyExpenses: ctx.monthlyExpenses,
+      monthlyContributions: ctx.annualSavings / 12,
+      yearlyMustExpenses: ctx.yearlyExpenses,
+      dateOfBirth: intake.dateOfBirth,
+    } satisfies FinancialInput,
+    annualReturn: ctx.grossReturn,
+    swrOverride: ctx.effectiveSwr,
+    inflationOverride: ctx.inflationRate,
+  }).result
 
   const dailyExpense = dailyExpenseRate(ctx.monthlyExpenses)
 
-  // FIRE-leeftijd: primair uit het grootboek (decumulatie-consistent), fallback
-  // op de snapshot-projectie (perpetueel) wanneer het grootboek geen pad vond.
-  //
-  // Rand-guard (zero-portfolio): het grootboek kan een trivial-late fireAge ≈
-  // eindleeftijd melden wanneer de portefeuille leeg is — meetsStrategyTarget
-  // toetst alleen de vroege jaren (≤ endAge−2), dus de allerlaatste kandidaat
-  // "slaagt" bij gebrek aan een vroeg venster. Zo'n FIRE met €0 liquide vermogen
-  // op het snijpunt is geen betekenisvolle vrijheid; behandel 'm als onhaalbaar
-  // en val terug op de snapshot-projectie (die hier "Niet haalbaar" geeft).
-  const ledgerFireMeaningful =
-    baseLedger?.fireReachable === true &&
-    baseLedger.fireAge != null &&
-    !(baseLedger.liquideAtFire <= 1 && baseLedger.fireAge >= REPORT_END_AGE - 1)
-  const fireAge = ledgerFireMeaningful
-    ? baseLedger!.fireAge
-    : (fireProj.fireAge != null ? Math.round(fireProj.fireAge) : null)
+  // FIRE-leeftijd uit de canonieke scalar-FIRE (fractioneel → afgerond). De scalar-router
+  // gate't onbereikbaar (`fireAge = null`) en `reached_now` (fireAge ≤ huidige leeftijd) al
+  // netjes af, dus de oude zero-portfolio-grootboekguard is niet meer nodig.
+  const fireAge = fireProj.fireAge != null ? Math.round(fireProj.fireAge) : null
   const fireReachable = fireAge != null
 
   // Health één keer berekenen: de sectie én de benchmark-score delen 'm.
@@ -760,17 +602,17 @@ export function buildReport(intake: CheckIntake, now: Date = new Date()): CheckR
     monthBalance: buildMonthBalance(ctx, dailyExpense),
     health,
     benchmark: buildBenchmark(ctx, health.score),
-    kruising: buildKruising(ctx, baseLedger),
+    kruising: buildKruising(ctx, baseRun, fireAge, fireReachable),
     savingsHistory: {
       available: false,
       targetPct: round1(ctx.savingsRatePct),
       note: 'Spaarquote-historie verschijnt zodra je transacties koppelt in de app.',
     },
     twoFutures: buildTwoFutures(ctx, fireAge, fireReachable, dailyExpense),
-    fireCards: buildFireCards(ctx, fireReachable, baseLedger, dailyExpense),
+    fireCards: buildFireCards(ctx, fireReachable, baseRun, dailyExpense),
     sensitivity: buildSensitivity(ctx),
-    withdrawalStrategies: buildWithdrawalStrategies(ctx),
-    lifePath: buildLifePath(ctx, baseLedger, fireAge),
+    withdrawalStrategies: buildWithdrawalStrategies(ctx, baseRun, fireReachable),
+    lifePath: buildLifePath(ctx, baseRun, fireAge),
     will: { intro: '', moves: buildWillMoves(ctx, dailyExpense) },
     houseInclusion: ctx.housingContext.hasEigenHuis
       ? { weightPct: Math.round(HOUSE_FIRE_WEIGHT * 100), note: HOUSE_INCLUSION_NOTE }
@@ -828,16 +670,6 @@ function buildContext(intake: CheckIntake, now: Date): EngineContext {
   const fireEligibleNetWorth =
     getFireEligibleNetWorth(netWorth, housingContext, CHECK_HOUSING_STRATEGY)
     + HOUSE_FIRE_WEIGHT * houseNetEquity
-  // FIRE-pot voor de engine: échte eigen woning + gekoppelde hypotheek gefilterd
-  // (woonkost blijft in budget; hypotheek niet dubbel). De meegerekende 50% van de
-  // overwaarde voegen we toe als één synthetisch groei-bezit dat op het canonieke
-  // woning-rendement meegroeit (zodat het ook in het grootboek/de kruising bijdraagt).
-  const fireFiltered = filterAssetsForFire(CHECK_HOUSING_STRATEGY, portfolio.assets, portfolio.debts)
-  const fireAssets = [...fireFiltered.assets]
-  if (houseNetEquity > 0) {
-    fireAssets.push(buildHouseEquityFireAsset(houseNetEquity))
-  }
-  const firePortfolio: SyntheticPortfolio = { assets: fireAssets, debts: fireFiltered.debts }
 
   const monthlyExpenses = Math.max(0, Number(intake.expenses.totaalMaand) || 0)
   const yearlyExpenses = monthlyExpenses * 12
@@ -881,7 +713,6 @@ function buildContext(intake: CheckIntake, now: Date): EngineContext {
     box3Method: fireParams.box3Method,
     hasPartner,
     portfolio,
-    firePortfolio,
     totalAssets,
     totalDebts,
     netWorth,
@@ -895,17 +726,6 @@ function buildContext(intake: CheckIntake, now: Date): EngineContext {
     fireEligibleNetWorth,
     houseNetEquity,
     housingContext,
-    lifeEventCashflows: buildLifeEventCashflows(intake),
-  }
-}
-
-/** Draai het grootboek met crash-vangnet (lege/onbereikbare uitkomst → null). */
-function safeLedger(input: UnifiedProjectionInput): HorizonLedgerResult | null {
-  try {
-    const r = runHorizonLedger(input)
-    return r.rows.length > 0 ? r : null
-  } catch {
-    return null
   }
 }
 
@@ -1025,9 +845,8 @@ function buildDualBars(ctx: EngineContext): ReportDualBar[] {
       // vrijheidsbijdrage is gehalveerd. `countsForFire` blijft FALSE voor het
       // huis-bucket: zo blijft het buiten `buildWillMoves`'s cash-drag-som
       // (`bars.filter(b => b.countsForFire)`), die anders de volle huiswaarde als
-      // FIRE-cash zou tellen (de échte 50% zit al als synthetisch bezit in
-      // firePortfolio, niet in deze allocatie-buckets). De 50%-vrijheid tonen we
-      // wél in het label.
+      // FIRE-cash zou tellen (de 50%-huisbijdrage zit al in `fireEligibleNetWorth`,
+      // niet in deze allocatie-buckets). De 50%-vrijheid tonen we wél in het label.
       const isHouse = bucket === 'huis'
       const freedomLabel = isHouse
         ? `${monthsLabel(HOUSE_FIRE_WEIGHT * v.eur, dailyExpense)} · telt voor ${Math.round(HOUSE_FIRE_WEIGHT * 100)}% mee`
@@ -1182,44 +1001,48 @@ function benchRow(
   }
 }
 
-function buildKruising(ctx: EngineContext, ledger: HorizonLedgerResult | null): ReportKruising {
+/**
+ * De kruising (V_op × FIRE-punt). NB: deze sectie wordt in het live-rapport NIET meer
+ * gerenderd (de `DeKruising`-grafiek is verwijderd); het veld blijft in de DTO voor
+ * back-compat van bestaande `report_snapshot`-rijen.
+ *
+ * KERNEL-MIGRATIE: `vOp` (oud `besteedbaarVermogen`) benaderen we met `rows[].netWorth`
+ * — zie de benaderingen bij `safeKernelRun`. De per-jaar `V_nodig`-lijn is VERVALLEN (de
+ * kernel-bridge levert alleen een scalair benodigd-vermogen, geen per-jaar reeks; die was
+ * LedgerRow-only). Het `vNodig`-veld is daarom uit `ReportKruising` verwijderd.
+ */
+function buildKruising(
+  ctx: EngineContext,
+  run: UnifiedProjectionResult | null,
+  fireAge: number | null,
+  fireReachable: boolean,
+): ReportKruising {
   const realReturnPct = realReturnFrom(ctx.grossReturn, ctx.inflationRate) * 100
   const startYear = ctx.now.getFullYear()
-  if (!ledger) {
+  const endYear = startYear + (REPORT_END_AGE - ctx.age)
+  if (!run) {
     return {
-      vOp: [], vNodig: [], crossing: null, fireReachable: false,
-      startYear, endYear: startYear + (REPORT_END_AGE - ctx.age),
+      vOp: [], crossing: null, fireReachable: false,
+      startYear, endYear,
       realReturnPct: round1(realReturnPct), savingsRatePct: round1(ctx.savingsRatePct),
     }
   }
-  // V_op (getoonde "liquide, vrij besteedbare"-lijn) leest `besteedbaarVermogen`
-  // (ADR 0030): de RAUW besteedbare pot. In de opbouw en voor include_full/geen-huis
-  // identiek aan de eligibility-pot; ná FIRE bij een nog-niet-verkochte downsize-
-  // woning toont dit de ECHTE besteedbare daling i.p.v. de eligibility-pot die door
-  // de groeiende woning misleidend zou stijgen.
-  const vOp: ReportProjectionPoint[] = ledger.rows.map((r) => ({ age: r.leeftijd, value: round0(r.besteedbaarVermogen) }))
-  const vNodig: ReportProjectionPoint[] = ledger.rows.map((r, i) => ({ age: r.leeftijd, value: round0(ledger.vNodig[i] ?? 0) }))
-  // De FIRE-kruising-stip ligt op de getoonde V_op-lijn → lees `besteedbaarVermogen`
-  // op de FIRE-rij (op de FIRE-leeftijd is de downsize-woning nog niet verkocht; ze
-  // telt wél voor de FIRE-gate maar staat niet in de besteedbare pot — de stip volgt
-  // de getekende lijn, niet de eligibility-pot). Voor non-downsize gelijk aan
-  // `liquideAtFire`.
-  const fireRow = ledger.fireAge != null ? ledger.rows.find((r) => r.leeftijd === ledger.fireAge) : undefined
-  const crossing = ledger.fireReachable && ledger.fireAge != null
-    ? { age: ledger.fireAge, value: round0(fireRow?.besteedbaarVermogen ?? ledger.liquideAtFire) }
+  const vOp: ReportProjectionPoint[] = run.rows.map((r) => ({ age: r.age, value: round0(Math.max(0, r.netWorth)) }))
+  // De FIRE-stip op de getoonde lijn: netto vermogen op de FIRE-leeftijd (nearest rij, ≥0).
+  const fireRow = fireAge != null
+    ? run.rows.find((r) => r.age === fireAge) ?? run.rows.find((r) => r.age >= fireAge)
+    : undefined
+  const crossing = fireReachable && fireAge != null
+    ? { age: fireAge, value: round0(Math.max(0, fireRow?.netWorth ?? 0)) }
     : null
   return {
-    vOp, vNodig, crossing,
-    fireReachable: ledger.fireReachable,
-    startYear, endYear: startYear + (REPORT_END_AGE - ctx.age),
+    vOp, crossing,
+    fireReachable,
+    startYear, endYear,
     realReturnPct: round1(realReturnPct),
     savingsRatePct: round1(ctx.savingsRatePct),
-    // `kruising.scenarios` (±2%-banden) wordt nergens gerenderd: de DeKruising-
-    // grafiek is uit het rapport verwijderd. Het veld is optioneel (`scenarios?`)
-    // op de DTO en wordt hier bewust NIET berekend — dat scheelde per rapport twee
-    // extra, dure `runHorizonLedger`-runs. De levenslange band (`lifePath.scenarios`)
-    // is de live waaier en blijft; die hergebruikt het BASIS-grootboek (geen extra
-    // runs). Zie ook `SCENARIO_RETURN_FLOOR`, gedeeld met `buildLifePathScenarios`.
+    // `kruising.scenarios` (±2%-banden) wordt niet gerenderd/berekend; de live band leeft
+    // op `lifePath.scenarios` (hergebruikt het BASIS-run, geen extra runs).
   }
 }
 
@@ -1252,7 +1075,7 @@ function buildTwoFutures(
 function buildFireCards(
   ctx: EngineContext,
   fireReachable: boolean,
-  ledger: HorizonLedgerResult | null,
+  run: UnifiedProjectionResult | null,
   dailyExpense: number,
 ): ReportFireCard[] {
   // Zelfde grondslag + tekort-guard als snapshot/twoFutures: een negatief
@@ -1263,8 +1086,8 @@ function buildFireCards(
   const freedomPct = computeFreedomProgress({ fireEligibleNetWorth: ctx.fireEligibleNetWorth, requiredPortfolio: fireTarget })
   // Dagen vrijheid die je per maand bijkoopt (sparen / dagtarief).
   const daysPerMonth = dailyExpense > 0 ? Math.round((ctx.annualSavings / 12) / dailyExpense) : 0
-  // Passief inkomen later: jaar-1-onttrekking uit het grootboek → maandbedrag.
-  const passiveMonthly = ledger && fireReachable ? Math.round(firstWithdrawalFromLedger(ledger) / 12) : 0
+  // Passief inkomen later: jaar-1-onttrekking uit de kernel-run → maandbedrag.
+  const passiveMonthly = run && fireReachable ? Math.round(firstWithdrawalFromRun(run) / 12) : 0
 
   return [
     { key: 'stop_today', value: stopLabel, sub: 'vrij als je vandaag stopt' },
@@ -1275,29 +1098,20 @@ function buildFireCards(
 }
 
 function buildSensitivity(ctx: EngineContext): ReportSensitivityRow[] {
-  const baseStrategy: FireStrategyConfig = { strategy: 'deplete', endAge: REPORT_END_AGE, legacyAmount: 0 }
-  // FRACTIONELE FIRE-leeftijd (Fix 4): vergelijk basis én elke hefboom op het
-  // grootboek-`fireAgeFractional` (sub-jaars), niet op de afgeronde headline. Anders
-  // verdween elk effect < 1 jaar in de afronding → "geen verschil". Basis en hefbomen
-  // gebruiken DEZELFDE methode (beide fractional, val terug op de integer `fireAge`
-  // wanneer het grootboek geen breukleeftijd kent).
-  const runFire = (overrides: Parameters<typeof buildEngineInput>[3]): number | null => {
-    const r = safeLedger(buildEngineInput(ctx, WITHDRAWAL_DEFAULTS, baseStrategy, overrides))
-    if (!r?.fireReachable) return null
-    return r.fireAgeFractional ?? r.fireAge
-  }
-  // Fractionele BASIS: zelfde ledger als de hefbomen, zonder overrides (NIET de
-  // afgeronde headline-fireAge — appels met appels).
-  const baseFireAge = runFire(undefined)
+  // FRACTIONELE FIRE-leeftijd (sub-jaars): vergelijk basis én elke hefboom op de
+  // fractionele scalar-FIRE (`fireAgeFractionalFor`), niet op de afgeronde headline —
+  // anders verdween elk effect < 1 jaar in de afronding → "geen verschil". Basis en
+  // hefbomen lopen door DEZELFDE methode (perpetueel, FIRE-eligible grondslag).
+  const baseFireAge = fireAgeFractionalFor(ctx)
 
   // 1) Spaarquote +4pp: hogere annualSavings (inkomen × (quote+4)%).
   const higherSavings = Math.max(0, ctx.netMonthlyIncome * 12 * ((ctx.savingsRatePct + 4) / 100))
   // 2) Rendement +1pp. 3) Uitgaven +€200/mnd. 4) +€20k eenmalig beleggen.
   const levers: { lever: string; fireAge: number | null }[] = [
-    { lever: 'Spaarquote +4pp', fireAge: runFire({ annualSavings: higherSavings }) },
-    { lever: 'Rendement +1pp', fireAge: runFire({ returnDelta: 0.01 }) },
-    { lever: 'Uitgaven +€200/mnd', fireAge: runFire({ extraYearlyExpenses: 200 * 12 }) },
-    { lever: 'Eenmalig +€20k beleggen', fireAge: runFire({ lumpSum: 20_000 }) },
+    { lever: 'Spaarquote +4pp', fireAge: fireAgeFractionalFor(ctx, { annualSavings: higherSavings }) },
+    { lever: 'Rendement +1pp', fireAge: fireAgeFractionalFor(ctx, { returnDelta: 0.01 }) },
+    { lever: 'Uitgaven +€200/mnd', fireAge: fireAgeFractionalFor(ctx, { extraYearlyExpenses: 200 * 12 }) },
+    { lever: 'Eenmalig +€20k beleggen', fireAge: fireAgeFractionalFor(ctx, { lumpSum: 20_000 }) },
   ]
 
   return levers.map((l) => toSensitivityRow(l.lever, baseFireAge, l.fireAge))
@@ -1322,64 +1136,47 @@ function toSensitivityRow(lever: string, baseFireAge: number | null, newFireAge:
   return { lever, effectLabel: `${sign}${parts.join(' ')}`, better }
 }
 
-function buildWithdrawalStrategies(ctx: EngineContext): ReportWithdrawalRow[] {
-  // SWR 3,5% (static), VPW (alleen deplete), Guyton-Klinger (guardrails).
-  const depleteStrategy: FireStrategyConfig = { strategy: 'deplete', endAge: REPORT_END_AGE, legacyAmount: 0 }
-
-  const runYear1 = (wd: WithdrawalStrategyConfig): { year1: number; reachable: boolean } => {
-    const r = safeLedger(buildEngineInput(ctx, wd, depleteStrategy))
-    if (!r || !r.fireReachable) return { year1: 0, reachable: false }
-    return { year1: firstWithdrawalFromLedger(r), reachable: true }
-  }
-
-  const swr = runYear1({ ...WITHDRAWAL_DEFAULTS, strategy: 'static' })
-  const vpw = runYear1({ ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' })
-  const gk = runYear1({ ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' })
-
+/**
+ * Onttrekkingsstrategieën (SWR / VPW / Guyton-Klinger). KERNEL-MIGRATIE: de synthetische
+ * scalar-pot van de publieke intake kan de drie onttrekkings-STRATEGIEËN niet los simuleren
+ * (dat vereiste de itemized v2-grootboek-onttrekkingslaag). We tonen daarom het door de
+ * kernel-run gemodelleerde jaar-1-onttrekkingsbedrag (`firstWithdrawalFromRun`, ≈ de
+ * jaaruitgaven) voor alle drie; het onderscheid zit in de RISICO-/houdbaarheids-kolommen
+ * (statische labels — geen engine-differentiatie op dit pad). Bij een onbereikbare FIRE
+ * (perpetueel) vallen alle bedragen terug op 0 / "—".
+ */
+function buildWithdrawalStrategies(
+  ctx: EngineContext,
+  run: UnifiedProjectionResult | null,
+  fireReachable: boolean,
+): ReportWithdrawalRow[] {
+  const year1 = run && fireReachable ? round0(firstWithdrawalFromRun(run)) : 0
+  const until = (label: string) => (fireReachable && year1 > 0 ? label : '—')
   return [
-    {
-      strategy: 'Vast (SWR)', year1: round0(swr.year1),
-      sustainableUntil: swr.reachable ? '90+' : '—', risk: 'green', riskLabel: 'laag',
-    },
-    {
-      strategy: 'VPW (herrekend)', year1: round0(vpw.year1),
-      sustainableUntil: vpw.reachable ? 'levenslang' : '—', risk: 'amber', riskLabel: 'variabel',
-    },
-    {
-      strategy: 'Guyton-Klinger', year1: round0(gk.year1),
-      sustainableUntil: gk.reachable ? '90+' : '—', risk: 'green', riskLabel: 'laag',
-    },
+    { strategy: 'Vast (SWR)', year1, sustainableUntil: until('90+'), risk: 'green', riskLabel: 'laag' },
+    { strategy: 'VPW (herrekend)', year1, sustainableUntil: until('levenslang'), risk: 'amber', riskLabel: 'variabel' },
+    { strategy: 'Guyton-Klinger', year1, sustainableUntil: until('90+'), risk: 'green', riskLabel: 'laag' },
   ]
 }
 
 /**
- * Meegroeiende netto-overwaarde van de eigen woning op een gegeven leeftijd. De
- * engine-pot heeft de eigen woning gefilterd; voor de NETTO-vermogen-lijn (incl.
- * huis, conform DTO) tellen we de overwaarde er per jaar weer bij op — via de
- * canonieke housing-helpers (geen eigen WOZ/groeiformule). Dit spiegelt
- * `buildSimNetWorthRows` (calc 'sim-netto-vermogen-projectie'). Gedeeld door de
- * basislijn (`buildLifePath`) én de scenariobanden, zodat beide exact dezelfde
- * grondslag hanteren.
+ * Netto-vermogen-reeks (incl. huis) uit een kernel-run — `rows[].netWorth` per jaar,
+ * met een display-vloer op €0. KERNEL-MIGRATIE: de scalar-pot rekent de (niet-liquide)
+ * eigen woning mee in de besteedbare pot; bij een `deplete`-eindstrategie kan die pot ná
+ * uitputting via de kernel-tekort-lening kort NEGATIEF (fictieve netto-schuld) worden vlak
+ * vóór de eindleeftijd. Een vermogenslijn hoort geen fictieve schuld te tonen → klem op ≥0
+ * (identiek aan de scenariobanden, die hun pot ook op 0 klemmen).
  */
-function houseEquityAtAge(ctx: EngineContext, age: number): number {
-  if (!ctx.housingContext.hasEigenHuis) return 0
-  const monthsForward = Math.max(0, (age - ctx.age) * 12)
-  const house = projectEigenHuisValuesAt(ctx.housingContext.eigenHuisAssets, monthsForward)
-  const mortgage = projectMortgageStateAt(ctx.housingContext.eigenHuisMortgages, monthsForward)
-  return Math.max(0, house.currentValue - mortgage.balance)
-}
-
-/** Netto-vermogen-reeks (incl. huis) uit een grootboek-resultaat — zelfde grondslag overal. */
-function nettoVermogenPoints(ctx: EngineContext, ledger: HorizonLedgerResult): ReportProjectionPoint[] {
-  return ledger.rows.map((r) => ({ age: r.leeftijd, value: round0(r.nettoVermogen + houseEquityAtAge(ctx, r.leeftijd)) }))
+function nettoVermogenPoints(run: UnifiedProjectionResult): ReportProjectionPoint[] {
+  return run.rows.map((r) => ({ age: r.age, value: round0(Math.max(0, r.netWorth)) }))
 }
 
 function buildLifePath(
   ctx: EngineContext,
-  ledger: HorizonLedgerResult | null,
+  run: UnifiedProjectionResult | null,
   fireAge: number | null,
 ): CheckReportData['lifePath'] {
-  const points: ReportProjectionPoint[] = ledger ? nettoVermogenPoints(ctx, ledger) : []
+  const points: ReportProjectionPoint[] = run ? nettoVermogenPoints(run) : []
   const markers = buildLifeMarkers(ctx, fireAge)
   // Piek-notitie: leeftijd waarop netto vermogen het hoogst is.
   let peakNote: string | undefined
@@ -1387,7 +1184,7 @@ function buildLifePath(
     const peak = points.reduce((m, p) => (p.value > m.value ? p : m), points[0])
     peakNote = `Je vermogen piekt rond je ${peak.age}e.`
   }
-  return { points, markers, fireAge, endAge: REPORT_END_AGE, peakNote, scenarios: buildLifePathScenarios(ctx, ledger) }
+  return { points, markers, fireAge, endAge: REPORT_END_AGE, peakNote, scenarios: buildLifePathScenarios(ctx, run) }
 }
 
 /** Reëel rendement uit een nominaal rendement + inflatie (engine-identiek). */
@@ -1400,83 +1197,60 @@ function realReturnFrom(nominal: number, inflation: number): number {
  * een ONZEKERHEIDSBAND op het rendement, NIET een her-geplande FIRE-uitkomst.
  *
  * Semantiek (gefixt plan, alleen rendement varieert):
- *  - Het PLAN ligt vast: zelfde inleg, zelfde FIRE-/onttrekkingstiming (de band
- *    draait op de BASIS-FIRE-leeftijd, niet op een eigen herrekend snijpunt) en
- *    zelfde onttrekkingsbedragen als de basislijn.
- *  - Alleen het rendement schuift ±2%. Resultaat: de opbouw-waaier WORDT BREDER
- *    tot de basis-FIRE-leeftijd; de afbouw-waaier blíjft breder worden (+2% put
- *    trager uit → blijft hoger, −2% sneller → lager, met de huis-overwaarde als
- *    natuurlijke vloer). Geen omkering, geen convergentie.
+ *  - Het PLAN ligt vast: zelfde kasstroom-vorm (inleg in opbouw, −onttrekking in afbouw,
+ *    omslag op de basis-FIRE-leeftijd die al in de basislijn zit) als de basislijn.
+ *  - Alleen het rendement schuift ±2%. De waaier wordt breder door de opbouw en blíjft
+ *    breder worden in de afbouw. Geen omkering, geen convergentie.
  *
- * Mechaniek (consume, don't recompute — GEEN extra ledger-runs):
- *  1. Uit het BASIS-grootboek leiden we de jaarlijkse netto-kasstroom van de
- *     belegbare pot af op DEZELFDE grondslag als de basislijn: `nettoVermogen`
- *     (= belegbare assets − schulden, exact de reeks die `nettoVermogenPoints`
- *     gebruikt vóór de huis-overwaarde erbij komt). cf[t] = base[t] − base[t−1] ·
- *     (1 + r_base) codeert het basisplan: inleg in de opbouw, −onttrekking in de
- *     afbouw, met de omslag precies OP de basis-FIRE-leeftijd (die in base[] zit).
- *  2. Voor elk scenario s herbeleggen we diezelfde kasstroom op het verschoven
- *     reële rendement: pot_s[0] = base[0]; pot_s[t] = pot_s[t−1]·(1 + r_s) + cf[t].
- *  3. netto_s[t] = pot_s[t] + huis-overwaarde(leeftijd) — via de GEDEELDE
- *     `houseEquityAtAge`, exact dezelfde grondslag/serie als `lifePath.points`.
- *     De huis-overwaarde groeit op WOZ (niet op het beleggingsrendement) en is
- *     daarom identiek over alle scenario's. Omdat we op `nettoVermogen` (niet
- *     `liquideVermogen`) reconstrueren, raakt de band de basislijn op t=0 exact.
+ * Mechaniek (consume, don't recompute — GEEN extra kernel-runs):
+ *  1. Uit het BASIS-run leiden we de jaarlijkse netto-kasstroom af op DEZELFDE grondslag
+ *     als de basislijn: `rows[].netWorth`. cf[t] = base[t] − base[t−1]·(1 + r_base).
+ *  2. Voor elk scenario s herbeleggen we diezelfde kasstroom op het verschoven reële
+ *     rendement: pot_s[0] = base[0]; pot_s[t] = pot_s[t−1]·(1 + r_s) + cf[t] (klem op 0).
  *
- * Reëel-vs-nominaal: het grootboek rekent in REËLE termen. We leiden `r_base`
- * (reëel) af uit het profiel-rendement/inflatie en passen ±2% op de NOMINALE
- * schaal toe vóór de reële conversie — exact zoals de engine `returnDelta` op
- * `grossReturn` optelt — zodat de band de basislijn op t=0 raakt (cf[0] absorbeert
- * het residu) en de onzekerheid spiegelt die de engine modelleert. De −2%-band
- * wordt geklemd op `SCENARIO_RETURN_FLOOR` (gedeeld met de kruising-banden).
+ * KERNEL-MIGRATIE-benadering: we reconstrueren op de VOLLE netto-vermogenreeks (incl. huis;
+ * het huis groeit hier mee met het portefeuille-rendement i.p.v. apart op WOZ — zie de
+ * benaderingen bij `safeKernelRun`). Omdat we op exact de basislijn (`rows[].netWorth`)
+ * reconstrueren, raakt de band de basislijn op t=0 exact (cf[0]=0). De −2%-band wordt
+ * geklemd op `SCENARIO_RETURN_FLOOR`.
  */
 function buildLifePathScenarios(
   ctx: EngineContext,
-  baseLedger: HorizonLedgerResult | null,
+  baseRun: UnifiedProjectionResult | null,
 ): ReportLifePathScenario[] {
   const deltas: { label: string; returnDeltaPct: number; raw: number }[] = [
     { label: '−2% rendement', returnDeltaPct: -2, raw: -0.02 },
     { label: '+2% rendement', returnDeltaPct: +2, raw: +0.02 },
   ]
-  // Geen basislijn (lege/onbereikbare engine) → geen banden (consistent met
-  // lifePath.points, dat dan ook leeg is).
-  if (!baseLedger || baseLedger.rows.length === 0) {
+  // Geen basislijn (lege/onbereikbare run) → geen banden (consistent met lifePath.points).
+  if (!baseRun || baseRun.rows.length === 0) {
     return deltas.map(({ label, returnDeltaPct }) => ({ label, returnDeltaPct, points: [] }))
   }
 
-  const rows = baseLedger.rows
-  // Belegbare-pot-grondslag = `nettoVermogen` (assets − schulden van de FIRE-pot,
-  // huis gefilterd) — exact de reeks die `nettoVermogenPoints` gebruikt vóór de
-  // huis-overwaarde. Reconstructie op deze reeks laat de band de basislijn op t=0
-  // raken en houdt de grondslag byte-identiek met lifePath.points.
-  const basePot = rows.map((r) => r.nettoVermogen)
+  const rows = baseRun.rows
+  // Grondslag = `netWorth` (volle netto-vermogenreeks) — byte-identiek met lifePath.points.
+  const basePot = rows.map((r) => r.netWorth)
   // Basis-reëel rendement op de NOMINALE schaal van het profiel (zoals returnDelta).
   const rBase = realReturnFrom(ctx.grossReturn, ctx.inflationRate)
-  // Jaarlijkse netto-kasstroom van het basisplan: inleg in opbouw, −onttrekking in
-  // afbouw (met de omslag op de basis-FIRE-leeftijd, die al in basePot zit).
-  // cf[0] = 0 (eerste punt is de start; geen kasstroom ervóór).
+  // Jaarlijkse netto-kasstroom van het basisplan; cf[0] = 0 (start, geen kasstroom ervóór).
   const cf: number[] = basePot.map((v, t) =>
     t === 0 ? 0 : v - basePot[t - 1] * (1 + rBase),
   )
 
   return deltas.map(({ label, returnDeltaPct, raw }) => {
-    // Klem de neerwaartse band zodat grossReturn + delta ≥ vloer (kleine positief)
-    // — identiek aan de kruising-banden.
+    // Klem de neerwaartse band zodat grossReturn + delta ≥ vloer (kleine positief).
     const nomDelta = raw < 0 && ctx.grossReturn + raw < SCENARIO_RETURN_FLOOR
       ? SCENARIO_RETURN_FLOOR - ctx.grossReturn
       : raw
     const rS = realReturnFrom(ctx.grossReturn + nomDelta, ctx.inflationRate)
-    // Herbeleg dezelfde plan-kasstroom op het verschoven reële rendement. De
-    // belegbare pot mag in de afbouw richting €0 zakken (geen huis erin); klem op 0.
     const potS: number[] = new Array(basePot.length)
     potS[0] = basePot[0]
     for (let t = 1; t < basePot.length; t++) {
       potS[t] = Math.max(0, potS[t - 1] * (1 + rS) + cf[t])
     }
-    // Netto vermogen (incl. huis) — zelfde grondslag/serie als lifePath.points.
     const points: ReportProjectionPoint[] = rows.map((r, t) => ({
-      age: r.leeftijd,
-      value: round0(potS[t] + houseEquityAtAge(ctx, r.leeftijd)),
+      age: r.age,
+      value: round0(potS[t]),
     }))
     return { label, returnDeltaPct, points }
   })
@@ -1515,10 +1289,10 @@ function buildLifeMarkers(ctx: EngineContext, fireAge: number | null): ReportLif
     })
   }
 
-  // Door de gebruiker ingevoerde levensgebeurtenissen (stap ⑦b) — dezelfde
-  // gebeurtenissen die via `lifeEventCashflows` daadwerkelijk in het grootboek
-  // doorwerken. Type 'leven', niet-illustratief. Alleen toekomstige events binnen
-  // de horizon worden als marker getoond.
+  // Door de gebruiker ingevoerde levensgebeurtenissen (stap ⑦b). Type 'leven',
+  // niet-illustratief; alleen toekomstige events binnen de horizon worden als marker
+  // getoond. NB (kernel-migratie): op de scalar-pot-route vormen deze events de
+  // projectie-LIJN niet meer — ze verschijnen enkel als marker/tip (zie `safeKernelRun`).
   for (const ev of ctx.intake.lifeEvents ?? []) {
     if (ev.age <= ctx.age || ev.age > REPORT_END_AGE) continue
     markers.push({

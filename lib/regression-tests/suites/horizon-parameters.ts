@@ -8,11 +8,10 @@ import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, STRATEGY_LABELS, type FireEndStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import {
   resolveWithdrawalStrategy, WITHDRAWAL_DEFAULTS,
-  type WithdrawalStrategyType,
 } from '@/lib/withdrawal-strategy'
 import { DEFAULT_RETURN, INFLATION, BOX3_DRAG, NL_AOW_AGE } from '@/lib/constants'
 import { type SimResult } from '@/lib/fire-simulation'
-import { runScalarProjectionV2 as runSimulation } from '@/lib/horizon-engine/scalar-bridge'
+import { runScalarProjectionV2 as runSimulation } from './_kernel-sim'
 
 const CAT = 'horizon.parameters'
 
@@ -258,10 +257,16 @@ const tests: TestCase[] = [
     priority: 'critical',
     estimatedDurationMs: 10,
     fn() {
-      const strategies: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
+      // 'vpw'/'bucket' bestaan niet meer in WithdrawalStrategyType (remote-migratie
+      // 20260703115225 voegde ze samen tot 'static' — een eerdere, aan de kernel-
+      // migratie ongerelateerde wijziging). Stale profielwaarden vallen terug op
+      // 'static' via resolveWithdrawalStrategy's validStrategies-guard; dat
+      // fallback-gedrag testen we hier expliciet i.p.v. de oude 1-op-1 doorgifte.
+      const strategies: string[] = ['static', 'guardrails', 'vpw', 'bucket']
       for (const s of strategies) {
         const c = resolveWithdrawalStrategy({ withdrawal_strategy: s })
-        assertEqual(c.strategy, s, `strategy ${s}`)
+        const expected = s === 'static' || s === 'guardrails' ? s : 'static'
+        assertEqual(c.strategy, expected, `strategy ${s} -> ${expected}`)
       }
     },
   },
@@ -357,11 +362,14 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
-      // Valid strategies per API route
-      const valid: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
+      // Valid strategies per API route. 'vpw'/'bucket' zijn géén WithdrawalStrategyType
+      // meer (remote-migratie 20260703115225 collapste ze naar 'static', ongerelateerd
+      // aan de kernel-migratie) — stale strings vallen terug op 'static'.
+      const valid: string[] = ['static', 'guardrails', 'vpw', 'bucket']
       for (const s of valid) {
         const c = resolveWithdrawalStrategy({ withdrawal_strategy: s })
-        assertEqual(c.strategy, s, `resolve ${s}`)
+        const expected = s === 'static' || s === 'guardrails' ? s : 'static'
+        assertEqual(c.strategy, expected, `resolve ${s} -> ${expected}`)
       }
       // Guardrail bounds from API: floor/ceiling 0.50-2.00, cutStep/raiseStep 0.01-0.50
       const minFloor = 0.50, maxFloor = 2.00

@@ -5,10 +5,9 @@ import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { ageAtDate } from '@/lib/horizon-data'
 import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
-import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
-import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
+import { buildHorizonInput } from '@/lib/horizon/build-input'
 
 export const metadata: Metadata = {
   title: 'Gebeurtenissen — TriFinity',
@@ -45,12 +44,10 @@ export default async function ToekomstGebeurtenissenPage() {
 
   // Baseline + lookup-data voor de levensstrategie-editors (AOW/Pensioen/Huis).
   const ei = horizonData.effectiveInput
-  // Cutover (C4, ADR 0016): bouw de preview-baseline via DEZELFDE gedeelde
-  // input-assemblage (`buildHorizonInput`) + flag-bewuste engine als de Tijdas-
-  // grafiek, i.p.v. de oude lossy `portfolio = totalAssets − totalDebts`-scalar
-  // op de legacy `runSimulation`. Daardoor matchen de AOW/Pensioen-previews per
-  // constructie de v2-grafiek voor v2-gebruikers (en blijven ze v1 als de flag
-  // uit staat). De editors injecteren hun events per-aanroep in deze input.
+  // Kernel-only: bouw de reële jaaruitgave-grondslag (+ null-guards) via de gedeelde
+  // `buildHorizonInput`; de preview-baseline draagt de rauwe kernel-context (de events
+  // injecteert `previewFireAge` per-aanroep). Zo matchen de AOW/Pensioen-previews per
+  // constructie de Tijdas-grafiek (dezelfde motor: de horizon-kernel).
   const aowFractional = lookupAowAge(aowRows, dob).fractional
   const builtPreview = buildHorizonInput({
     horizonInput: ei,
@@ -68,32 +65,22 @@ export default async function ToekomstGebeurtenissenPage() {
     monthlySavingsOverride: horizonData.monthlySavingsOverride,
     baseAnnualSavingsFromCashflow: horizonData.baseAnnualSavingsFromCashflow,
     housingStrategy: horizonData.housingStrategy,
-    potRules: horizonData.potRules,
-    horizonEngineV2: horizonData.horizonEngineV2,
   })
-  const strategieBaseline: PreviewBaseline | null = builtPreview
-    ? {
-        input: builtPreview.input,
-        useV2: horizonData.horizonEngineV2,
-        strategyOptions: builtPreview.strategyOptions,
-        pensioenFireAgeFractional: builtPreview.isPensioen ? aowFractional : null,
-        // FASE 6, stap 1 — kernel-pad voor de strategie-editor-previews. Dezelfde
-        // vlag + rauwe context als de Tijdas-grafiek-hook (use-horizon-fire-sim):
-        // loadHorizonData leverde beide al mee (kernelConvergentie + rawProfile,
-        // met yearly_essential_expenses), dus GEEN extra fetch. previewFireAge
-        // injecteert lifeEvents + yearlyExpenses per-aanroep. Vlag uit óf rawProfile
-        // null → de router draait byte-identiek v2 (runSelectedProjection).
-        kernelEnabled: horizonData.kernelConvergentie,
-        kernelRawContext: horizonData.rawProfile
-          ? {
-              profile: horizonData.rawProfile,
-              assets: horizonData.assets,
-              debts: horizonData.debts,
-              aowRows,
-            }
-          : undefined,
-      }
-    : null
+  const strategieBaseline: PreviewBaseline | null =
+    builtPreview && horizonData.rawProfile
+      ? {
+          // Rauwe kernel-context (mínus lifeEvents; die injecteert previewFireAge
+          // per-aanroep). loadHorizonData leverde rawProfile al mee (met
+          // yearly_essential_expenses), dus GEEN extra fetch.
+          rawContext: {
+            profile: horizonData.rawProfile,
+            assets: horizonData.assets,
+            debts: horizonData.debts,
+            aowRows,
+            yearlyExpenses: builtPreview.input.yearlyExpenses,
+          },
+        }
+      : null
   // Netto maandinkomen voor de Werk-strategie: 6-maands transactie-inkomen
   // (zelfde grondslag als de spaarquote); fallback ~65% van het bruto-profiel.
   const currentNetMonthly = Math.round(
@@ -118,16 +105,10 @@ export default async function ToekomstGebeurtenissenPage() {
       ? {
           simBasis: horizonData.housingSimBasis,
           context: horizonData.housingContext,
-          // Zelfde engine-keuze als de grafiek (profielvlag via de loader) zodat
-          // de modal-preview de v2-grafiek matcht (M2).
-          horizonEngineV2: horizonData.horizonEngineV2,
-          // FASE 6, stap 1 — kernel-pad voor de woon-scenario-preview. Dezelfde vlag
-          // + rauwe context als de Tijdas-grafiek-hook (use-horizon-fire-sim):
-          // loadHorizonData leverde beide al mee, dus GEEN extra fetch. De preview
-          // overschrijft per scenario alleen `profile.housing_strategy_config`; de
-          // adapter mapt dat native naar de kernel-woning-params. Vlag uit óf
-          // rawProfile null → byte-identiek v2/v1 (lib/housing-preview.ts).
-          kernelConvergentieEnabled: horizonData.kernelConvergentie,
+          // Kernel-native woon-scenario-preview: de rauwe kernel-context (dezelfde als
+          // de Tijdas-grafiek). De preview overschrijft per scenario alleen
+          // `profile.housing_strategy_config`; de adapter mapt dat native naar de
+          // kernel-woning-params. Zonder rawProfile → lege scenario-uitkomst.
           kernelRawContext: horizonData.rawProfile
             ? {
                 profile: horizonData.rawProfile,
@@ -148,33 +129,27 @@ export default async function ToekomstGebeurtenissenPage() {
   // Baseline FIRE-projectie voor de EventPane impact-preview — zelfde
   // strategy-aware aanroep als /horizon (scalar-projectie met strategy +
   // endAge) zodat de "vs. baseline"-delta klopt met de gekozen eindstrategie.
-  //
-  // Scalar-router (FASE 5, stap 2e): dit is een SERVER-component, dus de
-  // per-gebruiker-vlag `horizon_kernel_scalar` wordt hier server-side gelezen
-  // uit de al-geladen rauwe profiel-rij (geen client-doorvoer nodig). Vlag UIT
-  // (default) is byte-identiek aan de directe computeFireProjection-aanroep.
-  const baselineFire = computeScalarFireProjection(
-    {
-      input: ei,
-      annualReturn: horizonData.fireParams.grossReturn,
-      swrOverride: horizonData.fireParams.effectiveSwr,
-      inflationOverride: undefined,
-      strategyOptions: {
-        strategy: horizonData.fireStrategy.strategy,
-        endAge: horizonData.fireStrategy.endAge,
-        legacyAmount: horizonData.fireStrategy.legacyAmount,
-      },
+  // De scalar-router draait onvoorwaardelijk op de horizon-kernel voor de tijd-
+  // velden (en valt alleen bij een dob-loze/negatieve-pot-gate terug op de scalar-
+  // weergaveformule); geen vlag meer nodig.
+  const baselineFire = computeScalarFireProjection({
+    input: ei,
+    annualReturn: horizonData.fireParams.grossReturn,
+    swrOverride: horizonData.fireParams.effectiveSwr,
+    inflationOverride: undefined,
+    strategyOptions: {
+      strategy: horizonData.fireStrategy.strategy,
+      endAge: horizonData.fireStrategy.endAge,
+      legacyAmount: horizonData.fireStrategy.legacyAmount,
     },
-    { kernelEnabled: isKernelFlagEnabled(horizonData.rawProfile, 'scalar') },
-  ).result
+  }).result
 
   // Prop-bundle voor de herstelde EventPane (catalogus + bewerken vrije events).
-  // `previewBaseline` (C5-pre): DEZELFDE flag-bewuste, per-asset input als de Tijdas-
-  // grafiek en de strategie-editors (gebouwd via `buildHorizonInput`). De EventPane-
-  // delta-previews (view + edit) draaien hierop via `runSelectedProjection` i.p.v. de
-  // oude lossy `portfolio = totalAssets − totalDebts`-scalar op de legacy `runSimulation`
-  // — zodat v2-gebruikers v2-consistente "FIRE-impact"-delta's zien (en flag-uit v1).
-  // De fire-params/strategy/withdrawal blijven als fallback wanneer de baseline null is.
+  // `previewBaseline`: DEZELFDE rauwe kernel-context als de Tijdas-grafiek en de
+  // strategie-editors. De EventPane-delta-previews (view + edit) draaien hierop via de
+  // horizon-kernel (`computeConvergentieProjection`), zodat de "FIRE-impact"-delta's per
+  // constructie de grafiek matchen. De fire-params/strategy/withdrawal blijven als
+  // fallback wanneer de baseline null is (geen rauwe context).
   const eventPaneData = {
     baselineInput: ei,
     baselineFire,

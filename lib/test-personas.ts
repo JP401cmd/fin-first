@@ -980,7 +980,8 @@ const lisaData: PersonaData = {
     fire_end_age: 90,
     fire_legacy_amount: 100000,
     retirement_expense_method: 'essential_budgets',
-    withdrawal_strategy: 'bucket',
+    // 'bucket' is verwijderd (DB genormaliseerd → static, migratie 20260703115225).
+    withdrawal_strategy: 'static',
     marginaal_tarief: 0.3697, // modaal inkomen — laagste schijf
     feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([
@@ -1348,7 +1349,8 @@ const willemData: PersonaData = {
     fire_end_age: 95,
     retirement_expense_method: 'custom_amount',
     retirement_expense_custom_amount: 3000,
-    withdrawal_strategy: 'vpw',
+    // 'vpw' is verwijderd (DB genormaliseerd → static, migratie 20260703115225).
+    withdrawal_strategy: 'guardrails',
     rebalance_threshold: 10, // agressief — hoge tolerantie, minder herbalanceren
     feature_preferences: { _welcome_seen: true },
     widget_prefs: makeWidgetPrefs([

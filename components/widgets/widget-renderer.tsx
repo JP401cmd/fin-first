@@ -408,6 +408,16 @@ export interface DashboardData {
   // Vrijheidsmijlpalen (scalar-router; de loader levert dit al — de widget-sessie
   // maakt dit veld verplicht zodra de consumerende widget landt).
   freedomMilestones?: import('@/lib/freedom-milestones').FreedomMilestoneResult | null
+  // Hoofdbudgetten-lijst (idem: de loader levert dit al; de widget-sessie maakt het
+  // veld verplicht zodra de Budgetten-widget landt).
+  topBudgets?: {
+    id: string
+    name: string
+    icon: string
+    budgetType: 'income' | 'expense' | 'savings' | 'debt'
+    limit: number
+    spent: number
+  }[]
   // Core financial
   netWorth: number
   totalAssets: number

@@ -40,7 +40,6 @@ const DEFAULT_DEFICIT_PCT = 5
 export function EindstrategieBody({
   simSnapshot,
   fireStrategy,
-  withdrawalStrategy,
   onActionsChange,
   onClose,
   onSaved,
@@ -85,11 +84,6 @@ export function EindstrategieBody({
     }
   }, [])
   const deficitValid = Number.isFinite(deficitPct) && deficitPct >= 0 && deficitPct <= 100
-
-  // Een oud opgeslagen onttrekkingsprofiel (enum-waarde 'vpw' in de DB) is alleen met
-  // 'deplete' combineerbaar — de engine geeft anders een leeg pad. De profiel-UI biedt
-  // deze keuze niet meer aan; dit vangt bestaande gebruikers met die legacy-waarde af.
-  const legacyProfielConflict = withdrawalStrategy?.strategy === 'vpw'
 
   const { baseline, draftProj } = useMemo(() => {
     if (!simSnapshot) return { baseline: EMPTY_PROJ, draftProj: EMPTY_PROJ }
@@ -173,7 +167,6 @@ export function EindstrategieBody({
       <div className="space-y-2">
         {STRATEGY_ORDER.map((key) => {
           const meta = STRATEGY_LABELS[key]
-          const disabled = legacyProfielConflict && key !== 'deplete'
           return (
             <RegelOptionCard
               key={key}
@@ -181,12 +174,6 @@ export function EindstrategieBody({
               title={meta.name}
               description={meta.subtitle}
               onSelect={() => setDraft((d) => ({ ...d, strategy: key }))}
-              disabled={disabled}
-              note={
-                disabled
-                  ? 'Past niet bij je huidige onttrekkingskeuze. Kies eerst het profiel ‘Vast’ in het onttrekkingsprofiel-scherm om deze eindstrategie te gebruiken.'
-                  : undefined
-              }
             />
           )
         })}

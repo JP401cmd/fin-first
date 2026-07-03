@@ -113,7 +113,7 @@ export function LogTimeline({
       {/* Base FIRE marker — fade in at t=500ms */}
       {baseFireAge != null && (
         <g style={{ opacity: hasEntered ? 1 : 0, transition: hasEntered ? 'opacity 200ms ease-out 500ms' : 'none' }}>
-          <circle cx={x(baseFireAge)} cy={Y_LINE} r="6" fill="#10b981" />
+          <circle cx={x(baseFireAge)} cy={Y_LINE} r="6" fill="var(--positive)" />
           <text x={x(baseFireAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 9, fontWeight: 600 }} className="fill-emerald-600">
             FIRE {baseFireAge}j
           </text>
@@ -124,9 +124,9 @@ export function LogTimeline({
               <line
                 x1={x(baseFireAge)} y1={Y_LINE}
                 x2={x(adjustedFireAge)} y2={Y_LINE}
-                stroke="#ef4444" strokeWidth="2" strokeDasharray="4"
+                stroke="var(--negative)" strokeWidth="2" strokeDasharray="4"
               />
-              <circle cx={x(adjustedFireAge)} cy={Y_LINE} r="5" fill="none" stroke="#ef4444" strokeWidth="2" />
+              <circle cx={x(adjustedFireAge)} cy={Y_LINE} r="5" fill="none" stroke="var(--negative)" strokeWidth="2" />
               <text x={x(adjustedFireAge)} y={Y_LINE + 20} textAnchor="middle" style={{ fontSize: 8 }} className="fill-red-500">
                 {adjustedFireAge}j
               </text>

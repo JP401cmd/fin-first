@@ -640,9 +640,9 @@ export const SimChart = memo(function SimChart({
           return (
             <>
               <rect x={x1} y={PAD.top} width={Math.max(0, x2 - x1)} height={innerH}
-                fill="#ef4444" opacity={0.06} />
+                fill="var(--negative)" opacity={0.06} />
               <text x={x1 + 4} y={PAD.top + 14} fontSize={8}
-                fill="#dc2626" fontWeight={600}
+                fill="var(--negative)" fontWeight={600}
                 fontFamily="var(--font-inter, sans-serif)">
                 Vermogen op
               </text>

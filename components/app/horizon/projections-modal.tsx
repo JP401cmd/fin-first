@@ -318,8 +318,8 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
                       {impactMonths !== null && impactMonths !== 0 && (
                         <span className={`shrink-0 rounded-[var(--r-sm)] px-2 py-0.5 text-[10px] font-semibold ${
                           impactMonths > 0
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-red-50 text-red-700'
+                            ? 'bg-emerald-50 text-positive'
+                            : 'bg-red-50 text-negative'
                         }`}>
                           {impactMonths > 0 ? `−${impactMonths}` : `+${Math.abs(impactMonths)}`} mnd
                         </span>
@@ -516,6 +516,7 @@ function ThreeLineChart({
       <path d={linePath(expS)} fill="none" stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2.5"
         pathLength={1} strokeDasharray={1}
         style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
+      {/* eslint-disable-next-line no-restricted-syntax -- scenario-seriekleur (optimistisch/verwacht/pessimistisch), geen winst/verlies */}
       <path d={linePath(optS)} fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="4"
         style={{ animation: animated ? 'fadeInFill 400ms ease-out 200ms both' : 'none', opacity: animated ? undefined : 0 }} />
 
@@ -530,6 +531,7 @@ function ThreeLineChart({
       })}
 
       {/* Legend */}
+      {/* eslint-disable-next-line no-restricted-syntax -- scenario-seriekleur (optimistisch/verwacht/pessimistisch), geen winst/verlies */}
       <line x1={PAD} y1={12} x2={PAD + 16} y2={12} stroke="#10b981" strokeWidth="1.5" strokeDasharray="4" />
       <text x={PAD + 20} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Optimistisch</text>
       <line x1={PAD + 100} y1={12} x2={PAD + 116} y2={12} stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="2" />

@@ -13,10 +13,9 @@ export const metadata: Metadata = { title: 'Grafiek-werking — Beheer' }
  * register. Voor de stappen & tabellen zelf: `/beheer/horizon-kernel`. Bewust statisch
  * (geen live data) — een presentatie-/naslagdocument, geen productie-datapagina.
  *
- * De v2-grootboek-engine (`lib/horizon-engine/`, `runHorizonLedger`) draait tijdens de
- * migratie nog uitsluitend als TERUGVAL-arm achter de per-gebruiker-vlag
- * `horizon_kernel_convergentie` (default-flip = FASE 6 stap 3, fysieke v2-deletie =
- * stap 5) — niet meer als "de" werking.
+ * De oude v2-grootboek-engine (`lib/horizon-engine/`, `runHorizonLedger`) is in FASE 6
+ * (stap 5) fysiek verwijderd; de horizon-kernel is nu de enige, onvoorwaardelijke motor
+ * — er is geen terugval-arm en geen convergentie-vlag meer.
  */
 
 // ── lokale presentatie-helpers (server, geen state) ───────────────────────────
@@ -173,8 +172,8 @@ function DataStroom() {
   const chain = [
     { t: 'DB-tabellen', d: 'assets · debts · budgets · transactions · life_events · profiles · bank_accounts · pot_rules' },
     { t: 'Loaders (server)', d: 'horizon-data-loader.ts · dashboard-data-loader.ts → spaarquote, uitgaven, FIRE-params, strategieën, pot-regels' },
-    { t: 'Client-hook', d: 'useHorizonFireSim — bouwt de v2-input én de rauwe kernel-context (profiel + assets/debts + life-events)' },
-    { t: 'Convergentie-router', d: 'convergentie-router.ts → kernel (solveFire, achter de vlag) of v2 (runSelectedProjection, terugval); één beslispunt' },
+    { t: 'Client-hook', d: 'useHorizonFireSim — bouwt de rauwe kernel-context (profiel + assets/debts + life-events)' },
+    { t: 'Kernel-router', d: 'convergentie-router.ts → solveFire; één beslispunt dat élke run via de kernel draait' },
     { t: 'Grafiek', d: 'SimChart (lijn) · WealthCompositionChart (bar) · IncomeExpenseChart (in/uit) — via de gedeelde result-vorm (bridge)' },
   ]
   return (
@@ -214,7 +213,7 @@ const MATRIX: { onderdeel: string; opbouw: string; overbrugging: string; onttrek
 
 type Ernst = 'hoog' | 'midden' | 'laag'
 const GAPS: { titel: string; onderdeel: string; impact: string; ernst: Ernst; files: string }[] = [
-  { titel: 'Flag-periode: v2-terugval voor specifieke machinerie', onderdeel: 'Engines', ernst: 'midden', impact: 'Achter de vlag draait /toekomst op de kernel; generieke (niet-huis) liquidaties die de kernel-mapping niet aankan (wanneer-nodig/datum-trigger, payoffDebtIds, prijs-fractie) én een ontbrekende rauwe context of een kernel-fout vallen schoon terug op v2 (detectV2OnlyMachinery). Woning-strategieën zijn kernel-native en vallen NIET terug.', files: 'lib/horizon-kernel/convergentie-router.ts · adapter/whatif-varianten.ts' },
+  { titel: 'Generieke (niet-huis) liquidaties zonder kernel-mapping', onderdeel: 'Engines', ernst: 'midden', impact: 'De horizon-kernel is de enige motor; de oude v2-terugval bestaat niet meer. Generieke (niet-huis) liquidaties die de kernel-mapping niet aankan (wanneer-nodig/datum-trigger, payoffDebtIds, prijs-fractie) worden dus niet langer door een tweede engine opgevangen — ze zijn alleen gemodelleerd voor zover de kernel ze native ondersteunt. Woning-strategieën (downsize/opeethypotheek) zijn wél kernel-native.', files: 'lib/horizon-kernel/convergentie-router.ts · adapter/whatif-varianten.ts' },
   { titel: 'Geen Box 1-loonheffing in de projectie', onderdeel: 'Belasting', ernst: 'midden', impact: 'De kern rekent Box 3 (tabel Bel) maar geen Box 1 op AOW/pensioen-inkomen. AOW komt netto binnen, pensioen bruto/geannuïteerd; zonder jaarlijkse loonheffing wordt het besteedbaar pensioeninkomen overschat.', files: 'lib/horizon-kernel/tables/ (geen Box 1-tabel)' },
   { titel: 'Deterministische hoofdlijn; volatiliteit alleen in wrappers', onderdeel: 'Werking', ernst: 'midden', impact: 'De primaire lijn draait op een vast rendement per pot. Sequence-of-returns / "crash net bij FIRE" zit alleen in de scenario-band (RunScenarioBand) en Monte Carlo (RunMonteCarlo, deterministische sin-hash) als aparte wrappers, niet op de hoofdlijn.', files: 'lib/horizon-kernel/ (band/mc-wrappers)' },
   { titel: 'Toekomstige huis-aankoop niet als strategie', onderdeel: 'Strategieën', ernst: 'laag', impact: 'De woning-strategie modelleert alleen de EXIT van een bestaand huis (meerekenen/uitsluiten/verkopen/opeethypotheek). Een toekomstige aankoop kan alleen als los life-event via de generieke fallback.', files: 'lib/horizon-kernel/adapter/params.ts (buildWoning) · adapter/events.ts' },
@@ -307,9 +306,9 @@ export default function GrafiekWerkingPage() {
           .
         </p>
         <p className="text-[12px] text-[var(--ink-3)]">
-          Migratie-status: tijdens FASE 6 draait /toekomst op de kernel achter de per-gebruiker-vlag <C>horizon_kernel_convergentie</C>;
-          de oude <strong>v2-grootboek-engine</strong> (<C>runHorizonLedger</C>, <F>lib/horizon-engine/</F>) blijft uitsluitend als
-          terugval-arm tot de fysieke deletie (default-flip = stap 3, deletie = stap 5).
+          Migratie-status: de horizon-kernel is de <strong>enige</strong> rekenmotor van <F>/toekomst</F>. De oude
+          v2-grootboek-engine (<C>runHorizonLedger</C>, <F>lib/horizon-engine/</F>) is in FASE 6 stap 5 fysiek verwijderd — er is
+          geen terugval-arm en geen convergentie-vlag meer.
         </p>
       </header>
 
@@ -483,9 +482,9 @@ export default function GrafiekWerkingPage() {
           kern-woning-parameters (P!B57-B67); de verkoop/opeethypotheek loopt via het woningblok in <C>Bez</C> en de tekort-lening/opeet-schuld in <C>S</C>.
         </p>
         <Note>
-          <strong>Kernel-native (geen v2-terugval):</strong> downsize én opeethypotheek zijn volledig in de kern gemodelleerd — de
+          <strong>Kernel-native:</strong> downsize én opeethypotheek zijn volledig in de kern gemodelleerd — de
           opeet-schaduwschuld drukt echt op de projectie (S-slot), niet alleen als display. Álle previews (AOW, Pensioen, Huis) draaien
-          achter de vlag op dezelfde kern als de grafiek en matchen daarom de echte lijn.
+          op dezelfde kern als de grafiek en matchen daarom de echte lijn.
         </Note>
       </Sec>
 
@@ -558,14 +557,13 @@ export default function GrafiekWerkingPage() {
 
       {/* + Engines & databedrading */}
       <Sec id="engines" kicker="+ Aanvullend" title="Engines & databedrading">
-        <Sub>Twee motoren, één schakelaar (flag-periode)</Sub>
+        <Sub>Eén motor: de horizon-kernel</Sub>
         <p>
-          Tijdens FASE 6 kiest de <strong>convergentie-router</strong> (<F>lib/horizon-kernel/convergentie-router.ts</F>) per run tussen
-          de <strong>horizon-kernel</strong> (<C>solveFire</C>, achter de per-gebruiker-vlag <C>horizon_kernel_convergentie</C>) en de
-          bestaande <strong>v2-grootboek-engine</strong> (<C>runSelectedProjection</C> → <C>runHorizonLedger</C>). Eén vlag stuurt de hele
-          convergentie-set (/toekomst, /overzicht, het canonieke FIRE-doel en de AI-context); bij de vlag uit is de uitvoer byte-identiek
-          aan vandaag. Woning-strategieën zijn kernel-native; alleen generieke (niet-huis) liquidaties die de kern niet mapt — of een
-          kernel-fout — vallen schoon terug op v2. De default-flip is FASE 6 stap 3, de fysieke v2-deletie stap 5.
+          De <strong>convergentie-router</strong> (<F>lib/horizon-kernel/convergentie-router.ts</F>) is het enige beslispunt en draait
+          <strong> élke run</strong> via de <strong>horizon-kernel</strong> (<C>solveFire</C>). Dezelfde motor voedt de hele
+          convergentie-set (/toekomst, /overzicht, het canonieke FIRE-doel en de AI-context), zodat de FIRE-som overal identiek is. De
+          oude <strong>v2-grootboek-engine</strong> (<C>runHorizonLedger</C>, <F>lib/horizon-engine/</F>) is in FASE 6 stap 5 fysiek
+          verwijderd; er is geen per-gebruiker-vlag en geen terugval-arm meer.
         </p>
         <Sub>Databedrading</Sub>
         <DataStroom />
@@ -579,14 +577,14 @@ export default function GrafiekWerkingPage() {
       {/* ⚠ Aandachtspunten-register */}
       <Sec id="beperkingen" kicker="⚠ Voor de verdere migratie" title="Aandachtspunten-register">
         <p>
-          Wat de kern (nog) niet meeneemt in de weergave of berekening — geverifieerd tegen de huidige code. De grote v2-beperkingen
-          (jaarbasis, pot-regels los van de engine, surplus-naar-schuld onmogelijk, opeethypotheek-rente display-only) zijn met de kern
-          <strong> opgelost</strong>; wat overblijft is voornamelijk adapter-bedrading en de flag-periode.
+          Wat de kern (nog) niet meeneemt in de weergave of berekening — geverifieerd tegen de huidige code. De grote beperkingen van
+          de oude v2-engine (jaarbasis, pot-regels los van de engine, surplus-naar-schuld onmogelijk, opeethypotheek-rente display-only)
+          zijn met de kern <strong>opgelost</strong>; wat overblijft is voornamelijk adapter-bedrading.
         </p>
         <Register />
         <p className="text-[12px] text-[var(--ink-3)]">
-          Grootste vervolgstappen: de adapter-bedrading afmaken (o.a. <C>marginaal_tarief</C>), Box 1-loonheffing toevoegen, de default
-          naar de kern flippen (stap 3) en de v2-terugval verwijderen (stap 5).
+          Grootste vervolgstappen: de adapter-bedrading afmaken (o.a. <C>marginaal_tarief</C>) en de Box 1-loonheffing toevoegen. De
+          v2-grootboek-engine is inmiddels verwijderd; de kernel is de enige, onvoorwaardelijke motor.
         </p>
       </Sec>
     </div>

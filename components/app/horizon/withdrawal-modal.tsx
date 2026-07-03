@@ -499,7 +499,7 @@ function DrawdownChart({ schedule }: { schedule: WithdrawalYear[] }) {
             <rect
               x={x(depIdx)} y={PAD}
               width={W - PAD - x(depIdx)} height={H - PAD * 2}
-              fill="#ef4444" opacity="0.06"
+              fill="var(--negative)" opacity="0.06"
             />
           )
         }

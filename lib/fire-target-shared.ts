@@ -23,7 +23,7 @@ import { toSimResult } from '@/lib/unified-projection'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
-import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
+import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { computeConvergentieProjection } from '@/lib/horizon-kernel/convergentie-router'
 
 /**
@@ -70,12 +70,11 @@ export const computeHorizonFireTarget = cache(async function computeHorizonFireT
   const dob = data.effectiveInput.dateOfBirth
   if ((dob ? ageAtDate(dob) : null) === null) return null
 
-  // ── Cutover (C4/criterium 7, ADR 0016): gebruik DEZELFDE gedeelde input-
-  // assemblage (`buildHorizonInput`) + flag-bewuste engine-selectie als de
-  // /toekomst-hook en de /overzicht-loader. Daardoor leest de Kern (en alles
-  // wat hierop hangt — AI-context, freedomPct, gezondheidsscore, sovereignty)
-  // exact hetzelfde FIRE-doelbedrag als /toekomst en /overzicht. Bij v2 is dat
-  // inclusief de perpetual+AOW-correctie (v1 overcrediteert levenslange AOW).
+  // FASE 6 stap 5A — kernel-only. Gebruik DEZELFDE gedeelde metadata-assemblage
+  // (`buildHorizonInput`, voor `yearlyExpenses`) + de horizon-kernel als de /toekomst-hook en
+  // de /overzicht-loader. Daardoor leest de Kern (en alles wat hierop hangt — AI-context,
+  // freedomPct, gezondheidsscore, sovereignty) exact hetzelfde FIRE-doelbedrag als /toekomst
+  // en /overzicht.
   const built = buildHorizonInput({
     horizonInput: data.effectiveInput,
     lifeEvents: data.events ?? [],
@@ -92,47 +91,28 @@ export const computeHorizonFireTarget = cache(async function computeHorizonFireT
     monthlySavingsOverride: data.monthlySavingsOverride,
     baseAnnualSavingsFromCashflow: data.baseAnnualSavingsFromCashflow,
     housingStrategy: data.housingStrategy,
-    potRules: data.potRules,
-    horizonEngineV2: data.horizonEngineV2,
   })
   if (!built) return null
 
-  // Engine-keuze via de convergentie-router (zie module-doc): vlag uit → letterlijk
-  // de bestaande v2-run (byte-identiek); vlag aan + rauwe context → horizon-kernel,
-  // met schone v2-terugval bij een kernel-onondersteunde generieke liquidatie of een
-  // kernel-fout (woning-strategieën zijn kernel-native).
-  const outcome = computeConvergentieProjection({
-    builtInput: built.input,
-    strategyOptions: built.strategyOptions,
-    v2FlagArg: data.horizonEngineV2,
-    kernelEnabled: data.kernelConvergentie && !!data.rawProfile,
-    rawContext: data.rawProfile
-      ? {
-          profile: data.rawProfile,
-          assets: data.assets,
-          debts: data.debts,
-          lifeEvents: data.events ?? [],
-          aowRows: aowRowsForContext,
-          yearlyExpenses: built.input.yearlyExpenses,
-        }
-      : undefined,
-  })
-  const sim = toSimResult(outcome.result)
+  // Zonder rauwe profiel-rij kan de kernel-invoer niet worden samengesteld → geen doel.
+  if (!data.rawProfile) return null
 
-  if (built.isPensioen) {
-    // Pensioen post-processing verschilt per motor:
-    // • v2: gebruik het werkelijk geprojecteerde portfolio op AOW-leeftijd i.p.v.
-    //   het binary-search-minimum (zie use-horizon-fire-sim, regel 124-137).
-    // • kernel: de bridge levert voor de pensioen-eindstrategie
-    //   `firePortfolioAtFire === requiredFirePortfolio` per constructie (de maand-
-    //   bisectie stopt op de eerste toereikende maand — zie lib/horizon-kernel/
-    //   bridge.ts), dus `requiredFirePortfolio` ís hier al het portfolio-op-FIRE.
-    if (outcome.engine === 'v2') {
-      const value = sim.firePortfolioAtFire ?? sim.requiredFirePortfolio
-      return value > 0 ? value : null
-    }
-    return sim.requiredFirePortfolio > 0 ? sim.requiredFirePortfolio : null
-  }
+  // Horizon-kernel via de convergentie-router. De kernel resolvet pensioen/AOW zélf en levert
+  // per constructie `firePortfolioAtFire === requiredFirePortfolio` op de FIRE-maand (de
+  // bisectie stopt op de eerste toereikende maand — zie lib/horizon-kernel/bridge.ts), dus
+  // `requiredFirePortfolio` ís hier al het portfolio-op-FIRE (óók voor pensioen).
+  const outcome = computeConvergentieProjection({
+    rawContext: {
+      profile: data.rawProfile,
+      assets: data.assets,
+      debts: data.debts,
+      lifeEvents: data.events ?? [],
+      aowRows: aowRowsForContext,
+      yearlyExpenses: built.input.yearlyExpenses,
+    },
+  })
+  if (!outcome.ok) return null
+  const sim = toSimResult(outcome.result)
 
   return sim.requiredFirePortfolio > 0 ? sim.requiredFirePortfolio : null
 })

@@ -1,83 +1,44 @@
 /**
- * Scalar-router (FASE 5, stap 2e — gap-besluit V10, de laatste flip) — de dunne
- * motorschakelaar voor de **SWR-gebaseerde scalar-helpers** `computeFireProjection`
- * en `computeFireRange` (`lib/horizon-data.ts`) plus de mijlpalen-maandzoeker
- * (`lib/freedom-milestones.ts`). Kiest per aanroep tussen de **horizon-kernel**
- * (achter de per-gebruiker-vlag `horizon_kernel_scalar`) en de bestaande helpers.
+ * Scalar-router (FASE 6 stap 5A — kernel-onvoorwaardelijk) — de ingang voor de
+ * **SWR-gebaseerde scalar-helpers** `computeFireProjection` en `computeFireRange`
+ * (`lib/horizon-data.ts`) plus de mijlpalen-maandzoeker (`lib/freedom-milestones.ts`).
+ * De TIJD-velden (FIRE-leeftijd/-datum/aftelling) komen uit de **horizon-kernel**; de
+ * statische ratio-/weergavevelden blijven de scalar-formules.
  *
- * ## Byte-identiteit (harde eis)
- * Bij `kernelEnabled === false` (default) is de uitvoer LETTERLIJK de bestaande
- * helper-aanroep met exact dezelfde argumenten — inclusief de default-parameters
- * (een weggelaten `annualReturn`/`inflationOverride` laat de helper-defaults
- * `DEFAULT_RETURN`/`INFLATION` gelden, precies zoals vandaag).
+ * ## Belangrijk: "scalar-fallback" is GEEN grootboek-terugval
+ * De terugval hier (`engine === 'scalar-fallback'`) is NIET de verwijderde v2-grootboek-
+ * engine, maar de scalar-**weergaveformules** uit `lib/horizon-data.ts` (`computeFire-
+ * Projection`/`computeFireRange`) zélf. Die blijven bestaan: ze leveren óók op de kernel-tak
+ * de statische weergavevelden, én ze zijn de nette degradatie voor gevallen waarin de kernel
+ * geen tijdas kan bouwen (geen geboortedatum / negatief netto vermogen) of een kern-fout
+ * gooit — zodat onboarding/dob-loze gebruikers nooit breken.
  *
  * ## De semantische mapping (scalar → kernel)
  * De scalar-helpers beantwoorden "wanneer bereik ik doel = uitgaven/SWR" met één
- * portefeuille-getal + maandelijkse inleg + rendement. De kernel is
- * behoefte-gebaseerd met eindstrategieën. De eerlijke brug is een **synthetische
- * `KernelAdapterInput`**:
+ * portefeuille-getal + maandelijkse inleg + rendement. De kernel is behoefte-gebaseerd met
+ * eindstrategieën. De eerlijke brug is een **synthetische `KernelAdapterInput`**:
  *
- * - **Eén Beleggingen-pot** met startwaarde = `totalAssets − totalDebts` en
- *   pot-rendement = `annualReturn`. De scalar salde schulden immers direct in het
- *   beginvermogen en liet alles tegen één rendement groeien; een aparte
- *   schuld-pot zou een rentevoet vereisen die de scalar-parameters niet kennen.
- * - **Inleg** = inkomen − uitgaven per maand: het kernel-grootboek spaart in de
- *   CF-tabel exact het surplus `D − E` (= `net_monthly_income −
- *   estimated_monthly_expenses`), wat één-op-één de `monthlySavings` van de
- *   scalar-loop is. `FinancialInput.monthlyContributions` wordt door
- *   `computeFireProjection` zelf óók genegeerd en dus bewust niet gemapt.
- * - **Uitgaven-grondslag**: de scalar-doelbasis `yearlyMustExpenses > 0 ?
- *   yearlyMustExpenses : maanduitgaven × 12` (`computeEffectiveExpenses`) wordt
- *   via `retirement_expense_method = 'essential_budgets'` +
- *   `yearly_essential_expenses` in de kernel geïnjecteerd (zelfde truc als de
- *   household-router), zodat de pensioenuitgave dezelfde grondslag heeft.
- * - **SWR ↔ eindstrategie**: de `strategyOptions.strategy`-woordenschat is al
- *   identiek aan de kernel-eindstrategieën en mapt 1-op-1. Zonder
- *   `strategyOptions` (scalar-default: doel = uitgaven/SWR, een perpetuïteit)
- *   kiest de router **'perpetual'** ('Eeuwigdurend'): de SWR die de consumenten
- *   doorgeven is de effectieve (rendement − Box3-drag − inflatie), dus
- *   uitgaven/SWR ≈ "de portefeuille waarvan het reële na-belasting-rendement de
- *   uitgaven eeuwig draagt" — precies de kapitaal-instandhouding die de kernel
- *   bij 'Eeuwigdurend' endogeen oplost. 'legacy'-met-doelbedrag zou het
- *   SWR-quotiënt opnieuw voorschrijven en is daarmee de mindere spiegel; voor
- *   consumenten die wél legacy voeren, is `strategyOptions.legacyAmount`
- *   toegevoegd (additief; de bestaande helpers negeren het veld).
- *   LET OP: het adapter-default bij een ontbrekende strategie is 'deplete' —
- *   de router zet daarom altijd expliciet `fire_end_strategy`.
- * - **Box 3 AAN (forfaitair, kernel-default)** — bewuste keuze, beredeneerd: de
- *   scalar-loop zelf rekent geen Box 3 (geen `NL_FICTIEF_BELEGGINGEN`-gebruik),
- *   maar het SWR-dóel dat hij spiegelt is ná Box 3-drag (`computeEffectiveSwr =
- *   rendement − BOX3_DRAG − inflatie`; consumenten geven `effectiveSwr`/`NL_SWR`
- *   door). De kernel rekent diezelfde belasting endogeen op het grootboek;
- *   Box 3 uitzetten zou de kernel-tak juist láten afwijken van wat de
- *   SWR-doelsemantiek bedoelt — én van de convergentie-oppervlakken.
- * - **Geen AOW/events**: de scalar kent geen kasstromen; een lege
- *   `lifeEvents`-lijst geeft in de adapter automatisch `aowOpbouwjaren = 0`
- *   (AOW = €0) — dezelfde aanname, zonder speciale behandeling.
- * - **Reëel vs. nominaal**: de scalar rekent reëel (reëel rendement, doel in
- *   euro's van nu); de kernel nominaal met geïndexeerd doel — dezelfde
- *   vergelijking in andere kleding. `inflationOverride` → `inflation_rate`
- *   (weggelaten → zelfde `INFLATION`-default via `resolveFireParams`).
- * - **Resultaat-mapping**: alleen de TIJD-velden (`fireAge`, `fireDate`,
- *   `countdown*`) komen uit de kernel-solve; de statische ratio-/weergavevelden
- *   (`fireTarget`, `freedomPercentage`, `monthlyPassiveIncome`,
- *   `freedomYears/Months`, `savingsRate`, …) blijven de scalar-formules — hun
- *   canon leeft elders (`computeFreedomProgress`, `fire-target-shared`) en het
- *   kernel-doelbedrag is nominaal-op-eindleeftijd, een andere grootheid dan het
- *   `fireTarget`-in-euro's-van-nu dat de consumenten tonen.
- * - **Band (`computeFireRange`)**: drie synthetische offset-runs met exact de
- *   bestaande scalar-offsets (+0,02 geklemd op 0,20 / basis / −0,03 geklemd op
- *   0,01) op het pot-rendement. Bewust GEEN `runScenarioBand`: die levert alleen
- *   FIRE-leeftijd + twee vermogens (geen volledige `FireProjection` zoals het
- *   `FireRange`-contract eist) en hanteert ±0,02-shifts — de scalar-band-
- *   semantiek (+2pp/−3pp) blijft het contract tot F6. Mechanisch is het
- *   equivalent: de band-shift raakt óók alleen investeringspotten, en onze ene
- *   synthetische pot ís er één.
+ * - **Eén Beleggingen-pot** met startwaarde = `totalAssets − totalDebts` en pot-rendement
+ *   = `annualReturn` (de scalar salde schulden direct in het beginvermogen).
+ * - **Inleg** = inkomen − uitgaven per maand: de kernel-CF-tabel spaart exact het surplus
+ *   `D − E` — één-op-één de `monthlySavings` van de scalar-loop.
+ * - **Uitgaven-grondslag**: de scalar-doelbasis `computeEffectiveExpenses` wordt via
+ *   `retirement_expense_method = 'essential_budgets'` + `yearly_essential_expenses`
+ *   geïnjecteerd (zelfde truc als de household-router).
+ * - **SWR ↔ eindstrategie**: zonder `strategyOptions` kiest de router **'perpetual'**
+ *   (uitgaven/SWR ≈ kapitaalinstandhouding). Het adapter-default is 'deplete' → altijd
+ *   expliciet `fire_end_strategy` zetten.
+ * - **Box 3 AAN (forfaitair)** — het SWR-doel dat de scalar spiegelt is ná Box 3-drag.
+ * - **Geen AOW/events**; **reëel↔nominaal** via inflatie (weggelaten → helper-default).
+ * - **Resultaat-mapping**: alleen de TIJD-velden komen uit de kernel-solve; de statische
+ *   ratio-/weergavevelden blijven de scalar-formules (hun canon leeft elders).
+ * - **Band (`computeFireRange`)**: drie synthetische offset-runs met exact de bestaande
+ *   scalar-offsets (+0,02 geklemd op 0,20 / basis / −0,03 geklemd op 0,01) op het pot-rendement.
  *
- * ## Terugval-gates (geen stille engine-mix, geen crash achter de vlag)
- * Geen geboortedatum (kernel kan geen tijdas bouwen; de scalar kon zonder) of
- * negatief netto vermogen (geen zinnige negatieve kernel-pot) → schone
- * v2-terugval met reden. Elke kernel-fout → idem via het try/catch-vangnet.
+ * ## Fallback-gates (nette degradatie, geen crash)
+ * Geen geboortedatum (kernel kan geen tijdas bouwen; de scalar kon zonder) of negatief
+ * netto vermogen (geen zinnige negatieve kernel-pot) → scalar-fallback met reden. Elke
+ * kern-fout → idem via het try/catch-vangnet.
  *
  * Server- én client-bruikbaar (isomorf); deze module logt NOOIT (`console.*`).
  */
@@ -106,17 +67,20 @@ import { solveFire, type SolverStatus } from '@/lib/horizon-kernel/solver'
 import { runKernelProjection } from '@/lib/horizon-kernel/engine'
 import { prognoseI } from '@/lib/horizon-kernel/gap'
 
-/** Welke motor de aanroep daadwerkelijk berekende. */
-export type ScalarEngine = 'kernel' | 'v2'
+/**
+ * Welke motor de aanroep daadwerkelijk berekende. `'scalar-fallback'` = de statische
+ * scalar-weergaveformules (GEEN grootboek-engine — die is verwijderd), gebruikt als nette
+ * degradatie bij een gate/kern-fout.
+ */
+export type ScalarEngine = 'kernel' | 'scalar-fallback'
 
-/** Eindstrategie-opties van de scalar-helpers + het additieve `legacyAmount` (V10). */
+/** Eindstrategie-opties van de scalar-helpers + het additieve `legacyAmount`. */
 export interface ScalarStrategyOptions {
   strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
   endAge?: number
   /**
-   * Nalatenschap-doelbedrag (euro's van nu) voor de kernel-tak bij 'legacy'.
-   * De bestaande scalar-helpers negeren dit veld (zij rekenen legacy als
-   * uitgaven/SWR); weggelaten → 0.
+   * Nalatenschap-doelbedrag (euro's van nu) voor de kernel-tak bij 'legacy'. De bestaande
+   * scalar-helpers negeren dit veld (zij rekenen legacy als uitgaven/SWR); weggelaten → 0.
    */
   legacyAmount?: number
 }
@@ -132,16 +96,11 @@ export interface ScalarFireParams {
   readonly strategyOptions?: ScalarStrategyOptions
 }
 
-/** Router-opties: is de per-gebruiker-vlag `horizon_kernel_scalar` aan? */
-export interface ScalarRouterOptions {
-  readonly kernelEnabled: boolean
-}
-
 /** Uitkomst van één scalar-projectie: resultaat + motor (+ solver-status op de kernel-tak). */
 export interface ScalarFireProjectionOutcome {
   readonly result: FireProjection
   readonly engine: ScalarEngine
-  /** Alleen gezet bij een terugval op v2 terwijl de vlag aan stond. */
+  /** Alleen gezet bij een scalar-fallback (gate of kern-fout). */
   readonly fallbackReason?: string
   /** P!B93/B100 — alleen aanwezig op de kernel-tak. */
   readonly kernelStatus?: SolverStatus
@@ -163,7 +122,7 @@ export interface ScalarMilestoneParams {
   readonly inflationRate?: number
   readonly swrRate?: number
   readonly yearlyMustExpenses?: number
-  /** Nodig voor de kernel-tijdas; de scalar-loop kon zonder. Weggelaten → v2. */
+  /** Nodig voor de kernel-tijdas; de scalar-loop kon zonder. Weggelaten → scalar-fallback. */
   readonly dateOfBirth?: string | null
 }
 
@@ -225,10 +184,10 @@ function syntheticAsset(netWorth: number, returnDecimal: number): Asset {
 }
 
 /**
- * Scalar-parameters → synthetische `KernelAdapterInput` (zie de module-doc voor
- * de volledige mapping-redenering). Geëxporteerd voor de mapping-unit-tests.
- * Vereist een niet-lege geboortedatum en niet-negatief netto vermogen — de
- * aanroeper (router) bewaakt die gates vóór deze functie.
+ * Scalar-parameters → synthetische `KernelAdapterInput` (zie de module-doc voor de
+ * volledige mapping-redenering). Geëxporteerd voor de mapping-unit-tests. Vereist een
+ * niet-lege geboortedatum en niet-negatief netto vermogen — de aanroeper (router) bewaakt
+ * die gates vóór deze functie.
  */
 export function buildScalarAdapterInput(params: ScalarFireParams): KernelAdapterInput {
   const { input, strategyOptions } = params
@@ -247,8 +206,8 @@ export function buildScalarAdapterInput(params: ScalarFireParams): KernelAdapter
     // kernel-pensioenuitgave, ongeacht eventuele andere profiel-methoden.
     yearly_essential_expenses: effectiveYearlyExpenses,
     retirement_expense_method: 'essential_budgets',
-    // Alleen relevant voor resolveFireParams-doorvoer; het pot-rendement zelf
-    // staat op de synthetische pot. null → DEFAULT_RETURN (zelfde default).
+    // Alleen relevant voor resolveFireParams-doorvoer; het pot-rendement zelf staat op de
+    // synthetische pot. null → DEFAULT_RETURN (zelfde default).
     expected_return: annualReturn ?? null,
     // null → INFLATION via resolveFireParams — exact de helper-default.
     inflation_rate: params.inflationOverride ?? null,
@@ -276,8 +235,8 @@ function resolveScalarReturn(annualReturn: number | undefined): number {
 
 // ── Kern: één scalar-projectie ───────────────────────────────────────────────
 
-/** De letterlijke bestaande helper-aanroep (v2-tak + terugval). */
-function runScalarV2(params: ScalarFireParams): FireProjection {
+/** De statische scalar-weergaveformule (levert óók de kernel-tak-weergavevelden + de fallback). */
+function runScalarFallback(params: ScalarFireParams): FireProjection {
   return computeFireProjection(
     params.input,
     params.annualReturn, // undefined → helper-default DEFAULT_RETURN
@@ -287,7 +246,7 @@ function runScalarV2(params: ScalarFireParams): FireProjection {
   )
 }
 
-/** Terugval-gate vóór de kernel-tak; `null` = geen bezwaar. */
+/** Fallback-gate vóór de kernel-tak; `null` = geen bezwaar. */
 function scalarKernelGate(input: FinancialInput): string | null {
   if (!input.dateOfBirth) {
     return 'geen geboortedatum — kernel kan geen tijdas bouwen'
@@ -299,27 +258,22 @@ function scalarKernelGate(input: FinancialInput): string | null {
 }
 
 /**
- * Bereken één scalar-FIRE-projectie via de kernel (vlag aan) of via de bestaande
- * helper (vlag uit / terugval). Zie de module-doc voor mapping en garanties.
+ * Bereken één scalar-FIRE-projectie. De statische ratio-/weergavevelden komen altijd uit
+ * de scalar-formule; de TIJD-velden uit de kernel-solve — tenzij een gate/kern-fout naar de
+ * scalar-fallback degradeert. Zie de module-doc voor mapping en garanties.
  */
 export function computeScalarFireProjection(
   params: ScalarFireParams,
-  opts: ScalarRouterOptions,
 ): ScalarFireProjectionOutcome {
-  // Vlag uit → byte-identiek aan vandaag.
-  if (!opts.kernelEnabled) {
-    return { result: runScalarV2(params), engine: 'v2' }
-  }
-
   const gateReason = scalarKernelGate(params.input)
   if (gateReason) {
-    return { result: runScalarV2(params), engine: 'v2', fallbackReason: gateReason }
+    return { result: runScalarFallback(params), engine: 'scalar-fallback', fallbackReason: gateReason }
   }
 
   try {
-    // De statische ratio-/weergavevelden blijven de scalar-formules (goedkoop,
-    // puur, deterministisch); alleen de tijd-velden komen uit de kernel-solve.
-    const base = runScalarV2(params)
+    // De statische ratio-/weergavevelden blijven de scalar-formules (goedkoop, puur,
+    // deterministisch); alleen de tijd-velden komen uit de kernel-solve.
+    const base = runScalarFallback(params)
     const solve = solveFire(buildKernelInputFromApp(buildScalarAdapterInput(params)))
 
     if (solve.status === 'unreachable_within_horizon') {
@@ -355,13 +309,13 @@ export function computeScalarFireProjection(
       kernelStatus: solve.status,
     }
   } catch (err) {
-    // Defensief: een kernel-fout mag het oppervlak nooit laten crashen achter
-    // de vlag → schone terugval op de bestaande helper met reden.
+    // Defensief: een kern-fout mag het oppervlak nooit laten crashen → nette degradatie op
+    // de scalar-weergaveformule met reden.
     const message = err instanceof Error ? err.message : 'onbekende kernel-fout'
     return {
-      result: runScalarV2(params),
-      engine: 'v2',
-      fallbackReason: `kernel-fout, teruggevallen op v2: ${message}`,
+      result: runScalarFallback(params),
+      engine: 'scalar-fallback',
+      fallbackReason: `kernel-fout, teruggevallen op scalar-formule: ${message}`,
     }
   }
 }
@@ -369,17 +323,32 @@ export function computeScalarFireProjection(
 // ── Band: optimistisch / verwacht / pessimistisch ────────────────────────────
 
 /**
- * Bereken de scalar-band. Vlag uit → letterlijk `computeFireRange` (byte-identiek,
- * incl. de bestaande offsets en klemmen). Vlag aan → drie kernel-runs met exact
- * diezelfde offsets op het pot-rendement (synthetische offset-runs — zie de
- * module-doc voor waarom niet `runScenarioBand`). Valt één scenario terug op v2,
- * dan valt de HELE band terug (geen stille engine-mix binnen één band).
+ * Bereken de scalar-band via drie kernel-runs met exact de bestaande offsets op het
+ * pot-rendement (synthetische offset-runs — zie de module-doc). Valt één scenario terug op
+ * de scalar-formule, dan valt de HELE band terug (geen stille motor-mix binnen één band).
  */
 export function computeScalarFireRange(
   params: ScalarFireParams,
-  opts: ScalarRouterOptions,
 ): ScalarFireRangeOutcome {
-  if (!opts.kernelEnabled) {
+  const baseReturn = resolveScalarReturn(params.annualReturn)
+  // Exact de offsets + klemmen van computeFireRange.
+  const scenarios = {
+    optimistic: Math.min(0.2, baseReturn + 0.02),
+    expected: baseReturn,
+    pessimistic: Math.max(0.01, baseReturn - 0.03),
+  }
+
+  const run = (annualReturn: number) => computeScalarFireProjection({ ...params, annualReturn })
+
+  const optimistic = run(scenarios.optimistic)
+  const expected = run(scenarios.expected)
+  const pessimistic = run(scenarios.pessimistic)
+
+  // De fallback-gates (dob/negatief vermogen) zijn rendement-onafhankelijk, dus in de
+  // praktijk vallen de drie samen terug; deze toets bewaakt het ook bij een scenario-
+  // specifieke kern-fout.
+  const fallback = [optimistic, expected, pessimistic].find((o) => o.engine === 'scalar-fallback')
+  if (fallback) {
     return {
       result: computeFireRange(
         params.input,
@@ -388,39 +357,7 @@ export function computeScalarFireRange(
         params.annualReturn, // undefined → helper-default DEFAULT_RETURN
         params.strategyOptions,
       ),
-      engine: 'v2',
-    }
-  }
-
-  const baseReturn = resolveScalarReturn(params.annualReturn)
-  // Exact de offsets + klemmen van computeFireRange (het contract tot F6).
-  const scenarios = {
-    optimistic: Math.min(0.2, baseReturn + 0.02),
-    expected: baseReturn,
-    pessimistic: Math.max(0.01, baseReturn - 0.03),
-  }
-
-  const run = (annualReturn: number) =>
-    computeScalarFireProjection({ ...params, annualReturn }, opts)
-
-  const optimistic = run(scenarios.optimistic)
-  const expected = run(scenarios.expected)
-  const pessimistic = run(scenarios.pessimistic)
-
-  // De terugval-gates (dob/negatief vermogen) zijn rendement-onafhankelijk, dus
-  // in de praktijk vallen de drie samen terug; deze toets bewaakt het ook bij
-  // een scenario-specifieke kernel-fout.
-  const fallback = [optimistic, expected, pessimistic].find((o) => o.engine === 'v2')
-  if (fallback) {
-    return {
-      result: computeFireRange(
-        params.input,
-        params.swrOverride,
-        params.inflationOverride,
-        params.annualReturn,
-        params.strategyOptions,
-      ),
-      engine: 'v2',
+      engine: 'scalar-fallback',
       fallbackReason: fallback.fallbackReason ?? 'kernel-terugval in een band-scenario',
     }
   }
@@ -437,22 +374,20 @@ export function computeScalarFireRange(
 
 // ── Mijlpalen: 25/50/75/100% vrijheid ────────────────────────────────────────
 
-/** Scalar-horizon van de mijlpalen-loop (maanden) — zelfde kap als de v2-loop. */
+/** Scalar-horizon van de mijlpalen-loop (maanden) — zelfde kap als de scalar-loop. */
 const MILESTONE_HORIZON_MONTHS = 600
 
 /**
- * Bereken de vrijheidsmijlpalen. Vlag uit → letterlijk `computeFreedomMilestones`.
- * Vlag aan → één kernel-accumulatierun (FIRE geparkeerd op de horizon zodat de
- * inleg nooit stopt) en de kruisingsmaanden op het GEDEFLEERDE netto vermogen
- * (Prognose!I ÷ (1+inflatie)^(m/12)) tegen de scalar-doelen in euro's van nu.
- * De doel-/weergavesemantiek (fireTarget = uitgaven/SWR, labels, teksten) blijft
- * de scalar-presenter — alleen de maandzoeker wisselt van motor.
+ * Bereken de vrijheidsmijlpalen via één kernel-accumulatierun (FIRE geparkeerd op de
+ * horizon zodat de inleg nooit stopt) en de kruisingsmaanden op het GEDEFLEERDE netto
+ * vermogen (Prognose!I ÷ (1+inflatie)^(m/12)) tegen de scalar-doelen in euro's van nu. De
+ * doel-/weergavesemantiek blijft de scalar-presenter. Gate/kern-fout → scalar-fallback
+ * (`computeFreedomMilestones`).
  */
 export function computeScalarFreedomMilestones(
   params: ScalarMilestoneParams,
-  opts: ScalarRouterOptions,
 ): ScalarMilestonesOutcome {
-  const runV2 = (): FreedomMilestoneResult =>
+  const runFallback = (): FreedomMilestoneResult =>
     computeFreedomMilestones(
       params.netWorth,
       params.monthlyExpenses,
@@ -463,14 +398,11 @@ export function computeScalarFreedomMilestones(
       params.yearlyMustExpenses,
     )
 
-  if (!opts.kernelEnabled) {
-    return { result: runV2(), engine: 'v2' }
-  }
   if (!params.dateOfBirth) {
-    return { result: runV2(), engine: 'v2', fallbackReason: 'geen geboortedatum — kernel kan geen tijdas bouwen' }
+    return { result: runFallback(), engine: 'scalar-fallback', fallbackReason: 'geen geboortedatum — kernel kan geen tijdas bouwen' }
   }
   if (params.netWorth < 0) {
-    return { result: runV2(), engine: 'v2', fallbackReason: 'negatief netto vermogen — geen kernel-pot-equivalent' }
+    return { result: runFallback(), engine: 'scalar-fallback', fallbackReason: 'negatief netto vermogen — geen kernel-pot-equivalent' }
   }
 
   try {
@@ -480,8 +412,8 @@ export function computeScalarFreedomMilestones(
       params.yearlyMustExpenses ?? 0,
     )
 
-    // Synthetische invoer via dezelfde mapping als de projectie-router; de
-    // mijlpalen-signatuur kent alleen sparen + uitgaven → inkomen := uitgaven + sparen.
+    // Synthetische invoer via dezelfde mapping als de projectie-router; de mijlpalen-
+    // signatuur kent alleen sparen + uitgaven → inkomen := uitgaven + sparen.
     const kernelInput = buildKernelInputFromApp(
       buildScalarAdapterInput({
         input: {
@@ -499,8 +431,8 @@ export function computeScalarFreedomMilestones(
       }),
     )
 
-    // Accumulatierun: FIRE geparkeerd op leeftijd 100 → de CF-tabel blijft elke
-    // in-horizon-maand het surplus sparen (er is geen onttrekkingsfase).
+    // Accumulatierun: FIRE geparkeerd op leeftijd 100 → de CF-tabel blijft elke in-horizon-
+    // maand het surplus sparen (er is geen onttrekkingsfase).
     const proj = runKernelProjection(kernelInput, { fireAge: 100 })
 
     const milestoneMonths = new Map<number, number>()
@@ -538,9 +470,9 @@ export function computeScalarFreedomMilestones(
   } catch (err) {
     const message = err instanceof Error ? err.message : 'onbekende kernel-fout'
     return {
-      result: runV2(),
-      engine: 'v2',
-      fallbackReason: `kernel-fout, teruggevallen op v2: ${message}`,
+      result: runFallback(),
+      engine: 'scalar-fallback',
+      fallbackReason: `kernel-fout, teruggevallen op scalar-formule: ${message}`,
     }
   }
 }

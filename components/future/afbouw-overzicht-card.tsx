@@ -127,7 +127,7 @@ export function AfbouwOverzichtCard({
       </Link>
 
       <p className="mt-2 text-[10px] italic text-[var(--ink-4)] leading-snug">
-        Berekening uit horizon-engine met {stratMeta?.subtitle?.toLowerCase()}.
+        Berekening uit de horizon-kernel met {stratMeta?.subtitle?.toLowerCase()}.
       </p>
     </section>
   )

@@ -1,30 +1,30 @@
 import { describe, it, expect } from 'vitest'
-import { buildSimNetWorthRows } from './networth-projection'
+import { buildSimNetWorthRows } from './networth-rows'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import {
   deriveHousingContext,
-  projectEigenHuisValuesAt,
-  projectMortgageStateAt,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 
 /**
- * Variant-tabel-test voor de grafiek-dip-fix (jun 2026).
+ * Variant-tabel-test voor de grafiek-dip-fix (jun 2026), na de v2-verwijdering
+ * (FASE 6 stap 5A: de horizon-kernel is de enige motor — `useV2`/`v1DownsizeSaleAge`
+ * bestaan niet meer).
  *
  * `buildSimNetWorthRows` levert het GEPROJECTEERDE VOLLEDIGE netto vermogen per
- * jaar (FIRE-pot + meegroeiende niet-liquide assets). Deze test valideert de
- * architect-eisen over ALLE 6 housing-modi × {v1, v2}:
+ * jaar (FIRE-pot + meegroeiende niet-liquide assets). Deze test valideert:
  *   - continuïteit vandaag→jaar-1: |simNetWorthRows[0] − currentNetWorth| < ε;
- *   - include_full/reverse_mortgage/v2-downsize: reeks ≡ endPortfolio (geen optelling);
- *   - exclude_from_fire: reeks > endPortfolio met meegroeiende huiswaarde, geen dip;
- *   - v1-downsize: geen sprong op het verkoopjaar (geen dubbele correctie).
+ *   - include_full/reverse_mortgage: reeks ≡ endPortfolio (geen optelling);
+ *   - exclude_from_fire (zonder houseInLedger): reeks > endPortfolio met
+ *     meegroeiende huiswaarde, geen dip;
+ *   - houseInLedger (kernel-tak): huis al in endPortfolio, nooit bijtellen.
  */
 
 const EPS = 1 // €1 tolerantie (afronding)
 
 // Eigen huis €400k @ 2%/jr nominaal, hypotheek €200k annuïteit.
-const DOB = '1986-01-01' // ~40 jr op 2026 (deterministisch via dateOfBirth-pin elders; hier alleen relatief)
+const DOB = '1986-01-01' // ~40 jr op 2026 (deterministisch; hier alleen relatief)
 const HOUSE_VALUE = 400_000
 const HOUSE_RETURN = 2 // %
 const MORTGAGE_BALANCE = 200_000
@@ -88,7 +88,7 @@ const fireAge = 52
 /**
  * Bouw een gefilterd `endPortfolio`-pad (zónder huis): het LIQUIDE deel groeit
  * van currentNetWorth − overwaarde naar boven. Dit is wat de engine voor
- * exclude_from_fire / v1-downsize teruggeeft.
+ * exclude_from_fire teruggeeft.
  */
 function buildEndPortfolioFiltered(): { age: number; endPortfolio: number }[] {
   const rows: { age: number; endPortfolio: number }[] = []
@@ -115,9 +115,8 @@ function buildEndPortfolioFull(): { age: number; endPortfolio: number }[] {
 // currentNetWorth = volledig netto vermogen vandaag (liquide + overwaarde).
 const currentNetWorth = 100_000 + houseEquityNow
 
-const NON_FILTERING: { mode: HousingStrategyConfig; useV2: boolean; label: string }[] = [
-  { mode: { mode: 'include_full' }, useV2: false, label: 'include_full v1' },
-  { mode: { mode: 'include_full' }, useV2: true, label: 'include_full v2' },
+const NON_FILTERING: { mode: HousingStrategyConfig; label: string }[] = [
+  { mode: { mode: 'include_full' }, label: 'include_full' },
   {
     mode: {
       mode: 'reverse_mortgage',
@@ -128,35 +127,7 @@ const NON_FILTERING: { mode: HousingStrategyConfig; useV2: boolean; label: strin
       interestRate: 0.055,
       monthlyPayout: null,
     },
-    useV2: false,
-    label: 'reverse_mortgage v1',
-  },
-  {
-    mode: {
-      mode: 'reverse_mortgage',
-      trigger: 'fixed_age',
-      triggerAge: 67,
-      depletionThresholdYears: 0,
-      maxLoanPct: 0.5,
-      interestRate: 0.055,
-      monthlyPayout: null,
-    },
-    useV2: true,
-    label: 'reverse_mortgage v2',
-  },
-  // v2-downsize houdt het huis IN de pot (ADR 0015) → niet filteren.
-  {
-    mode: {
-      mode: 'downsize',
-      trigger: 'fixed_age',
-      triggerAge: 67,
-      depletionThresholdYears: 0,
-      salePricePct: 1,
-      salesCostsPct: 0.04,
-      newMonthlyHousingCost: null,
-    },
-    useV2: true,
-    label: 'v2-downsize',
+    label: 'reverse_mortgage',
   },
 ]
 
@@ -168,11 +139,9 @@ describe('buildSimNetWorthRows — niet-filterende modi: reeks ≡ endPortfolio'
         simRows,
         currentNetWorth,
         housingStrategy: variant.mode,
-        useV2: variant.useV2,
         assets,
         debts,
         dateOfBirth: DOB,
-        v1DownsizeSaleAge: null,
       })
       // currentNetWorth ≈ endPortfolio[0] (volledig pad), dus de reconcile-offset
       // is ~0 en de reeks blijft gelijk aan endPortfolio.
@@ -188,139 +157,60 @@ describe('buildSimNetWorthRows — niet-filterende modi: reeks ≡ endPortfolio'
         simRows,
         currentNetWorth,
         housingStrategy: variant.mode,
-        useV2: variant.useV2,
         assets,
         debts,
         dateOfBirth: DOB,
-        v1DownsizeSaleAge: null,
       })
       expect(Math.abs(out[0].netWorth - currentNetWorth)).toBeLessThanOrEqual(EPS)
     })
   }
 })
 
-describe('buildSimNetWorthRows — exclude_from_fire: huis-overwaarde erbij, geen dip', () => {
+describe('buildSimNetWorthRows — exclude_from_fire (zonder houseInLedger): huis-overwaarde erbij, geen dip', () => {
   const cfg: HousingStrategyConfig = { mode: 'exclude_from_fire' }
 
-  for (const useV2 of [false, true]) {
-    const label = `exclude_from_fire ${useV2 ? 'v2' : 'v1'}`
-
-    it(`${label}: reeks > endPortfolio met meegroeiende huiswaarde`, () => {
-      const simRows = buildEndPortfolioFiltered()
-      const out = buildSimNetWorthRows({
-        simRows,
-        currentNetWorth,
-        housingStrategy: cfg,
-        useV2,
-        assets,
-        debts,
-        dateOfBirth: DOB,
-        v1DownsizeSaleAge: null,
-      })
-      // Elke rij telt overwaarde bij → reeks ligt boven het gefilterde endPortfolio.
-      for (let i = 0; i < out.length; i++) {
-        expect(out[i].netWorth).toBeGreaterThan(simRows[i].endPortfolio)
-      }
-      // De huiswaarde groeit → de bijdrage neemt toe over de jaren.
-      const contribFirst = out[0].netWorth - simRows[0].endPortfolio
-      const contribLast = out[out.length - 1].netWorth - simRows[simRows.length - 1].endPortfolio
-      expect(contribLast).toBeGreaterThan(contribFirst)
-    })
-
-    it(`${label}: continuïteit — geen dip direct na vandaag (rij0 ≈ currentNetWorth)`, () => {
-      const simRows = buildEndPortfolioFiltered()
-      const out = buildSimNetWorthRows({
-        simRows,
-        currentNetWorth,
-        housingStrategy: cfg,
-        useV2,
-        assets,
-        debts,
-        dateOfBirth: DOB,
-        v1DownsizeSaleAge: null,
-      })
-      expect(Math.abs(out[0].netWorth - currentNetWorth)).toBeLessThanOrEqual(EPS)
-      // Geen dip: rij 1 ligt niet structureel ónder currentNetWorth door het
-      // wegvallen van het huis (zoals de bug deed). De reeks stijgt of blijft.
-      expect(out[1].netWorth).toBeGreaterThanOrEqual(out[0].netWorth - EPS)
-    })
-  }
-})
-
-describe('buildSimNetWorthRows — v1-downsize: geen sprong op het verkoopjaar', () => {
-  const cfg: HousingStrategyConfig = {
-    mode: 'downsize',
-    trigger: 'fixed_age',
-    triggerAge: 67,
-    depletionThresholdYears: 0,
-    salePricePct: 1,
-    salesCostsPct: 0.04,
-    newMonthlyHousingCost: null,
-  }
-  const saleAge = 47
-
-  it('vóór verkoop telt overwaarde mee; ná verkoop niet (continu, geen sprong)', () => {
-    // Simuleer het v1-pad: gefilterd endPortfolio dat op het verkoopjaar
-    // OMHOOG springt door de ingespoten verkoopopbrengst.
-    const simRows: { age: number; endPortfolio: number }[] = []
-    let v = 100_000
-    for (let age = currentAge; age <= fireAge; age++) {
-      // Op het verkoopjaar springt endPortfolio omhoog met de overwaarde-bij-verkoop.
-      if (age === saleAge) {
-        const monthsForward = (saleAge - currentAge) * 12
-        const { currentValue } = projectEigenHuisValuesAt(ctx.eigenHuisAssets, monthsForward)
-        const { balance } = projectMortgageStateAt(ctx.eigenHuisMortgages, monthsForward)
-        v += Math.max(0, currentValue - balance) * (1 - 0.04) // −verkoopkosten
-      }
-      simRows.push({ age, endPortfolio: Math.round(v) })
-      v = v * 1.06 + 15_000
-    }
-
-    const out = buildSimNetWorthRows({
-      simRows,
-      currentNetWorth,
-      housingStrategy: cfg,
-      useV2: false,
-      assets,
-      debts,
-      dateOfBirth: DOB,
-      v1DownsizeSaleAge: saleAge,
-    })
-
-    // De VOLLEDIGE netto-vermogen-reeks mag op het verkoopjaar GEEN sprong
-    // omhoog maken (de overwaarde gaat van "apart bijgeteld" naar "in
-    // endPortfolio" — netto neutraal, alleen −verkoopkosten). Vergelijk de
-    // jaar-op-jaar-delta rond de verkoop met een normale groei-delta.
-    const idxSale = out.findIndex((r) => r.age === saleAge)
-    expect(idxSale).toBeGreaterThan(0)
-    const deltaAtSale = out[idxSale].netWorth - out[idxSale - 1].netWorth
-    const deltaBefore = out[idxSale - 1].netWorth - out[idxSale - 2].netWorth
-    // Door de verkoopkosten daalt het volledige vermogen iets t.o.v. de trend —
-    // het mag in elk geval NIET ver boven de normale groei uitspringen (de bug).
-    expect(deltaAtSale).toBeLessThan(deltaBefore + 5_000)
-  })
-
-  it('continuïteit vandaag→jaar-1 (|rij0 − currentNetWorth| < ε)', () => {
+  it('reeks > endPortfolio met meegroeiende huiswaarde', () => {
     const simRows = buildEndPortfolioFiltered()
     const out = buildSimNetWorthRows({
       simRows,
       currentNetWorth,
       housingStrategy: cfg,
-      useV2: false,
       assets,
       debts,
       dateOfBirth: DOB,
-      v1DownsizeSaleAge: saleAge,
+    })
+    // Elke rij telt overwaarde bij → reeks ligt boven het gefilterde endPortfolio.
+    for (let i = 0; i < out.length; i++) {
+      expect(out[i].netWorth).toBeGreaterThan(simRows[i].endPortfolio)
+    }
+    // De huiswaarde groeit → de bijdrage neemt toe over de jaren.
+    const contribFirst = out[0].netWorth - simRows[0].endPortfolio
+    const contribLast = out[out.length - 1].netWorth - simRows[simRows.length - 1].endPortfolio
+    expect(contribLast).toBeGreaterThan(contribFirst)
+  })
+
+  it('continuïteit — geen dip direct na vandaag (rij0 ≈ currentNetWorth)', () => {
+    const simRows = buildEndPortfolioFiltered()
+    const out = buildSimNetWorthRows({
+      simRows,
+      currentNetWorth,
+      housingStrategy: cfg,
+      assets,
+      debts,
+      dateOfBirth: DOB,
     })
     expect(Math.abs(out[0].netWorth - currentNetWorth)).toBeLessThanOrEqual(EPS)
+    // Geen dip: rij 1 ligt niet structureel ónder currentNetWorth door het
+    // wegvallen van het huis (zoals de bug deed). De reeks stijgt of blijft.
+    expect(out[1].netWorth).toBeGreaterThanOrEqual(out[0].netWorth - EPS)
   })
 })
 
 describe('buildSimNetWorthRows — kernel-tak (houseInLedger): huis al in het grootboek', () => {
   // Op de kernel-tak zit het eigen huis voor ÉLKE modus al in endPortfolio
   // (= LedgerRow nettoVermogen). De helper mag dan nooit overwaarde bijtellen —
-  // ook niet bij exclude_from_fire, waar v1/v2 dat juist WÉL doen. Spiegelt de
-  // `houseInLedger`-kortsluiting van applyHousingToComposition op /toekomst.
+  // ook niet bij exclude_from_fire, waar de filterende modus dat juist WÉL doet.
+  // Spiegelt de `houseInLedger`-kortsluiting van applyHousingToComposition op /toekomst.
   for (const mode of ['exclude_from_fire', 'downsize'] as const) {
     const cfg: HousingStrategyConfig =
       mode === 'exclude_from_fire'
@@ -342,12 +232,10 @@ describe('buildSimNetWorthRows — kernel-tak (houseInLedger): huis al in het gr
         simRows,
         currentNetWorth,
         housingStrategy: cfg,
-        useV2: true,
         houseInLedger: true,
         assets,
         debts,
         dateOfBirth: DOB,
-        v1DownsizeSaleAge: null,
       })
       expect(out.length).toBe(simRows.length)
       for (let i = 0; i < out.length; i++) {
@@ -356,7 +244,7 @@ describe('buildSimNetWorthRows — kernel-tak (houseInLedger): huis al in het gr
     })
   }
 
-  it('exclude_from_fire: houseInLedger onderdrukt de overwaarde-optelling die v2 wél doet', () => {
+  it('exclude_from_fire: houseInLedger onderdrukt de overwaarde-optelling van de filterende modus', () => {
     const cfg: HousingStrategyConfig = { mode: 'exclude_from_fire' }
     // Zelfde (gefilterde) endPortfolio-invoer; alleen de kernel-vlag verschilt.
     const simRows = buildEndPortfolioFiltered()
@@ -364,18 +252,16 @@ describe('buildSimNetWorthRows — kernel-tak (houseInLedger): huis al in het gr
       simRows,
       currentNetWorth,
       housingStrategy: cfg,
-      useV2: true,
       assets,
       debts,
       dateOfBirth: DOB,
-      v1DownsizeSaleAge: null,
     }
-    const v2 = buildSimNetWorthRows({ ...base, houseInLedger: false })
+    const filtered = buildSimNetWorthRows({ ...base, houseInLedger: false })
     const kernel = buildSimNetWorthRows({ ...base, houseInLedger: true })
-    // v2 telt de meegroeiende overwaarde bij; de kernel-tak niet. In de latere
-    // jaren (huiswaarde gegroeid) ligt v2 dus strikt boven de kernel-reeks.
+    // De filterende modus telt de meegroeiende overwaarde bij; de kernel-tak niet.
+    // In de latere jaren (huiswaarde gegroeid) ligt de filterende reeks strikt boven.
     const last = simRows.length - 1
-    expect(v2[last].netWorth).toBeGreaterThan(kernel[last].netWorth + EPS)
+    expect(filtered[last].netWorth).toBeGreaterThan(kernel[last].netWorth + EPS)
   })
 
   it('houseInLedger weggelaten ≡ houseInLedger:false (byte-identiek, default-veilig)', () => {
@@ -385,11 +271,9 @@ describe('buildSimNetWorthRows — kernel-tak (houseInLedger): huis al in het gr
       simRows,
       currentNetWorth,
       housingStrategy: cfg,
-      useV2: true,
       assets,
       debts,
       dateOfBirth: DOB,
-      v1DownsizeSaleAge: null,
     }
     const omitted = buildSimNetWorthRows(base)
     const explicitFalse = buildSimNetWorthRows({ ...base, houseInLedger: false })
@@ -403,7 +287,6 @@ describe('buildSimNetWorthRows — edge cases', () => {
       simRows: [],
       currentNetWorth,
       housingStrategy: { mode: 'exclude_from_fire' },
-      useV2: false,
       assets,
       debts,
       dateOfBirth: DOB,
@@ -418,7 +301,6 @@ describe('buildSimNetWorthRows — edge cases', () => {
       simRows,
       currentNetWorth: 100_000, // geen overwaarde
       housingStrategy: { mode: 'exclude_from_fire' },
-      useV2: false,
       assets: noHouseAssets,
       debts: [],
       dateOfBirth: DOB,

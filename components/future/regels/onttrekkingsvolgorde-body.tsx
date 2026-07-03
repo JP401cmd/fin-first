@@ -26,7 +26,7 @@ export function OnttrekkingsvolgordeBody({
   const [order, setOrder] = useState<WealthGroup[]>(rules.withdrawalOrderGroups)
   const prio = useCategoriePrioState(rules, 'onttrekking')
   const { saving, error, save } = usePotRulesSave(onClose, onSaved)
-  const oneYearExpense = simSnapshot?.unifiedInput.yearlyExpenses
+  const oneYearExpense = simSnapshot?.rawContext.yearlyExpenses
 
   const changed =
     order.join('|') !== rules.withdrawalOrderGroups.join('|') || prio.changed

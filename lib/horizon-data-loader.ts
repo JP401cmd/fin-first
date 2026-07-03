@@ -33,13 +33,11 @@ import {
   type HousingStrategyConfig,
   type HousingContext,
 } from '@/lib/housing-strategy'
-import { resolveHousingEventsForSim, type HousingTriggerSimBasis } from '@/lib/housing-trigger'
+import { type HousingTriggerSimBasis } from '@/lib/housing-trigger'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { resolvePensionFactorA } from '@/lib/jaarruimte'
-import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
-import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
 import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { resolvePotRules, type PotRulesConfig } from '@/lib/pot-rules'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
@@ -105,19 +103,10 @@ export interface HorizonPageData {
    *  bedrijfspensioen een misleidende (te hoge) jaarruimte-tip te dempen. Een
    *  expliciete 0 (zzp, geen werkgeverspensioen) is wél bekend → true. */
   pensioenFactorAKnown: boolean
-  /** Feature-flag: gebruik de grootboek-engine v2 op /toekomst (per-user opt-in). */
-  horizonEngineV2: boolean
-  /**
-   * Convergentie-set-vlag (`horizon_kernel_convergentie`, ADR 0032 §6) voor deze
-   * gebruiker. True → de kernel-router mag de horizon-kernel gebruiken i.p.v. v2.
-   * Additief: de v2-consumenten negeren dit veld (byte-identiek bij vlag uit).
-   */
-  kernelConvergentie: boolean
   /**
    * Rauwe profiel-rij voor de kernel-router (`computeConvergentieProjection`) —
    * de al-gemergede hoofdprofiel-rij + de al-berekende essentiële-jaaruitgaven.
-   * Null wanneer de profiel-query faalde. Alleen geconsumeerd wanneer
-   * `kernelConvergentie` aan staat; anders inert.
+   * Null wanneer de profiel-query faalde.
    */
   rawProfile: ConvergentieRawProfileRow | null
   /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde voor v2. */
@@ -766,20 +755,11 @@ export async function loadHorizonData(
     hasPartner: housingHasPartner,
     bankAccountCash: unlinkedCash,
   }
-  // De housing-meetrun draait op DEZELFDE engine die de gebruiker in de grafiek
-  // ziet: flag-aan → v2-grootboek, flag-uit → v1 (byte-identiek). Zonder dit zou
-  // een v2-gebruiker met reverse_mortgage zijn trigger op v1 gemeten krijgen
-  // terwijl de lijn v2 is. (Berekend vóór de housing-call; verderop hergebruikt.)
-  const horizonEngineV2 = isHorizonV2Enabled(profile as { feature_preferences?: Record<string, unknown> | null })
-  let housingEvents: LifeEvent[] = []
-  try {
-    housingEvents = resolveHousingEventsForSim(housingStrategy, housingContext, housingSimBasis, horizonEngineV2).events
-  } catch (err) {
-    // Degradatie: zonder housing-events laden (zelfde gedrag als sim-failure
-    // elders) — beter een tijdlijn zonder verkoop-event dan een 500.
-    console.error('[horizon-data-loader] resolveHousingEventsForSim failed:', err)
-  }
-  const loadedEvents: LifeEvent[] = [...realEvents, ...housingEvents]
+  // FASE 6 stap 5A — kernel-only: de horizon-kernel resolvet housing ZÉLF
+  // (`kernelHousingSale`, client-side via `applyKernelHousingSaleToEvents`). De server
+  // genereert geen virtuele huis-verkoop-events meer (die waren op een v2-meetrun geresolved
+  // en werden op de kernel-tak toch gestript).
+  const loadedEvents: LifeEvent[] = realEvents
 
   // Cumulative impacts
   const impacts = computeCumulativeImpacts(effectiveInput, loadedEvents)
@@ -830,15 +810,9 @@ export async function loadHorizonData(
     ? Math.max(0, avgIncome6m - avgExpenses6m)
     : null
 
-  // ── Convergentie-set: kernel-vlag + rauwe kernel-context ──────────
-  // De kernel-router (fire-target-shared, use-horizon-fire-sim, dashboard-loader)
-  // heeft naast de gebouwde v2-input óók de RAUWE profiel-rij nodig om de kernel-
-  // invoer samen te stellen. Beide velden zijn additief; met de vlag uit worden ze
-  // door de v2-consumenten genegeerd → byte-identiek gedrag.
-  const kernelConvergentie = isKernelFlagEnabled(
-    profile as { feature_preferences?: Record<string, unknown> | null },
-    'convergentie',
-  )
+  // ── Rauwe kernel-context ──────────────────────────────────────────
+  // De kernel-router (fire-target-shared, use-horizon-fire-sim, dashboard-loader) heeft de
+  // RAUWE profiel-rij nodig om de kernel-invoer samen te stellen.
   // rawProfile = de al-gemergede hoofdprofiel-rij (incl. withdrawal/guardrail-velden,
   // hierboven gemerged) + de al-berekende essentiële-jaaruitgaven (geen DB-kolom)
   // zodat de kernel dezelfde pensioen-uitgave-grondslag ('essential_budgets')
@@ -869,8 +843,6 @@ export async function loadHorizonData(
     hasPartner: hasPartnerFlag,
     pensioenFactorA,
     pensioenFactorAKnown,
-    horizonEngineV2,
-    kernelConvergentie,
     rawProfile,
     potRules,
     profileError: profileResult.error

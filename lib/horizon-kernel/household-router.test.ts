@@ -1,13 +1,14 @@
 /**
- * FASE 5, stap 2d — household-engine-router-tests. Kernpunten (spiegel van de convergentie-/
- * what-if-router-tests):
- *  - vlag UIT → `engine: 'v2'` zonder kernel-velden (byte-identiteits-signaal);
- *  - vlag AAN + geschikt synthetisch huishouden → `engine: 'kernel'`: de gecombineerde run
+ * FASE 6 stap 5A — household-router-tests (kernel-only). Kernpunten:
+ *  - geschikte synthetische huishouden-context → `ok:true`: de gecombineerde run
  *    én beide perspectief-runs lopen zonder throw (rijen aanwezig), de Σ-startwaarden-
  *    eigenschap blijft (Σ perspectieven = gecombineerd), en de partner-pensioen-notices
  *    reizen mee;
- *  - de terugval-poorten (geen context, ontbrekende geboortedatum, jaaruitgave 0, gelijk
- *    user_id) geven een schone `engine: 'v2'` + reden — crash-vangnet zoals de peers.
+ *  - de geschiktheids-poorten (geen context, ontbrekende geboortedatum, jaaruitgave 0,
+ *    gelijk user_id) geven een schone `ok:false` + reden — crash-vangnet.
+ *
+ * De vroegere vlag-uit/`engine: 'v2'`-byte-identiteitstest is vervallen: er is geen
+ * tweede motor meer om op terug te vallen, dus dat scenario bestaat niet meer.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -92,76 +93,73 @@ function makeContext(over: Partial<HouseholdKernelRawContext> = {}): HouseholdKe
   }
 }
 
-// ── Byte-identiteit (vlag uit) ────────────────────────────────────────────────────
+// ── Kernel-run (synthetisch huishouden) ────────────────────────────────────────────
 
-describe('computeHouseholdProjection — byte-identiteit (vlag uit)', () => {
-  it('vlag uit → engine "v2", geen kernel-velden (ook mét context)', () => {
-    const outcome = computeHouseholdProjection({ kernelEnabled: false, rawContext: makeContext() })
-    expect(outcome).toStrictEqual({ engine: 'v2' })
-  })
-})
-
-// ── Kernel-tak ─────────────────────────────────────────────────────────────────────
-
-describe('computeHouseholdProjection — kernel-tak (synthetisch huishouden)', () => {
-  it('vlag aan + geschikt → engine "kernel": combined + beide perspectieven lopen', () => {
-    const outcome = computeHouseholdProjection({ kernelEnabled: true, rawContext: makeContext() })
-    expect(outcome.engine).toBe('kernel')
-    expect(outcome.fallbackReason).toBeUndefined()
-    expect(outcome.combined?.rows.length ?? 0).toBeGreaterThan(0)
-    expect(outcome.perMember?.hoofd?.rows.length ?? 0).toBeGreaterThan(0)
-    expect(outcome.perMember?.partner?.rows.length ?? 0).toBeGreaterThan(0)
+describe('computeHouseholdProjection — kernel-run (synthetisch huishouden)', () => {
+  it('geschikt → ok:true: combined + beide perspectieven lopen', () => {
+    const outcome = computeHouseholdProjection({ rawContext: makeContext() })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    expect(outcome.combined.rows.length).toBeGreaterThan(0)
+    expect(outcome.perMember.hoofd?.rows.length ?? 0).toBeGreaterThan(0)
+    expect(outcome.perMember.partner?.rows.length ?? 0).toBeGreaterThan(0)
   })
 
   it('Σ-startwaarden-eigenschap: perspectieven-startvermogen sommeert tot het gecombineerde', () => {
-    const outcome = computeHouseholdProjection({ kernelEnabled: true, rawContext: makeContext() })
-    expect(outcome.engine).toBe('kernel')
-    const combinedStart = outcome.combined!.rows[0]!.startNetWorth
-    const hoofdStart = outcome.perMember!.hoofd!.rows[0]!.startNetWorth
-    const partnerStart = outcome.perMember!.partner!.rows[0]!.startNetWorth
+    const outcome = computeHouseholdProjection({ rawContext: makeContext() })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    const combinedStart = outcome.combined.rows[0]!.startNetWorth
+    const hoofdStart = outcome.perMember.hoofd!.rows[0]!.startNetWorth
+    const partnerStart = outcome.perMember.partner!.rows[0]!.startNetWorth
     expect(hoofdStart + partnerStart).toBeCloseTo(combinedStart, 2)
   })
 
   it('partner-pensioen/-AOW-notices reizen mee in de uitvoer', () => {
-    const outcome = computeHouseholdProjection({ kernelEnabled: true, rawContext: makeContext() })
-    expect(outcome.notices?.some(n => /pensioen/i.test(n.message))).toBe(true)
-    expect(outcome.notices?.every(n => n.kind === 'info')).toBe(true)
+    const outcome = computeHouseholdProjection({ rawContext: makeContext() })
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    expect(outcome.notices.some((n) => /pensioen/i.test(n.message))).toBe(true)
+    expect(outcome.notices.every((n) => n.kind === 'info')).toBe(true)
   })
 })
 
-// ── Terugval-poorten (crash-vangnet) ─────────────────────────────────────────────────
+// ── Geschiktheids-poorten (crash-vangnet) ─────────────────────────────────────────
 
-describe('computeHouseholdProjection — terugval', () => {
-  it('vlag aan zonder rawContext → engine "v2" + reden', () => {
-    const outcome = computeHouseholdProjection({ kernelEnabled: true })
-    expect(outcome.engine).toBe('v2')
-    expect(outcome.fallbackReason).toBeTruthy()
+describe('computeHouseholdProjection — geschiktheids-poorten', () => {
+  it('geen rawContext → ok:false + reden', () => {
+    const outcome = computeHouseholdProjection({})
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    expect(outcome.reason).toBeTruthy()
   })
 
-  it('vlag aan + ontbrekende partner-geboortedatum → engine "v2" + /geboortedatum/', () => {
+  it('ontbrekende partner-geboortedatum → ok:false + /geboortedatum/', () => {
     const ctx = makeContext({
       partner: { userId: 'partner', profile: profile({ date_of_birth: null }), lifeEvents: [], yearlyExpenses: 24_000 },
     })
-    const outcome = computeHouseholdProjection({ kernelEnabled: true, rawContext: ctx })
-    expect(outcome.engine).toBe('v2')
-    expect(outcome.fallbackReason).toMatch(/geboortedatum/)
+    const outcome = computeHouseholdProjection({ rawContext: ctx })
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    expect(outcome.reason).toMatch(/geboortedatum/)
   })
 
-  it('vlag aan + gecombineerde jaaruitgave 0 → engine "v2" + /jaaruitgave/', () => {
+  it('gecombineerde jaaruitgave 0 → ok:false + /jaaruitgave/', () => {
     const outcome = computeHouseholdProjection({
-      kernelEnabled: true,
       rawContext: makeContext({ combinedYearlyExpenses: 0 }),
     })
-    expect(outcome.engine).toBe('v2')
-    expect(outcome.fallbackReason).toMatch(/jaaruitgave/)
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    expect(outcome.reason).toMatch(/jaaruitgave/)
   })
 
-  it('vlag aan + head en partner met hetzelfde user_id → engine "v2" + /user_id/', () => {
+  it('head en partner met hetzelfde user_id → ok:false + /user_id/', () => {
     const ctx = makeContext({
       partner: { userId: 'hoofd', profile: profile({ date_of_birth: `${new Date().getFullYear() - 42}-01-01` }), lifeEvents: [], yearlyExpenses: 24_000 },
     })
-    const outcome = computeHouseholdProjection({ kernelEnabled: true, rawContext: ctx })
-    expect(outcome.engine).toBe('v2')
-    expect(outcome.fallbackReason).toMatch(/user_id/)
+    const outcome = computeHouseholdProjection({ rawContext: ctx })
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    expect(outcome.reason).toMatch(/user_id/)
   })
 })

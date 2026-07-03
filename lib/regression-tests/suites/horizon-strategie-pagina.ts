@@ -15,7 +15,7 @@ import {
   type WithdrawalContext,
 } from '@/lib/withdrawal-strategy'
 import { type SimCashflow } from '@/lib/fire-simulation'
-import { runScalarProjectionV2 as runSimulation } from '@/lib/horizon-engine/scalar-bridge'
+import { runScalarProjectionV2 as runSimulation } from './_kernel-sim'
 import { type FireStrategyConfig, parseFireStrategy, STRATEGY_LABELS as FIRE_STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
 import { ageAtDate, DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'
@@ -24,9 +24,23 @@ const CAT = 'horizon.strategie-pagina'
 
 // ── Test data ───────────────────────────────────────────────────────────────
 
-const ALL_STRATEGIES: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
+/**
+ * Legacy UI-concept: de (inmiddels tot een /toekomst-redirect vervangen)
+ * strategie-pagina toonde ooit 4 onttrekkingsstrategieën. 'vpw'/'bucket' bestaan
+ * niet meer in `WithdrawalStrategyType` (remote-migratie 20260703115225 voegde ze
+ * samen tot 'static' — zie lib/withdrawal-strategy.ts en de legacyConfig()-pattern
+ * in onttrekkingsstrategie.ts). Deze suite documenteert bewust de STALE 4-optie-
+ * lijst; aanroepen die een echte `WithdrawalStrategyConfig['strategy']` nodig
+ * hebben casten expliciet.
+ */
+type LegacyWithdrawalStrategy = WithdrawalStrategyType | 'vpw' | 'bucket'
 
-const STRATEGY_LABELS: Record<WithdrawalStrategyType, string> = {
+/** De 2 echte strategieën (na de static/guardrails-migratie). */
+const KNOWN_STRATEGIES: WithdrawalStrategyType[] = ['static', 'guardrails']
+
+const ALL_STRATEGIES: LegacyWithdrawalStrategy[] = ['static', 'guardrails', 'vpw', 'bucket']
+
+const STRATEGY_LABELS: Record<LegacyWithdrawalStrategy, string> = {
   static: 'Vast (SWR)',
   guardrails: 'Guardrails',
   vpw: 'VPW',
@@ -129,13 +143,17 @@ const tests: TestCase[] = [
     id: 'strategie-picker-resolve',
     name: 'Strategie picker resolver',
     category: CAT,
-    description: 'resolveWithdrawalStrategy herkent alle geldige strategieën',
+    description: 'HERIJKT: resolveWithdrawalStrategy herkent alleen nog static/guardrails; de legacy-strings "vpw"/"bucket" (vóór migratie 20260703115225) vallen terug op static — zelfde gedrag als strategie-picker-invalid-fallback.',
     priority: 'high',
     estimatedDurationMs: 20,
     fn() {
-      for (const s of ALL_STRATEGIES) {
+      for (const s of KNOWN_STRATEGIES) {
         const config = resolveWithdrawalStrategy({ withdrawal_strategy: s })
         assertEqual(config.strategy, s, `resolve ${s}`)
+      }
+      for (const legacy of ['vpw', 'bucket']) {
+        const config = resolveWithdrawalStrategy({ withdrawal_strategy: legacy })
+        assertEqual(config.strategy, 'static', `legacy "${legacy}" valt terug op static`)
       }
     },
   },
@@ -270,7 +288,8 @@ const tests: TestCase[] = [
       for (const s of ALL_STRATEGIES) {
         const config: WithdrawalStrategyConfig = {
           ...WITHDRAWAL_DEFAULTS,
-          strategy: s,
+          // legacy 'vpw'/'bucket' hier bewust gecast — zie ALL_STRATEGIES-doc
+          strategy: s as WithdrawalStrategyConfig['strategy'],
         }
         const w = applyWithdrawalStrategy(config, ctx)
         assertGreaterThanOrEqual(w, 0, `${s} withdrawal ≥ 0`)
@@ -285,17 +304,17 @@ const tests: TestCase[] = [
     id: 'strategie-comparison-different-outcomes',
     name: 'Strategieën produceren diverse uitkomsten',
     category: CAT,
-    description: 'Niet alle strategieën geven exact hetzelfde bedrag',
+    description: 'Niet alle strategieën geven exact hetzelfde bedrag. HERIJKTE GRONDSLAG: legacy "vpw"/"bucket" vallen nu terug op static (applyVpw/applyBucket zijn onbereikbare dode code), dus 3 van de 4 waarden zijn identiek — alleen guardrails wijkt af door de ceiling-raise. ≥2 unieke waarden blijft waar.',
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      // Use a context where guardrails/vpw should deviate from static
+      // Use a context where guardrails should deviate from static (vpw/bucket vallen terug op static)
       const ctx = makeCtx({
         currentPortfolio: 1_300_000, // Above ceiling → guardrails raises
         yearReturn: 0.15,
       })
       const results = ALL_STRATEGIES.map(s => {
-        const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: s }
+        const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: s as WithdrawalStrategyConfig['strategy'] }
         return applyWithdrawalStrategy(config, ctx)
       })
       // At least 2 different values (guardrails should differ from static)
@@ -386,11 +405,17 @@ const tests: TestCase[] = [
       })
       assert(putRes.status === 401 || putRes.status === 400, 'PUT handler validates')
 
-      // Verify VALID_STRATEGIES list matches our known strategies
-      const validStrategies: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
+      // HERIJKT: 'vpw'/'bucket' zijn geen geldige WithdrawalStrategyType meer
+      // (migratie 20260703115225) — resolveWithdrawalStrategy laat ze niet meer
+      // door en valt terug op static (zie strategie-picker-resolve).
+      const validStrategies: WithdrawalStrategyType[] = ['static', 'guardrails']
       for (const s of validStrategies) {
         const config = resolveWithdrawalStrategy({ withdrawal_strategy: s })
         assertEqual(config.strategy, s, `${s} is valid`)
+      }
+      for (const legacy of ['vpw', 'bucket']) {
+        const config = resolveWithdrawalStrategy({ withdrawal_strategy: legacy })
+        assertEqual(config.strategy, 'static', `legacy "${legacy}" valt terug op static`)
       }
     },
   },
@@ -452,15 +477,15 @@ const tests: TestCase[] = [
     id: 'strategie-vpw-age-sensitivity',
     name: 'VPW onttrekking stijgt bij hogere leeftijd',
     category: CAT,
-    description: 'Minder resterende jaren → hoger onttrekkingspercentage',
+    description: 'HERIJKT — ECHTE gedragswijziging (geen shim-beperking): legacy-string "vpw" bestaat niet meer in WithdrawalStrategyType (migratie 20260703115225); applyWithdrawalStrategy\'s default-tak valt terug op applyStatic, dat leeftijd-ONAFHANKELIJK is. De oorspronkelijke VPW-leeftijdsgevoeligheid (applyVpw in withdrawal-strategy.ts) is nu onbereikbare dode code — niet meer aanroepbaar via de publieke API. Toetst het huidige leeftijd-onafhankelijke fallback-gedrag.',
     priority: 'high',
     estimatedDurationMs: 30,
     fn() {
-      const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' }
+      const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' as WithdrawalStrategyConfig['strategy'] }
       const young = applyWithdrawalStrategy(config, makeCtx({ currentAge: 55, endAge: 90 }))
       const old = applyWithdrawalStrategy(config, makeCtx({ currentAge: 80, endAge: 90 }))
-      // Older person should withdraw more (higher % of portfolio)
-      assertGreaterThan(old, young, 'hogere leeftijd → hogere onttrekking')
+      // Legacy "vpw" == static-fallback == leeftijd-onafhankelijk
+      assertEqual(old, young, 'legacy "vpw" is nu leeftijd-onafhankelijk (static-fallback)')
     },
   },
 
@@ -469,30 +494,29 @@ const tests: TestCase[] = [
     id: 'strategie-bucket-cash-first',
     name: 'Bucket strategie onttrekt uit cash eerst',
     category: CAT,
-    description: 'Onttrekking is gemaximeerd op cash bucket inhoud',
+    description: 'HERIJKTE GRONDSLAG: legacy-string "bucket" valt terug op static (applyBucket is onbereikbare dode code sinds migratie 20260703115225) — de assertie (40_000) blijft numeriek kloppen omdat static in deze ctx toevallig dezelfde uitkomst geeft (netBaseExpenses), maar de reden is nu "static-fallback", niet "cash-bucket-cap".',
     priority: 'high',
     estimatedDurationMs: 30,
     fn() {
-      const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' }
+      const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' as WithdrawalStrategyConfig['strategy'] }
       // With enough cash in the bucket, withdrawal = base expenses
       const w = applyWithdrawalStrategy(config, makeCtx({
         currentPortfolio: 1_000_000,
         baseExpenses: 40_000,
       }))
-      // Bucket initializes with 2 years of expenses in cash = 80_000
-      // Withdrawal should be the full 40_000 (capped by base - income)
-      assertEqual(w, 40_000, 'volledige onttrekking uit cash')
+      // Legacy "bucket" == static-fallback == netBaseExpenses (40_000 - 0 inkomen)
+      assertEqual(w, 40_000, 'volledige onttrekking (static-fallback)')
     },
   },
   {
     id: 'strategie-bucket-low-cash',
     name: 'Bucket allocatie bij klein vermogen',
     category: CAT,
-    description: 'Klein portfolio: alles naar cash, niets naar bonds/stocks',
+    description: 'Klein portfolio: alles naar cash, niets naar bonds/stocks. initBucketState is pure allocatie-wiskunde, onafhankelijk van de withdrawal-strategy-fallback (ongewijzigd door de migratie).',
     priority: 'medium',
     estimatedDurationMs: 30,
     fn() {
-      const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' }
+      const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' as WithdrawalStrategyConfig['strategy'] }
       // Small portfolio → small cash bucket
       const smallBucket = initBucketState(50_000, 40_000)
       // Cash = min(80_000, 50_000) = 50_000
@@ -516,7 +540,7 @@ const tests: TestCase[] = [
     fn() {
       const ctx = makeCtx({ currentPortfolio: 0, startPortfolio: 0 })
       for (const s of ALL_STRATEGIES) {
-        const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: s }
+        const config: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: s as WithdrawalStrategyConfig['strategy'] }
         const w = applyWithdrawalStrategy(config, ctx)
         assertGreaterThanOrEqual(w, 0, `${s} bij €0 portfolio ≥ 0`)
       }
@@ -545,43 +569,43 @@ const tests: TestCase[] = [
   // ── Compatibiliteitsmatrix: onttrekkingsstrategie × eindstrategie ──────────
   {
     id: 'strategie-compat-vpw-incompatible',
-    name: 'VPW + perpetual/legacy incompatibel',
+    name: 'Legacy "vpw"-string is nu compatibel via static-fallback',
     category: CAT,
-    description: 'VPW onttrekt per definitie volledig — perpetual en legacy markeren als onbereikbaar',
+    description: 'HERIJKT — ECHTE gedragswijziging (geen shim-beperking): legacy-string "vpw" bestaat niet meer in WithdrawalStrategyType (migratie 20260703115225); applyWithdrawalStrategy/de kernel-adapter vallen terug op static-gedrag (applyVpw is nu onbereikbare dode code in withdrawal-strategy.ts). VPW+perpetual/legacy was vóór die migratie bewust onbereikbaar (VPW onttrekt per definitie volledig, oneindig-perpetueel kan dat niet dragen); als static-fallback IS de combinatie nu bereikbaar — consistent met "bucket" in strategie-compat-matrix-valid, dat om dezelfde reden al bereikbaar was. Deze test legt die ombuiging vast i.p.v. de oude (nu onjuiste) verwachting stil te laten staan.',
     priority: 'critical',
     estimatedDurationMs: 100,
     fn() {
-      const vpw: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' }
-      // VPW + perpetual
+      const vpw: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' as WithdrawalStrategyConfig['strategy'] }
+      // Legacy "vpw" + perpetual (nu static-fallback → bereikbaar)
       const rPerp = runSimulation(
         SIM.currentAge, SIM.endAge, SIM.currentPortfolio, SIM.yearlyExpenses,
         SIM.annualSavings, SIM.grossReturn, SIM.returnModel, SIM.inflation,
         [], { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, vpw,
       )
-      assert(!rPerp.fireReachable, 'VPW+perpetual onbereikbaar')
-      assertEqual(rPerp.fireAge, null, 'perpetual: geen fireAge')
-      // VPW + legacy
+      assert(rPerp.fireReachable, 'legacy "vpw"+perpetual nu bereikbaar via static-fallback')
+      assertNotNull(rPerp.fireAge, 'perpetual: fireAge aanwezig')
+      // Legacy "vpw" + legacy (nu static-fallback → bereikbaar)
       const rLeg = runSimulation(
         SIM.currentAge, SIM.endAge, SIM.currentPortfolio, SIM.yearlyExpenses,
         SIM.annualSavings, SIM.grossReturn, SIM.returnModel, SIM.inflation,
         [], { strategy: 'legacy', endAge: 90, legacyAmount: 200_000 }, vpw,
       )
-      assert(!rLeg.fireReachable, 'VPW+legacy onbereikbaar')
-      assertEqual(rLeg.fireAge, null, 'legacy: geen fireAge')
+      assert(rLeg.fireReachable, 'legacy "vpw"+legacy nu bereikbaar via static-fallback')
+      assertNotNull(rLeg.fireAge, 'legacy: fireAge aanwezig')
     },
   },
   {
     id: 'strategie-compat-matrix-valid',
     name: 'Compatibele combinaties convergeren',
     category: CAT,
-    description: 'static/guardrails/bucket × deplete/legacy/perpetual leveren geldig resultaat',
+    description: 'static/guardrails/bucket × deplete/legacy/perpetual leveren geldig resultaat. "bucket" is een legacy-string die terugvalt op static (zie strategie-bucket-cash-first) — cast expliciet.',
     priority: 'high',
     estimatedDurationMs: 600,
     fn() {
       const wsStrategies: WithdrawalStrategyConfig[] = [
         { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
         { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
-        { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' as WithdrawalStrategyConfig['strategy'] },
       ]
       const endStrategies: FireStrategyConfig[] = [
         { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
@@ -696,7 +720,7 @@ const tests: TestCase[] = [
     id: 'strategie-pensioen-withdrawal-combos',
     name: 'Alle 4 withdrawal strategies × pensioen',
     category: CAT,
-    description: 'static/guardrails/vpw/bucket allen compatibel met pensioen eindstrategie',
+    description: 'static/guardrails/vpw/bucket allen compatibel met pensioen eindstrategie. "vpw"/"bucket" zijn legacy-strings die terugvallen op static (zie strategie-vpw-age-sensitivity) — cast expliciet.',
     priority: 'critical',
     estimatedDurationMs: 400,
     fn() {
@@ -704,8 +728,8 @@ const tests: TestCase[] = [
       const wsStrategies: WithdrawalStrategyConfig[] = [
         { ...WITHDRAWAL_DEFAULTS, strategy: 'static' },
         { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' },
-        { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' },
-        { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' as WithdrawalStrategyConfig['strategy'] },
+        { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' as WithdrawalStrategyConfig['strategy'] },
       ]
       for (const ws of wsStrategies) {
         const r = runSimulation(

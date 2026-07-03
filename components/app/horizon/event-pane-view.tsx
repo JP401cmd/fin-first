@@ -7,13 +7,8 @@ import {
   LIFE_EVENT_CATALOG,
   type LifeEvent,
   type FinancialInput,
-  ageAtDate,
 } from '@/lib/horizon-data'
-import {
-  lifeEventsToCashflows,
-} from '@/lib/fire-simulation'
-import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
-import { previewSimResult } from './event-preview-sim'
+import { previewSimResult, EMPTY_SIM_RESULT } from './event-preview-sim'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -34,11 +29,11 @@ interface Props {
   withdrawalStrategy: WithdrawalStrategyConfig
   endAge: number
   /**
-   * Flag-bewuste, per-asset projectie-input (zelfde assemblage als de Tijdas-
-   * grafiek) incl. optionele kernel-context. Wanneer gezet, draait de impact-preview
-   * via `previewSimResult` (→ computeConvergentieProjection) op DEZELFDE motor als de
-   * grafiek: kernel bij convergentie-vlag aan, anders byte-identiek v2. Null →
-   * scalar-portefeuille via de v2-bridge.
+   * Per-asset kernel-context (rauwe convergentie-context, zelfde assemblage als de
+   * Tijdas-grafiek). Wanneer gezet, draait de impact-preview via `previewSimResult`
+   * (→ computeConvergentieProjection) op DEZELFDE motor als de grafiek (de horizon-
+   * kernel). Zonder context is er geen doorrekening — de preview toont dan zijn lege
+   * staat (geen tweede motor sinds de v2-verwijdering).
    */
   previewBaseline?: PreviewBaseline | null
 }
@@ -47,51 +42,23 @@ export function EventPaneView({
   event,
   baselineEvents,
   baselineInput,
-  fireParams,
-  fireStrategy,
-  withdrawalStrategy,
-  endAge,
   previewBaseline,
 }: Props) {
-  const currentAge = baselineInput.dateOfBirth ? Math.floor(ageAtDate(baselineInput.dateOfBirth)) : 30
-
   const { baselineSim, withSim } = useMemo(() => {
     const eventsWithout = baselineEvents.filter(e => e.id !== event.id)
 
-    // Wanneer de server een per-asset baseline levert, draaien beide runs door
-    // DEZELFDE motorschakelaar als de grafiek (`previewSimResult` →
-    // computeConvergentieProjection). Daardoor is de "FIRE-impact"-delta consistent
-    // met de grafiek — kernel wanneer de convergentie-vlag aan is (FASE 6, stap 1),
-    // anders byte-identiek v2. Zonder baseline → scalar-portefeuille via de v2-bridge
-    // (C5-c: v2 is de enige engine; geen legacy `runSimulation`-fallback meer).
-    if (previewBaseline) {
-      return {
-        baselineSim: previewSimResult(previewBaseline, eventsWithout),
-        withSim: previewSimResult(previewBaseline, [...eventsWithout, event]),
-      }
+    // Kernel-only: de preview draait door DEZELFDE motor als de Tijdas-grafiek
+    // (`previewSimResult` → computeConvergentieProjection). Zonder kernel-context
+    // (`previewBaseline`) is er geen doorrekening — lege resultaten tonen de lege
+    // staat i.p.v. een eigen (verwijderde) tweede motor.
+    if (!previewBaseline) {
+      return { baselineSim: EMPTY_SIM_RESULT, withSim: EMPTY_SIM_RESULT }
     }
-
-    const baselineCashflows = lifeEventsToCashflows(eventsWithout)
-    const withCashflows = lifeEventsToCashflows([...eventsWithout, event])
-    const yearlyExp = baselineInput.yearlyMustExpenses > 0 ? baselineInput.yearlyMustExpenses : 0
-    const annualSavings = (baselineInput.monthlyContributions ?? 0) * 12
-    const portfolio = baselineInput.totalAssets - baselineInput.totalDebts
-    const args = [
-      currentAge,
-      endAge,
-      portfolio,
-      yearlyExp,
-      annualSavings,
-      fireParams.grossReturn,
-      'nl_box3' as const,
-      fireParams.inflationRate,
-    ] as const
-    // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c).
     return {
-      baselineSim: runScalarProjectionV2(...args, baselineCashflows, fireStrategy, withdrawalStrategy),
-      withSim: runScalarProjectionV2(...args, withCashflows, fireStrategy, withdrawalStrategy),
+      baselineSim: previewSimResult(previewBaseline, eventsWithout),
+      withSim: previewSimResult(previewBaseline, [...eventsWithout, event]),
     }
-  }, [event, baselineEvents, baselineInput, fireParams, fireStrategy, withdrawalStrategy, endAge, currentAge, previewBaseline])
+  }, [event, baselineEvents, previewBaseline])
 
   const fireDeltaMonths =
     baselineSim.fireAgeFractional != null && withSim.fireAgeFractional != null

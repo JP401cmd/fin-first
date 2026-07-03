@@ -18,6 +18,15 @@
 // geen Infinity-fout krijgt.
 
 import type { CalculatorDefinition } from './types'
+import { resolveSchenkErfParams } from '@/lib/horizon-data'
+
+/**
+ * Schenk-/erfbelastingvrijstellingen voor het lopende jaar — één bron
+ * (SCHENK_ERF_PARAMS in horizon-data.ts). De schenkenVsErven-prefab vult
+ * hiermee zijn default-velden i.p.v. losse literals, zodat de defaults
+ * meebewegen met de jaargelaagde bron.
+ */
+const SCHENK_ERF_HUIDIG = resolveSchenkErfParams()
 
 export type PrefabTier = 'starter' | 'verdieping' | 'specialist'
 
@@ -335,8 +344,8 @@ const schenkenVsErven: CalculatorDefinition = {
     { key: 'vermogen', label: 'Vermogen', kind: 'euro', default: 400000, min: 0, max: 10000000, prefill: 'net_worth' },
     { key: 'kinderen', label: 'Aantal kinderen', kind: 'number', default: 2, min: 1, max: 6 },
     { key: 'horizon', label: 'Jaren (schatting)', kind: 'years', default: 15, min: 1, max: 40, hint: 'Periode waarover je kunt schenken' },
-    { key: 'jaarvrijstelling', label: 'Schenkvrijstelling/kind/jaar', kind: 'euro', default: 6713, min: 0, max: 12000 },
-    { key: 'erf_vrijstelling', label: 'Erfvrijstelling per kind', kind: 'euro', default: 25187, min: 0, max: 50000 },
+    { key: 'jaarvrijstelling', label: 'Schenkvrijstelling/kind/jaar', kind: 'euro', default: SCHENK_ERF_HUIDIG.schenking.vrijstelling.kind, min: 0, max: 12000 },
+    { key: 'erf_vrijstelling', label: 'Erfvrijstelling per kind', kind: 'euro', default: SCHENK_ERF_HUIDIG.erfbelasting.vrijstelling.kind, min: 0, max: 50000 },
     { key: 'erf_tarief', label: 'Erfbelastingtarief', kind: 'percent', default: 0.1, min: 0, max: 0.4, hint: 'Schijf 1 voor kinderen: 10%' },
     { key: 'maandlasten', label: 'Maandelijkse uitgaven', kind: 'euro', default: 2500, min: 0, max: 15000, prefill: 'monthly_expenses' },
   ],

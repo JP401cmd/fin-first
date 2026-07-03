@@ -4,21 +4,17 @@ import type { Asset } from '@/lib/asset-data'
 import type { FinancialInput } from '@/lib/horizon-data'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
-import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { toSimResult } from '@/lib/unified-projection'
-import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { computeConvergentieProjection, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 
 /**
- * FASE 5, stap 2b — use-horizon-fire-sim: convergentie-flip-tests.
+ * FASE 6, stap 5A — use-horizon-fire-sim: kernel-only contract-tests.
  *
- * Kernpunten: byte-identiteit bij vlag UIT (result deep-equals de directe v2-run),
- * de kernel-tak-doorvoer (engine/status/hint) en de terugval zonder rauwe context.
- * Spiegelt de fixture uit lib/horizon-kernel/convergentie-router.test.ts.
- *
- * De supabase-client wordt gemockt zodat het debounced snapshot-effect inert is:
- * `getUser` resolvet nooit en de update-keten is een no-op. We `unmount()` na elke
- * render zodat de debounce-timer wordt opgeruimd.
+ * De v2-grootboek-engine (`@/lib/horizon-engine/*`, `runSelectedProjection`) is fysiek
+ * verwijderd; de hook heeft nu geen `engine`/vlag-tak meer — `kernelRawProfile` is
+ * verplicht en de kernel is de enige motor (`computeConvergentieProjection`). Deze tests
+ * bouwen de verwachte uitkomst met dezelfde router-aanroep (geen mock van de kernel zelf,
+ * enkel van de Supabase-client voor het debounced snapshot-effect).
  */
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -94,71 +90,77 @@ function makeParams(overrides: Partial<HookParams> = {}): HookParams {
     box3Method: 'forfaitair',
     hasPartner: false,
     housingStrategy: { mode: 'include_full' },
+    kernelRawProfile: PROFILE,
+    aowRows: [],
     ...overrides,
   }
 }
 
-describe('useHorizonFireSim — vlag uit (byte-identiteit)', () => {
-  it('result deep-equals de directe v2-run + engine "v2" + kernelStatus null', () => {
-    // Bouw dezelfde v2-input als de hook intern (horizonEngineV2 default false).
-    const built = buildHorizonInput({
-      horizonInput: FINANCIAL,
-      lifeEvents: [],
-      fireStrategy: FIRE_STRATEGY,
-      withdrawalStrategy: WITHDRAWAL_DEFAULTS,
-      grossReturn: 0.07,
-      inflation: 0.02,
-      aowAgeFractional: undefined,
-      assets: makeAssets(),
-      debts: [],
-      box3Method: 'forfaitair',
-      hasPartner: false,
-      bankAccountCash: undefined,
-      monthlySavingsOverride: undefined,
-      baseAnnualSavingsFromCashflow: undefined,
-      housingStrategy: { mode: 'include_full' },
-      potRules: undefined,
-      horizonEngineV2: false,
+describe('useHorizonFireSim — kernel-tak (rawProfile aanwezig)', () => {
+  it('result deep-equals een directe computeConvergentieProjection-aanroep met dezelfde rawContext', () => {
+    // yearlyExpenses zoals buildHorizonInput 'm afleidt: yearlyMustExpenses (30_000 > 0).
+    const outcome = computeConvergentieProjection({
+      rawContext: {
+        profile: PROFILE,
+        assets: makeAssets(),
+        debts: [],
+        lifeEvents: [],
+        aowRows: [],
+        yearlyExpenses: 30_000,
+      },
     })
-    if (!built) throw new Error('buildHorizonInput gaf null')
-    const expected = toSimResult(runSelectedProjection(built.input, false, built.strategyOptions))
+    if (!outcome.ok) throw new Error('kernel-outcome was niet ok — fixture ongeldig')
+    const expected = toSimResult(outcome.result)
 
     const params = makeParams()
     const { result, unmount } = renderHook(() => useHorizonFireSim(params))
 
-    expect(result.current.engine).toBe('v2')
-    expect(result.current.kernelStatus).toBeNull()
     expect(result.current.result).toEqual(expected)
-    unmount()
-  })
-})
-
-describe('useHorizonFireSim — vlag aan (kernel-tak)', () => {
-  it('engine "kernel" + solver-status + €/mnd-hint + rijen', () => {
-    const params = makeParams({
-      kernelConvergentieEnabled: true,
-      kernelRawProfile: PROFILE,
-      aowRows: [],
-    })
-    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
-
-    expect(result.current.engine).toBe('kernel')
+    expect(result.current.unifiedRows).toEqual(outcome.result.rows)
+    expect(result.current.kernelStatus).toBe(outcome.kernelStatus)
+    expect(result.current.kernelMaandHint).toBe(outcome.kernelMaandHint)
+    expect(result.current.kernelHousingSale).toEqual(outcome.kernelHousingSale ?? null)
     expect(['reached_now', 'reached_at', 'unreachable_within_horizon', 'pension_shortfall'])
       .toContain(result.current.kernelStatus)
-    expect(typeof result.current.kernelMaandHint).toBe('number')
-    expect(result.current.result).not.toBeNull()
-    expect(result.current.result?.rows.length ?? 0).toBeGreaterThan(0)
     unmount()
   })
 })
 
-describe('useHorizonFireSim — vlag aan zonder rawProfile (terugval)', () => {
-  it('valt terug op v2 zonder te crashen', () => {
-    const params = makeParams({ kernelConvergentieEnabled: true, kernelRawProfile: null })
+describe('useHorizonFireSim — kernelRawProfile ontbreekt', () => {
+  it('levert een leeg resultaat zonder te crashen (geen kernel-run mogelijk)', () => {
+    const params = makeParams({ kernelRawProfile: null })
     const { result, unmount } = renderHook(() => useHorizonFireSim(params))
 
-    expect(result.current.engine).toBe('v2')
-    expect(result.current.result).not.toBeNull()
+    expect(result.current.result).toBeNull()
+    expect(result.current.unifiedRows).toBeNull()
+    expect(result.current.kernelStatus).toBeNull()
+    expect(result.current.kernelMaandHint).toBeNull()
+    expect(result.current.kernelHousingSale).toBeNull()
+    // Zonder kernel-run vallen de effectieve events terug op de rauwe input-events.
+    expect(result.current.effectiveLifeEvents).toEqual([])
+    unmount()
+  })
+})
+
+describe('useHorizonFireSim — kern-fout in de rawProfile (geen geboortedatum)', () => {
+  it('degradeert netjes naar een leeg resultaat (computeConvergentieProjection { ok: false })', () => {
+    const brokenProfile: ConvergentieRawProfileRow = { ...PROFILE, date_of_birth: null }
+    const params = makeParams({ kernelRawProfile: brokenProfile })
+    const { result, unmount } = renderHook(() => useHorizonFireSim(params))
+
+    expect(result.current.result).toBeNull()
+    expect(result.current.unifiedRows).toBeNull()
+    unmount()
+  })
+})
+
+describe('useHorizonFireSim — geen horizonInput', () => {
+  it('isLoading=true en alle velden leeg/null', () => {
+    const { result, unmount } = renderHook(() => useHorizonFireSim({ ...makeParams(), horizonInput: null }))
+
+    expect(result.current.isLoading).toBe(true)
+    expect(result.current.result).toBeNull()
+    expect(result.current.unifiedRows).toBeNull()
     unmount()
   })
 })

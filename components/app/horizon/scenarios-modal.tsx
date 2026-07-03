@@ -764,6 +764,7 @@ function PayoffComparisonChart({
           style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) both' : 'none' }} />
       )}
       {avaS.length > 1 && (
+        // eslint-disable-next-line no-restricted-syntax -- strategie-seriekleur, geen winst/verlies
         <path d={linePath(avaS)} fill="none" stroke="#10b981" strokeWidth="2"
           pathLength={1} strokeDasharray={1}
           style={{ strokeDashoffset: animated ? undefined : 1, animation: animated ? 'drawPath 700ms cubic-bezier(.22,1,.36,1) 100ms both' : 'none' }} />
@@ -783,6 +784,7 @@ function PayoffComparisonChart({
       {/* Legend */}
       <line x1={PAD} y1={12} x2={PAD + 16} y2={12} stroke="#3b82f6" strokeWidth="2" />
       <text x={PAD + 20} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Snowball</text>
+      {/* eslint-disable-next-line no-restricted-syntax -- strategie-seriekleur, geen winst/verlies */}
       <line x1={PAD + 100} y1={12} x2={PAD + 116} y2={12} stroke="#10b981" strokeWidth="2" />
       <text x={PAD + 120} y={16} className="fill-zinc-500" style={{ fontSize: 10 }}>Avalanche</text>
       <line x1={PAD + 200} y1={12} x2={PAD + 216} y2={12} stroke="#a1a1aa" strokeWidth="1.5" strokeDasharray="4" />

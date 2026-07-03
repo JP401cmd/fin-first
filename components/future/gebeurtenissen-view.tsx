@@ -48,10 +48,9 @@ export interface EventPaneData {
   endAge: number
   householdMode: boolean
   /**
-   * Flag-bewuste, per-asset projectie-input (zelfde `buildHorizonInput`-assemblage
-   * als de Tijdas-grafiek). Wanneer gezet, draaien de EventPane-delta-previews via
-   * `runSelectedProjection` (v2-consistent voor v2-gebruikers); null → legacy
-   * `runSimulation`-fallback. Zie gebeurtenissen/page.tsx.
+   * Rauwe kernel-context (zelfde als de Tijdas-grafiek). Wanneer gezet, draaien de
+   * EventPane-delta-previews via de horizon-kernel (`computeConvergentieProjection`);
+   * null → geen doorrekening (lege staat). Zie gebeurtenissen/page.tsx.
    */
   previewBaseline: PreviewBaseline | null
 }

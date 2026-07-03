@@ -265,8 +265,6 @@ export function buildWoning(housingConfigRaw: unknown): WoningStrategieParams {
 const WITHDRAWAL_TO_PROFIEL: Record<WithdrawalStrategyType, Onttrekkingsprofiel> = {
   static: 'Vast',
   guardrails: 'Guardrails',
-  vpw: 'Vast', // V4: vpw/bucket zijn gemigreerd naar 'Vast'
-  bucket: 'Vast',
 }
 
 /**

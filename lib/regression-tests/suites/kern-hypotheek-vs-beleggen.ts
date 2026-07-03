@@ -8,8 +8,10 @@ import {
   compareMortgageVsInvest,
   type HvBParams,
   type HvBResult,
+  type HvBKernelRouting,
 } from '@/lib/hypotheek-vs-beleggen'
 import { BOX3_DRAG } from '@/lib/horizon-data'
+import { syntheticDateOfBirth } from './_kernel-sim'
 
 const CAT = 'kern.hypotheek-vs-beleggen'
 
@@ -29,12 +31,13 @@ const STANDARD: HvBParams = {
   horizonJaren: 20,
 }
 
-function run(overrides: Partial<HvBParams> = {}): HvBResult {
-  // FASE 6, stap 2 — bewust ZONDER kernel-routing: dit is een synthetische suite
-  // zonder gebruiker/profiel, dus geen convergentie-vlag om mee te flippen. De
-  // v2-arm (default) is hier het contract; deze aanroep flipt niet mee en wordt met
-  // de v2-uitfasering (stap 5) herijkt of verwijderd.
-  return compareMortgageVsInvest({ ...STANDARD, ...overrides })
+function run(overrides: Partial<HvBParams> = {}, routing?: HvBKernelRouting): HvBResult {
+  // FASE 6, stap 5A — de v2-grootboek-engine is verwijderd; `computeFireImpact`
+  // draait nu ALTIJD via de horizon-kernel (convergentie-router) en heeft dus een
+  // `routing.dateOfBirth` nodig om een tijdas te bouwen. Zonder `routing` (het
+  // merendeel van deze tests, die geen FIRE-impact toetsen) blijft `dob = null` →
+  // `fireImpactMaanden` blijft `null`, exact zoals vóór deze migratie.
+  return compareMortgageVsInvest({ ...STANDARD, ...overrides }, routing)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -157,14 +160,28 @@ const tests: TestCase[] = [
       const rZonder = run()
       assertEqual(rZonder.fireImpactMaanden, null, 'Zonder FIRE-params: null')
 
-      // Met FIRE-params
-      const rMet = run({
+      // Zonder routing.dateOfBirth: ook met FIRE-params blijft de impact null
+      // (de kernel kan zonder geboortedatum geen tijdas bouwen — computeFireImpact
+      // retourneert dan direct null, ongeacht de FIRE-params).
+      const rZonderDob = run({
         currentAge: 35,
         currentPortfolio: 150_000,
         yearlyExpenses: 36_000,
         annualSavings: 18_000,
       })
-      assertNotNull(rMet.fireImpactMaanden, 'Met FIRE-params: niet null')
+      assertEqual(rZonderDob.fireImpactMaanden, null, 'FIRE-params zonder dateOfBirth: null')
+
+      // Met FIRE-params + routing.dateOfBirth: de kernel-tijdas is bruikbaar
+      const rMet = run(
+        {
+          currentAge: 35,
+          currentPortfolio: 150_000,
+          yearlyExpenses: 36_000,
+          annualSavings: 18_000,
+        },
+        { dateOfBirth: syntheticDateOfBirth(35) },
+      )
+      assertNotNull(rMet.fireImpactMaanden, 'Met FIRE-params + dateOfBirth: niet null')
       assertFinite(rMet.fireImpactMaanden!, 'FIRE-impact is finite')
       // Bij 7% rendement: beleggen zou FIRE eerder moeten brengen (positief)
       assertGreaterThan(rMet.fireImpactMaanden!, 0, 'Bij 7%: beleggen brengt FIRE eerder (positief)')

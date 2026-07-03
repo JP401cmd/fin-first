@@ -20,18 +20,15 @@ import TabGeselecteerd from './tab-geselecteerd'
 import TabStappen from './tab-stappen'
 import TabTechnisch from './tab-technisch'
 import TabVerificatie from './tab-verificatie'
-import TabVergelijk from './tab-vergelijk'
-import KernelFlagsCard from './kernel-flags-card'
 
-type TabId = 'uitgangspunten' | 'geselecteerd' | 'stappen' | 'vergelijk' | 'technisch' | 'verificatie'
+type TabId = 'uitgangspunten' | 'geselecteerd' | 'stappen' | 'technisch' | 'verificatie'
 
 const TABS: ReadonlyArray<{ id: TabId; nr: number; label: string }> = [
   { id: 'uitgangspunten', nr: 1, label: 'Uitgangspunten' },
   { id: 'geselecteerd', nr: 2, label: 'Geselecteerde invoer' },
   { id: 'stappen', nr: 3, label: 'Stappen & tabellen' },
-  { id: 'vergelijk', nr: 4, label: 'Vergelijk' },
-  { id: 'technisch', nr: 5, label: 'Technisch rapport' },
-  { id: 'verificatie', nr: 6, label: 'Verificatie' },
+  { id: 'technisch', nr: 4, label: 'Technisch rapport' },
+  { id: 'verificatie', nr: 5, label: 'Verificatie' },
 ]
 
 const STATUS_LABEL: Record<SolverResult['status'], string> = {
@@ -130,10 +127,6 @@ export default function HorizonKernelClient() {
         </span>
       </div>
 
-      {/* Cutover-vlaggen — altijd onder de header, in élke staat: de vlaggen staan
-          los van of de kern op je eigen data kan draaien. */}
-      <KernelFlagsCard />
-
       {state === 'loading' && <Spinner label="Rekenkern wordt gedraaid op je data…" />}
 
       {state === 'error' && (
@@ -203,7 +196,6 @@ export default function HorizonKernelClient() {
               <TabGeselecteerd kernelInput={data.kernelInput} notices={data.notices ?? []} />
             )}
             {tab === 'stappen' && <TabStappen fireAge={data.solver.fireAge} />}
-            {tab === 'vergelijk' && <TabVergelijk />}
             {tab === 'technisch' && <TabTechnisch bron={bron} />}
             {tab === 'verificatie' && <TabVerificatie onBron={setBron} />}
           </div>

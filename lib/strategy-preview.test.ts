@@ -1,32 +1,33 @@
 import { describe, it, expect } from 'vitest'
 import type { Asset } from '@/lib/asset-data'
-import type { FinancialInput, LifeEvent } from '@/lib/horizon-data'
-import type { FireStrategyConfig } from '@/lib/fire-strategy'
-import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
-import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
-import { lifeEventsToCashflows } from '@/lib/fire-simulation'
-import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
-import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import type { Debt } from '@/lib/debt-data'
+import type { LifeEvent } from '@/lib/horizon-data'
+import { toSimResult } from '@/lib/unified-projection'
+import {
+  computeConvergentieProjection,
+  type ConvergentieRawProfileRow,
+  type ConvergentieRawContext,
+} from '@/lib/horizon-kernel/convergentie-router'
 import {
   previewFireAge,
+  previewProjection,
   computeFreedomShift,
   type PreviewBaseline,
-  type PreviewKernelRawContext,
 } from './strategy-preview'
 
 /**
- * FASE 6, stap 1 — strategy-preview-tests. Kernpunt (harde eis): met de kernel-vlag
- * AFWEZIG of `false` geeft `previewFireAge`/`computeFreedomShift` EXACT hetzelfde
- * resultaat als de directe `runSelectedProjection`-aanroep van vóór de kernel-
- * threading. We mocken niets — de referentie ís de letterlijke pre-wijziging-logica
- * (hieronder als `legacyPreviewFireAge`), en de kernel-context is bewust aanwezig
- * om te bewijzen dat een uitgeschakelde vlag de context negeert.
+ * FASE 6, stap 5A — strategy-preview kernel-only contract-tests.
+ *
+ * De v2-grootboek-engine (`buildHorizonInput`/`runSelectedProjection` uit
+ * `@/lib/horizon-engine/*`) is fysiek verwijderd; `strategy-preview.ts` routeert nu
+ * onvoorwaardelijk via `computeConvergentieProjection` — dezelfde motor als de
+ * /toekomst-hoofdgrafiek. De vorige "byte-identiek aan de legacy runSelectedProjection"
+ * -opzet is vervangen door: previewFireAge/previewProjection/computeFreedomShift zijn
+ * dunne wrappers om computeConvergentieProjection — we bewijzen dat met een directe
+ * kernel-run op dezelfde rawContext (geen mock van de kernel zelf).
  */
 
 const DOB = '1986-01-01'
-
-const FIRE_STRATEGY: FireStrategyConfig = { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }
 
 const PROFILE: ConvergentieRawProfileRow = {
   date_of_birth: DOB,
@@ -62,67 +63,22 @@ function makeAssets(): Asset[] {
   ] as unknown as Asset[]
 }
 
-/**
- * Bouw een `PreviewBaseline` (pure beleggingsportefeuille) via dezelfde
- * `buildHorizonInput`-assemblage als de server-page. `kernel` = optioneel de
- * kernel-velden zoals de server-page ze zet.
- */
-function makeBaseline(kernel?: {
-  enabled: boolean
-  context?: PreviewKernelRawContext
-}): { baseline: PreviewBaseline; input: UnifiedProjectionInput; useV2: boolean; strategyOptions: PreviewBaseline['strategyOptions'] } {
-  const assets = makeAssets()
-  const financial: FinancialInput = {
-    totalAssets: 150_000,
-    totalDebts: 0,
-    monthlyIncome: 4000,
-    monthlyExpenses: 2500,
-    yearlyMustExpenses: 30_000,
-    monthlyContributions: 800,
-    dateOfBirth: DOB,
+function makeBaseline(profile: ConvergentieRawProfileRow = PROFILE): PreviewBaseline {
+  return {
+    rawContext: {
+      profile,
+      assets: makeAssets(),
+      debts: [] as Debt[],
+      aowRows: [],
+      yearlyExpenses: 30_000,
+    },
   }
-  const built = buildHorizonInput({
-    horizonInput: financial,
-    lifeEvents: [],
-    fireStrategy: FIRE_STRATEGY,
-    withdrawalStrategy: WITHDRAWAL_DEFAULTS,
-    grossReturn: 0.07,
-    inflation: 0.02,
-    assets,
-    debts: [],
-    box3Method: 'forfaitair',
-    hasPartner: false,
-    housingStrategy: { mode: 'include_full' },
-    horizonEngineV2: true,
-  })
-  if (!built) throw new Error('buildHorizonInput gaf null')
-  const baseline: PreviewBaseline = {
-    input: built.input,
-    useV2: true,
-    strategyOptions: built.strategyOptions,
-    pensioenFireAgeFractional: null,
-    ...(kernel
-      ? { kernelEnabled: kernel.enabled, kernelRawContext: kernel.context }
-      : {}),
-  }
-  return { baseline, input: built.input, useV2: true, strategyOptions: built.strategyOptions }
 }
 
-/**
- * Referentie: de LETTERLIJKE `previewFireAge`-logica van vóór de kernel-threading
- * (commit 4b000b365). Elke afwijking hiervan bij vlag-uit is een regressie.
- */
-function legacyPreviewFireAge(
-  baseline: PreviewBaseline,
-  events: LifeEvent[],
-): number | null {
-  const input: UnifiedProjectionInput = {
-    ...baseline.input,
-    cashflows: lifeEventsToCashflows(events),
-  }
-  const sim = toSimResult(runSelectedProjection(input, baseline.useV2, baseline.strategyOptions))
-  if (baseline.pensioenFireAgeFractional != null) return baseline.pensioenFireAgeFractional
-  return sim.fireAgeFractional
+/** Directe kernel-run met dezelfde rawContext (+ events) — spiegelt wat de preview intern doet. */
+function directOutcome(baseline: PreviewBaseline, events: LifeEvent[]) {
+  const rawContext: ConvergentieRawContext = { ...baseline.rawContext, lifeEvents: events }
+  return computeConvergentieProjection({ rawContext })
 }
 
 /** Een simpel inkomens-verhogend event (erfenis-achtig) om cashflows te vullen. */
@@ -151,77 +107,72 @@ const EVENT_SETS: Record<string, LifeEvent[]> = {
   'meerdere events': [makeEvent('a', 50, 500), makeEvent('b', 60, -200)],
 }
 
-describe('previewFireAge — byte-identiteit bij vlag afwezig/false', () => {
+describe('previewFireAge — dunne wrapper om computeConvergentieProjection', () => {
   it.each(Object.keys(EVENT_SETS))(
-    'kernel-velden AFWEZIG → identiek aan de legacy runSelectedProjection-aanroep (%s)',
+    'levert exact de fireAgeFractional van een directe kernel-run op dezelfde rawContext (%s)',
     (label) => {
-      const { baseline } = makeBaseline() // geen kernel-velden
+      const baseline = makeBaseline()
       const events = EVENT_SETS[label]!
-      expect(previewFireAge(baseline, events)).toBe(legacyPreviewFireAge(baseline, events))
+      const outcome = directOutcome(baseline, events)
+      if (!outcome.ok) throw new Error('kernel-outcome was niet ok — fixture ongeldig')
+      expect(previewFireAge(baseline, events)).toBe(toSimResult(outcome.result).fireAgeFractional)
     },
   )
 
-  it.each(Object.keys(EVENT_SETS))(
-    'kernelEnabled=false (mét aanwezige context) → context genegeerd, identiek aan legacy (%s)',
-    (label) => {
-      const context: PreviewKernelRawContext = {
-        profile: PROFILE,
-        assets: makeAssets(),
-        debts: [],
-      }
-      const { baseline } = makeBaseline({ enabled: false, context })
-      const events = EVENT_SETS[label]!
-      expect(previewFireAge(baseline, events)).toBe(legacyPreviewFireAge(baseline, events))
-    },
-  )
-
-  it('pensioen-baseline (pensioenFireAgeFractional gezet) blijft byte-identiek bij vlag uit', () => {
-    const { baseline: base } = makeBaseline()
-    const baseline: PreviewBaseline = { ...base, pensioenFireAgeFractional: 67.25 }
-    const events = EVENT_SETS['één inkomens-event']!
-    expect(previewFireAge(baseline, events)).toBe(legacyPreviewFireAge(baseline, events))
-    // De pensioen-override wint óók hier (engine !== 'kernel').
-    expect(previewFireAge(baseline, events)).toBe(67.25)
+  it('kern-fout (geen geboortedatum) → null (geen crash)', () => {
+    const baseline = makeBaseline({ ...PROFILE, date_of_birth: null })
+    expect(previewFireAge(baseline, [])).toBeNull()
   })
 })
 
-describe('computeFreedomShift — byte-identiteit bij vlag afwezig/false', () => {
-  it('kernelEnabled=false (mét context) → deep-equals de legacy-shift', () => {
-    const context: PreviewKernelRawContext = {
-      profile: PROFILE,
-      assets: makeAssets(),
-      debts: [],
-    }
-    const { baseline } = makeBaseline({ enabled: false, context })
+describe('previewProjection — dunne wrapper om computeConvergentieProjection', () => {
+  it('levert het volledige UnifiedProjectionResult van de kernel-run', () => {
+    const baseline = makeBaseline()
+    const events = EVENT_SETS['één inkomens-event']!
+    const outcome = directOutcome(baseline, events)
+    if (!outcome.ok) throw new Error('kernel-outcome was niet ok — fixture ongeldig')
+    expect(previewProjection(baseline, events)).toEqual(outcome.result)
+  })
+
+  it('kern-fout → null', () => {
+    const baseline = makeBaseline({ ...PROFILE, date_of_birth: null })
+    expect(previewProjection(baseline, [])).toBeNull()
+  })
+})
+
+describe('computeFreedomShift', () => {
+  it('deltaMonths = afgeronde maand-verschuiving tussen baseline en draft', () => {
+    const baseline = makeBaseline()
     const otherEvents = [makeEvent('a', 50, 500)]
     const draftEvent = makeEvent('draft', 55, 800)
 
     const actual = computeFreedomShift(baseline, otherEvents, draftEvent)
-    const legacyBaselineAge = legacyPreviewFireAge(baseline, otherEvents)
-    const legacyDraftAge = legacyPreviewFireAge(baseline, [...otherEvents, draftEvent])
-    const legacyDelta =
-      legacyBaselineAge != null && legacyDraftAge != null
-        ? Math.round((legacyDraftAge - legacyBaselineAge) * 12)
-        : null
+    const baselineOutcome = directOutcome(baseline, otherEvents)
+    const draftOutcome = directOutcome(baseline, [...otherEvents, draftEvent])
+    if (!baselineOutcome.ok || !draftOutcome.ok) throw new Error('kernel-outcome was niet ok — fixture ongeldig')
+    const baselineAge = toSimResult(baselineOutcome.result).fireAgeFractional
+    const draftAge = toSimResult(draftOutcome.result).fireAgeFractional
+    const expectedDelta =
+      baselineAge != null && draftAge != null ? Math.round((draftAge - baselineAge) * 12) : null
 
-    expect(actual).toEqual({
-      baselineAge: legacyBaselineAge,
-      draftAge: legacyDraftAge,
-      deltaMonths: legacyDelta,
-    })
+    expect(actual).toEqual({ baselineAge, draftAge, deltaMonths: expectedDelta })
   })
 
-  it('draftEvent = null (verwijderen) → byte-identiek aan legacy', () => {
-    const { baseline } = makeBaseline() // geen kernel-velden
+  it('draftEvent = null (verwijderen) → baselineAge === draftAge, deltaMonths 0', () => {
+    const baseline = makeBaseline()
     const otherEvents = [makeEvent('a', 50, 500)]
 
     const actual = computeFreedomShift(baseline, otherEvents, null)
-    const legacyAge = legacyPreviewFireAge(baseline, otherEvents)
+    const outcome = directOutcome(baseline, otherEvents)
+    if (!outcome.ok) throw new Error('kernel-outcome was niet ok — fixture ongeldig')
+    const age = toSimResult(outcome.result).fireAgeFractional
 
-    expect(actual).toEqual({
-      baselineAge: legacyAge,
-      draftAge: legacyAge,
-      deltaMonths: 0,
-    })
+    expect(actual).toEqual({ baselineAge: age, draftAge: age, deltaMonths: 0 })
+  })
+
+  it('kern-fout op de baseline → beide leeftijden null, deltaMonths null', () => {
+    const baseline = makeBaseline({ ...PROFILE, date_of_birth: null })
+    const actual = computeFreedomShift(baseline, [], makeEvent('a', 50, 500))
+    expect(actual).toEqual({ baselineAge: null, draftAge: null, deltaMonths: null })
   })
 })

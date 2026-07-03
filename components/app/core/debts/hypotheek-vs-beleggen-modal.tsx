@@ -130,7 +130,7 @@ function ScenarioCard({
         <div>
           <p className="text-xs text-[var(--ink-3)]">Netto voordeel</p>
           <p className={`font-mono text-xl font-bold tabular-nums ${
-            nettoVoordeel >= 0 ? 'text-emerald-600' : 'text-red-500'
+            nettoVoordeel >= 0 ? 'text-positive' : 'text-negative'
           }`}>
             {nettoVoordeel >= 0 ? '+' : ''}{<MaskedAmount value={nettoVoordeel} tone="kern" />}
           </p>
@@ -263,12 +263,13 @@ export function HypotheekVsBeleggenSectie({
       annualSavings,
       cashflows,
     }
-    // FASE 6, stap 2 — bewust GEEN kernel-routing (v2 tot stap 5). De schuld-detail-
-    // keten (`DebtDetailModal` → deze modal) fetcht geen profiel: er is geen
-    // `date_of_birth` en geen convergentie-vlag beschikbaar, en de call-site geeft ook
-    // geen FIRE-parameters mee (currentAge/currentPortfolio/…), dus `computeFireImpact`
-    // retourneert hier sowieso `null`. Een nieuwe profiel-fetch toevoegen enkel voor de
-    // routing is niet gerechtvaardigd — deze caller flipt mee zodra v2 verdwijnt (stap 5).
+    // FASE 6 stap 5A — bewust GEEN kernel-routing meegegeven. De schuld-detail-keten
+    // (`DebtDetailModal` → deze modal) fetcht geen profiel: er is geen `date_of_birth`
+    // beschikbaar, en de call-site geeft ook geen FIRE-parameters mee (currentAge/
+    // currentPortfolio/…), dus `computeFireImpact` retourneert hier sowieso `null`. Een
+    // `date_of_birth`-prop door de keten trekken (of een profiel-fetch toevoegen) enkel
+    // voor de routing verandert daar niets aan — de kernel-tijdas heeft óók de FIRE-
+    // parameters nodig, die deze context niet levert. De lib degradeert netjes (null).
     return compareMortgageVsInvest(params)
   }, [
     extraBedrag, verwachtRendement, horizonJaren,

@@ -351,191 +351,27 @@ describe('guardrails strategy', () => {
   })
 })
 
-// ── VPW Strategy ─────────────────────────────────────────────────────
-
-describe('vpw strategy', () => {
-  const config = makeConfig({ strategy: 'vpw' })
-
-  it('vpw percentage increases with age (fewer years remaining)', () => {
-    const young = applyWithdrawalStrategy(config, makeCtx({
-      currentAge: 55,
-      endAge: 90,
-      currentPortfolio: 1_000_000,
-      recurringIncome: 0,
-    }))
-    const old = applyWithdrawalStrategy(config, makeCtx({
-      currentAge: 80,
-      endAge: 90,
-      currentPortfolio: 1_000_000,
-      recurringIncome: 0,
-    }))
-    // Older person should withdraw higher percentage
-    expect(old).toBeGreaterThan(young)
-  })
-
-  it('last year withdraws 100% of portfolio (minus income)', () => {
-    const result = applyWithdrawalStrategy(config, makeCtx({
-      currentAge: 89,
-      endAge: 90,
-      currentPortfolio: 500_000,
-      recurringIncome: 0,
-      baseExpenses: 40_000,
-    }))
-    // yearsRemaining = 1, vpwRate = 1.0
-    // withdrawal = 1.0 * 500_000 = 500_000
-    expect(result).toBe(500_000)
-  })
-
-  it('respects minimum floor (bestaansminimum)', () => {
-    const result = applyWithdrawalStrategy(config, makeCtx({
-      currentAge: 55,
-      endAge: 90,
-      currentPortfolio: 10_000,        // very small portfolio
-      recurringIncome: 0,
-      baseExpenses: 40_000,
-    }))
-    // VPW of tiny portfolio would be very small
-    // But floor = 0.80 * 40_000 = 32_000
-    expect(result).toBeGreaterThanOrEqual(0.80 * 40_000)
-  })
-
-  it('subtracts recurring income correctly', () => {
-    const withIncome = applyWithdrawalStrategy(config, makeCtx({
-      currentAge: 70,
-      endAge: 90,
-      currentPortfolio: 1_000_000,
-      recurringIncome: 20_000,
-      baseExpenses: 40_000,
-    }))
-    const withoutIncome = applyWithdrawalStrategy(config, makeCtx({
-      currentAge: 70,
-      endAge: 90,
-      currentPortfolio: 1_000_000,
-      recurringIncome: 0,
-      baseExpenses: 40_000,
-    }))
-    // With income should withdraw less from portfolio
-    expect(withIncome).toBeLessThan(withoutIncome)
-  })
-
-  it('scales with portfolio size', () => {
-    const small = applyWithdrawalStrategy(config, makeCtx({
-      currentPortfolio: 500_000,
-      recurringIncome: 0,
-      baseExpenses: 10_000,  // low floor
-    }))
-    const large = applyWithdrawalStrategy(config, makeCtx({
-      currentPortfolio: 2_000_000,
-      recurringIncome: 0,
-      baseExpenses: 10_000,  // low floor
-    }))
-    expect(large).toBeGreaterThan(small)
-  })
-})
-
-// ── Bucket Strategy ──────────────────────────────────────────────────
-
-describe('bucket strategy', () => {
-  const config = makeConfig({ strategy: 'bucket' })
-
-  it('withdraws net base expenses (perpetual)', () => {
-    const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
-    const result = applyWithdrawalStrategy(config, makeCtx({
-      baseExpenses: 40_000,
-      recurringIncome: 0,
-    }), state)
-    expect(result).toBe(40_000)
-  })
-
-  it('uses annuity withdrawal for deplete end strategy', () => {
-    const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
-    const result = applyWithdrawalStrategy(config, makeCtx({
-      baseExpenses: 40_000,
-      recurringIncome: 0,
-      currentPortfolio: 1_000_000,
-      yearReturn: 0.05,
-      currentAge: 67,
-      endAge: 90,
-      endStrategy: 'deplete',
-    }), state)
-    // Annuity on €1M at 5% over 23 years ≈ €74k — exceeds netBaseExpenses
-    expect(result).toBeGreaterThan(40_000)
-    // Sanity: annuity = 1_000_000 * 0.05 / (1 - (1.05)^(-23)) ≈ 74_137
-    expect(result).toBeCloseTo(74_137, -2)
-  })
-
-  it('bucket matches static for deplete (both use annuity)', () => {
-    const staticConfig = makeConfig({ strategy: 'static' })
-    const bucketConfig = makeConfig({ strategy: 'bucket' })
-    const ctx = makeCtx({
-      baseExpenses: 40_000,
-      recurringIncome: 0,
-      currentPortfolio: 1_000_000,
-      yearReturn: 0.05,
-      currentAge: 67,
-      endAge: 90,
-      endStrategy: 'deplete',
-    })
-    const staticW = applyWithdrawalStrategy(staticConfig, ctx)
-    const bucketW = applyWithdrawalStrategy(bucketConfig, ctx)
-    // Both use the same annuity formula for deplete
-    expect(bucketW).toBe(staticW)
-  })
-
-  it('subtracts recurring income', () => {
-    const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
-    const result = applyWithdrawalStrategy(config, makeCtx({
-      baseExpenses: 40_000,
-      recurringIncome: 15_000,
-    }), state)
-    expect(result).toBe(25_000)
-  })
-
-  it('returns 0 when income exceeds expenses', () => {
-    const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
-    const result = applyWithdrawalStrategy(config, makeCtx({
-      baseExpenses: 20_000,
-      recurringIncome: 30_000,
-    }), state)
-    expect(result).toBe(0)
-  })
-
-  it('bucket + legacy uses annuity on surplus above legacy target', () => {
-    const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
-    const result = applyWithdrawalStrategy(config, makeCtx({
-      baseExpenses: 40_000,
-      recurringIncome: 0,
-      currentPortfolio: 1_000_000,
-      yearReturn: 0.05,
-      currentAge: 67,
-      endAge: 90,
-      endStrategy: 'legacy',
-      legacyAmount: 300_000,
-    }), state)
-    // PV(L) = 300_000 / 1.05^23 ≈ 98_752 wordt apart gezet (groeit naar
-    // 300k op endAge). Available = 1_000_000 − 98_752 = 901_248 onttrokken
-    // via groeiende annuïteit (g=0) over 23 jaar bij 5% ≈ €66_896.
-    expect(result).toBeGreaterThan(40_000)
-    expect(result).toBeCloseTo(66_896, -2)
-  })
-
-  it('bucket + legacy falls back to netBaseExpenses when surplus annuity is small', () => {
-    const state: BucketState = { cash: 80_000, bonds: 200_000, stocks: 720_000 }
-    const result = applyWithdrawalStrategy(config, makeCtx({
-      baseExpenses: 40_000,
-      recurringIncome: 0,
-      currentPortfolio: 500_000,
-      yearReturn: 0.05,
-      currentAge: 67,
-      endAge: 90,
-      endStrategy: 'legacy',
-      legacyAmount: 400_000,
-    }), state)
-    // Annuity on surplus (€500k - €400k = €100k) at 5% over 23 years ≈ €7_414
-    // netBaseExpenses = 40_000 > annuity, so netBaseExpenses is used
-    expect(result).toBe(40_000)
-  })
-})
+// ── VPW / Bucket strategieën — VERWIJDERD (FASE 6 stap 5A) ────────────
+//
+// De DB-normalisatie (remote-migratie 20260703115225) heeft 'vpw' en 'bucket'
+// samengevoegd in 'static'; `WithdrawalStrategyType` is nu `'static' | 'guardrails'`.
+// De hierboven verwijderde "vpw strategy"- en "bucket strategy"-describe-blokken
+// riepen `applyWithdrawalStrategy` aan met `strategy: 'vpw'`/`'bucket'` — een
+// configuratie die het type niet meer toestaat (compile-fout) en die de switch in
+// `applyWithdrawalStrategy` ook niet meer bereikt (default-tak valt terug op
+// `applyStatic`; de losse `applyVpw`/`applyBucket`-functies en de dode
+// `bucketState`-parameter zijn in stap 5A fysiek verwijderd). De VERLOREN dekking:
+//   - vpw-leeftijdsafhankelijke onttrekkingspercentage / laatste-jaar-100%-regel /
+//     bestaansminimum-vloer / portefeuille-schaling: géén equivalent meer (de vpw-
+//     tak bestaat niet meer in het publieke contract — geen vervangende assertie
+//     nodig, dit gedrag is niet meer bereikbaar).
+//   - "bucket matches static for deplete" en de bucket+legacy-annuïteit-tests: de
+//     onderliggende annuïteit-wiskunde (deplete/legacy, incl. legacy-surplus-PV)
+//     blijft gedekt via de "static strategy with deplete endStrategy" en
+//     "guardrails + legacy" describe-blokken hieronder — zelfde `computeAnnuityBase`,
+//     alleen bereikt via een andere (wél nog bestaande) strategie.
+//   - `initBucketState`/`rebalanceBuckets` blijven bestaande, losstaande exports
+//     (niet gekoppeld aan het `strategy`-enum) — hun tests blijven hieronder staan.
 
 // ── initBucketState ──────────────────────────────────────────────────
 
@@ -597,16 +433,16 @@ describe('rebalanceBuckets', () => {
 
 describe('cross-strategy', () => {
   it('all strategies return non-negative values', () => {
-    const strategies: WithdrawalStrategyConfig['strategy'][] = ['static', 'guardrails', 'vpw', 'bucket']
+    const strategies: WithdrawalStrategyConfig['strategy'][] = ['static', 'guardrails']
     for (const strategy of strategies) {
       const config = makeConfig({ strategy })
-      const result = applyWithdrawalStrategy(config, makeCtx(), initBucketState(1_000_000, 40_000))
+      const result = applyWithdrawalStrategy(config, makeCtx())
       expect(result).toBeGreaterThanOrEqual(0)
     }
   })
 
   it('all strategies handle zero portfolio', () => {
-    const strategies: WithdrawalStrategyConfig['strategy'][] = ['static', 'guardrails', 'vpw', 'bucket']
+    const strategies: WithdrawalStrategyConfig['strategy'][] = ['static', 'guardrails']
     for (const strategy of strategies) {
       const config = makeConfig({ strategy })
       const ctx = makeCtx({
@@ -614,22 +450,20 @@ describe('cross-strategy', () => {
         startPortfolio: 1_000_000,
         yearsIntoRetirement: 5,
       })
-      const buckets: BucketState = { cash: 0, bonds: 0, stocks: 0 }
-      const result = applyWithdrawalStrategy(config, ctx, buckets)
+      const result = applyWithdrawalStrategy(config, ctx)
       expect(result).toBeGreaterThanOrEqual(0)
     }
   })
 
   it('all strategies work with recurring income', () => {
-    const strategies: WithdrawalStrategyConfig['strategy'][] = ['static', 'guardrails', 'vpw', 'bucket']
+    const strategies: WithdrawalStrategyConfig['strategy'][] = ['static', 'guardrails']
     for (const strategy of strategies) {
       const config = makeConfig({ strategy })
       const ctx = makeCtx({
         recurringIncome: 20_000,
         yearsIntoRetirement: 0, // first year for guardrails
       })
-      const buckets = initBucketState(1_000_000, 40_000)
-      const result = applyWithdrawalStrategy(config, ctx, buckets)
+      const result = applyWithdrawalStrategy(config, ctx)
       expect(result).toBeGreaterThanOrEqual(0)
     }
   })

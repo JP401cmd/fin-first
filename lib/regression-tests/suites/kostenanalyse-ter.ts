@@ -19,6 +19,7 @@ import {
   findAlternatives,
   FUND_MAPPINGS,
 } from '@/lib/fund-alternatives'
+import { syntheticDateOfBirth } from './_kernel-sim'
 
 const CAT = 'kostenanalyse.ter'
 
@@ -262,10 +263,13 @@ const tests: TestCase[] = [
       }
       const weightedTER = 0.005 // 0.5%
 
-      // FASE 6, stap 2 — bewust ZONDER kernel-routing (synthetische suite, geen
-      // gebruiker/profiel = geen convergentie-vlag). De v2-arm is hier het contract;
-      // flipt niet mee, wordt met de v2-uitfasering (stap 5) herijkt of verwijderd.
-      const impact = computeFeeImpactOnFire(params, weightedTER)
+      // FASE 6, stap 5A — de v2-grootboek-engine is verwijderd; `computeFeeImpactOnFire`
+      // draait nu ALTIJD via de horizon-kernel (convergentie-router) en heeft dus een
+      // `routing.dateOfBirth` nodig om een tijdas te bouwen. Zonder routing zouden beide
+      // scenario's stil `null` blijven en zou deze test niets zinnigs meer bewijzen.
+      const impact = computeFeeImpactOnFire(params, weightedTER, {
+        dateOfBirth: syntheticDateOfBirth(params.currentAge),
+      })
 
       // Fees should delay FIRE → positive months
       assertGreaterThanOrEqual(impact.feeImpactMonths, 0, 'feeImpactMonths >= 0')
@@ -301,8 +305,10 @@ const tests: TestCase[] = [
         cashflows: [],
       }
 
-      // FASE 6, stap 2 — bewust ZONDER kernel-routing (synthetische suite, v2-arm; zie boven).
-      const impact = computeFeeImpactOnFire(params, 0)
+      // FASE 6, stap 5A — idem: routing.dateOfBirth nodig voor de kernel-tijdas (zie boven).
+      const impact = computeFeeImpactOnFire(params, 0, {
+        dateOfBirth: syntheticDateOfBirth(params.currentAge),
+      })
 
       assertEqual(impact.feeImpactMonths, 0, 'geen vertraging bij 0% TER')
       // fireAgeWithFees should equal fireAgeWithoutFees

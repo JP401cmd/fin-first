@@ -8,7 +8,7 @@ import { isSignificantDelta } from '@/lib/whatif-suggestions'
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import type { FinancialInput } from '@/lib/horizon-data'
 import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
-import { runScalarProjectionV2 as runSimulation } from '@/lib/horizon-engine/scalar-bridge'
+import { runScalarProjectionV2 as runSimulation } from './_kernel-sim'
 
 const CAT = 'whatif.scenarios'
 

@@ -6,7 +6,7 @@ import {
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
-import { computeWhatifProjection } from '@/lib/whatif-engine-router'
+import { computeWhatifProjection } from '@/lib/horizon-kernel/whatif-router'
 import type { WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { lifeEventsToCashflows, type SimCashflow, type SimResult } from '@/lib/fire-simulation'
 import { formatFireAge } from '@/lib/horizon-data'
@@ -28,9 +28,9 @@ import type { LifeEventImpactKind } from '@/lib/calculator/to-life-event'
  * tijdas worden gezet via de bestaande CalculatorToLifeEventSheet.
  *
  * ── Modelkeuzes (motor-eerlijk) ─────────────────────────────────────────────
- * De motor (`runSelectedProjection`, flag-bewust v1/v2) routeert élke terugkerende
- * `income`-cashflow als surplus naar beleggingsbuckets op het VERWACHTE rendement;
- * er is GEEN per-cashflow rendement en GEEN versnelde schuldafbouw. Daarom:
+ * De horizon-kernel routeert élke terugkerende `income`-cashflow als surplus naar
+ * beleggingsbuckets op het VERWACHTE rendement; er is GEEN per-cashflow rendement en
+ * GEEN versnelde schuldafbouw. Daarom:
  *
  * 1. BELEGGEN  — exact: een `extra_inleg`-event (monthly_income_change = +X),
  *    identiek aan de bestaande extra-inleg-slider. Compound op verwacht
@@ -84,12 +84,12 @@ export function WhatIfBeslishulp({
   scenarioEvents,
   currentAge,
   debts,
-  useV2,
   kernel,
 }: {
   /**
-   * De what-if UnifiedProjectionInput van de pagina (incl. return-deltas).
-   * Wanneer null is er onvoldoende data — de kaart rendert niet.
+   * De what-if UnifiedProjectionInput van de pagina (incl. return-deltas). Levert de
+   * `yearlyExpenses`-grondslag voor de kernel-runs. Wanneer null is er onvoldoende
+   * data — de kaart rendert niet.
    */
   baseInput: UnifiedProjectionInput | null
   /** Actieve scenario-events (DB + scenario-only) — de vergelijkingsbasis. */
@@ -99,24 +99,13 @@ export function WhatIfBeslishulp({
   /** Actieve schulden — voor de aflossen-rente in de voetnoot én de kernel-context. */
   debts: Debt[]
   /**
-   * Draait de gebruiker de v2-grootboek-engine? (`isHorizonV2Enabled`). Bepaalt
-   * via `computeWhatifProjection` of de baseline- én optie-runs door v2 of v1 lopen
-   * — zodat de FIRE-maand-delta's per constructie consistent zijn met de Tijdas-
-   * grafiek en de what-if-baseline van de pagina (single source of truth).
-   */
-  useV2: boolean
-  /**
-   * FASE 6, stap 1 — de rauwe kernel-context + vlag-beslissing van de
-   * /horizon/whatif-pagina (de PAGE-LEVEL-beslissing `pageKernelEnabled`). Wanneer
-   * `enabled` (én een profiel aanwezig), routeren de beslishulp-runs via
-   * `computeWhatifProjection` op DEZELFDE motor (kernel) als de hoofd-what-if-lijnen
-   * en de per-event-impact-chips — geen stille engine-mix binnen één pagina.
-   * Afwezig/`enabled: false` → byte-identiek v2 (de router draait dan letterlijk
-   * `runSelectedProjection(builtInput, useV2)`). De rendement-slider (return-deltas)
-   * zit al in `baseInput` voor de v2-tak; de kernel-tak past dezelfde delta's zelf toe.
+   * De rauwe kernel-context van de /horizon/whatif-pagina. De beslishulp-runs
+   * routeren via `computeWhatifProjection` (de horizon-kernel) — DEZELFDE motor als de
+   * hoofd-what-if-lijnen en de per-event-impact-chips. De rendement-slider
+   * (return-deltas) past de kernel-tak zelf toe op de assets. Afwezig → geen
+   * doorrekening (de kaart heeft dan geen opties; zichtbare degradatie).
    */
   kernel?: {
-    enabled: boolean
     profile: WhatifRawProfileRow
     assets: Asset[]
     aowRows?: AowLeeftijdRow[]
@@ -159,35 +148,29 @@ export function WhatIfBeslishulp({
     scenario_origin: `beslishulp:${id}`,
   })
 
-  // ── Motorschakelaar (FASE 5, stap 2a-router; FASE 6, stap 1-context) ─────
-  // Elke beslishulp-run loopt via de what-if-router met DEZELFDE page-level-
-  // beslissing als de hoofd-what-if-lijnen. `builtInput` draagt de v2-input
-  // (byte-identiek: vlag uit → `runSelectedProjection(builtInput, useV2)`);
-  // `lifeEvents` voedt de kernel-tak (adapter-guard partitioneert ze). De
-  // rendement-slider zit al in `baseInput` voor v2; de kernel-tak past dezelfde
-  // delta's zelf toe via `returnDeltaByAssetType`.
+  // ── Kernel-run (via de what-if-router) ───────────────────────────────────
+  // Elke beslishulp-run loopt via de horizon-kernel — DEZELFDE motor als de
+  // hoofd-what-if-lijnen. `lifeEvents` voedt de kernel (adapter-guard partitioneert
+  // ze); de rendement-slider past de kernel-tak zelf toe via `returnDeltaByAssetType`.
+  // Zonder rauwe kernel-context (of bij een kern-fout) → `null` (geen doorrekening).
   const runProjection = useCallback(
-    (builtInput: UnifiedProjectionInput, lifeEvents: WhatIfEvent[]): SimResult => {
-      const kernelEnabled = kernel?.enabled === true && !!kernel?.profile
+    (builtInput: UnifiedProjectionInput, lifeEvents: WhatIfEvent[]): SimResult | null => {
+      if (!kernel) return null
       const outcome = computeWhatifProjection({
-        builtInput,
-        v2FlagArg: useV2,
-        kernelEnabled,
-        rawContext: kernel
-          ? {
-              profile: kernel.profile,
-              assets: kernel.assets,
-              debts,
-              lifeEvents,
-              aowRows: kernel.aowRows,
-              returnDeltaByAssetType: kernel.returnDeltaByAssetType,
-              yearlyExpenses: builtInput.yearlyExpenses,
-            }
-          : undefined,
+        rawContext: {
+          profile: kernel.profile,
+          assets: kernel.assets,
+          debts,
+          lifeEvents,
+          aowRows: kernel.aowRows,
+          returnDeltaByAssetType: kernel.returnDeltaByAssetType,
+          yearlyExpenses: builtInput.yearlyExpenses,
+        },
       })
+      if (!outcome.ok) return null
       return toSimResult(outcome.result)
     },
-    [kernel, useV2, debts],
+    [kernel, debts],
   )
 
   // ── Bereken het BASISSCENARIO (zonder optie) één keer ───────────────────
@@ -219,7 +202,7 @@ export function WhatIfBeslishulp({
         [...scenarioEvents, ...extraEvents],
       )
       // Zelfde fractionele grondslag als de Aflossen-pot (motor-kruispunt).
-      return fireAgeFromSim(sim)
+      return sim ? fireAgeFromSim(sim) : null
     }
 
     const deltaFrom = (withAge: number | null): number | null =>

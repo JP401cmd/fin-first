@@ -33,8 +33,11 @@ import {
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
-import { lifeEventsToCashflows, type SimResult } from '@/lib/fire-simulation'
+import { type SimResult } from '@/lib/fire-simulation'
+import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
+import { solveFire } from '@/lib/horizon-kernel/solver'
+import { kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
+import type { LifeEvent } from '@/lib/horizon-data'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -112,7 +115,12 @@ function makeInput(overrides: Partial<UnifiedProjectionInput> = {}): UnifiedProj
     inflationRate: 0.02,
     box3Method: 'forfaitair',
     cashflows: [],
-    strategyConfig: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+    // 'perpetual' (kapitaalinstandhouding) geeft een POSITIEF FIRE-doel
+    // (`requiredFirePortfolio` = uitgaven/SWR), wat het aflossen-pot-model nodig heeft.
+    // De kernel geeft 'deplete' bewust doel = 0 (B93-quirk) → aflossenFireAge zou dan
+    // null geven; de beleggen/aflossen-crossover die deze suite toetst is strategie-
+    // onafhankelijk, dus perpetual is de juiste, goed-gedefinieerde grondslag.
+    strategyConfig: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 },
     withdrawalStrategy: WITHDRAWAL_DEFAULTS,
     hasPartner: false,
     ...overrides,
@@ -141,14 +149,53 @@ function contributionEvent(monthly: number, age: number): WhatIfEvent {
   }
 }
 
-function simOf(input: UnifiedProjectionInput): SimResult {
-  return toSimResult(runSelectedProjection(input, true))
+/**
+ * Bouw een SimResult uit een test-UnifiedProjectionInput via de horizon-kernel (de
+ * enige motor): synthetische adapter-invoer → solveFire → bridge. De extra inleg
+ * reist als life-event mee; de kernel-adapter routeert 'm als Geb-post.
+ */
+function simOf(input: UnifiedProjectionInput, events: LifeEvent[] = []): SimResult {
+  const dob = `${new Date().getFullYear() - input.currentAge}-01-01`
+  const adapterInput: KernelAdapterInput = {
+    profile: {
+      date_of_birth: dob,
+      net_monthly_income: input.monthlyIncome,
+      estimated_monthly_expenses: input.yearlyExpenses / 12,
+      yearly_essential_expenses: input.yearlyExpenses,
+      retirement_expense_method: 'essential_budgets',
+      expected_return: input.grossReturn,
+      inflation_rate: input.inflationRate,
+      box3_method: input.box3Method,
+      fire_end_strategy: input.strategyConfig.strategy,
+      fire_end_age: input.strategyConfig.endAge,
+      fire_legacy_amount: input.strategyConfig.legacyAmount ?? 0,
+      withdrawal_strategy: input.withdrawalStrategy.strategy,
+      feature_preferences: null,
+    },
+    assets: input.assets,
+    debts: input.debts,
+    lifeEvents: events,
+    aowRows: [],
+  }
+  const kernelInput = buildKernelInputFromApp(adapterInput)
+  const solve = solveFire(kernelInput)
+  const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
+    input.assets,
+    input.debts,
+    deriveEigenHuisIds(input.assets),
+  )
+  return toSimResult(
+    kernelToUnifiedResult(solve, {
+      input: kernelInput,
+      yearlyExpenses: input.yearlyExpenses,
+      assetSlotMeta,
+      debtSlotMeta,
+    }),
+  )
 }
 /** Beleggen-FIRE: motor-run (basis + extra inleg) → fractioneel kruispunt. */
 function beleggenAge(input: UnifiedProjectionInput, amount: number): number | null {
-  return fireAgeFromSim(
-    simOf({ ...input, cashflows: lifeEventsToCashflows([contributionEvent(amount, input.currentAge)]) }),
-  )
+  return fireAgeFromSim(simOf(input, [contributionEvent(amount, input.currentAge)]))
 }
 
 describe('WhatIf-beslishulp — één-motor-model', () => {

@@ -228,6 +228,28 @@ export const CALCULATIONS: Calculation[] = [
     constants: [{ label: 'Box 2-tarief', value: '31% boven €68.843 (gecorrigeerd)' }],
     elementIds: ['as-belasting'],
   },
+  {
+    id: 'schenk-erfbelasting',
+    title: 'Schenk- & erfbelasting',
+    domain: 'Belasting',
+    summary: 'Schenk- en erfbelasting per ontvanger: jaarlijkse vrijstelling, eenmalig verhoogde schenkvrijstelling en het tweeschijventarief per tariefgroep — de basis voor de schenkings- en erfenisplanning in Horizon.',
+    inputs: ['geschonken/geërfd bedrag', 'relatie tot schenker/erflater', 'belastingjaar'],
+    outputs: ['vrijstelling', 'belastbaar bedrag', 'schenk-/erfbelasting €', 'netto ontvangen'],
+    formula: 'belasting = min(belastbaar, grens) × laag + max(0, belastbaar − grens) × hoog; belastbaar = max(0, bedrag − vrijstelling)',
+    files: ['lib/horizon-data.ts', 'lib/phase-analysis.ts', 'lib/calculator/prefab-definitions.ts'],
+    functions: ['berekenSchenkbelasting', 'berekenErfbelasting', 'resolveSchenkErfParams', 'analyzeSchenkingPlan', 'formatErfenisTipTekst'],
+    constants: [
+      { label: 'Schenkvrijstelling kind (2026)', value: '€6.908' },
+      { label: 'Schenkvrijstelling kleinkind/overig (2026)', value: '€2.769' },
+      { label: 'Eenmalig verhoogd kind 18-40 (2026)', value: '€33.129' },
+      { label: 'Erfvrijstelling partner (2026)', value: '€828.035' },
+      { label: 'Erfvrijstelling kind/kleinkind (2026)', value: '€26.230' },
+      { label: 'Schijfgrens schijf 1→2 (2026)', value: '€158.669' },
+      { label: 'Tarieven (jaaronafhankelijk)', value: 'kind 10/20% · kleinkind 18/36% · overig 30/40%' },
+    ],
+    elementIds: ['as-belasting'],
+    note: 'Jaargelaagd in SCHENK_ERF_PARAMS (2024/2025/2026) analoog aan BOX3_PARAMS; berekenSchenkbelasting/berekenErfbelasting lezen via resolveSchenkErfParams(jaar) (default = lopend jaar, met fallback naar het dichtstbijzijnde bekende jaar ≤ gevraagd — 2027 blijft dus op 2026-niveau tot een 2027-laag wordt toegevoegd). Alleen vrijstellingen, de eenmalig verhoogde schenkvrijstelling en de schijfgrens zijn jaargebonden; de schijfpercentages (10/20 · 18/36 · 30/40) zijn wettelijk jaaronafhankelijk en staan één keer als SCHENK_TARIEVEN_RATES/ERF_TARIEVEN_RATES. Eén bron over alle oppervlakken: phase-analysis (NL_SCHENKING_VRIJSTELLING), de calculator-prefab (schenkenVsErven-defaults) én de erfenis-prefab tip/opties worden uit SCHENK_ERF_PARAMS afgeleid (generatorfuncties formatErfenisTipTekst/-Opties/-Tip) i.p.v. losse literals. Dit hief de drift op waarbij de constanten "2026" claimden maar 2024/2025-cijfers bevatten en één modal 2024- én 2025-vrijstellingen naast elkaar toonde (heffing werd ~1,5-2,2% overschat).',
+  },
 
   // ── Toekomst (FIRE) ──
   {

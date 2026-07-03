@@ -30,9 +30,15 @@ interface HypotheekVsBeleggenOpbouwProps {
   hasPartner?: boolean
   /** Marginaal IB-tarief (e.g. 0.3697 or 0.4950), overrides default */
   marginaalTarief?: number
-  /** FASE 6, stap 2 — convergentie-vlag (`horizon_kernel_convergentie`) + geboortedatum
-   *  voor de HvB-FIRE-impact-routing. Vlag uit / geen dob → v2 (byte-identiek). */
+  /**
+   * FASE 6 stap 5A — de horizon-kernel is de enige motor; deze vlag doet niets meer
+   * en wordt genegeerd. Blijft als geaccepteerde prop zodat de parent-keten
+   * (horizon-client → PhaseModalOpbouw) ongewijzigd blijft compileren tot de bredere
+   * flag-teardown 'm daar verwijdert.
+   */
   kernelEnabled?: boolean
+  /** Geboortedatum voor de kernel-tijdas van de HvB-FIRE-impact; zonder dob
+   *  degradeert de lib netjes (geen impact). */
   dateOfBirth?: string | null
 }
 
@@ -156,7 +162,6 @@ export const HypotheekVsBeleggenOpbouw = memo(
     cashflows,
     hasPartner = false,
     marginaalTarief,
-    kernelEnabled,
     dateOfBirth,
   }: HypotheekVsBeleggenOpbouwProps) {
     // Find the first active mortgage debt
@@ -207,10 +212,11 @@ export const HypotheekVsBeleggenOpbouw = memo(
         cashflows,
       }
 
-      // FASE 6, stap 2 — routeer de FIRE-impact via de convergentie-vlag: vlag aan
-      // (+ geboortedatum) → horizon-kernel, anders v2 (byte-identiek). Deze fase-
-      // analyse zit onder horizon-client, dat de vlag + dob aanreikt.
-      return compareMortgageVsInvest(params, { kernelEnabled, dateOfBirth })
+      // FASE 6 stap 5A — de FIRE-impact draait op de horizon-kernel; de enige routing
+      // die de lib nog nodig heeft is de geboortedatum voor de tijdas. Zonder dob
+      // degradeert de lib netjes (geen impact). Deze fase-analyse zit onder
+      // horizon-client, dat de dob aanreikt.
+      return compareMortgageVsInvest(params, { dateOfBirth })
     }, [
       mortgage,
       deferredExtra,
@@ -223,7 +229,6 @@ export const HypotheekVsBeleggenOpbouw = memo(
       cashflows,
       hasPartner,
       marginaalTarief,
-      kernelEnabled,
       dateOfBirth,
     ])
 
