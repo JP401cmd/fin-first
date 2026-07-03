@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import type { ModuleColorConfig, ModuleName, Shade, BudgetColorConfig, BudgetTypeName, PhaseColorConfig, PhaseColorName } from '@/lib/color-palette'
 import {
   generateAllColorVars,
@@ -338,15 +338,24 @@ export function ModuleColorProvider({
     return palette[shade].hex
   }, [phaseConfig])
 
+  // Gememoized context-value: alle setters/getters zijn al useCallback, dus
+  // zonder deze memo kreeg élke provider-render een nieuwe object-identiteit
+  // en herrenderden alle useModuleColors/useModuleHex-consumers app-breed —
+  // hoogfrequent tijdens kleur-slepen op /mijn/uiterlijk. Zelfde patroon als
+  // PageStatusProvider/DisplayModeProvider/FeatureAccessProvider.
+  const contextValue = useMemo(() => ({
+    config, setConfig, getHex,
+    budgetConfig, setBudgetConfig, getBudgetHex,
+    phaseConfig, setPhaseConfig, getPhaseHex,
+    hydrateColors,
+    fontTheme, setFontTheme,
+    paletteTheme, setPaletteTheme,
+  }), [config, setConfig, getHex, budgetConfig, setBudgetConfig, getBudgetHex,
+    phaseConfig, setPhaseConfig, getPhaseHex, hydrateColors,
+    fontTheme, setFontTheme, paletteTheme, setPaletteTheme])
+
   return (
-    <ModuleColorContext.Provider value={{
-      config, setConfig, getHex,
-      budgetConfig, setBudgetConfig, getBudgetHex,
-      phaseConfig, setPhaseConfig, getPhaseHex,
-      hydrateColors,
-      fontTheme, setFontTheme,
-      paletteTheme, setPaletteTheme,
-    }}>
+    <ModuleColorContext.Provider value={contextValue}>
       {children}
     </ModuleColorContext.Provider>
   )
