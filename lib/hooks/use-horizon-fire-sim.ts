@@ -9,7 +9,7 @@
  * Schrijft de FIRE-velden weg naar net_worth_snapshots.
  */
 
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect, useRef, useDeferredValue } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { type FinancialInput, type LifeEvent } from '@/lib/horizon-data'
 import { type SimResult, type SimCashflow } from '@/lib/fire-simulation'
@@ -93,40 +93,73 @@ interface HorizonFireSimInput {
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
   const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows } = params ?? {}
 
-  // Synchrone berekening via useMemo — geen async nodig want data is al geladen
+  // ── Slider-defer (alléén scheduling; geen formule/parameter-wijziging) ─────
+  // Bundel de kernel-inputs in één object dat exact op dezelfde 16 waarden keyt als de
+  // kernel-useMemo hiervóór (bankAccountCash bleef — net als voorheen — bewust géén key:
+  // enkel bankAccountCash wijzigen triggerde geen recompute en mag dat nog steeds niet).
+  // useDeferredValue laat een urgente render (slider-tick) het vórige input-object
+  // hergebruiken, terwijl de kernel (fase 1-meting: 173–419ms main-thread) in een
+  // onderbreekbare achtergrond-render draait die bij continu schuiven coalesced. Op de
+  // initiële render is de deferred waarde gelijk aan de huidige → de eerste kernel-run
+  // blijft synchroon (contract-tests van deze hook ongewijzigd).
+  const kernelInput = useMemo(() => ({
+    horizonInput,
+    lifeEvents,
+    fireStrategy,
+    withdrawalStrategy,
+    grossReturnParam,
+    inflationParam,
+    aowAgeFractionalParam,
+    assets,
+    debts,
+    box3Method,
+    hasPartner,
+    bankAccountCash,
+    monthlySavingsOverride,
+    baseAnnualSavingsFromCashflow,
+    housingStrategy,
+    kernelRawProfile,
+    aowRows,
+  }), [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows])
+
+  const deferredKernelInput = useDeferredValue(kernelInput)
+
+  // Synchrone berekening via useMemo — geen async nodig want data is al geladen. Keyt op
+  // het deferred input-object (referentie-stabiel zolang de 16 deps ongewijzigd blijven).
   const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[]; kernelStatus: SolverStatus | null; kernelMaandHint: number | null; kernelHousingSale: KernelHousingSale | null; kernelPensionPots: readonly KernelPensionPotView[] } | null>(() => {
+    const p = deferredKernelInput
     // Metadata-assemblage via de gedeelde builder (yearlyExpenses + guards). Zie
     // lib/horizon/build-input.ts.
     const built = buildHorizonInput({
-      horizonInput: horizonInput ?? null,
-      lifeEvents: lifeEvents ?? [],
-      fireStrategy,
-      withdrawalStrategy,
-      grossReturn: grossReturnParam,
-      inflation: inflationParam,
-      aowAgeFractional: aowAgeFractionalParam,
-      assets,
-      debts,
-      box3Method,
-      hasPartner,
-      bankAccountCash,
-      monthlySavingsOverride,
-      baseAnnualSavingsFromCashflow,
-      housingStrategy,
+      horizonInput: p.horizonInput ?? null,
+      lifeEvents: p.lifeEvents ?? [],
+      fireStrategy: p.fireStrategy,
+      withdrawalStrategy: p.withdrawalStrategy,
+      grossReturn: p.grossReturnParam,
+      inflation: p.inflationParam,
+      aowAgeFractional: p.aowAgeFractionalParam,
+      assets: p.assets,
+      debts: p.debts,
+      box3Method: p.box3Method,
+      hasPartner: p.hasPartner,
+      bankAccountCash: p.bankAccountCash,
+      monthlySavingsOverride: p.monthlySavingsOverride,
+      baseAnnualSavingsFromCashflow: p.baseAnnualSavingsFromCashflow,
+      housingStrategy: p.housingStrategy,
     })
     if (!built) return null
     // Zonder rauwe profiel-rij kan de kernel-invoer niet worden samengesteld.
-    if (!kernelRawProfile) return null
+    if (!p.kernelRawProfile) return null
     const { input: unifiedInput, cashflows } = built
 
     // ── Kernel-only: route via de convergentie-router ─────────────────
     const outcome = computeConvergentieProjection({
       rawContext: {
-        profile: kernelRawProfile,
-        assets: assets ?? [],
-        debts: debts ?? [],
-        lifeEvents: lifeEvents ?? [],
-        aowRows,
+        profile: p.kernelRawProfile,
+        assets: p.assets ?? [],
+        debts: p.debts ?? [],
+        lifeEvents: p.lifeEvents ?? [],
+        aowRows: p.aowRows,
         yearlyExpenses: unifiedInput.yearlyExpenses,
       },
     })
@@ -143,7 +176,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       cashflows,
       unifiedRows: unifiedResult.rows,
       effectiveLifeEvents: applyKernelHousingSaleToEvents(
-        dedupeById(lifeEvents ?? []),
+        dedupeById(p.lifeEvents ?? []),
         outcome.kernelHousingSale ?? null,
       ),
       kernelStatus: outcome.kernelStatus ?? null,
@@ -151,7 +184,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       kernelHousingSale: outcome.kernelHousingSale ?? null,
       kernelPensionPots: outcome.result.kernelPensionPots,
     }
-  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows])
+  }, [deferredKernelInput])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
