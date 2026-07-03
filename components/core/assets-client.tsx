@@ -371,7 +371,11 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     loadAssets(signal)
   }, [loadAssets, perspectiveSignal])
 
-  const activeAssets = assets.filter((a) => a.is_active !== false)
+  // Gememoized: een verse array-referentie per render brak alle downstream-
+  // useMemo's (byType/assetPillItems/kpiByAssetId/projection) én liet de
+  // sparkline-/connections-useEffect hieronder bij élke render opnieuw
+  // fetchen (fetch → setState → render → verse ref → fetch — een lus).
+  const activeAssets = useMemo(() => assets.filter((a) => a.is_active !== false), [assets])
   // Aandeel-fractie voor purchase/inleg-aggregaten: bij gedeelde items buiten
   // het huishoud-perspectief telt alleen het aandeel van deze viewer mee
   // (spiegelt `perspectiveAssetValue` maar zonder inclusiepercentage — dat is
