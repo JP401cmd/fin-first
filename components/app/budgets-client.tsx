@@ -50,7 +50,6 @@ import { PerspectiveContextLabel } from '@/components/app/perspective-context-la
 import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { SpendingConfidenceBadge, SpendingVarianceDetailPanel, calculateSpendingVariance, type SpendingVarianceData } from '@/components/app/spending-confidence-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
-import { BudgetPlanEditorSheet } from '@/components/app/budget-plan-editor-sheet'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import type { BudgetFormActionsState } from '@/components/app/budget-form'
 
@@ -73,6 +72,21 @@ const TransactionForm = dynamic(() =>
 )
 const GoalForm = dynamic(() =>
   import('@/components/app/goal-form').then(m => ({ default: m.GoalForm })),
+  { ssr: false }
+)
+// BudgetPlanEditorSheet trekt naast ~59kB eigen source óók een eigen @dnd-kit-
+// intrek mee. Zelfde next/dynamic-splitsing als de zuster-modals hierboven, maar
+// met één verschil: hij wordt NIET plat op `showPlanEditor` gegate. De sheet
+// rendert via <BottomSheet>, die een sluit-animatie (250ms slide-down/fade) op
+// `open: true→false` draait vóór hij unmount. Een platte `{showPlanEditor && …}`
+// zou de component bij sluiten meteen unmounten en die exit-animatie overslaan —
+// een zichtbare gedragswijziging. Daarom een mount-latch (zie
+// `planEditorEverOpened` op de callsite, patroon van chat-panel-lazy.tsx): pas
+// mounten bij de eerste open, daarna gemount laten zodat `open=false` de
+// animatie normaal afspeelt. De draft-state overleeft open/dicht niet
+// observeerbaar — die wordt bij elke open opnieuw geseed.
+const BudgetPlanEditorSheet = dynamic(() =>
+  import('@/components/app/budget-plan-editor-sheet').then(m => ({ default: m.BudgetPlanEditorSheet })),
   { ssr: false }
 )
 import { useToast } from '@/components/app/toast-provider'
@@ -1015,6 +1029,13 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
   const [rollovers, setRollovers] = useState<BudgetRollover[]>(initialData?.rollovers ?? [])
   const [budgetAmounts, setBudgetAmounts] = useState<{ id: string; budget_id: string; effective_from: string; amount: number }[]>(initialData?.budgetAmounts ?? [])
   const [showPlanEditor, setShowPlanEditor] = useState(false)
+  // Mount-latch voor de lazy BudgetPlanEditorSheet: false tot de planeditor voor
+  // het eerst opent, daarna voorgoed true. Zo wordt de dynamische chunk pas bij
+  // de eerste open gefetcht, maar blijft de sheet daarna gemount zodat de
+  // <BottomSheet>-sluit-animatie bij `open=false` normaal afspeelt (zie de
+  // dynamic-import-comment). Verandert niets observeerbaars vóór de eerste open:
+  // de sheet rendert dan toch niets (open=false ⇒ BottomSheet rendert null).
+  const [planEditorEverOpened, setPlanEditorEverOpened] = useState(false)
   const [goals, setGoals] = useState<Goal[]>(initialData?.goals ?? [])
   const [budgetRolloverHistory, setBudgetRolloverHistory] = useState<BudgetRollover[]>([])
   const [loadingRolloverHistory, setLoadingRolloverHistory] = useState(false)
@@ -1601,6 +1622,13 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
       setShowPlanEditor(true)
     }
   }, [searchParams])
+
+  // Latch de eerste open: zodra de planeditor ooit opengaat, blijft de sheet
+  // gemount (idempotent — nooit teruggezet). Zie de mount-latch-uitleg bij de
+  // dynamic import + de state-declaratie hierboven.
+  useEffect(() => {
+    if (showPlanEditor) setPlanEditorEverOpened(true)
+  }, [showPlanEditor])
 
   // "Nieuw budget" pane — getriggerd door `?newBudget=true`. Bron-of-truth:
   // - "+ Nieuw budget"-CTA in de planeditor-toolbar
@@ -2437,7 +2465,10 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         />
       )}
 
-      {/* Budget allocation modal */}
+      {/* Budget allocation modal — lazy via mount-latch (zie planEditorEverOpened).
+          De `open`-prop blijft `showPlanEditor` zodat de BottomSheet-sluit-animatie
+          intact blijft; alleen de eerste mount wordt uitgesteld tot de eerste open. */}
+      {planEditorEverOpened && (
       <BudgetPlanEditorSheet
         open={showPlanEditor}
         onClose={closePlanEditor}
@@ -2454,6 +2485,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         monthDate={monthDate}
         monthlyAverages={initialData?.monthlyAverages ?? {}}
       />
+      )}
 
       {/* "Nieuw budget" pane — uitgebreide create-flow met alle parameters
           (icoon, prioriteit, doeltype, eigendoms-keuze, …). Geopend vanuit
