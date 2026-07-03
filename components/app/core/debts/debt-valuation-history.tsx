@@ -39,7 +39,7 @@ export function ValuationHistory({
               </span>
               <span className="font-medium text-[var(--ink-2)]">{<MaskedAmount value={Number(v.value)} tone="kern" />}</span>
               {diff !== null && (
-                <span className={`text-[10px] font-medium ${diff <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                <span className={`text-[10px] font-medium ${diff <= 0 ? 'text-positive' : 'text-negative'}`}>
                   {diff >= 0 ? '+' : ''}{<MaskedAmount value={diff} tone="kern" />}
                 </span>
               )}

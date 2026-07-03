@@ -2,7 +2,8 @@
 
 import { memo, useState, useEffect } from 'react'
 import { ArrowDownRight, CheckCircle2, Shield, TrendingDown, AlertTriangle } from 'lucide-react'
-import { formatCurrency, formatCurrencyDecimals } from '@/lib/format'
+import { formatCurrency, formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
@@ -52,6 +53,7 @@ function computeErosie(
   startAge: number,
   endAge: number,
   yearlyAowIncome: number,
+  masked: boolean,
 ): ComputedState {
   const totalIncome = yearlyWithdrawal + yearlyAowIncome
   const durationYears = Math.max(Math.round(endAge - startAge), 1)
@@ -109,7 +111,7 @@ function computeErosie(
   // indexes itself, so it stays at its current level in this nominal view.
   const finalDeflator = Math.pow(1 + inflationRate, durationYears)
   const levensstijlKostNominaal = Math.round(yearlyWithdrawal * finalDeflator + yearlyAowIncome)
-  const levensstijlKostTekst = `Om je huidige koopkracht vast te houden, moet je portfolio-deel over ${durationYears} jaar ${formatCurrency(levensstijlKostNominaal)}/jaar opleveren in toekomstige euro's`
+  const levensstijlKostTekst = `Om je huidige koopkracht vast te houden, moet je portfolio-deel over ${durationYears} jaar ${formatMaskedCurrency(levensstijlKostNominaal, masked)}/jaar opleveren in toekomstige euro's`
 
   return { rows, totalErosiePct, reeelLaatsteJaar, levensstijlKostTekst, hasInflationProofPart: yearlyAowIncome > 0 }
 }
@@ -133,6 +135,7 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
   endAge,
   yearlyAowIncome = 0,
 }: KoopkrachtErosieProps) {
+  const { masked } = useMaskedAmounts()
   const [state, setState] = useState<ComputedState | null>(null)
 
   // Lazy compute: defer past first paint
@@ -144,13 +147,14 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
         startAge,
         endAge,
         yearlyAowIncome,
+        masked,
       )
       setState(result)
     }, 50)
 
     return () => clearTimeout(timer)
-     
-  }, [yearlyWithdrawal, inflationRate, startAge, endAge, yearlyAowIncome])
+
+  }, [yearlyWithdrawal, inflationRate, startAge, endAge, yearlyAowIncome, masked])
 
   const loading = state === null
   const durationYears = Math.max(Math.round(endAge - startAge), 1)
@@ -341,9 +345,12 @@ export const KoopkrachtErosieOnttrekken = memo(function KoopkrachtErosieOnttrekk
                 </p>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ink-4)]">
                   Ofwel: elke euro die je nu onttrekt, is over {durationYears} jaar slechts{' '}
-                  <span className="font-mono tabular-nums font-medium">
-                    {formatCurrencyDecimals(100 / Math.pow(1 + inflationRate, durationYears))}
-                  </span>{' '}
+                  <MaskedAmount
+                    value={100 / Math.pow(1 + inflationRate, durationYears)}
+                    tone="horizon"
+                    decimals
+                    className="font-medium"
+                  />{' '}
                   waard.
                 </p>
               </div>

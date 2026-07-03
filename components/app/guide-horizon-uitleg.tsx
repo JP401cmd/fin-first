@@ -18,6 +18,14 @@ import {
   Compass,
   Wallet,
 } from 'lucide-react'
+import { formatCurrency } from '@/lib/format'
+import { NL_SWR } from '@/lib/horizon-data'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
+
+/* Box 3-getallen uit de canonieke jaartabel — geen hardcoded percentages meer. */
+const BOX3 = BOX3_PARAMS[CURRENT_TAX_YEAR]
+const pct2 = (x: number) => (x * 100).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const pct0 = (x: number) => (x * 100).toLocaleString('nl-NL', { maximumFractionDigits: 0 })
 
 /* ── Section data ─────────────────────── */
 
@@ -407,14 +415,16 @@ export default function GuideHorizonUitleg() {
           </p>
           <p>
             <strong>Per type een ander forfaitair rendement:</strong> de overheid maakt
-            onderscheid tussen spaargeld (forfaitair ca. 1,28%) en beleggingen (forfaitair ca.
-            6,04%). Over dit fictieve rendement betaal je <strong>36% belasting</strong>. Het
-            maakt niet uit wat je werkelijke rendement is — de belasting is altijd gebaseerd op
-            het forfaitaire percentage van dat type.
+            onderscheid tussen spaargeld (forfaitair ca. {pct2(BOX3.forfaitSpaargeld)}%) en
+            beleggingen (forfaitair ca. {pct2(BOX3.forfaitBeleggingen)}%). Over dit fictieve
+            rendement betaal je <strong>{pct0(BOX3.tarief)}% belasting</strong>. Het maakt niet
+            uit wat je werkelijke rendement is — de belasting is altijd gebaseerd op het
+            forfaitaire percentage van dat type.
           </p>
           <p>
             <strong>Heffingsvrij vermogen:</strong> je betaalt niet over alles. De eerste{' '}
-            <strong>€ 57.000</strong> (of € 114.000 met fiscaal partner) is vrijgesteld. Dit{' '}
+            <strong>{formatCurrency(BOX3.heffingsvrijSingle)}</strong> (of{' '}
+            {formatCurrency(BOX3.heffingsvrijPartner)} met fiscaal partner) is vrijgesteld. Dit{' '}
             <strong>heffingsvrij vermogen</strong> wordt proportioneel verdeeld over al je
             bezittingstypes. Heb je €50.000 spaargeld en €100.000 beleggingen? Dan wordt
             ⅓ van de vrijstelling aan spaargeld toegerekend en ⅔ aan beleggingen.
@@ -424,9 +434,9 @@ export default function GuideHorizonUitleg() {
             berekend per type: forfaitair rendement × tarief, verminderd met je aandeel in het
             heffingsvrij vermogen. Spaargeld heeft hierdoor een veel lagere belastingdruk dan
             beleggingen. Dit verklaart waarom de bekende{' '}
-            <strong>NL_SWR van 2,88%</strong> lager is dan de Amerikaanse 4%-regel — de 2,88%
-            is geen instelling maar een <strong>uitkomst</strong> van deze berekening bij
-            standaardwaarden (7% bruto rendement, 2% inflatie).
+            <strong>NL_SWR van {pct2(NL_SWR)}%</strong> lager is dan de Amerikaanse 4%-regel — de{' '}
+            {pct2(NL_SWR)}% is geen instelling maar een <strong>uitkomst</strong> van deze
+            berekening bij standaardwaarden (7% bruto rendement, 2% inflatie).
           </p>
           <p>
             Je kunt je bruto rendement aanpassen via{' '}

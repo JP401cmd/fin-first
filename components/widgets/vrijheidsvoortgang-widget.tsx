@@ -174,11 +174,15 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
     )
   }
 
-  // ── Full-size: milestones, growth rate, estimated dates ────
+  // ── Full-size: ring + bedragen + groei ────
+  // Het mijlpaal-datumlijstje is hier bewust verwijderd (widgetreview): die rol
+  // ligt exclusief bij de Vrijheidsmijlpalen-widget, die de canonieke motor
+  // (data.freedomMilestones, lib/freedom-milestones.ts) consumeert. Dit widget
+  // toont "waar sta ik nu + hoe snel groei ik": ring, bedragen en groei/mnd.
   const milestones = [25, 50, 75, 100] as const
 
-  // Monthly growth rate from netWorthHistory — per-user only, so it (and the
-  // milestone date estimates that depend on it) is suppressed in shared views.
+  // Monthly growth rate from netWorthHistory — per-user only, so it is
+  // suppressed in shared views.
   // Geschaald met de housing-filter-ratio zodat groei én restbedrag op de
   // FIRE-eligible grondslag liggen (consistent met effectivePct).
   const monthlyGrowthRate = (() => {
@@ -192,24 +196,14 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
     return ((newest - oldest) / months) * housingFilterRatio
   })()
 
-  // Estimate date to reach a milestone percentage. "Bereikt" en het restbedrag
-  // delen de canonieke grondslag: effectivePct (= FIRE-eligible ÷ doel) en het
-  // FIRE-eligible vermogen als teller.
-  const estimateDateForMilestone = (targetPct: number): string | null => {
-    if (effectivePct >= targetPct) return 'Bereikt'
-    if (!monthlyGrowthRate || monthlyGrowthRate <= 0) return null
-    const targetValue = (targetPct / 100) * effectiveFire
-    const remaining = targetValue - freedomEligibleNetWorth
-    const monthsNeeded = Math.ceil(remaining / monthlyGrowthRate)
-    if (monthsNeeded > 600) return null // > 50 years, not realistic
-    const date = new Date()
-    date.setMonth(date.getMonth() + monthsNeeded)
-    return date.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
-  }
+  // Restbedrag tot volledige vrijheid — zelfde canonieke paar als effectivePct
+  // (FIRE-eligible vermogen vs. doelportfolio), puur presentationeel.
+  const remainingToFullFreedom = Math.max(effectiveFire - freedomEligibleNetWorth, 0)
 
-  // SVG donut ring dimensions
-  const RING_SIZE = 120
-  const RING_STROKE = 10
+  // SVG donut ring dimensions — groter nu het datumlijstje weg is, zodat de
+  // full-size hoogte gevuld blijft.
+  const RING_SIZE = 148
+  const RING_STROKE = 12
   const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2
   const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
   const fillLength = (Math.min(effectivePct, 100) / 100) * RING_CIRCUMFERENCE
@@ -286,43 +280,37 @@ export const VrijheidsvoortgangWidget = memo(function VrijheidsvoortgangWidget({
             </div>
           </div>
 
-          {/* Right column: wealth + growth */}
-          <div className="flex-1 min-w-0 pt-1">
-            <p className="text-[var(--ink-3)] truncate">
-              <MaskedAmount value={netWorth} tone="ink" className="text-[11px]" />
-            </p>
-            <p className="text-[var(--ink-4)] truncate">
-              / <MaskedAmount value={effectiveFire} tone="ink" className="text-[10px]" />{simRequiredPortfolio ? ' (sim)' : ''}
-            </p>
-            {monthlyGrowthRate !== null && (
-              <p className="mt-1.5 text-[10px] text-[var(--ink-3)]">
-                <span className="text-[var(--ink-2)] font-medium">Groei</span>{' '}
-                <MaskedAmount value={monthlyGrowthRate} tone="ink" />/mnd
+          {/* Right column: wealth + growth + rest tot vrijheid */}
+          <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Vermogen</p>
+              <p className="text-[var(--ink-2)] truncate">
+                <MaskedAmount value={netWorth} tone="ink" className="text-[13px] font-medium" />
               </p>
+              <p className="text-[var(--ink-4)] truncate">
+                / <MaskedAmount value={effectiveFire} tone="ink" className="text-[11px]" />{simRequiredPortfolio ? ' (sim)' : ''}
+              </p>
+            </div>
+            {monthlyGrowthRate !== null && (
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Groei</p>
+                <p className="text-[11px] text-[var(--ink-2)]">
+                  <MaskedAmount value={monthlyGrowthRate} tone="ink" className="font-medium" />/mnd
+                </p>
+              </div>
+            )}
+            {effectivePct < 100 && remainingToFullFreedom > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Nog te gaan</p>
+                <p className="text-[11px] text-[var(--ink-2)] truncate">
+                  <MaskedAmount value={remainingToFullFreedom} tone="ink" className="font-medium" />
+                </p>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Milestone estimated dates */}
-        <div className="mt-2 space-y-0.5">
-          {milestones.map(m => {
-            const est = estimateDateForMilestone(m)
-            if (est === null) return null
-            const reached = est === 'Bereikt'
-            return (
-              <div key={m} className="flex items-center justify-between text-[11px]">
-                <span className={`font-mono tabular-nums ${reached ? 'text-horizon-600 font-medium' : 'text-[var(--ink-3)]'}`}>
-                  {m}% vrijheid
-                </span>
-                <span className={`font-mono tabular-nums ${reached ? 'text-positive' : 'text-[var(--ink-3)]'}`}>
-                  {reached ? 'Bereikt' : `~${est}`}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-
-        <p className="mt-1.5 font-serif italic text-[11px] text-[var(--ink-3)]">
+        <p className="mt-3 font-serif italic text-[11px] text-[var(--ink-3)]">
           {(() => {
             // Shared views have no per-user countdown date — use a neutral
             // percentage framing rather than a faked personal projection.

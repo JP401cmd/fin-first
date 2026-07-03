@@ -247,7 +247,7 @@ export function RoadmapModal({ data, open, onClose }: RoadmapModalProps) {
                 <StatBlock
                   label="Vermogen"
                   value={<MaskedAmount value={data.netWorth} tone="horizon" />}
-                  color={data.netWorth >= 0 ? 'text-green-700' : 'text-red-600'}
+                  color={data.netWorth >= 0 ? 'text-positive' : 'text-negative'}
                 />
                 <div className="border-x border-[var(--border-ed)]">
                   <StatBlock label="Vrijheid" value={`${data.freedomPct.toFixed(1)}%`} color="text-horizon-700" />

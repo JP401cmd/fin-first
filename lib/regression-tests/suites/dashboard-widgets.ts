@@ -59,7 +59,7 @@ function makeAnswers(o?: Partial<AutoDashboardAnswers>): AutoDashboardAnswers {
 }
 
 const VALID_MODULES: WidgetModule[] = ['kern', 'wil', 'horizon', 'cross']
-const VALID_SIZES: WidgetSize[] = ['mini', 'quarter', 'half', 'full']
+const VALID_SIZES: WidgetSize[] = ['mini', 'quarter', 'half', 'full', 'xl']
 
 // ── Tests ─────────────────────────────────────────────────────────────
 

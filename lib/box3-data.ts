@@ -132,6 +132,16 @@ export const BOX3_PARAMS: Record<TaxYear, Box3Params> = {
   },
 }
 
+/**
+ * Het lopende/actieve belastingjaar — de enige plek waar "welk jaar is nu
+ * actueel" wordt vastgelegd. UI-defaults (jaar-toggle, glossary/guide-teksten)
+ * én de NL-FIRE-afgeleiden in lib/constants.ts (NL_FICTIEF_BELEGGINGEN →
+ * BOX3_DRAG/NL_SWR/NL_MULTIPLIER) lezen hun jaarwaarden uit
+ * BOX3_PARAMS[CURRENT_TAX_YEAR]. Bump dit zodra een nieuw jaar aan BOX3_PARAMS
+ * is toegevoegd; alle afgeleiden en oppervlakken schuiven dan automatisch mee.
+ */
+export const CURRENT_TAX_YEAR: TaxYear = 2026
+
 export const BOX3_TOOLTIPS: Record<string, string> = {
   box3: 'Box 3 belast je vermogen op basis van een fictief rendement — niet wat je werkelijk verdient.',
   forfaitairRendement: 'Een vast percentage waarmee de Belastingdienst berekent hoeveel je "geacht wordt" te verdienen. Spaargeld heeft een lager percentage dan beleggingen.',

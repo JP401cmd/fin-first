@@ -221,7 +221,7 @@ function CheckinHistoryCard({
           <div className="mt-0.5 flex items-center gap-3 text-[10px] text-[var(--ink-3)]">
             <span className="font-mono tabular-nums">{fc(metrics.netWorth)}</span>
             {netWorthDelta !== null && netWorthDelta !== 0 && (
-              <span className={`font-mono tabular-nums font-medium ${netWorthDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+              <span className={`font-mono tabular-nums font-medium ${netWorthDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
                 {netWorthDelta >= 0 ? '+' : ''}{fc(netWorthDelta)}
               </span>
             )}
@@ -320,7 +320,7 @@ function MiniMetric({
         style={{
           fontFamily: 'var(--font-playfair, Georgia, serif)',
           color: typeof positive === 'boolean'
-            ? positive ? 'var(--positive, #10b981)' : 'var(--negative, #dc2626)'
+            ? positive ? 'var(--positive)' : 'var(--negative)'
             : 'var(--ink)',
         }}
       >

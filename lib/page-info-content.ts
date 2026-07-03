@@ -38,8 +38,9 @@ export const PAGE_INFO: Record<string, string> = {
     'Koppel een rekening om automatisch te importeren.',
 
   '/overzicht/cashflow/vaste-lasten':
-    'Je abonnementen en terugkerende kosten op één plek. ' +
-    'Zie wat je per maand en per jaar kwijt bent, en welke posten je kunt opzeggen. ' +
+    'Je abonnementen en terugkerende kosten op één plek — met hoeveel vrijheidstijd ze je kosten. ' +
+    'In Volledig zie je je vaste-lastenquote (aandeel van je inkomen, met Nibud-duiding), ' +
+    'abonnementen-sluipverbruik t.o.v. het gemiddelde, de samenstelling per categorie en wat opzeggen oplevert. ' +
     'Elke euro minder vaste last is vrijheid die je terugkoopt.',
 
   '/overzicht/cashflow/forecast':

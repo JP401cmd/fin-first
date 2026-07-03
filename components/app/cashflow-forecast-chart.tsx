@@ -392,13 +392,13 @@ export const CashFlowForecastChart = memo(function CashFlowForecastChart({ forec
         </div>
         <div className="rounded-lg bg-[var(--subtle)] p-2">
           <p className="text-[10px] text-[var(--ink-3)]">Over 3 maanden</p>
-          <p className={`text-sm font-bold ${forecast.length >= 4 && forecast[3].projectedBalance >= currentBalance ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`text-sm font-bold ${forecast.length >= 4 && forecast[3].projectedBalance >= currentBalance ? 'text-positive' : 'text-negative'}`}>
             {forecast.length >= 4 ? formatCurrency(forecast[3].projectedBalance) : '—'}
           </p>
         </div>
         <div className="rounded-lg bg-[var(--subtle)] p-2">
           <p className="text-[10px] text-[var(--ink-3)]">Over 6 maanden</p>
-          <p className={`text-sm font-bold ${forecast.length >= 7 && forecast[6].projectedBalance >= currentBalance ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`text-sm font-bold ${forecast.length >= 7 && forecast[6].projectedBalance >= currentBalance ? 'text-positive' : 'text-negative'}`}>
             {forecast.length >= 7 ? formatCurrency(forecast[6].projectedBalance) : '—'}
           </p>
         </div>

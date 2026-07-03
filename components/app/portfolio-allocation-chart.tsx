@@ -233,6 +233,7 @@ function TargetEditor({
         </div>
 
         <div className={`mt-4 flex items-center justify-between rounded-lg p-2 text-sm ${
+          // eslint-disable-next-line no-restricted-syntax -- validatie-status (som=100%), geen winst/verlies
           isValid ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
         }`}>
           <span className="font-medium">Totaal: {totalPct.toFixed(0)}%</span>
@@ -461,7 +462,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
                   s.action === 'buy' ? 'bg-emerald-100' : 'bg-red-100'
                 }`}>
                   <ArrowRightLeft className={`h-3.5 w-3.5 ${
-                    s.action === 'buy' ? 'text-emerald-600' : 'text-red-600'
+                    s.action === 'buy' ? 'text-positive' : 'text-negative'
                   }`} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -473,7 +474,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
                   </p>
                 </div>
                 <span className={`shrink-0 text-xs font-semibold ${
-                  s.action === 'buy' ? 'text-emerald-600' : 'text-red-600'
+                  s.action === 'buy' ? 'text-positive' : 'text-negative'
                 }`}>
                   {s.action === 'buy' ? '+' : '-'}{<MaskedAmount value={s.amount} tone="kern" />}
                 </span>

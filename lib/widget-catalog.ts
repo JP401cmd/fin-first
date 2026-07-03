@@ -5,11 +5,16 @@ import { WIDGET_TO_FEATURE } from '@/lib/feature-registry'
 import type { ModuleId } from '@/lib/module-registry'
 import { getWidgetRequiredModule } from '@/lib/module-registry'
 
-export type WidgetSize = 'mini' | 'quarter' | 'half' | 'full'
+// 'xl' ("Double" in de UI) is een opt-in bouwblok voor stats-heavy widgets:
+// alleen widgets die 'xl' expliciet in hun `sizes` hebben, bieden de optie aan.
+// Op mobiel bestaat Double niet — de selector biedt 'm daar niet aan en de
+// weergave zakt via downsizeForMobile terug naar 'full'.
+export type WidgetSize = 'mini' | 'quarter' | 'half' | 'full' | 'xl'
 
-/** Downsize a widget one step for mobile display: full→half, half→quarter, quarter→mini */
+/** Downsize a widget one step for mobile display: xl→full, full→half, half→quarter, quarter→mini */
 export function downsizeForMobile(size: WidgetSize): WidgetSize {
   switch (size) {
+    case 'xl': return 'full'
     case 'full': return 'half'
     case 'half': return 'quarter'
     case 'quarter': return 'mini'
@@ -60,7 +65,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   {
     id: 'budgetten',
     name: 'Budgetten',
-    description: 'Top budgetten en bestedingen',
+    description: 'Je drukste budgetten deze maand',
     module: 'kern',
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
@@ -310,7 +315,9 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     name: 'Maandoverzicht',
     description: 'Samenvatting van deze maand',
     module: 'cross',
-    sizes: ['mini', 'quarter', 'half', 'full'],
+    // Eerste widget met de opt-in 'xl' (Double): stats-heavy rapportkaart
+    // die de volle breedte benut. Zie de xl-rendertak in de widget zelf.
+    sizes: ['mini', 'quarter', 'half', 'full', 'xl'],
     defaultSize: 'half',
   },
   {

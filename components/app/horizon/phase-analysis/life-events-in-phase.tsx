@@ -2,7 +2,8 @@
 
 import { memo } from 'react'
 import { Calendar, Info } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { LifeEvent } from '@/lib/horizon-data'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -19,11 +20,12 @@ interface LifeEventsInPhaseProps {
  * Format an amount with positive/negative styling.
  * Returns the formatted text and a Tailwind color class.
  */
-function formatImpact(amount: number): { text: string; colorClass: string } {
+function formatImpact(amount: number, masked: boolean): { text: string; colorClass: string } {
   if (amount === 0) return { text: '', colorClass: '' }
   const sign = amount > 0 ? '+' : ''
   return {
-    text: `${sign}${formatCurrency(amount)}`,
+    // Bij masking geen sign-prefix: richting mag niet lekken via '+'.
+    text: masked ? formatMaskedCurrency(amount, masked) : `${sign}${formatCurrency(amount)}`,
     colorClass:
       amount > 0
         ? 'text-[var(--positive)]'
@@ -46,6 +48,8 @@ export const LifeEventsInPhase = memo(function LifeEventsInPhase({
   phaseStartAge,
   phaseEndAge,
 }: LifeEventsInPhaseProps) {
+  const { masked } = useMaskedAmounts()
+
   // Filter to active events whose target_age falls within the phase range
   const phaseEvents = events.filter((e) => {
     if (!e.is_active || e.target_age == null) return false
@@ -79,9 +83,9 @@ export const LifeEventsInPhase = memo(function LifeEventsInPhase({
       {/* Event list */}
       <div className="space-y-2">
         {phaseEvents.map((event) => {
-          const oneTime = formatImpact(-event.one_time_cost)
-          const monthlyCost = formatImpact(-event.monthly_cost_change)
-          const monthlyIncome = formatImpact(event.monthly_income_change)
+          const oneTime = formatImpact(-event.one_time_cost, masked)
+          const monthlyCost = formatImpact(-event.monthly_cost_change, masked)
+          const monthlyIncome = formatImpact(event.monthly_income_change, masked)
 
           return (
             <div

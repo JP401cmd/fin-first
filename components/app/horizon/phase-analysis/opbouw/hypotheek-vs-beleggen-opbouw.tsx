@@ -2,7 +2,8 @@
 
 import { memo, useMemo, useState, useDeferredValue } from 'react'
 import { Scale, Minus, Plus } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { AnalysisSection } from '../analysis-section'
 import {
   compareMortgageVsInvest,
@@ -173,6 +174,8 @@ export const HypotheekVsBeleggenOpbouw = memo(
       [debts],
     )
 
+    const { masked } = useMaskedAmounts()
+
     // Adjustable extra monthly amount — default = real monthly surplus, rounded.
     const [extraBedrag, setExtraBedrag] = useState(() => deriveDefaultExtra(annualSavings))
 
@@ -307,7 +310,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
             {/* Aflossen scenario */}
             <ScenarioCard
               title="Extra aflossen"
-              subtitle={`${formatCurrency(extraBedrag)}/mnd op hypotheek`}
+              subtitle={`${formatMaskedCurrency(extraBedrag, masked)}/mnd op hypotheek`}
               endValue={result.aflossing.eindwaarde}
               netBenefit={result.aflossing.nettoVoordeel}
               benefitLabel="Rentebesparing"
@@ -317,7 +320,7 @@ export const HypotheekVsBeleggenOpbouw = memo(
             {/* Beleggen scenario */}
             <ScenarioCard
               title="Extra beleggen"
-              subtitle={`${formatCurrency(extraBedrag)}/mnd investeren`}
+              subtitle={`${formatMaskedCurrency(extraBedrag, masked)}/mnd investeren`}
               endValue={result.beleggen.eindwaarde}
               netBenefit={result.beleggen.nettoVoordeel}
               benefitLabel="Verwacht rendement"
@@ -427,9 +430,11 @@ const ExtraBedragControl = memo(function ExtraBedragControl({
         <span className="text-xs font-medium text-[var(--ink-3)]">
           Extra per maand
         </span>
-        <span className="font-mono text-sm font-semibold tabular-nums text-[var(--color-horizon-600)]">
-          {formatCurrency(extraBedrag)}
-        </span>
+        <MaskedAmount
+          value={extraBedrag}
+          tone="horizon"
+          className="text-sm font-semibold text-[var(--color-horizon-600)]"
+        />
       </div>
 
       <div className="mt-2 flex items-center gap-2">

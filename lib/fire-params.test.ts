@@ -76,7 +76,7 @@ describe('resolveFireParams — defaults + overrides', () => {
       expected_return: 0.07,
       inflation_rate: 0.02,
     })
-    // BOX3_DRAG ≈ 0.02117 → effectiveSwr ≈ 0.02883
+    // BOX3_DRAG ≈ 0.0216 (2026) → effectiveSwr ≈ 0.0284
     expect(params.effectiveSwr).toBeGreaterThan(0.025)
     expect(params.effectiveSwr).toBeLessThan(0.035)
   })

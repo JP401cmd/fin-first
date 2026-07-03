@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_WIDGET_PREFS,
   WIDGET_CATALOG,
+  downsizeForMobile,
   mergeWidgetPrefs,
   type WidgetPrefs,
 } from './widget-catalog'
@@ -156,6 +157,21 @@ describe('mergeWidgetPrefs — favoriet-prefs (budget_fav: / holding_fav:)', () 
    */
 })
 
+// ── 4b. downsizeForMobile — xl (Double) zakt naar full ────────────────────────
+
+describe('downsizeForMobile', () => {
+  it('xl → full (Double bestaat niet op mobiel)', () => {
+    expect(downsizeForMobile('xl')).toBe('full')
+  })
+
+  it('overige stappen blijven: full→half, half→quarter, quarter→mini, mini→mini', () => {
+    expect(downsizeForMobile('full')).toBe('half')
+    expect(downsizeForMobile('half')).toBe('quarter')
+    expect(downsizeForMobile('quarter')).toBe('mini')
+    expect(downsizeForMobile('mini')).toBe('mini')
+  })
+})
+
 // ── 5. Randgevallen ───────────────────────────────────────────────────────────
 
 describe('mergeWidgetPrefs — randgevallen', () => {
@@ -176,6 +192,26 @@ describe('mergeWidgetPrefs — randgevallen', () => {
     const result = mergeWidgetPrefs(saved)
     const nv = result.widgets.find(w => w.id === 'netto_vermogen')
     expect(nv?.size).not.toBe('mini')
+  })
+
+  it("xl (Double) blijft behouden voor widgets die 'xl' ondersteunen", () => {
+    // maandoverzicht heeft 'xl' in zijn catalog-sizes
+    const saved: WidgetPrefs = {
+      widgets: [{ id: 'maandoverzicht', enabled: true, size: 'xl', order: 0 }],
+    }
+    const result = mergeWidgetPrefs(saved)
+    expect(result.widgets.find(w => w.id === 'maandoverzicht')?.size).toBe('xl')
+  })
+
+  it("xl op een widget zónder xl-support wordt gesanitized naar defaultSize", () => {
+    // netto_vermogen heeft 'xl' niet in .sizes → fallback naar defaultSize
+    const saved: WidgetPrefs = {
+      widgets: [{ id: 'netto_vermogen', enabled: true, size: 'xl', order: 0 }],
+    }
+    const result = mergeWidgetPrefs(saved)
+    const nv = result.widgets.find(w => w.id === 'netto_vermogen')
+    expect(nv?.size).not.toBe('xl')
+    expect(nv?.size).toBe('half') // defaultSize van netto_vermogen
   })
 
   it('onbekende catalog-id (stale widget) wordt uit resultaat gefilterd', () => {

@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { safeRelativePath } from '@/lib/safe-redirect'
 
 function LoginForm() {
   const router = useRouter()
@@ -32,9 +33,9 @@ function LoginForm() {
       setError(error.message)
       setLoading(false)
     } else {
-      // Redirect to the originally requested page or the app home
-      const destination = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/overzicht'
-      router.push(destination)
+      // Redirect to the originally requested page or the app home.
+      // safeRelativePath weigert open-redirect-patronen (//evil.com, /\evil.com, absolute URLs).
+      router.push(safeRelativePath(redirectTo))
     }
   }
 

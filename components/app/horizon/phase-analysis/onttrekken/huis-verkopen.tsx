@@ -284,7 +284,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
             min={500}
             max={4000}
             step={HUUR_STAP}
-            format={(v) => `${formatCurrency(v)}/mnd`}
+            format={(v) => `${formatMaskedCurrency(v, masked)}/mnd`}
           />
           <SliderControl
             label="Woningwaardegroei"
@@ -302,7 +302,7 @@ export const HuisVerkopen = memo(function HuisVerkopen({
             min={50}
             max={1500}
             step={OVERIG_STAP}
-            format={(v) => `${formatCurrency(v)}/mnd`}
+            format={(v) => `${formatMaskedCurrency(v, masked)}/mnd`}
           />
           <p className="text-[10px] leading-snug text-[var(--ink-4)]">
             Horizon: {horizonJaren} jaar (je afbouwperiode).

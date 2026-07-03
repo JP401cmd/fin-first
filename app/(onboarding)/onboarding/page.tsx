@@ -1061,7 +1061,7 @@ export default function OnboardingPage() {
       if (state.activeModules.includes('toekomstplannen')) {
         // Uitgaven-na-pensioen-keuze (nieuwe onboarding-stap) bepaalt de
         // retirement-velden. Consume-only: we leggen alleen de keuze vast — de
-        // horizon-engine + computeRetirementExpenses blijven de rekenbron.
+        // horizon-kernel + computeRetirementExpenses blijven de rekenbron.
         //
         // Bij SKIP sturen we de retirement-velden bewust NIET mee (undefined):
         // dan vult de server via resolveRetirementExpenseDefaults de impliciete

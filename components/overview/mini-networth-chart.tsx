@@ -11,7 +11,7 @@ import { NetWorthHistorySheet, type HistoryPoint } from './networth-history-shee
  * MiniNetWorthChart — compacte netto-vermogen-grafiek voor /overzicht hero.
  *
  * Bron-van-waarheid: gebruikt **dezelfde simulatie-data** als de grafiek
- * op /toekomst (`simRows` uit de horizon-engine), maar dan als
+ * op /toekomst (`simRows` uit de horizon-kernel), maar dan als
  * **geprojecteerd VOLLEDIG netto vermogen** (`simNetWorthRows` uit de loader):
  * de FIRE-portefeuille (`endPortfolio`) plús meegroeiende niet-liquide assets
  * (huis) die uit de FIRE-pot zijn gefilterd. Hierdoor loopt de projectielijn

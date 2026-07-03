@@ -24,6 +24,11 @@ import { useState } from 'react'
 import { Info } from 'lucide-react'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { NL_FICTIEF_BELEGGINGEN, BOX3_TARIEF } from '@/lib/horizon-data'
+
+/** Forfait/tarief als Dutch-genoteerd percentage, uit de canonieke constanten. */
+const FORFAIT_PCT = (NL_FICTIEF_BELEGGINGEN * 100).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const TARIEF_PCT = (BOX3_TARIEF * 100).toLocaleString('nl-NL', { maximumFractionDigits: 0 })
 
 /** Masked-aware currency formatter hook used across this file. */
 function useFcLocal() {
@@ -73,7 +78,7 @@ export function Box3Comparison({ calc }: Box3ComparisonProps) {
         <Box3Panel
           title="Forfaitair"
           subtitle="Huidig stelsel"
-          tooltip="Belasting op fictief rendement: 5,88% × marktwaarde × 36% tarief. Onafhankelijk van werkelijke huurinkomsten of waardestijging."
+          tooltip={`Belasting op fictief rendement: ${FORFAIT_PCT}% × marktwaarde × ${TARIEF_PCT}% tarief. Onafhankelijk van werkelijke huurinkomsten of waardestijging.`}
           basis="Fictief rendement"
           basisAmount={calc.forfaitairRendement}
           taxAmount={calc.forfaitairBelasting}

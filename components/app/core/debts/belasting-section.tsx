@@ -7,6 +7,8 @@ import {
   calculateBox3,
   generateBox3Optimizations,
   BOX3_TOOLTIPS,
+  BOX3_PARAMS,
+  CURRENT_TAX_YEAR,
   type Box3Input,
   type Box3Result,
   type TaxYear,
@@ -32,6 +34,10 @@ import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
+/** Box 3-forfaits als Dutch-genoteerd percentage, uit result.params (geen hardcode). */
+const fmtPct2 = (x: number) => (x * 100).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const fmtPct0 = (x: number) => (x * 100).toLocaleString('nl-NL', { maximumFractionDigits: 0 })
+
 function KpiTooltip({ text }: { text: string }) {
   return (
     <div className="group relative">
@@ -52,7 +58,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
   const [debts, setDebts] = useState<Debt[]>([])
   const [dailyExpenses, setDailyExpenses] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [year, setYear] = useState<TaxYear>(2025)
+  const [year, setYear] = useState<TaxYear>(CURRENT_TAX_YEAR)
   const [hasPartner, setHasPartner] = useState(false)
   const [showScenarioModal, setShowScenarioModal] = useState(false)
   const [showPartnerModal, setShowPartnerModal] = useState(false)
@@ -611,8 +617,8 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
                 </p>
               </div>
               <p className="font-sans text-xs leading-relaxed text-[var(--ink-3)]">
-                De eerste <span className="font-semibold text-[var(--ink-2)]">€57.684</span> is belastingvrij
-                (alleenstaand 2025). Dit verbetert de berekening voor kleinere vermogens — je betaalt
+                De eerste <span className="font-semibold text-[var(--ink-2)]">{formatCurrency(result.params.heffingsvrijSingle)}</span> is belastingvrij
+                (alleenstaand {year}). Dit verbetert de berekening voor kleinere vermogens — je betaalt
                 pas Box 3 over het meerdere.
               </p>
             </div>
@@ -626,7 +632,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
               </div>
               <p className="font-sans text-xs leading-relaxed text-[var(--ink-3)]">
                 Schulden verlagen je Box 3 grondslag. Aftrek: fictief rendement{' '}
-                <span className="font-semibold text-[var(--ink-2)]">2.70%</span> (minus €3.800 drempel).
+                <span className="font-semibold text-[var(--ink-2)]">{fmtPct2(result.params.forfaitSchulden)}%</span> (minus {formatCurrency(result.params.schuldendrempelSingle)} drempel).
                 Dit maakt schulden relatief voordelig voor je belastinggrondslag.
               </p>
             </div>
@@ -640,8 +646,8 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
               </div>
               <p className="font-sans text-xs leading-relaxed text-[var(--ink-3)]">
                 Nieuwe wetgeving: belasting over <span className="font-semibold text-[var(--ink-2)]">werkelijk rendement</span>.
-                Bij 7% rendement: 7% × 36% ={' '}
-                <span className="font-semibold text-[var(--ink-2)]">2.52% drag</span> (iets hoger dan 2025&apos;s 2.12%).
+                Bij {fmtPct0(DEFAULT_RETURN)}% rendement: {fmtPct0(DEFAULT_RETURN)}% × {fmtPct0(result.params.tarief)}% ={' '}
+                <span className="font-semibold text-[var(--ink-2)]">{fmtPct2(DEFAULT_RETURN * result.params.tarief)}% drag</span> (iets hoger dan {year}&apos;s {fmtPct2(result.params.forfaitBeleggingen * result.params.tarief)}%).
               </p>
             </div>
           </div>
@@ -649,15 +655,15 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
           {/* Officiële percentages tabel */}
           <div className="mt-4 rounded-[var(--r-lg)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/50 p-4">
             <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-              Belastingdienst — forfaitaire rendementen 2025
+              Belastingdienst — forfaitaire rendementen {year}
             </p>
             <div className="space-y-1 font-mono text-sm">
               {[
-                { label: 'Banktegoeden (sparen)', pct: '1.37%' },
-                { label: 'Overige bezittingen (beleggen)', pct: '5.88%' },
-                { label: 'Schulden (aftrek)', pct: '2.70%' },
-                { label: 'Belastingtarief Box 3', pct: '36%' },
-                { label: 'Heffingsvrij vermogen (alleenstaand)', pct: '€57.684' },
+                { label: 'Banktegoeden (sparen)', pct: `${fmtPct2(result.params.forfaitSpaargeld)}%` },
+                { label: 'Overige bezittingen (beleggen)', pct: `${fmtPct2(result.params.forfaitBeleggingen)}%` },
+                { label: 'Schulden (aftrek)', pct: `${fmtPct2(result.params.forfaitSchulden)}%` },
+                { label: 'Belastingtarief Box 3', pct: `${fmtPct0(result.params.tarief)}%` },
+                { label: 'Heffingsvrij vermogen (alleenstaand)', pct: formatCurrency(result.params.heffingsvrijSingle) },
               ].map(row => (
                 <div key={row.label} className="flex justify-between border-b border-dashed border-[var(--border-ed)] py-1 last:border-0">
                   <span className="font-sans text-xs text-[var(--ink-3)]">{row.label}</span>
@@ -667,7 +673,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
             </div>
             <div className="mt-3 flex items-center justify-between">
               <p className="font-sans text-[10px] text-[var(--ink-4)]">
-                Bron: Belastingdienst.nl — peildatum 1 januari 2025
+                Bron: Belastingdienst.nl — peildatum 1 januari {year}
               </p>
               <button
                 type="button"
@@ -863,7 +869,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
               FIRE &amp; BOX 3 BEREKENING
             </p>
             <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
-              Herleiding NL Safe Withdrawal Rate — officiële bronnen 2025
+              Herleiding NL Safe Withdrawal Rate — officiële bronnen {CURRENT_TAX_YEAR}
             </p>
           </div>
 
@@ -881,6 +887,8 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
               { jaar: '2023', pct: '6.17%' },
               { jaar: '2024', pct: '6.04%' },
               { jaar: '2025', pct: '5.88%' },
+              // Lopend jaar uit de canonieke jaartabel — geen hardcoded literal.
+              { jaar: String(CURRENT_TAX_YEAR), pct: `${fmtPct2(BOX3_PARAMS[CURRENT_TAX_YEAR].forfaitBeleggingen)}%` },
             ].map(r => (
               <div key={r.jaar} className="flex justify-between py-0.5">
                 <span className="font-sans text-xs text-[var(--ink-3)]">{r.jaar}</span>
@@ -897,7 +905,7 @@ export function BelastingSection({ dailyExpenses: parentDailyExpenses }: Belasti
                 <span className="tabular-nums text-xs text-emerald-700">+{(DEFAULT_RETURN * 100).toFixed(2)}%</span>
               </div>
               <div className="flex justify-between py-0.5">
-                <span className="font-sans text-xs text-[var(--ink-3)]">Box 3 drag (5.88% × 36%)</span>
+                <span className="font-sans text-xs text-[var(--ink-3)]">Box 3 drag ({fmtPct2(NL_FICTIEF_BELEGGINGEN)}% × {fmtPct0(BOX3_TARIEF)}%)</span>
                 <span className="tabular-nums text-xs text-red-500">−{(BOX3_DRAG * 100).toFixed(2)}%</span>
               </div>
               <div className="flex justify-between py-0.5">

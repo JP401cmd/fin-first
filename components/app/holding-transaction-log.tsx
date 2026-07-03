@@ -311,7 +311,7 @@ export default function HoldingTransactionLog({
                         </p>
                         <FreedomTimeBadge amount={tx.total_amount} className="mt-0.5 justify-end text-[10px]" />
                         {tx.type === 'sell' && tx.realized_pnl !== 0 && (
-                          <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                          <p className={`text-xs font-medium ${tx.realized_pnl >= 0 ? 'text-positive' : 'text-negative'}`}
                              data-testid="tx-realized-pnl"
                           >
                             W/V: {tx.realized_pnl >= 0 ? '+' : ''}{<MaskedAmount value={tx.realized_pnl} tone="kern" />}

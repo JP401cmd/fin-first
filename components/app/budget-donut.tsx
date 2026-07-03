@@ -430,7 +430,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
                     <path
                       d={describeArc(cx, cy, outerR - outerWidth / 2, arc.start, arc.end)}
                       fill="none"
-                      stroke={isOverPositive(budgetType) ? '#10b981' : '#ef4444'}
+                      stroke={isOverPositive(budgetType) ? 'var(--positive)' : 'var(--negative)'}
                       strokeWidth={outerWidth + 6}
                       strokeLinecap="butt"
                       opacity={dimmed ? 0.06 : 0.25}
@@ -493,7 +493,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
                           <path
                             d={describeArc(cx, cy, innerR - innerWidth / 2, ca.start, ca.end)}
                             fill="none"
-                            stroke={isOverPositive(budgetType) ? '#10b981' : '#ef4444'}
+                            stroke={isOverPositive(budgetType) ? 'var(--positive)' : 'var(--negative)'}
                             strokeWidth={innerWidth + 4}
                             strokeLinecap="butt"
                             opacity={childDimmed ? 0.06 : 0.25}
@@ -549,14 +549,14 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
                     <div className="min-w-0 flex-1">
                       <p className={`truncate text-xs font-medium ${isHidden ? 'text-[var(--ink-4)] line-through' : 'text-[var(--ink)]'}`}>{seg.name}</p>
                       <p className="font-mono text-[10px] text-[var(--ink-3)]">
-                        <span className={isOver && !isHidden ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
+                        <span className={isOver && !isHidden ? (isOverPositive(budgetType) ? 'font-semibold text-positive' : 'font-semibold text-negative') : ''}>
                           {<MaskedAmount value={seg.spent} tone="wil" />}
                         </span>
                         {' / '}
                         {<MaskedAmount value={seg.limit} tone="wil" />}
                       </p>
                     </div>
-                    <span className={`shrink-0 font-mono text-[10px] font-bold ${isOver && !isHidden ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}`}>
+                    <span className={`shrink-0 font-mono text-[10px] font-bold ${isOver && !isHidden ? (isOverPositive(budgetType) ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}`}>
                       {pct}%
                     </span>
                   </button>
@@ -595,13 +595,13 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
                           </div>
                           <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--ink-2)]">{child.name}</span>
                           <span className="font-mono text-[10px] text-[var(--ink-3)]">
-                            <span className={childOver ? (isOverPositive(budgetType) ? 'font-semibold text-emerald-600' : 'font-semibold text-red-600') : ''}>
+                            <span className={childOver ? (isOverPositive(budgetType) ? 'font-semibold text-positive' : 'font-semibold text-negative') : ''}>
                               {<MaskedAmount value={child.spent} tone="wil" />}
                             </span>
                             {' / '}
                             {<MaskedAmount value={child.limit} tone="wil" />}
                           </span>
-                          <span className={`w-7 text-right font-mono text-[10px] font-medium ${childOver ? (isOverPositive(budgetType) ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-3)]'}`}>
+                          <span className={`w-7 text-right font-mono text-[10px] font-medium ${childOver ? (isOverPositive(budgetType) ? 'text-positive' : 'text-negative') : 'text-[var(--ink-3)]'}`}>
                             {childPct}%
                           </span>
                         </button>

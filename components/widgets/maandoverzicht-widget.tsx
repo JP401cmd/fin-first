@@ -174,6 +174,104 @@ export const MaandoverzichtWidget = memo(function MaandoverzichtWidget({ size, d
     return score < worstScore ? b : worst
   }, budgetEntries[0])
 
+  // ── XL (Double): brede rapportkaart over de volle grid-breedte ────────────
+  // 4 KPI's naast elkaar + budgetten en maandvergelijking in één oogopslag.
+  // Alleen bereikbaar op desktop (Double is opt-in en niet selecteerbaar op
+  // mobiel; daar zakt de weergave via downsizeForMobile terug naar full).
+  if (size === 'xl') {
+    return (
+      <WidgetShell module="kern" size={size} kicker="Maandoverzicht" href={href}>
+        <div className="flex h-full flex-col justify-between gap-4">
+          {/* Rij 1: 4 KPI's op volle breedte */}
+          <div className="grid grid-cols-4 gap-6">
+            <div>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vermogen</p>
+                <MiniSparkline data={histValues.slice(-6)} color={deltaPositive ? 'var(--positive)' : 'var(--negative)'} />
+              </div>
+              <p className={deltaPositive ? 'text-positive' : 'text-negative'}>
+                <MaskedAmount
+                  value={netWorthDelta}
+                  signPrefix={deltaPositive ? '+' : ''}
+                  tone="kern"
+                  className="text-2xl font-semibold"
+                />
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Vrijheidsdagen</p>
+                <TrendArrow value={freedomDaysWon} />
+              </div>
+              <p className={`font-mono text-2xl font-semibold tabular-nums ${freedomDaysWon >= 0 ? 'text-positive' : 'text-negative'}`}>
+                {freedomDaysWon >= 0 ? '+' : ''}{freedomDaysWon}d
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Spaarquote · 6 mnd</p>
+                <TrendArrow value={savingsRate} />
+              </div>
+              <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
+                {savingsRate.toFixed(1)}%
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)]">Budgetscore</p>
+                <TrendArrow value={budgetScore - 50} />
+              </div>
+              <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
+                {budgetScore}<span className="text-sm text-[var(--ink-3)]">/100</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-dashed border-[var(--border-ed)]" />
+
+          {/* Rij 2: budgetten + maandvergelijking naast elkaar */}
+          <div className="grid grid-cols-4 gap-6">
+            {bestBudget && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Beste budget</p>
+                <p className="text-sm font-medium text-positive">{bestBudget.label}</p>
+                <p className="text-[var(--ink-3)]">
+                  <MaskedAmount value={bestBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={bestBudget.limit} tone="kern" className="text-xs" />
+                </p>
+              </div>
+            )}
+            {worstBudget && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">Aandachtspunt</p>
+                <p className="text-sm font-medium text-[var(--ink-2)]">{worstBudget.label}</p>
+                <p className="text-[var(--ink-3)]">
+                  <MaskedAmount value={worstBudget.spent} tone="kern" className="text-xs" /> / <MaskedAmount value={worstBudget.limit} tone="kern" className="text-xs" />
+                </p>
+              </div>
+            )}
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">3-maandsgemiddelde</p>
+              <p className={avg3MonthDelta >= 0 ? 'text-positive' : 'text-negative'}>
+                <MaskedAmount
+                  value={avg3MonthDelta}
+                  signPrefix={avg3MonthDelta >= 0 ? '+' : ''}
+                  tone="kern"
+                  className="text-sm font-semibold"
+                />/mnd
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--ink-3)] mb-1">vs. vorige maand</p>
+              <p className={`font-mono text-sm font-semibold tabular-nums ${prevMonthComparison >= 0 ? 'text-positive' : 'text-negative'}`}>
+                {prevMonthComparison >= 0 ? '+' : ''}{prevMonthComparison.toFixed(1)}%
+              </p>
+            </div>
+          </div>
+        </div>
+      </WidgetShell>
+    )
+  }
+
   return (
     <WidgetShell module="kern" size={size} kicker="Maandoverzicht" href={href}>
       <div className="space-y-4">

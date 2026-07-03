@@ -63,6 +63,22 @@ export function transactiesCardStatus(input: {
   return rate >= 20 ? 'good' : rate >= 0 ? 'warn' : 'bad'
 }
 
+/**
+ * Vaste-lasten-aandeeldrempels (fractie van maandinkomen).
+ *
+ * Gedeeld tussen `vasteLastenCardStatus` (de statussemantiek) én de
+ * vaste-lasten-quote-meter op /overzicht/cashflow/vaste-lasten, zodat de
+ * meter-zones EXACT samenvallen met de statusgrenzen — geen losse getallen in
+ * de UI, geen drift. Grondslag: Nibud-richtlijn (≤ ~50% van je netto-inkomen
+ * aan vaste lasten is gezond; boven ~70% wordt het risicovol).
+ *
+ *   aandeel < VASTE_LASTEN_GOOD_MAX  → good  (gezond)
+ *   aandeel ≤ VASTE_LASTEN_WARN_MAX  → warn  (aandacht)
+ *   anders                           → bad   (risico)
+ */
+export const VASTE_LASTEN_GOOD_MAX = 0.5
+export const VASTE_LASTEN_WARN_MAX = 0.7
+
 /** Vaste lasten: aandeel van inkomen. <50% good, ≤70% warn, anders bad. */
 export function vasteLastenCardStatus(input: {
   totalMonthly: number
@@ -72,7 +88,7 @@ export function vasteLastenCardStatus(input: {
   const hasVaste = input.count > 0
   const ratio = input.monthlyIncome > 0 ? input.totalMonthly / input.monthlyIncome : null
   if (!hasVaste || ratio == null) return 'neutral'
-  return ratio < 0.5 ? 'good' : ratio <= 0.7 ? 'warn' : 'bad'
+  return ratio < VASTE_LASTEN_GOOD_MAX ? 'good' : ratio <= VASTE_LASTEN_WARN_MAX ? 'warn' : 'bad'
 }
 
 /** Forecast: netto per maand. >0 good, <0 bad, ==0 warn; geen forecast → neutral. */

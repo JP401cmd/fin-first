@@ -647,6 +647,7 @@ export default function BeheerDoelenPage() {
           {saveMessage && (
             <span
               className={`text-xs font-medium ${
+                // eslint-disable-next-line no-restricted-syntax -- statusmelding gelukt/fout, geen winst/verlies
                 saveMessage.startsWith('Fout') ? 'text-red-600' : 'text-emerald-600'
               }`}
             >

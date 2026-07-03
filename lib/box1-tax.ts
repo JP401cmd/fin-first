@@ -37,7 +37,20 @@ export interface Box1Params {
   /** AOW-gerechtigd: lager schijf-1 tarief (geen AOW-premie). */
   schijvenAow: Box1Schijf[]
   algemeneHeffingskorting: { max: number; afbouwStart: number; afbouwRate: number }
+  /**
+   * AOW-variant van de algemene heffingskorting: AOW-gerechtigden betalen geen
+   * AOW-premie, dus zij krijgen alleen het belastingdeel van de korting (≈ de
+   * niet-AOW-korting × schijf-1-belastingtarief / volledig schijf-1-tarief).
+   */
+  algemeneHeffingskortingAow: { max: number; afbouwStart: number; afbouwRate: number }
   arbeidskorting: {
+    max: number
+    opbouwPunten: ArbeidskortingPunt[]
+    afbouwStart: number
+    afbouwRate: number
+  }
+  /** AOW-variant van de arbeidskorting (alleen belastingdeel; zie AOW-AHK). */
+  arbeidskortingAow: {
     max: number
     opbouwPunten: ArbeidskortingPunt[]
     afbouwStart: number
@@ -95,29 +108,50 @@ export const BOX1_PARAMS: Record<Box1TaxYear, Box1Params> = {
       { tot: null, tarief: 0.495 },
     ],
     algemeneHeffingskorting: {
-      max: 3_068, // indicatie 2025
-      afbouwStart: 28_406, // indicatie — afbouw start rond minimumloon-grens
-      afbouwRate: 0.06337,
+      max: 3_068, // Belastingdienst 2025
+      afbouwStart: 28_406, // Belastingdienst 2025 — afbouw start rond minimumloon-grens
+      afbouwRate: 0.06337, // Belastingdienst 2025
+    },
+    // AOW-variant 2025: Belastingdienst tabel algemene heffingskorting 2025
+    // (max €1.536, afbouw 3,17% vanaf dezelfde grens; belastingdeel-only).
+    algemeneHeffingskortingAow: {
+      max: 1_536,
+      afbouwStart: 28_406,
+      afbouwRate: 0.0317,
     },
     arbeidskorting: {
-      max: 5_599, // indicatie 2025
+      max: 5_599, // Belastingdienst 2025
       // Piecewise opbouw (benadering van de officiële knikpunten).
       opbouwPunten: [
         { vanaf: 0, tarief: 0.08053 },
         { vanaf: 12_169, tarief: 0.30030 },
         { vanaf: 26_288, tarief: 0.02258 },
       ],
-      afbouwStart: 39_957, // indicatie 2025
+      afbouwStart: 43_071, // Belastingdienst 2025 (was foutief 2024-waarde €39.957)
       afbouwRate: 0.0651,
     },
+    // AOW-variant 2025: max €2.802 en afbouw 3,257% zijn officiële Belastingdienst-
+    // waarden 2025; de opbouw-tarieven zijn hier het belastingdeel = niet-AOW-tarief ×
+    // (AOW-schijf-1 17,92% / schijf-1 35,82%) ≈ ×0,5003 (dezelfde verhouding waarmee
+    // 2026 exact klopt). Zelfde inkomens-knikpunten als de niet-AOW-variant.
+    arbeidskortingAow: {
+      max: 2_802,
+      opbouwPunten: [
+        { vanaf: 0, tarief: 0.04029 },
+        { vanaf: 12_169, tarief: 0.15023 },
+        { vanaf: 26_288, tarief: 0.01130 },
+      ],
+      afbouwStart: 43_071,
+      afbouwRate: 0.03257,
+    },
     iack: {
-      max: 2_950, // indicatie 2025
+      max: 2_986, // Belastingdienst 2025 (was foutief 2024-waarde €2.950)
       drempelInkomen: 6_145, // indicatie
       opbouwRate: 0.11450,
     },
     eigenwoningforfaitRate: 0.0035,
     hypotheekAftrekMaxTarief: 0.3748, // gelijk aan schijf 2 tarief 2025
-    hillenPct: 0.7333, // indicatie — Wet Hillen 2025 ≈ 73,33%
+    hillenPct: 0.7667, // Wet Hillen 2025 = 76,67% (was foutief 2024-waarde 73,33%)
   },
   2026: {
     schijven: [
@@ -126,32 +160,50 @@ export const BOX1_PARAMS: Record<Box1TaxYear, Box1Params> = {
       { tot: null, tarief: 0.495 }, // schijf 3
     ],
     schijvenAow: [
-      // benadering — alleen belastingdeel (geen AOW-premie) in schijf 1
-      { tot: 38_883, tarief: 0.197 },
+      // alleen belastingdeel (geen AOW-premie) in schijf 1: 35,75% − 17,90% AOW-premie
+      { tot: 38_883, tarief: 0.1785 }, // Belastingdienst 2026 (was foutief 19,7%)
       { tot: 78_426, tarief: 0.3756 },
       { tot: null, tarief: 0.495 },
     ],
     algemeneHeffingskorting: {
-      max: 3_115, // indicatie — verifieer tegen Belastingdienst 2026
-      afbouwStart: 28_406, // indicatie — verifieer tegen Belastingdienst 2026
-      afbouwRate: 0.06337, // indicatie
+      max: 3_115, // Belastingdienst 2026
+      afbouwStart: 29_736, // Belastingdienst 2026 (was foutief 2025-waarde €28.406)
+      afbouwRate: 0.06398, // Belastingdienst 2026 (was foutief 2025-waarde 6,337%)
+    },
+    // AOW-variant 2026: Belastingdienst tabel algemene heffingskorting 2026
+    // (max €1.556, afbouw 3,195% vanaf €29.737; belastingdeel-only).
+    algemeneHeffingskortingAow: {
+      max: 1_556,
+      afbouwStart: 29_737,
+      afbouwRate: 0.03195,
     },
     arbeidskorting: {
-      max: 5_685, // indicatie — verifieer tegen Belastingdienst 2026
-      // Piecewise opbouw — gedocumenteerde benadering; exacte knikpunten = indicatie.
-      // De drie opbouwtrajecten lopen tot ~de afbouwStart, daarna afbouw.
+      max: 5_685, // Belastingdienst 2026
+      // Piecewise opbouw — officiële Belastingdienst-knikpunten 2026.
       opbouwPunten: [
-        { vanaf: 0, tarief: 0.08231 }, // indicatie
-        { vanaf: 12_465, tarief: 0.30030 }, // indicatie
-        { vanaf: 26_940, tarief: 0.02258 }, // indicatie
+        { vanaf: 0, tarief: 0.08324 }, // Belastingdienst 2026 (was 8,231%)
+        { vanaf: 11_965, tarief: 0.31009 }, // Belastingdienst 2026 (was €12.465/30,030%)
+        { vanaf: 25_845, tarief: 0.01950 }, // Belastingdienst 2026 (was €26.940/2,258%)
       ],
-      afbouwStart: 43_071, // indicatie — verifieer tegen Belastingdienst 2026
-      afbouwRate: 0.0651, // indicatie
+      afbouwStart: 45_592, // Belastingdienst 2026 (was foutief 2025-waarde €43.071)
+      afbouwRate: 0.0651, // Belastingdienst 2026
+    },
+    // AOW-variant 2026: max €2.840 en opbouw/afbouw = niet-AOW × (17,85%/35,75%),
+    // exact conform de Belastingdienst-tabel arbeidskorting 2026 (belastingdeel-only).
+    arbeidskortingAow: {
+      max: 2_840,
+      opbouwPunten: [
+        { vanaf: 0, tarief: 0.04156 },
+        { vanaf: 11_965, tarief: 0.15483 },
+        { vanaf: 25_845, tarief: 0.00974 },
+      ],
+      afbouwStart: 45_592,
+      afbouwRate: 0.03250,
     },
     iack: {
-      max: 2_986, // indicatie — verifieer tegen Belastingdienst 2026
-      drempelInkomen: 6_145, // indicatie
-      opbouwRate: 0.11450, // indicatie
+      max: 3_032, // Belastingdienst 2026 (was foutief 2025-waarde €2.986)
+      drempelInkomen: 6_239, // Belastingdienst 2026 (was foutief 2025-waarde €6.145)
+      opbouwRate: 0.11450, // Belastingdienst 2026
     },
     eigenwoningforfaitRate: 0.0035, // 0,35% WOZ
     hypotheekAftrekMaxTarief: 0.3756, // max aftrektarief 2026
@@ -306,11 +358,16 @@ function computeBox1Core(input: Box1Input): Omit<Box1Result, 'marginalRate'> {
 
   // Stap 4: Heffingskortingen
   // Arbeidskorting wordt over arbeidsinkomen berekend (hier: bruto inkomen).
+  // AOW-gerechtigden krijgen alleen het belastingdeel van AHK + arbeidskorting
+  // (geen AOW-premiedeel) → aparte, lagere AOW-variant-params.
   const algemeneHeffingskorting = computeAlgemeneHeffingskorting(
     belastbaarInkomen,
-    params.algemeneHeffingskorting,
+    aow ? params.algemeneHeffingskortingAow : params.algemeneHeffingskorting,
   )
-  const arbeidskorting = computeArbeidskorting(gross, params.arbeidskorting)
+  const arbeidskorting = computeArbeidskorting(
+    gross,
+    aow ? params.arbeidskortingAow : params.arbeidskorting,
+  )
   const iack = computeIack(gross, input.heeftKinderenOnder12 ?? false, params.iack)
 
   // Heffingskortingen kunnen de heffing niet onder nul brengen.

@@ -318,12 +318,12 @@ const tests: TestCase[] = [
       const yearlyExpenses = monthlyExpenses * 12 // 36.000
 
       // OUD (buggy): vol vermogen ÷ benodigde portfolio op NL_SWR-grondslag.
-      // NL_SWR ≈ 0,02883 → benodigd ≈ 1.248.613.
-      const oldRequired = yearlyExpenses / NL_SWR          // ≈ 1.248.613
-      const oldFreedomPct = (netWorth / oldRequired) * 100 // 1.150k/1.249M ≈ 92,1%
+      // NL_SWR ≈ 0,0284 (2026) → benodigd ≈ 1.267.605.
+      const oldRequired = yearlyExpenses / NL_SWR          // ≈ 1.267.605
+      const oldFreedomPct = (netWorth / oldRequired) * 100 // 1.150k/1.268M ≈ 90,7%
       // CANONIEK: FIRE-eligible (huis uitgesloten) ÷ dezelfde noemer.
       const fireEligibleNetWorth = 624_000                 // belegd + cash, huis eruit
-      const canonicalFreedomPct = (fireEligibleNetWorth / oldRequired) * 100 // ≈ 50,0%
+      const canonicalFreedomPct = (fireEligibleNetWorth / oldRequired) * 100 // ≈ 49,2%
 
       // Sanity: de twee grondslagen verschillen substantieel (anders zegt de case niets).
       assertGreaterThanOrEqual(oldFreedomPct, 75, `oude grondslag duwt naar ≥75% (was ${oldFreedomPct.toFixed(1)}%)`)

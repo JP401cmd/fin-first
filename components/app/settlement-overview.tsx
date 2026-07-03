@@ -172,7 +172,7 @@ export function SettlementOverview({ householdId, currentUserId, members }: Sett
 
                     return (
                       <div key={entry.id} className="flex items-center gap-2 rounded-[var(--r-sm)] px-2 py-1.5 hover:bg-[var(--subtle)]">
-                        <ArrowRight className={`h-3 w-3 shrink-0 ${iOwe ? 'text-red-400' : 'text-emerald-400'}`} />
+                        <ArrowRight className={`h-3 w-3 shrink-0 ${iOwe ? 'text-negative' : 'text-positive'}`} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs text-[var(--ink-2)]">
                             {entry.description ?? (iOwe ? `Aan ${getMemberName(otherId)}` : `Van ${getMemberName(otherId)}`)}
@@ -181,7 +181,7 @@ export function SettlementOverview({ householdId, currentUserId, members }: Sett
                             {new Date(entry.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
                           </p>
                         </div>
-                        <span className={`shrink-0 font-mono text-xs tabular-nums font-medium ${iOwe ? 'text-red-600' : 'text-emerald-600'}`}>
+                        <span className={`shrink-0 font-mono text-xs tabular-nums font-medium ${iOwe ? 'text-negative' : 'text-positive'}`}>
                           {iOwe ? '-' : '+'}{<MaskedAmount value={Number(entry.amount)} tone="wil" />}
                         </span>
                         <button

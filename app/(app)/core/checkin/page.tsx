@@ -306,21 +306,20 @@ function CheckinPageContent() {
           }
           setAssetNewValues(aVals)
 
-          // Check holdings for all assets
-          const holdingsChecks = await Promise.all(
-            loadedAssets.map(async (a) => {
-              try {
-                const res = await fetch(`/api/assets/has-holdings?asset_id=${a.id}`)
-                const data = await res.json()
-                return { id: a.id, hasHoldings: data.has_holdings === true }
-              } catch {
-                return { id: a.id, hasHoldings: false }
-              }
-            })
-          )
+          // Check holdings for all assets in één batch-call (i.p.v. N calls)
           const hMap: Record<string, boolean> = {}
-          for (const h of holdingsChecks) {
-            hMap[h.id] = h.hasHoldings
+          if (loadedAssets.length > 0) {
+            try {
+              const ids = loadedAssets.map((a) => a.id).join(',')
+              const res = await fetch(`/api/assets/has-holdings?asset_ids=${ids}`)
+              const data = await res.json()
+              const holdings = (data.holdings ?? {}) as Record<string, boolean>
+              for (const a of loadedAssets) {
+                hMap[a.id] = holdings[a.id] === true
+              }
+            } catch {
+              // Bij een fout: geen assets als holdings-locked markeren
+            }
           }
           setHoldingsMap(hMap)
         }
@@ -465,7 +464,7 @@ function CheckinPageContent() {
                   {fc(snap.metrics?.netWorth ?? 0)}
                 </p>
                 {snap.details?.netWorthChange != null && snap.details.netWorthChange !== 0 && (
-                  <p className={`text-xs font-mono tabular-nums font-medium mt-0.5 ${snap.details.netWorthChange >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  <p className={`text-xs font-mono tabular-nums font-medium mt-0.5 ${snap.details.netWorthChange >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {snap.details.netWorthChange >= 0 ? '+' : ''}{fc(snap.details.netWorthChange)}
                   </p>
                 )}
@@ -484,7 +483,7 @@ function CheckinPageContent() {
               </div>
               <div className="card-editorial p-4">
                 <p className="label-editorial text-[var(--ink-3)] mb-1">Gespaard</p>
-                <p className={`text-lg font-mono tabular-nums font-semibold ${(snap.metrics?.monthlySavings ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                <p className={`text-lg font-mono tabular-nums font-semibold ${(snap.metrics?.monthlySavings ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {fc(snap.metrics?.monthlySavings ?? 0)}
                 </p>
               </div>
@@ -615,7 +614,7 @@ function CheckinPageContent() {
                             {b.icon && <BudgetIcon name={b.icon} className="inline h-3.5 w-3.5 mr-1" />}
                             {b.name}
                           </span>
-                          <span className={`text-xs font-mono tabular-nums ${isOver ? (overPos ? 'text-emerald-600 font-semibold' : 'text-red-500 font-semibold') : 'text-[var(--ink-3)]'}`}>
+                          <span className={`text-xs font-mono tabular-nums ${isOver ? (overPos ? 'text-positive font-semibold' : 'text-negative font-semibold') : 'text-[var(--ink-3)]'}`}>
                             {fc(b.spent)} / {fc(b.limit)}
                           </span>
                         </div>
@@ -938,7 +937,7 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
           <div className="space-y-1.5 text-sm text-[var(--ink-2)]">
             {netWorthDelta !== null && (
               <p>
-                Vermogen: <span className={`font-mono tabular-nums font-medium ${netWorthDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                Vermogen: <span className={`font-mono tabular-nums font-medium ${netWorthDelta >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {netWorthDelta >= 0 ? '+' : ''}{fc(netWorthDelta)}
                 </span>
                 {freedomGrowth && !freedomGrowth.isInfinite && (
@@ -960,7 +959,7 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
             )}
             {fireAgeDelta !== null && fireAgeDelta !== 0 && (
               <p>
-                FIRE-leeftijd: <span className={`font-mono tabular-nums font-medium ${fireAgeDelta <= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                FIRE-leeftijd: <span className={`font-mono tabular-nums font-medium ${fireAgeDelta <= 0 ? 'text-positive' : 'text-negative'}`}>
                   {fireAgeDelta > 0 ? '+' : ''}{fireAgeDelta} {Math.abs(fireAgeDelta) === 1 ? 'jaar' : 'jaar'}
                 </span>
                 <span className="text-[var(--ink-3)] ml-1.5">
@@ -1162,7 +1161,7 @@ function StepBezittingen({
                         )}
                         {!locked && hasChanged && (
                           <span className={`text-xs font-mono tabular-nums font-medium shrink-0 ${
-                            delta > 0 ? 'text-emerald-600' : 'text-red-500'
+                            delta > 0 ? 'text-positive' : 'text-negative'
                           }`}>
                             {delta > 0 ? '+' : ''}{fc(delta)}
                           </span>
@@ -1372,7 +1371,7 @@ function StepSchulden({
                     </div>
                     {hasChanged && (
                       <span className={`text-xs font-mono tabular-nums font-medium shrink-0 ${
-                        delta < 0 ? 'text-emerald-600' : 'text-red-500'
+                        delta < 0 ? 'text-positive' : 'text-negative'
                       }`}>
                         {delta > 0 ? '+' : ''}{fc(delta)}
                       </span>
@@ -1939,7 +1938,7 @@ function StepReflectie({
             <p>
               Geschatte FIRE-leeftijd: <span className="font-mono tabular-nums font-medium">{overview.fireAge}</span>
               {prevMetrics?.fireAge != null && overview.fireAge !== prevMetrics.fireAge && (
-                <span className={`ml-1.5 ${overview.fireAge <= prevMetrics.fireAge ? 'text-emerald-600' : 'text-red-500'}`}>
+                <span className={`ml-1.5 ${overview.fireAge <= prevMetrics.fireAge ? 'text-positive' : 'text-negative'}`}>
                   ({overview.fireAge < prevMetrics.fireAge ? overview.fireAge - prevMetrics.fireAge : '+' + (overview.fireAge - prevMetrics.fireAge)} jaar)
                 </span>
               )}
@@ -2125,17 +2124,17 @@ function MetricCard({
       <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase tracking-wider">{label}</p>
       <p className="mt-1 text-lg font-mono tabular-nums font-semibold text-[var(--ink)]">{value}</p>
       {showChange && (
-        <p className={`mt-0.5 text-[10px] font-medium ${isPositiveChange ? 'text-emerald-600' : 'text-red-500'}`}>
+        <p className={`mt-0.5 text-[10px] font-medium ${isPositiveChange ? 'text-positive' : 'text-negative'}`}>
           {change! > 0 ? '+' : ''}{change!.toFixed(1)}% t.o.v. vorige maand
         </p>
       )}
       {typeof positive === 'boolean' && !showDelta && (
-        <p className={`mt-0.5 text-[10px] font-medium ${positive ? 'text-emerald-600' : 'text-red-500'}`}>
+        <p className={`mt-0.5 text-[10px] font-medium ${positive ? 'text-positive' : 'text-negative'}`}>
           {positive ? 'Positief' : 'Negatief'}
         </p>
       )}
       {showDelta && (
-        <p className={`mt-0.5 text-[10px] font-mono tabular-nums font-medium ${isDeltaPositive ? 'text-emerald-600' : 'text-red-500'}`}>
+        <p className={`mt-0.5 text-[10px] font-mono tabular-nums font-medium ${isDeltaPositive ? 'text-positive' : 'text-negative'}`}>
           {delta! > 0 ? '+' : ''}{fc(delta!)} sinds check-in
         </p>
       )}
@@ -2188,7 +2187,7 @@ function BudgetRow({
             </div>
           </div>
           {hasChanged && (
-            <span className={`text-xs font-mono tabular-nums font-medium ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+            <span className={`text-xs font-mono tabular-nums font-medium ${delta > 0 ? 'text-positive' : 'text-negative'}`}>
               {delta > 0 ? '+' : ''}{fc(delta)}
             </span>
           )}

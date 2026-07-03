@@ -273,7 +273,9 @@ export function computeBarSegments(
   overPositive: boolean,
 ): BarSegments {
   const rawPct = limit > 0 ? (spent / limit) * 100 : 0
-  const overColor = overPositive ? '#10b981' : '#ef4444'
+  // Stoplicht-semantiek via design-tokens (oklch), niet losse hexen — zo valt de
+  // 'volledig over budget'-balk exact samen met bg-positive/negative elders.
+  const overColor = overPositive ? 'var(--positive)' : 'var(--negative)'
   const isFullyOver = rawPct > 105
 
   // When overbudget, scale everything so 105% fits within the track

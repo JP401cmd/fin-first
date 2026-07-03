@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { type Account } from '@/components/app/account-form-modal'
-import { formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency } from '@/components/app/budget-shared'
+import { formatCurrency as formatCurrencyShort } from '@/components/app/budget-shared'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
@@ -974,12 +974,12 @@ export function CashOverview({
               onClick={() => setShowIncomeReceipt(true)}
               className="p-4 text-left border-r border-[var(--rule-soft)] [&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0 transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
-              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--positive,#10b981)] mb-1.5">
+              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--positive)] mb-1.5">
                 Inkomen
               </div>
               <div
                 className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--positive, #10b981)' }}
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--positive)' }}
               >
                 {<MaskedAmount value={totalIncome} tone="kern" decimals />}
               </div>
@@ -996,12 +996,12 @@ export function CashOverview({
               onClick={() => setShowExpenseReceipt(true)}
               className="p-4 text-left border-r border-[var(--rule-soft)] [&:nth-child(-n+2)]:border-b sm:[&:nth-child(-n+2)]:border-b-0 transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
-              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--negative,#dc2626)] mb-1.5">
+              <div className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--negative)] mb-1.5">
                 Uitgaven
               </div>
               <div
                 className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--negative, #dc2626)' }}
+                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--negative)' }}
               >
                 {<MaskedAmount value={totalExpenses} tone="kern" decimals />}
               </div>
@@ -1021,7 +1021,7 @@ export function CashOverview({
                 className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
                 style={{
                   fontFamily: 'var(--font-playfair, Georgia, serif)',
-                  color: netAmount >= 0 ? 'var(--positive, #10b981)' : 'var(--negative, #dc2626)',
+                  color: netAmount >= 0 ? 'var(--positive)' : 'var(--negative)',
                 }}
               >
                 <span
@@ -1188,7 +1188,7 @@ export function CashOverview({
                 <div className="text-right">
                   <span className="font-bold tabular-nums">{<MaskedAmount value={item.amount} tone="kern" decimals />}</span>
                   {item.limit > 0 && (
-                    <span className="ml-1 text-[10px] text-[var(--ink-4)]">/ {formatCurrencyShort(item.limit)}</span>
+                    <span className="ml-1 text-[10px] text-[var(--ink-4)]">/ <MaskedAmount value={item.limit} tone="kern" monoWhenVisible={false} /></span>
                   )}
                 </div>
               </div>
@@ -1220,7 +1220,7 @@ export function CashOverview({
                     <div className="text-right">
                       <span className="font-bold tabular-nums">{<MaskedAmount value={child.amount} tone="kern" decimals />}</span>
                       {child.limit > 0 && (
-                        <span className="ml-1 text-[10px] text-[var(--ink-4)]">/ {formatCurrencyShort(child.limit)}</span>
+                        <span className="ml-1 text-[10px] text-[var(--ink-4)]">/ <MaskedAmount value={child.limit} tone="kern" monoWhenVisible={false} /></span>
                       )}
                     </div>
                   </div>
@@ -1542,7 +1542,7 @@ function CashflowChart({
                   y={incTop}
                   width={barW}
                   height={Math.max(0, baselineY - incTop)}
-                  fill="var(--positive, #10b981)"
+                  fill="var(--positive)"
                   opacity={0.85}
                 />
               )}
@@ -1552,7 +1552,7 @@ function CashflowChart({
                   y={baselineY}
                   width={barW}
                   height={Math.max(0, expBottom - baselineY)}
-                  fill="var(--negative, #dc2626)"
+                  fill="var(--negative)"
                   opacity={0.8}
                 />
               )}
@@ -1578,7 +1578,7 @@ function CashflowChart({
           <path
             d={forecastPathStr}
             fill="none"
-            stroke={forecastOverBudget ? 'var(--negative, #dc2626)' : 'var(--ink-3)'}
+            stroke={forecastOverBudget ? 'var(--negative)' : 'var(--ink-3)'}
             strokeWidth={1.5}
             strokeDasharray="3 3"
             strokeLinecap="round"
@@ -1648,7 +1648,7 @@ function CashflowChart({
           <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
             {forecast.isCurrentMonth ? 'Prognose' : 'Netto'}
           </div>
-          <div className={`text-sm font-semibold ${forecast.isCurrentMonth ? forecastTone : netAmount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <div className={`text-sm font-semibold ${forecast.isCurrentMonth ? forecastTone : netAmount >= 0 ? 'text-positive' : 'text-negative'}`}>
             {forecast.isCurrentMonth
               ? <MaskedAmount value={forecast.projectedExpenses} tone="kern" decimals className="text-sm font-semibold" />
               : <MaskedAmount value={netAmount} signPrefix={netAmount >= 0 ? '+' : ''} tone="kern" decimals className="text-sm font-semibold" />}
@@ -1657,8 +1657,8 @@ function CashflowChart({
             <div className="mt-0.5 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">
               {totalMonthlyBudget > 0
                 ? forecastOverBudget
-                  ? `+${formatCurrency(forecast.projectedExpenses - totalMonthlyBudget)} over`
-                  : `${formatCurrency(totalMonthlyBudget - forecast.projectedExpenses)} ruimte`
+                  ? <><MaskedAmount value={forecast.projectedExpenses - totalMonthlyBudget} signPrefix="+" tone="kern" decimals /> over</>
+                  : <><MaskedAmount value={totalMonthlyBudget - forecast.projectedExpenses} tone="kern" decimals /> ruimte</>
                 : forecast.forecastSource === 'historical'
                   ? 'o.b.v. 12 mnd'
                   : 'o.b.v. tempo'}

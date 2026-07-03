@@ -13,6 +13,9 @@
  * Gebruik dezelfde key als `id` in ConceptFlipCards en als `term` in GlossaryTerm.
  */
 
+import { formatCurrency } from '@/lib/format'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
+
 export interface GlossaryEntry {
   /** Korte weergavenaam (bijv. "FIRE", "Vrijheidstijd"). */
   name: string
@@ -73,7 +76,7 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     name: 'Heffingsvrij vermogen',
     alternative: 'Belastingvrije drempel',
     explanation:
-      'De eerste € 57.000 (of € 114.000 met partner) van je vermogen is vrijgesteld van Box 3 belasting. Dit bedrag wordt proportioneel verdeeld over je bezittingstypes. Spaargeld profiteert relatief meer omdat het forfaitair rendement lager is.',
+      `De eerste ${formatCurrency(BOX3_PARAMS[CURRENT_TAX_YEAR].heffingsvrijSingle)} (of ${formatCurrency(BOX3_PARAMS[CURRENT_TAX_YEAR].heffingsvrijPartner)} met partner) van je vermogen is vrijgesteld van Box 3 belasting. Dit bedrag wordt proportioneel verdeeld over je bezittingstypes. Spaargeld profiteert relatief meer omdat het forfaitair rendement lager is.`,
   },
 
   // ── Sectie 2: Aanvullende financiële termen ──────────────────

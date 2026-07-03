@@ -25,11 +25,20 @@ function getServerSnapshot(): boolean {
 }
 
 /**
+ * Whether the viewport is mobile-sized (<640px). SSR assumes desktop.
+ * Gedeeld door useDisplaySize en de size-selector (Double is niet
+ * selecteerbaar op mobiel).
+ */
+export function useIsMobile(): boolean {
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+}
+
+/**
  * Returns the effective display size for a widget.
- * On mobile (<640px), downsizes one step: full→half, half→quarter, quarter→mini.
+ * On mobile (<640px), downsizes one step: xl→full, full→half, half→quarter, quarter→mini.
  * On desktop, returns the stored size unchanged.
  */
 export function useDisplaySize(storedSize: WidgetSize): WidgetSize {
-  const isMobile = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const isMobile = useIsMobile()
   return isMobile ? downsizeForMobile(storedSize) : storedSize
 }

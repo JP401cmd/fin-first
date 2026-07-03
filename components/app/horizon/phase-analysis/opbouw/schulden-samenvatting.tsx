@@ -499,7 +499,7 @@ export const SchuldenSamenvatting = memo(function SchuldenSamenvatting({
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
                           {scenario.interestSaved > 0
-                            ? formatCurrency(scenario.interestSaved)
+                            ? <MaskedAmount value={scenario.interestSaved} tone="horizon" />
                             : '–'}
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">

@@ -115,11 +115,15 @@ describe('CompoundInsightCard — privacy-masking voor saldi', () => {
     expect(hits.length).toBeGreaterThanOrEqual(4)
   })
 
-  it('houdt de slider-invoerwaarde zichtbaar (eigen keuze, geen saldo)', () => {
+  it('maskeert ook het slider-label — één kaart, één maskeer-belofte (sweep A6)', () => {
+    // Was eerder bewust zichtbaar ("eigen keuze, geen saldo"), maar de
+    // masking-sweep (werkqueue "Privacy-modus dekt álle bedragen") koos voor
+    // consistentie: deels zichtbare bedragen op één kaart breken de belofte.
     const { container } = renderMasked(
       <CompoundInsightCard liquidCash={45_000} monthlyContribution={250} />,
     )
-    expect(container.textContent).toMatch(/250.*\/mnd/)
+    expect(container.textContent).not.toMatch(/250.*\/mnd/)
+    expect(container.textContent).toContain(`${MASKED_AMOUNT_PLACEHOLDER}/mnd`)
   })
 
   it('minimaliseer-knop verbergt de card en schrijft id naar localStorage', () => {

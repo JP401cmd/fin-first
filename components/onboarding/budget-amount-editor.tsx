@@ -127,10 +127,10 @@ export function BudgetAmountEditor({
           <span className="font-medium text-[var(--ink-2)]">&euro;{totalOut.toLocaleString('nl-NL')}</span>
         </div>
         <div className="mt-2 border-t border-[var(--border-ed)] pt-2 flex justify-between text-sm">
-          <span className={`font-semibold ${isOver ? 'text-red-600' : 'text-emerald-600'}`}>
+          <span className={`font-semibold ${isOver ? 'text-negative' : 'text-positive'}`}>
             {isOver ? 'Tekort' : 'Over'}
           </span>
-          <span className={`font-bold ${isOver ? 'text-red-600' : 'text-emerald-600'}`}>
+          <span className={`font-bold ${isOver ? 'text-negative' : 'text-positive'}`}>
             &euro;{Math.abs(remaining).toLocaleString('nl-NL')}
           </span>
         </div>

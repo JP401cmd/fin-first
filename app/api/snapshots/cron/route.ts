@@ -53,9 +53,20 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const querySecret = url.searchParams.get('secret')
 
-  // Allow if CRON_SECRET matches (header or query param) or if no secret is configured (dev mode)
+  const isProduction = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
+
+  // In productie is een geconfigureerd secret verplicht — een ontbrekend
+  // secret mag dit service-role-endpoint niet openbaar maken (fail-closed).
+  if (!cronSecret && isProduction) {
+    return NextResponse.json(
+      { error: 'CRON_SECRET not configured' },
+      { status: 500 },
+    )
+  }
+
+  // Allow if CRON_SECRET matches (header or query param); alleen in dev mag het zonder secret
   const isAuthorized =
-    !cronSecret || // No secret configured = dev mode, allow
+    !cronSecret || // dev mode zonder secret
     authHeader === `Bearer ${cronSecret}` ||
     querySecret === cronSecret
 

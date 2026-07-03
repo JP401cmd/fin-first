@@ -65,6 +65,7 @@ function makeEmptyDashboardData(): DashboardData {
     // FIRE & Simulation
     fireAgeFractional: null,
     fireRange: null,
+    freedomMilestones: null,
     simRows: null,
     simNetWorthRows: null,
     simRequiredPortfolio: null,
@@ -93,6 +94,7 @@ function makeEmptyDashboardData(): DashboardData {
     netWorthDelta: null,
     // Favorites (empty)
     favoriteBudgets: [],
+    topBudgets: [],
     favoriteHoldings: [],
     allBudgets: [],
     // Notifications & Insights
@@ -174,6 +176,7 @@ const EMPTY_ARRAY_KEYS: (keyof DashboardData)[] = [
   'expenseHistory',
   'assetsByType',
   'favoriteBudgets',
+  'topBudgets',
   'favoriteHoldings',
   'allBudgets',
   'notifications',

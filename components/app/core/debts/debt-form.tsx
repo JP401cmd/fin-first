@@ -21,7 +21,6 @@ import { AlertTriangle, Building2 } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { createClient } from '@/lib/supabase/client'
 import { upsertSingleBalanceSnapshot } from '@/lib/balance-snapshot'
-import { formatCurrency } from '@/components/app/budget-shared'
 import {
   type Debt,
   type DebtType,
@@ -954,7 +953,7 @@ export function DebtForm({
                     )}
                     {gewogenAflossing > 0 && (
                       <p className="mt-1.5 font-mono text-[11px] tabular-nums text-positive">
-                        +{<MaskedAmount value={gewogenAflossing} tone="kern" />} p/m in spaarquote{netWorthInclusionPct < 100 ? ` (${netWorthInclusionPct}% van ${formatCurrency(effectiefAflossing)})` : ''}
+                        +{<MaskedAmount value={gewogenAflossing} tone="kern" />} p/m in spaarquote{netWorthInclusionPct < 100 ? <>{' '}({netWorthInclusionPct}% van <MaskedAmount value={effectiefAflossing} tone="kern" />)</> : null}
                       </p>
                     )}
                   </div>

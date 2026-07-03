@@ -20,6 +20,9 @@ import {
   type RecurringCategory,
   CATEGORY_LABELS,
 } from '@/lib/recurring-detection'
+import { buildVasteLastenInsights } from '@/lib/vaste-lasten-insights'
+import { vasteLastenCardStatus } from '@/lib/cashflow-cards'
+import type { VasteLastenItem, VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 
 const CAT = 'wil.vaste-kosten-analyse'
 
@@ -249,6 +252,78 @@ const tests: TestCase[] = [
 
       assertGreaterThanOrEqual(subs.length, 2, 'At least 2 subscriptions')
       assertEqual(vk.length, 0, 'No vaste kosten when only subscriptions present')
+    },
+  },
+
+  /* ── Tier gating: AI-classificatie vereist AI-abonnement ──────────────────── */
+  /* ── Inzichten-model: display-pariteit (geen drift) ──────────────────────── */
+  {
+    id: 'vaste-lasten-insights-totaal-ongewijzigd',
+    name: 'Inzichten-model laat totaal + categorie-split ongewijzigd',
+    description: 'buildVasteLastenInsights consumeert de summary zonder totalen te herrekenen',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 20,
+    fn() {
+      const mk = (
+        id: string,
+        name: string,
+        monthlyAmount: number,
+        category: RecurringCategory,
+      ): VasteLastenItem => ({
+        id, name, averageAmount: monthlyAmount, monthlyAmount, frequency: 'monthly',
+        nextDate: null, confidence: 'high', isVariableAmount: false, occurrences: null,
+        alreadyConfirmed: true, category, categoryLabel: CATEGORY_LABELS[category],
+        categoryOverride: null,
+      })
+      const subs = [mk('s1', 'Netflix', 16, 'subscription'), mk('s2', 'Spotify', 10, 'subscription')]
+      const vk = [mk('v1', 'Huur', 900, 'rent'), mk('v2', 'Energie', 180, 'utility')]
+      const summary: VasteLastenSummary = {
+        subscriptions: subs,
+        vasteKosten: vk,
+        totalMonthlySubscriptions: 26,
+        totalMonthlyVasteKosten: 1080,
+        totalMonthly: 1106,
+        count: 4,
+      }
+      const insights = buildVasteLastenInsights({
+        summary, monthlyIncome: 4000, monthlyExpenses: 2500,
+      })
+      assertEqual(insights.totalMonthly, 1106, 'Totaal ongewijzigd t.o.v. summary')
+      assertEqual(insights.subscriptionsMonthly, 26, 'Abonnementen-subtotaal ongewijzigd')
+      assertEqual(insights.vasteKostenMonthly, 1080, 'Vaste-kosten-subtotaal ongewijzigd')
+      assertEqual(insights.count, 4, 'Aantal posten ongewijzigd')
+      // Samenstelling sommeert terug naar het totaal
+      const sum = insights.composition.reduce((s, c) => s + c.monthlyAmount, 0)
+      assert(Math.abs(sum - 1106) < 0.01, `Samenstelling sommeert naar totaal, kreeg ${sum}`)
+    },
+  },
+  {
+    id: 'vaste-lasten-insights-status-pariteit',
+    name: 'Inzichten-status == vasteLastenCardStatus (single source)',
+    description: 'De getoonde status komt exact uit de canonieke kaart-statushelper',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const mk = (monthlyAmount: number): VasteLastenItem => ({
+        id: 'x', name: 'X', averageAmount: monthlyAmount, monthlyAmount, frequency: 'monthly',
+        nextDate: null, confidence: 'high', isVariableAmount: false, occurrences: null,
+        alreadyConfirmed: true, category: 'subscription',
+        categoryLabel: CATEGORY_LABELS.subscription, categoryOverride: null,
+      })
+      for (const total of [1000, 2400, 3200]) {
+        const summary: VasteLastenSummary = {
+          subscriptions: [mk(total)], vasteKosten: [],
+          totalMonthlySubscriptions: total, totalMonthlyVasteKosten: 0,
+          totalMonthly: total, count: 1,
+        }
+        const insights = buildVasteLastenInsights({
+          summary, monthlyIncome: 4000, monthlyExpenses: 2500,
+        })
+        const expected = vasteLastenCardStatus({ totalMonthly: total, count: 1, monthlyIncome: 4000 })
+        assertEqual(insights.status, expected, `Status pariteit bij totaal ${total}`)
+      }
     },
   },
 

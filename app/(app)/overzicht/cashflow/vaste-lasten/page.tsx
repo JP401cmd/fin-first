@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
+import { loadDashboardData } from '@/lib/dashboard-data-loader'
+import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
+import { buildVasteLastenInsights } from '@/lib/vaste-lasten-insights'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { VasteLastenLoader } from '@/components/overview/vaste-lasten-loader'
+import { VasteLastenClient } from '@/components/overview/vaste-lasten-client'
 import { CashflowKalender } from '@/components/overview/cashflow-kalender'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
@@ -23,7 +26,17 @@ export const metadata: Metadata = {
 export default async function OverzichtCashflowVasteLastenPage() {
   const supabase = await createClient()
   const perspective = await getServerPerspective()
-  const { recurrings, fullName } = await loadCashflowData(supabase, perspective)
+  const [dashboardResult, cashflow, summary] = await Promise.all([
+    loadDashboardData(supabase),
+    loadCashflowData(supabase, perspective),
+    loadVasteLastenSummary(supabase),
+  ])
+  const { dashboardData } = dashboardResult
+  const insights = buildVasteLastenInsights({
+    summary,
+    monthlyIncome: dashboardData.monthlyIncome,
+    monthlyExpenses: dashboardData.monthlyExpenses,
+  })
 
   return (
     <>
@@ -36,12 +49,17 @@ export default async function OverzichtCashflowVasteLastenPage() {
         />
       </div>
       <div className="mx-auto max-w-6xl space-y-6 px-4 pt-4 sm:px-6">
-        <VasteLastenLoader fullName={fullName} />
+        <VasteLastenClient
+          insights={insights}
+          subscriptions={summary.subscriptions}
+          vasteKosten={summary.vasteKosten}
+          fullName={cashflow.fullName}
+        />
         {/* Kalender = secundaire diepte ("wanneer komt het"): in Eenvoudig
             verborgen, in Volledig zichtbaar. De primaire analyse + het
-            hoofdcijfer (VasteLastenLoader) blijven altijd staan. */}
+            hoofdcijfer (VasteLastenClient) blijven altijd staan. */}
         <HideInSimple>
-          <CashflowKalender recurrings={recurrings} />
+          <CashflowKalender recurrings={cashflow.recurrings} />
         </HideInSimple>
       </div>
     </>

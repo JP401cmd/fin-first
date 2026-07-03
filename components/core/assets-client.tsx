@@ -2889,7 +2889,7 @@ export function AssetForm({
   const subtypeOptions = ASSET_SUBTYPE_LABELS[assetType]
   const visibleFields = ASSET_TYPE_FIELDS[assetType]
   // Toont de verkoopstrategie-sectie? Geldt voor de niet-liquide types die de
-  // v2-grootboek-engine kan liquideren (sale_config in ASSET_TYPE_FIELDS).
+  // horizon-kernel kan liquideren (sale_config in ASSET_TYPE_FIELDS).
   const showSaleConfig = visibleFields.includes('sale_config')
 
   // Load deelneming options + DGA total when subtype is dga_lening

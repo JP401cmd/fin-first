@@ -80,7 +80,7 @@ describe('computeBox3TaxableInput — BOX3_ASSET_TYPES filter', () => {
 
 describe('computeBox3TaxableInput — net_worth_inclusion_pct weighting', () => {
   it('50% inclusion_pct contributes half the value', () => {
-    // 100000 × 0.5 = 50000 → below vrijstelling 57684 → above = 0
+    // 100000 × 0.5 = 50000 → below vrijstelling → above = 0
     const result = computeBox3TaxableInput(
       [{ asset_type: 'savings', current_value: 100_000, net_worth_inclusion_pct: 50 }],
       [],
@@ -90,7 +90,7 @@ describe('computeBox3TaxableInput — net_worth_inclusion_pct weighting', () => 
   })
 
   it('200% inclusion_pct doubles the value', () => {
-    // 100000 × 2 = 200000 → above = 200000 − 57684 = 142316
+    // 100000 × 2 = 200000 → above = 200000 − vrijstelling
     const result = computeBox3TaxableInput(
       [{ asset_type: 'savings', current_value: 100_000, net_worth_inclusion_pct: 200 }],
       [],
@@ -99,7 +99,7 @@ describe('computeBox3TaxableInput — net_worth_inclusion_pct weighting', () => 
   })
 
   it('debt with 50% inclusion_pct reduces box3 by half', () => {
-    // asset savings 200000, debt 100000 at 50% → effectief 50000 → net 150000 → above = 150000 − 57684 = 92316
+    // asset savings 200000, debt 100000 at 50% → effectief 50000 → net 150000 → above = 150000 − vrijstelling
     const result = computeBox3TaxableInput(
       [{ asset_type: 'savings', current_value: 200_000 }],
       [{ current_balance: 100_000, net_worth_inclusion_pct: 50 }],
@@ -109,12 +109,12 @@ describe('computeBox3TaxableInput — net_worth_inclusion_pct weighting', () => 
 })
 
 describe('computeBox3TaxableInput — threshold calculation', () => {
-  it('savings 200000, no debts → above = 200000 − 57684 = 142316', () => {
+  it('savings 200000, no debts → above = 200000 − vrijstelling', () => {
     const result = computeBox3TaxableInput(
       [{ asset_type: 'savings', current_value: 200_000 }],
       [],
     )
-    expect(result.box3TaxableAboveThreshold).toBe(142_316)
+    expect(result.box3TaxableAboveThreshold).toBe(200_000 - BOX3_VRIJSTELLING_SINGLE)
   })
 
   it('cash 50000, no debts → under threshold → above = 0', () => {
@@ -127,12 +127,12 @@ describe('computeBox3TaxableInput — threshold calculation', () => {
   })
 
   it('debts reduce box3Net before threshold is applied', () => {
-    // savings 100000 − debt 20000 = net 80000 → above = 80000 − 57684 = 22316
+    // savings 100000 − debt 20000 = net 80000 → above = 80000 − vrijstelling
     const result = computeBox3TaxableInput(
       [{ asset_type: 'savings', current_value: 100_000 }],
       [{ current_balance: 20_000 }],
     )
-    expect(result.box3TaxableAboveThreshold).toBe(22_316)
+    expect(result.box3TaxableAboveThreshold).toBe(80_000 - BOX3_VRIJSTELLING_SINGLE)
   })
 
   it('debts cannot push threshold below 0 (above is always ≥ 0)', () => {
@@ -158,8 +158,8 @@ describe('computeBox3TaxableInput — string current_value coercion', () => {
       [],
     )
     expect(result.hasBox3Assets).toBe(true)
-    // 100000 < 57684? no, 100000 > 57684 → above = 100000 − 57684 = 42316
-    expect(result.box3TaxableAboveThreshold).toBe(42_316)
+    // 100000 > vrijstelling → above = 100000 − vrijstelling
+    expect(result.box3TaxableAboveThreshold).toBe(100_000 - BOX3_VRIJSTELLING_SINGLE)
   })
 
   it('current_balance as string on debt is coerced via Number()', () => {
@@ -167,8 +167,8 @@ describe('computeBox3TaxableInput — string current_value coercion', () => {
       [{ asset_type: 'savings', current_value: 200_000 }],
       [{ current_balance: '50000' }],
     )
-    // net = 200000 − 50000 = 150000 → above = 150000 − 57684 = 92316
-    expect(result.box3TaxableAboveThreshold).toBe(92_316)
+    // net = 200000 − 50000 = 150000 → above = 150000 − vrijstelling
+    expect(result.box3TaxableAboveThreshold).toBe(150_000 - BOX3_VRIJSTELLING_SINGLE)
   })
 })
 

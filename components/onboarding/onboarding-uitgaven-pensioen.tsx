@@ -22,7 +22,7 @@ import {
  *
  * **Consume-only:** het scherm legt alleen bedrag + methode vast. Het FIRE-doel
  * en de pensioenuitgave worden NIET hier herberekend — dat blijft van
- * `computeRetirementExpenses` + de horizon-engine. De 80%-suggestie komt uit de
+ * `computeRetirementExpenses` + de horizon-kernel. De 80%-suggestie komt uit de
  * pure, geteste helper `computeRetirementPrefill`.
  *
  * Skipbaar via "Kan altijd later nog →" (consistent met pensioen/spaardoel):

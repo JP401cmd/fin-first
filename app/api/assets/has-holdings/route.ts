@@ -1,15 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { assetHasActiveHoldings } from '@/lib/holdings-sync'
+import { assetHasActiveHoldings, assetsWithActiveHoldings } from '@/lib/holdings-sync'
+
+/** Max aantal asset-ids per batch-call (URL-lengte + query-veiligheid). */
+const MAX_BATCH_IDS = 200
 
 /**
- * GET /api/assets/has-holdings?asset_id=<uuid>
+ * GET /api/assets/has-holdings
  *
- * Check if an asset has active holdings linked to it.
- * When an asset has active holdings, the portfolio tracker is the source of truth
- * and manual edits to current_value would be overwritten on the next sync.
+ * Twee modi (één auth-check per request):
+ * - `?asset_id=<uuid>` → `{ has_holdings, holdings_count, total_value }` voor één asset.
+ * - `?asset_ids=<id1,id2,...>` → `{ holdings: { [assetId]: boolean } }` voor meerdere
+ *   assets in 2 queries (i.p.v. N calls). Alle gevraagde ids zitten in de map;
+ *   `false` als een asset geen actieve holdings heeft. Lege lijst → `{ holdings: {} }`.
  *
- * Returns: { has_holdings, holdings_count, total_value }
+ * Wanneer een asset actieve holdings heeft, is de portfolio-tracker de bron van
+ * waarheid en zou een handmatige current_value-wijziging bij de volgende sync
+ * worden overschreven.
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -20,6 +27,43 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url)
+  const assetIdsParam = searchParams.get('asset_ids')
+
+  // ── Batch-modus ────────────────────────────────────────────────────
+  if (assetIdsParam !== null) {
+    const ids = Array.from(
+      new Set(
+        assetIdsParam
+          .split(',')
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+      )
+    )
+
+    if (ids.length === 0) {
+      return NextResponse.json({ holdings: {} })
+    }
+    if (ids.length > MAX_BATCH_IDS) {
+      return NextResponse.json(
+        { error: `Maximaal ${MAX_BATCH_IDS} asset_ids per verzoek` },
+        { status: 400 }
+      )
+    }
+
+    try {
+      const withHoldings = await assetsWithActiveHoldings(supabase, ids, user.id)
+      const holdings: Record<string, boolean> = {}
+      for (const id of ids) {
+        holdings[id] = withHoldings.has(id)
+      }
+      return NextResponse.json({ holdings })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Onbekende fout'
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+  }
+
+  // ── Single-asset-modus (backward-compat) ───────────────────────────
   const assetId = searchParams.get('asset_id')
 
   if (!assetId) {

@@ -10,7 +10,8 @@ import { type SimCashflow, type SimRow, type SimResult } from '@/lib/fire-simula
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
-import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, formatCurrency, formatMaskedCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   computeFireProjection, computeFireRange,
@@ -27,7 +28,8 @@ import {
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress } from '@/lib/core-metrics'
 import { computeEmergencyFundMonths } from '@/lib/health-score-input'
-import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
+import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, STARTERSVRIJSTELLING_MAX } from '@/lib/constants'
+import { computeKostenKoper } from '@/lib/kosten-koper'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { isKernelReachedNowDisplay, kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
 import { buildConvergentieAdapterProfile, computeConvergentieProjection, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
@@ -2033,17 +2035,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       direction = 'income'
     }
 
-    // House purchase: kosten koper
+    // House purchase: kosten koper (canonieke bron — lib/kosten-koper.ts)
     if (type === 'house_purchase') {
-      const prijs = Number(metadata.aankoopprijs ?? 350000)
-      const isStarter = Boolean(metadata.eersteWoning ?? true)
-      const hasNHG = Boolean(metadata.nhg ?? false)
-      const overdracht = (isStarter && prijs <= 510000) ? 0 : Math.round(prijs * 0.02)
-      const notaris = 1200
-      const taxatie = 500
-      const bankgarantie = Math.round(prijs * 0.001)
-      const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
-      amount = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+      amount = computeKostenKoper({
+        aankoopprijs: Number(metadata.aankoopprijs ?? 350000),
+        isStarter: Boolean(metadata.eersteWoning ?? true),
+        hasNHG: Boolean(metadata.nhg ?? false),
+      }).totaal
       durationType = 'one_time'
       direction = 'expense'
     }
@@ -4676,17 +4674,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 const factor = (50 - jarenBuiten) / 50
                                 setFormAmount(Math.round(baseAmount * factor))
                               }
-                              // Auto-calculate kosten koper for house_purchase
+                              // Auto-calculate kosten koper for house_purchase (canonieke bron — lib/kosten-koper.ts)
                               if (formType === 'house_purchase' && field.key === 'aankoopprijs') {
-                                const prijs = Number(val) || 0
-                                const isStarter = Boolean(updated.eersteWoning ?? true)
-                                const hasNHG = Boolean(updated.nhg ?? false)
-                                const overdracht = (isStarter && prijs <= 510000) ? 0 : Math.round(prijs * 0.02)
-                                const notaris = 1200
-                                const taxatie = 500
-                                const bankgarantie = Math.round(prijs * 0.001)
-                                const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
-                                const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+                                const { totaal } = computeKostenKoper({
+                                  aankoopprijs: Number(val) || 0,
+                                  isStarter: Boolean(updated.eersteWoning ?? true),
+                                  hasNHG: Boolean(updated.nhg ?? false),
+                                })
                                 setFormAmount(totaal)
                                 setFormDirection('expense')
                                 setFormDurationType('one_time')
@@ -4890,17 +4884,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               }
                               setFormMetadata(prev => {
                                 const updated = { ...prev, [field.key]: checked }
-                                // Recalculate kosten koper when eersteWoning or nhg toggles
+                                // Recalculate kosten koper when eersteWoning or nhg toggles (canonieke bron — lib/kosten-koper.ts)
                                 if (formType === 'house_purchase' && (field.key === 'eersteWoning' || field.key === 'nhg')) {
-                                  const prijs = Number(updated.aankoopprijs ?? 350000)
-                                  const isStarter = Boolean(updated.eersteWoning ?? true)
-                                  const hasNHG = Boolean(updated.nhg ?? false)
-                                  const overdracht = (isStarter && prijs <= 510000) ? 0 : Math.round(prijs * 0.02)
-                                  const notaris = 1200
-                                  const taxatie = 500
-                                  const bankgarantie = Math.round(prijs * 0.001)
-                                  const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
-                                  const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+                                  const { totaal } = computeKostenKoper({
+                                    aankoopprijs: Number(updated.aankoopprijs ?? 350000),
+                                    isStarter: Boolean(updated.eersteWoning ?? true),
+                                    hasNHG: Boolean(updated.nhg ?? false),
+                                  })
                                   setFormAmount(totaal)
                                   setFormDirection('expense')
                                   setFormDurationType('one_time')
@@ -4971,13 +4961,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                       {formType === 'house_purchase' && field.key === 'nhg' && (() => {
                         const prijs = Number(formMetadata.aankoopprijs ?? 350000)
                         const isStarter = Boolean(formMetadata.eersteWoning ?? true)
-                        const hasNHG = Boolean(formMetadata.nhg ?? false)
-                        const overdracht = (isStarter && prijs <= 510000) ? 0 : Math.round(prijs * 0.02)
-                        const notaris = 1200
-                        const taxatie = 500
-                        const bankgarantie = Math.round(prijs * 0.001)
-                        const nhgKosten = (hasNHG && prijs <= 435000) ? Math.round(prijs * 0.006) : 0
-                        const totaal = overdracht + notaris + taxatie + bankgarantie + nhgKosten
+                        // Canonieke bron — lib/kosten-koper.ts (geen lokale herberekening)
+                        const { overdracht, notaris, taxatie, bankgarantie, nhgKosten, totaal } = computeKostenKoper({
+                          aankoopprijs: prijs,
+                          isStarter,
+                          hasNHG: Boolean(formMetadata.nhg ?? false),
+                        })
                         const pct = prijs > 0 ? ((totaal / prijs) * 100).toFixed(1) : '0.0'
                         const hypotheekLasten = Number(formMetadata.hypotheekLasten ?? 1200)
                         const huidigeHuur = Number(formMetadata.huidigeHuur ?? 1000)
@@ -5003,16 +4992,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                                 <div className="flex justify-between"><span>Taxatiekosten</span><span className="font-mono tabular-nums">{<MaskedAmount value={taxatie} tone="horizon" />}</span></div>
                                 <div className="flex justify-between"><span>Bankgarantie (0,1%)</span><span className="font-mono tabular-nums">{<MaskedAmount value={bankgarantie} tone="horizon" />}</span></div>
                                 {nhgKosten > 0 && (
-                                  <div className="flex justify-between"><span>NHG-premie (0,6%)</span><span className="font-mono tabular-nums">{<MaskedAmount value={nhgKosten} tone="horizon" />}</span></div>
+                                  <div className="flex justify-between"><span>NHG-premie (0,4%)</span><span className="font-mono tabular-nums">{<MaskedAmount value={nhgKosten} tone="horizon" />}</span></div>
                                 )}
                                 <div className="flex justify-between border-t border-horizon-200 pt-1 font-semibold">
                                   <span>Totaal kosten koper</span>
                                   <span className="font-mono tabular-nums">{<MaskedAmount value={totaal} tone="horizon" />}</span>
                                 </div>
                               </div>
-                              {isStarter && prijs > 510000 && (
+                              {isStarter && prijs > STARTERSVRIJSTELLING_MAX && (
                                 <p className="text-[10px] text-amber-600">
-                                  Let op: startersvrijstelling geldt alleen tot €510.000 (2026).
+                                  Let op: startersvrijstelling geldt alleen tot €555.000 (2026).
                                 </p>
                               )}
                             </div>
@@ -5553,7 +5542,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                               <div className="h-px bg-horizon-200 my-1" />
                               <div className="flex justify-between font-semibold"><span>Totale kosten</span><span className="font-mono tabular-nums text-negative">-{<MaskedAmount value={totaal} tone="horizon" />}</span></div>
                             </div>
-                            <p className="text-[10px] text-[var(--ink-4)] mt-1">💍 Na trouwen word je fiscaal partners — <GlossaryTerm term="box_3">Box 3</GlossaryTerm> vermogen en vrijstelling (€57.000 p.p.) worden gezamenlijk berekend.</p>
+                            <p className="text-[10px] text-[var(--ink-4)] mt-1">💍 Na trouwen word je fiscaal partners — <GlossaryTerm term="box_3">Box 3</GlossaryTerm> vermogen en vrijstelling ({formatCurrency(BOX3_PARAMS[CURRENT_TAX_YEAR].heffingsvrijSingle)} p.p.) worden gezamenlijk berekend.</p>
                           </div>
                         )
                       })()}

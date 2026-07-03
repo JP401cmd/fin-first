@@ -321,7 +321,7 @@ export const SORRAnalyse = memo(function SORRAnalyse({
                           )}
                         </td>
                         <td className="px-1 py-1.5 text-right font-mono tabular-nums text-[var(--ink-2)]">
-                          {b.bufferYears === 0 ? '\u2013' : formatCurrency(b.bufferAmount)}
+                          {b.bufferYears === 0 ? '\u2013' : <MaskedAmount value={b.bufferAmount} tone="horizon" />}
                         </td>
                         <td className={`px-1 py-1.5 text-right font-mono tabular-nums ${successColor(b.successRate)} ${successBgColor(b.successRate)} rounded-sm`}>
                           {Math.round(b.successRate * 100)}%

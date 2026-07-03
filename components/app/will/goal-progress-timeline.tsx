@@ -167,10 +167,10 @@ export function GoalProgressTimeline({ goal, history }: GoalProgressTimelineProp
                 y1={yPos(val)}
                 x2={W - PAD.right}
                 y2={yPos(val)}
-                stroke="#e4e4e7"
+                stroke="var(--rule-soft)"
                 strokeWidth="0.5"
               />
-              <text x={PAD.left - 6} y={yPos(val) + 3} textAnchor="end" fontSize="7" fill="#a1a1aa">
+              <text x={PAD.left - 6} y={yPos(val) + 3} textAnchor="end" fontSize="7" fill="var(--ink-4)">
                 {formatYTick(val, goalType, goal.custom_unit)}
               </text>
             </g>

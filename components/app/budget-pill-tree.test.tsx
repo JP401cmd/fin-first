@@ -121,7 +121,7 @@ describe('BudgetPillTree', () => {
   })
 
   it('toont semantische waarschuwingskleur bij over-budget', () => {
-    // spent 120 / limit 100 → rawPct 120 (>105) → isFullyOver → overColor (#ef4444).
+    // spent 120 / limit 100 → rawPct 120 (>105) → isFullyOver → overColor (var(--negative)).
     const groups = [makeGroup({ id: 'p1', name: 'Uit eten' }, [{ id: 'c1', name: 'Restaurant' }])]
     const spending = { c1: 120 }
     const beschikbaarMap = { c1: -20 } // limit = -20 + 120 = 100
@@ -129,7 +129,7 @@ describe('BudgetPillTree', () => {
     const colors = getTypeColors('expense')
     const seg = computeBarSegments(120, 100, 80, colors, false)
     expect(seg.isFullyOver).toBe(true)
-    expect(seg.normalColor).toBe('#ef4444')
+    expect(seg.normalColor).toBe('var(--negative)')
 
     const { container } = render(
       <BudgetPillTree
@@ -145,7 +145,7 @@ describe('BudgetPillTree', () => {
     // De PillBars-laag zit in de pil-wrapper (`<div data-budget-id>`).
     const parentPill = container.querySelector('[data-budget-id="p1"]') as HTMLElement
     const parentFill = parentPill.querySelector('span[style*="width"]') as HTMLElement
-    expect(parentFill.style.backgroundColor).toBe('rgb(239, 68, 68)') // #ef4444
+    expect(parentFill.style.backgroundColor).toBe('var(--negative)')
   })
 
   it('roept onNavigate aan bij klik op een parent zonder kinderen', () => {

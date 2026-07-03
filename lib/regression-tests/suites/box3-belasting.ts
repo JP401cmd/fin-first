@@ -5,7 +5,7 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 import {
-  calculateBox3, BOX3_PARAMS,
+  calculateBox3, BOX3_PARAMS, CURRENT_TAX_YEAR,
   classifyAsset, classifyDebt,
 } from '@/lib/box3-data'
 import type { Box3Input, TaxYear } from '@/lib/box3-data'
@@ -125,13 +125,17 @@ const tests: TestCase[] = [
   // ── Step 1: Box 3 berekening met actuele tarieven ────────────────
   {
     id: 'box3-tarieven-constanten', name: 'Box 3: constanten NL_FICTIEF_BELEGGINGEN en BOX3_TARIEF', category: CAT,
-    description: 'NL_FICTIEF_BELEGGINGEN = 5.88%, BOX3_TARIEF = 36%, BOX3_DRAG ≈ 2.117%',
+    description: 'NL_FICTIEF_BELEGGINGEN = 6,00% (2026), BOX3_TARIEF = 36%, BOX3_DRAG ≈ 2,16%',
     priority: 'critical', estimatedDurationMs: 5,
     fn() {
-      assertEqual(NL_FICTIEF_BELEGGINGEN, 0.0588, 'fictief rendement beleggingen')
+      // De constante is nu afgeleid uit de canonieke jaartabel — geen losse
+      // literal meer. Assert zowel de single-source-koppeling als de concrete
+      // 2026-waarde, zodat een jaartabel-bump bewust deze verwachting raakt.
+      assertEqual(NL_FICTIEF_BELEGGINGEN, BOX3_PARAMS[CURRENT_TAX_YEAR].forfaitBeleggingen, 'fictief rendement = jaartabel[CURRENT_TAX_YEAR]')
+      assertEqual(NL_FICTIEF_BELEGGINGEN, 0.0600, 'fictief rendement beleggingen (2026: 6,00%)')
       assertEqual(BOX3_TARIEF, 0.36, 'Box 3 tarief')
-      // BOX3_DRAG = 0.0588 * 0.36 = 0.021168
-      const expectedDrag = 0.0588 * 0.36
+      // BOX3_DRAG = 0.0600 * 0.36 = 0.0216
+      const expectedDrag = 0.0600 * 0.36
       assertEqual(BOX3_DRAG, expectedDrag, 'Box 3 drag = forfait × tarief')
     },
   },

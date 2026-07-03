@@ -25,7 +25,6 @@ const VERIFY_HARNESS_TRACE_EXCLUDES = [
   './test/**',
   './Plannen/**',
   './specs/**',
-  './drizzle/**',
   // losse root-bestanden (plannen, exports, screenshots, scratch-json)
   './*',
 ]

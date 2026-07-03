@@ -1365,13 +1365,13 @@ export function CashAccountView({
       {/* Monthly overview — figures-strip editorial blueprint */}
       <section className="mt-5 sm:mt-8 grid grid-cols-3 border-t border-b border-[var(--ink)]" data-testid="monthly-summary">
         <div className="p-4 text-left border-r border-[var(--rule-soft)]">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--positive,#10b981)] mb-1.5">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--positive)] mb-1.5">
             <ArrowDownLeft className="h-3 w-3 shrink-0" aria-hidden />
             <span>Inkomen</span>
           </div>
           <p
             className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
-            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--positive, #10b981)' }}
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--positive)' }}
           >
             {formatCurrencyShort(totalIncome)}
           </p>
@@ -1386,13 +1386,13 @@ export function CashAccountView({
           )}
         </div>
         <div className="p-4 text-left border-r border-[var(--rule-soft)]">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--negative,#dc2626)] mb-1.5">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--negative)] mb-1.5">
             <ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden />
             <span>Uitgaven</span>
           </div>
           <p
             className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
-            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--negative, #dc2626)' }}
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--negative)' }}
           >
             {formatCurrencyShort(totalExpenses)}
           </p>
@@ -1414,7 +1414,7 @@ export function CashAccountView({
             className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
             style={{
               fontFamily: 'var(--font-playfair, Georgia, serif)',
-              color: netAmount >= 0 ? 'var(--positive, #10b981)' : 'var(--negative, #dc2626)',
+              color: netAmount >= 0 ? 'var(--positive)' : 'var(--negative)',
             }}
           >
             <span
@@ -1911,7 +1911,7 @@ export function CashAccountView({
                       {isNeg && pct > 0 && (
                         <div className="h-1 rounded-full bg-red-200" style={{ width: `${Math.max(pct * 0.6, 4)}px` }} />
                       )}
-                      <span className={`text-xs font-medium font-mono tabular-nums ${isNeg ? 'text-red-600' : 'text-emerald-600'}`}>
+                      <span className={`text-xs font-medium font-mono tabular-nums ${isNeg ? 'text-negative' : 'text-positive'}`}>
                         {isNeg ? '−' : '+'}{formatCurrencyShort(Math.abs(cat.total))}
                       </span>
                       {isNeg && pct > 0 && (

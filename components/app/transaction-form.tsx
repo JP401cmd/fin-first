@@ -673,6 +673,7 @@ export function TransactionForm({
                         Totaal: <span className="font-mono font-medium">{form.amount ? `€${form.amount}` : '€0'}</span>
                         {' — '}
                         Verdeeld: <span className={`font-mono font-medium ${
+                          // eslint-disable-next-line no-restricted-syntax -- validatie-status (verdeling klopt/klopt niet), geen winst/verlies
                           Math.abs(splitRows.filter(r => r.amount).reduce((s, r) => s + parseFloat(r.amount || '0'), 0) - parseFloat(form.amount || '0')) > 0.01
                             ? 'text-red-600' : 'text-emerald-600'
                         }`}>

@@ -21,6 +21,7 @@
 
 import type { HealthScoreInput } from '@/lib/financial-health'
 import { hasPartner } from '@/lib/household-type'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
 // ── Box 3 (educatief "kans"-inzicht; sinds v2 geen score-pijler, ADR 0010) ───
 
@@ -74,9 +75,12 @@ export function buildTaxData(
   if (box3Bezittingen < 1_000) return null
   // Bug-fix: voorheen tegen de verouderde woordenschat ('samenwonend'/'getrouwd')
   // die householdType nooit is → altijd false. Nu via canonieke helper.
-  const heffingsvrijVermogen = hasPartner(householdType) ? 114_000 : 57_000
+  // Vermogensvrijstelling én forfait/tarief uit de canonieke jaartabel
+  // (BOX3_PARAMS[CURRENT_TAX_YEAR]) i.p.v. losse hardcoded 2025-waarden.
+  const p = BOX3_PARAMS[CURRENT_TAX_YEAR]
+  const heffingsvrijVermogen = hasPartner(householdType) ? p.heffingsvrijPartner : p.heffingsvrijSingle
   const rendementsgrondslag = Math.max(0, box3Bezittingen - heffingsvrijVermogen)
-  const box3Tax = Math.round(rendementsgrondslag * 0.0588 * 0.36)
+  const box3Tax = Math.round(rendementsgrondslag * p.forfaitBeleggingen * p.tarief)
   return { box3Bezittingen, box3Tax, heffingsvrijVermogen, rendementsgrondslag }
 }
 

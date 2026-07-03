@@ -93,6 +93,7 @@ import {
 } from '@/lib/budget-perspective'
 import { Users } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
@@ -527,7 +528,7 @@ export function BudgetHub({
   dekkingsgraad,
   opSchemaCount,
   parentBudgetsCount,
-  formatCurrency: fmt,
+  formatCurrency: fmtRaw,
   openWithMessage,
   totalIncome,
   teVerdelen,
@@ -561,6 +562,10 @@ export function BudgetHub({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [alertsExpanded, setAlertsExpanded] = useState(false)
+  // Privacy-masking: alle hub-bedragen (te verdelen, inkomen, alerts) lopen
+  // door de injected formatter — één wrap dekt zowel JSX als aria-labels.
+  const { masked } = useMaskedAmounts()
+  const fmt = (n: number) => (masked ? MASKED_AMOUNT_PLACEHOLDER : fmtRaw(n))
   const { dailyExpenseRate, loading: rateLoading, source } = useDailyExpenseRate()
   const hasFreedomData = !rateLoading && source === 'transactions' && dailyExpenseRate > 0
 
@@ -895,8 +900,8 @@ function PartnerBudgetSection({ rows }: { rows: PartnerBudgetRow[] }) {
               </p>
             )}
           </div>
-          <span className="shrink-0 font-mono tabular-nums text-sm font-semibold text-[var(--ink)]">
-            {formatCurrency(Number(row.default_limit) || 0)}
+          <span className="shrink-0 text-sm font-semibold text-[var(--ink)]">
+            <MaskedAmount value={Number(row.default_limit) || 0} tone="wil" />
           </span>
         </div>
       ))}
@@ -1850,7 +1855,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
         <span className="font-medium text-[var(--ink-2)]">tellen nergens mee</span> als uitgave
         of inkomen — je stelt er dus geen bedrag voor in.
         {eigenRekeningSpent > 0 && (
-          <> Deze maand: <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(eigenRekeningSpent)}</span> verschoven.</>
+          <> Deze maand: <span className="text-[var(--ink-2)]"><MaskedAmount value={eigenRekeningSpent} tone="wil" /></span> verschoven.</>
         )}
       </div>
     </div>
@@ -2411,7 +2416,7 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
                 </span>
                 {!showEigenRekeningProminent && eigenRekeningSpent > 0 && (
                   <span className="ml-1 text-[10px] normal-case tracking-normal font-normal text-[var(--ink-3)] tabular-nums">
-                    · {formatCurrency(eigenRekeningSpent)} verschoven
+                    · <MaskedAmount value={eigenRekeningSpent} tone="wil" /> verschoven
                   </span>
                 )}
                 <ChevronDown className={`h-3 w-3 transition-transform ${showArchive ? 'rotate-180' : ''}`} />
@@ -2634,7 +2639,7 @@ function DetailModalDonut({
   const cssType = budgetType === 'archive' ? 'other' : budgetType
   const trackColor = `color-mix(in srgb, var(--color-${cssType}-300) 35%, transparent)`
   const fillColor = overBudget
-    ? (overPositive ? '#10b981' : '#ef4444')
+    ? (overPositive ? 'var(--positive)' : 'var(--negative)')
     : `var(--color-${cssType}-500)`
 
   return (
@@ -3147,12 +3152,12 @@ function BudgetDetailModal({
           {showProRataLine && (
             <p className="mt-2 font-serif text-[12px] italic text-[var(--ink-3)]">
               Volledig budget{' '}
-              <span className="font-mono tabular-nums not-italic text-[var(--ink-2)]">
-                {formatCurrency(getEffectiveLimit(budget) / detailShareFraction)}
+              <span className="not-italic text-[var(--ink-2)]">
+                <MaskedAmount value={getEffectiveLimit(budget) / detailShareFraction} tone="wil" />
               </span>{' '}
               · jouw aandeel {Math.round(detailShareFraction * 100)}% ={' '}
-              <span className="font-mono tabular-nums not-italic text-[var(--ink-2)]">
-                {formatCurrency(getEffectiveLimit(budget))}
+              <span className="not-italic text-[var(--ink-2)]">
+                <MaskedAmount value={getEffectiveLimit(budget)} tone="wil" />
               </span>
             </p>
           )}
@@ -3624,7 +3629,7 @@ function BudgetDetailModal({
                 const over = h.spent > h.limit && h.limit > 0
                 const isSelected = selectedHistMonth === h.month
                 const isCurrentMonth = i === history.length - 1
-                const barColor = over ? '#f87171' : colors.barHex
+                const barColor = over ? 'var(--negative)' : colors.barHex
                 return (
                   <button
                     key={h.month}

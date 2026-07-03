@@ -75,7 +75,7 @@ describe('computeFireTarget', () => {
   })
 
   it('uses NL SWR correctly', () => {
-    const nlSwr = 0.02883
+    const nlSwr = 0.0284 // 2026: DEFAULT_RETURN − BOX3_DRAG(6,00%×36%) − inflatie
     expect(computeFireTarget(40000, nlSwr)).toBeCloseTo(40000 / nlSwr, 2)
   })
 })

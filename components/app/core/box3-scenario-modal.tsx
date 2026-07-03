@@ -241,7 +241,7 @@ function CompareTab({ input, result }: { input: Box3Input; result: Box3Result })
 
       {delta !== 0 && (
         <div className={`mt-4 rounded-lg p-3 text-center ${delta > 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
-          <p className={`text-sm font-semibold ${delta > 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+          <p className={`text-sm font-semibold ${delta > 0 ? 'text-positive' : 'text-negative'}`}>
             {otherYear} is {<MaskedAmount value={Math.abs(delta)} tone="kern" />} {delta > 0 ? 'goedkoper' : 'duurder'}
           </p>
         </div>

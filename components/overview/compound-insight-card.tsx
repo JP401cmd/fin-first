@@ -44,9 +44,9 @@ export function CompoundInsightCard({
   // om het compound-effect dynamisch te ervaren.
   const [monthly, setMonthly] = useState(monthlyContribution)
   const { visible, hide } = useInsightVisibility(COMPOUND_INSIGHT_ID)
-  // liquidCash en de afgeleide projectie-bedragen zijn saldo-gevoelig en
-  // honoreren de privacy-toggle. De slider-invoer (monthly) is eigen keuze,
-  // geen saldo, en blijft zichtbaar zodat de slider bruikbaar blijft.
+  // Alle euro-weergaves op deze kaart honoreren de privacy-toggle — ook het
+  // slider-label (monthly): één kaart met deels zichtbare bedragen breekt de
+  // masking-belofte (zie werkqueue "Privacy-modus dekt álle bedragen", A6).
   const { masked } = useMaskedAmounts()
 
   const result = compareCompound({
@@ -106,7 +106,7 @@ export function CompoundInsightCard({
             Extra €/maand inleggen
           </label>
           <span className="font-serif font-semibold text-[var(--positive)] tabular-nums text-sm">
-            {formatCurrency(monthly)}/mnd
+            {formatMaskedCurrency(monthly, masked)}/mnd
           </span>
         </div>
         <input

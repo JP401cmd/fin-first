@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { WidgetPref } from '@/lib/widget-catalog'
-import { WIDGET_CATALOG } from '@/lib/widget-catalog'
+import type { WidgetPref, WidgetSize } from '@/lib/widget-catalog'
+import { WIDGET_CATALOG, getWidgetDef } from '@/lib/widget-catalog'
+
+/** Server-side size-sanitering: mini wordt nooit gepersisteerd (→ quarter) en
+ *  'xl' (Double) is opt-in — alleen geldig als de catalog-def 'm toestaat. */
+function sanitizeSize(id: string, size: unknown): WidgetSize {
+  if (size === 'quarter' || size === 'full') return size
+  if (size === 'mini') return 'quarter'
+  if (size === 'xl' && getWidgetDef(id)?.sizes.includes('xl')) return 'xl'
+  return 'half'
+}
 
 export async function PUT(request: Request) {
   try {
@@ -22,7 +31,7 @@ export async function PUT(request: Request) {
       .map(w => ({
         id: w.id,
         enabled: Boolean(w.enabled),
-        size: w.size === 'full' ? 'full' : w.size === 'quarter' ? 'quarter' : w.size === 'mini' ? 'quarter' : 'half',
+        size: sanitizeSize(w.id, w.size),
         order: Number(w.order) || 0,
       }))
 

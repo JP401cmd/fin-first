@@ -383,8 +383,8 @@ const tests: TestCase[] = [
     id: 'horizon-persona-gepensioneerd', name: 'Persona: gepensioneerde (al voorbij)', category: CAT,
     description: 'Oudere persoon met voldoende vermogen → al FIRE bereikt. HERIJKTE FIXTURE (niet gerelateerd '
       + 'aan de kernel-migratie — computeFireProjection roept runSimulation/_kernel-sim niet aan): €850K bleek '
-      + 'ONVOLDOENDE voor €2.500/mnd bij de echte NL_SWR (~2,88%, ≈34,7x i.p.v. de 25x/4% waar de oorspronkelijke '
-      + '€850K-fixture kennelijk van uitging) → fireTarget ≈ €1.04M, dus fireDate was geen "Bereikt!" meer maar '
+      + 'ONVOLDOENDE voor €2.500/mnd bij de echte NL_SWR (~2,84%, ≈35,2x i.p.v. de 25x/4% waar de oorspronkelijke '
+      + '€850K-fixture kennelijk van uitging) → fireTarget ≈ €1.06M, dus fireDate was geen "Bereikt!" meer maar '
       + '"mrt 2030". Vermogen opgehoogd naar €1.3M (ruime marge boven target) zodat de persona weer ondubbelzinnig '
       + 'al-FIRE is, ook bij kleine toekomstige verschuivingen in de Box 3-forfait-constanten.',
     priority: 'high', estimatedDurationMs: 50,
@@ -395,7 +395,7 @@ const tests: TestCase[] = [
         dateOfBirth: '1957-06-20',
       }
       const r = computeFireProjection(gepensioneerd)
-      // Met €1.3M en €2.500/mnd (NL_SWR-target ≈ €1.04M) is dit ruim al FI
+      // Met €1.3M en €2.500/mnd (NL_SWR-target ≈ €1.06M) is dit ruim al FI
       assertEqual(r.fireDate, 'Bereikt!', 'gepensioneerde is al FI')
       assertNotNull(r.fireAge)
       assertGreaterThanOrEqual(r.freedomPercentage, 80, 'hoog freedom%')

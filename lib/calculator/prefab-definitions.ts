@@ -19,6 +19,7 @@
 
 import type { CalculatorDefinition } from './types'
 import { resolveSchenkErfParams } from '@/lib/horizon-data'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
 /**
  * Schenk-/erfbelastingvrijstellingen voor het lopende jaar — één bron
@@ -27,6 +28,13 @@ import { resolveSchenkErfParams } from '@/lib/horizon-data'
  * meebewegen met de jaargelaagde bron.
  */
 const SCHENK_ERF_HUIDIG = resolveSchenkErfParams()
+
+/**
+ * Box 3-forfaits/vrijstelling voor het lopende belastingjaar — één bron
+ * (BOX3_PARAMS in box3-data.ts). De box3ForfaitVsWerkelijk-prefab vult hiermee
+ * zijn forfait-defaults i.p.v. losse 2025-literals (waren 5,88%/1,44%).
+ */
+const BOX3_HUIDIG = BOX3_PARAMS[CURRENT_TAX_YEAR]
 
 export type PrefabTier = 'starter' | 'verdieping' | 'specialist'
 
@@ -311,8 +319,8 @@ const box3ForfaitVsWerkelijk: CalculatorDefinition = {
     { key: 'spaargeld', label: 'Spaargeld', kind: 'euro', default: 30000, min: 0, max: 2000000, prefill: 'liquid_cash' },
     { key: 'beleggingen', label: 'Beleggingen', kind: 'euro', default: 100000, min: 0, max: 5000000, prefill: 'investment_total' },
     { key: 'rendement', label: 'Werkelijk rendement beleggingen', kind: 'percent', default: 0.06, min: 0, max: 0.15, prefill: 'gross_return' },
-    { key: 'forfait_beleggen', label: 'Forfait beleggen', kind: 'percent', default: 0.0588, min: 0, max: 0.08 },
-    { key: 'forfait_spaar', label: 'Forfait spaargeld', kind: 'percent', default: 0.0144, min: 0, max: 0.04 },
+    { key: 'forfait_beleggen', label: 'Forfait beleggen', kind: 'percent', default: BOX3_HUIDIG.forfaitBeleggingen, min: 0, max: 0.08 },
+    { key: 'forfait_spaar', label: 'Forfait spaargeld', kind: 'percent', default: BOX3_HUIDIG.forfaitSpaargeld, min: 0, max: 0.04 },
     { key: 'tarief', label: 'Box 3-tarief', kind: 'percent', default: 0.36, min: 0.2, max: 0.5 },
     { key: 'jaar', label: 'Belastingjaar', kind: 'number', default: 2026, min: 2026, max: 2035 },
   ],
@@ -437,7 +445,7 @@ const verhuurkamerRegimes: CalculatorDefinition = {
     { key: 'hra_voordeel', label: 'HRA-voordeel (jaar)', formula: 'hypotheek * 0.04 * ib_tarief', format: 'euro', hint: 'Aftrek bij ~4% rente' },
   ],
   outputs: [
-    { key: 'belasting_jaar', label: 'Belasting per jaar', formula: 'if(scenario == "niet_verhuren", 0, if(scenario == "kamervrijstelling", if(jaarhuur <= 6633, 0, boven_vrijstelling * ib_tarief), if(scenario == "box3", woz * 0.25 * 0.0588 * 0.36, if(scenario == "box1_row", max(0, jaarhuur * 0.7) * ib_tarief, boven_vrijstelling * ib_tarief * 0.5))))', format: 'euro', section: 'Belasting', style: 'warn' },
+    { key: 'belasting_jaar', label: 'Belasting per jaar', formula: 'if(scenario == "niet_verhuren", 0, if(scenario == "kamervrijstelling", if(jaarhuur <= 6633, 0, boven_vrijstelling * ib_tarief), if(scenario == "box3", woz * 0.25 * 0.06 * 0.36, if(scenario == "box1_row", max(0, jaarhuur * 0.7) * ib_tarief, boven_vrijstelling * ib_tarief * 0.5))))', format: 'euro', section: 'Belasting', style: 'warn' },
     { key: 'netto_cashflow', label: 'Netto opbrengst per jaar', formula: 'if(scenario == "niet_verhuren", 0, jaarhuur - belasting_jaar)', format: 'euro', section: 'Opbrengst', style: 'total' },
     { key: 'vrijheid_per_jaar', label: 'Vrijheid per jaar', formula: 'if(maandlasten > 0, (if(scenario == "niet_verhuren", 0, jaarhuur - belasting_jaar)) / (maandlasten * 12), 0)', format: 'years', section: 'Opbrengst', style: 'good', hint: 'Extra vrijheid die verhuur jaarlijks oplevert' },
   ],

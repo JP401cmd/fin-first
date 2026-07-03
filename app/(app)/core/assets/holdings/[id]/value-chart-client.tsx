@@ -200,7 +200,7 @@ function ValueChart({ data }: { data: ValueHistoryResponse }) {
       {/* P&L summary badge */}
       <div className="mb-3 flex items-center gap-2">
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-          pnlAbs >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+          pnlAbs >= 0 ? 'bg-emerald-50 text-positive' : 'bg-red-50 text-negative'
         }`} data-testid="chart-pnl-badge">
           {pnlAbs >= 0 ? '▲' : '▼'} {pnlAbs >= 0 ? '+' : ''}{fc(pnlAbs)}
           <span className="ml-0.5 font-normal">
@@ -400,6 +400,7 @@ function HoverTooltip({
       <text x={tx + 8} y={ty + 44} fontSize="9" fill="#a1a1aa">
         {point.units.toFixed(3)} eenheden @ {formatShortCurrency(point.price)}
       </text>
+      {/* eslint-disable-next-line no-restricted-syntax -- lichte P&L-tint op donkere tooltip; var(--positive/negative) is hier onleesbaar */}
       <text x={tx + 8} y={ty + 58} fontSize="9" fill={pnl >= 0 ? '#34d399' : '#f87171'}>
         W/V: {pnl >= 0 ? '+' : ''}{fc(pnl)}
       </text>

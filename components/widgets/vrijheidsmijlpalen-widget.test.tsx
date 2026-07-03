@@ -1,7 +1,53 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { VrijheidsMijlpalenWidget } from './vrijheidsmijlpalen-widget'
 import type { DashboardData } from './widget-renderer'
+import type { FreedomMilestone, FreedomMilestoneResult } from '@/lib/freedom-milestones'
+
+// Stuurbaar perspectief — default personal (zelfde als buiten de provider).
+const mockPerspective = { perspective: 'personal' as string, partnerName: null as string | null }
+vi.mock('@/components/app/perspective-provider', () => ({
+  usePerspective: () => mockPerspective,
+}))
+
+beforeEach(() => {
+  mockPerspective.perspective = 'personal'
+  mockPerspective.partnerName = null
+})
+
+// jsdom kent geen ResizeObserver; de WidgetShell-scrollcheck gebruikt 'm bij
+// full-size (zelfde mock-patroon als wealth-composition-chart.test.tsx).
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
+
+// ── Canonieke-motor-uitkomst factory (lib/freedom-milestones.ts) ─────────────
+function makeMilestone(percent: number, overrides: Partial<FreedomMilestone> = {}): FreedomMilestone {
+  return {
+    percent,
+    label: `${percent}% vrijheid`,
+    targetNetWorth: 500_000 * (percent / 100),
+    reached: false,
+    projectedDate: null,
+    monthsAway: null,
+    message: '',
+    icon: 'clock',
+    ...overrides,
+  }
+}
+
+function makeMilestoneResult(milestones: FreedomMilestone[]): FreedomMilestoneResult {
+  return {
+    milestones,
+    currentFreedomPct: 60,
+    nextMilestone: milestones.find(m => !m.reached && m.monthsAway !== null) ?? null,
+    allReached: milestones.every(m => m.reached),
+    anyReachable: true,
+  }
+}
 
 function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
   return {
@@ -50,6 +96,7 @@ function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
     assetsByType: [],
     totalPurchaseValue: 0,
     fireRange: null,
+    freedomMilestones: null,
     simRows: null,
     simRequiredPortfolio: null,
     backtestSuccessRate: null,
@@ -132,5 +179,66 @@ describe('VrijheidsMijlpalenWidget — canonieke grondslag (ADR 0009)', () => {
     })
     render(<VrijheidsMijlpalenWidget size="mini" data={data} />)
     expect(screen.getByText('Bereikt!')).toBeInTheDocument()
+  })
+})
+
+describe('VrijheidsMijlpalenWidget — mijlpaal-datums uit de canonieke motor', () => {
+  const motorResult = makeMilestoneResult([
+    makeMilestone(25, { reached: true, monthsAway: 0, icon: 'check' }),
+    makeMilestone(50, { reached: true, monthsAway: 0, icon: 'check' }),
+    makeMilestone(75, { projectedDate: 'maart 2030', monthsAway: 44 }),
+    makeMilestone(100, { projectedDate: 'januari 2035', monthsAway: 103, icon: 'target' }),
+  ])
+
+  it('toont de datums uit data.freedomMilestones (geen eigen som)', () => {
+    const data = makeData({
+      netWorth: 300_000,
+      fireEligibleNetWorth: 300_000,
+      simRequiredPortfolio: 500_000,
+      fireTarget: 500_000,
+      freedomPct: 60,
+      freedomMilestones: motorResult,
+    })
+    render(<VrijheidsMijlpalenWidget size="full" data={data} />)
+    expect(screen.getByText('maart 2030')).toBeInTheDocument()
+    expect(screen.getByText('januari 2035')).toBeInTheDocument()
+  })
+
+  it('zonder bundel-uitkomst: geen datums, wel het %-fallback-label', () => {
+    const data = makeData({
+      netWorth: 300_000,
+      fireEligibleNetWorth: 300_000,
+      simRequiredPortfolio: 500_000,
+      fireTarget: 500_000,
+      freedomPct: 60,
+      freedomMilestones: null,
+    })
+    render(<VrijheidsMijlpalenWidget size="full" data={data} />)
+    expect(screen.queryByText('maart 2030')).not.toBeInTheDocument()
+    expect(screen.getByText('75%')).toBeInTheDocument()
+  })
+
+  it('huishouden-perspectief onderdrukt de per-user datums', () => {
+    mockPerspective.perspective = 'household'
+    const data = makeData({
+      netWorth: 300_000,
+      fireEligibleNetWorth: 300_000,
+      fireTarget: 500_000,
+      freedomPct: 60,
+      freedomMilestones: motorResult,
+      householdOverrides: {
+        netWorth: 400_000,
+        totalAssets: 450_000,
+        totalDebts: 50_000,
+        monthlyExpenses: 3_000,
+        monthlyIncome: 6_000,
+        freedomPct: 60,
+        fireTarget: 650_000,
+      },
+    })
+    render(<VrijheidsMijlpalenWidget size="full" data={data} />)
+    expect(screen.getByText('Gecombineerd huishouden')).toBeInTheDocument()
+    expect(screen.queryByText('maart 2030')).not.toBeInTheDocument()
+    expect(screen.queryByText('januari 2035')).not.toBeInTheDocument()
   })
 })

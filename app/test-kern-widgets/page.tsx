@@ -100,6 +100,7 @@ const MOCK_DATA: DashboardData = {
     expected: { fireTarget: 750000, netWorth: 125000, freedomPercentage: 35, fireAge: 55, currentAge: 40, fireDate: 'jan 2041', countdownDays: 5475, countdownYears: 15, countdownMonths: 0, freedomYears: 2, freedomMonths: 11, monthlyPassiveIncome: 350, monthlySavings: 1500, savingsRate: 30 },
     optimistic: { fireTarget: 750000, netWorth: 125000, freedomPercentage: 35, fireAge: 50, currentAge: 40, fireDate: 'jan 2036', countdownDays: 3650, countdownYears: 10, countdownMonths: 0, freedomYears: 2, freedomMonths: 11, monthlyPassiveIncome: 400, monthlySavings: 1500, savingsRate: 30 },
   },
+  freedomMilestones: null,
   simRows: null,
   simNetWorthRows: null,
   simRequiredPortfolio: 750000,
@@ -115,6 +116,15 @@ const MOCK_DATA: DashboardData = {
   favoriteBudgets: [
     { id: 'fav1', name: 'Boodschappen', icon: 'shopping-cart', budgetType: 'expense', limit: 600, spent: 450 },
     { id: 'fav2', name: 'Sparen', icon: 'piggy-bank', budgetType: 'savings', limit: 1500, spent: 1200 },
+  ],
+  topBudgets: [
+    { id: 'tb1', name: 'Boodschappen', icon: 'ShoppingCart', budgetType: 'expense', limit: 600, spent: 720 },
+    { id: 'tb2', name: 'Wonen', icon: 'Home', budgetType: 'expense', limit: 1200, spent: 1100 },
+    { id: 'tb3', name: 'Uit eten', icon: 'UtensilsCrossed', budgetType: 'expense', limit: 200, spent: 165 },
+    { id: 'tb4', name: 'Sparen', icon: 'PiggyBank', budgetType: 'savings', limit: 1500, spent: 1650 },
+    { id: 'tb5', name: 'Vervoer', icon: 'Car', budgetType: 'expense', limit: 300, spent: 140 },
+    { id: 'tb6', name: 'Salaris', icon: 'TrendingUp', budgetType: 'income', limit: 5200, spent: 5200 },
+    { id: 'tb7', name: 'Aflossing', icon: 'CreditCard', budgetType: 'debt', limit: 400, spent: 400 },
   ],
   allBudgets: [
     { id: 'fav1', name: 'Boodschappen', icon: 'shopping-cart', budgetType: 'expense', isFavorite: true, parentId: null },

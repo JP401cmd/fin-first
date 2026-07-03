@@ -265,6 +265,7 @@ import { isWidgetVisible } from '@/lib/compute-module-access'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
+import type { FreedomMilestoneResult } from '@/lib/freedom-milestones'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { HealthScore } from '@/lib/financial-health'
@@ -405,19 +406,6 @@ export interface HeatmapBudgetGroup {
 }
 
 export interface DashboardData {
-  // Vrijheidsmijlpalen (scalar-router; de loader levert dit al — de widget-sessie
-  // maakt dit veld verplicht zodra de consumerende widget landt).
-  freedomMilestones?: import('@/lib/freedom-milestones').FreedomMilestoneResult | null
-  // Hoofdbudgetten-lijst (idem: de loader levert dit al; de widget-sessie maakt het
-  // veld verplicht zodra de Budgetten-widget landt).
-  topBudgets?: {
-    id: string
-    name: string
-    icon: string
-    budgetType: 'income' | 'expense' | 'savings' | 'debt'
-    limit: number
-    spent: number
-  }[]
   // Core financial
   netWorth: number
   totalAssets: number
@@ -482,6 +470,12 @@ export interface DashboardData {
   totalPurchaseValue: number
   // Horizon: scenario range (optimistic/expected/pessimistic FIRE ages)
   fireRange: FireRange | null
+  // Vrijheidsmijlpalen (25/50/75/100%) uit de canonieke motor
+  // (lib/freedom-milestones.ts via de scalar-router), één keer berekend in de
+  // loader op FIRE-eligible grondslag (ADR 0009). Widgets consumeren dit voor
+  // mijlpaal-datums — géén eigen datum-sommen (consume-don't-recompute).
+  // Per-user projectie: in huishouden/partner-perspectief onderdrukken.
+  freedomMilestones: FreedomMilestoneResult | null
   // Horizon: simplified sim rows for vermogenspad chart (age + portfolio + phase)
   simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number }[] | null
   // Horizon: geprojecteerd VOLLEDIG netto vermogen per jaar (FIRE-pot + meegroeiende
@@ -511,6 +505,17 @@ export interface DashboardData {
     name: string
     icon: string
     budgetType: 'income' | 'expense' | 'savings' | 'debt' | 'archive'
+    limit: number
+    spent: number
+  }[]
+  // Alle (niet-archief) hoofdbudgetten met maandlimiet + besteding — de
+  // Budgetten-widget rankt hieruit zelf de top-N (consume-don't-recompute;
+  // spent is per parent, kinderen al opgerold in de loader).
+  topBudgets: {
+    id: string
+    name: string
+    icon: string
+    budgetType: 'income' | 'expense' | 'savings' | 'debt'
     limit: number
     spent: number
   }[]

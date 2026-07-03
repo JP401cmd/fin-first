@@ -13,7 +13,7 @@
  *  5. formatMaskedCurrency unit behavior matches the JSX wrapper.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import {
   PRIVACY_MASKED_STORAGE_KEY,
   PrivacyProvider,
@@ -121,5 +121,76 @@ describe('<MaskedAmount>', () => {
     renderInProvider(<MaskedAmount value={1234.56} decimals />)
     // formatCurrencyDecimals → "€ 1.234,56" in nl-NL.
     expect(screen.getByText(/1\.234,56/)).toBeInTheDocument()
+  })
+})
+
+/**
+ * Regressietests voor de masking-bypass-sweep (werkqueue-kaart "Privacy-modus
+ * dekt álle bedragen"): componenten die eerder plain formatCurrency naast
+ * gemaskeerde bedragen renderden. Grote data-gedreven surfaces (budgets-client,
+ * cash-overview, household-fire-section, horizon fase-modals) zijn hier
+ * onpraktisch — die staan op de handmatige checklist in de werkqueue-kaart.
+ */
+describe('masking-bypass regressies', () => {
+  it('CompoundInsightCard toont géén euro-cijfers wanneer masked (incl. slider-label)', async () => {
+    const { CompoundInsightCard } = await import(
+      '@/components/overview/compound-insight-card'
+    )
+    const { container } = renderInProvider(
+      <CompoundInsightCard liquidCash={10000} monthlyContribution={100} />,
+      { masked: true },
+    )
+    const text = container.textContent ?? ''
+    // Alle saldo-gevoelige bedragen (hoofdvraag, slider-label A6, balken,
+    // verschil) → bullets.
+    expect(text).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    // liquidCash mag nergens meer als cijfer opduiken.
+    expect(text).not.toMatch(/10\.000/)
+    // De enige zichtbare euro-cijfers zijn de statische slider-schaallabels
+    // (€ 0 / € 500 / € 1.000 — vaste referentiewaarden, geen gebruikersdata).
+    const euroDigits = (text.match(/€\s?[\d.,]+/g) ?? []).map((s) =>
+      s.replace(/ /g, ' '),
+    )
+    expect(euroDigits).toEqual(['€ 0', '€ 500', '€ 1.000'])
+  })
+
+  it('EnvelopeTransferSheet-foutmelding maskeert het budgetlimiet (A7)', async () => {
+    const { EnvelopeTransferSheet } = await import(
+      '@/components/app/envelope-transfer-sheet'
+    )
+    const budgets = [
+      {
+        id: 'parent-1',
+        name: 'Vaste lasten',
+        budget_type: 'expense',
+        default_limit: 700,
+        children: [
+          { id: 'child-a', name: 'Boodschappen', budget_type: 'expense', default_limit: 500 },
+          { id: 'child-b', name: 'Vervoer', budget_type: 'expense', default_limit: 200 },
+        ],
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ] as any
+    renderInProvider(
+      <EnvelopeTransferSheet
+        budgets={budgets}
+        budgetAmounts={[]}
+        monthDate={new Date(2026, 5, 1)}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+      { masked: true },
+    )
+    const [fromSelect, toSelect] = screen.getAllByRole('combobox')
+    fireEvent.change(fromSelect, { target: { value: 'child-a' } })
+    fireEvent.change(toSelect, { target: { value: 'child-b' } })
+    fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '600' } })
+    fireEvent.click(screen.getByRole('button', { name: /Verplaatsen/ }))
+
+    const errorNode = screen.getByText(/overschrijdt het limiet/)
+    // Het limiet (500) is saldo-gevoelig → bullets; het zélf ingetypte bedrag
+    // (600) mag zichtbaar blijven (eigen invoer, geen lek).
+    expect(errorNode.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(errorNode.textContent).not.toMatch(/500/)
   })
 })

@@ -78,9 +78,9 @@ export const PayoffChart = memo(function PayoffChart({ months, debts }: { months
         <g key={val}>
           <line
             x1={pad.left} y1={y(val)} x2={w - pad.right} y2={y(val)}
-            stroke="#e4e4e7" strokeWidth="0.5"
+            stroke="var(--rule-soft)" strokeWidth="0.5"
           />
-          <text x={pad.left - 8} y={y(val) + 3} textAnchor="end" fontSize="8" fill="#a1a1aa">
+          <text x={pad.left - 8} y={y(val) + 3} textAnchor="end" fontSize="8" fill="var(--ink-4)">
             {val >= 1000 ? `${Math.round(val / 1000)}k` : val}
           </text>
         </g>
@@ -93,7 +93,7 @@ export const PayoffChart = memo(function PayoffChart({ months, debts }: { months
 
       {/* X-axis labels */}
       {xTicks.map((m) => (
-        <text key={m} x={x(m)} y={h - 5} textAnchor="middle" fontSize="8" fill="#a1a1aa">
+        <text key={m} x={x(m)} y={h - 5} textAnchor="middle" fontSize="8" fill="var(--ink-4)">
           {m >= 12 ? `${Math.floor(m / 12)}j` : `${m}m`}
         </text>
       ))}
@@ -102,7 +102,7 @@ export const PayoffChart = memo(function PayoffChart({ months, debts }: { months
       {debts.map((d, i) => (
         <g key={d.id} transform={`translate(${pad.left + i * 130}, ${h - 16})`}>
           <rect width="8" height="8" rx="2" fill={debtColors[i % debtColors.length]} fillOpacity="0.7" />
-          <text x="12" y="7" fontSize="7" fill="#71717a">{d.name}</text>
+          <text x="12" y="7" fontSize="7" fill="var(--ink-3)">{d.name}</text>
         </g>
       ))}
     </svg>

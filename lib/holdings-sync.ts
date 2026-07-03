@@ -195,3 +195,60 @@ export async function assetHasActiveHoldings(
     return { hasHoldings: false, holdingsCount: 0, totalValue: 0 }
   }
 }
+
+/**
+ * Batch-variant van `assetHasActiveHoldings`: geeft de subset van `assetIds`
+ * terug die minstens één actieve holding heeft (investment óf crypto). Doet
+ * exact 2 queries ongeacht het aantal assets (i.p.v. 1 lookup + 1 query per
+ * asset), zodat de check-in- en herwaardeer-pagina's niet langer N+1 fetchen.
+ *
+ * Een asset_id komt per definitie in maar één holdings-tabel voor, dus de union
+ * van beide tabellen geeft precies dezelfde uitkomst als de asset_type-switch in
+ * `assetHasActiveHoldings`. De `.eq('user_id', userId)`-filter blijft identiek,
+ * dus geen cross-user-lek: holdings-RLS is own-row en een partner-asset levert
+ * hier — net als in het single-asset-pad — géén treffer op.
+ *
+ * Ids worden gededupliceerd; een lege lijst geeft een lege Set zonder query.
+ */
+export async function assetsWithActiveHoldings(
+  supabase: SupabaseLike,
+  assetIds: string[],
+  userId: string
+): Promise<Set<string>> {
+  const result = new Set<string>()
+
+  const uniqueIds = Array.from(new Set(assetIds))
+  if (uniqueIds.length === 0) return result
+
+  try {
+    const [investmentRes, cryptoRes] = await Promise.all([
+      supabase
+        .from('investment_holdings')
+        .select('asset_id')
+        .in('asset_id', uniqueIds)
+        .eq('user_id', userId)
+        .eq('is_active', true),
+      supabase
+        .from('crypto_holdings')
+        .select('asset_id')
+        .in('asset_id', uniqueIds)
+        .eq('user_id', userId)
+        .eq('is_active', true),
+    ])
+
+    for (const row of investmentRes.data ?? []) {
+      const id = (row as { asset_id: string | null }).asset_id
+      if (id) result.add(id)
+    }
+    for (const row of cryptoRes.data ?? []) {
+      const id = (row as { asset_id: string | null }).asset_id
+      if (id) result.add(id)
+    }
+  } catch {
+    // Best-effort: bij een fout geeft de UI simpelweg geen lock aan, net als het
+    // single-asset-pad dat bij een error has_holdings=false teruggeeft.
+    return result
+  }
+
+  return result
+}

@@ -21,9 +21,12 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
 }))
 
-// Mock useDisplaySize — always return stored size (desktop behavior)
+// Mock useDisplaySize — always return stored size (desktop behavior).
+// mockIsMobile is per-test schakelbaar voor het Double-op-mobiel-gedrag.
+let mockIsMobile = false
 vi.mock('@/lib/hooks/use-display-size', () => ({
   useDisplaySize: (size: string) => size,
+  useIsMobile: () => mockIsMobile,
 }))
 
 // Mock useFeatureAccess — all features enabled by default
@@ -100,6 +103,7 @@ const mockData: DashboardData = {
   totalPurchaseValue: 0,
   fireAgeFractional: null,
   fireRange: null,
+  freedomMilestones: null,
   simRows: null,
   simNetWorthRows: null,
   simRequiredPortfolio: null,
@@ -113,6 +117,7 @@ const mockData: DashboardData = {
   prevMonthExpenses: 0,
   netWorthDelta: null,
   favoriteBudgets: [],
+  topBudgets: [],
   favoriteHoldings: [],
   allBudgets: [] as { id: string; name: string; icon: string; budgetType: 'income' | 'expense' | 'savings' | 'debt'; isFavorite: boolean; parentId: string | null }[],
   notifications: [],
@@ -161,16 +166,17 @@ const mockData: DashboardData = {
   heatmapBeschikbaarMap: {},
 }
 
-const makePrefs = (ids: string[], sizes: ('half' | 'full')[] = []): WidgetPref[] =>
+const makePrefs = (ids: string[], sizes: ('half' | 'full' | 'xl')[] = []): WidgetPref[] =>
   ids.map((id, i) => ({
     id,
     enabled: true,
-    size: (sizes[i] ?? 'half') as 'half' | 'full',
+    size: (sizes[i] ?? 'half') as 'half' | 'full' | 'xl',
     order: i,
   }))
 
 beforeEach(() => {
   mockFetch.mockResolvedValue({ ok: true })
+  mockIsMobile = false
 })
 
 describe('DraggableWidgetGrid', () => {
@@ -263,6 +269,25 @@ describe('DraggableWidgetGrid', () => {
     expect(screen.queryByTestId('auto-dashboard-btn')).not.toBeInTheDocument()
   })
 
+  it('rendert gemengde-grootte widgets in edit-mode zonder te crashen (live-reorder dnd-wiring)', () => {
+    // Bewaakt de heterogene-grid dnd-herschikking: no-transform-strategie +
+    // MeasuringStrategy.Always + onDragOver-reorder mogen de render niet breken.
+    const prefs = makePrefs(['netto_vermogen', 'fire_prognose', 'maandoverzicht'], ['half', 'full', 'xl'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={mockData}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+    expect(screen.getByTestId('widget-item-netto_vermogen')).toBeInTheDocument()
+    expect(screen.getByTestId('drag-handle-fire_prognose')).toBeInTheDocument()
+    // Double (xl) behoudt zijn volle-breedte span in de herschikbare grid.
+    expect(screen.getByTestId('widget-item-maandoverzicht').className).toContain('lg:col-span-4')
+  })
+
   it('Auto dashboard button is visible in edit mode', () => {
     const prefs = makePrefs(['acties'])
     // Edit-mode wordt door de host (controlled) aangestuurd — er is geen
@@ -278,6 +303,61 @@ describe('DraggableWidgetGrid', () => {
     )
 
     expect(screen.getByTestId('auto-dashboard-btn')).toBeInTheDocument()
+  })
+})
+
+// ── Double (xl) — opt-in bouwblok voor stats-heavy widgets ──────────────────
+describe('DraggableWidgetGrid — Double (xl) size', () => {
+  it('past xl span-classes toe (col-span-2 lg:col-span-4 row-span-2)', () => {
+    const prefs = makePrefs(['maandoverzicht'], ['xl'])
+    render(
+      <DraggableWidgetGrid initialPrefs={prefs} allPrefs={prefs} data={mockData} />
+    )
+    const item = screen.getByTestId('widget-item-maandoverzicht')
+    expect(item.className).toContain('lg:col-span-4')
+    expect(item.className).toContain('row-span-2')
+  })
+
+  it('toont de Double-optie alleen voor widgets met xl in hun catalog-sizes', () => {
+    const prefs = makePrefs(['maandoverzicht', 'netto_vermogen'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={mockData}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+    // maandoverzicht ondersteunt xl → Double aanwezig
+    expect(
+      screen.getByRole('button', { name: 'maandoverzicht widget Double' })
+    ).toBeInTheDocument()
+    // netto_vermogen ondersteunt xl niet → geen Double
+    expect(
+      screen.queryByRole('button', { name: 'netto_vermogen widget Double' })
+    ).not.toBeInTheDocument()
+  })
+
+  it('biedt Double NIET aan op mobiel, ook niet voor xl-widgets', () => {
+    mockIsMobile = true
+    const prefs = makePrefs(['maandoverzicht'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={mockData}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+    expect(
+      screen.queryByRole('button', { name: 'maandoverzicht widget Double' })
+    ).not.toBeInTheDocument()
+    // De gewone S/M/L blijven wél beschikbaar
+    expect(
+      screen.getByRole('button', { name: 'maandoverzicht widget 100%' })
+    ).toBeInTheDocument()
   })
 })
 

@@ -179,7 +179,7 @@ function DailyFlowChart({
               y={midY - height}
               width={barWidth}
               height={height}
-              fill="#10b981"
+              fill="var(--positive)"
               opacity={i + 1 <= today ? 0.9 : 0.4}
               rx="0.5"
             >
@@ -200,7 +200,7 @@ function DailyFlowChart({
               y={midY}
               width={barWidth}
               height={height}
-              fill="#dc2626"
+              fill="var(--negative)"
               opacity={i + 1 <= today ? 0.9 : 0.4}
               rx="0.5"
             >

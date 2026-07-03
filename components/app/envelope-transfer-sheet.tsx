@@ -8,6 +8,8 @@ import { formatCurrency } from '@/components/app/budget-shared'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import type { Budget } from '@/lib/budget-data'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 interface EnvelopeTransferSheetProps {
   budgets: BudgetWithChildren[]
@@ -29,6 +31,8 @@ export function EnvelopeTransferSheet({
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // Privacy-masking: het budgetlimiet in de foutmelding mag de toggle niet omzeilen.
+  const { masked } = useMaskedAmounts()
 
   const displayDate = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-01`
 
@@ -72,7 +76,7 @@ export function EnvelopeTransferSheet({
       return
     }
     if (transferAmount > fromCurrentLimit) {
-      setError(`Bedrag (${formatCurrency(transferAmount)}) overschrijdt het limiet van ${fromCurrentLimit ? formatCurrency(fromCurrentLimit) : '€0'} voor ${fromBudget?.name}`)
+      setError(`Bedrag (${formatCurrency(transferAmount)}) overschrijdt het limiet van ${formatMaskedCurrency(fromCurrentLimit, masked)} voor ${fromBudget?.name}`)
       return
     }
 

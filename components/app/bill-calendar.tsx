@@ -417,7 +417,7 @@ export function BillCalendar({
             <line x1="0" y1={sparklineSvg.svgH * 0.75} x2={sparklineSvg.svgW} y2={sparklineSvg.svgH * 0.75} stroke="#e2e0d8" strokeWidth="1"/>
 
             {sparklineSvg.negFillSegments.map((d, i) => (
-              <path key={i} d={d} fill="#ef4444" opacity={0.15} />
+              <path key={i} d={d} fill="var(--negative)" opacity={0.15} />
             ))}
 
             <path

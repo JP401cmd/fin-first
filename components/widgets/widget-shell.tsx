@@ -35,6 +35,8 @@ const SIZE_HEIGHT: Record<WidgetSize, string> = {
   quarter: 'h-[140px] sm:h-[160px]',
   half:    'h-[140px] sm:h-[160px]',
   full:    'h-[296px] sm:h-[336px]',
+  // xl (Double) spant 2 rijen net als full — alleen breder (4 kolommen)
+  xl:      'h-[296px] sm:h-[336px]',
 }
 
 // ── Scroll-fade wrapper for full-size content ─────────────────

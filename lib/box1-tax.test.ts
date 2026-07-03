@@ -46,8 +46,8 @@ describe('schijftariefOp — juiste tarief per schijf', () => {
   it('inkomen in schijf 3 → 49,5% (2026)', () => {
     expect(schijftariefOp(100_000, 2026)).toBeCloseTo(0.495, 4)
   })
-  it('AOW: schijf 1 lager tarief', () => {
-    expect(schijftariefOp(30_000, 2026, true)).toBeCloseTo(0.197, 3)
+  it('AOW: schijf 1 lager tarief (17,85% = 35,75% − 17,90% AOW-premie)', () => {
+    expect(schijftariefOp(30_000, 2026, true)).toBeCloseTo(0.1785, 4)
   })
 })
 
@@ -290,5 +290,120 @@ describe('computeBox1Tax — AOW', () => {
     const regulier = computeBox1Tax({ grossYearlyIncome: 30_000, year: 2026 })
     const aow = computeBox1Tax({ grossYearlyIncome: 30_000, year: 2026, aow: true })
     expect(aow.tax).toBeLessThan(regulier.tax)
+  })
+})
+
+// ── Officiële Belastingdienst-cijfers 2026 (fisin2026 / VA 2026) ──────────────
+// Deze suite vergrendelt de gecorrigeerde constanten en de narekening tegen de
+// officiële tabellen, zodat een toekomstige jaar-lag (2026 met 2025-waarden) rood wordt.
+
+describe('BOX1_PARAMS 2026 — officiële heffingskorting-constanten', () => {
+  it('AHK 2026: max €3.115, afbouwstart €29.736, afbouw 6,398%', () => {
+    const ahk = BOX1_PARAMS[2026].algemeneHeffingskorting
+    expect(ahk.max).toBe(3_115)
+    expect(ahk.afbouwStart).toBe(29_736)
+    expect(ahk.afbouwRate).toBeCloseTo(0.06398, 5)
+  })
+
+  it('Arbeidskorting 2026: opbouwknikpunten €11.965/€25.845 en afbouwstart €45.592', () => {
+    const ak = BOX1_PARAMS[2026].arbeidskorting
+    expect(ak.max).toBe(5_685)
+    expect(ak.opbouwPunten[0].tarief).toBeCloseTo(0.08324, 5)
+    expect(ak.opbouwPunten[1]).toEqual({ vanaf: 11_965, tarief: 0.31009 })
+    expect(ak.opbouwPunten[2]).toEqual({ vanaf: 25_845, tarief: 0.01950 })
+    expect(ak.afbouwStart).toBe(45_592)
+  })
+
+  it('IACK 2026: max €3.032, drempel €6.239', () => {
+    expect(BOX1_PARAMS[2026].iack.max).toBe(3_032)
+    expect(BOX1_PARAMS[2026].iack.drempelInkomen).toBe(6_239)
+  })
+
+  it('AOW-tarief schijf 1 2026 = 17,85% en AOW-korting-varianten aanwezig', () => {
+    expect(BOX1_PARAMS[2026].schijvenAow[0].tarief).toBeCloseTo(0.1785, 4)
+    expect(BOX1_PARAMS[2026].algemeneHeffingskortingAow.max).toBe(1_556)
+    expect(BOX1_PARAMS[2026].arbeidskortingAow.max).toBe(2_840)
+  })
+})
+
+describe('computeBox1Tax — arbeidskorting-knikpunten 2026 (narekening)', () => {
+  it('€11.965 = einde 1e opbouwtraject: 11.965 × 8,324%', () => {
+    const r = computeBox1Tax({ grossYearlyIncome: 11_965, year: 2026 })
+    expect(r.arbeidskorting).toBeCloseTo(11_965 * 0.08324, 2)
+  })
+
+  it('€25.845 = einde 2e opbouwtraject', () => {
+    const r = computeBox1Tax({ grossYearlyIncome: 25_845, year: 2026 })
+    const verwacht = 11_965 * 0.08324 + (25_845 - 11_965) * 0.31009
+    expect(r.arbeidskorting).toBeCloseTo(verwacht, 2)
+  })
+
+  it('€45.592 = afbouwstart: arbeidskorting op het maximum (€5.685)', () => {
+    const r = computeBox1Tax({ grossYearlyIncome: 45_592, year: 2026 })
+    expect(r.arbeidskorting).toBeCloseTo(5_685, 2)
+  })
+})
+
+describe('computeBox1Tax — narekening €60.000 bruto 2026 (geen AOW/kind/woning)', () => {
+  // Handmatige som tegen de officiële 2026-tabellen (zie kaart):
+  //   AHK          = 3115 − (60000−29736)·6,398%  = €1.178,71
+  //   arbeidskorting = 5685 − (60000−45592)·6,51%  = €4.747,04
+  //   tax          = heffing €21.832,22 − korting €5.925,75 = €15.906,47
+  // ≈ €230 lager dan de oude (foute) uitkomst van ±€16.136.
+  const r = computeBox1Tax({ grossYearlyIncome: 60_000, year: 2026 })
+
+  it('algemene heffingskorting = €1.178,71', () => {
+    expect(r.algemeneHeffingskorting).toBeCloseTo(1_178.71, 1)
+  })
+  it('arbeidskorting = €4.747,04', () => {
+    expect(r.arbeidskorting).toBeCloseTo(4_747.04, 1)
+  })
+  it('netto te betalen Box 1 = €15.906,47', () => {
+    expect(r.tax).toBeCloseTo(15_906.47, 1)
+  })
+  it('≈ €230 lager dan de oude foute uitkomst (±€16.136)', () => {
+    expect(16_136 - r.tax).toBeGreaterThan(200)
+    expect(16_136 - r.tax).toBeLessThan(260)
+  })
+})
+
+describe('computeBox1Tax — AOW-scenario €60.000 bruto 2026', () => {
+  const aow = computeBox1Tax({ grossYearlyIncome: 60_000, year: 2026, aow: true })
+  const regulier = computeBox1Tax({ grossYearlyIncome: 60_000, year: 2026 })
+
+  it('AOW-variant AHK: 1556 − (60000−29737)·3,195% = €589,10', () => {
+    expect(aow.algemeneHeffingskorting).toBeCloseTo(589.10, 1)
+    expect(aow.algemeneHeffingskorting).toBeLessThan(regulier.algemeneHeffingskorting)
+  })
+
+  it('AOW-variant arbeidskorting ≈ €2.370 (gehalveerde opbouw + afbouw)', () => {
+    expect(aow.arbeidskorting).toBeCloseTo(2_370.38, 1)
+    expect(aow.arbeidskorting).toBeLessThan(regulier.arbeidskorting)
+  })
+
+  it('AOW betaalt minder Box 1 dan regulier (lager schijf-1 tarief weegt zwaarder)', () => {
+    expect(aow.tax).toBeLessThan(regulier.tax)
+  })
+})
+
+describe('BOX1_PARAMS 2025 — regressie (2024-waarden waren doorgeschoven)', () => {
+  it('arbeidskorting-afbouwstart €43.071 (was 2024-waarde €39.957)', () => {
+    expect(BOX1_PARAMS[2025].arbeidskorting.afbouwStart).toBe(43_071)
+  })
+  it('IACK max €2.986 (was 2024-waarde €2.950)', () => {
+    expect(BOX1_PARAMS[2025].iack.max).toBe(2_986)
+  })
+  it('Hillen 2025 = 76,67% (was 2024-waarde 73,33%)', () => {
+    expect(BOX1_PARAMS[2025].hillenPct).toBeCloseTo(0.7667, 4)
+  })
+  it('AHK 2025 blijft correct (€3.068 / €28.406 / 6,337%)', () => {
+    const ahk = BOX1_PARAMS[2025].algemeneHeffingskorting
+    expect(ahk.max).toBe(3_068)
+    expect(ahk.afbouwStart).toBe(28_406)
+    expect(ahk.afbouwRate).toBeCloseTo(0.06337, 5)
+  })
+  it('AOW-korting-varianten 2025 aanwezig (AHK max €1.536, arbeidskorting max €2.802)', () => {
+    expect(BOX1_PARAMS[2025].algemeneHeffingskortingAow.max).toBe(1_536)
+    expect(BOX1_PARAMS[2025].arbeidskortingAow.max).toBe(2_802)
   })
 })

@@ -37,8 +37,12 @@ export async function GET() {
     // Profiel voor cohort-afbakening + inkomensfallback.
     const { data: profile } = await supabase
       .from('profiles')
-      .select('full_name, date_of_birth, household_type, number_of_children, gross_annual_income')
+      .select('full_name, date_of_birth, household_type, number_of_children, gross_annual_income, feature_preferences')
       .maybeSingle()
+
+    // FASE 6 stap 5A — kernel-only: de gemodelleerde peer rekent onvoorwaardelijk op de
+    // horizon-kernel (via de scalar-router). De doorvoer blijft bestaan maar is inert.
+    const kernelScalarEnabled = true
 
     const cohort = deriveCohort({
       date_of_birth: profile?.date_of_birth ?? null,
@@ -70,6 +74,7 @@ export async function GET() {
       cohort,
       displayName: profile?.full_name ?? null,
       generatedAt: new Date().toISOString(),
+      kernelScalarEnabled,
     })
 
     return Response.json(report)

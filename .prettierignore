@@ -7,9 +7,6 @@ pnpm-lock.yaml
 dist/
 build/
 
-# Database
-drizzle/
-
 # Generated files
 *.min.js
 *.min.css

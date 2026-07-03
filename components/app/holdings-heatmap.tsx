@@ -695,7 +695,7 @@ function HeatmapTooltip({
         {plAbs != null && plPct != null && (
           <div className="flex justify-between">
             <span className="text-[var(--ink-3)]">Onger. P&amp;L</span>
-            <span className={`font-mono tabular-nums ${plAbs >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <span className={`font-mono tabular-nums ${plAbs >= 0 ? 'text-positive' : 'text-negative'}`}>
               {plAbs >= 0 ? '+' : ''}{<MaskedAmount value={plAbs} tone="kern" />} ({plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%)
             </span>
           </div>
@@ -705,7 +705,7 @@ function HeatmapTooltip({
         {holding.daily_change_percent != null && (
           <div className="flex justify-between">
             <span className="text-[var(--ink-3)]">Dagelijks rendement</span>
-            <span className={`font-mono tabular-nums ${holding.daily_change_percent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <span className={`font-mono tabular-nums ${holding.daily_change_percent >= 0 ? 'text-positive' : 'text-negative'}`}>
               {holding.daily_change_percent >= 0 ? '+' : ''}{holding.daily_change_percent.toFixed(2)}%
             </span>
           </div>
@@ -749,6 +749,7 @@ function ColorLegend({ colorMode }: { colorMode: ColorMode }) {
             <linearGradient id={gradientId}>
               <stop offset="0%" stopColor="#6b7280" />
               <stop offset="25%" stopColor="#86efac" />
+              {/* eslint-disable-next-line no-restricted-syntax -- legenda van continue lerp-kleurschaal, geen winst/verlies-token */}
               <stop offset="62%" stopColor="#16a34a" />
               <stop offset="100%" stopColor="#166534" />
             </linearGradient>
@@ -781,10 +782,12 @@ function ColorLegend({ colorMode }: { colorMode: ColorMode }) {
         <defs>
           <linearGradient id={gradientId}>
             <stop offset="0%" stopColor="#991b1b" />
+            {/* eslint-disable-next-line no-restricted-syntax -- legenda van continue lerp-kleurschaal, geen winst/verlies-token */}
             <stop offset="17%" stopColor="#dc2626" />
             <stop offset="33%" stopColor="#fca5a5" />
             <stop offset="50%" stopColor="#6b7280" />
             <stop offset="67%" stopColor="#86efac" />
+            {/* eslint-disable-next-line no-restricted-syntax -- legenda van continue lerp-kleurschaal, geen winst/verlies-token */}
             <stop offset="83%" stopColor="#16a34a" />
             <stop offset="100%" stopColor="#166534" />
           </linearGradient>

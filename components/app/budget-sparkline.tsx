@@ -279,10 +279,10 @@ export const SparklineWithLabel = memo(function SparklineWithLabel({
     labelColor = 'text-[var(--ink-3)]'
   } else if (isIncome) {
     trendLabel = trend === 'up' ? '↑ groei' : '↓ daling'
-    labelColor = trend === 'up' ? 'text-emerald-600' : 'text-red-600'
+    labelColor = trend === 'up' ? 'text-positive' : 'text-negative'
   } else {
     trendLabel = trend === 'up' ? '↑ stijgend' : '↓ dalend'
-    labelColor = trend === 'up' ? 'text-red-600' : 'text-emerald-600'
+    labelColor = trend === 'up' ? 'text-negative' : 'text-positive'
   }
 
   return (

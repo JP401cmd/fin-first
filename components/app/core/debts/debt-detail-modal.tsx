@@ -146,17 +146,17 @@ export function DebtDetailModal({
 
         {/* Balance highlight — editorial blueprint met HighlightMark */}
         <div className="border-b border-[var(--border-ed)] px-6 py-5 text-center">
-          <div className="mb-2 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--negative,#dc2626)]">
+          <div className="mb-2 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--negative)]">
             <span
               aria-hidden
               className="inline-block w-5 h-px"
-              style={{ background: 'var(--negative, #dc2626)' }}
+              style={{ background: 'var(--negative)' }}
             />
             Restschuld
           </div>
           <p
             className="text-[32px] sm:text-[40px] font-black leading-none tracking-[-0.02em] tabular-nums"
-            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--negative, #dc2626)' }}
+            style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--negative)' }}
             data-testid="modal-debt-balance"
           >
             <span
@@ -412,7 +412,7 @@ export function DebtDetailModal({
                       </span>
                       <span className="font-medium text-[var(--ink-2)]">{<MaskedAmount value={Number(v.value)} tone="kern" />}</span>
                       {diff !== null && (
-                        <span className={`text-[10px] font-medium ${diff <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <span className={`text-[10px] font-medium ${diff <= 0 ? 'text-positive' : 'text-negative'}`}>
                           {diff >= 0 ? '+' : ''}{<MaskedAmount value={diff} tone="kern" />}
                         </span>
                       )}

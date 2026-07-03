@@ -3,6 +3,7 @@
 import { memo, useState, useEffect } from 'react'
 import { TrendingDown, Check, AlertTriangle, X, CheckCircle2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import { MaskedAmount } from '@/components/app/masked-amount'
 import { AnalysisSection } from '../analysis-section'
 import { berekenEerderStoppen, type EerderStoppenResult, type EerderStoppenStatus } from '@/lib/phase-analysis'
 import type { SimCashflow } from '@/lib/fire-simulation'
@@ -171,7 +172,7 @@ export const EerderStoppen = memo(function EerderStoppen({
                     </td>
                     <td className="px-1 py-2 text-right font-mono tabular-nums text-[var(--ink)]">
                       {optie.extraMaandelijksBesparen > 0
-                        ? `+${formatCurrency(optie.extraMaandelijksBesparen)}`
+                        ? <MaskedAmount value={optie.extraMaandelijksBesparen} signPrefix="+" tone="horizon" />
                         : '\u2013'}
                     </td>
                     <td className="px-1 py-2 text-center">

@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { formatCurrency } from '@/components/app/budget-shared'
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { SPLIT_MODE_LABELS } from '@/lib/household-data'
@@ -65,6 +66,8 @@ export function HouseholdFireSection({
   // Toon/verberg de uitgangspunten-uitleg (i) bij "Samen sterker".
   const [showAssumptions, setShowAssumptions] = useState(false)
   const { perspective, perspectiveVersion, refreshData } = usePerspective()
+  // Privacy-masking voor bedragen die als string worden opgebouwd (ComparisonBar).
+  const { masked } = useMaskedAmounts()
   // Alle hooks MOETEN vóór elke conditionele return staan (rules-of-hooks).
   const { ref: inViewRef } = useInViewAnimation({ duration: 1100 })
   // Balken renderen DIRECT op hun eindbreedte. De in-view-flag bleef 'false'
@@ -428,7 +431,7 @@ export function HouseholdFireSection({
               values={partners.map(p => ({
                 name: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
                 value: p.financials.netWorth,
-                formatted: formatCurrency(p.financials.netWorth),
+                formatted: formatMaskedCurrency(p.financials.netWorth, masked),
               }))}
               testId="comparison-net-worth"
               hasEntered={hasEntered}
@@ -439,7 +442,7 @@ export function HouseholdFireSection({
               values={partners.map(p => ({
                 name: p.fullName ?? (p.isCurrentUser ? 'Jij' : 'Partner'),
                 value: p.financials.monthlyIncome,
-                formatted: formatCurrency(p.financials.monthlyIncome),
+                formatted: formatMaskedCurrency(p.financials.monthlyIncome, masked),
               }))}
               testId="comparison-income"
               hasEntered={hasEntered}
@@ -539,7 +542,7 @@ export function HouseholdFireSection({
                         </li>
                         <li>
                           Uitgave na pensioen: <strong>{methodLabel}</strong> —{' '}
-                          <span className="font-mono tabular-nums">{formatCurrency(comparison.combinedRetirementExpenses)}</span>/jaar.
+                          <MaskedAmount value={comparison.combinedRetirementExpenses} tone="horizon" />/jaar.
                           Gedeelde vaste lasten tellen één keer mee, niet dubbel.
                         </li>
                         {swrPct != null && (
@@ -629,18 +632,18 @@ export function HouseholdFireSection({
                               {indiv.map((p) => (
                                 <div key={p.userId} className="flex items-baseline justify-between gap-3">
                                   <dt className="text-xs text-horizon-800/80">{p.fullName ?? 'Partner'} — apart</dt>
-                                  <dd className="font-mono tabular-nums text-xs text-horizon-800">{formatCurrency(p.amount)}</dd>
+                                  <dd className="text-xs text-horizon-800"><MaskedAmount value={p.amount} tone="horizon" /></dd>
                                 </div>
                               ))}
                               <div className="flex items-baseline justify-between gap-3 border-t border-horizon-200/70 pt-1">
                                 <dt className="text-xs text-horizon-800/80">Twee aparte huishoudens</dt>
-                                <dd className="font-mono tabular-nums text-xs text-horizon-800">{formatCurrency(sumIndiv)}</dd>
+                                <dd className="text-xs text-horizon-800"><MaskedAmount value={sumIndiv} tone="horizon" /></dd>
                               </div>
                               <div className="flex items-baseline justify-between gap-3">
                                 <dt className="text-xs font-medium text-horizon-900">Samen als huishouden</dt>
                                 <dd className="font-mono tabular-nums text-xs font-semibold text-horizon-900">
                                   <span className="bg-[linear-gradient(transparent_60%,var(--color-horizon-200)_60%)] px-0.5">
-                                    {formatCurrency(comparison.combinedRetirementExpenses)}
+                                    <MaskedAmount value={comparison.combinedRetirementExpenses} tone="horizon" />
                                   </span>
                                 </dd>
                               </div>
@@ -666,7 +669,7 @@ export function HouseholdFireSection({
                                 <div className="flex items-baseline justify-between gap-3 border-t-2 border-double border-horizon-300 pt-1">
                                   <dt className="text-xs font-medium text-horizon-900">Verschil — samen minder</dt>
                                   <dd className="font-mono tabular-nums text-xs font-semibold text-positive">
-                                    −{formatCurrency(verschil)}
+                                    −<MaskedAmount value={verschil} tone="horizon" />
                                   </dd>
                                 </div>
                               )}
@@ -685,8 +688,8 @@ export function HouseholdFireSection({
                               {comparison.sharedEssentialBudgets.map((b, i) => (
                                 <li key={i} className="flex items-baseline justify-between gap-3">
                                   <span className="text-xs text-horizon-800/80">{b.name}</span>
-                                  <span className="font-mono tabular-nums text-xs text-horizon-800">
-                                    {formatCurrency(b.yearlyAmount)}
+                                  <span className="text-xs text-horizon-800">
+                                    <MaskedAmount value={b.yearlyAmount} tone="horizon" />
                                     <span className="text-horizon-700/50">/jaar</span>
                                   </span>
                                 </li>
@@ -695,8 +698,8 @@ export function HouseholdFireSection({
                             {comparison.sharedEssentialYearly > 0 && (
                               <p className="mt-1.5 text-[11px] text-horizon-700/70">
                                 Samen{' '}
-                                <span className="font-mono tabular-nums font-medium text-horizon-900">
-                                  {formatCurrency(comparison.sharedEssentialYearly)}/jaar
+                                <span className="font-medium text-horizon-900">
+                                  <MaskedAmount value={comparison.sharedEssentialYearly} tone="horizon" />/jaar
                                 </span>{' '}
                                 die je één keer opzij zet in plaats van dubbel.
                               </p>
@@ -708,7 +711,7 @@ export function HouseholdFireSection({
                   })()
                 ) : (
                   <p className="mt-1 text-horizon-700/80">
-                    {`Jullie gecombineerde netto vermogen is ${formatCurrency(comparison.combinedNetWorth)}, dat is ${comparison.combinedFreedomPercentage.toFixed(1)}% richting volledige vrijheid voor het huishouden.`}
+                    Jullie gecombineerde netto vermogen is <MaskedAmount value={comparison.combinedNetWorth} tone="horizon" />, dat is {comparison.combinedFreedomPercentage.toFixed(1)}% richting volledige vrijheid voor het huishouden.
                   </p>
                 )}
               </div>

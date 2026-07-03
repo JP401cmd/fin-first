@@ -96,22 +96,20 @@ export default function RevaluePage() {
         setDailyExpenses(totalSpend / daysInMonth)
       }
 
-      // Check holdings for all assets in parallel
-      const holdingsChecks = await Promise.all(
-        loadedAssets.map(async (a) => {
-          try {
-            const res = await fetch(`/api/assets/has-holdings?asset_id=${a.id}`)
-            const data = await res.json()
-            return { id: a.id, hasHoldings: data.has_holdings === true }
-          } catch {
-            return { id: a.id, hasHoldings: false }
-          }
-        })
-      )
-
+      // Check holdings for all assets in één batch-call (i.p.v. N calls)
       const hMap: HoldingsMap = {}
-      for (const h of holdingsChecks) {
-        hMap[h.id] = h.hasHoldings
+      if (loadedAssets.length > 0) {
+        try {
+          const ids = loadedAssets.map((a) => a.id).join(',')
+          const res = await fetch(`/api/assets/has-holdings?asset_ids=${ids}`)
+          const data = await res.json()
+          const holdings = (data.holdings ?? {}) as Record<string, boolean>
+          for (const a of loadedAssets) {
+            hMap[a.id] = holdings[a.id] === true
+          }
+        } catch {
+          // Bij een fout: geen assets als holdings-locked markeren
+        }
       }
       setHoldingsMap(hMap)
     } catch (err) {

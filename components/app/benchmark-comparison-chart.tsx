@@ -451,7 +451,7 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
         <div className="flex items-center gap-1.5">
           <span className="inline-block h-0.5 w-4 rounded-full" style={{ backgroundColor: PORTFOLIO_COLOR }} />
           <span className="text-[11px] font-medium text-[var(--ink-2)]">Jouw portfolio</span>
-          <span className={`text-[11px] font-semibold ${comparison.portfolio.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <span className={`text-[11px] font-semibold ${comparison.portfolio.returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
             {comparison.portfolio.returnPct >= 0 ? '+' : ''}{comparison.portfolio.returnPct.toFixed(1)}%
           </span>
         </div>
@@ -470,7 +470,7 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
               }}
             />
             <span className="text-[11px] text-[var(--ink-3)]">{b.name}{b.dataSource === 'synthetic' ? '*' : ''}</span>
-            <span className={`text-[11px] font-medium ${b.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <span className={`text-[11px] font-medium ${b.returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
               {b.returnPct >= 0 ? '+' : ''}{b.returnPct.toFixed(1)}%
             </span>
           </div>
@@ -507,7 +507,7 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
           <p className="text-xs text-[var(--ink-2)] leading-relaxed">
             <span className="font-medium">Benchmarkvergelijking:</span>{' '}
             Je portfolio rendement van{' '}
-            <span className={`font-semibold ${comparison.portfolio.returnPct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <span className={`font-semibold ${comparison.portfolio.returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
               {comparison.portfolio.returnPct >= 0 ? '+' : ''}{comparison.portfolio.returnPct.toFixed(1)}%
             </span>
             {' '}over deze periode.{' '}

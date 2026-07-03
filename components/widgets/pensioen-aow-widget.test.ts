@@ -22,7 +22,7 @@ describe('pensioen-aow-widget — AOW-vermogensequivalent', () => {
     const capitalOnSwr = aowYearly / swr
     const capitalOnGross = aowYearly / grossReturn
 
-    // SWR (~2,88%) << grossReturn (7%) → het equivalent is fors groter.
+    // SWR (~2,84%) << grossReturn (7%) → het equivalent is fors groter.
     expect(capitalOnSwr).toBeGreaterThan(capitalOnGross)
     // De verhouding is grossReturn / swr ≈ 2,4.
     expect(capitalOnSwr / capitalOnGross).toBeCloseTo(grossReturn / swr, 10)
@@ -33,7 +33,7 @@ describe('pensioen-aow-widget — AOW-vermogensequivalent', () => {
     // Fallback-pad: zonder profiel-params gebruikt de widget NL_SWR.
     const capital = aowYearly / NL_SWR
     expect(capital).toBeGreaterThan(0)
-    // Sanity: AOW (~€1558/mnd) op ≈2,88% SWR ≈ €648k vermogensequivalent.
+    // Sanity: AOW (~€1558/mnd) op ≈2,84% SWR ≈ €658k vermogensequivalent.
     expect(capital).toBeGreaterThan(500_000)
     expect(capital).toBeLessThan(800_000)
   })

@@ -208,6 +208,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
             {/* Overspend glow — cell level */}
             <filter id={`${dp}glow`} x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="blur" />
+              {/* eslint-disable-next-line no-restricted-syntax -- overspend-glow in SVG-filterprimitief; var()-support in flood-color is wisselvallig */}
               <feFlood floodColor="#ef4444" floodOpacity="0.5" result="color" />
               <feComposite in="color" in2="blur" operator="in" result="glow" />
               <feMerge>
@@ -219,6 +220,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
             {/* Overspend glow — lobe level (bigger blur) */}
             <filter id={`${dp}lobe-glow`} x="-30%" y="-30%" width="160%" height="160%">
               <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="blur" />
+              {/* eslint-disable-next-line no-restricted-syntax -- overspend-glow in SVG-filterprimitief; var()-support in flood-color is wisselvallig */}
               <feFlood floodColor="#ef4444" floodOpacity="0.35" result="color" />
               <feComposite in="color" in2="blur" operator="in" result="glow" />
               <feMerge>
@@ -335,7 +337,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                   <path
                     d={lobe.boundaryPath}
                     fill="none"
-                    stroke="#ef4444"
+                    stroke="var(--negative)"
                     strokeWidth={2.5}
                     strokeOpacity={0.7}
                     strokeDasharray="8 4"
@@ -369,7 +371,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                       y={lobe.cy - lobe.radius + 12}
                       textAnchor="middle"
                       fontSize="9"
-                      fill={lobeIsOver ? '#dc2626' : c.dark}
+                      fill={lobeIsOver ? 'var(--negative)' : c.dark}
                       fontWeight="700"
                       fontFamily="Inter, sans-serif"
                     >
@@ -380,7 +382,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                       y={lobe.cy - lobe.radius + 24}
                       textAnchor="middle"
                       fontSize="7.5"
-                      fill={lobeIsOver ? '#dc2626' : c.mid}
+                      fill={lobeIsOver ? 'var(--negative)' : c.mid}
                       fontWeight="500"
                       fontFamily="'DM Mono', monospace"
                     >
@@ -443,7 +445,7 @@ export function BudgetBlob({ groups, spending, onNavigate }: BudgetBlobProps) {
                   <path
                     d={cell.blobPath}
                     fill={c.wash}
-                    stroke={isOver ? '#ef4444' : 'none'}
+                    stroke={isOver ? 'var(--negative)' : 'none'}
                     strokeWidth={isOver ? 1.5 : 0}
                     strokeDasharray={isOver ? '6 3' : 'none'}
                     filter={!isOver ? `url(#${dp}cell-glow)` : undefined}
@@ -668,7 +670,7 @@ function Tooltip({
         </div>
         <div className="flex justify-between">
           <span className="text-[var(--ink-3)]">Resterend</span>
-          <span className={`font-medium ${remaining < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+          <span className={`font-medium ${remaining < 0 ? 'text-negative' : 'text-positive'}`}>
             <MaskedAmount value={remaining} tone="wil" />
           </span>
         </div>

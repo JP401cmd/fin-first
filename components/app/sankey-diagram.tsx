@@ -421,7 +421,7 @@ function NodeRect({
           height={nodeH + 3}
           rx={4}
           fill="none"
-          stroke="#ef4444"
+          stroke="var(--negative)"
           strokeWidth={1.5}
         />
       )}

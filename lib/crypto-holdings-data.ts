@@ -29,6 +29,7 @@ import {
   BOX3_TARIEF,
   NL_FICTIEF_BELEGGINGEN,
 } from './constants'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from './box3-data'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -1687,7 +1688,7 @@ export async function loadCryptoFeesSummary(
 // ── Box 3 belastingimpact (indicatief) ────────────────────────────────────
 //
 // Crypto valt in NL Box 3 onder "overige bezittingen" (niet onder bank-
-// tegoeden) — fictief rendement = `NL_FICTIEF_BELEGGINGEN` (2026: 5,88%).
+// tegoeden) — fictief rendement = `NL_FICTIEF_BELEGGINGEN` (2026: 6,00%).
 // De feitelijke heffing = forfait × `BOX3_TARIEF` (2026: 36%) op de waarde
 // boven de drempelvrijstelling. Wij tonen de **bruto** indicatie zonder
 // vrijstelling te verrekenen — die hangt af van partner, peildatum en
@@ -1705,7 +1706,7 @@ export interface CryptoBox3Impact {
   fictiefRendementEur: number
   /** Indicatieve jaarheffing (fictiefRendement × tarief). */
   belastingEur: number
-  /** Forfait-percentage (bv. 5.88 voor 2026). */
+  /** Forfait-percentage (bv. 6.00 voor 2026). */
   ratePct: number
   /** Belastingtarief (bv. 36 voor 2026). */
   taxRatePct: number
@@ -1714,12 +1715,14 @@ export interface CryptoBox3Impact {
 }
 
 /**
- * Drempelvrijstelling Box 3 voor 2026 — per persoon. Dit is louter een
- * disclosure-veld in de UI; de heffing wordt berekend op de **bruto**
- * crypto-waarde omdat we per user (nog) geen volledige Box 3-grondslag
- * kennen. Voor de echte aangifte tellen ook spaargeld + andere beleggingen.
+ * Drempelvrijstelling Box 3 (heffingsvrij vermogen, alleenstaande) voor het
+ * lopende belastingjaar — afgeleid uit de canonieke jaartabel
+ * BOX3_PARAMS[CURRENT_TAX_YEAR] (2026: € 59.357), niet los hardcoded. Dit is
+ * louter een disclosure-veld in de UI; de heffing wordt berekend op de **bruto**
+ * crypto-waarde omdat we per user (nog) geen volledige Box 3-grondslag kennen.
+ * Voor de echte aangifte tellen ook spaargeld + andere beleggingen.
  */
-const NL_BOX3_DREMPELVRIJSTELLING_2026 = 57000
+const NL_BOX3_DREMPELVRIJSTELLING = BOX3_PARAMS[CURRENT_TAX_YEAR].heffingsvrijSingle
 
 export function computeCryptoBox3Impact(totalEur: number): CryptoBox3Impact {
   const safeTotal = Number.isFinite(totalEur) && totalEur > 0 ? totalEur : 0
@@ -1731,6 +1734,6 @@ export function computeCryptoBox3Impact(totalEur: number): CryptoBox3Impact {
     belastingEur,
     ratePct: NL_FICTIEF_BELEGGINGEN * 100,
     taxRatePct: BOX3_TARIEF * 100,
-    drempelvrijstellingEur: NL_BOX3_DREMPELVRIJSTELLING_2026,
+    drempelvrijstellingEur: NL_BOX3_DREMPELVRIJSTELLING,
   }
 }

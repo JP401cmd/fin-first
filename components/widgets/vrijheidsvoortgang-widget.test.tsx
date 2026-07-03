@@ -1,7 +1,27 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { VrijheidsvoortgangWidget } from './vrijheidsvoortgang-widget'
 import type { DashboardData } from './widget-renderer'
+
+// Stuurbaar perspectief — default personal (zelfde als buiten de provider).
+const mockPerspective = { perspective: 'personal' as string, partnerName: null as string | null }
+vi.mock('@/components/app/perspective-provider', () => ({
+  usePerspective: () => mockPerspective,
+}))
+
+beforeEach(() => {
+  mockPerspective.perspective = 'personal'
+  mockPerspective.partnerName = null
+})
+
+// jsdom kent geen ResizeObserver; de WidgetShell-scrollcheck gebruikt 'm bij
+// full-size (zelfde mock-patroon als wealth-composition-chart.test.tsx).
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
 
 // ── Minimal DashboardData factory ────────────────────────────────────────────
 // Only the fields the widget reads matter; the rest are zero/empty stubs.
@@ -52,6 +72,7 @@ function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
     assetsByType: [],
     totalPurchaseValue: 0,
     fireRange: null,
+    freedomMilestones: null,
     simRows: null,
     simRequiredPortfolio: null,
     backtestSuccessRate: null,
@@ -134,5 +155,55 @@ describe('VrijheidsvoortgangWidget — canonieke grondslag (ADR 0009)', () => {
     })
     render(<VrijheidsvoortgangWidget size="mini" data={data} />)
     expect(screen.getByText('100.0%')).toBeInTheDocument()
+  })
+})
+
+describe('VrijheidsvoortgangWidget — full-size zonder mijlpaal-datumlijstje', () => {
+  const fullData = () => makeData({
+    netWorth: 600_000,
+    fireEligibleNetWorth: 300_000,
+    simRequiredPortfolio: 500_000,
+    fireTarget: 500_000,
+    freedomPct: 60,
+    // Twee historie-punten → groei/mnd wordt getoond (bron ongewijzigd tot
+    // bevinding A over de snapshot-cadans is besloten).
+    netWorthHistory: [
+      { month: '2026-05', value: 580_000 },
+      { month: '2026-06', value: 600_000 },
+    ],
+  })
+
+  it('toont ring + groei + restbedrag, maar GEEN mijlpaal-datumregels meer', () => {
+    render(<VrijheidsvoortgangWidget size="full" data={fullData()} />)
+    // Ring-centrum met het canonieke percentage.
+    expect(screen.getByText('60.0%')).toBeInTheDocument()
+    // Groei/mnd en restbedrag zijn de full-size verdieping.
+    expect(screen.getByText('Groei')).toBeInTheDocument()
+    expect(screen.getByText('Nog te gaan')).toBeInTheDocument()
+    // Het datumlijstje (rol van de Vrijheidsmijlpalen-widget) is verwijderd.
+    expect(screen.queryByText('25% vrijheid')).not.toBeInTheDocument()
+    expect(screen.queryByText('75% vrijheid')).not.toBeInTheDocument()
+    expect(screen.queryByText('100% vrijheid')).not.toBeInTheDocument()
+  })
+
+  it('huishouden-perspectief: geen per-user groei, wel het household-%', () => {
+    mockPerspective.perspective = 'household'
+    const data = makeData({
+      ...fullData(),
+      householdOverrides: {
+        netWorth: 400_000,
+        totalAssets: 450_000,
+        totalDebts: 50_000,
+        monthlyExpenses: 3_000,
+        monthlyIncome: 6_000,
+        freedomPct: 55,
+        fireTarget: 650_000,
+      },
+    })
+    render(<VrijheidsvoortgangWidget size="full" data={data} />)
+    expect(screen.getByText('Gecombineerd huishouden')).toBeInTheDocument()
+    expect(screen.getByText('55.0%')).toBeInTheDocument()
+    // Groei komt uit per-user netWorthHistory → onderdrukt in gedeelde views.
+    expect(screen.queryByText('Groei')).not.toBeInTheDocument()
   })
 })

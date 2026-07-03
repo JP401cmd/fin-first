@@ -61,7 +61,7 @@ function ChildBar({
           {child.name}
         </span>
         <span className="shrink-0 font-mono text-xs tabular-nums">
-          <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>
+          <span className={overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}>
             {<MaskedAmount value={spent} tone="wil" />}
           </span>
           <span className="text-[var(--ink-3)]"> / {<MaskedAmount value={limit} tone="wil" />}</span>
@@ -202,12 +202,12 @@ function TreeGroup({
           </span>
           {/* Percentage badge */}
           <span className={`shrink-0 rounded-full bg-[var(--subtle)] px-2 py-0.5 text-xs font-medium ${
-            overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : pct >= 80 ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
+            overBudget ? (overPositive ? 'text-positive' : 'text-negative') : pct >= 80 ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
           }`}>
             {pct}%
           </span>
           <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
-            <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
+            <span className={overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
             {' / '}{<MaskedAmount value={totalLimit} tone="wil" />}
           </span>
         </div>
@@ -282,13 +282,13 @@ function TreeGroup({
         {childOverBudget && <BudgetOverWarningIcon />}
         {/* Percentage badge */}
         <span className={`shrink-0 rounded-full bg-[var(--subtle)] px-2 py-0.5 text-xs font-medium ${
-          overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : pct >= 80 ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
+          overBudget ? (overPositive ? 'text-positive' : 'text-negative') : pct >= 80 ? `text-[${colors.barHexWarn}]` : 'text-[var(--ink-3)]'
         }`}>
           {pct}%
         </span>
         {/* Amount */}
         <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-3)]">
-          <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
+          <span className={overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}>{<MaskedAmount value={totalSpent} tone="wil" />}</span>
           {' / '}{<MaskedAmount value={totalLimit} tone="wil" />}
         </span>
         {/* Chevron */}

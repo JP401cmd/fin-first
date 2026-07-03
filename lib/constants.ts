@@ -7,7 +7,7 @@
  * Categories:
  * - Investment assumptions (returns, volatility)
  * - Withdrawal rates (SWR, NL-specific)
- * - Dutch tax system (Box 3, 2025)
+ * - Dutch tax system (Box 3 — jaargebonden, afgeleid uit box3-data.ts)
  * - Dutch social security (AOW)
  * - Inflation
  * - Transaction costs (verkoopkosten per asset-type)
@@ -16,6 +16,10 @@
 // Type-only import: bij compilatie geheel weg-erased, dus geen runtime-cycle
 // (asset-data.ts importeert constants.ts niet). Houdt deze leaf vrij van runtime-deps.
 import type { AssetType } from '@/lib/asset-data'
+// Runtime-import van de canonieke Box 3-jaartabel. box3-data.ts is een pure leaf
+// (alleen type-imports) en importeert constants.ts NIET terug → geen cycle. Hiermee
+// zijn de NL-FIRE-belastingafgeleiden hieronder één-op-één afgeleid van de bron.
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
 // ── Investment Assumptions ──────────────────────────────────────
 
@@ -55,23 +59,28 @@ export const NL_AOW_MONTHLY = 1558
 /** Dutch AOW netto monthly benefit, cohabiting/married — €1 072 per person. Source: SVB 2026. */
 export const NL_AOW_MONTHLY_SAMENWONEND = 1072
 
-// ── Dutch Tax System — Box 3 (2025) ────────────────────────────
+// ── Dutch Tax System — Box 3 (jaargebonden) ────────────────────
+//
+// GEEN losse literals meer: forfait en tarief worden één-op-één afgeleid uit de
+// canonieke jaartabel BOX3_PARAMS[CURRENT_TAX_YEAR] (lib/box3-data.ts). Zo kunnen
+// het FIRE-forfait en de aangifte-engine nooit meer divergeren (was: 5,88% hier
+// vs. 6,00% in de tabel). Het jaartal wisselt op één plek: CURRENT_TAX_YEAR.
 
-/** Forfaitair rendement beleggingen — 5.88%. Source: Belastingdienst 2025. */
-export const NL_FICTIEF_BELEGGINGEN = 0.0588
+/** Forfaitair rendement beleggingen — afgeleid uit BOX3_PARAMS[CURRENT_TAX_YEAR] (2026: 6,00%). Source: Belastingdienst. */
+export const NL_FICTIEF_BELEGGINGEN = BOX3_PARAMS[CURRENT_TAX_YEAR].forfaitBeleggingen
 
-/** Box 3 belastingtarief — 36%. Source: Belastingdienst 2025. */
-export const BOX3_TARIEF = 0.36
+/** Box 3 belastingtarief — afgeleid uit BOX3_PARAMS[CURRENT_TAX_YEAR] (2026: 36%). Source: Belastingdienst. */
+export const BOX3_TARIEF = BOX3_PARAMS[CURRENT_TAX_YEAR].tarief
 
-/** Effective annual Box 3 tax drag: forfait × tarief ≈ 2.117%. */
+/** Effective annual Box 3 tax drag: forfait × tarief (2026 ≈ 2,16%). */
 export const BOX3_DRAG = NL_FICTIEF_BELEGGINGEN * BOX3_TARIEF
 
 // ── NL-FIRE Derived Constants ───────────────────────────────────
 
-/** Netherlands-specific SWR: DEFAULT_RETURN − BOX3_DRAG − NL_INFLATIE ≈ 2.883%. */
+/** Netherlands-specific SWR: DEFAULT_RETURN − BOX3_DRAG − NL_INFLATIE (2026 ≈ 2,84%). */
 export const NL_SWR = DEFAULT_RETURN - BOX3_DRAG - NL_INFLATIE
 
-/** NL FIRE multiplier — 1 / NL_SWR ≈ 34.7× annual expenses. */
+/** NL FIRE multiplier — 1 / NL_SWR (2026 ≈ 35,2× annual expenses). */
 export const NL_MULTIPLIER = 1 / NL_SWR
 
 // ── Transaction Costs — verkoopkosten per asset-type ────────────
@@ -137,3 +146,32 @@ export const REVERSE_MORTGAGE_DEFAULT_MAX_LOAN_PCT = 0.5
  * op dezelfde grondslag stapelen (zie engine.ts comment bij de opeetschuld).
  */
 export const REVERSE_MORTGAGE_DEFAULT_RATE = 0.055
+
+// ── Kosten koper — aankoop eigen woning (hoofdverblijf) ─────────
+//
+// Fiscale grenzen/tarieven zijn JAARGEBONDEN — verifieer jaarlijks bij de bron.
+// Deze constanten voeden lib/kosten-koper.ts (computeKostenKoper), de enige bron
+// voor het life-event 'house_purchase' in de Horizon-scenario/projectie. Het
+// totaal stroomt als eenmalige uitgave in de FIRE-berekening; verkeerde grenzen =
+// verkeerd bedrag. Geen losse literals meer in de UI dupliceren.
+
+/** Overdrachtsbelasting eigen woning (hoofdverblijf, niet-starter) — 2%. Bron: Belastingdienst, 2026 — jaarlijks verifiëren. */
+export const OVB_TARIEF_EIGEN_WONING = 0.02
+
+/** Startersvrijstelling overdrachtsbelasting: vrijgesteld tot deze woningwaarde — €555.000. Bron: Belastingdienst, 2026 — jaarlijks verifiëren. */
+export const STARTERSVRIJSTELLING_MAX = 555000
+
+/** NHG-kostengrens: max koopsom om NHG te kunnen afsluiten — €470.000. Bron: nhg.nl, 2026 — jaarlijks verifiëren. */
+export const NHG_KOSTENGRENS = 470000
+
+/** NHG borgtochtprovisie: eenmalig over de hypotheeksom — 0,4%. Bron: nhg.nl, 2026 — jaarlijks verifiëren. */
+export const NHG_BORGTOCHTPROVISIE_PCT = 0.004
+
+/** Notariskosten (leverings- + hypotheekakte), vaste indicatie — €1.200. Bron: marktgemiddelde, 2026 — jaarlijks verifiëren. */
+export const KOSTEN_KOPER_NOTARIS = 1200
+
+/** Taxatiekosten woning, vaste indicatie — €500. Bron: marktgemiddelde, 2026 — jaarlijks verifiëren. */
+export const KOSTEN_KOPER_TAXATIE = 500
+
+/** Bankgarantie (waarborgsom-garantie), als fractie van de aankoopprijs — 0,1%. Bron: marktgemiddelde, 2026 — jaarlijks verifiëren. */
+export const KOSTEN_KOPER_BANKGARANTIE_PCT = 0.001

@@ -227,13 +227,13 @@ export const FeeErosionChart = memo(function FeeErosionChart({
         <defs>
           {/* Gradient for erosion area */}
           <linearGradient id="fee-erosion-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ef4444" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#ef4444" stopOpacity="0.03" />
+            <stop offset="0%" stopColor="var(--negative)" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="var(--negative)" stopOpacity="0.03" />
           </linearGradient>
           {/* Low cost line gradient */}
           <linearGradient id="fee-low-line" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#10b981" />
-            <stop offset="100%" stopColor="#059669" />
+            <stop offset="0%" stopColor="var(--positive)" />
+            <stop offset="100%" stopColor="var(--positive)" />
           </linearGradient>
           {/* High cost line gradient */}
           <linearGradient id="fee-high-line" x1="0" y1="0" x2="1" y2="0">
@@ -374,7 +374,7 @@ export const FeeErosionChart = memo(function FeeErosionChart({
           cx={x(years)}
           cy={y(endLowValue)}
           r="4"
-          fill="#059669"
+          fill="var(--positive)"
           style={{
             opacity: phase >= 5 ? 1 : 0,
             transform: phase >= 5 ? 'scale(1)' : 'scale(0)',
@@ -388,7 +388,7 @@ export const FeeErosionChart = memo(function FeeErosionChart({
         <text
           x={x(years) + 10}
           y={y(endLowValue) + 4}
-          className="fill-[#059669]"
+          className="fill-[var(--positive)]"
           fontSize="11"
           fontFamily="var(--font-mono)"
           fontWeight="600"
@@ -428,7 +428,7 @@ export const FeeErosionChart = memo(function FeeErosionChart({
               y1={y(lowCostPoints[Math.round(years * 0.75)]?.value ?? endLowValue)}
               x2={x(Math.round(years * 0.75))}
               y2={y(highCostPoints[Math.round(years * 0.75)]?.value ?? endHighValue)}
-              stroke="#ef4444"
+              stroke="var(--negative)"
               strokeWidth="1.5"
               strokeDasharray="4,3"
             />
@@ -437,7 +437,7 @@ export const FeeErosionChart = memo(function FeeErosionChart({
               x={x(Math.round(years * 0.75)) - 6}
               y={(y(lowCostPoints[Math.round(years * 0.75)]?.value ?? endLowValue) + y(highCostPoints[Math.round(years * 0.75)]?.value ?? endHighValue)) / 2 + 4}
               textAnchor="end"
-              fill="#ef4444"
+              fill="var(--negative)"
               fontSize="10"
               fontFamily="var(--font-mono)"
               fontWeight="600"
@@ -461,7 +461,7 @@ export const FeeErosionChart = memo(function FeeErosionChart({
         }}
       >
         <div className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-5 rounded-sm bg-gradient-to-r from-[#10b981] to-[#059669]" />
+          <span className="inline-block h-2.5 w-5 rounded-sm bg-[var(--positive)]" />
           <span className="text-[var(--ink-2)]">Lage kosten ({lowTERpct}% TER)</span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -469,7 +469,7 @@ export const FeeErosionChart = memo(function FeeErosionChart({
           <span className="text-[var(--ink-2)]">Huidige kosten ({currentTERpct}% TER)</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-5 rounded-sm bg-[#ef4444]/15 border border-[#ef4444]/30" />
+          <span className="inline-block h-2.5 w-5 rounded-sm bg-[var(--negative)]/15 border border-[var(--negative)]/30" />
           <span className="text-[var(--ink-2)]">Verschil (verloren rendement)</span>
         </div>
       </div>

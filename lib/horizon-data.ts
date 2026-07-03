@@ -1156,13 +1156,15 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     defaultMonthlyIncome: -2500,
     defaultDuration: 0,
     description: 'Eerder stoppen met werken',
-    tip: 'AOW-leeftijd is 67 jaar (2026). Eerder stoppen = overbruggen zonder AOW-inkomen. RVU-drempelvrijstelling 2026: ca. €2.182/mnd bruto (max 3 jaar vóór AOW). Check mijnpensioenoverzicht.nl voor je verwachte pensioeninkomen.',
+    // Bron: Rijksoverheid/AWVN, 2026 — jaarlijks verifiëren. RVU-drempelvrijstelling €2.357/mnd (knelsituatie €2.657, +€300 structureel per 1-1-2026).
+    tip: 'AOW-leeftijd is 67 jaar (2026). Eerder stoppen = overbruggen zonder AOW-inkomen. RVU-drempelvrijstelling 2026: ca. €2.357/mnd bruto (€2.657 bij knelsituatie; max 3 jaar vóór AOW). Check mijnpensioenoverzicht.nl voor je verwachte pensioeninkomen.',
     fields: [
       { key: 'pensioenLeeftijd', label: 'Gewenste pensioenleeftijd', fieldType: 'number', default: 62, tip: 'AOW-leeftijd is 67 (2026). Elke jaar eerder stoppen = extra jaar overbruggen uit eigen vermogen.' },
       { key: 'vroegpensioenUitkering', label: 'Vroegpensioen uitkering (optioneel)', fieldType: 'number', default: 0, suffix: '/mnd', tip: 'Sommige regelingen bieden een vroegpensioenuitkering (bijv. 70% van je pensioen). Check mijnpensioenoverzicht.nl. Laat op 0 als je geen regeling hebt.' },
       { key: 'vroegpensioenVanafLeeftijd', label: 'Uitkering vanaf leeftijd', fieldType: 'number', default: 63, tip: 'Leeftijd waarop de vroegpensioenuitkering ingaat. Vaak 60-65 jaar.' },
       { key: 'heeftPensioenregeling', label: 'Aanvullende pensioenregeling', fieldType: 'toggle', default: false, tip: 'Check mijnpensioenoverzicht.nl. Sommige regelingen staan vervroegde opname toe vanaf 60 jaar (met actuariële korting).' },
-      { key: 'overbruggingsUitkering', label: 'Verwachte overbruggingsuitkering', fieldType: 'number', default: 0, suffix: '/mnd', tip: 'RVU-regeling: max €2.182/mnd bruto (2026). Alleen beschikbaar als je werkgever meedoet. Anders uit eigen vermogen overbruggen.' },
+      // Bron: Rijksoverheid/AWVN, 2026 — jaarlijks verifiëren.
+      { key: 'overbruggingsUitkering', label: 'Verwachte overbruggingsuitkering', fieldType: 'number', default: 0, suffix: '/mnd', tip: 'RVU-regeling: max €2.357/mnd bruto (€2.657 bij knelsituatie; 2026). Alleen beschikbaar als je werkgever meedoet. Anders uit eigen vermogen overbruggen.' },
     ],
   },
   house_purchase: {
@@ -1179,10 +1181,12 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     fields: [
       { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: 350000, tip: 'Gemiddelde koopsom NL 2025: ca. €430.000. In Randstad hoger, buiten Randstad lager.' },
       { key: 'hypotheekRente', label: 'Hypotheekrente', fieldType: 'percentage', default: 4.0, tip: 'Indicatie 2026: 10-jarig vast ca. 3,8–4,2%. NHG-rente ca. 0,2% lager. Check hypotheker.nl voor actuele tarieven.', suffix: '%' },
-      { key: 'eersteWoning', label: 'Eerste woning (starter)', fieldType: 'toggle', default: true, tip: 'Starters (18–35 jaar) zijn vrijgesteld van 2% overdrachtsbelasting tot €510.000 (Belastingdienst, 2026).' },
+      // Bron: Belastingdienst, 2026 — jaarlijks verifiëren. Startersvrijstelling-grens €555.000 (zie STARTERSVRIJSTELLING_MAX in lib/constants.ts).
+      { key: 'eersteWoning', label: 'Eerste woning (starter)', fieldType: 'toggle', default: true, tip: 'Starters (18–35 jaar) zijn vrijgesteld van 2% overdrachtsbelasting tot €555.000 (Belastingdienst, 2026).' },
       { key: 'hypotheekLasten', label: 'Verwachte hypotheeklasten/mnd', fieldType: 'number', default: 1200, tip: 'Geschatte bruto hypotheeklasten per maand. Indicatie: €350K hypotheek à 4% = ca. €1.200/mnd annuïteit. Check hypotheker.nl voor je persoonlijke berekening.', suffix: '/mnd' },
       { key: 'huidigeHuur', label: 'Huidige huur/mnd', fieldType: 'number', default: 1000, tip: 'Gemiddelde vrije sector huur NL: ca. €1.100–€1.400/mnd. Dit bedrag bespaar je — verschil met hypotheek + onderhoud is de netto maandlast.', suffix: '/mnd' },
-      { key: 'nhg', label: 'Nationale Hypotheek Garantie (NHG)', fieldType: 'toggle', default: false, tip: 'NHG-grens 2026: €435.000. Eenmalige kosten: 0,6% van hypotheeksom. Levert ca. 0,2% rentekorting op.' },
+      // Bron: nhg.nl, 2026 — jaarlijks verifiëren. Kostengrens €470.000, borgtochtprovisie 0,4% (zie NHG_KOSTENGRENS/NHG_BORGTOCHTPROVISIE_PCT in lib/constants.ts).
+      { key: 'nhg', label: 'Nationale Hypotheek Garantie (NHG)', fieldType: 'toggle', default: false, tip: 'NHG-grens 2026: €470.000. Eenmalige kosten: 0,4% van hypotheeksom (borgtochtprovisie). Levert ca. 0,2% rentekorting op.' },
     ],
   },
   house_sale: {
@@ -1314,10 +1318,11 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     defaultMonthlyIncome: 0,
     defaultDuration: 0,
     description: 'Tweede woning / vastgoed (geen eigen woning)',
-    tip: 'Let op: een tweede woning valt NIET in de eigen-woningregeling. Overdrachtsbelasting is 10,4% (2026, geen startersvrijstelling), er is géén hypotheekrenteaftrek en de woning valt in Box 3 (vermogensrendementsheffing). Verhuur kan een deel van de lasten dekken.',
+    // Bron: Belastingdienst/Ondernemersplein, 2026 — jaarlijks verifiëren. OVB niet-hoofdverblijf (woning) verlaagd van 10,4% naar 8% per 1-1-2026; 10,4% blijft voor niet-woningen.
+    tip: 'Let op: een tweede woning valt NIET in de eigen-woningregeling. Overdrachtsbelasting is 8% (2026, geen startersvrijstelling), er is géén hypotheekrenteaftrek en de woning valt in Box 3 (vermogensrendementsheffing). Verhuur kan een deel van de lasten dekken.',
     fields: [
-      { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: 250000, tip: 'Vraagprijs van de tweede woning. Kosten koper ca. 8% (overdrachtsbelasting 10,4% telt het zwaarst — geen startersvrijstelling).' },
-      { key: 'eigenInbreng', label: 'Eigen inbreng + kosten koper', fieldType: 'number', default: 50000, tip: 'Eenmalige uitgave: eigen geld voor aanbetaling plus kosten koper (notaris, taxatie, overdrachtsbelasting 10,4%).' },
+      { key: 'aankoopprijs', label: 'Aankoopprijs', fieldType: 'number', default: 250000, tip: 'Vraagprijs van de tweede woning. Kosten koper ca. 9% (overdrachtsbelasting 8% telt het zwaarst — geen startersvrijstelling).' },
+      { key: 'eigenInbreng', label: 'Eigen inbreng + kosten koper', fieldType: 'number', default: 50000, tip: 'Eenmalige uitgave: eigen geld voor aanbetaling plus kosten koper (notaris, taxatie, overdrachtsbelasting 8%).' },
       { key: 'maandlasten', label: 'Maandlasten', fieldType: 'number', default: 600, tip: 'Hypotheek/financiering + VvE, OZB, opstalverzekering en onderhoud. Indicatie €400–€900/mnd afhankelijk van financiering.', suffix: '/mnd' },
       { key: 'verhuurInkomsten', label: 'Verhuurinkomsten', fieldType: 'number', default: 0, tip: 'Optioneel: netto huurinkomsten per maand bij (deel)verhuur. Houd rekening met leegstand, beheerkosten en Box 3-heffing.', suffix: '/mnd' },
       { key: 'inBox3', label: 'Valt in Box 3', fieldType: 'toggle', default: true, tip: 'Een tweede woning is vermogen in Box 3 — geen eigen woning. Houd deze waarde gescheiden van je liquide FIRE-portefeuille.' },

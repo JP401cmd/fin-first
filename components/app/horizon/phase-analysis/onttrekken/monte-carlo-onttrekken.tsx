@@ -191,7 +191,7 @@ export const MonteCarloOnttrekken = memo(function MonteCarloOnttrekken({
               Deze analyse simuleert 1.000 mogelijke scenario&apos;s voor je onttrekkingsfase.
               Startend met {<MaskedAmount value={startPortfolio} tone="horizon" />} vermogen en een jaarlijkse
               portfolio-onttrekking van {<MaskedAmount value={yearlyWithdrawal} tone="horizon" />}
-              {yearlyAowIncome > 0 ? ` (bovenop ${formatCurrency(yearlyAowIncome)} AOW, die buiten je portfolio om loopt)` : ''}.
+              {yearlyAowIncome > 0 ? <> (bovenop <MaskedAmount value={yearlyAowIncome} tone="horizon" /> AOW, die buiten je portfolio om loopt)</> : ''}.
               De &ldquo;slagingskans&rdquo; toont hoe vaak je vermogen niet opraakt vóór leeftijd {Math.round(endAge)}.
             </p>
           </div>

@@ -20,13 +20,6 @@ const MILESTONES = [
   { pct: 100, label: 'Volledige vrijheid', desc: 'FIRE bereikt' },
 ]
 
-function yearsToDate(years: number): string {
-  const d = new Date()
-  d.setFullYear(d.getFullYear() + Math.floor(years))
-  d.setMonth(d.getMonth() + Math.round((years % 1) * 12))
-  return d.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
-}
-
 export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({ size, data, href }: Props) {
   // ── Perspective-aware milestones ───────────────────────────────
   // Milestones are fractions of the FIRE target — override netWorth +
@@ -37,36 +30,26 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
   const ov = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
   const isShared = isHouseholdView || isPartnerView
 
-  const { freedomPct, fireTarget, fireEligibleNetWorth, fireProjResult, simRequiredPortfolio, simFireCountdown } = data
-  const netWorth = ov?.netWorth ?? data.netWorth
-  const effectiveFire = ov?.fireTarget ?? simRequiredPortfolio ?? fireTarget
+  const { freedomPct } = data
   // Vrijheids-% = canonieke grondslag (ADR 0009). Eigen perspectief:
   // data.freedomPct (FIRE-eligible vermogen ÷ benodigde portfolio, huis
   // gefilterd). Huishouden/partner: ov.freedomPct (eigen household-grondslag).
   // GEEN eigen som op vol netWorth meer.
   const effectivePct = ov?.freedomPct ?? freedomPct
-  // FIRE-eligible vermogen is de canonieke teller; mijlpaal-datums (target/
-  // "bereikt") leggen hierop zodat ze met effectivePct overeenstemmen. Shared
-  // views gebruiken het ov-vermogen (consistent paar uit de household-engine).
-  const freedomEligibleNetWorth = ov?.netWorth ?? fireEligibleNetWorth
 
-  // Monthly savings approximation using the personal countdown — used purely
-  // to estimate milestone dates, which are per-user and therefore suppressed
-  // in household/partner views (no shared savings cadence exists).
-  const cd = simFireCountdown ?? fireProjResult
-  const countdownYears = cd.countdownYears + cd.countdownMonths / 12
-  const monthlySavingsApprox = !isShared && countdownYears > 0 && effectiveFire > 0
-    ? (effectiveFire - freedomEligibleNetWorth) / (countdownYears * 12)
-    : 0
-
-  const getMilestoneDate = (targetPct: number): string | null => {
-    if (isShared) return null // date projection is per-user only
-    const targetAmount = effectiveFire * (targetPct / 100)
-    if (freedomEligibleNetWorth >= targetAmount) return null // Already reached
-    if (monthlySavingsApprox <= 0) return null
-    const monthsNeeded = (targetAmount - freedomEligibleNetWorth) / monthlySavingsApprox
-    return yearsToDate(monthsNeeded / 12)
+  // Mijlpaal-datums komen uit de canonieke motor (lib/freedom-milestones.ts),
+  // één keer berekend in de bundel (data.freedomMilestones) — geen eigen
+  // datum-som meer in deze widget (consume-don't-recompute). De projectie is
+  // per-user en wordt daarom in huishouden/partner-perspectief onderdrukt
+  // (geen gedeelde spaarcadans).
+  const milestoneDates = new Map<number, string>()
+  if (!isShared && data.freedomMilestones) {
+    for (const m of data.freedomMilestones.milestones) {
+      if (!m.reached && m.projectedDate) milestoneDates.set(m.percent, m.projectedDate)
+    }
   }
+  const getMilestoneDate = (targetPct: number): string | null =>
+    milestoneDates.get(targetPct) ?? null
 
   const baseKicker = 'Vrijheidsmijlpalen'
   const kicker = isHouseholdView

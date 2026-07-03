@@ -23,6 +23,7 @@
 
 import type { LeverageStatus } from '@/lib/leverage-status'
 import { hasPartner as deriveHasPartner } from '@/lib/household-type'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
 /**
  * Box 3-belastbare asset-typen. Pension, eigen_huis, vehicle, physical en
@@ -42,11 +43,15 @@ export const BOX3_ASSET_TYPES: ReadonlySet<string> = new Set([
 ])
 
 /**
- * Box 3-heffingsvrij vermogen (2025, alleenstaande). Wettelijk vast — bewust
- * hier en niet in lib/constants.ts, want het is specifiek voor dit
- * drempel-signaal (geen volledige Box 3-aangiftewaarde).
+ * Box 3-heffingsvrij vermogen (alleenstaande) voor het lopende belastingjaar —
+ * afgeleid uit de canonieke jaartabel BOX3_PARAMS[CURRENT_TAX_YEAR]
+ * (lib/box3-data.ts), niet los hardcoded. Bewust een eigen export voor dít
+ * drempel-signaal (sidebar-dot + Belasting-kaart): het is de heffingsvrije voet,
+ * geen volledige Box 3-aangiftewaarde. Het bedrag is jaargebonden (het "wettelijk
+ * vast"-comment was fout: het wijzigt jaarlijks) en schuift mee met de jaartabel
+ * (2026: € 59.357).
  */
-export const BOX3_VRIJSTELLING_SINGLE = 57_684
+export const BOX3_VRIJSTELLING_SINGLE = BOX3_PARAMS[CURRENT_TAX_YEAR].heffingsvrijSingle
 
 export interface Box3TaxableInput {
   /** Totaal box3-belast vermogen boven de heffingsvrije voet (≥ 0). */

@@ -5,6 +5,7 @@
 
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { FireRange } from '@/lib/horizon-data'
+import type { FreedomMilestoneResult } from '@/lib/freedom-milestones'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
 
@@ -31,6 +32,21 @@ const fireRange: FireRange = {
   optimistic: { ...fireProjBase, fireAge: 48, fireDate: 'jan 2039', countdownDays: 4748, countdownYears: 13, freedomPercentage: 35 },
   expected: fireProjBase,
   pessimistic: { ...fireProjBase, fireAge: 58, fireDate: 'sep 2049', countdownDays: 8583, countdownYears: 23, freedomPercentage: 24 },
+}
+
+// Canonieke mijlpaal-motor-uitkomst (lib/freedom-milestones.ts) — consistent
+// met freedomPct 30: 25% bereikt, de rest op de tijdlijn richting fireDate.
+const freedomMilestones: FreedomMilestoneResult = {
+  milestones: [
+    { percent: 25, label: '25% vrijheid', targetNetWorth: 156250, reached: true, projectedDate: null, monthsAway: 0, message: '25% vrijheid bereikt ✓', icon: 'check' },
+    { percent: 50, label: '50% vrijheid', targetNetWorth: 312500, reached: false, projectedDate: 'juni 2031', monthsAway: 64, message: 'Je bereikt 50% vrijheid rond juni 2031', icon: 'clock' },
+    { percent: 75, label: '75% vrijheid', targetNetWorth: 468750, reached: false, projectedDate: 'maart 2037', monthsAway: 133, message: 'Je bereikt 75% vrijheid rond maart 2037', icon: 'clock' },
+    { percent: 100, label: '100% vrijheid', targetNetWorth: 625000, reached: false, projectedDate: 'mei 2042', monthsAway: 195, message: 'Je bereikt 100% vrijheid rond mei 2042', icon: 'target' },
+  ],
+  currentFreedomPct: 30,
+  nextMilestone: null,
+  allReached: false,
+  anyReachable: true,
 }
 
 export const MOCK_DASHBOARD_DATA: DashboardData = {
@@ -120,6 +136,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
 
   // Horizon
   fireRange,
+  freedomMilestones,
   simRows: Array.from({ length: 10 }, (_, i) => {
     const isAccumulation = i < 6
     return {
@@ -165,6 +182,16 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   favoriteBudgets: [
     { id: 'bf1', name: 'Boodschappen', icon: 'shopping-cart', budgetType: 'expense', limit: 600, spent: 485 },
     { id: 'bf2', name: 'Uit eten', icon: 'utensils', budgetType: 'expense', limit: 200, spent: 165 },
+  ],
+  // Top-budgetten (per hoofdbudget) — de Budgetten-widget rankt hieruit de top-N
+  topBudgets: [
+    { id: 'tb1', name: 'Boodschappen', icon: 'ShoppingCart', budgetType: 'expense', limit: 600, spent: 720 },
+    { id: 'tb2', name: 'Wonen', icon: 'Home', budgetType: 'expense', limit: 1200, spent: 1100 },
+    { id: 'tb3', name: 'Uit eten', icon: 'UtensilsCrossed', budgetType: 'expense', limit: 200, spent: 165 },
+    { id: 'tb4', name: 'Sparen', icon: 'PiggyBank', budgetType: 'savings', limit: 1500, spent: 1650 },
+    { id: 'tb5', name: 'Vervoer', icon: 'Car', budgetType: 'expense', limit: 300, spent: 140 },
+    { id: 'tb6', name: 'Salaris', icon: 'TrendingUp', budgetType: 'income', limit: 5200, spent: 5200 },
+    { id: 'tb7', name: 'Aflossing', icon: 'CreditCard', budgetType: 'debt', limit: 400, spent: 400 },
   ],
 
   // All budgets (for auto-dashboard wizard)

@@ -501,8 +501,10 @@ function CombinedHeatmapLegend() {
               <linearGradient id={gradientId}>
                 <stop offset="0%" stopColor="#d4d4d8" />
                 <stop offset="40%" stopColor="#a3e635" />
+                {/* eslint-disable no-restricted-syntax -- legenda van continue lerp-kleurschaal, geen winst/verlies-token */}
                 <stop offset="70%" stopColor="#22c55e" />
                 <stop offset="100%" stopColor="#16a34a" />
+                {/* eslint-enable no-restricted-syntax */}
               </linearGradient>
             </defs>
             <rect x="0" y="0" width="180" height="10" rx="3" fill={`url(#${gradientId})`} />
@@ -519,6 +521,7 @@ function CombinedHeatmapLegend() {
           <svg width="50" height="14" viewBox="0 0 50 14" className="overflow-visible">
             <defs>
               <linearGradient id="heatmap-legend-over">
+                {/* eslint-disable-next-line no-restricted-syntax -- legenda van continue lerp-kleurschaal, geen winst/verlies-token */}
                 <stop offset="0%" stopColor="#ef4444" />
                 <stop offset="100%" stopColor="#991b1b" />
               </linearGradient>
@@ -627,6 +630,7 @@ function MobileCombinedHeatmap({
                                 {item.name}
                               </span>
                               <span className={`font-mono text-[10px] font-bold tabular-nums [text-shadow:0_1px_2px_rgba(0,0,0,0.3)] ${
+                                // eslint-disable-next-line no-restricted-syntax -- lichte tint-variant op gekleurde heatmap-cel; text-positive/negative is hier onleesbaar
                                 isOver ? (overPositive ? 'text-emerald-100' : 'text-red-100') : 'text-white'
                               }`}>
                                 {pct}%
@@ -754,6 +758,7 @@ function TreemapCell({
             {canFitPct && (
               <p
                 className={`font-mono font-bold tabular-nums leading-tight ${isQuarter ? 'text-[8px]' : 'text-[10px]'} ${
+                  // eslint-disable-next-line no-restricted-syntax -- lichte tint-variant op gekleurde heatmap-cel; text-positive/negative is hier onleesbaar
                   isOver ? (overPositive ? 'text-emerald-100' : 'text-red-100') : 'text-white'
                 }`}
                 style={{ textShadow }}

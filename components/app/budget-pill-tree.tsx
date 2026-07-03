@@ -237,7 +237,7 @@ function BudgetPill({
 
         {/* Bedrag: besteed / begroot. Over-budget kleurt semantisch. */}
         <span className="shrink-0 font-mono text-xs tabular-nums">
-          <span className={overBudget ? (overPositive ? 'text-emerald-600' : 'text-red-600') : 'text-[var(--ink-2)]'}>
+          <span className={overBudget ? (overPositive ? 'text-positive' : 'text-negative') : 'text-[var(--ink-2)]'}>
             <MaskedAmount value={spent} tone="wil" />
           </span>
           <span className="text-[var(--ink-3)]">

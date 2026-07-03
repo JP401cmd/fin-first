@@ -352,8 +352,8 @@ const tests: TestCase[] = [
       assert(highPort.fireReachable, 'hoog portfolio bereikbaar')
       // Verify FIRE age consistency: higher portfolio → earlier FIRE (despite more Box 3)
       assertLessThanOrEqual(highPort.fireAge!, base.fireAge!, 'hoger portfolio = eerder FIRE')
-      // Verify Box 3 constant is approximately 2.12% (forfaitair × tarief)
-      assertLessThan(Math.abs(BOX3_DRAG - 0.02117), 0.001, 'BOX3_DRAG ≈ 2.12%')
+      // Verify Box 3 constant is approximately 2,16% (2026: forfaitair 6,00% × tarief 36%)
+      assertLessThan(Math.abs(BOX3_DRAG - 0.0216), 0.001, 'BOX3_DRAG ≈ 2,16%')
       // Verify all rows have finite values (no NaN from Box 3 computation)
       for (const row of base.rows) {
         assertFinite(row.startPortfolio, `row ${row.age} start finite`)
