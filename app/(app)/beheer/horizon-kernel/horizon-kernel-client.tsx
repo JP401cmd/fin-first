@@ -19,16 +19,18 @@ import TabGeselecteerd from './tab-geselecteerd'
 import TabStappen from './tab-stappen'
 import TabTechnisch from './tab-technisch'
 import TabVerificatie from './tab-verificatie'
+import TabVergelijk from './tab-vergelijk'
 import KernelFlagsCard from './kernel-flags-card'
 
-type TabId = 'uitgangspunten' | 'geselecteerd' | 'stappen' | 'technisch' | 'verificatie'
+type TabId = 'uitgangspunten' | 'geselecteerd' | 'stappen' | 'vergelijk' | 'technisch' | 'verificatie'
 
 const TABS: ReadonlyArray<{ id: TabId; nr: number; label: string }> = [
   { id: 'uitgangspunten', nr: 1, label: 'Uitgangspunten' },
   { id: 'geselecteerd', nr: 2, label: 'Geselecteerde invoer' },
   { id: 'stappen', nr: 3, label: 'Stappen & tabellen' },
-  { id: 'technisch', nr: 4, label: 'Technisch rapport' },
-  { id: 'verificatie', nr: 5, label: 'Verificatie' },
+  { id: 'vergelijk', nr: 4, label: 'Vergelijk' },
+  { id: 'technisch', nr: 5, label: 'Technisch rapport' },
+  { id: 'verificatie', nr: 6, label: 'Verificatie' },
 ]
 
 const STATUS_LABEL: Record<SolverResult['status'], string> = {
@@ -183,6 +185,7 @@ export default function HorizonKernelClient() {
               <TabGeselecteerd kernelInput={data.kernelInput} notices={data.notices ?? []} />
             )}
             {tab === 'stappen' && <TabStappen fireAge={data.solver.fireAge} />}
+            {tab === 'vergelijk' && <TabVergelijk />}
             {tab === 'technisch' && <TabTechnisch bron={bron} />}
             {tab === 'verificatie' && <TabVerificatie onBron={setBron} />}
           </div>
