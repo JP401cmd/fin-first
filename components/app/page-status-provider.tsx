@@ -10,7 +10,7 @@ import {
   useState,
 } from 'react'
 import { usePathname } from 'next/navigation'
-import { usePageStatus } from '@/lib/hooks/use-page-status'
+import { usePageStatus, type PageStatusSeedData } from '@/lib/hooks/use-page-status'
 import {
   resolveBannerDisplay,
   type BannerDisplay,
@@ -29,6 +29,14 @@ import type { PageStatusInfo } from '@/lib/page-status/types'
  * minimize()/restore() schrijven de keuze fire-and-forget naar de server
  * (`PUT /api/overzicht/page-status`) en rollen lokaal terug bij een fout, zodat
  * de UI direct reageert maar consistent blijft met de opgeslagen voorkeur.
+ *
+ * SERVER-SEED (dedup): een server-pagina die de databron toch al SSR-laadt (bv.
+ * /overzicht met loadDashboardData) berekent de status server-side
+ * (`computePageStatusInfo`) en registreert die via een `<PageStatusSeed>`. Die
+ * seed laat `usePageStatus` de overbodige eerste client-fetch ná hydration
+ * overslaan (−queries + −1 λ per bezoek), terwijl de API-route blijft bestaan
+ * voor client-side her-fetches bij route-wissel. De provider blijft daarmee het
+ * ENIGE fetch-pad; de seed is enkel een server-side voorsprong, geen tweede pad.
  */
 
 interface PageStatusContextValue {
@@ -52,6 +60,22 @@ const NULL_CONTEXT: PageStatusContextValue = {
 const PageStatusContext = createContext<PageStatusContextValue | null>(null)
 
 /**
+ * Kanaal waarmee een descendant `<PageStatusSeed>` de server-berekende initiële
+ * status bij de provider registreert. Bewust apart van `PageStatusContext` zodat
+ * de pure consumers (banner/dot) hun contract ongewijzigd houden.
+ */
+const PageStatusSeedContext = createContext<
+  ((seed: PageStatusSeedData) => void) | null
+>(null)
+
+/** Trailing slash strippen vóór lookup (behoud "/" als enige teken). */
+function normalizeRoute(pathname: string): string {
+  return pathname.length > 1 && pathname.endsWith('/')
+    ? pathname.slice(0, -1)
+    : pathname
+}
+
+/**
  * Veilig buiten de provider: geeft een null-ish default terug zodat een
  * `PageStatusDot` die per ongeluk zonder provider mount niet crasht (rendert
  * dan simpelweg niets via display === 'none').
@@ -62,11 +86,19 @@ export function usePageStatusContext(): PageStatusContextValue {
 
 export function PageStatusProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  // Trailing slash strippen vóór lookup (behoud "/" als enige teken).
-  const route =
-    pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+  const route = normalizeRoute(pathname)
 
-  const { info, minimized: fetchedMinimized } = usePageStatus(route)
+  // Server-side seed (van een pagina die de status al berekende). Een descendant
+  // <PageStatusSeed> zet 'm hier in zijn mount-effect — dat vuurt vóór het
+  // fetch-effect van deze provider (React draait child-effects vóór
+  // parent-effects), zodat usePageStatus de seed kan consumeren en de overbodige
+  // eerste client-fetch overslaat. De ref is stabiel; hij triggert geen re-fetch.
+  const seedRef = useRef<PageStatusSeedData | null>(null)
+  const registerInitialStatus = useCallback((seed: PageStatusSeedData) => {
+    seedRef.current = seed
+  }, [])
+
+  const { info, minimized: fetchedMinimized } = usePageStatus(route, seedRef)
 
   // Optimistische lokale state, geseed uit de fetch. Sync mee zodra de fetch
   // (of een route-wissel) een nieuwe serverwaarde levert.
@@ -144,7 +176,31 @@ export function PageStatusProvider({ children }: { children: React.ReactNode }) 
 
   return (
     <PageStatusContext.Provider value={value}>
-      {children}
+      <PageStatusSeedContext.Provider value={registerInitialStatus}>
+        {children}
+      </PageStatusSeedContext.Provider>
     </PageStatusContext.Provider>
   )
+}
+
+/**
+ * PageStatusSeed — onzichtbaar (`null`-renderend) component dat een server-pagina
+ * inside de provider rendert om de reeds SERVER-BEREKENDE status-duiding
+ * (`computePageStatusInfo` + `readMinimizedLevel`) mee te geven. De provider
+ * consumeert die seed zodat de eerste client-fetch ná hydration vervalt.
+ *
+ * Timing: de registratie loopt in een mount-effect, dat gegarandeerd vóór het
+ * fetch-effect van de (voorouder-)provider vuurt — React draait child-effects
+ * vóór parent-effects. Registreert uitsluitend voor de eigen route; een
+ * mismatch of ontbrekende seed laat de provider gewoon fetchen.
+ */
+export function PageStatusSeed({ route, info, minimized }: PageStatusSeedData) {
+  const registerInitialStatus = useContext(PageStatusSeedContext)
+  const normRoute = normalizeRoute(route)
+
+  useEffect(() => {
+    registerInitialStatus?.({ route: normRoute, info, minimized })
+  }, [registerInitialStatus, normRoute, info, minimized])
+
+  return null
 }

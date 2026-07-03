@@ -24,6 +24,8 @@ import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { ageAtDate } from '@/lib/horizon-data'
 import { resolveFreedomFraming } from '@/lib/fire-strategy'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
+import { PageStatusSeed } from '@/components/app/page-status-provider'
+import { computePageStatusInfo, readMinimizedLevel } from '@/lib/page-status/compute'
 
 export const metadata: Metadata = {
   title: 'Overzicht — TriFinity',
@@ -267,8 +269,30 @@ export default async function OverzichtPage() {
       ? dashboardData.monthlyContributions
       : (dashboardData.monthlyIncome ?? 0) - (dashboardData.monthlyExpenses ?? 0)
 
+  // Status-duiding-banner SERVER-SIDE seeden (dedup). /overzicht is de
+  // 'freedom'-familie: `computePageStatusInfo` consumeert exact dezelfde
+  // loadDashboardData die deze pagina hierboven al laadde (React-cache() →
+  // gratis, één query-set per request). De seed laat de PageStatusProvider de
+  // overbodige eerste client-fetch naar /api/overzicht/page-status ná hydration
+  // overslaan (−~25 queries + −1 λ per /overzicht-bezoek). De API-route blijft
+  // bestaan voor client-side her-fetches bij route-wissel binnen /overzicht.
+  const [pageStatusInfo, pageStatusMinimized] = await Promise.all([
+    computePageStatusInfo(supabase, '/overzicht'),
+    authUser.user?.id
+      ? readMinimizedLevel(supabase, authUser.user.id, '/overzicht')
+      : Promise.resolve(null),
+  ])
+
   return (
     <>
+      {/* Seedt de status-duiding-banner met de reeds server-berekende status,
+          zodat de PageStatusProvider niet nóg eens de dashboard-loader in een
+          aparte λ hoeft te draaien na hydration. Rendert niets. */}
+      <PageStatusSeed
+        route="/overzicht"
+        info={pageStatusInfo}
+        minimized={pageStatusMinimized}
+      />
       {/* Tab-root → 'rich' TopBar (utility-cluster) + tab-titel in de mobiele
           bovenbalk, gelijk aan /toekomst en /mijn. Zonder expliciete topBar
           valt NavStackMeta terug op 'simple' en verdwijnt de cluster. */}
