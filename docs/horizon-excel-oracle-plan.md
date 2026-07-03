@@ -350,8 +350,15 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
   PUT-route-hygiëne mee (aan = sleutel wissen, uit = `false` schrijven), beheer-kaart-copy
   bijgewerkt; routers blijven vangnet. Restpunt: de client-side mount-fetch-flits op
   /toekomst en /horizon/whatif toont nu voor íedereen kort v2 vóór de kernel-mount —
-  echte fix = server-side context-preload (stap-5-lijst). **(4)** DB-migratie: vpw/bucket uit
-  withdrawal_strategy (kolom blijft; geen DB-CHECK — enum is app-side); vlag-lezingen weg.
+  echte fix = server-side context-preload (stap-5-lijst). **(4) ✔ KLAAR (remote `20260703115225` + lokaal spiegelbestand)** — DB bleek al schoon
+  (0 vpw/bucket-rijen); migratie = idempotent normalisatie-vangnet + kolom-COMMENTs
+  (withdrawal_strategy-contract 'static'|'guardrails' + withdrawal_profile_config-shape
+  incl. profiel-voorrang — restpunt "COMMENT-update profiel-shape" hiermee afgevoerd).
+  App-side enum-vernauwing ('vpw'|'bucket' uit de types) verhuist naar stap 5 — v2's
+  eigen vpw/bucket-runtime + fire-withdrawal-integration-goldens bestaan tot dan.
+  Vlag-lezingen blijven eveneens tot stap 5 (noodklep). En passant: drift
+  net_worth_snapshots_engine_bron lokaal 20260703013500 → remote-versie 20260702233200
+  hernoemd.
   **(5)** fysieke deletie lib/horizon-engine/ + routers ontvouwen + v2-tests/goldens +
   vergelijk-route weg + calculations.ts/concerns (flag-periode-concern + 3 v2-grondslag-
   concerns)/ADR's (0013/0016→vervangen)/docs + .claude-agents-verwijzingen (calc-engine-
