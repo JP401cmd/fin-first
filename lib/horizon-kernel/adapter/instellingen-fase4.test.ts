@@ -160,14 +160,36 @@ describe('V8 — housing fallbackAge', () => {
     expect(cfg.fallbackAge).toBe(79)
   })
 
-  it('afwezig → verkoopleeftijd = triggerAge (byte-identiek)', () => {
+  it('afwezig (on_depletion) → verkoopleeftijd = Excel-fallback (75), NIET triggerAge', () => {
+    // Bugfix: on_depletion zonder fallbackAge mag niet op de app-triggerAge (68)
+    // vallen — dat forceerde een harde verkoop op 68 ongeacht FIRE. Nu Excel-default 75.
     const w = buildWoning({ ...downsizeBase })
-    expect(w.verkoopleeftijd).toBe(68)
+    expect(w.verkoopleeftijd).toBe(EXCEL_WONING_DEFAULTS.verkoopleeftijd)
+    expect(w.verkoopleeftijd).toBe(75)
   })
 
   it('aanwezig (on_depletion) → verkoopleeftijd = fallbackAge', () => {
     const w = buildWoning({ ...downsizeBase, fallbackAge: 82 })
     expect(w.verkoopleeftijd).toBe(82)
+  })
+
+  it('at_age (fixed_age) → verkoopleeftijd = triggerAge (ongewijzigd)', () => {
+    const w = buildWoning({ ...downsizeBase, trigger: 'fixed_age' })
+    expect(w.verkoopleeftijd).toBe(68)
+  })
+
+  it('reverse_mortgage on_depletion ZONDER fallbackAge → opeetStart = triggerAge (geen gedragswijziging)', () => {
+    const rm = {
+      mode: 'reverse_mortgage' as const,
+      trigger: 'on_depletion' as const,
+      triggerAge: 67,
+      depletionThresholdYears: 0,
+      maxLoanPct: 0.5,
+      interestRate: 0.055,
+      monthlyPayout: null,
+    }
+    const w = buildWoning(rm as ReverseMortgageConfig)
+    expect(w.opeetStartleeftijdOpname).toBe(67)
   })
 
   it('reverse_mortgage on_depletion → opeetStart = fallbackAge', () => {

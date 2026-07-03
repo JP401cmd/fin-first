@@ -1695,6 +1695,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     ? pensionParseResult.nabestaandenpensioen
     : undefined
 
+  // V12 — kernel + opeten (deplete): een "impliciete opnamerate" is hier
+  // betekenisloos. Bij interen wordt het vermogen bewust opgegeten, dus de
+  // jaaronttrekking t.o.v. het (kleine) FIRE-vermogen kan tientallen procenten
+  // zijn (bv. 83%) — dat is geen SWR maar een artefact van de deplete-strategie.
+  // De Opnamerate-KPI toont dan een teer-op-vermogen-duiding i.p.v. een %.
+  const isKernelDepleteRate =
+    engine === 'kernel' && fireStrategy?.strategy === 'deplete' && !isPensioenMode
+
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
   const effectiveCountdown = simResult?.fireAgeFractional != null && currentAge != null
     ? deriveCountdown(simResult.fireAgeFractional, currentAge)
@@ -2988,7 +2996,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             >
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
                 <Percent className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isPensioenMode ? 'Mnd. onttrekking' : 'Opnamerate'}</span>
+                <span>{isPensioenMode ? 'Mnd. onttrekking' : isKernelDepleteRate ? 'Onttrekking' : 'Opnamerate'}</span>
               </div>
               <div
                 className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
@@ -2996,15 +3004,17 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               >
                 {isPensioenMode && monthlyWithdrawalAtAow != null
                   ? <MaskedAmount value={Math.round(monthlyWithdrawalAtAow)} tone="horizon" monoWhenVisible={false} />
-                  : simResult?.implicitWithdrawalRate != null
-                    ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
-                    : `${(fireSwr * 100).toFixed(2)}%`}
+                  : isKernelDepleteRate
+                    ? 'Interen'
+                    : simResult?.implicitWithdrawalRate != null
+                      ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
+                      : `${(fireSwr * 100).toFixed(2)}%`}
               </div>
               <div
                 className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                {isPensioenMode ? 'per maand' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
+                {isPensioenMode ? 'per maand' : isKernelDepleteRate ? 'je teert op je vermogen — geen vaste opnamerate' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
               </div>
             </button>
             </HideInSimple>
@@ -3147,7 +3157,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
             >
               <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
                 <Percent className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isPensioenMode ? 'Mnd.' : 'Opnamerate'}</span>
+                <span>{isPensioenMode ? 'Mnd.' : isKernelDepleteRate ? 'Onttrekking' : 'Opnamerate'}</span>
               </div>
               <div
                 className="text-[18px] font-black leading-none tracking-[-0.02em]"
@@ -3155,15 +3165,17 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               >
                 {isPensioenMode && monthlyWithdrawalAtAow != null
                   ? <MaskedAmount value={Math.round(monthlyWithdrawalAtAow)} tone="horizon" monoWhenVisible={false} />
-                  : simResult?.implicitWithdrawalRate != null
-                    ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
-                    : `${(fireSwr * 100).toFixed(2)}%`}
+                  : isKernelDepleteRate
+                    ? 'Interen'
+                    : simResult?.implicitWithdrawalRate != null
+                      ? `${(simResult.implicitWithdrawalRate * 100).toFixed(2)}%`
+                      : `${(fireSwr * 100).toFixed(2)}%`}
               </div>
               <div
                 className="italic text-[10px] text-[var(--ink-3)] mt-1"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                {isPensioenMode ? 'per maand' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
+                {isPensioenMode ? 'per maand' : isKernelDepleteRate ? 'teert op vermogen' : simResult?.implicitWithdrawalRate != null ? 'impliciet' : 'ingesteld'}
               </div>
             </button>
             </HideInSimple>

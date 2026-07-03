@@ -183,6 +183,8 @@ export default function TabGeselecteerd({
                 { label: 'Afname-strategie', waarde: k.strategie.afname, bron: 'P!B29' },
                 { label: 'Onttrekking-strategie', waarde: k.strategie.onttrekking, bron: 'P!B30' },
                 { label: 'Woningstrategie', waarde: k.woning.selector, bron: 'P!B57' },
+                { label: 'Woning verkoop-trigger', waarde: k.woning.trigger, bron: 'P!B58' },
+                { label: 'Woning verkoopleeftijd', waarde: `${k.woning.verkoopleeftijd} jr`, bron: 'P!B59 · fallback (Excel-default 75 bij "wanneer nodig")' },
               ]}
             />
           </div>

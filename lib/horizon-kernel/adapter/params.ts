@@ -224,10 +224,17 @@ export function buildWoning(housingConfigRaw: unknown): WoningStrategieParams {
   }
 
   if (cfg.mode === 'downsize') {
-    // V8: bij "wanneer nodig" is de verkoopleeftijd de UITERSTE fallback. `fallbackAge`
-    // (indien gezet) wint van de app-`triggerAge`; afwezig → triggerAge (byte-identiek).
+    // V8/bugfix: bij "wanneer nodig" (on_depletion) is de verkoopleeftijd de UITERSTE
+    // fallback voor het geval het liquide vermogen nooit onder de drempel zakt. Die
+    // hoort NIET op de app-`triggerAge` te vallen — dat forceerde `bez.ts` (AY:
+    // `age >= verkoopleeftijd`) tot een harde verkoop op de trigger-leeftijd, ongeacht
+    // FIRE, waardoor de woning veel te vroeg werd verkocht. `fallbackAge` (indien gezet)
+    // wint; anders de Excel-default (75). Bij een vaste leeftijd (fixed_age) blijft
+    // `triggerAge` de verkoopleeftijd.
     const verkoopleeftijd =
-      cfg.trigger === 'on_depletion' ? cfg.fallbackAge ?? cfg.triggerAge : cfg.triggerAge
+      cfg.trigger === 'on_depletion'
+        ? cfg.fallbackAge ?? EXCEL_WONING_DEFAULTS.verkoopleeftijd
+        : cfg.triggerAge
     return {
       ...base,
       trigger: cfg.trigger === 'on_depletion' ? 'Wanneer nodig' : 'Vaste leeftijd',
