@@ -55,6 +55,12 @@ import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementEx
 import type { Box3Method } from '@/lib/bucket-projection'
 import { computeSharePct, type SplitMode } from '@/lib/household-data'
 import { hasPartner } from '@/lib/household-type'
+import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
+import type { EventMappingNotice, KernelAdapterProfile } from '@/lib/horizon-kernel/adapter'
+import {
+  computeHouseholdProjection,
+  type HouseholdProjectionOutcome,
+} from '@/lib/horizon-kernel/household-router'
 
 // ── Result types ────────────────────────────────────────────────────────────
 
@@ -224,6 +230,41 @@ export interface HouseholdProjectionResult {
   partnerDataHidden: boolean
   /** True wanneer de partner z'n volledige TOEKOMST-gegevens verbergt. */
   partnerFutureHidden: boolean
+  /**
+   * Welke motor de huishouden-projectie draaide: 'kernel' (vlag `horizon_kernel_household`
+   * aan én geschikt) of 'v2' (default/terugval). Doorvoer voor beheer/observability.
+   */
+  householdEngine?: 'kernel' | 'v2'
+  /**
+   * Partner-pensioen/-AOW-notices uit de horizon-kernel — alleen gevuld wanneer de
+   * projectie via de kernel liep. De adapter kent partner-pensioen niet in het profiel-
+   * oppervlak → gedocumenteerde defaults + notices. Doorvoer naar beheer/UI; nog niet
+   * geconsumeerd. Afwezig op het v2-pad.
+   */
+  kernelNotices?: readonly EventMappingNotice[]
+}
+
+/**
+ * Vertaal een huishoud-lid-profiel (`MemberProfile`, uit de privacy-gated RPC
+ * `household_member_profiles`) naar een `KernelAdapterProfile`. Mapt UITSLUITEND de al-
+ * geladen velden — géén data-verbreding. Ontbrekende kern-velden (box3-methode, woning-/
+ * onttrekkings-config, guardrails) blijven undefined → adapter-defaults. De post-pensioen-
+ * uitgave wordt in de router expliciet geïnjecteerd (via `essential_budgets`), dus de
+ * retirement-velden hier zijn slechts een neutrale doorgifte.
+ */
+function toKernelAdapterProfile(p: MemberProfile | null): KernelAdapterProfile {
+  return {
+    date_of_birth: p?.date_of_birth ?? null,
+    net_monthly_income: p?.net_monthly_income ?? null,
+    estimated_monthly_expenses: p?.estimated_monthly_expenses ?? null,
+    expected_return: p?.expected_return ?? null,
+    inflation_rate: p?.inflation_rate ?? null,
+    fire_end_strategy: p?.fire_end_strategy ?? null,
+    fire_end_age: p?.fire_end_age ?? null,
+    fire_legacy_amount: p?.fire_legacy_amount ?? null,
+    retirement_expense_method: p?.retirement_expense_method ?? null,
+    retirement_custom_amount: p?.retirement_expense_custom_amount ?? null,
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -553,6 +594,13 @@ export async function buildHouseholdProjectionInput(
   // huishoud-projectie (combined + beide partnerlijnen), zodat de viewer overal
   // dezelfde engine ziet. Flag-uit → byte-identiek aan v1.
   const useV2 = isHorizonV2Enabled(ownFlagRes.data as { feature_preferences?: Record<string, unknown> | null } | null)
+  // FASE 5, stap 2d — draait het huishouden-oppervlak (gecombineerd + per-partner) via de
+  // horizon-kernel? Zelfde eigen-flag-bron als useV2; default UIT (alleen letterlijke true).
+  // Vlag-uit → byte-identiek aan het bestaande v2-pad hieronder.
+  const useHouseholdKernel = isKernelFlagEnabled(
+    ownFlagRes.data as { feature_preferences?: Record<string, unknown> | null } | null,
+    'household',
+  )
   const baseAssets = (baseAssetsRes.data ?? []) as Asset[]
   const baseDebts = (baseDebtsRes.data ?? []) as Debt[]
   const allBudgets = (budgetsRes.data ?? []) as Array<{ id: string; name: string; default_limit: number; interval: string; budget_type: string; is_essential: boolean; parent_id: string | null; user_id: string; ownership: 'personal' | 'shared' }>
@@ -705,7 +753,10 @@ export async function buildHouseholdProjectionInput(
   }
 
   // ── Bouw per-partner projectie ─────────────────────────────────────────────
-  const partners: HouseholdPartnerProjection[] = memberIds.map(memberId => {
+  // `let` (niet `const`): bij de horizon-kernel-tak (vlag horizon_kernel_household) worden
+  // de per-partner PROJECTIES onderaan vervangen door solo-kernel-runs. De v2-berekening
+  // hieronder blijft ongewijzigd — vlag-uit is byte-identiek.
+  let partners: HouseholdPartnerProjection[] = memberIds.map(memberId => {
     const profile = profiles.find(p => p.id === memberId) ?? null
     const isCurrentUser = memberId === user.id
     const myIncome = memberIncome(memberId)
@@ -992,6 +1043,78 @@ export async function buildHouseholdProjectionInput(
   const headFireParams = headProfile ? resolveFireParams(headProfile) : { grossReturn: DEFAULT_RETURN, inflationRate: INFLATION, effectiveSwr: HOUSEHOLD_SWR, box3Method: 'forfaitair' as Box3Method }
   const headFireStrategy = headProfile ? resolveFireStrategyWithOverride(headProfile) : DEFAULT_FIRE_STRATEGY
 
+  // ── Horizon-kernel-tak (vlag horizon_kernel_household, FASE 5 stap 2d) ─────────
+  // Gecombineerd = kernel-huishouden-run (partner via de PT-laag); per-partner = solo-
+  // kernel-runs (buildPerspectiefInputs). Alleen bij een 2-persoons-huishouden dat VOLLEDIG
+  // itemized deelt (geen totals/hidden/aggregaat) + beide met geboortedatum. Buiten die band,
+  // bij vlag-uit of een kernel-fout geeft de router 'v2' terug en draait het bestaande v2-pad
+  // hieronder byte-identiek. Zie lib/horizon-kernel/household-router.ts.
+  const kernelEligible =
+    useHouseholdKernel &&
+    memberIds.length === 2 &&
+    !partnerFutureHidden &&
+    !partnerDataHidden &&
+    !partnerAggregateOnly &&
+    headDobEntry !== null &&
+    memberIds.every(id => !!profiles.find(p => p.id === id)?.date_of_birth)
+
+  let kernelOutcome: HouseholdProjectionOutcome = { engine: 'v2' }
+  if (kernelEligible && headDobEntry) {
+    const headId = headDobEntry.id
+    const partnerMemberId = memberIds.find(id => id !== headId) ?? headId
+    const headShareFraction =
+      computeSharePct(householdSettings, headId, memberIncome(headId), memberIncome(partnerMemberId)) / 100
+    // Per-lid post-pensioen-uitgave = exact de al-getoonde `yearlyMustExpenses` (summary óf
+    // recompute), zodat de kernel-FIRE-doelen consistent zijn met de partner-kaarten en de
+    // gecombineerde uitgave (`combinedYearlyExpenses`) met de "Samen sterker"-weergave.
+    const headYearly = partners.find(p => p.userId === headId)?.financials.yearlyMustExpenses ?? 0
+    const partnerYearly = partners.find(p => p.userId === partnerMemberId)?.financials.yearlyMustExpenses ?? 0
+    kernelOutcome = computeHouseholdProjection({
+      kernelEnabled: true,
+      rawContext: {
+        head: {
+          userId: headId,
+          profile: toKernelAdapterProfile(profiles.find(p => p.id === headId) ?? null),
+          lifeEvents: eventsForMember(headId),
+          yearlyExpenses: headYearly,
+        },
+        partner: {
+          userId: partnerMemberId,
+          profile: toKernelAdapterProfile(profiles.find(p => p.id === partnerMemberId) ?? null),
+          lifeEvents: eventsForMember(partnerMemberId),
+          yearlyExpenses: partnerYearly,
+        },
+        assets: combinedAssets,
+        debts: combinedDebts,
+        combinedLifeEvents: allEvents,
+        gedeeldAandeelHoofd: headShareFraction,
+        combinedYearlyExpenses,
+      },
+    })
+
+    // Vervang de per-partner PROJECTIES door de solo-kernel-runs. De household-specifieke
+    // velden (financials/settings/lifeEvents) blijven exact zoals de v2-tak ze zette;
+    // alleen projection/rows/fireAgeFractional wisselen van motor. Toekomst-verborgen
+    // partners houden hun lege projectie.
+    if (kernelOutcome.engine === 'kernel' && kernelOutcome.perMember) {
+      const perMember = kernelOutcome.perMember
+      partners = partners.map(p => {
+        const kr = perMember[p.userId]
+        if (!kr || p.futureHidden) return p
+        const sim = toSimResult(kr)
+        const f = p.financials
+        return {
+          ...p,
+          projection: simResultToProjection(
+            f.netWorth, f.monthlyIncome, f.monthlyExpenses, f.yearlyMustExpenses, p.settings.currentAge, sim,
+          ),
+          rows: sim.rows,
+          fireAgeFractional: sim.fireAgeFractional,
+        }
+      })
+    }
+  }
+
   let combinedProjection: HouseholdFireProjectionData
   // Gecombineerd projectie-pad voor de grafieklijn. Bij itemized ('full') uit de
   // unified engine; bij 'totals' uit een TOTALEN-simulatie via dezelfde
@@ -999,7 +1122,16 @@ export async function buildHouseholdProjectionInput(
   // oudste partner (deplete → dalend, perpetual → vlak, legacy → naar nalatenschap).
   let combinedRows: SimRow[] = []
   let combinedFireAgeFractional: number | null = null
-  if (partnerAggregateOnly && headAge !== null && combinedYearlyExpenses > 0) {
+  if (kernelOutcome.engine === 'kernel' && kernelOutcome.combined) {
+    // Gecombineerde kernel-huishouden-run (head-as + partner-PT). Zelfde nabewerking als de
+    // v2-takken: toSimResult → simResultToProjection op de huishoud-brede grondslagen.
+    const sim = toSimResult(kernelOutcome.combined)
+    combinedProjection = simResultToProjection(
+      combinedNetWorth, combinedMonthlyIncome, combinedMonthlyExpenses, combinedYearlyExpenses, headAge, sim,
+    )
+    combinedRows = sim.rows
+    combinedFireAgeFractional = sim.fireAgeFractional
+  } else if (partnerAggregateOnly && headAge !== null && combinedYearlyExpenses > 0) {
     // Partner deelt alleen totalen → gecombineerde totalen-simulatie (geen itemized
     // cashflows). Flag-bewust via de engine-selector op een synthetisch portfolio
     // (= het gecombineerde netto vermogen), identiek aan de runSimulation-totalen-run.
@@ -1112,6 +1244,8 @@ export async function buildHouseholdProjectionInput(
     },
     partnerDataHidden,
     partnerFutureHidden,
+    householdEngine: kernelOutcome.engine,
+    kernelNotices: kernelOutcome.engine === 'kernel' ? kernelOutcome.notices : undefined,
   }
 }
 
