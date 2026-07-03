@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-02T10:57:05.105Z",
-  "generatedDate": "2026-07-02",
+  "generatedAt": "2026-07-03T15:08:35.280Z",
+  "generatedDate": "2026-07-03",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 322,
+    "routes": 324,
     "routesProduction": 98,
-    "api": 383,
+    "api": 384,
     "tables": 56,
-    "migrations": 115,
+    "migrations": 118,
     "integrations": 25,
-    "components": 761,
+    "components": 765,
     "providers": 11,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -329,6 +329,12 @@
       "isTest": false
     },
     {
+      "url": "/beheer/horizon-kernel",
+      "file": "app/(app)/beheer/horizon-kernel/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
       "url": "/beheer/horizon-strategie",
       "file": "app/(app)/beheer/horizon-strategie/page.tsx",
       "group": "beheer",
@@ -415,6 +421,12 @@
     {
       "url": "/beheer/widget-audit",
       "file": "app/(app)/beheer/widget-audit/page.tsx",
+      "group": "beheer",
+      "isTest": false
+    },
+    {
+      "url": "/beheer/widget-galerij",
+      "file": "app/(app)/beheer/widget-galerij/page.tsx",
       "group": "beheer",
       "isTest": false
     },
@@ -2264,6 +2276,12 @@
         "isTest": false
       },
       {
+        "url": "/beheer/horizon-kernel",
+        "file": "app/(app)/beheer/horizon-kernel/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
         "url": "/beheer/horizon-strategie",
         "file": "app/(app)/beheer/horizon-strategie/page.tsx",
         "group": "beheer",
@@ -2350,6 +2368,12 @@
       {
         "url": "/beheer/widget-audit",
         "file": "app/(app)/beheer/widget-audit/page.tsx",
+        "group": "beheer",
+        "isTest": false
+      },
+      {
+        "url": "/beheer/widget-galerij",
+        "file": "app/(app)/beheer/widget-galerij/page.tsx",
         "group": "beheer",
         "isTest": false
       },
@@ -4506,15 +4530,6 @@
       ]
     },
     {
-      "url": "/api/apply-roadmap-migration",
-      "file": "app/api/apply-roadmap-migration/route.ts",
-      "domain": "apply-roadmap-migration",
-      "methods": [
-        "GET",
-        "POST"
-      ]
-    },
-    {
       "url": "/api/assets/has-holdings",
       "file": "app/api/assets/has-holdings/route.ts",
       "domain": "assets",
@@ -5101,9 +5116,25 @@
       ]
     },
     {
-      "url": "/api/horizon-engine/ledger",
-      "file": "app/api/horizon-engine/ledger/route.ts",
-      "domain": "horizon-engine",
+      "url": "/api/horizon-kernel",
+      "file": "app/api/horizon-kernel/route.ts",
+      "domain": "horizon-kernel",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/horizon-kernel/tabel",
+      "file": "app/api/horizon-kernel/tabel/route.ts",
+      "domain": "horizon-kernel",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/horizon-kernel/verificatie",
+      "file": "app/api/horizon-kernel/verificatie/route.ts",
+      "domain": "horizon-kernel",
       "methods": [
         "GET"
       ]
@@ -8604,6 +8635,37 @@
       ]
     },
     {
+      "domain": "horizon-kernel",
+      "label": "horizon-kernel",
+      "count": 3,
+      "routes": [
+        {
+          "url": "/api/horizon-kernel",
+          "file": "app/api/horizon-kernel/route.ts",
+          "domain": "horizon-kernel",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/horizon-kernel/tabel",
+          "file": "app/api/horizon-kernel/tabel/route.ts",
+          "domain": "horizon-kernel",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/horizon-kernel/verificatie",
+          "file": "app/api/horizon-kernel/verificatie/route.ts",
+          "domain": "horizon-kernel",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "module-guide",
       "label": "module-guide",
       "count": 3,
@@ -8968,22 +9030,6 @@
           "domain": "appearance",
           "methods": [
             "PUT"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "apply-roadmap-migration",
-      "label": "apply-roadmap-migration",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/apply-roadmap-migration",
-          "file": "app/api/apply-roadmap-migration/route.ts",
-          "domain": "apply-roadmap-migration",
-          "methods": [
-            "GET",
-            "POST"
           ]
         }
       ]
@@ -9382,21 +9428,6 @@
             "POST",
             "PATCH",
             "DELETE"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "horizon-engine",
-      "label": "horizon-engine",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/horizon-engine/ledger",
-          "file": "app/api/horizon-engine/ledger/route.ts",
-          "domain": "horizon-engine",
-          "methods": [
-            "GET"
           ]
         }
       ]
@@ -12372,7 +12403,7 @@
         "migration": "supabase/migrations/20260501000001_create_external_connections.sql"
       }
     ],
-    "migrationCount": 115
+    "migrationCount": 118
   },
   "tablesByDomain": [
     {
@@ -12702,7 +12733,7 @@
     }
   ],
   "components": {
-    "total": 761,
+    "total": 765,
     "groups": [
       {
         "group": "app",
@@ -13228,7 +13259,7 @@
       },
       {
         "group": "widgets",
-        "count": 61,
+        "count": 62,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -13246,6 +13277,7 @@
           "budget-heatmap-widget",
           "budget-trend-widget",
           "budgetten-widget",
+          "budgetten-widget.test",
           "cash-flow-widget",
           "category-app-nav-bar",
           "doelen-widget",
@@ -13295,13 +13327,15 @@
       },
       {
         "group": "future",
-        "count": 52,
+        "count": 55,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
           "aow-strategie-editor",
           "calculator-runner",
           "calculator-to-life-event-sheet",
+          "categorie-prio-editor",
+          "categorie-prio-editor.test",
           "disclaimer-strip",
           "doel-bewerken-sheet",
           "doel-bewerken-sheet.test",
@@ -13321,6 +13355,7 @@
           "like-button",
           "onttrekking-afname-body",
           "onttrekkingsstrategie-body",
+          "onttrekkingsstrategie-body.test",
           "onttrekkingsvolgorde-body",
           "owner-stats-badge",
           "pensioen-projectie-chart",
@@ -18064,7 +18099,7 @@
     {
       "id": "0013-horizon-grootboek-engine-v2",
       "title": "horizon grootboek engine v2",
-      "status": "aanvaard",
+      "status": "vervangen",
       "date": "2026-06-13",
       "elements": [
         "as-planning",
@@ -18103,7 +18138,7 @@
     {
       "id": "0016-horizon-v2-cutover-acceptatie-en-reeel-nominaal",
       "title": "horizon v2 cutover acceptatie en reeel nominaal",
-      "status": "aanvaard",
+      "status": "vervangen",
       "date": "2026-06-13",
       "elements": [
         "as-planning",
@@ -18326,12 +18361,12 @@
         "commits": 85
       },
       {
-        "path": "lib/ai",
+        "path": "app/(app)/toekomst",
         "commits": 33
       },
       {
-        "path": "app/(app)/toekomst",
-        "commits": 30
+        "path": "lib/ai",
+        "commits": 33
       },
       {
         "path": "app/api/ai",
@@ -18347,7 +18382,7 @@
       },
       {
         "path": "lib/horizon-data.ts",
-        "commits": 5
+        "commits": 6
       },
       {
         "path": "components/horizon",
@@ -18365,18 +18400,18 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 6917,
-        "commits": 63
+        "loc": 7129,
+        "commits": 71
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 4984,
-        "commits": 25
+        "commits": 24
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4236,
-        "commits": 39
+        "commits": 38
       },
       {
         "file": "lib/release-notes.ts",
@@ -18395,12 +18430,12 @@
       },
       {
         "file": "lib/horizon-data.ts",
-        "loc": 2314,
-        "commits": 5
+        "loc": 2400,
+        "commits": 6
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
-        "loc": 2206,
+        "loc": 2205,
         "commits": 9
       }
     ]
@@ -18452,7 +18487,7 @@
       {
         "id": "calc-engine-specialist",
         "name": "calc-engine-specialist",
-        "description": "Use this agent for TriFinity's financial calculation engines (rekenmotoren): the code that turns raw DB data into the derived numbers users see — spaarquote, netto vermogen, belastingdruk (box 1/box 3), FIRE-doel, vrijheids-% and vrijheidstijd. It owns `lib/constants.ts`, `lib/fire-params.ts`, `lib/unified-projection.ts`, `lib/budget-utils.ts`, `lib/effective-financials.ts`, `lib/savings-source.ts`, `lib/housing-strategy.ts`, `lib/box1-tax.ts`, `lib/box3-data.ts`, `lib/dashboard-data-loader.ts` and `lib/format.ts`. Use it whenever a calculation, constant or assumption changes, or to verify a number is correct and single-sourced. It also keeps the curated *Berekeningen* view (`lib/architecture/calculations.ts`) in sync.",
+        "description": "Use this agent for TriFinity's financial calculation engines (rekenmotoren): the code that turns raw DB data into the derived numbers users see — spaarquote, netto vermogen, belastingdruk (box 1/box 3), FIRE-doel, vrijheids-% and vrijheidstijd. It owns `lib/horizon-kernel/**` (the FIRE/Horizon engine: engine/solver/gap/bridge/run-unified/wrappers/adapter), `lib/horizon/build-input.ts`, `lib/horizon/networth-rows.ts`, `lib/constants.ts`, `lib/fire-params.ts`, `lib/budget-utils.ts`, `lib/effective-financials.ts`, `lib/savings-source.ts`, `lib/housing-strategy.ts`, `lib/box1-tax.ts`, `lib/box3-data.ts`, `lib/dashboard-data-loader.ts` and `lib/format.ts`; `lib/unified-projection.ts` is only the consumer type contract (SimRow/SimResult) produced by the kernel bridge — not an engine. Use it whenever a calculation, constant or assumption changes, or to verify a number is correct and single-sourced. It also keeps the curated *Berekeningen* view (`lib/architecture/calculations.ts`) in sync.",
         "model": "opus",
         "color": "amber"
       },
@@ -19178,9 +19213,37 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-06-25",
-    "hasChanges": false,
-    "sections": []
+    "previousDate": "2026-07-02",
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Schermen",
+        "added": [
+          "/beheer/horizon-kernel",
+          "/beheer/widget-galerij"
+        ],
+        "removed": []
+      },
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/horizon-kernel",
+          "/api/horizon-kernel/tabel",
+          "/api/horizon-kernel/verificatie"
+        ],
+        "removed": [
+          "/api/apply-roadmap-migration",
+          "/api/horizon-engine/ledger"
+        ]
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+4"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -19278,6 +19341,13 @@
       "date": "2026-07-02",
       "api": 383,
       "components": 761,
+      "tables": 56,
+      "routesProduction": 98
+    },
+    {
+      "date": "2026-07-03",
+      "api": 384,
+      "components": 765,
       "tables": 56,
       "routesProduction": 98
     }

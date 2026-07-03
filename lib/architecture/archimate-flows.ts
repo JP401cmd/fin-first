@@ -31,7 +31,7 @@ export const ARCHI_FLOWS: ArchiFlow[] = [
       { elementId: 't-bankimport', label: 'Bank-bestand inlezen', artifact: 'lib/parsers/*', detail: 'Coherente dedup via import_hash + bank_seq.' },
       { elementId: 'do-transactie', label: 'Transactie vastgelegd', artifact: 'transactions', detail: 'Eigen-rekening-transfers krijgen een zichtbare budgetpost.' },
       { elementId: 'as-budget', label: 'Budget-match + spaarquote', artifact: 'lib/savings-source.ts', detail: 'Cashflow-spaarquote = (inkomen − uitgaven) / inkomen.' },
-      { elementId: 'as-planning', label: 'Spaarquote × inkomen → projectie', artifact: 'runHorizonLedger', detail: 'Geïndexeerd in de grootboek-engine v2, met aflossing-dubbeltel-guard.' },
+      { elementId: 'as-planning', label: 'Spaarquote × inkomen → projectie', artifact: 'runKernelUnified', detail: 'Geïndexeerd door de horizon-kernel (maandbasis, Excel-oracle, ADR 0032), met aflossing-dubbeltel-guard.' },
       { elementId: 'fn-toekomstplannen', label: 'FIRE-datum', artifact: 'computeFireRange', detail: 'Het eindresultaat: jaren vrijheid.' },
     ],
   },

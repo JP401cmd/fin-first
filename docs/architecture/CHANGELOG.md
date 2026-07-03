@@ -326,3 +326,10 @@
 ## 2026-07-02
 
 - Geen wijzigingen.
+
+## 2026-07-03
+
+- **Schermen** toegevoegd: /beheer/horizon-kernel, /beheer/widget-galerij
+- **API-routes** toegevoegd: /api/horizon-kernel, /api/horizon-kernel/tabel, /api/horizon-kernel/verificatie
+- **API-routes** verwijderd: /api/apply-roadmap-migration, /api/horizon-engine/ledger
+- **Componenten (aantal)** toegevoegd: +4

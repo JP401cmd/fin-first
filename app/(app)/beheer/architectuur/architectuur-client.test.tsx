@@ -139,7 +139,7 @@ describe('ArchitectuurClient — aandachtspunten-lens', () => {
   it('element-detail toont zijn aandachtspunten', () => {
     renderClient()
     fireEvent.click(screen.getByRole('button', { name: /Technologie · service: Supabase/i }))
-    expect(screen.getByText(/dode better-auth-scaffolding/i)).toBeInTheDocument()
+    expect(screen.getByText(/Supabase migratie-drift/i)).toBeInTheDocument()
   })
 })
 

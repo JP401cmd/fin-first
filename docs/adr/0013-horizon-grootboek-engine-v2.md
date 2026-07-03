@@ -1,5 +1,5 @@
 ---
-status: aanvaard
+status: vervangen
 date: 2026-06-13
 elements: [as-planning, fn-toekomstplannen, as-vermogen]
 ---
@@ -38,3 +38,15 @@ Een tweede, **tabel-georiënteerde** engine in `lib/horizon-engine/` naast de be
 - ~~De **onomkeerbare** stap — v2 als globale default + verwijderen van `runUnifiedProjection`/`runSimulation` — blijft gated tot de live-test akkoord is.~~ **C5-c AFGEROND (14 jun 2026):** `runUnifiedProjection` en `runSimulation` zijn fysiek verwijderd. De gedeelde types/helpers in `lib/unified-projection.ts`/`lib/fire-simulation.ts` zijn bewaard. Scalar-bridge toegevoegd: `runScalarProjectionV2` (`lib/horizon-engine/scalar-bridge.ts`) is een drop-in voor de scalar-portfolio-signatuur. De parity-tooling (`compareEngines`, `/beheer/horizon-tabellen`) is bewust behouden per productbeslissing D3 (`docs/horizon-v1-verwijderplan-c5.md`). 238 bestanden / 3389 tests groen, tsc schoon.
 
 Bewaakt door `test/horizon-engine.test.ts`, `test/horizon-persona.test.ts`, `test/horizon-engine-compare.test.ts` en de catalogus-entry `horizon-grootboek-v2` in `lib/architecture/calculations.ts`.
+
+## Addendum (2026-07-03) — VERVANGEN door ADR 0032
+
+De v2-grootboek-engine die dit besluit beschrijft is **fysiek verwijderd** (FASE 6 stap 5A,
+commit `95bafeb53`), na de default-flip naar de horizon-kernel (`afb75d738`, 2026-07-03).
+ADR 0032 (`0032-horizon-kernel-excel-oracle-maandbasis.md`) legt het vervolgbesluit vast:
+een pure-TypeScript rekenkern (`lib/horizon-kernel/`) die de eigenaar-geverifieerde Excel-
+oracle port — maandbasis + nominaal (keert punt 2/6 hierboven om), met een eigen maand-
+bisectie-solver i.p.v. de forward-doel-zoektocht in punt 5. De catalogus-entry heet nu
+`horizon-kernel` in `lib/architecture/calculations.ts`. Dit document blijft staan als
+historisch besluit-record van de v2-architectuur; wijzig de tekst hierboven niet met
+terugwerkende kracht — nieuwe besluiten horen in ADR 0032 of een eigen addendum.

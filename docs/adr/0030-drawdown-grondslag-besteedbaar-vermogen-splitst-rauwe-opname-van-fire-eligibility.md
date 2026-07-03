@@ -101,3 +101,15 @@ Bewaakt door `test/horizon-downsize-verkopen.test.ts` (case "SSoT (ADR 0030):
 daarna"; regressie "besteedbaarVermogen monotoon niet-stijgend ná downsize-verkoop
 (symptoom 1)") en `test/horizon-housing-liquidation.test.ts` (ADR 0030 / Optie B:
 engine scant intern `besteedbaarVermogen` via saleManaged-markering op endAge+1).
+
+## Addendum (2026-07-03) — MOOT onder de horizon-kernel
+
+De v2-engine die dit besluit implementeerde is fysiek verwijderd (FASE 6 stap 5A, commit
+`95bafeb53`). Dit besluit loste een defect op dat ONTSTOND doordat ADR 0028 de downsize-
+woning `spendable` maakte vóór de verkoop (één pot, `liquideVermogen`, kreeg drie rollen
+tegelijk). De horizon-kernel neemt ADR 0028 niet over (zie die addendum): het huis is bij
+"Verkopen" nooit spendable vóór de daadwerkelijke verkoopmaand, dus bestaat de
+`liquideVermogen`/`besteedbaarVermogen`-tweedeling die dit besluit invoerde niet — er is
+maar één pot-begrip nodig (Prognose!J, netto-liquide). Dit besluit is daarmee **moot**
+(niet gefaald, niet ingetrokken — de onderliggende spanning is er simpelweg niet meer onder
+het nieuwe, eenvoudiger model). Blijft staan als historisch besluit-record.

@@ -76,3 +76,29 @@ de **oracle**: de nieuwe kern moet aantoonbaar dezelfde uitkomsten geven.
 - Tijdens de flag-periode bestaan twee motoren naast elkaar — vastgelegd als
   aandachtspunt op de plaat; verwijderen bij afronding (FASE 6).
 - Plan, mapping en gap-besluitenregister: `docs/horizon-excel-oracle-plan.md`.
+
+## Addendum (2026-07-03) — FASE 6 afgerond: default-flip + fysieke v2-verwijdering
+
+De cutover (punt 6 hierboven) is afgerond volgens het C5-precedent:
+
+- **Default-flip** naar de horizon-kernel: commit `afb75d738` (2026-07-03) — de kernel is
+  de motor, de v2-grootboek-engine wordt de noodklep.
+- **Fysieke verwijdering** van de v2-paden: commit `95bafeb53` (FASE 6 stap 5A,
+  2026-07-03) — `lib/horizon-engine/` bestaat niet meer. Alle routers zijn dunne
+  kernel-calls rond `runKernelUnified` (`lib/horizon-kernel/run-unified.ts`); de
+  vlaggen/vergelijk-route zijn weg. `buildSimNetWorthRows` verhuisde naar
+  `lib/horizon/networth-rows.ts`, `buildHorizonInput` naar `lib/horizon/build-input.ts`;
+  `lib/unified-projection.ts` is nu een kaal consumer-typecontract (zie de addendum op dat
+  gedeelte in de catalogus-entry `unified-projection`).
+- **ADR 0013 en 0016 gaan naar status `vervangen`** (zie hun addenda). De besluiten die de
+  kernel materieel wijzigt kregen een gerichte addendum: ADR 0014 (geërfd, ander
+  detectiepad), ADR 0015 (geërfd, ander mechanisme), ADR 0027 (geërfd, maand-precisie),
+  ADR 0028 (VERVALLEN — de kernel unificeert `spendable`/`saleManaged` niet), ADR 0030
+  (MOOT — de tweedeling die het oploste bestaat niet meer) en ADR 0031 (MOOT — geen
+  vaste-punt-iteratie meer nodig; de valuatie-basis-keuze is niet overgenomen). Twee
+  concerns die uit de ADR 0028/0030-spanning volgden (`downsize-display-eligibility-desync`,
+  `downsize-fire-gate-eligibility-vs-besteedbaar`) zijn met deze cutover opgelost en van de
+  plaat verwijderd; het concern `horizon-kernel-flag-periode` (twee-motoren-tijdens-cutover)
+  is eveneens verwijderd nu er nog maar één motor is.
+- Catalogus-entry hernoemd van `horizon-grootboek-v2` naar `horizon-kernel`
+  (`lib/architecture/calculations.ts`).

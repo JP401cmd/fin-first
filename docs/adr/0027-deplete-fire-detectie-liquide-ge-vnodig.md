@@ -180,3 +180,18 @@ zet alle assets op inclusion_pct 100 → die goldens zijn **byte-identiek** vó�
 
 Bewaakt door `test/horizon-eindstrategie.test.ts` (#5 huis-engine-waarde = current_value ×
 inclusion_pct) en `test/horizon-engine.test.ts` (herijkte golden + netto-start-anker €583.154).
+
+## Addendum (2026-07-03) — geërfd door de horizon-kernel
+
+De v2-engine die dit besluit implementeerde is fysiek verwijderd (FASE 6 stap 5A, commit
+`95bafeb53`). Het PRINCIPE — deplete/pensioen-FIRE via een crossing met de referentielijn,
+niet via een aparte decumulatie-feasibility-test — ERFT structureel over: de horizon-kernel-
+solver (`lib/horizon-kernel/solver.ts`, letterlijke port van de VBA-macro `BepaalFIRE`) bepaalt
+de status via exact dit soort crossing-toets, nu op MAAND-precisie i.p.v. jaar-precisie:
+`reached_now` wanneer `Prognose!J(0) ≥ B36` (het doelbedrag) direct al geldt, anders een
+maand-bisectie naar de kleinste maand waar de gap (`B37 modelwaarde − B36 doelbedrag`)
+niet-negatief wordt. Voor `pensioen` kort de kernel — net als v2 via `forcedFireAge` —
+altijd sluit op de AOW-/pensioenleeftijd (geen bisectie). Zie de nieuwe concern
+`horizon-kernel-bekende-afwijkingen` (`lib/architecture/archimate-concerns.ts`) voor een
+bewust-gereproduceerde Excel-eigenaardigheid van dit statusblok bij een doelbedrag van €0.
+Catalogus-entry: `horizon-kernel` in `lib/architecture/calculations.ts`.

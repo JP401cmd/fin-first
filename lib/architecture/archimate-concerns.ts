@@ -31,14 +31,6 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['app-comp'],
   },
   {
-    id: 'better-auth-scaffolding',
-    title: 'Vermoedelijk dode better-auth-scaffolding',
-    detail:
-      'Supabase Auth is canoniek (RLS op auth.uid()). De better-auth-resten in src/lib zijn waarschijnlijk dood; opruimen voorkomt verwarring over welk auth-model geldt.',
-    severity: 'debt',
-    elementIds: ['t-supabase'],
-  },
-  {
     id: 'nav-shell-cleanup',
     title: 'Navigatie-redesign — fase 4 cleanup openstaand',
     detail:
@@ -87,34 +79,18 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['t-supabase', 'data-cont'],
   },
   {
-    id: 'horizon-kernel-flag-periode',
-    title: 'Twee Horizon-rekenmotoren tijdens de kernel-cutover (Excel-oracle-traject)',
-    detail:
-      'Besloten koers (ADR 0032): een nieuwe maandbasis-rekenkern (lib/horizon-kernel, nominaal, Excel-parity ≤ €0,01) vervangt de v2-grootboek-engine. Tijdens de flag-periode bestaan beide motoren naast elkaar met omgekeerde modelkeuzes (jaarbasis/reëel vs maandbasis/nominaal) — divergentie-risico als oppervlakken op verschillende momenten flippen. Invariant: de convergentie-set (/overzicht, /toekomst, dashboard-loader/freedomPct via fire-target-shared, AI-context) flipt als geheel. Plan: docs/horizon-excel-oracle-plan.md. Verwijder dit punt zodra de default-flip rond is en de v2-paden fysiek weg zijn (FASE 6).',
-    severity: 'risk',
-    elementIds: ['as-planning', 'fn-toekomstplannen', 'as-vermogen'],
-  },
-  {
     id: 'deplete-doel-lijn-grondslag',
     title: 'Doel-lijn (V_nodig) is liquide; getekende curve is netto vermogen',
     detail:
-      'De horizontale doel-lijn op /toekomst is gebaseerd op het liquide vermogen (V_nodig via backwardVnodig), terwijl de getekende hoofdcurve het netto vermogen weergeeft (inclusief eigen woning). Voor accounts met een groot niet-liquide eigen huis (netto >> liquide) blijft een zichtbare afstand tussen de FIRE-stip en de doel-lijn bestaan: twee opties open (aparte liquide-curve tekenen, of een hellende V_nodig-lijn). Verwijder zodra dat besluit genomen en doorgevoerd is. NB: de reverse_mortgage-desync (display vs engine op leenruimte-grondslag) is beslist via ADR 0029 en is GEEN deel meer van dit aandachtspunt; de downsize-display-desync is een eigen concern — zie downsize-display-eligibility-desync.',
+      'ERFT NAAR DE KERNEL (ADR 0032). De horizontale doel-lijn op /toekomst is gebaseerd op het liquide vermogen (kernel: Prognose!J, het B36-doelbedrag in het solver-statusblok), terwijl de getekende hoofdcurve het netto vermogen weergeeft (Prognose!I, inclusief eigen woning). Voor accounts met een groot niet-liquide eigen huis (netto >> liquide) blijft een zichtbare afstand tussen de FIRE-stip en de doel-lijn bestaan: de spanning is structureel gelijk aan onder de verwijderde v2-engine (V_nodig vs netto vermogen) — twee opties nog open (aparte liquide-curve tekenen, of een hellende doel-lijn). Verwijder zodra dat besluit genomen en doorgevoerd is. NB: de reverse_mortgage-desync (display vs engine op leenruimte-grondslag) is beslist via ADR 0029; de downsize-eligibility-desync die v2 had is met de kernel-migratie vervallen (kernel behandelt het huis pas ná verkoop als liquide, net als de display-helper — zie calc "Vrijheidsvoortgang").',
     severity: 'info',
     elementIds: ['as-planning', 'fn-toekomstplannen'],
   },
   {
-    id: 'downsize-display-eligibility-desync',
-    title: 'Downsize: engine-eligibility (liquidValue incl. huis) ≠ dashboard-display (getFireEligibleNetWorth excl. overwaarde)',
+    id: 'horizon-kernel-bekende-afwijkingen',
+    title: 'Horizon-kernel: twee bekende, bewust-gereproduceerde grenzen van het Excel-oracle',
     detail:
-      'De v2-engine telt de downsize-woning als FIRE-eligible (spendable, ADR 0028) waardoor engine-FIRE doorgaans vroeger valt. De DISPLAY-helper getFireEligibleNetWorth is engine-agnostisch en trekt voor downsize de overwaarde nog af (mode-switch exclude_from_fire/downsize → −equity). Daardoor tellen dashboard-"belegbaar vermogen", freedomPct (via computeFreedomProgress), de AI shared-context, de freedom-card en het rapport de downsize-gebruiker ÓNDER t.o.v. wat de engine als eligible ziet. Bewust open gelaten als cross-surface grondslag-besluit (ADR 0028 §Gevolgen + addendum). Verwijder zodra getFireEligibleNetWorth de spendable-grondslag meekrijgt en de ADR de consistentie bevestigt.',
-    severity: 'risk',
-    elementIds: ['as-planning', 'fn-toekomstplannen', 'as-vermogen'],
-  },
-  {
-    id: 'downsize-fire-gate-eligibility-vs-besteedbaar',
-    title: 'Downsize-trigger leunt op een hold-FIRE-omweg omdat de FIRE-gate op liquideVermogen (incl. spendable huis) detecteert',
-    detail:
-      'De v2 FIRE-detectie (meetsStrategyTarget/liquideAtFire) draait op de eligibility-pot liquideVermogen — incl. de spendable saleManaged downsize-woning (ADR 0028) — terwijl die woning niet rauw besteedbaar is (besteedbaarVermogen, ADR 0030). Een zelf-berekende downsize-graaf-FIRE claimt daardoor bij een late verkoop een onmogelijk-vroege FIRE; een vaste-punt-iteratie op die FIRE divergeert (41→79→83→41). resolveDownsizeTriggerV2 omzeilt dit met een hold-FIRE-anker (FIRE van de run waarin de woning óók rauw besteedbaar is → besteedbaarVermogen == liquideVermogen → eerlijke, sale-timing-onafhankelijke gate) + één income-gated verfijning (ADR 0031). De omweg is correct en getest, maar de trigger-correctheid blijft gekoppeld aan dit gate-grondslag-artefact: een toekomstige wijziging aan de FIRE-detectie moet hiermee rekenen. Principiële richting: detecteer de downsize-FIRE op de rauw-besteedbare pot (of de overwaarde-bijdrage) i.p.v. de volle spendable-waarde — raakt ADR 0028, de matrix-goldens en de display-grondslag, dus eigen besluit. Onderscheiden van downsize-display-eligibility-desync (dat is display vs engine; dit is gate-grondslag vs trigger-stabiliteit binnen de engine). Verwijder zodra de downsize-FIRE-gate op de besteedbare grondslag rust en het hold-FIRE-anker overbodig is.',
+      'Twee structurele kanttekeningen bij de horizon-kernel (ADR 0032), geen bugs maar wel aandachtspunten voor UI-consumenten. (1) B93 reached_now-quirk: bij een doelbedrag van €0 (bv. legacy-nalatenschap €0, of deplete zonder expliciet doel) geeft het solver-statusblok altijd status reached_now zodra Prognose!J(0) ≥ 0 — letterlijke Excel-parity, maar mogelijk verwarrend als UI-tekst ("je kunt nu al stoppen" bij een leeg doel). Nog geen apart gap-besluit genomen (docs/horizon-excel-oracle-plan.md §V12). (2) De scenario-band/Monte-Carlo-wrappers (lib/horizon-kernel/wrappers/band.ts, wrappers/mc.ts) leveren uitsluitend SCALAIRE uitkomsten per scenario (fireAge, netto-vermogen-bij-FIRE, netto-liquide-bij-eindleeftijd — de Sim!B/C/D-rij) — geen volledige per-jaar LedgerRow-achtige asset-/schuld-/onttrekkingsbreakdown per scenario. Een toekomstige UI die per-scenario samenstelling wil tonen (net als de hoofdgrafiek) vindt die breakdown niet; dat vereist een aparte volledige kernel-run per scenario.',
     severity: 'debt',
     elementIds: ['as-planning', 'fn-toekomstplannen'],
   },

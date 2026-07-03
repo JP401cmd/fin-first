@@ -365,14 +365,27 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
   specialist, bug-reporter, requirement-specialist, senior-developer, refactor-skill:
   unified-projection-begrippen). Volledige werklijst in het inventaris-rapport (sessie
   2026-07-03); computeScalarFreedomMilestones nog nergens productie-bedraad (restpunt).
-- **FASE 6 — Nazorg**: vpw/bucket-DB-migratie; regressie-goldens herijken (gap V1);
-  Berekeningen-view + ADR's (0013/0016 → `vervangen`; gerichte addenda op 0014/0015/0027/0028/
-  0030/0031 waar de kern die besluiten materieel wijzigt); concern `horizon-kernel-flag-periode`
-  verwijderen + de drie v2-grondslag-concerns (`deplete-doel-lijn-grondslag`,
-  `downsize-display-eligibility-desync`, `downsize-fire-gate-eligibility-vs-besteedbaar`) per
-  stuk beoordelen: lost de kernel ze op of erft hij ze — geen stale concerns achterlaten;
-  calc-engine-specialist herschrijven (parity als review-regel); agents/skills-scan op oude
-  engine-begrippen; /beheer/development-curatie + `arch:diagram`.
+- **FASE 6 — Nazorg: ✔ 5B KLAAR (2026-07-03).** Berekeningen-view: `horizon-kernel`-entry
+  (verving horizon-grootboek-v2), unified-projection = typecontract, huis-trigger/werk-strategie/
+  vrijheidscheck herschreven op kernel-native mechanismen. Concerns: `horizon-kernel-flag-periode`
+  weg; `downsize-display-eligibility-desync` + `downsize-fire-gate-eligibility-vs-besteedbaar`
+  **opgelost door de kernel** (huis illiquide tot echte verkoop, matcht getFireEligibleNetWorth;
+  geen spendable/saleManaged-splitsing meer); `deplete-doel-lijn-grondslag` geërfd (Prognose!J vs
+  !I, geherformuleerd); nieuw concern `horizon-kernel-bekende-afwijkingen` (reached_now-quirk +
+  wrappers-scalars). ADR's: 0013/0016 → vervangen; addenda 0014/0015 (geërfd), 0027 (geërfd,
+  maand-precisie), 0028 (vervallen), 0030/0031 (moot); 0032-addendum registreert flip +
+  verwijdering. horizon-engine-v2.md gearchiveerd met verwijsbanner. Team: calc-engine-specialist
+  bezit lib/horizon-kernel/** met oracle-parity-poort + Σruw=0-invariant als Non-negotiables;
+  bug-reporter/requirement-specialist/senior-developer gezuiverd; development-model ongewijzigd
+  (grep .claude/** = 0 verouderde treffers). arch:diagram geregenereerd; 106 architectuur-tests
+  groen. **⏳ Rest 5C (hygiëne):** opruim-migratie feature_preferences horizon_kernel_*-sleutels;
+  horizon-tabellen-mij-stub + nav-entry definitief weg (wacht op widget-sessie-commit van
+  beheer-sections); dode props (phase-modal kernelEnabled, applyHousingToComposition.isV2);
+  test-only initBucketState/rebalanceBuckets; parity-and-schema-performance. Bugfix-lijst
+  (ná F6, eigenaar-besluit): deplete-reached_now-benchmark; SimRow-breakdowns undefined
+  (whatif-lagen); fireReachable-altijd-true; exponentiële-groei-anomalie late FIRE;
+  float-precisie whatif-overrides; verkoop-transitie-lag-piek; pre-FIRE-deficit-spiegel;
+  server-side context-preload (mount-flits).
 
 Elke fase sluit met `npx tsc --noEmit` + relevante vitest groen + korte statusmelding.
 

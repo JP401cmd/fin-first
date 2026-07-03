@@ -142,3 +142,19 @@ invariant `trigger ≥ eligibility-FIRE` of `no_sale`; Bug B exacte
 `saleProceeds == engine-net` binnen €1; woz-basis kleinere huiswaarde;
 `fixed_age`-regressie) en de bestaande
 `test/horizon-downsize-verkopen.test.ts` / `test/housing-strategy.test.ts`.
+
+## Addendum (2026-07-03) — MOOT onder de horizon-kernel
+
+De v2-engine die dit besluit implementeerde is fysiek verwijderd (FASE 6 stap 5A, commit
+`95bafeb53`). Het hold-FIRE-anker was een workaround voor de vaste-punt-iteratie-divergentie
+die ontstond doordat de app-zijdige meetrun de verkoop-trigger BUITEN de eigenlijke
+engine-run moest schatten (ADR 0028's spendable-vóór-verkoop-model maakte die schatting
+instabiel). De horizon-kernel bepaalt de verkoop-trigger NATIVE, ÉÉN keer, binnen dezelfde
+maandloop als de rest van de projectie (`Bez!AY`, `lib/horizon-kernel/tables/bez.ts`) — er
+is geen aparte meetrun, geen vaste-punt-iteratie, dus geen hold-FIRE-anker nodig. De
+valuatie-basis-keuze (`saleValuationBasis: 'market' | 'woz'`) is NIET overgenomen: de kernel
+kent geen WOZ-alternatief en gebruikt altijd de pot-waarde (het Excel-oracle heeft geen
+market/woz-onderscheid). Dit besluit is daarmee **moot** voor het hold-FIRE-anker-deel en
+**vervallen** voor het valuatie-basis-deel; blijft staan als historisch besluit-record. Wie
+een WOZ-conservatieve verkoopwaarde nog nodig heeft, moet dat als nieuw gap-besluit voor de
+kernel indienen (`docs/horizon-excel-oracle-plan.md`).

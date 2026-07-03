@@ -1,8 +1,32 @@
-# Horizon FIRE-rekenmotor v2 — architectuur (`lib/horizon-engine/`)
+# Horizon FIRE-rekenmotor v2 — architectuur (`lib/horizon-engine/`, HISTORISCH)
 
-> Status: **blijvend architectuurdocument.** Verankerd door ADR 0013, de Berekeningen-catalogus-entry `horizon-grootboek-v2` (`lib/architecture/calculations.ts`), het plan `docs/horizon-tabel-rekenmotor-plan.md` en de testsuites `test/horizon-engine*.test.ts`. Dit document beschrijft de **bedoelde architectuur en de invarianten** die ze beschermen — lees het vóór je iets aan de engine fixt of toevoegt. Wijzig je gedrag, werk dan ADR 0013, de catalogus én dit document mee bij.
+> **⚠ GEARCHIVEERD (2026-07-03).** `lib/horizon-engine/` is FYSIEK VERWIJDERD (FASE 6
+> stap 5A, commit `95bafeb53`), na de default-flip naar de horizon-kernel (`afb75d738`).
+> De **enige** FIRE-rekenmotor is nu `lib/horizon-kernel/` — een maandbasis, nominale port
+> van de eigenaar-geverifieerde Excel-oracle (ADR 0032). De invarianten/architectuur die
+> hieronder staan beschrijven een MOTOR DIE NIET MEER BESTAAT; lees dit document uitsluitend
+> voor historische context (bv. "waarom koos v2 destijds voor reëel-intern", "welke bug loste
+> ADR 0027 op") — niet als leidraad voor huidig werk aan de rekenkern.
 >
-> Laatste verificatie tegen de code: 13 jun 2026.
+> **Voor de huidige architectuur, ga naar:**
+> - `lib/horizon-kernel/README.md` — modulekaart, teacher-forced-parity-patroon, parity-stand
+> - `docs/horizon-oracle/*` — Excel-structuur, rekenflow, named ranges, verificatie
+> - `docs/horizon-excel-oracle-plan.md` — plan + gap-besluitenregister (V-nummers)
+> - ADR 0032 (`docs/adr/0032-horizon-kernel-excel-oracle-maandbasis.md`) — het besluit-anker
+> - Catalogus-entry `horizon-kernel` in `lib/architecture/calculations.ts`
+>
+> Dit document zelf is vervangen: ADR 0013 (dat dit document ankerde) heeft status
+> `vervangen` gekregen met een addendum die naar ADR 0032 verwijst. ADR 0027 (deplete-FIRE-
+> detectie) heeft eveneens een addendum: het PRINCIPE (crossing met de referentielijn) erft
+> over naar de kernel-solver, nu op maand- i.p.v. jaarprecisie.
+>
+> ---
+>
+> Origineel status-blok (historisch, niet meer geldig): "blijvend architectuurdocument,
+> verankerd door ADR 0013, de Berekeningen-catalogus-entry `horizon-grootboek-v2`
+> (`lib/architecture/calculations.ts`), het plan `docs/horizon-tabel-rekenmotor-plan.md` en
+> de testsuites `test/horizon-engine*.test.ts`". Laatste verificatie tegen de (inmiddels
+> verwijderde) code: 13 jun 2026.
 
 ---
 

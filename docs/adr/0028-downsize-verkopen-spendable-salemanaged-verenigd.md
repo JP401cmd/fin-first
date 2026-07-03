@@ -198,3 +198,25 @@ waarop de getoonde besteedbare daling de verkoopkosten-buffer raakt.
 (oude buggy ex-huis-meetpad codificeerde de bug); de overige cases (huis-in-opbouw,
 `fixed_age`-continuïteit, `SSoT-trigger==verkoop`, `inclusion_pct=50`, generieke
 saleManaged-regressie, `include_full`/`exclude_from_fire` byte-identiek) groen.
+
+## Addendum (2026-07-03) — VERVALLEN onder de horizon-kernel (materiële wijziging)
+
+De v2-engine die dit besluit implementeerde is fysiek verwijderd (FASE 6 stap 5A, commit
+`95bafeb53`). Dit besluit — de downsize-woning is tijdens de OPBOUW al `spendable`
+(FIRE-eligible) ÉN `saleManaged` (verlaat de pot alleen via de verkoop) — wordt door de
+horizon-kernel **NIET overgenomen**. De kernel behandelt het huis bij ÉLKE housing-modus
+(dus ook "Verkopen") als niet-liquide TOTDAT de daadwerkelijke verkoopmaand valt
+(`Bez!AY` monotone verkoopvlag, `lib/horizon-kernel/tables/bez.ts`) — geen `spendable`-vóór-
+verkoop-begrip. Dat is een terugkeer naar het model van vóór dit besluit ("geen overlap in
+de praktijk"), nu correct geïmplementeerd doordat de kernel de verkoop-trigger NATIVE in
+dezelfde maandloop bepaalt (geen aparte app-zijdige meetrun/vaste-punt-iteratie meer nodig
+— zie de ADR 0031-addendum). Gevolg: de FIRE-eligibility voor "Verkopen" komt onder de
+kernel structureel LATER dan onder v2 (pas ná de daadwerkelijke verkoop, niet al tijdens de
+opbouw) — dit is een bewuste, eenvoudigere modelkeuze, geen regressie-bug. De hele
+`countsAsEligibilityLiquid`/`mayBeRawWithdrawn`-helperlaag die dit besluit invoerde bestaat
+niet meer; zie de ADR 0030-addendum voor het gevolg voor de drawdown-grondslag-splitsing.
+De concerns `downsize-display-eligibility-desync` en `downsize-fire-gate-eligibility-vs-
+besteedbaar` (`lib/architecture/archimate-concerns.ts`) zijn met deze wijziging OPGELOST en
+verwijderd van de plaat: de display-helper `getFireEligibleNetWorth` trok de overwaarde al
+vóór verkoop af voor downsize/exclude_from_fire — dat is nu weer congruent met de engine.
+Catalogus-entry: `horizon-kernel` in `lib/architecture/calculations.ts`.

@@ -23,7 +23,7 @@ For each feature, produce a structured spec:
 
 ## TriFinity-specific expectation rules (bake these into every spec)
 
-- **Numbers are canonical.** Any required figure must name its single source of truth (e.g. FIRE-datum → `lib/unified-projection.ts`); the spec forbids recomputing or inventing numbers. Amounts of significance must also be expressed in vrijheidstijd (`lib/format.ts`).
+- **Numbers are canonical.** Any required figure must name its single source of truth (e.g. FIRE-datum → `lib/horizon-kernel`); the spec forbids recomputing or inventing numbers. Amounts of significance must also be expressed in vrijheidstijd (`lib/format.ts`).
 - **One philosophy.** Requirements must reinforce the freedom-time framing and the module's voice, not bolt on generic finance UX.
 - **Compliance is a requirement, not a footnote.** No buy/sell/investment or tax advice (no Wft licence). If the intent flirts with advice, write the requirement to reframe it as educational and flag it back to the business-owner.
 - **Security/ownership is explicit.** State exactly whose data is read/written and the RLS scope; never leave access implicit.

@@ -99,3 +99,22 @@ netWorth = endPortfolio + houseEquity(age) + reconcileOffset
 **Geen tweede engine-run, geen tweede WOZ-formule:** `endPortfolio` komt 1:1 uit de engine, huiswaarde-groei uit de canonieke `projectEigenHuisValuesAt`, hypotheek-afbouw uit `projectMortgageStateAt` — dezelfde helpers die ook `huis-strategie-trigger` gebruikt. Geen nieuwe aannames.
 
 **Bestanden:** `lib/horizon-engine/networth-projection.ts` (nieuw), `lib/dashboard-data-loader.ts` (levert `simNetWorthRows` in de `DashboardData`-bundel), `components/overview/mini-networth-chart.tsx` (consumeert). Bewaakt door de berekeningen-catalogus (`lib/architecture/calculations.ts`, calc-id `sim-netto-vermogen-projectie`) en de `calculations.test.ts`-suite.
+
+## Addendum (2026-07-03) — geërfd door de horizon-kernel, ander mechanisme
+
+De v2-engine die dit besluit implementeerde is fysiek verwijderd (FASE 6 stap 5A, commit
+`95bafeb53`). Het PRINCIPE — het huis blijft een niet-liquide asset in het grootboek en
+verlaat het pas via een échte verkoop-liquidatie binnen dezelfde loop, i.p.v. gefilterd +
+de opbrengst als los inkomen ingespoten — ERFT over naar de horizon-kernel (ADR 0032), maar
+het MECHANISME is herbouwd: waar v2 een generiek `UnifiedProjectionInput.assetLiquidations`-
+zijkanaal had (gevoed door zowel het downsize-pad als generieke asset-liquidaties), is het
+woningblok in de kernel een **kernel-NATIVE Excel-tabel-port** (`Bez!AY:BE`,
+`lib/horizon-kernel/tables/bez.ts`) die verkoop/opeethypotheek intern in de maandloop
+afhandelt — geen los liquidatie-array, geen generieke asset-liquidatie-mechaniek voor
+overige niet-liquide bezittingen (die bestond in v2, niet in de kernel; huis is de enige
+verkoop-/opeet-rol die de kernel kent). `lib/horizon.ts`-brede storting van `endPortfolio`
++ meegroeiende overwaarde (`buildSimNetWorthRows`, verhuisd naar `lib/horizon/networth-rows.ts`)
+blijft hetzelfde SSoT-principe volgen, nu via de `houseInLedger`-vlag i.p.v. per-housing-
+modus-switch. Zie de ADR 0028-addendum voor het materiële verschil (geen spendable-vóór-
+verkoop meer). Catalogus-entries: `horizon-kernel` en `sim-netto-vermogen-projectie` in
+`lib/architecture/calculations.ts`.

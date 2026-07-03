@@ -1,5 +1,5 @@
 ---
-status: aanvaard
+status: vervangen
 date: 2026-06-13
 elements: [as-planning, fn-toekomstplannen, as-vermogen]
 ---
@@ -43,3 +43,14 @@ Criterium 7 ("Surfaces convergeren") had betrekking op de FIRE-leeftijd en het v
 - Beide verankeren op dezelfde Vandaag-grondslag (`currentNetWorth`) via de reconcile-offset in `buildSimNetWorthRows`.
 
 **Verwijdering housing-strategy-nudge-sheet (jun 2026):** de eenmalige educatieve pop-up `components/app/horizon/housing-strategy-nudge-sheet.tsx` is verwijderd. De housing-strategie-functionaliteit zelf (instellingen-sectie, `lib/housing-strategy.ts`, `/api/housing-strategy`) blijft. De nudge was een tijdelijke UX-laag en liet geen architectureel spoor achter — geen ADR-besluit vereist, geen element of concern geraakt.
+
+## Addendum (2026-07-03) — VERVANGEN door ADR 0032
+
+De reëel-vs-nominaal-keuze (B3, Route 2) is met de horizon-kernel-cutover **omgekeerd**:
+de v2-grootboek-engine die dit besluit vastlegde is fysiek verwijderd (FASE 6 stap 5A,
+commit `95bafeb53`); de horizon-kernel (`lib/horizon-kernel/`, ADR 0032) rekent
+**nominaal-throughout** (net als het Excel-oracle), niet reëel-intern-met-nominale-adapter.
+De B1-acceptatiecriteria en de C1-C5-cutoverdiscipline hierboven blijven wél het precedent
+voor de kernel-cutover (ADR 0032 punt 6: "Default-flip en fysieke verwijdering van v2-paden
+volgen het C5-precedent"). Dit document blijft staan als historisch besluit-record; nieuwe
+besluiten over de rekenkern horen in ADR 0032 of een eigen addendum daarop.
