@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
-import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
+import { GebeurtenissenView, type KernelSimData } from '@/components/future/gebeurtenissen-view'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { ageAtDate } from '@/lib/horizon-data'
 import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
+import { buildConvergentieAdapterProfile } from '@/lib/horizon-kernel/convergentie-router'
+import { resolveDeficitLoanRate } from '@/lib/horizon-kernel/adapter/params'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
@@ -161,6 +163,26 @@ export default async function ToekomstGebeurtenissenPage() {
     previewBaseline: strategieBaseline,
   }
 
+  // Feature #876 — kernel-afgeleide strategiemomenten. De view draait de
+  // client-side `useHorizonFireSim`-hook (DEZELFDE run-site als de Tijdas-
+  // grafiek) op strategieBaseline.rawContext + eventPaneData; dit blok draagt
+  // alleen de hook-inputs die nog níet in die props zitten. `deficitLoanRate`
+  // is de canonieke tekort-lening-rente (V7-resolver, geen eigen 0,05).
+  const kernelSim: KernelSimData | null =
+    strategieBaseline && horizonData.rawProfile
+      ? {
+          aowAgeFractional: aowFractional,
+          box3Method: horizonData.box3Method,
+          bankAccountCash: horizonData.unlinkedCash,
+          monthlySavingsOverride: horizonData.monthlySavingsOverride,
+          baseAnnualSavingsFromCashflow: horizonData.baseAnnualSavingsFromCashflow,
+          housingStrategy: horizonData.housingStrategy,
+          deficitLoanRate: resolveDeficitLoanRate(
+            buildConvergentieAdapterProfile(horizonData.rawProfile),
+          ),
+        }
+      : null
+
   return (
     <>
       <ToekomstSubpageShell kicker="Toekomst" title="Gebeurtenissen" />
@@ -173,6 +195,7 @@ export default async function ToekomstGebeurtenissenPage() {
         )}
         strategieData={strategieData}
         eventPaneData={eventPaneData}
+        kernelSim={kernelSim}
       />
     </>
   )

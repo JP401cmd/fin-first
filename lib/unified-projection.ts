@@ -112,6 +112,22 @@ export interface UnifiedProjectionRow {
   // ── Inflatie ──────────────────────────────────────────────
   /** Inflatiefactor: (1 + inflationRate)^year, altijd >= 1.0 */
   inflationFactor: number
+
+  // ── Opeethypotheek-weergavevelden (kernel-bridge, alléén in opeet-modus) ──
+  /**
+   * Jaarsom van de opeethypotheek-opnames (Bez!BE) — read-only WEERGAVEVELD,
+   * gezet door de kernel-bridge en uitsluitend wanneer de woning-strategie
+   * 'Opeethypotheek' is. Consument: `deriveOpeetLifespanFromRows`
+   * (lib/horizon/kernel-strategy-moments.ts). Geen rekeninput.
+   */
+  opeetOpname?: number
+  /**
+   * Hoogste opeet-leenruimte-cap (Bez!BD) binnen het jaar — read-only
+   * WEERGAVEVELD (zelfde bron/voorwaarde als `opeetOpname`). `> 0` betekent:
+   * het opeet-venster is dit jaar actief; samen met `opeetOpname === 0` is dat
+   * het uitputtingssignaal ("pot 0 ná start"). Geen rekeninput.
+   */
+  opeetCap?: number
 }
 
 // ── Unified Projection Input ────────────────────────────────────────────────

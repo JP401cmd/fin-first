@@ -24,7 +24,7 @@ import {
 import { dedupeById } from '@/lib/horizon-kernel/adapter'
 import { applyKernelHousingSaleToEvents } from '@/lib/horizon/kernel-display-events'
 import type { SolverStatus } from '@/lib/horizon-kernel/solver'
-import type { KernelHousingSale } from '@/lib/horizon-kernel/bridge'
+import type { KernelHousingSale, KernelPensionPotView } from '@/lib/horizon-kernel/bridge'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -50,6 +50,8 @@ export interface HorizonFireSimResult {
   kernelMaandHint: number | null
   /** Verkoopmoment eigen woning volgens de kernel (marker-contract); null = geen verkoop. */
   kernelHousingSale: KernelHousingSale | null
+  /** Pensioenpot-weergave (feature #876; bridge-weergaveveld); null in loading/null-paden. */
+  kernelPensionPots: readonly KernelPensionPotView[] | null
 }
 
 interface HorizonFireSimInput {
@@ -92,7 +94,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
-  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[]; kernelStatus: SolverStatus | null; kernelMaandHint: number | null; kernelHousingSale: KernelHousingSale | null } | null>(() => {
+  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[]; kernelStatus: SolverStatus | null; kernelMaandHint: number | null; kernelHousingSale: KernelHousingSale | null; kernelPensionPots: readonly KernelPensionPotView[] } | null>(() => {
     // Metadata-assemblage via de gedeelde builder (yearlyExpenses + guards). Zie
     // lib/horizon/build-input.ts.
     const built = buildHorizonInput({
@@ -147,6 +149,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       kernelStatus: outcome.kernelStatus ?? null,
       kernelMaandHint: outcome.kernelMaandHint ?? null,
       kernelHousingSale: outcome.kernelHousingSale ?? null,
+      kernelPensionPots: outcome.result.kernelPensionPots,
     }
   }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, kernelRawProfile, aowRows])
 
@@ -193,7 +196,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null }
   }
 
   return {
@@ -206,5 +209,6 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     kernelStatus: simResult?.kernelStatus ?? null,
     kernelMaandHint: simResult?.kernelMaandHint ?? null,
     kernelHousingSale: simResult?.kernelHousingSale ?? null,
+    kernelPensionPots: simResult?.kernelPensionPots ?? null,
   }
 }

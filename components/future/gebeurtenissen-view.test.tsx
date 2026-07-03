@@ -1,12 +1,14 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
-import { GebeurtenissenView, type EventPaneData } from './gebeurtenissen-view'
+import { GebeurtenissenView, type EventPaneData, type KernelSimData } from './gebeurtenissen-view'
 import type { LifeEvent, FinancialInput } from '@/lib/horizon-data'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { StrategieEditorsData } from './strategie/strategie-editors'
+import type { HorizonFireSimResult } from '@/lib/hooks/use-horizon-fire-sim'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 
 // GebeurtenissenView mount de EventPane (dynamisch, ssr:false → rendert niets in
 // jsdom) + de strategie-launcher die next/navigation + supabase client gebruiken.
@@ -22,6 +24,37 @@ vi.mock('@/lib/supabase/client', () => ({
     from: () => ({ insert: vi.fn().mockResolvedValue({ error: null }) }),
   }),
 }))
+// Feature #876 — de kernel-run (useHorizonFireSim) wordt gemockt: params null
+// (geen kernelSim/baseline, of pre-hydration) → loading-shape; anders het per
+// test gezette `mockSimResult`. Zo testen we de weergave-afleiding zonder een
+// echte kernel-run in jsdom.
+const LOADING_SIM: HorizonFireSimResult = {
+  result: null,
+  cashflows: [],
+  isLoading: true,
+  error: null,
+  unifiedRows: null,
+  effectiveLifeEvents: [],
+  kernelStatus: null,
+  kernelMaandHint: null,
+  kernelHousingSale: null,
+  kernelPensionPots: null,
+}
+let mockSimResult: HorizonFireSimResult = LOADING_SIM
+vi.mock('@/lib/hooks/use-horizon-fire-sim', () => ({
+  useHorizonFireSim: (params: unknown) => (params ? mockSimResult : LOADING_SIM),
+}))
+// StrategieEditors gestubd: registreert alleen welke strategie open is, zodat
+// klik-routering van kernel-rijen (huis/pensioen) asserteerbaar is.
+vi.mock('./strategie/strategie-editors', () => ({
+  StrategieEditors: ({ open }: { open: string | null }) => (
+    <div data-testid="strategie-editors-open">{open ?? 'none'}</div>
+  ),
+}))
+
+beforeEach(() => {
+  mockSimResult = LOADING_SIM
+})
 
 /**
  * Tests voor GebeurtenissenView — Gebeurtenissen-tab op /toekomst.
@@ -61,13 +94,17 @@ function renderView(props: {
   events: LifeEvent[]
   currentAge?: number | null
   annualSavings?: number
+  strategieData?: StrategieEditorsData
+  kernelSim?: KernelSimData | null
 }) {
+  const { strategieData, kernelSim, ...rest } = props
   return render(
     <DisplayModeProvider initialMode="full">
       <GebeurtenissenView
-        {...props}
-        strategieData={mockStrategieData}
+        {...rest}
+        strategieData={strategieData ?? mockStrategieData}
         eventPaneData={mockEventPaneData}
+        kernelSim={kernelSim ?? null}
       />
     </DisplayModeProvider>,
   )
@@ -216,5 +253,220 @@ describe('GebeurtenissenView — strategieën-sectie', () => {
       events: [mockEvent({ event_type: 'pension', name: 'Bedrijfspensioen', target_age: 67 })],
     })
     expect(screen.getByText('Beheerd via Pensioen-strategie')).toBeTruthy()
+  })
+})
+
+// ── Feature #876 — kernel-afgeleide strategiemomenten ────────────────────────
+
+/** strategieData mét rawContext-baseline zodat de kernel-run (hook) actief is. */
+const kernelStrategieData: StrategieEditorsData = {
+  ...mockStrategieData,
+  dailyExpenses: 100,
+  baseline: {
+    rawContext: {
+      profile: {} as never,
+      assets: [],
+      debts: [],
+      aowRows: [],
+      yearlyExpenses: 36_500,
+    },
+  },
+}
+
+const mockKernelSim: KernelSimData = {
+  aowAgeFractional: 67,
+  box3Method: 'forfaitair' as KernelSimData['box3Method'],
+  bankAccountCash: 0,
+  monthlySavingsOverride: null,
+  baseAnnualSavingsFromCashflow: null,
+  housingStrategy: undefined,
+  deficitLoanRate: 0.05,
+}
+
+/** Minimale jaar-rij; alleen de door de afleidingen gelezen velden tellen. */
+function makeRow(age: number, over: Partial<UnifiedProjectionRow> = {}): UnifiedProjectionRow {
+  return {
+    year: age - 55,
+    age,
+    phase: 'withdrawal',
+    assetBuckets: {},
+    debtBalances: {},
+    totalAssets: 0,
+    totalDebts: 0,
+    netWorth: 0,
+    startNetWorth: 0,
+    grossIncome: 0,
+    savings: 0,
+    withdrawal: 0,
+    withdrawalByType: {},
+    cashflowNet: 0,
+    oneTimeNet: 0,
+    totalGrowth: 0,
+    totalBox3: 0,
+    cumulativeBox3: 0,
+    inflationFactor: 1,
+    ...over,
+  }
+}
+
+/** Geladen sim-resultaat met per test aangeleverde velden. */
+function loadedSim(over: Partial<HorizonFireSimResult>): HorizonFireSimResult {
+  return {
+    ...LOADING_SIM,
+    isLoading: false,
+    unifiedRows: [],
+    kernelPensionPots: [],
+    ...over,
+  }
+}
+
+/** Kernel-afgeleid verkoop-event zoals `applyKernelHousingSaleToEvents` het bouwt. */
+function kernelSaleEvent(age: number, proceeds: number): LifeEvent {
+  return mockEvent({
+    id: 'housing-strategy:downsize',
+    name: 'Verkoop eigen woning',
+    event_type: 'verkoop_eigen_woning',
+    target_date: null,
+    target_age: age,
+    one_time_cost: 0,
+    monthly_cost_change: 0,
+    icon: 'Home',
+    metadata: {
+      source: 'housing-strategy',
+      strategy: 'downsize',
+      saleProceeds: proceeds,
+      mortgageBalanceAtTrigger: 80_000,
+      kernelDerived: true,
+    },
+  })
+}
+
+// Stale server-virtueel verkoop-event (v2-meetrun) — mag op de kernel-tak
+// NIET meer zichtbaar zijn (anti-drift).
+const staleServerSale = mockEvent({
+  id: 'housing-strategy:downsize',
+  name: 'Verkoop eigen woning',
+  event_type: 'verkoop_eigen_woning',
+  target_date: null,
+  target_age: 89,
+  metadata: { source: 'housing-strategy', strategy: 'downsize' },
+})
+
+function renderKernelView(events: LifeEvent[]) {
+  return renderView({ events, strategieData: kernelStrategieData, kernelSim: mockKernelSim })
+}
+
+describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #876)', () => {
+  it('anti-drift: tab toont de verkoopleeftijd uit dezelfde kernel-run, niet het stale server-event', () => {
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [kernelSaleEvent(71.25, 250_000)],
+      kernelHousingSale: { month: 195, age: 71.25, proceeds: 250_000 },
+    })
+    renderKernelView([staleServerSale])
+    // Kernel-waarheid (71, gevloerd) zichtbaar; stale v2-leeftijd (89) weg.
+    expect(screen.getByText('Leeftijd 71')).toBeTruthy()
+    expect(screen.queryByText(/Leeftijd 89/)).toBeNull()
+    expect(screen.getByText('Berekend door je plan')).toBeTruthy()
+  })
+
+  it('kernel-verkooprij is niet bewerkbaar (aria "Berekend:", geen edit-affordance) en toont netto-opbrengst + aflos-subtekst', () => {
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [kernelSaleEvent(71.25, 250_000)],
+      kernelHousingSale: { month: 195, age: 71.25, proceeds: 250_000 },
+    })
+    renderKernelView([staleServerSale])
+    const row = screen.getByRole('button', { name: 'Berekend: Verkoop eigen woning' })
+    expect(row).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Bewerk Verkoop eigen woning/ })).toBeNull()
+    expect(screen.getByText(/Netto-opbrengst/)).toBeTruthy()
+    expect(screen.getByText(/Restschuld hypotheek/)).toBeTruthy()
+    // Klik → bestaand huis-strategie-open-mechanisme.
+    fireEvent.click(row)
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('huis')
+  })
+
+  it('opeet-rijen (start + uitputting) renderen uit de rijen en openen de Huis-strategie', () => {
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [mockEvent({ target_date: null, target_age: 60 })],
+      unifiedRows: [
+        makeRow(70, { opeetOpname: 12_000, opeetCap: 40_000 }),
+        makeRow(71, { opeetOpname: 0, opeetCap: 41_000 }),
+      ],
+    })
+    renderKernelView([mockEvent({ target_date: null, target_age: 60 })])
+    expect(screen.getByText('Opname opeethypotheek start')).toBeTruthy()
+    expect(screen.getByText('Leenruimte opeethypotheek uitgeput')).toBeTruthy()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Berekend: Opname opeethypotheek start' }),
+    )
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('huis')
+  })
+
+  it('pensioenpot-einde rendert bij eindige duur en opent de Pensioen-strategie', () => {
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [mockEvent({ target_date: null, target_age: 60 })],
+      unifiedRows: [makeRow(55), makeRow(90)],
+      kernelPensionPots: [
+        { naam: 'Lijfrente', ingangsLeeftijd: 70, eindLeeftijd: 80, maandbedrag: 400, levenslang: false },
+        { naam: 'Bedrijfspensioen', ingangsLeeftijd: 67, eindLeeftijd: 100, maandbedrag: 900, levenslang: true },
+      ],
+    })
+    renderKernelView([mockEvent({ target_date: null, target_age: 60 })])
+    expect(screen.getByText('Lijfrente stopt')).toBeTruthy()
+    // Levenslange pot → geen einde-rij.
+    expect(screen.queryByText('Bedrijfspensioen stopt')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Berekend: Lijfrente stopt' }))
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('pensioen')
+  })
+
+  it('tekort-lening-rij opent de read-only uitleg-sheet met rente + voorkeuren-link', () => {
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [mockEvent({ target_date: null, target_age: 60 })],
+      unifiedRows: [
+        makeRow(82, {
+          debtBalances: {
+            'tekort-lening': { startBalance: 0, interestPaid: 0, principalPaid: 0, endBalance: 25_000 },
+          },
+        }),
+      ],
+    })
+    renderKernelView([mockEvent({ target_date: null, target_age: 60 })])
+    fireEvent.click(screen.getByRole('button', { name: 'Berekend: Tekort-lening ontstaat' }))
+    expect(screen.getByText('Gehanteerde rente')).toBeTruthy()
+    expect(screen.getByText(/5%\/jr/)).toBeTruthy()
+    expect(screen.getByText('Ontstaat op leeftijd')).toBeTruthy()
+    const link = screen.getByRole('link', { name: /Rente tekort-lening aanpassen/ })
+    expect(link.getAttribute('href')).toBe('/toekomst/voorkeuren?regel=eindstrategie')
+  })
+
+  it('regressie: geladen run zónder kernel-momenten → DB-event-rijen en edit-flow ongewijzigd', () => {
+    const userEvent = mockEvent({ target_date: null, target_age: 60, name: 'Wereldreis' })
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [userEvent],
+      unifiedRows: [makeRow(55), makeRow(90)],
+    })
+    renderKernelView([userEvent])
+    expect(screen.queryByText('Berekend door je plan')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Bewerk Wereldreis' })).toBeTruthy()
+  })
+
+  it('verkoop-wanneer-nodig zonder trigger: kernel stript het virtuele event → geen verkooprij', () => {
+    const userEvent = mockEvent({ target_date: null, target_age: 60, name: 'Wereldreis' })
+    // Hook-uitkomst: kernelHousingSale null → applyKernelHousingSaleToEvents
+    // heeft het server-virtuele verkoop-event gestript.
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [userEvent],
+      kernelHousingSale: null,
+    })
+    renderKernelView([userEvent, staleServerSale])
+    expect(screen.queryByText('Verkoop eigen woning')).toBeNull()
+  })
+
+  it('zonder kernelSim (geen rauwe context) → geen kernel-rijen en geen skeleton', () => {
+    const { container } = renderView({
+      events: [mockEvent({ target_date: null, target_age: 60 })],
+    })
+    expect(screen.queryByText('Berekend door je plan')).toBeNull()
+    expect(container.querySelector('.animate-pulse')).toBeNull()
   })
 })

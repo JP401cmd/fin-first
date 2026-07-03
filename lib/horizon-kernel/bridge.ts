@@ -144,6 +144,28 @@ export interface KernelHousingSale {
   readonly proceeds: number
 }
 
+/**
+ * Pensioenpot-weergave (read-only WEERGAVEVELD, feature #876). De jaar-rijen
+ * dragen pensioen-uitkeringen alleen geaggregeerd (CF!H → `grossIncome`, zie
+ * `buildRow`), dus een per-pot EINDE is uit de rijen niet af te leiden. Deze
+ * view spiegelt de statische Auto-gebeurtenissen-afleiding (rij 26-31, J-M):
+ * ingang/duur/maandbedrag per actieve pot. Consument:
+ * `derivePensionPotEndFromRows` (lib/horizon/kernel-strategy-moments.ts).
+ * Puur weergave — GEEN rekeninput, GEEN kern-wijziging.
+ */
+export interface KernelPensionPotView {
+  /** Kolom A — naam van de pot (alleen actieve potten; A26-gate). */
+  readonly naam: string
+  /** Kolom C — ingangsleeftijd (null = onbekend). */
+  readonly ingangsLeeftijd: number | null
+  /** Kolom L — eind-leeftijd = ingang + duur-model (J). */
+  readonly eindLeeftijd: number
+  /** Kolom K — bruto maandbedrag (PMT-annuïtisering of directe invoer). */
+  readonly maandbedrag: number
+  /** True voor levenslange typen (`bedrijf`/`lijfrente_levenslang`, J = 100−C). */
+  readonly levenslang: boolean
+}
+
 /** `UnifiedProjectionResult` + de solver-doorvoer (V12; nog niet geconsumeerd). */
 export interface KernelUnifiedResult extends UnifiedProjectionResult {
   /** P!B93/B100 — solver-status (doorvoer, V12). */
@@ -152,6 +174,8 @@ export interface KernelUnifiedResult extends UnifiedProjectionResult {
   readonly kernelMaandHint: number
   /** Verkoopmoment eigen woning binnen de horizon; `null` = geen verkoop. */
   readonly kernelHousingSale: KernelHousingSale | null
+  /** Pensioenpot-weergave per actieve pot (weergaveveld; leeg = geen potten). */
+  readonly kernelPensionPots: readonly KernelPensionPotView[]
 }
 
 // ── m-accessors (guard voorbij-horizon / lege cellen → 0) ────────────────────
@@ -312,6 +336,11 @@ function buildRow(
   let grossIncome = 0
   let cashflowNet = 0
   let oneTimeNet = 0
+  // Opeet-weergavevelden (feature #876): jaarsom Bez!BE + max Bez!BD. Alleen
+  // gezet in opeet-modus zodat de rij-shape in alle andere modi identiek blijft.
+  const opeetMode = input.woning.selector === 'Opeethypotheek'
+  let opeetOpname = 0
+  let opeetCap = 0
 
   for (let m = monthStart; m <= monthEnd; m++) {
     const bez = proj.bez[m]
@@ -357,6 +386,10 @@ function buildRow(
     }
     oneTimeNet += bez.woning.verkoopopbrengst
     cashflowNet += bez.woning.opeetOpname - (af !== undefined ? af.totaalAfname : 0)
+    if (opeetMode) {
+      opeetOpname += bez.woning.opeetOpname
+      if (bez.woning.opeetCap > opeetCap) opeetCap = bez.woning.opeetCap
+    }
   }
 
   // ── Schulden per app-debt-id (+ tekort-lening zodra aangesproken) ──────────
@@ -411,6 +444,7 @@ function buildRow(
     totalBox3,
     cumulativeBox3: cumBox3Prev + totalBox3,
     inflationFactor: Math.pow(1 + input.inflatie, k),
+    ...(opeetMode ? { opeetOpname, opeetCap } : {}),
   }
 }
 
@@ -554,6 +588,27 @@ export function kernelToUnifiedResult(
     }
   }
 
+  // ── Pensioenpot-weergave (feature #876) ────────────────────────────────────
+  // Spiegelt de statische Auto-gebeurtenissen-afleiding (rij 26-31, J-M): per
+  // actieve pot de eind-leeftijd (L) + het maandbedrag (K). De jaar-rijen dragen
+  // pensioen alleen geaggregeerd (CF!H), dus dit is het per-pot weergaveveld.
+  const kernelPensionPots: KernelPensionPotView[] = []
+  for (const pot of input.autoGebeurtenissen.pensioenPotten) {
+    if (pot.naam === null) continue // A26-gate: inactief slot
+    const row = proj.autoGebeurtenissen.pensioenRows[pot.slot]
+    if (row === undefined) continue
+    const eind = row.eindLeeftijd
+    const maand = row.maandbedrag
+    if (typeof eind !== 'number' || typeof maand !== 'number') continue
+    kernelPensionPots.push({
+      naam: pot.naam,
+      ingangsLeeftijd: pot.ingangsLeeftijd,
+      eindLeeftijd: eind,
+      maandbedrag: maand,
+      levenslang: pot.type === 'bedrijf' || pot.type === 'lijfrente_levenslang',
+    })
+  }
+
   return {
     rows,
     fireAge,
@@ -568,6 +623,7 @@ export function kernelToUnifiedResult(
     kernelStatus: status,
     kernelMaandHint: solve.maandHint,
     kernelHousingSale,
+    kernelPensionPots,
   }
 }
 

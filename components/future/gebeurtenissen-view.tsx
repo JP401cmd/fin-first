@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   Briefcase,
@@ -9,20 +10,33 @@ import {
   Wallet,
   Compass,
   ArrowRight,
+  Calculator,
+  KeyRound,
   TrendingDown,
   TrendingUp,
   Pencil,
   Sparkles,
   Plus,
 } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { resolveEventIcon } from '@/lib/event-icon'
 import type { LifeEvent, FinancialInput, FireProjection, WerkMetadata } from '@/lib/horizon-data'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
+import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
+import type { Box3Method } from '@/lib/bucket-projection'
+import type { HousingStrategyConfig } from '@/lib/housing-strategy'
 import { computeEventImpact } from '@/lib/event-impact'
+import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
+import {
+  deriveOpeetLifespanFromRows,
+  derivePensionPotEndFromRows,
+} from '@/lib/horizon/kernel-strategy-moments'
+import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
 import {
   isStrategyManagedEvent,
   STRATEGY_BADGE_LABEL,
@@ -30,6 +44,7 @@ import {
 } from '@/lib/strategy-events'
 import { StrategieEditors, type StrategieEditorsData } from './strategie/strategie-editors'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { BottomSheet } from '@/components/app/bottom-sheet'
 
 // EventPane = herstelde toevoeg/bewerk-flow uit /horizon (catalogus + Praat met
 // Will + 3-blokken-editor). Dynamisch geladen zodat de pagina-bundle licht blijft.
@@ -54,6 +69,44 @@ export interface EventPaneData {
    */
   previewBaseline: PreviewBaseline | null
 }
+
+/**
+ * Feature #876 — hook-inputs voor de kernel-run op deze tab die níet al in
+ * `strategieData.baseline.rawContext` of `eventPaneData` zitten. De view draait
+ * `useHorizonFireSim` (DEZELFDE run-site als de Tijdas-grafiek) zodat de
+ * kernel-afgeleide strategiemomenten per constructie het verkoopmoment/de
+ * rijen van de grafiek delen. `null` (geen rauwe context) → geen kernel-run,
+ * geen kernel-rijen.
+ */
+export interface KernelSimData {
+  aowAgeFractional: number
+  box3Method: Box3Method
+  bankAccountCash: number
+  monthlySavingsOverride: number | null
+  baseAnnualSavingsFromCashflow: number | null
+  housingStrategy?: HousingStrategyConfig
+  /** Gehanteerde tekort-lening-jaarrente (canonieke V7-resolver, 0..1). */
+  deficitLoanRate: number
+}
+
+/** Eén kernel-afgeleid strategiemoment als tijdlijn-rij (puur weergave). */
+interface KernelMoment {
+  key: string
+  /** Leeftijd op de rij-as (kan fractioneel zijn; weergave vloert op hele jaren). */
+  age: number
+  /** Klik-doel: strategie-modal (huis/pensioen) of de tekort-uitleg-sheet. */
+  action: 'huis' | 'pensioen' | 'tekort'
+  Icon: typeof Compass
+  title: string
+  detail: string
+  sub?: string
+  /** Waarschuwings-toon (stoplicht-amber, geen module-accent). */
+  warn?: boolean
+}
+
+/** Kaart-styling van een tijdlijn-rij (gedeeld tussen event- en kernel-rijen). */
+const TIMELINE_CARD_CLASS =
+  'flex-1 min-w-0 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left'
 
 /**
  * GebeurtenissenView — content voor Gebeurtenissen-tab op /toekomst.
@@ -184,6 +237,7 @@ export function GebeurtenissenView({
   annualSavings,
   strategieData,
   eventPaneData,
+  kernelSim = null,
 }: {
   events: LifeEvent[]
   /** Huidige leeftijd uit DOB — nodig om scenario-defaults op te baseren
@@ -197,6 +251,8 @@ export function GebeurtenissenView({
   strategieData: StrategieEditorsData
   /** Baseline-data voor de EventPane (toevoegen + bewerken vrije events). */
   eventPaneData: EventPaneData
+  /** Feature #876 — extra hook-inputs voor de kernel-run; null = geen kernel-rijen. */
+  kernelSim?: KernelSimData | null
 }) {
   // EventPane (toevoegen/bewerken) = scenario-tool → alleen in 'plannen'-modus
   // zichtbaar (plan A-5). Niveau-A "Kijken"-gebruikers zien dan een
@@ -207,9 +263,119 @@ export function GebeurtenissenView({
   const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view'>('catalog')
   // Welke levensstrategie-modal is open (null = dicht).
   const [openStrategy, setOpenStrategy] = useState<ManagedStrategy | null>(null)
+  // Feature #876 — read-only uitleg-sheet voor de tekort-lening-rij.
+  const [deficitSheetOpen, setDeficitSheetOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
+  // ── Feature #876: kernel-run (zelfde run-site als de Tijdas-grafiek) ─────
+  // De hook draait pas ná hydration (params null → isLoading, skeleton-rij);
+  // een korte mount-flits is acceptabel en consistent met de grafiek. GEEN
+  // tweede server-run: alle invoer komt uit de al-geserialiseerde props.
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
+  const rawContext = strategieData.baseline?.rawContext ?? null
+  const kernelSimActive = Boolean(kernelSim && rawContext)
+  const sim = useHorizonFireSim(
+    hydrated && kernelSim && rawContext
+      ? {
+          horizonInput: eventPaneData.baselineInput,
+          lifeEvents: events,
+          fireStrategy: eventPaneData.fireStrategy,
+          withdrawalStrategy: eventPaneData.withdrawalStrategy,
+          grossReturn: eventPaneData.fireParams.grossReturn,
+          inflation: eventPaneData.fireParams.inflationRate,
+          aowAgeFractional: kernelSim.aowAgeFractional,
+          assets: rawContext.assets as Asset[],
+          debts: rawContext.debts as Debt[],
+          box3Method: kernelSim.box3Method,
+          hasPartner: eventPaneData.householdMode,
+          bankAccountCash: kernelSim.bankAccountCash,
+          monthlySavingsOverride: kernelSim.monthlySavingsOverride,
+          baseAnnualSavingsFromCashflow: kernelSim.baseAnnualSavingsFromCashflow,
+          housingStrategy: kernelSim.housingStrategy,
+          kernelRawProfile: rawContext.profile,
+          aowRows: rawContext.aowRows as AowLeeftijdRow[] | undefined,
+        }
+      : null,
+  )
+
+  // Bedragen in € mét vrijheidstijd — zelfde dagtarief-grondslag als de
+  // strategie-editors (consume, don't recompute). Zonder dagtarief: alleen €.
+  const dailyExpenses = strategieData.dailyExpenses
+  const fmtAmount = (v: number) =>
+    dailyExpenses > 0 ? formatWithFreedom(v, dailyExpenses) : formatCurrency(v)
+
+  // Tekort-lening uit dezelfde rijen als de grafiek (kernel-only signaal).
+  const deficitNotice = useMemo(
+    () => detectDeficitLoanFromRows(sim.unifiedRows),
+    [sim.unifiedRows],
+  )
+
+  // Kernel-afgeleide strategiemomenten (puur weergave; voeden NOOIT lifeEvents
+  // of simulatie-invoer terug). Rijen verschijnen alleen als het moment bestaat.
+  const kernelMoments = useMemo<KernelMoment[]>(() => {
+    const out: KernelMoment[] = []
+    const opeet = deriveOpeetLifespanFromRows(sim.unifiedRows)
+    if (opeet) {
+      out.push({
+        key: 'opeet-start',
+        age: opeet.startAge,
+        action: 'huis',
+        Icon: KeyRound,
+        title: 'Opname opeethypotheek start',
+        detail:
+          dailyExpenses > 0
+            ? `Totaal ${formatWithFreedom(opeet.totalDrawn, dailyExpenses)} opgenomen binnen je plan`
+            : `Totaal ${formatCurrency(opeet.totalDrawn)} opgenomen binnen je plan`,
+      })
+      if (opeet.depletionAge != null) {
+        out.push({
+          key: 'opeet-uitputting',
+          age: opeet.depletionAge,
+          action: 'huis',
+          Icon: KeyRound,
+          title: 'Leenruimte opeethypotheek uitgeput',
+          detail: 'De overwaarde-ruimte is op — geen verdere opnames meer.',
+          warn: true,
+        })
+      }
+    }
+    for (const end of derivePensionPotEndFromRows(sim.unifiedRows, sim.kernelPensionPots)) {
+      out.push({
+        key: `pensioen-einde-${end.naam}-${end.endAge}`,
+        age: end.endAge,
+        action: 'pensioen',
+        Icon: Wallet,
+        title: `${end.naam} stopt`,
+        detail: `${formatCurrency(end.maandbedrag)}/mnd uitkering valt weg`,
+      })
+    }
+    if (deficitNotice) {
+      out.push({
+        key: 'tekort-lening',
+        age: deficitNotice.firstAge,
+        action: 'tekort',
+        Icon: TrendingDown,
+        title: 'Tekort-lening ontstaat',
+        detail:
+          dailyExpenses > 0
+            ? `Loopt op tot ${formatWithFreedom(deficitNotice.peak, dailyExpenses)}`
+            : `Loopt op tot ${formatCurrency(deficitNotice.peak)}`,
+        warn: true,
+      })
+    }
+    return out.sort((a, b) => a.age - b.age)
+  }, [sim.unifiedRows, sim.kernelPensionPots, deficitNotice, dailyExpenses])
+
+  // Klik-routering kernel-rijen: huis/opeet → bestaand ?strategie=huis-
+  // mechanisme (zelfde modal-open als de deeplink), pensioenpot-einde →
+  // pensioen-strategie, tekort-lening → read-only uitleg-sheet.
+  function openKernelMoment(m: KernelMoment) {
+    if (m.action === 'tekort') setDeficitSheetOpen(true)
+    else setOpenStrategy(m.action)
+  }
 
   // Deep-link: ?strategie=aow|pensioen|huis opent de bijbehorende modal.
   // (Disjunct van het bestaande ?strategie=open van de horizon-strategiekiezer.)
@@ -265,10 +431,15 @@ export function GebeurtenissenView({
       router.replace(`${pathname}${p.toString() ? `?${p}` : ''}`, { scroll: false })
     }
   }
+  // Tijdlijn-bron: op de kernel-tak vervangt de hook het stale server-virtuele
+  // verkoop-event door het kernel-afgeleide verkoopmoment (zelfde run als de
+  // grafiek-markers); vóór hydration vallen we terug op de server-events.
+  const displayEvents = sim.effectiveLifeEvents.length > 0 ? sim.effectiveLifeEvents : events
+
   // Sort events op target_date (alfabet als fallback). Events met datum
   // tonen we eerst chronologisch, daarna events met alleen target_age,
   // tenslotte events zonder timing.
-  const sorted = [...events].sort((a, b) => {
+  const sorted = [...displayEvents].sort((a, b) => {
     if (a.target_date && b.target_date) {
       return a.target_date.localeCompare(b.target_date)
     }
@@ -279,6 +450,28 @@ export function GebeurtenissenView({
     }
     return a.name.localeCompare(b.name)
   })
+
+  // Interleave de kernel-momenten op leeftijd tussen de leeftijd-gesorteerde
+  // events (datum-events blijven vooraan, conform de bestaande sortering).
+  // Zonder kernel-momenten is de tijdlijn identiek aan de events-lijst.
+  type TimelineItem = { kind: 'event'; event: LifeEvent } | { kind: 'moment'; moment: KernelMoment }
+  const timeline: TimelineItem[] = []
+  {
+    let mi = 0
+    for (const event of sorted) {
+      const evAge = event.target_date == null ? event.target_age : null
+      while (mi < kernelMoments.length && evAge != null && kernelMoments[mi].age <= evAge) {
+        timeline.push({ kind: 'moment', moment: kernelMoments[mi++] })
+      }
+      timeline.push({ kind: 'event', event })
+    }
+    while (mi < kernelMoments.length) {
+      timeline.push({ kind: 'moment', moment: kernelMoments[mi++] })
+    }
+  }
+
+  // Skeleton-rij zolang de kernel-run nog niet gedraaid heeft (tot hydration).
+  const showKernelSkeleton = kernelSimActive && sim.isLoading
 
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8 space-y-8">
@@ -305,7 +498,7 @@ export function GebeurtenissenView({
           </button>
         </header>
 
-        {sorted.length === 0 ? (
+        {sorted.length === 0 && kernelMoments.length === 0 && !showKernelSkeleton ? (
           <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 sm:p-8 text-center">
             <p className="text-sm text-[var(--ink-2)] leading-relaxed mb-3">
               Voeg een gebeurtenis toe om de impact op je tijdas te zien —
@@ -350,7 +543,61 @@ export function GebeurtenissenView({
               </div>
             </li>
 
-            {sorted.map((event) => {
+            {timeline.map((item) => {
+              // ── Kernel-afgeleid strategiemoment (feature #876) ──────────
+              // Niet-bewerkbaar: geen EventPane/edit-affordance. Klik opent de
+              // bijbehorende strategie-modal of de tekort-uitleg-sheet.
+              if (item.kind === 'moment') {
+                const m = item.moment
+                const MomentIcon = m.Icon
+                const nodeTone = m.warn
+                  ? 'border-amber-400 text-amber-700'
+                  : 'border-[var(--ink-3)] text-[var(--ink-2)]'
+                return (
+                  <li key={`kernel-${m.key}`} className="relative flex gap-4 pb-6 last:pb-0">
+                    {/* Gestippeld bolletje = berekend (onderscheid met events) */}
+                    <span
+                      className={`relative z-10 shrink-0 w-10 h-10 rounded-full border-2 border-dashed bg-[var(--paper)] flex items-center justify-center ${nodeTone}`}
+                    >
+                      <MomentIcon className="w-4 h-4" aria-hidden="true" />
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => openKernelMoment(m)}
+                      aria-label={`Berekend: ${m.title}`}
+                      className={`${TIMELINE_CARD_CLASS} w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all`}
+                    >
+                      <div className="text-[11px] text-[var(--ink-3)] mb-0.5">
+                        Leeftijd {Math.floor(m.age)}
+                      </div>
+                      <h3 className="text-sm font-semibold text-[var(--ink)] truncate inline-flex items-center gap-1.5">
+                        {m.title}
+                        <Calculator
+                          className="w-3 h-3 text-[var(--ink-4)] shrink-0"
+                          aria-hidden="true"
+                        />
+                      </h3>
+                      <div className="mt-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+                        Berekend door je plan
+                      </div>
+                      <p className="text-xs text-[var(--ink-2)] leading-snug mt-1">{m.detail}</p>
+                      {m.sub && (
+                        <p className="text-[11px] text-[var(--ink-3)] leading-snug mt-0.5">
+                          {m.sub}
+                        </p>
+                      )}
+                      {/* Klik-bestemming expliciet (ux-review): strategie-modal vs
+                          read-only uitleg — uit het uiterlijk alleen niet af te leiden. */}
+                      <p className="mt-1.5 text-[11px] font-medium text-[var(--module-active-700)]">
+                        {m.action === 'tekort' ? 'Meer uitleg →' : 'Bekijk strategie →'}
+                      </p>
+                    </button>
+                  </li>
+                )
+              }
+
+              const event = item.event
               const Icon = iconForEvent(event.event_type, event.icon)
               // Plan F-5: per event een impact-badge met geschatte
               // delta in maanden/jaren vrijheid. Alleen wanneer
@@ -382,16 +629,26 @@ export function GebeurtenissenView({
                     : 'border-[var(--ink-3)] text-[var(--ink-2)]'
               // Content-kaart is een button die de EventPane (vrij event)
               // of strategie-editor opent.
-              const cardClass =
-                'flex-1 min-w-0 rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 text-left'
               const managed = isStrategyManagedEvent(event)
+              // Feature #876: het kernel-afgeleide verkoop-event (uit
+              // `applyKernelHousingSaleToEvents`) is puur weergave — badge
+              // "Berekend door je plan", geen edit-affordance; klik opent de
+              // Huis-strategie (via `managed`, zelfde ?strategie=huis-modal).
+              const meta = (event.metadata ?? {}) as {
+                kernelDerived?: boolean
+                saleProceeds?: number
+                mortgageBalanceAtTrigger?: number
+              }
+              const kernelDerived = meta.kernelDerived === true
               const cardProps = {
                 type: 'button' as const,
                 onClick: () => openEventOrStrategy(event),
-                'aria-label': managed
-                  ? `Open ${STRATEGY_BADGE_LABEL[managed]}`
-                  : `Bewerk ${event.name}`,
-                className: `${cardClass} w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
+                'aria-label': kernelDerived
+                  ? `Berekend: ${event.name}`
+                  : managed
+                    ? `Open ${STRATEGY_BADGE_LABEL[managed]}`
+                    : `Bewerk ${event.name}`,
+                className: `${TIMELINE_CARD_CLASS} w-full hover:border-[var(--ink-3)] hover:shadow-sm transition-all`,
               }
               return (
                 <li key={event.id} className="relative flex gap-4 pb-6 last:pb-0">
@@ -404,25 +661,47 @@ export function GebeurtenissenView({
 
                   <button {...cardProps}>
                     <div className="text-[11px] text-[var(--ink-3)] mb-0.5">
-                      {formatEventDate(event)}
+                      {kernelDerived && event.target_age != null
+                        ? `Leeftijd ${Math.floor(event.target_age)}`
+                        : formatEventDate(event)}
                     </div>
                     <h3 className="text-sm font-semibold text-[var(--ink)] truncate inline-flex items-center gap-1.5">
                       {event.name}
-                      {!managed && (
+                      {!managed && !kernelDerived && (
                         <Pencil className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
                       )}
-                      {managed && (
+                      {managed && !kernelDerived && (
                         <Sparkles className="w-3 h-3 text-[var(--module-active-700)] shrink-0" aria-hidden="true" />
                       )}
+                      {kernelDerived && (
+                        <Calculator className="w-3 h-3 text-[var(--ink-4)] shrink-0" aria-hidden="true" />
+                      )}
                     </h3>
-                    {managed && (
+                    {kernelDerived ? (
                       <div className="mt-0.5 text-[10px] font-medium text-[var(--ink-3)]">
-                        {STRATEGY_BADGE_LABEL[managed]}
+                        Berekend door je plan
                       </div>
+                    ) : (
+                      managed && (
+                        <div className="mt-0.5 text-[10px] font-medium text-[var(--ink-3)]">
+                          {STRATEGY_BADGE_LABEL[managed]}
+                        </div>
+                      )
                     )}
                     <p className="text-xs text-[var(--ink-2)] leading-snug mt-1">
-                      {eventImpact(event)}
+                      {kernelDerived && typeof meta.saleProceeds === 'number' && meta.saleProceeds > 0
+                        ? `Netto-opbrengst ${fmtAmount(Math.round(meta.saleProceeds))}`
+                        : eventImpact(event)}
                     </p>
+                    {kernelDerived &&
+                      typeof meta.mortgageBalanceAtTrigger === 'number' &&
+                      meta.mortgageBalanceAtTrigger > 0 && (
+                        <p className="text-[11px] text-[var(--ink-3)] leading-snug mt-0.5">
+                          Restschuld hypotheek (≈{' '}
+                          {formatCurrency(Math.round(meta.mortgageBalanceAtTrigger))}) wordt bij
+                          verkoop afgelost
+                        </p>
+                      )}
                     {impact && impact.tone !== 'neutral' && (
                       <div
                         className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${impactClass}`}
@@ -436,6 +715,18 @@ export function GebeurtenissenView({
                 </li>
               )
             })}
+
+            {/* Feature #876 — skeleton-rij tot hydration: de kernel-momenten
+                komen uit de client-side kernel-run (zelfde als de grafiek). */}
+            {showKernelSkeleton && (
+              <li className="relative flex gap-4 pb-6 last:pb-0" aria-hidden="true">
+                <span className="relative z-10 shrink-0 w-10 h-10 rounded-full border-2 border-dashed border-[var(--border-md)] bg-[var(--paper)] animate-pulse" />
+                <div className={`${TIMELINE_CARD_CLASS} animate-pulse`}>
+                  <div className="h-3 w-20 rounded bg-[var(--subtle)] mb-2" />
+                  <div className="h-4 w-44 rounded bg-[var(--subtle)]" />
+                </div>
+              </li>
+            )}
           </ol>
         )}
       </div>
@@ -519,6 +810,58 @@ export function GebeurtenissenView({
         data={strategieData}
         readOnly={false}
       />
+
+      {/* Feature #876 — read-only uitleg-sheet voor de tekort-lening-rij.
+          Gedeelde BottomSheet (z-[70]-conventie automatisch). */}
+      <BottomSheet
+        open={deficitSheetOpen}
+        onClose={() => setDeficitSheetOpen(false)}
+        title="Tekort-lening"
+        size="sm"
+      >
+        <div className="px-5 pb-6 space-y-4">
+          <p className="text-sm text-[var(--ink-2)] leading-relaxed">
+            Op je huidige plan komt er een moment waarop je uitgaven niet meer
+            gedekt worden door je vermogen. Je plan rekent dat tekort door als
+            een synthetische lening met rente — geen echte lening, wel een
+            eerlijk signaal dat je plan hier knelt.
+          </p>
+          {deficitNotice && (
+            <dl className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] divide-y divide-[var(--border-ed)] text-sm">
+              <div className="flex items-baseline justify-between gap-3 px-4 py-2.5">
+                <dt className="text-[var(--ink-3)]">Ontstaat op leeftijd</dt>
+                <dd className="font-semibold text-[var(--ink)]">
+                  {Math.floor(deficitNotice.firstAge)}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 px-4 py-2.5">
+                <dt className="text-[var(--ink-3)]">Piek van het tekort</dt>
+                <dd className="font-semibold text-[var(--ink)] text-right">
+                  {fmtAmount(deficitNotice.peak)}
+                </dd>
+              </div>
+              {kernelSim && (
+                <div className="flex items-baseline justify-between gap-3 px-4 py-2.5">
+                  <dt className="text-[var(--ink-3)]">Gehanteerde rente</dt>
+                  <dd className="font-semibold text-[var(--ink)]">
+                    {(kernelSim.deficitLoanRate * 100).toLocaleString('nl-NL', {
+                      maximumFractionDigits: 1,
+                    })}
+                    %/jr
+                  </dd>
+                </div>
+              )}
+            </dl>
+          )}
+          <Link
+            href="/toekomst/voorkeuren?regel=eindstrategie"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--module-active-700)]"
+          >
+            Rente tekort-lening aanpassen bij je voorkeuren
+            <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+      </BottomSheet>
     </section>
   )
 }
