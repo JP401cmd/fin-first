@@ -22,7 +22,7 @@ Schaaf conventies altijd in de skill bij — nooit een lokale kopie hier. De `ux
 
 - **Next.js 16 App Router, React 19, TypeScript, Tailwind CSS v4 (PostCSS), Lucide React** icons. State via hooks (`useState/useEffect/useCallback/useContext`). Supabase client for data.
 - **Dutch UI copy**, informal (je/jij, never u), empowering and never judgmental — the same voice as the AI base DNA.
-- Three modules, each with a color theme: **DE KERN** (amber), **DE WIL** (teal), **DE HORIZON** (purple). Use the module's tokens (`kern-*`, `wil-*`/teal, `horizon-*`) consistently.
+- Three modules, each with a **user-configurable** accent colour (chosen on `/mijn/uiterlijk`) — never assume or hardcode a specific hue. Module identity goes exclusively through the tokens `kern-*`/`wil-*`/`horizon-*`, `var(--color-<module>-*)` or route-wide `--module-active-*`; charts/canvas that need a real hex use `useModuleHex()` from `components/app/module-color-provider.tsx`. Tailwind default colours (amber/teal/purple etc.) or loose hexes for module identity are forbidden.
 
 ## The philosophy is load-bearing in the UI
 
@@ -32,7 +32,8 @@ Schaaf conventies altijd in de skill bij — nooit een lokale kopie hier. De `ux
 
 ## Established patterns to reuse (don't reinvent)
 
-- **Module hero** sections with gradient backgrounds in the module color.
+- **Editorial pagina-opening** = dé standaard-aanhef van elke app-pagina: volg de spec in de ui-ux-skill, `pattern-cards.md` → *Editorial pagina-opening* (hairline-kicker → narratieve Playfair-H1 met één `<em>`-accent, 28/36/44px, bewust líchter dan `EditorialHeadline` → optionele deck → optioneel hairline-cijferblok). Nooit een gradient-kaart-doos als pagina-kop.
+- **Module hero** sections with gradient backgrounds in the module color — alleen als sectie/kaart bínnen een pagina, niet als pagina-opening (zie hierboven).
 - **KPI stat cards** in 4-column grids, with info tooltips.
 - **BottomSheet** modals for deep-dive analysis. It renders ABOVE the mobile floating nav-pill by default (`z-[70]` > pill `z-[60]`), so modal content/sticky buttons get the full height — prefer it over a hand-rolled overlay. Only `NavMenuSheet` opts out via `belowFloatingNav`.
 - **Charts** following the existing chart components (look at `components/core/*` and `components/app/horizon/*`).
