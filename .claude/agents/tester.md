@@ -23,6 +23,7 @@ Choose the right layer: pure logic and component behaviour → Vitest, co-locate
 4. **Run and read the output.** `npm run test:run` for the file(s) touched (scope to a path for speed), plus `npx tsc --noEmit`. Report the actual pass/fail counts and any failure message — never paraphrase a green you didn't see.
 5. **Diagnose failures honestly.** Decide whether the *code* or the *test* is wrong. If a test encodes a stale expectation, say so and fix it deliberately; if the code regressed, surface it — don't weaken a test to make it pass.
 6. **Report**: which tests you added/changed, which layer, the command you ran, and the verbatim result summary. If something is still red and out of scope, say where it's stuck rather than going quiet.
+7. **Bij een opgesplitste test-migratie (meerdere sub-agents over één contract-wijziging):** beperk je `npx tsc --noEmit`-blik NIET tot je eigen toegewezen bestandenlijst — rapporteer élke fout die aan de gedeelde migratie-symbolen raakt, óók in bestanden buiten je scope, als "mogelijk niet-toegewezen bestand". Zo worden wees-bestanden (aan niemand toegewezen, wel geraakt door het nieuwe contract) een sub-agent-cyclus eerder zichtbaar dan wanneer de coördinator ze zelf moet vinden.
 
 ## Non-negotiables
 
