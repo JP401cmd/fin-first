@@ -628,16 +628,17 @@ export const DebtPayoffStrategy = memo(function DebtPayoffStrategy({
   )
 
   // ── Simulaties ────────────────────────────────────────────
-  // We runnen alle vier targeting-strategieën met de huidige `extraPayment`
-  // — die voeden de chart als `StrategyTrajectory[]`, waarbij de actieve
-  // strategie dik gerenderd wordt en de andere drie als dunne contextlijnen.
-  // Daarnaast runnen we per strategie de €0-baseline zodat de
+  // We runnen alle vier targeting-strategieën met `deferredExtraPayment`
+  // (de slider-thumb en het €-label blijven live op `extraPayment`; de sim
+  // volgt deferred) — die voeden de chart als `StrategyTrajectory[]`, waarbij
+  // de actieve strategie dik gerenderd wordt en de andere drie als dunne
+  // contextlijnen. Daarnaast runnen we per strategie de €0-baseline zodat de
   // <StrategyComparisonMessage> kan vergelijken (active+extra vs active+€0,
   // of bij €0 vs de andere baselines).
   //
   // Vier × twee = acht simulaties. `simulatePayoff` is goedkoop genoeg
   // (<5ms voor typische schuld-portfolios) en `useMemo` zorgt dat het alleen
-  // herhaalt bij `activeDebts`/`extraPayment` wijzigingen.
+  // herhaalt bij `activeDebts`/`deferredExtraPayment` wijzigingen.
 
   const PAYOFF_STRATEGIES: PayoffStrategy[] = useMemo(
     () => ['snowball', 'avalanche', 'highest_balance', 'custom'],
