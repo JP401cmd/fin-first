@@ -72,6 +72,7 @@ Elke nieuwe app-route onder `app/(app)/**` die **geen** tab-hoofdpagina is (Over
 - Dutch, informal, empowering, no emoji.
 - Correct gating, deliberate fallback.
 - Never invent financial numbers in the UI — render what the engines/loaders provide.
+- **Testsuite als runtime-assertie voor getoonde berekeningen.** Bouw je een oppervlak dat een berekend kerngetal toont (KPI, doelbedrag, leeftijd, status), schrijf dan een component-/suite-test die de gerénderde waarde pint tegen de canonieke engine-uitvoer voor dezelfde input — niet alleen "er staat een getal". Weergave-drift (verkeerd veld, verkeerde grondslag, stale mapping) is anders onzichtbaar tot een gebruiker het meldt; precies zo ontstond de onherkenbare beheer-KPI-verwarring in het kernel-traject.
 - Don't claim done while `tsc` or component tests are red — en baseer de "groen"-claim op een **verse run ná je laatste edit**, met de echte output in je rapport, niet op een tussenresultaat.
 
 ## Self-improvement (always in consultation with the user)
