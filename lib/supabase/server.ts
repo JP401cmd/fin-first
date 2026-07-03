@@ -1,7 +1,18 @@
+import { cache } from 'react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function createClient() {
+/**
+ * Request-gecached via React `cache()`: layout, page en loaders die binnen
+ * dezelfde RSC-render `createClient()` aanroepen krijgen dezelfde instantie.
+ * Dat is de sleutel tot loader-dedup — alle `cache()`-gewrapte loaders
+ * (getCachedUser, loadDashboardData, loadHorizonData, …) keyen op de
+ * client-instantie, dus alleen met één gedeelde instantie per request delen
+ * layout en page hun cache-entries. Buiten een RSC-render (route handlers
+ * zonder request-store) gedraagt cache() zich als passthrough — identiek aan
+ * het oude gedrag.
+ */
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies()
 
   return createServerClient(
@@ -28,4 +39,4 @@ export async function createClient() {
       },
     }
   )
-}
+})
