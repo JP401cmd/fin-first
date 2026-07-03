@@ -163,19 +163,26 @@ describe('applyAssignmentPlan', () => {
     expect((updates[1].filters[0][2] as string[]).length).toBe(50)
   })
 
-  it('scope "rule": delete-vóór-insert per regel, daarna retro (naam + IBAN) mét tellingen', async () => {
+  it('scope "rule": delete per regel, daarna één bulk-insert, dan retro (naam + IBAN) mét tellingen', async () => {
     const plan = buildAssignmentPlan(input({ scope: 'rule' }))
     const supabase = fakeSupabase([{ id: 'x1' }, { id: 'x2' }])
     const result = await applyAssignmentPlan(asClient(supabase), plan)
 
     const ops = supabase.calls.map((c) => `${c.table}:${c.op}`)
-    // 1 tx-update, dan per regel delete+insert (2 regels), dan 2 retro-updates
+    // 1 tx-update, dan per regel een delete (2 regels), één bulk-insert, dan 2 retro-updates
     expect(ops).toEqual([
       'transactions:update',
-      'category_corrections:delete', 'category_corrections:insert',
-      'category_corrections:delete', 'category_corrections:insert',
+      'category_corrections:delete', 'category_corrections:delete',
+      'category_corrections:insert',
       'transactions:update', 'transactions:update',
     ])
+    // de bulk-insert bevat beide regels (naam + IBAN) mét user_id
+    const insertCall = supabase.calls.find((c) => c.table === 'category_corrections' && c.op === 'insert')
+    const insertedRows = insertCall?.args[0] as Record<string, unknown>[]
+    expect(insertedRows).toHaveLength(2)
+    for (const row of insertedRows) {
+      expect(row.user_id).toBe('u-1')
+    }
     // retro-updates filteren op user + budget_id is null
     const retro = supabase.calls.slice(-2)
     for (const call of retro) {

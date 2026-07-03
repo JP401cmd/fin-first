@@ -1557,16 +1557,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         const partnerId = memberIds.find(id => id !== authUser.id)
         cachedPartnerId = partnerId ?? null
         let partnerDisplayName = 'Partner'
-        if (partnerId) {
-          const { data: partnerProfile } = await supabase
-            .from('profiles')
-            .select('first_name')
-            .eq('id', partnerId)
-            .maybeSingle()
-          if (partnerProfile?.first_name) {
-            partnerDisplayName = partnerProfile.first_name
-          }
-        }
 
         // Derive display name from full_name (use first word)
         const myDisplayName = profileFullName?.split(' ')[0] || 'Jij'
@@ -1576,13 +1566,28 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
           const cutoffStr = thirtyDaysAgo.toISOString().split('T')[0]
 
-          const { data: sharedTxs } = await supabase
-            .from('transactions')
-            .select('id, description, amount, date, budget_id, user_id, ownership')
-            .in('user_id', memberIds)
-            .gte('date', cutoffStr)
-            .order('date', { ascending: false })
-            .limit(30)
+          // Partner-profiel en shared transactions zijn onafhankelijk (beide
+          // hangen alleen af van partnerId/memberIds) — parallel geladen.
+          const [partnerProfileResult, sharedTxsResult] = await Promise.all([
+            partnerId
+              ? supabase
+                  .from('profiles')
+                  .select('first_name')
+                  .eq('id', partnerId)
+                  .maybeSingle()
+              : Promise.resolve({ data: null }),
+            supabase
+              .from('transactions')
+              .select('id, description, amount, date, budget_id, user_id, ownership')
+              .in('user_id', memberIds)
+              .gte('date', cutoffStr)
+              .order('date', { ascending: false })
+              .limit(30),
+          ])
+          if (partnerProfileResult.data?.first_name) {
+            partnerDisplayName = partnerProfileResult.data.first_name
+          }
+          const sharedTxs = sharedTxsResult.data
 
           if (sharedTxs && sharedTxs.length > 0) {
             // Get budget names

@@ -150,7 +150,7 @@ type SupabaseLike = {
   from: (table: string) => {
     update: (values: Record<string, unknown>) => QueryBuilder
     delete: () => QueryBuilder
-    insert: (values: Record<string, unknown>) => QueryBuilder
+    insert: (values: Record<string, unknown> | Record<string, unknown>[]) => QueryBuilder
     select: (columns: string) => QueryBuilder
   }
 }
@@ -171,6 +171,10 @@ export async function applyAssignmentPlan(
   }
 
   // 2. Regels — delete vóór insert zodat een bestaande regel wordt vervangen.
+  //    Delete blijft bewust per regel: elke delete matcht case-insensitief
+  //    (.ilike) op een eigen (match_field, match_value)-paar; een bulk-delete
+  //    met .in() zou cross-matchen (over-deletie) en ilike-semantiek verliezen.
+  //    De inserts zijn wél gebundeld tot één bulk-insert.
   for (const rule of plan.rules) {
     const { error: delError } = await supabase
       .from('category_corrections')
@@ -179,9 +183,11 @@ export async function applyAssignmentPlan(
       .eq('match_field', rule.match_field)
       .ilike('match_value', rule.match_value)
     if (delError) throw new Error(delError.message)
+  }
+  if (plan.rules.length > 0) {
     const { error: insError } = await supabase
       .from('category_corrections')
-      .insert({ user_id: plan.retro!.userId, ...rule })
+      .insert(plan.rules.map((rule) => ({ user_id: plan.retro!.userId, ...rule })))
     if (insError) throw new Error(insError.message)
   }
 

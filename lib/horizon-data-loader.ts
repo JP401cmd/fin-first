@@ -259,7 +259,6 @@ export async function loadHorizonData(
   const [
     txResult,
     fullAssetsResult,
-    debtsResult,
     profileResult,
     allBudgetsResult,
     eventsResult,
@@ -282,7 +281,6 @@ export async function loadHorizonData(
     // unified projection. Replaces the previous trimmed-select + full-select
     // duplicate pair on the same table.
     supabase.from('assets').select('*').eq('is_active', true).limit(500),
-    supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
     supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules, box3_method, deficit_loan_rate, withdrawal_profile_config').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
@@ -428,7 +426,11 @@ export async function loadHorizonData(
     s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
   const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
   const totalAssets = totalAssetsOnly + unlinkedCash
-  const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
+  // totalDebts uit fullDebtsResult (select *) — vervangt de eerdere trimmed
+  // duplicate-query op dezelfde tabel (zelfde dedupe als assets hierboven).
+  // Bewuste keuze: fullDebtsResult heeft .limit(200); >200 actieve schulden
+  // is onrealistisch, dus dat limiet-verschil is geaccepteerd.
+  const totalDebts = (fullDebtsResult.data ?? []).reduce((s, d) =>
     s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
   const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 

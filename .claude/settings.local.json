@@ -128,7 +128,13 @@
       "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --hide-scrollbars --window-size=900,8000 --screenshot=/tmp/rapport_full.png \"http://localhost:3000/check/rapport?preview=1\")",
       "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --hide-scrollbars --force-prefers-reduced-motion --window-size=900,1400 --screenshot=/tmp/rapport_kruising.png \"http://localhost:3000/check/rapport?preview=1#s3\")",
       "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless=new --disable-gpu --hide-scrollbars --force-prefers-reduced-motion --window-size=820,900 --default-background-color=FFFFFFFF --screenshot=/tmp/k1.png \"http://localhost:3000/check/rapport?preview=1\")",
-      "Bash(python -c \"print\\('ok'\\)\")"
+      "Bash(python -c \"print\\('ok'\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 py -)",
+      "Bash(PYTHONIOENCODING=utf-8 py -m oletools.olevba \"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\")",
+      "Bash(cp \"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\" /tmp/corecalc_v4.xlsm)",
+      "Read(//tmp/**)",
+      "PowerShell(Get-Item \"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\" | Select-Object Name,Length,LastWriteTime,Attributes; try { $s=[IO.File]::Open\\(\"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\",'Open','Read','ReadWrite'\\); $s.Close\\(\\); \"open Read+shareRW OK\" } catch { \"still locked: $\\($_.Exception.Message\\)\" })",
+      "PowerShell($src=\"C:\\\\Users\\\\janpa\\\\OneDrive\\\\Prive\\\\Archief\\\\Core calc v4.xlsm\"; $dst=\"$env:TEMP\\\\corecalc_v4_inspD.xlsm\"; $ok=$false; foreach\\($i in 1..20\\){ try { [IO.File]::Copy\\($src,$dst,$true\\); $ok=$true; break } catch { Start-Sleep -Milliseconds 800 } }; if\\($ok\\){ \"copied\"; \\(Get-Item $dst\\).Length } else { \"FAILED after retries\" })"
     ]
   },
   "enableAllProjectMcpServers": true,

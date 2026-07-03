@@ -36,6 +36,7 @@ import { BudgetIcon, formatCurrency, getTypeColors, isOverPositive, computeBarSe
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover } from '@/lib/budget-rollover'
+import { computeBudgetPeriod, localDateStr } from '@/lib/budget-period'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetPillTree } from '@/components/app/budget-pill-tree'
 import { BudgetDonut } from '@/components/app/budget-donut'
@@ -120,10 +121,6 @@ type PartnerBudgetRow = {
   budget_type?: string
   _aggregated?: boolean
   _aggregatedCount?: number
-}
-
-function localDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 // ─── Editorial header voor de Budgetteren-app ─────────────────────
@@ -1105,34 +1102,13 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
     void refreshAllTimeUncatCount()
   }, [refreshAllTimeUncatCount])
 
-  // Compute date range + month count based on period mode
-  const { periodStart, periodEnd, periodMonthCount } = useMemo(() => {
-    const now = new Date()
-    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-    if (periodMode === 'ytd') {
-      const yearStart = new Date(monthDate.getFullYear(), 0, 1)
-      const months = monthDate.getMonth() + 1 // Jan=1, Feb=2, etc.
-      return {
-        periodStart: localDateStr(yearStart),
-        periodEnd: localDateStr(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1)),
-        periodMonthCount: months,
-      }
-    }
-    if (periodMode === '12m') {
-      const twelveMonthsAgo = new Date(currentMonthEnd.getFullYear(), currentMonthEnd.getMonth() - 12, 1)
-      return {
-        periodStart: localDateStr(twelveMonthsAgo),
-        periodEnd: localDateStr(currentMonthEnd),
-        periodMonthCount: 12,
-      }
-    }
-    // Default: single month
-    return {
-      periodStart: localDateStr(monthDate),
-      periodEnd: localDateStr(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1)),
-      periodMonthCount: 1,
-    }
-  }, [monthDate, periodMode])
+  // Compute date range + month count based on period mode.
+  // Pure bron: lib/budget-period.ts. YTD/12m hangen aan de huidige datum (now),
+  // niet aan de maand-selectie (monthDate) — zie computeBudgetPeriod.
+  const { periodStart, periodEnd, periodMonthCount } = useMemo(
+    () => computeBudgetPeriod(periodMode, monthDate),
+    [monthDate, periodMode],
+  )
 
   // Aliases so the rest of the file continues to work without renaming every reference
   const monthStart = periodStart
@@ -2134,7 +2110,9 @@ export default function BudgetsPage({ initialBudgetId, initialData }: { initialB
               style={{ fontFamily: 'var(--font-playfair, serif)' }}
             >
               {periodMode === 'ytd'
-                ? `${monthDate.getFullYear()} YTD`
+                ? // Jaar uit de berekende YTD-periode (huidig kalenderjaar), niet uit
+                  // de maand-selectie — periodStart is `${huidigJaar}-01-01`.
+                  `${periodStart.slice(0, 4)} YTD`
                 : periodMode === '12m'
                   ? 'Afgelopen 12 maanden'
                   : monthLabel}

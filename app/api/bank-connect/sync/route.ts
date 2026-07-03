@@ -117,33 +117,37 @@ export async function POST(req: Request) {
     // Map to ParsedTransaction
     const parsed = await mapTransactions(tlTransactions)
 
-    // Load budgets + corrections for categorization
-    const { data: budgets } = await supabase
-      .from('budgets')
-      .select('*')
-      .order('sort_order', { ascending: true })
-
-    const { data: corrections } = await supabase
-      .from('category_corrections')
-      .select('*')
-      .eq('user_id', user.id)
-
-    // Check existing hashes for dedup
+    // Load budgets + corrections (categorization), existing hashes (dedup) and
+    // the frequency map (smart matching) — all four are independent reads, so
+    // they run in one parallel batch instead of a sequential waterfall.
     const hashes = parsed.map((p) => p.import_hash)
-    const { data: existingHashes } = await supabase
-      .from('transactions')
-      .select('import_hash')
-      .eq('user_id', user.id)
-      .in('import_hash', hashes)
+    const [
+      { data: budgets },
+      { data: corrections },
+      { data: existingHashes },
+      freqMap,
+    ] = await Promise.all([
+      supabase
+        .from('budgets')
+        .select('*')
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('category_corrections')
+        .select('*')
+        .eq('user_id', user.id),
+      supabase
+        .from('transactions')
+        .select('import_hash')
+        .eq('user_id', user.id)
+        .in('import_hash', hashes),
+      buildFrequencyMap(user.id, supabase),
+    ])
 
     const existingHashSet = new Set((existingHashes ?? []).map((r) => r.import_hash))
 
     // Filter out duplicates and prepare inserts
     const newTransactions = parsed.filter((p) => !existingHashSet.has(p.import_hash))
     const duplicateCount = parsed.length - newTransactions.length
-
-    // Build frequency map for smart matching
-    const freqMap = await buildFrequencyMap(user.id, supabase)
 
     // Categorize and batch insert
     const BATCH_SIZE = 50

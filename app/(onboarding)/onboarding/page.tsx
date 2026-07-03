@@ -31,9 +31,17 @@ import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-pre
 import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
 import { WelcomePopup } from '@/components/onboarding/welcome-popup'
-import { type PersonaId, type IntentId, type ModuleId, ALL_MODULES } from '@/lib/module-registry'
+import { type ModuleId, ALL_MODULES } from '@/lib/module-registry'
 import type { GoalSlug } from '@/lib/goals/types'
-import { INTENT_TO_GOAL_FALLBACK, isGoalSlug } from '@/lib/goals/catalog'
+import { isGoalSlug } from '@/lib/goals/catalog'
+import {
+  serializeDraft,
+  sanitizeStoredDraft,
+  hasResumableDraft,
+  firstIncompleteRequiredStep,
+  type NonSensitiveDraft,
+  type DeferredFieldKey,
+} from './draft-persistence'
 
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
@@ -292,13 +300,6 @@ interface SpaardoelState {
   skipped: boolean
 }
 
-/**
- * Keys for fields deferred via "Later invullen" during onboarding.
- * Tracked so we can surface targeted post-onboarding suggestions
- * via the coach-bubble (feature #830).
- */
-type DeferredFieldKey = 'income' | 'assets' | 'spaardoel'
-
 interface State {
   step: Step
   direction: Direction
@@ -336,36 +337,6 @@ interface State {
   deferredFields: DeferredFieldKey[]
 }
 
-/** Data portion of state that gets persisted to localStorage (excludes step/direction) */
-interface PersistedData {
-  identity: IdentityData
-  /** Selected goal-slugs — primaire keuze sinds mei 2026 (fase 3) */
-  selectedGoals: GoalSlug[]
-  /** @deprecated Use selectedGoals — kept for migration from older drafts */
-  goal?: GoalSlug | null
-  /** @deprecated Use selectedGoals — kept for migration from old localStorage drafts */
-  intent?: IntentId | null
-  /** @deprecated Use selectedGoals — kept for migration from old localStorage drafts */
-  persona?: PersonaId | null
-  activeModules: ModuleId[]
-  /** @deprecated Use activeModules — kept for migration from old localStorage drafts */
-  selectedModules?: ModuleId[]
-  horizon?: HorizonData
-  budgetAmounts: Record<string, number>
-  quickAssets: AssetQuickInput[]
-  quickDebts: DebtQuickInput[]
-  /** Spaardoel-keuze van stap v. — optioneel zodat oude drafts blijven werken. */
-  spaardoel?: SpaardoelState
-  /** Uitgaven-na-pensioen-keuze — optioneel zodat oude drafts (zonder de stap) werken. */
-  retirementExpense?: RetirementExpenseState
-  /** Pensioen-keuze — optioneel zodat oude drafts (zonder pensioen-stap) werken. */
-  pension?: PensionDraft
-  /** Last step the user was on (to restore position) */
-  lastStep?: Step
-  /** Fields deferred via "Later invullen" — optioneel, oude drafts kennen dit veld niet. */
-  deferredFields?: DeferredFieldKey[]
-}
-
 type Action =
   | { type: 'SET_STEP'; step: Step }
   | { type: 'SET_IDENTITY'; data: IdentityData }
@@ -387,7 +358,7 @@ type Action =
    * Idempotent: voegt de key alleen toe als hij er nog niet in zit.
    */
   | { type: 'DEFER_FIELD'; key: DeferredFieldKey }
-  | { type: 'RESTORE_STATE'; data: PersistedData }
+  | { type: 'RESTORE_STATE'; data: NonSensitiveDraft }
 
 export const _initialState: State = {
   step: 'naam',
@@ -417,30 +388,6 @@ export const _initialState: State = {
   retirementExpense: INITIAL_RETIREMENT_EXPENSE,
   pension: INITIAL_PENSION_DRAFT,
   deferredFields: [],
-}
-
-/**
- * Map een legacy persisted intent (of persona) onto a new GoalSlug. Wordt
- * door `loadFromLocalStorage` / `RESTORE_STATE` gebruikt om oude drafts te
- * heelen — single-goal-output, caller wraps in array.
- */
-function migrateIntentToGoal(
-  intent: IntentId | null | undefined,
-  persona: PersonaId | null | undefined,
-): GoalSlug | null {
-  if (intent && intent in INTENT_TO_GOAL_FALLBACK) {
-    return INTENT_TO_GOAL_FALLBACK[intent]
-  }
-  if (persona) {
-    const personaToGoal: Record<PersonaId, GoalSlug | null> = {
-      budgetteerder: 'grip-uitgaven',
-      vermogensverdeler: 'vermogen-overzicht',
-      pensioenplanner: 'eerder-stoppen',
-      fire_fighter: 'eerder-stoppen',
-    }
-    return personaToGoal[persona] ?? null
-  }
-  return null
 }
 
 export function _reducer(state: State, action: Action): State {
@@ -485,49 +432,54 @@ export function _reducer(state: State, action: Action): State {
           `[onboarding] lastStep ${action.data.lastStep ?? '(none)'} not in active order, falling back to ${restoredStep}`
         )
       }
-      // Migrate single-goal drafts naar de nieuwe multi-select array.
-      // Volgorde: nieuwe array > legacy single-goal > legacy intent/persona.
-      let restoredGoals: GoalSlug[] = []
-      if (Array.isArray(action.data.selectedGoals) && action.data.selectedGoals.length > 0) {
-        restoredGoals = action.data.selectedGoals.filter(isGoalSlug)
-      } else if (action.data.goal) {
-        restoredGoals = [action.data.goal]
-      } else {
-        const migrated = migrateIntentToGoal(action.data.intent, action.data.persona)
-        if (migrated) restoredGoals = [migrated]
-      }
+      // Security (optie A): het draft bevat alléén niet-gevoelige velden. Alle
+      // gevoelige data (identity, bedragen, vermogen, pensioenbedragen,
+      // spaardoel-naam/bedrag) wordt NOOIT hersteld — die houdt de
+      // _initialState-shape en wordt door de gebruiker opnieuw ingevoerd. De
+      // finish-guard (`firstIncompleteRequiredStep`) voorkomt dat de eind-save
+      // met lege verplichte velden vertrekt.
+      const restoredGoals = action.data.selectedGoals.filter(isGoalSlug)
       return {
         ...state,
         step: restoredStep,
         direction: 'forward',
-        // Merge over de initial-shape zodat velden die een oude draft nog
-        // niet kent (estimated_yearly_income) altijd een string zijn —
-        // anders worden de controlled inputs uncontrolled.
-        identity: { ..._initialState.identity, ...action.data.identity },
+        // Gevoelig — nooit hersteld: houd de lege initiële identiteit.
+        identity: { ..._initialState.identity },
         selectedGoals: restoredGoals,
         // Sinds jun 2026 kiest de gebruiker geen modules meer in onboarding —
-        // negeer wat een oude draft had (incl. news-only) en zet alles aan.
+        // alles staat default aan.
         activeModules: [...ALL_MODULES],
-        horizon: action.data.horizon ?? INITIAL_HORIZON_DATA,
-        budgetAmounts: action.data.budgetAmounts,
-        quickAssets: action.data.quickAssets,
-        quickDebts: action.data.quickDebts,
-        // Ontbrekend `spaardoel` in een legacy draft → val terug op de
-        // _initialState-shape. Geen migratie nodig — het is een nieuw veld
-        // dat oude drafts gewoon niet kennen.
-        spaardoel: action.data.spaardoel ?? _initialState.spaardoel,
-        // Uitgaven-na-pensioen — optioneel; oude drafts (vóór deze stap) kennen
-        // het veld niet en vallen veilig terug op de initiële shape. Bij die
-        // default (skipped=false, leeg bedrag) stuurt de save niets expliciets
-        // mee → de impliciete 80%-server-default blijft werken.
-        retirementExpense: action.data.retirementExpense ?? _initialState.retirementExpense,
-        // Pensioen — optioneel; oude drafts (vóór de pensioen-stap) kennen het
-        // veld niet en vallen terug op de initiële shape.
-        pension: action.data.pension ?? _initialState.pension,
-        // Deferred fields — optioneel, oude drafts kennen dit veld niet.
-        deferredFields: Array.isArray(action.data.deferredFields)
-          ? action.data.deferredFields
-          : [],
+        // Alleen de niet-gevoelige horizon-strategiekeuzes terug; de gevoelige
+        // bedragen (fire_legacy_amount, retirement_custom_amount) en life_events
+        // blijven op de initiële shape.
+        horizon: {
+          ...INITIAL_HORIZON_DATA,
+          fire_end_strategy: action.data.horizon.fire_end_strategy,
+          fire_end_age: action.data.horizon.fire_end_age,
+          temporal_balance: action.data.horizon.temporal_balance,
+        },
+        // Gevoelig — nooit hersteld.
+        budgetAmounts: {},
+        quickAssets: [],
+        quickDebts: [],
+        // Alleen preset-keuze + skip-vlag terug; naam/streefbedrag/datum blijven leeg.
+        spaardoel: {
+          ..._initialState.spaardoel,
+          presetKey: action.data.spaardoel.presetKey,
+          skipped: action.data.spaardoel.skipped,
+        },
+        // Alleen methode + skip-vlag terug; het bedrag blijft leeg.
+        retirementExpense: {
+          ..._initialState.retirementExpense,
+          method: action.data.retirementExpense.method,
+          skipped: action.data.retirementExpense.skipped,
+        },
+        // Alleen het gekozen pad terug; brutobedrag/leeftijd/parseResult blijven leeg.
+        pension: {
+          ..._initialState.pension,
+          mode: action.data.pension.mode,
+        },
+        deferredFields: [...action.data.deferredFields],
       }
     }
     default:
@@ -552,196 +504,38 @@ function StepTransition({ direction, children }: {
 
 function saveToLocalStorage(state: State) {
   try {
-    const data: PersistedData = {
-      identity: state.identity,
-      selectedGoals: state.selectedGoals,
-      activeModules: state.activeModules,
-      horizon: state.horizon,
-      budgetAmounts: state.budgetAmounts,
-      quickAssets: state.quickAssets,
-      quickDebts: state.quickDebts,
-      spaardoel: state.spaardoel,
-      retirementExpense: state.retirementExpense,
-      pension: state.pension,
-      deferredFields: state.deferredFields,
-      lastStep: state.step,
-    }
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(data))
+    // Security (optie A): schrijf ALLEEN het niet-gevoelige draft weg — de
+    // serialisatie leeft in `draft-persistence.ts` en laat bedragen, namen en
+    // identiteit per definitie buiten het gepersisteerde object.
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(serializeDraft(state)))
   } catch {
     // localStorage may be full or unavailable — silently ignore
   }
 }
 
-function loadFromLocalStorage(): PersistedData | null {
+function loadFromLocalStorage(): NonSensitiveDraft | null {
   try {
     const raw = localStorage.getItem(ONBOARDING_STORAGE_KEY)
     if (!raw) return null
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migration requires flexible typing
-    const parsed = JSON.parse(raw) as Record<string, any>
-    // Basic validation: identity must exist
-    if (!parsed.identity || typeof parsed.identity !== 'object') return null
-
-    // Migration: old format had FIRE params and budgettering_mode on identity
-    let identity: IdentityData
-    let horizon: HorizonData | undefined = parsed.horizon
-
-    if ('budgettering_mode' in parsed.identity) {
-      const old = parsed.identity as Record<string, unknown>
-      if (!horizon) {
-        horizon = {
-          fire_end_strategy: (old.fire_end_strategy as string) ?? 'deplete',
-          fire_end_age: (old.fire_end_age as number) ?? 90,
-          fire_legacy_amount: String(old.fire_legacy_amount ?? ''),
-          retirement_expense_method: (old.retirement_expense_method as string) ?? 'current_income',
-          retirement_custom_amount: String(old.retirement_custom_amount ?? ''),
-          temporal_balance: (old.temporal_balance as number) ?? 3,
-          life_events: [],
-        } as HorizonData
-      }
-      identity = {
-        full_name: (old.full_name as string) ?? '',
-        date_of_birth: (old.date_of_birth as string) ?? '',
-        household_type: (old.household_type as string) ?? 'solo',
-        number_of_children: (old.number_of_children as number) ?? 0,
-        net_monthly_income: (old.net_monthly_income as string) ?? '',
-        estimated_yearly_income: '',
-        estimated_monthly_expenses: (old.estimated_monthly_expenses as string) ?? '',
-      } as IdentityData
-    } else {
-      identity = parsed.identity as IdentityData
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      return null
     }
-
-    // Migratie inkomensveld. Sinds jun 2026 (deze wijziging) is het inkomen
-    // per MAAND uitgevraagd: `net_monthly_income` is het primaire invoerveld,
-    // `estimated_yearly_income` (×12) blijft de canonieke spiegel.
-    //
-    // Drie soorten drafts moeten correct herstellen:
-    //  (a) nieuw — `net_monthly_income` gevuld: leid jaar daaruit af (×12).
-    //  (b) tussenperiode — alleen `estimated_yearly_income` (jaar-vraag):
-    //      leid maand daaruit af (÷12) zodat de gebruiker zijn invoer terugziet
-    //      in het nu maand-gebonden veld.
-    //  (c) heel oud — alleen legacy `net_monthly_income`: valt onder (a).
-    const cleanNumber = (s: string) =>
-      Number(String(s).replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.'))
-    const monthlyVal = identity.net_monthly_income
-      ? cleanNumber(identity.net_monthly_income)
-      : NaN
-    const yearlyVal = identity.estimated_yearly_income
-      ? cleanNumber(identity.estimated_yearly_income)
-      : NaN
-    if (isFinite(monthlyVal) && monthlyVal > 0) {
-      // (a)/(c): maandbedrag aanwezig → spiegel het canonieke jaarinkomen.
-      identity = {
-        ...identity,
-        estimated_yearly_income: String(Math.round(monthlyVal * 12)),
-      }
-    } else if (isFinite(yearlyVal) && yearlyVal > 0) {
-      // (b): alleen jaarbedrag → leid het maandbedrag af voor het invoerveld.
-      identity = {
-        ...identity,
-        net_monthly_income: String(Math.round(yearlyVal / 12)),
-      }
+    // Strip gevoelige velden uit een (mogelijk oud, vol) draft → alléén de
+    // niet-gevoelige keuzes + stap blijven over.
+    const sanitized = sanitizeStoredDraft(parsed)
+    if (!sanitized) return null
+    // Eenmalige migratie: overschrijf de opgeslagen key met de gestripte
+    // versie zodat oude bedragen/identiteit al bij de eerste load uit
+    // localStorage verdwijnen — óók wanneer we niet daadwerkelijk herstellen.
+    try {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(sanitized))
+    } catch {
+      // ignore — best-effort strip
     }
-
-    // Migratie selectedGoals: nieuwe shape > legacy single `goal` > leeg array.
-    // De daadwerkelijke intent/persona-fallback gebeurt in `RESTORE_STATE`
-    // omdat dat dichter bij waar de array daadwerkelijk wordt gezet leeft.
-    let selectedGoals: GoalSlug[] = []
-    if (Array.isArray(parsed.selectedGoals)) {
-      selectedGoals = parsed.selectedGoals.filter(isGoalSlug)
-    } else if (parsed.goal && isGoalSlug(parsed.goal)) {
-      selectedGoals = [parsed.goal]
-    }
-
-    // Migratie: een draft van vóór de QuickAddWizard-flow heeft `bankAccounts`,
-    // `assets`, `debts` met de oude shape. Die items zijn niet 1:1 te mappen
-    // op de nieuwe 3-velden-input zonder data te verzinnen — dus we droppen
-    // ze. De gebruiker voegt opnieuw toe via de wizard. Acceptabel voor
-    // onboarding (transient draft, geen permanente data).
-    //
-    // Spaardoel: oude drafts kennen het veld niet — defensieve parse die
-    // alleen overneemt wat we exact verwachten (presetKey-validatie tegen
-    // de bekende set). Faalt validatie, dan landt RESTORE_STATE op de
-    // _initialState-shape.
-    const validPresetKeys: ReadonlyArray<SpaardoelPresetKey> = [
-      'noodfonds', 'vakantie', 'auto', 'aanbetaling', 'groei', 'custom',
-    ]
-    let spaardoel: SpaardoelState | undefined = undefined
-    if (parsed.spaardoel && typeof parsed.spaardoel === 'object') {
-      const raw = parsed.spaardoel as Record<string, unknown>
-      const presetKey = typeof raw.presetKey === 'string' && (validPresetKeys as readonly string[]).includes(raw.presetKey)
-        ? (raw.presetKey as SpaardoelPresetKey)
-        : null
-      spaardoel = {
-        presetKey,
-        name: typeof raw.name === 'string' ? raw.name : '',
-        target_value: typeof raw.target_value === 'string' ? raw.target_value : '',
-        target_date: typeof raw.target_date === 'string' ? raw.target_date : '',
-        skipped: raw.skipped === true,
-      }
-    }
-
-    // Uitgaven-na-pensioen: oude drafts kennen het veld niet. Lichte shape-
-    // guard — alleen overnemen wat we exact verwachten; anders valt
-    // RESTORE_STATE terug op de initiële shape (skipped=false, leeg bedrag →
-    // impliciete server-default blijft werken).
-    let retirementExpense: RetirementExpenseState | undefined = undefined
-    if (parsed.retirementExpense && typeof parsed.retirementExpense === 'object') {
-      const rawR = parsed.retirementExpense as Record<string, unknown>
-      const method =
-        rawR.method === 'custom_amount' || rawR.method === 'current_income'
-          ? rawR.method
-          : 'custom_amount'
-      retirementExpense = {
-        method,
-        customAmount: typeof rawR.customAmount === 'string' ? rawR.customAmount : '',
-        skipped: rawR.skipped === true,
-      }
-    }
-
-    // Pensioen: oude drafts kennen het veld niet. Lichte shape-guard — neem
-    // alleen over wat we herkennen; RESTORE_STATE valt anders terug op de
-    // initiële shape. `parseResult` wordt verbatim overgenomen (JSON uit de
-    // mijnpensioen-mapper of de AI-route) of genegeerd als 't geen object is.
-    let pension: PensionDraft | undefined = undefined
-    if (parsed.pension && typeof parsed.pension === 'object') {
-      const rawP = parsed.pension as Record<string, unknown>
-      const mode = rawP.mode === 'estimate' || rawP.mode === 'upload' ? rawP.mode : null
-      pension = {
-        mode,
-        grossMonthly: typeof rawP.grossMonthly === 'string' ? rawP.grossMonthly : '',
-        startAge: typeof rawP.startAge === 'string' ? rawP.startAge : '',
-        parseResult:
-          rawP.parseResult && typeof rawP.parseResult === 'object'
-            ? (rawP.parseResult as PensionParseResult)
-            : null,
-      }
-    }
-
-    const data: PersistedData = {
-      identity,
-      selectedGoals,
-      goal: isGoalSlug(parsed.goal) ? parsed.goal : null,
-      intent: parsed.intent ?? null,
-      persona: parsed.persona ?? null,
-      activeModules: Array.isArray(parsed.activeModules) ? parsed.activeModules : (Array.isArray(parsed.selectedModules) ? parsed.selectedModules : []),
-      selectedModules: Array.isArray(parsed.selectedModules) ? parsed.selectedModules : [],
-      horizon,
-      budgetAmounts: parsed.budgetAmounts && typeof parsed.budgetAmounts === 'object' ? parsed.budgetAmounts : {},
-      quickAssets: Array.isArray(parsed.quickAssets) ? parsed.quickAssets : [],
-      quickDebts: Array.isArray(parsed.quickDebts) ? parsed.quickDebts : [],
-      spaardoel,
-      retirementExpense,
-      pension,
-      deferredFields: Array.isArray(parsed.deferredFields) ? parsed.deferredFields : [],
-      lastStep: parsed.lastStep,
-    }
-
-    // Legacy step-namen worden door `_resolveRestoredStep` zelf gemapt;
-    // hier laten we ze ongemoeid zodat de healed-flag in RESTORE_STATE
-    // accuraat aangeeft of er een mapping heeft plaatsgevonden.
-
-    return data
+    return sanitized
   } catch {
     return null
   }
@@ -903,11 +697,13 @@ export default function OnboardingPage() {
         return
       }
 
-      // Try to restore previously entered data from localStorage
+      // Try to restore previously entered data from localStorage. Sinds de
+      // security-fix (optie A) bevat het draft alléén niet-gevoelige velden;
+      // het "is er iets te hervatten?"-signaal baseert daarom op de stap +
+      // keuzes (`hasResumableDraft`), niet meer op de (niet meer gepersisteerde)
+      // naam/geboortedatum.
       const saved = loadFromLocalStorage()
-      const hasRestoredDraft = Boolean(
-        saved && (saved.identity.full_name || saved.identity.date_of_birth),
-      )
+      const hasRestoredDraft = hasResumableDraft(saved)
       if (hasRestoredDraft && saved) {
         dispatch({ type: 'RESTORE_STATE', data: saved })
         setRestoredNotice(true)
@@ -969,6 +765,10 @@ export default function OnboardingPage() {
   // ── Handlers ─────────────────────────────────────────────────
 
   const handleLogout = useCallback(async () => {
+    // Afbreken = concept wissen. Zonder deze clear bleef een (al gestript,
+    // maar nog altijd resumbaar) draft op een gedeeld apparaat achter na
+    // uitloggen — acceptatiecriterium "gewist bij afbreken".
+    clearLocalStorage()
     await supabase.auth.signOut()
     window.location.href = '/login'
   }, [supabase])
@@ -993,6 +793,17 @@ export default function OnboardingPage() {
   const handleSaveOwnData = useCallback(async () => {
     // Prevent double-submit: if already saving, ignore subsequent calls
     if (saving) return
+    // Restore-guard (optie A): identiteit wordt niet meer hersteld, dus na een
+    // draft-restore is de naam/geboortedatum leeg terwijl de gebruiker op een
+    // latere stap kan landen. Zonder deze guard zou de eind-save een payload
+    // met lege verplichte velden insturen. Zak in dat geval terug naar de
+    // eerste onvolledige verplichte stap i.p.v. te saven.
+    const incompleteStep = firstIncompleteRequiredStep(state.identity, activeStepOrder)
+    if (incompleteStep) {
+      setSaveError('Vul eerst je naam en geboortedatum in — die hebben we nodig om je profiel af te ronden.')
+      dispatch({ type: 'SET_STEP', step: incompleteStep })
+      return
+    }
     setSaving(true)
     setSaveProgress(0)
     setSaveMessageIdx(0)

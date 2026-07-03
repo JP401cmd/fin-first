@@ -8,6 +8,7 @@ import {
 } from './page'
 import { ALL_MODULES } from '@/lib/module-registry'
 import type { PensionDraft } from '@/components/onboarding/onboarding-pensioen'
+import type { NonSensitiveDraft } from './draft-persistence'
 
 // The component module imports a CSS file and a chain of client components
 // (onboarding-identity, onboarding-inkomen, etc.) plus `@/lib/supabase/client`.
@@ -125,18 +126,23 @@ describe('onboarding _initialState — modules default aan', () => {
   })
 })
 
-describe('onboarding _reducer — RESTORE_STATE', () => {
-  const baseIdentity = {
-    full_name: 'Jan Paul',
-    date_of_birth: '1986-04-05',
-    household_type: 'solo',
-    number_of_children: 0,
-    net_monthly_income: '3500',
-    estimated_yearly_income: '42000',
-    estimated_monthly_expenses: '2200',
+describe('onboarding _reducer — RESTORE_STATE (niet-gevoelig)', () => {
+  // Sinds de security-fix (optie A) draagt RESTORE_STATE alléén een
+  // niet-gevoelig draft: stap + keuzes-zonder-bedrag. Gevoelige velden
+  // (identity, bedragen, vermogen, pensioenbedragen, spaardoel-naam/bedrag)
+  // worden NOOIT hersteld en houden de _initialState-shape.
+  function makeDraft(overrides: Partial<NonSensitiveDraft> = {}): NonSensitiveDraft {
+    return {
+      selectedGoals: [],
+      activeModules: [...ALL_MODULES],
+      deferredFields: [],
+      spaardoel: { presetKey: null, skipped: false },
+      pension: { mode: null },
+      retirementExpense: { method: 'custom_amount', skipped: false },
+      horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
+      ...overrides,
+    }
   }
-
-  const baseHorizon = _initialState.horizon
 
   let warnSpy: ReturnType<typeof vi.spyOn>
 
@@ -151,16 +157,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
   it('restores a valid lastStep without warning and forces all modules on', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: ['grip-uitgaven'],
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        lastStep: 'bezittingen',
-      },
+      data: makeDraft({ selectedGoals: ['grip-uitgaven'], lastStep: 'bezittingen' }),
     })
     expect(result.step).toBe('bezittingen')
     expect(result.activeModules).toEqual([...ALL_MODULES])
@@ -168,87 +165,65 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
     expect(warnSpy).not.toHaveBeenCalled()
   })
 
-  it('restores a draft saved mid-flow on the new schulden step without warning', () => {
-    // Mid-loop restore landt op groep-niveau met de reeds-toegevoegde posten
-    // intact (data-behoudend); de schulden-stap zelf is gewoon herstelbaar.
+  it('herstelt de identiteit NOOIT — die blijft de lege initiële shape', () => {
+    // Kern van de security-fix: zelfs met een lastStep diep in de flow blijft
+    // de naam/geboortedatum/inkomen leeg (nooit gepersisteerd, nooit hersteld).
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: [],
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [{ asset_type: 'cash', name: 'Betaalrekening', current_value: 1200 }],
-        quickDebts: [{ debt_type: 'student_loan', name: 'DUO', current_balance: 9000 }],
-        lastStep: 'schulden',
-      },
+      data: makeDraft({ lastStep: 'schulden' }),
     })
     expect(result.step).toBe('schulden')
-    // Reeds toegevoegde posten blijven behouden bij restore.
-    expect(result.quickAssets).toHaveLength(1)
-    expect(result.quickDebts).toHaveLength(1)
+    expect(result.identity).toEqual(_initialState.identity)
+    expect(result.identity.full_name).toBe('')
+    expect(result.identity.net_monthly_income).toBe('')
+  })
+
+  it('herstelt gevoelige bezittingen/schulden NOOIT (blijven leeg)', () => {
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: makeDraft({ lastStep: 'schulden' }),
+    })
+    expect(result.quickAssets).toEqual([])
+    expect(result.quickDebts).toEqual([])
+    expect(result.budgetAmounts).toEqual({})
     expect(warnSpy).not.toHaveBeenCalled()
   })
 
-  it('behoudt het maand-inkomensveld bij restore (jun 2026: inkomen per maand)', () => {
+  it('herstelt de niet-gevoelige keuzes (selectedGoals, deferredFields)', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: {
-          full_name: 'Jan Paul',
-          date_of_birth: '1986-04-05',
-          household_type: 'solo',
-          number_of_children: 0,
-          net_monthly_income: '3000',
-          estimated_yearly_income: '36000',
-          estimated_monthly_expenses: '2100',
-        } as (typeof _initialState)['identity'],
-        selectedGoals: [],
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        lastStep: 'inkomen',
-      },
-    })
-    expect(result.identity.net_monthly_income).toBe('3000')
-    expect(result.identity.estimated_yearly_income).toBe('36000')
-  })
-
-  it('migrates a legacy single-goal draft to a selectedGoals array', () => {
-    const result = _reducer(_initialState, {
-      type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: [],
-        goal: 'grip-uitgaven',
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
+      data: makeDraft({
+        selectedGoals: ['grip-uitgaven'],
+        deferredFields: ['income', 'assets'],
         lastStep: 'bezittingen',
-      },
+      }),
     })
     expect(result.selectedGoals).toEqual(['grip-uitgaven'])
+    expect(result.deferredFields).toEqual(['income', 'assets'])
+  })
+
+  it('herstelt alléén de horizon-strategiekeuzes, niet de bedragen/life_events', () => {
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: makeDraft({
+        horizon: { fire_end_strategy: 'legacy', fire_end_age: 85, temporal_balance: 4 },
+        lastStep: 'klaar',
+      }),
+    })
+    expect(result.horizon.fire_end_strategy).toBe('legacy')
+    expect(result.horizon.fire_end_age).toBe(85)
+    expect(result.horizon.temporal_balance).toBe(4)
+    // Gevoelige horizon-velden blijven de initiële (lege) shape.
+    expect(result.horizon.fire_legacy_amount).toBe('')
+    expect(result.horizon.retirement_custom_amount).toBe('')
+    expect(result.horizon.life_events).toEqual([])
   })
 
   it('migrates a legacy "identity" lastStep to "naam"', () => {
     // Een draft van vóór de profiel-split. LEGACY_STEP_MAP mapt identity → naam.
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: [],
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        lastStep: 'identity' as (typeof _initialState)['step'],
-      },
+      data: makeDraft({ lastStep: 'identity' }),
     })
     expect(result.step).toBe('naam')
     expect(warnSpy).toHaveBeenCalledOnce()
@@ -259,16 +234,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
   it('migrates a legacy "budgets" lastStep to "klaar"', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: ['grip-uitgaven'],
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        lastStep: 'budgets' as (typeof _initialState)['step'],
-      },
+      data: makeDraft({ selectedGoals: ['grip-uitgaven'], lastStep: 'budgets' }),
     })
     expect(result.step).toBe('klaar')
     expect(warnSpy).toHaveBeenCalledOnce()
@@ -279,16 +245,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
   it('heals a news-only draft (lastStep nieuws_only) back to naam', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: [],
-        activeModules: ['nieuws'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        lastStep: 'nieuws_only' as unknown as (typeof _initialState)['step'],
-      },
+      data: makeDraft({ lastStep: 'nieuws_only' }),
     })
     expect(result.step).toBe('naam')
     expect(result.activeModules).toEqual([...ALL_MODULES])
@@ -298,16 +255,7 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
   it('falls back to naam for an unknown lastStep', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: [],
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        lastStep: 'verzonnen_stap' as unknown as (typeof _initialState)['step'],
-      },
+      data: makeDraft({ lastStep: 'verzonnen_stap' }),
     })
     expect(result.step).toBe('naam')
     expect(warnSpy).toHaveBeenCalledOnce()
@@ -448,17 +396,19 @@ describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
   })
 })
 
-describe('onboarding _reducer — RESTORE_STATE met spaardoel + pensioen', () => {
-  const baseIdentity = {
-    full_name: 'Jan Paul',
-    date_of_birth: '1986-04-05',
-    household_type: 'solo',
-    number_of_children: 0,
-    net_monthly_income: '3500',
-    estimated_yearly_income: '42000',
-    estimated_monthly_expenses: '2200',
+describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', () => {
+  function makeDraft(overrides: Partial<NonSensitiveDraft> = {}): NonSensitiveDraft {
+    return {
+      selectedGoals: [],
+      activeModules: [...ALL_MODULES],
+      deferredFields: [],
+      spaardoel: { presetKey: null, skipped: false },
+      pension: { mode: null },
+      retirementExpense: { method: 'custom_amount', skipped: false },
+      horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
+      ...overrides,
+    }
   }
-  const baseHorizon = _initialState.horizon
 
   let warnSpy: ReturnType<typeof vi.spyOn>
   beforeEach(() => {
@@ -468,134 +418,81 @@ describe('onboarding _reducer — RESTORE_STATE met spaardoel + pensioen', () =>
     warnSpy.mockRestore()
   })
 
-  it('restores a saved spaardoel substate verbatim', () => {
+  it('herstelt alléén de spaardoel-keuze (preset + skip), niet naam/bedrag', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
+      data: makeDraft({
         selectedGoals: ['noodfonds'],
-        activeModules: ['budgetteren', 'inzicht_acties'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        spaardoel: {
-          presetKey: 'vakantie',
-          name: 'Italië 2027',
-          target_value: '3500',
-          target_date: '2027-06',
-          skipped: false,
-        },
+        spaardoel: { presetKey: 'vakantie', skipped: false },
         lastStep: 'spaardoel',
-      },
+      }),
     })
     expect(result.step).toBe('spaardoel')
     expect(result.spaardoel.presetKey).toBe('vakantie')
-    expect(result.spaardoel.name).toBe('Italië 2027')
+    // Gevoelig — nooit hersteld: blijven de lege initiële shape.
+    expect(result.spaardoel.name).toBe('')
+    expect(result.spaardoel.target_value).toBe('')
+    expect(result.spaardoel.target_date).toBe('')
   })
 
-  it('restores a saved retirementExpense substate verbatim', () => {
+  it('herstelt de spaardoel-skip-vlag', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: [],
-        activeModules: ['toekomstplannen'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        retirementExpense: {
-          method: 'custom_amount',
-          customAmount: '30.000',
-          skipped: false,
-        },
+      data: makeDraft({ spaardoel: { presetKey: null, skipped: true }, lastStep: 'spaardoel' }),
+    })
+    expect(result.spaardoel.skipped).toBe(true)
+    expect(result.spaardoel.name).toBe('')
+  })
+
+  it('herstelt alléén de retirementExpense-methode + skip, niet het bedrag', () => {
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: makeDraft({
+        retirementExpense: { method: 'custom_amount', skipped: false },
         lastStep: 'uitgaven_pensioen',
-      },
+      }),
     })
     expect(result.step).toBe('uitgaven_pensioen')
-    expect(result.retirementExpense).toEqual({
-      method: 'custom_amount',
-      customAmount: '30.000',
-      skipped: false,
-    })
+    expect(result.retirementExpense.method).toBe('custom_amount')
+    expect(result.retirementExpense.skipped).toBe(false)
+    // Gevoelig bedrag — nooit hersteld.
+    expect(result.retirementExpense.customAmount).toBe('')
   })
 
-  it('falls back to the initial retirementExpense state for a legacy draft without it', () => {
+  it('valt terug op de initiële retirementExpense bij default keuzes', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: [],
-        activeModules: ['toekomstplannen'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        // retirementExpense ontbreekt bewust — legacy draft simulatie
-        lastStep: 'klaar',
-      },
+      data: makeDraft({ lastStep: 'klaar' }),
     })
     expect(result.retirementExpense).toEqual(_initialState.retirementExpense)
   })
 
-  it('restores a saved pension substate verbatim', () => {
-    const pension: PensionDraft = {
-      mode: 'estimate',
-      grossMonthly: '1400',
-      startAge: '68',
-      parseResult: null,
-    }
+  it('herstelt alléén het pensioen-pad (mode), niet brutobedrag/leeftijd/parseResult', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: [],
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        pension,
-        lastStep: 'pensioen',
-      },
+      data: makeDraft({ pension: { mode: 'estimate' }, lastStep: 'pensioen' }),
     })
     expect(result.step).toBe('pensioen')
-    expect(result.pension).toEqual(pension)
+    expect(result.pension.mode).toBe('estimate')
+    // Gevoelig — nooit hersteld.
+    expect(result.pension.grossMonthly).toBe('')
+    expect(result.pension.startAge).toBe('')
+    expect(result.pension.parseResult).toBeNull()
   })
 
-  it('falls back to the initial pension state when missing from a legacy draft', () => {
+  it('valt terug op de initiële pension-shape wanneer geen pad gekozen is', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: ['grip-uitgaven'],
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        // pension ontbreekt bewust — legacy draft simulatie
-        lastStep: 'klaar',
-      },
+      data: makeDraft({ pension: { mode: null }, lastStep: 'klaar' }),
     })
     expect(result.step).toBe('klaar')
     expect(result.pension).toEqual(_initialState.pension)
   })
 
-  it('falls back to the initial spaardoel state when missing from a legacy draft', () => {
+  it('valt terug op de initiële spaardoel-shape bij geen keuze', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: {
-        identity: baseIdentity as (typeof _initialState)['identity'],
-        selectedGoals: ['grip-uitgaven'],
-        activeModules: ['budgetteren'],
-        horizon: baseHorizon,
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        lastStep: 'klaar',
-      },
+      data: makeDraft({ lastStep: 'klaar' }),
     })
     expect(result.step).toBe('klaar')
     expect(result.spaardoel).toEqual(_initialState.spaardoel)

@@ -63,50 +63,56 @@ export async function GET() {
     })
   }
 
-  // Get household details
-  const { data: household } = await supabase
-    .from('households')
-    .select('id, name, split_mode, custom_split_pct, primary_payer_id, created_by, created_at')
-    .eq('id', membership.household_id)
-    .single()
+  // Household details, members and sent invitations depend only on
+  // membership.household_id — fetch them in parallel.
+  const [
+    { data: household },
+    { data: members },
+    { data: sentInvitations },
+  ] = await Promise.all([
+    supabase
+      .from('households')
+      .select('id, name, split_mode, custom_split_pct, primary_payer_id, created_by, created_at')
+      .eq('id', membership.household_id)
+      .single(),
+    supabase
+      .from('household_members')
+      .select(`
+        id,
+        user_id,
+        role,
+        sort_order,
+        joined_at
+      `)
+      .eq('household_id', membership.household_id)
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('household_invitations')
+      .select('id, invited_email, status, expires_at, created_at, token')
+      .eq('household_id', membership.household_id)
+      .in('status', ['pending', 'expired'])
+      .order('created_at', { ascending: false }),
+  ])
 
-  // Get members with profile names
-  const { data: members } = await supabase
-    .from('household_members')
-    .select(`
-      id,
-      user_id,
-      role,
-      sort_order,
-      joined_at
-    `)
-    .eq('household_id', membership.household_id)
-    .order('sort_order', { ascending: true })
+  // Get member profile names in one query (was an N+1 per-member lookup).
+  // RLS visibility is identical to the previous per-id .eq() reads.
+  const memberUserIds = (members ?? []).map((m) => m.user_id)
+  const profileNameById = new Map<string, string | null>()
+  if (memberUserIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', memberUserIds)
+    for (const p of profiles ?? []) {
+      profileNameById.set(p.id, p.full_name ?? null)
+    }
+  }
 
-  // Get member profile names separately
-  const memberDetails = await Promise.all(
-    (members ?? []).map(async (m) => {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', m.user_id)
-        .maybeSingle()
-
-      return {
-        ...m,
-        full_name: profile?.full_name ?? null,
-        is_current_user: m.user_id === user.id,
-      }
-    })
-  )
-
-  // Get pending invitations sent
-  const { data: sentInvitations } = await supabase
-    .from('household_invitations')
-    .select('id, invited_email, status, expires_at, created_at, token')
-    .eq('household_id', membership.household_id)
-    .in('status', ['pending', 'expired'])
-    .order('created_at', { ascending: false })
+  const memberDetails = (members ?? []).map((m) => ({
+    ...m,
+    full_name: profileNameById.get(m.user_id) ?? null,
+    is_current_user: m.user_id === user.id,
+  }))
 
   // Auto-expire stale pending invitations (past expires_at)
   const now = new Date()
