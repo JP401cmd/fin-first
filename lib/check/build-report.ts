@@ -49,7 +49,8 @@ import { TYPICAL_RETURNS } from '@/lib/asset-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 
 import { resolveFireParams } from '@/lib/fire-params'
-import { computeFireProjection, computeAowMonthly, ageAtDate, type FinancialInput, type LifeEvent } from '@/lib/horizon-data'
+import { computeAowMonthly, ageAtDate, type FinancialInput, type LifeEvent } from '@/lib/horizon-data'
+import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { computeRetirementExpenses } from '@/lib/budget-utils'
 import { runHorizonLedger } from '@/lib/horizon-engine/engine'
@@ -684,20 +685,29 @@ export function buildReport(intake: CheckIntake, now: Date = new Date()): CheckR
   const baseLedger = safeLedger(buildEngineInput(ctx, WITHDRAWAL_DEFAULTS, baseStrategy))
 
   // Snapshot-FIRE (hero / twee toekomsten / fireCards) — perpetuele formule.
-  const fireProj = computeFireProjection(
+  //
+  // Scalar-router (FASE 5, stap 2e) — BEWUSTE UITZONDERING: de vrijheidscheck is
+  // een publieke intake (ADR 0022) zónder ingelogd profiel, dus de per-gebruiker-
+  // vlag `horizon_kernel_scalar` bestaat hier niet. `kernelEnabled: false` is
+  // byte-identiek aan de directe computeFireProjection-aanroep van vandaag; bij
+  // de default-flip (F6) wisselt deze site mee via de router.
+  const fireProj = computeScalarFireProjection(
     {
-      totalAssets: ctx.fireEligibleNetWorth + ctx.totalDebts, // netWorth-grondslag (assets − debts) op FIRE-eligible
-      totalDebts: ctx.totalDebts,
-      monthlyIncome: ctx.netMonthlyIncome,
-      monthlyExpenses: ctx.monthlyExpenses,
-      monthlyContributions: ctx.annualSavings / 12,
-      yearlyMustExpenses: ctx.yearlyExpenses,
-      dateOfBirth: intake.dateOfBirth,
-    } satisfies FinancialInput,
-    ctx.grossReturn,
-    ctx.effectiveSwr,
-    ctx.inflationRate,
-  )
+      input: {
+        totalAssets: ctx.fireEligibleNetWorth + ctx.totalDebts, // netWorth-grondslag (assets − debts) op FIRE-eligible
+        totalDebts: ctx.totalDebts,
+        monthlyIncome: ctx.netMonthlyIncome,
+        monthlyExpenses: ctx.monthlyExpenses,
+        monthlyContributions: ctx.annualSavings / 12,
+        yearlyMustExpenses: ctx.yearlyExpenses,
+        dateOfBirth: intake.dateOfBirth,
+      } satisfies FinancialInput,
+      annualReturn: ctx.grossReturn,
+      swrOverride: ctx.effectiveSwr,
+      inflationOverride: ctx.inflationRate,
+    },
+    { kernelEnabled: false },
+  ).result
 
   const dailyExpense = dailyExpenseRate(ctx.monthlyExpenses)
 

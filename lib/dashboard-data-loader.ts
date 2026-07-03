@@ -27,8 +27,6 @@ import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress, computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import {
-  computeFireProjection,
-  computeFireRange,
   runBacktest,
   ageAtDate,
   deriveCountdown,
@@ -44,6 +42,7 @@ import { toSimResult } from '@/lib/unified-projection'
 import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
 import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
 import { computeConvergentieProjection, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { computeScalarFireProjection, computeScalarFireRange, type ScalarFireParams } from '@/lib/horizon-kernel/scalar-router'
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
 import { buildSimNetWorthRows } from '@/lib/horizon-engine/networth-projection'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
@@ -603,15 +602,30 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     dateOfBirth: profileResult.data?.date_of_birth ?? null,
   }
   const strategyOpts = { strategy: fireStrategy.strategy, endAge: fireStrategy.endAge }
-  // FALLBACK-ONLY: computeFireProjection kent géén life events. De widgets
+  // FALLBACK-ONLY: de scalar-projectie kent géén life events. De widgets
   // prefereren overal de unified engine (`simFireCountdown ?? fireProjResult`,
   // `simFireAgeFractional ?? snapshotFireAge`); dit resultaat is alleen
   // zichtbaar als de unified-sim niet kan draaien (geen dob, netWorth ≤ 0,
   // of een sim-error). Niet als primaire KPI-bron gebruiken.
-  const fireProjResult = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr, undefined, strategyOpts)
+  //
+  // Scalar-router (FASE 5, stap 2e): achter de per-gebruiker-vlag
+  // `horizon_kernel_scalar` rekent dit pad via de kernel; vlag UIT (default) is
+  // byte-identiek aan de directe computeFireProjection/computeFireRange-aanroep.
+  const kernelScalar = isKernelFlagEnabled(
+    profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null,
+    'scalar',
+  )
+  const scalarParams: ScalarFireParams = {
+    input: horizonInput,
+    annualReturn: fireParams.grossReturn,
+    swrOverride: fireSwr,
+    inflationOverride: undefined,
+    strategyOptions: { ...strategyOpts, legacyAmount: fireStrategy.legacyAmount },
+  }
+  const fireProjResult = computeScalarFireProjection(scalarParams, { kernelEnabled: kernelScalar }).result
 
   // Horizon extra: scenario range (optimistic / expected / pessimistic)
-  const fireRange = computeFireRange(horizonInput, fireSwr, undefined, fireParams.grossReturn, strategyOpts)
+  const fireRange = computeScalarFireRange(scalarParams, { kernelEnabled: kernelScalar }).result
 
   // Horizon extra: sim rows for vermogenspad chart
   // Uses runUnifiedProjection() — the same engine as the horizon page — for per-asset-type

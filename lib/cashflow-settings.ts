@@ -1,4 +1,5 @@
-import { computeFireProjection, type FireProjection } from './horizon-data'
+import type { FireProjection } from './horizon-data'
+import { computeScalarFireProjection } from './horizon-kernel/scalar-router'
 import type { FinancialInput } from './core-metrics'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from './budget-utils'
 
@@ -81,7 +82,15 @@ export interface FireRecomputeParams {
   fireStrategy: {
     strategy: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
     endAge: number
+    /** Nalatenschap-doelbedrag; alleen relevant voor 'legacy' op de kernel-tak. */
+    legacyAmount?: number
   }
+  /**
+   * Scalar-router-doorvoer (FASE 5, stap 2e): de per-gebruiker-vlag
+   * `horizon_kernel_scalar` van de aanroepende surface. Weggelaten/false =
+   * byte-identiek aan de directe computeFireProjection-aanroep van vandaag.
+   */
+  kernelScalarEnabled?: boolean
 }
 
 /**
@@ -112,11 +121,19 @@ export function recomputeFireFromSettings(
     yearlyMustExpenses: yearlyRetirement,
   }
 
-  return computeFireProjection(
-    input,
-    params.grossReturn,
-    params.effectiveSwr,
-    params.inflationRate,
-    { strategy: params.fireStrategy.strategy, endAge: params.fireStrategy.endAge },
-  )
+  // Via de scalar-router (stap 2e); vlag uit = letterlijk computeFireProjection.
+  return computeScalarFireProjection(
+    {
+      input,
+      annualReturn: params.grossReturn,
+      swrOverride: params.effectiveSwr,
+      inflationOverride: params.inflationRate,
+      strategyOptions: {
+        strategy: params.fireStrategy.strategy,
+        endAge: params.fireStrategy.endAge,
+        legacyAmount: params.fireStrategy.legacyAmount,
+      },
+    },
+    { kernelEnabled: params.kernelScalarEnabled === true },
+  ).result
 }

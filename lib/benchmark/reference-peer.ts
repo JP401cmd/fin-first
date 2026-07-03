@@ -13,7 +13,8 @@
  * score. Sommige invoer (noodfonds-maanden, schuldlast) is een transparante aanname.
  */
 
-import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
+import type { FinancialInput } from '@/lib/horizon-data'
+import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
 import { computeHealthScoreFromInputs, type HealthScoreInput } from '@/lib/financial-health'
 import type { CohortReference } from './nl-reference'
 
@@ -45,11 +46,17 @@ export interface ReferencePeerResult {
  * @param ref       cohort-referentiewaarden (mediaan vermogen/inkomen, spaarquote)
  * @param midAge    midden-leeftijd van de cohort-band (voor synthetische geboortedatum)
  * @param now       injecteerbaar "vandaag" voor deterministische tests
+ * @param opts      scalar-router-doorvoer (FASE 5, stap 2e): zet `kernelScalarEnabled`
+ *                  wanneer de aanroepende (ingelogde) surface de per-gebruiker-vlag
+ *                  `horizon_kernel_scalar` aan heeft — de peer rekent dan op dezelfde
+ *                  motor als de gebruiker zelf (appels-met-appels). Default false =
+ *                  byte-identiek aan de directe computeFireProjection-aanroep.
  */
 export function computeReferencePeer(
   ref: CohortReference,
   midAge: number,
   now: Date = new Date(),
+  opts?: { kernelScalarEnabled?: boolean },
 ): ReferencePeerResult {
   const monthlyIncome = ref.incomeMedian / 12
   const monthlySavings = monthlyIncome * (ref.savingsRatePct / 100)
@@ -71,10 +78,14 @@ export function computeReferencePeer(
 
   // Canonieke FIRE-projectie met de app-default-aannames (rendement/SWR/inflatie),
   // mét spend-down tot eind-leeftijd (deplete) i.p.v. eeuwigdurend — zie PEER_FIRE_END_AGE.
-  const proj = computeFireProjection(fin, undefined, undefined, undefined, {
-    strategy: 'deplete',
-    endAge: PEER_FIRE_END_AGE,
-  })
+  // Via de scalar-router (stap 2e); vlag uit = letterlijk computeFireProjection.
+  const proj = computeScalarFireProjection(
+    {
+      input: fin,
+      strategyOptions: { strategy: 'deplete', endAge: PEER_FIRE_END_AGE },
+    },
+    { kernelEnabled: opts?.kernelScalarEnabled === true },
+  ).result
 
   // Canonieke gezondheidsscore op dezelfde peer-invoer.
   const hsInput: HealthScoreInput = {

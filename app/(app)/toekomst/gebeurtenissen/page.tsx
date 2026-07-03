@@ -3,7 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { GebeurtenissenView } from '@/components/future/gebeurtenissen-view'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
-import { ageAtDate, computeFireProjection } from '@/lib/horizon-data'
+import { ageAtDate } from '@/lib/horizon-data'
+import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
+import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
@@ -109,15 +111,27 @@ export default async function ToekomstGebeurtenissenPage() {
   }
 
   // Baseline FIRE-projectie voor de EventPane impact-preview — zelfde
-  // strategy-aware aanroep als /horizon (computeFireProjection met strategy +
+  // strategy-aware aanroep als /horizon (scalar-projectie met strategy +
   // endAge) zodat de "vs. baseline"-delta klopt met de gekozen eindstrategie.
-  const baselineFire = computeFireProjection(
-    ei,
-    horizonData.fireParams.grossReturn,
-    horizonData.fireParams.effectiveSwr,
-    undefined,
-    { strategy: horizonData.fireStrategy.strategy, endAge: horizonData.fireStrategy.endAge },
-  )
+  //
+  // Scalar-router (FASE 5, stap 2e): dit is een SERVER-component, dus de
+  // per-gebruiker-vlag `horizon_kernel_scalar` wordt hier server-side gelezen
+  // uit de al-geladen rauwe profiel-rij (geen client-doorvoer nodig). Vlag UIT
+  // (default) is byte-identiek aan de directe computeFireProjection-aanroep.
+  const baselineFire = computeScalarFireProjection(
+    {
+      input: ei,
+      annualReturn: horizonData.fireParams.grossReturn,
+      swrOverride: horizonData.fireParams.effectiveSwr,
+      inflationOverride: undefined,
+      strategyOptions: {
+        strategy: horizonData.fireStrategy.strategy,
+        endAge: horizonData.fireStrategy.endAge,
+        legacyAmount: horizonData.fireStrategy.legacyAmount,
+      },
+    },
+    { kernelEnabled: isKernelFlagEnabled(horizonData.rawProfile, 'scalar') },
+  ).result
 
   // Prop-bundle voor de herstelde EventPane (catalogus + bewerken vrije events).
   // `previewBaseline` (C5-pre): DEZELFDE flag-bewuste, per-asset input als de Tijdas-

@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
-import { computeFireProjection, NL_SWR, type FinancialInput } from '@/lib/horizon-data'
+// Scalar-router (FASE 5, stap 2e) — BEWUSTE UITZONDERING: deze route riep
+// computeFireProjection nooit aan (dode import, hier opgeruimd). De FIRE-sectie
+// is historische snapshot-weergave (doel = uitgaven/NL_SWR per snapshot-moment),
+// geen FIRE-solve — de kernel kan historische percentages niet herrekenen.
+import { NL_SWR } from '@/lib/horizon-data'
 
 export interface YearInReviewData {
   year: number

@@ -40,78 +40,43 @@ export interface FreedomMilestoneResult {
   anyReachable: boolean
 }
 
-const MILESTONE_PERCENTS = [25, 50, 75, 100]
+/** De vier mijlpaal-percentages — gedeeld met de scalar-router (kernel-tak). */
+export const MILESTONE_PERCENTS = [25, 50, 75, 100]
 
 /**
- * Calculate projected dates for freedom milestones.
- *
- * @param netWorth - Current net worth
- * @param monthlyExpenses - Monthly expenses
- * @param monthlySavings - Monthly savings (income - expenses)
- * @param annualReturn - Expected annual return (default 7%)
- * @param inflationRate - Annual inflation rate (default 2%)
- * @param swrRate - Safe withdrawal rate (default NL_SWR ≈2.88%)
+ * Het scalar-FIRE-doel van de mijlpalen (uitgaven/SWR, must-uitgaven eerst) —
+ * geëxtraheerd zodat de scalar-router (FASE 5, stap 2e) exact dezelfde
+ * doel-semantiek hanteert wanneer alleen de maandzoeker naar de kernel wisselt.
  */
-export function computeFreedomMilestones(
-  netWorth: number,
+export function scalarMilestoneFireTarget(
   monthlyExpenses: number,
-  monthlySavings: number,
-  annualReturn: number = DEFAULT_RETURN,
-  inflationRate: number = INFLATION,
   swrRate: number = NL_SWR,
   yearlyMustExpenses: number = 0,
-): FreedomMilestoneResult {
+): number {
   const yearlyExpenses = monthlyExpenses * 12
   const effectiveYearlyExpenses = yearlyMustExpenses > 0 ? yearlyMustExpenses : yearlyExpenses
-  const fireTarget = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swrRate : 0
+  return effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / swrRate : 0
+}
+
+/** Invoer voor de presenter: doel + huidige stand + de gevonden kruisingsmaanden. */
+export interface PresentMilestonesArgs {
+  fireTarget: number
+  netWorth: number
+  monthlySavings: number
+  /** Per percentage de maand waarin de mijlpaal wordt bereikt (0 = al bereikt). */
+  milestoneMonths: Map<number, number>
+}
+
+/**
+ * Bouw de weergave-objecten uit de gevonden kruisingsmaanden. Geëxtraheerd uit
+ * `computeFreedomMilestones` (gedragsidentiek) zodat de scalar-router de
+ * kernel-maanden door dezelfde teksten/labels/datums kan laten presenteren.
+ */
+export function presentFreedomMilestones(args: PresentMilestonesArgs): FreedomMilestoneResult {
+  const { fireTarget, netWorth, monthlySavings, milestoneMonths } = args
   const currentFreedomPct = fireTarget > 0
     ? Math.max(Math.min((netWorth / fireTarget) * 100, 100), 0)
     : 0
-
-  // Inflation-adjusted real return (same as computeFireProjection)
-  const realReturn = (1 + annualReturn) / (1 + inflationRate) - 1
-  const monthlyReturn = realReturn / 12
-
-  // Pre-compute: simulate month-by-month to find when each target is reached
-  // Only need to simulate if there are unreached milestones and savings > 0
-  const milestoneTargets = MILESTONE_PERCENTS.map(pct => ({
-    percent: pct,
-    target: fireTarget * (pct / 100),
-  }))
-
-  // Find the month each milestone is reached
-  const milestoneMonths: Map<number, number> = new Map()
-
-  // Mark already-reached milestones
-  for (const { percent, target } of milestoneTargets) {
-    if (fireTarget > 0 && netWorth >= target) {
-      milestoneMonths.set(percent, 0) // Already reached
-    }
-  }
-
-  // Simulate forward if there are unreached milestones and positive savings
-  if (monthlySavings > 0 && fireTarget > 0) {
-    let projected = netWorth
-    const unreachedTargets = milestoneTargets.filter(
-      mt => !milestoneMonths.has(mt.percent)
-    )
-
-    if (unreachedTargets.length > 0) {
-      // Sort by target ascending so we can find them in order
-      const sorted = [...unreachedTargets].sort((a, b) => a.target - b.target)
-      let nextIdx = 0
-
-      for (let month = 1; month <= 600 && nextIdx < sorted.length; month++) {
-        projected = projected * (1 + monthlyReturn) + monthlySavings
-
-        // Check if we've reached any milestones this month
-        while (nextIdx < sorted.length && projected >= sorted[nextIdx].target) {
-          milestoneMonths.set(sorted[nextIdx].percent, month)
-          nextIdx++
-        }
-      }
-    }
-  }
 
   // Build milestone objects
   const now = new Date()
@@ -203,4 +168,74 @@ export function computeFreedomMilestones(
     allReached,
     anyReachable,
   }
+}
+
+/**
+ * Calculate projected dates for freedom milestones.
+ *
+ * @param netWorth - Current net worth
+ * @param monthlyExpenses - Monthly expenses
+ * @param monthlySavings - Monthly savings (income - expenses)
+ * @param annualReturn - Expected annual return (default 7%)
+ * @param inflationRate - Annual inflation rate (default 2%)
+ * @param swrRate - Safe withdrawal rate (default NL_SWR ≈2.88%)
+ */
+export function computeFreedomMilestones(
+  netWorth: number,
+  monthlyExpenses: number,
+  monthlySavings: number,
+  annualReturn: number = DEFAULT_RETURN,
+  inflationRate: number = INFLATION,
+  swrRate: number = NL_SWR,
+  yearlyMustExpenses: number = 0,
+): FreedomMilestoneResult {
+  const fireTarget = scalarMilestoneFireTarget(monthlyExpenses, swrRate, yearlyMustExpenses)
+
+  // Inflation-adjusted real return (same as computeFireProjection)
+  const realReturn = (1 + annualReturn) / (1 + inflationRate) - 1
+  const monthlyReturn = realReturn / 12
+
+  // Pre-compute: simulate month-by-month to find when each target is reached
+  // Only need to simulate if there are unreached milestones and savings > 0
+  const milestoneTargets = MILESTONE_PERCENTS.map(pct => ({
+    percent: pct,
+    target: fireTarget * (pct / 100),
+  }))
+
+  // Find the month each milestone is reached
+  const milestoneMonths: Map<number, number> = new Map()
+
+  // Mark already-reached milestones
+  for (const { percent, target } of milestoneTargets) {
+    if (fireTarget > 0 && netWorth >= target) {
+      milestoneMonths.set(percent, 0) // Already reached
+    }
+  }
+
+  // Simulate forward if there are unreached milestones and positive savings
+  if (monthlySavings > 0 && fireTarget > 0) {
+    let projected = netWorth
+    const unreachedTargets = milestoneTargets.filter(
+      mt => !milestoneMonths.has(mt.percent)
+    )
+
+    if (unreachedTargets.length > 0) {
+      // Sort by target ascending so we can find them in order
+      const sorted = [...unreachedTargets].sort((a, b) => a.target - b.target)
+      let nextIdx = 0
+
+      for (let month = 1; month <= 600 && nextIdx < sorted.length; month++) {
+        projected = projected * (1 + monthlyReturn) + monthlySavings
+
+        // Check if we've reached any milestones this month
+        while (nextIdx < sorted.length && projected >= sorted[nextIdx].target) {
+          milestoneMonths.set(sorted[nextIdx].percent, month)
+          nextIdx++
+        }
+      }
+    }
+  }
+
+  // Presentatie (labels/datums/teksten) — gedeeld met de scalar-router (stap 2e).
+  return presentFreedomMilestones({ fireTarget, netWorth, monthlySavings, milestoneMonths })
 }
