@@ -335,13 +335,22 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
   (3) FASE 6-verwijdering gefaseerd (eerst alle rest-consumenten een kernel-pad, dan C5-stijl-
   deletie). Bug-fixing van weergavepunten mag daarna (eigenaar-besluit "bugfixen later").
 - **FASE 6 — verwijderplan (inventaris 2026-07-03, C5-stijl, 5 stappen):**
-  **(1)** kernel-pad voor de resterende pure-v2-previews: strategy-preview, regel-sim,
-  fee-analysis, hypotheek-vs-beleggen, housing-trigger, whatif-beslishulp, EventPanes +
-  strategie-modal + horizon-client lokale sims (:1638/:1831), housing-section-preview;
-  benchmark-doorbedrading + build-report-besluit. **(2)** beheer/API: /api/horizon-engine/ledger
-  + /beheer/horizon-tabellen(-mij) → kernel-ledger of weg; grafiek-werking-teksten;
-  horizon-strategie-goldens; buildSimNetWorthRows/compositie op kernel. **(3)** default-flip
-  (4 vlaggen AAN; routers blijven vangnet). **(4)** DB-migratie: vpw/bucket uit
+  **(1) ✔ KLAAR (`0c3abdc60` + nazending `206ad72b2` + type-fix `b76730d91`)** — kernel-pad voor
+  de resterende pure-v2-previews: strategy-preview, regel-sim, fee-analysis,
+  hypotheek-vs-beleggen, housing-trigger, whatif-beslishulp, EventPanes, housing-section-preview;
+  benchmark-doorbedrading; build-report-besluit = bewust v2 tot stap 5 (publieke intake).
+  **(2) ✔ KLAAR (`51a9bac5c`)** — beheer/API: /beheer/horizon-tabellen-mij vervangen-door-banner
+  (route/views blijven tot stap 5, deletiepunten als doc-comment); grafiek-werking herijkt naar
+  kernel; horizon-strategie-matrix op kernel-goldens (C/D op perpetual-baseline, v2 als
+  vergelijkarm); AOW-stop-sim kernel-native (evaluateFireAt); strategie-modal-profielvergelijk;
+  fase-analyse-hvb bedraad. Bewust-v2-tot-stap-5: ghost-overlays, schuld-modal-hvb,
+  synthetische regressiesuites (kostenanalyse-ter, kern-hypotheek-vs-beleggen),
+  build-report-grootboekdeel. **(3) ✔ KLAAR — DE DEFAULT-FLIP (2026-07-03)**: vlag-semantiek
+  gespiegeld in `flag.ts` (default AAN; alleen letterlijke `false` = noodklep terug naar v2),
+  PUT-route-hygiëne mee (aan = sleutel wissen, uit = `false` schrijven), beheer-kaart-copy
+  bijgewerkt; routers blijven vangnet. Restpunt: de client-side mount-fetch-flits op
+  /toekomst en /horizon/whatif toont nu voor íedereen kort v2 vóór de kernel-mount —
+  echte fix = server-side context-preload (stap-5-lijst). **(4)** DB-migratie: vpw/bucket uit
   withdrawal_strategy (kolom blijft; geen DB-CHECK — enum is app-side); vlag-lezingen weg.
   **(5)** fysieke deletie lib/horizon-engine/ + routers ontvouwen + v2-tests/goldens +
   vergelijk-route weg + calculations.ts/concerns (flag-periode-concern + 3 v2-grondslag-

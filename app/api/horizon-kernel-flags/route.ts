@@ -13,7 +13,9 @@ import {
  * Deze route bestaat zodat een account de vier kernel-vlaggen per stuk aan/uit kan
  * zetten zonder in de DB te hoeven prikken. De stand leeft in de user-writable JSONB-
  * kolom `profiles.feature_preferences`; deze route is het schrijfpad, `readKernelFlags`
- * (`@/lib/horizon-kernel/flag`) het leescontract.
+ * (`@/lib/horizon-kernel/flag`) het leescontract. Sinds de default-flip (FASE 6 stap 3)
+ * is AAN de default: aanzetten wist de sleutel, uitzetten schrijft een letterlijke
+ * `false` (de noodklep naar de oude v2-motor).
  *
  * De `convergentie`-vlag is BEWUST één schakelaar voor de hele kern-getallen-set
  * (/overzicht-hero + /toekomst-grafiek + dashboard-loader/`freedomPct` + AI-context) —
@@ -93,11 +95,13 @@ export async function PUT(request: NextRequest) {
   const fp = (current?.feature_preferences ?? {}) as Record<string, unknown>
   const key = KERNEL_FLAG_KEYS[flag]
   if (enabled) {
-    // Alleen een letterlijke `true` telt als aan (spiegelt isKernelFlagEnabled).
-    fp[key] = true
-  } else {
-    // Wis de sleutel bij uitzetten zodat de JSONB schoon blijft (geen `false`-ruis).
+    // Aan = de default (FASE 6 stap 3) — wis de sleutel zodat de JSONB schoon blijft
+    // (ruimt en passant legacy `true`-waarden uit de FASE 5-uitrolperiode op).
     delete fp[key]
+  } else {
+    // Alleen een letterlijke `false` schakelt uit (spiegelt isKernelFlagEnabled):
+    // de noodklep terug naar de v2-motor, per account per oppervlak.
+    fp[key] = false
   }
 
   // Own-row write — uitsluitend de eigen rij (RLS), geen service-role.

@@ -595,8 +595,8 @@ export async function buildHouseholdProjectionInput(
   // dezelfde engine ziet. Flag-uit → byte-identiek aan v1.
   const useV2 = isHorizonV2Enabled(ownFlagRes.data as { feature_preferences?: Record<string, unknown> | null } | null)
   // FASE 5, stap 2d — draait het huishouden-oppervlak (gecombineerd + per-partner) via de
-  // horizon-kernel? Zelfde eigen-flag-bron als useV2; default UIT (alleen letterlijke true).
-  // Vlag-uit → byte-identiek aan het bestaande v2-pad hieronder.
+  // horizon-kernel? Zelfde eigen-flag-bron als useV2; sinds de default-flip (FASE 6 stap 3)
+  // default AAN (alleen letterlijke false schakelt terug). Vlag-uit → byte-identiek v2-pad.
   const useHouseholdKernel = isKernelFlagEnabled(
     ownFlagRes.data as { feature_preferences?: Record<string, unknown> | null } | null,
     'household',

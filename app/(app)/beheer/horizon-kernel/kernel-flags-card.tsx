@@ -1,12 +1,12 @@
 'use client'
 
 /**
- * Horizon-kernel · cutover-vlaggen (FASE 5, stap 1).
+ * Horizon-kernel · cutover-vlaggen (FASE 5 uitrol → FASE 6 stap 3 default-flip).
  *
- * Per-oppervlak schakelaars die de nieuwe Excel-oracle-rekenkern voor het EIGEN
- * account inschakelen. Standaard uit; productie blijft op de huidige engine.
- * Stap 1 zet alléén de schakelaars neer — de oppervlakken lezen de vlaggen nog
- * niet uit; dat gebeurt in de volgende stap.
+ * Per-oppervlak schakelaars voor de nieuwe Excel-oracle-rekenkern van het EIGEN
+ * account. Sinds de default-flip staat alles standaard AAN: de kernel is de motor,
+ * uitschakelen is de noodklep terug naar de oude v2-engine (per oppervlak, alleen
+ * dit account). Verdwijnt samen met de v2-engine in FASE 6 stap 5.
  *
  * API-contract (`app/api/horizon-kernel-flags/route.ts`, eigen-rij RLS):
  *   GET  /api/horizon-kernel-flags → { flags }
@@ -139,8 +139,9 @@ export default function KernelFlagsCard() {
           Cutover-vlaggen — jouw account
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-[var(--ink-3)]">
-          Schakelt de nieuwe Excel-oracle-rekenkern in voor jouw eigen account, per
-          oppervlak. Standaard uit; productie blijft op de huidige engine.
+          De nieuwe Excel-oracle-rekenkern staat <strong>standaard aan</strong> voor
+          elk account. Een schakelaar uitzetten is de noodklep: dat oppervlak valt dan
+          (alleen voor jouw account) terug op de oude v2-motor.
         </p>
       </div>
 
@@ -182,10 +183,10 @@ export default function KernelFlagsCard() {
       </ul>
 
       <p className="text-xs leading-relaxed text-[var(--ink-4)]">
-        Alle vier de oppervlakken lezen deze vlaggen al uit. What-if en /toekomst kunnen
-        per doorrekening met een reden terugvallen op de v2-motor — bijvoorbeeld bij een
-        verkoop-instelling die de kernel (nog) niet kan uitdrukken. De indicator “rekent
-        via” op die pagina’s laat dan zien welke motor daadwerkelijk rekende.
+        What-if en /toekomst kunnen per doorrekening met een reden terugvallen op de
+        v2-motor — bijvoorbeeld bij een verkoop-instelling die de kernel (nog) niet kan
+        uitdrukken. De indicator “rekent via” op die pagina’s laat dan zien welke motor
+        daadwerkelijk rekende.
       </p>
     </section>
   )

@@ -9,8 +9,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  *   - 401 zonder sessie (GET + PUT);
  *   - GET leest own-row en vertaalt naar de vlaggen-stand;
  *   - PUT-whitelist-afwijzing (onbekende vlag) + non-boolean `enabled` → 400;
- *   - aanzetten schrijft uitsluitend een letterlijke `true`;
- *   - uitzetten VERWIJDERT de sleutel (JSONB schoon);
+ *   - uitzetten schrijft uitsluitend een letterlijke `false` (de noodklep);
+ *   - aanzetten VERWIJDERT de sleutel (JSONB schoon — aan is sinds de
+ *     default-flip, FASE 6 stap 3, de default);
  *   - beide DB-paden op de EIGEN rij (`.eq('id', user.id)`), geen service-role;
  *   - 500 bij DB-fout.
  */
@@ -71,14 +72,14 @@ describe('GET /api/horizon-kernel-flags', () => {
     expect(spies.from).not.toHaveBeenCalled()
   })
 
-  it('leest own-row en vertaalt naar vlaggen-stand', async () => {
+  it('leest own-row en vertaalt naar vlaggen-stand (default aan, false = uit)', async () => {
     const { spies } = makeClient({
-      readData: { feature_preferences: { horizon_kernel_convergentie: true } },
+      readData: { feature_preferences: { horizon_kernel_convergentie: false } },
     })
     const res = await GET()
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({
-      flags: { convergentie: true, whatif: false, household: false, scalar: false },
+      flags: { convergentie: false, whatif: true, household: true, scalar: true },
     })
     expect(spies.from).toHaveBeenCalledWith('profiles')
     expect(spies.selectEq).toHaveBeenCalledWith('id', USER.id) // own-row
@@ -119,29 +120,30 @@ describe('PUT /api/horizon-kernel-flags', () => {
     expect(spies.update).not.toHaveBeenCalled()
   })
 
-  it('aanzetten schrijft uitsluitend een letterlijke true (own-row)', async () => {
+  it('uitzetten schrijft uitsluitend een letterlijke false (own-row, noodklep)', async () => {
     const { spies } = makeClient({ readData: { feature_preferences: {} } })
-    const res = await PUT(putRequest({ flag: 'convergentie', enabled: true }))
+    const res = await PUT(putRequest({ flag: 'convergentie', enabled: false }))
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({
-      flags: { convergentie: true, whatif: false, household: false, scalar: false },
+      flags: { convergentie: false, whatif: true, household: true, scalar: true },
     })
     expect(spies.update).toHaveBeenCalledWith({
-      feature_preferences: { horizon_kernel_convergentie: true },
+      feature_preferences: { horizon_kernel_convergentie: false },
     })
     expect(spies.updateEq).toHaveBeenCalledWith('id', USER.id) // own-row
   })
 
-  it('uitzetten VERWIJDERT de sleutel (JSONB schoon)', async () => {
+  it('aanzetten VERWIJDERT de sleutel (JSONB schoon — aan is de default)', async () => {
     const { spies } = makeClient({
-      readData: { feature_preferences: { horizon_kernel_whatif: true, iets_anders: 1 } },
+      // Legacy FASE 5-`true` én een expliciete noodklep-`false` worden beide gewist.
+      readData: { feature_preferences: { horizon_kernel_whatif: false, iets_anders: 1 } },
     })
-    const res = await PUT(putRequest({ flag: 'whatif', enabled: false }))
+    const res = await PUT(putRequest({ flag: 'whatif', enabled: true }))
     expect(res.status).toBe(200)
     // whatif-sleutel weg, ongerelateerde sleutel blijft staan
     expect(spies.update).toHaveBeenCalledWith({ feature_preferences: { iets_anders: 1 } })
     const { flags } = (await res.json()) as { flags: Record<string, boolean> }
-    expect(flags.whatif).toBe(false)
+    expect(flags.whatif).toBe(true)
   })
 
   it('500 bij write-fout', async () => {
