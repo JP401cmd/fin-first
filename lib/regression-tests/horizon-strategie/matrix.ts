@@ -1,26 +1,56 @@
 /**
- * Horizon-strategie-regressiematrix.
+ * Horizon-strategie-regressiematrix — op de **horizon-kernel** (FASE 6, stap 2).
  *
- * Draait de horizon-FIRE-projectie (productie-engine v2) over álle
- * strategie-combinaties op de complete persona en valideert per combinatie de
- * **vrijheidsleeftijd (FIRE)** en het **doelbedrag** tegen een vooraf opgezette
- * verwachting (golden) mét marges, plus structurele en relationele invarianten.
+ * Draait de horizon-FIRE-projectie over álle strategie-combinaties op de complete
+ * persona en valideert per combinatie de **vrijheidsleeftijd (FIRE)** en het
+ * **doelbedrag** tegen een golden mét marges, plus structurele en relationele
+ * invarianten.
  *
- * Vier groepen (16 combinaties), telkens op de standaard-baseline:
- *   A — Huisvesting varieert  (× deplete × static)
- *   B — Eindstrategie varieert (× include_full × static)
- *   C — Onttrekking varieert   (× include_full × deplete)
+ * ## Twee armen per combinatie
+ *  - **Kernel (primair)** — `computeConvergentieProjection({ kernelEnabled: true, … })`:
+ *    de nieuwe rekenkern (`lib/horizon-kernel`) is sinds FASE 6 stap 2 de gemeten motor.
+ *    Per combinatie eist de suite dat de motor daadwerkelijk `'kernel'` was (geen stille
+ *    v2-terugval) en dat de kernel-goldens + invarianten kloppen.
+ *  - **v2 (vergelijk, drift-bewaking flag-periode)** — de bestaande v2-grootboek-engine
+ *    (`runSelectedProjection(input, true, …)`), getoetst tegen de vroegere goldens
+ *    (`EXPECTED_V2`). Behouden tot de v2-deletie (stap 5) zodat een drift in de nog-live
+ *    v2-tak zichtbaar blijft. Alléén voor combinaties die v2 kan uitdrukken.
+ *
+ * ## Vier groepen (16 combinaties), telkens op de standaard-baseline
+ *   A — Huisvesting varieert   (× opmaken × vast)
+ *   B — Eindstrategie varieert  (× woning meetellen × vast)
+ *   C — Onttrekkingsprofiel     (vast / afnemend / oplopend / guardrails)
  *   D — Werk-strategie varieert (inkomenslijn-life-event op de baseline)
  *
- * Eén bron: `buildHorizonInput` → `runSelectedProjection(input, /*useV2*‍/ true)`
- * — exact het pad van `/toekomst`. Puur/synchroon: geen Supabase, geen netwerk.
+ * ## Groep C — herdefinitie op de kernel (F4)
+ * De v2-onttrekkings-enum kende vier keuzes (static/guardrails/vpw/bucket), maar
+ * `WITHDRAWAL_TO_PROFIEL` (`adapter/params.ts`) mapt vpw/bucket sinds F4 op 'Vast' —
+ * ze bestaan niet meer als kernel-keuze. De nieuwe groep C zijn de vier
+ * onttrekkingsPROFIELEN (`withdrawal_profile_config.profiel`, zie `withdrawal-strategy.ts`):
+ * **vast / afnemend / oplopend / guardrails**. `afnemend`/`oplopend` zijn KERNEL-ONLY
+ * (v2 kent ze niet → geen v2-vergelijkarm, geen EXPECTED_V2). De v2-vpw/bucket-
+ * varianten verdwijnen dus uit deze matrix; hun v2-gedrag blijft gedekt door
+ * `lib/fire-withdrawal-integration.test.ts` (byte-identiteit static, guardrails ≤ static,
+ * vpw/bucket-bereikbaarheid).
+ *
+ * ## Kernel-context-assemblage
+ * Per combinatie wordt een `ConvergentieRawContext` gebouwd uit de persona-fixture
+ * (`buildCompleetKernelProfileBase` + `fx.assets/debts/lifeEvents`) met de combo-config
+ * uitgedrukt als profielrij-kolommen — exact zoals `/toekomst` de kernel voedt. De
+ * `builtInput` (v2) reist mee als byte-identieke v2-tak binnen de router.
  *
  * Consumenten: de vitest (`matrix.test.ts`, CI-regressie) én de beheerpagina
- * (`/beheer/horizon-strategie`, on-demand).
+ * (`/beheer/horizon-strategie`, on-demand). Puur/synchroon: geen Supabase, geen netwerk.
  */
 
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import {
+  computeConvergentieProjection,
+  type ConvergentieEngine,
+  type ConvergentieRawContext,
+  type ConvergentieRawProfileRow,
+} from '@/lib/horizon-kernel/convergentie-router'
 import {
   DEFAULT_HOUSING_STRATEGY,
   DEFAULT_DOWNSIZE_CONFIG,
@@ -28,9 +58,13 @@ import {
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
-import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
+import {
+  WITHDRAWAL_DEFAULTS,
+  type WithdrawalStrategyConfig,
+  type WithdrawalProfiel,
+} from '@/lib/withdrawal-strategy'
 import type { LifeEvent, WerkMetadata } from '@/lib/horizon-data'
-import { buildCompleetHorizonFixture } from './persona-fixture'
+import { buildCompleetHorizonFixture, buildCompleetKernelProfileBase } from './persona-fixture'
 
 // ── Marges ───────────────────────────────────────────────────
 export const FIRE_AGE_MARGIN_YEARS = 0.5
@@ -43,6 +77,15 @@ export const SWR_MAX = 0.06
 // ── Standaard-baseline ───────────────────────────────────────
 const STD_HOUSING: HousingStrategyConfig = DEFAULT_HOUSING_STRATEGY // include_full
 const STD_END: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
+/**
+ * Perpetual-baseline voor de groepen C (onttrekkingsprofiel) en D (werk-strategie),
+ * FASE 6 stap 2. Bewust NIET deplete: de kernel-deplete-FIRE is voor deze (vermogende)
+ * persona "reached now" (B93-doel=0-quirk, `solver.ts`/`bridge.ts`), waardoor de
+ * onttrekkings- en werk-varianten degeneratief samenvallen (8× dezelfde waarde).
+ * Op de perpetual-baseline valt FIRE op een echte toekomst-datum (~45,8 jr) en werken de
+ * profiel-/werk-verschillen wél door in de uitkomst. Groepen A en B blijven op deplete.
+ */
+const PERP_END: FireStrategyConfig = { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }
 const STD_WITHDRAWAL: WithdrawalStrategyConfig = { ...WITHDRAWAL_DEFAULTS, strategy: 'static' }
 const LEGACY_AMOUNT = 100_000
 
@@ -51,7 +94,7 @@ export type GroupKey = 'housing' | 'end' | 'withdrawal' | 'werk'
 
 /**
  * Werk-strategie-trajectorie voor een combinatie (de vorm; het netto inkomen en
- * de huidige leeftijd worden in `runCombo` uit de fixture gebonden). `null` =
+ * de huidige leeftijd worden in `runCombo*` uit de fixture gebonden). `null` =
  * geen werk-event (baseline-referentie).
  */
 export type ComboWerk = Pick<
@@ -62,7 +105,24 @@ export type ComboWerk = Pick<
 export interface ComboConfig {
   housing: HousingStrategyConfig
   end: FireStrategyConfig
+  /** v2-onttrekkingsstrategie — voedt de v2-vergelijkarm (byte-identiek pad). */
   withdrawal: WithdrawalStrategyConfig
+  /**
+   * Kernel-onttrekkingsPROFIEL (groep C). Afwezig → de kernel valt via de enum-mapping
+   * (`WITHDRAWAL_TO_PROFIEL`, static→'Vast') terug op 'vast'. Bij groep C expliciet gezet
+   * zodat afnemend/oplopend (kernel-only) bereikbaar zijn.
+   */
+  withdrawalProfiel?: WithdrawalProfiel
+  /**
+   * Extra fase-curve-velden voor `withdrawal_profile_config` (naast `profiel`). NODIG voor
+   * echte discriminatie tussen 'afnemend' en 'oplopend': de kernel (`tables/ont.ts`
+   * `actieveFactor`) past voor BEIDE profielen dezelfde fase-factor F toe — de RICHTING
+   * (dalend vs. stijgend) zit uitsluitend in de curve-getallen (gogo/slowgo/nogo-pct),
+   * niet in de selector. Zonder curve vallen beide terug op dezelfde Excel-default
+   * (100/85/70 = dalend) → identieke uitkomst. Sleutels = de JSONB-vorm die
+   * `parseWithdrawalProfileConfig` leest (`gogo_pct`/`slowgo_pct`/`nogo_pct`/…).
+   */
+  withdrawalCurve?: Record<string, number>
   /** Werk-strategie-life-event dat bovenop de baseline wordt geïnjecteerd. */
   werk?: ComboWerk
 }
@@ -77,8 +137,8 @@ export interface ComboDef {
 export const GROUP_LABELS: Record<GroupKey, string> = {
   housing: 'A — Huisvestingsstrategie (× opmaken × vast)',
   end: 'B — Eindstrategie (× woning meetellen × vast)',
-  withdrawal: 'C — Onttrekkingsstrategie (× woning meetellen × opmaken)',
-  werk: 'D — Werk-strategie (× woning meetellen × opmaken × vast)',
+  withdrawal: 'C — Onttrekkingsprofiel op eeuwigdurende baseline (vast / afnemend / oplopend / guardrails)',
+  werk: 'D — Werk-strategie op eeuwigdurende baseline (× woning meetellen × vast)',
 }
 
 export const COMBOS: ComboDef[] = [
@@ -94,18 +154,33 @@ export const COMBOS: ComboDef[] = [
   { id: 'B-perpetual', label: 'Eeuwigdurend (perpetual)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
   { id: 'B-pensioen', label: 'Pensioen (opbouw tot AOW)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
 
-  // ── Groep C — onttrekking varieert ──
-  { id: 'C-static', label: 'Vast (static)', group: 'withdrawal', config: { housing: STD_HOUSING, end: STD_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'static' } } },
-  { id: 'C-guardrails', label: 'Guardrails (Guyton-Klinger)', group: 'withdrawal', config: { housing: STD_HOUSING, end: STD_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' } } },
-  { id: 'C-vpw', label: 'Variabel percentage (VPW)', group: 'withdrawal', config: { housing: STD_HOUSING, end: STD_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'vpw' } } },
-  { id: 'C-bucket', label: 'Emmer-strategie (bucket)', group: 'withdrawal', config: { housing: STD_HOUSING, end: STD_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'bucket' } } },
+  // ── Groep C — onttrekkingsprofiel varieert (F4: profielen, niet de oude v2-enum) ──
+  //    Op de PERPETUAL-baseline (PERP_END), niet deplete — zie PERP_END-doc.
+  { id: 'C-vast', label: 'Vast onttrekkingsprofiel', group: 'withdrawal', config: { housing: STD_HOUSING, end: PERP_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'static' }, withdrawalProfiel: 'vast' } },
+  // Afnemend = dalende curve (go-go 100% → no-go 70%, = Excel-default, expliciet gezet).
+  { id: 'C-afnemend', label: 'Afnemend (go-go → no-go)', group: 'withdrawal', config: { housing: STD_HOUSING, end: PERP_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'static' }, withdrawalProfiel: 'afnemend', withdrawalCurve: { gogo_pct: 100, slowgo_pct: 85, nogo_pct: 70 } } },
+  // Oplopend = stijgende curve (spiegel: go-go 70% → no-go 100%), zodat 'oplopend' echt
+  // stijgt i.p.v. de dalende default te erven (anders identiek aan afnemend — zie ont.ts).
+  { id: 'C-oplopend', label: 'Oplopend (uitgaven stijgen)', group: 'withdrawal', config: { housing: STD_HOUSING, end: PERP_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'static' }, withdrawalProfiel: 'oplopend', withdrawalCurve: { gogo_pct: 70, slowgo_pct: 85, nogo_pct: 100 } } },
+  { id: 'C-guardrails', label: 'Guardrails (Guyton-Klinger)', group: 'withdrawal', config: { housing: STD_HOUSING, end: PERP_END, withdrawal: { ...WITHDRAWAL_DEFAULTS, strategy: 'guardrails' }, withdrawalProfiel: 'guardrails' } },
 
   // ── Groep D — werk-strategie varieert (inkomenslijn-life-event op de baseline) ──
-  { id: 'D-geen', label: 'Geen werk-strategie (referentie)', group: 'werk', config: { housing: STD_HOUSING, end: STD_END, withdrawal: STD_WITHDRAWAL, werk: null } },
-  { id: 'D-groei', label: 'Salarisgroei 4%/jr reëel', group: 'werk', config: { housing: STD_HOUSING, end: STD_END, withdrawal: STD_WITHDRAWAL, werk: { reeleGroeiPct: 0.04, faseStappen: [], sprongen: [] } } },
-  { id: 'D-deeltijd', label: 'Minder werken: 60% vanaf 44', group: 'werk', config: { housing: STD_HOUSING, end: STD_END, withdrawal: STD_WITHDRAWAL, werk: { reeleGroeiPct: 0, faseStappen: [{ fromAge: 44, pct: 60 }], sprongen: [] } } },
-  { id: 'D-combi', label: 'Groei 3% + plafond + grote promotie', group: 'werk', config: { housing: STD_HOUSING, end: STD_END, withdrawal: STD_WITHDRAWAL, werk: { reeleGroeiPct: 0.03, plafondNettoMaand: 12000, faseStappen: [], sprongen: [{ atAge: 43, deltaNettoMaand: 2500 }] } } },
+  //    Op de PERPETUAL-baseline (PERP_END), niet deplete — zie PERP_END-doc.
+  { id: 'D-geen', label: 'Geen werk-strategie (referentie)', group: 'werk', config: { housing: STD_HOUSING, end: PERP_END, withdrawal: STD_WITHDRAWAL, werk: null } },
+  { id: 'D-groei', label: 'Salarisgroei 4%/jr reëel', group: 'werk', config: { housing: STD_HOUSING, end: PERP_END, withdrawal: STD_WITHDRAWAL, werk: { reeleGroeiPct: 0.04, faseStappen: [], sprongen: [] } } },
+  { id: 'D-deeltijd', label: 'Minder werken: 60% vanaf 44', group: 'werk', config: { housing: STD_HOUSING, end: PERP_END, withdrawal: STD_WITHDRAWAL, werk: { reeleGroeiPct: 0, faseStappen: [{ fromAge: 44, pct: 60 }], sprongen: [] } } },
+  { id: 'D-combi', label: 'Groei 3% + plafond + grote promotie', group: 'werk', config: { housing: STD_HOUSING, end: PERP_END, withdrawal: STD_WITHDRAWAL, werk: { reeleGroeiPct: 0.03, plafondNettoMaand: 12000, faseStappen: [], sprongen: [{ atAge: 43, deltaNettoMaand: 2500 }] } } },
 ]
+
+/**
+ * Kan v2 deze combinatie uitdrukken? De onttrekkingsprofielen `afnemend`/`oplopend`
+ * zijn kernel-only (de v2-enum kent ze niet). Alle overige combo's — inclusief
+ * `vast` (≈ v2 static) en `guardrails` (v2 guardrails) — dragen een v2-vergelijkarm.
+ */
+export function isV2Expressible(combo: ComboDef): boolean {
+  const p = combo.config.withdrawalProfiel
+  return p === undefined || p === 'vast' || p === 'guardrails'
+}
 
 // ── Verwachtingen (golden) ───────────────────────────────────
 export interface ComboExpectation {
@@ -116,80 +191,109 @@ export interface ComboExpectation {
 }
 
 /**
- * Golden-waarden, opgezet vanuit de testsuite. Gegenereerd uit de productie-
- * engine (v2) op de complete persona; regenereer met
- * `npx vitest run …/_generate-golden` na een bewuste rekenmotor-wijziging.
+ * **Kernel-goldens** (primaire arm). Gegenereerd uit de horizon-kernel op de complete
+ * persona (FASE 6, stap 2). Regenereer bewust na een gewenste rekenmotor-wijziging.
  *
- * GEREGENEREERD 2026-06-24 — BUG #4: blended reële disconto-voet (Zuiver).
- * `backwardVnodig` discounteert nu op de WERKELIJKE waarde-gewogen blended reële
- * return van de FIRE-eligible startpot (`blendedRealReturnStart`) i.p.v. de
- * verborgen `0,6 × reëel gemiddeld rendement`-buffer. De hogere disconto-voet
- * drukt V_nodig over de hele lijn omlaag → de stijgende opbouwcurve raakt de
- * (lagere) V_nodig-lijn eerder. Uniformele drift (geen verkapte regressie):
- *   - vrijheidsleeftijd: +1..+3 jaar (stijgende opbouwcurve bereikt de nu-lagere
- *     doel-lijn op een LATERE leeftijd dan de oude hogere lijn — eenduidige richting)
- *   - doelbedrag: −3..−4,5% (V_nodig op de FIRE-leeftijd is lager doordat de
- *     dalende doel-lijn eerder daalt bij hogere discontovoet)
- * B-legacy/B-perpetual/B-pensioen/C-guardrails/C-vpw/D-combi vallen
- * binnen de 2%-doelbedrag-marge en bewegen ≤ 0,5 jaar — geen afzonderlijke reden.
- * Relatie-invarianten (legacy≥deplete, perpetual≥deplete, groei≤geen, deeltijd≥geen,
- * referentie=baseline) blijven groen; SWR-band ongewijzigd; deplete-eind≈€0 groen.
+ * ## Waarom de kernel-waarden verschillen van de v2-goldens (EXPECTED_V2)
+ * Structurele oorzaken (ADR 0032), per combinatie geduid — GEEN verkapte regressie:
+ *  (a) **Nominaal/maandbasis met één-maand-lag** vs. v2 reëel/jaarbasis.
+ *  (b) **`requiredFirePortfolio` = Prognose!J@FIRE** (nominaal benodigd liquide op de
+ *      FIRE-maand) — een ANDERE grootheid dan v2's reële doelbedrag (V_nodig). Grote
+ *      doelbedrag-verschuivingen t.o.v. v2 zijn dus per constructie, niet weg te masseren.
+ *  (c) **Liquide-grondslag (dé dominante oorzaak op deze persona).** De kernel telt
+ *      ÁLLE categorieën behalve 'Eigen huis' als FIRE-eligible liquide (Prognose!J =
+ *      I − niet-liquide; `adapter/prio-overgang.ts` vlagt enkel Eigen huis, en dan nog
+ *      alléén bij woning-uitsluiten). Het verhuurde appartement (Vastgoed), het
+ *      BV-belang (Overig), pensioen, kapitaalverzekering en vordering tellen dus VOL
+ *      mee in de FIRE-pot. Combineer dat met de rijke persona (~€1,18 mln netto vermogen,
+ *      €48k pensioenuitgaven → ~4% aanvangs-onttrekking) én 7% nominaal rendement, dan
+ *      is de opmaak-strategie (deplete: gap = J@eindleeftijd ≥ 0) op de startleeftijd al
+ *      haalbaar. **Gevolg (belangrijk):** de deplete-FIRE valt ≈ nú (42 jr + 1 mnd; de
+ *      B93-doel=0-quirk maakt deplete triviaal "reached_now" — zie
+ *      `bridge.ts#isKernelReachedNowDisplay`). Dat is GEEN mapping-fout (mapping
+ *      spiegelt /toekomst); het is de kernel-liquide-categorisatie op een vermogende
+ *      persona. Zie het rapport — de v2-baseline (~48) is conservatiever dan de
+ *      kernel-baseline (~42).
+ *  (d) **AOW/pensioen endogeen**: de kernel rekent de AOW-hoogte zelf (basis 993/mnd
+ *      samenwonend, start = canonieke AOW-leeftijd 67) en annuïtiseert het pensioen-event,
+ *      i.p.v. de v2-event-inkomensbedragen (1050/1100).
+ *  (e) **Spaargrondslag** = netto jaarinkomen − geschatte jaaruitgaven; voor deze fixture
+ *      gelijk aan `baseAnnualSavingsFromCashflow` ((7600−4100)×12 = 42.000) → geen divergentie.
  *
- * HER-BASELINE 2026-06-24 — Fase 2 "Verkopen" (downsize-herdefinitie, ADR 0028).
- * UITSLUITEND A-downsize wijzigt: de downsize-woning telt vanaf nu AL als besteedbaar
- * (spendable) FIRE-eligible vermogen tijdens de OPBOUW (zoals include_full), waardoor
- * de FIRE-eligibility eerder bereikt wordt.
- *
- * Drie meetpunten voor A-downsize (ADR 0028 + ADR 0030, "Optie B"):
- *   golden vóór Fase 2:    fireAgeFractional = 62, doelbedrag = €2.071.090
- *   pre-existing WIP:      fireAgeFractional = 63, doelbedrag = €2.042.600  (pre-fix, stale)
- *   met fix (Optie B):     fireAgeFractional = 57, doelbedrag = €2.349.333  (Δ 0,24% t.o.v. golden)
- *
- * Drift-analyse:
- *   - fireAgeFractional 63 → 57 (shift −6): het bulk (63→58 = −5 jaar) was al aanwezig
- *     als pre-existing WIP-drift door blended-disconto-voet-bug (#4); de Optie-B-fix
- *     voegt −1 jaar toe (trigger vuurt eerder omdat de meetrun nu `besteedbaarVermogen`
- *     scant op de ECHTE besteedbare daling i.p.v. de ex-huis-meetrun die jaren te laat
- *     vuurde). Nieuwe golden = 57 (de met-fix-waarde).
- *   - doelbedrag: fix brengt dit van €2.042.600 → €2.349.333 (+15,0%), wat slechts
- *     0,24% van de eerder vastgestelde golden (€2.343.807) afwijkt → binnen de 2%-marge.
- *     Doelbedrag-golden ongewijzigd (€2.343.807 is nog steeds correct).
- *   - Alle overige combo's: byte-identiek (huis was al spendable bij include_full,
- *     of speelt geen rol). Geen regressie op niet-downsize strategieën.
- *
- * HER-BASELINE 2026-06-24 — Fase 3 "Opeethypotheek" in het grootboek (ADR 0029).
- * UITSLUITEND A-reverse wijzigt: de opeethypotheek is nu een ECHTE schuld in het
- * grootboek i.p.v. een display-only schaduwschuld + recurring-payout-life-event.
- * Daardoor (a) telt de woning NIET meer voor 100% als FIRE-eligible (vóór ADR 0029 gaf
- * getFireEligibleNetWorth → totalNetWorth de hele huiswaarde mee), maar slechts de
- * LEEN-RUIMTE (overwaarde × maxLoanPct, met de huis-return als voet), en (b) is er geen
- * payout-inkomensstroom meer die V_nodig kunstmatig verlaagde. Beide effecten verhogen
- * het benodigde liquide vermogen: doelbedrag €1.274.081 → €1.537.473 (+20,67%).
- * fireAgeFractional blijft 58. Alle overige combo's zijn byte-identiek (geen huis-rol
- * of huis al via include_full/spendable behandeld). Géén verkapte regressie — de
- * include_full/exclude/downsize-goldens bewegen NIET.
+ * ## Groep C/D op de PERPETUAL-baseline (FASE-6-herijking, scope-besluit)
+ * Op de deplete-baseline vallen groep C (onttrekkingsprofiel) en D (werk-strategie)
+ * degeneratief samen (8× 42,083 / €1.102.575): de kernel-deplete-FIRE is voor deze
+ * vermogende persona "reached now" (B93-doel=0-quirk, oorzaak c), dus er is geen
+ * decumulatie-/accumulatiefase over om de varianten te laten doorwerken. Daarom draaien
+ * C en D op de **perpetual-baseline** (`PERP_END`), waar FIRE een echte toekomst-datum
+ * (~45,8 jr) is en de profiel-/werk-verschillen wél doorwerken. A en B blijven op deplete.
+ *   - Groep C discrimineert nu: oplopend 42,08 < afnemend 43,50 < vast 45,83 < guardrails
+ *     47,75. NB: 'Afnemend' en 'Oplopend' gebruiken in de kernel (`tables/ont.ts`
+ *     `actieveFactor`) DEZELFDE fase-factor F — de richting zit uitsluitend in de
+ *     curve-getallen, niet in de profiel-selector. Daarom dragen C-afnemend (dalend
+ *     100/85/70) en C-oplopend (stijgend 70/85/100) een expliciete fase-curve
+ *     (`withdrawalCurve`); zónder die curve zouden beide op de Excel-default (dalend) vallen
+ *     en identiek zijn.
+ *   - Groep D discrimineert: combi 45,17 < groei 45,67 < geen 45,83 < deeltijd 46,83.
  *
  * GENERATED:GOLDEN:START
  */
 export const EXPECTED: Record<string, ComboExpectation> = {
-  'A-include_full': { fireAgeFractional: 53, doelbedrag: 1736457 },
-  'A-exclude': { fireAgeFractional: 53, doelbedrag: 1125531 },
-  'A-downsize': { fireAgeFractional: 57, doelbedrag: 2343807 },
-  'A-reverse': { fireAgeFractional: 58, doelbedrag: 1537473 },
-  'B-deplete': { fireAgeFractional: 53, doelbedrag: 1736457 },
-  'B-legacy': { fireAgeFractional: 46, doelbedrag: 1926664 },
-  'B-perpetual': { fireAgeFractional: 49, doelbedrag: 2605386 },
-  'B-pensioen': { fireAgeFractional: 67, doelbedrag: 1135484 },
-  'C-static': { fireAgeFractional: 53, doelbedrag: 1736457 },
-  'C-guardrails': { fireAgeFractional: 51, doelbedrag: 1773805 },
-  'C-vpw': { fireAgeFractional: 57, doelbedrag: 2390722 },
-  'C-bucket': { fireAgeFractional: 53, doelbedrag: 1736457 },
-  'D-geen': { fireAgeFractional: 53, doelbedrag: 1736457 },
-  'D-groei': { fireAgeFractional: 51, doelbedrag: 1773663 },
-  'D-deeltijd': { fireAgeFractional: 56, doelbedrag: 1655157 },
-  'D-combi': { fireAgeFractional: 50, doelbedrag: 1785137 },
+  'A-include_full': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
+  'A-exclude': { fireAgeFractional: 43.0, doelbedrag: 1036734 },
+  'A-downsize': { fireAgeFractional: 42.583, doelbedrag: 997273 },
+  'A-reverse': { fireAgeFractional: 42.083, doelbedrag: 950670 },
+  'B-deplete': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
+  'B-legacy': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
+  'B-perpetual': { fireAgeFractional: 45.833, doelbedrag: 1562958 },
+  'B-pensioen': { fireAgeFractional: 67.0, doelbedrag: 5747356 },
+  // Groep C/D op de PERPETUAL-baseline (PERP_END) — hier discrimineren de profielen/
+  // werk-varianten wél (op deplete vielen ze samen op 42,083). Ordening klopt semantisch:
+  // oplopend (minder vroeg onttrekken) → vroegst vrij; guardrails → laatst; deeltijd later
+  // dan geen-werk; groei/combi eerder.
+  'C-vast': { fireAgeFractional: 45.833, doelbedrag: 1562958 },
+  'C-afnemend': { fireAgeFractional: 43.5, doelbedrag: 1269697 },
+  'C-oplopend': { fireAgeFractional: 42.083, doelbedrag: 1103777 },
+  'C-guardrails': { fireAgeFractional: 47.75, doelbedrag: 1823619 },
+  'D-geen': { fireAgeFractional: 45.833, doelbedrag: 1562958 },
+  'D-groei': { fireAgeFractional: 45.667, doelbedrag: 1561132 },
+  'D-deeltijd': { fireAgeFractional: 46.833, doelbedrag: 1583739 },
+  'D-combi': { fireAgeFractional: 45.167, doelbedrag: 1558998 },
 }
 // GENERATED:GOLDEN:END
+
+/**
+ * **v2-goldens** (vergelijkarm, drift-bewaking flag-periode). De productie-engine-
+ * goldens (v2), behouden tot de v2-deletie (stap 5). Alléén voor de combinaties die v2
+ * kan uitdrukken (`isV2Expressible`): A×4, B×4, D×4, C-vast (≈ v2 `static`) en
+ * C-guardrails (v2 `guardrails`) = 14. C-afnemend/C-oplopend zijn kernel-only en staan
+ * hier bewust NIET (hun v2-vpw/bucket-voorgangers zijn uit de matrix verdwenen; dat
+ * v2-gedrag blijft gedekt door `lib/fire-withdrawal-integration.test.ts`).
+ *
+ * HER-BASELINE FASE 6, stap 2: deze v2-goldens zijn t.o.v. de pre-FASE-6-matrix
+ * VERSCHOVEN (bv. baseline 53 → 48). Oorzaak: de fixture pint de vijf generieke
+ * niet-liquide bezittingen nu op `niet_verkopen` (nodig om de kernel te kunnen draaien
+ * — zie `persona-fixture.ts`), waardoor v2 ze niet langer on-demand liquideert. Dat is
+ * een bewuste, gedocumenteerde her-baseline, geen v2-regressie.
+ */
+export const EXPECTED_V2: Record<string, ComboExpectation> = {
+  'A-include_full': { fireAgeFractional: 48.0, doelbedrag: 1862900 },
+  'A-exclude': { fireAgeFractional: 46.418, doelbedrag: 1203370 },
+  'A-downsize': { fireAgeFractional: 51.0, doelbedrag: 2320720 },
+  'A-reverse': { fireAgeFractional: 50.0, doelbedrag: 1687994 },
+  'B-deplete': { fireAgeFractional: 48.0, doelbedrag: 1862900 },
+  'B-legacy': { fireAgeFractional: 48.0, doelbedrag: 1917249 },
+  'B-perpetual': { fireAgeFractional: 54.0, doelbedrag: 2665256 },
+  'B-pensioen': { fireAgeFractional: 67.0, doelbedrag: 1135484 },
+  // Groep C/D op de PERPETUAL-baseline (PERP_END) — v2-vergelijk. C-afnemend/C-oplopend
+  // zijn kernel-only (v2 kent geen 'Afnemend'/'Oplopend') → geen v2-golden.
+  'C-vast': { fireAgeFractional: 54.0, doelbedrag: 2665256 },
+  'C-guardrails': { fireAgeFractional: 53.0, doelbedrag: 2645167 },
+  'D-geen': { fireAgeFractional: 54.0, doelbedrag: 2665256 },
+  'D-groei': { fireAgeFractional: 52.0, doelbedrag: 2624051 },
+  'D-deeltijd': { fireAgeFractional: 59.0, doelbedrag: 2734167 },
+  'D-combi': { fireAgeFractional: 51.0, doelbedrag: 2601985 },
+}
 
 // ── Uitkomsten ───────────────────────────────────────────────
 export interface ComboActual {
@@ -200,6 +304,13 @@ export interface ComboActual {
   targetEndPortfolio: number
   implicitWithdrawalRate: number
   strategy: string
+}
+
+/** Uitkomst van de kernel-arm: de standen + welke motor daadwerkelijk rekende. */
+export interface ComboKernelOutcome {
+  actual: ComboActual
+  engine: ConvergentieEngine
+  fallbackReason?: string
 }
 
 export interface Check {
@@ -213,8 +324,17 @@ export interface ComboResult {
   label: string
   group: GroupKey
   config: ComboConfig
-  expected: ComboExpectation | null
-  actual: ComboActual
+  /** Kernel-only (geen v2-equivalent) → geen v2-vergelijkarm. */
+  kernelOnly: boolean
+  /** Motor die de primaire (kernel-)run daadwerkelijk berekende — verwacht 'kernel'. */
+  engine: ConvergentieEngine
+  fallbackReason?: string
+  /** Kernel-arm (primair). */
+  kernelExpected: ComboExpectation | null
+  kernelActual: ComboActual
+  /** v2-arm (vergelijk, drift-bewaking); null voor kernel-only combo's. */
+  v2Expected: ComboExpectation | null
+  v2Actual: ComboActual | null
   checks: Check[]
   status: 'pass' | 'fail'
 }
@@ -268,9 +388,8 @@ function werkEventFor(werk: ComboWerk, fx: ReturnType<typeof buildCompleetHorizo
   ]
 }
 
-// ── Run één combinatie via de productie-engine (v2) ──────────
-export function runCombo(combo: ComboDef, pinnedAge?: number): ComboActual {
-  const fx = buildCompleetHorizonFixture(pinnedAge)
+/** Bouw de gedeelde v2-input (`buildHorizonInput`) voor een combinatie. */
+function buildComboInput(combo: ComboDef, fx: ReturnType<typeof buildCompleetHorizonFixture>) {
   const built = buildHorizonInput({
     horizonInput: fx.financialInput,
     lifeEvents: [...fx.lifeEvents, ...werkEventFor(combo.config.werk ?? null, fx)],
@@ -289,7 +408,19 @@ export function runCombo(combo: ComboDef, pinnedAge?: number): ComboActual {
   if (!built) {
     throw new Error(`buildHorizonInput gaf null voor combinatie ${combo.id} (controleer persona/fixture)`)
   }
-  const r = runSelectedProjection(built.input, true, built.strategyOptions)
+  return built
+}
+
+/** Vertaal een `UnifiedProjectionResult`-achtige naar het `ComboActual`-contract. */
+function toActual(r: {
+  fireAgeFractional: number | null
+  fireReachable: boolean
+  requiredFirePortfolio: number
+  firePortfolioAtFire: number
+  targetEndPortfolio: number
+  implicitWithdrawalRate: number
+  strategy: string
+}): ComboActual {
   return {
     fireAgeFractional: r.fireAgeFractional,
     fireReachable: r.fireReachable,
@@ -301,6 +432,49 @@ export function runCombo(combo: ComboDef, pinnedAge?: number): ComboActual {
   }
 }
 
+// ── Run één combinatie via de horizon-kernel (primaire motor) ─
+export function runComboKernel(combo: ComboDef, pinnedAge?: number): ComboKernelOutcome {
+  const fx = buildCompleetHorizonFixture(pinnedAge)
+  const built = buildComboInput(combo, fx)
+
+  // Combo-config → profielrij-kolommen (spiegelt de /toekomst-context-assemblage).
+  const profile: ConvergentieRawProfileRow = {
+    ...buildCompleetKernelProfileBase(fx.currentAge),
+    fire_end_strategy: combo.config.end.strategy,
+    fire_end_age: combo.config.end.endAge,
+    fire_legacy_amount: combo.config.end.legacyAmount,
+    housing_strategy_config: combo.config.housing,
+    withdrawal_profile_config: combo.config.withdrawalProfiel
+      ? { profiel: combo.config.withdrawalProfiel, ...combo.config.withdrawalCurve }
+      : undefined,
+  }
+
+  const rawContext: ConvergentieRawContext = {
+    profile,
+    assets: fx.assets,
+    debts: fx.debts,
+    lifeEvents: [...fx.lifeEvents, ...werkEventFor(combo.config.werk ?? null, fx)],
+    aowRows: [], // afwezig → adapter-default (deterministische AOW-leeftijd 67)
+    yearlyExpenses: built.input.yearlyExpenses,
+  }
+
+  const outcome = computeConvergentieProjection({
+    builtInput: built.input,
+    strategyOptions: built.strategyOptions,
+    v2FlagArg: true,
+    kernelEnabled: true,
+    rawContext,
+  })
+  return { actual: toActual(outcome.result), engine: outcome.engine, fallbackReason: outcome.fallbackReason }
+}
+
+// ── Run één combinatie via de v2-grootboek-engine (vergelijkarm) ─
+export function runComboV2(combo: ComboDef, pinnedAge?: number): ComboActual {
+  const fx = buildCompleetHorizonFixture(pinnedAge)
+  const built = buildComboInput(combo, fx)
+  return toActual(runSelectedProjection(built.input, true, built.strategyOptions))
+}
+
 // ── Checks ───────────────────────────────────────────────────
 function fmtEur(n: number): string {
   return `€${Math.round(n).toLocaleString('nl-NL')}`
@@ -310,13 +484,13 @@ function relDiff(actual: number, expected: number): number {
   return Math.abs(actual - expected) / Math.abs(expected)
 }
 
-function goldenChecks(actual: ComboActual, expected: ComboExpectation | null): Check[] {
+/** Golden-toets (vrijheidsleeftijd ±0,5 jr + doelbedrag ±2%). `arm` labelt de check. */
+function goldenChecks(actual: ComboActual, expected: ComboExpectation | null, arm: string): Check[] {
   const checks: Check[] = []
 
-  // FIRE-leeftijd binnen marge
   if (!expected) {
-    checks.push({ name: 'Golden vrijheidsleeftijd', pass: false, detail: 'geen golden-waarde opgezet — genereer eerst' })
-    checks.push({ name: 'Golden doelbedrag', pass: false, detail: 'geen golden-waarde opgezet — genereer eerst' })
+    checks.push({ name: `${arm}: golden vrijheidsleeftijd`, pass: false, detail: 'geen golden-waarde opgezet — genereer eerst' })
+    checks.push({ name: `${arm}: golden doelbedrag`, pass: false, detail: 'geen golden-waarde opgezet — genereer eerst' })
     return checks
   }
 
@@ -325,7 +499,7 @@ function goldenChecks(actual: ComboActual, expected: ComboExpectation | null): C
   if (ea === null || aa === null) {
     const pass = ea === aa
     checks.push({
-      name: 'Golden vrijheidsleeftijd',
+      name: `${arm}: golden vrijheidsleeftijd`,
       pass,
       detail: pass ? `beide ${aa === null ? 'onbereikbaar' : aa}` : `verwacht ${ea ?? 'onbereikbaar'}, werkelijk ${aa ?? 'onbereikbaar'}`,
     })
@@ -333,22 +507,33 @@ function goldenChecks(actual: ComboActual, expected: ComboExpectation | null): C
     const delta = Math.abs(aa - ea)
     const pass = delta <= FIRE_AGE_MARGIN_YEARS
     checks.push({
-      name: 'Golden vrijheidsleeftijd',
+      name: `${arm}: golden vrijheidsleeftijd`,
       pass,
       detail: `verwacht ${ea.toFixed(2)}, werkelijk ${aa.toFixed(2)} (Δ ${delta.toFixed(2)} ≤ ${FIRE_AGE_MARGIN_YEARS})`,
     })
   }
 
-  // Doelbedrag binnen relatieve marge
   const rd = relDiff(actual.requiredFirePortfolio, expected.doelbedrag)
   const passDoel = rd <= DOELBEDRAG_REL_MARGIN
   checks.push({
-    name: 'Golden doelbedrag',
+    name: `${arm}: golden doelbedrag`,
     pass: passDoel,
     detail: `verwacht ${fmtEur(expected.doelbedrag)}, werkelijk ${fmtEur(actual.requiredFirePortfolio)} (Δ ${(rd * 100).toFixed(2)}% ≤ ${(DOELBEDRAG_REL_MARGIN * 100).toFixed(0)}%)`,
   })
 
   return checks
+}
+
+/** Assert dat de primaire run daadwerkelijk de kernel was (geen stille v2-terugval). */
+function engineCheck(outcome: ComboKernelOutcome): Check {
+  return {
+    name: 'Motor = kernel (geen v2-terugval)',
+    pass: outcome.engine === 'kernel' && !outcome.fallbackReason,
+    detail:
+      outcome.engine === 'kernel'
+        ? 'kernel'
+        : `terugval op v2${outcome.fallbackReason ? ` — ${outcome.fallbackReason}` : ''}`,
+  }
 }
 
 function invariantChecks(combo: ComboDef, actual: ComboActual, currentAge: number): Check[] {
@@ -388,9 +573,9 @@ function invariantChecks(combo: ComboDef, actual: ComboActual, currentAge: numbe
   })
 
   // Impliciete SWR binnen redelijke bandbreedte. Pensioen is bewust uitgezonderd:
-  // die mode dwingt FIRE op AOW af en rapporteert een afwijkende
-  // requiredFirePortfolio (de hook overschrijft 'm post-run), waardoor de
-  // impliciete ratio buiten de normale SWR-band valt — geen drift-signaal.
+  // die mode verankert FIRE op de AOW-leeftijd en rapporteert een afwijkende
+  // requiredFirePortfolio, waardoor de impliciete ratio buiten de normale SWR-band
+  // valt — geen drift-signaal.
   if (strat !== 'pensioen') {
     checks.push({
       name: 'Impliciete SWR plausibel',
@@ -399,10 +584,14 @@ function invariantChecks(combo: ComboDef, actual: ComboActual, currentAge: numbe
     })
   }
 
-  // targetEndPortfolio past bij eindstrategie
+  // targetEndPortfolio past bij eindstrategie.
+  // KERNEL-SEMANTIEK: targetEndPortfolio = `solve.doelbedrag` (P!B36, het EIND-doel op
+  // de eindleeftijd) — bij deplete per constructie 0 (B93-doel=0-quirk, zie
+  // bridge.ts#isKernelReachedNowDisplay-docs), bij perpetual de bewaarde pot, bij legacy
+  // het nominaal-op-eindleeftijd nagelaten bedrag.
   if (strat === 'deplete' || strat === 'pensioen') {
-    // ≈0 t.o.v. doelbedrag. Marge ruimer (5%) omdat VPW-onttrekking bij deplete
-    // een klein restvermogen kan laten staan (herberekent % per jaar).
+    // Kernel: B36 = 0 bij deplete → exact €0 (geen VPW-restvermogen zoals v2). Marge
+    // ruim (5%) gehouden voor de pensioen-tak (B36 ≠ 0 mogelijk).
     const ratio = actual.requiredFirePortfolio > 0 ? Math.abs(actual.targetEndPortfolio) / actual.requiredFirePortfolio : Math.abs(actual.targetEndPortfolio)
     checks.push({
       name: `Eind-doelvermogen ≈ €0 (${strat})`,
@@ -410,8 +599,8 @@ function invariantChecks(combo: ComboDef, actual: ComboActual, currentAge: numbe
       detail: `${fmtEur(actual.targetEndPortfolio)} (${(ratio * 100).toFixed(2)}% van doelbedrag)`,
     })
   } else if (strat === 'perpetual') {
-    // Perpetual behoudt koopkracht eeuwigdurend → eind-doelvermogen is juist
-    // GROOT (de bewaarde pot), niet €0. Invariant: positief en eindig.
+    // Perpetual behoudt koopkracht eeuwigdurend → eind-doelvermogen is juist GROOT
+    // (de bewaarde pot), niet €0. Invariant: positief en eindig.
     checks.push({
       name: 'Eind-doelvermogen behouden (perpetual)',
       pass: Number.isFinite(actual.targetEndPortfolio) && actual.targetEndPortfolio > 0,
@@ -472,14 +661,18 @@ function relationalChecks(byId: Map<string, ComboActual>): Map<string, Check[]> 
   const groei = byId.get('D-groei')
   const deeltijd = byId.get('D-deeltijd')
   const fa = (a?: ComboActual) => a?.fireAgeFractional ?? null
-  // De referentie zonder werk-event MOET gelijk zijn aan de standaard-baseline
-  // (include_full × deplete × static) — anders lekt het lege werk-event iets.
-  const baseInc = byId.get('A-include_full')
-  if (geen && baseInc) {
+  // De referentie zonder werk-event MOET gelijk zijn aan de PERPETUAL-baseline die groep
+  // C/D delen: C-vast (include_full × perpetual × vast, géén werk). D-geen heeft geen
+  // expliciet profiel (enum static → 'Vast'), wat de kernel op exact hetzelfde 'Vast'-
+  // profiel + Excel-fasecurve mapt als C-vast → identieke invoer, dus identieke uitkomst.
+  // Wijkt het af, dan lekt het lege werk-event iets. (Was A-include_full; die staat nu op
+  // deplete i.p.v. perpetual en is geen geldige referentie meer voor de perpetual-groepen.)
+  const perpRef = byId.get('C-vast')
+  if (geen && perpRef) {
     add('D-geen', {
-      name: 'Referentie = baseline (geen werk-event is inert)',
-      pass: fa(geen) === fa(baseInc) && Math.abs(geen.requiredFirePortfolio - baseInc.requiredFirePortfolio) < 1,
-      detail: `vrijheidsleeftijd ${fa(geen) ?? '—'} vs ${fa(baseInc) ?? '—'}`,
+      name: 'Referentie = perpetual-baseline C-vast (geen werk-event is inert)',
+      pass: fa(geen) === fa(perpRef) && Math.abs(geen.requiredFirePortfolio - perpRef.requiredFirePortfolio) < 1,
+      detail: `vrijheidsleeftijd ${fa(geen) ?? '—'} vs ${fa(perpRef) ?? '—'}`,
     })
   }
   // Salarisgroei (volledig gespaard) ⇒ eerder of gelijk vrij dan zonder werk.
@@ -507,29 +700,63 @@ export function runHorizonStrategyMatrix(pinnedAge?: number): MatrixResult {
   const fx = buildCompleetHorizonFixture(pinnedAge)
   const currentAge = fx.currentAge
 
-  const actuals = new Map<string, ComboActual>()
-  for (const combo of COMBOS) actuals.set(combo.id, runCombo(combo, pinnedAge))
+  // Primaire (kernel-)arm + v2-vergelijkarm per combinatie.
+  const kernelOutcomes = new Map<string, ComboKernelOutcome>()
+  const kernelActuals = new Map<string, ComboActual>()
+  const v2Actuals = new Map<string, ComboActual>()
+  for (const combo of COMBOS) {
+    const outcome = runComboKernel(combo, pinnedAge)
+    kernelOutcomes.set(combo.id, outcome)
+    kernelActuals.set(combo.id, outcome.actual)
+    if (isV2Expressible(combo)) v2Actuals.set(combo.id, runComboV2(combo, pinnedAge))
+  }
 
-  const relational = relationalChecks(actuals)
+  // Relationele checks draaien op de KERNEL-arm (de gemeten motor).
+  const relational = relationalChecks(kernelActuals)
 
   const groupsMap = new Map<GroupKey, ComboResult[]>()
   let passed = 0
   let failed = 0
 
   for (const combo of COMBOS) {
-    const actual = actuals.get(combo.id)!
-    const expected = EXPECTED[combo.id] ?? null
+    const outcome = kernelOutcomes.get(combo.id)!
+    const kernelActual = outcome.actual
+    const kernelExpected = EXPECTED[combo.id] ?? null
+    const kernelOnly = !isV2Expressible(combo)
+    const v2Actual = v2Actuals.get(combo.id) ?? null
+    const v2Expected = kernelOnly ? null : EXPECTED_V2[combo.id] ?? null
+
     const checks: Check[] = [
-      ...goldenChecks(actual, expected),
-      ...invariantChecks(combo, actual, currentAge),
+      engineCheck(outcome),
+      ...goldenChecks(kernelActual, kernelExpected, 'kernel'),
+      ...invariantChecks(combo, kernelActual, currentAge),
       ...(relational.get(combo.id) ?? []),
     ]
+    // v2-drift-bewaking (alleen voor v2-uitdrukbare combo's).
+    if (!kernelOnly && v2Actual) {
+      checks.push(...goldenChecks(v2Actual, v2Expected, 'v2'))
+    }
+
     const status: 'pass' | 'fail' = checks.every((c) => c.pass) ? 'pass' : 'fail'
     if (status === 'pass') passed++
     else failed++
 
     const arr = groupsMap.get(combo.group) ?? []
-    arr.push({ id: combo.id, label: combo.label, group: combo.group, config: combo.config, expected, actual, checks, status })
+    arr.push({
+      id: combo.id,
+      label: combo.label,
+      group: combo.group,
+      config: combo.config,
+      kernelOnly,
+      engine: outcome.engine,
+      fallbackReason: outcome.fallbackReason,
+      kernelExpected,
+      kernelActual,
+      v2Expected,
+      v2Actual,
+      checks,
+      status,
+    })
     groupsMap.set(combo.group, arr)
   }
 

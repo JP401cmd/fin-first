@@ -70,6 +70,10 @@ interface PhaseModalOpbouwProps {
   hasPartner?: boolean
   /** Marginaal IB-tarief (e.g. 0.3697 or 0.4950) */
   marginaalTarief?: number
+  /** FASE 6, stap 2 — convergentie-vlag (`horizon_kernel_convergentie`) + geboortedatum
+   *  voor de HvB-FIRE-impact-routing. Vlag uit / geen dob → v2 (byte-identiek). */
+  kernelEnabled?: boolean
+  dateOfBirth?: string | null
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -115,6 +119,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
   fireTarget,
   hasPartner,
   marginaalTarief,
+  kernelEnabled,
+  dateOfBirth,
 }: PhaseModalOpbouwProps) {
   const [assumptionsOpen, setAssumptionsOpen] = useState(false)
 
@@ -396,6 +402,8 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
           cashflows={cashflows}
           hasPartner={hasPartner}
           marginaalTarief={marginaalTarief}
+          kernelEnabled={kernelEnabled}
+          dateOfBirth={dateOfBirth}
         />
 
         {/* 10. Koopkrachterosie — inflation erosion analysis */}

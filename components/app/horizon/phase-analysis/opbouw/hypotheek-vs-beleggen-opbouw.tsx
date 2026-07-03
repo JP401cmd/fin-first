@@ -30,6 +30,10 @@ interface HypotheekVsBeleggenOpbouwProps {
   hasPartner?: boolean
   /** Marginaal IB-tarief (e.g. 0.3697 or 0.4950), overrides default */
   marginaalTarief?: number
+  /** FASE 6, stap 2 — convergentie-vlag (`horizon_kernel_convergentie`) + geboortedatum
+   *  voor de HvB-FIRE-impact-routing. Vlag uit / geen dob → v2 (byte-identiek). */
+  kernelEnabled?: boolean
+  dateOfBirth?: string | null
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -152,6 +156,8 @@ export const HypotheekVsBeleggenOpbouw = memo(
     cashflows,
     hasPartner = false,
     marginaalTarief,
+    kernelEnabled,
+    dateOfBirth,
   }: HypotheekVsBeleggenOpbouwProps) {
     // Find the first active mortgage debt
     const mortgage = useMemo(
@@ -201,7 +207,10 @@ export const HypotheekVsBeleggenOpbouw = memo(
         cashflows,
       }
 
-      return compareMortgageVsInvest(params)
+      // FASE 6, stap 2 — routeer de FIRE-impact via de convergentie-vlag: vlag aan
+      // (+ geboortedatum) → horizon-kernel, anders v2 (byte-identiek). Deze fase-
+      // analyse zit onder horizon-client, dat de vlag + dob aanreikt.
+      return compareMortgageVsInvest(params, { kernelEnabled, dateOfBirth })
     }, [
       mortgage,
       deferredExtra,
@@ -214,6 +223,8 @@ export const HypotheekVsBeleggenOpbouw = memo(
       cashflows,
       hasPartner,
       marginaalTarief,
+      kernelEnabled,
+      dateOfBirth,
     ])
 
     // No mortgage found — show informative empty state

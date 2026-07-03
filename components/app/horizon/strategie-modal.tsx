@@ -10,13 +10,14 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
-import { type FinancialInput, ageAtDate, DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
+import { type FinancialInput, type LifeEvent, ageAtDate, DEFAULT_RETURN, INFLATION } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { resolveFireParams } from '@/lib/fire-params'
 import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import {
   type WithdrawalStrategyConfig,
   type WithdrawalStrategyType,
+  type WithdrawalProfiel,
   WITHDRAWAL_DEFAULTS,
   resolveWithdrawalStrategy,
 } from '@/lib/withdrawal-strategy'
@@ -27,6 +28,14 @@ import {
   type SimCashflow,
 } from '@/lib/fire-simulation'
 import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
+import { toSimResult } from '@/lib/unified-projection'
+import { buildConvergentieAdapterProfile, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
+import { solveFire } from '@/lib/horizon-kernel/solver'
+import { kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
+import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
+import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import {
   computeYearlyMustExpenses,
   computeRetirementExpenses,
@@ -98,6 +107,44 @@ const STRATEGY_ICONS: Record<WithdrawalStrategyType, React.ReactNode> = {
 }
 
 const ALL_STRATEGIES: WithdrawalStrategyType[] = ['static', 'guardrails', 'vpw', 'bucket']
+
+// ── OnttrekkingsPROFIELEN (FASE 6, stap 2 — kernel-vergelijk) ────────────────
+// Wanneer /toekomst op de horizon-kernel rekent, vergelijkt deze modal de VIER
+// onttrekkingsPROFIELEN (Vast/Afnemend/Oplopend/Guardrails) i.p.v. de v2-enum
+// (static/guardrails/vpw/bucket). Reden: de kernel-adapter mapt vpw én bucket → 'Vast'
+// (params.ts `WITHDRAWAL_TO_PROFIEL`), dus static/vpw/bucket zouden op de kernel drie
+// identieke curves worden. De vier profielen krijgen één BESTAAND slot elk zodat de
+// chart/secties (die op `WithdrawalStrategyType`-slots leunen) ONGEWIJZIGD blijven —
+// alleen de simulatiebron + labelset wisselen. Vlag uit → de enum + v2-runs blijven
+// het pad (byte-identiek). Dit vergelijk is read-only informatief: de "opslaan"-flow
+// (activeer-knop, enum) draait alleen op de v2-tak; het `profiel`-veld heeft een eigen
+// opslagpad op /toekomst?tab=voorkeuren (onttrekkingsstrategie-regel).
+const SLOT_TO_PROFIEL: Record<WithdrawalStrategyType, WithdrawalProfiel> = {
+  static: 'vast',
+  vpw: 'afnemend',
+  bucket: 'oplopend',
+  guardrails: 'guardrails',
+}
+
+/** Profiel-labelset — gespiegeld aan `onttrekkingsstrategie-body.tsx` (zelfde teksten). */
+const PROFIEL_INFO: Record<WithdrawalProfiel, { label: string; description: string }> = {
+  vast: {
+    label: 'Vast',
+    description: 'Elk jaar hetzelfde bedrag, inflatie-geïndexeerd (de klassieke 4%-regel). Voorspelbaar; reageert niet op de markt.',
+  },
+  afnemend: {
+    label: 'Afnemend',
+    description: 'Je geeft in je actieve jaren méér uit en bouwt af: go-go (fit, veel reizen) → slow-go (rustiger aan) → no-go (vooral thuis, lagere uitgaven).',
+  },
+  oplopend: {
+    label: 'Oplopend',
+    description: 'Je begint bescheiden en geeft later méér uit — denk aan zorgkosten op hoge leeftijd. Het spiegelbeeld van afnemend.',
+  },
+  guardrails: {
+    label: 'Guardrails',
+    description: 'Dynamische bandbreedte: verlaagt je opname na een slecht beursjaar, verhoogt na een goed jaar. Robuust tegen sequence-risk.',
+  },
+}
 
 // ── Detailed strategy explanations (Dutch) ─────────────────────────────────
 
@@ -420,9 +467,21 @@ interface StrategieModalProps {
   /** Tab die actief is bij openen (deep-link, bv. direct naar 'woning' vanuit
    *  de "huis wordt nooit verkocht"-melding). Default 'eind'. */
   initialTab?: StrategyTab | null
+  /**
+   * FASE 6, stap 2 — kernel-convergentie-context vanuit horizon-client. Wanneer de
+   * vlag aan staat én er een rauwe kernel-context is, vergelijkt de onttrekking-tab
+   * de vier onttrekkingsPROFIELEN via de horizon-kernel i.p.v. de v2-enum-strategieën.
+   * Afwezig / vlag uit → byte-identiek aan het bestaande v2-vergelijk.
+   */
+  kernelEnabled?: boolean
+  kernelRawProfile?: ConvergentieRawProfileRow | null
+  kernelAssets?: Asset[]
+  kernelDebts?: Debt[]
+  kernelLifeEvents?: LifeEvent[]
+  kernelAowRows?: AowLeeftijdRow[]
 }
 
-export function StrategieModal({ open, onClose, housingStrategy, initialTab }: StrategieModalProps) {
+export function StrategieModal({ open, onClose, housingStrategy, initialTab, kernelEnabled, kernelRawProfile, kernelAssets, kernelDebts, kernelLifeEvents, kernelAowRows }: StrategieModalProps) {
   const [activeTab, setActiveTab] = useState<StrategyTab>(initialTab ?? 'eind')
 
   // Synchroniseer de actieve tab wanneer de modal opent met een expliciete
@@ -704,7 +763,29 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
     [fireStrategy],
   )
 
-  // ── Run simulations for all 4 strategies ───────────────────────────────
+  // FASE 6, stap 2 — draait de pagina op de horizon-kernel? Dan vergelijkt de
+  // onttrekking-tab de vier PROFIELEN (via de kernel) i.p.v. de v2-enum-strategieën.
+  // Vereist een rauwe kernel-context (vlag + profielrij + bezittingen) én geldige
+  // basisgegevens; anders valt alles terug op het bestaande v2-vergelijk.
+  const profielVergelijk =
+    kernelEnabled === true &&
+    !!kernelRawProfile &&
+    currentAge !== null &&
+    yearlyExpenses > 0 &&
+    (kernelAssets?.length ?? 0) > 0
+
+  // Labelset per SLOT: in profiel-modus het onttrekkingsPROFIEL (Vast/Afnemend/
+  // Oplopend/Guardrails); anders de klassieke enum-strategie-info. Kleuren/iconen
+  // (visuele identiteit per slot) blijven ongewijzigd — alleen label + beschrijving
+  // wisselen zodat de bestaande chart/legenda/kaarten hetzelfde blijven ogen.
+  const infoFor = (strat: WithdrawalStrategyType): StrategyInfo => {
+    const base = STRATEGY_INFO[strat]
+    if (!profielVergelijk) return base
+    const p = PROFIEL_INFO[SLOT_TO_PROFIEL[strat]]
+    return { ...base, label: p.label, description: p.description }
+  }
+
+  // ── Run simulations for all 4 strategies (v2-enum) of 4 profielen (kernel) ──
 
   const simulations = useMemo<Record<WithdrawalStrategyType, SimResult | null>>(() => {
     if (currentAge === null || yearlyExpenses <= 0) {
@@ -713,21 +794,64 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
 
     const results: Record<string, SimResult | null> = {}
 
+    // ── Kernel-tak (FASE 6, stap 2): per SLOT één profiel-kernel-run met een
+    // `withdrawal_profile_config.profiel`-override. De vier profielen mappen op de
+    // vier bestaande slots (SLOT_TO_PROFIEL) zodat de chart/secties ongewijzigd
+    // blijven. Fout → schone terugval op de v2-enum-runs hieronder (nooit crashen).
+    if (profielVergelijk && kernelRawProfile) {
+      try {
+        const rawCfg =
+          kernelRawProfile.withdrawal_profile_config &&
+          typeof kernelRawProfile.withdrawal_profile_config === 'object'
+            ? (kernelRawProfile.withdrawal_profile_config as Record<string, unknown>)
+            : {}
+        const kernelAssetList = kernelAssets ?? []
+        const kernelDebtList = kernelDebts ?? []
+        const eigenHuisIds = deriveEigenHuisIds(kernelAssetList)
+        for (const strat of ALL_STRATEGIES) {
+          const profiel = SLOT_TO_PROFIEL[strat]
+          const adapterInput: KernelAdapterInput = {
+            profile: {
+              ...buildConvergentieAdapterProfile(kernelRawProfile),
+              // Override alléén het profiel; de 3-fasen-curve (go-go/slow-go/no-go)
+              // blijft de door de gebruiker ingestelde curve of de Excel-defaults.
+              withdrawal_profile_config: { ...rawCfg, profiel },
+            },
+            assets: kernelAssetList,
+            debts: kernelDebtList,
+            lifeEvents: kernelLifeEvents ?? [],
+            aowRows: kernelAowRows,
+          }
+          const kernelInput = buildKernelInputFromApp(adapterInput)
+          const solve = solveFire(kernelInput)
+          const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
+            kernelAssetList,
+            kernelDebtList,
+            eigenHuisIds,
+          )
+          results[strat] = toSimResult(
+            kernelToUnifiedResult(solve, {
+              input: kernelInput,
+              yearlyExpenses,
+              assetSlotMeta,
+              debtSlotMeta,
+            }),
+          )
+        }
+        return results as Record<WithdrawalStrategyType, SimResult | null>
+      } catch {
+        // Val defensief terug op de v2-enum-runs hieronder.
+      }
+    }
+
     for (const strat of ALL_STRATEGIES) {
       const wsOverride: WithdrawalStrategyConfig = {
         ...withdrawalConfig,
         strategy: strat,
       }
 
-      // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c).
-      //
-      // FASE 6, stap 1 — bewust GEEN kernel-tak (gedocumenteerde v2-terugval, geen
-      // eerlijke mapping): deze modal VERGELIJKT de vier onttrekkingsstrategieën
-      // (static/guardrails/vpw/bucket). De kernel-adapter mapt echter `vpw` én
-      // `bucket` → onttrekkingsprofiel 'Vast' (params.ts `WITHDRAWAL_TO_PROFIEL`),
-      // dus op de kernel zouden static/vpw/bucket DRIE identieke curves worden — de
-      // vergelijking klapt in en zou misleiden. Zolang de kernel vpw/bucket niet als
-      // aparte onttrekkingsmethode uitdrukt, blijft dit vergelijk-oppervlak op v2.
+      // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c). Draait
+      // wanneer de convergentie-vlag uit staat (default) → byte-identiek aan voorheen.
       results[strat] = runScalarProjectionV2(
         currentAge,
         strategyForSim.endAge,
@@ -744,7 +868,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
     }
 
     return results as Record<WithdrawalStrategyType, SimResult | null>
-  }, [currentAge, yearlyExpenses, currentPortfolio, annualSavings, userGrossReturn, userInflation, lifeEvents, strategyForSim, withdrawalConfig])
+  }, [currentAge, yearlyExpenses, currentPortfolio, annualSavings, userGrossReturn, userInflation, lifeEvents, strategyForSim, withdrawalConfig, profielVergelijk, kernelRawProfile, kernelAssets, kernelDebts, kernelLifeEvents, kernelAowRows])
 
   // ── Extract retirement rows for chart ───────────────────────────────────
 
@@ -925,7 +1049,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
   }
 
   const selectedSim = simulations[selectedStrategy]
-  const selectedInfo = STRATEGY_INFO[selectedStrategy]
+  const selectedInfo = infoFor(selectedStrategy)
   const fireAge = selectedSim?.fireAge ?? null
 
   return (
@@ -1118,8 +1242,20 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
 
         {activeTab === 'onttrekking' && (
         <>
-        {/* ── Incompatibility warning when current withdrawal + new end strategy clash ── */}
-        {(() => {
+        {/* FASE 6, stap 2 — profiel-modus (kernel): read-only informatief vergelijk. */}
+        {profielVergelijk && (
+          <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/60 px-4 py-2.5">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-horizon-500" />
+            <p className="font-sans text-[11px] leading-snug text-[var(--ink-2)]">
+              Deze berekening gebruikt de nieuwe manier van doorrekenen. Hieronder vergelijk je de vier
+              onttrekkings<strong>profielen</strong> — Vast, Afnemend, Oplopend en Guardrails.
+              Dit vergelijk is informatief; je kiest en bewaart je profiel bij{' '}
+              <Link href="/toekomst?tab=voorkeuren" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Voorkeuren</Link>.
+            </p>
+          </div>
+        )}
+        {/* ── Incompatibility warning (alleen v2-tak; enum × eindstrategie) ── */}
+        {!profielVergelijk && (() => {
           const endStrat = localEndStrategy
           const wsStrat = withdrawalConfig.strategy
           const entry = COMPATIBILITY_MATRIX[wsStrat]?.[endStrat]
@@ -1142,19 +1278,21 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
           )
         })()}
 
-        {/* ── Withdrawal strategy label ────────────────────────────── */}
+        {/* ── Withdrawal strategy/profiel label ────────────────────── */}
         <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-          Onttrekkingsstrategie
+          {profielVergelijk ? 'Onttrekkingsprofiel' : 'Onttrekkingsstrategie'}
         </p>
 
         {/* ── Strategy selector cards ─────────────────────────────── */}
         <div className="mb-6 grid grid-cols-2 gap-3">
           {ALL_STRATEGIES.map(strat => {
-            const info = STRATEGY_INFO[strat]
+            const info = infoFor(strat)
             const sim = simulations[strat]
             const isActive = strat === selectedStrategy
-            const isCurrent = strat === withdrawalConfig.strategy
-            const compat = COMPATIBILITY_MATRIX[strat]?.[localEndStrategy]
+            // Enum-concepten (actieve strategie, compatibiliteit) gelden alleen op de
+            // v2-tak; in profiel-modus is dit vergelijk read-only informatief.
+            const isCurrent = !profielVergelijk && strat === withdrawalConfig.strategy
+            const compat = profielVergelijk ? undefined : COMPATIBILITY_MATRIX[strat]?.[localEndStrategy]
             const isIncompatible = compat?.status === 'incompatible'
 
             return (
@@ -1205,7 +1343,10 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
         </div>
 
         {/* ── Activate strategy button (when selection differs from active) ── */}
-        {selectedStrategy !== withdrawalConfig.strategy && (
+        {/* Alleen v2-tak: de "activeer"-flow slaat de enum-strategie op. In
+            profiel-modus is dit vergelijk read-only (het profiel-veld heeft een
+            eigen opslagpad op /toekomst?tab=voorkeuren). */}
+        {!profielVergelijk && selectedStrategy !== withdrawalConfig.strategy && (
           <div className="mb-6 flex items-center gap-3">
             <button
               type="button"
@@ -1227,7 +1368,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
         )}
 
         {/* ── Inline incompatibility warning under activate button ─── */}
-        {selectedStrategy !== withdrawalConfig.strategy && (() => {
+        {!profielVergelijk && selectedStrategy !== withdrawalConfig.strategy && (() => {
           const entry = COMPATIBILITY_MATRIX[selectedStrategy]?.[localEndStrategy]
           if (!entry || entry.status === 'compatible') return null
           const colors = STATUS_COLORS[entry.status]
@@ -1243,7 +1384,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
         })()}
 
         {/* ── Activation error message ───────────────────────────── */}
-        {activateError && (
+        {!profielVergelijk && activateError && (
           <div className="mb-6 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2">
             <p className="font-sans text-sm text-red-700">{activateError}</p>
           </div>
@@ -1261,7 +1402,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
               {/* Legend */}
               <div className="mb-3 flex flex-wrap items-center gap-3">
                 {ALL_STRATEGIES.map(strat => {
-                  const info = STRATEGY_INFO[strat]
+                  const info = infoFor(strat)
                   const isSelected = strat === selectedStrategy
                   return (
                     <button
@@ -1317,25 +1458,34 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
                       </span>
                       {' '}per maand
                     </p>
-                    {selectedStrategy === 'static' && (
+                    {/* Profiel-modus: de profiel-beschrijving; anders de enum-specifieke duiding. */}
+                    {profielVergelijk ? (
                       <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                        Bij de vaste strategie is je onttrekking constant (gecorrigeerd voor inflatie).
+                        {selectedInfo.description}
                       </p>
-                    )}
-                    {selectedStrategy === 'guardrails' && (
-                      <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                        De Guardrails-strategie past je onttrekking aan bij goede en slechte beursjaren.
-                      </p>
-                    )}
-                    {selectedStrategy === 'vpw' && (
-                      <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                        VPW berekent elk jaar een nieuw percentage op basis van je resterende horizon.
-                      </p>
-                    )}
-                    {selectedStrategy === 'bucket' && (
-                      <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
-                        De bucket-strategie beschermt je onttrekking door verschillende emmers voor korte en lange termijn.
-                      </p>
+                    ) : (
+                      <>
+                        {selectedStrategy === 'static' && (
+                          <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
+                            Bij de vaste strategie is je onttrekking constant (gecorrigeerd voor inflatie).
+                          </p>
+                        )}
+                        {selectedStrategy === 'guardrails' && (
+                          <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
+                            De Guardrails-strategie past je onttrekking aan bij goede en slechte beursjaren.
+                          </p>
+                        )}
+                        {selectedStrategy === 'vpw' && (
+                          <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
+                            VPW berekent elk jaar een nieuw percentage op basis van je resterende horizon.
+                          </p>
+                        )}
+                        {selectedStrategy === 'bucket' && (
+                          <p className="mt-1 font-sans text-[11px] text-[var(--ink-4)]">
+                            De bucket-strategie beschermt je onttrekking door verschillende emmers voor korte en lange termijn.
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1419,7 +1569,8 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
           </section>
         )}
 
-        {/* ── Compatibility matrix ─────────────────────────────── */}
+        {/* ── Compatibility matrix (alleen v2-tak: enum × eindstrategie) ── */}
+        {!profielVergelijk && (
         <section className="mb-6">
           <CompatibilityMatrix
             selectedWithdrawal={selectedStrategy}
@@ -1427,17 +1578,18 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
             activeEnd={localEndStrategy}
           />
         </section>
+        )}
 
-        {/* ── Strategy explanation cards ──────────────────────── */}
+        {/* ── Strategy/profiel explanation cards ──────────────── */}
         <section className="mb-6">
           <p className="mb-3 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-            Strategieën uitgelegd
+            {profielVergelijk ? 'Profielen uitgelegd' : 'Strategieën uitgelegd'}
           </p>
           <div className="space-y-3">
             {ALL_STRATEGIES.map(strat => {
-              const info = STRATEGY_INFO[strat]
+              const info = infoFor(strat)
               const explanation = STRATEGY_EXPLANATIONS[strat]
-              const isCurrent = strat === withdrawalConfig.strategy
+              const isCurrent = !profielVergelijk && strat === withdrawalConfig.strategy
 
               return (
                 <div
@@ -1468,6 +1620,14 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
                       )}
                     </div>
 
+                    {/* Profiel-modus: alleen de profiel-beschrijving (de enum-specifieke
+                        hoe/geschikt/voor-nadelen gelden voor de klassieke strategieën). */}
+                    {profielVergelijk ? (
+                      <p className="font-sans text-xs leading-relaxed text-[var(--ink-2)]">
+                        {info.description}
+                      </p>
+                    ) : (
+                    <>
                     {/* How it works */}
                     <div className="mb-2">
                       <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.06em] text-[var(--ink-3)]">
@@ -1521,6 +1681,8 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
                         </ul>
                       </div>
                     </div>
+                    </>
+                    )}
                   </div>
                 </div>
               )

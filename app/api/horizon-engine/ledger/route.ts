@@ -14,6 +14,11 @@ import { runHorizonLedger } from '@/lib/horizon-engine'
  * NB: sinds de C5-uitfasering (commit 1417a4568) is v2 de enige FIRE-engine —
  * `runUnifiedProjection` (v1) bestaat niet meer. De oude v1↔v2-vergelijking is
  * daarmee komen te vervallen; deze route levert uitsluitend het v2-grootboek.
+ *
+ * STAP-5-DELETIEPUNT (FASE 6, horizon-kernel-migratie): deze route bedient alleen de
+ * beheer-pagina `/beheer/horizon-tabellen-mij`, die is vervangen door
+ * `/beheer/horizon-kernel`. Route + pagina + de gedeelde `horizon-tabellen`-modules
+ * verdwijnen bij FASE 6 stap 5 (default-flip = stap 3).
  */
 export async function GET() {
   const supabase = await createClient()

@@ -9,7 +9,8 @@
  */
 
 import { useEffect, useState } from 'react'
-import { LineChart, UserCheck, AlertCircle, GitCompareArrows } from 'lucide-react'
+import Link from 'next/link'
+import { LineChart, UserCheck, AlertCircle, GitCompareArrows, Info } from 'lucide-react'
 
 import type { HorizonLedgerResult } from '@/lib/horizon-engine'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
@@ -77,6 +78,30 @@ export default function MijnLedger() {
 
   return (
     <div className="space-y-6">
+      {/* STAP-5-banner: dit v2-grootboek-inzicht is vervangen door de horizon-kernel.
+          De kernel-tabellen (maandbasis, oracle-bewezen) zijn de waarheid; deze pagina
+          toont nog de oude v2-tabellen en verdwijnt in FASE 6, stap 5. */}
+      <div className="rounded-xl border border-[var(--border-ed)] border-l-[3px] border-l-[var(--color-horizon-500)] bg-[var(--subtle)] p-4">
+        <div className="flex items-start gap-3">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-horizon-600)]" />
+          <div className="text-sm text-[var(--ink-2)]">
+            <div className="font-semibold text-[var(--ink)]">Vervangen door de Horizon-kernel</div>
+            <p className="mt-1 text-[var(--ink-3)]">
+              Dit v2-grootboek-inzicht is vervangen door{' '}
+              <Link
+                href="/beheer/horizon-kernel"
+                className="font-medium text-[var(--color-horizon-700)] underline decoration-[var(--ink-4)] underline-offset-2 hover:text-[var(--ink)]"
+              >
+                /beheer/horizon-kernel
+              </Link>{' '}
+              — tab &ldquo;Stappen &amp; tabellen&rdquo;. Die maandbasis-, oracle-bewezen kernel-tabellen
+              zijn de waarheid. Deze pagina toont nog de oude v2-grootboek-tabellen en verdwijnt in
+              FASE 6, stap 5.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

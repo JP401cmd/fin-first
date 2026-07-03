@@ -30,6 +30,10 @@ const STANDARD: HvBParams = {
 }
 
 function run(overrides: Partial<HvBParams> = {}): HvBResult {
+  // FASE 6, stap 2 — bewust ZONDER kernel-routing: dit is een synthetische suite
+  // zonder gebruiker/profiel, dus geen convergentie-vlag om mee te flippen. De
+  // v2-arm (default) is hier het contract; deze aanroep flipt niet mee en wordt met
+  // de v2-uitfasering (stap 5) herijkt of verwijderd.
   return compareMortgageVsInvest({ ...STANDARD, ...overrides })
 }
 

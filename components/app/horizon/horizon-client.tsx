@@ -6,7 +6,7 @@ import { useDreamTransition } from '@/components/app/horizon/dream-transition-co
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
-import { lifeEventsToCashflows, type SimCashflow, type SimRow } from '@/lib/fire-simulation'
+import { lifeEventsToCashflows, type SimCashflow, type SimRow, type SimResult } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
@@ -30,8 +30,10 @@ import { computeEmergencyFundMonths } from '@/lib/health-score-input'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
-import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
-import { type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { isKernelReachedNowDisplay, kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
+import { buildConvergentieAdapterProfile, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
+import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
+import { evaluateFireAt } from '@/lib/horizon-kernel/solver'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
@@ -1648,14 +1650,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // deze lokale AOW-stop-wat-als v2-consistente cijfers (single source of truth
   // met de grafiek); flag-uit blijft v1.
   //
-  // FASE 6, stap 1 — bewust GEEN kernel-tak (gedocumenteerde v2-terugval):
-  // deze wat-als draait een geFORCEERD FIRE-moment (`forcedFireAge` = AOW) met een
-  // deplete-eindstrategie. De convergentie-router (`computeConvergentieProjection`)
+  // FASE 6, stap 2 — kernel-tak (was stap 1: bewust op v2). Deze wat-als forceert een
+  // FIRE-moment op de AOW-leeftijd met een deplete-eindstrategie. De convergentie-router
   // SOLVET de FIRE-leeftijd zelf en kan geen forced-fireAge-deplete-run uitdrukken;
-  // 'm rechtstreeks via `runKernelProjection({ fireAge })` bouwen zou de adapter→
-  // engine→bridge-pijplijn buiten de router dupliceren zonder gevalideerde
-  // deplete-op-AOW-pariteit. Daarom blijft deze secundaire shortfall-lijn bewust op
-  // v2 — ook wanneer de hoofdlijn op de kernel rekent (bekende 2b-stijl-beperking).
+  // `evaluateFireAt(input, fireAge)` (solver.ts) draait daarom ÉÉN geforceerde
+  // kernel-run (adapter→engine→bridge, geen bisectie) met dezelfde deplete-op-AOW-vorm
+  // als de v2-arm. Zelfde vlag-beslissing als de hoofd-hook (`kernelConvergentie &&
+  // kernelRawProfile`); een fout valt defensief terug op de v2-arm hieronder. Vlag uit
+  // (default) → de v2-arm draait byte-identiek als voorheen.
   const aowStopSimResult = useMemo(() => {
     if (!isShortfallScenario || !effectiveInput || currentAge == null) return null
     const aowAgeInt = Math.ceil(userAowAge.fractional)
@@ -1663,6 +1665,55 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     if (yearlyExp <= 0) return null
     const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
     const pensioenEndAge = Math.max(strat.endAge, 90)
+
+    // Gedeelde pensioen-post-wrap: forceer FIRE = AOW (weergave-integer), pensioen-modus.
+    const wrapPensioen = (result: SimResult) => ({
+      ...result,
+      strategy: 'pensioen' as const,
+      fireAge: aowAgeInt,
+      fireAgeFractional: userAowAge.fractional,
+      fireReachable: true,
+      requiredFirePortfolio: result.firePortfolioAtFire,
+    })
+
+    // ── Kernel-arm (FASE 6, stap 2) ────────────────────────────────────────────
+    // Bouw de adapter-invoer zoals de hook/convergentie-router (rauwe context van
+    // de pagina) MET de deplete-op-AOW-overrides, en forceer FIRE op de fractionele
+    // AOW-leeftijd (maandnauwkeurig — de kernel rekent op maanden). De weergave-
+    // velden (fireAge = ceil) blijven gelijk aan de v2-arm via `wrapPensioen`.
+    if (kernelConvergentie && kernelRawProfile) {
+      try {
+        const adapterInput: KernelAdapterInput = {
+          profile: {
+            ...buildConvergentieAdapterProfile(kernelRawProfile),
+            fire_end_strategy: 'deplete',
+            fire_end_age: pensioenEndAge,
+          },
+          assets: initialData.assets ?? [],
+          debts,
+          lifeEvents: events,
+          aowRows,
+        }
+        const kernelInput = buildKernelInputFromApp(adapterInput)
+        const solve = evaluateFireAt(kernelInput, userAowAge.fractional)
+        const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
+          initialData.assets ?? [],
+          debts,
+          deriveEigenHuisIds(initialData.assets ?? []),
+        )
+        const kernelUnified = kernelToUnifiedResult(solve, {
+          input: kernelInput,
+          yearlyExpenses: yearlyExp,
+          assetSlotMeta,
+          debtSlotMeta,
+        })
+        return wrapPensioen(toSimResult(kernelUnified))
+      } catch {
+        // Defensief: val terug op de v2-arm hieronder (zelfde regel als de router).
+      }
+    }
+
+    // ── v2-arm (vlag uit / terugval): EXACT het bestaande gedrag ────────────────
     const unifiedInput: UnifiedProjectionInput = {
       assets: initialData.assets ?? [],
       debts,
@@ -1684,16 +1735,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       bankAccountCash: initialData.unlinkedCash ?? 0,
     }
     const unifiedResult = runSelectedProjection(unifiedInput, initialData.horizonEngineV2)
-    const result = toSimResult(unifiedResult)
-    return {
-      ...result,
-      strategy: 'pensioen' as const,
-      fireAge: aowAgeInt,
-      fireAgeFractional: userAowAge.fractional,
-      fireReachable: true,
-      requiredFirePortfolio: result.firePortfolioAtFire,
-    }
-  }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireParams.grossReturn, fireParams.inflationRate, simCashflows, fireStrategy, withdrawalStrategyConfig, debts, initialData.assets, initialData.box3Method, initialData.hasPartner, initialData.unlinkedCash, initialData.horizonEngineV2])
+    return wrapPensioen(toSimResult(unifiedResult))
+  }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireParams.grossReturn, fireParams.inflationRate, simCashflows, fireStrategy, withdrawalStrategyConfig, debts, events, aowRows, initialData.assets, initialData.box3Method, initialData.hasPartner, initialData.unlinkedCash, initialData.horizonEngineV2, kernelConvergentie, kernelRawProfile])
 
   const effectiveSimRows = isAowStopActive && aowStopSimResult ? aowStopSimResult.rows : (simResult?.rows ?? [])
   // Partner-view: vervang de hoofdlijn door het PARTNER-pad (eigen as + FIRE-
@@ -1882,15 +1925,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
       // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c).
       //
-      // FASE 6, stap 1 — bewust GEEN kernel-tak (gedocumenteerde v2-terugval, alle
-      // overlays op dezelfde motor): de opgeslagen what-if-scenario's muteren via
+      // FASE 6, stap 2 — bewust GEPARKEERD op v2 (v2 tot stap 5). Reden: deze
+      // ghost-overlays draaien via de SCALAR-engine (`runScalarProjectionV2`, één
+      // portefeuille-getal), terwijl de opgeslagen what-if-scenario's via
       // `applyWhatIfOverrides` een SCALAIR spaarbedrag (`annualSavings`, uit inkomen-/
-      // spaarquote-sliders). De kernel leidt sparen af uit (inkomen − uitgaven) en kan
-      // dat scalaire spaarbedrag niet eerlijk reproduceren (de bekende spaargrondslag-
-      // divergentie, whatif-varianten.ts §1); de overrides zo herbouwen dat ze wél
-      // kernel-mapbaar zijn (events + return-delta, zoals de /horizon/whatif-pinned-
-      // overlays) zou het v2-pad wijzigen en de byte-identiteit breken. Daarom blijven
-      // deze ghost-overlays bewust op v2.
+      // spaarquote-sliders) muteren. De kernel leidt sparen af uit (inkomen − uitgaven)
+      // op de RAUWE per-asset-context; dat scalaire spaarbedrag laat zich niet verliesloos
+      // op die context mappen (de bekende spaargrondslag-divergentie, whatif-varianten.ts
+      // §1) — een ghost ZONDER overrides zou daardoor NIET op de kernel-hoofdlijn vallen
+      // (die rekent op profiel-inkomen/-uitgaven, niet op `annualSavings`). Een misleidende
+      // ghost is erger dan een eerlijke v2-ghost; convergentie van dit oppervlak wacht op
+      // de v2-uitfasering (stap 5). Het vlag-uit-pad is hier al triviaal byte-identiek
+      // (altijd v2, geen vlag-tak).
       const result = runScalarProjectionV2(
         currentAgeVal,
         endStrategy.endAge ?? 90,
@@ -6440,6 +6486,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           fireTarget={fire?.fireTarget}
           hasPartner={initialData.hasPartner}
           marginaalTarief={fireParams.marginaalTarief}
+          kernelEnabled={kernelConvergentie}
+          dateOfBirth={kernelRawProfile?.date_of_birth ?? null}
         />
       )}
       {/* Overgang phase modal */}
@@ -7055,6 +7103,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         onClose={() => { setActiveModal(null); setStrategieInitialTab(null); loadData(); router.refresh() }}
         housingStrategy={initialData.housingStrategy}
         initialTab={strategieInitialTab}
+        // FASE 6, stap 2 — kernel-convergentie-context: vlag aan + rauwe context →
+        // de onttrekking-tab vergelijkt de vier PROFIELEN via de kernel; anders v2.
+        kernelEnabled={kernelConvergentie}
+        kernelRawProfile={kernelRawProfile}
+        kernelAssets={initialData.assets}
+        kernelDebts={debts}
+        kernelLifeEvents={displayEvents}
+        kernelAowRows={aowRows}
       />
       <UitgavenPane open={uitgavenPaneOpen} onClose={() => { setUitgavenPaneOpen(false); loadData() }} />
 

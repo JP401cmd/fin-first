@@ -483,6 +483,25 @@ interface EngineContext {
   lifeEventCashflows: SimCashflow[]
 }
 
+// ── FASE 6, stap 2 — networth/grootboek bewust op v2 tot stap 5 (gedocumenteerde uitzondering) ──
+//
+// De horizon-kernel-migratie flipt de convergentie-set (/toekomst, /overzicht,
+// fire-target-shared, AI-context) via de per-gebruiker-vlag `horizon_kernel_convergentie`.
+// Het networth-/grootboek-deel van DIT rapport blijft bewust op de v2-grootboek-engine
+// (`buildEngineInput` → `runHorizonLedger`/`safeLedger`) tot de fysieke v2-deletie in
+// stap 5. Redenen:
+//  (a) De vrijheidscheck is een PUBLIEKE intake (ADR 0022) zónder ingelogd profiel en
+//      dus zonder de per-gebruiker-vlag — er is hier niets om op te flippen.
+//  (b) De her-runs consumeren `HorizonLedgerResult`-RIJvelden (`werkt`, `aowEnPensioen`,
+//      `cashflowNetto`, `liquideVermogen`, `vNodig`) — gevoeligheid (±rendement),
+//      onttrekkingsstrategie-vergelijk en decumulatie/levenspad — plus een
+//      `SimCashflow`-samenstelling (AOW-cashflow, post-pensioen-uitgave-delta, lumpsum)
+//      die de LifeEvent-gebaseerde kernel-adapter niet uitdrukt. Een synthetische
+//      kernel-run zou ruim boven de ~50-regels-drempel uitkomen en álle sectie-consumenten
+//      (kruising, sensitivity, withdrawalStrategies, lifePath) raken.
+//  (c) De FIRE-SOM van dit rapport loopt al via `computeScalarFireProjection`
+//      (scalar-router, zie de BEWUSTE UITZONDERING bij die aanroep in `buildReport`) en
+//      flipt bij de default-flip (stap 3) vanzelf mee — het grootboek-deel volgt in stap 5.
 /**
  * Bouw een `UnifiedProjectionInput` voor `runHorizonLedger` met een gegeven
  * withdrawal-strategie. Eén bron; de gevoeligheids- en strategie-her-runs

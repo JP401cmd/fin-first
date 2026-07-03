@@ -100,12 +100,32 @@ function PersonaPanel() {
   )
 }
 
+// ── Motor-badge (kernel = groen; v2-terugval = rood, want dat is een testfout) ──
+function EngineBadge({ combo }: { combo: ComboResult }) {
+  if (combo.engine === 'kernel' && !combo.fallbackReason) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700" title="Gemeten op de horizon-kernel">
+        kernel
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700" title={combo.fallbackReason ?? 'v2-terugval'}>
+      v2-terugval
+    </span>
+  )
+}
+
 // ── Eén combinatie-rij met uitklapbare checks ───────────────────────────────
+// Primaire (kernel-)arm in de kolommen; de v2-vergelijkarm + alle checks in de
+// uitklap. `Motor` per rij (verwacht 'kernel'; rood = stille v2-terugval = testfout).
 function ComboRow({ combo }: { combo: ComboResult }) {
   const [open, setOpen] = useState(false)
   const ok = combo.status === 'pass'
-  const exp = combo.expected
-  const act = combo.actual
+  const exp = combo.kernelExpected
+  const act = combo.kernelActual
+  const v2exp = combo.v2Expected
+  const v2act = combo.v2Actual
 
   return (
     <>
@@ -116,14 +136,23 @@ function ComboRow({ combo }: { combo: ComboResult }) {
         <td className="px-3 py-2 align-top">
           <div className="flex items-start gap-1.5">
             {open ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ink-4)]" /> : <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ink-4)]" />}
-            <span className="text-[var(--ink)]">{combo.label}</span>
+            <span className="flex flex-wrap items-center gap-1.5 text-[var(--ink)]">
+              {combo.label}
+              {combo.kernelOnly && (
+                <span className="inline-flex items-center rounded-full bg-[var(--subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ink-3)]" title="Kernel-only: v2 kent dit onttrekkingsprofiel niet">
+                  kernel-only
+                </span>
+              )}
+            </span>
           </div>
         </td>
-        {/* Vrijheidsleeftijd */}
+        {/* Motor */}
+        <td className="px-3 py-2 text-center align-top"><EngineBadge combo={combo} /></td>
+        {/* Vrijheidsleeftijd (kernel) */}
         <td className="px-3 py-2 text-right align-top font-mono tabular-nums text-[var(--ink-3)]">{exp ? fireLabel(exp.fireAgeFractional) : '—'}</td>
         <td className="px-3 py-2 text-right align-top font-mono tabular-nums text-[var(--ink)]">{fireLabel(act.fireAgeFractional)}</td>
         <td className="px-3 py-2 text-right align-top font-mono tabular-nums text-[var(--ink-4)]">{exp ? fireDelta(act.fireAgeFractional, exp.fireAgeFractional) : '—'}</td>
-        {/* Doelbedrag */}
+        {/* Doelbedrag (kernel) */}
         <td className="px-3 py-2 text-right align-top font-mono tabular-nums text-[var(--ink-3)]">{exp ? formatCurrency(exp.doelbedrag) : '—'}</td>
         <td className="px-3 py-2 text-right align-top font-mono tabular-nums text-[var(--ink)]">{formatCurrency(act.requiredFirePortfolio)}</td>
         <td className="px-3 py-2 text-right align-top font-mono tabular-nums text-[var(--ink-4)]">{exp ? doelDelta(act.requiredFirePortfolio, exp.doelbedrag) : '—'}</td>
@@ -142,7 +171,21 @@ function ComboRow({ combo }: { combo: ComboResult }) {
       </tr>
       {open && (
         <tr className="border-t border-[var(--border-ed)] bg-[var(--subtle)]/30">
-          <td colSpan={8} className="px-3 py-3">
+          <td colSpan={9} className="px-3 py-3">
+            {/* v2-vergelijkarm (drift-bewaking flag-periode) */}
+            <div className="mb-2.5 text-xs text-[var(--ink-2)]">
+              <span className="font-medium text-[var(--ink)]">v2-vergelijk: </span>
+              {combo.kernelOnly || !v2act ? (
+                <span className="text-[var(--ink-4)]">kernel-only — v2 kan dit onttrekkingsprofiel niet uitdrukken.</span>
+              ) : (
+                <span className="font-mono tabular-nums text-[var(--ink-4)]">
+                  vrijheidsleeftijd {v2exp ? fireLabel(v2exp.fireAgeFractional) : '—'} → {fireLabel(v2act.fireAgeFractional)}
+                  {v2exp ? ` (Δ ${fireDelta(v2act.fireAgeFractional, v2exp.fireAgeFractional)})` : ''}
+                  {'  ·  '}doelbedrag {v2exp ? formatCurrency(v2exp.doelbedrag) : '—'} → {formatCurrency(v2act.requiredFirePortfolio)}
+                  {v2exp ? ` (Δ ${doelDelta(v2act.requiredFirePortfolio, v2exp.doelbedrag)})` : ''}
+                </span>
+              )}
+            </div>
             <ul className="space-y-1.5">
               {combo.checks.map((c, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs">
@@ -192,10 +235,11 @@ export default function HorizonStrategieClient() {
         <div>
           <h2 className="text-lg font-semibold text-[var(--ink)]">Horizon-strategietest</h2>
           <p className="mt-1 max-w-2xl font-serif text-sm italic text-[var(--ink-3)]">
-            Regressietest van de horizon-grafiek (productie-engine v2) over alle strategie-combinaties op
-            de complete persona. Per combinatie worden de vrijheidsleeftijd (±{FIRE_AGE_MARGIN_YEARS} jr) en
-            het doelbedrag (±{(DOELBEDRAG_REL_MARGIN * 100).toFixed(0)}%) tegen een vooraf opgezette verwachting
-            gevalideerd, plus structurele invarianten.
+            Regressietest van de horizon-grafiek op de <strong>horizon-kernel</strong> (primair) over alle
+            strategie-combinaties op de complete persona, met de v2-grootboek-engine als vergelijk
+            (drift-bewaking flag-periode). Per combinatie worden de vrijheidsleeftijd (±{FIRE_AGE_MARGIN_YEARS} jr)
+            en het doelbedrag (±{(DOELBEDRAG_REL_MARGIN * 100).toFixed(0)}%) tegen een golden gevalideerd, plus
+            structurele invarianten en de eis dat de motor daadwerkelijk de kernel was.
           </p>
         </div>
         <button
@@ -238,8 +282,9 @@ export default function HorizonStrategieClient() {
               <thead>
                 <tr className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">
                   <th rowSpan={2} className="px-3 py-2 text-left font-medium">Combinatie</th>
-                  <th colSpan={3} className="border-b border-[var(--border-ed)] px-3 py-1.5 text-center font-medium">Vrijheidsleeftijd</th>
-                  <th colSpan={3} className="border-b border-[var(--border-ed)] px-3 py-1.5 text-center font-medium">Doelbedrag</th>
+                  <th rowSpan={2} className="px-3 py-2 text-center font-medium">Motor</th>
+                  <th colSpan={3} className="border-b border-[var(--border-ed)] px-3 py-1.5 text-center font-medium">Vrijheidsleeftijd (kernel)</th>
+                  <th colSpan={3} className="border-b border-[var(--border-ed)] px-3 py-1.5 text-center font-medium">Doelbedrag (kernel)</th>
                   <th rowSpan={2} className="px-3 py-2 text-center font-medium">Status</th>
                 </tr>
                 <tr className="text-[10px] uppercase tracking-wide text-[var(--ink-4)]">

@@ -214,3 +214,29 @@ export function solveFire(input: KernelInput): SolveFireResult {
   const fireAge = leeftijd + hi / 12
   return afronden(fireAge, run(fireAge))
 }
+
+/**
+ * Evalueer het volledige FIRE-statusblok bij een GEFORCEERDE FIRE-leeftijd — één
+ * `runKernelProjection`, GÉÉN bisectie. Voor de secundaire wat-als-lijnen die een
+ * vast FIRE-moment forceren i.p.v. te solven (bv. de AOW-stop-sim op /toekomst:
+ * FIRE = AOW-leeftijd met een deplete-eindstrategie). Hergebruikt hetzelfde
+ * (module-private) `computeStatusBlok` als `solveFire`, dus het statusblok is
+ * identiek aan de stand die de solver op diezelfde leeftijd zou opleveren — alleen
+ * de bisectie-stappen vervallen (`engineRuns` = 1).
+ */
+export function evaluateFireAt(input: KernelInput, fireAge: number): SolveFireResult {
+  const proj = runKernelProjection(input, { fireAge })
+  const blok = computeStatusBlok(input, proj, fireAge)
+  return {
+    fireAge,
+    eindleeftijd: blok.eindleeftijd,
+    doelbedrag: blok.doelbedrag,
+    modelwaarde: blok.modelwaarde,
+    gap: blok.gap,
+    status: blok.status,
+    maandHint: blok.maandHint,
+    tekortLeningTotEindleeftijd: blok.tekortLening,
+    engineRuns: 1,
+    projection: proj,
+  }
+}

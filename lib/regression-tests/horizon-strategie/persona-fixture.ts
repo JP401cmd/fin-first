@@ -21,6 +21,7 @@ import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Debt, DebtType, RepaymentType } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import type { FinancialInput, LifeEvent } from '@/lib/horizon-data'
+import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import {
   PERSONAS,
   type PersonaAsset,
@@ -185,11 +186,48 @@ function toLifeEvent(p: PersonaLifeEvent): LifeEvent {
  * Bouw de drop-in fixture voor `buildHorizonInput` uit de complete persona.
  * `pinnedAge` bepaalt de (deterministische) huidige leeftijd in de projectie.
  */
+/**
+ * Generieke, niet-liquide bezitting-typen die `build-input.ts` (ADR 0020) bij een
+ * ONTBREKENDE `sale_config` standaard op `wanneer_nodig` (on_demand-liquidatie) zet —
+ * en die de horizon-kernel NIET kan uitdrukken (`detectV2OnlyMachinery` → v2-terugval).
+ * Spiegelt `build-input.ts#LIQUIDATABLE_NON_LIQUID` / `adapter/potten.ts`.
+ */
+const FIXTURE_GENERIC_NON_LIQUID: ReadonlySet<AssetType> = new Set<AssetType>([
+  'vehicle',
+  'physical',
+  'other',
+  'deelneming',
+  'real_estate',
+])
+
+/**
+ * Bouw de drop-in fixture voor `buildHorizonInput` uit de complete persona.
+ * `pinnedAge` bepaalt de (deterministische) huidige leeftijd in de projectie.
+ *
+ * KERNEL-EXPRESSEERBAARHEID (FASE 6, stap 2 — bewuste fixture-keuze, gedocumenteerd):
+ * de persona draagt vijf generieke niet-liquide bezittingen (auto, kunst, BV-belang,
+ * verhuurd appartement, aanhangwagen) zónder `sale_config`. `build-input.ts` geeft die
+ * dan de resolve-time-default `wanneer_nodig` → een `on_demand`-`AssetLiquidation`, en
+ * de convergentie-router valt daarop VERPLICHT terug op v2 (`detectV2OnlyMachinery` —
+ * de kern kent geen dynamische liquidatie-trigger voor generieke potten). Om de matrix
+ * daadwerkelijk op de KERNEL te meten (task-eis: engine === 'kernel'), pinnen we die
+ * bezittingen op `niet_verkopen`: dan liquideert géén van beide motoren ze on-demand
+ * (v2 én kernel houden ze als niet-liquide bezit in het grootboek — dezelfde
+ * behandeling, eerlijke vergelijking). Dit is óók trouwer aan de persona-intentie
+ * ("belegbaar vermogen vs. niet-liquide BV-belang en vastgoed" — die assets zijn
+ * bewust NIET liquide). Gevolg: zowel de kernel- als de v2-goldens zijn t.o.v. de
+ * pre-FASE-6-matrix her-gebaseerd (de v2-baseline verschuift doordat de generieke
+ * on-demand-verkoop wegvalt) — zie de golden-blokken in `matrix.ts`.
+ */
 export function buildCompleetHorizonFixture(
   pinnedAge: number = COMPLEET_PINNED_AGE,
 ): CompleetHorizonFixture {
   const persona = PERSONAS.compleet
-  const assets = persona.assets.map(toAsset)
+  const assets = persona.assets.map(toAsset).map((a) =>
+    FIXTURE_GENERIC_NON_LIQUID.has(a.asset_type)
+      ? ({ ...a, sale_config: { stand: 'niet_verkopen' } } as Asset)
+      : a,
+  )
 
   const assetIdByName = new Map<string, string>()
   for (let i = 0; i < persona.assets.length; i++) {
@@ -232,5 +270,46 @@ export function buildCompleetHorizonFixture(
     grossReturn,
     inflation,
     currentAge: pinnedAge,
+  }
+}
+
+/**
+ * Basis-profielrij voor de **horizon-kernel-arm** van de regressiematrix (FASE 6, stap 2).
+ *
+ * Spiegelt de context-assemblage van `/toekomst` (`use-horizon-fire-sim` +
+ * `horizon-client`): de kernel-adapter leest ditzelfde profiel-rij-contract. De
+ * combo-specifieke kolommen (`housing_strategy_config`, `fire_end_*`,
+ * `withdrawal_profile_config`) worden in `matrix.ts#runComboKernel` overlay'd; deze
+ * basis draagt alleen de persona-brede, combo-onafhankelijke velden.
+ *
+ * DETERMINISME + GRONDSLAG-PARITEIT met de v2-fixture:
+ *  - `date_of_birth` = dezelfde GEPINDE datum als `financialInput.dateOfBirth`
+ *    (NIET de echte persona-`date_of_birth` — zie determinisme-doc bovenaan), zodat
+ *    `ageAtDate` in de kernel exact `pinnedAge` teruggeeft.
+ *  - `retirement_expense_method: 'essential_budgets'` + `yearly_essential_expenses` =
+ *    `COMPLEET_RETIREMENT_YEARLY_EXPENSES` (48.000): dezelfde pensioenuitgave-grondslag
+ *    als de v2-fixture (`yearlyMustExpenses`) — identieke truc als `buildScalarAdapterInput`
+ *    (`scalar-router.ts`) en `buildFeeKernelContext` (`fee-analysis.ts`).
+ *  - rendement/inflatie/inkomen/uitgaven/box3/marginaal tarief uit de persona (één bron).
+ *
+ * AOW-rijen worden NIET meegegeven aan de context (`aowRows: []`) → de adapter valt
+ * deterministisch terug op de canonieke AOW-leeftijd (fallback 67).
+ */
+export function buildCompleetKernelProfileBase(
+  pinnedAge: number = COMPLEET_PINNED_AGE,
+): ConvergentieRawProfileRow {
+  const p = PERSONAS.compleet.profile
+  return {
+    date_of_birth: pinnedDateOfBirth(pinnedAge),
+    net_monthly_income: p.net_monthly_income ?? 0,
+    estimated_monthly_expenses: p.estimated_monthly_expenses ?? 0,
+    yearly_essential_expenses: COMPLEET_RETIREMENT_YEARLY_EXPENSES,
+    retirement_expense_method: 'essential_budgets',
+    expected_return: p.expected_return ?? 0.07,
+    inflation_rate: p.inflation_rate ?? 0.02,
+    box3_method: 'forfaitair',
+    marginaal_tarief: p.marginaal_tarief ?? null,
+    withdrawal_strategy: p.withdrawal_strategy ?? 'static',
+    feature_preferences: p.feature_preferences ?? null,
   }
 }

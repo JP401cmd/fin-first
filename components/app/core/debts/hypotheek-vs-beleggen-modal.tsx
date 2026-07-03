@@ -263,6 +263,12 @@ export function HypotheekVsBeleggenSectie({
       annualSavings,
       cashflows,
     }
+    // FASE 6, stap 2 — bewust GEEN kernel-routing (v2 tot stap 5). De schuld-detail-
+    // keten (`DebtDetailModal` → deze modal) fetcht geen profiel: er is geen
+    // `date_of_birth` en geen convergentie-vlag beschikbaar, en de call-site geeft ook
+    // geen FIRE-parameters mee (currentAge/currentPortfolio/…), dus `computeFireImpact`
+    // retourneert hier sowieso `null`. Een nieuwe profiel-fetch toevoegen enkel voor de
+    // routing is niet gerechtvaardigd — deze caller flipt mee zodra v2 verdwijnt (stap 5).
     return compareMortgageVsInvest(params)
   }, [
     extraBedrag, verwachtRendement, horizonJaren,
