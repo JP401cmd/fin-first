@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef, useDeferredValue } from 'react'
+import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -67,7 +68,7 @@ import { WhatIfEventsPanel, type WhatIfEvent } from '@/components/app/horizon/wh
 import { usePerspective } from '@/components/app/perspective-provider'
 import { WhatIfActions } from '@/components/app/horizon/whatif-actions'
 import { WhatIfPresets, PRESET_EXPLAINERS } from '@/components/app/horizon/whatif-presets'
-import { WhatIfChat, type WhatIfScenarioContext } from '@/components/app/horizon/whatif-chat'
+import { type WhatIfScenarioContext } from '@/components/app/horizon/whatif-chat'
 import { WhatIfScenarios } from '@/components/app/horizon/whatif-scenarios'
 import { ChartOverlayExplainer } from '@/components/app/horizon/chart-overlay-explainer'
 import { ChartTips } from '@/components/editorial/chart-tips'
@@ -82,6 +83,28 @@ import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-char
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { type StackedRow } from '@/lib/wealth-composition'
 import { buildBreakdownFromSimRows } from '@/lib/income-expense-breakdown'
+
+// WhatIfChat trekt de zware `ai` + `@ai-sdk/react` bundels (~30–40kB gz) mee. Die horen niet
+// in de First-Load JS van deze route: de chat staat onderaan een lange pagina en wordt lang
+// niet altijd gebruikt. next/dynamic met ssr:false splitst de chat + zijn ai-deps af in een
+// aparte chunk die pas client-side wordt gefetcht wanneer de chat mount (ná de data-load-fase
+// van de pagina). Eenmaal gemount blijft de component gemount → useChat-state en berichten-
+// historie blijven behouden, analoog aan components/app/chat/chat-panel-lazy.tsx. De `loading`-
+// skeleton spiegelt het card-frame zodat er geen layout-shift optreedt terwijl de chunk laadt.
+const WhatIfChatDynamic = dynamic(
+  () => import('@/components/app/horizon/whatif-chat').then((m) => m.WhatIfChat),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="card-editorial overflow-hidden" aria-hidden="true">
+        <div className="h-[3px] bg-horizon-500" />
+        <div className="flex min-h-[200px] items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-horizon-400" />
+        </div>
+      </div>
+    ),
+  },
+)
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
@@ -1518,8 +1541,8 @@ export default function WhatIfPage() {
             onScenariosChange={handleScenariosChange}
           />
 
-          {/* Will-chat */}
-          <WhatIfChat
+          {/* Will-chat — lazy (next/dynamic, ssr:false) zodat de ai-bundels uit de First-Load JS blijven */}
+          <WhatIfChatDynamic
             onAddEvent={handleAddEvent}
             scenarioContext={chatScenarioContext}
           />
