@@ -604,8 +604,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       useV2: initialData.horizonEngineV2,
       strategyOptions: built.strategyOptions,
       pensioenFireAgeFractional: built.isPensioen ? built.aowAge : null,
+      // FASE 6, stap 1 — dezelfde vlag-beslissing + rauwe kernel-context als de
+      // hoofdgrafiek-hook (use-horizon-fire-sim). Zo lopen de EventPane-delta-
+      // previews per constructie op DEZELFDE motor als de Tijdas-grafiek:
+      // kernelConvergentie aan + kernelRawProfile aanwezig → kernel, anders v2
+      // (byte-identiek aan vandaag). De preview-baseline draagt de context mínus
+      // lifeEvents/yearlyExpenses; die injecteert de preview-run per aanroep.
+      kernelEnabled: kernelConvergentie,
+      kernelRawContext: kernelRawProfile
+        ? { profile: kernelRawProfile, assets: initialData.assets ?? [], debts, aowRows }
+        : undefined,
     }
-  }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, monthlySavingsOverride, initialData])
+  }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, monthlySavingsOverride, initialData, kernelConvergentie, kernelRawProfile, aowRows])
 
   // Fetch dividend income client-side (not available from server loader)
   useEffect(() => {
@@ -1637,6 +1647,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // op AOW-leeftijd (identiek aan pensioen-modus). Zo zien v2-gebruikers ook in
   // deze lokale AOW-stop-wat-als v2-consistente cijfers (single source of truth
   // met de grafiek); flag-uit blijft v1.
+  //
+  // FASE 6, stap 1 — bewust GEEN kernel-tak (gedocumenteerde v2-terugval):
+  // deze wat-als draait een geFORCEERD FIRE-moment (`forcedFireAge` = AOW) met een
+  // deplete-eindstrategie. De convergentie-router (`computeConvergentieProjection`)
+  // SOLVET de FIRE-leeftijd zelf en kan geen forced-fireAge-deplete-run uitdrukken;
+  // 'm rechtstreeks via `runKernelProjection({ fireAge })` bouwen zou de adapter→
+  // engine→bridge-pijplijn buiten de router dupliceren zonder gevalideerde
+  // deplete-op-AOW-pariteit. Daarom blijft deze secundaire shortfall-lijn bewust op
+  // v2 — ook wanneer de hoofdlijn op de kernel rekent (bekende 2b-stijl-beperking).
   const aowStopSimResult = useMemo(() => {
     if (!isShortfallScenario || !effectiveInput || currentAge == null) return null
     const aowAgeInt = Math.ceil(userAowAge.fractional)
@@ -1862,6 +1881,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       const endStrategy = initialFireStrategy ?? DEFAULT_FIRE_STRATEGY
 
       // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c).
+      //
+      // FASE 6, stap 1 — bewust GEEN kernel-tak (gedocumenteerde v2-terugval, alle
+      // overlays op dezelfde motor): de opgeslagen what-if-scenario's muteren via
+      // `applyWhatIfOverrides` een SCALAIR spaarbedrag (`annualSavings`, uit inkomen-/
+      // spaarquote-sliders). De kernel leidt sparen af uit (inkomen − uitgaven) en kan
+      // dat scalaire spaarbedrag niet eerlijk reproduceren (de bekende spaargrondslag-
+      // divergentie, whatif-varianten.ts §1); de overrides zo herbouwen dat ze wél
+      // kernel-mapbaar zijn (events + return-delta, zoals de /horizon/whatif-pinned-
+      // overlays) zou het v2-pad wijzigen en de byte-identiteit breken. Daarom blijven
+      // deze ghost-overlays bewust op v2.
       const result = runScalarProjectionV2(
         currentAgeVal,
         endStrategy.endAge ?? 90,

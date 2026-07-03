@@ -15,8 +15,11 @@ import {
   interestOnlySchedule,
 } from '@/lib/debt-data'
 import { type SimCashflow } from '@/lib/fire-simulation'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import {
+  computeConvergentieProjection,
+  type ConvergentieRawContext,
+} from '@/lib/horizon-kernel/convergentie-router'
 import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
@@ -373,19 +376,73 @@ export function buildHvBSimInput(
 }
 
 /**
+ * Kernel-routing voor de HvB-FIRE-impact (FASE 6, item 5). Achter de per-gebruiker-
+ * vlag `horizon_kernel_convergentie` draaien de twee FIRE-scenario's via de
+ * horizon-kernel i.p.v. de v2-grootboek-engine. Default (afwezig / `kernelEnabled`
+ * false) = byte-identiek aan de directe v2-aanroep.
+ *
+ * NB: geen in-scope caller vuurt dit pad momenteel af. De dashboard-loader-samenvatting
+ * geeft géén FIRE-velden mee (→ `computeFireImpact` retourneert `null` vóór de
+ * engine-arm); de overige callers (schuld-modal, fase-analyse) geven geen `routing`
+ * mee → v2. Het pad bestaat zodat HvB — net als de andere convergentie-oppervlakken —
+ * een kernel-route heeft zodra een caller met rauwe context 'm aanzet.
+ */
+export interface HvBKernelRouting {
+  /** Is de vlag `horizon_kernel_convergentie` aan voor deze gebruiker? Default false. */
+  kernelEnabled?: boolean
+  /** Geboortedatum voor de kernel-tijdas; afwezig → geen kernel-context → v2. */
+  dateOfBirth?: string | null
+}
+
+/**
+ * Synthetische convergentie-context voor één HvB-scenario: dezelfde
+ * één-investment-pot als `buildHvBSimInput` (hergebruikt uit `builtInput.assets`),
+ * zónder schulden of gebeurtenissen. De twee scenario's verschillen enkel in de
+ * spaarinleg (aflossen vs. beleggen), die via inkomen − uitgaven in de kernel-CF-
+ * tabel loopt = exact de `annualSavings` van de v2-tak.
+ */
+function buildHvBKernelContext(
+  builtInput: UnifiedProjectionInput,
+  yearlyExpenses: number,
+  annualSavings: number,
+  grossReturn: number,
+  inflation: number,
+  dateOfBirth: string,
+): ConvergentieRawContext {
+  return {
+    profile: {
+      date_of_birth: dateOfBirth,
+      net_monthly_income: (yearlyExpenses + annualSavings) / 12,
+      estimated_monthly_expenses: yearlyExpenses / 12,
+      yearly_essential_expenses: yearlyExpenses,
+      retirement_expense_method: 'essential_budgets',
+      expected_return: grossReturn, // decimaal
+      inflation_rate: inflation,
+      box3_method: 'forfaitair',
+      fire_end_strategy: DEFAULT_FIRE_STRATEGY.strategy,
+      fire_end_age: FIRE_IMPACT_END_AGE,
+      fire_legacy_amount: 0,
+    },
+    assets: builtInput.assets, // de synthetische investment-pot uit buildHvBSimInput
+    debts: [],
+    lifeEvents: [],
+    yearlyExpenses,
+  }
+}
+
+/**
  * Bereken FIRE-impact: verschil in fireAge tussen aflossen- en beleggen-scenario.
  * Positief = beleggen brengt FIRE eerder.
  *
- * Engine-selectie (C5-b, engine 4 van 4): met `useV2 = false` (default) draaien
- * beide scenario's byte-identiek op de legacy v1-engine (`runSimulation`) — exact
- * het gedrag van vóór deze migratie. Met `useV2 = true` (de horizon-grootboek-flag
- * van de gebruiker) draaien BEIDE scenario's op v2 via `runSelectedProjection` op
- * dezelfde synthetisch-portfolio-bridge. De twee scenario's verschillen enkel in
- * `annualSavings`; v2 rekent reëel, dus de absolute FIRE-leeftijden verschuiven
- * t.o.v. v1 — maar de gerapporteerde DELTA (aflossen − beleggen, in maanden) blijft
- * betekenisvol: bij rendement boven de hypotheekrente wint beleggen op beide engines.
+ * Engine-selectie (FASE 6, item 5): standaard draaien beide scenario's op de
+ * v2-grootboek-engine (de enige engine sinds C5-c) via de convergentie-router. Zet
+ * `routing.kernelEnabled` (vlag `horizon_kernel_convergentie`) + een `dateOfBirth`,
+ * dan draaien BEIDE scenario's op de horizon-kernel. De twee scenario's verschillen
+ * enkel in `annualSavings`; de absolute FIRE-leeftijden verschuiven per motor, maar
+ * de DELTA (aflossen − beleggen, in maanden) blijft betekenisvol: bij rendement boven
+ * de hypotheekrente wint beleggen op beide engines. Vlag uit = byte-identiek.
  */
-function computeFireImpact(params: HvBParams): number | null {
+function computeFireImpact(params: HvBParams, routing?: HvBKernelRouting): number | null {
   const { currentAge, currentPortfolio, yearlyExpenses, annualSavings,
           verwachtRendement, inflatie, cashflows, extraBedrag } = params
 
@@ -397,20 +454,30 @@ function computeFireImpact(params: HvBParams): number | null {
 
   const baseCashflows = cashflows ?? []
   const extraJaarlijks = extraBedrag * 12
+  const kernelEnabled = routing?.kernelEnabled === true
+  const dob = routing?.dateOfBirth ?? null
 
-  // Beide scenario's op de v2-grootboek-engine (de enige engine sinds C5-c).
-  // Aflossen houdt de spaarruimte gelijk; beleggen verhoogt `annualSavings` met
-  // de jaarinleg.
-  const simAflossen = toSimResult(runSelectedProjection(
-    buildHvBSimInput(currentAge, currentPortfolio, yearlyExpenses, annualSavings,
-      verwachtRendement, inflatie, baseCashflows),
-    true,
-  ))
-  const simBeleggen = toSimResult(runSelectedProjection(
-    buildHvBSimInput(currentAge, currentPortfolio, yearlyExpenses, annualSavings + extraJaarlijks,
-      verwachtRendement, inflatie, baseCashflows),
-    true,
-  ))
+  // Eén scenario-run via de convergentie-router: aflossen houdt de spaarruimte
+  // gelijk; beleggen verhoogt `annualSavings` met de jaarinleg.
+  const runScenario = (savings: number) => {
+    const builtInput = buildHvBSimInput(
+      currentAge, currentPortfolio, yearlyExpenses, savings,
+      verwachtRendement, inflatie, baseCashflows,
+    )
+    return toSimResult(
+      computeConvergentieProjection({
+        builtInput,
+        v2FlagArg: true,
+        kernelEnabled,
+        rawContext: kernelEnabled && dob
+          ? buildHvBKernelContext(builtInput, yearlyExpenses, savings, verwachtRendement, inflatie, dob)
+          : undefined,
+      }).result,
+    )
+  }
+
+  const simAflossen = runScenario(annualSavings)
+  const simBeleggen = runScenario(annualSavings + extraJaarlijks)
   const ageA: number | null = simAflossen.fireAgeFractional
   const ageB: number | null = simBeleggen.fireAgeFractional
 
@@ -427,16 +494,16 @@ function computeFireImpact(params: HvBParams): number | null {
 /**
  * Vergelijk extra aflossen vs. extra beleggen.
  *
- * @param params — Alle input parameters
- * @param useV2  — Engine-selectie voor de FIRE-impact (C5-b, engine 4 van 4).
- *   `false` (default) = byte-identiek aan vóór de migratie (legacy v1 `runSimulation`);
- *   `true` (de horizon-grootboek-flag van de gebruiker) = beide FIRE-scenario's via
- *   `runSelectedProjection` op v2. Raakt ALLEEN `fireImpactMaanden`; de
- *   aflossing-/beleggen-scenario's en breakeven draaien op deterministische
- *   amortisatie-/groeischema's (geen FIRE-engine) en zijn dus flag-onafhankelijk.
+ * @param params  — Alle input parameters
+ * @param routing — Kernel-routing voor de FIRE-impact (FASE 6, item 5). Afwezig /
+ *   `kernelEnabled` false (default) = beide FIRE-scenario's op de v2-grootboek-engine
+ *   (byte-identiek aan vandaag). Met de vlag `horizon_kernel_convergentie` + een
+ *   `dateOfBirth` draaien ze op de horizon-kernel. Raakt ALLEEN `fireImpactMaanden`;
+ *   de aflossing-/beleggen-scenario's en breakeven draaien op deterministische
+ *   amortisatie-/groeischema's (geen FIRE-engine) en zijn dus routing-onafhankelijk.
  * @returns HvBResult met beide scenario's, breakeven en FIRE-impact
  */
-export function compareMortgageVsInvest(params: HvBParams, _useV2 = false): HvBResult {
+export function compareMortgageVsInvest(params: HvBParams, routing?: HvBKernelRouting): HvBResult {
   // Edge case: bij 0 extra bedrag is er geen verschil
   if (params.extraBedrag <= 0) {
     return {
@@ -483,7 +550,7 @@ export function compareMortgageVsInvest(params: HvBParams, _useV2 = false): HvBR
   }
 
   // FIRE-impact
-  const fireImpactMaanden = computeFireImpact(params)
+  const fireImpactMaanden = computeFireImpact(params, routing)
 
   // Aanbeveling
   const DREMPEL = 100 // €100 verschil = praktisch gelijk

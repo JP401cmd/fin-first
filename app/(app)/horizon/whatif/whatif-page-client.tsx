@@ -592,6 +592,25 @@ export default function WhatIfPage() {
   }, [baseBuilt, whatIfBuilt])
   const pageKernelEnabled = kernelWhatifEnabled && !machineryReason
 
+  // ── Kernel-context voor de Beslishulp (FASE 6, stap 1) ──────────────────
+  // Gememoïseerd zodat de identiteit STABIEL is: een inline-object zou de
+  // useCallback/useMemo's in de Beslishulp elke render invalideren en de dure
+  // solveFire-runs onnodig herberekenen. rawProfile afwezig → null → beslishulp
+  // rekent byte-identiek v2.
+  const beslishulpKernel = useMemo(
+    () =>
+      rawProfile
+        ? {
+            enabled: pageKernelEnabled,
+            profile: rawProfile,
+            assets: fullAssets,
+            aowRows,
+            returnDeltaByAssetType: returnDeltas,
+          }
+        : null,
+    [rawProfile, pageKernelEnabled, fullAssets, aowRows, returnDeltas],
+  )
+
   // ── Legacy what-if FinancialInput (for dailyExpenses display only) ──────
   const { adjustedInput: whatIfInput, annualSavings: whatIfAnnualSavings_sim } = useMemo(() => {
     if (!input || !overrides || !baseline) return { adjustedInput: null as FinancialInput | null, annualSavings: 0 }
@@ -1519,12 +1538,16 @@ export default function WhatIfPage() {
           />
 
           {/* Beslishulp — "Wat doe je met €X/mnd extra?" (beleggen/aflossen/noodfonds) */}
+          {/* FASE 6, stap 1 — geef de PAGE-LEVEL kernel-beslissing + rauwe context mee zodat
+              de beslishulp-runs op DEZELFDE motor lopen als de hoofd-what-if-lijnen (geen
+              engine-mix). rawProfile afwezig → kernel=null → byte-identiek v2. */}
           <WhatIfBeslishulp
             baseInput={whatIfUnifiedInput}
             scenarioEvents={scenarioActiveEvents}
             currentAge={currentAge ?? 30}
             debts={fullDebts}
             useV2={horizonEngineV2}
+            kernel={beslishulpKernel}
           />
 
           {/* Marktbias — per-asset-groep rendement-delta */}

@@ -77,6 +77,21 @@ export default async function ToekomstGebeurtenissenPage() {
         useV2: horizonData.horizonEngineV2,
         strategyOptions: builtPreview.strategyOptions,
         pensioenFireAgeFractional: builtPreview.isPensioen ? aowFractional : null,
+        // FASE 6, stap 1 — kernel-pad voor de strategie-editor-previews. Dezelfde
+        // vlag + rauwe context als de Tijdas-grafiek-hook (use-horizon-fire-sim):
+        // loadHorizonData leverde beide al mee (kernelConvergentie + rawProfile,
+        // met yearly_essential_expenses), dus GEEN extra fetch. previewFireAge
+        // injecteert lifeEvents + yearlyExpenses per-aanroep. Vlag uit óf rawProfile
+        // null → de router draait byte-identiek v2 (runSelectedProjection).
+        kernelEnabled: horizonData.kernelConvergentie,
+        kernelRawContext: horizonData.rawProfile
+          ? {
+              profile: horizonData.rawProfile,
+              assets: horizonData.assets,
+              debts: horizonData.debts,
+              aowRows,
+            }
+          : undefined,
       }
     : null
   // Netto maandinkomen voor de Werk-strategie: 6-maands transactie-inkomen
@@ -106,6 +121,26 @@ export default async function ToekomstGebeurtenissenPage() {
           // Zelfde engine-keuze als de grafiek (profielvlag via de loader) zodat
           // de modal-preview de v2-grafiek matcht (M2).
           horizonEngineV2: horizonData.horizonEngineV2,
+          // FASE 6, stap 1 — kernel-pad voor de woon-scenario-preview. Dezelfde vlag
+          // + rauwe context als de Tijdas-grafiek-hook (use-horizon-fire-sim):
+          // loadHorizonData leverde beide al mee, dus GEEN extra fetch. De preview
+          // overschrijft per scenario alleen `profile.housing_strategy_config`; de
+          // adapter mapt dat native naar de kernel-woning-params. Vlag uit óf
+          // rawProfile null → byte-identiek v2/v1 (lib/housing-preview.ts).
+          kernelConvergentieEnabled: horizonData.kernelConvergentie,
+          kernelRawContext: horizonData.rawProfile
+            ? {
+                profile: horizonData.rawProfile,
+                assets: horizonData.assets,
+                debts: horizonData.debts,
+                // Rauwe app-events; de adapter-guard routeert virtuele woning-events
+                // (en AOW/pensioen/werk) zelf naar hun param-blokken.
+                lifeEvents: horizonData.events,
+                aowRows,
+                // Zelfde jaaruitgaven-grondslag als de housing-simBasis (geen nieuwe som).
+                yearlyExpenses: horizonData.housingSimBasis.yearlyExpenses,
+              }
+            : undefined,
         }
       : null,
   }

@@ -18,6 +18,10 @@ import {
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import {
+  computeConvergentieProjection,
+  type ConvergentieRawContext,
+} from '@/lib/horizon-kernel/convergentie-router'
 import type { HorizonStrategyOptions } from '@/lib/horizon-engine/strategies'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -51,6 +55,22 @@ export interface RegelSimSnapshot {
    * `buildHorizonInput` afgeleid — dezelfde set die de grafiek voedt.
    */
   strategyOptions?: Partial<HorizonStrategyOptions>
+  /**
+   * Convergentie-router-vlag (FASE 6, item 5): staat `horizon_kernel_convergentie`
+   * aan én is er een rauwe context (`rawContext`), dan draaien baseline én draft
+   * door de horizon-kernel — DEZELFDE motor als de Tijdas-grafiek wanneer die op de
+   * kernel staat (voorheen C4: editors bleven op v2 tot deze stap). Default false /
+   * afwezig = byte-identiek aan de v2-tak (`runSelectedProjection` met `useV2`).
+   */
+  kernelEnabled?: boolean
+  /**
+   * Rauwe kernel-context (profiel-rij + bezittingen/schulden/gebeurtenissen), gebouwd
+   * server-side in `dashboard-data-loader` — DEZELFDE die de Tijdas-grafiek voedt. De
+   * draft-strategie wordt hier bovenop de profiel-velden geplakt (zie
+   * `runRegelProjection`), zodat de kernel de kandidaat-config leest zoals de gebruiker
+   * 'm zou opslaan. Alleen aanwezig wanneer `kernelEnabled`; anders v2.
+   */
+  rawContext?: ConvergentieRawContext
 }
 
 export interface RegelProjection {
@@ -92,10 +112,67 @@ export function runRegelProjection(
     forcedFireAge,
   }
 
-  // Flag-bewuste engine-selectie (C4): v2-gebruikers krijgen de grootboek-engine
-  // zodat de editor-baseline IDENTIEK is aan de Tijdas-grafiek. Flag uit = v1.
+  // Kernel-tak (convergentie-router, FASE 6 item 5): vlag aan + rauwe context →
+  // baseline én draft door de horizon-kernel, zodat de editor-curve identiek is aan
+  // de Tijdas-grafiek wanneer die op de kernel draait. De draft-strategie wordt op de
+  // profiel-velden van de rauwe context geplakt (`applyDraftToRawContext`); de kernel
+  // leest die en resolvet pensioen ZÉLF op AOW (mirror dashboard-data-loader) → lees
+  // fireAgeFractional dan direct uit de solve. Bij een v2-terugval binnen de router
+  // geldt de v2-pensioen-relatie (aowFractional) weer.
+  if (snapshot.kernelEnabled && snapshot.rawContext) {
+    const outcome = computeConvergentieProjection({
+      builtInput: input,
+      strategyOptions: snapshot.strategyOptions,
+      v2FlagArg: snapshot.useV2 ?? false,
+      kernelEnabled: true,
+      rawContext: applyDraftToRawContext(snapshot.rawContext, override),
+    })
+    const res = toSimResult(outcome.result)
+    const fireAgeFractional =
+      outcome.engine === 'kernel'
+        ? res.fireAgeFractional
+        : isPensioen
+          ? snapshot.aowFractional
+          : res.fireAgeFractional
+    return { rows: res.rows, fireAgeFractional }
+  }
+
+  // v2-tak (byte-identiek aan vóór deze stap): v2-gebruikers krijgen de grootboek-
+  // engine zodat de editor-baseline IDENTIEK is aan de Tijdas-grafiek. Flag uit = v1.
   const res = toSimResult(runSelectedProjection(input, snapshot.useV2 ?? false, snapshot.strategyOptions))
   const fireAgeFractional = isPensioen ? snapshot.aowFractional : res.fireAgeFractional
 
   return { rows: res.rows, fireAgeFractional }
+}
+
+/**
+ * Plak de draft-strategie op de profiel-velden van de rauwe kernel-context zodat de
+ * kernel de kandidaat-config leest zoals de gebruiker 'm zou opslaan. ZONDER override
+ * (baseline) blijft de context ONgewijzigd — dan is de kernel-run identiek aan de
+ * Tijdas-grafiek (die dezelfde rauwe context gebruikt), geen default-drift. De
+ * withdrawal-guardrails en de eindstrategie-velden spiegelen exact de kolommen die
+ * `buildConvergentieAdapterProfile` leest.
+ */
+function applyDraftToRawContext(
+  base: ConvergentieRawContext,
+  override?: {
+    fireStrategy?: FireStrategyConfig
+    withdrawalStrategy?: WithdrawalStrategyConfig
+  },
+): ConvergentieRawContext {
+  if (!override?.fireStrategy && !override?.withdrawalStrategy) return base
+  const profile = { ...base.profile }
+  if (override.fireStrategy) {
+    profile.fire_end_strategy = override.fireStrategy.strategy
+    profile.fire_end_age = override.fireStrategy.endAge
+    profile.fire_legacy_amount = override.fireStrategy.legacyAmount
+  }
+  if (override.withdrawalStrategy) {
+    profile.withdrawal_strategy = override.withdrawalStrategy.strategy
+    profile.guardrail_floor = override.withdrawalStrategy.guardrailFloor
+    profile.guardrail_ceiling = override.withdrawalStrategy.guardrailCeiling
+    profile.guardrail_cut_step = override.withdrawalStrategy.guardrailCutStep
+    profile.guardrail_raise_step = override.withdrawalStrategy.guardrailRaiseStep
+  }
+  return { ...base, profile }
 }

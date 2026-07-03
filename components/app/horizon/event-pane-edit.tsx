@@ -12,9 +12,8 @@ import {
   lifeEventsToCashflows,
   type SimResult,
 } from '@/lib/fire-simulation'
-import { toSimResult } from '@/lib/unified-projection'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { runScalarProjectionV2 } from '@/lib/horizon-engine/scalar-bridge'
+import { previewSimResult } from './event-preview-sim'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -272,8 +271,10 @@ interface Props {
   endAge: number
   /**
    * Flag-bewuste, per-asset projectie-input (zelfde assemblage als de Tijdas-
-   * grafiek). Wanneer gezet, draait de live impact-preview via
-   * `runSelectedProjection` (v2-consistent); null → legacy `runSimulation`-fallback.
+   * grafiek) incl. optionele kernel-context. Wanneer gezet, draait de live
+   * impact-preview via `previewSimResult` (→ computeConvergentieProjection) op
+   * DEZELFDE motor als de grafiek: kernel bij convergentie-vlag aan, anders
+   * byte-identiek v2. Null → scalar-portefeuille via de v2-bridge.
    */
   previewBaseline?: PreviewBaseline | null
   saving: boolean
@@ -319,25 +320,22 @@ export function EventPaneEdit({
     const eventsWithoutEditing = existingEvent
       ? baselineEvents.filter(e => e.id !== existingEvent.id)
       : baselineEvents
-    const baselineCashflows = lifeEventsToCashflows(eventsWithoutEditing)
-    const draftCashflows = lifeEventsToCashflows([...eventsWithoutEditing, draftEvent])
 
-    // Met een per-asset baseline draaien beide runs door DEZELFDE engine-selector
-    // als de grafiek (runSelectedProjection) → consistente live FIRE-impact-delta.
-    // Zonder baseline → scalar-portefeuille via de v2-bridge (C5-c: v2 is de enige
-    // engine; geen legacy `runSimulation`-fallback meer).
+    // Met een per-asset baseline draaien beide runs door DEZELFDE motorschakelaar
+    // als de grafiek (`previewSimResult` → computeConvergentieProjection) →
+    // consistente live FIRE-impact-delta: kernel wanneer de convergentie-vlag aan
+    // is (FASE 6, stap 1), anders byte-identiek v2. Zonder baseline →
+    // scalar-portefeuille via de v2-bridge (C5-c: v2 is de enige engine; geen legacy
+    // `runSimulation`-fallback meer).
     if (previewBaseline) {
-      const run = (cf: ReturnType<typeof lifeEventsToCashflows>): SimResult =>
-        toSimResult(
-          runSelectedProjection(
-            { ...previewBaseline.input, cashflows: cf },
-            previewBaseline.useV2,
-            previewBaseline.strategyOptions,
-          ),
-        )
-      return { baselineSim: run(baselineCashflows), draftSim: run(draftCashflows) }
+      return {
+        baselineSim: previewSimResult(previewBaseline, eventsWithoutEditing),
+        draftSim: previewSimResult(previewBaseline, [...eventsWithoutEditing, draftEvent]),
+      }
     }
 
+    const baselineCashflows = lifeEventsToCashflows(eventsWithoutEditing)
+    const draftCashflows = lifeEventsToCashflows([...eventsWithoutEditing, draftEvent])
     const yearlyExp =
       baselineInput.yearlyMustExpenses > 0 ? baselineInput.yearlyMustExpenses : 0
     const annualSavings = (baselineInput.monthlyContributions ?? 0) * 12

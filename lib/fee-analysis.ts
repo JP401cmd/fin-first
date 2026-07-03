@@ -10,8 +10,11 @@
 import { type SimCashflow, type ReturnModel } from '@/lib/fire-simulation'
 import { DEFAULT_FIRE_STRATEGY, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { toSimResult, type UnifiedProjectionInput } from '@/lib/unified-projection'
+import {
+  computeConvergentieProjection,
+  type ConvergentieRawContext,
+} from '@/lib/horizon-kernel/convergentie-router'
 import type { Asset } from '@/lib/asset-data'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -270,34 +273,101 @@ export function buildFeeSimInput(
 }
 
 /**
+ * Kernel-routing voor de fee-FIRE-impact (FASE 6, item 5). Achter de per-gebruiker-
+ * vlag `horizon_kernel_convergentie` rekent de fee-A/B via de horizon-kernel i.p.v.
+ * de v2-grootboek-engine, zodat de fee-vertraging dezelfde motor spreekt als de
+ * hoofdgrafiek. Default (afwezig / `kernelEnabled` false) = byte-identiek aan de
+ * directe `computeConvergentieProjection`-v2-tak (zelf byte-identiek aan de oude
+ * `runSelectedProjection(input, true)`-aanroep).
+ */
+export interface FeeKernelRouting {
+  /** Is de vlag `horizon_kernel_convergentie` aan voor deze gebruiker? Default false. */
+  kernelEnabled?: boolean
+  /** Geboortedatum voor de kernel-tijdas; afwezig → geen kernel-context → v2. */
+  dateOfBirth?: string | null
+}
+
+/**
+ * Bouw de synthetische convergentie-context voor één fee-scenario: dezelfde
+ * één-investment-pot als `buildFeeSimInput` (hergebruikt uit `builtInput.assets`),
+ * zónder schulden of gebeurtenissen. De fee-A/B isoleert bewust de rendement-drag
+ * op de pure portefeuille — de v2-tak neemt weliswaar de life-event-cashflows mee,
+ * maar op de kernel-tak dragen BEIDE scenario's dezelfde (event-loze) basis, dus de
+ * DELTA (fee-impact) blijft zuiver geïsoleerd. De spaarinleg loopt via inkomen −
+ * uitgaven (kernel-CF-tabel) = exact de `annualSavings` van de v2-tak.
+ */
+function buildFeeKernelContext(
+  simParams: FeeSimParams,
+  builtInput: UnifiedProjectionInput,
+  dateOfBirth: string,
+): ConvergentieRawContext {
+  const strategyConfig = simParams.strategyConfig ?? { ...DEFAULT_FIRE_STRATEGY, endAge: simParams.endAge }
+  return {
+    profile: {
+      date_of_birth: dateOfBirth,
+      net_monthly_income: (simParams.yearlyExpenses + simParams.annualSavings) / 12,
+      estimated_monthly_expenses: simParams.yearlyExpenses / 12,
+      // essential_budgets + yearly_essential_expenses → kernel-pensioenuitgave op
+      // dezelfde grondslag als de v2-doelbasis (zelfde truc als de scalar-router).
+      yearly_essential_expenses: simParams.yearlyExpenses,
+      retirement_expense_method: 'essential_budgets',
+      expected_return: builtInput.grossReturn, // decimaal — dit scenario's effectieve return
+      inflation_rate: simParams.inflation,
+      box3_method: 'forfaitair',
+      fire_end_strategy: strategyConfig.strategy,
+      fire_end_age: strategyConfig.endAge,
+      fire_legacy_amount: strategyConfig.legacyAmount ?? 0,
+    },
+    assets: builtInput.assets, // de synthetische investment-pot uit buildFeeSimInput
+    debts: [],
+    lifeEvents: [],
+    yearlyExpenses: simParams.yearlyExpenses,
+  }
+}
+
+/**
  * Compute the FIRE impact of portfolio fees.
  *
  * Runs TWO FIRE scenarios and reports the delta:
  * 1. With the original grossReturn (no fee drag)
  * 2. With effectiveReturn = grossReturn - weightedTER
  *
- * Engine-selectie (C5-b, engine 3 van 4): met `useV2 = false` (default) draaien
- * beide scenario's byte-identiek op de legacy v1-engine (`runSimulation`) — exact
- * het gedrag van vóór deze migratie. Met `useV2 = true` (de horizon-grootboek-flag
- * van de gebruiker) draaien BEIDE scenario's op v2 via `runSelectedProjection` op
- * de synthetisch-portfolio-bridge. De fee is een return-reductie, die v2 schoon
- * representeert via `grossReturn` in `UnifiedProjectionInput`. v2 rekent reëel, dus
- * de absolute FIRE-leeftijden verschuiven t.o.v. v1 — maar de gerapporteerde DELTA
- * (de fee-impact) blijft betekenisvol en monotoon stijgend met de TER.
+ * Engine-selectie (FASE 6, item 5): standaard draaien beide scenario's op de
+ * v2-grootboek-engine (de enige engine sinds C5-c) via de convergentie-router. De
+ * fee is een return-reductie, die schoon in `grossReturn` van de synthetische
+ * input zit. Zet `routing.kernelEnabled` (vlag `horizon_kernel_convergentie`) +
+ * een `dateOfBirth`, dan draaien BEIDE scenario's op de horizon-kernel — dezelfde
+ * motor als de hoofdgrafiek. De absolute FIRE-leeftijden verschuiven dan, maar de
+ * gerapporteerde DELTA (de fee-impact) blijft betekenisvol en monotoon stijgend met
+ * de TER. Vlag uit (default) = byte-identiek aan de directe v2-aanroep.
  *
  * Returns the difference in FIRE age (months) and the total missed returns.
  */
 export function computeFeeImpactOnFire(
   simParams: FeeSimParams,
   weightedTER: number,
-  _useV2 = false,
+  routing?: FeeKernelRouting,
 ): FeeImpact {
   const effectiveReturn = simParams.grossReturn - weightedTER
+  const kernelEnabled = routing?.kernelEnabled === true
+  const dob = routing?.dateOfBirth ?? null
 
-  // Beide scenario's op de v2-grootboek-engine (de enige engine sinds C5-c). De
-  // fee zit in de (lagere) effectieve return op dezelfde input-vorm.
-  const simWithout = toSimResult(runSelectedProjection(buildFeeSimInput(simParams, simParams.grossReturn), true))
-  const simWith = toSimResult(runSelectedProjection(buildFeeSimInput(simParams, effectiveReturn), true))
+  // Eén scenario-run via de convergentie-router: vlag uit → letterlijk
+  // runSelectedProjection(builtInput, true); vlag aan (+ dob) → horizon-kernel.
+  const runScenario = (ret: number) => {
+    const builtInput = buildFeeSimInput(simParams, ret)
+    return toSimResult(
+      computeConvergentieProjection({
+        builtInput,
+        v2FlagArg: true,
+        kernelEnabled,
+        rawContext: kernelEnabled && dob ? buildFeeKernelContext(simParams, builtInput, dob) : undefined,
+      }).result,
+    )
+  }
+
+  const simWithout = runScenario(simParams.grossReturn)
+  const simWith = runScenario(effectiveReturn)
   const fireAgeWithoutFees: number | null = simWithout.fireAgeFractional
   const fireAgeWithFees: number | null = simWith.fireAgeFractional
   const bothReachable: boolean = simWithout.fireReachable && simWith.fireReachable

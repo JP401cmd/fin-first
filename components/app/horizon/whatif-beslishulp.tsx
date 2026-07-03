@@ -1,16 +1,19 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Coins, TrendingUp, Landmark, Shield, ChevronDown, ChevronUp, ArrowRight, Info } from 'lucide-react'
 import {
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { computeWhatifProjection } from '@/lib/whatif-engine-router'
+import type { WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { lifeEventsToCashflows, type SimCashflow, type SimResult } from '@/lib/fire-simulation'
 import { formatFireAge } from '@/lib/horizon-data'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import type { Debt } from '@/lib/debt-data'
+import type { Asset } from '@/lib/asset-data'
+import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { weightedDebtRate, fireAgeFromSim, aflossenFireAge } from '@/components/app/horizon/whatif-beslishulp.model'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { CalculatorToLifeEventSheet } from '@/components/future/calculator-to-life-event-sheet'
@@ -82,6 +85,7 @@ export function WhatIfBeslishulp({
   currentAge,
   debts,
   useV2,
+  kernel,
 }: {
   /**
    * De what-if UnifiedProjectionInput van de pagina (incl. return-deltas).
@@ -92,15 +96,32 @@ export function WhatIfBeslishulp({
   scenarioEvents: WhatIfEvent[]
   /** Huidige leeftijd (target_age voor het option-event). */
   currentAge: number
-  /** Actieve schulden — voor de aflossen-rente in de voetnoot. */
+  /** Actieve schulden — voor de aflossen-rente in de voetnoot én de kernel-context. */
   debts: Debt[]
   /**
    * Draait de gebruiker de v2-grootboek-engine? (`isHorizonV2Enabled`). Bepaalt
-   * via `runSelectedProjection` of de baseline- én optie-runs door v2 of v1 lopen
+   * via `computeWhatifProjection` of de baseline- én optie-runs door v2 of v1 lopen
    * — zodat de FIRE-maand-delta's per constructie consistent zijn met de Tijdas-
    * grafiek en de what-if-baseline van de pagina (single source of truth).
    */
   useV2: boolean
+  /**
+   * FASE 6, stap 1 — de rauwe kernel-context + vlag-beslissing van de
+   * /horizon/whatif-pagina (de PAGE-LEVEL-beslissing `pageKernelEnabled`). Wanneer
+   * `enabled` (én een profiel aanwezig), routeren de beslishulp-runs via
+   * `computeWhatifProjection` op DEZELFDE motor (kernel) als de hoofd-what-if-lijnen
+   * en de per-event-impact-chips — geen stille engine-mix binnen één pagina.
+   * Afwezig/`enabled: false` → byte-identiek v2 (de router draait dan letterlijk
+   * `runSelectedProjection(builtInput, useV2)`). De rendement-slider (return-deltas)
+   * zit al in `baseInput` voor de v2-tak; de kernel-tak past dezelfde delta's zelf toe.
+   */
+  kernel?: {
+    enabled: boolean
+    profile: WhatifRawProfileRow
+    assets: Asset[]
+    aowRows?: AowLeeftijdRow[]
+    returnDeltaByAssetType?: Record<string, number>
+  } | null
 }) {
   const [open, setOpen] = useState(false)
   const [amount, setAmount] = useState(200)
@@ -138,16 +159,45 @@ export function WhatIfBeslishulp({
     scenario_origin: `beslishulp:${id}`,
   })
 
+  // ── Motorschakelaar (FASE 5, stap 2a-router; FASE 6, stap 1-context) ─────
+  // Elke beslishulp-run loopt via de what-if-router met DEZELFDE page-level-
+  // beslissing als de hoofd-what-if-lijnen. `builtInput` draagt de v2-input
+  // (byte-identiek: vlag uit → `runSelectedProjection(builtInput, useV2)`);
+  // `lifeEvents` voedt de kernel-tak (adapter-guard partitioneert ze). De
+  // rendement-slider zit al in `baseInput` voor v2; de kernel-tak past dezelfde
+  // delta's zelf toe via `returnDeltaByAssetType`.
+  const runProjection = useCallback(
+    (builtInput: UnifiedProjectionInput, lifeEvents: WhatIfEvent[]): SimResult => {
+      const kernelEnabled = kernel?.enabled === true && !!kernel?.profile
+      const outcome = computeWhatifProjection({
+        builtInput,
+        v2FlagArg: useV2,
+        kernelEnabled,
+        rawContext: kernel
+          ? {
+              profile: kernel.profile,
+              assets: kernel.assets,
+              debts,
+              lifeEvents,
+              aowRows: kernel.aowRows,
+              returnDeltaByAssetType: kernel.returnDeltaByAssetType,
+              yearlyExpenses: builtInput.yearlyExpenses,
+            }
+          : undefined,
+      })
+      return toSimResult(outcome.result)
+    },
+    [kernel, useV2, debts],
+  )
+
   // ── Bereken het BASISSCENARIO (zonder optie) één keer ───────────────────
   // De volledige SimResult (rows + requiredFirePortfolio) is nodig voor zowel
   // de baseline-FIRE-leeftijd als het Aflossen-model, dat het netto-vermogens-
   // pad én het motor-doelvermogen hergebruikt.
   const baselineSim = useMemo<SimResult | null>(() => {
     if (!baseInput) return null
-    return toSimResult(
-      runSelectedProjection({ ...baseInput, cashflows: scenarioCashflows }, useV2),
-    )
-  }, [baseInput, scenarioCashflows, useV2])
+    return runProjection({ ...baseInput, cashflows: scenarioCashflows }, scenarioEvents)
+  }, [baseInput, scenarioCashflows, scenarioEvents, runProjection])
 
   // Fractionele baseline-FIRE-leeftijd uit de MOTOR-rijen (kruispunt opgebouwd ×
   // benodigd vermogen) — exact dezelfde grondslag als de Aflossen-pot, zodat
@@ -161,9 +211,12 @@ export function WhatIfBeslishulp({
   const options = useMemo<OptionResult[]>(() => {
     if (!baseInput || !baselineSim || amount <= 0) return []
 
-    const runWith = (extra: SimCashflow[]): number | null => {
-      const sim = toSimResult(
-        runSelectedProjection({ ...baseInput, cashflows: [...scenarioCashflows, ...extra] }, useV2),
+    const runWith = (extra: SimCashflow[], extraEvents: WhatIfEvent[]): number | null => {
+      // `builtInput` blijft byte-identiek (cashflow-concat); `extraEvents` voedt de
+      // kernel-tak zodat de extra_inleg ook daar als Geb-post landt.
+      const sim = runProjection(
+        { ...baseInput, cashflows: [...scenarioCashflows, ...extra] },
+        [...scenarioEvents, ...extraEvents],
       )
       // Zelfde fractionele grondslag als de Aflossen-pot (motor-kruispunt).
       return fireAgeFromSim(sim)
@@ -175,8 +228,9 @@ export function WhatIfBeslishulp({
         : null
 
     // 1. Beleggen — echte motor: extra_inleg compoundt op verwacht rendement.
-    const beleggenCf = lifeEventsToCashflows([buildContributionEvent('beleggen', amount)])
-    const beleggenAge = runWith(beleggenCf)
+    const beleggenEvent = buildContributionEvent('beleggen', amount)
+    const beleggenCf = lifeEventsToCashflows([beleggenEvent])
+    const beleggenAge = runWith(beleggenCf, [beleggenEvent])
 
     // 3. Noodfonds — bewust bijna-vlak (geen FIRE-versnelling)
     const noodfondsAge = baselineFireAge
@@ -232,7 +286,7 @@ export function WhatIfBeslishulp({
 
     return raw.map(o => ({ ...o, isWinner: o.id === winnerId }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseInput, baselineSim, amount, scenarioCashflows, baselineFireAge, hasDebt, debtRate, currentAge, useV2])
+  }, [baseInput, baselineSim, amount, scenarioCashflows, scenarioEvents, baselineFireAge, hasDebt, debtRate, currentAge, runProjection])
 
   if (!baseInput) return null
 

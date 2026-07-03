@@ -38,6 +38,24 @@ function makeArgs(overrides: Partial<BuildBenchmarkArgs> = {}): BuildBenchmarkAr
   }
 }
 
+// ── Scalar-router-vlag: default UIT = byte-identiek (FASE 6) ──────
+
+describe('buildBenchmarkReport — kernelScalarEnabled', () => {
+  it('vlag weggelaten ≡ kernelScalarEnabled:false (byte-identiek aan vandaag)', () => {
+    const omitted = buildBenchmarkReport(makeArgs())
+    const explicitFalse = buildBenchmarkReport(makeArgs({ kernelScalarEnabled: false }))
+    expect(omitted).toEqual(explicitFalse)
+  })
+
+  it('vlag AAN draait de peer via de kernel zonder te crashen (5 metrics)', () => {
+    const report = buildBenchmarkReport(makeArgs({ kernelScalarEnabled: true }))
+    expect(report.metrics).toHaveLength(5)
+    // De vrijheidsleeftijd-metric blijft aanwezig en getypeerd als 'modelled'.
+    const fireAge = report.metrics.find(m => m.key === 'fire_age')!
+    expect(fireAge.tier).toBe('modelled')
+  })
+})
+
 // ── Test 1: volledig rapport — 5 metrics in volgorde ──────
 
 describe('buildBenchmarkReport — volledig cohort', () => {

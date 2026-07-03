@@ -56,6 +56,14 @@ export interface BuildBenchmarkArgs {
   displayName: string | null
   generatedAt: string
   now?: Date
+  /**
+   * Scalar-router-doorvoer (FASE 5/6): zet dit wanneer de ingelogde gebruiker de
+   * per-gebruiker-vlag `horizon_kernel_scalar` aan heeft. De gemodelleerde
+   * referentie-peer rekent zijn vrijheidsleeftijd dan op DEZELFDE motor (de
+   * horizon-kernel) als de gebruiker zelf — appels-met-appels. Default false =
+   * byte-identiek aan de directe `computeFireProjection`-aanroep.
+   */
+  kernelScalarEnabled?: boolean
 }
 
 /** Vrijheidstijd-duiding van een euro-verschil (bv. vermogen boven/onder mediaan). */
@@ -82,7 +90,9 @@ export function buildBenchmarkReport(args: BuildBenchmarkArgs): BenchmarkReportD
   // ── Cohort-vergelijkingen (alleen met bekende leeftijd) ──
   if (cohort.ageBand) {
     const ref = getCohortReference(cohort.ageBand, cohort.household)
-    const peer = computeReferencePeer(ref, bandMidAge(cohort.ageBand), now)
+    const peer = computeReferencePeer(ref, bandMidAge(cohort.ageBand), now, {
+      kernelScalarEnabled: args.kernelScalarEnabled === true,
+    })
     if (ref.householdAdjusted) addSource(SOURCE_HOUSEHOLD_ADJUST)
 
     // 1. Gezondheidsscore (gemodelleerde peer)

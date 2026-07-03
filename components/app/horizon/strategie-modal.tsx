@@ -720,6 +720,14 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab }: S
       }
 
       // v2-grootboek-engine via de scalar-bridge (de enige engine sinds C5-c).
+      //
+      // FASE 6, stap 1 — bewust GEEN kernel-tak (gedocumenteerde v2-terugval, geen
+      // eerlijke mapping): deze modal VERGELIJKT de vier onttrekkingsstrategieën
+      // (static/guardrails/vpw/bucket). De kernel-adapter mapt echter `vpw` én
+      // `bucket` → onttrekkingsprofiel 'Vast' (params.ts `WITHDRAWAL_TO_PROFIEL`),
+      // dus op de kernel zouden static/vpw/bucket DRIE identieke curves worden — de
+      // vergelijking klapt in en zou misleiden. Zolang de kernel vpw/bucket niet als
+      // aparte onttrekkingsmethode uitdrukt, blijft dit vergelijk-oppervlak op v2.
       results[strat] = runScalarProjectionV2(
         currentAge,
         strategyForSim.endAge,

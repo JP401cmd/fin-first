@@ -43,8 +43,10 @@ interface Props {
   householdMode: boolean
   /**
    * Flag-bewuste, per-asset projectie-input (zelfde assemblage als de Tijdas-
-   * grafiek). Wanneer gezet, draaien de EventPaneView/Edit-delta-previews via
-   * `runSelectedProjection` (v2-consistent); null → legacy `runSimulation`-fallback.
+   * grafiek) incl. optionele kernel-context. Wanneer gezet, draaien de
+   * EventPaneView/Edit-delta-previews via `previewSimResult`
+   * (→ computeConvergentieProjection) op DEZELFDE motor als de grafiek: kernel bij
+   * convergentie-vlag aan, anders byte-identiek v2. Null → scalar-bridge-fallback.
    */
   previewBaseline: PreviewBaseline | null
   /** Callback na save of delete — horizon-client moet events herladen. */

@@ -10,6 +10,13 @@
  * AOW/Pensioen-previews per constructie de v2-grafiek voor v2-gebruikers (en
  * blijven ze v1 wanneer de flag uit staat). De server (gebeurtenissen/page.tsx)
  * bouwt de input via de gedeelde `buildHorizonInput` — één assemblagepad.
+ *
+ * FASE 6, stap 1 (kernel-pad): de baseline kan additief een kernel-context dragen
+ * (`kernelEnabled` + `kernelRawContext`, vlag `horizon_kernel_convergentie`).
+ * De preview routeert dan via dezelfde `computeConvergentieProjection` als de
+ * hoofdgrafiek-hook — previews en grafiek spreken per constructie dezelfde motor.
+ * Vlag uit (of context afwezig) → byte-identiek aan vandaag: de router draait
+ * LETTERLIJK `runSelectedProjection(input, useV2, strategyOptions)`.
  */
 
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
@@ -17,9 +24,23 @@ import {
   toSimResult,
   type UnifiedProjectionInput,
 } from '@/lib/unified-projection'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import type { HorizonStrategyOptions } from '@/lib/horizon-engine/strategies'
+import {
+  computeConvergentieProjection,
+  type ConvergentieRawContext,
+} from '@/lib/horizon-kernel/convergentie-router'
 import type { LifeEvent } from '@/lib/horizon-data'
+
+/**
+ * Rauwe kernel-context voor de preview-baseline — de convergentie-context mínus
+ * de per-aanroep-variabelen: `lifeEvents` worden per preview-aanroep geïnjecteerd
+ * (dat is precies wat de preview varieert) en `yearlyExpenses` komt uit de al
+ * gebouwde `baseline.input` (zelfde grondslag als de hook meegeeft).
+ */
+export type PreviewKernelRawContext = Omit<
+  ConvergentieRawContext,
+  'lifeEvents' | 'yearlyExpenses'
+>
 
 export interface PreviewBaseline {
   /**
@@ -36,8 +57,19 @@ export interface PreviewBaseline {
    * Pensioen-modus: de fractionele AOW-leeftijd (= getoonde vrijheidsleeftijd,
    * gelijk aan de hook). Wanneer gezet, retourneert de preview deze waarde i.p.v.
    * het binary-search-resultaat — net als `useHorizonFireSim`/de grafiek.
+   * Alleen van toepassing op de v2-tak: op de kernel-tak doet de solver de
+   * AOW-kortsluiting zélf (spiegel van de hook, die het pensioen-post-processing-
+   * blok op de kernel-tak overslaat).
    */
   pensioenFireAgeFractional?: number | null
+  /**
+   * FASE 6, stap 1 — vlag `horizon_kernel_convergentie` (dezelfde vlag-beslissing
+   * als de hoofdgrafiek-hook op het oppervlak). Alleen een letterlijke `true`
+   * (én een aanwezige `kernelRawContext`) laat de preview via de kernel lopen.
+   */
+  kernelEnabled?: boolean
+  /** Rauwe kernel-context; afwezig → v2 (byte-identiek aan vandaag). */
+  kernelRawContext?: PreviewKernelRawContext
 }
 
 /** Fractionele vrijheidsleeftijd voor de gegeven events (null = onbereikbaar). */
@@ -46,10 +78,30 @@ export function previewFireAge(baseline: PreviewBaseline, events: LifeEvent[]): 
     ...baseline.input,
     cashflows: lifeEventsToCashflows(events),
   }
-  const sim = toSimResult(runSelectedProjection(input, baseline.useV2, baseline.strategyOptions))
+  // Dezelfde motorschakelaar als de hoofdgrafiek-hook: vlag uit → letterlijk
+  // `runSelectedProjection(input, useV2, strategyOptions)` (byte-identiek);
+  // vlag aan → kernel met de rauwe events van deze preview-aanroep.
+  const kernelEnabled = baseline.kernelEnabled === true && !!baseline.kernelRawContext
+  const outcome = computeConvergentieProjection({
+    builtInput: input,
+    strategyOptions: baseline.strategyOptions,
+    v2FlagArg: baseline.useV2,
+    kernelEnabled,
+    rawContext: baseline.kernelRawContext
+      ? {
+          ...baseline.kernelRawContext,
+          lifeEvents: events,
+          yearlyExpenses: baseline.input.yearlyExpenses,
+        }
+      : undefined,
+  })
+  const sim = toSimResult(outcome.result)
   // Pensioen: getoonde vrijheidsleeftijd = AOW-leeftijd (gelijk aan de grafiek),
-  // niet het binary-search-minimum.
-  if (baseline.pensioenFireAgeFractional != null) return baseline.pensioenFireAgeFractional
+  // niet het binary-search-minimum. NIET op de kernel-tak — daar doet de solver
+  // de AOW-kortsluiting zelf en toont de hook het kernel-resultaat direct.
+  if (outcome.engine !== 'kernel' && baseline.pensioenFireAgeFractional != null) {
+    return baseline.pensioenFireAgeFractional
+  }
   return sim.fireAgeFractional
 }
 
