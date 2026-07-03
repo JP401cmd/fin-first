@@ -116,10 +116,12 @@ export async function GET() {
     const loaded = await loadKernelReportInput(supabase)
     kernelInput = buildKernelInputFromAppWithNotices(loaded.adapterInput).input
     solve = solveFire(kernelInput)
-  } catch (err) {
+  } catch {
+    // Bewust generiek (security-gate): geen interne foutdetails naar de client,
+    // ook niet achter de superadmin-poort.
     return NextResponse.json({
       ok: false,
-      reason: err instanceof Error ? err.message : 'Kon de kernel-invoer niet laden.',
+      reason: 'Kon de kernel-invoer niet laden.',
     } satisfies VergelijkResponse)
   }
 
@@ -263,7 +265,17 @@ export async function GET() {
   const eindDelta = delta(v2.eindNettoVermogen, kernel.eindNettoVermogen)
 
   // ── Vlag-stand (hergebruik de flags-data) ───────────────────────────────────
-  const { data: prof } = await supabase.from('profiles').select('feature_preferences').single()
+  // Expliciete eigen-rij-filter als defense-in-depth (security-gate): RLS dekt
+  // dit al, maar een toekomstige bredere profiles-policy mag hier nooit een
+  // andere rij opleveren.
+  const { data: auth } = await supabase.auth.getUser()
+  const { data: prof } = auth.user
+    ? await supabase
+        .from('profiles')
+        .select('feature_preferences')
+        .eq('id', auth.user.id)
+        .single()
+    : { data: null }
   const flags = readKernelFlags(prof as { feature_preferences?: Record<string, unknown> | null } | null)
 
   return NextResponse.json({

@@ -64,7 +64,7 @@ function Switch({
       aria-label={label}
       disabled={disabled}
       onClick={onToggle}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-horizon-500)] disabled:opacity-50 ${
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-horizon-500)] disabled:opacity-50 after:absolute after:-inset-2.5 after:content-[''] ${
         checked ? 'bg-[var(--color-horizon-500)]' : 'bg-[var(--border-md)]'
       }`}
     >

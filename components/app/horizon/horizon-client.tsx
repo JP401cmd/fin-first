@@ -3266,10 +3266,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                 </div>
               )}
 
-              {/* V12 — kernel reached_now: nu al genoeg. Neutrale (niet-oranje) horizon-toon. */}
+              {/* V12 — kernel reached_now: nu al genoeg. Stoplicht-"goed"-status
+                  (emerald, volgt de accentkeuze bewust NIET — CLAUDE.md-kleurconventie). */}
               {engine === 'kernel' && kernelStatus === 'reached_now' && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 px-3 py-2.5">
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-horizon-600" />
+                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 px-3 py-2.5">
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                   <p className="font-sans text-[12px] text-[var(--ink-2)]">
                     Volgens je huidige cijfers kun je nu al stoppen met werken.
                   </p>

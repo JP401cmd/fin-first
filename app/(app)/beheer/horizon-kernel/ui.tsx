@@ -45,7 +45,9 @@ export function Kicker({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-2">
       <span className="h-3.5 w-1 rounded-full bg-[var(--color-horizon-500)]" />
-      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-horizon-700)] font-mono">
+      {/* Kleine uppercase-labels niet in module-accent (contrast-fragiel op 11px);
+          het accent zit in het streepje ernaast. */}
+      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-2)] font-mono">
         {children}
       </span>
     </div>

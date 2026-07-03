@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { GitCompareArrows, ArrowRight } from 'lucide-react'
+import { GitCompareArrows, ArrowRight, AlertTriangle } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon-data'
 import { SectionCard, Kicker, StatCard, Spinner, Notice, DataGrid } from './ui'
@@ -94,8 +94,12 @@ export default function TabVergelijk() {
   if (state === 'loading') return <Spinner label="Beide motoren draaien op je data…" />
   if (state === 'error' || !data || !data.ok) {
     return (
-      <div className="rounded-xl border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-5 text-sm text-[var(--ink-2)]">
-        {err || data?.reason || 'Vergelijken is niet mogelijk.'}
+      <div
+        role="alert"
+        className="flex items-start gap-2.5 rounded-xl border border-[var(--negative)] bg-[var(--paper)] px-4 py-5 text-sm text-negative"
+      >
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <span>{err || data?.reason || 'Vergelijken is niet mogelijk.'}</span>
       </div>
     )
   }
