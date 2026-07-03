@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef, useDeferredValue } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatMaskedCurrency } from '@/lib/format'
@@ -592,23 +592,44 @@ export default function WhatIfPage() {
   }, [baseBuilt, rawProfile, fullAssets, fullDebts, baselineDbEvents, aowRows])
 
   // ── Run what-if simulation (DB + scenario events; return override applied) ──
+  // Slider-defer (alléén scheduling; geen formule/parameter-wijziging). Bundel de sim-inputs
+  // in één object dat op exact dezelfde deps keyt als de whatIfSim-useMemo hiervóór, en defer
+  // dat object. Zo hergebruikt de urgente slider-render (returnDeltas/scenarioActiveEvents
+  // wijzigen per tick) het vórige sim-resultaat, terwijl de solveFire (fase 1-meting:
+  // 173–419ms main-thread) in een onderbreekbare achtergrond-render draait die bij continu
+  // schuiven coalesced. Slider-thumb/label hangen aan `overrides` en blijven live. Op de
+  // initiële render is de deferred waarde gelijk aan de huidige.
+  const whatIfSimInput = useMemo(() => ({
+    whatIfBuilt,
+    whatIfUnifiedInput,
+    rawProfile,
+    fullAssets,
+    fullDebts,
+    scenarioActiveEvents,
+    returnDeltas,
+    aowRows,
+  }), [whatIfBuilt, whatIfUnifiedInput, rawProfile, fullAssets, fullDebts, scenarioActiveEvents, returnDeltas, aowRows])
+
+  const deferredWhatIfSimInput = useDeferredValue(whatIfSimInput)
+
   const whatIfSim = useMemo<{ result: SimResult; cashflows: SimCashflow[] } | null>(() => {
-    if (!whatIfBuilt || !whatIfUnifiedInput || !rawProfile) return null
+    const p = deferredWhatIfSimInput
+    if (!p.whatIfBuilt || !p.whatIfUnifiedInput || !p.rawProfile) return null
     // De kernel-tak past de rendement-delta's ZELF toe op de assets (rawContext).
     const outcome = computeWhatifProjection({
       rawContext: {
-        profile: rawProfile,
-        assets: fullAssets,
-        debts: fullDebts,
-        lifeEvents: scenarioActiveEvents,
-        aowRows,
-        returnDeltaByAssetType: returnDeltas,
-        yearlyExpenses: whatIfBuilt.input.yearlyExpenses,
+        profile: p.rawProfile,
+        assets: p.fullAssets,
+        debts: p.fullDebts,
+        lifeEvents: p.scenarioActiveEvents,
+        aowRows: p.aowRows,
+        returnDeltaByAssetType: p.returnDeltas,
+        yearlyExpenses: p.whatIfBuilt.input.yearlyExpenses,
       },
     })
     if (!outcome.ok) return null
-    return { result: toSimResult(outcome.result), cashflows: whatIfBuilt.input.cashflows }
-  }, [whatIfBuilt, whatIfUnifiedInput, rawProfile, fullAssets, fullDebts, scenarioActiveEvents, returnDeltas, aowRows])
+    return { result: toSimResult(outcome.result), cashflows: p.whatIfBuilt.input.cashflows }
+  }, [deferredWhatIfSimInput])
 
   // ── Pinned scenario overlays — re-run sim per pinned saved scenario ──
   const pinnedOverlays = useMemo<ScenarioOverlay[]>(() => {
