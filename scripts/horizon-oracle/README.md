@@ -124,6 +124,32 @@ afgerond op 1e-6; lege cel = `null`; datums = ISO-string; cached foutwaarden
 `null` bij status `unreachable_within_horizon` (P!B16 staat dan geparkeerd op
 de horizon).
 
+## Eigenaar-live end-to-end-verificatie (eenmalig, niet-gecommit)
+
+Test of het adapter-pad (Supabase → adapter → `KernelInput`) zó inleest dat het
+Excel met diezelfde invoer dezelfde uitkomst geeft. Drie stappen (service-role-key
+uit `.env.local`, nooit hardcoden):
+
+```
+# 1. Dump de app-KernelInput + kernel-solve van de eigenaar (jpsmit@jps-holding.nl)
+npx vitest run scripts/horizon-oracle/dump-eigenaar-live.test.ts
+#    → schrijft <scratchpad>/eigenaar-live/{kernel-input,solve-result,prognose-samples,raw-summary}.json
+
+# 2. Injecteer diezelfde KernelInput als INVOER in een KOPIE van Core calc v5.xlsm
+#    (inverse van input-from-fixture.ts) en extraheer fixture eigenaar-live.json.gz
+py scripts/horizon-oracle/inject_eigenaar_live.py \
+   --kernel-input "<scratchpad>/eigenaar-live/kernel-input.json" \
+   --out "<scratchpad>/eigenaar-live"
+
+# 3. Drievoudige vergelijking: round-trip (C2) + uitkomst (C1) + grid (3b)
+npx vitest run scripts/horizon-oracle/compare-eigenaar-live.test.ts
+```
+
+De injector zet de strategie-selectors op 'Eigen indeling' en schrijft de resolved
+TS-prio's in de matrix-kolommen G/F (rij 32-37/40-44/52-57/65-70). Schuld-toename
+onder 'Eigen indeling' krijgt prio 5 (niet 6 — A23 accepteert 6 niet). Niets van
+dit alles committen; de kernel/adapter/parity-suites blijven ongemoeid.
+
 ## Structuurkennis
 
 De volledige model-analyse (tabbladen, rekenflow, invoercellen, VBA) staat in

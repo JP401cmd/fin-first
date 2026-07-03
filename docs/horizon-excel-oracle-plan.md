@@ -190,6 +190,8 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
 | V14 | Reëel-weergave | **Optie 1** — kernel-adapter blijft de inflatiefactor per rij meegeven (deflatie-wrapper); contract intact. |
 | V15 | Snapshot-trend | **Optie 1** — knik accepteren + annoteren ("rekenwijze gewijzigd op …") in de trend-weergave. |
 | V16 | Erfenis-formule (FASE 2-vondst) | **Akkoord: bewuste modelkeuze** — Excel keert de vrijstelling zelf niet uit (netto = MAX(0, bruto − vrijstelling) × (1 − tarief)); kernel volgt het oracle exact (NB-comment in `tables/auto-gebeurtenissen.ts`). |
+| V17 | Lege-surplus-doelpot (end-to-end-verificatie 2026-07-03: app FIRE 59,58 vs Excel 89,33 op identieke eigenaar-invoer; oorzaak: Excel laat maandspaar verdampen bij Σgewicht=0, kernel-degeneratie-fallback stort het in de lege pot) | **Besluit eigenaar: kernel-extensie blijft; borging = Excel v6 fixen + fixtures herextraheren** (eigenaar-actie; daarna is byte-parity weer totaal). Tot die tijd: surplus-/withdrawal-evaporation-tests = vangnet, concern `horizon-kernel-bekende-afwijkingen` documenteert de divergentie, en de divergentie mag níet "richting oracle" worden weggefixt zonder nieuw eigenaar-besluit. Herhaalbare check: `scripts/horizon-oracle/{dump,inject,compare}-eigenaar-live*` (opt-in `EIGENAAR_LIVE=1`; zie README §Re-run). |
+| V18 | Handmatige AOW-event-invoer (eigenaar had €1.558/mnd vanaf 69 ingevoerd; adapter negeert dat en rekent formule-AOW €1.452/mnd vanaf 68,5 uit de AOW-tabel — kernel én Excel onderling consistent) | **Besluit eigenaar: formule blijft leidend** — de AOW-tabel (wettelijke leeftijd + formule) is de bron; handmatige event-waarden blijven alleen weergave/marker. Geen adapter-wijziging. |
 
 ## 8. Faseplan
 
