@@ -1919,6 +1919,14 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     return results
   }, [selectedScenarioIds, savedScenarios, initialData, kernelRawProfile, debts, aowRows])
 
+  // Gememoized samenstelling voor de SimChart-prop: een inline spread op de
+  // callsite gaf per render een verse array-identiteit, waardoor de memo() van
+  // SimChart bij élke monoliet-setState bail-de en de volledige SVG herbouwde.
+  const combinedScenarioOverlays = useMemo(() => [
+    ...(scenarioOverlays ?? []),
+    ...scenarioOverlayDataList.map(d => d.overlay),
+  ], [scenarioOverlays, scenarioOverlayDataList])
+
   async function handleActionStatusChange(id: string, status: ActionStatus, data?: Record<string, unknown>) {
     const res = await fetch(`/api/ai/actions/${id}`, {
       method: 'PATCH',
@@ -3761,7 +3769,6 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           aria-hidden={chartMode !== 'vermogenspad'}
                         >
                           <SimChart
-                            key={planningMode}
                             emphasis={overlayEmphasis}
                             disableCrosshair={overlayVisible && chartMode === 'vermogenspad'}
                             rows={useHouseholdMainLine ? householdMainLine!.rows : usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? effectiveSimRows : simResult.rows)}
@@ -3781,10 +3788,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             // partner-event-markers, zodat de lijn + de partner-gebeurtenissen
                             // visueel bij elkaar horen. FIRE-annotaties blijven goud (COLOR_OPBOUW).
                             mainLineColor={(usePartnerMainLine || useHouseholdMainLine) ? COLOR_PARTNER_EVENT : undefined}
-                            scenarioOverlays={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : [
-                              ...(scenarioOverlays ?? []),
-                              ...scenarioOverlayDataList.map(d => d.overlay),
-                            ]}
+                            scenarioOverlays={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : combinedScenarioOverlays}
                             monteCarloOverlay={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : monteCarloOverlay}
                             dailyExpenseRate={(effectiveInput?.yearlyMustExpenses ?? 0) / 365}
                             householdOverlays={householdOverlays ?? undefined}
