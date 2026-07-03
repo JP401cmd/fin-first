@@ -69,6 +69,18 @@ export interface BuildSimNetWorthRowsParams {
   housingStrategy: HousingStrategyConfig
   /** Of de v2-grootboek-engine actief is — bepaalt of downsize het huis al in de pot houdt. */
   useV2: boolean
+  /**
+   * Kernel-tak (convergentie-router `engine === 'kernel'`): de horizon-kernel houdt
+   * het eigen huis voor ÉLKE housing-modus in het grootboek (ADR 0015/0032) —
+   * `endPortfolio` (= LedgerRow nettoVermogen) bevat de overwaarde dus altijd al.
+   * Net als `applyHousingToComposition`'s `houseInLedger`-tak (zie de /toekomst-
+   * vermogenssamenstelling in `components/app/horizon/horizon-client.tsx`) mag de
+   * huis-overwaarde dan NOOIT nog eens worden bijgeteld — ook niet bij
+   * `exclude_from_fire` (de enige filterende niet-downsize-modus). `useV2` dekte
+   * alléén het downsize-geval af; deze vlag dekt álle modi op de kernel-tak.
+   * Default false = v1/v2-gedrag ongewijzigd (byte-identiek).
+   */
+  houseInLedger?: boolean
   /** Alle (rauwe) assets — voor de eigen-huis-context. */
   assets: Asset[]
   /** Alle (rauwe) debts — voor de gekoppelde hypotheek-context. */
@@ -101,8 +113,14 @@ export function buildSimNetWorthRows(p: BuildSimNetWorthRowsParams): SimNetWorth
   // huis zit al in endPortfolio. Behandel die combinatie als "niet filteren".
   const v2DownsizeKeepsHouse = p.useV2 && p.housingStrategy.mode === 'downsize'
 
+  // Kernel-tak: het huis zit voor ÉLKE modus al in endPortfolio (grootboek) →
+  // nooit overwaarde bijtellen. Spiegelt `applyHousingToComposition`'s
+  // `if (houseInLedger) return baseRows`-kortsluiting (geen dubbeltelling).
+  const houseInLedger = p.houseInLedger === true
+
   const housingContext = deriveHousingContext(p.assets, p.debts)
-  const addsHouseEquity = housingFilters && !v2DownsizeKeepsHouse && housingContext.hasEigenHuis
+  const addsHouseEquity =
+    housingFilters && !v2DownsizeKeepsHouse && !houseInLedger && housingContext.hasEigenHuis
 
   const currentAge = p.dateOfBirth ? ageAtDate(p.dateOfBirth) : null
 

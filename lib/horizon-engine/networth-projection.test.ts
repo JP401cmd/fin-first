@@ -316,6 +316,87 @@ describe('buildSimNetWorthRows — v1-downsize: geen sprong op het verkoopjaar',
   })
 })
 
+describe('buildSimNetWorthRows — kernel-tak (houseInLedger): huis al in het grootboek', () => {
+  // Op de kernel-tak zit het eigen huis voor ÉLKE modus al in endPortfolio
+  // (= LedgerRow nettoVermogen). De helper mag dan nooit overwaarde bijtellen —
+  // ook niet bij exclude_from_fire, waar v1/v2 dat juist WÉL doen. Spiegelt de
+  // `houseInLedger`-kortsluiting van applyHousingToComposition op /toekomst.
+  for (const mode of ['exclude_from_fire', 'downsize'] as const) {
+    const cfg: HousingStrategyConfig =
+      mode === 'exclude_from_fire'
+        ? { mode: 'exclude_from_fire' }
+        : {
+            mode: 'downsize',
+            trigger: 'fixed_age',
+            triggerAge: 67,
+            depletionThresholdYears: 0,
+            salePricePct: 1,
+            salesCostsPct: 0.04,
+            newMonthlyHousingCost: null,
+          }
+
+    it(`${mode} + houseInLedger → reeks ≡ endPortfolio (geen huis-optelling)`, () => {
+      // Kernel geeft het VOLLEDIGE pad (huis zit in endPortfolio).
+      const simRows = buildEndPortfolioFull()
+      const out = buildSimNetWorthRows({
+        simRows,
+        currentNetWorth,
+        housingStrategy: cfg,
+        useV2: true,
+        houseInLedger: true,
+        assets,
+        debts,
+        dateOfBirth: DOB,
+        v1DownsizeSaleAge: null,
+      })
+      expect(out.length).toBe(simRows.length)
+      for (let i = 0; i < out.length; i++) {
+        expect(Math.abs(out[i].netWorth - simRows[i].endPortfolio)).toBeLessThanOrEqual(EPS)
+      }
+    })
+  }
+
+  it('exclude_from_fire: houseInLedger onderdrukt de overwaarde-optelling die v2 wél doet', () => {
+    const cfg: HousingStrategyConfig = { mode: 'exclude_from_fire' }
+    // Zelfde (gefilterde) endPortfolio-invoer; alleen de kernel-vlag verschilt.
+    const simRows = buildEndPortfolioFiltered()
+    const base = {
+      simRows,
+      currentNetWorth,
+      housingStrategy: cfg,
+      useV2: true,
+      assets,
+      debts,
+      dateOfBirth: DOB,
+      v1DownsizeSaleAge: null,
+    }
+    const v2 = buildSimNetWorthRows({ ...base, houseInLedger: false })
+    const kernel = buildSimNetWorthRows({ ...base, houseInLedger: true })
+    // v2 telt de meegroeiende overwaarde bij; de kernel-tak niet. In de latere
+    // jaren (huiswaarde gegroeid) ligt v2 dus strikt boven de kernel-reeks.
+    const last = simRows.length - 1
+    expect(v2[last].netWorth).toBeGreaterThan(kernel[last].netWorth + EPS)
+  })
+
+  it('houseInLedger weggelaten ≡ houseInLedger:false (byte-identiek, default-veilig)', () => {
+    const cfg: HousingStrategyConfig = { mode: 'exclude_from_fire' }
+    const simRows = buildEndPortfolioFiltered()
+    const base = {
+      simRows,
+      currentNetWorth,
+      housingStrategy: cfg,
+      useV2: true,
+      assets,
+      debts,
+      dateOfBirth: DOB,
+      v1DownsizeSaleAge: null,
+    }
+    const omitted = buildSimNetWorthRows(base)
+    const explicitFalse = buildSimNetWorthRows({ ...base, houseInLedger: false })
+    expect(omitted).toEqual(explicitFalse)
+  })
+})
+
 describe('buildSimNetWorthRows — edge cases', () => {
   it('lege simRows → lege reeks', () => {
     const out = buildSimNetWorthRows({

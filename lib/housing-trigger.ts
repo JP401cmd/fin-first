@@ -57,6 +57,9 @@ import {
 } from '@/lib/unified-projection'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import type { HorizonStrategyOptions } from '@/lib/horizon-engine/strategies'
+// Type-only (erased): de preview-bundel draagt de kernel-context die
+// `computeConvergentieProjection` consumeert. Geen runtime-koppeling met de router.
+import type { ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
 import {
   buildHousingLifeEventsAtAge,
   filterAssetsForFire,
@@ -510,6 +513,20 @@ export interface HousingPreviewData {
    * de v2-grafiek matcht (M2). Default/false = v1-engine (huidige gedrag).
    */
   horizonEngineV2?: boolean
+  /**
+   * FASE 6, stap 1 — convergentie-vlag (`horizon_kernel_convergentie`) voor deze
+   * gebruiker. Alleen een letterlijke `true` (én een aanwezige `kernelRawContext`)
+   * laat de scenario-preview via de horizon-kernel lopen; anders byte-identiek aan
+   * de bestaande v2/v1-preview. Additief: consumers zonder kernel negeren dit.
+   */
+  kernelConvergentieEnabled?: boolean
+  /**
+   * Rauwe kernel-context (basis-profiel + assets/debts/lifeEvents/aow/jaaruitgaven)
+   * waaruit `computeConvergentieProjection` de kernel-invoer samenstelt. De preview
+   * overschrijft per scenario alleen `profile.housing_strategy_config`. Afwezig →
+   * v2/v1-terugval. Zie `lib/housing-preview.ts`.
+   */
+  kernelRawContext?: ConvergentieRawContext
 }
 
 export interface HousingScenarioResult {
