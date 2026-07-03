@@ -47,7 +47,11 @@ import {
   type KernelAdapterInput,
   type KernelAdapterProfile,
 } from '@/lib/horizon-kernel/adapter'
-import { kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
+import {
+  kernelToUnifiedResult,
+  buildKernelSlotMeta,
+  type KernelHousingSale,
+} from '@/lib/horizon-kernel/bridge'
 import {
   detectV2OnlyMachinery,
   type WhatifRawProfileRow,
@@ -140,6 +144,8 @@ export interface ConvergentieProjectionOutcome {
   readonly kernelStatus?: SolverStatus
   /** P!B96 — €/mnd-extra-sparen-hint; alleen aanwezig op de kernel-tak (V12). */
   readonly kernelMaandHint?: number
+  /** Verkoopmoment eigen woning (marker-contract); alleen op de kernel-tak, `null` = geen verkoop. */
+  readonly kernelHousingSale?: KernelHousingSale | null
 }
 
 /** Parameters voor `computeConvergentieProjection`. */
@@ -210,6 +216,7 @@ export function computeConvergentieProjection(
       engine: 'kernel',
       kernelStatus: kernelResult.kernelStatus,
       kernelMaandHint: kernelResult.kernelMaandHint,
+      kernelHousingSale: kernelResult.kernelHousingSale,
     }
   } catch (err) {
     // Defensief: een kernel-fout (bv. ontbrekende geboortedatum) mag het oppervlak

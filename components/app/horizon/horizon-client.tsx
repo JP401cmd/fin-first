@@ -62,6 +62,7 @@ import {
   getFireEligibleNetWorth,
 } from '@/lib/housing-strategy'
 import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-housing'
+import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { FeatureGate } from '@/components/app/feature-gate'
@@ -1255,6 +1256,18 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     return showNaturalMilestones ? [...base, ...naturalMilestonesAsEvents] : base
   }, [showLifeEvents, showNaturalMilestones, displayEvents, naturalMilestonesAsEvents])
 
+  // ── V7 tekort-lening-zichtbaarheid ──────────────────────────────────────
+  // De grafiek plot netWorth (tekort al gesaldeerd) en vloert op 0 — een
+  // aangesproken tekort-lening is dan onzichtbaar. We detecteren 'm uit de rijen
+  // (eerste leeftijd + piek) voor een expliciete stoplicht-melding + tijdlijn-
+  // marker. Alleen de kernel-bridge levert debtBalances['tekort-lening'], dus dit
+  // is per constructie kernel-only (v2-rijen → null). Vóór chartEventOverlay
+  // gedeclareerd zodat de marker-builder 'm mag consumeren (geen TDZ).
+  const deficitLoanNotice = useMemo(
+    () => detectDeficitLoanFromRows(unifiedRows),
+    [unifiedRows],
+  )
+
   // ── Chart event-overlay (markers boven/onder de bar) ───────────────────
   // Bouw één lijst met ChartEventOverlay-items uit gebruiker-events +
   // natuurlijke mijlpalen. De chart bepaalt zelf side+positie via xScale;
@@ -1339,8 +1352,24 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         })
       }
     }
+    // V7 — tekort-lening als read-only waarschuwingsmarker op de eerste leeftijd
+    // waarop de lening wordt aangesproken (stoplicht-rood, geen module-accent). Kind
+    // 'natural' zonder sourceId → klik is een no-op (geen milestone-sheet) en de
+    // marker is niet sleepbaar; volgt de natuurlijke-mijlpaal-zichtbaarheid.
+    if (deficitLoanNotice && showNaturalMilestones && showOwnEvents) {
+      out.push({
+        id: 'deficit-loan',
+        label: 'Tekort-lening aangesproken',
+        age: deficitLoanNotice.firstAge,
+        side: 'below',
+        color: COLOR_NAT_DANGER,
+        icon: 'AlertTriangle',
+        kind: 'natural',
+        readOnly: true,
+      })
+    }
     return out
-  }, [showLifeEvents, showNaturalMilestones, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents])
+  }, [showLifeEvents, showNaturalMilestones, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents, deficitLoanNotice])
 
   // ── Natuurlijke-mijlpaal info-sheet state ─────────────────────────────
   const [selectedNaturalMilestone, setSelectedNaturalMilestone] =
@@ -1766,8 +1795,13 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       currentAgeFloor,
       fireEndAge: initialData.fireStrategy.endAge,
       isV2: initialData.horizonEngineV2,
+      // FIX 2 — de kernel houdt huis + hypotheek (én de verkoop-/opeet-kasstromen)
+      // voor ELKE woonstrategie al in het grootboek. Zónder deze vlag valt een
+      // kernel-gebruiker met horizonEngineV2=false in het v1-injectie-pad en telt het
+      // huis dubbel in de Opbouw-balken.
+      houseInLedger: engine === 'kernel',
     })
-  }, [chartMode, unifiedRows, initialData, displayEvents])
+  }, [chartMode, unifiedRows, initialData, displayEvents, engine])
 
   // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode
   const ieBreakdownResult = useMemo(() => {
@@ -3293,6 +3327,35 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   </p>
                 </div>
               )}
+
+              {/* V7 — tekort-lening aangesproken: expliciete, uitlegbare melding.
+                  De lijn plot netWorth (tekort al gesaldeerd) en vloert op 0, dus een
+                  aangesproken tekort-lening is in Pad-modus onzichtbaar. De 0-vloer
+                  blijft bewust staan (y-schaal-invariant over meerdere render-sites;
+                  netWorth is rekenkundig al de waarheid) — daarom deze melding + de
+                  tijdlijn-marker i.p.v. de lijn ontvloeren. Stoplicht-oranje (aandacht),
+                  volgt de module-accentkeuze bewust NIET (CLAUDE.md-kleurconventie).
+                  View-gating spiegelt de marker: in partner-weergave (met partner-pad)
+                  plot de grafiek de pártnerlijn — dan geen eigen tekort-verhaal tonen. */}
+              {deficitLoanNotice && !(isPartnerView && partnerLine !== null) && (() => {
+                const dRate = dailyExpenseRate(effectiveInput?.monthlyExpenses ?? 0)
+                const freedom = dRate > 0 && !masked
+                  ? formatWithFreedom(deficitLoanNotice.peak, dRate, { includeCurrency: false, format: 'long', includeDays: false })
+                  : null
+                return (
+                  <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                    <p className="font-sans text-[12px] text-orange-700">
+                      Tekort-lening aangesproken vanaf leeftijd{' '}
+                      <strong>{Math.floor(deficitLoanNotice.firstAge)}</strong> — piek{' '}
+                      <strong>{formatMaskedCurrency(deficitLoanNotice.peak, masked)}</strong>
+                      {freedom ? <> ({freedom} vrijheid die je later terugkoopt)</> : null}. In die
+                      periode leen je bij om je uitgaven te dekken; op de vermogenslijn zie je dit
+                      niet, want die toont je nettovermogen (tekort al verrekend).
+                    </p>
+                  </div>
+                )
+              })()}
 
               {/* "Huis wordt nooit verkocht" — beschrijvende info (geen advies, Wft-veilig).
                   Neutrale horizon-toon, niet de rode "fout"-stijl. */}

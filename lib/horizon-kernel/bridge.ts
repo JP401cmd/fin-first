@@ -129,12 +129,29 @@ export interface KernelBridgeContext {
   readonly debtSlotMeta?: ReadonlyArray<DebtSlotMeta>
 }
 
+/**
+ * Kernel-verkoopmoment van de eigen woning (weergave/marker-contract): de eerste
+ * maand met een Bez!AZ-verkoopopbrengst > 0. De tijdlijn op de kernel-tak hoort DIT
+ * moment te tonen (de server-virtuele v2-`verkoop_eigen_woning`-events zijn op de
+ * kernel-tak stale — zie `use-horizon-fire-sim`).
+ */
+export interface KernelHousingSale {
+  /** Maandindex m (0 = eerste prognose-maand). */
+  readonly month: number
+  /** Leeftijd op het verkoopmoment: afgeronde startleeftijd + m/12 (as van de rijen). */
+  readonly age: number
+  /** Netto verkoopopbrengst (Bez!AZ) in die maand. */
+  readonly proceeds: number
+}
+
 /** `UnifiedProjectionResult` + de solver-doorvoer (V12; nog niet geconsumeerd). */
 export interface KernelUnifiedResult extends UnifiedProjectionResult {
   /** P!B93/B100 — solver-status (doorvoer, V12). */
   readonly kernelStatus: SolverStatus
   /** P!B96 — €/mnd-extra-sparen-hint. */
   readonly kernelMaandHint: number
+  /** Verkoopmoment eigen woning binnen de horizon; `null` = geen verkoop. */
+  readonly kernelHousingSale: KernelHousingSale | null
 }
 
 // ── m-accessors (guard voorbij-horizon / lege cellen → 0) ────────────────────
@@ -519,6 +536,24 @@ export function kernelToUnifiedResult(
 
   const strategy = CODE_TO_STRATEGY[computeEs(input).interneCode]
 
+  // ── Verkoopmoment eigen woning (marker-contract) ───────────────────────────
+  // Eerste in-horizon-maand met Bez!AZ-opbrengst > 0; leeftijd op dezelfde as als
+  // de rijen (afgeronde startleeftijd + m/12, vgl. `buildRow`).
+  let kernelHousingSale: KernelHousingSale | null = null
+  for (let m = 0; m <= lastInHorizonMonth; m++) {
+    const bez = proj.bez[m]
+    if (bez === undefined || bez.beyondHorizon) continue
+    const proceeds = bez.woning.verkoopopbrengst
+    if (proceeds > 0) {
+      kernelHousingSale = {
+        month: m,
+        age: Math.round(input.startLeeftijd) + m / 12,
+        proceeds,
+      }
+      break
+    }
+  }
+
   return {
     rows,
     fireAge,
@@ -532,6 +567,7 @@ export function kernelToUnifiedResult(
     displayEndAge: solve.eindleeftijd,
     kernelStatus: status,
     kernelMaandHint: solve.maandHint,
+    kernelHousingSale,
   }
 }
 

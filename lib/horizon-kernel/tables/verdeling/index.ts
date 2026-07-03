@@ -36,8 +36,84 @@
 
 import type { KernelInput, MonthIndex } from '../../types'
 import { isBeyondHorizon, leeftijdJaren, maandInJaar } from '../../scaffold'
-import { aflossingWeightsCombined, halveningWeights, reserveMask } from './weights'
+import {
+  aflossingWeightsCombined,
+  halveningWeights,
+  halveningWeightsZonderGevuld,
+  reserveMask,
+} from './weights'
 import { runWaterfall, type WaterfallResult } from './waterfall'
+
+/** Numerieke drempel (euro-schaal) voor de degenerate-fallback-detectie (vgl. `CAP_EPS`). */
+const DEGEN_EPS = 1e-9
+
+/**
+ * Bezit-waterval (afname of onttrekking) met **degenerate-CAPACITEITS-fallback**
+ * (kernel-extensie, buiten het Excel-oracle — spiegel van de toename-fallback
+ * `toenameGewichten`, maar CAPACITEITS-gedreven i.p.v. gewicht-gedreven).
+ *
+ * ## Waarom capaciteits-gedreven (anders dan de toename-fallback)
+ * De toename-degeneratie was een GEWICHT-degeneratie (`somToename===0`: géén categorie
+ * gewogen). De uitstroom-degeneratie is een CAPACITEITS-degeneratie: de gewogen
+ * categorie (bv. Spaargeld, prio 1, STATISCH gevuld) heeft weight > 0 maar is LEEG
+ * (cap 0), terwijl de volgelopen categorie (bv. Beleggingen, prio 2, STATISCH ongevuld
+ * — de surplus-doelpot die tijdens accumulatie vulde) cap > 0 heeft maar door de
+ * statische gevuld-vlag weight 0 krijgt. Hier is `som > 0` (Spaargeld weegt mee), dus
+ * een gewicht-fallback (`som===0`) zou NOOIT vuren. Het budget lekt daardoor elke maand
+ * als `onbenut` naar de tekort-lening (S!AB, 5% rente) terwijl er liquide saldo
+ * klaarstaat — de bewezen eigenaar-bug.
+ *
+ * ## Fallback (inert-by-construction)
+ * Draai eerst de reguliere waterval (gevuld-eis intact = oracle-getrouw). Vuurt ALLÉÉN
+ * als het budget LEKT (`onbenut > 0`) ÉN er een LIQUIDE prio-1..4-categorie is die
+ * louter door de statische gevuld-vlag is uitgesloten (`w=0`, `gevuld=false`) maar nog
+ * restcapaciteit (cap > 0, niet reeds vol via `initialCapped`) heeft. Dan wordt de
+ * gevuld-eis losgelaten (`halveningWeightsZonderGevuld`) en de waterval één keer
+ * opnieuw gedraaid; de cap begrenst alsnog per categorie, zodat de uitgesloten liquide
+ * pot het restant absorbeert i.p.v. de tekort-lening.
+ *
+ * ## Waarom oracle-inert (parity byte-groen = scheidsrechter)
+ * Bij ECHTE depletie (het oracle-scenario waar budget legitiem naar de tekort-lening
+ * lekt) zijn ALLE liquide categorieën leeg → géén uitgesloten restcapaciteit → de
+ * fallback vuurt NIET en de oracle-lek blijft exact staan. De poort onderscheidt precies
+ * "leeg door échte depletie" (cap 0 overal → inert) van "uitgesloten door de statische
+ * gevuld-artefact" (cap > 0 op een ongevulde pot → fixen). Op de 19 fixtures valt een lek
+ * altijd samen met échte depletie; deze tak is er dus byte-inert (bewezen door de
+ * integrale Verdeling-parity over 19×1200×218 cellen). Wanneer de fallback niet vuurt
+ * wordt de reguliere `WaterfallResult` ONgewijzigd teruggegeven (byte-identiek).
+ */
+function runBezitWaterfallMetDegeneratie(
+  budget: number,
+  caps: readonly number[],
+  prio: readonly (number | null)[],
+  gevuld: readonly boolean[],
+  nietLiquide: readonly boolean[],
+  resMask: readonly boolean[],
+  initialCapped?: readonly boolean[],
+): WaterfallResult {
+  const wRegulier = halveningWeights(prio, gevuld, nietLiquide)
+  const reguliere = runWaterfall(budget, caps, wRegulier, resMask, initialCapped)
+  if (budget <= DEGEN_EPS || reguliere.onbenut <= DEGEN_EPS) return reguliere
+  // Uitgesloten liquide restcapaciteit: prio 1..4 + liquide + NIET regulier gewogen
+  // (dus gevuld=false) + niet reeds vol (initialCapped) + cap > 0.
+  let uitgeslotenCap = 0
+  for (let c = 0; c < caps.length; c++) {
+    const p = prio[c]
+    const actiefPrio = typeof p === 'number' && p >= 1 && p <= 4
+    if (
+      wRegulier[c] === 0 &&
+      !nietLiquide[c] &&
+      actiefPrio &&
+      !(initialCapped?.[c] ?? false) &&
+      caps[c] > DEGEN_EPS
+    ) {
+      uitgeslotenCap += caps[c]
+    }
+  }
+  if (uitgeslotenCap <= DEGEN_EPS) return reguliere // échte depletie → oracle-lek intact
+  const wFallback = halveningWeightsZonderGevuld(prio, nietLiquide)
+  return runWaterfall(budget, caps, wFallback, resMask, initialCapped)
+}
 
 /** Aantal bezitting-categorieën (Spaargeld, Beleggingen, Pensioen, Vastgoed, Eigen huis, Overig). */
 export const BEZIT_CATEGORIEEN = 6
@@ -112,17 +188,8 @@ export function computeVerdeling(
   )
 
   // ── Gewichten (½^(prio−1), volle precisie uit TS) + reserve-maskers. ───────────
-  // Afname/onttrekking: genormaliseerd over de bezit-categorieën (eigen noemer).
-  const wAfname = halveningWeights(
-    bezit.map((c) => c.prioAfname),
-    bezit.map((c) => c.gevuld),
-    bezit.map((c) => c.nietLiquide),
-  )
-  const wOnttrekking = halveningWeights(
-    bezit.map((c) => c.prioOnttrekking),
-    bezit.map((c) => c.gevuld),
-    bezit.map((c) => c.nietLiquide),
-  )
+  // Afname/onttrekking draaien via `runBezitWaterfallMetDegeneratie` (die de reguliere
+  // `halveningWeights` intern berekent + de degenerate-capaciteits-fallback bewaakt).
   // Toename-gewicht bezit (voor de HC:HH-overloop): bezit-toename over bezit-noemer.
   const wBezitToename = halveningWeights(
     bezit.map((c) => c.prioToename),
@@ -144,19 +211,29 @@ export function computeVerdeling(
   const resOnttrekking = reserveMask(bezit.map((c) => c.prioOnttrekking))
   const resAflossing = reserveMask(schuld.map((c) => c.prioAflossing))
 
-  // ── 1. AFNAME ─────────────────────────────────────────────────────────────────
-  const afname = runWaterfall(dep.afnameBudget, bezCaps, wAfname, resAfname)
+  // ── 1. AFNAME (met degenerate-capaciteits-fallback; zie de helper-doc) ──────────
+  const afname = runBezitWaterfallMetDegeneratie(
+    dep.afnameBudget,
+    bezCaps,
+    bezit.map((c) => c.prioAfname),
+    bezit.map((c) => c.gevuld),
+    bezit.map((c) => c.nietLiquide),
+    resAfname,
+  )
 
   // ── 2. ONTTREKKING: gaat verder waar afname stopte (één gedeelde bezit-pot). ─────
   // Capaciteit = afname-cap − afname-toewijzing; en de categorieën die afname vól
   // trok (`afname.capped`) erven die status, zodat een door afname geleegde
   // categorie uit de onttrekking-Σw valt (Excel: `gezin` maand 24), terwijl een
   // door afname onaangeraakte cap-0-categorie blijft meetellen (`partner-aan`).
+  // Zelfde degenerate-capaciteits-fallback als afname (de eigenaar-bug zit hier).
   const onttrekkingCaps = bezCaps.map((cap, i) => cap - afname.eind[i])
-  const onttrekking = runWaterfall(
+  const onttrekking = runBezitWaterfallMetDegeneratie(
     dep.onttrekkingBudget,
     onttrekkingCaps,
-    wOnttrekking,
+    bezit.map((c) => c.prioOnttrekking),
+    bezit.map((c) => c.gevuld),
+    bezit.map((c) => c.nietLiquide),
     resOnttrekking,
     afname.capped,
   )

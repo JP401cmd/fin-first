@@ -38,6 +38,41 @@ function baseWeight(prio: number | null, gevuld: boolean, nietLiquide: boolean):
 }
 
 /**
+ * Basisgewicht `½^(prio−1)` ZONDER de `gevuld`-eis (prio 1..4 + liquide) — voor de
+ * degenerate-CAPACITEITS-fallback van de uitstroom-waterval (afname/onttrekking). Een
+ * categorie die STATISCH ongevuld (startwaarde 0) was maar inmiddels een positief
+ * saldo(m−1) heeft, is een geldig uitstroom-doel; de waterval-cap (= saldo m−1)
+ * begrenst alsnog of ze werkelijk geld krijgt (cap 0 → Σw-poort 0). Spiegel van
+ * `ruwGewichtInstroom` (toename-afname.ts), maar dan voor UITstroom. Zie
+ * `runBezitWaterfallMetDegeneratie` (verdeling/index.ts) voor de exacte poort.
+ */
+function baseWeightZonderGevuld(prio: number | null, nietLiquide: boolean): number {
+  return !nietLiquide && typeof prio === 'number' && prio >= 1 && prio <= MAX_WEIGHTED_PRIO
+    ? Math.pow(0.5, prio - 1)
+    : 0
+}
+
+/**
+ * Genormaliseerde `½^(prio−1)`-uitstroom-gewichten ZONDER de statische gevuld-eis
+ * (prio 1..4 + liquide). Uitsluitend gebruikt in de degenerate-capaciteits-fallback
+ * van `runBezitWaterfallMetDegeneratie` (verdeling/index.ts) — nóóit op het reguliere
+ * pad, waar `halveningWeights` (mét gevuld-eis) de oracle-getrouwe bron blijft.
+ */
+export function halveningWeightsZonderGevuld(
+  prio: readonly (number | null)[],
+  nietLiquide: readonly boolean[],
+): number[] {
+  const n = prio.length
+  const base = new Array<number>(n).fill(0)
+  let sum = 0
+  for (let c = 0; c < n; c++) {
+    base[c] = baseWeightZonderGevuld(prio[c], nietLiquide[c])
+    sum += base[c]
+  }
+  return sum > 0 ? base.map((b) => b / sum) : base
+}
+
+/**
  * Bereken de genormaliseerde halverings-gewichten per categorie voor één
  * onderwerp (afname / onttrekking / schuld-aflossing).
  *

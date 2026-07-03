@@ -328,6 +328,27 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
   Overige oppervlakken (what-if, household, beheer, scalar-helpers gap V10) mogen apart.
   Vergelijk-weergave oud↔nieuw in beheer. Default-flip + verwijderen v2-paden ALLEEN na
   expliciet akkoord (C5-precedent).
+- **EIGENAAR-GO (2026-07-03): default-flip + v2-verwijdering geaccordeerd.** Rationale eigenaar:
+  alle flag-periode-bugs zaten in de naden tussen twee motoren; één motor elimineert de klasse.
+  Volgorde: (1) lopende weergave-/datapad-fix landt eerst (laatste gezondheidscheck kernel-run
+  op echte data), (2) default-flip (kernel aan; v2 achter tijdelijke legacy-noodklep),
+  (3) FASE 6-verwijdering gefaseerd (eerst alle rest-consumenten een kernel-pad, dan C5-stijl-
+  deletie). Bug-fixing van weergavepunten mag daarna (eigenaar-besluit "bugfixen later").
+- **FASE 6 — verwijderplan (inventaris 2026-07-03, C5-stijl, 5 stappen):**
+  **(1)** kernel-pad voor de resterende pure-v2-previews: strategy-preview, regel-sim,
+  fee-analysis, hypotheek-vs-beleggen, housing-trigger, whatif-beslishulp, EventPanes +
+  strategie-modal + horizon-client lokale sims (:1638/:1831), housing-section-preview;
+  benchmark-doorbedrading + build-report-besluit. **(2)** beheer/API: /api/horizon-engine/ledger
+  + /beheer/horizon-tabellen(-mij) → kernel-ledger of weg; grafiek-werking-teksten;
+  horizon-strategie-goldens; buildSimNetWorthRows/compositie op kernel. **(3)** default-flip
+  (4 vlaggen AAN; routers blijven vangnet). **(4)** DB-migratie: vpw/bucket uit
+  withdrawal_strategy (kolom blijft; geen DB-CHECK — enum is app-side); vlag-lezingen weg.
+  **(5)** fysieke deletie lib/horizon-engine/ + routers ontvouwen + v2-tests/goldens +
+  vergelijk-route weg + calculations.ts/concerns (flag-periode-concern + 3 v2-grondslag-
+  concerns)/ADR's (0013/0016→vervangen)/docs + .claude-agents-verwijzingen (calc-engine-
+  specialist, bug-reporter, requirement-specialist, senior-developer, refactor-skill:
+  unified-projection-begrippen). Volledige werklijst in het inventaris-rapport (sessie
+  2026-07-03); computeScalarFreedomMilestones nog nergens productie-bedraad (restpunt).
 - **FASE 6 — Nazorg**: vpw/bucket-DB-migratie; regressie-goldens herijken (gap V1);
   Berekeningen-view + ADR's (0013/0016 → `vervangen`; gerichte addenda op 0014/0015/0027/0028/
   0030/0031 waar de kern die besluiten materieel wijzigt); concern `horizon-kernel-flag-periode`

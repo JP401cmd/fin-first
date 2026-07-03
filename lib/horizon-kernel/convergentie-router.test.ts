@@ -327,6 +327,16 @@ describe('computeConvergentieProjection — woning-strategieën zijn kernel-nati
     })
     expect(outcome.fallbackReason).toBeUndefined()
     expect(outcome.engine).toBe('kernel')
+    // LOAD-BEARING invariant voor de Opbouw-balken: de kernel houdt het eigen huis
+    // voor ÉLKE woningstrategie (óók exclude_from_fire — dat is enkel de
+    // V_op-eligibility-selector 'Uitsluiten') in de grootboek-rijen. De chart-laag
+    // (`applyHousingToComposition` met `houseInLedger`) slaat daarom álle
+    // huis-injectie over op de kernel-tak. Breekt deze assert, dan verdwijnt het
+    // huis stil uit de balken — eerst dáár kijken vóór je dit hier "fixt".
+    const rows = outcome.result.rows
+    expect(
+      rows.some((r) => (r.assetBuckets.eigen_huis?.endValue ?? 0) > 0),
+    ).toBe(true)
   })
 
   it('generiek-onondersteund: sale_config "wanneer_nodig" op een niet-huis-asset → nette v2-terugval met reden', () => {

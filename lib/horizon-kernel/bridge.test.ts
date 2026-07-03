@@ -317,6 +317,53 @@ describe('isKernelReachedNowDisplay — weergave-regel bij deplete-doel=0', () =
   })
 })
 
+// ── kernelHousingSale — verkoopmoment eigen woning (marker-contract) ─────────
+
+describe('bridge — kernelHousingSale (verkoopmoment eigen woning)', () => {
+  const HOUSE_ASSETS: Asset[] = [
+    makeAsset({ id: 'sav', asset_type: 'savings', current_value: 30_000, monthly_contribution: 200 }),
+    makeAsset({ id: 'house', asset_type: 'eigen_huis', current_value: 400_000, expected_return: 2 }),
+  ]
+  const HOUSE_DEBTS: Debt[] = [
+    makeDebt({ id: 'mort', debt_type: 'mortgage', current_balance: 150_000, linked_asset_id: 'house', interest_rate: 3, monthly_payment: 700, is_tax_deductible: true }),
+  ]
+  const NO_HOUSE_ASSETS: Asset[] = [
+    makeAsset({ id: 'sav', asset_type: 'savings', current_value: 30_000 }),
+    makeAsset({ id: 'etf', asset_type: 'investment', current_value: 120_000, expected_return: 6 }),
+  ]
+
+  it('verkoop → month/age/proceeds ingevuld (age = afgeronde startleeftijd + month/12)', () => {
+    const input = buildKernelInputFromApp({
+      profile: synthProfile({
+        housing_strategy_config: {
+          mode: 'downsize', trigger: 'on_depletion', triggerAge: 67,
+          salePricePct: 1, salesCostsPct: 0.04, newMonthlyHousingCost: null, depletionThresholdYears: 0,
+        },
+      }),
+      assets: HOUSE_ASSETS, debts: HOUSE_DEBTS,
+    })
+    const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(HOUSE_ASSETS, HOUSE_DEBTS, new Set(['house']))
+    const result = kernelToUnifiedResult(solveFire(input), {
+      input, yearlyExpenses: 2600 * 12, assetSlotMeta, debtSlotMeta,
+    })
+    expect(result.kernelHousingSale).not.toBeNull()
+    const sale = result.kernelHousingSale!
+    expect(sale.month).toBeGreaterThan(0)
+    expect(sale.proceeds).toBeGreaterThan(0)
+    // Leeftijd op dezelfde as als de rijen: afgeronde startleeftijd + m/12.
+    expect(sale.age).toBeCloseTo(Math.round(input.startLeeftijd) + sale.month / 12, 6)
+  })
+
+  it('geen eigen woning → kernelHousingSale null', () => {
+    const input = buildKernelInputFromApp({ profile: synthProfile(), assets: NO_HOUSE_ASSETS, debts: [] })
+    const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(NO_HOUSE_ASSETS, [], new Set())
+    const result = kernelToUnifiedResult(solveFire(input), {
+      input, yearlyExpenses: 2600 * 12, assetSlotMeta, debtSlotMeta,
+    })
+    expect(result.kernelHousingSale).toBeNull()
+  })
+})
+
 // ── Fixture-route (skip tot de extractor fixtures schreef) ────────────────────
 
 if (!hasFixtures) {

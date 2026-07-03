@@ -49,6 +49,16 @@ export interface ApplyHousingCompositionOpts {
   fireEndAge: number
   /** True wanneer de v2-grootboekengine actief is (huis al in de engine-rijen). */
   isV2: boolean
+  /**
+   * True wanneer de engine het eigen huis (én de verkoop-/opeet-kasstromen) al voor
+   * ELKE woonstrategie in de rijen houdt — de horizon-kernel-tak. De kernel voert het
+   * huis altijd als slot in het grootboek (ook onder 'Uitsluiten'/exclude_from_fire),
+   * dus élke injectie hieronder zou dubbeltellen. Empirisch geverifieerd: kernel +
+   * exclude_from_fire levert `assetBuckets.eigen_huis` gevuld in de rijen. v2 houdt
+   * het huis alléén bij include_full/downsize/reverse in de rijen (NIET bij
+   * exclude_from_fire) — vandaar dat `isV2` de fijnere paden hieronder blijft sturen.
+   */
+  houseInLedger?: boolean
 }
 
 /**
@@ -65,7 +75,7 @@ export function applyHousingToComposition(
 ): StackedRow[] {
   // `fireEndAge` blijft in de opts-interface (callers geven 'm), maar wordt sinds
   // ADR 0029 niet meer gebruikt (de reverse_mortgage-schaduwschuld is vervallen).
-  const { housingCfg, ctx, displayEvents, currentAgeFloor, isV2 } = opts
+  const { housingCfg, ctx, displayEvents, currentAgeFloor, isV2, houseInLedger } = opts
 
   const eigenHuisAssets = ctx.eigenHuisAssets ?? []
   const mortgages = ctx.eigenHuisMortgages
@@ -74,6 +84,11 @@ export function applyHousingToComposition(
   if (!hasHouse) return baseRows
   // include_full: huis + hypotheek zitten al in de engine — geen injectie.
   if (housingCfg.mode === 'include_full') return baseRows
+  // Horizon-kernel: het huis (én de verkoop-/opeet-kasstromen) zitten voor ELKE
+  // woonstrategie al in het grootboek-rijen — óók bij exclude_from_fire (de kernel
+  // kent geen filterAssetsForFire; het huis blijft slot 2 in Bez, empirisch
+  // geverifieerd). Élke injectie hieronder zou dubbeltellen → sla ze allemaal over.
+  if (houseInLedger) return baseRows
   // v2-downsize: het huis zit al als eigen_huis-asset in het grootboek én de
   // verkoopopbrengst stroomt bij liquidatie al naar de liquide groepen. De
   // engine-rijen zijn dus al continu — de v1-injectie zou dubbeltellen

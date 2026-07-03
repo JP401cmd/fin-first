@@ -24,7 +24,9 @@ import {
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
 import { dedupeById } from '@/lib/horizon-kernel/adapter'
+import { applyKernelHousingSaleToEvents } from '@/lib/horizon/kernel-display-events'
 import type { SolverStatus } from '@/lib/horizon-kernel/solver'
+import type { KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { PotRulesConfig } from '@/lib/pot-rules'
 import type { Asset } from '@/lib/asset-data'
@@ -70,6 +72,8 @@ export interface HorizonFireSimResult {
   kernelMaandHint: number | null
   /** Reden van de v2-terugval terwijl de vlag aan stond; anders null. */
   kernelFallbackReason: string | null
+  /** Verkoopmoment eigen woning volgens de kernel (marker-contract); alleen op de kernel-tak, anders null. */
+  kernelHousingSale: KernelHousingSale | null
 }
 
 interface HorizonFireSimInput {
@@ -123,7 +127,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, horizonEngineV2, potRules, kernelConvergentieEnabled, kernelRawProfile, aowRows } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
-  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[]; housingHeldToEnd: boolean; engine: 'kernel' | 'v2'; kernelStatus: SolverStatus | null; kernelMaandHint: number | null; kernelFallbackReason: string | null } | null>(() => {
+  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[]; housingHeldToEnd: boolean; engine: 'kernel' | 'v2'; kernelStatus: SolverStatus | null; kernelMaandHint: number | null; kernelFallbackReason: string | null; kernelHousingSale: KernelHousingSale | null } | null>(() => {
     // Input-assemblage via de gedeelde builder (single source — ook gebruikt door
     // de beheer-tabel-API). Zie lib/horizon-engine/build-input.ts.
     const built = buildHorizonInput({
@@ -183,6 +187,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     //    ín de adapter; het kernel-verkoopmoment is bewust (2b-beperking) nog niet als
     //    marker ontsloten. housingHeldToEnd = false: dat is een v2-meetrun-concept en
     //    op de kernel-tak niet van toepassing.
+    //
+    //    FIX 1 — verkoop-marker: de server-virtuele housing-verkoop-events zijn op
+    //    v2-basis geresolved (on_depletion valt bv. op ~89j) en liegen op de kernel-
+    //    tak. `applyKernelHousingSaleToEvents` stript die stale verkoop-events en zet
+    //    — als de kernel binnen de horizon verkoopt — één kernel-afgeleid verkoop-
+    //    event op `kernelHousingSale.age`. De opeethypotheek-virtuele en de echte
+    //    gebruikers-events blijven ongemoeid.
     if (outcome.engine === 'kernel') {
       return {
         result,
@@ -190,12 +201,16 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
         originalFireAge: null,
         originalFireAgeFractional: null,
         unifiedRows: unifiedResult.rows,
-        effectiveLifeEvents: dedupeById(lifeEvents ?? []),
+        effectiveLifeEvents: applyKernelHousingSaleToEvents(
+          dedupeById(lifeEvents ?? []),
+          outcome.kernelHousingSale ?? null,
+        ),
         housingHeldToEnd: false,
         engine: 'kernel' as const,
         kernelStatus: outcome.kernelStatus ?? null,
         kernelMaandHint: outcome.kernelMaandHint ?? null,
         kernelFallbackReason: null,
+        kernelHousingSale: outcome.kernelHousingSale ?? null,
       }
     }
 
@@ -210,6 +225,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
       kernelStatus: null,
       kernelMaandHint: null,
       kernelFallbackReason: outcome.fallbackReason ?? null,
+      kernelHousingSale: null,
     }
 
     // ── Pensioen post-processing (#471) ─────────────────────────────
@@ -286,7 +302,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult, kernelConvergentieEnabled])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: null, effectiveLifeEvents: [], housingHeldToEnd: false, engine: 'v2', kernelStatus: null, kernelMaandHint: null, kernelFallbackReason: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: null, effectiveLifeEvents: [], housingHeldToEnd: false, engine: 'v2', kernelStatus: null, kernelMaandHint: null, kernelFallbackReason: null, kernelHousingSale: null }
   }
 
   return {
@@ -304,5 +320,6 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     kernelStatus: simResult?.kernelStatus ?? null,
     kernelMaandHint: simResult?.kernelMaandHint ?? null,
     kernelFallbackReason: simResult?.kernelFallbackReason ?? null,
+    kernelHousingSale: simResult?.kernelHousingSale ?? null,
   }
 }
