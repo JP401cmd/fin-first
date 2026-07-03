@@ -6,7 +6,7 @@
  * DreamTransitionContext (plan §8.1) blijft als per-module override actief.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useDeferredValue } from 'react'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
@@ -68,6 +68,26 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
   const [bkCashYears, setBkCashYears] = useState(DEFAULT_BUCKET.cashBufferYears)
   const bkStock = 100 - bkCash - bkBond
 
+  // Slider-defer (alléén scheduling; geen formule/parameter-wijziging). Alle slider-gestuurde
+  // params gaan in één object dat op exact dezelfde waarden keyt als de recompute-effect deps
+  // hiervóór; useDeferredValue laat de urgente slider-render dóórgaan terwijl de maandlus +
+  // computeWithdrawal (fase 1: zware herberekening per tick) op de settelde waarde draaien.
+  // Labels en slider-thumbs blijven op de live state. Op de initiële render is de deferred
+  // waarde gelijk aan de live state.
+  const withdrawalSliderInput = useMemo(() => ({
+    retirementAge,
+    targetAge,
+    grFloor,
+    grCeiling,
+    grRaise,
+    grCut,
+    bkCash,
+    bkBond,
+    bkBondReturn,
+    bkCashYears,
+  }), [retirementAge, targetAge, grFloor, grCeiling, grRaise, grCut, bkCash, bkBond, bkBondReturn, bkCashYears])
+  const deferredWithdrawalSliderInput = useDeferredValue(withdrawalSliderInput)
+
   // Set retirement age based on FIRE projection on first open
   useEffect(() => {
     if (!open) return
@@ -80,9 +100,10 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
   // Recalculate when parameters change
   useEffect(() => {
     if (!open) return
+    const p = deferredWithdrawalSliderInput
 
     const currentAge = input.dateOfBirth ? ageAtDate(input.dateOfBirth) : 55
-    const yearsToRetirement = Math.max(0, retirementAge - currentAge)
+    const yearsToRetirement = Math.max(0, p.retirementAge - currentAge)
     const monthlyReturn = DEFAULT_RETURN / 12
     const monthlySavings = input.monthlyIncome - input.monthlyExpenses
     let projectedPortfolio = input.totalAssets - input.totalDebts
@@ -94,22 +115,22 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
     const yearlyExpenses = input.monthlyExpenses * 12
 
     const guardrails: GuardrailsConfig = {
-      floor: grFloor / 100,
-      ceiling: grCeiling / 100,
-      raiseStep: grRaise / 100,
-      cutStep: grCut / 100,
+      floor: p.grFloor / 100,
+      ceiling: p.grCeiling / 100,
+      raiseStep: p.grRaise / 100,
+      cutStep: p.grCut / 100,
     }
     const bucket: BucketConfig = {
-      cashPct: bkCash / 100,
-      bondPct: bkBond / 100,
-      bondReturn: bkBondReturn / 100,
-      cashBufferYears: bkCashYears,
+      cashPct: p.bkCash / 100,
+      bondPct: p.bkBond / 100,
+      bondReturn: p.bkBondReturn / 100,
+      cashBufferYears: p.bkCashYears,
     }
 
     const res = computeWithdrawal(
       Math.max(0, projectedPortfolio),
-      retirementAge,
-      targetAge,
+      p.retirementAge,
+      p.targetAge,
       strategy,
       yearlyExpenses,
       undefined,
@@ -117,7 +138,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
       bucket,
     )
     setResult(res)
-  }, [input, strategy, retirementAge, targetAge, open, grFloor, grCeiling, grRaise, grCut, bkCash, bkBond, bkBondReturn, bkCashYears])
+  }, [input, strategy, deferredWithdrawalSliderInput, open])
 
   if (!open || !result) return null
 

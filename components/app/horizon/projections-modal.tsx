@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useDeferredValue } from 'react'
 import { useModalAnimation } from '@/lib/hooks/use-modal-animation'
 
 import {
@@ -37,6 +37,17 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
   const [inflation, setInflation] = useState(2)
   const [showParams, setShowParams] = useState(false)
 
+  // Slider-defer (alléén scheduling; geen formule/parameter-wijziging). De zware FIRE-
+  // recompute (3× computeFireProjection in het effect, de impact-badges en de 3× projectForward
+  // in ThreeLineChart) keyt op de DEFERRED slider-waarden, terwijl de labels en slider-thumbs
+  // op de live state blijven. Zo blijft slepen responsief en volgen countdown/range/grafiek de
+  // settelde waarde. Op de initiële render zijn de deferred waarden gelijk aan de live state.
+  const deferredExtraMonthly = useDeferredValue(extraMonthly)
+  const deferredWorkDays = useDeferredValue(workDays)
+  const deferredSwr = useDeferredValue(swr)
+  const deferredReturnRate = useDeferredValue(returnRate)
+  const deferredInflation = useDeferredValue(inflation)
+
   // Future cashflows
   const [cashflows, setCashflows] = useState<FutureCashflow[]>([])
   const [showCashflowForm, setShowCashflowForm] = useState(false)
@@ -50,7 +61,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
   useEffect(() => {
     if (!open) return
 
-    const incomeMultiplier = workDays / 5
+    const incomeMultiplier = deferredWorkDays / 5
     const adjusted: FinancialInput = {
       ...input,
       monthlyIncome: input.monthlyIncome * incomeMultiplier,
@@ -58,12 +69,12 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
     }
     const effectiveInput: FinancialInput = {
       ...adjusted,
-      monthlyIncome: adjusted.monthlyIncome + extraMonthly,
+      monthlyIncome: adjusted.monthlyIncome + deferredExtraMonthly,
     }
 
-    const r = returnRate / 100
-    const s = swr / 100
-    const inf = inflation / 100
+    const r = deferredReturnRate / 100
+    const s = deferredSwr / 100
+    const inf = deferredInflation / 100
     const f = computeFireProjection(effectiveInput, r, s, inf)
     setFire(f)
     setRange({
@@ -71,7 +82,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
       expected: f,
       pessimistic: computeFireProjection(effectiveInput, Math.max(r - 0.03, 0.02), s, inf),
     })
-  }, [input, extraMonthly, workDays, swr, returnRate, inflation, open, cashflows])
+  }, [input, deferredExtraMonthly, deferredWorkDays, deferredSwr, deferredReturnRate, deferredInflation, open, cashflows])
 
   function addCatalogCashflow(template: Omit<FutureCashflow, 'id'>) {
     const newCf: FutureCashflow = { ...template, id: newCfId() }
@@ -100,27 +111,40 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
     setCashflows(prev => prev.filter(cf => cf.id !== id))
   }
 
-  // Compute impact badge for a single cashflow
-  function getCashflowImpactMonths(cf: FutureCashflow): number | null {
-    if (!fire) return null
-    const r = returnRate / 100
-    const s = swr / 100
-    const inf = inflation / 100
-    const incomeMultiplier = workDays / 5
+  // Impact-badges per cashflow-rij — gememoïseerd tot een Map (cf.id → maanden) i.p.v. een
+  // functie die per render (elke slider-tick) 2× computeFireProjection per rij draaide. Keyt op
+  // de DEFERRED slider-params + cashflows + fire, zodat de badges alleen herrekenen wanneer de
+  // deferred invoer settelt en coherent blijven met de deferred countdown/range. De
+  // rij-invariante baseCountdown wordt één keer buiten de lus berekend (identieke uitkomst per
+  // rij: Math.round((baseCountdown − cfCountdown)/30)). NB: de oude, ongebruikte `withCf =
+  // computeFireProjection(...)`-aanroep is bewust NIET meegenomen — `computeFireProjection` is
+  // puur en het resultaat werd nooit gelezen, dus de uitkomst blijft bit-identiek.
+  const impactByCashflow = useMemo<Map<string, number | null>>(() => {
+    const map = new Map<string, number | null>()
+    if (!fire) {
+      for (const cf of cashflows) map.set(cf.id, null)
+      return map
+    }
+    const r = deferredReturnRate / 100
+    const s = deferredSwr / 100
+    const inf = deferredInflation / 100
+    const incomeMultiplier = deferredWorkDays / 5
     const effectiveInput: FinancialInput = {
       ...input,
-      monthlyIncome: input.monthlyIncome * incomeMultiplier + extraMonthly,
+      monthlyIncome: input.monthlyIncome * incomeMultiplier + deferredExtraMonthly,
     }
     const baseCountdown = computeFireProjection(effectiveInput, r, s, inf).countdownDays
-    const withCf = computeFireProjection(effectiveInput, r, s, inf)
-    // Approximate: monthly cashflow adds to savings
-    const cfInput: FinancialInput = {
-      ...effectiveInput,
-      monthlyIncome: effectiveInput.monthlyIncome + cf.monthlyAmount,
+    for (const cf of cashflows) {
+      // Approximate: monthly cashflow adds to savings
+      const cfInput: FinancialInput = {
+        ...effectiveInput,
+        monthlyIncome: effectiveInput.monthlyIncome + cf.monthlyAmount,
+      }
+      const cfCountdown = computeFireProjection(cfInput, r, s, inf).countdownDays
+      map.set(cf.id, Math.round((baseCountdown - cfCountdown) / 30))
     }
-    const cfCountdown = computeFireProjection(cfInput, r, s, inf).countdownDays
-    return Math.round((baseCountdown - cfCountdown) / 30)
-  }
+    return map
+  }, [fire, cashflows, input, deferredReturnRate, deferredSwr, deferredInflation, deferredWorkDays, deferredExtraMonthly])
 
   if (!open || !fire || !range) return null
 
@@ -305,7 +329,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
             {cashflows.length > 0 && (
               <div className="mt-4 space-y-2">
                 {cashflows.map(cf => {
-                  const impactMonths = getCashflowImpactMonths(cf)
+                  const impactMonths = impactByCashflow.get(cf.id) ?? null
                   return (
                     <div key={cf.id} className="flex items-center justify-between gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-3 py-2">
                       <div className="min-w-0 flex-1">
@@ -424,7 +448,7 @@ export function ProjectionsModal({ input, open, onClose }: Props) {
               </p>
             </div>
             <div className="overflow-hidden rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
-              <ThreeLineChart input={input} returnRate={returnRate} extraMonthly={extraMonthly} workDays={workDays} fireTarget={fire.fireTarget} swr={swr} cashflows={cashflows} />
+              <ThreeLineChart input={input} returnRate={deferredReturnRate} extraMonthly={deferredExtraMonthly} workDays={deferredWorkDays} fireTarget={fire.fireTarget} swr={deferredSwr} cashflows={cashflows} />
             </div>
           </section>
         </div>
