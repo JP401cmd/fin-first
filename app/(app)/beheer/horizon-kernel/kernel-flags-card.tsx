@@ -182,8 +182,10 @@ export default function KernelFlagsCard() {
       </ul>
 
       <p className="text-xs leading-relaxed text-[var(--ink-4)]">
-        De oppervlakken zelf zijn nog niet omgezet — deze vlaggen worden in de volgende
-        stap uitgelezen.
+        Alle vier de oppervlakken lezen deze vlaggen al uit. What-if en /toekomst kunnen
+        per doorrekening met een reden terugvallen op de v2-motor — bijvoorbeeld bij een
+        verkoop-instelling die de kernel (nog) niet kan uitdrukken. De indicator “rekent
+        via” op die pagina’s laat dan zien welke motor daadwerkelijk rekende.
       </p>
     </section>
   )

@@ -15,9 +15,13 @@
  * vandaag. Geef `v2FlagArg` exact door wat de pagina doorgeeft (`horizonEngineV2`).
  *
  * ## Geen stille engine-mix
- * Draagt de gebouwde input v2-only woningmachinerie (`assetLiquidations`/`reverseMortgage`/
- * `collateralBorrowableById`), dan valt de HELE vergelijking met een schone reden terug op
- * v2 (`detectV2OnlyMachinery`). Ook bij ontbrekende ruwe context of een kernel-fout valt de
+ * Woning-strategieën (incl. downsize/opeethypotheek) zijn kernel-native — de adapter mapt
+ * `housing_strategy_config` naar de kernel-woning-params, dus de daaruit afgeleide
+ * v2-transforms (huis-`assetLiquidations`/`reverseMortgage`/`collateralBorrowableById`)
+ * triggeren geen terugval. Draagt de gebouwde input een generieke (niet-huis) liquidatie
+ * die de kernel-mapping niet aankan (wanneer_nodig / datum-trigger / payoffDebtIds /
+ * prijs-fractie), dan valt de HELE vergelijking met een schone reden terug op v2
+ * (`detectV2OnlyMachinery`). Ook bij ontbrekende ruwe context of een kernel-fout valt de
  * router terug op v2 (defensief; de vlag mag de pagina nooit laten crashen).
  *
  * Deze module logt NOOIT (`console.*`).
@@ -145,7 +149,8 @@ export function computeWhatifProjection(
     return { result: runV2(), engine: 'v2' }
   }
 
-  // v2-only woningmachinerie → HELE vergelijking terug naar v2 (geen engine-mix).
+  // Kernel-onondersteunde generieke liquidatie → HELE vergelijking terug naar v2
+  // (geen engine-mix); woning-strategieën zijn kernel-native en passeren deze check.
   const machineryReason = detectV2OnlyMachinery(builtInput)
   if (machineryReason) {
     return { result: runV2(), engine: 'v2', fallbackReason: machineryReason }

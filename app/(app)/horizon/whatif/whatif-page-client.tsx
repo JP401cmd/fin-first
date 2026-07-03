@@ -574,9 +574,11 @@ export default function WhatIfPage() {
   // Één beslissing voor de HÉLE pagina i.p.v. per losse run: draait alles op de
   // kernel, óf de hele pagina valt terug op v2. Zo lopen de headline-lijnen,
   // de pinned overlays én de per-event impact-chips NOOIT op verschillende
-  // motoren (geen stille engine-mix). Woningmachinerie (assetLiquidations /
-  // opeethypotheek / leen-ruimte) is asset-/woning-config-gedreven en dus GEDEELD
-  // over alle runs; de baseline- én scenario-input checken dekt 'm volledig.
+  // motoren (geen stille engine-mix). Woning-strategieën zijn kernel-native (geen
+  // terugval); alleen een kernel-onondersteunde GENERIEKE liquidatie (wanneer_nodig /
+  // datum-trigger / payoffDebtIds / prijs-fractie) triggert de terugval. Die is
+  // asset-/sale_config-gedreven en dus GEDEELD over alle runs; de baseline- én
+  // scenario-input checken dekt 'm volledig.
   // Residueel toekomstig risico (stap 2b): een EVENT-gedreven machinerie-bron
   // (bv. een scenario-only 'verkoop huis'-event dat assetLiquidations zet) zou de
   // motoren in theorie kunnen splitsen — vandaag is alle machinerie asset-gedreven,

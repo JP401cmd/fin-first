@@ -284,6 +284,11 @@ const STATUS_LABEL: Record<NonNullable<VergelijkResponse['kernel']>['solverStatu
 
 const DUIDING: ReadonlyArray<{ titel: string; tekst: string }> = [
   {
+    titel: 'Woning-grondslag in de FIRE-detectie',
+    tekst:
+      'bij een verkoop-woonstrategie (downsize) telt de v2-engine de te verkopen woning al vóór de verkoop mee als besteedbaar vermogen in de FIRE-detectie (ADR 0028); de kernel telt het huis pas mee ná de verkoop, als netto-opbrengst in de liquide pot. Bij vermogens die zwaar in de eigen woning zitten is dit doorgaans het dominante verschil in FIRE-leeftijd.',
+  },
+  {
     titel: 'Maand- vs. jaarbasis',
     tekst:
       'de kernel rekent per maand (1200 maanden tot leeftijd 100), de v2-engine per jaar. Rente, inleg en onttrekking worden daardoor op een andere periode samengesteld — dat schuift bedragen licht.',

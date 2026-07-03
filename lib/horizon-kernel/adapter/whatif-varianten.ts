@@ -20,9 +20,12 @@
  *  - vaste (pinned) uniforme rendement-shift (`returnDelta`):
  *      → tel de delta bij ELKE bezitting op vóór de adapter (uniformReturnDelta).
  *  - pot-regels: de kernel leest `profile.pot_rules` zelf → gewoon meegeven op het profiel.
- *  - v2-woningmachinerie (built input mét `assetLiquidations`/`reverseMortgage`/
- *    `collateralBorrowableById`): NIET rauw uitdrukbaar — de router valt met een
- *    schone reden terug op v2 (zie `detectV2OnlyMachinery`).
+ *  - woning-strategieën (`housing_strategy_config`): kernel-NATIVE — de adapter mapt
+ *    ze naar de kernel-woning-params (`buildWoning`); de v2-meetrun-transforms die
+ *    build-input daaruit afleidt (huis-`assetLiquidations`/`reverseMortgage`/
+ *    `collateralBorrowableById`) triggeren dus GEEN terugval. Alleen generieke
+ *    (niet-huis) liquidaties die `buildPotLiquidaties` niet kan mappen vallen met
+ *    een schone reden terug op v2 (zie `detectV2OnlyMachinery`).
  *
  * ## Bekende afwijkingen (gedocumenteerd, NIET gefixt in 2a)
  *  1. **Spaargrondslag-divergentie (grootste baseline-afwijking, GEEN fallback-trigger).**
@@ -51,6 +54,8 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { TaxYear } from '@/lib/box3-data'
 import type { UnifiedProjectionInput } from '@/lib/unified-projection'
+import { parseSaleConfig } from '@/lib/sale-config'
+import { deriveEigenHuisIds as deriveEigenHuisIdsCanoniek } from './potten'
 import type { KernelAdapterInput, KernelAdapterProfile } from './index'
 
 // ── Rendement-deltas → asset-`expected_return`-mutatie ───────────────────────
@@ -168,28 +173,64 @@ export function buildWhatifKernelAdapterInput(
   }
 }
 
-// ── Fallback-detectie: v2-only woningmachinerie ──────────────────────────────
+// ── Fallback-detectie: kernel-onondersteunde generieke liquidaties ───────────
 
 /**
- * Draagt de gebouwde `UnifiedProjectionInput` v2-only woningmachinerie? Zo ja →
- * NL-reden (fallback-trigger voor de router); anders `null`. Deze transforms
- * (`assetLiquidations` = downsize-als-liquidatie, `reverseMortgage` = opeethypotheek,
- * `collateralBorrowableById` = leen-ruimte-eligibility) zijn v2-meetrun-afgeleid; de
- * kernel modelleert woning via een ANDER mechanisme (de woning-config-parameterlaag) en
- * kan ze niet byte-getrouw rauw uitdrukken. Geen stille engine-mix binnen één vergelijking.
+ * Kan de kernel deze gebouwde `UnifiedProjectionInput` uitdrukken? Zo nee →
+ * NL-reden (fallback-trigger voor de router); anders `null`.
+ *
+ * De WONING-strategieën zijn kernel-native en triggeren dus GEEN terugval: de
+ * adapter mapt `housing_strategy_config` rechtstreeks naar de kernel-woning-params
+ * (`buildWoning` — Verkopen/Opeethypotheek incl. "wanneer nodig" + fallbackAge,
+ * oracle-bewezen). De v2-meetrun-transforms die build-input daaruit afleidt
+ * (huis-`assetLiquidations`, `reverseMortgage`, `collateralBorrowableById`) zijn
+ * daarom géén signaal dat de kernel iets niet kan — de kernel rekent dezelfde
+ * strategie via zijn eigen woningblok. Huis-afgeleide liquidaties worden herkend
+ * zoals de adapter dat doet: via `deriveEigenHuisIds` op de input-assets.
+ *
+ * GENERIEKE (niet-huis) liquidaties zijn kernel-native zolang `buildPotLiquidaties`
+ * (adapter/potten.ts) ze kan mappen: `vast_moment` met leeftijd-trigger, zonder
+ * schuld-aflossing en zonder prijs-fractie. De bekende notice-gevallen daar zijn
+ * hier de terugval-triggers (geen stille engine-mix / stille verschil-bron):
+ *  - `wanneer_nodig` (on_demand) — de kernel kent geen dynamische liquidatie-trigger
+ *    voor generieke potten;
+ *  - `payoffDebtIds` — de kernel routeert de netto-opbrengst zonder schuld-aflossing;
+ *  - prijs-fractie (`salePricePct` ≠ 1) — de kernel verkoopt tegen de modelwaarde;
+ *  - alleen een datum-trigger in de `sale_config` — de kernel mapt alleen
+ *    leeftijd-triggers (gespiegeld aan `buildPotLiquidaties`).
  */
 export function detectV2OnlyMachinery(builtInput: UnifiedProjectionInput): string | null {
-  if (builtInput.assetLiquidations && builtInput.assetLiquidations.length > 0) {
-    return 'woningverkoop/downsize (assetLiquidations) is een v2-meetrun-transformatie die de kernel niet rauw kan uitdrukken'
-  }
-  if (builtInput.reverseMortgage) {
-    return 'opeethypotheek (reverseMortgage) wordt door de kernel via een ander woningmodel berekend — geen rauwe kernel-expressie'
-  }
-  if (
-    builtInput.collateralBorrowableById &&
-    Object.keys(builtInput.collateralBorrowableById).length > 0
-  ) {
-    return 'leen-ruimte-bijdrage (collateralBorrowableById) is v2-meetrun-afgeleid — niet rauw in de kernel uit te drukken'
+  const liquidations = builtInput.assetLiquidations
+  if (!liquidations || liquidations.length === 0) return null
+
+  const assets = builtInput.assets ?? []
+  const eigenHuisIds = deriveEigenHuisIdsCanoniek(assets)
+  const assetById = new Map(assets.map((a) => [a.id, a]))
+
+  for (const liq of liquidations) {
+    // Huis-strategie-afgeleid (downsize) → kernel-native via het woningblok.
+    if (eigenHuisIds.has(liq.assetId)) continue
+
+    const asset = assetById.get(liq.assetId)
+    const naam = asset?.name ?? liq.assetId
+    if (liq.trigger === 'on_demand') {
+      return `verkoop '${naam}' staat op 'wanneer nodig' — de kernel kent geen dynamische liquidatie-trigger voor generieke potten`
+    }
+    if (liq.payoffDebtIds.length > 0) {
+      return `verkoop '${naam}' lost gekoppelde schulden af (payoffDebtIds) — niet in de kernel-mapping uit te drukken`
+    }
+    if (liq.salePricePct !== 1) {
+      return `verkoop '${naam}' hanteert een prijs-fractie (salePricePct ≠ 1) — de kernel verkoopt tegen de modelwaarde`
+    }
+    // Datum-trigger: in de gebouwde input al naar een leeftijd omgerekend, maar de
+    // kernel-adapter leest de rauwe `sale_config` en mapt alléén leeftijd-triggers
+    // (`buildPotLiquidaties`). Spiegel die regel hier op dezelfde bron.
+    if (asset) {
+      const cfg = parseSaleConfig((asset as { sale_config?: unknown }).sale_config)
+      if (cfg.stand === 'vast_moment' && cfg.triggerAge == null) {
+        return `verkoop '${naam}' heeft alleen een datum-trigger — de kernel mapt alleen leeftijd-triggers`
+      }
+    }
   }
   return null
 }

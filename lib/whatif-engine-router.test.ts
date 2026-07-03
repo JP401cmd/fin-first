@@ -145,17 +145,65 @@ describe('computeWhatifProjection — kernel-tak', () => {
   })
 })
 
-describe('computeWhatifProjection — fallback', () => {
-  it('vlag aan + v2-only woningmachinerie → engine "v2" + fallbackReason', () => {
-    const { built, assets } = makeBuilt()
+describe('computeWhatifProjection — woning-strategie is kernel-native (BUG 1, spiegel convergentie-router)', () => {
+  it('downsize-huis-liquidatie in de built input → engine "kernel", geen terugval', () => {
+    const { built } = makeBuilt()
+    const huis = {
+      id: 'huis',
+      name: 'Eigen huis',
+      asset_type: 'eigen_huis',
+      current_value: 450_000,
+      woz_value: 420_000,
+      expected_return: 2,
+      monthly_contribution: 0,
+      is_active: true,
+      net_worth_inclusion_pct: 100,
+      depreciation_rate: 0,
+    } as unknown as Asset
+    const assetsMetHuis = [...makeAssets(), huis]
     const inputWithHousing: UnifiedProjectionInput = {
       ...built.input,
+      assets: assetsMetHuis,
       assetLiquidations: [
-        { assetId: 'huis', age: 65, salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: [] },
+        { assetId: 'huis', age: 65, trigger: 'fixed_age', salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: [] },
       ],
     }
     const outcome = computeWhatifProjection({
       builtInput: inputWithHousing,
+      strategyOptions: built.strategyOptions,
+      v2FlagArg: true,
+      kernelEnabled: true,
+      rawContext: {
+        profile: {
+          ...PROFILE,
+          housing_strategy_config: {
+            mode: 'downsize', trigger: 'fixed_age', triggerAge: 65,
+            depletionThresholdYears: 0, salePricePct: 1, salesCostsPct: 0.04, newMonthlyHousingCost: null,
+          },
+        },
+        assets: assetsMetHuis,
+        debts: [],
+        lifeEvents: [],
+        aowRows: [],
+        yearlyExpenses: built.input.yearlyExpenses,
+      },
+    })
+    expect(outcome.fallbackReason).toBeUndefined()
+    expect(outcome.engine).toBe('kernel')
+  })
+})
+
+describe('computeWhatifProjection — fallback', () => {
+  it('vlag aan + kernel-onondersteunde generieke liquidatie (on_demand) → engine "v2" + fallbackReason', () => {
+    const { built, assets } = makeBuilt()
+    const inputWithGenericOnDemand: UnifiedProjectionInput = {
+      ...built.input,
+      assetLiquidations: [
+        { assetId: 'inv', age: Number.POSITIVE_INFINITY, trigger: 'on_demand', salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: [] },
+      ],
+    }
+    const outcome = computeWhatifProjection({
+      builtInput: inputWithGenericOnDemand,
       strategyOptions: built.strategyOptions,
       v2FlagArg: true,
       kernelEnabled: true,
@@ -172,7 +220,7 @@ describe('computeWhatifProjection — fallback', () => {
     expect(outcome.fallbackReason).toBeTruthy()
     // Byte-identiek aan de v2-run van diezelfde input.
     expect(outcome.result).toEqual(
-      runSelectedProjection(inputWithHousing, true, built.strategyOptions),
+      runSelectedProjection(inputWithGenericOnDemand, true, built.strategyOptions),
     )
   })
 

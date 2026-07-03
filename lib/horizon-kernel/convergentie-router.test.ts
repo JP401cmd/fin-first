@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import type { Asset } from '@/lib/asset-data'
+import type { Debt } from '@/lib/debt-data'
 import type { FinancialInput } from '@/lib/horizon-data'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { HousingStrategyConfig } from '@/lib/housing-strategy'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
 import { runSelectedProjection } from '@/lib/horizon-engine/select'
@@ -144,17 +146,232 @@ describe('computeConvergentieProjection — kernel-tak', () => {
   })
 })
 
+// ── BUG 1-fixture: eigenaar-vorm — eigen huis + hypotheek + woning-strategie ──
+
+/**
+ * Bouw de "eigenaar-vorm": eigen-huis-asset + gekoppelde hypotheek + een bescheiden
+ * liquide pot, met een instelbare woning-strategie. De uitgaven liggen dicht op het
+ * inkomen zodat de on_depletion-downsize-meetrun daadwerkelijk een verkoop triggert
+ * (assetLiquidations niet leeg) — precies de vorm waarop de router vóór de fix
+ * permanent op v2 terugviel.
+ */
+function makeHousingFixture(housing: HousingStrategyConfig, extraAssets: Asset[] = []) {
+  const assets = [
+    {
+      id: 'inv',
+      name: 'Beleggingen',
+      asset_type: 'investment',
+      current_value: 40_000,
+      woz_value: null,
+      expected_return: 7,
+      monthly_contribution: 100,
+      is_active: true,
+      net_worth_inclusion_pct: 100,
+      depreciation_rate: 0,
+    },
+    {
+      id: 'huis',
+      name: 'Eigen huis',
+      asset_type: 'eigen_huis',
+      current_value: 450_000,
+      woz_value: 420_000,
+      expected_return: 2,
+      monthly_contribution: 0,
+      is_active: true,
+      net_worth_inclusion_pct: 100,
+      depreciation_rate: 0,
+    },
+    ...extraAssets,
+  ] as unknown as Asset[]
+  const debts = [
+    {
+      id: 'hyp',
+      name: 'Hypotheek',
+      debt_type: 'mortgage',
+      current_balance: 220_000,
+      interest_rate: 3.5,
+      monthly_payment: 950,
+      repayment_type: 'annuity',
+      linked_asset_id: 'huis',
+      is_active: true,
+      net_worth_inclusion_pct: 100,
+      include_aflossing_in_savings: false,
+    },
+  ] as unknown as Debt[]
+  const financial: FinancialInput = {
+    totalAssets: 490_000,
+    totalDebts: 220_000,
+    monthlyIncome: 3200,
+    monthlyExpenses: 3000,
+    yearlyMustExpenses: 36_000,
+    monthlyContributions: 100,
+    dateOfBirth: DOB,
+  }
+  const fireStrategy: FireStrategyConfig = { strategy: 'deplete', endAge: 90, legacyAmount: 0 }
+  const built = buildHorizonInput({
+    horizonInput: financial,
+    lifeEvents: [],
+    fireStrategy,
+    withdrawalStrategy: WITHDRAWAL_DEFAULTS,
+    grossReturn: 0.07,
+    inflation: 0.02,
+    assets,
+    debts,
+    box3Method: 'forfaitair',
+    hasPartner: false,
+    housingStrategy: housing,
+    horizonEngineV2: true,
+  })
+  if (!built) throw new Error('buildHorizonInput gaf null')
+  const profile: ConvergentieRawProfileRow = {
+    ...PROFILE,
+    fire_end_strategy: 'deplete',
+    housing_strategy_config: housing,
+  }
+  const rawContext = {
+    profile,
+    assets,
+    debts,
+    lifeEvents: [],
+    aowRows: [],
+    yearlyExpenses: built.input.yearlyExpenses,
+  }
+  return { built, rawContext }
+}
+
+describe('computeConvergentieProjection — woning-strategieën zijn kernel-native (BUG 1)', () => {
+  it('EIGENAAR-VORM: downsize + on_depletion (huis + hypotheek) → engine "kernel", geen terugval', () => {
+    const housing: HousingStrategyConfig = {
+      mode: 'downsize',
+      trigger: 'on_depletion',
+      triggerAge: 75,
+      depletionThresholdYears: 0,
+      salePricePct: 1,
+      salesCostsPct: 0.04,
+      newMonthlyHousingCost: null,
+    }
+    const { built, rawContext } = makeHousingFixture(housing)
+    // Precondities: dit ís de bug-vorm — de gebouwde input draagt de huis-liquidatie.
+    expect(built.input.assetLiquidations?.length ?? 0).toBeGreaterThan(0)
+    expect(built.input.assetLiquidations!.every((l) => l.assetId === 'huis')).toBe(true)
+    const outcome = computeConvergentieProjection({
+      builtInput: built.input,
+      strategyOptions: built.strategyOptions,
+      v2FlagArg: true,
+      kernelEnabled: true,
+      rawContext,
+    })
+    expect(outcome.fallbackReason).toBeUndefined()
+    expect(outcome.engine).toBe('kernel')
+  })
+
+  it('downsize + vaste leeftijd → engine "kernel"', () => {
+    const housing: HousingStrategyConfig = {
+      mode: 'downsize',
+      trigger: 'fixed_age',
+      triggerAge: 70,
+      depletionThresholdYears: 0,
+      salePricePct: 1,
+      salesCostsPct: 0.04,
+      newMonthlyHousingCost: null,
+    }
+    const { built, rawContext } = makeHousingFixture(housing)
+    expect(built.input.assetLiquidations?.length ?? 0).toBeGreaterThan(0)
+    const outcome = computeConvergentieProjection({
+      builtInput: built.input,
+      strategyOptions: built.strategyOptions,
+      v2FlagArg: true,
+      kernelEnabled: true,
+      rawContext,
+    })
+    expect(outcome.fallbackReason).toBeUndefined()
+    expect(outcome.engine).toBe('kernel')
+  })
+
+  it('reverse_mortgage → engine "kernel" (opeethypotheek is kernel-native)', () => {
+    const housing: HousingStrategyConfig = {
+      mode: 'reverse_mortgage',
+      trigger: 'fixed_age',
+      triggerAge: 70,
+      depletionThresholdYears: 0,
+      maxLoanPct: 0.5,
+      interestRate: 0.055,
+      monthlyPayout: null,
+    }
+    const { built, rawContext } = makeHousingFixture(housing)
+    // Precondities: de v2-input draagt het opeet-plan + de leen-ruimte-bijdrage.
+    expect(built.input.reverseMortgage).toBeTruthy()
+    expect(Object.keys(built.input.collateralBorrowableById ?? {}).length).toBeGreaterThan(0)
+    const outcome = computeConvergentieProjection({
+      builtInput: built.input,
+      strategyOptions: built.strategyOptions,
+      v2FlagArg: true,
+      kernelEnabled: true,
+      rawContext,
+    })
+    expect(outcome.fallbackReason).toBeUndefined()
+    expect(outcome.engine).toBe('kernel')
+  })
+
+  it.each<[string, HousingStrategyConfig]>([
+    ['include_full', { mode: 'include_full' }],
+    ['exclude_from_fire', { mode: 'exclude_from_fire' }],
+  ])('%s → engine "kernel"', (_label, housing) => {
+    const { built, rawContext } = makeHousingFixture(housing)
+    const outcome = computeConvergentieProjection({
+      builtInput: built.input,
+      strategyOptions: built.strategyOptions,
+      v2FlagArg: true,
+      kernelEnabled: true,
+      rawContext,
+    })
+    expect(outcome.fallbackReason).toBeUndefined()
+    expect(outcome.engine).toBe('kernel')
+  })
+
+  it('generiek-onondersteund: sale_config "wanneer_nodig" op een niet-huis-asset → nette v2-terugval met reden', () => {
+    const boot = {
+      id: 'boot',
+      name: 'Vakantiewoning',
+      asset_type: 'real_estate',
+      current_value: 120_000,
+      woz_value: null,
+      expected_return: 2,
+      monthly_contribution: 0,
+      is_active: true,
+      net_worth_inclusion_pct: 100,
+      depreciation_rate: 0,
+      sale_config: { stand: 'wanneer_nodig' },
+    } as unknown as Asset
+    const { built, rawContext } = makeHousingFixture({ mode: 'include_full' }, [boot])
+    // Preconditie: de generieke on_demand-liquidatie zit in de gebouwde input.
+    expect(built.input.assetLiquidations?.some((l) => l.assetId === 'boot' && l.trigger === 'on_demand')).toBe(true)
+    const outcome = computeConvergentieProjection({
+      builtInput: built.input,
+      strategyOptions: built.strategyOptions,
+      v2FlagArg: true,
+      kernelEnabled: true,
+      rawContext,
+    })
+    expect(outcome.engine).toBe('v2')
+    expect(outcome.fallbackReason).toMatch(/wanneer nodig/i)
+    expect(outcome.result).toEqual(
+      runSelectedProjection(built.input, true, built.strategyOptions),
+    )
+  })
+})
+
 describe('computeConvergentieProjection — terugval', () => {
-  it('vlag aan + v2-only woningmachinerie → engine "v2" + fallbackReason', () => {
+  it('vlag aan + kernel-onondersteunde generieke liquidatie → engine "v2" + fallbackReason', () => {
     const { built, assets } = makeBuilt()
-    const inputWithHousing: UnifiedProjectionInput = {
+    const inputWithGenericOnDemand: UnifiedProjectionInput = {
       ...built.input,
       assetLiquidations: [
-        { assetId: 'huis', age: 65, salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: [] },
+        { assetId: 'inv', age: Number.POSITIVE_INFINITY, trigger: 'on_demand', salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: [] },
       ],
     }
     const outcome = computeConvergentieProjection({
-      builtInput: inputWithHousing,
+      builtInput: inputWithGenericOnDemand,
       strategyOptions: built.strategyOptions,
       v2FlagArg: true,
       kernelEnabled: true,
@@ -170,7 +387,7 @@ describe('computeConvergentieProjection — terugval', () => {
     expect(outcome.engine).toBe('v2')
     expect(outcome.fallbackReason).toBeTruthy()
     expect(outcome.result).toEqual(
-      runSelectedProjection(inputWithHousing, true, built.strategyOptions),
+      runSelectedProjection(inputWithGenericOnDemand, true, built.strategyOptions),
     )
   })
 

@@ -536,6 +536,38 @@ export function kernelToUnifiedResult(
 }
 
 /**
+ * **WEERGAVE-regel** voor de B93-doel=0-quirk — GEEN rekenkern-wijziging.
+ *
+ * Bij eindstrategie "Vermogen opeten" (deplete) is het doelbedrag P!B36 = 0. De
+ * solver-status P!B93 wordt dan per constructie ALTIJD `reached_now` (de conditie
+ * `Prognose!J(0) ≥ 0` is triviaal waar), óók wanneer de maand-bisectie een echte,
+ * latere FIRE-maand vond (`solve.fireAge` = bv. 89 jaar en 3 maanden). De kern blijft
+ * hier bewust Excel-exact (zie `solver.ts` — "incl. de bewuste doel=0-quirk"); alleen
+ * de *presentatie* mag niet misleidend "Nu al bereikt" tonen als de gevonden
+ * FIRE-leeftijd in werkelijkheid later ligt.
+ *
+ * Deze helper beslist of de "Nu al bereikt"-taal terecht is: alléén wanneer de
+ * gevonden FIRE-leeftijd ~ de startleeftijd is (≤ startleeftijd + één maand, met een
+ * kleine float-epsilon). Anders hoort de `reached_at`-presentatie ("Bereikt op
+ * leeftijd") getoond te worden.
+ *
+ * BELANGRIJK — voed de ECHTE solver-fireAge in: de `fireAgeFractional` die
+ * `kernelToUnifiedResult` doorgeeft (= `solve.fireAge`, NIET op de startleeftijd
+ * geclampt). Een op `currentAge` geklemde waarde maakt de conditie altijd waar en
+ * laat de misleiding bestaan.
+ *
+ * Pure functie; `null`/`undefined`/niet-eindig → `false` (val terug op reached_at).
+ */
+export function isKernelReachedNowDisplay(
+  fireAge: number | null | undefined,
+  startAge: number | null | undefined,
+): boolean {
+  if (fireAge == null || startAge == null) return false
+  if (!Number.isFinite(fireAge) || !Number.isFinite(startAge)) return false
+  return fireAge <= startAge + 1 / 12 + 1e-9
+}
+
+/**
  * Convenience: leid `assetSlotMeta`/`debtSlotMeta` af uit app-`Asset[]`/`Debt[]` via
  * DEZELFDE slot-toewijzing als de adapter (`assignAssetSlots`/`assignDebtSlots`),
  * zodat de bridge de pot-`slot` niet zelf hoeft te herleiden (geen tweede, driftende

@@ -18,10 +18,13 @@
  * als vandaag. Geef `v2FlagArg` exact door wat het oppervlak vandaag doorgeeft.
  *
  * ## Geen stille engine-mix + defensieve terugval
- * v2-only woningmachinerie (`assetLiquidations`/`reverseMortgage`/
- * `collateralBorrowableById`) → schone v2-terugval met reden (`detectV2OnlyMachinery`,
- * gedeeld met de what-if-router). Ontbrekende rauwe context of een kernel-fout →
- * idem; de vlag mag een oppervlak nooit laten crashen.
+ * Woning-strategieën (incl. downsize/opeethypotheek) zijn kernel-native (de adapter
+ * mapt `housing_strategy_config` → kernel-woning-params) en vallen dus NIET terug.
+ * Alleen generieke (niet-huis) liquidaties die de kernel-mapping niet aankan
+ * (wanneer_nodig / datum-trigger / payoffDebtIds / prijs-fractie) → schone
+ * v2-terugval met reden (`detectV2OnlyMachinery`, gedeeld met de what-if-router).
+ * Ontbrekende rauwe context of een kernel-fout → idem; de vlag mag een oppervlak
+ * nooit laten crashen.
  *
  * Deze module logt NOOIT (`console.*`).
  */
@@ -168,7 +171,8 @@ export function computeConvergentieProjection(
     return { result: runV2(), engine: 'v2' }
   }
 
-  // v2-only woningmachinerie → schone v2-terugval (geen stille engine-mix).
+  // Kernel-onondersteunde generieke liquidatie → schone v2-terugval (geen stille
+  // engine-mix); woning-strategieën zijn kernel-native en passeren deze check.
   const machineryReason = detectV2OnlyMachinery(builtInput)
   if (machineryReason) {
     return { result: runV2(), engine: 'v2', fallbackReason: machineryReason }

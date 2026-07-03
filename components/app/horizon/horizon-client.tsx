@@ -30,6 +30,7 @@ import { computeEmergencyFundMonths } from '@/lib/health-score-input'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
+import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
 import { type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
@@ -52,7 +53,7 @@ import {
   Plus, X, Trash2, Edit3, Zap, Target, History, Sparkles,
   DollarSign, TableProperties, RefreshCw, GitBranch,
   ChevronDown, ChevronUp, Compass, SlidersHorizontal,
-  Home, Lightbulb,
+  Home, Lightbulb, Activity,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
@@ -528,7 +529,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
-  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows, effectiveLifeEvents, housingHeldToEnd, engine, kernelStatus, kernelMaandHint } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows, effectiveLifeEvents, housingHeldToEnd, engine, kernelStatus, kernelMaandHint, kernelFallbackReason } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -3267,8 +3268,12 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               )}
 
               {/* V12 — kernel reached_now: nu al genoeg. Stoplicht-"goed"-status
-                  (emerald, volgt de accentkeuze bewust NIET — CLAUDE.md-kleurconventie). */}
-              {engine === 'kernel' && kernelStatus === 'reached_now' && (
+                  (emerald, volgt de accentkeuze bewust NIET — CLAUDE.md-kleurconventie).
+                  B93-doel=0-quirk: bij deplete is de status ALTIJD `reached_now`, óók bij
+                  een echte latere FIRE-maand — toon deze "nu al stoppen"-banner daarom alleen
+                  als de gevonden FIRE-leeftijd (echte solver-waarde) ~ je huidige leeftijd is;
+                  anders krijgt /toekomst gewoon de normale grafiek/countdown (reached_at). */}
+              {engine === 'kernel' && kernelStatus === 'reached_now' && isKernelReachedNowDisplay(simResult.fireAgeFractional, currentAge) && (
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-emerald-200 bg-emerald-50/50 px-3 py-2.5">
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                   <p className="font-sans text-[12px] text-[var(--ink-2)]">
@@ -3320,6 +3325,28 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                   </div>
                 )
               })()}
+
+              {/* ── Motor-indicator (FIX 4) — alleen met de convergentie-vlag aan;
+                  beheer-transparantie, bewust token-neutraal (geen module-accent/stoplicht).
+                  Toont welke motor deze projectie rekende; bij een per-run-terugval op de
+                  v2-motor volgt de reden (bv. een verkoop-instelling die de kernel niet kan
+                  uitdrukken). Spiegelt het what-if-patroon. ── */}
+              {kernelConvergentie && (
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--subtle)] px-2 py-0.5 text-[11px] font-mono text-[var(--ink-3)]">
+                    <Activity className="h-3 w-3 shrink-0" aria-hidden />
+                    rekent via: {engine}
+                  </span>
+                  {kernelFallbackReason && (
+                    <span
+                      className="text-[11px] italic text-[var(--ink-3)]"
+                      title={kernelFallbackReason}
+                    >
+                      teruggevallen — {kernelFallbackReason}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* ── Overlay toggles boven de grafiek ── */}
               <div className="mb-2 flex flex-wrap items-center gap-1.5">

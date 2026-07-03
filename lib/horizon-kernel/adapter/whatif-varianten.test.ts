@@ -140,28 +140,73 @@ describe('buildWhatifKernelAdapterInput', () => {
 
 describe('detectV2OnlyMachinery', () => {
   const clean = {} as unknown as UnifiedProjectionInput
+  const huis = makeAsset({ id: 'huis', name: 'Eigen huis', asset_type: 'eigen_huis' })
+  const boot = (saleConfig?: unknown) =>
+    makeAsset({
+      id: 'boot',
+      name: 'Vakantiewoning',
+      asset_type: 'real_estate',
+      ...(saleConfig !== undefined ? { sale_config: saleConfig } : {}),
+    } as Partial<Asset>)
 
-  it('assetLiquidations aanwezig → non-null reden', () => {
+  it('huis-strategie-afgeleide liquidatie (eigen_huis-asset) → null (kernel-native woningblok)', () => {
     const input = {
-      assetLiquidations: [{ assetId: 'huis', age: 65, salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: [] }],
+      assets: [huis],
+      assetLiquidations: [{ assetId: 'huis', age: 65, trigger: 'on_demand', salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: ['hyp'] }],
     } as unknown as UnifiedProjectionInput
-    expect(detectV2OnlyMachinery(input)).toMatch(/assetLiquidations/)
+    expect(detectV2OnlyMachinery(input)).toBeNull()
   })
 
-  it('reverseMortgage aanwezig → non-null reden', () => {
+  it('reverseMortgage (opeethypotheek) → null (kernel-native via woning-params)', () => {
     const input = {
       reverseMortgage: { houseAssetId: 'huis', triggerAge: 67, interestRate: 0.055, maxLoanPct: 0.5, monthlyPayout: null, mortgageDebtIds: [] },
+      collateralBorrowableById: { huis: 120_000 },
     } as unknown as UnifiedProjectionInput
-    expect(detectV2OnlyMachinery(input)).toMatch(/reverseMortgage/)
+    expect(detectV2OnlyMachinery(input)).toBeNull()
   })
 
-  it('collateralBorrowableById met entries → non-null reden', () => {
-    const input = { collateralBorrowableById: { huis: 120_000 } } as unknown as UnifiedProjectionInput
-    expect(detectV2OnlyMachinery(input)).toMatch(/collateralBorrowableById/)
+  it('generieke liquidatie op "wanneer nodig" (on_demand) → reden', () => {
+    const input = {
+      assets: [huis, boot({ stand: 'wanneer_nodig' })],
+      assetLiquidations: [{ assetId: 'boot', age: Number.POSITIVE_INFINITY, trigger: 'on_demand', salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: [] }],
+    } as unknown as UnifiedProjectionInput
+    expect(detectV2OnlyMachinery(input)).toMatch(/wanneer nodig/i)
   })
 
-  it('lege collateralBorrowableById (geen entries) → null', () => {
-    const input = { collateralBorrowableById: {} } as unknown as UnifiedProjectionInput
+  it('generieke liquidatie met payoffDebtIds → reden', () => {
+    const input = {
+      assets: [boot({ stand: 'vast_moment', triggerAge: 60 })],
+      assetLiquidations: [{ assetId: 'boot', age: 60, trigger: 'fixed_age', salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: ['lening'] }],
+    } as unknown as UnifiedProjectionInput
+    expect(detectV2OnlyMachinery(input)).toMatch(/payoffDebtIds/)
+  })
+
+  it('generieke liquidatie met prijs-fractie (salePricePct ≠ 1) → reden', () => {
+    const input = {
+      assets: [boot({ stand: 'vast_moment', triggerAge: 60 })],
+      assetLiquidations: [{ assetId: 'boot', age: 60, trigger: 'fixed_age', salePricePct: 0.9, salesCostsPct: 0.04, payoffDebtIds: [] }],
+    } as unknown as UnifiedProjectionInput
+    expect(detectV2OnlyMachinery(input)).toMatch(/prijs-fractie/)
+  })
+
+  it('generieke liquidatie met alléén een datum-trigger in sale_config → reden', () => {
+    const input = {
+      assets: [boot({ stand: 'vast_moment', triggerDate: '2040-06-01' })],
+      assetLiquidations: [{ assetId: 'boot', age: 60, trigger: 'fixed_age', salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: [] }],
+    } as unknown as UnifiedProjectionInput
+    expect(detectV2OnlyMachinery(input)).toMatch(/datum-trigger/)
+  })
+
+  it('kernel-mapbare generieke liquidatie (vast_moment + leeftijd, geen payoff/fractie) → null', () => {
+    const input = {
+      assets: [boot({ stand: 'vast_moment', triggerAge: 60 })],
+      assetLiquidations: [{ assetId: 'boot', age: 60, trigger: 'fixed_age', salePricePct: 1, salesCostsPct: 0.04, payoffDebtIds: [] }],
+    } as unknown as UnifiedProjectionInput
+    expect(detectV2OnlyMachinery(input)).toBeNull()
+  })
+
+  it('lege assetLiquidations → null', () => {
+    const input = { assetLiquidations: [] } as unknown as UnifiedProjectionInput
     expect(detectV2OnlyMachinery(input)).toBeNull()
   })
 

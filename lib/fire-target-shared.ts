@@ -99,7 +99,8 @@ export const computeHorizonFireTarget = cache(async function computeHorizonFireT
 
   // Engine-keuze via de convergentie-router (zie module-doc): vlag uit → letterlijk
   // de bestaande v2-run (byte-identiek); vlag aan + rauwe context → horizon-kernel,
-  // met schone v2-terugval bij v2-only woningmachinerie of een kernel-fout.
+  // met schone v2-terugval bij een kernel-onondersteunde generieke liquidatie of een
+  // kernel-fout (woning-strategieën zijn kernel-native).
   const outcome = computeConvergentieProjection({
     builtInput: built.input,
     strategyOptions: built.strategyOptions,

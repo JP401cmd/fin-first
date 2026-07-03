@@ -12,8 +12,9 @@
 import { useEffect, useState } from 'react'
 import { LineChart, UserCheck, AlertCircle } from 'lucide-react'
 import { formatFireAge } from '@/lib/horizon-data'
+import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
 import { Kicker, StatCard, Spinner, eurShort } from './ui'
-import type { OverviewResponse, SolverResult, VerifReport } from './types'
+import type { KernelInput, OverviewResponse, SolverResult, VerifReport } from './types'
 import TabUitgangspunten from './tab-uitgangspunten'
 import TabGeselecteerd from './tab-geselecteerd'
 import TabStappen from './tab-stappen'
@@ -40,15 +41,30 @@ const STATUS_LABEL: Record<SolverResult['status'], string> = {
   pension_shortfall: 'Pensioen-tekort',
 }
 
-function SolverStrip({ solver, nettoLiquideBijFire, tekortPiek }: {
+function SolverStrip({ solver, nettoLiquideBijFire, tekortPiek, startLeeftijd, eindstrategieSelector }: {
   solver: SolverResult
   nettoLiquideBijFire: number | null
   tekortPiek: number
+  startLeeftijd: number
+  eindstrategieSelector: KernelInput['eindstrategie']['selector']
 }) {
+  // B93-doel=0-quirk (deplete → doelbedrag 0 → status altijd `reached_now`, óók bij een
+  // echte latere FIRE-maand): toon "Nu al bereikt" alleen als de gevonden FIRE-leeftijd
+  // ~ de startleeftijd is; anders de reached_at-tekst. Weergave-regel, kern blijft exact.
+  const fireStatusSub =
+    solver.status === 'reached_now' && !isKernelReachedNowDisplay(solver.fireAge, startLeeftijd)
+      ? STATUS_LABEL.reached_at
+      : STATUS_LABEL[solver.status]
+  // Deplete-selector (P!B48 = 'Vermogen opeten', zie FIRE_END_TO_SELECTOR): het doelbedrag
+  // is bewust €0 (vermogen mag op) — duid dat i.p.v. "op eindleeftijd (nominaal)".
+  const doelSub =
+    eindstrategieSelector === 'Vermogen opeten'
+      ? '€0 — vermogen mag op (opeten-strategie)'
+      : 'op eindleeftijd (nominaal)'
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-      <StatCard label="FIRE-leeftijd" value={formatFireAge(solver.fireAge)} sub={STATUS_LABEL[solver.status]} />
-      <StatCard label="Doelbedrag" value={eurShort(solver.doelbedrag)} sub="op eindleeftijd (nominaal)" />
+      <StatCard label="FIRE-leeftijd" value={formatFireAge(solver.fireAge)} sub={fireStatusSub} />
+      <StatCard label="Doelbedrag" value={eurShort(solver.doelbedrag)} sub={doelSub} />
       <StatCard label="Modelwaarde" value={eurShort(solver.modelwaarde)} sub="Prognose op eindleeftijd" />
       <StatCard label="Gap" value={eurShort(solver.gap)} sub={solver.gap >= 0 ? 'gehaald' : `hint ${eurShort(solver.maandHint)}/mnd`} />
       <StatCard label="Netto-liquide bij FIRE" value={nettoLiquideBijFire != null ? eurShort(nettoLiquideBijFire) : '—'} sub="Prognose!J op FIRE-maand" />
@@ -143,6 +159,8 @@ export default function HorizonKernelClient() {
             solver={data.solver}
             nettoLiquideBijFire={data.summary.nettoLiquideBijFire}
             tekortPiek={data.summary.tekortLeningPiek}
+            startLeeftijd={data.kernelInput.startLeeftijd}
+            eindstrategieSelector={data.kernelInput.eindstrategie.selector}
           />
 
           {/* Tab-navigatie */}

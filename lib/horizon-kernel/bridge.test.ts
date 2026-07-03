@@ -27,6 +27,7 @@ import { listFixtures, loadFixture } from './oracle/fixture-load'
 import { buildKernelInputFromApp } from './adapter'
 import {
   buildKernelSlotMeta,
+  isKernelReachedNowDisplay,
   kernelToUnifiedResult,
   type KernelBridgeContext,
 } from './bridge'
@@ -282,6 +283,37 @@ describe('bridge — solver-doorvoer + requiredFirePortfolio-bron', () => {
       // targetEndPortfolio = B36 (deplete/perpetual→0 op eindleeftijd bij deze bron; legacy > 0).
       if (strategy === 'legacy') expect(result.targetEndPortfolio).toBeGreaterThan(0)
     }
+  })
+})
+
+// ── isKernelReachedNowDisplay — WEERGAVE-regel voor de B93-doel=0-quirk ──────
+
+describe('isKernelReachedNowDisplay — weergave-regel bij deplete-doel=0', () => {
+  const START = 45
+
+  it('fireAge == startleeftijd → true (echt nu al bereikt)', () => {
+    expect(isKernelReachedNowDisplay(START, START)).toBe(true)
+  })
+
+  it('fireAge == startleeftijd + één maand → true (binnen de epsilon-band)', () => {
+    expect(isKernelReachedNowDisplay(START + 1 / 12, START)).toBe(true)
+  })
+
+  it('fireAge == startleeftijd + 0,2 jaar → false (echte latere FIRE-maand)', () => {
+    expect(isKernelReachedNowDisplay(START + 0.2, START)).toBe(false)
+  })
+
+  it('een duidelijk latere FIRE-leeftijd (deplete-quirk, bv. 89,25) → false', () => {
+    expect(isKernelReachedNowDisplay(89.25, START)).toBe(false)
+  })
+
+  it('null / undefined / niet-eindig → false (val terug op reached_at)', () => {
+    expect(isKernelReachedNowDisplay(null, START)).toBe(false)
+    expect(isKernelReachedNowDisplay(START, null)).toBe(false)
+    expect(isKernelReachedNowDisplay(undefined, START)).toBe(false)
+    expect(isKernelReachedNowDisplay(START, undefined)).toBe(false)
+    expect(isKernelReachedNowDisplay(Number.NaN, START)).toBe(false)
+    expect(isKernelReachedNowDisplay(Number.POSITIVE_INFINITY, START)).toBe(false)
   })
 })
 
