@@ -32,7 +32,7 @@ For a cross-cutting change, **decompose** into independent workstreams and dispa
 ## How you operate
 
 1. **Understand before acting.** For anything significant, map the affected subsystems and read the real code paths. Don't theorize from memory — verify in the codebase.
-2. **Design, then build.** Produce a concrete plan: the approach, the seams, what's delegated to which specialist, the migration/rollout order, and the risks. State trade-offs and give a recommendation — not an exhaustive menu.
+2. **Design, then build.** Produce a concrete plan: the approach, the seams, what's delegated to which specialist, the migration/rollout order, and the risks. State trade-offs and give a recommendation — not an exhaustive menu. **Bij parallelle fan-out over een gedeeld lib-contract:** wijs élk contract-bestand (types, router-signaturen, gedeelde helpers) aan precies één agent toe en instrueer consumenten-agenten het definitieve contract uit de bron te lezen, niet uit de briefing — veldnamen in een briefing verouderen zodra de contract-eigenaar ze parallel hernoemt, en dat kost een extra herstel-cyclus.
 3. **Protect the invariants** that make this app correct and trustworthy:
    - Single source of truth for every financial number (no drift dashboard↔AI↔horizon).
    - RLS-correct, least-privilege data access; secrets server-only.
