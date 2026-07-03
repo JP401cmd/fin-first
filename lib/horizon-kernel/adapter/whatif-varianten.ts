@@ -197,13 +197,8 @@ export function detectV2OnlyMachinery(builtInput: UnifiedProjectionInput): strin
 // ── Eigen-huis-ids (voor buildKernelSlotMeta) ────────────────────────────────
 
 /**
- * Leid de eigen-huis-ids af — EXACT dezelfde regel als de adapter-barrel
- * (`buildKernelInputFromAppWithNotices`): actieve bezittingen met
- * `asset_type === 'eigen_huis'`. Nodig voor `buildKernelSlotMeta`, zodat de bridge-
- * slot-toewijzing dezelfde hypotheek→slot-0-keuze maakt als de adapter.
+ * Her-export van de canonieke kernel-API (stap 2b-dedupe): de regel leeft nu op
+ * één plek in `./potten` en wordt gedeeld met de adapter-barrel en de
+ * convergentie-router. Import-pad blijft werken voor bestaande consumenten.
  */
-export function deriveEigenHuisIds(assets: readonly Asset[]): Set<string> {
-  return new Set(
-    assets.filter((a) => a.is_active !== false && a.asset_type === 'eigen_huis').map((a) => a.id),
-  )
-}
+export { deriveEigenHuisIds } from './potten'

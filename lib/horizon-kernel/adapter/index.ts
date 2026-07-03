@@ -37,7 +37,7 @@ import { resolveFireParams } from '@/lib/fire-params'
 import { resolvePotRules } from '@/lib/pot-rules'
 import { parseHousingStrategy } from '@/lib/housing-strategy'
 import type { KernelInput } from '../types'
-import { buildAssetPotten, buildPotLiquidaties, buildSchuldPotten } from './potten'
+import { buildAssetPotten, buildPotLiquidaties, buildSchuldPotten, deriveEigenHuisIds } from './potten'
 import { buildTsParams } from './prio-overgang'
 import {
   DEFAULT_TAX_YEAR,
@@ -104,9 +104,7 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
 
   const { startLeeftijd, persoon } = buildPersoonTijdas(profile.date_of_birth, aowRows)
 
-  const eigenHuisIds = new Set(
-    assets.filter((a) => a.is_active !== false && a.asset_type === 'eigen_huis').map((a) => a.id),
-  )
+  const eigenHuisIds = deriveEigenHuisIds(assets)
   // V7: tekort-lening-rente uit het profiel (deficit_loan_rate) of Excel-default.
   const deficitLoanRate = resolveDeficitLoanRate(profile)
   const assetPotten = buildAssetPotten(assets)
@@ -186,6 +184,7 @@ export {
   buildAssetPotten,
   buildPotLiquidaties,
   buildSchuldPotten,
+  deriveEigenHuisIds,
   mapInSparenNaAflossing,
   type DebtSlot,
   type LiquidatieContext,

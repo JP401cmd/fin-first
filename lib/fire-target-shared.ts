@@ -5,6 +5,15 @@
  * en daardoor identieke output. Eén bron van waarheid voor het FIRE-doelbedrag —
  * gebruikt door de Kern (`core-data-loader.ts`) zodat het bedrag op `/core`
  * exact overeenkomt met wat Horizon toont, zonder afhankelijkheid van een DB-snapshot.
+ *
+ * ## Convergentie-set-oppervlak (FASE 5 stap 2b, ADR 0032 §6)
+ * Dit is oppervlak 3 van de convergentie-set: de engine-keuze loopt via
+ * `computeConvergentieProjection` achter de per-gebruiker-vlag
+ * `horizon_kernel_convergentie` (uit `loadHorizonData().kernelConvergentie`).
+ * Omdat de AI-context de Kern consumeert (`loadCoreData().fireTargetFromHorizon`
+ * ← deze functie), flipt de vlag óók de AI mee — zónder extra code. Vlag uit →
+ * byte-identiek aan de bestaande v2-run (de router draait dan letterlijk
+ * `runSelectedProjection`).
  */
 
 import { cache } from 'react'
@@ -15,7 +24,7 @@ import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
+import { computeConvergentieProjection } from '@/lib/horizon-kernel/convergentie-router'
 
 /**
  * Compute het FIRE-doelbedrag identiek aan Horizon's `useHorizonFireSim`-hook.
@@ -40,13 +49,17 @@ export const computeHorizonFireTarget = cache(async function computeHorizonFireT
   }
 
   // ── AOW-leeftijd: aparte query (zit niet in horizon-data-loader) ──
+  // De opgehaalde rijen bewaren we óók als array voor de kernel-rawContext (de
+  // select-kolommen volstaan voor `lookupAowAge`; de kernel gebruikt ze net zo).
   let aowAgeFractional = NL_AOW_AGE
+  let aowRowsForContext: AowLeeftijdRow[] = []
   try {
     const { data: aowRows } = await supabase
       .from('aow_leeftijd')
       .select('birth_date_from, birth_date_through, aow_years, aow_months, is_definitive')
+    aowRowsForContext = (aowRows as AowLeeftijdRow[] | null) ?? []
     aowAgeFractional = lookupAowAge(
-      (aowRows as AowLeeftijdRow[] | null) ?? [],
+      aowRowsForContext,
       data.effectiveInput.dateOfBirth,
     ).fractional
   } catch {
@@ -84,15 +97,40 @@ export const computeHorizonFireTarget = cache(async function computeHorizonFireT
   })
   if (!built) return null
 
-  const sim = toSimResult(
-    runSelectedProjection(built.input, data.horizonEngineV2, built.strategyOptions),
-  )
+  // Engine-keuze via de convergentie-router (zie module-doc): vlag uit → letterlijk
+  // de bestaande v2-run (byte-identiek); vlag aan + rauwe context → horizon-kernel,
+  // met schone v2-terugval bij v2-only woningmachinerie of een kernel-fout.
+  const outcome = computeConvergentieProjection({
+    builtInput: built.input,
+    strategyOptions: built.strategyOptions,
+    v2FlagArg: data.horizonEngineV2,
+    kernelEnabled: data.kernelConvergentie && !!data.rawProfile,
+    rawContext: data.rawProfile
+      ? {
+          profile: data.rawProfile,
+          assets: data.assets,
+          debts: data.debts,
+          lifeEvents: data.events ?? [],
+          aowRows: aowRowsForContext,
+          yearlyExpenses: built.input.yearlyExpenses,
+        }
+      : undefined,
+  })
+  const sim = toSimResult(outcome.result)
 
-  // Pensioen post-processing: gebruik het werkelijk geprojecteerde portfolio
-  // op AOW-leeftijd i.p.v. het binary-search-minimum (zie hook regel 124-137).
   if (built.isPensioen) {
-    const value = sim.firePortfolioAtFire ?? sim.requiredFirePortfolio
-    return value > 0 ? value : null
+    // Pensioen post-processing verschilt per motor:
+    // • v2: gebruik het werkelijk geprojecteerde portfolio op AOW-leeftijd i.p.v.
+    //   het binary-search-minimum (zie use-horizon-fire-sim, regel 124-137).
+    // • kernel: de bridge levert voor de pensioen-eindstrategie
+    //   `firePortfolioAtFire === requiredFirePortfolio` per constructie (de maand-
+    //   bisectie stopt op de eerste toereikende maand — zie lib/horizon-kernel/
+    //   bridge.ts), dus `requiredFirePortfolio` ís hier al het portfolio-op-FIRE.
+    if (outcome.engine === 'v2') {
+      const value = sim.firePortfolioAtFire ?? sim.requiredFirePortfolio
+      return value > 0 ? value : null
+    }
+    return sim.requiredFirePortfolio > 0 ? sim.requiredFirePortfolio : null
   }
 
   return sim.requiredFirePortfolio > 0 ? sim.requiredFirePortfolio : null

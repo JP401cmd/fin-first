@@ -18,8 +18,14 @@ import { type SimResult, type SimCashflow } from '@/lib/fire-simulation'
 import { type FireStrategyConfig } from '@/lib/fire-strategy'
 import { type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { toSimResult, type UnifiedProjectionRow } from '@/lib/unified-projection'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
+import {
+  computeConvergentieProjection,
+  type ConvergentieRawProfileRow,
+} from '@/lib/horizon-kernel/convergentie-router'
+import { dedupeById } from '@/lib/horizon-kernel/adapter'
+import type { SolverStatus } from '@/lib/horizon-kernel/solver'
+import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { PotRulesConfig } from '@/lib/pot-rules'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -52,6 +58,18 @@ export interface HorizonFireSimResult {
    * /toekomst. Default false in loading/null-paden.
    */
   housingHeldToEnd: boolean
+  /**
+   * FASE 5, stap 2b — welke motor deze projectie berekende. 'kernel' alleen
+   * wanneer de convergentie-vlag aan staat én er geen terugval was; anders 'v2'
+   * (vlag uit, terugval, of loading/null-pad).
+   */
+  engine: 'kernel' | 'v2'
+  /** P!B93 — solver-status (V12); alleen gezet op de kernel-tak, anders null. */
+  kernelStatus: SolverStatus | null
+  /** P!B96 — €/mnd-extra-sparen-hint (V12); alleen op de kernel-tak, anders null. */
+  kernelMaandHint: number | null
+  /** Reden van de v2-terugval terwijl de vlag aan stond; anders null. */
+  kernelFallbackReason: string | null
 }
 
 interface HorizonFireSimInput {
@@ -90,13 +108,22 @@ interface HorizonFireSimInput {
   horizonEngineV2?: boolean
   /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde voor v2. */
   potRules?: PotRulesConfig
+  /** FASE 5, stap 2b — vlag `horizon_kernel_convergentie`. Alleen een letterlijke
+   *  true (én een aanwezige `kernelRawProfile`) laat de projectie via de kernel lopen;
+   *  anders byte-identiek aan v2. */
+  kernelConvergentieEnabled?: boolean
+  /** Rauwe profiel-rij voor de kernel-adapter (incl. kernel-instellingen-kolommen +
+   *  geïnjecteerde `yearly_essential_expenses`). Afwezig/null → v2-terugval. */
+  kernelRawProfile?: ConvergentieRawProfileRow | null
+  /** Rauwe AOW-tabel — voor de kern-tijdas (lookupAowAge) in de adapter. */
+  aowRows?: AowLeeftijdRow[]
 }
 
 export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFireSimResult {
-  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, horizonEngineV2, potRules } = params ?? {}
+  const { horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturn: grossReturnParam, inflation: inflationParam, profileError, aowAgeFractional: aowAgeFractionalParam, assets, debts, box3Method, hasPartner, bankAccountCash, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, horizonEngineV2, potRules, kernelConvergentieEnabled, kernelRawProfile, aowRows } = params ?? {}
 
   // Synchrone berekening via useMemo — geen async nodig want data is al geladen
-  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[]; housingHeldToEnd: boolean } | null>(() => {
+  const simResult = useMemo<{ result: SimResult; cashflows: SimCashflow[]; originalFireAge: number | null; originalFireAgeFractional: number | null; unifiedRows: UnifiedProjectionRow[]; effectiveLifeEvents: LifeEvent[]; housingHeldToEnd: boolean; engine: 'kernel' | 'v2'; kernelStatus: SolverStatus | null; kernelMaandHint: number | null; kernelFallbackReason: string | null } | null>(() => {
     // Input-assemblage via de gedeelde builder (single source — ook gebruikt door
     // de beheer-tabel-API). Zie lib/horizon-engine/build-input.ts.
     const built = buildHorizonInput({
@@ -121,11 +148,69 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     if (!built) return null
     const { input: unifiedInput, cashflows, effectiveLifeEvents, isPensioen, aowAge, aowAgeInt, strategyOptions, housingHeldToEnd } = built
 
-    // ── Run projection engine (flag-selectie v1/v2, default v1) ────────
-    const unifiedResult = runSelectedProjection(unifiedInput, horizonEngineV2 ?? false, strategyOptions)
+    // ── FASE 5, stap 2b: route via de convergentie-motorschakelaar ─────
+    // Vlag uit (of geen rauwe kernel-context) → byte-identiek aan v2:
+    // computeConvergentieProjection roept intern `runSelectedProjection` aan met
+    // dezelfde argumenten als voorheen. Vlag aan + schone input → de horizon-kernel.
+    const kernelEnabled = kernelConvergentieEnabled === true && !!kernelRawProfile
+    const outcome = computeConvergentieProjection({
+      builtInput: unifiedInput,
+      strategyOptions,
+      v2FlagArg: horizonEngineV2 ?? false,
+      kernelEnabled,
+      rawContext: kernelRawProfile
+        ? {
+            profile: kernelRawProfile,
+            assets: assets ?? [],
+            debts: debts ?? [],
+            lifeEvents: lifeEvents ?? [],
+            aowRows,
+            yearlyExpenses: unifiedInput.yearlyExpenses,
+          }
+        : undefined,
+    })
+    const unifiedResult = outcome.result
 
     // ── Convert to SimResult via toSimResult() for backwards compatibility ──
     const result = toSimResult(unifiedResult)
+
+    // ── Kernel-tak: sla het v2-pensioen-post-processing-blok OVER — de kernel doet
+    //    de AOW-kortsluiting zélf via de pensioen-eindstrategie in de solver, dus
+    //    originalFireAge* = null. effectiveLifeEvents = NIET built.effectiveLifeEvents
+    //    (dat zijn v2-geregenereerde virtuele huis-events uit een v2-meetrun, die op
+    //    de kernel-tak zouden liegen); we dedupliceren de rauwe app-events. De
+    //    guard-partitionering (partitionEvents, adapter/guard.ts) bepaalt de routering
+    //    ín de adapter; het kernel-verkoopmoment is bewust (2b-beperking) nog niet als
+    //    marker ontsloten. housingHeldToEnd = false: dat is een v2-meetrun-concept en
+    //    op de kernel-tak niet van toepassing.
+    if (outcome.engine === 'kernel') {
+      return {
+        result,
+        cashflows,
+        originalFireAge: null,
+        originalFireAgeFractional: null,
+        unifiedRows: unifiedResult.rows,
+        effectiveLifeEvents: dedupeById(lifeEvents ?? []),
+        housingHeldToEnd: false,
+        engine: 'kernel' as const,
+        kernelStatus: outcome.kernelStatus ?? null,
+        kernelMaandHint: outcome.kernelMaandHint ?? null,
+        kernelFallbackReason: null,
+      }
+    }
+
+    // ── v2-tak (vlag uit óf terugval): EXACT het bestaande gedrag ──────
+    // fallbackReason is alleen gezet bij een vlag-aan-terugval; vlag uit → null.
+    const v2Base = {
+      cashflows,
+      unifiedRows: unifiedResult.rows,
+      effectiveLifeEvents,
+      housingHeldToEnd,
+      engine: 'v2' as const,
+      kernelStatus: null,
+      kernelMaandHint: null,
+      kernelFallbackReason: outcome.fallbackReason ?? null,
+    }
 
     // ── Pensioen post-processing (#471) ─────────────────────────────
     if (isPensioen) {
@@ -143,11 +228,11 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
         requiredFirePortfolio: result.firePortfolioAtFire,
       }
 
-      return { result: pensioenResult, cashflows, originalFireAge, originalFireAgeFractional, unifiedRows: unifiedResult.rows, effectiveLifeEvents, housingHeldToEnd }
+      return { result: pensioenResult, originalFireAge, originalFireAgeFractional, ...v2Base }
     }
 
-    return { result, cashflows, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: unifiedResult.rows, effectiveLifeEvents, housingHeldToEnd }
-  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, horizonEngineV2, potRules])
+    return { result, originalFireAge: null, originalFireAgeFractional: null, ...v2Base }
+  }, [horizonInput, lifeEvents, fireStrategy, withdrawalStrategy, grossReturnParam, inflationParam, aowAgeFractionalParam, assets, debts, box3Method, hasPartner, monthlySavingsOverride, baseAnnualSavingsFromCashflow, housingStrategy, horizonEngineV2, potRules, kernelConvergentieEnabled, kernelRawProfile, aowRows])
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -156,6 +241,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     if (!simResult?.result) return
 
     const { fireAgeFractional, requiredFirePortfolio } = simResult.result
+    const engineBron = simResult.engine
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
@@ -174,12 +260,19 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
         // Treft de update nul rijen (snapshot-cron heeft de dagrij nog niet
         // geschreven), dan wordt de FIRE-data simpelweg niet voor vandaag
         // opgeslagen — acceptabel; de cron schrijft later de volledige rij.
+        //
+        // V15 (FASE 5, stap 2b): schrijf de rekenwijze (`engine_bron`) ALLEEN mee
+        // wanneer de convergentie-vlag aan staat — dit voedt de "rekenwijze
+        // gewijzigd"-annotatie in de trend-weergave. Vlag uit → payload byte-
+        // identiek aan vandaag (géén extra sleutel).
+        const payload = {
+          fire_age: fireAgeFractional,
+          fire_portfolio_required: requiredFirePortfolio,
+          ...(kernelConvergentieEnabled === true ? { engine_bron: engineBron } : {}),
+        }
         await supabase
           .from('net_worth_snapshots')
-          .update({
-            fire_age: fireAgeFractional,
-            fire_portfolio_required: requiredFirePortfolio,
-          })
+          .update(payload)
           .eq('user_id', user.id)
           .eq('snapshot_date', today)
       } catch {
@@ -190,10 +283,10 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [simResult])
+  }, [simResult, kernelConvergentieEnabled])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: null, effectiveLifeEvents: [], housingHeldToEnd: false }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, originalFireAge: null, originalFireAgeFractional: null, unifiedRows: null, effectiveLifeEvents: [], housingHeldToEnd: false, engine: 'v2', kernelStatus: null, kernelMaandHint: null, kernelFallbackReason: null }
   }
 
   return {
@@ -206,5 +299,10 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     unifiedRows: simResult?.unifiedRows ?? null,
     effectiveLifeEvents: simResult?.effectiveLifeEvents ?? lifeEvents ?? [],
     housingHeldToEnd: simResult?.housingHeldToEnd ?? false,
+    // FASE 5, stap 2b — additief; loading/null-pad valt terug op de v2-defaults.
+    engine: simResult?.engine ?? 'v2',
+    kernelStatus: simResult?.kernelStatus ?? null,
+    kernelMaandHint: simResult?.kernelMaandHint ?? null,
+    kernelFallbackReason: simResult?.kernelFallbackReason ?? null,
   }
 }

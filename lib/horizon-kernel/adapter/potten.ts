@@ -150,6 +150,19 @@ function* freeSlots(reserved: ReadonlySet<number>): Generator<number> {
   }
 }
 
+/**
+ * Leid de eigen-huis-ids af: actieve bezittingen met `asset_type === 'eigen_huis'`.
+ * Dé canonieke regel (kernel-API) — gebruikt door de adapter-barrel
+ * (`buildKernelInputFromAppWithNotices`), `buildKernelSlotMeta`-aanroepers en de
+ * engine-routers (what-if + convergentie), zodat de hypotheek→slot-0-keuze overal
+ * op exact dezelfde huis-set is gebaseerd (geen tweede, driftende afleiding).
+ */
+export function deriveEigenHuisIds(assets: readonly Asset[]): Set<string> {
+  return new Set(
+    assets.filter((a) => a.is_active !== false && a.asset_type === 'eigen_huis').map((a) => a.id),
+  )
+}
+
 /** Eén actieve bezitting met haar toegewezen fysieke slot. */
 interface AssetSlot {
   readonly asset: Asset

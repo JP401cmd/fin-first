@@ -41,8 +41,9 @@ import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { parseFireStrategy, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS, resolveWithdrawalStrategy } from '@/lib/withdrawal-strategy'
 import { toSimResult } from '@/lib/unified-projection'
-import { runSelectedProjection } from '@/lib/horizon-engine/select'
 import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
+import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
+import { computeConvergentieProjection, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { buildHorizonInput } from '@/lib/horizon-engine/build-input'
 import { buildSimNetWorthRows } from '@/lib/horizon-engine/networth-projection'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
@@ -173,7 +174,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('transactions').select('amount, budget_id, transaction_type').gte('date', monthStart).lt('date', monthEnd),
     supabase.from('assets').select('*').eq('is_active', true),
     supabase.from('debts').select('*').eq('is_active', true),
-    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, income_source, expenses_source, monthly_savings_override').single(),
+    supabase.from('profiles').select('full_name, date_of_birth, last_known_phase, widget_prefs, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, budgeting_active, marginaal_tarief, feature_preferences, active_modules, household_type, box3_method, ai_enabled, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, income_source, expenses_source, monthly_savings_override, pot_rules, deficit_loan_rate, withdrawal_profile_config').single(),
     // Single budget query replaces 4 separate queries (essential, allParent, children, favorites)
     supabase.from('budgets').select('id, name, icon, default_limit, interval, budget_type, alert_threshold, parent_id, is_favorite, is_essential'),
     supabase.from('actions')
@@ -669,11 +670,44 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           withdrawalStrategy,
           aowAgeInt: built.aowAgeInt,
           aowFractional: userAowAge.fractional,
-          // C4: editor-baseline draait door dezelfde engine als de Tijdas-grafiek.
+          // C4: editor-baseline draait door de build-input-engine (v1/v2). BEWUST
+          // op de v2-basis (`horizonEngineV2`), NIET op de convergentie-router: de
+          // /toekomst Voorkeuren-editors previewen op v2 tot FASE 5 stap 2c, ook
+          // wanneer de convergentie-vlag de Tijdas-grafiek al op de kernel zet.
           useV2: horizonEngineV2,
           strategyOptions: built.strategyOptions,
         }
-        const unifiedResult = runSelectedProjection(built.input, horizonEngineV2, built.strategyOptions)
+        // Convergentie-router (FASE 5, stap 2b, ADR 0032 §6): kies per gebruiker
+        // tussen de horizon-kernel (achter de vlag `horizon_kernel_convergentie`)
+        // en de bestaande v2-grootboek-engine. Vlag UIT (default) is byte-identiek
+        // aan vandaag: de router draait dan letterlijk
+        // `runSelectedProjection(built.input, horizonEngineV2, built.strategyOptions)`.
+        const kernelConvergentie = isKernelFlagEnabled(
+          profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null,
+          'convergentie',
+        )
+        const outcome = computeConvergentieProjection({
+          builtInput: built.input,
+          strategyOptions: built.strategyOptions,
+          v2FlagArg: horizonEngineV2,
+          kernelEnabled: kernelConvergentie,
+          rawContext: {
+            // `yearly_essential_expenses` = de `computeYearlyMustExpenses`-uitkomst
+            // (essentiële budgetten, NIET `yearlyRetirementExpenses`), zodat de
+            // kernel-pensioenuitgave-methode (`essential_budgets`) exact dezelfde
+            // grondslag hanteert als de v2-tak.
+            profile: {
+              ...(profileResult.data as ConvergentieRawProfileRow),
+              yearly_essential_expenses: yearlyMustExpenses,
+            },
+            assets: dashboardAssetsArr,
+            debts: dashboardDebtsArr,
+            lifeEvents: (eventsResult.data ?? []) as LifeEvent[],
+            aowRows: (aowResult.data ?? []) as AowLeeftijdRow[],
+            yearlyExpenses: built.input.yearlyExpenses,
+          },
+        })
+        const unifiedResult = outcome.result
         const simResult = toSimResult(unifiedResult)
         simRows = simResult.rows.map(r => ({
           age: r.age,
@@ -689,8 +723,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         // modi (huis al in de pot) is het ≡ endPortfolio. Verankerd op netWorth
         // (zelfde "vandaag"-grondslag als het Vandaag-punt). Eén bron: de
         // canonieke huiswaarde-/hypotheek-projectie (geen tweede engine-run).
+        // v1DownsizeSaleAge is een v1-specifieke verkoopleeftijd (v1 spuit de
+        // opbrengst als inkomen in). De kernel houdt het huis in het grootboek en
+        // modelleert downsize als in-ledger-liquidatie (net als v2, ADR 0015) →
+        // geen aparte verkoopleeftijd. `outcome.engine === 'kernel'` sluit die tak
+        // uit, ook al staat de v2-vlag (`horizonEngineV2`) uit.
         const v1DownsizeSaleAge =
-          !horizonEngineV2 && housingStrategyCfg.mode === 'downsize'
+          outcome.engine !== 'kernel' && !horizonEngineV2 && housingStrategyCfg.mode === 'downsize'
             ? built.effectiveLifeEvents.find(
                 (e) => e.event_type === 'verkoop_eigen_woning' && e.target_age != null,
               )?.target_age ?? null
@@ -699,15 +738,31 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
           simRows,
           currentNetWorth: netWorth,
           housingStrategy: housingStrategyCfg,
-          useV2: horizonEngineV2,
+          // `useV2` beïnvloedt binnen buildSimNetWorthRows UITSLUITEND de downsize-
+          // modus (`v2DownsizeKeepsHouse = useV2 && mode === 'downsize'`): bij true
+          // zit het huis al in endPortfolio → geen overwaarde bijtellen. De kernel
+          // houdt het huis — net als v2 — in het grootboek (ADR 0015), dus de
+          // kernel-tak moet de v2-semantiek volgen om dubbeltelling te voorkomen.
+          // Voor alle andere modi is `useV2` een no-op, dus deze OR verandert enkel
+          // het downsize-geval; vlag-uit blijft byte-identiek (`horizonEngineV2`).
+          useV2: horizonEngineV2 || outcome.engine === 'kernel',
           assets: dashboardAssetsArr,
           debts: dashboardDebtsArr,
           dateOfBirth: dob,
           v1DownsizeSaleAge,
         })
-        // Pensioen post-processing: use actual projected portfolio at AOW age
-        // instead of binary-search minimum (consistent with useHorizonFireSim).
-        if (built.isPensioen) {
+        // Pensioen post-processing.
+        if (outcome.engine === 'kernel') {
+          // Kernel-tak: de kernel verankert de pensioen-eindstrategie ZÉLF op AOW
+          // (solver-ES), en de bridge levert per constructie firePortfolioAtFire ===
+          // requiredFirePortfolio (bisectie stopt op de eerste toereikende maand).
+          // Daarom geen aparte AOW-post-processing nodig — lees requiredFirePortfolio
+          // en fireAgeFractional direct uit simResult (óók correct voor niet-pensioen).
+          simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
+          simFireAgeFractional = simResult.fireAgeFractional
+        } else if (built.isPensioen) {
+          // v2-tak, pensioen: gebruik de werkelijk geprojecteerde portefeuille op
+          // AOW-leeftijd i.p.v. het binary-search-minimum (consistent met useHorizonFireSim).
           simRequiredPortfolio = simResult.firePortfolioAtFire > 0 ? simResult.firePortfolioAtFire : null
           simFireAgeFractional = userAowAge.fractional
         } else {
@@ -730,6 +785,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // verschijnt nooit meer naast "nog jaren". Fallback wanneer de sim niet kon
   // draaien (geen dob / netWorth ≤ 0 / sim-error): het strategie-bewuste
   // fireTarget op dezelfde FIRE-eligible grondslag — geen nieuwe parallelle som.
+  // Convergentie-router (ADR 0009 intact): op de kernel-tak is
+  // `simRequiredPortfolio` de kernel-`requiredFirePortfolio` (= Prognose!J op de
+  // FIRE-maand, nominaal — het V_nodig(FIRE)-equivalent, zie bridge.ts module-doc).
+  // Dat draagt DEZELFDE semantiek als v2's `requiredFirePortfolio`, dus teller
+  // (FIRE-eligible vermogen vandaag) en noemer blijven consistent — geen wijziging
+  // aan `computeFreedomProgress`.
   const requiredPortfolioForProgress = simRequiredPortfolio ?? (fireTarget > 0 ? fireTarget : null)
   const freedomPct = computeFreedomProgress({
     fireEligibleNetWorth,

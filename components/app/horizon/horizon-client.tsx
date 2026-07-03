@@ -29,6 +29,8 @@ import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgress } f
 import { computeEmergencyFundMonths } from '@/lib/health-score-input'
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
+import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
+import { type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
@@ -252,6 +254,16 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   const [estimatedYearlyIncome, setEstimatedYearlyIncome] = useState(0)
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(initialData?.fireStrategy ?? undefined)
   const [userAowAge, setUserAowAge] = useState<AowAge>({ years: 67, months: 0, fractional: 67, isDefinitive: false })
+  // ── Kernel-convergentie (FASE 5, stap 2b) ──
+  /** horizon_kernel_convergentie — draait de /toekomst-projectie via de horizon-kernel
+   *  (adapter→solveFire→bridge). Default uit → byte-identiek aan v2. */
+  const [kernelConvergentie, setKernelConvergentie] = useState(false)
+  /** Rauwe profiel-rij (incl. kernel-instellingen-kolommen + geïnjecteerde
+   *  yearly_essential_expenses) — kern-invoerbron voor de convergentie-router; alleen
+   *  geconsumeerd wanneer de vlag aan is. Los van `profileRaw` (doorrekening-inline). */
+  const [kernelRawProfile, setKernelRawProfile] = useState<ConvergentieRawProfileRow | null>(null)
+  /** Rauwe AOW-tabel — voor de kern-tijdas (lookupAowAge) in de adapter. */
+  const [aowRows, setAowRows] = useState<AowLeeftijdRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
@@ -516,7 +528,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
-  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows, effectiveLifeEvents, housingHeldToEnd } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, originalFireAge, originalFireAgeFractional, unifiedRows, effectiveLifeEvents, housingHeldToEnd, engine, kernelStatus, kernelMaandHint } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -537,6 +549,10 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           housingStrategy: initialData.housingStrategy,
           horizonEngineV2: initialData.horizonEngineV2,
           potRules: initialData.potRules,
+          // FASE 5, stap 2b — kernel-convergentie (vlag + rauwe context).
+          kernelConvergentieEnabled: kernelConvergentie,
+          kernelRawProfile,
+          aowRows,
         }
       : null,
   )
@@ -613,6 +629,58 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       .catch(() => {})
   }, [])
 
+  // ── Kernel-convergentie-context laden op mount (FASE 5, stap 2b) ──────────
+  // `loadData` draait op deze route alléén na CRUD/pane-close, niet op mount.
+  // Zonder deze aparte mount-fetch zou /toekomst pas ná een interactie naar de
+  // kernel flippen. Daarom laden we de kern-context hier ook op de eerste render
+  // — zelfde patroon als de dividend-/scenario-mount-fetches hierboven. De vlag
+  // wordt eerst (goedkoop, één rij) gelezen; staat 'm uit, dan blijft
+  // kernelRawProfile null → de hook rekent byte-identiek v2 (geen gedragswijziging).
+  useEffect(() => {
+    let cancelled = false
+    async function loadKernelContext() {
+      try {
+        const supabase = createClient()
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules')
+          .single()
+        if (cancelled || !profileData) return
+        const enabled = isKernelFlagEnabled(
+          profileData as { feature_preferences?: Record<string, unknown> | null },
+          'convergentie',
+        )
+        setKernelConvergentie(enabled)
+        // Vlag uit → geen kern-context nodig; de hook blijft op v2 (byte-identiek).
+        if (!enabled) return
+        // Jaarlijkse essentiële uitgaven — zelfde grondslag (echte essentiële
+        // budgetten, NIET de retirement-expenses) als v2/loadData, zodat de
+        // 'essential_budgets'-pensioenuitgave-methode in de kernel klopt.
+        const [essentialBudgetsResult, childBudgetsResult, aowResult] = await Promise.all([
+          supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
+          supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
+          supabase.from('aow_leeftijd').select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source').order('birth_date_from', { ascending: true }),
+        ])
+        if (cancelled) return
+        const { yearlyMustExpenses } = computeYearlyMustExpenses(
+          essentialBudgetsResult.data ?? [],
+          childBudgetsResult.data ?? [],
+        )
+        setKernelRawProfile({
+          ...(profileData as ConvergentieRawProfileRow),
+          yearly_essential_expenses: yearlyMustExpenses,
+        })
+        if (aowResult.data && aowResult.data.length > 0) {
+          setAowRows(aowResult.data as AowLeeftijdRow[])
+        }
+      } catch {
+        // Non-critical — zonder kern-context rekent de hook byte-identiek v2.
+      }
+    }
+    loadKernelContext()
+    return () => { cancelled = true }
+  }, [])
+
   // Client-side data reload (used after event CRUD operations)
   const loadData = useCallback(async () => {
     try {
@@ -629,7 +697,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase
@@ -731,6 +799,21 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       setProfileRaw((profileResult.data as Record<string, unknown>) ?? null)
       setEstimatedYearlyIncome(extrapolatedIncome)
 
+      // FASE 5, stap 2b — kernel-convergentie-context ná elke loadData verversen
+      // (los van profileRaw hierboven). yearly_essential_expenses = de al-berekende
+      // essentiële jaaruitgaven (NIET de retirement-expenses) zodat de kernel
+      // dezelfde grondslag gebruikt als v2.
+      setKernelConvergentie(
+        isKernelFlagEnabled(
+          profileResult.data as { feature_preferences?: Record<string, unknown> | null } | null,
+          'convergentie',
+        ),
+      )
+      setKernelRawProfile({
+        ...(profileResult.data as ConvergentieRawProfileRow),
+        yearly_essential_expenses: yearlyMustExpenses,
+      })
+
       const dob = profileResult.data?.date_of_birth ?? null
 
       // FIRE strategy from profile — use API for pensioen fallback
@@ -761,6 +844,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
           .order('birth_date_from', { ascending: true })
         if (aowRes.data && aowRes.data.length > 0) {
           setUserAowAge(lookupAowAge(aowRes.data as AowLeeftijdRow[], dob))
+          // FASE 5, stap 2b — rauwe AOW-tabel voor de kern-tijdas (adapter).
+          setAowRows(aowRes.data as AowLeeftijdRow[])
         }
       } catch {
         // Non-critical — fallback to 67
@@ -3161,6 +3246,32 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                     ) : (
                       <>FIRE niet haalbaar binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>
                     )}
+                    {/* V12 — kernel-hint: hoeveel €/mnd extra sparen het wél haalbaar maakt. */}
+                    {engine === 'kernel' && kernelStatus === 'unreachable_within_horizon' && kernelMaandHint != null && kernelMaandHint > 0 && (
+                      <> Zo&apos;n {formatMaskedCurrency(Math.ceil(kernelMaandHint), masked)}/mnd extra opzij zetten maakt het wél haalbaar binnen je projectie.</>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {/* V12 — kernel pensioen-tekort: vóór AOW komt het vermogen tekort, ná AOW
+                  dekt het inkomen het wél. Beschrijvend (Wft-veilig); eigen oranje regel
+                  omdat de banner hierboven pensioen-modus overslaat. */}
+              {engine === 'kernel' && kernelStatus === 'pension_shortfall' && (
+                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                  <p className="font-sans text-[12px] text-orange-700">
+                    Tot je AOW-leeftijd komt je vermogen tekort — in die periode teer je in op een tekort-lening. Vanaf je AOW-leeftijd dekt je inkomen je uitgaven wél.
+                  </p>
+                </div>
+              )}
+
+              {/* V12 — kernel reached_now: nu al genoeg. Neutrale (niet-oranje) horizon-toon. */}
+              {engine === 'kernel' && kernelStatus === 'reached_now' && (
+                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-horizon-200 bg-horizon-50/50 px-3 py-2.5">
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-horizon-600" />
+                  <p className="font-sans text-[12px] text-[var(--ink-2)]">
+                    Volgens je huidige cijfers kun je nu al stoppen met werken.
                   </p>
                 </div>
               )}

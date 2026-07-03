@@ -39,6 +39,8 @@ import { NL_AOW_AGE } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { resolvePensionFactorA } from '@/lib/jaarruimte'
 import { isHorizonV2Enabled } from '@/lib/horizon-engine/flag'
+import { isKernelFlagEnabled } from '@/lib/horizon-kernel/flag'
+import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { resolvePotRules, type PotRulesConfig } from '@/lib/pot-rules'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
@@ -59,6 +61,12 @@ export type SnapshotForTrend = {
   freedom_percentage: number | null
   fire_age: number | null
   score_version: number | null
+  /**
+   * Rekenmotor die de FIRE-velden (fire_age / fire_portfolio) van deze snapshot
+   * schreef — 'kernel' of 'v2' (FASE 5 stap 2b, V15). NULL = historisch / vlag-uit.
+   * Voedt de "rekenwijze gewijzigd"-annotatie in de FIRE-trend-weergave.
+   */
+  engine_bron: string | null
 }
 
 export interface HorizonPageData {
@@ -99,6 +107,19 @@ export interface HorizonPageData {
   pensioenFactorAKnown: boolean
   /** Feature-flag: gebruik de grootboek-engine v2 op /toekomst (per-user opt-in). */
   horizonEngineV2: boolean
+  /**
+   * Convergentie-set-vlag (`horizon_kernel_convergentie`, ADR 0032 §6) voor deze
+   * gebruiker. True → de kernel-router mag de horizon-kernel gebruiken i.p.v. v2.
+   * Additief: de v2-consumenten negeren dit veld (byte-identiek bij vlag uit).
+   */
+  kernelConvergentie: boolean
+  /**
+   * Rauwe profiel-rij voor de kernel-router (`computeConvergentieProjection`) —
+   * de al-gemergede hoofdprofiel-rij + de al-berekende essentiële-jaaruitgaven.
+   * Null wanneer de profiel-query faalde. Alleen geconsumeerd wanneer
+   * `kernelConvergentie` aan staat; anders inert.
+   */
+  rawProfile: ConvergentieRawProfileRow | null
   /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde voor v2. */
   potRules: PotRulesConfig
   /** Error message from profile query, null if successful */
@@ -273,7 +294,7 @@ export async function loadHorizonData(
     // duplicate pair on the same table.
     supabase.from('assets').select('*').eq('is_active', true).limit(500),
     supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules').single(),
+    supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, household_type, number_of_children, housing_strategy_config, housing_strategy_dismissed_at, income_source, expenses_source, pot_rules, box3_method, deficit_loan_rate, withdrawal_profile_config').single(),
     // Single budget query (all budgets) — replaces separate essential + child queries
     supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }),
@@ -288,7 +309,7 @@ export async function loadHorizonData(
     supabase.from('debts').select('*').eq('is_active', true).limit(200),
     supabase
       .from('net_worth_snapshots')
-      .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version')
+      .select('snapshot_date, resilience_score, net_worth, freedom_percentage, fire_age, score_version, engine_bron')
       .order('snapshot_date', { ascending: true })
       .limit(60),
     supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
@@ -809,6 +830,24 @@ export async function loadHorizonData(
     ? Math.max(0, avgIncome6m - avgExpenses6m)
     : null
 
+  // ── Convergentie-set: kernel-vlag + rauwe kernel-context ──────────
+  // De kernel-router (fire-target-shared, use-horizon-fire-sim, dashboard-loader)
+  // heeft naast de gebouwde v2-input óók de RAUWE profiel-rij nodig om de kernel-
+  // invoer samen te stellen. Beide velden zijn additief; met de vlag uit worden ze
+  // door de v2-consumenten genegeerd → byte-identiek gedrag.
+  const kernelConvergentie = isKernelFlagEnabled(
+    profile as { feature_preferences?: Record<string, unknown> | null },
+    'convergentie',
+  )
+  // rawProfile = de al-gemergede hoofdprofiel-rij (incl. withdrawal/guardrail-velden,
+  // hierboven gemerged) + de al-berekende essentiële-jaaruitgaven (geen DB-kolom)
+  // zodat de kernel dezelfde pensioen-uitgave-grondslag ('essential_budgets')
+  // gebruikt als v2. Geen nieuwe som — hergebruikt `yearlyMustExpenses`.
+  const rawProfile: ConvergentieRawProfileRow = {
+    ...(profile as ConvergentieRawProfileRow),
+    yearly_essential_expenses: yearlyMustExpenses,
+  }
+
   return {
     effectiveInput,
     events: loadedEvents,
@@ -831,6 +870,8 @@ export async function loadHorizonData(
     pensioenFactorA,
     pensioenFactorAKnown,
     horizonEngineV2,
+    kernelConvergentie,
+    rawProfile,
     potRules,
     profileError: profileResult.error
       ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`

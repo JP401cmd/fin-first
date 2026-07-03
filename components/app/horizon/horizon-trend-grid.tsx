@@ -29,6 +29,39 @@ type HorizonTrendGridProps = {
 }
 
 /**
+ * Detecteer de eerste "rekenwijze gewijzigd"-overgang in een chronologisch
+ * geordende snapshot-reeks (V15, FASE 5 stap 2b): het eerste punt waarop de motor
+ * die de FIRE-velden schreef (`engine_bron`) verschilt van het vorige punt. NULL
+ * (historisch / vlag-uit) telt als 'v2'. Retourneert de `snapshot_date` van dát
+ * punt, of null als de hele reeks met één rekenwijze is doorgerekend (dan is er
+ * geen knik-uitleg nodig).
+ */
+export function detectEngineBronTransition(
+  snapshots: readonly Pick<SnapshotForTrend, 'snapshot_date' | 'engine_bron'>[],
+): string | null {
+  const norm = (bron: string | null | undefined): string => bron ?? 'v2'
+  for (let i = 1; i < snapshots.length; i++) {
+    if (norm(snapshots[i].engine_bron) !== norm(snapshots[i - 1].engine_bron)) {
+      return snapshots[i].snapshot_date
+    }
+  }
+  return null
+}
+
+/**
+ * Compacte NL-maand+jaar-notatie voor de overgang-annotatie (bv. "jul 2026").
+ * Parseert de `YYYY-MM-DD`-string zélf (TZ-onafhankelijk): `new Date(dateStr)`
+ * zou UTC-middernacht opleveren en via lokale getters bij negatieve UTC-offsets
+ * een dag (en op een maandgrens dus een maand) kunnen verschuiven.
+ */
+function formatTransitionDate(dateStr: string): string {
+  const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+  const [year, month] = dateStr.split('-')
+  const monthIdx = Number(month) - 1
+  return monthIdx >= 0 && monthIdx < 12 ? `${months[monthIdx]} ${year}` : dateStr
+}
+
+/**
  * Verloop-grid: Gezondheids- + FIRE-leeftijd-trend (Deep Dive).
  *
  * Geëxtraheerd uit `horizon-client.tsx` (sectie 5b) als zelfstandige,
@@ -51,6 +84,9 @@ export function HorizonTrendGrid({
   const hasFireTrend = fireAgeSnapshots.length >= 2
   const last = hasFireTrend ? fireAgeSnapshots[fireAgeSnapshots.length - 1] : null
   const lastAge = last ? (last.fire_age as number) : null
+  // V15: markeer een overgang in de rekenwijze (engine_bron) op de FIRE-lijn.
+  // Null wanneer de reeks met één rekenwijze is doorgerekend → geen annotatie.
+  const fireEngineTransitionDate = detectEngineBronTransition(fireAgeSnapshots)
 
   return (
     <div className="mt-5 grid gap-4 sm:mt-8 sm:gap-5 lg:grid-cols-2">
@@ -158,6 +194,14 @@ export function HorizonTrendGrid({
               <div className="p-4 sm:p-6">
                 <FireAgeContextMessage snapshots={fireAgeSnapshots} />
                 <FireAgeTrendChart snapshots={resilienceSnapshots} />
+                {fireEngineTransitionDate && (
+                  <p
+                    className="mt-2 font-mono text-[11px] text-[var(--ink-3)]"
+                    data-testid="engine-bron-transition-note"
+                  >
+                    Rekenwijze gewijzigd op {formatTransitionDate(fireEngineTransitionDate)} — een knik in de lijn kan daardoor komen.
+                  </p>
+                )}
               </div>
             ) : (
               <div className="p-6 text-center sm:p-8">

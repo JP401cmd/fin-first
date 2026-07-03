@@ -10,7 +10,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import type { SnapshotForTrend } from '@/components/app/horizon/horizon-helpers'
-import { HorizonTrendGrid } from './horizon-trend-grid'
+import { HorizonTrendGrid, detectEngineBronTransition } from './horizon-trend-grid'
 
 // FeatureGate → render children onvoorwaardelijk (gating wordt elders getest).
 vi.mock('@/components/app/feature-gate', () => ({
@@ -128,5 +128,49 @@ describe('HorizonTrendGrid', () => {
   it('rendert de fire-age-trendchart wanneer fire open is en trend bestaat', () => {
     render(<HorizonTrendGrid {...baseProps()} fireAgeChartOpen />)
     expect(screen.getByTestId('fireage-chart')).toBeTruthy()
+  })
+
+  it('toont GEEN "rekenwijze gewijzigd"-annotatie zonder engine_bron-overgang (V15)', () => {
+    // baseProps-snapshots dragen geen engine_bron → alles telt als 'v2' → geen knik.
+    render(<HorizonTrendGrid {...baseProps()} fireAgeChartOpen />)
+    expect(screen.queryByTestId('engine-bron-transition-note')).toBeNull()
+  })
+
+  it('toont de "rekenwijze gewijzigd"-annotatie bij een engine_bron-overgang (V15)', () => {
+    const withTransition: SnapshotForTrend[] = [
+      { snapshot_date: '2026-05-01', resilience_score: 60, net_worth: 100_000, freedom_percentage: 30, fire_age: 55, score_version: 2, engine_bron: 'v2' },
+      { snapshot_date: '2026-06-01', resilience_score: 61, net_worth: 101_000, freedom_percentage: 31, fire_age: 54, score_version: 2, engine_bron: 'kernel' },
+    ]
+    render(<HorizonTrendGrid {...baseProps()} resilienceSnapshots={withTransition} fireAgeChartOpen />)
+    const note = screen.getByTestId('engine-bron-transition-note')
+    // Datum-format is tijdzone-gevoelig; assert alleen op de stabiele tekst + jaar.
+    expect(note.textContent).toMatch(/Rekenwijze gewijzigd op .*2026 — een knik/)
+  })
+})
+
+describe('detectEngineBronTransition (V15)', () => {
+  const snap = (snapshot_date: string, engine_bron: string | null) => ({ snapshot_date, engine_bron })
+
+  it('geen overgang (één rekenwijze) → null', () => {
+    expect(detectEngineBronTransition([snap('2026-05-01', 'v2'), snap('2026-06-01', 'v2')])).toBeNull()
+    expect(detectEngineBronTransition([snap('2026-05-01', 'kernel'), snap('2026-06-01', 'kernel')])).toBeNull()
+  })
+
+  it('null → kernel = overgang → de datum van het kernel-punt (null telt als v2)', () => {
+    expect(
+      detectEngineBronTransition([snap('2026-05-01', null), snap('2026-06-01', 'kernel')]),
+    ).toBe('2026-06-01')
+  })
+
+  it('kernel → v2 = ook een overgang → de datum van het v2-punt', () => {
+    expect(
+      detectEngineBronTransition([snap('2026-05-01', 'kernel'), snap('2026-06-01', 'v2')]),
+    ).toBe('2026-06-01')
+  })
+
+  it('alles-null (allemaal v2) → null', () => {
+    expect(
+      detectEngineBronTransition([snap('2026-05-01', null), snap('2026-06-01', null), snap('2026-07-01', null)]),
+    ).toBeNull()
   })
 })

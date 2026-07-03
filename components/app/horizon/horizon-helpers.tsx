@@ -25,6 +25,13 @@ export type SnapshotForTrend = {
    * niet — dan blijft de "methode aangepast"-markering achterwege.
    */
   score_version?: number | null
+  /**
+   * Rekenmotor die de FIRE-velden schreef — 'kernel' of 'v2' (FASE 5 stap 2b,
+   * V15). NULL/afwezig = historisch / vlag-uit (telt als 'v2'). Voedt de
+   * "rekenwijze gewijzigd"-annotatie op de FIRE-trend. Optioneel: oudere selects
+   * leveren 'm niet.
+   */
+  engine_bron?: string | null
 }
 
 export type PensionParseSummaryResult = {
