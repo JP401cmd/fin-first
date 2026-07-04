@@ -40,6 +40,8 @@ const EXPENSE_PALETTE = ['#5b5450', '#7a746f', '#9e9893', '#b5afaa', '#6b6661', 
 const INCOME_HEX_BY_ID: Record<string, string> = {
   growth: '#c4a06b',    // Rendement: horizon-500
   savings: '#a37a3a',   // Besparingen: horizon-700
+  salaris: '#d8be93',   // Salaris & werk: horizon-300 (lichte goud)
+  'gebeurtenis-baten': '#b3894e', // AOW & pensioen: horizon-500 warm
 }
 
 const EXPENSE_HEX_BY_ID: Record<string, string> = {

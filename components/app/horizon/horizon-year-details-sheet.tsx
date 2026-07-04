@@ -49,7 +49,12 @@ import {
 } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow, SimRow } from '@/lib/fire-simulation'
-import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import type {
+  UnifiedProjectionRow,
+  AssetBucketDetail,
+  WithdrawalNeedBreakdown,
+} from '@/lib/unified-projection'
+import { cashflowsForYear } from '@/lib/horizon/cashflows-for-year'
 import { HorizonCashflowSankey } from '@/components/app/horizon/horizon-cashflow-sankey'
 
 // ── Privacy-aware EUR-formatter (custom hook keeps the masked-toggle live) ──
@@ -78,6 +83,76 @@ function deflationFactor(years: number, inflation: number): number {
   return 1 / Math.pow(1 + inflation, years)
 }
 
+// ── Onttrekkings-kassabon (behoefte-decompositie) ─────────────────
+
+/** Eén kassabon-regel in de onttrekkings-behoefte-uitsplitsing. */
+export interface WithdrawalReceiptLine {
+  id: string
+  label: string
+  /** Optionele verduidelijking onder het label (bv. de dubbele-box3-duiding). */
+  sublabel?: string
+  /** Bijdrage aan de behoefte, mét teken (+ verhoogt, − verlaagt de behoefte). */
+  signed: number
+  kind: 'component' | 'total' | 'deficit'
+}
+
+/**
+ * Bouwt de kassabon-regels voor de onttrekkings-behoefte-decompositie
+ * (`WithdrawalNeedBreakdown`). De component-regels reconciliëren float-exact
+ * naar `need.totaalNeed`; de sluitregel "Niet gedekt" (alleen in tekortjaren)
+ * maakt de bon exact gelijk aan de werkelijk onttrokken `withdrawal` — het
+ * getoonde bedrag op de hoofdregel:
+ *   Σ component.signed === need.totaalNeed          (bridge-invariant)
+ *   need.totaalNeed − need.nietGedekt === withdrawal (tekort-sluiting)
+ *
+ * Optionele termen (huur/hyplast/box3/partner/maandcorrectie) worden alleen
+ * opgenomen wanneer ≠ 0; dat verandert de som niet (weggelaten termen zijn 0).
+ */
+export function buildWithdrawalReceiptLines(
+  need: WithdrawalNeedBreakdown,
+  withdrawal: number,
+): WithdrawalReceiptLine[] {
+  const lines: WithdrawalReceiptLine[] = [
+    {
+      id: 'uitgave',
+      label: 'Basisuitgaven (geïndexeerd)',
+      signed: need.uitgaveTerm,
+      kind: 'component',
+    },
+  ]
+  if (need.huurNaVerkoop !== 0) {
+    lines.push({ id: 'huur', label: 'Huur na verkoop woning', signed: need.huurNaVerkoop, kind: 'component' })
+  }
+  if (need.vervallenHypotheeklast !== 0) {
+    lines.push({
+      id: 'hyplast',
+      label: 'Vrijgevallen hypotheeklast',
+      signed: -need.vervallenHypotheeklast,
+      kind: 'component',
+    })
+  }
+  if (need.box3 !== 0) {
+    lines.push({
+      id: 'box3',
+      label: 'Box 3-belasting',
+      sublabel: 'zelfde heffing als hierboven — hier als deel van de onttrekkingsbehoefte',
+      signed: need.box3,
+      kind: 'component',
+    })
+  }
+  if (need.partnerBijdrage !== 0) {
+    lines.push({ id: 'partner', label: 'Bijdrage partner', signed: -need.partnerBijdrage, kind: 'component' })
+  }
+  if (need.restMaandClamp !== 0) {
+    lines.push({ id: 'maandcorrectie', label: 'Maandcorrectie', signed: need.restMaandClamp, kind: 'component' })
+  }
+  lines.push({ id: 'totaal', label: 'Behoefte-totaal', signed: need.totaalNeed, kind: 'total' })
+  if (need.nietGedekt > 0.5) {
+    lines.push({ id: 'niet-gedekt', label: 'Niet gedekt (tekort)', signed: -need.nietGedekt, kind: 'deficit' })
+  }
+  return lines
+}
+
 /** Dynamische Lucide-icon-resolver met fallback. */
 function renderLucideIcon(
   name: string | undefined,
@@ -92,42 +167,8 @@ function renderLucideIcon(
   return IconComp ? <IconComp {...props} /> : null
 }
 
-/**
- * Filter cashflows op `[yearStartAge, yearStartAge+1)`. Splits AOW eruit
- * (wordt apart getoond) zodat we niet dubbel renderen.
- */
-function cashflowsForYear(
-  cashflows: SimCashflow[],
-  yearStartAge: number,
-): { id: string; amount: number; isAow: boolean }[] {
-  const yearEndAge = yearStartAge + 1
-  const out: { id: string; amount: number; isAow: boolean }[] = []
-
-  for (const cf of cashflows) {
-    let delta = 0
-    if (cf.type === 'one_time') {
-      if (cf.fromAge >= yearStartAge && cf.fromAge < yearEndAge) {
-        delta = cf.amount * (cf.direction === 'income' ? 1 : -1)
-      }
-    } else {
-      const cfEnd = cf.toAge ?? Number.POSITIVE_INFINITY
-      const overlapStart = Math.max(cf.fromAge, yearStartAge)
-      const overlapEnd = Math.min(cfEnd, yearEndAge)
-      if (overlapStart < overlapEnd) {
-        const months = Math.round((overlapEnd - overlapStart) * 12)
-        delta = cf.amount * months * (cf.direction === 'income' ? 1 : -1)
-      }
-    }
-    if (delta !== 0) {
-      const isAow =
-        cf.id.startsWith('le-aow-') ||
-        cf.id === '__aow' ||
-        cf.name?.toLowerCase().includes('aow')
-      out.push({ id: cf.id, amount: delta, isAow })
-    }
-  }
-  return out
-}
+// `cashflowsForYear` is verhuisd naar `@/lib/horizon/cashflows-for-year` (puur +
+// getest); het respecteert nu de `indexed`-vlag via de kernel-inflatiefactor.
 
 // ── Sub-components ────────────────────────────────────────────────
 
@@ -196,12 +237,78 @@ function PvLine({
   )
 }
 
+/**
+ * Subtiele kassabon-sub-regel onder een hoofdregel — indented, dotted-left.
+ * Hergebruikt voor de onttrekkings-behoefte-uitsplitsing én de per-asset-type
+ * rendement-/Box 3-toerekeningen. Toont label + getekend bedrag (mono/tabular,
+ * − als U+2212) + optionele "≈ vandaag"-deflatie (zelfde grondslag als PvLine).
+ */
+function ReceiptSubRow({
+  label,
+  sublabel,
+  signed,
+  age,
+  currentAge,
+  inflation,
+  variant = 'component',
+}: {
+  label: string
+  sublabel?: string
+  signed: number
+  age: number
+  currentAge: number
+  inflation: number
+  variant?: 'component' | 'total' | 'deficit'
+}) {
+  const fc = useFc()
+  const sign = signed < 0 ? '−' : '+'
+  const isTotal = variant === 'total'
+  const amountTone =
+    variant === 'deficit'
+      ? 'text-[var(--negative,#b91c1c)]'
+      : isTotal
+        ? 'text-[var(--ink)]'
+        : 'text-[var(--ink-2)]'
+  return (
+    <li
+      className={`flex items-start justify-between gap-3 py-1 ${
+        isTotal ? 'mt-0.5 border-t border-dotted border-[var(--border-ed)]/70 pt-1.5' : ''
+      }`}
+    >
+      <span className="min-w-0 flex-1">
+        <span
+          className={`block text-[11px] leading-snug ${
+            isTotal ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-3)]'
+          }`}
+        >
+          {label}
+        </span>
+        {sublabel && (
+          <span className="mt-0.5 block text-[10px] italic leading-snug text-[var(--ink-4)]">
+            {sublabel}
+          </span>
+        )}
+      </span>
+      <div className="shrink-0 text-right">
+        <span
+          className={`font-mono text-[11px] tabular-nums ${isTotal ? 'font-semibold' : ''} ${amountTone}`}
+        >
+          <span aria-hidden="true">{sign}</span>
+          {fc(Math.abs(signed))}
+        </span>
+        <PvLine nominal={signed} age={age} currentAge={currentAge} inflation={inflation} />
+      </div>
+    </li>
+  )
+}
+
 /** Eén bezittings-rij: icoon + label + waarde + sub-regel met groei/bijdrage. */
 function AssetTypeRow({
   type,
   endValue,
   growth,
   contributions,
+  box3Drag,
   phase,
   age,
   currentAge,
@@ -211,12 +318,14 @@ function AssetTypeRow({
   endValue: number
   growth: number
   contributions: number
+  box3Drag: number
   phase: 'opbouw' | 'afbouw' | 'overgang'
   age: number
   currentAge: number
   inflation: number
 }) {
   const fc = useFc()
+  const showContribution = phase !== 'afbouw' && contributions > 0
   return (
     <li className="flex items-start justify-between gap-3 border-b border-dotted border-[var(--border-ed)]/70 py-2.5 last:border-b-0">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -233,19 +342,26 @@ function AssetTypeRow({
           <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
             {ASSET_TYPE_LABELS[type]}
           </p>
-          {(growth !== 0 || contributions !== 0) && (
+          {(growth !== 0 || contributions !== 0 || box3Drag !== 0) && (
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
-              {phase !== 'afbouw' && contributions > 0 && (
+              {showContribution && (
                 <>
                   <span>+ Bijdrage </span>
                   <span className="font-mono tabular-nums">{fc(contributions)}</span>
-                  {growth !== 0 && <span className="mx-1.5">·</span>}
+                  {(growth !== 0 || box3Drag !== 0) && <span className="mx-1.5">·</span>}
                 </>
               )}
               {growth !== 0 && (
                 <>
                   <span>{growth >= 0 ? '+ Rendement ' : '− Verlies '}</span>
                   <span className="font-mono tabular-nums">{fc(Math.abs(growth))}</span>
+                  {box3Drag !== 0 && <span className="mx-1.5">·</span>}
+                </>
+              )}
+              {box3Drag !== 0 && (
+                <>
+                  <span>− Box 3 </span>
+                  <span className="font-mono tabular-nums">{fc(Math.abs(box3Drag))}</span>
                 </>
               )}
             </p>
@@ -338,6 +454,7 @@ function CostsRow({
   age,
   currentAge,
   inflation,
+  children,
 }: {
   label: string
   sublabel?: string
@@ -346,6 +463,8 @@ function CostsRow({
   age: number
   currentAge: number
   inflation: number
+  /** Optionele kassabon-uitsplitsing onder de hoofdregel (ReceiptSubRow-lijst). */
+  children?: React.ReactNode
 }) {
   const fc = useFc()
   const sign = amount < 0 ? '−' : amount > 0 ? '+' : ''
@@ -356,20 +475,25 @@ function CostsRow({
         ? 'text-[var(--positive,#0f766e)]'
         : 'text-[var(--ink)]'
   return (
-    <li className="flex items-start justify-between gap-3 border-b border-dotted border-[var(--border-ed)]/70 py-2 last:border-b-0">
-      <div className="min-w-0">
-        <p className="text-[13px] font-medium text-[var(--ink)]">{label}</p>
-        {sublabel && (
-          <p className="mt-0.5 text-[10px] italic text-[var(--ink-4)]">{sublabel}</p>
-        )}
+    <li className="border-b border-dotted border-[var(--border-ed)]/70 py-2 last:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[13px] font-medium text-[var(--ink)]">{label}</p>
+          {sublabel && (
+            <p className="mt-0.5 text-[10px] italic text-[var(--ink-4)]">{sublabel}</p>
+          )}
+        </div>
+        <div className="shrink-0 text-right">
+          <p className={`font-mono text-sm font-semibold tabular-nums ${toneClass}`}>
+            {sign}
+            {fc(Math.abs(amount))}
+          </p>
+          <PvLine nominal={amount} age={age} currentAge={currentAge} inflation={inflation} />
+        </div>
       </div>
-      <div className="shrink-0 text-right">
-        <p className={`font-mono text-sm font-semibold tabular-nums ${toneClass}`}>
-          {sign}
-          {fc(Math.abs(amount))}
-        </p>
-        <PvLine nominal={amount} age={age} currentAge={currentAge} inflation={inflation} />
-      </div>
+      {children && (
+        <ul className="mt-1.5 border-l border-[var(--border-ed)]/60 pl-3">{children}</ul>
+      )}
     </li>
   )
 }
@@ -485,6 +609,30 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
       .sort((a, b) => b[1].endValue - a[1].endValue)
   }, [row])
 
+  // ── Rendement per asset-type (RAUW), |bedrag| ≥ €0,50, aflopend ─────
+  const rendementRows = useMemo(() => {
+    if (!row) return []
+    return (Object.entries(row.assetBuckets) as Array<[AssetType, AssetBucketDetail]>)
+      .map(([type, b]) => ({ type, amount: b.growth }))
+      .filter(x => Math.abs(x.amount) >= 0.5)
+      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+  }, [row])
+
+  // ── Box 3-toerekening per asset-type, |bedrag| ≥ €0,50, aflopend ────
+  const box3Rows = useMemo(() => {
+    if (!row) return []
+    return (Object.entries(row.assetBuckets) as Array<[AssetType, AssetBucketDetail]>)
+      .map(([type, b]) => ({ type, amount: b.box3Drag }))
+      .filter(x => Math.abs(x.amount) >= 0.5)
+      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+  }, [row])
+
+  // ── Onttrekkings-behoefte-kassabon (alleen post-FIRE behoefte-jaren) ─
+  const withdrawalReceipt = useMemo(() => {
+    if (!row?.withdrawalNeed || row.withdrawal <= 0) return null
+    return buildWithdrawalReceiptLines(row.withdrawalNeed, row.withdrawal)
+  }, [row])
+
   // ── Debt-rijen: alleen actief in dit jaar (saldo of aflossing/rente > 0) ─
   const debtsById = useMemo(() => new Map(debts.map(d => [d.id, d])), [debts])
   const debtRows = useMemo(() => {
@@ -502,7 +650,11 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   // ── Gebeurtenissen voor dit jaar (life events + AOW apart) ──────
   const eventBreakdown = useMemo(() => {
     if (age == null) return { aowAmount: 0, others: [] as { id: string; name: string; icon: string; amount: number }[] }
-    const cfs = cashflowsForYear(cashflows, age)
+    // Geïndexeerde stromen (AOW) groeien mee met inflatie: consume de
+    // kernel-inflatiefactor van dit jaar (row.inflationFactor, V14) i.p.v. een
+    // eigen (1+inflatie)^t. Zo hanteert de Gebeurtenissen-sectie dezelfde
+    // grondslag als de "Kosten en inkomsten"-sectie hierboven.
+    const cfs = cashflowsForYear(cashflows, age, row?.inflationFactor ?? 1)
     let aowAmount = 0
     const aggregated = new Map<string, { name: string; icon: string; amount: number }>()
     for (const cf of cfs) {
@@ -536,7 +688,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
       // het toevoegt. Geen heuristische "fake" AOW-bedragen.
     }
     return { aowAmount, others }
-  }, [age, cashflows, lifeEvents, aowAge])
+  }, [age, cashflows, lifeEvents, aowAge, row])
 
   // ── Titel + delta-context ───────────────────────────────────────
   const title = useMemo(() => {
@@ -612,8 +764,14 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
             <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--ink-3)]">
               Netto vermogen
             </p>
-            <p className="mt-0.5 text-[10px] italic text-[var(--ink-3)]">
-              bezittingen − schulden
+            <p className="mt-0.5 font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
+              <span aria-hidden="true">+ </span>
+              {fc(totalAssets)}
+              <span className="text-[var(--ink-4)]"> bezittingen</span>
+              <span className="mx-1" aria-hidden="true">·</span>
+              <span aria-hidden="true">− </span>
+              {fc(totalDebts)}
+              <span className="text-[var(--ink-4)]"> schulden</span>
             </p>
           </div>
           <div className="text-right">
@@ -668,6 +826,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                       endValue={bucket.endValue}
                       growth={bucket.growth}
                       contributions={bucket.contributions}
+                      box3Drag={bucket.box3Drag}
                       phase={phase}
                       age={age!}
                       currentAge={currentAge}
@@ -714,14 +873,27 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
               <ul className="mt-1">
                 {row.totalBox3 > 0 && (
                   <CostsRow
-                    label="Box 3 belasting"
-                    sublabel="fictief rendement × tarief"
+                    label="Box 3-belasting"
+                    sublabel="fictief rendement × tarief · toerekening per bezitting"
                     amount={-row.totalBox3}
                     tone="expense"
                     age={age!}
                     currentAge={currentAge}
                     inflation={inflationRate}
-                  />
+                  >
+                    {box3Rows.length > 0
+                      ? box3Rows.map(({ type, amount }) => (
+                          <ReceiptSubRow
+                            key={type}
+                            label={ASSET_TYPE_LABELS[type]}
+                            signed={-amount}
+                            age={age!}
+                            currentAge={currentAge}
+                            inflation={inflationRate}
+                          />
+                        ))
+                      : undefined}
+                  </CostsRow>
                 )}
                 {(phase === 'opbouw' || phase === 'overgang') && row.savings > 0 && (
                   <CostsRow
@@ -743,18 +915,44 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                     age={age!}
                     currentAge={currentAge}
                     inflation={inflationRate}
-                  />
+                  >
+                    {withdrawalReceipt?.map(line => (
+                      <ReceiptSubRow
+                        key={line.id}
+                        label={line.label}
+                        sublabel={line.sublabel}
+                        signed={line.signed}
+                        variant={line.kind}
+                        age={age!}
+                        currentAge={currentAge}
+                        inflation={inflationRate}
+                      />
+                    ))}
+                  </CostsRow>
                 )}
                 {row.totalGrowth !== 0 && (
                   <CostsRow
                     label={row.totalGrowth >= 0 ? 'Rendement portfolio' : 'Verlies portfolio'}
-                    sublabel="gewogen groei over alle assets"
+                    sublabel="rauw rendement per vermogenstype"
                     amount={row.totalGrowth}
                     tone={row.totalGrowth >= 0 ? 'income' : 'expense'}
                     age={age!}
                     currentAge={currentAge}
                     inflation={inflationRate}
-                  />
+                  >
+                    {rendementRows.length > 0
+                      ? rendementRows.map(({ type, amount }) => (
+                          <ReceiptSubRow
+                            key={type}
+                            label={ASSET_TYPE_LABELS[type]}
+                            signed={amount}
+                            age={age!}
+                            currentAge={currentAge}
+                            inflation={inflationRate}
+                          />
+                        ))
+                      : undefined}
+                  </CostsRow>
                 )}
                 {row.cashflowNet !== 0 && (
                   <CostsRow

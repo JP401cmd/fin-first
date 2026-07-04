@@ -141,6 +141,7 @@ import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-char
 import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
+import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming } from '@/lib/fire-strategy'
 import { toSimResult } from '@/lib/unified-projection'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
@@ -1589,12 +1590,40 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
     }
   })()
 
-  // Inflatie-indexfactor per leeftijd (consume-only uit unifiedRows). Voedt de
-  // meegroeiende erfenis/koopkracht-doellijn in SimChart: het reële doel-van-nu
-  // groeit met inflatie mee naar de nominale eindwaarde. Geen eigen inflatie-som.
+  // ── Weergave-clip: t/m eindleeftijd − 1 (besluit 4 juli 2026) ───────────────
+  // Het laatste levensjaar is terminale modelmarge en verdwijnt uit BEELD. We
+  // clippen op databron-niveau (`clipRowsToPlanEnd`, puur + getest) zodat de
+  // chart-componenten (incl. de sibling-owned sim-chart) onaangeraakt blijven.
+  // Grens = kernel-`displayEndAge` (perpetual/pensioen = horizon-cap 100, deplete/
+  // legacy = fire_end_age). Idempotent → veilig als een consument elders ook clipt.
+  // `displaySimRows` (SimRow[]) volgt verderop, ná `effectiveSimRows`.
+  const displayEndAge = simResult?.displayEndAge ?? null
+  const displayUnifiedRows = useMemo(
+    () => clipRowsToPlanEnd(unifiedRows, displayEndAge),
+    [unifiedRows, displayEndAge],
+  )
+
+  // Chart-x-domein-eindleeftijd = één jaar vóór `displayEndAge`. De projectie-
+  // data stopt op `displayEndAge − 1` (het laatste modeljaar dat de kernel als
+  // "gemeld" beschouwt; het eindjaar zelf is een cutoff-grens, niet een datapunt
+  // — zie de displayRows-clip hierboven). Zonder deze −1 loopt de as door tot
+  // `displayEndAge` terwijl er geen data meer is → lege rechtermarge in álle
+  // grafieken. Eén afgeleide, gebruikt door alle zes chart-consumers zodat de
+  // `useChartZoom`-visibleMax (= endAge van ZoomableChartContainer) vanzelf mee
+  // cascadeert. Null-safe: null iff `simResult`/`displayEndAge` ontbreekt, en de
+  // consumers hieronder staan alle in de `simResult`-gegate JSX-regio.
+  const chartEndAge = useMemo(
+    () => (displayEndAge != null ? displayEndAge - 1 : null),
+    [displayEndAge],
+  )
+
+  // Inflatie-indexfactor per leeftijd (consume-only uit de geclipte weergaverijen).
+  // Voedt de meegroeiende erfenis/koopkracht-doellijn in SimChart: het reële
+  // doel-van-nu groeit met inflatie mee naar de nominale eindwaarde. Geen eigen
+  // inflatie-som. Geclipt zodat de doellijn niet tot het (verborgen) laatste jaar loopt.
   const targetInflationFactors = useMemo(
-    () => (unifiedRows ?? []).map(r => ({ age: r.age, factor: r.inflationFactor })),
-    [unifiedRows],
+    () => displayUnifiedRows.map(r => ({ age: r.age, factor: r.inflationFactor })),
+    [displayUnifiedRows],
   )
 
   // "Huis wordt nooit verkocht"-melding (Wft-veilig, beschrijvend). Verschijnt
@@ -1698,6 +1727,22 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireStrategy, debts, events, aowRows, initialData.assets, kernelRawProfile])
 
   const effectiveSimRows = isAowStopActive && aowStopSimResult ? aowStopSimResult.rows : (simResult?.rows ?? [])
+
+  // Weergave-clip voor de SimRow-oppervlakken (Pad-grafiek + Inkomen&Uitgaven-
+  // strip): t/m eindleeftijd − 1, spiegelbeeld van `displayUnifiedRows`. De
+  // AOW-stop-wat-als heeft een eigen eindleeftijd → clip die op de eigen grens.
+  const displaySimRows = useMemo(
+    () => clipRowsToPlanEnd(simResult?.rows ?? null, displayEndAge),
+    [simResult?.rows, displayEndAge],
+  )
+  const displayEffectiveSimRows = useMemo(
+    () =>
+      clipRowsToPlanEnd(
+        effectiveSimRows,
+        isAowStopActive && aowStopSimResult ? aowStopSimResult.displayEndAge : displayEndAge,
+      ),
+    [effectiveSimRows, isAowStopActive, aowStopSimResult, displayEndAge],
+  )
   // Partner-view: vervang de hoofdlijn door het PARTNER-pad (eigen as + FIRE-
   // markers op de partner). Alleen wanneer er een precies partner-pad is
   // (`partnerLine` niet-null); anders degraderen we naar de eigen lijn zodat de
@@ -1799,8 +1844,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // wél tonen (anders verdwijnt het vastgoed/hypotheek-balkje).
   const wealthCompositionRows: StackedRow[] = useMemo(() => {
     if (chartMode !== 'vermogensopbouw') return []
-    if (!unifiedRows?.length) return []
-    const baseRows = unifiedRowsToStackedRows(unifiedRows)
+    if (!displayUnifiedRows.length) return []
+    const baseRows = unifiedRowsToStackedRows(displayUnifiedRows)
 
     const currentAgeFloor = initialData.effectiveInput.dateOfBirth
       ? Math.floor(ageAtDate(initialData.effectiveInput.dateOfBirth))
@@ -1820,13 +1865,15 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
       isV2: true,
       houseInLedger: true,
     })
-  }, [chartMode, unifiedRows, initialData, displayEvents])
+  }, [chartMode, displayUnifiedRows, initialData, displayEvents])
 
-  // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode
+  // Lazy compute income/expense breakdown only when user toggles to 'breakdown' mode.
+  // Consume de geclipte weergaverijen zodat de bronnen-breakdown niet tot het
+  // (verborgen) laatste jaar doorloopt.
   const ieBreakdownResult = useMemo(() => {
-    if (ieViewMode !== 'breakdown' || !unifiedRows?.length || !simResult?.rows.length) return null
-    return buildBreakdown(unifiedRows, simResult.rows, debts)
-  }, [ieViewMode, unifiedRows, simResult, debts])
+    if (ieViewMode !== 'breakdown' || !displayUnifiedRows.length || !displaySimRows.length) return null
+    return buildBreakdown(displayUnifiedRows, displaySimRows, debts)
+  }, [ieViewMode, displayUnifiedRows, displaySimRows, debts])
 
   // Saved scenario ghost overlays — re-runs simulation for each selected scenario's overrides
   // applied to the current financial data, then renders as ghost lines over the main chart.
@@ -3709,7 +3756,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               />
 
               <div className="-mx-4 sm:-mx-6 md:-mx-8 overflow-hidden">
-                <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={simResult.displayEndAge}>
+                <ZoomableChartContainer currentAge={currentAge ?? 30} endAge={chartEndAge!}>
                   {(visibleMin, visibleMax, controls) => (
                     <>
                       {/* STEP 3b/4: tips-laag wikkelt de grafiek — markers in een rij
@@ -3779,11 +3826,11 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           <SimChart
                             emphasis={overlayEmphasis}
                             disableCrosshair={overlayVisible && chartMode === 'vermogenspad'}
-                            rows={useHouseholdMainLine ? householdMainLine!.rows : usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? effectiveSimRows : simResult.rows)}
+                            rows={useHouseholdMainLine ? householdMainLine!.rows : usePartnerMainLine ? partnerLine!.rows : (isAowStopActive ? displayEffectiveSimRows : displaySimRows)}
                             fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge)}
                             fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional)}
                             currentAge={useHouseholdMainLine ? (householdMainLine!.currentAge ?? currentAge ?? 30) : usePartnerMainLine ? (partnerLine!.currentAge ?? currentAge ?? 30) : (currentAge ?? 30)}
-                            endAge={simResult.displayEndAge}
+                            endAge={chartEndAge!}
                             cashflows={simCashflows}
                             fireTarget={simResult.requiredFirePortfolio}
                             strategy={simResult.strategy}
@@ -3828,7 +3875,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                           <WealthCompositionChart
                             stackedRows={wealthCompositionRows}
                             currentAge={currentAge ?? 30}
-                            endAge={simResult.displayEndAge}
+                            endAge={chartEndAge!}
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
                             fireAge={simResult.fireAge}
@@ -3901,9 +3948,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         }}
                       >
                         <IncomeExpenseChart
-                          rows={isAowStopActive ? effectiveSimRows : simResult.rows}
+                          rows={isAowStopActive ? displayEffectiveSimRows : displaySimRows}
                           currentAge={currentAge ?? 30}
-                          endAge={simResult.displayEndAge}
+                          endAge={chartEndAge!}
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
                           fireAge={isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge}
@@ -3925,7 +3972,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                         <EventsTimeline
                           events={eventsForTimeline}
                           currentAge={currentAge ?? 30}
-                          endAge={simResult.displayEndAge}
+                          endAge={chartEndAge!}
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
                           scenarioEvents={scenarioOverlayDataList[0]?.events}
@@ -3964,7 +4011,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             fireAge={isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge}
                             fireAgeFractional={isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional}
                             aowAge={userAowAge.fractional}
-                            endAge={simResult.displayEndAge}
+                            endAge={chartEndAge!}
                             fireReachable={simResult.fireReachable}
                             isPensioenMode={isAowStopActive || isPensioenMode}
                             onSegmentClick={(fase) => setActiveFaseModal(fase)}
@@ -4034,7 +4081,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
               </div>
 
               <p className="mt-3 font-sans text-[10px] text-[var(--ink-4)]">
-                {STRATEGY_LABELS[simResult.strategy].name} &middot; Simulatie tot leeftijd {simResult.displayEndAge} &middot; Klik Details voor jaar-op-jaar tabel
+                {STRATEGY_LABELS[simResult.strategy].name} &middot; Weergave t/m leeftijd {simResult.displayEndAge - 1} (eindleeftijd {simResult.displayEndAge}) &middot; Klik Details voor jaar-op-jaar tabel
               </p>
 
               {/* Context-hint: modus indicator + link to StrategieModal */}
@@ -7107,8 +7154,8 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         open={selectedYearAge !== null}
         age={selectedYearAge}
         onClose={() => setSelectedYearAge(null)}
-        unifiedRows={unifiedRows ?? []}
-        simRows={simResult?.rows ?? []}
+        unifiedRows={displayUnifiedRows}
+        simRows={displaySimRows}
         currentAge={currentAge ?? 30}
         inflationRate={fireParams.inflationRate}
         debts={debts}
@@ -7117,7 +7164,9 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
         aowAge={userAowAge.fractional}
         fireAge={simResult?.fireAge ?? null}
         onChangeAge={(newAge) => {
-          const rows = simResult?.rows ?? []
+          // Clamp op de geclipte weergaverijen: de gebruiker mag niet naar het
+          // (verborgen) laatste jaar bladeren.
+          const rows = displaySimRows
           if (rows.length === 0) return
           const minA = rows[0].age
           const maxA = rows[rows.length - 1].age

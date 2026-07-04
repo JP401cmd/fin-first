@@ -333,9 +333,23 @@ function buildRow(
   let withdrawal = 0
   let totalGrowth = 0
   let totalBox3 = 0
-  let grossIncome = 0
+  // grossIncome-splitsing (read-only weergaveveld): CF!D resp. CF!H apart. De
+  // jaar-`grossIncome` wordt uit deze twee opgeteld → `salaris + gebeurtenisBaten
+  // === grossIncome` geldt float-exact.
+  let incomeSalaris = 0
+  let incomeGebeurtenisBaten = 0
   let cashflowNet = 0
   let oneTimeNet = 0
+  // Onttrekkings-behoefte-decompositie (read-only weergaveveld): de ONGECAPTE
+  // Ont!D-termen per in-horizon, post-FIRE maand. Rauwe jaar-sommen (alle ≥ 0);
+  // de Ont!D-tekens komen pas in de reconciliatie (zie na de loop). Alleen gezet
+  // wanneer totaalNeed > 0 zodat de rij-vorm in accumulatie-jaren identiek blijft.
+  let needUitgaveTerm = 0
+  let needHuur = 0
+  let needHyplast = 0
+  let needBox3 = 0
+  let needPartner = 0
+  let needTotaal = 0
   // Opeet-weergavevelden (feature #876): jaarsom Bez!BE + max Bez!BD. Alleen
   // gezet in opeet-modus zodat de rij-shape in alle andere modi identiek blijft.
   const opeetMode = input.woning.selector === 'Opeethypotheek'
@@ -382,13 +396,33 @@ function buildRow(
     //  oneTimeNet   = Bez!AZ (eenmalige woningverkoop-opbrengst).
     //  cashflowNet  = Bez!BE (opeethypotheek-opname) − Af!D (gebeurtenis-kosten).
     if (cf !== undefined && !cf.beyondHorizon) {
-      grossIncome += cf.inkomen + cf.gebeurtenisBaten
+      incomeSalaris += cf.inkomen
+      incomeGebeurtenisBaten += cf.gebeurtenisBaten
     }
     oneTimeNet += bez.woning.verkoopopbrengst
     cashflowNet += bez.woning.opeetOpname - (af !== undefined ? af.totaalAfname : 0)
     if (opeetMode) {
       opeetOpname += bez.woning.opeetOpname
       if (bez.woning.opeetCap > opeetCap) opeetCap = bez.woning.opeetCap
+    }
+
+    // Onttrekkings-behoefte-decompositie: reconstrueer de ONGECAPTE Ont!D-termen
+    // uit de al-aanwezige kernel-tabellen. Alléén post-FIRE (m ≥ fireMonth): vóór
+    // FIRE is Ont!D=0 (D-gate), dus die maanden dragen niet bij aan de behoefte.
+    // De uitgave-term reconstrueert exact wat computeOnt gebruikte: (uitgave-na-
+    // pensioen/12)·inflatie-idx·Ont!I (de profielfactor grijpt ALLEEN hierop). BA/BB
+    // = Bez-woningblok, box3 = CF!K (= Bel!N(m−1), identiek aan Ont's box3-term),
+    // partner = PT!K. `needTotaal` telt de gecapte Ont!D (na MAX(0,·) per maand).
+    const ont = proj.ont[m]
+    if (m >= fireMonth && ont !== undefined && !ont.beyondHorizon) {
+      const idx = Math.pow(1 + input.inflatie, m / 12)
+      needUitgaveTerm +=
+        (input.inkomenUitgaven.uitgaveNaPensioenPerJaar / 12) * idx * ont.actieveFactor
+      needHuur += bez.woning.huurPerMaand
+      needHyplast += bez.woning.vervallenHypotheeklast
+      needBox3 += cf !== undefined && !cf.beyondHorizon ? cf.box3VorigeMaand : 0
+      needPartner += proj.pt[m]?.totaal ?? 0
+      needTotaal += ont.onttrekking
     }
   }
 
@@ -424,6 +458,16 @@ function buildRow(
   const phase: UnifiedProjectionRow['phase'] =
     12 * k >= fireMonth ? 'withdrawal' : 'accumulation'
 
+  // grossIncome uit de splitsing opgeteld → `salaris + gebeurtenisBaten ===
+  // grossIncome` is float-exact (dezelfde IEEE-optelling).
+  const grossIncome = incomeSalaris + incomeGebeurtenisBaten
+
+  // Behoefte-reconciliatie: rauwe Ont!D-som met de kern-tekens; restMaandClamp
+  // vangt de per-maand-MAX(0,·)-opwaartse correctie zodat de vijf termen +
+  // restMaandClamp float-exact tot totaalNeed sommeren (zie WithdrawalNeedBreakdown).
+  const needRawInner = needUitgaveTerm + needHuur - needHyplast + needBox3 - needPartner
+  const needRestMaandClamp = needTotaal - needRawInner
+
   return {
     year: k,
     age: startAge + k,
@@ -445,6 +489,28 @@ function buildRow(
     cumulativeBox3: cumBox3Prev + totalBox3,
     inflationFactor: Math.pow(1 + input.inflatie, k),
     ...(opeetMode ? { opeetOpname, opeetCap } : {}),
+    ...(needTotaal > 0
+      ? {
+          withdrawalNeed: {
+            uitgaveTerm: needUitgaveTerm,
+            huurNaVerkoop: needHuur,
+            vervallenHypotheeklast: needHyplast,
+            box3: needBox3,
+            partnerBijdrage: needPartner,
+            totaalNeed: needTotaal,
+            restMaandClamp: needRestMaandClamp,
+            nietGedekt: Math.max(0, needTotaal - withdrawal),
+          },
+        }
+      : {}),
+    ...(incomeSalaris !== 0 || incomeGebeurtenisBaten !== 0
+      ? {
+          grossIncomeBySource: {
+            salaris: incomeSalaris,
+            gebeurtenisBaten: incomeGebeurtenisBaten,
+          },
+        }
+      : {}),
   }
 }
 

@@ -123,6 +123,58 @@ function expectedWithdrawal(proj: KernelProjection, months: number[]): number {
   }, 0)
 }
 
+/**
+ * Onafhankelijke recompute van de onttrekkings-behoefte-decompositie (Veld 1). Voor de
+ * post-FIRE in-horizon maanden van het blok: de RAUWE Ont!D-termen + twee onafhankelijke
+ * totaal-varianten — `ontDirect` (canonieke Σ proj.ont[m].onttrekking) en `formuleMax`
+ * (Σ MAX(0, uitgaveTerm + BA − BB + CF!K − PT!K), de formule-reconstructie). De bridge
+ * mag zich hier niet in mengen: alle waarden komen uit de kernel-tabellen.
+ */
+function expectedWithdrawalNeed(
+  proj: KernelProjection,
+  input: KernelBridgeContext['input'],
+  months: number[],
+  fireMonth: number,
+): {
+  uitgaveTerm: number
+  huur: number
+  hyplast: number
+  box3: number
+  partner: number
+  ontDirect: number
+  formuleMax: number
+} {
+  let uitgaveTerm = 0
+  let huur = 0
+  let hyplast = 0
+  let box3 = 0
+  let partner = 0
+  let ontDirect = 0
+  let formuleMax = 0
+  for (const m of months) {
+    if (m < fireMonth) continue
+    const ont = proj.ont[m]
+    if (ont === undefined || ont.beyondHorizon) continue
+    const bez = proj.bez[m]
+    if (bez === undefined || bez.beyondHorizon) continue
+    const cf = proj.cf[m]
+    const idx = Math.pow(1 + input.inflatie, m / 12)
+    const ut = (input.inkomenUitgaven.uitgaveNaPensioenPerJaar / 12) * idx * ont.actieveFactor
+    const ba = bez.woning.huurPerMaand
+    const bb = bez.woning.vervallenHypotheeklast
+    const k = cf !== undefined && !cf.beyondHorizon ? cf.box3VorigeMaand : 0
+    const pt = proj.pt[m]?.totaal ?? 0
+    uitgaveTerm += ut
+    huur += ba
+    hyplast += bb
+    box3 += k
+    partner += pt
+    ontDirect += ont.onttrekking
+    formuleMax += Math.max(0, ut + ba - bb + k - pt)
+  }
+  return { uitgaveTerm, huur, hyplast, box3, partner, ontDirect, formuleMax }
+}
+
 // ── Shared assertion-set over één bridge-resultaat ───────────────────────────
 
 function assertRowContinuityAndSums(solve: ReturnType<typeof solveFire>, ctx: KernelBridgeContext): void {
@@ -155,6 +207,79 @@ function assertRowContinuityAndSums(solve: ReturnType<typeof solveFire>, ctx: Ke
     expect(row.cumulativeBox3).toBeGreaterThanOrEqual(runningCum - EUR)
     runningCum = row.cumulativeBox3
     totalBox3Sum += row.totalBox3
+
+    // ── Veld 1: onttrekkings-behoefte-decompositie (recompute-asserties) ────────
+    const fireMonth = proj.summary.fireMonth
+    const en = expectedWithdrawalNeed(proj, ctx.input, months, fireMonth)
+    if (en.ontDirect > 0) {
+      const wn = row.withdrawalNeed
+      expect(wn).toBeDefined()
+      if (wn) {
+        // (a) totaalNeed === onafhankelijk herberekende Σ Ont!D (canoniek), en de
+        //     formule-reconstructie MAX(0,·) sluit op diezelfde Σ (kern-identiteit).
+        expect(wn.totaalNeed).toBeCloseTo(en.ontDirect, 2)
+        expect(en.formuleMax).toBeCloseTo(en.ontDirect, 2)
+        // componenten = de rauwe jaar-sommen.
+        expect(wn.uitgaveTerm).toBeCloseTo(en.uitgaveTerm, 2)
+        expect(wn.huurNaVerkoop).toBeCloseTo(en.huur, 2)
+        expect(wn.vervallenHypotheeklast).toBeCloseTo(en.hyplast, 2)
+        expect(wn.box3).toBeCloseTo(en.box3, 2)
+        expect(wn.partnerBijdrage).toBeCloseTo(en.partner, 2)
+        // (b) reconciliatie float-exact: termen (met Ont!D-tekens) + restMaandClamp.
+        expect(
+          wn.uitgaveTerm +
+            wn.huurNaVerkoop -
+            wn.vervallenHypotheeklast +
+            wn.box3 -
+            wn.partnerBijdrage +
+            wn.restMaandClamp,
+        ).toBeCloseTo(wn.totaalNeed, 6)
+        expect(wn.restMaandClamp).toBeGreaterThanOrEqual(-EUR) // opwaartse clamp ≥ 0
+        // (c) nietGedekt === max(0, totaalNeed − withdrawal).
+        expect(wn.nietGedekt).toBeCloseTo(Math.max(0, wn.totaalNeed - row.withdrawal), 2)
+        // (e) geen NaN/undefined in de load-bearing velden.
+        for (const v of [
+          wn.uitgaveTerm,
+          wn.huurNaVerkoop,
+          wn.vervallenHypotheeklast,
+          wn.box3,
+          wn.partnerBijdrage,
+          wn.totaalNeed,
+          wn.restMaandClamp,
+          wn.nietGedekt,
+        ]) {
+          expect(Number.isFinite(v)).toBe(true)
+        }
+      }
+    } else {
+      // (f) aanwezigheids-gating: geen behoefte-jaar → veld afwezig.
+      expect(row.withdrawalNeed).toBeUndefined()
+    }
+
+    // ── Veld 2: bruto-inkomen-splitsing (recompute-asserties) ───────────────────
+    let salaris = 0
+    let gebBaten = 0
+    for (const m of months) {
+      const cf = proj.cf[m]
+      if (cf !== undefined && !cf.beyondHorizon) {
+        salaris += cf.inkomen
+        gebBaten += cf.gebeurtenisBaten
+      }
+    }
+    if (salaris !== 0 || gebBaten !== 0) {
+      const gs = row.grossIncomeBySource
+      expect(gs).toBeDefined()
+      if (gs) {
+        expect(gs.salaris).toBeCloseTo(salaris, 2)
+        expect(gs.gebeurtenisBaten).toBeCloseTo(gebBaten, 2)
+        // (d) exact: salaris + gebeurtenisBaten === row.grossIncome.
+        expect(gs.salaris + gs.gebeurtenisBaten).toBe(row.grossIncome)
+        expect(Number.isFinite(gs.salaris)).toBe(true)
+        expect(Number.isFinite(gs.gebeurtenisBaten)).toBe(true)
+      }
+    } else {
+      expect(row.grossIncomeBySource).toBeUndefined()
+    }
   }
   const lastRow = result.rows[result.rows.length - 1]
   expect(lastRow.cumulativeBox3).toBeCloseTo(totalBox3Sum, 2)

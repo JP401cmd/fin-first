@@ -45,6 +45,8 @@ export interface BreakdownResult {
 const FIXED_COLORS: Record<string, string> = {
   savings: 'var(--horizon-400, #c4a06b)',
   growth: 'var(--horizon-600, #8a6e42)',
+  salaris: 'var(--horizon-300, #d8be93)',
+  'gebeurtenis-baten': 'var(--horizon-500, #b3894e)',
   withdrawal: 'var(--kern-400, #a07860)',
   box3: 'var(--kern-600, #6b4339)',
 }
@@ -52,7 +54,11 @@ const FIXED_COLORS: Record<string, string> = {
 const FIXED_LABELS: Record<string, string> = {
   savings: 'Besparingen',
   growth: 'Rendement',
-  withdrawal: 'Levensonderhoud',
+  salaris: 'Salaris & werk',
+  'gebeurtenis-baten': 'AOW & pensioen',
+  // Levensonderhoud toont ná box3-ontdubbeling alléén het niet-fiscale deel van
+  // de onttrekking; Box 3 staat als eigen post ernaast (zie buildBreakdown).
+  withdrawal: 'Levensonderhoud via onttrekking',
   box3: 'Box 3 belasting',
 }
 
@@ -69,7 +75,7 @@ const EXPENSE_EVENT_PALETTE = [
 /** Reds for debt interest */
 const DEBT_INTEREST_COLOR = '#ef4444'
 
-const FIXED_INCOME_IDS: Set<string> = new Set(['savings', 'growth'])
+const FIXED_INCOME_IDS: Set<string> = new Set(['savings', 'growth', 'salaris', 'gebeurtenis-baten'])
 const FIXED_EXPENSE_IDS: Set<string> = new Set(['withdrawal', 'box3'])
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -155,6 +161,8 @@ export function buildBreakdown(
 
   // Build candidate layers
   const candidateIncomeLayers: BreakdownLayer[] = [
+    buildLayer('salaris', FIXED_LABELS.salaris, FIXED_COLORS.salaris, true),
+    buildLayer('gebeurtenis-baten', FIXED_LABELS['gebeurtenis-baten'], FIXED_COLORS['gebeurtenis-baten'], true),
     buildLayer('savings', FIXED_LABELS.savings, FIXED_COLORS.savings, true),
     buildLayer('growth', FIXED_LABELS.growth, FIXED_COLORS.growth, true),
     ...incomeEventIds.map((id, i) =>
@@ -198,10 +206,40 @@ export function buildBreakdown(
       incomeBySource['savings'] = Math.round(uRow.savings)
     }
 
-    // Rendement (bruto = totalGrowth + totalBox3, since totalGrowth is already net of box3)
-    const grossGrowth = uRow.totalGrowth + uRow.totalBox3
-    if (grossGrowth > 0) {
-      incomeBySource['growth'] = Math.round(grossGrowth)
+    // Rendement — RAUW rendement rechtstreeks uit de kernel-bridge. De oude
+    // `+ totalBox3`-opplussing stamt uit de v2-engine (waar totalGrowth
+    // box3-genet was); de kernel levert `totalGrowth` nu al rauw, dus opplussen
+    // zou het rendement met het box3-bedrag opblazen (dubbeltelling — box3 zit
+    // óók in de aparte Box 3-expensepost).
+    if (uRow.totalGrowth > 0) {
+      incomeBySource['growth'] = Math.round(uRow.totalGrowth)
+    }
+
+    // Salaris/werk + AOW & pensioen — bruto-inkomen-bronnen uit de bridge-split
+    // (CF!D = salaris, CF!H = gebeurtenis-baten incl. AOW/pensioen).
+    //
+    // GATE: `withdrawal > 0 && !(savings > 0)`. Dit is een VERMOGENSstromen-view
+    // (flows naar/uit netto vermogen). In pure opbouwjaren vloeit het salaris NIET
+    // volledig het vermogen in — alleen het spaaroverschot, dat al als `savings`
+    // staat; salaris én savings samen zou dubbeltellen. Zodra er zuiver onttrokken
+    // wordt (retirement met withdrawal > 0, savings === 0) stort de kernel CF!D +
+    // CF!H wél volledig in de potten terwijl de onttrekking de volle behoefte dekt
+    // — dán zijn het volwaardige instromen (bv. deeltijdwerk-strategie, AOW).
+    //
+    // Het GEMENGDE FIRE-overgangsjaar (`savings > 0` ÉN `withdrawal > 0`) is de
+    // uitzondering: daar is `phase === 'accumulation'` (de savings-laag toont het
+    // pre-FIRE-spaaroverschot) terwijl `withdrawalNeed` óók al onttrekt, en de
+    // bridge-`salaris` (CF!D) telt álle maanden van dat jaar incl. het pre-FIRE-
+    // salaris — dat pre-FIRE-deel zit al in `savings`. Salaris tonen zou dat jaar
+    // een fantoom-instroom (dubbeltelling) opleveren. We onderdrukken de laag daar
+    // bewust: één jaar lichte ONDER- i.p.v. OVERtelling, wat in een vermogens-
+    // stromen-view de veiliger keuze is.
+    const gib = uRow.grossIncomeBySource
+    if (gib && uRow.withdrawal > 0 && !(uRow.savings > 0)) {
+      if (gib.salaris > 0) incomeBySource['salaris'] = Math.round(gib.salaris)
+      if (gib.gebeurtenisBaten > 0) {
+        incomeBySource['gebeurtenis-baten'] = Math.round(gib.gebeurtenisBaten)
+      }
     }
 
     // Positive life event cashflows from SimRow breakdown
@@ -215,12 +253,30 @@ export function buildBreakdown(
 
     // -- Outflows --
 
-    // Levensonderhoud (withdrawal in retirement)
+    // Levensonderhoud via onttrekking — met box3-ONTDUBBELING. De onttrekking
+    // (Ont!D) bevat de Box 3-heffing al als component (CF!K), en Box 3 wordt
+    // hieronder óók als eigen expensepost getoond → zonder correctie telt box3
+    // dubbel. Trek daarom het box3-deel van de onttrekking af zodat de post
+    // alleen het niet-fiscale levensonderhoud toont; `box3` blijft apart staan.
+    //
+    // LET OP — één-maand-lag: `withdrawalNeed.box3` = Σ CF!K = Σ Bel!N(m−1) (de
+    // heffing van de vórige maand, over de post-FIRE-maanden), terwijl `totalBox3`
+    // = Σ Bel!N(m) (heffing van de lopende maand, hele jaar). De twee dekken
+    // dezelfde heffing maar één maand verschoven, dus de ontdubbeling is exact tot
+    // op ~één maand box3 na (~€100–200) — geen float-exacte nul, wél verwaarloosbaar
+    // t.o.v. de dubbeltelling die hij wegneemt.
+    //
+    // Terugval: ontbreekt `withdrawalNeed` (geen decompositie beschikbaar), dan
+    // blijft de post ongewijzigd de volledige onttrekking (geen dedup mogelijk).
     if (uRow.withdrawal > 0) {
-      expenseBySource['withdrawal'] = Math.round(uRow.withdrawal)
+      const box3InWithdrawal = uRow.withdrawalNeed?.box3 ?? 0
+      const levensonderhoud = Math.max(0, uRow.withdrawal - box3InWithdrawal)
+      if (levensonderhoud > 0) {
+        expenseBySource['withdrawal'] = Math.round(levensonderhoud)
+      }
     }
 
-    // Box 3 belasting
+    // Box 3 belasting (eigen post; ontdubbeld uit de onttrekking hierboven)
     if (uRow.totalBox3 > 0) {
       expenseBySource['box3'] = Math.round(uRow.totalBox3)
     }

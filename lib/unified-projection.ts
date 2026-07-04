@@ -57,6 +57,69 @@ export interface DebtBalanceDetail {
   endBalance: number
 }
 
+// ── Read-only weergave-decomposities (kernel-bridge, spread-gated) ──────────
+
+/**
+ * Onttrekkings-behoefte-decompositie per jaarrij — **read-only WEERGAVEVELD**
+ * (precedent feature #876), spread-gated door de kernel-bridge. Toont de
+ * BEHOEFTE-kant (de ONGECAPTE Ont!D-termen) náást `row.withdrawal` (= de gecapte
+ * Verdeling-eindtoewijzing). GEEN rekeninput, GEEN kern-wijziging.
+ *
+ * Bronformule — Ont!D per maand (`lib/horizon-kernel/tables/ont.ts:169-181`):
+ *   `Ont!D = MAX(0, uitgaveTerm + Bez!BA − Bez!BB + CF!K − PT!K)` met
+ *   `uitgaveTerm = (uitgaveNaPensioen/12)·inflatie-idx·Ont!I` (de profielfactor
+ *   Ont!I grijpt ALLEEN op de uitgave-term; huur/hyplast/box3/partner ongefactord).
+ *
+ * **Sign-conventie:** elk term-veld is de RAUWE jaar-som van zijn kern-term (alle
+ * ≥ 0). De reconciliatie past de Ont!D-tekens toe:
+ *   `uitgaveTerm + huurNaVerkoop − vervallenHypotheeklast + box3 − partnerBijdrage
+ *    + restMaandClamp === totaalNeed` (float-exact).
+ * `restMaandClamp` (≥ 0) vangt de per-maand-`MAX(0,·)`-opwaartse correctie: in
+ * "normale" maanden (inner ≥ 0) is hij 0 en tellen de vijf termen exact op tot
+ * `totaalNeed`; in maanden waar partnerbijdrage/vervallen hypotheeklast de behoefte
+ * onder 0 zouden duwen ligt `totaalNeed` (= Σ MAX(0,·)) boven de rauwe som en draagt
+ * `restMaandClamp` het verschil. Zo kan de UI kassabon-gewijs sommeren.
+ *
+ * Aanwezig alléén wanneer `totaalNeed > 0` (post-FIRE behoefte-jaren), zodat de
+ * rij-vorm in accumulatie-/nul-behoefte-jaren identiek blijft.
+ */
+export interface WithdrawalNeedBreakdown {
+  /** Jaar-som geïndexeerde basisuitgave × profielfactor: Σ (uitgaveNaPensioen/12)·idx·Ont!I. */
+  uitgaveTerm: number
+  /** Jaar-som Bez!BA — huur/mnd na woningverkoop (verhoogt de behoefte). */
+  huurNaVerkoop: number
+  /** Jaar-som Bez!BB — vervallen hypotheeklast/mnd na verkoop (verlaagt de behoefte; afgetrokken). */
+  vervallenHypotheeklast: number
+  /** Jaar-som CF!K — Box 3-heffing-component in Ont!D (= Bel!N(m−1); verhoogt de behoefte). */
+  box3: number
+  /** Jaar-som PT!K — partner cashflow-bijdrage (verlaagt de behoefte; afgetrokken). */
+  partnerBijdrage: number
+  /** Jaar-som Ont!D = Σ MAX(0, per-maand-behoefte) — de ongecapte behoefte na de maand-clamp. */
+  totaalNeed: number
+  /**
+   * `totaalNeed − (uitgaveTerm + huur − hyplast + box3 − partner)` (≥ 0). De
+   * opwaartse correctie van de per-maand-`MAX(0,·)`; 0 in normale jaren. Maakt de
+   * som-reconciliatie float-exact zodat de UI op de termen kan sommeren.
+   */
+  restMaandClamp: number
+  /** `max(0, totaalNeed − row.withdrawal)` — het onttrekkings-tekort t.o.v. de gecapte realisatie (tekortjaren). */
+  nietGedekt: number
+}
+
+/**
+ * Bruto-inkomen-splitsing per jaarrij — **read-only WEERGAVEVELD**, spread-gated.
+ * `row.grossIncome` = CF!D + CF!H gecombineerd; dit veld levert de twee bronnen
+ * apart zodat consumenten de splitsing niet uit een heuristiek hoeven af te leiden.
+ * Jaar-sommen over de in-horizon maanden; `salaris + gebeurtenisBaten ===
+ * grossIncome` (float-exact — `grossIncome` wordt uit deze twee opgeteld). GEEN rekeninput.
+ */
+export interface GrossIncomeBySource {
+  /** Jaar-som CF!D — netto-inkomen + partnerbijdrage + (FIRE-gegate) werk-delta. */
+  salaris: number
+  /** Jaar-som CF!H — gebeurtenis-baten (incl. AOW/pensioen uit de Geb-posten). */
+  gebeurtenisBaten: number
+}
+
 // ── Unified Projection Row ──────────────────────────────────────────────────
 
 /**
@@ -90,7 +153,13 @@ export interface UnifiedProjectionRow {
   startNetWorth: number
 
   // ── Kasstromen ────────────────────────────────────────────
-  /** Bruto inkomen dit jaar (salaris + extra inkomsten) */
+  /**
+   * Bruto inkomen dit jaar = CF!D (netto-inkomen + partnerbijdrage + FIRE-gegate
+   * werk-delta) **+** CF!H (gebeurtenis-baten incl. AOW/pensioen) gecombineerd,
+   * jaar-som over de in-horizon maanden. Consumenten die de twee bronnen apart
+   * nodig hebben lezen `grossIncomeBySource` (i.p.v. een heuristiek), niet dit
+   * gecombineerde totaal.
+   */
   grossIncome: number
   /** Besparingen / inleg dit jaar */
   savings: number
@@ -128,6 +197,22 @@ export interface UnifiedProjectionRow {
    * het uitputtingssignaal ("pot 0 ná start"). Geen rekeninput.
    */
   opeetCap?: number
+
+  // ── Kassabon-decomposities (kernel-bridge, read-only weergave, spread-gated) ──
+  /**
+   * Onttrekkings-behoefte-decompositie — read-only WEERGAVEVELD, gezet door de
+   * kernel-bridge en **alléén wanneer `totaalNeed > 0`** (post-FIRE behoefte-jaren),
+   * zodat de rij-vorm in accumulatie-/nul-behoefte-jaren identiek blijft. Toont de
+   * BEHOEFTE-kant náást de gecapte `withdrawal`. Zie `WithdrawalNeedBreakdown`.
+   * Geen rekeninput.
+   */
+  withdrawalNeed?: WithdrawalNeedBreakdown
+  /**
+   * Bruto-inkomen-splitsing (CF!D vs CF!H) — read-only WEERGAVEVELD, gezet door de
+   * kernel-bridge wanneer er inkomen is (`salaris !== 0 || gebeurtenisBaten !== 0`).
+   * Zie `GrossIncomeBySource`. Geen rekeninput.
+   */
+  grossIncomeBySource?: GrossIncomeBySource
 }
 
 // ── Unified Projection Input ────────────────────────────────────────────────
