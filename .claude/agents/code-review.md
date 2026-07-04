@@ -83,6 +83,7 @@ When reviewing code, you will systematically evaluate against these criteria:
    - Voer de **eigen testsuite van de feature** uit (`npx vitest run <gewijzigde testpaden>`), niet alléén `tsc`/lint — een 'tsc-clean'-claim verbergt routinematig rode unit-tests (een groene type-check bewijst niets over falende assertions). Scope op de gewijzigde testbestanden voor snelheid en rapporteer pass/fail expliciet.
    - Report all findings from these tools
    - Bij een scoped diff-review: stel eerst de before-staat vast met `git diff HEAD -- <files>` én `git show HEAD:<file>` per doelbestand — de vorige versie onthult of de wijziging nieuw gedrag introduceert (andere blast radius) of bestaand gedrag aanpast.
+   - Bij een **refactor-/performance-review met een expliciete "puur, geen gedragswijziging?"-vraag**: classificeer elke bevinding vooraf op één van twee assen — *behoud-geverifieerd* (uitkomst bit-identiek, aangetoond via code-trace) vs. *nieuwe observeerbare staat* (bv. `useDeferredValue`-lag, remount-verlies, effect-timing) — en rapporteer beide expliciet gescheiden, zodat "by design gedocumenteerd" niet ongemerkt samenvalt met "stil geïntroduceerd".
    - Bevat de diff een Supabase-migratie? Verifieer dan altijd de **uitvoervolgorde op een verse DB**: grep alle migraties die dezelfde tabel/constraint aanraken, sorteer op timestamp, en controleer of elke top-level `ALTER`/`DROP` een `CREATE TABLE` op een *eerder* tijdstip heeft (anders breekt `db reset`/CI ook al ziet de remote er goed uit).
 
 2. **Then, conduct manual review:**
