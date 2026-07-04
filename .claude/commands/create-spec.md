@@ -6,6 +6,8 @@ description: Create a new spec with requirements and implementation plan
 
 This command creates a new feature specification folder with requirements and implementation plan documents.
 
+> **Let op — naamgenoot:** dit is de repo-lokale spec-flow (output: `/specs/{feature}/`). De Autoforge-flow met dezelfde naam (output: `.autoforge/prompts/app_spec.txt`, uit de development-level CLAUDE.md) is een ánder proces — gebruik die alleen binnen de Autoforge-UI. Voor het daadwerkelijk bouwen van een TriFinity-feature is de `new-feature`-pijplijn-skill doorgaans de betere ingang; dit command is voor het vastleggen van een plan als document.
+
 ## Instructions
 
 ### Given the above conversation:
@@ -25,7 +27,7 @@ This command creates a new feature specification folder with requirements and im
    - Each task should have a checkbox: `[ ] Task description`
    - Tasks should be specific enough for an agent to implement independently
    - Include dependencies between tasks where relevant
-   - Mark complex tasks with `[complex]` suffix (these will get their own GitHub issue when published)
+   - Mark complex tasks with `[complex]` suffix (groot genoeg om als eigen sub-agent-taak of losse sessie te draaien)
    - **Add a `### Technical Details` section after each phase's tasks**
    - **Capture ALL technical specifics from the planning conversation**: CLI commands, database schemas, code snippets, file paths, configuration values
    - **This is the single source of truth** - anything not captured here is lost
@@ -90,7 +92,7 @@ Brief summary of what will be built.
 {Technical details for Phase 2 tasks.}
 ```
 
-**Note:** Tasks marked with `[complex]` or containing nested sub-tasks will be created as separate GitHub issues when published (linked to their parent phase issue).
+**Note:** Tasks marked with `[complex]` or containing nested sub-tasks are candidates to delegate to their own sub-agent (or a dedicated session) during implementation.
 
 ## Capturing Technical Details
 
@@ -106,7 +108,7 @@ Each phase should include a `### Technical Details` section containing:
 - **API endpoints**: Routes, methods, request/response shapes
 - **Third-party integration**: SDK usage, webhook formats, auth flows
 
-These details flow through to GitHub issues via `/publish-to-github`, making them available to any agent (or human) implementing the tasks.
+These details are what implementing agents (or humans) work from later — the spec folder is the only carrier.
 
 ## action-required.md Format
 
@@ -156,8 +158,7 @@ After creating the feature, inform the user:
 >
 > 1. Review `action-required.md` for tasks you need to complete manually
 > 2. Review the requirements and implementation plan
-> 3. Run `/publish-to-github` to create GitHub issues and project
-> 4. Use `/continue-feature` to start implementing
+> 3. Start bouwen via de `new-feature`-pijplijn-skill (of `superpowers:executing-plans` voor stapsgewijze uitvoering van dit plan)
 
 ## Notes
 

@@ -10,11 +10,13 @@ Brengt afgerond werk gecontroleerd naar master/productie. Kern: "het werkt bij m
 
 Geef mee wat er geshipt wordt; onduidelijke scope ⇒ eerst de diff inventariseren.
 
-## Rol van de hoofdchat — orchestrator
+**Master = productie.** Er is geen CI en geen vangnet ná de push: `git push` naar master triggert direct een Vercel-productie-deploy (`vercel.json` in de root). "Even pushen om werk veilig te stellen" bestaat dus niet op master — dat is deployen. De poorten in deze pijplijn zijn de énige poorten. Werk je op een feature-branch, dan is de push onschuldig en gaat de poortenreeks vooraf aan de merge/PR; werk je (zoals gebruikelijk in deze repo) direct op master, dan gaat de volledige poortenreeks vooraf aan de push.
 
-De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn. Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport, inventariseer dan eerst diens deelstaat (git status/diff op de opdracht-scope) en maak het werk in de hoofdthread af of dispatch gericht het restant — nooit blind opnieuw dispatchen of het rapport als compleet behandelen.
+**Herdraai-regel (poorten verlopen).** Elke codewijziging ná een gehaalde poort — een fix uit review, security of build — maakt eerdere poorten stale. Na zo'n fix draaien minimaal opnieuw: `npx tsc --noEmit` + de tests van de geraakte paden; raakte de fix een route/RLS/AI-context, dan ook de security-blik daarop. "De build was net nog groen" telt niet als de tree sindsdien veranderde.
 
-**Voortgangsrapportage (verplicht):** houd de gebruiker doorlopend op de hoogte van waar de pijplijn mee bezig is. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten, draai de agent(s) dan met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
+## Gedeelde conventies (verplicht)
+
+Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (hoofdchat delegeert; bij een gestrande subagent eerst diens deelstaat per toegewezen deeltaak inventariseren), voortgangsritme (vóór/na elke stap melden, nooit >5 min stilte), git-hygiëne in de gedeelde werkboom (nooit `git stash`/`checkout --`/`reset`) en de zelfverbeterings-slotstap (definitie-wijzigingen alleen ná expliciet akkoord, aparte `self-improve:`-commit). Deze regels gelden onverkort.
 
 ## Proces
 
@@ -37,6 +39,8 @@ Eerst gericht (de geraakte paden), dan volledig `npm run test:run`. Gedragswijzi
 
 Volgorde-regel: migratie **vóór** de code live gaat, anders 500's op de nieuwe route.
 
+**Destructieve DDL is een aparte poort.** `DROP TABLE/COLUMN`, kolom hernoemen, `NOT NULL` op een bestaande kolom of een type-wijziging kan de nú draaiende productie-code breken (de oude code draait tot de nieuwe deploy klaar is) en is niet terug te draaien. Daarom: (a) expliciet akkoord van de gebruiker vóór toepassen, (b) expand-contract waar mogelijk — eerst additief uitbreiden en de code omzetten, pas in een latere release het oude pad opruimen, (c) vóór een DROP met `execute_sql` controleren dat niets in de code het oude pad nog leest.
+
 ### 5. Security-gate — `security-specialist`
 Verplichte poort wanneer de diff data-toegang, auth, routes, AI-context, secrets of admin-paden raakt (bij twijfel: wél draaien). De `security-specialist` loopt zijn ship-gate-checklist: geen secrets/JWT's in de diff, geen dev/test/debug-route bereikbaar in productie, partner-privacy via de perspective-loaders, RLS/RPC-dekking, AI-sanitize/PII-mask, geen lekkende foutmeldingen. Een 🔴-bevinding blokkeert de release tot opgelost.
 
@@ -53,17 +57,25 @@ Geen brede review-pass over alles: stappen 2–7 hebben statics, tests, security
 - Alleen bij een **architectuur-brede of risicovolle wijziging** (nieuwe datastroom, cross-domein refactor, rekenmotor-aanname) zet je de volledige `code-review`-agent of `senior-developer` op de complete diff — dat is de uitzondering, niet de standaard.
 
 ### 9. Ship
-Expliciete `git add` van de bedoelde bestanden (geen `add -A`), commit met heldere message, hooks laten draaien (geen `--no-verify`). **Na de commit, vóór de push: hercontroleer `git status`.** Verschijnen bestanden opnieuw als gewijzigd (een editor/IDE die buffered edits laat flushen, of een lint-/format-hook die de tree herschreef), dan ving de commit een verouderde of half-geschreven versie — inspecteer die diff, valideer (tsc + de geraakte test) en amendeer vóór de push. Push nooit in de aanname dat de commit de bedoelde tree ving; een schone tree ná de commit is het bewijs. Push + PR naar master met: wat het is, de migratie-status (al remote toegepast), en de bijgewerkte architectuurdocs. **Post-deploy**: de nieuwe flow één keer op productie doorlopen en `mcp__supabase__get_logs` checken op errors.
+Expliciete `git add` van de bedoelde bestanden (geen `add -A`), commit met heldere message, hooks laten draaien (geen `--no-verify`). **Na de commit, vóór de push: hercontroleer `git status`.** Verschijnen bestanden opnieuw als gewijzigd (een editor/IDE die buffered edits laat flushen, of een lint-/format-hook die de tree herschreef), dan ving de commit een verouderde of half-geschreven versie — inspecteer die diff, valideer (tsc + de geraakte test) en amendeer vóór de push. Push nooit in de aanname dat de commit de bedoelde tree ving; een schone tree ná de commit is het bewijs. Feature-branch: push + PR naar master met wat het is, de migratie-status (al remote toegepast) en de bijgewerkte architectuurdocs. Master: de push zelf is de deploy — extra reden dat álle poorten hiervóór gehaald zijn.
+
+### 10. Deploy-verificatie & rollback-pad
+Een groene lokale build is geen groene Vercel-build (andere env, NFT-excludes, regio, lambda-limieten — hier eerder misgegaan). Na de push:
+1. **Deploy bevestigen**: controleer dat de Vercel-deploy slaagt (`npx vercel ls`/dashboard, of na enkele minuten de productie-URL met een verse response). Rapporteer pas "geshipt" als de deploy live staat — niet bij de push.
+2. **Smoke op productie**: de nieuwe/geraakte flow één keer echt doorlopen en `mcp__supabase__get_logs` checken op nieuwe errors.
+3. **Rollback-pad bij een kapotte deploy**: `git revert` van de commit(s) + push (geen force-push, geen reset op gedeelde history). Het schema blijft staan — migraties zijn forward-only; idempotente, additieve migraties (stap 4) zijn er precies zodat de oude code naast het nieuwe schema blijft werken. Meld de gebruiker wat er terugrolde en waarom.
+
+## Rationalisaties die de pijplijn niet passeren
+
+| Gedachte | Werkelijkheid |
+|---|---|
+| "Het is maar één regel, direct pushen" | Eén regel op master = één regel op productie. Poorten gelden per aard van de wijziging, niet per omvang. |
+| "De build/tests waren net nog groen" | Elke wijziging daarná maakt dat bewijs stale — herdraai-regel. |
+| "Deze test raakt dit pad toch niet" | Dat is precies wat de poort moet bewíjzen, niet wat je aanneemt. |
+| "Migratie is idempotent, gewoon toepassen" | Remote drift is hier de norm; eerst schema-effect vergelijken (stap 4.1). |
+| "Security n.v.t., het is alleen UI" | UI lekt ook: masking, partner-privacy, client-side data. Bij twijfel draaien. |
+| "Push maar vast, dan staat het veilig" | Push naar master ís de deploy. Veiligstellen doe je op een branch. |
+| "De deploy zal wel goed gaan, lokaal bouwde het" | Vercel-build ≠ lokale build (env/NFT/regio) — stap 10 bestaat omdat dit hier eerder misging. |
 
 ## Afronding
-Rapporteer per poort het bewijs (commando + uitkomst), de security-bevindingen en hun status, en wat er bewust is overgeslagen met reden. "Alles groen" zonder output is geen afronding.
-
-## Slotstap — Zelfverbetering (altijd in overleg met de gebruiker)
-
-Sluit elke run af met een korte retrospectief:
-
-1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus je eigen observaties over deze pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot. Kijk daarbij ook expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten — en welke instructie-aanpassing zou dat de volgende keer afdwingen?
-2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*/SKILL.md` of `.claude/agents/*.md` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen).
-3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan de eigen definities sleutelen.
-
-Houd het schaars: één scherp voorstel per run is het maximum; geen voorstel is prima.
+Rapporteer per poort het bewijs (commando + uitkomst), de security-bevindingen en hun status, en wat er bewust is overgeslagen met reden. "Alles groen" zonder output is geen afronding. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.

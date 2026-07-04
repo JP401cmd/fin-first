@@ -1,37 +1,15 @@
 ---
-description: Create commit with detailed comment
+description: Tussentijds checkpoint-commit van samenhangend werk (géén release — daarvoor de release-skill)
 ---
 
-Please create a comprehensive checkpoint commit with the following steps:
+Maak een checkpoint-commit van het huidige werk. Dit is een tussentijdse vastlegging, géén ship-gate: gaat dit werk richting master/productie, gebruik dan de `release`-skill.
 
-1. **Initialize Git if needed**: Run `git init` if git has not been instantiated for the project yet.
+1. **Inventariseer**: `git status` + `git diff --stat`. Bepaal welke bestanden bij dít samenhangende werk horen. Er kunnen parallelle sessies actief zijn — bestanden die je niet zelf hebt gewijzigd blijven buiten de commit.
 
-2. **Analyze all changes**:
-   - Run `git status` to see all tracked and untracked files
-   - Run `git diff` to see detailed changes in tracked files
-   - Run `git log -5 --oneline` to understand the commit message style of this repository
+2. **Stage gericht**: expliciete `git add <paden>` van alleen de bedoelde bestanden. **Nooit `git add -A` of `git add .`** — deze repo heeft eerder een git-tracked secret gehad. Twijfel je over een untracked bestand (scripts, dumps, env-achtige bestanden): niet stagen, benoemen in je rapport.
 
-3. **Stage everything**:
-   - Add ALL tracked changes (modified and deleted files)
-   - Add ALL untracked files (new files)
-   - Use `git add -A` or `git add .` to stage everything
+3. **Secrets-check**: geen keys/JWT's/tokens in de gestagede diff (`git diff --cached`); env-waarden horen in `.env` (untracked), placeholders in `env.example`.
 
-4. **Create a detailed commit message**:
-   - **First line**: Write a clear, concise summary (50-72 chars) describing the primary change
-     - Use imperative mood (e.g., "Add feature" not "Added feature")
-     - Examples: "feat: add user authentication", "fix: resolve database connection issue", "refactor: improve API route structure"
-   - **Body**: Provide a detailed description including:
-     - What changes were made (list of key modifications)
-     - Why these changes were made (purpose/motivation)
-     - Any important technical details or decisions
-     - Breaking changes or migration notes if applicable
-   - **Footer**: Include co-author attribution as shown in the Git Safety Protocol
+4. **Commit-message in de stijl van deze repo** (check `git log -5 --oneline`): Nederlands, conventional-prefix (`feat(scope):`, `fix:`, `perf(ui):`, `checkpoint:` voor verzamelwerk), imperatief, eerste regel ≤72 tekens; body met wat + waarom. Hooks laten draaien (geen `--no-verify`). Sluit af met de standaard Claude-co-author-regels.
 
-5. **Execute the commit**: Create the commit with the properly formatted message following this repository's conventions.
-
-IMPORTANT:
-
-- Do NOT skip any files - include everything
-- Make the commit message descriptive enough that someone reviewing the git log can understand what was accomplished
-- Follow the project's existing commit message conventions (check git log first)
-- Include the Claude Code co-author attribution in the commit message
+5. **Verifieer**: na de commit `git status` — een schone tree (voor de gestagede scope) is het bewijs dat de commit de bedoelde staat ving. Niet pushen tenzij daar expliciet om gevraagd is: push naar master is een productie-deploy.

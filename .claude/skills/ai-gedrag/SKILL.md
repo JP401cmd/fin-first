@@ -1,7 +1,7 @@
 ---
 name: ai-gedrag
 effort: high
-description: Pijplijn voor het bijsturen van AI-GEDRAG in TriFinity — hoe De Wil (en Kern/Horizon) praat, redeneert, categoriseert en antwoordt. Voor verkeerde categorisaties, toon/lengte-problemen, filosofie-drift, compliance-zorgen of het verfijnen van een bestaande prompt. Werkt als een evaluatie-loop: concrete voorbeelden → diagnose → chirurgische prompt-aanpassing → regressiebewijs. Gebruik /ai-feature wanneer de app iets nieuws met AI moet kunnen; deze skill gaat over hoe de bestaande AI zich gedraagt.
+description: "Pijplijn voor het bijsturen van AI-GEDRAG in TriFinity — hoe De Wil (en Kern/Horizon) praat, redeneert, categoriseert en antwoordt. Gebruik bij verkeerde categorisaties, toon/lengte-problemen, filosofie-drift, compliance-zorgen of het verfijnen van een bestaande prompt — ook wanneer zoiets als 'bug' gemeld wordt. Voor nieuwe AI-functionaliteit gebruik je /ai-feature; deze skill gaat over hoe de bestaande AI zich gedraagt."
 ---
 
 # AI-gedrag pijplijn
@@ -10,11 +10,9 @@ Stuurt het gedrag van de AI bij via de prompt-DNA. Kern: gedrag verander je met 
 
 Geef het ongewenste gedrag mee als argument, het liefst met voorbeelden.
 
-## Rol van de hoofdchat — orchestrator
+## Gedeelde conventies (verplicht)
 
-De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn. Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport, inventariseer dan eerst diens deelstaat (git status/diff op de opdracht-scope) en maak het werk in de hoofdthread af of dispatch gericht het restant — nooit blind opnieuw dispatchen of het rapport als compleet behandelen.
-
-**Voortgangsrapportage (verplicht):** houd de gebruiker doorlopend op de hoogte van waar de pijplijn mee bezig is. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten, draai de agent(s) dan met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
+Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (hoofdchat delegeert; bij een gestrande subagent eerst diens deelstaat per toegewezen deeltaak inventariseren), voortgangsritme (vóór/na elke stap melden, nooit >5 min stilte), git-hygiëne in de gedeelde werkboom (nooit `git stash`/`checkout --`/`reset`) en de zelfverbeterings-slotstap (definitie-wijzigingen alleen ná expliciet akkoord, aparte `self-improve:`-commit). Deze regels gelden onverkort.
 
 ## Proces
 
@@ -45,14 +43,4 @@ De `tester` legt élk voorbeeldgeval uit stap 1 vast als testcase — categorisa
 - Vermeld dat beheerders via `ai_system_prompt_override` het volledige prompt kunnen overschrijven — de default moet op zichzelf coherent blijven (admin-auditview).
 
 ## Afronding
-Lever op: de geciteerde prompt-diff met redenering, de voorbeeldgevallen als regressietests (groen), het bewijs dat de invarianten en eerder gedrag intact zijn, en eventuele overdracht aan plumbing/`ai-feature` als de oorzaak daar lag.
-
-## Slotstap — Zelfverbetering (altijd in overleg met de gebruiker)
-
-Sluit elke run af met een korte retrospectief:
-
-1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus je eigen observaties over deze pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot. Kijk daarbij ook expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten — en welke instructie-aanpassing zou dat de volgende keer afdwingen?
-2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*/SKILL.md` of `.claude/agents/*.md` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen).
-3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan de eigen definities sleutelen.
-
-Houd het schaars: één scherp voorstel per run is het maximum; geen voorstel is prima.
+Lever op: de geciteerde prompt-diff met redenering, de voorbeeldgevallen als regressietests (groen), het bewijs dat de invarianten en eerder gedrag intact zijn, en eventuele overdracht aan plumbing/`ai-feature` als de oorzaak daar lag. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.

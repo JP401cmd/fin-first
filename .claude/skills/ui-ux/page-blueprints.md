@@ -4,12 +4,12 @@
 
 ## Page-type-blueprints
 
-> Elke pagina valt in één van tien archetypes. Bij review/ontwerp eerst type bepalen, dan de blueprint volgen. Pagina's mogen blokken weglaten, maar nooit volgorde of hiërarchie veranderen. Cross-cutting standaarden (back-nav, action-bar, confirmation, loading, saving, success) gelden voor alle types.
+> Elke pagina valt in één van elf archetypes. Bij review/ontwerp eerst type bepalen, dan de blueprint volgen. Pagina's mogen blokken weglaten, maar nooit volgorde of hiërarchie veranderen. Cross-cutting standaarden (back-nav, action-bar, confirmation, loading, saving, success) gelden voor alle types.
 
 Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell` (zie Type 11). Pagina-content leeft *binnen* die chrome zonder zelf back-knop, breadcrumb, of module-tab-rij te renderen. Module-layouts (`app/(app)/{module}/layout.tsx`) leveren alleen de kleur-context (`--module-active-*` CSS-vars) en optionele transitie-context (DreamTransition op `/horizon/**`).
 
 ### Type 1: Module-landing
-- **Routes**: `/dashboard`, `/core`, `/will`, `/horizon`, `/identity`, `/rapportages`, `/berichten`, `/nieuws`.
+- **Routes**: `/overzicht`, `/toekomst`, `/mijn`, `/rapportages`, `/berichten`, `/nieuws` (legacy backing: `/dashboard`, `/core`, `/horizon` — niet als referentie gebruiken).
 - **Doel**: hero + categorie-overzicht — eerste indruk van een module of feed.
 - **Top-down structuur**:
   1. Module-accent-bar (3px boven, `bg-[var(--module-active-500)]`).
@@ -23,7 +23,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
 - **Niet doen**: meerdere hero-blokken stapelen, mini-bar gebruiken in plaats van figures-strip, cards in een tabel renderen.
 
 ### Type 2: Categorie / list-pagina
-- **Routes**: `/core/assets/[type]`, `/core/debts/[type]`, `/core/budgets`, `/core/cash`, `/core/assets/holdings`, `/identity/koppelingen`, `/rapportages/budget`, `/rapportages/balans`.
+- **Routes**: `/overzicht/bezittingen/[type]`, `/overzicht/schulden/[type]`, `/overzicht/cashflow/budget`, `/overzicht/cashflow/transacties`, `/overzicht/cashflow/vaste-lasten`, `/mijn/koppelingen`, rapportage-sublijsten.
 - **Doel**: overzicht van entiteiten binnen één categorie.
 - **Top-down structuur**:
   1. ~~Back-link~~ — shell levert via TopBar (mobile) of pane-header (desktop). Pagina rendert geen eigen "← Terug naar {parent}"-link.
@@ -38,7 +38,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
 - **Mobile**: filter-bar wordt scroll-x chip-strip; search verbergt achter een knop; sort-control wordt segmented control onder de toolbar; CTA blijft prominent.
 
 ### Type 3: Detail-pagina
-- **Routes**: `/core/budgets/[id]`, `/core/assets/cash/[accountId]`, `/core/assets/holdings/[id]`, `/core/assets/crypto/[holdingId]`, `/core/assets/investment/[holdingId]`, `/rapportages/[id]`.
+- **Routes**: entiteit-details (budget, rekening, holding, rapportage) — tegenwoordig bij voorkeur als pane binnen de lijst (zie *In-list detail-flow* hieronder); aparte detail-routes zijn de uitzondering.
 - **Doel**: alles wat één entiteit toont — eigendomsinfo, KPI's, transacties, gekoppelde items.
 - **In-list detail-flow**: voor entiteiten die altijd via een lijst worden bereikt (bezittingen, schulden, events) — gebruik het *Entity detail-pane met mode-switch* patroon i.p.v. een aparte route. Eén pane wisselt tussen view en edit; herwaardering blijft als secondary footer-action in view-mode én als header-action icon in edit-mode beschikbaar (kern-actie mag niet wegvallen).
 - **Top-down structuur** (voor de aparte-route variant):
@@ -54,7 +54,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
 - **Niet doen**: hoofdwaarde dupliceren tussen header en figures-strip; meer dan één highlight-marker per scherm-sectie.
 
 ### Type 4: Bewerk-/create-pagina (form-flow)
-- **Routes**: `/core/budgets/new`, `/core/budgets/[id]/edit`, `/core/assets/revalue`, `/core/cash/import`, `/core/assets/holdings/import`, en alle CRUD-sheets/modals.
+- **Routes**: create/edit-flows voor budgetten, bezittingen, schulden, import-flows (bank/CSV/holdings), en alle CRUD-sheets/modals.
 - **Doel**: gegevens aanmaken of wijzigen in een gestructureerd formulier.
 - **Variant-keuze** (altijd via `<ShellOverlay kind="...">`, nooit directe `BottomSheet`):
   - Lichte form (≤5 velden): `kind="sheet"` op zowel desktop als mobile — responsive uit één component.
@@ -95,7 +95,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
   6. Optionele year-table met dotted-rows + sleep-hint op `<640px`.
 
 ### Type 7: Wizard / multi-step-pagina
-- **Routes**: `/core/checkin`, `/core/cash/connect/*`, `/identity/gids`, `/identity/jaaroverzicht`, `/horizon/doorrekening-test/*`.
+- **Routes**: `/onboarding`, `/mijn/checkins`, bank-koppel- en importflows.
 - **Doel**: gefaseerde flow — onboarding, jaaroverzicht, doorrekening-stappen.
 - **Top-down structuur**:
   1. Stappen-balk bovenaan: "i / iv" of "stap 2 van 5" in italic Playfair, paarse cijfers → dunne progress-bar (height 1-2px).
@@ -106,7 +106,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
   6. Bij laatste stap success: redirect naar bestemming + toast met undo-link.
 
 ### Type 8: Settings / preferences-pagina
-- **Routes**: `/identity/instellingen`, `/identity/profiel`, `/beheer/*`.
+- **Routes**: `/mijn/*` (profiel, uiterlijk, notificaties, privacy, geavanceerd, account), `/beheer/*`.
 - **Doel**: configuratie en voorkeuren — meestal autosave.
 - **Top-down structuur**:
   1. Editorial header: kicker-met-streepje "INSTELLINGEN" → titel (Playfair) → `<EditorialDeck>`.
@@ -131,7 +131,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
   - *No-results-van-filter*: "Geen resultaten. Wis filters."
 
 ### Type 10: Calculator / tool-pagina (volledig WOZ-blueprint)
-- **Routes**: `/horizon/whatif`, `/tools/fire-sim`, `/horizon/strategie`, `/core/belasting`.
+- **Routes**: `/toekomst/whatif`, `/toekomst/strategie`, `/toekomst/rekenhulp`, `/overzicht/belasting` (+ box1/2/3).
 - **Doel**: scenario-input + live berekening + resultaat-uitkomst.
 - **Top-down structuur**:
   1. Masthead met dubbele lijn boven (`border-t-4 border-double border-b border-[var(--ink)]`): meta-l "Editie · {Module}" → logo "tf." met module-accent dot → meta-r (subtitle).
@@ -145,7 +145,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
   7. Ornament-colophon: `Trifinity ✦ {Module} ✦ {Tool} v{x}`.
 
 ### Type 11: Module-shell (cross-cutting chrome-blueprint)
-- **Bestanden**: `components/app/shell/responsive-shell.tsx` als root, daarbinnen `desktop-sidebar-shell.tsx` (≥lg) of `mobile-stack-shell.tsx` (<lg). Activeert achter feature-flag `new_navigation_shell`.
+- **Bestanden**: `components/app/shell/responsive-shell.tsx` als root, daarbinnen `desktop-sidebar-shell.tsx` (≥lg) of `mobile-stack-shell.tsx` (<lg).
 - **Doel**: chrome leveren rond alle pagina-content — sidebar (desktop), TopBar + StackContainer + BottomBar (mobile), slide-in pane, focus-trap, swipe-back, skeleton-fallbacks.
 - **Top-down structuur (desktop, ≥lg)**:
   1. `ResponsiveShell` rendert `Sidebar` via portal naar `document.body` (omzeilt `ChatLayoutWrapper`'s `contain: layout`).

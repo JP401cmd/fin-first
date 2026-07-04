@@ -1,7 +1,7 @@
 ---
 name: bug-fix
 effort: high
-description: End-to-end bug-fix pijplijn voor TriFinity die de juiste subagents in volgorde inzet — van reproduceerbaar bugrapport naar gefixte, geverifieerde en (indien nodig) architectuur-gereviewde oplossing. Gebruik deze skill wanneer een bug gemeld of waargenomen is en je 'm gestructureerd wilt oplossen in plaats van ad-hoc te patchen.
+description: "Bug-fix pijplijn voor TriFinity. Gebruik wanneer een defect gemeld of waargenomen is — 'werkt niet', 'klopt niet', crash, verkeerd getal. NIET voor AI-gedragsafwijkingen (verkeerde categorisatie, toon of antwoorden van de AI) → /ai-gedrag."
 ---
 
 # Bug-fix pijplijn
@@ -10,13 +10,15 @@ Lost een bug op via de gespecialiseerde subagents, in een vaste volgorde met con
 
 Geef de bug-omschrijving mee als argument; ontbreekt die, vraag er eerst naar.
 
-## Rol van de hoofdchat — orchestrator
+## Gedeelde conventies (verplicht)
 
-De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn. Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport, inventariseer dan eerst diens deelstaat (git status/diff op de opdracht-scope) en maak het werk in de hoofdthread af of dispatch gericht het restant — nooit blind opnieuw dispatchen of het rapport als compleet behandelen. **Toets die deelstaat per TOEGEWEZEN deeltaak, niet alleen of de gewijzigde bestanden compileren: een agent die halverwege sneuvelt kan een vroege deeltaak (bv. een helper of refactor) hebben uitgevoerd maar latere deeltaken (bv. een copy-aanpassing, een test, een tweede bestand) stilzwijgend hebben overgeslagen terwijl de code tóch groen is — compile-clean ≠ taak-compleet. Loop expliciet de oorspronkelijke opdrachtlijst van de agent langs en vink elk punt af tegen de echte diff; een overgeslagen deeltaak die pas in de review opduikt is een gemiste inventarisatie.**
+Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (hoofdchat delegeert; bij een gestrande subagent eerst diens deelstaat per toegewezen deeltaak inventariseren), voortgangsritme (vóór/na elke stap melden, nooit >5 min stilte), git-hygiëne in de gedeelde werkboom (nooit `git stash`/`checkout --`/`reset`) en de zelfverbeterings-slotstap (definitie-wijzigingen alleen ná expliciet akkoord, aparte `self-improve:`-commit). Deze regels gelden onverkort.
 
-**Voortgangsrapportage (verplicht):** houd de gebruiker doorlopend op de hoogte van waar de pijplijn mee bezig is. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten, draai de agent(s) dan met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
+Aanvulling bij het gestrande-subagent-protocol in deze pijplijn: compile-clean ≠ taak-compleet — een agent die halverwege sneuvelt kan een vroege deeltaak (bv. een helper of refactor) hebben uitgevoerd maar latere deeltaken (bv. een copy-aanpassing, een test, een tweede bestand) stilzwijgend hebben overgeslagen terwijl de code tóch groen is. Loop expliciet de oorspronkelijke opdrachtlijst van de agent langs en vink elk punt af tegen de echte diff; een overgeslagen deeltaak die pas in de review opduikt is een gemiste inventarisatie.
 
 ## Proces
+
+**Afslag vooraf — AI-gedrag?** Blijkt de gemelde "bug" een AI-gedragsafwijking — verkeerde categorisatie, toon, lengte of antwoorden van de AI — verlaat dan deze pijplijn en start **`/ai-gedrag`**, ook al is het als bug gemeld. Deze pijplijn is voor defecten in code/data/UI, niet voor hoe de bestaande AI zich gedraagt.
 
 ### 0. Fast-path-poort — al firsthand gediagnosticeerd? (zelf, geen agent)
 Levert de opdracht de bug al **firsthand gediagnosticeerd** aan — oorzaak, exacte locatie(s) én fix-richting, niet slechts een symptoom — handel stap 1–3 (rapport, verwachting, triage) dan af als een **korte bevestiging in de hoofdthread** i.p.v. drie aparte subagent-runs, en ga direct naar stap 4 (falende test). Dit bespaart 2–3 subagent-runs en context bij een al-doorgrond probleem. Voorwaarden: de **firsthand-verificatieplicht blijft hard** (lees zelf de betrokken regels/diff, draai zelf `tsc`/de relevante tests — vertrouw geen aangeleverde diagnose blind), en blijkt de diagnose bij die verificatie tóch onvolledig of fout, val dan terug op de volledige stappen 1–3. Bij twijfel over de diagnose: niet de fast-path nemen.
@@ -40,7 +42,7 @@ De `senior-developer` routeert naar het juiste domein en integreert:
 - Foute cijfers / rekenfout → `calc-engine-specialist`
 - Schema / RLS / migratie / datatoegang → `supabase-db-specialist`
 - AI-plumbing (SDK, routes, tools, guardrails) → `ai-specialist-general`
-- Prompt/categorisatie/DNA → `ai-specialist-prompt-dna`
+- Prompt/categorisatie/DNA → `ai-specialist-prompt-dna` (alleen wanneer prompt-werk deel is van een bredere bug — een puur AI-gedragsprobleem hoort in `/ai-gedrag`, zie de afslag vooraf)
 - UI/component/scherm → `frontend-ui-builder`
 - Overig/cross-cutting → `coder` of de `senior-developer` zelf
 Fix bij de **bron** (geen symptoombestrijding, geen duplicatie van een berekening). **Bij een rekenmotor- of constante-correctie: grep niet alleen op de canonieke functienaam, maar óók op de rúwe constante-literalen van de oude/foute formule (bv. `0.133`, `17_545`) — een tweede surface die de metric volledig herimplementeert met magic numbers verschijnt nooit in een grep op de geëxporteerde functie, en blijft anders ongecorrigeerd achter.**
@@ -57,14 +59,4 @@ De `tester` draait de test uit stap 4 (nu **groen**) plus de bredere relevante s
 Was stap 3 "structureel"? Dan reviewt de `architect` of de fit klopt en zorgt hij dat de vier views van `/beheer/architectuur` meebewegen — gedelegeerd aan `architecture-docs-keeper` (`npm run arch:diagram`, suites groen), inclusief een ADR/concern-update (concern verwíjderen als het risico is opgelost). Lokale bug zonder impact? Sla over.
 
 ## Afronding
-Sluit af met: het bugrapport, de bron-oorzaak, wat gewijzigd is, het bewijs (groene test + regressiecase) en eventuele architectuur/plaat-updates. Bij restrisico of out-of-scope bevindingen: benoem waar het stokt.
-
-## Slotstap — Zelfverbetering (altijd in overleg met de gebruiker)
-
-Sluit elke run af met een korte retrospectief:
-
-1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus je eigen observaties over deze pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot. Kijk daarbij ook expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten — en welke instructie-aanpassing zou dat de volgende keer afdwingen?
-2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*/SKILL.md` of `.claude/agents/*.md` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen).
-3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan de eigen definities sleutelen.
-
-Houd het schaars: één scherp voorstel per run is het maximum; geen voorstel is prima.
+Sluit af met: het bugrapport, de bron-oorzaak, wat gewijzigd is, het bewijs (groene test + regressiecase) en eventuele architectuur/plaat-updates. Bij restrisico of out-of-scope bevindingen: benoem waar het stokt. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.

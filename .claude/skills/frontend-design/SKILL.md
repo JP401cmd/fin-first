@@ -1,46 +1,16 @@
 ---
 name: frontend-design
-description: Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics.
+description: Create distinctive, production-grade frontend interfaces for NON-APP surfaces — marketing-/landingpagina's, artifacts, posters, one-off demo's. Voor in-app TriFinity-UI (app/(app)/**, components/**) is de ui-ux-skill de single source of truth en overrulet die deze skill volledig. Genereert creatief, gepolijst design dat generieke AI-esthetiek vermijdt.
 license: Complete terms in LICENSE.txt
 ---
 
-This skill guides creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices.
+# frontend-design — router
 
-The user provides frontend requirements: a component, page, application, or interface to build. They may include context about the purpose, audience, or technical constraints.
+**Routeringsregel (eerst dit):**
 
-## Design Thinking
+- **In-app TriFinity-UI** (alles onder `app/(app)/**` en `components/**`) → gebruik de **`ui-ux`-skill**. TriFinity heeft één vaste, niet-onderhandelbare design-taal (krant/editorial, Playfair/Source Serif/DM Mono, warm off-white, module-tokens). "Kies een gedurfde eigen esthetiek" — het hart van deze skill — is dáár expliciet verboden.
+- **Niet-app oppervlakken** (marketingsite/landing, Artifacts, posters, presentatiemateriaal, losse demo's) → volg de generieke methodiek van de **`frontend-design:frontend-design`-pluginskill** (zelfde naam, plugin-namespace): gedurfde esthetische richting kiezen, onderscheidende typografie, atmosfeer/diepte, motion op high-impact-momenten, nooit convergeren op generieke keuzes.
 
-Before coding, understand the context and commit to a BOLD aesthetic direction:
-- **Purpose**: What problem does this interface solve? Who uses it?
-- **Tone**: Pick an extreme: brutally minimal, maximalist chaos, retro-futuristic, organic/natural, luxury/refined, playful/toy-like, editorial/magazine, brutalist/raw, art deco/geometric, soft/pastel, industrial/utilitarian, etc. There are so many flavors to choose from. Use these for inspiration but design one that is true to the aesthetic direction.
-- **Constraints**: Technical requirements (framework, performance, accessibility).
-- **Differentiation**: What makes this UNFORGETTABLE? What's the one thing someone will remember?
+**TriFinity-aanvulling voor niet-app oppervlakken:** de marketingsite deelt de belofte-structuur (#inzicht #grip #nu #toekomst) en verzint geen proof; juridische teksten zijn concept. Hergebruik de merk-typografie (Playfair/Source Serif) waar herkenbaarheid gewenst is, maar marketingpagina's mógen vrijer zijn dan de app.
 
-**CRITICAL**: Choose a clear conceptual direction and execute it with precision. Bold maximalism and refined minimalism both work - the key is intentionality, not intensity.
-
-Then implement working code (HTML/CSS/JS, React, Vue, etc.) that is:
-- Production-grade and functional
-- Visually striking and memorable
-- Cohesive with a clear aesthetic point-of-view
-- Meticulously refined in every detail
-
-## Frontend Aesthetics Guidelines
-
-Focus on:
-- **Typography**: Choose fonts that are beautiful, unique, and interesting. Avoid generic fonts like Arial and Inter; opt instead for distinctive choices that elevate the frontend's aesthetics; unexpected, characterful font choices. Pair a distinctive display font with a refined body font.
-- **Color & Theme**: Commit to a cohesive aesthetic. Use CSS variables for consistency. Dominant colors with sharp accents outperform timid, evenly-distributed palettes.
-- **Motion**: Use animations for effects and micro-interactions. Prioritize CSS-only solutions for HTML. Use Motion library for React when available. Focus on high-impact moments: one well-orchestrated page load with staggered reveals (animation-delay) creates more delight than scattered micro-interactions. Use scroll-triggering and hover states that surprise.
-- **Spatial Composition**: Unexpected layouts. Asymmetry. Overlap. Diagonal flow. Grid-breaking elements. Generous negative space OR controlled density.
-- **Backgrounds & Visual Details**: Create atmosphere and depth rather than defaulting to solid colors. Add contextual effects and textures that match the overall aesthetic. Apply creative forms like gradient meshes, noise textures, geometric patterns, layered transparencies, dramatic shadows, decorative borders, custom cursors, and grain overlays.
-
-NEVER use generic AI-generated aesthetics like overused font families (Inter, Roboto, Arial, system fonts), cliched color schemes (particularly purple gradients on white backgrounds), predictable layouts and component patterns, and cookie-cutter design that lacks context-specific character.
-
-Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. NEVER converge on common choices (Space Grotesk, for example) across generations.
-
-**IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
-
-Remember: Claude is capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
-
-## TriFinity project-conventie — mobiele bovenbalk-titel
-
-Bouw of wijzig je een pagina in het TriFinity-project, dan geldt aanvullend: **elke app-route onder `app/(app)/**` die geen tab-hoofdpagina is, MOET op mobiel een titel in de TopBar tonen** (anders blijft de bovenbalk leeg). Dit gaat automatisch zodra de route in `lib/nav-config.ts` staat — de `resolveRouteTitle()`-fallback vult de titel. Staat de route daar niet, voeg 'm toe aan `EXTRA_ROUTE_TITLES`; hangt de titel van runtime-data af (`[type]`/`[id]`-detailpagina's), render dan expliciet `<NavStackMeta title={runtimeLabel} />` in de pagina. Tab-hoofdpagina's (Overzicht/Toekomst/Mijn) blijven bewust titelloos. De titel-styling (module-accentkleur + editorial serif) zit centraal in `components/app/shell/top-bar.tsx` — niet per pagina regelen. Verifieer op een smal viewport dat de titel verschijnt.
+> De vroegere inline kopie van de plugin-inhoud en de mobiele TopBar-titel-conventie zijn hier bewust verwijderd: het generieke deel leeft in de plugin, de TopBar-conventie in de `ui-ux`-skill (quality-checklist → Navigatie) en operationeel in de `frontend-ui-builder`-agent.

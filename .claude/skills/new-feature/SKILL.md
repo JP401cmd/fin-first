@@ -1,7 +1,7 @@
 ---
 name: new-feature
 effort: high
-description: End-to-end pijplijn voor een NIEUWE functionaliteit in TriFinity die de juiste subagents in volgorde inzet — van waarde & scope, via requirements en solution-architectuur, naar parallelle bouw, test, review en het bijwerken van de architectuurplaten. Gebruik deze skill wanneer iets nieuws gebouwd moet worden dat nog niet bestaat.
+description: "End-to-end pijplijn voor een NIEUWE functionaliteit in TriFinity. Gebruik deze skill wanneer iets nieuws gebouwd moet worden dat nog niet bestaat. Bouwt het voort op iets bestaands → /extend-feature; kleine bijschaving → /kleine-aanpassing; AI-functionaliteit → /ai-feature."
 ---
 
 # Nieuwe-functie pijplijn
@@ -10,15 +10,15 @@ Bouwt een nieuwe functionaliteit via de gespecialiseerde subagents. Nadruk: eers
 
 Geef het idee mee als argument; is het vaag, laat de `business-owner` het eerst scherpen.
 
-## Rol van de hoofdchat — orchestrator
+## Gedeelde conventies (verplicht)
 
-De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn. Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport, inventariseer dan eerst diens deelstaat (git status/diff op de opdracht-scope) en maak het werk in de hoofdthread af of dispatch gericht het restant — nooit blind opnieuw dispatchen of het rapport als compleet behandelen.
-
-**Voortgangsrapportage (verplicht):** houd de gebruiker doorlopend op de hoogte van waar de pijplijn mee bezig is. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten, draai de agent(s) dan met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
+Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (hoofdchat delegeert; bij een gestrande subagent eerst diens deelstaat per toegewezen deeltaak inventariseren), voortgangsritme (vóór/na elke stap melden, nooit >5 min stilte), git-hygiëne in de gedeelde werkboom (nooit `git stash`/`checkout --`/`reset`) en de zelfverbeterings-slotstap (definitie-wijzigingen alleen ná expliciet akkoord, aparte `self-improve:`-commit). Deze regels gelden onverkort.
 
 ## Proces
 
 ### 1. Waarde, scope & prioriteit — `business-owner`
+**"Bestaat dit al?"-poort (eerst):** check vóór al het andere of (een deel van) de gevraagde functionaliteit al bestaat — een korte gerichte `Explore` op routes, componenten en libs volstaat. Bestaat er al een fundament dat dit deels doet, verlaat dan deze pijplijn en start **`/extend-feature`** met een verwijzing naar wat er al is; alleen écht nieuw werk gaat hier verder.
+
 De `business-owner` toetst het idee aan de missie en de pijlers (Kern/Wil/Horizon), bewaakt **Wft-compliance** (geen vergunningsplichtig advies), en zet het om in concrete backlog-feature(s) via de `feature_*`-tools. Verdeel grote ideeën in zelfstandig opleverbare features. Uitkomst: een go + duidelijke waarde-framing.
 
 ### 2. Verwachtingen vastleggen — `requirement-specialist`
@@ -49,14 +49,4 @@ De `tester` schrijft unit-/component-tests en (waar end-to-end) een regression-s
 `architecture-docs-keeper` werkt de vier views van `/beheer/architectuur` bij (ArchiMate-topologie/relaties/flows, HLD-capability, ERD via migraties, Berekeningen) en regenereert facts (`npm run arch:diagram`); suites groen. De `architect` doet de eind-fit-review: past het, klopt de ADR, is een concern nodig of opgelost.
 
 ## Afronding
-Lever op: de feature(s) in de backlog, het requirement-spec, het architectuurbesluit (ADR), wat gebouwd is, groene tests/reviews en de bijgewerkte platen. Benoem next steps en restrisico.
-
-## Slotstap — Zelfverbetering (altijd in overleg met de gebruiker)
-
-Sluit elke run af met een korte retrospectief:
-
-1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus je eigen observaties over deze pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot. Kijk daarbij ook expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten — en welke instructie-aanpassing zou dat de volgende keer afdwingen?
-2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*/SKILL.md` of `.claude/agents/*.md` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen).
-3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan de eigen definities sleutelen.
-
-Houd het schaars: één scherp voorstel per run is het maximum; geen voorstel is prima.
+Lever op: de feature(s) in de backlog, het requirement-spec, het architectuurbesluit (ADR), wat gebouwd is, groene tests/reviews en de bijgewerkte platen. Benoem next steps en restrisico. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.

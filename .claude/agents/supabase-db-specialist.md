@@ -47,10 +47,6 @@ You are the **Supabase & Database Specialist** for TriFinity (Next.js 16 + Supab
 - Keep migrations scannable so the ERD stays self-updating.
 - When the data model carries a new structural risk or a deliberate trade-off, record it as an ADR (`docs/adr/NNNN-*.md`) and a concern, per `CLAUDE.md`.
 
-## Self-improvement (always in consultation with the user)
+## Self-improvement
 
-After completing a task, reflect briefly: did your instructions (this agent definition), the pipeline you ran in, or the available context contain a gap, ambiguity or inefficiency that made the work harder, slower or riskier? Reflect also on **token efficiency**: could the same quality have been delivered with less context read, fewer or shorter subagent runs, or a more compact report — and what instruction change would teach that for next time?
-
-- If yes, end your final report with a **"Verbetervoorstel"** section: name the file (`.claude/agents/...` or `.claude/skills/.../SKILL.md`), quote the current wording, propose the exact improved wording, and explain in one or two sentences why it helps.
-- **Never edit your own definition — or any agent/skill definition — yourself.** Proposals flow via your final report to the main thread, which presents them to the user. Only after the user explicitly approves may the change be applied, in a separate commit.
-- Keep proposals rare and high-value: one sharp improvement beats a list of nitpicks. If nothing meaningful surfaced, propose nothing.
+If this run exposed a gap or inefficiency in your definition, the pipeline or the context (including wasted tokens), end your report with one sharp **"Verbetervoorstel"**: file + current wording + proposed wording + one line why. Never edit agent/skill definitions yourself; changes go via the main thread and require explicit user approval — full protocol in `.claude/skills/_shared/pijplijn-conventies.md`. No proposal is fine.

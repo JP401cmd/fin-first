@@ -8,13 +8,11 @@ description: Pijplijn voor VERBOUWEN ZONDER GEDRAGSWIJZIGING in TriFinity — go
 
 Verbouwt code zonder het gedrag te veranderen. Het risico is sluipend: een "kleine verbetering" die meelift, state die van plek verschuift, een dependency-array die nét anders wordt. Daarom is de kern: **elke stap is een aantoonbare pure move** — klein, gecommit, getypecheckt, getest en (bij UI) visueel vergeleken, zodat een afwijking altijd binnen één kleine diff te vinden en terug te draaien is.
 
-Geef mee wát er verbouwd wordt en waarom; check eerst of er al een lopend plan/eerdere extractie bestaat (zie `docs/superpowers/plans/` en de git-log van het doelbestand) — daarop voortbouwen, niet opnieuw beginnen.
+Geef mee wát er verbouwd wordt en waarom; check eerst of er al een lopend plan/eerdere extractie bestaat (zie `docs/superpowers/plans/` en de git-log van het doelbestand) — daarop voortbouwen, niet opnieuw beginnen. **Concreet:** een half-af plan in `docs/superpowers/plans/` wordt hervat vanaf de daar vastgelegde checklist-staat — niet opnieuw beginnen bij stap 1, en nooit parallel een tweede plan voor hetzelfde doelwit starten.
 
-## Rol van de hoofdchat — orchestrator
+## Gedeelde conventies (verplicht)
 
-De hoofdchat voert deze pijplijn uit als **orchestrator**, niet als uitvoerder: hij zet subagents en skills in voor het inhoudelijke werk, bewaakt volgorde, samenhang en kwaliteit tussen de stappen, en beschermt zijn eigen contextvenster door te delegeren. Zelf doet hij alleen triviale lijm en snelle checks; onderzoek, bouw, test en review lopen via de gespecialiseerde agents — parallel waar stappen onafhankelijk zijn. Eindigt een subagent voortijdig (limiet/fout) of zonder bruikbaar rapport, inventariseer dan eerst diens deelstaat (git status/diff op de opdracht-scope) en maak het werk in de hoofdthread af of dispatch gericht het restant — nooit blind opnieuw dispatchen of het rapport als compleet behandelen.
-
-**Voortgangsrapportage (verplicht):** houd de gebruiker doorlopend op de hoogte van waar de pijplijn mee bezig is. Meld vóór elke stap in één à twee zinnen wat je gaat doen en welke agent(s) je inzet; meld na elke stap kort het resultaat (klaar / kernbevinding / blokkade) voordat je doorgaat. Duurt een stap naar verwachting langer dan ~5 minuten, draai de agent(s) dan met `run_in_background: true` en rapporteer tussentijds zodra een deelresultaat binnenkomt — laat nooit langer dan ~5 minuten stilte vallen. Stil doorwerken zonder updates is een fout, ook als het eindresultaat goed is.
+Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (hoofdchat delegeert; bij een gestrande subagent eerst diens deelstaat per toegewezen deeltaak inventariseren), voortgangsritme (vóór/na elke stap melden, nooit >5 min stilte), git-hygiëne in de gedeelde werkboom (nooit `git stash`/`checkout --`/`reset`) en de zelfverbeterings-slotstap (definitie-wijzigingen alleen ná expliciet akkoord, aparte `self-improve:`-commit). Deze regels gelden onverkort.
 
 ## Proces
 
@@ -29,7 +27,9 @@ Breng het doelwit in kaart: structuurkaart van state/hooks/helpers/types en de g
 ### 3. Plan — `senior-developer`
 Kleinste veilige stappen, van **puur naar stateful**: (1) pure helpers/types/constanten eruit, (2) presentational bladcomponenten, (3) secties, (4) de orchestrator blijft als laatste over (state + compositie). Eén commit per stap; **sequentieel**, nooit parallelle agents op hetzelfde bronbestand.
 
-### 4. De pure-move loop — `coder` / `frontend-ui-builder`
+### 4. De pure-move loop — `coder` / `frontend-ui-builder` / `calc-engine-specialist`
+Routeer per doelwit: **UI-componenten** → `frontend-ui-builder`; **pure libs/hooks/utilities** → `coder`; **rekenmotor-code** → `calc-engine-specialist` — daar is de pure-move-eis extra kritiek, want elke "kleine verbetering" in een rekenmotor is per definitie een rekenkundige gedragswijziging.
+
 Per extractie dezelfde cyclus, met deze **harde regels**:
 - **Knippen-en-plakken, niet herschrijven.** Geen hernoemingen, geen samengevoegde effects, geen toegevoegde memoization, geen "nette" verbeteringen — die komen in een aparte, latere wijziging.
 - **State blijft in de parent**, tenzij aantoonbaar 100% lokaal. State mee verhuizen verandert reset-semantiek bij unmount — dat ís een gedragswijziging.
@@ -53,14 +53,4 @@ Met als expliciete reviewvraag: is dit een pure move? Elke inhoudelijke wijzigin
 Pure herindeling raakt de platen meestal niet, maar: stond er een **aandachtspunt** over dit doelwit in `lib/architecture/archimate-concerns.ts`? Verwijder het zodra opgelost. `npm run arch:diagram` voor de feiten/churn.
 
 ## Afronding
-Lever op: de nieuwe structuur (welke bestanden ontstonden, hoeveel regels het doelwit nog telt), het vangnet dat nu bestaat, en expliciet **welke verificaties bewijzen dat het gedrag identiek is**. Restpunten (bewust uitgestelde verbeteringen) als aparte lijst — die zijn vervolgwerk, geen onderdeel van deze refactor.
-
-## Slotstap — Zelfverbetering (altijd in overleg met de gebruiker)
-
-Sluit elke run af met een korte retrospectief:
-
-1. **Verzamel** de "Verbetervoorstel"-secties uit de eindrapporten van de ingezette subagents, plus je eigen observaties over deze pijplijn: overbodige of ontbrekende stap, verkeerde routering, onduidelijke instructie, een agent-definitie die tekortschoot. Kijk daarbij ook expliciet naar **token-efficiëntie**: had hetzelfde resultaat gekund met minder gelezen context, minder of kortere agent-runs of compactere rapporten — en welke instructie-aanpassing zou dat de volgende keer afdwingen?
-2. **Leg betekenisvolle voorstellen expliciet aan de gebruiker voor** — wat, waarom, en de exacte tekstwijziging in `.claude/skills/*/SKILL.md` of `.claude/agents/*.md` — bij voorkeur als keuzevraag (doorvoeren / aanpassen / afwijzen).
-3. **Alleen na expliciet akkoord doorvoeren**, in een aparte commit met prefix `self-improve:`. Geen akkoord of geen voorstel? Niets wijzigen — nooit stilzwijgend aan de eigen definities sleutelen.
-
-Houd het schaars: één scherp voorstel per run is het maximum; geen voorstel is prima.
+Lever op: de nieuwe structuur (welke bestanden ontstonden, hoeveel regels het doelwit nog telt), het vangnet dat nu bestaat, en expliciet **welke verificaties bewijzen dat het gedrag identiek is**. Restpunten (bewust uitgestelde verbeteringen) als aparte lijst — die zijn vervolgwerk, geen onderdeel van deze refactor. Sluit daarna af met de zelfverbeterings-slotstap uit de gedeelde conventies.
