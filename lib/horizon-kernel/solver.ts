@@ -119,6 +119,11 @@ function computeStatusBlok(
   // → tekortLening blijft 0 (gelijk aan het oude lezen van de lege slot 6).
   const tekortSlot = input.schuldPotten.find((p) => p.rol === 'tekortLening')?.slot
   if (tekortSlot !== undefined) {
+    // NB — het venster hier is `leeftijd ≤ eindleeftijd` (INCLUSIEF de eindleeftijd),
+    // byte-exacte Excel-oracle-port (MAXIFS S!AR "<="&B35) voor pension_shortfall. De
+    // app-weergave-detector `detectDeficitLoanFromRows` (lib/horizon/deficit-loan-display.ts)
+    // hanteert bewust een ANDER venster — `age ≤ endAge − 1` (staart op de eindleeftijd =
+    // modelmarge, besluit 4 juli 2026). Verwacht ze dus niet identiek.
     for (const rij of proj.s) {
       const leeftijd = rij.helperLeeftijd
       if (typeof leeftijd !== 'number' || leeftijd > eindleeftijd) continue

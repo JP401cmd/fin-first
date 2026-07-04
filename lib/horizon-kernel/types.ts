@@ -660,4 +660,21 @@ export interface KernelInput {
    * elke bestaande parity-run blijft byte-identiek.
    */
   readonly potLiquidaties?: readonly PotLiquidatie[]
+  /**
+   * **Buiten oracle-domein (gap-besluit V19, TRANSITIONEEL — ADR 0033).** Zet de
+   * maandelijkse tekort-aflos-stap AAN: los een openstaand tekort-lening-saldo
+   * (S!AB > 0) elke maand af uit de resterende liquide bezit-capaciteit (ná
+   * afname/onttrekking, m−1-lag), in de onttrekking-waterval-volgorde. Dit heft de
+   * F6-modelbeperking op waarbij een transitie-lag-tekort (bv. de één-maand-piek bij
+   * een "wanneer nodig"-huisverkoop) nooit werd afgelost en met de tekort-rente
+   * compoundde terwijl er liquide vermogen náást stond.
+   *
+   * Weggelaten/`false` → **byte-identiek aan het Excel v5-oracle** (lening blijft
+   * staan): `input-from-fixture` zet 'm níet, dus de parity-fixtures blijven groen.
+   * De app-adapter (`buildKernelInputFromApp*`) zet 'm op `true` (default AAN).
+   * TRANSITIONEEL: zodra Excel v6 dezelfde stap heeft en de fixtures heréxtraheerd
+   * zijn (zie `docs/horizon-excel-oracle-plan.md` gap V19), kan parity mét de stap
+   * AAN draaien en vervalt deze vlag.
+   */
+  readonly tekortAflossingUitLiquide?: boolean
 }

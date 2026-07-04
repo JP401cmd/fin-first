@@ -308,9 +308,17 @@ export function GebeurtenissenView({
     dailyExpenses > 0 ? formatWithFreedom(v, dailyExpenses) : formatCurrency(v)
 
   // Tekort-lening uit dezelfde rijen als de grafiek (kernel-only signaal).
+  // Besluit 4 juli 2026: de tekort-lening-staart op/na de eindleeftijd is
+  // modelmarge en wordt niet gemeld → cutoff op `displayEndAge − 1`. We gebruiken
+  // bewust de KERNEL-eindleeftijd (`sim.result.displayEndAge`) uit dezelfde run
+  // als de rijen — NIET de rauwe `eventPaneData.endAge` (= profiles.fire_end_age).
+  // Zo clipt dit oppervlak op exact dezelfde eindleeftijd als de Tijdas-grafiek in
+  // horizon-client (perpetual/pensioen → 100, deplete/legacy → fire_end_age); de
+  // rauwe prop zou bij doorlopende strategieën divergeren (cutoff 89 vs 99).
+  // `result` en `unifiedRows` komen atomair uit dezelfde memo → geen flikker.
   const deficitNotice = useMemo(
-    () => detectDeficitLoanFromRows(sim.unifiedRows),
-    [sim.unifiedRows],
+    () => detectDeficitLoanFromRows(sim.unifiedRows, { endAge: sim.result?.displayEndAge }),
+    [sim.unifiedRows, sim.result?.displayEndAge],
   )
 
   // Kernel-afgeleide strategiemomenten (puur weergave; voeden NOOIT lifeEvents

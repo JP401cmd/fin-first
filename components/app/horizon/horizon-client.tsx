@@ -1251,9 +1251,17 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
   // marker. Alleen de kernel-bridge levert debtBalances['tekort-lening'], dus dit
   // is per constructie kernel-only (v2-rijen → null). Vóór chartEventOverlay
   // gedeclareerd zodat de marker-builder 'm mag consumeren (geen TDZ).
+  //
+  // Besluit 4 juli 2026: de tekort-lening-staart op/na de eindleeftijd is
+  // modelmarge en wordt niet gemeld → cutoff op `displayEndAge − 1`.
+  // `simResult.displayEndAge` = `solve.eindleeftijd` = de eindleeftijd die de
+  // kernel voor DÉZE run hanteerde: bij 'Vermogen opeten'/'Nalatenschap' de
+  // plan-eindleeftijd (fire_end_age, bv. 93), bij perpetual/pensioen de
+  // horizon-cap 100 (geen bewuste deplete-staart → een tekort vóór 100 is een
+  // echt signaal, geen marge). Dat is precies de "eindleeftijd" uit het besluit.
   const deficitLoanNotice = useMemo(
-    () => detectDeficitLoanFromRows(unifiedRows),
-    [unifiedRows],
+    () => detectDeficitLoanFromRows(unifiedRows, { endAge: simResult?.displayEndAge }),
+    [unifiedRows, simResult?.displayEndAge],
   )
 
   // ── Chart event-overlay (markers boven/onder de bar) ───────────────────
@@ -3827,6 +3835,7 @@ export default function HorizonPage({ initialData }: { initialData: HorizonPageD
                             fireAgeFractional={simResult.fireAgeFractional}
                             planningMode={planningMode}
                             aowAgeFractional={userAowAge.fractional}
+                            housingSaleAge={kernelHousingSale?.age ?? null}
                             eventOverlay={chartEventOverlay}
                             onEventClick={handleChartEventClick}
                             onYearClick={(age) => setSelectedYearAge(age)}

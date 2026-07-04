@@ -157,9 +157,19 @@ export interface VerdelingRow {
   /**
    * S!AC — tekort-lening-aflossing (prio-1-toewijzing die het ruwe schuld-aflos-
    * budget absorbeert vóór de vijf categorieën; `EQ = ruwBudget − tekortAflossing`).
-   * Wordt door S geconsumeerd (`SDep.tekortAflossing`); 0 zonder tekort.
+   * Wordt door S geconsumeerd (`SDep.tekortAflossing`); 0 zonder tekort. Bevat sinds
+   * de F6-bugfix (gap V19) OPTIONEEL óók de liquide-gefinancierde extra-aflossing
+   * (`tekortAflossingUitLiquide`); zonder de vlag = enkel de surplus-tak (oracle).
    */
   readonly tekortAflossing: number
+  /**
+   * Per bezit-categorie: de extra onttrekking uit LIQUIDE bezit om de tekort-lening
+   * af te lossen (F6-bugfix, gap V19; buiten het Excel v5-oracle). `Σ` = het liquide
+   * deel van `tekortAflossing`. Bez trekt dit — net als afname/onttrekking —
+   * share-gewogen van de potten af; S lost er de tekort-lening mee af. Zonder de vlag
+   * `tekortAflossingUitLiquide` is dit een nul-array (byte-identiek oracle-gedrag).
+   */
+  readonly tekortAflossingLiquide: readonly number[]
   /** HC:HH — niet-plaatsbaar aflos-budget terug naar bezitting-toename (6 categorieën). */
   readonly overflow: readonly number[]
 }
@@ -249,9 +259,48 @@ export function computeVerdeling(
   // (m≥699). Het restant `EQ = ruwBudget − AC` voedt de 5-categorie-waterval hieronder;
   // is EQ 0 dan is ook de overloop naar bezit 0.
   const tekortRente = (dep.tekortSaldoPrev * input.tekortLeningRente) / 12
-  const tekortAflossing = Math.min(dep.aflossingBudget, dep.tekortSaldoPrev + tekortRente)
-  const schuldAflossingBudget = dep.aflossingBudget - tekortAflossing
+  const tekortAflossingSurplus = Math.min(dep.aflossingBudget, dep.tekortSaldoPrev + tekortRente)
+  const schuldAflossingBudget = dep.aflossingBudget - tekortAflossingSurplus
   const aflossing = runWaterfall(schuldAflossingBudget, schuldCaps, wAflossing, resAflossing)
+
+  // ── 3b. TEKORT-AFLOSSING UIT LIQUIDE (F6-bugfix, gap-besluit V19 — TRANSITIONEEL,
+  //    buiten het Excel v5-oracle; zie `tekortAflossingUitLiquide` in types.ts). ─────
+  // De surplus-tak (hierboven) vulde `tekortAflossing` uitsluitend uit het positieve
+  // Toename-aflos-budget — dat is in de onttrekkingsfase structureel 0, waardoor een
+  // transitie-lag-tekort (bv. de één-maand-piek bij een "wanneer nodig"-huisverkoop)
+  // NOOIT werd afgelost en met de tekort-rente compoundde terwijl er liquide vermogen
+  // náást stond. Deze stap lost het PRE-EXISTENTE tekort (saldo m−1 + zijn rente),
+  // vóór zover de surplus-tak het al pakte, alsnog af uit de RESTERENDE liquide
+  // capaciteit (categoriesaldo m−1 − afname − onttrekking; m−1-lag = zelfde conventie
+  // als de overige caps), in de onttrekking-waterval-volgorde. Σruw=0 blijft gelden:
+  // wat hier uit bezit wordt getrokken (`tekortAflossingLiquide`) == wat op de
+  // tekort-lening wordt afgelost (het liquide deel van `tekortAflossing`). Rente wordt
+  // niet dubbel geboekt: de cap `saldo m−1 + tekortRente` is exact het bedrag dat S
+  // deze maand accruet (`AE`), dus de aflossing dekt hoofdsom + die ene rente-bijschrijving.
+  let tekortAflossingLiquide: readonly number[] = ZERO_OVERFLOW
+  let tekortAflossingExtra = 0
+  if (input.tekortAflossingUitLiquide) {
+    const resterendTekort = dep.tekortSaldoPrev + tekortRente - tekortAflossingSurplus
+    if (resterendTekort > DEGEN_EPS) {
+      // Resterende liquide capaciteit ná afname + onttrekking (beide putten al uit
+      // dezelfde bezit-pot); niet-liquide categorieën hebben cap 0 via `bezCaps`.
+      const resterendeCaps = bezCaps.map((cap, i) =>
+        Math.max(0, cap - afname.eind[i] - onttrekking.eind[i]),
+      )
+      const tekortWaterval = runBezitWaterfallMetDegeneratie(
+        resterendTekort,
+        resterendeCaps,
+        bezit.map((c) => c.prioOnttrekking),
+        bezit.map((c) => c.gevuld),
+        bezit.map((c) => c.nietLiquide),
+        resOnttrekking,
+        onttrekking.capped, // erft afname+onttrekking's volgelopen-status (unie)
+      )
+      tekortAflossingLiquide = tekortWaterval.eind
+      tekortAflossingExtra = tekortWaterval.eind.reduce((sum, v) => sum + v, 0)
+    }
+  }
+  const tekortAflossing = tekortAflossingSurplus + tekortAflossingExtra
 
   // HC:HH — de niet-plaatsbare aflossing (aflossing.onbenut) stroomt terug naar
   // bezitting-toename, verdeeld naar rato van de **bezit-toename-gewichten**
@@ -274,6 +323,7 @@ export function computeVerdeling(
     onttrekking,
     aflossing,
     tekortAflossing,
+    tekortAflossingLiquide,
     overflow,
   }
 }

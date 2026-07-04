@@ -88,6 +88,13 @@ export interface BezDep {
   readonly verdelingAfname: CategorieBedrag
   /** Per categorie: `Verdeling` onttrekking-eindtoewijzing (positief; wordt afgetrokken). */
   readonly verdelingOnttrekking: CategorieBedrag
+  /**
+   * Per categorie: `Verdeling.tekortAflossingLiquide` — de extra onttrekking uit
+   * liquide bezit om de tekort-lening af te lossen (F6-bugfix, gap V19). Optioneel;
+   * afwezig → 0 (byte-identiek aan het Excel v5-oracle). Wordt — net als
+   * afname/onttrekking — share-gewogen van de pot afgetrokken.
+   */
+  readonly verdelingTekortAflossing?: CategorieBedrag
   /** Per categorie: `Verdeling!HC:HH` schuld-aflossings-overloop → toename (per stuk). */
   readonly overloop: CategorieBedrag
   /** Bez!AY(m−1) — vorige verkoop-status (monotone trigger + BA/BB-vertakking). */
@@ -213,7 +220,10 @@ export function computeBez(input: KernelInput, dep: BezDep, m: MonthIndex): BezR
     const toenamePerStuk = aantal > 0 ? (dep.toenameEur[cat] + dep.overloop[cat]) / aantal : 0
     const catSaldoVorig = m === 0 ? 0 : dep.categoriesaldoVorig[cat]
     const share = catSaldoVorig > 0 ? waardeVorig / catSaldoVorig : 0
-    const onttrokken = (dep.verdelingAfname[cat] + dep.verdelingOnttrekking[cat]) * share
+    // afname + onttrekking + tekort-aflossing-uit-liquide (F6-bugfix, gap V19; laatste
+    // is 0/afwezig zonder de vlag → byte-identiek oracle-gedrag).
+    const tekortAflos = dep.verdelingTekortAflossing?.[cat] ?? 0
+    const onttrokken = (dep.verdelingAfname[cat] + dep.verdelingOnttrekking[cat] + tekortAflos) * share
     const inleg = toenamePerStuk - onttrokken
 
     // waarde: MAX(0, basis + inleg); huis-slot krijgt de verkoop-guard.

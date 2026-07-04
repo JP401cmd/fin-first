@@ -9,6 +9,7 @@ import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { StrategieEditorsData } from './strategie/strategie-editors'
 import type { HorizonFireSimResult } from '@/lib/hooks/use-horizon-fire-sim'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import type { SimResult } from '@/lib/fire-simulation'
 
 // GebeurtenissenView mount de EventPane (dynamisch, ssr:false → rendert niets in
 // jsdom) + de strategie-launcher die next/navigation + supabase client gebruiken.
@@ -96,14 +97,15 @@ function renderView(props: {
   annualSavings?: number
   strategieData?: StrategieEditorsData
   kernelSim?: KernelSimData | null
+  eventPaneData?: EventPaneData
 }) {
-  const { strategieData, kernelSim, ...rest } = props
+  const { strategieData, kernelSim, eventPaneData, ...rest } = props
   return render(
     <DisplayModeProvider initialMode="full">
       <GebeurtenissenView
         {...rest}
         strategieData={strategieData ?? mockStrategieData}
-        eventPaneData={mockEventPaneData}
+        eventPaneData={eventPaneData ?? mockEventPaneData}
         kernelSim={kernelSim ?? null}
       />
     </DisplayModeProvider>,
@@ -309,11 +311,18 @@ function makeRow(age: number, over: Partial<UnifiedProjectionRow> = {}): Unified
   }
 }
 
-/** Geladen sim-resultaat met per test aangeleverde velden. */
+/**
+ * Geladen sim-resultaat met per test aangeleverde velden. `result` draagt een
+ * minimaal-geldige `displayEndAge: 90` (de kernel-eindleeftijd die de detector
+ * consumeert voor de tekort-lening-cutoff, besluit 4 juli 2026) — spiegelt
+ * productie waar een geladen run altijd een displayEndAge heeft. Individuele
+ * tests kunnen `result` overriden.
+ */
 function loadedSim(over: Partial<HorizonFireSimResult>): HorizonFireSimResult {
   return {
     ...LOADING_SIM,
     isLoading: false,
+    result: { displayEndAge: 90 } as SimResult,
     unifiedRows: [],
     kernelPensionPots: [],
     ...over,
@@ -437,6 +446,64 @@ describe('GebeurtenissenView — kernel-afgeleide strategiemomenten (feature #87
     expect(screen.getByText('Ontstaat op leeftijd')).toBeTruthy()
     const link = screen.getByRole('link', { name: /Rente tekort-lening aanpassen/ })
     expect(link.getAttribute('href')).toBe('/toekomst/voorkeuren?regel=eindstrategie')
+  })
+
+  // ── Besluit 4 juli 2026: tekort-lening telt alleen mee t/m endAge − 1 ──────
+  // BRON (doorgevoerd): de detector krijgt de KERNEL-eindleeftijd
+  // `sim.result.displayEndAge` uit dezelfde run als de rijen — identiek aan
+  // horizon-client.tsx, zodat beide Toekomst-oppervlakken op exact dezelfde
+  // eindleeftijd clippen (perpetual/pensioen → 100, deplete/legacy → fire_end_age).
+  // NIET de rauwe `eventPaneData.endAge` (= profiles.fire_end_age): die is
+  // strategie-onafhankelijk en zou bij doorlopende strategieën divergeren.
+  // loadedSim() zet `result.displayEndAge = 90` (zie boven) → venster-cutoff = 89.
+  it('tekort-lening-rij verschijnt NIET wanneer de lening pas op de eindleeftijd zelf ontstaat (modelmarge, endAge-cutoff)', () => {
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [mockEvent({ target_date: null, target_age: 60 })],
+      unifiedRows: [
+        makeRow(90, {
+          debtBalances: {
+            'tekort-lening': { startBalance: 0, interestPaid: 0, principalPaid: 0, endBalance: 30_000 },
+          },
+        }),
+      ],
+    })
+    renderKernelView([mockEvent({ target_date: null, target_age: 60 })])
+    expect(screen.queryByText('Tekort-lening ontstaat')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Berekend: Tekort-lening ontstaat' })).toBeNull()
+  })
+
+  it('tekort-lening-rij verschijnt NIET wanneer de lening pas ná de eindleeftijd ontstaat (staart, endAge-cutoff)', () => {
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [mockEvent({ target_date: null, target_age: 60 })],
+      unifiedRows: [
+        makeRow(90, { debtBalances: {} }),
+        makeRow(95, {
+          debtBalances: {
+            'tekort-lening': { startBalance: 0, interestPaid: 0, principalPaid: 0, endBalance: 80_000 },
+          },
+        }),
+      ],
+    })
+    renderKernelView([mockEvent({ target_date: null, target_age: 60 })])
+    expect(screen.queryByText('Tekort-lening ontstaat')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Berekend: Tekort-lening ontstaat' })).toBeNull()
+  })
+
+  it('tekort-lening-rij blijft WEL verschijnen wanneer de lening al vóór endAge − 1 aangesproken is (boundary)', () => {
+    mockSimResult = loadedSim({
+      effectiveLifeEvents: [mockEvent({ target_date: null, target_age: 60 })],
+      unifiedRows: [
+        makeRow(89, {
+          // = eventPaneData.endAge (90) − 1: laatste rij die nog mee mag tellen.
+          debtBalances: {
+            'tekort-lening': { startBalance: 0, interestPaid: 0, principalPaid: 0, endBalance: 15_000 },
+          },
+        }),
+      ],
+    })
+    renderKernelView([mockEvent({ target_date: null, target_age: 60 })])
+    expect(screen.getByText('Tekort-lening ontstaat')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Berekend: Tekort-lening ontstaat' })).toBeTruthy()
   })
 
   it('regressie: geladen run zónder kernel-momenten → DB-event-rijen en edit-flow ongewijzigd', () => {

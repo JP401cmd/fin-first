@@ -170,6 +170,65 @@ describe('WealthCompositionChart — rendering', () => {
     expect(fireText).toBeFalsy()
   })
 
+  it('renders a housing-sale marker when housingSaleAge is provided', () => {
+    const { container } = render(
+      <WealthCompositionChart
+        stackedRows={makeRows(30, 35)}
+        currentAge={35}
+        endAge={64}
+        housingSaleAge={60}
+      />
+    )
+
+    const svg = container.querySelector('svg')
+    expect(svg).toBeTruthy()
+
+    // Label "Huis verkocht" moet als SVG-text verschijnen
+    const texts = svg!.querySelectorAll('text')
+    const saleText = Array.from(texts).find(t => t.textContent?.includes('Huis verkocht'))
+    expect(saleText).toBeTruthy()
+
+    // Duiding "hypotheek afgelost" moet via <title>/aria-label toegankelijk zijn
+    const saleGroup = svg!.querySelector('[aria-label="Huis verkocht — hypotheek afgelost"]')
+    expect(saleGroup).toBeTruthy()
+    expect(svg!.querySelector('title')?.textContent).toContain('hypotheek afgelost')
+  })
+
+  it('does not render the housing-sale marker when housingSaleAge is null', () => {
+    const { container } = render(
+      <WealthCompositionChart
+        stackedRows={makeRows(5, 35)}
+        currentAge={35}
+        endAge={39}
+        housingSaleAge={null}
+      />
+    )
+
+    const svg = container.querySelector('svg')
+    const texts = svg!.querySelectorAll('text')
+    const saleText = Array.from(texts).find(t => t.textContent?.includes('Huis verkocht'))
+    expect(saleText).toBeFalsy()
+  })
+
+  it('does not render the housing-sale marker when the sale age is outside the visible range', () => {
+    // Verkoop op 80, maar zichtbaar venster is 45–55 → marker buiten bereik.
+    const { container } = render(
+      <WealthCompositionChart
+        stackedRows={makeRows(50, 35)}
+        currentAge={35}
+        endAge={84}
+        visibleMinAge={45}
+        visibleMaxAge={55}
+        housingSaleAge={80}
+      />
+    )
+
+    const svg = container.querySelector('svg')
+    const texts = svg!.querySelectorAll('text')
+    const saleText = Array.from(texts).find(t => t.textContent?.includes('Huis verkocht'))
+    expect(saleText).toBeFalsy()
+  })
+
   it('shows "Geen gegevens beschikbaar" when rows are empty', () => {
     render(
       <WealthCompositionChart

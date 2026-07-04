@@ -582,6 +582,9 @@ export function runKernelProjection(
       aantalPotten: catMap(taBezitField(taRow, (c) => c.aantal)),
       verdelingAfname: catMap(verdelingRow.afname.eind),
       verdelingOnttrekking: catMap(verdelingRow.onttrekking.eind),
+      // F6-bugfix (gap V19): extra onttrekking uit liquide om de tekort-lening af te
+      // lossen. Nul-array zonder de vlag → byte-identiek aan het oracle-pad.
+      verdelingTekortAflossing: catMap(verdelingRow.tekortAflossingLiquide),
       overloop: catMap(verdelingRow.overflow),
     }
     const bezRow = computeBez(input, bezDep, m)

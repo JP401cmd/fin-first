@@ -192,6 +192,7 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
 | V16 | Erfenis-formule (FASE 2-vondst) | **Akkoord: bewuste modelkeuze** — Excel keert de vrijstelling zelf niet uit (netto = MAX(0, bruto − vrijstelling) × (1 − tarief)); kernel volgt het oracle exact (NB-comment in `tables/auto-gebeurtenissen.ts`). |
 | V17 | Lege-surplus-doelpot (end-to-end-verificatie 2026-07-03: app FIRE 59,58 vs Excel 89,33 op identieke eigenaar-invoer; oorzaak: Excel laat maandspaar verdampen bij Σgewicht=0, kernel-degeneratie-fallback stort het in de lege pot) | **Besluit eigenaar: kernel-extensie blijft; borging = Excel v6 fixen + fixtures herextraheren** (eigenaar-actie; daarna is byte-parity weer totaal). Tot die tijd: surplus-/withdrawal-evaporation-tests = vangnet, concern `horizon-kernel-bekende-afwijkingen` documenteert de divergentie, en de divergentie mag níet "richting oracle" worden weggefixt zonder nieuw eigenaar-besluit. Herhaalbare check: `scripts/horizon-oracle/{dump,inject,compare}-eigenaar-live*` (opt-in `EIGENAAR_LIVE=1`; zie README §Re-run). |
 | V18 | Handmatige AOW-event-invoer (eigenaar had €1.558/mnd vanaf 69 ingevoerd; adapter negeert dat en rekent formule-AOW €1.452/mnd vanaf 68,5 uit de AOW-tabel — kernel én Excel onderling consistent) | **Besluit eigenaar: formule blijft leidend** — de AOW-tabel (wettelijke leeftijd + formule) is de bron; handmatige event-waarden blijven alleen weergave/marker. Geen adapter-wijziging. |
+| V19 | Verkoop-transitie-lag-piek / geen aflossingspad tekort-lening (F6-bugfix, 2026-07-04). Bij een "wanneer nodig"-huisverkoop ontstaat door de één-maand-capaciteitslag (verdeling capt op categoriesaldo m−1) een tekort van één maand (eigenaar: €6.758 op leeftijd 75) dat als tekort-lening wordt geboekt. Die lening kon NOOIT worden afgelost: `tekortAflossing` (S!AC) werd uitsluitend gevoed uit het Toename-aflos-budget (positief maandsurplus), in de onttrekkingsfase structureel 0 → 17 jaar 5%-rente-compounding (€7.074 → €16.521) terwijl er >€900k liquide náást stond. Oracle-getrouw (Excel doet het ook), maar een modelbeperking. | **Besluit eigenaar (2026-07-04): kernel-extensie, TRANSITIONEEL — ADR 0033.** Een maandelijkse tekort-aflos-stap in `computeVerdeling` lost een openstaand tekort (saldo m−1 + zijn rente) af uit de RESTERENDE liquide bezit-capaciteit (ná afname/onttrekking, m−1-lag), in de onttrekking-waterval-volgorde; Σruw=0 blijft gelden (wat uit bezit wordt getrokken = wat op de tekort-lening wordt afgelost), geen dubbele rente-boeking. Schakelbaar via `KernelInput.tekortAflossingUitLiquide`: **app-pad AAN** (adapter), **parity-/fixture-pad UIT** (`input-from-fixture` zet 'm níet → 735 fixtures byte-groen tegen Excel v5). Borging = Excel v6 fixen + fixtures herextraheren (eigenaar-actie; prompt geleverd bij de F6-bugfix); daarná kan parity mét de stap AAN draaien en vervalt de vlag. Vangnet tot die tijd: `lib/horizon-kernel/tekort-aflossing-liquide.test.ts` + concern `horizon-kernel-bekende-afwijkingen` (punt 4); de divergentie mag níet "richting oracle" worden weggefixt zonder nieuw eigenaar-besluit. |
 
 ## 8. Faseplan
 
@@ -386,7 +387,13 @@ _Vragenlijst V1–V15 geleverd bij afronding FASE 0; alle antwoorden ontvangen 2
   test-only initBucketState/rebalanceBuckets; parity-and-schema-performance. Bugfix-lijst
   (ná F6, eigenaar-besluit): deplete-reached_now-benchmark; SimRow-breakdowns undefined
   (whatif-lagen); fireReachable-altijd-true; exponentiële-groei-anomalie late FIRE;
-  float-precisie whatif-overrides; verkoop-transitie-lag-piek; pre-FIRE-deficit-spiegel;
+  float-precisie whatif-overrides; **verkoop-transitie-lag-piek ✔ GEFIXT (2026-07-04,
+  gap-besluit V19 + ADR 0033)** — maandelijkse tekort-aflos-stap uit liquide bezit,
+  schakelbaar via `KernelInput.tekortAflossingUitLiquide` (app-pad AAN, parity-pad UIT
+  → 735 fixtures byte-groen). Eigenaar-acceptatie (`EIGENAAR_LIVE`): sale-maand-tekort
+  €6.758 op leeftijd 75 → maand erna €0; jaarrij-endBalance 75 = €0 (UI-melding
+  verdwijnt); terminale depletie ≥93 blijft (legitiem, stap inert). Nog transitioneel
+  (Excel v6 + fixture-herextractie → vlag eruit); pre-FIRE-deficit-spiegel;
   server-side context-preload (mount-flits).
 
 Elke fase sluit met `npx tsc --noEmit` + relevante vitest groen + korte statusmelding.

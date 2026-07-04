@@ -159,6 +159,10 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     // kern-uitbreidingen buiten het oracle-domein (snede 2b) — weggelaten bij leeg.
     potMutaties: events.potMutaties.length > 0 ? events.potMutaties : undefined,
     potLiquidaties: liquidaties.liquidaties.length > 0 ? liquidaties.liquidaties : undefined,
+    // F6-bugfix (gap V19, TRANSITIONEEL): app-pad lost een transitie-lag-tekort af uit
+    // liquide bezit i.p.v. het eindeloos te laten compounden. Parity-/fixture-pad zet
+    // deze vlag NIET (input-from-fixture) → Excel v5-oracle byte-identiek.
+    tekortAflossingUitLiquide: true,
   }
 
   return {

@@ -45,6 +45,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   forModal,
   planningMode = 'fire',
   aowAgeFractional,
+  housingSaleAge,
   eventOverlay,
   onEventClick,
   onYearClick,
@@ -61,6 +62,15 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   planningMode?: 'fire' | 'pensioen'
   /** AOW pension age as fractional value (e.g. 67.25 for 67j+3m) */
   aowAgeFractional?: number
+  /**
+   * Leeftijd waarop de kernel de eigen woning verkoopt (`kernelHousingSale.age`),
+   * of `null`/`undefined` wanneer er binnen de horizon geen verkoop is. Consume-
+   * only uit de kernel — géén eigen afleiding. Rendert een verticale duidings-
+   * marker op het verkoopmoment: in Opbouw-modus valt Vastgoed → 0 en verdwijnt
+   * het hypotheek-schuldsegment abrupt (de verkoopopbrengst lost de hypotheek af),
+   * wat zonder marker als "fout" leest.
+   */
+  housingSaleAge?: number | null
   /**
    * Optionele event-markers (levensgebeurtenissen + natuurlijke mijlpalen)
    * die boven of onder de bars worden gerenderd. Wanneer aanwezig vergroot
@@ -266,6 +276,13 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   // AOW vertical line X position (promoted in pensioen mode)
   const xAow = isPensioenMode && aowAgeFractional != null && aowAgeFractional >= minAge && aowAgeFractional <= maxAge
     ? PAD.left + xScale(aowAgeFractional)
+    : null
+
+  // Huisverkoop-marker X-positie (kernel-verkoopmoment, planning-mode-onafhankelijk).
+  // Alleen renderen als de verkoop daadwerkelijk plaatsvindt én binnen het
+  // zichtbare leeftijdsbereik valt (null-safe).
+  const xSale = housingSaleAge != null && housingSaleAge >= minAge && housingSaleAge <= maxAge
+    ? PAD.left + xScale(housingSaleAge)
     : null
 
   // Tooltip data — gerendered als HTML-strip onder de chart (niet SVG-floating)
@@ -638,6 +655,47 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
               {aowAgeFractional % 1 === 0
                 ? `${aowAgeFractional}`
                 : `${Math.floor(aowAgeFractional)}+${Math.round((aowAgeFractional % 1) * 12)}m`}
+            </text>
+          </g>
+        )}
+
+        {/* Huisverkoop-marker — verticale stippellijn + compact label op het
+            kernel-verkoopmoment (`housingSaleAge` = `kernelHousingSale.age`).
+            Duidt het visuele breekpunt in Opbouw-modus: Vastgoed valt naar 0 en
+            het hypotheek-schuldsegment verdwijnt doordat de verkoopopbrengst de
+            hypotheek aflost — zonder marker leest dat als "fout". Zelfde dashed-
+            lijn-patroon als de FIRE-lijn, maar neutrale ink-tint i.p.v. het
+            horizon-module-accent (neutrale duiding, geen stoplicht-semantiek) én
+            visueel onderscheidbaar van de FIRE/AOW-accentlijnen. `<title>` +
+            aria-label dragen de duiding "hypotheek afgelost", spiegelend aan de
+            Pad-modus. Label links van de lijn (textAnchor end) zodat het binnen
+            de chart blijft (de verkoop ligt doorgaans rechts op de as) en van de
+            FIRE-label wegwijst (die staat rechts van z'n lijn); FIRE en verkoop
+            liggen in de praktijk ruim uit elkaar — dit is de minimale
+            overlap-mitigatie. */}
+        {xSale !== null && (
+          <g role="img" aria-label="Huis verkocht — hypotheek afgelost">
+            <title>Huis verkocht — hypotheek afgelost</title>
+            <line
+              x1={xSale}
+              x2={xSale}
+              y1={PAD.top}
+              y2={PAD.top + innerH}
+              stroke="var(--ink-3)"
+              strokeWidth={1.5}
+              strokeDasharray="4 2"
+              opacity={0.8}
+            />
+            <text
+              x={xSale - 4}
+              y={PAD.top + 12}
+              textAnchor="end"
+              fontSize={8}
+              fill="var(--ink-3)"
+              fontFamily="var(--font-inter, sans-serif)"
+              fontWeight={600}
+            >
+              Huis verkocht
             </text>
           </g>
         )}
