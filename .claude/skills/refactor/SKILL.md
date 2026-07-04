@@ -36,6 +36,11 @@ Per extractie dezelfde cyclus, met deze **harde regels**:
 - **Hooks die onvoorwaardelijk draaiden, blijven onvoorwaardelijk draaien**; props zijn exact wat het blok las (waarden + setters expliciet).
 - Per stap: `npx tsc --noEmit` → gerichte tests → **diff-review met de vraag "is elke regel een move, geen edit?"** → (bij UI) visuele vergelijking + interacties doorklikken → commit ("refactor: extract X — pure move, no behavior change").
 
+**Lazy-loading & server-seed valkuilen** (geleerd in de performance-tranche jul 2026):
+- **Vóór je een altijd-gemounte modal plat op zijn open-prop gate** (`{flag && …}`): check of hij via `BottomSheet`/overlay een exit-animatie op `open: true→false` draait. Zo ja → mount-latch (chat-panel-lazy-patroon), anders unmount je vóór de animatie en verlies je zichtbaar gedrag.
+- **De mount-latch is alléén gratis wanneer het doelcomponent null-rendert zolang het dicht is** (zoals ChatPanel via `isOpen`). Voor een altijd-zichtbaar inline-oppervlak is er geen gratis latch-signaal — kies dan `next/dynamic({ ssr:false })` zónder interactie-gate (chunk uit de First-Load JS is de winst) i.p.v. een persistente placeholder te dupliceren.
+- **Server-side seeden van client-fetch-state is alleen een pure win als de pagina de benodigde databron al in zijn eigen SSR laadt** (cache-hit). Zo nee → je verzwaart het SSR-kritieke pad; buiten scope verklaren i.p.v. breed doorduwen.
+
 ### 5. Eindverificatie — `tester`
 Volledige `npm run test:run` + lint + relevante regressiesuites. Handmatige click-through van alle geraakte oppervlakken incl. deeplinks/modals. Screenshot-vergelijking tegen de baseline. Grep op importers van het verbouwde bestand (geen export-wissels die elders breken).
 
