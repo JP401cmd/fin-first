@@ -134,6 +134,17 @@ export interface KernelProjectionOptions {
    * de eigen Prognose!J(fireMaand−1) tijdens de loop. Overridebaar voor tests.
    */
   readonly guardrailsAnker?: number
+  /**
+   * Sla de post-loop Ont-uitvoer-herberekening met het definitieve anker over (F7).
+   * Uitsluitend veilig op projecties die worden WEGGEGOOID — de bisectie-INTERNE
+   * solver-probes: het anker beïnvloedt vóór FIRE alléén de weergave-kolommen Ont!H/I
+   * (Ont!D=0, géén model-terugkoppeling), en gap/status/tekort lezen `proj.prognose`/
+   * `proj.s` — nóóit `proj.ont`. Default (`false`) = volle recompute = byte-identiek
+   * oracle-pad; met de vlag wijkt UITSLUITEND `ont` af (provisioneel anker vóór FIRE),
+   * alle andere arrays zijn identiek. NOOIT zetten op een projectie die geretourneerd
+   * wordt (horizon-check-run, finale run, evaluateFireAt).
+   */
+  readonly skipOntPostRecompute?: boolean
 }
 
 /**
@@ -732,7 +743,9 @@ export function runKernelProjection(
   // ── Ont-uitvoer herrekenen met het definitieve anker ──────────────────────────
   // Het anker beïnvloedt vóór FIRE alléén Ont!H/I (Ont!D=0, geen model-terugkoppeling);
   // tijdens de loop was het anker daar nog provisioneel. Post-FIRE is dit identiek.
-  if (selfCaptureAnker) {
+  // F7: bisectie-interne probes (projectie wordt weggegooid; gap/status lezen geen ont)
+  // slaan deze 1200× computeOnt over — zie `skipOntPostRecompute`.
+  if (selfCaptureAnker && !opts.skipOntPostRecompute) {
     for (let m = 0; m < HORIZON_MONTHS; m++) {
       ont[m] = computeOnt(
         input,

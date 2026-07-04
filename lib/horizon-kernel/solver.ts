@@ -36,7 +36,7 @@
  */
 
 import { runKernelProjection, type KernelProjection } from './engine'
-import { clng, computeDoelblok, prognoseJ } from './gap'
+import { clng, computeDoelblok, computeGap, prognoseJ } from './gap'
 import { computeEs } from './tables/es'
 import type { KernelInput } from './types'
 
@@ -164,9 +164,13 @@ export function solveFire(input: KernelInput): SolveFireResult {
   const es = computeEs(input)
   let engineRuns = 0
 
-  const run = (fireAge: number): KernelProjection => {
+  // F7: bisectie-INTERNE probes mogen de post-loop Ont-herberekening overslaan (hun
+  // projectie wordt weggegooid; de gap/status-toetsen lezen alleen prognose/s). De
+  // horizon-check-run + de finale run laten 'm STAAN (die projectie kan geretourneerd
+  // worden) → default `skipOntPostRecompute = false`.
+  const run = (fireAge: number, skipOntPostRecompute = false): KernelProjection => {
     engineRuns += 1
-    return runKernelProjection(input, { fireAge })
+    return runKernelProjection(input, { fireAge, skipOntPostRecompute })
   }
 
   const afronden = (
@@ -200,16 +204,21 @@ export function solveFire(input: KernelInput): SolveFireResult {
   let hi = hiStart
   let lo = loStart
 
+  // Horizon-check-run: NIET skippen (deze projectie wordt geretourneerd bij gap<0).
+  // F5: alleen de gap nodig → `computeGap` i.p.v. het volle `computeStatusBlok`
+  // (byte-identiek: beide leiden B38 uit computeDoelblok(input, es, proj, fireAge)).
   let proj = run(leeftijd + hi / 12)
-  if (computeStatusBlok(input, proj, leeftijd + hi / 12).gap < 0) {
+  if (computeGap(input, es, proj, leeftijd + hi / 12) < 0) {
     return afronden(leeftijd + hi / 12, proj)
   }
 
   // ── Maand-bisectie op de gap (VBA: `\` = integer-deling, floor) ─────────────
   while (hi - lo > 1) {
     const mid = Math.floor((lo + hi) / 2)
-    proj = run(leeftijd + mid / 12)
-    if (computeStatusBlok(input, proj, leeftijd + mid / 12).gap >= 0) {
+    // F7: interne probe — projectie wordt weggegooid, dus sla de Ont-post-recompute
+    // over. F5: alleen de gap-sign telt → computeGap.
+    proj = run(leeftijd + mid / 12, true)
+    if (computeGap(input, es, proj, leeftijd + mid / 12) >= 0) {
       hi = mid
     } else {
       lo = mid
