@@ -71,11 +71,39 @@ const OPEET_LEVENSVERWACHTING_LEEFTIJD = 90
 export type CategorieBedrag = Readonly<Record<AssetCategorie, number>>
 
 /**
+ * De m−1-woningblok-invoer die `computeWoningblok`/`computeBezWoning` consumeert —
+ * een deelverzameling van `BezDep`. Bevat UITSLUITEND de vorige-maand-cellen die het
+ * woningblok AY:BE leest (géén toename/verdeling/slot-arrays; het woningblok hangt
+ * niet aan die m-deps). Zo kan de engine het woningblok vroeg (vóór Toename/Verdeling)
+ * berekenen zonder de volle Bez-slotloop te draaien — zie `computeBezWoning` (F3).
+ */
+export interface BezWoningDep {
+  /** Bez!AY(m−1) — vorige verkoop-status (monotone trigger + BA/BB-vertakking). */
+  readonly ayVorig: number
+  /** Bez!BA(m−1) — vorige huur/mnd (indexatie-recursie na verkoop). */
+  readonly baVorig: number
+  /** Bez!BB(m−1) — vorige vervallen hypotheeklast/mnd (bevriezing na verkoop). */
+  readonly bbVorig: number
+  /** Bez!J(m−1) — huiswaarde vorige maand (AZ/BA-basis/BC). */
+  readonly huisWaardeVorig: number
+  /** S!D(m−1) — hypotheeksaldo vorige maand (AZ/BB-basis/BC). */
+  readonly hypotheekSaldoVorig: number
+  /** S!P(m−1) — opeethypotheeksaldo vorige maand (BE-cap-restant). */
+  readonly opeetSaldoVorig: number
+  /** Prognose!J(m−1) — netto-liquide vermogen vorige maand ("wanneer nodig"-trigger). */
+  readonly prognoseLiquideVorig: number
+  /** P!B16 — FIRE-leeftijd (solver-output; teacher-forced uit de fixture-P-sheet). */
+  readonly fireLeeftijd: number
+  /** Overwaarde (J − S!D) in de maand vóór opeet-start (bevroren auto-opname-basis). */
+  readonly overwaardeBijOpeetStart: number
+}
+
+/**
  * Upstream-waarden die Bez op maand m consumeert. Alle m−1-waarden komen
  * teacher-forced uit de fixture; de per-slot-arrays sluiten 1-op-1 aan op
- * `input.assetPotten`.
+ * `input.assetPotten`. Erft de woningblok-subset uit `BezWoningDep`.
  */
-export interface BezDep {
+export interface BezDep extends BezWoningDep {
   /** Per pot (volgorde = `input.assetPotten`): eigen waarde(m−1) — Bez-waardekolom vorige rij. */
   readonly slotWaardeVorig: readonly number[]
   /** Per categorie: categoriesaldo(m−1) — Bez!AM…AR vorige rij (noemer van `share`). */
@@ -97,24 +125,6 @@ export interface BezDep {
   readonly verdelingTekortAflossing?: CategorieBedrag
   /** Per categorie: `Verdeling!HC:HH` schuld-aflossings-overloop → toename (per stuk). */
   readonly overloop: CategorieBedrag
-  /** Bez!AY(m−1) — vorige verkoop-status (monotone trigger + BA/BB-vertakking). */
-  readonly ayVorig: number
-  /** Bez!BA(m−1) — vorige huur/mnd (indexatie-recursie na verkoop). */
-  readonly baVorig: number
-  /** Bez!BB(m−1) — vorige vervallen hypotheeklast/mnd (bevriezing na verkoop). */
-  readonly bbVorig: number
-  /** Bez!J(m−1) — huiswaarde vorige maand (AZ/BA-basis/BC). */
-  readonly huisWaardeVorig: number
-  /** S!D(m−1) — hypotheeksaldo vorige maand (AZ/BB-basis/BC). */
-  readonly hypotheekSaldoVorig: number
-  /** S!P(m−1) — opeethypotheeksaldo vorige maand (BE-cap-restant). */
-  readonly opeetSaldoVorig: number
-  /** Prognose!J(m−1) — netto-liquide vermogen vorige maand ("wanneer nodig"-trigger). */
-  readonly prognoseLiquideVorig: number
-  /** P!B16 — FIRE-leeftijd (solver-output; teacher-forced uit de fixture-P-sheet). */
-  readonly fireLeeftijd: number
-  /** Overwaarde (J − S!D) in de maand vóór opeet-start (bevroren auto-opname-basis). */
-  readonly overwaardeBijOpeetStart: number
 }
 
 /** Eén per-slot uitkomst (in-horizon). */
@@ -281,13 +291,35 @@ export function computeBez(input: KernelInput, dep: BezDep, m: MonthIndex): BezR
 }
 
 /**
+ * Alléén het woningblok AY:BE voor maand m (F3-optimalisatie). De engine berekent
+ * het woningblok VROEG in de intra-maand-volgorde — vóór Toename/Verdeling bestaan —
+ * omdat Ont/CF/S de woning-stromen consumeren; het blok hangt uitsluitend aan de
+ * m−1-toestand (`BezWoningDep`), NIET aan de m-deps (toename/aantal/verdeling).
+ *
+ * Byte-identiek aan de vroegere `computeBez(input, {...bezM1, ZERO_CAT-m-deps}, m).woning`:
+ * dezelfde `computeWoningblok` op dezelfde m−1-invoer, en voorbij de horizon dezelfde
+ * nul-woning — maar zónder de volle 10-slot-loop + totalen + rij-constructie die de
+ * vroege call daar voor niets draaide (het resultaat waarvan alleen `.woning` werd gelezen).
+ */
+export function computeBezWoning(
+  input: KernelInput,
+  dep: BezWoningDep,
+  m: MonthIndex,
+): BezWoningblok {
+  if (isBeyondHorizon(input, m)) return NUL_WONING
+  const idx = inflationIndex(input, m) // (1+P!B14)^(m/12)
+  const age = ageAtMonth(input, m)
+  return computeWoningblok(input, dep, m, idx, age)
+}
+
+/**
  * Woningblok AY:BE. De verkoop-status (AY) is monotoon en alle triggers lezen
  * maand m−1 (lag-veilig). De opeethypotheek-tak (BD/BE) is alléén actief bij
  * `Opeethypotheek` vanaf leeftijd B64.
  */
 function computeWoningblok(
   input: KernelInput,
-  dep: BezDep,
+  dep: BezWoningDep,
   m: MonthIndex,
   idx: number,
   age: number,

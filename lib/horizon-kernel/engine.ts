@@ -66,7 +66,14 @@ import {
   type VerdelingDep,
   type VerdelingRow,
 } from './tables/verdeling'
-import { computeBez, type BezDep, type BezRow, type BezWoningblok, type CategorieBedrag } from './tables/bez'
+import {
+  computeBez,
+  computeBezWoning,
+  type BezDep,
+  type BezRow,
+  type BezWoningblok,
+  type CategorieBedrag,
+} from './tables/bez'
 import { computeS, S_EXTRA_CATEGORIEEN, debtSlotCount, type SDep, type SRow } from './tables/s'
 import { computePrognose, type PrognoseDep, type PrognoseRow } from './tables/prognose'
 import { computeWerkStrategie, type WerkStrategieRow } from './tables/werk-strategie'
@@ -510,16 +517,11 @@ export function runKernelProjection(
       overwaardeBijOpeetStart,
     }
 
-    // (1) Woningblok AY:BE — genulde m-deps (het blok hangt niet aan Toename/Verdeling).
-    const earlyDep: BezDep = {
-      ...bezM1,
-      toenameEur: ZERO_CAT,
-      aantalPotten: ZERO_CAT,
-      verdelingAfname: ZERO_CAT,
-      verdelingOnttrekking: ZERO_CAT,
-      overloop: ZERO_CAT,
-    }
-    const woning = bezWoning(computeBez(input, earlyDep, m))
+    // (1) Woningblok AY:BE — hangt uitsluitend aan de m−1-toestand (bezM1), niet aan
+    // Toename/Verdeling. Lichte call (F3): berekent alléén het woningblok, niet de volle
+    // 10-slot-loop + totalen + rij-constructie die de vroegere `computeBez(earlyDep)` voor
+    // niets draaide (er werd alleen `.woning` van gelezen). Byte-identiek — zie computeBezWoning.
+    const woning = computeBezWoning(input, bezM1, m)
 
     // (2) PT(m) en Werk-strategie(m).
     const ptRow = computePT(input, {}, m)
