@@ -285,11 +285,21 @@ function cfTotaalExtraGeld(row: CFRow): number {
   return row.beyondHorizon ? 0 : row.totaalExtraGeld
 }
 
-/** Bouw een `CategorieBedrag` uit een array in ASSET_ORDER-volgorde. */
-function catMap(values: readonly number[]): CategorieBedrag {
-  const out = { ...ZERO_CAT } as Record<AssetCategorie, number>
+/**
+ * Vul een `CategorieBedrag`-doelobject `out` uit een array in ASSET_ORDER-volgorde
+ * en geef het terug. `out` is een herbruikbare scratch-buffer (F2): alle 6 sleutels
+ * worden elke aanroep volledig overschreven, dus een over maanden hergebruikte buffer
+ * draagt geen stale waarden. De consumenten (computeBez) lezen het element-wise en
+ * bewaren geen referentie → byte-identiek aan de vroegere verse `{ ...ZERO_CAT }`-alloc.
+ */
+function catMap(values: readonly number[], out: Record<AssetCategorie, number>): CategorieBedrag {
   for (let i = 0; i < ASSET_ORDER.length; i++) out[ASSET_ORDER[i]] = values[i] ?? 0
   return out
+}
+
+/** Verse mutable CategorieBedrag-scratch-buffer (alle categorieën 0). */
+function newCatBuf(): Record<AssetCategorie, number> {
+  return { ...ZERO_CAT } as Record<AssetCategorie, number>
 }
 
 /** Tel twee categorie-bedragen op (voor het injecteren van liquidatie-opbrengst als toename). */
@@ -488,14 +498,45 @@ export function runKernelProjection(
   let prevProg: PrognoseRow | undefined
   let prevBel: BelRow | undefined
 
+  // ── F2 — herbruikbare scratch-buffers (in-place gevuld per maand i.p.v. een verse
+  // allocatie per maand). Elke buffer is TOEGEWIJD aan één grootheid en wordt elke
+  // maand volledig overschreven; de tabellen lezen alle dep-arrays/-objecten
+  // element-wise en bewaren geen referentie (geverifieerd) → hergebruik over maanden
+  // is byte-identiek. Alleen het reguliere (oracle-)pad gebruikt de buffers direct;
+  // de inert-by-default pot-aanpassingen-tak kloont ze eerst (slice/spread), dus die
+  // blijft óók byte-identiek.
+  const nAssets = input.assetPotten.length
+  const nSchuld = input.schuldPotten.length
+  const nBezCat = input.ts.bezitCategorien.length
+  const nExtra = S_EXTRA_CATEGORIEEN.length
+  const slotWaardeVorigBuf = new Array<number>(nAssets).fill(0)
+  const schuldSaldiVorigBuf = new Array<number>(nSchuld).fill(0)
+  const saldoVorigeBuf = new Array<number>(nDebtSlots).fill(0)
+  const extraAflossingBuf = new Array<number>(nExtra).fill(0)
+  const categorieCapBuf = new Array<number>(nExtra).fill(0)
+  const assetRendementenBuf = new Array<number>(nAssets).fill(0)
+  const schuldRentesBuf = new Array<number>(nSchuld).fill(0)
+  const bezCatTotBuf = new Array<number>(nBezCat).fill(0)
+  const schuldCatTotBuf = new Array<number>(input.ts.schuldCategorien.length).fill(0)
+  const catBufCategoriesaldo = newCatBuf()
+  const catBufToename = newCatBuf()
+  const catBufAantal = newCatBuf()
+  const catBufVerdAfname = newCatBuf()
+  const catBufVerdOnttrekking = newCatBuf()
+  const catBufVerdTekort = newCatBuf()
+  const catBufOverloop = newCatBuf()
+
   for (let m: MonthIndex = 0; m < HORIZON_MONTHS; m++) {
     // ── m−1-afhankelijke Bez-deps (gedeeld door de vroege woning- en de volle Bez-call) ──
     const prevWon = prevWoning(prevBez)
     // Base m−1-waarden (ongewijzigd pad = byte-identiek). Alleen wanneer er
     // buiten-oracle pot-aanpassingen zijn (V9-schok / liquidatie) worden ze op een
     // KLOON via delta's aangepast (snede 2b, ADR 0032 §4 — inert-by-default).
-    let slotWaardeVorig: readonly number[] = input.assetPotten.map((p) => bezSlotWaarde(prevBez, p.slot))
-    let categoriesaldoVorig: CategorieBedrag = catMap(bezCatTotals(prevBez))
+    for (let i = 0; i < nAssets; i++) {
+      slotWaardeVorigBuf[i] = bezSlotWaarde(prevBez, input.assetPotten[i].slot)
+    }
+    let slotWaardeVorig: readonly number[] = slotWaardeVorigBuf
+    let categoriesaldoVorig: CategorieBedrag = catMap(bezCatTotals(prevBez), catBufCategoriesaldo)
     let liquidatieToename: Record<AssetCategorie, number> | null = null
     if (heeftPotAanpassingen) {
       const adj = applyPotAanpassingen(input, m, slotWaardeVorig, categoriesaldoVorig)
@@ -543,6 +584,9 @@ export function runKernelProjection(
     const ontRow = computeOnt(input, ontDep, m)
 
     // (5) CF(m).
+    for (let i = 0; i < nSchuld; i++) {
+      schuldSaldiVorigBuf[i] = sSlotSaldo(prevS, input.schuldPotten[i].slot)
+    }
     const cfDep: CFDep = {
       partnerBijdrage: ptRow.totaal,
       werkStrategieDelta: werkRow.gegateDelta,
@@ -553,7 +597,7 @@ export function runKernelProjection(
       afname: afRow.totaalAfname,
       onttrekking: ontRow.onttrekking,
       canoniekeHeffingVorigeMaand: m === 0 ? 0 : belCanoniek(prevBel),
-      schuldSaldiVorigeMaand: input.schuldPotten.map((p) => sSlotSaldo(prevS, p.slot)),
+      schuldSaldiVorigeMaand: schuldSaldiVorigBuf,
       fireMonth,
       gebPosten,
     }
@@ -588,56 +632,68 @@ export function runKernelProjection(
     // Liquidatie-opbrengst (snede 2b) telt hier — ná rendement — als inleg in de
     // doelcategorie mee (spiegel woningverkoop → nieuw liquide geld). `null` bij
     // geen liquidatie deze maand, dus het reguliere pad blijft byte-identiek.
-    const toenameEurBase = catMap(taBezitField(taRow, (c) => c.toenameEur))
+    const toenameEurBase = catMap(taBezitField(taRow, (c) => c.toenameEur), catBufToename)
     const bezDep: BezDep = {
       ...bezM1,
       toenameEur: liquidatieToename === null ? toenameEurBase : addCat(toenameEurBase, liquidatieToename),
-      aantalPotten: catMap(taBezitField(taRow, (c) => c.aantal)),
-      verdelingAfname: catMap(verdelingRow.afname.eind),
-      verdelingOnttrekking: catMap(verdelingRow.onttrekking.eind),
+      aantalPotten: catMap(taBezitField(taRow, (c) => c.aantal), catBufAantal),
+      verdelingAfname: catMap(verdelingRow.afname.eind, catBufVerdAfname),
+      verdelingOnttrekking: catMap(verdelingRow.onttrekking.eind, catBufVerdOnttrekking),
       // F6-bugfix (gap V19): extra onttrekking uit liquide om de tekort-lening af te
       // lossen. Nul-array zonder de vlag → byte-identiek aan het oracle-pad.
-      verdelingTekortAflossing: catMap(verdelingRow.tekortAflossingLiquide),
-      overloop: catMap(verdelingRow.overflow),
+      verdelingTekortAflossing: catMap(verdelingRow.tekortAflossingLiquide, catBufVerdTekort),
+      overloop: catMap(verdelingRow.overflow, catBufOverloop),
     }
     const bezRow = computeBez(input, bezDep, m)
     const bezWoningRow = bezWoning(bezRow)
 
     // (9) S(m).
+    for (let slot = 0; slot < nDebtSlots; slot++) saldoVorigeBuf[slot] = sSlotSaldo(prevS, slot)
+    for (let c = 0; c < nExtra; c++) {
+      extraAflossingBuf[c] = verdelingRow.aflossing.eind[c] ?? 0
+      categorieCapBuf[c] = verdelingRow.aflossing.caps[c] ?? 0
+    }
     const sDep: SDep = {
-      saldoVorige: Array.from({ length: nDebtSlots }, (_, slot) => sSlotSaldo(prevS, slot)),
+      saldoVorige: saldoVorigeBuf,
       verkocht: bezWoningRow.verkocht,
       opeetCap: bezWoningRow.opeetCap,
       opeetOpname: bezWoningRow.opeetOpname,
       tekortBudget: verdelingRow.afname.onbenut + verdelingRow.onttrekking.onbenut,
-      extraAflossingBudget: S_EXTRA_CATEGORIEEN.map((_, c) => verdelingRow.aflossing.eind[c] ?? 0),
-      categorieCap: S_EXTRA_CATEGORIEEN.map((_, c) => verdelingRow.aflossing.caps[c] ?? 0),
+      extraAflossingBudget: extraAflossingBuf,
+      categorieCap: categorieCapBuf,
       // S!AC: de prio-1-tekort-aflossing die Verdeling(m) al berekende (EQ = ruwBudget − AC).
       tekortAflossing: verdelingRow.tekortAflossing,
     }
     const sRow = computeS(input, sDep, m)
 
     // (10) Bel(m) — grondslagen = Bez/S-saldi van maand m zelf.
+    for (let i = 0; i < nAssets; i++) {
+      assetRendementenBuf[i] = bezSlotRendement(bezRow, input.assetPotten[i].slot)
+    }
+    for (let i = 0; i < nSchuld; i++) {
+      schuldRentesBuf[i] = sSlotRente(sRow, input.schuldPotten[i].slot)
+    }
     const belDep: BelDep = {
       grondslagSpaar: bezRow.beyondHorizon ? 0 : bezRow.totaalBox3Spaar,
       grondslagInvestering: bezRow.beyondHorizon ? 0 : bezRow.totaalBox3Investering,
       grondslagSchuld: numCell(sRow.totaalBox3),
-      assetRendementen: input.assetPotten.map((p) => bezSlotRendement(bezRow, p.slot)),
-      schuldRentes: input.schuldPotten.map((p) => sSlotRente(sRow, p.slot)),
+      assetRendementen: assetRendementenBuf,
+      schuldRentes: schuldRentesBuf,
     }
     const belRow = computeBel(input, belDep, m)
 
     // (11) Prognose(m).
     const bezTotalsM = bezCatTotals(bezRow) // in ASSET_ORDER-volgorde
+    for (let i = 0; i < nBezCat; i++) {
+      bezCatTotBuf[i] = bezTotalsM[ASSET_ORDER.indexOf(input.ts.bezitCategorien[i].categorie)] ?? 0
+    }
     const prognoseDep: PrognoseDep = {
       totaalBezittingen: bezTotaalBezittingen(bezRow),
       totaalSchulden: numCell(sRow.totaalBox3) + numCell(sRow.totaalGeenBox3),
       box3Forfaitair: belForfait(belRow),
       cumulatiefBox3Vorige: prognoseCumBox3(prevProg),
-      bezCategorieTotalen: input.ts.bezitCategorien.map(
-        (c) => bezTotalsM[ASSET_ORDER.indexOf(c.categorie)] ?? 0,
-      ),
-      schuldCategorieTotalen: schuldCatTotalsPerTs(input, sRow),
+      bezCategorieTotalen: bezCatTotBuf,
+      schuldCategorieTotalen: schuldCatTotalsPerTs(input, sRow, schuldCatTotBuf),
     }
     const prognoseRow = computePrognose(input, prognoseDep, m)
 
@@ -735,9 +791,10 @@ function taBezitField(
 /**
  * S-categorietotalen uitgelijnd op `input.ts.schuldCategorien` (voor Prognose L/M).
  * De vijf categorie-totalen [Woning..Overig] komen uit S!AJ:AN; "Tekort-lening"
- * heeft géén categorie-kolom → 0.
+ * heeft géén categorie-kolom → 0. Vult de herbruikbare scratch-buffer `out` in-place
+ * (F2) en geeft 'm terug — computePrognose leest 'm element-wise, bewaart geen ref.
  */
-function schuldCatTotalsPerTs(input: KernelInput, sRow: SRow): number[] {
+function schuldCatTotalsPerTs(input: KernelInput, sRow: SRow, out: number[]): number[] {
   const byLabel: Record<string, number> = {
     Woning: numCell(sRow.totaalWoning),
     Consumptief: numCell(sRow.totaalConsumptief),
@@ -745,7 +802,9 @@ function schuldCatTotalsPerTs(input: KernelInput, sRow: SRow): number[] {
     Zakelijk: numCell(sRow.totaalZakelijk),
     Overig: numCell(sRow.totaalOverig),
   }
-  return input.ts.schuldCategorien.map((c) => byLabel[c.categorie] ?? 0)
+  const cats = input.ts.schuldCategorien
+  for (let i = 0; i < cats.length; i++) out[i] = byLabel[cats[i].categorie] ?? 0
+  return out
 }
 
 /** Bouw de compacte samenvatting uit de voltooide Prognose-/S-arrays. */
