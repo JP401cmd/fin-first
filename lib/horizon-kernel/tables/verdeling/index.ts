@@ -86,12 +86,14 @@ function runBezitWaterfallMetDegeneratie(
   budget: number,
   caps: readonly number[],
   prio: readonly (number | null)[],
-  gevuld: readonly boolean[],
   nietLiquide: readonly boolean[],
+  wRegulier: readonly number[],
   resMask: readonly boolean[],
   initialCapped?: readonly boolean[],
 ): WaterfallResult {
-  const wRegulier = halveningWeights(prio, gevuld, nietLiquide)
+  // `wRegulier` = `halveningWeights(prio, gevuld, nietLiquide)` — input-constant en
+  // daarom voorgecomputeerd (F4-hoisting); doorgegeven i.p.v. per maand herrekend.
+  // Byte-identiek: dezelfde pure functie, alleen één keer per input geëvalueerd.
   const reguliere = runWaterfall(budget, caps, wRegulier, resMask, initialCapped)
   if (budget <= DEGEN_EPS || reguliere.onbenut <= DEGEN_EPS) return reguliere
   // Uitgesloten liquide restcapaciteit: prio 1..4 + liquide + NIET regulier gewogen
@@ -143,6 +145,82 @@ export interface VerdelingDep {
    * tekort-slot is (18 van de 19 fixtures).
    */
   readonly tekortSaldoPrev: number
+  /**
+   * Voorgecomputeerde input-constante gewicht-/reserve-bundel (F4-hoisting). De
+   * ½^(prio−1)-gewichten en reserve-maskers hangen UITSLUITEND aan de statische
+   * TS-invoer (`input.ts.bezit/schuldCategorien`: prio/gevuld/nietLiquide) en zijn
+   * dus per input constant, maar werden per maand (2× via de degeneratie-helper)
+   * herrekend. De engine berekent ze één keer vóór de maandloop (`computeVerdeling­Weights`)
+   * en geeft ze hier door. **Afwezig** (bv. de teacher-forced parity-test die de dep
+   * zelf bouwt) → `computeVerdeling` herleidt ze zelf uit `input.ts` (compute-if-absent)
+   * → byte-identiek aan het oude pad.
+   */
+  readonly weights?: VerdelingWeights
+}
+
+/**
+ * De input-constante gewicht-/reserve-bundel van Verdeling (F4-hoisting). Puur
+ * afgeleid van de statische TS-prio's/gevuld/nietLiquide; verandert niet per maand.
+ */
+export interface VerdelingWeights {
+  /** Bezit-afname-prio's (voor de degenerate-capaciteits-poort). */
+  readonly bezitPrioAfname: readonly (number | null)[]
+  /** Bezit-onttrekking-prio's (idem). */
+  readonly bezitPrioOnttrekking: readonly (number | null)[]
+  /** Bezit niet-liquide-masker (idem + fallback-noemer). */
+  readonly bezitNietLiquide: readonly boolean[]
+  /** Genormaliseerde ½^(prio−1)-afname-gewichten (reguliere waterval). */
+  readonly wAfname: readonly number[]
+  /** Genormaliseerde ½^(prio−1)-onttrekking-gewichten. */
+  readonly wOnttrekking: readonly number[]
+  /** Bezit-toename-gewichten (HC:HH-overloop-verdeling). */
+  readonly wBezitToename: readonly number[]
+  /** Schuld-aflossing-gewichten (gecombineerde toename-noemer). */
+  readonly wAflossing: readonly number[]
+  /** Reserve-masker afname (prio 5). */
+  readonly resAfname: readonly boolean[]
+  /** Reserve-masker onttrekking (prio 5). */
+  readonly resOnttrekking: readonly boolean[]
+  /** Reserve-masker schuld-aflossing (prio 5). */
+  readonly resAflossing: readonly boolean[]
+}
+
+/**
+ * Bereken de input-constante `VerdelingWeights`-bundel één keer. Byte-identiek aan
+ * de per-maand-berekening die `computeVerdeling` anders zelf doet (dezelfde pure
+ * `halveningWeights`/`aflossingWeightsCombined`/`reserveMask` op dezelfde statische
+ * TS-invoer) — enkel gehoist zodat de maandloop 'm niet 1200× herrekent.
+ */
+export function computeVerdelingWeights(input: KernelInput): VerdelingWeights {
+  const bezit = input.ts.bezitCategorien
+  const schuld = input.ts.schuldCategorien
+  const bezitPrioAfname = bezit.map((c) => c.prioAfname)
+  const bezitPrioOnttrekking = bezit.map((c) => c.prioOnttrekking)
+  const bezitGevuld = bezit.map((c) => c.gevuld)
+  const bezitNietLiquide = bezit.map((c) => c.nietLiquide)
+  return {
+    bezitPrioAfname,
+    bezitPrioOnttrekking,
+    bezitNietLiquide,
+    wAfname: halveningWeights(bezitPrioAfname, bezitGevuld, bezitNietLiquide),
+    wOnttrekking: halveningWeights(bezitPrioOnttrekking, bezitGevuld, bezitNietLiquide),
+    wBezitToename: halveningWeights(
+      bezit.map((c) => c.prioToename),
+      bezitGevuld,
+      bezitNietLiquide,
+    ),
+    wAflossing: aflossingWeightsCombined(
+      bezit.map((c) => c.prioToename),
+      bezitGevuld,
+      bezitNietLiquide,
+      schuld.map((c) => c.prioAflossing),
+      schuld.map((c) => c.gevuld),
+      schuld.map((c) => c.nietLiquide),
+    ),
+    resAfname: reserveMask(bezit.map((c) => c.prioAfname)),
+    resOnttrekking: reserveMask(bezit.map((c) => c.prioOnttrekking)),
+    resAflossing: reserveMask(schuld.map((c) => c.prioAflossing)),
+  }
 }
 
 /** Verdeling-rij: de drie onderwerp-resultaten + scaffold + overloop. */
@@ -191,44 +269,25 @@ export function computeVerdeling(
   const bezit = input.ts.bezitCategorien // 6, vaste volgorde = categorie-identiteit
   const schuld = input.ts.schuldCategorien // eerste 5 = aflossing-categorieën
 
+  // ── Gewichten (½^(prio−1), volle precisie uit TS) + reserve-maskers. ───────────
+  // Input-constant → voorgecomputeerd door de engine en meegegeven (F4-hoisting);
+  // afwezig (parity-test) → hier alsnog uit `input.ts` herleid (byte-identiek).
+  const weights = dep.weights ?? computeVerdelingWeights(input)
+
   // ── Capaciteiten: categoriesaldo m−1, 0 voor niet-liquide (TS!H). ──────────────
   const bezCaps = dep.bezSaldiPrev.map((saldo, i) => (bezit[i].nietLiquide ? 0 : saldo))
   const schuldCaps = dep.schuldSaldiPrev.map((saldo, i) =>
     schuld[i].nietLiquide ? 0 : saldo,
   )
 
-  // ── Gewichten (½^(prio−1), volle precisie uit TS) + reserve-maskers. ───────────
-  // Afname/onttrekking draaien via `runBezitWaterfallMetDegeneratie` (die de reguliere
-  // `halveningWeights` intern berekent + de degenerate-capaciteits-fallback bewaakt).
-  // Toename-gewicht bezit (voor de HC:HH-overloop): bezit-toename over bezit-noemer.
-  const wBezitToename = halveningWeights(
-    bezit.map((c) => c.prioToename),
-    bezit.map((c) => c.gevuld),
-    bezit.map((c) => c.nietLiquide),
-  )
-  // Schuld-aflossing: genormaliseerd over de GECOMBINEERDE toename-noemer
-  // (bezit-toename + schuld-aflossing), zodat Σw de aflos-fractie is (bv. 0,3),
-  // conform Excel. Scale-invariant in de waterval → eind-toewijzing onveranderd.
-  const wAflossing = aflossingWeightsCombined(
-    bezit.map((c) => c.prioToename),
-    bezit.map((c) => c.gevuld),
-    bezit.map((c) => c.nietLiquide),
-    schuld.map((c) => c.prioAflossing),
-    schuld.map((c) => c.gevuld),
-    schuld.map((c) => c.nietLiquide),
-  )
-  const resAfname = reserveMask(bezit.map((c) => c.prioAfname))
-  const resOnttrekking = reserveMask(bezit.map((c) => c.prioOnttrekking))
-  const resAflossing = reserveMask(schuld.map((c) => c.prioAflossing))
-
   // ── 1. AFNAME (met degenerate-capaciteits-fallback; zie de helper-doc) ──────────
   const afname = runBezitWaterfallMetDegeneratie(
     dep.afnameBudget,
     bezCaps,
-    bezit.map((c) => c.prioAfname),
-    bezit.map((c) => c.gevuld),
-    bezit.map((c) => c.nietLiquide),
-    resAfname,
+    weights.bezitPrioAfname,
+    weights.bezitNietLiquide,
+    weights.wAfname,
+    weights.resAfname,
   )
 
   // ── 2. ONTTREKKING: gaat verder waar afname stopte (één gedeelde bezit-pot). ─────
@@ -241,10 +300,10 @@ export function computeVerdeling(
   const onttrekking = runBezitWaterfallMetDegeneratie(
     dep.onttrekkingBudget,
     onttrekkingCaps,
-    bezit.map((c) => c.prioOnttrekking),
-    bezit.map((c) => c.gevuld),
-    bezit.map((c) => c.nietLiquide),
-    resOnttrekking,
+    weights.bezitPrioOnttrekking,
+    weights.bezitNietLiquide,
+    weights.wOnttrekking,
+    weights.resOnttrekking,
     afname.capped,
   )
 
@@ -261,7 +320,7 @@ export function computeVerdeling(
   const tekortRente = (dep.tekortSaldoPrev * input.tekortLeningRente) / 12
   const tekortAflossingSurplus = Math.min(dep.aflossingBudget, dep.tekortSaldoPrev + tekortRente)
   const schuldAflossingBudget = dep.aflossingBudget - tekortAflossingSurplus
-  const aflossing = runWaterfall(schuldAflossingBudget, schuldCaps, wAflossing, resAflossing)
+  const aflossing = runWaterfall(schuldAflossingBudget, schuldCaps, weights.wAflossing, weights.resAflossing)
 
   // ── 3b. TEKORT-AFLOSSING UIT LIQUIDE (F6-bugfix, gap-besluit V19 — TRANSITIONEEL,
   //    buiten het Excel v5-oracle; zie `tekortAflossingUitLiquide` in types.ts). ─────
@@ -290,10 +349,10 @@ export function computeVerdeling(
       const tekortWaterval = runBezitWaterfallMetDegeneratie(
         resterendTekort,
         resterendeCaps,
-        bezit.map((c) => c.prioOnttrekking),
-        bezit.map((c) => c.gevuld),
-        bezit.map((c) => c.nietLiquide),
-        resOnttrekking,
+        weights.bezitPrioOnttrekking,
+        weights.bezitNietLiquide,
+        weights.wOnttrekking,
+        weights.resOnttrekking,
         onttrekking.capped, // erft afname+onttrekking's volgelopen-status (unie)
       )
       tekortAflossingLiquide = tekortWaterval.eind
@@ -311,7 +370,7 @@ export function computeVerdeling(
   // overloop weer 0. In de 18 fixtures zonder prio-aflossing is het budget 0 → 0.
   const overflow =
     aflossing.onbenut !== 0
-      ? wBezitToename.map((w) => aflossing.onbenut * w)
+      ? weights.wBezitToename.map((w) => aflossing.onbenut * w)
       : ZERO_OVERFLOW
 
   return {

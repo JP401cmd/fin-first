@@ -60,7 +60,12 @@ import {
   type ToenameAfnameDep,
   type ToenameAfnameRow,
 } from './tables/toename-afname'
-import { computeVerdeling, type VerdelingDep, type VerdelingRow } from './tables/verdeling'
+import {
+  computeVerdeling,
+  computeVerdelingWeights,
+  type VerdelingDep,
+  type VerdelingRow,
+} from './tables/verdeling'
 import { computeBez, type BezDep, type BezRow, type BezWoningblok, type CategorieBedrag } from './tables/bez'
 import { computeS, S_EXTRA_CATEGORIEEN, debtSlotCount, type SDep, type SRow } from './tables/s'
 import { computePrognose, type PrognoseDep, type PrognoseRow } from './tables/prognose'
@@ -427,6 +432,11 @@ export function runKernelProjection(
   const heeftPotAanpassingen =
     (input.potMutaties?.length ?? 0) > 0 || (input.potLiquidaties?.length ?? 0) > 0
 
+  // Input-constante Verdeling-gewicht-/reserve-bundel — één keer vóór de maandloop
+  // (F4-hoisting; werd anders per maand 2× herrekend). Byte-identiek: `computeVerdeling`
+  // gebruikt exact deze bundel i.p.v. 'm zelf te herleiden.
+  const verdelingWeights = computeVerdelingWeights(input)
+
   // Statische blokken (één keer).
   const es = computeEs(input)
   const autoGebeurtenissen = computeAutoGebeurtenissen(input)
@@ -568,6 +578,7 @@ export function runKernelProjection(
       // S!AB(m−1): het tekort-lening-saldo, buiten sCatTotals (= S!AJ:AN). Via de
       // getypte rol gelokaliseerd (snede 2b); voor de fixtures = slot 6 → byte-identiek.
       tekortSaldoPrev: sSlotSaldo(prevS, tekortSlot),
+      weights: verdelingWeights, // F4-hoisting (input-constant, één keer berekend)
     }
     const verdelingRow = computeVerdeling(input, verdelingDep, m)
 
